@@ -774,6 +774,35 @@ class PlaybooksUI {
     this.updateSubmitButton();
   }
   
+  navigateToPlayDetails(playName) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const mode = urlParams.get('mode') || 'single';
+    const teamId = urlParams.get('team_id') || urlParams.get('user_team_id') || urlParams.get('home_id') || urlParams.get('away_id');
+    
+    let playDetailsUrl = `/static/play-details.html?play_name=${encodeURIComponent(playName)}`;
+    playDetailsUrl += `&mode=${mode}`;
+    if (teamId) playDetailsUrl += `&team_id=${teamId}`;
+    
+    if (mode === 'single') {
+      const gameId = urlParams.get('game_id') || localStorage.getItem('game_id');
+      if (gameId) playDetailsUrl += `&game_id=${gameId}`;
+    } else if (mode === 'tournament') {
+      const tournamentId = urlParams.get('tournament_id');
+      if (tournamentId) playDetailsUrl += `&tournament_id=${tournamentId}`;
+    } else if (mode === 'franchise') {
+      const franchiseId = urlParams.get('franchise_id');
+      if (franchiseId) playDetailsUrl += `&franchise_id=${franchiseId}`;
+    }
+    
+    // Also pass home_id and away_id as fallbacks
+    const homeId = urlParams.get('home_id');
+    const awayId = urlParams.get('away_id');
+    if (homeId) playDetailsUrl += `&home_id=${homeId}`;
+    if (awayId) playDetailsUrl += `&away_id=${awayId}`;
+    
+    window.location.href = playDetailsUrl;
+  }
+
   handleSlotClick(slotNumber, sectionKey, playId) {
     const dropdown = sectionKey === 'motion' 
       ? (this.state.motionDropdowns[playId] || 'Inside')

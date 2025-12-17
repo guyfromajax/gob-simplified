@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Play Details - GOB</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .play-name {
+      font-size: 2.5rem;
+      color: #FFD700;
+      text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+      margin-bottom: 5px;
+    }
+
+    .play-type {
+      font-size: 1.2rem;
+      color: rgba(255, 255, 255, 0.8);
+      opacity: 0.8;
+    }
+
+    .back-button {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: #4a90e2;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    .back-button:hover {
+      background: #357abd;
+    }
+
+    .content-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-top: 20px;
+      min-height: calc(100vh - 200px);
+    }
+
+    .left-column {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .info-container {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      min-height: 100px;
+    }
+
+    .info-container h3 {
+      color: #FFD700;
+      margin-bottom: 10px;
+      font-size: 1.1rem;
+    }
+
+    .info-container p {
+      color: rgba(255, 255, 255, 0.9);
+      line-height: 1.6;
+    }
+
+    .right-column {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .court-container {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 15px;
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .court-visualization {
+      position: relative;
+      max-width: 100%;
+      width: 100%;
+    }
+
+    .court-image {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+      opacity: 0.8;
+      display: block;
+    }
+
+    .player-icons-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .player-icon {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #4a90e2, #357abd);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 0.9rem;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      transition: left 0.5s ease, top 0.5s ease;
+      z-index: 10;
+    }
+
+    .ball-icon {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #FFD700;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      z-index: 20;
+      transition: left 0.5s ease, top 0.5s ease;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    @media (max-width: 1024px) {
+      .content-container {
+        grid-template-columns: 1fr;
+      }
+      
+      .right-column {
+        order: -1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <button class="back-button" onclick="goBack()">← Back</button>
+  
+  <div class="container">
+    <div class="header">
+      <h1 class="play-name" id="play-name">Loading...</h1>
+      <p class="play-type" id="play-type"></p>
+    </div>
+
+    <div class="content-container">
+      <div class="left-column">
+        <div class="info-container">
+          <h3>Play Description</h3>
+          <p>Copy Goes Here</p>
+        </div>
+        <div class="info-container">
+          <h3>Key Concepts</h3>
+          <p>Copy Goes Here</p>
+        </div>
+        <div class="info-container">
+          <h3>Usage Tips</h3>
+          <p>Copy Goes Here</p>
+        </div>
+      </div>
+
+      <div class="right-column">
+        <div class="court-container">
+          <div class="court-visualization" id="court-visualization">
+            <img src="/static/images/courts/bentley_truman.jpg" alt="Basketball Court" class="court-image">
+            <div id="player-icons-container" class="player-icons-container"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Constants from backend
+    const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
+    
+    // Court coordinates (from HCO_STRING_SPOTS in constants.py)
+    const HCO_STRING_SPOTS = {
+      "key": {"x": 64, "y": 25},
+      "upper midWing": {"x": 68, "y": 36},
+      "lower midWing": {"x": 68, "y": 14},
+      "upper wing": {"x": 73, "y": 40},
+      "lower wing": {"x": 73, "y": 10},
+      "upper midCorner": {"x": 81, "y": 43},
+      "lower midCorner": {"x": 81, "y": 7},
+      "upper corner": {"x": 88, "y": 44},
+      "lower corner": {"x": 88, "y": 6},
+      "upper highPost": {"x": 74, "y": 32},
+      "lower highPost": {"x": 74, "y": 19},
+      "upper midPost": {"x": 80, "y": 32},
+      "lower midPost": {"x": 80, "y": 19},
+      "upper lowPost": {"x": 86, "y": 32},
+      "lower lowPost": {"x": 86, "y": 19},
+      "topLane": {"x": 74, "y": 25},
+      "midLane": {"x": 80, "y": 25},
+      "upper apex": {"x": 80, "y": 36},
+      "lower apex": {"x": 80, "y": 15},
+      "upper midBaseline": {"x": 89, "y": 36},
+      "lower midBaseline": {"x": 89, "y": 15},
+      "deep key": {"x": 57, "y": 25},
+      "deep lower wing": {"x": 57, "y": 15},
+      "deep lower baseline": {"x": 57, "y": 5},
+      "deep upper wing": {"x": 57, "y": 35},
+      "deep upper baseline": {"x": 57, "y": 45}
+    };
+
+    // Offset positions for collision handling
+    const OFFSET_SPOTS = {
+      "deep key": {"x": 60, "y": 25},
+      "key": {"x": 67, "y": 25},
+      "topLane": {"x": 77, "y": 25},
+      "midLane": {"x": 83, "y": 25},
+      "deep upper wing": {"x": 60, "y": 32},
+      "upper midWing": {"x": 71, "y": 33},
+      "upper wing": {"x": 76, "y": 37},
+      "upper apex": {"x": 83, "y": 33},
+      "upper corner": {"x": 88, "y": 41},
+      "upper midCorner": {"x": 81, "y": 40},
+      "deep upper baseline": {"x": 57, "y": 42},
+      "upper midBaseline": {"x": 89, "y": 33},
+      "deep lower wing": {"x": 60, "y": 18},
+      "lower midWing": {"x": 71, "y": 17},
+      "lower wing": {"x": 76, "y": 13},
+      "lower apex": {"x": 83, "y": 18},
+      "lower corner": {"x": 88, "y": 9},
+      "lower midCorner": {"x": 81, "y": 10},
+      "deep lower baseline": {"x": 57, "y": 8},
+      "lower midBaseline": {"x": 89, "y": 18},
+      "upper lowPost": {"x": 83, "y": 35},
+      "upper midPost": {"x": 77, "y": 35},
+      "upper highPost": {"x": 71, "y": 35},
+      "lower lowPost": {"x": 89, "y": 16},
+      "lower midPost": {"x": 83, "y": 16},
+      "lower highPost": {"x": 77, "y": 16}
+    };
+
+    // Ball-handling actions
+    const BALL_HANDLING_ACTIONS = ["handle_ball", "receive", "shoot"];
+
+    // Play state
+    let playState = {
+      name: "",
+      type: "", // "Motion" or "Set Play"
+      skeleton: null
+    };
+
+    // Animation state
+    let animationIntervalId = null;
+    let isAnimating = false;
+    let animationStepIndex = 0;
+    let currentStepAssignments = {};
+    let previousStepAssignments = {};
+    let positionOffsets = {};
+    let currentBallHandler = null;
+
+    // Get play name from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const playName = urlParams.get('play_name');
+
+    // Back navigation
+    function goBack() {
+      const mode = urlParams.get('mode') || 'single';
+      const teamId = urlParams.get('team_id') || urlParams.get('user_team_id') || urlParams.get('home_id') || urlParams.get('away_id');
+      
+      let backUrl = '/static/playbooks.html?';
+      backUrl += `mode=${mode}`;
+      if (teamId) backUrl += `&team_id=${teamId}`;
+      
+      if (mode === 'single') {
+        const gameId = urlParams.get('game_id') || localStorage.getItem('game_id');
+        if (gameId) backUrl += `&game_id=${gameId}`;
+      } else if (mode === 'tournament') {
+        const tournamentId = urlParams.get('tournament_id');
+        if (tournamentId) backUrl += `&tournament_id=${tournamentId}`;
+      } else if (mode === 'franchise') {
+        const franchiseId = urlParams.get('franchise_id');
+        if (franchiseId) backUrl += `&franchise_id=${franchiseId}`;
+      }
+      
+      window.location.href = backUrl;
+    }
+
+    // Load play data from API
+    async function loadPlayData() {
+      if (!playName) {
+        document.getElementById('play-name').textContent = 'Play Not Found';
+        return;
+      }
+
+      try {
+        const encodedPlayName = encodeURIComponent(playName);
+        const response = await fetch(`/api/play/${encodedPlayName}`);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to load play: ${response.status}`);
+        }
+
+        const playData = await response.json();
+        
+        // Update header
+        document.getElementById('play-name').textContent = playData.name || playName;
+        const playType = playData.play_type === 'motion' ? 'Motion' : 'Set Play';
+        document.getElementById('play-type').textContent = playType;
+        
+        // Store play state
+        playState.name = playData.name;
+        playState.type = playType;
+        
+        // Get skeleton based on play type
+        if (playState.type === 'Motion') {
+          playState.skeleton = playData.skeletons?.base_loop;
+        } else {
+          playState.skeleton = playData.skeletons?.successful;
+        }
+
+        if (!playState.skeleton || !playState.skeleton.steps || playState.skeleton.steps.length === 0) {
+          console.error('No skeleton data found for play');
+          return;
+        }
+
+        // Start animation
+        startAnimation();
+        
+      } catch (error) {
+        console.error('Error loading play:', error);
+        document.getElementById('play-name').textContent = 'Error Loading Play';
+      }
+    }
+
+    // Start animation
+    function startAnimation() {
+      if (!playState.skeleton || playState.skeleton.steps.length === 0) {
+        console.error('No steps to animate');
+        return;
+      }
+
+      // Stop any existing animation
+      stopAnimation();
+
+      // Setup animation
+      isAnimating = true;
+      animationStepIndex = 0;
+      currentStepAssignments = {};
+      previousStepAssignments = {};
+      positionOffsets = {};
+      currentBallHandler = null;
+
+      // Start animation loop
+      animateNextStep();
+    }
+
+    // Animate next step
+    function animateNextStep() {
+      if (!isAnimating) {
+        return;
+      }
+
+      const steps = playState.skeleton.steps;
+
+      // Check if we've reached the end
+      if (animationStepIndex >= steps.length) {
+        if (playState.type === 'Motion') {
+          // Motion: Loop back to step 0
+          animationStepIndex = 0;
+        } else {
+          // Set Play: Pause 2 seconds, then restart
+          setTimeout(() => {
+            animationStepIndex = 0;
+            animateNextStep();
+          }, 2000);
+          return;
+        }
+      }
+
+      const step = steps[animationStepIndex];
+
+      // Update step assignments
+      previousStepAssignments = {...currentStepAssignments};
+      currentStepAssignments = {};
+      positionOffsets = {};
+
+      // Process step data
+      POSITIONS.forEach(pos => {
+        if (step.pos_actions && step.pos_actions[pos]) {
+          currentStepAssignments[pos] = {
+            location: step.pos_actions[pos].location,
+            action: step.pos_actions[pos].action
+          };
+
+          // Track ball handler
+          if (BALL_HANDLING_ACTIONS.includes(step.pos_actions[pos].action)) {
+            currentBallHandler = pos;
+          }
+        }
+      });
+
+      // Check for position collisions and apply offsets
+      POSITIONS.forEach(pos => {
+        const assignment = currentStepAssignments[pos];
+        if (!assignment) return;
+
+        for (const otherPos of POSITIONS) {
+          if (otherPos === pos) continue;
+          const otherAssignment = currentStepAssignments[otherPos];
+          if (otherAssignment && otherAssignment.location === assignment.location) {
+            if (assignment.action === 'screen') {
+              positionOffsets[pos] = true;
+            } else if (otherAssignment.action === 'screen') {
+              positionOffsets[otherPos] = true;
+            }
+            break;
+          }
+        }
+      });
+
+      // Render the step
+      renderCourtVisualization();
+
+      // Move to next step after delay
+      animationStepIndex++;
+      animationIntervalId = setTimeout(() => animateNextStep(), 1000);
+    }
+
+    // Stop animation
+    function stopAnimation() {
+      isAnimating = false;
+      if (animationIntervalId) {
+        clearTimeout(animationIntervalId);
+        animationIntervalId = null;
+      }
+    }
+
+    // Render court visualization
+    function renderCourtVisualization() {
+      const container = document.getElementById('player-icons-container');
+
+      // Get existing icons to reuse for animation
+      const existingIcons = {};
+      container.querySelectorAll('.player-icon').forEach(icon => {
+        const pos = icon.textContent;
+        existingIcons[pos] = icon;
+      });
+
+      // Find ball handler
+      let ballHandlerPos = null;
+      let ballHandlerCoords = null;
+      let ballLocation = null;
+
+      // Update or create player icons
+      POSITIONS.forEach(pos => {
+        const assignment = currentStepAssignments[pos];
+        const prevAssignment = previousStepAssignments[pos];
+
+        if (assignment && assignment.location) {
+          const coords = HCO_STRING_SPOTS[assignment.location];
+          if (!coords) return;
+
+          // Apply offset if exists
+          const isOffset = positionOffsets[pos];
+          let targetLeft, targetTop;
+
+          if (isOffset) {
+            const offsetCoords = OFFSET_SPOTS[assignment.location];
+            if (offsetCoords) {
+              targetLeft = `${offsetCoords.x}%`;
+              targetTop = `${(50 - offsetCoords.y) * 2}%`;
+            } else {
+              targetLeft = `${coords.x}%`;
+              targetTop = `${(50 - coords.y) * 2}%`;
+            }
+          } else {
+            targetLeft = `${coords.x}%`;
+            targetTop = `${(50 - coords.y) * 2}%`;
+          }
+
+          let icon = existingIcons[pos];
+
+          if (!icon) {
+            // Create new icon
+            icon = document.createElement('div');
+            icon.className = `player-icon ${pos}`;
+            icon.textContent = pos;
+            icon.dataset.position = pos;
+
+            // Start from previous position if exists
+            if (prevAssignment && prevAssignment.location) {
+              const prevCoords = HCO_STRING_SPOTS[prevAssignment.location];
+              if (prevCoords) {
+                icon.style.left = `${prevCoords.x}%`;
+                icon.style.top = `${(50 - prevCoords.y) * 2}%`;
+              }
+            } else {
+              icon.style.left = targetLeft;
+              icon.style.top = targetTop;
+            }
+
+            container.appendChild(icon);
+
+            // Animate to target position
+            if (prevAssignment && prevAssignment.location) {
+              requestAnimationFrame(() => {
+                icon.style.left = targetLeft;
+                icon.style.top = targetTop;
+              });
+            }
+          } else {
+            // Update existing icon position
+            icon.style.left = targetLeft;
+            icon.style.top = targetTop;
+            delete existingIcons[pos];
+          }
+
+          // Check if this player has the ball
+          if (assignment.action) {
+            if (BALL_HANDLING_ACTIONS.includes(assignment.action)) {
+              ballHandlerPos = pos;
+              ballHandlerCoords = { left: targetLeft, top: targetTop };
+              currentBallHandler = pos;
+              ballLocation = 'player';
+            } else if (assignment.action === 'pass') {
+              ballLocation = 'in_transit_pass';
+            } else if (assignment.action === 'shoot') {
+              ballLocation = 'basket';
+            }
+          }
+        } else if (existingIcons[pos]) {
+          delete existingIcons[pos];
+        }
+      });
+
+      // Remove icons for positions that no longer exist
+      Object.values(existingIcons).forEach(icon => icon.remove());
+
+      // Handle ball sprite
+      let ballIcon = container.querySelector('.ball-icon');
+
+      let finalBallLeft = null;
+      let finalBallTop = null;
+
+      if (ballLocation === 'player' && ballHandlerPos && ballHandlerCoords) {
+        finalBallLeft = ballHandlerCoords.left;
+        finalBallTop = ballHandlerCoords.top;
+      } else if (ballLocation === 'in_transit_pass') {
+        const receiver = Object.entries(currentStepAssignments).find(([pos, assignment]) =>
+          assignment && assignment.action === 'receive'
+        );
+        if (receiver) {
+          const [receiverPos, receiverAssignment] = receiver;
+          const receiverCoords = HCO_STRING_SPOTS[receiverAssignment.location];
+          const receiverOffset = positionOffsets[receiverPos];
+          const receiverActualCoords = receiverOffset ? OFFSET_SPOTS[receiverAssignment.location] : receiverCoords;
+
+          if (receiverActualCoords) {
+            finalBallLeft = `${receiverActualCoords.x}%`;
+            finalBallTop = `${(50 - receiverActualCoords.y) * 2}%`;
+            currentBallHandler = receiverPos;
+          }
+        }
+      } else if (ballLocation === 'basket') {
+        finalBallLeft = '90%';
+        finalBallTop = '50%';
+      } else if (currentBallHandler) {
+        const handlerAssignment = currentStepAssignments[currentBallHandler] || previousStepAssignments[currentBallHandler];
+        if (handlerAssignment && handlerAssignment.location) {
+          const handlerCoords = HCO_STRING_SPOTS[handlerAssignment.location];
+          if (handlerCoords) {
+            finalBallLeft = `${handlerCoords.x}%`;
+            finalBallTop = `${(50 - handlerCoords.y) * 2}%`;
+          }
+        }
+      }
+
+      if (finalBallLeft !== null && finalBallTop !== null) {
+        if (!ballIcon) {
+          ballIcon = document.createElement('div');
+          ballIcon.className = 'ball-icon';
+          container.appendChild(ballIcon);
+        }
+        ballIcon.style.left = finalBallLeft;
+        ballIcon.style.top = finalBallTop;
+      } else if (ballIcon) {
+        ballIcon.remove();
+      }
+    }
+
+    // Initialize on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      loadPlayData();
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      stopAnimation();
+    });
+  </script>
+</body>
+</html>
+
