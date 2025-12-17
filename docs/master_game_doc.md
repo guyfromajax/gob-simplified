@@ -5798,6 +5798,145 @@ teams.{team_id}.playbook_settings = {
 
 ---
 
+## Plays Page System ✅ **IMPLEMENTED** (February 2025)
+
+### Overview
+
+The Plays Page System provides detailed views for individual plays, allowing users to see play animations and information. Each play has its own dedicated page that displays the play's animation and descriptive content.
+
+**Location:** `FrontEnd/static/play-details.html`  
+**Purpose:** Display play details, animations, and information  
+**Status:** ✅ Fully implemented with auto-animating play visualization
+
+### Navigation
+
+**Entry Point:**
+- Play names in the Playbooks page are clickable links (except "To Be Added" placeholders)
+- Clicking a play name navigates to `/static/play-details.html` with:
+  - `play_name` parameter (URL encoded)
+  - All context parameters (mode, team_id, game_id/tournament_id/franchise_id)
+  - Preserves navigation context for back button functionality
+
+**Back Navigation:**
+- Back button (top-left) returns to Playbooks page
+- Reconstructs Playbooks URL with all original parameters
+- Maintains user's context across navigation
+
+### Layout Structure
+
+**Header:**
+- **Play Name:** Centered, large gold font (2.5rem), with text shadow
+- **Play Type:** Centered, smaller font (1.2rem), muted color (Motion or Set Play)
+
+**2-Column Layout:**
+- **Left Column (50% width):**
+  - Three horizontal info containers
+  - Each container has:
+    - Title (gold color, 1.1rem)
+    - Content area (placeholder "Copy Goes Here" for future content)
+  - Containers are vertically centered as a unit, middle-aligned with animation container
+  - Containers: "Play Description", "Key Concepts", "Usage Tips"
+  
+- **Right Column (50% width):**
+  - Court animation container
+  - Same dimensions and styling as Play Builder v2 animation container
+  - Centered horizontally and vertically within its column
+  - Uses same court image: `/static/images/courts/bentley_truman.jpg`
+
+### Animation System
+
+**Auto-Start Behavior:**
+- Animation begins automatically on page load
+- No user interaction required
+- Fetches play data from `/api/play/{play_name}` endpoint
+- Loads appropriate skeleton based on play type:
+  - **Motion Plays:** Uses `base_loop` skeleton
+  - **Set Plays:** Uses `successful` skeleton
+
+**Animation Logic:**
+- Reuses animation system from Play Builder v2:
+  - Same constants (court coordinates, positions, ball-handling actions)
+  - Same rendering logic (`renderCourtVisualization()`)
+  - Same step-by-step animation (`animateNextStep()`)
+  - Player icons positioned using percentage-based coordinates
+  - Ball sprite follows ball handler or pass/shoot actions
+  - Smooth transitions between steps (1 second delay per step)
+
+**Motion Play Animation:**
+- Continuous loop behavior
+- When reaching final step (marked with `is_final_step: true`), loops back to step 0
+- If no final step marked, loops back to step 0 when reaching end of steps
+- Runs indefinitely until page is closed
+
+**Set Play Animation:**
+- Runs animation from start to finish
+- Pauses for 2 seconds after completion
+- Restarts from step 0
+- Repeats continuously
+
+**Player Rendering:**
+- Player icons positioned at court locations based on skeleton step data
+- Icons animate smoothly between positions using CSS transitions
+- Ball sprite follows ball handler or shows pass/shoot animations
+- Position offsets applied for screen actions (collision handling)
+
+### Data Flow
+
+**Page Load:**
+1. Extract `play_name` from URL parameters
+2. Fetch play data from `/api/play/{play_name}` endpoint
+3. Display play name and type in header
+4. Load skeleton data (Motion: `base_loop`, Set Play: `successful`)
+5. Initialize animation state
+6. Auto-start animation
+
+**Animation Loop:**
+1. Process current step's `pos_actions` data
+2. Update player positions and actions
+3. Render court visualization with player icons and ball
+4. Move to next step after 1 second delay
+5. Handle looping logic (Motion: loop to 0, Set Play: pause then restart)
+
+### Responsive Design
+
+**Desktop:**
+- 2-column grid layout
+- All content fits above the fold
+- Left column containers vertically centered
+- Animation container centered in right column
+
+**Mobile/Tablet:**
+- Stacks vertically (right column first, then left column)
+- Animation container remains full width
+- Info containers stack below animation
+- Maintains readability and usability
+
+### Key Files
+
+**Frontend:**
+- `FrontEnd/static/play-details.html` - Main page structure and animation logic
+- `FrontEnd/static/playbooks.js` - Navigation integration (clickable play names)
+
+**Key Features:**
+- ✅ Auto-starting animation on page load
+- ✅ Motion play continuous loop
+- ✅ Set play pause-and-restart behavior
+- ✅ Smooth player and ball animations
+- ✅ Responsive layout (desktop-first, mobile-friendly)
+- ✅ Back navigation with context preservation
+- ✅ Three info containers ready for content (placeholder text)
+
+### Future Enhancements
+
+**Pending:**
+- Populate info containers with actual play descriptions, concepts, and tips
+- Add play statistics (usage rate, success rate, etc.)
+- Add variant selector for Set Plays (successful, mid_play_change, contested, broken)
+- Add animation controls (play/pause, speed adjustment)
+- Add step-by-step navigation (previous/next step buttons)
+
+---
+
 ## In-Game Play Calling System ✅ **IMPLEMENTED** (January 2025)
 
 ### Overview
