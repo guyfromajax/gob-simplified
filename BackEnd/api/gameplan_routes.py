@@ -618,7 +618,11 @@ def save_playbooks(request: PlaybookSettingsRequest):
         actual_team_id = request.team_id
         if request.mode != "franchise":
             # For tournament/single mode, try to resolve team name to team_id
-            doc = collection.find_one({"_id": ObjectId(doc_id)})
+            # For single game mode, use UUID string directly; for others, use ObjectId
+            if request.mode == "single":
+                doc = collection.find_one({"_id": doc_id})
+            else:
+                doc = collection.find_one({"_id": ObjectId(doc_id)})
             if not doc:
                 raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
             
