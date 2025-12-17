@@ -146,7 +146,7 @@
       font-size: 0.9rem;
       border: 2px solid #fff;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-      transition: left 0.5s ease, top 0.5s ease;
+      transition: left 0.5s ease, top 0.5s ease, background 0.3s ease;
       z-index: 10;
     }
 
@@ -207,7 +207,7 @@
       <div class="right-column">
         <div class="court-container">
           <div class="court-visualization" id="court-visualization">
-            <img src="/static/images/courts/bentley_truman.jpg" alt="Basketball Court" class="court-image">
+            <img id="court-image" src="/static/images/courts/bentley_truman.jpg" alt="Basketball Court" class="court-image">
             <div id="player-icons-container" class="player-icons-container"></div>
           </div>
         </div>
@@ -298,9 +298,57 @@
     let positionOffsets = {};
     let currentBallHandler = null;
 
-    // Get play name from URL
+    // Get play name and team info from URL
     const urlParams = new URLSearchParams(window.location.search);
     const playName = urlParams.get('play_name');
+    const teamId = urlParams.get('team_id') || urlParams.get('user_team_id') || urlParams.get('home_id') || urlParams.get('away_id');
+    
+    // Team name to court image mapping (normalize team name)
+    function normalizeTeamName(name) {
+      if (!name) return 'bentley_truman'; // Default
+      return name.toLowerCase().replace(/[\s\-]/g, '_');
+    }
+    
+    // Set court image based on team
+    function setCourtImage(teamName) {
+      const courtImage = document.getElementById('court-image');
+      if (courtImage && teamName) {
+        const normalizedName = normalizeTeamName(teamName);
+        courtImage.src = `/static/images/courts/${normalizedName}.jpg`;
+        courtImage.alt = `${teamName} Basketball Court`;
+        // Fallback to default if image doesn't exist
+        courtImage.onerror = function() {
+          this.src = '/static/images/courts/bentley_truman.jpg';
+          this.onerror = null; // Prevent infinite loop
+        };
+      }
+    }
+    
+    // Get vibrant color for team
+    const VIBRANT_COLORS = {
+      "Bentley-Truman": "#5080ff",
+      "Four Corners": "#ffcc66",
+      "Lancaster": "#ff6200",
+      "Little York": "#9945ff",
+      "Morristown": "#ff2233",
+      "Ocean City": "#4444ff",
+      "South Lancaster": "#cc3322",
+      "Xavien": "#00cc44"
+    };
+    
+    function getVibrantColor(teamName) {
+      return VIBRANT_COLORS[teamName] || "#4a90e2"; // Default blue
+    }
+    
+    // Apply team color to player icons
+    let teamColor = "#4a90e2"; // Default blue
+    function setTeamColor(teamName) {
+      if (teamName) {
+        teamColor = getVibrantColor(teamName);
+        // Update CSS variable for player icons
+        document.documentElement.style.setProperty('--team-vibrant-color', teamColor);
+      }
+    }
 
     // Back navigation
     function goBack() {
@@ -325,6 +373,51 @@
       window.location.href = backUrl;
     }
 
+    // Helper function to adjust color brightness
+    function adjustColorBrightness(hex, percent) {
+      const num = parseInt(hex.replace("#", ""), 16);
+      const r = Math.max(0, Math.min(255, (num >> 16) + percent));
+      const g = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + percent));
+      const b = Math.max(0, Math.min(255, (num & 0x0000FF) + percent));
+      return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+    
+    // Load team info and set court/colors
+    async function loadTeamInfo() {
+      if (!teamId) {
+        // Try to get team name from URL params (home/away)
+        const homeTeam = urlParams.get('home');
+        const awayTeam = urlParams.get('away');
+        const userTeamSide = urlParams.get('my_team'); // "home" or "away"
+        
+        let teamName = null;
+        if (userTeamSide === 'home' && homeTeam) {
+          teamName = homeTeam;
+        } else if (userTeamSide === 'away' && awayTeam) {
+          teamName = awayTeam;
+        } else if (homeTeam) {
+          // Default to home team if no user team side specified
+          teamName = homeTeam;
+        }
+        
+        if (teamName) {
+          setCourtImage(teamName);
+          setTeamColor(teamName);
+        }
+        return;
+      }
+      
+      // Try to fetch team info from API
+      try {
+        // For now, use teamId as team name (it might be a name already)
+        // In the future, we could fetch team details from API
+        setCourtImage(teamId);
+        setTeamColor(teamId);
+      } catch (error) {
+        console.warn('Could not load team info, using defaults:', error);
+      }
+    }
+    
     // Load play data from API
     async function loadPlayData() {
       if (!playName) {
@@ -526,6 +619,8 @@
             icon.className = `player-icon ${pos}`;
             icon.textContent = pos;
             icon.dataset.position = pos;
+            // Apply team color
+            icon.style.background = `linear-gradient(135deg, ${teamColor}, ${adjustColorBrightness(teamColor, -20)})`;
 
             // Start from previous position if exists
             if (prevAssignment && prevAssignment.location) {
@@ -549,9 +644,10 @@
               });
             }
           } else {
-            // Update existing icon position
+            // Update existing icon position and color
             icon.style.left = targetLeft;
             icon.style.top = targetTop;
+            icon.style.background = `linear-gradient(135deg, ${teamColor}, ${adjustColorBrightness(teamColor, -20)})`;
             delete existingIcons[pos];
           }
 
@@ -629,7 +725,8 @@
     }
 
     // Initialize on page load
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
+      await loadTeamInfo();
       loadPlayData();
     });
 
