@@ -1677,7 +1677,13 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 
 **Team-Level Stats (Scouting Data):**
 
-**Offensive Success Tracking:**
+**Offensive Attempt and Success Tracking:**
+- **`off_scouting["offense"]["Playcalls"][type_label]["overall"]["attempts"]`**: Incremented when a playcall is executed
+- **`off_scouting["offense"]["Playcalls"][type_label][focus]["attempts"]`**: Incremented by play focus (inside/attack/outside)
+  - **Set Plays**: Attempts tracked using intended play focus from strategy settings (tracked in `turn_manager.py` before shot resolution)
+  - **Motion Plays**: Attempts tracked using actual shot attempt type (tracked in `phase_resolution.py` after shot resolution)
+    - Uses `motion_shot_type` from `roles["motion_shot_type"]` (the actual shot type that was attempted)
+    - Reflects the actual shot location, not the strategy setting focus
 - **`off_scouting["offense"]["Playcalls"][type_label]["overall"]["success"]`**: Incremented when:
   - Shot is made (`MAKE`), or
   - Defensive foul occurs (`FOUL` where `foul_team == "DEFENSE"`)
@@ -1686,7 +1692,14 @@ The Statistics System tracks comprehensive player-level and team-level statistic
   - **Motion Plays**: Uses actual shot attempt type (inside/attack/outside) based on where the shot was taken
     - Determined dynamically from `motion_shot_type` (stored in `roles["motion_shot_type"]`)
     - Reflects the actual shot location, not the strategy setting focus
+- **`off_scouting["offense"]["Playcalls"]["Cumulative"][focus]["attempts"]`**: Cumulative attempts across all play types
 - **`off_scouting["offense"]["Playcalls"]["Cumulative"][focus]["success"]`**: Cumulative success across all play types
+
+**Key Difference:**
+- **Set Plays**: Both attempts and successes use the intended focus (tracked at playcall selection time)
+- **Motion Plays**: Both attempts and successes use the actual shot type (tracked after shot resolution)
+  - This ensures attempts and successes are tracked consistently for the same shot type
+  - Example: If a Motion play starts with "Outside" focus but player chooses "Attack" shot, both attempt and success are tracked under "Attack"
 
 **Expected Value (EV) and Average Execution Tracking:**
 - **EV Scores** (`ev_scores`): Expected Value percentage (-99.0 to +99.0) calculated for each playcall matchup

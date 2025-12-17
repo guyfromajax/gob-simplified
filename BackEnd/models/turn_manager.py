@@ -946,9 +946,13 @@ class TurnManager:
                         vs_key = "vs_3-2_zone"
                     elif defense_playcall == "1-3-1 Zone":
                         vs_key = "vs_1-3-1_zone"
-                    else:
-                        vs_key = None
-                    
+                else:
+                    vs_key = None
+                
+                # ✅ MOTION OFFENSE: Attempt tracking moved to phase_resolution.py (after shot resolution)
+                # For Motion plays, we need to track attempts using the actual shot type, not the intended focus
+                # Set Plays: Track attempts here using intended focus (before shot resolution)
+                if play_type_label == "Set":
                     # Motion/Set overall + focus
                     pc[play_type_label]["overall"]["attempts"] += 1
                     pc[play_type_label][focus_label]["attempts"] += 1
@@ -969,8 +973,9 @@ class TurnManager:
                     
                     # Cumulative by focus
                     pc["Cumulative"][focus_label]["attempts"] += 1
-                    
-                    # Track last play run for this category (for tooltips)
+                # Motion plays: Attempts tracked in phase_resolution.py after shot resolution (using actual shot type)
+                
+                # Track last play run for this category (for tooltips)
                     category_key = f"{play_type_label.lower()}_{focus_label}"
                     self.game.offense_team.scouting_data["offense"]["last_play_by_category"][category_key] = chosen_playcall
             except Exception as e:
@@ -1128,26 +1133,31 @@ class TurnManager:
                 else:
                     vs_key = None
                 
-                # Motion/Set overall + focus
-                pc[play_type_label]["overall"]["attempts"] += 1
-                pc[play_type_label][focus_label]["attempts"] += 1
-                
-                # Track granular attempts against defensive playcall
-                if vs_key:
-                    # Overall attempts vs defense
-                    if vs_key in pc[play_type_label]["overall"]:
-                        pc[play_type_label]["overall"][vs_key]["attempts"] += 1
-                    # Focus attempts vs defense
-                    if vs_key in pc[play_type_label][focus_label]:
-                        pc[play_type_label][focus_label][vs_key]["attempts"] += 1
+                # ✅ MOTION OFFENSE: Attempt tracking moved to phase_resolution.py (after shot resolution)
+                # For Motion plays, we need to track attempts using the actual shot type, not the intended focus
+                # Set Plays: Track attempts here using intended focus (before shot resolution)
+                if play_type_label == "Set":
+                    # Motion/Set overall + focus
+                    pc[play_type_label]["overall"]["attempts"] += 1
+                    pc[play_type_label][focus_label]["attempts"] += 1
                     
-                    # Track aggregate vs_zone for any zone type
-                    if is_zone_defense(defense_playcall) and "vs_zone" in pc[play_type_label]["overall"]:
-                        pc[play_type_label]["overall"]["vs_zone"]["attempts"] += 1
-                        pc[play_type_label][focus_label]["vs_zone"]["attempts"] += 1
-                
-                # Cumulative by focus
-                pc["Cumulative"][focus_label]["attempts"] += 1
+                    # Track granular attempts against defensive playcall
+                    if vs_key:
+                        # Overall attempts vs defense
+                        if vs_key in pc[play_type_label]["overall"]:
+                            pc[play_type_label]["overall"][vs_key]["attempts"] += 1
+                        # Focus attempts vs defense
+                        if vs_key in pc[play_type_label][focus_label]:
+                            pc[play_type_label][focus_label][vs_key]["attempts"] += 1
+                        
+                        # Track aggregate vs_zone for any zone type
+                        if is_zone_defense(defense_playcall) and "vs_zone" in pc[play_type_label]["overall"]:
+                            pc[play_type_label]["overall"]["vs_zone"]["attempts"] += 1
+                            pc[play_type_label][focus_label]["vs_zone"]["attempts"] += 1
+                    
+                    # Cumulative by focus
+                    pc["Cumulative"][focus_label]["attempts"] += 1
+                # Motion plays: Attempts tracked in phase_resolution.py after shot resolution (using actual shot type)
                 
                 # Track last play run for this category (for tooltips)
                 category_key = f"{play_type_label.lower()}_{focus_label}"

@@ -3163,6 +3163,44 @@ def resolve_half_court_offense_logic(game):
         type_label = "Motion" if play_type == "motion" else ("Set" if play_type == "set_play" else None)
         if type_label and focus in ["inside", "attack", "outside"]:
             pc = off_team.scouting_data["offense"]["Playcalls"]
+            
+            # ✅ MOTION OFFENSE: Track attempts using actual shot type (after shot resolution)
+            # Set Plays: Attempts already tracked in turn_manager.py using intended focus
+            if play_type == "motion":
+                # Track attempts for Motion plays using actual shot type
+                pc[type_label]["overall"]["attempts"] += 1
+                pc[type_label][focus]["attempts"] += 1
+                pc["Cumulative"][focus]["attempts"] += 1
+                
+                # Track granular attempts against defensive playcall
+                from BackEnd.utils.defense_utils import is_zone_defense
+                defense_playcall = game.game_state.get("defense_playcall", "Man")  # "Man", "2-3 Zone", etc.
+                
+                # Determine defense tracking key based on specific defense name
+                if defense_playcall == "Man":
+                    vs_key = "vs_man"
+                elif defense_playcall == "2-3 Zone":
+                    vs_key = "vs_2-3_zone"
+                elif defense_playcall == "3-2 Zone":
+                    vs_key = "vs_3-2_zone"
+                elif defense_playcall == "1-3-1 Zone":
+                    vs_key = "vs_1-3-1_zone"
+                else:
+                    vs_key = None
+                
+                if vs_key:
+                    # Overall attempts vs defense
+                    if vs_key in pc[type_label]["overall"]:
+                        pc[type_label]["overall"][vs_key]["attempts"] += 1
+                    # Focus attempts vs defense
+                    if vs_key in pc[type_label][focus]:
+                        pc[type_label][focus][vs_key]["attempts"] += 1
+                    
+                    # Track aggregate vs_zone for any zone type
+                    if is_zone_defense(defense_playcall) and "vs_zone" in pc[type_label]["overall"]:
+                        pc[type_label]["overall"]["vs_zone"]["attempts"] += 1
+                        pc[type_label][focus]["vs_zone"]["attempts"] += 1
+            
             rt = shot_result.get("result_type")
             foul_team = game.game_state.get("foul_team")
             # print(f"🎯 SUCCESS DEBUG: rt={rt}, foul_team={foul_team}")
