@@ -122,7 +122,7 @@ class Animator:
             #         logging.warning(f"  end (no flip, HOME orientation): {end}")
             
             # Use end_coords as-is (no coordinate flipping)
-                end = end_coords
+            end = end_coords
 
             movement = [
                 {"timestamp": 0, "coords": start, "action": action if not has_ball else ACTIONS["HANDLE"]},
