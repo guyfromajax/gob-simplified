@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plays Builder - GOB</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .header h1 {
+      font-size: 2.5rem;
+      color: #FFD700;
+      text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+      margin-bottom: 20px;
+    }
+
+    .play-selector {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .play-selector label {
+      font-size: 1.2rem;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .play-selector select {
+      padding: 10px 20px;
+      font-size: 1rem;
+      border-radius: 6px;
+      border: 2px solid rgba(255, 215, 0, 0.3);
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      cursor: pointer;
+      min-width: 250px;
+    }
+
+    .play-selector select:focus {
+      outline: none;
+      border-color: #FFD700;
+    }
+
+    .play-selector select option {
+      background: #1a1a2e;
+      color: #fff;
+    }
+
+    .content-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-top: 20px;
+      min-height: calc(100vh - 300px);
+    }
+
+    .left-column {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      justify-content: center;
+    }
+
+    .copy-container {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      min-height: 150px;
+    }
+
+    .copy-container label {
+      display: block;
+      color: #FFD700;
+      margin-bottom: 10px;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .copy-container textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 15px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 1rem;
+      font-family: inherit;
+      resize: vertical;
+    }
+
+    .copy-container textarea:focus {
+      outline: none;
+      border-color: #FFD700;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .right-column {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .court-visualization {
+      width: 100%;
+      max-width: 600px;
+      position: relative;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    #court-image {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+    }
+
+    .player-icon {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 0.8rem;
+      transition: all 0.3s ease;
+    }
+
+    .ball-icon {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #FFD700;
+      border: 2px solid #fff;
+      transition: all 0.3s ease;
+    }
+
+    .animation-controls {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .pause-resume-btn {
+      background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);
+    }
+
+    .pause-resume-btn:hover {
+      background: linear-gradient(135deg, #357abd 0%, #2a5f8f 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(74, 144, 226, 0.4);
+    }
+
+    .submit-section {
+      text-align: center;
+      margin-top: 30px;
+      padding-top: 30px;
+      border-top: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    .submit-btn {
+      background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+      color: #1a1a2e;
+      border: none;
+      padding: 15px 40px;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+    }
+
+    .submit-btn:hover {
+      background: linear-gradient(135deg, #FFA500 0%, #FF8C00 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .loading {
+      text-align: center;
+      color: rgba(255, 255, 255, 0.7);
+      margin-top: 20px;
+    }
+
+    .error-message {
+      background: rgba(255, 0, 0, 0.2);
+      border: 1px solid rgba(255, 0, 0, 0.5);
+      color: #ff6b6b;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    .success-message {
+      background: rgba(0, 255, 0, 0.2);
+      border: 1px solid rgba(0, 255, 0, 0.5);
+      color: #51cf66;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    @media (max-width: 968px) {
+      .content-container {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Plays Builder</h1>
+      <div class="play-selector">
+        <label for="play-dropdown">Select Play:</label>
+        <select id="play-dropdown">
+          <option value="">-- Select a Play --</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="content-container" id="content-container" style="display: none;">
+      <div class="left-column">
+        <div class="copy-container">
+          <label for="copy-1">Copy Container 1</label>
+          <textarea id="copy-1" placeholder="Enter copy for the first container..."></textarea>
+        </div>
+        <div class="copy-container">
+          <label for="copy-2">Copy Container 2</label>
+          <textarea id="copy-2" placeholder="Enter copy for the second container..."></textarea>
+        </div>
+        <div class="copy-container">
+          <label for="copy-3">Copy Container 3</label>
+          <textarea id="copy-3" placeholder="Enter copy for the third container..."></textarea>
+        </div>
+      </div>
+
+      <div class="right-column">
+        <div class="court-visualization">
+          <img id="court-image" src="/static/images/courts/default-court.png" alt="Basketball Court">
+          <div id="player-icons-container"></div>
+          <div id="ball-icon" class="ball-icon" style="display: none;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="animation-controls" id="animation-controls" style="display: none;">
+      <button class="pause-resume-btn" id="pause-resume-btn">Pause</button>
+    </div>
+
+    <div class="submit-section" id="submit-section" style="display: none;">
+      <button class="submit-btn" id="submit-btn">Submit Copy</button>
+      <div id="message-container"></div>
+    </div>
+  </div>
+
+  <script>
+    // Constants (reused from play-builder-v2.html)
+    const POSITIONS = {
+      PG: { x: 0, y: 0 },
+      SG: { x: 0, y: 0 },
+      SF: { x: 0, y: 0 },
+      PF: { x: 0, y: 0 },
+      C: { x: 0, y: 0 }
+    };
+
+    // Court coordinates (from HCO_STRING_SPOTS in constants.py)
+    const HCO_STRING_SPOTS = {
+      "key": {"x": 64, "y": 25},
+      "upper midWing": {"x": 68, "y": 36},
+      "lower midWing": {"x": 68, "y": 14},
+      "upper wing": {"x": 73, "y": 40},
+      "lower wing": {"x": 73, "y": 10},
+      "upper midCorner": {"x": 81, "y": 43},
+      "lower midCorner": {"x": 81, "y": 7},
+      "upper corner": {"x": 88, "y": 44},
+      "lower corner": {"x": 88, "y": 6},
+      "upper highPost": {"x": 74, "y": 32},
+      "lower highPost": {"x": 74, "y": 19},
+      "upper midPost": {"x": 80, "y": 32},
+      "lower midPost": {"x": 80, "y": 19},
+      "upper lowPost": {"x": 86, "y": 32},
+      "lower lowPost": {"x": 86, "y": 19},
+      "topLane": {"x": 74, "y": 25},
+      "midLane": {"x": 80, "y": 25},
+      "upper apex": {"x": 80, "y": 36},
+      "lower apex": {"x": 80, "y": 15},
+      "upper midBaseline": {"x": 89, "y": 36},
+      "lower midBaseline": {"x": 89, "y": 15},
+      "deep key": {"x": 57, "y": 25},
+      "deep lower wing": {"x": 57, "y": 15},
+      "deep lower baseline": {"x": 57, "y": 5},
+      "deep upper wing": {"x": 57, "y": 35},
+      "deep upper baseline": {"x": 57, "y": 45}
+    };
+
+    // Offset positions for collision handling
+    const OFFSET_SPOTS = {
+      "deep key": {"x": 60, "y": 25},
+      "key": {"x": 67, "y": 25},
+      "topLane": {"x": 77, "y": 25},
+      "midLane": {"x": 83, "y": 25},
+      "deep upper wing": {"x": 60, "y": 32},
+      "upper midWing": {"x": 71, "y": 33},
+      "upper wing": {"x": 76, "y": 37},
+      "upper apex": {"x": 83, "y": 33},
+      "upper corner": {"x": 88, "y": 41},
+      "upper midCorner": {"x": 81, "y": 40},
+      "deep upper baseline": {"x": 57, "y": 42},
+      "upper midBaseline": {"x": 89, "y": 33},
+      "deep lower wing": {"x": 60, "y": 18},
+      "lower midWing": {"x": 71, "y": 17},
+      "lower wing": {"x": 76, "y": 13},
+      "lower apex": {"x": 83, "y": 18},
+      "lower corner": {"x": 88, "y": 9},
+      "lower midCorner": {"x": 81, "y": 10},
+      "deep lower baseline": {"x": 57, "y": 8},
+      "lower midBaseline": {"x": 89, "y": 18},
+      "upper lowPost": {"x": 83, "y": 35},
+      "upper midPost": {"x": 77, "y": 35},
+      "upper highPost": {"x": 71, "y": 35},
+      "lower lowPost": {"x": 89, "y": 16},
+      "lower midPost": {"x": 83, "y": 16},
+      "lower highPost": {"x": 77, "y": 16}
+    };
+
+    const ACTIONS = {
+      "handle_ball": "🏀",
+      "pass": "🏀",
+      "receive": "🏀",
+      "cut": "🏃",
+      "stationary": "📍",
+      "post_up": "💪",
+      "screen": "🛡️",
+      "get_open": "🏃"
+    };
+
+    const BALL_HANDLING_ACTIONS = ["handle_ball", "receive", "shoot"];
+    const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
+
+    let allPlays = [];
+    let currentPlay = null;
+    let animationStepIndex = 0;
+    let animationIntervalId = null;
+    let isAnimating = false;
+    let isPaused = false;
+    let currentStepAssignments = {};
+    let previousStepAssignments = {};
+    let positionOffsets = {};
+    let currentBallHandler = null;
+
+    // Load all plays on page load
+    async function loadAllPlays() {
+      try {
+        const response = await fetch('/api/plays');
+        if (!response.ok) throw new Error('Failed to load plays');
+        const data = await response.json();
+        allPlays = data.plays || [];
+        
+        const dropdown = document.getElementById('play-dropdown');
+        dropdown.innerHTML = '<option value="">-- Select a Play --</option>';
+        
+        allPlays.forEach(play => {
+          const option = document.createElement('option');
+          option.value = play.name;
+          option.textContent = play.name;
+          dropdown.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Error loading plays:', error);
+        showMessage('Error loading plays. Please refresh the page.', 'error');
+      }
+    }
+
+    // Handle play selection
+    document.getElementById('play-dropdown').addEventListener('change', async (e) => {
+      const playName = e.target.value;
+      if (!playName) {
+        document.getElementById('content-container').style.display = 'none';
+        document.getElementById('animation-controls').style.display = 'none';
+        document.getElementById('submit-section').style.display = 'none';
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/play/${encodeURIComponent(playName)}`);
+        if (!response.ok) throw new Error('Failed to load play');
+        currentPlay = await response.json();
+        
+        // Load existing copy if it exists
+        if (currentPlay.copy) {
+          document.getElementById('copy-1').value = currentPlay.copy.copy_1 || '';
+          document.getElementById('copy-2').value = currentPlay.copy.copy_2 || '';
+          document.getElementById('copy-3').value = currentPlay.copy.copy_3 || '';
+        } else {
+          // Clear if no copy exists
+          document.getElementById('copy-1').value = '';
+          document.getElementById('copy-2').value = '';
+          document.getElementById('copy-3').value = '';
+        }
+
+        // Show content
+        document.getElementById('content-container').style.display = 'grid';
+        document.getElementById('animation-controls').style.display = 'block';
+        document.getElementById('submit-section').style.display = 'block';
+
+        // Load team info and start animation
+        await loadTeamInfo();
+        startAnimation();
+      } catch (error) {
+        console.error('Error loading play:', error);
+        showMessage('Error loading play. Please try again.', 'error');
+      }
+    });
+
+    // Load team info (default team for now)
+    async function loadTeamInfo() {
+      // Use default court image for now
+      document.getElementById('court-image').src = '/static/images/courts/default-court.png';
+    }
+
+    // Render court visualization
+    function renderCourtVisualization() {
+      const container = document.getElementById('player-icons-container');
+      const courtImg = document.getElementById('court-image');
+      
+      if (!courtImg.complete) {
+        courtImg.onload = () => renderCourtVisualization();
+        return;
+      }
+
+      // Clear container
+      container.innerHTML = '';
+
+      // Render players
+      POSITIONS.forEach(pos => {
+        const assignment = currentStepAssignments[pos];
+        if (!assignment) return;
+
+        const location = assignment.location;
+        const spot = HCO_STRING_SPOTS[location] || OFFSET_SPOTS[location];
+        if (!spot) return;
+
+        // Check for offset due to collision
+        const needsOffset = positionOffsets[pos];
+        const finalSpot = needsOffset ? OFFSET_SPOTS[location] || spot : spot;
+
+        const icon = document.createElement('div');
+        icon.className = 'player-icon';
+        icon.textContent = pos;
+        icon.style.left = `${finalSpot.x}%`;
+        icon.style.top = `${(50 - finalSpot.y) * 2}%`;
+        icon.style.background = `linear-gradient(135deg, #4a90e2 0%, #357abd 100%)`;
+        container.appendChild(icon);
+      });
+
+      // Render ball
+      const ball = document.getElementById('ball-icon');
+      if (currentBallHandler && currentStepAssignments[currentBallHandler]) {
+        const location = currentStepAssignments[currentBallHandler].location;
+        const spot = HCO_STRING_SPOTS[location] || OFFSET_SPOTS[location];
+        if (spot) {
+          ball.style.display = 'block';
+          ball.style.left = `${spot.x}%`;
+          ball.style.top = `${(50 - spot.y) * 2}%`;
+        } else {
+          ball.style.display = 'none';
+        }
+      } else {
+        ball.style.display = 'none';
+      }
+    }
+
+    // Animate next step (matching play-details.html)
+    function animateNextStep() {
+      if (!isAnimating || isPaused || !currentPlay) {
+        return;
+      }
+
+      const skeleton = currentPlay.play_type === 'motion' 
+        ? currentPlay.skeletons?.base_loop 
+        : currentPlay.skeletons?.successful;
+      
+      if (!skeleton || !skeleton.steps) return;
+
+      const steps = skeleton.steps;
+
+      // Check if we've reached the end
+      if (animationStepIndex >= steps.length) {
+        if (currentPlay.play_type === 'motion') {
+          // Motion: Loop back to step 0
+          animationStepIndex = 0;
+        } else {
+          // Set Play: Pause 2 seconds, then restart
+          setTimeout(() => {
+            if (!isPaused) {
+              animationStepIndex = 0;
+              animateNextStep();
+            }
+          }, 2000);
+          return;
+        }
+      }
+
+      const step = steps[animationStepIndex];
+
+      // Update step assignments
+      previousStepAssignments = {...currentStepAssignments};
+      currentStepAssignments = {};
+      positionOffsets = {};
+      currentBallHandler = null;
+
+      // Process step data
+      POSITIONS.forEach(pos => {
+        if (step.pos_actions && step.pos_actions[pos]) {
+          currentStepAssignments[pos] = {
+            location: step.pos_actions[pos].location,
+            action: step.pos_actions[pos].action
+          };
+
+          // Track ball handler
+          if (BALL_HANDLING_ACTIONS.includes(step.pos_actions[pos].action)) {
+            currentBallHandler = pos;
+          }
+        }
+      });
+
+      // Check for position collisions and apply offsets
+      POSITIONS.forEach(pos => {
+        const assignment = currentStepAssignments[pos];
+        if (!assignment) return;
+
+        for (const otherPos of POSITIONS) {
+          if (otherPos === pos) continue;
+          const otherAssignment = currentStepAssignments[otherPos];
+          if (otherAssignment && otherAssignment.location === assignment.location) {
+            if (assignment.action === 'screen') {
+              positionOffsets[pos] = true;
+            } else if (otherAssignment.action === 'screen') {
+              positionOffsets[otherPos] = true;
+            }
+            break;
+          }
+        }
+      });
+
+      // Render the step
+      renderCourtVisualization();
+
+      // Move to next step after delay
+      animationStepIndex++;
+      animationIntervalId = setTimeout(() => animateNextStep(), 1000);
+    }
+
+    // Start animation
+    function startAnimation() {
+      if (!currentPlay) return;
+
+      stopAnimation();
+
+      isAnimating = true;
+      animationStepIndex = 0;
+      currentStepAssignments = {};
+      previousStepAssignments = {};
+      positionOffsets = {};
+      currentBallHandler = null;
+
+      animateNextStep();
+    }
+
+    // Stop animation
+    function stopAnimation() {
+      isAnimating = false;
+      if (animationIntervalId) {
+        clearTimeout(animationIntervalId);
+        animationIntervalId = null;
+      }
+    }
+
+    // Toggle pause/resume
+    document.getElementById('pause-resume-btn').addEventListener('click', () => {
+      const btn = document.getElementById('pause-resume-btn');
+      if (isPaused) {
+        // Resume
+        isPaused = false;
+        btn.textContent = 'Pause';
+        btn.classList.remove('paused');
+        animateNextStep();
+      } else {
+        // Pause
+        isPaused = true;
+        btn.textContent = 'Resume';
+        btn.classList.add('paused');
+      }
+    });
+
+    // Submit copy
+    document.getElementById('submit-btn').addEventListener('click', async () => {
+      if (!currentPlay) {
+        showMessage('Please select a play first.', 'error');
+        return;
+      }
+
+      const submitBtn = document.getElementById('submit-btn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving...';
+
+      const copyData = {
+        copy_1: document.getElementById('copy-1').value,
+        copy_2: document.getElementById('copy-2').value,
+        copy_3: document.getElementById('copy-3').value
+      };
+
+      try {
+        // Get full play data and update with copy
+        const playUpdate = {
+          ...currentPlay,
+          copy: copyData
+        };
+
+        // Remove _id for update
+        delete playUpdate._id;
+
+        const response = await fetch('/api/plays', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(playUpdate)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to save copy');
+        }
+
+        const result = await response.json();
+        currentPlay = result.play; // Update current play with saved data
+        showMessage('Copy saved successfully!', 'success');
+      } catch (error) {
+        console.error('Error saving copy:', error);
+        showMessage(`Error saving copy: ${error.message}`, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Copy';
+      }
+    });
+
+    // Show message
+    function showMessage(message, type) {
+      const container = document.getElementById('message-container');
+      container.innerHTML = `<div class="${type}-message">${message}</div>`;
+      setTimeout(() => {
+        container.innerHTML = '';
+      }, 5000);
+    }
+
+    // Initialize on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      loadAllPlays();
+    });
+  </script>
+</body>
+</html>
+
