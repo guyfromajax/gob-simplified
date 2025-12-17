@@ -3152,7 +3152,14 @@ def resolve_half_court_offense_logic(game):
     # 4. scouting report update (new buckets)
     try:
         play_type = game.game_state.get("offense_play_type")  # 'motion' or 'set_play'
-        focus = game.game_state.get("offense_play_focus")     # 'inside' | 'attack' | 'outside'
+        # ✅ MOTION OFFENSE: Use actual shot type for Motion plays, intended focus for Set Plays
+        if play_type == "motion":
+            # For Motion plays, use the actual shot type that was attempted
+            motion_shot_type = roles.get("motion_shot_type")  # 'inside', 'attack', or 'outside'
+            focus = motion_shot_type if motion_shot_type in ["inside", "attack", "outside"] else game.game_state.get("offense_play_focus", "")
+        else:
+            # For Set Plays, use the intended focus from strategy settings
+            focus = game.game_state.get("offense_play_focus")     # 'inside' | 'attack' | 'outside'
         type_label = "Motion" if play_type == "motion" else ("Set" if play_type == "set_play" else None)
         if type_label and focus in ["inside", "attack", "outside"]:
             pc = off_team.scouting_data["offense"]["Playcalls"]
