@@ -5497,12 +5497,22 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 - Empty slots are filled with "To Be Added" placeholders (disabled for interaction)
 
 **Team ID Resolution:**
-- The page attempts to resolve `team_id` from URL parameters using multiple fallbacks:
+- **Frontend:** The page attempts to resolve `team_id` from URL parameters using multiple fallbacks:
   1. Primary: `team_id` parameter
   2. Fallback 1: `user_team_id` parameter (used in tournament/franchise modes)
   3. Fallback 2: `home_id` or `away_id` parameters
 - If no team_id is found, the page displays empty play slots with a console warning
 - Debug logging shows all parameters being used for troubleshooting
+- **Backend:** The API endpoint (`GET /api/playbooks`) performs team name resolution for all modes:
+  - **Single Game/Tournament Mode:** Resolves team names to team_id by:
+    1. Direct lookup in document's `teams` collection
+    2. Iterating through teams to match by name
+    3. Looking up in `teams` collection by name and matching back to document
+  - **Franchise Mode:** Uses the same team name resolution logic:
+    1. Direct lookup in document's `franchise_teams` collection
+    2. Iterating through `franchise_teams` to match by name
+    3. Looking up in `teams` collection by name and matching back to document
+  - This ensures that team names (e.g., "Morristown") passed from the frontend are correctly resolved to the actual `team_id` used in the document structure
 
 ### Persistence Layer
 
@@ -5521,9 +5531,13 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
   - **Tournament/Franchise Mode:** Uses ObjectId for document lookup
   - Ensures team objects exist before loading plays (creates with defaults if missing)
   - Reloads document after ensuring team objects to get updated data
-- `POST /api/playbooks` - Saves playbook settings (percentages) to `teams.{team_id}.playbook_settings`
+- `POST /api/playbooks` - Saves playbook settings (percentages) to `teams.{team_id}.playbook_settings` (or `franchise_teams.{team_id}.playbook_settings` for franchise mode)
   - Request body: `{ mode, team_id, game_id/tournament_id/franchise_id, playbook_settings }`
-  - Resolves team names to team_id automatically
+  - Resolves team names to team_id automatically for all modes (single, tournament, franchise)
+  - **Franchise Mode:** Uses the same team name resolution logic as GET endpoint:
+    1. Direct lookup in document's `franchise_teams` collection
+    2. Iterating through `franchise_teams` to match by name
+    3. Looking up in `teams` collection by name and matching back to document
   - Ensures team objects exist before saving
   - Validates required parameters based on mode
   - **Single Game Mode:** Handles both string and ObjectId formats for game_id
