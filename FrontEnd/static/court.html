@@ -2772,11 +2772,173 @@
       console.log('✅ [PLAYCALL HEADSHOTS] Populated headshots from play skeletons for user team:', userTeamSide);
     }
     
+    // Load slot assignments from playbooks and reorder Playcall Center plays
+    async function loadAndApplySlotAssignments() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const mode = urlParams.get('mode') || 'single';
+      let teamId = urlParams.get('team_id') || urlParams.get('home_id') || urlParams.get('away_id');
+      let gameId = urlParams.get('game_id');
+      if (!gameId && mode === 'single' && typeof localStorage !== 'undefined') {
+        gameId = localStorage.getItem('game_id');
+      }
+      const tournamentId = urlParams.get('tournament_id');
+      const franchiseId = urlParams.get('franchise_id');
+      
+      if (!teamId) {
+        console.warn('⚠️ [PLAYCALL CENTER] No team_id found, using default play order');
+        return;
+      }
+      
+      try {
+        const params = new URLSearchParams();
+        params.set('mode', mode);
+        params.set('team_id', teamId);
+        if (mode === 'single' && gameId) {
+          params.set('game_id', gameId);
+        } else if (mode === 'tournament' && tournamentId) {
+          params.set('tournament_id', tournamentId);
+        } else if (mode === 'franchise' && franchiseId) {
+          params.set('franchise_id', franchiseId);
+        }
+        
+        const response = await fetch(`/api/playbooks?${params.toString()}`);
+        if (!response.ok) {
+          console.warn('⚠️ [PLAYCALL CENTER] Failed to load slot assignments:', response.status);
+          return;
+        }
+        
+        const data = await response.json();
+        const slotAssignments = data.slot_assignments || {};
+        const motionDropdowns = data.motion_dropdowns || {};
+        
+        // Get all play options
+        const playOptions = Array.from(document.querySelectorAll('#offense-play-scroller .play-option'));
+        if (playOptions.length === 0) {
+          console.warn('⚠️ [PLAYCALL CENTER] No play options found');
+          return;
+        }
+        
+        // Get play data to map playId to play name
+        const motionPlays = data.motion || [];
+        const setPlayInside = data.set_play_inside || [];
+        const setPlayAttack = data.set_play_attack || [];
+        const setPlayOutside = data.set_play_outside || [];
+        
+        // Build map of frontend playId (like "motion-1") to play name
+        // The API returns plays with name, but slot assignments use frontend IDs
+        // We need to reconstruct the frontend ID mapping
+        const playIdToName = {};
+        motionPlays.forEach((play, index) => {
+          const frontendId = `motion-${index + 1}`;
+          playIdToName[frontendId] = play.name;
+          playIdToName[play.name] = play.name; // Also map name to name for direct lookup
+        });
+        setPlayInside.forEach((play, index) => {
+          const frontendId = `set-inside-${index + 1}`;
+          playIdToName[frontendId] = play.name;
+          playIdToName[play.name] = play.name;
+        });
+        setPlayAttack.forEach((play, index) => {
+          const frontendId = `set-attack-${index + 1}`;
+          playIdToName[frontendId] = play.name;
+          playIdToName[play.name] = play.name;
+        });
+        setPlayOutside.forEach((play, index) => {
+          const frontendId = `set-outside-${index + 1}`;
+          playIdToName[frontendId] = play.name;
+          playIdToName[play.name] = play.name;
+        });
+        
+        // Build ordered list based on slot assignments (1-6)
+        const orderedPlays = [];
+        for (let slot = 1; slot <= 6; slot++) {
+          const assignment = slotAssignments[slot];
+          if (assignment) {
+            // Get play name from assignment
+            let playName = null;
+            if (assignment.playName) {
+              playName = assignment.playName;
+            } else if (assignment.playId) {
+              // Try to find play name from playId (frontend ID like "motion-1")
+              playName = playIdToName[assignment.playId];
+              if (!playName) {
+                // Fallback: try to find by matching playId as name
+                const allPlays = [...motionPlays, ...setPlayInside, ...setPlayAttack, ...setPlayOutside];
+                const play = allPlays.find(p => p.name === assignment.playId);
+                playName = play ? play.name : null;
+              }
+            }
+            
+            if (!playName) {
+              console.warn(`⚠️ [PLAYCALL CENTER] Could not find play name for slot ${slot}, assignment:`, assignment);
+              continue;
+            }
+            
+            // Find matching play option
+            const matchingPlay = playOptions.find(play => {
+              const domPlayName = play.getAttribute('data-play');
+              const playFocus = play.getAttribute('data-focus') || '';
+              
+              // For motion plays, check dropdown variant
+              if (assignment.section === 'motion') {
+                const dropdown = assignment.dropdown || motionDropdowns[assignment.playId] || '-';
+                // Match play name and focus (dropdown)
+                return domPlayName === playName && 
+                       (dropdown === '-' || playFocus.toLowerCase() === dropdown.toLowerCase());
+              } else {
+                // For set plays, match by play name
+                return domPlayName === playName;
+              }
+            });
+            
+            if (matchingPlay) {
+              orderedPlays.push(matchingPlay);
+            } else {
+              console.warn(`⚠️ [PLAYCALL CENTER] Could not find DOM element for slot ${slot}, play: ${playName}, focus: ${assignment.dropdown || 'N/A'}`);
+            }
+          }
+        }
+        
+        // Add any unassigned plays at the end
+        playOptions.forEach(play => {
+          if (!orderedPlays.includes(play)) {
+            orderedPlays.push(play);
+          }
+        });
+        
+        // Reorder DOM elements
+        const scroller = document.getElementById('offense-play-scroller');
+        if (scroller) {
+          orderedPlays.forEach(play => {
+            scroller.appendChild(play);
+          });
+          console.log('✅ [PLAYCALL CENTER] Reordered plays based on slot assignments');
+          
+          // Trigger re-initialization of navigation after reordering
+          setTimeout(() => {
+            const navUp = document.getElementById('play-nav-up');
+            const navDown = document.getElementById('play-nav-down');
+            if (navUp && navDown) {
+              // Remove old listeners and re-add (navigation code will handle this)
+              window.dispatchEvent(new Event('playcall-center-reordered'));
+            }
+          }, 100);
+        }
+      } catch (error) {
+        console.error('❌ [PLAYCALL CENTER] Error loading slot assignments:', error);
+      }
+    }
+    
     // ✅ SS&S: Call on page load (runs on all game entry/re-entry instances)
     // This ensures images are set whenever we return to court.html from lineup/game plan screens
     // Now uses intended shooter from play skeletons (same logic as backend)
     populatePlayHeadshots().catch(error => {
       console.error('❌ [PLAYCALL HEADSHOTS] Error populating headshots:', error);
+    });
+    
+    // Load and apply slot assignments from playbooks
+    loadAndApplySlotAssignments().catch(error => {
+      console.error('❌ [PLAYCALL CENTER] Error loading slot assignments:', error);
     });
     
     (function initPlaycallCenter() {
@@ -3315,31 +3477,49 @@
 
     // Diagnostics removed - issue resolved with position: fixed
 
-    // ==================== CIRCULAR PLAY NAVIGATION ====================
+    // ==================== SLOT-BASED PLAY NAVIGATION ====================
     let currentPlayIndex = 0;
-    const playOptions = document.querySelectorAll('#offense-play-scroller .play-option');
+    let playOptions = []; // Will be populated after slot assignments are loaded
+    
+    function updatePlayOptions() {
+      playOptions = Array.from(document.querySelectorAll('#offense-play-scroller .play-option'));
+    }
     
     function showPlay(index) {
+      if (playOptions.length === 0) updatePlayOptions();
       playOptions.forEach((play, i) => {
         play.style.display = (i === index) ? 'flex' : 'none';
       });
       currentPlayIndex = index;
     }
     
-    // Initialize - show first play
-    showPlay(0);
+    // Initialize - show first play (will be updated after slot assignments load)
+    updatePlayOptions();
+    if (playOptions.length > 0) {
+      showPlay(0);
+    }
     
-    // Up button - circular
+    // Up button - goes to previous slot (1→2→3→4→5→6, wraps to 6)
     document.getElementById('play-nav-up')?.addEventListener('click', () => {
+      if (playOptions.length === 0) updatePlayOptions();
       const newIndex = (currentPlayIndex - 1 + playOptions.length) % playOptions.length;
       showPlay(newIndex);
     });
     
-    // Down button - circular
+    // Down button - goes to next slot (6→5→4→3→2→1, wraps to 1)
     document.getElementById('play-nav-down')?.addEventListener('click', () => {
+      if (playOptions.length === 0) updatePlayOptions();
       const newIndex = (currentPlayIndex + 1) % playOptions.length;
       showPlay(newIndex);
     });
+    
+    // Re-update play options after slot assignments are applied
+    setTimeout(() => {
+      updatePlayOptions();
+      if (playOptions.length > 0) {
+        showPlay(0); // Reset to first play after reordering
+      }
+    }, 500); // Small delay to ensure slot assignments have been applied
 
     // ✅ SS&S: Headshots are populated by populatePlayHeadshots() function (lines 2484-2566)
     // which correctly checks my_team to determine user team side and uses appropriate lineup
