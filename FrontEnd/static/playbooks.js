@@ -243,7 +243,11 @@ class PlaybooksState {
   deserialize(data) {
     if (data.sections) this.sections = data.sections;
     if (data.slotAssignments) this.slotAssignments = data.slotAssignments;
-    if (data.motionDropdowns) this.motionDropdowns = data.motionDropdowns;
+    // Merge persisted motionDropdowns with defaults (don't overwrite defaults for new plays)
+    if (data.motionDropdowns) {
+      // Merge: persisted values take precedence, but defaults remain for new plays
+      this.motionDropdowns = { ...this.motionDropdowns, ...data.motionDropdowns };
+    }
   }
 }
 
