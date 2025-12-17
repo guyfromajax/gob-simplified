@@ -788,6 +788,61 @@ class PlaybooksUI {
         this.handleSubmit();
       });
     }
+    
+    const backBtn = document.getElementById('back-btn');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => {
+        this.handleBack();
+      });
+    }
+  }
+  
+  handleBack() {
+    // Get the referrer or default to game-plan
+    const referrer = document.referrer;
+    const urlParams = new URLSearchParams(window.location.search);
+    const from = urlParams.get('from');
+    
+    // If we have a 'from' parameter, use it to determine where to go
+    if (from === 'command_center') {
+      // Check mode to determine which command center
+      const mode = urlParams.get('mode') || 'single';
+      if (mode === 'tournament') {
+        window.location.href = '/static/tournament.html';
+        return;
+      } else if (mode === 'franchise') {
+        window.location.href = '/static/franchise-command-center.html';
+        return;
+      }
+    }
+    
+    // Default: go back to game-plan with current params
+    const mode = urlParams.get('mode') || 'single';
+    const gameId = urlParams.get('game_id');
+    const tournamentId = urlParams.get('tournament_id');
+    const franchiseId = urlParams.get('franchise_id');
+    const teamId = urlParams.get('team_id');
+    
+    const params = new URLSearchParams();
+    if (mode === 'single' && gameId) {
+      params.set('game_id', gameId);
+    } else if (mode === 'tournament' && tournamentId) {
+      params.set('tournament_id', tournamentId);
+      params.set('mode', 'tournament');
+      if (teamId) params.set('user_team_id', teamId);
+    } else if (mode === 'franchise' && franchiseId) {
+      params.set('franchise_id', franchiseId);
+      params.set('mode', 'franchise');
+      if (teamId) params.set('user_team_id', teamId);
+    }
+    
+    // Try to use referrer if it's a valid game-plan URL
+    if (referrer && referrer.includes('game-plan.html')) {
+      window.location.href = referrer;
+    } else {
+      // Fallback to game-plan with params
+      window.location.href = `/static/game-plan.html?${params.toString()}`;
+    }
   }
   
   async handleSubmit() {
@@ -821,12 +876,24 @@ class PlaybooksUI {
       const urlParams = new URLSearchParams(window.location.search);
       const mode = urlParams.get('mode') || 'single';
       const teamId = urlParams.get('team_id') || urlParams.get('home_id') || urlParams.get('away_id');
-      const gameId = urlParams.get('game_id');
+      // Try to get game_id from URL, fallback to localStorage
+      let gameId = urlParams.get('game_id');
+      if (!gameId && mode === 'single' && typeof localStorage !== 'undefined') {
+        gameId = localStorage.getItem('game_id');
+      }
       const tournamentId = urlParams.get('tournament_id');
       const franchiseId = urlParams.get('franchise_id');
       
       if (!teamId) {
         console.error('❌ No team_id found in URL params');
+        this.showToast('Error: Team ID not found', true);
+        return false;
+      }
+      
+      // For single mode, game_id is required
+      if (mode === 'single' && !gameId) {
+        console.error('❌ No game_id found in URL params or localStorage for single mode');
+        this.showToast('Error: Game ID not found. Please start a game first.', true);
         return false;
       }
       
@@ -897,15 +964,18 @@ class PlaybooksUI {
       });
       
       if (response.ok) {
-        console.log('✅ Playbook settings saved successfully');
+        const result = await response.json();
+        console.log('✅ Playbook settings saved successfully:', result);
         return true;
       } else {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ detail: `HTTP ${response.status}: ${response.statusText}` }));
         console.error('❌ Failed to save playbook settings:', error);
+        console.error('❌ Request body was:', requestBody);
         return false;
       }
     } catch (error) {
       console.error('❌ Error saving playbook settings:', error);
+      console.error('❌ Error stack:', error.stack);
       return false;
     }
   }
