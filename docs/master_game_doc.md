@@ -5236,7 +5236,9 @@ Player headshots in the Playcall Center are assigned once when returning to `cou
    - Analyzes steps 1-10 (excluding step 0) to count shot opportunities for each player
    - **Inside Shots:** Player with most opportunities to take inside shot:
      - Counts when player handles ball at inside spot (lower lowPost, lower midPost, midLane, basketSpot, upper lowPost, upper midPost)
-     - Counts when player receives pass at inside spot (viable pass opportunity)
+     - Counts when player is at inside spot AND there's a ball handler in the same step (matches backend `_check_inside_shot_possibility` logic)
+       - Backend doesn't require specific action - just checks if player is at inside location
+       - Frontend checks if ball handler exists in step, then counts any player at inside location regardless of action (stationary, cut, post_up, receive, etc.)
    - **Outside/Attack Shots:** Player who handles ball at outside shot spot the most:
      - Counts when player handles ball at any non-inside location
      - Same player image used for both Outside and Attack (since outside spots are also attack-possible spots)
@@ -5253,8 +5255,9 @@ Player headshots in the Playcall Center are assigned once when returning to `cou
 **Key Points:**
 - Images assigned on page load for all timeout navigation entry points
 - **Set Plays:** Uses actual intended shooter from successful skeleton (not hardcoded focus-to-position mapping)
-- **Motion Plays:** Uses statistical analysis of steps 1-6 to find most likely shooter for each shot type
-- Matches backend logic for Set Plays
+- **Motion Plays:** Uses statistical analysis of steps 1-10 to find most likely shooter for each shot type
+- **Inside Pass Detection:** Matches backend `_check_inside_shot_possibility` logic - counts any player at inside location if ball handler exists in step (regardless of action)
+- Matches backend logic for Set Plays and Motion inside pass opportunities
 - Uses lineup data from URL parameters (preserved by `TimeoutNavigationHelper`)
 - Images remain static during gameplay (no mid-game changes)
 - Function is async to handle API calls to fetch play documents
