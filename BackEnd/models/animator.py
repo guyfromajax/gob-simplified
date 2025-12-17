@@ -93,7 +93,7 @@ class Animator:
                     start = {"x": ball_handler_outlet_x, "y": ball_handler_outlet_y}
                 else:
                     # Fallback to player.coords if outlet position not available
-            start = getattr(player, "coords", {"x": 25, "y": 50})
+                    start = getattr(player, "coords", {"x": 25, "y": 50})
             else:
                 # For non-ball handlers, use player.coords as normal
                 start = getattr(player, "coords", {"x": 25, "y": 50})
