@@ -269,7 +269,7 @@ class Animator:
                 player_id = getattr(d, "player_id", None)
                 # Only animate if this defender was a get-back player in the most recent shot attempt
                 if player_id and player_id in getback_player_ids_set:
-                build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
+                    build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
                     animated_player_ids.add(player_id)
         else:
             # ✅ NEW LOGIC: Shot attempt - defender positioned based on ball handler movement
@@ -315,7 +315,7 @@ class Animator:
                 player_id = getattr(d, "player_id", None)
                 # Only animate if this defender was a get-back player in the most recent shot attempt
                 if player_id and player_id in getback_player_ids_set:
-                build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
+                    build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
                     animated_player_ids.add(player_id)
         
         # ✅ Animate rebounders (players who stayed near rim, not get-back, not release)
@@ -1102,7 +1102,7 @@ class Animator:
                         coords = OFFSET_SPOTS.get(location) or HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
                     else:
                         # Use standard coordinates for non-screen actions
-                    coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
+                        coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
                     
                     coords_from_location = True
                     coords_already_flipped = False
@@ -1396,7 +1396,7 @@ class Animator:
                     if ts is not None:
                         ball_handler_by_timestamp[ts] = pos
                         if ball_handler_pos is None:
-                ball_handler_pos = pos
+                            ball_handler_pos = pos
         if not ball_handler_pos:
             ball_handler_pos = "PG"  # Fallback
         
