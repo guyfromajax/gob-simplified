@@ -4275,7 +4275,9 @@ All frontend navigation now uses a unified helper (`FrontEnd/static/js/shared/ti
 
 **Navigation Entry Points Using Helper:**
 - `set-lineup.js`: "Play Now" button, "Game Plan" button
-- `game-plan.js`: `navigateToCourt()`, `navigateBack()`
+- `game-plan.js`: `navigateToCourt()`, `navigateBack()`, navigation to playbooks
+- `playbooks.js`: `navigateToPlayDetails()`, `handleBack()` (navigation to/from play-details and game-plan)
+- `play-details.html`: `goBack()` (navigation back to playbooks)
 - `timeoutButtonManager.js`: `showTimeoutPopup()` (timeout button navigation)
 - `foulOutPopup.js`: Foul out navigation to lineup
 - `gameScene.js`: Quarter end navigation
