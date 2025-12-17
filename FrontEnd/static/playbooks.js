@@ -954,51 +954,57 @@ class PlaybooksUI {
   }
   
   handleBack() {
-    // Get the referrer or default to game-plan
-    const referrer = document.referrer;
     const urlParams = new URLSearchParams(window.location.search);
     const from = urlParams.get('from');
+    const mode = urlParams.get('mode') || 'single';
     
-    // If we have a 'from' parameter, use it to determine where to go
-    if (from === 'command_center') {
-      // Check mode to determine which command center
-      const mode = urlParams.get('mode') || 'single';
-      if (mode === 'tournament') {
-        window.location.href = '/static/tournament.html';
-        return;
-      } else if (mode === 'franchise') {
-        window.location.href = '/static/franchise-command-center.html';
-        return;
-      }
+    // Determine where to navigate back based on 'from' parameter
+    if (from === 'tournament-command-center') {
+      // Navigate back to Tournament Command Center
+      const tournamentId = urlParams.get('tournament_id');
+      const userTeamId = urlParams.get('team_id') || urlParams.get('user_team_id');
+      
+      const params = new URLSearchParams();
+      if (tournamentId) params.set('tournament_id', tournamentId);
+      if (userTeamId) params.set('user_team_id', userTeamId);
+      
+      window.location.href = `/static/tournament.html?${params.toString()}`;
+      return;
     }
     
-    // Default: go back to game-plan with current params
-    const mode = urlParams.get('mode') || 'single';
+    if (from === 'franchise-command-center') {
+      // Navigate back to Franchise Command Center
+      const franchiseId = urlParams.get('franchise_id');
+      const userTeamName = urlParams.get('team_id') || urlParams.get('user_team_id');
+      
+      const params = new URLSearchParams();
+      if (franchiseId) params.set('franchise_id', franchiseId);
+      if (userTeamName) params.set('user_team_name', userTeamName);
+      
+      window.location.href = `/static/franchise-command-center.html?${params.toString()}`;
+      return;
+    }
+    
+    // Default: go back to game-plan (from === 'game-plan' or no 'from' parameter)
     const gameId = urlParams.get('game_id');
-    const tournamentId = urlParams.get('tournament_id');
-    const franchiseId = urlParams.get('franchise_id');
-    const teamId = urlParams.get('team_id');
+    const teamId = urlParams.get('team_id') || urlParams.get('user_team_id');
+    const homeId = urlParams.get('home_id');
+    const awayId = urlParams.get('away_id');
     
     const params = new URLSearchParams();
     if (mode === 'single' && gameId) {
       params.set('game_id', gameId);
-    } else if (mode === 'tournament' && tournamentId) {
-      params.set('tournament_id', tournamentId);
-      params.set('mode', 'tournament');
-      if (teamId) params.set('user_team_id', teamId);
-    } else if (mode === 'franchise' && franchiseId) {
-      params.set('franchise_id', franchiseId);
-      params.set('mode', 'franchise');
-      if (teamId) params.set('user_team_id', teamId);
     }
     
-    // Try to use referrer if it's a valid game-plan URL
-    if (referrer && referrer.includes('game-plan.html')) {
-      window.location.href = referrer;
+    // Add team identifiers
+    if (teamId) {
+      params.set('team_id', teamId);
     } else {
-      // Fallback to game-plan with params
-      window.location.href = `/static/game-plan.html?${params.toString()}`;
+      if (homeId) params.set('home_id', homeId);
+      if (awayId) params.set('away_id', awayId);
     }
+    
+    window.location.href = `/static/game-plan.html?${params.toString()}`;
   }
   
   async handleSubmit() {

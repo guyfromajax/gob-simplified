@@ -462,13 +462,14 @@ if (playbooksBtn) {
       return;
     }
     
-    // Build playbooks URL with franchise parameters
-    const params = new URLSearchParams();
-    params.set('mode', 'franchise');
-    params.set('franchise_id', franchiseId);
-    params.set('team_id', userTeamName); // userTeamName is the team name, backend will resolve to team_id
-    
-    window.location.href = `/static/playbooks.html?${params.toString()}`;
+      // Build playbooks URL with franchise parameters
+      const params = new URLSearchParams();
+      params.set('mode', 'franchise');
+      params.set('franchise_id', franchiseId);
+      params.set('team_id', userTeamName); // userTeamName is the team name, backend will resolve to team_id
+      params.set('from', 'franchise-command-center'); // Track navigation source
+      
+      window.location.href = `/static/playbooks.html?${params.toString()}`;
   });
 }
 
