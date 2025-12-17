@@ -5499,10 +5499,12 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 - Empty slots are filled with "To Be Added" placeholders (disabled for interaction)
 
 **Team ID Resolution:**
-- **Frontend:** The page attempts to resolve `team_id` from URL parameters using multiple fallbacks:
+- **Frontend:** All functions (`savePlaybookSettings()`, `loadPlays()`, `loadSlotAssignmentsFromAPI()`, and `loadAndApplySlotAssignments()` in court.html) use the same consistent pattern to resolve `team_id` from URL parameters:
   1. Primary: `team_id` parameter
-  2. Fallback 1: `user_team_id` parameter (used in tournament/franchise modes)
-  3. Fallback 2: `home_id` or `away_id` parameters
+  2. Fallback 1: `user_team_id` parameter (used by Game Plan page in all modes)
+  3. Fallback 2: `home_id` parameter
+  4. Fallback 3: `away_id` parameter
+- This ensures consistency across all navigation paths (Game Plan → Playbooks → Play Details → Court)
 - If no team_id is found, the page displays empty play slots with a console warning
 - Debug logging shows all parameters being used for troubleshooting
 - **Backend:** The API endpoint (`GET /api/playbooks`) performs team name resolution for all modes:
