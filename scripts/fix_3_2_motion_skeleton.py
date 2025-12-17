@@ -45,17 +45,16 @@ def fix_skeleton():
         
         for i, step in enumerate(steps):
             timestamp = step.get("timestamp", 0)
-            new_steps.append(step)
+            updated_step = step.copy()
             
             # Check if we need to insert an intermediate step after this one
             if timestamp == 4500:
                 # Step 15: SG passes to SF at key, PG cuts to upper wing
-                # Need to insert: PG cuts to key, C sets screen at midLane
-                # Then adjust Step 16: SF passes to PG at key (not upper wing)
+                # Append current step as-is
+                new_steps.append(updated_step)
                 
+                # Insert intermediate step: PG cuts to key, C sets screen at midLane
                 print(f"🔧 Inserting intermediate step after step {i+1} (timestamp {timestamp})")
-                
-                # Create intermediate step (4800ms)
                 intermediate_step = {
                     "timestamp": 4800,
                     "pos_actions": {
@@ -85,56 +84,49 @@ def fix_skeleton():
                 new_steps.append(intermediate_step)
                 inserted_count += 1
                 
-                # Update Step 16: SF passes to PG at key (not upper wing)
-                # We'll handle this in the next iteration
-                
             elif timestamp == 4800:
                 # This is the old Step 16, need to update it
                 # Change PG from "upper wing" receive to "key" receive
                 # And update timestamp to 5100
                 print(f"🔧 Updating step {i+1} (old timestamp {timestamp}) to new timestamp 5100")
-                updated_step = step.copy()
                 updated_step["timestamp"] = 5100
                 updated_pos_actions = step["pos_actions"].copy()
                 
                 # Change PG from upper wing receive to key receive
-                if "PG" in updated_pos_actions:
-                    updated_pos_actions["PG"] = {
-                        "location": "key",
-                        "action": "receive"
-                    }
+                updated_pos_actions["PG"] = {
+                    "location": "key",
+                    "action": "receive"
+                }
                 
                 # SF passes (stays the same)
                 # SG should cut to upper wing (since PG is now at key)
-                if "SG" in updated_pos_actions:
-                    updated_pos_actions["SG"] = {
-                        "location": "upper wing",
-                        "action": "cut"
-                    }
+                updated_pos_actions["SG"] = {
+                    "location": "upper wing",
+                    "action": "cut"
+                }
                 
                 updated_step["pos_actions"] = updated_pos_actions
-                new_steps[-1] = updated_step  # Replace the last added step
+                new_steps.append(updated_step)
                 
             elif timestamp == 5100:
                 # This is the old Step 17, need to shift it to 5400
                 print(f"🔧 Shifting step {i+1} from timestamp {timestamp} to 5400")
-                updated_step = step.copy()
                 updated_step["timestamp"] = 5400
-                new_steps[-1] = updated_step
+                new_steps.append(updated_step)
                 
             elif timestamp == 5400:
                 # This is the old Step 18, need to shift it to 5700
                 print(f"🔧 Shifting step {i+1} from timestamp {timestamp} to 5700")
-                updated_step = step.copy()
                 updated_step["timestamp"] = 5700
-                new_steps[-1] = updated_step
+                new_steps.append(updated_step)
                 
             elif timestamp == 5700:
-                # Step 19: PG passes to SG at key
-                # Need to insert: SF cuts to key, PF sets screen at midLane
-                print(f"🔧 Inserting intermediate step after step {i+1} (timestamp {timestamp})")
+                # Step 19: PG passes to SG at key, SF cuts to lower wing
+                # Append current step as-is
+                new_steps.append(updated_step)
                 
-                # Create intermediate step (6000ms)
+                # Insert intermediate step: SF cuts to key, PF sets screen at midLane
+                print(f"🔧 Inserting intermediate step after step {i+1} (timestamp {timestamp})")
                 intermediate_step = {
                     "timestamp": 6000,
                     "pos_actions": {
@@ -169,35 +161,34 @@ def fix_skeleton():
                 # Change SF from "lower wing" receive to "key" receive
                 # And update timestamp to 6300
                 print(f"🔧 Updating step {i+1} (old timestamp {timestamp}) to new timestamp 6300")
-                updated_step = step.copy()
                 updated_step["timestamp"] = 6300
                 updated_pos_actions = step["pos_actions"].copy()
                 
                 # Change SF from lower wing receive to key receive
-                if "SF" in updated_pos_actions:
-                    updated_pos_actions["SF"] = {
-                        "location": "key",
-                        "action": "receive"
-                    }
+                updated_pos_actions["SF"] = {
+                    "location": "key",
+                    "action": "receive"
+                }
                 
                 # SG passes (stays the same)
                 # PF should cut to lower wing (since SF is now at key)
-                if "PF" in updated_pos_actions:
-                    updated_pos_actions["PF"] = {
-                        "location": "lower lowPost",
-                        "action": "cut"
-                    }
+                updated_pos_actions["PF"] = {
+                    "location": "lower lowPost",
+                    "action": "cut"
+                }
                 
                 updated_step["pos_actions"] = updated_pos_actions
-                new_steps[-1] = updated_step  # Replace the last added step
+                new_steps.append(updated_step)
                 
             elif timestamp >= 6300:
                 # Shift remaining steps by 300ms
                 new_timestamp = timestamp + 300
                 print(f"🔧 Shifting step {i+1} from timestamp {timestamp} to {new_timestamp}")
-                updated_step = step.copy()
                 updated_step["timestamp"] = new_timestamp
-                new_steps[-1] = updated_step
+                new_steps.append(updated_step)
+            else:
+                # All other steps: append as-is
+                new_steps.append(updated_step)
         
         # Update the skeleton
         skeleton["steps"] = new_steps
