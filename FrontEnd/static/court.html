@@ -2977,14 +2977,10 @@
           console.log('🔍 [PLAYCALL CENTER] Final play order:', finalOrder);
           
           // Trigger re-initialization of navigation after reordering
-          setTimeout(() => {
-            const navUp = document.getElementById('play-nav-up');
-            const navDown = document.getElementById('play-nav-down');
-            if (navUp && navDown) {
-              // Remove old listeners and re-add (navigation code will handle this)
-              window.dispatchEvent(new Event('playcall-center-reordered'));
-            }
-          }, 100);
+          // Dispatch event to notify navigation code that reordering is complete
+          window.dispatchEvent(new CustomEvent('playcall-center-reordered', {
+            detail: { orderedPlays: orderedPlays.length }
+          }));
         } else {
           console.error('❌ [PLAYCALL CENTER] Could not find #offense-play-scroller element');
         }
@@ -3001,8 +2997,13 @@
     });
     
     // Load and apply slot assignments from playbooks
+    // This is async, so navigation code should wait for the 'playcall-center-reordered' event
     loadAndApplySlotAssignments().catch(error => {
       console.error('❌ [PLAYCALL CENTER] Error loading slot assignments:', error);
+      // Still dispatch event even on error so navigation can initialize
+      window.dispatchEvent(new CustomEvent('playcall-center-reordered', {
+        detail: { orderedPlays: 0, error: true }
+      }));
     });
     
     (function initPlaycallCenter() {
@@ -3577,13 +3578,15 @@
       showPlay(newIndex);
     });
     
-    // Re-update play options after slot assignments are applied
-    setTimeout(() => {
+    // Wait for slot assignments to be applied, then update play options and show first play
+    window.addEventListener('playcall-center-reordered', () => {
+      console.log('🔍 [PLAYCALL CENTER] Received reordered event, updating play options');
       updatePlayOptions();
       if (playOptions.length > 0) {
-        showPlay(0); // Reset to first play after reordering
+        showPlay(0); // Reset to first play (Slot 1) after reordering
+        console.log(`✅ [PLAYCALL CENTER] Showing first play: ${playOptions[0].getAttribute('data-play')} (${playOptions[0].getAttribute('data-focus')})`);
       }
-    }, 500); // Small delay to ensure slot assignments have been applied
+    }, { once: false }); // Allow multiple events in case of errors/retries
 
     // ✅ SS&S: Headshots are populated by populatePlayHeadshots() function (lines 2484-2566)
     // which correctly checks my_team to determine user team side and uses appropriate lineup
