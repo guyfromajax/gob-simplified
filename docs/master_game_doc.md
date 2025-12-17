@@ -5922,6 +5922,8 @@ The Plays Page System provides detailed views for individual plays, allowing use
 - ✅ Motion play continuous loop
 - ✅ Set play pause-and-restart behavior
 - ✅ Smooth player and ball animations
+- ✅ Pause/Resume button for animation control
+- ✅ Team-specific court images and player icon colors
 - ✅ Responsive layout (desktop-first, mobile-friendly)
 - ✅ Back navigation with context preservation
 - ✅ Three info containers ready for content (placeholder text)

@@ -108,6 +108,9 @@
       border: 1px solid rgba(255, 215, 0, 0.2);
       width: 100%;
       max-width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     .court-visualization {
@@ -168,6 +171,37 @@
       color: rgba(255, 255, 255, 0.7);
     }
 
+    .pause-resume-btn {
+      margin-top: 15px;
+      padding: 10px 24px;
+      background: linear-gradient(135deg, #4a90e2, #357abd);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .pause-resume-btn:hover {
+      background: linear-gradient(135deg, #357abd, #2a5a8a);
+      transform: translateY(-1px);
+    }
+
+    .pause-resume-btn:active {
+      transform: translateY(0);
+    }
+
+    .pause-resume-btn.paused {
+      background: linear-gradient(135deg, #4CAF50, #45a049);
+    }
+
+    .pause-resume-btn.paused:hover {
+      background: linear-gradient(135deg, #45a049, #3d8b40);
+    }
+
     @media (max-width: 1024px) {
       .content-container {
         grid-template-columns: 1fr;
@@ -210,6 +244,9 @@
             <img id="court-image" src="/static/images/courts/bentley_truman.jpg" alt="Basketball Court" class="court-image">
             <div id="player-icons-container" class="player-icons-container"></div>
           </div>
+          <button id="pause-resume-btn" class="pause-resume-btn" onclick="togglePauseResume()">
+            ⏸️ Pause
+          </button>
         </div>
       </div>
     </div>
@@ -292,6 +329,7 @@
     // Animation state
     let animationIntervalId = null;
     let isAnimating = false;
+    let isPaused = false;
     let animationStepIndex = 0;
     let currentStepAssignments = {};
     let previousStepAssignments = {};
@@ -487,9 +525,30 @@
       animateNextStep();
     }
 
+    // Toggle pause/resume
+    function togglePauseResume() {
+      const btn = document.getElementById('pause-resume-btn');
+      if (!btn) return;
+
+      if (isPaused) {
+        // Resume
+        isPaused = false;
+        btn.textContent = '⏸️ Pause';
+        btn.classList.remove('paused');
+        // Continue animation
+        animateNextStep();
+      } else {
+        // Pause
+        isPaused = true;
+        btn.textContent = '▶️ Resume';
+        btn.classList.add('paused');
+        // Animation will stop at next check
+      }
+    }
+
     // Animate next step
     function animateNextStep() {
-      if (!isAnimating) {
+      if (!isAnimating || isPaused) {
         return;
       }
 
