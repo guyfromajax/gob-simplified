@@ -338,18 +338,11 @@ class PlaybooksUI {
       // Get URL parameters
       const urlParams = new URLSearchParams(window.location.search);
       const mode = urlParams.get('mode') || 'single';
-      let teamId = urlParams.get('team_id');
-      
-      // If no team_id, try multiple fallbacks
-      if (!teamId) {
-        // Try user_team_id (used in tournament/franchise modes)
-        teamId = urlParams.get('user_team_id');
-      }
-      
-      if (!teamId) {
-        // Try home_id or away_id
-        teamId = urlParams.get('home_id') || urlParams.get('away_id');
-      }
+      // Check multiple possible team_id parameter names (matching loadAndApplySlotAssignments pattern)
+      let teamId = urlParams.get('team_id') || 
+                   urlParams.get('user_team_id') || 
+                   urlParams.get('home_id') || 
+                   urlParams.get('away_id');
       
       // For single mode, try to get game_id from localStorage if not in URL
       let gameId = urlParams.get('game_id');
@@ -466,7 +459,11 @@ class PlaybooksUI {
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const mode = urlParams.get('mode') || 'single';
-      let teamId = urlParams.get('team_id') || urlParams.get('home_id') || urlParams.get('away_id');
+      // Check multiple possible team_id parameter names (matching loadAndApplySlotAssignments pattern)
+      let teamId = urlParams.get('team_id') || 
+                   urlParams.get('user_team_id') || 
+                   urlParams.get('home_id') || 
+                   urlParams.get('away_id');
       let gameId = urlParams.get('game_id');
       if (!gameId && mode === 'single' && typeof localStorage !== 'undefined') {
         gameId = localStorage.getItem('game_id');
@@ -1096,7 +1093,11 @@ class PlaybooksUI {
       // Get URL parameters
       const urlParams = new URLSearchParams(window.location.search);
       const mode = urlParams.get('mode') || 'single';
-      const teamId = urlParams.get('team_id') || urlParams.get('home_id') || urlParams.get('away_id');
+      // Check multiple possible team_id parameter names (matching loadAndApplySlotAssignments pattern)
+      const teamId = urlParams.get('team_id') || 
+                     urlParams.get('user_team_id') || 
+                     urlParams.get('home_id') || 
+                     urlParams.get('away_id');
       // Try to get game_id from URL, fallback to localStorage
       let gameId = urlParams.get('game_id');
       if (!gameId && mode === 'single' && typeof localStorage !== 'undefined') {
