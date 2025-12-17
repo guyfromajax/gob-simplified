@@ -4992,7 +4992,7 @@ The Playcall Center consists of three main components:
 **Left Panel: Offense Tactical Panel**
 - **Title:** "OFFENSE OVERRIDE"
 - **Play Scroller:** Displays 6 offensive play options in order determined by Playbooks slot assignments:
-  - **Slot 1:** First play (assigned in Playbooks page)
+  - **Slot 1:** First play (assigned in Playbooks page) - shown by default when page loads
   - **Slot 2:** Second play (assigned in Playbooks page)
   - **Slot 3:** Third play (assigned in Playbooks page)
   - **Slot 4:** Fourth play (assigned in Playbooks page)
@@ -5006,6 +5006,20 @@ The Playcall Center consists of three main components:
 - **Clear Override Button:** Removes any selected offense override
 - **Selection State:** Selected plays are highlighted with `selected` class
 - **Slot Order Integration:** Play order is automatically synchronized with Playbooks page slot assignments (loaded from database on page load)
+  - **Loading Process:** `loadAndApplySlotAssignments()` function runs on page load
+  - **Team ID Resolution:** Checks multiple URL parameters in order: `team_id`, `user_team_id`, `home_id`, `away_id`
+    - Different pages pass team ID with different parameter names (Game Plan uses `user_team_id`)
+  - **Event-Based Synchronization:** Uses `playcall-center-reordered` event to notify navigation code when reordering completes
+    - Prevents race conditions where navigation might show wrong play before reordering finishes
+    - Navigation code listens for event and updates play options/show first play when event fires
+  - **Debug Logging:** Comprehensive logging for troubleshooting:
+    - API request URL and response
+    - Slot assignments and motion dropdowns received
+    - Current play order in DOM before reordering
+    - PlayId to play name mapping
+    - Slot assignment processing for each slot (1-6)
+    - Matching attempts and results
+    - Final play order after reordering
 
 **Center: Lean Meter**
 - Visual indicator of play effectiveness
@@ -5583,13 +5597,27 @@ teams.{team_id}.playbook_settings = {
 
 **Integration with Playcall Center:**
 - Slot assignments (1-6) determine the order of plays in the Playcall Center
-- Slot 1 = First play displayed in Playcall Center
+- Slot 1 = First play displayed in Playcall Center (shown by default on page load)
 - Slot 2 = Second play, etc.
 - Navigation buttons respect slot order:
   - **Up button (▲)**: Navigates to previous slot (1→2→3→4→5→6, wraps to 6)
   - **Down button (▼)**: Navigates to next slot (6→5→4→3→2→1, wraps to 1)
 - Plays are automatically reordered when slot assignments are loaded from playbooks
 - Unassigned plays appear at the end (after slots 1-6)
+- **Loading Implementation:**
+  - `loadAndApplySlotAssignments()` function in `court.html` loads slot assignments on page load
+  - Fetches from `GET /api/playbooks` endpoint with mode, team_id, and mode-specific ID
+  - **Team ID Resolution:** Checks multiple URL parameters in order:
+    1. `team_id` (primary)
+    2. `user_team_id` (used by Game Plan page)
+    3. `home_id` (fallback)
+    4. `away_id` (fallback)
+  - Maps frontend playIds (like "motion-1") to play names from API response
+  - Matches plays by name and focus (for Motion plays, also matches dropdown variant)
+  - Reorders DOM elements based on slot assignments (1-6)
+  - Dispatches `playcall-center-reordered` event when complete
+  - Navigation code listens for event and updates play options/show first play
+  - **Event-Based Synchronization:** Prevents race conditions where navigation might show wrong play before reordering completes
 
 ### Priority Slots 1-6 (Offense Only)
 
