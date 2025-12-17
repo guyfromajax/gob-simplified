@@ -585,14 +585,49 @@ def save_playbooks(request: PlaybookSettingsRequest):
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode: {request.mode}")
         
-        # Ensure team objects exist first
+        # Ensure team objects exist first (this will resolve team_id if it's a name)
         ensure_team_objects_exist(request.mode, doc_id, request.team_id)
+        
+        # ✅ Resolve team_id (might be a name, need actual team_id for update path)
+        actual_team_id = request.team_id
+        if request.mode != "franchise":
+            # For tournament/single mode, try to resolve team name to team_id
+            doc = collection.find_one({"_id": ObjectId(doc_id)})
+            if not doc:
+                raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
+            
+            teams = doc.get("teams", {})
+            # First try direct lookup
+            if request.team_id not in teams:
+                # Try to find by team name - iterate through teams to find match
+                for tid in teams.keys():
+                    # Find the team that matches our input team_id (could be name or ObjectId)
+                    try:
+                        team_doc = db.teams.find_one({"_id": ObjectId(tid)})
+                    except:
+                        # If tid is not a valid ObjectId, try as team_id string
+                        team_doc = db.teams.find_one({"team_id": tid})
+                    if team_doc and (team_doc.get("name") == request.team_id or str(team_doc.get("_id")) == request.team_id or team_doc.get("team_id") == request.team_id):
+                        actual_team_id = tid
+                        break
+                # If still not found, try teams collection lookup by name
+                if actual_team_id == request.team_id:
+                    team_doc = db.teams.find_one({"name": request.team_id})
+                    if team_doc:
+                        team_id_from_doc = team_doc.get("team_id")
+                        # Try to find this team_id in the document's teams
+                        for tid in teams.keys():
+                            if tid == team_id_from_doc or str(tid) == str(team_doc.get("_id")):
+                                actual_team_id = tid
+                                break
+            else:
+                actual_team_id = request.team_id
         
         # Update playbook_settings in the appropriate document
         if request.mode == "franchise":
-            update_path = f"franchise_teams.{request.team_id}.playbook_settings"
+            update_path = f"franchise_teams.{actual_team_id}.playbook_settings"
         else:
-            update_path = f"teams.{request.team_id}.playbook_settings"
+            update_path = f"teams.{actual_team_id}.playbook_settings"
         
         result = collection.update_one(
             {"_id": ObjectId(doc_id)},
@@ -602,7 +637,7 @@ def save_playbooks(request: PlaybookSettingsRequest):
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
         
-        logger.info(f"✅ Saved playbook settings for team {request.team_id} in {request.mode} mode")
+        logger.info(f"✅ Saved playbook settings for team {actual_team_id} in {request.mode} mode")
         return {"success": True, "message": "Playbook settings saved successfully"}
     
     except HTTPException:
