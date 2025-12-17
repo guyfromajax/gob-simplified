@@ -452,9 +452,54 @@ class PlaybooksUI {
   }
   
   async loadState() {
+    // First try to load from API (slot assignments and motion dropdowns)
+    await this.loadSlotAssignmentsFromAPI();
+    
+    // Then load from localStorage (UI state like percentages)
     const saved = await this.persistence.load();
     if (saved) {
       this.state.deserialize(saved);
+    }
+  }
+  
+  async loadSlotAssignmentsFromAPI() {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const mode = urlParams.get('mode') || 'single';
+      let teamId = urlParams.get('team_id') || urlParams.get('home_id') || urlParams.get('away_id');
+      let gameId = urlParams.get('game_id');
+      if (!gameId && mode === 'single' && typeof localStorage !== 'undefined') {
+        gameId = localStorage.getItem('game_id');
+      }
+      const tournamentId = urlParams.get('tournament_id');
+      const franchiseId = urlParams.get('franchise_id');
+      
+      if (!teamId) return;
+      
+      const params = new URLSearchParams();
+      params.set('mode', mode);
+      params.set('team_id', teamId);
+      if (mode === 'single' && gameId) {
+        params.set('game_id', gameId);
+      } else if (mode === 'tournament' && tournamentId) {
+        params.set('tournament_id', tournamentId);
+      } else if (mode === 'franchise' && franchiseId) {
+        params.set('franchise_id', franchiseId);
+      }
+      
+      const response = await fetch(`/api/playbooks?${params.toString()}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.slot_assignments && this.state) {
+          this.state.slotAssignments = data.slot_assignments;
+        }
+        if (data.motion_dropdowns && this.state) {
+          // Merge API motion dropdowns with state (API takes precedence)
+          this.state.motionDropdowns = { ...this.state.motionDropdowns, ...data.motion_dropdowns };
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error loading slot assignments from API:', error);
     }
   }
   
@@ -1010,6 +1055,10 @@ class PlaybooksUI {
           playbookSettings.zone_defense[play.name] = playData.percentage;
         }
       });
+      
+      // Include slot assignments and motion dropdowns in playbook settings
+      playbookSettings.slot_assignments = this.state.slotAssignments;
+      playbookSettings.motion_dropdowns = this.state.motionDropdowns;
       
       // Build request body
       const requestBody = {

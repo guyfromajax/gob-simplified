@@ -574,11 +574,18 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         set_plays_attack.sort(key=lambda x: x["name"])
         set_plays_outside.sort(key=lambda x: x["name"])
         
+        # Get playbook settings (percentages, slot assignments, and motion dropdowns)
+        playbook_settings = team_obj.get("playbook_settings", {})
+        slot_assignments = playbook_settings.get("slot_assignments", {})
+        motion_dropdowns = playbook_settings.get("motion_dropdowns", {})
+        
         return {
             "motion": motion_plays,
             "set_play_inside": set_plays_inside,
             "set_play_attack": set_plays_attack,
-            "set_play_outside": set_plays_outside
+            "set_play_outside": set_plays_outside,
+            "slot_assignments": slot_assignments,
+            "motion_dropdowns": motion_dropdowns
         }
     
     except HTTPException:
