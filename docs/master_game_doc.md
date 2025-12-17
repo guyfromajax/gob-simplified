@@ -5222,9 +5222,9 @@ Player headshots in the Playcall Center are assigned once when returning to `cou
    - Extracts intended shooter position from the final step's `pos_actions` where `action == "shoot"`
    - Uses the same logic as backend `phase_resolution.py` (lines 1011-1017)
 
-5. **Motion Plays - Analyze Steps 1-6 for Most Likely Shooter:**
+5. **Motion Plays - Analyze Steps 1-10 for Most Likely Shooter:**
    - Gets the `base_loop` skeleton from `play.skeletons.base_loop`
-   - Analyzes steps 1-6 (excluding step 0) to count shot opportunities for each player
+   - Analyzes steps 1-10 (excluding step 0) to count shot opportunities for each player
    - **Inside Shots:** Player with most opportunities to take inside shot:
      - Counts when player handles ball at inside spot (lower lowPost, lower midPost, midLane, basketSpot, upper lowPost, upper midPost)
      - Counts when player receives pass at inside spot (viable pass opportunity)

@@ -2608,9 +2608,9 @@
             const playFocus = playOption.getAttribute('data-focus') || 'inside';
             const focusLower = playFocus.toLowerCase();
             
-            // Analyze steps 1-6 (excluding step 0)
+            // Analyze steps 1-10 (excluding step 0)
             const steps = baseLoopSkeleton.steps;
-            const stepsToAnalyze = steps.slice(1, Math.min(7, steps.length)); // Steps 1-6 (or fewer if skeleton is shorter)
+            const stepsToAnalyze = steps.slice(1, Math.min(11, steps.length)); // Steps 1-10 (or fewer if skeleton is shorter)
             
             // Inside shot locations (normalized for comparison)
             const insideLocations = ['lowerlowpost', 'lowermidpost', 'midlane', 'basketspot', 'upperlowpost', 'uppermidpost'];
