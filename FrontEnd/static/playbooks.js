@@ -1060,6 +1060,9 @@ class PlaybooksUI {
       playbookSettings.slot_assignments = this.state.slotAssignments;
       playbookSettings.motion_dropdowns = this.state.motionDropdowns;
       
+      console.log('🔍 [PLAYBOOKS] Saving slot assignments:', this.state.slotAssignments);
+      console.log('🔍 [PLAYBOOKS] Saving motion dropdowns:', this.state.motionDropdowns);
+      
       // Build request body
       const requestBody = {
         mode: mode,
