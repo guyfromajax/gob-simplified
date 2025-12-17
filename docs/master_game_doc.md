@@ -5366,8 +5366,31 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
   - Helper text displayed: "All sections must total 100% to submit."
 - **On Click (when enabled):**
   - Runs final validation
-  - Persists settings (currently localStorage, API interface ready)
-  - Shows success toast notification ("Saved")
+  - Saves UI state to localStorage (for UI persistence)
+  - Saves playbook percentages to database via `POST /api/playbooks`
+  - Shows success toast notification ("Playbooks saved successfully")
+  - On error, shows error toast with details
+
+**Save Process:**
+1. Extracts percentages from state (excludes "To Be Added" plays)
+2. Builds request with mode, team_id, and mode-specific ID (game_id/tournament_id/franchise_id)
+3. Falls back to localStorage for game_id if not in URL (single mode)
+4. Validates required parameters before sending
+5. Backend resolves team_id (name to ID) and ensures team objects exist
+6. Saves to `teams.{team_id}.playbook_settings` in appropriate mode document
+
+### Back Button
+
+**Location:** Top-right of page header (next to Submit button)  
+**Styling:** Blue button (`#4a90e2`)  
+**Behavior:**
+- **Navigation Logic:**
+  - If `from=command_center` parameter exists:
+    - Tournament mode → `/static/tournament.html`
+    - Franchise mode → `/static/franchise-command-center.html`
+  - Otherwise, tries to use `document.referrer` if it's a game-plan URL
+  - Falls back to game-plan.html with current mode parameters
+- **Purpose:** Returns user to the page they came from (Game Plan, Tournament Command Center, or Franchise Command Center)
 
 ### Database Integration
 
@@ -5415,7 +5438,13 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 
 **API Endpoints:**
 - `GET /api/playbooks` - Loads plays from database (organized by type and focus)
+  - Resolves team names to team_id automatically
+  - Returns plays organized by motion, set_play_inside, set_play_attack, set_play_outside
 - `POST /api/playbooks` - Saves playbook settings (percentages) to `teams.{team_id}.playbook_settings`
+  - Request body: `{ mode, team_id, game_id/tournament_id/franchise_id, playbook_settings }`
+  - Resolves team names to team_id automatically
+  - Ensures team objects exist before saving
+  - Validates required parameters based on mode
 
 **Storage Structure:**
 ```javascript
@@ -5606,6 +5635,13 @@ teams.{team_id}.playbook_settings = {
 - ✅ Supports 2 slots per Set Play focus (fills with "To Be Added" if needed)
 - ✅ "To Be Added" placeholders are disabled (no percentage input, no slot assignment)
 - ✅ Mode-aware: Works with single game, tournament, and franchise modes
+- ✅ Back button with smart navigation to return to previous page
+- ✅ Save functionality with error handling and validation
+
+**Navigation Entry Points:**
+- **Game Plan Screen:** Playbooks button links to playbooks.html with mode, team_id, and mode-specific ID
+- **Tournament Command Center:** Playbooks button links to playbooks.html with tournament_id and team_id
+- **Franchise Command Center:** Playbooks button links to playbooks.html with franchise_id and team_id
 
 ### Game Engine Integration
 
