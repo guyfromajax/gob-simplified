@@ -787,32 +787,39 @@ class PlaybooksUI {
   }
   
   navigateToPlayDetails(playName) {
+    // ✅ SS&S: Preserve all game context parameters using TimeoutNavigationHelper pattern
     const urlParams = new URLSearchParams(window.location.search);
-    const mode = urlParams.get('mode') || 'single';
-    const teamId = urlParams.get('team_id') || urlParams.get('user_team_id') || urlParams.get('home_id') || urlParams.get('away_id');
     
-    let playDetailsUrl = `/static/play-details.html?play_name=${encodeURIComponent(playName)}`;
-    playDetailsUrl += `&mode=${mode}`;
-    if (teamId) playDetailsUrl += `&team_id=${teamId}`;
+    // Build params preserving all game context
+    const params = new URLSearchParams();
+    params.set('play_name', playName);
     
-    if (mode === 'single') {
-      const gameId = urlParams.get('game_id') || localStorage.getItem('game_id');
-      if (gameId) playDetailsUrl += `&game_id=${gameId}`;
-    } else if (mode === 'tournament') {
-      const tournamentId = urlParams.get('tournament_id');
-      if (tournamentId) playDetailsUrl += `&tournament_id=${tournamentId}`;
-    } else if (mode === 'franchise') {
-      const franchiseId = urlParams.get('franchise_id');
-      if (franchiseId) playDetailsUrl += `&franchise_id=${franchiseId}`;
+    // Preserve all game context parameters
+    const gameContextParams = [
+      'home', 'away', 'home_id', 'away_id', 'my_team', 'user_team_id',
+      'game_id', 'mode', 'tournament_id', 'franchise_id', 'week',
+      'quarter', 'period', 'resume_from_timeout', 'clock',
+      'home_pg', 'home_sg', 'home_sf', 'home_pf', 'home_c',
+      'away_pg', 'away_sg', 'away_sf', 'away_pf', 'away_c',
+      'team_id', 'from', 'debug'
+    ];
+    
+    gameContextParams.forEach(param => {
+      const value = urlParams.get(param);
+      if (value) {
+        params.set(param, value);
+      }
+    });
+    
+    // For single mode, also check localStorage for game_id
+    if (params.get('mode') === 'single' && !params.get('game_id')) {
+      const gameId = typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null;
+      if (gameId) {
+        params.set('game_id', gameId);
+      }
     }
     
-    // Also pass home_id and away_id as fallbacks
-    const homeId = urlParams.get('home_id');
-    const awayId = urlParams.get('away_id');
-    if (homeId) playDetailsUrl += `&home_id=${homeId}`;
-    if (awayId) playDetailsUrl += `&away_id=${awayId}`;
-    
-    window.location.href = playDetailsUrl;
+    window.location.href = `/static/play-details.html?${params.toString()}`;
   }
 
   handleSlotClick(slotNumber, sectionKey, playId) {
@@ -1027,22 +1034,33 @@ class PlaybooksUI {
     
     // Default: go back to game-plan (from === 'game-plan' or no 'from' parameter)
     console.log('✅ [PLAYBOOKS BACK] Navigating to Game Plan (default)');
-    const gameId = urlParams.get('game_id');
-    const teamId = urlParams.get('team_id') || urlParams.get('user_team_id');
-    const homeId = urlParams.get('home_id');
-    const awayId = urlParams.get('away_id');
     
+    // ✅ SS&S: Preserve all game context parameters when navigating to game-plan
     const params = new URLSearchParams();
-    if (mode === 'single' && gameId) {
-      params.set('game_id', gameId);
-    }
     
-    // Add team identifiers
-    if (teamId) {
-      params.set('team_id', teamId);
-    } else {
-      if (homeId) params.set('home_id', homeId);
-      if (awayId) params.set('away_id', awayId);
+    // Preserve all game context parameters
+    const gameContextParams = [
+      'home', 'away', 'home_id', 'away_id', 'my_team', 'user_team_id',
+      'game_id', 'mode', 'tournament_id', 'franchise_id', 'week',
+      'quarter', 'period', 'resume_from_timeout', 'clock',
+      'home_pg', 'home_sg', 'home_sf', 'home_pf', 'home_c',
+      'away_pg', 'away_sg', 'away_sf', 'away_pf', 'away_c',
+      'team_id', 'debug'
+    ];
+    
+    gameContextParams.forEach(param => {
+      const value = urlParams.get(param);
+      if (value) {
+        params.set(param, value);
+      }
+    });
+    
+    // For single mode, also check localStorage for game_id
+    if (mode === 'single' && !params.get('game_id')) {
+      const gameId = typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null;
+      if (gameId) {
+        params.set('game_id', gameId);
+      }
     }
     
     window.location.href = `/static/game-plan.html?${params.toString()}`;
