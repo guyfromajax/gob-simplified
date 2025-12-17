@@ -689,6 +689,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       params.set('mode', 'tournament');
       params.set('tournament_id', tournament._id);
       params.set('team_id', userTeamId); // userTeamId is the team name, backend will resolve to team_id
+      params.set('from', 'tournament-command-center'); // Track navigation source
       
       window.location.href = `/static/playbooks.html?${params.toString()}`;
     });

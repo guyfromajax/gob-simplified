@@ -547,6 +547,9 @@ async function init() {
         params.set('franchise_id', franchiseId);
       }
       
+      // Add 'from' parameter to track navigation source
+      params.set('from', 'game-plan');
+      
       console.log('🔍 [GAME-PLAN] Navigating to playbooks with params:', params.toString());
       window.location.href = `/static/playbooks.html?${params.toString()}`;
     });
