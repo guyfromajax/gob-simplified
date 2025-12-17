@@ -2660,6 +2660,12 @@
                   // This player can receive pass for inside shot
                   playerInsideOpportunities[posUpper] = (playerInsideOpportunities[posUpper] || 0) + 1;
                 }
+                
+                // Check if player is posting up at inside spot (viable inside shot opportunity)
+                if (action === 'post_up' && location && isInsideLocation(location)) {
+                  // Player posting up at inside spot can receive pass and shoot inside
+                  playerInsideOpportunities[posUpper] = (playerInsideOpportunities[posUpper] || 0) + 1;
+                }
               }
             }
             
