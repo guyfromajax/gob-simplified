@@ -1682,6 +1682,10 @@ The Statistics System tracks comprehensive player-level and team-level statistic
   - Shot is made (`MAKE`), or
   - Defensive foul occurs (`FOUL` where `foul_team == "DEFENSE"`)
 - **`off_scouting["offense"]["Playcalls"][type_label][focus]["success"]`**: Same criteria, tracked by play focus (inside/attack/outside)
+  - **Set Plays**: Uses intended play focus from strategy settings (what the play was designed for)
+  - **Motion Plays**: Uses actual shot attempt type (inside/attack/outside) based on where the shot was taken
+    - Determined dynamically from `motion_shot_type` (stored in `roles["motion_shot_type"]`)
+    - Reflects the actual shot location, not the strategy setting focus
 - **`off_scouting["offense"]["Playcalls"]["Cumulative"][focus]["success"]`**: Cumulative success across all play types
 
 **Expected Value (EV) and Average Execution Tracking:**
