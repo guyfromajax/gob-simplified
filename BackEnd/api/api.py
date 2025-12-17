@@ -1990,6 +1990,8 @@ def init_game(request: dict):
     home_team = request.get("home_team")
     away_team = request.get("away_team")
     mode = request.get("mode", "single")
+    tournament_id = request.get("tournament_id")
+    franchise_id = request.get("franchise_id")
     
     if not home_team or not away_team:
         raise HTTPException(status_code=400, detail="home_team and away_team required")
@@ -2016,6 +2018,14 @@ def init_game(request: dict):
         summary["home_team"]["score"] = 0
     if "away_team" in summary and isinstance(summary["away_team"], dict):
         summary["away_team"]["score"] = 0
+    
+    # ✅ Set mode and mode-specific IDs on game document for playbook settings persistence
+    # This ensures _load_playbook_settings() can find the correct tournament/franchise document during gameplay
+    summary["mode"] = mode
+    if mode == "tournament" and tournament_id:
+        summary["tournament_id"] = str(tournament_id)
+    elif mode == "franchise" and franchise_id:
+        summary["franchise_id"] = str(franchise_id)
     
     # Set GameManager quarter to 1 to match
     gm.quarter = 1
