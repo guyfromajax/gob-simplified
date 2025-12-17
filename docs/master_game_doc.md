@@ -5562,6 +5562,9 @@ teams.{team_id}.playbook_settings = {
 - Each Motion row includes dropdown with options: **Inside / Attack / Outside**
 - Dropdown default: **Inside**
 - **Persistence:** Selection persists when changed (stored in `motionDropdowns` state)
+- **Default Preservation:** When loading persisted state, defaults are merged with saved values (not overwritten)
+  - Ensures new Motion plays always default to "Inside" even after loading persisted state
+  - Saved user selections take precedence, but defaults remain for plays without saved values
 - **Display:** Dropdown shows current selection until user changes it or leaves page
 
 **Integration with Slot Assignment:**
