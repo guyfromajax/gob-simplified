@@ -2634,7 +2634,17 @@
             for (const step of stepsToAnalyze) {
               const posActions = step.pos_actions || {};
               
-              // Count opportunities for each player
+              // First pass: Identify if there's a ball handler in this step
+              let hasBallHandler = false;
+              for (const [pos, actionInfo] of Object.entries(posActions)) {
+                const action = (actionInfo.action || '').toLowerCase();
+                if (['pass', 'shoot', 'drive', 'dribble', 'hold', 'handle_ball'].includes(action)) {
+                  hasBallHandler = true;
+                  break;
+                }
+              }
+              
+              // Second pass: Count opportunities for each player
               for (const [pos, actionInfo] of Object.entries(posActions)) {
                 const posUpper = pos.toUpperCase();
                 if (!lineup[posUpper]) continue; // Skip if player not in lineup
@@ -2655,15 +2665,11 @@
                   }
                 }
                 
-                // Check if player receives pass at inside spot (viable pass opportunity)
-                if (action === 'receive' && location && isInsideLocation(location)) {
-                  // This player can receive pass for inside shot
-                  playerInsideOpportunities[posUpper] = (playerInsideOpportunities[posUpper] || 0) + 1;
-                }
-                
-                // Check if player is posting up at inside spot (viable inside shot opportunity)
-                if (action === 'post_up' && location && isInsideLocation(location)) {
-                  // Player posting up at inside spot can receive pass and shoot inside
+                // Check if player is at inside location and there's a ball handler in the step
+                // (matches backend logic: any player at inside location can receive pass if ball handler exists)
+                if (hasBallHandler && location && isInsideLocation(location) && !isBallHandler) {
+                  // Player at inside spot can receive pass for inside shot (regardless of action)
+                  // This matches backend _check_inside_shot_possibility logic
                   playerInsideOpportunities[posUpper] = (playerInsideOpportunities[posUpper] || 0) + 1;
                 }
               }
