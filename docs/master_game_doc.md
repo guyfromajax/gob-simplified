@@ -5448,11 +5448,16 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 - `GET /api/playbooks` - Loads plays from database (organized by type and focus)
   - Resolves team names to team_id automatically
   - Returns plays organized by motion, set_play_inside, set_play_attack, set_play_outside
+  - **Single Game Mode:** Uses UUID string for game_id (not ObjectId)
+  - **Tournament/Franchise Mode:** Uses ObjectId for document lookup
+  - Ensures team objects exist before loading plays
 - `POST /api/playbooks` - Saves playbook settings (percentages) to `teams.{team_id}.playbook_settings`
   - Request body: `{ mode, team_id, game_id/tournament_id/franchise_id, playbook_settings }`
   - Resolves team names to team_id automatically
   - Ensures team objects exist before saving
   - Validates required parameters based on mode
+  - **Single Game Mode:** Uses UUID string for game_id (not ObjectId)
+  - **Tournament/Franchise Mode:** Uses ObjectId for document lookup
 
 **Storage Structure:**
 ```javascript
