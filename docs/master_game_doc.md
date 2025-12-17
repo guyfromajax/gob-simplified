@@ -4991,17 +4991,21 @@ The Playcall Center consists of three main components:
 
 **Left Panel: Offense Tactical Panel**
 - **Title:** "OFFENSE OVERRIDE"
-- **Play Scroller:** Displays 6 offensive play options:
-  - 4-1 Motion (Inside focus)
-  - 3-2 Motion (Attack focus)
-  - 5-0 Motion (Outside focus)
-  - Base Post Play (Inside focus)
-  - Pick & Roll (Lower Wing) (Attack focus)
-  - Double Screen For SG (Outside focus)
+- **Play Scroller:** Displays 6 offensive play options in order determined by Playbooks slot assignments:
+  - **Slot 1:** First play (assigned in Playbooks page)
+  - **Slot 2:** Second play (assigned in Playbooks page)
+  - **Slot 3:** Third play (assigned in Playbooks page)
+  - **Slot 4:** Fourth play (assigned in Playbooks page)
+  - **Slot 5:** Fifth play (assigned in Playbooks page)
+  - **Slot 6:** Sixth play (assigned in Playbooks page)
+  - Unassigned plays appear after slots 1-6
 - **Player Headshots:** Each play displays a player headshot image assigned based on play focus and user's lineup
-- **Navigation Buttons:** Up/down arrows to scroll through plays
+- **Navigation Buttons:** Up/down arrows to navigate through plays in slot order:
+  - **Up (▲):** Previous slot (1→2→3→4→5→6, wraps to 6)
+  - **Down (▼):** Next slot (6→5→4→3→2→1, wraps to 1)
 - **Clear Override Button:** Removes any selected offense override
 - **Selection State:** Selected plays are highlighted with `selected` class
+- **Slot Order Integration:** Play order is automatically synchronized with Playbooks page slot assignments (loaded from database on page load)
 
 **Center: Lean Meter**
 - Visual indicator of play effectiveness
