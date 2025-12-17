@@ -5853,6 +5853,13 @@ The Plays Page System provides detailed views for individual plays, allowing use
   - **Motion Plays:** Uses `base_loop` skeleton
   - **Set Plays:** Uses `successful` skeleton
 
+**Animation Controls:**
+- **Pause/Resume Button:** Located below the animation container, horizontally centered
+- Button text changes: "⏸️ Pause" when playing, "▶️ Resume" when paused
+- Button styling changes: Blue gradient when playing, green gradient when paused
+- Clicking pauses/resumes the animation at the current step
+- Animation state persists when paused (can resume from same step)
+
 **Animation Logic:**
 - Reuses animation system from Play Builder v2:
   - Same constants (court coordinates, positions, ball-handling actions)
