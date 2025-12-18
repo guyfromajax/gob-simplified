@@ -175,8 +175,7 @@ class TrainingSession:
         # Apply multiplier only if it's a team attribute that's not "team_chemistry"
         TEAM_TRAITS_WITH_MULTIPLIER = [
             "shot_threshold", "turnover_threshold", "foul_threshold",
-            "rebound_modifier", "offensive_efficiency", "offensive_adjust",
-            "o_tendency_reads", "d_tendency_reads"
+            "rebound_modifier", "offensive_efficiency"
         ]
 
         if team_level and trait_name in TEAM_TRAITS_WITH_MULTIPLIER:
@@ -273,9 +272,9 @@ def save_training_results(
 
     # --- Team Updates ---
     TEAM_FIELDS = [
-        "team_chemistry", "offensive_efficiency", "offensive_adjust",
+        "team_chemistry", "offensive_efficiency",
         "defense_threshold", "shot_threshold", "turnover_threshold",
-        "foul_threshold", "rebound_modifier", "o_tendency_reads", "d_tendency_reads"
+        "foul_threshold", "rebound_modifier"
     ]
     team_fields = {k: v for k, v in team_doc.items() if k in TEAM_FIELDS}
     if team_fields:

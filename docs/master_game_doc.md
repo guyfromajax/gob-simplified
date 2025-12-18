@@ -7031,3 +7031,285 @@ if (remainingOffensivePromises.length > 0) {
 - ✅ All offensive players complete their movements
 - ✅ No regression in other animation systems
 
+## Game Mode Systems ✅ **NEW** (January 2025)
+
+### Overview
+
+The game supports three distinct modes, each with its own data persistence strategy:
+
+1. **Single Game Mode**: One-off games with no persistent state between games
+2. **Tournament Mode**: Multi-game tournament brackets with persistent team data
+3. **Franchise Mode**: Multi-season franchise with persistent team and player evolution
+
+Each mode stores team objects (attributes, plays, settings) in different MongoDB collections and documents, ensuring data isolation and proper persistence.
+
+---
+
+## Single Game Mode
+
+### Overview
+
+Single Game Mode is designed for one-off games with no persistent state between games. Each game is independent and does not affect future games.
+
+### Team Object Lifecycle
+
+#### 1. **Team Object Creation**
+
+When a user accesses the Game Plan or Playbooks page for the first time in a new game:
+
+- **Trigger**: `ensure_team_objects_exist()` is called with `mode="single"` and `doc_id=game_id`
+- **Location**: `BackEnd/api/gameplan_routes.py` (lines 152-299)
+- **Process**:
+  1. Checks if team object exists in `games` collection under `teams.{team_id}`
+  2. If missing, creates team object with:
+     - `playcall_settings`: Default settings (all set to 2 = Normal)
+     - `strategy_settings`: Default settings (all set to 2 = Normal)
+     - `plays`: Populated plays from universal collection
+     - **Team attributes**: Copied from the **universal `teams` collection** in MongoDB (the core/master team data):
+       - `shot_threshold`, `turnover_threshold`, `foul_threshold`
+       - `rebound_modifier`, `momentum_score`
+       - `offensive_efficiency`, `team_chemistry`
+       - `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`
+       - `fb_opp_modifier`, `pt_opp_modifier`
+
+#### 2. **Team Object Storage**
+
+- **Collection**: `games`
+- **Document**: Game document (UUID string or ObjectId)
+- **Path**: `games.{game_id}.teams.{team_id}`
+- **Structure**:
+  ```json
+  {
+    "playcall_settings": {...},
+    "strategy_settings": {...},
+    "plays": {...},
+    "shot_threshold": 0,
+    "turnover_threshold": 0,
+    "foul_threshold": 0,
+    "rebound_modifier": 0,
+    "momentum_score": 0,
+    "offensive_efficiency": 0,
+    "team_chemistry": 0,
+    "defensive_efficiency": 0,
+    "fb_efficiency": 0,
+    "pt_efficiency": 0,
+    "fb_opp_modifier": 0,
+    "pt_opp_modifier": 0
+  }
+  ```
+
+#### 3. **Team Object Loading**
+
+When creating a new game instance:
+
+- **Location**: `BackEnd/api/api.py` (lines 1246-1253, 1337-1344)
+- **Process**:
+  1. `load_team_attributes_from_doc()` is called with `mode="single"` and `doc_id=game_id`
+  2. Loads team attributes from `games.{game_id}.teams.{team_id}`
+  3. If not found, falls back to the **universal `teams` collection** in MongoDB
+  4. Attributes are passed to `GameManager()` constructor
+  5. If no attributes are loaded, `TeamManager._init_team_attributes()` generates random values
+
+#### 4. **Team Object Updates**
+
+- **Playbook Settings**: Saved to `games.{game_id}.teams.{team_id}.playbook_settings`
+- **Strategy Settings**: Saved to `games.{game_id}.teams.{team_id}.strategy_settings`
+- **Team Attributes**: Currently not updated during gameplay (training not implemented for single game mode)
+
+#### 5. **Team Object Persistence**
+
+- Team objects persist for the duration of the game
+- When a new game is started, new team objects are created (no carryover from previous games)
+- Team attributes are reset to the **universal `teams` collection** values for each new game
+
+### Key Files
+
+- `BackEnd/api/gameplan_routes.py` - `ensure_team_objects_exist()` (lines 152-299)
+- `BackEnd/api/api.py` - `load_team_attributes_from_doc()` (lines 196-244)
+- `BackEnd/api/api.py` - Game creation logic (lines 1246-1253, 1337-1344)
+- `BackEnd/models/team_manager.py` - `_init_team_attributes()` (lines 128-141)
+
+---
+
+## Tournament Mode
+
+### Overview
+
+Tournament Mode supports multi-game tournament brackets where team data persists across games within the tournament. Team attributes can be modified (e.g., through training) and persist throughout the tournament.
+
+### Team Object Lifecycle
+
+#### 1. **Team Object Creation**
+
+When a tournament is first created or when a team is first accessed:
+
+- **Trigger**: `ensure_team_objects_exist()` is called with `mode="tournament"` and `doc_id=tournament_id`
+- **Location**: `BackEnd/api/gameplan_routes.py` (lines 152-299)
+- **Process**:
+  1. Checks if team object exists in `tournaments` collection under `teams.{team_id}`
+  2. If missing, creates team object with:
+     - `playcall_settings`: Default settings (all set to 2 = Normal)
+     - `strategy_settings`: Default settings (all set to 2 = Normal)
+     - `plays`: Populated plays from universal collection
+     - **Team attributes**: Copied from the **universal `teams` collection** in MongoDB (same attributes as Single Game Mode)
+
+#### 2. **Team Object Storage**
+
+- **Collection**: `tournaments`
+- **Document**: Tournament document (ObjectId)
+- **Path**: `tournaments.{tournament_id}.teams.{team_id}`
+- **Structure**: Same as Single Game Mode
+
+#### 3. **Team Object Loading**
+
+When creating a new game instance within a tournament:
+
+- **Location**: `BackEnd/api/api.py` (lines 1246-1253, 1337-1344)
+- **Process**:
+  1. `load_team_attributes_from_doc()` is called with `mode="tournament"` and `doc_id=tournament_id`
+  2. Loads team attributes from `tournaments.{tournament_id}.teams.{team_id}`
+  3. If not found, falls back to the **universal `teams` collection** in MongoDB
+  4. Attributes are passed to `GameManager()` constructor
+  5. If no attributes are loaded, `TeamManager._init_team_attributes()` generates random values
+
+#### 4. **Team Object Updates**
+
+- **Playbook Settings**: Saved to `tournaments.{tournament_id}.teams.{team_id}.playbook_settings`
+- **Strategy Settings**: Saved to `tournaments.{tournament_id}.teams.{team_id}.strategy_settings`
+- **Team Attributes**: Can be updated through training (future implementation)
+  - Training changes should be saved to `tournaments.{tournament_id}.teams.{team_id}.{attribute_name}`
+
+#### 5. **Team Object Persistence**
+
+- Team objects persist for the duration of the tournament
+- Changes to team attributes persist across all games in the tournament
+- When a new tournament is started, new team objects are created (no carryover from previous tournaments)
+
+### Key Files
+
+- `BackEnd/api/gameplan_routes.py` - `ensure_team_objects_exist()` (lines 152-299)
+- `BackEnd/api/api.py` - `load_team_attributes_from_doc()` (lines 196-244)
+- `BackEnd/api/api.py` - Game creation logic (lines 1246-1253, 1337-1344)
+- `BackEnd/tournament/tournament_manager.py` - Tournament creation and management
+
+---
+
+## Franchise Mode
+
+### Overview
+
+Franchise Mode supports multi-season franchise play where team and player data evolves over time. Team attributes can be modified through training and persist across seasons.
+
+### Team Object Lifecycle
+
+#### 1. **Team Object Creation**
+
+When a franchise season is initialized:
+
+- **Trigger**: `FranchiseManager.initialize_season()` is called
+- **Location**: `BackEnd/models/franchise_manager.py` (lines 109-235)
+- **Process**:
+  1. Creates `franchise_teams` objects for all 8 teams in the franchise
+  2. Each team object includes:
+     - `playcall_settings`: Default settings (all set to 2 = Normal)
+     - `strategy_settings`: Default settings (all set to 2 = Normal)
+     - `plays`: Populated plays from universal collection
+     - **Team attributes**: Copied from the **universal `teams` collection** in MongoDB (same attributes as Single Game Mode)
+
+- **Also Triggered By**: `ensure_team_objects_exist()` when accessing Game Plan or Playbooks
+- **Location**: `BackEnd/api/gameplan_routes.py` (lines 182-235)
+- **Process**: Same as above, but only creates missing team objects (doesn't recreate existing ones)
+
+#### 2. **Team Object Storage**
+
+- **Collection**: `franchises`
+- **Document**: Franchise document (ObjectId)
+- **Path**: `franchises.{franchise_id}.franchise_teams.{team_id}`
+- **Structure**: Same as Single Game Mode
+
+#### 3. **Team Object Loading**
+
+When creating a new game instance within a franchise:
+
+- **Location**: `BackEnd/api/api.py` (lines 1246-1253, 1337-1344)
+- **Process**:
+  1. `load_team_attributes_from_doc()` is called with `mode="franchise"` and `doc_id=franchise_id`
+  2. Loads team attributes from `franchises.{franchise_id}.franchise_teams.{team_id}`
+  3. If not found, falls back to the **universal `teams` collection** in MongoDB
+  4. Attributes are passed to `GameManager()` constructor
+  5. If no attributes are loaded, `TeamManager._init_team_attributes()` generates random values
+
+#### 4. **Team Object Updates**
+
+- **Playbook Settings**: Saved to `franchises.{franchise_id}.franchise_teams.{team_id}.playbook_settings`
+- **Strategy Settings**: Saved to `franchises.{franchise_id}.franchise_teams.{team_id}.strategy_settings`
+- **Team Attributes**: Updated through training
+  - **Location**: `BackEnd/api/franchise_routes.py` (lines 1045-1061)
+  - **Process**: Training changes are saved to `franchises.{franchise_id}.franchise_teams.{team_id}.{attribute_name}`
+  - **Example**: `franchises.{franchise_id}.franchise_teams.{team_id}.defensive_efficiency = new_value`
+
+#### 5. **Team Object Persistence**
+
+- Team objects persist across all games and seasons in the franchise
+- Changes to team attributes persist permanently (until modified again)
+- When a new season is started, team objects are preserved (carryover from previous seasons)
+
+### Key Files
+
+- `BackEnd/models/franchise_manager.py` - `initialize_season()` (lines 109-235)
+- `BackEnd/api/gameplan_routes.py` - `ensure_team_objects_exist()` (lines 182-235)
+- `BackEnd/api/api.py` - `load_team_attributes_from_doc()` (lines 196-244)
+- `BackEnd/api/api.py` - Game creation logic (lines 1246-1253, 1337-1344)
+- `BackEnd/api/franchise_routes.py` - Training save logic (lines 1045-1061)
+
+---
+
+## Team Attribute Management
+
+### Attribute List
+
+All team attributes are stored in team objects across all game modes:
+
+**Core Attributes:**
+- `shot_threshold` - Shot attempt threshold
+- `turnover_threshold` - Turnover threshold
+- `foul_threshold` - Foul threshold
+- `rebound_modifier` - Rebound effectiveness modifier
+- `momentum_score` - Team momentum score
+- `offensive_efficiency` - Offensive efficiency rating
+- `team_chemistry` - Team chemistry rating
+
+**New Attributes (January 2025):**
+- `defensive_efficiency` - Defensive efficiency rating
+- `fb_efficiency` - Fast break efficiency rating
+- `pt_efficiency` - Press/Trap efficiency rating
+- `fb_opp_modifier` - Fast break opponent modifier
+- `pt_opp_modifier` - Press/Trap opponent modifier
+
+### Default Values
+
+- **New Attributes**: All default to `0`
+- **Core Attributes**: Loaded from the **universal `teams` collection** in MongoDB or generated randomly via `TeamManager._init_team_attributes()`
+
+### Attribute Initialization
+
+1. **First Access**: Team attributes are copied from the **universal `teams` collection** in MongoDB (the core/master team data)
+2. **Missing Attributes**: If attributes don't exist in team object, they're initialized from the **universal `teams` collection**
+3. **Fallback**: If the **universal `teams` collection** doesn't have attributes, `TeamManager._init_team_attributes()` generates random values
+
+### Universal Teams Collection
+
+The **universal `teams` collection** in MongoDB (`db.teams`) is the source of truth for initial team attribute values. This collection contains the master/base team data that is copied when team objects are first created in any game mode. It stores:
+
+- Team metadata (name, colors, mascot, team_id)
+- Base team attributes (shot_threshold, turnover_threshold, etc.)
+- Initial playbook and strategy settings (if any)
+
+When team objects are created in Single Game, Tournament, or Franchise modes, they copy attribute values from this universal collection. If attributes don't exist in the universal collection, they default to `0` (for new attributes) or are generated randomly (for core attributes via `_init_team_attributes()`).
+
+### Attribute Updates
+
+- **Training**: Updates team attributes in franchise mode (and future tournament mode)
+- **Gameplay**: Team attributes are read-only during gameplay (not modified by game events)
+- **Persistence**: Changes persist to the appropriate document based on game mode
+

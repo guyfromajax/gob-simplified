@@ -75,8 +75,8 @@ class TestPossessionChanges:
         game.game_state["one_and_one"] = False
         game.game_state["shooter"] = game.offense_team.lineup["PG"]
         
-        # Lower threshold to guarantee make
-        game.offense_team.team_attributes["ft_shot_threshold"] = 1
+        # Lower threshold to guarantee make (use game_state, not team_attributes)
+        game.game_state["ft_shot_threshold"] = 1
         
         result = game.turn_manager.run_micro_turn()
         
@@ -97,8 +97,8 @@ class TestPossessionChanges:
         game.game_state["one_and_one"] = False
         game.game_state["shooter"] = game.offense_team.lineup["PG"]
         
-        # High threshold to guarantee miss
-        game.offense_team.team_attributes["ft_shot_threshold"] = 1000
+        # High threshold to guarantee miss (use game_state, not team_attributes)
+        game.game_state["ft_shot_threshold"] = 1000
         
         # Force defensive rebound
         with patch('BackEnd.engine.phase_resolution.random.random', side_effect=[0.8, 0.8]):  # DREB
@@ -262,7 +262,7 @@ class TestPossessionChangeSequences:
         
         # Lower threshold to guarantee make
         game.offense_team.team_attributes["shot_threshold"] = 1
-        game.offense_team.team_attributes["ft_shot_threshold"] = 1
+        game.game_state["ft_shot_threshold"] = 1
         
         # Force AND-1
         with patch('BackEnd.models.shot_manager.random.random', side_effect=[0.01, 0.01]):

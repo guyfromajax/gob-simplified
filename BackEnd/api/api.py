@@ -197,18 +197,25 @@ def load_team_attributes_from_doc(mode: str, doc_id: str, team_id: str, team_nam
     """Load team_attributes from tournament/franchise doc, fallback to core teams doc."""
     from BackEnd.db import franchises_collection
     
+    # Resolve team_id from team_name if not provided
+    if not team_id and team_name:
+        team_doc = teams_collection.find_one({"name": team_name})
+        if team_doc:
+            team_id = str(team_doc.get("_id"))
+    
     attrs = None
     
     if mode == "tournament":
         try:
             doc = tournaments_collection.find_one({"_id": ObjectId(doc_id)})
-            if doc:
+            if doc and team_id:
                 team_obj = doc.get("teams", {}).get(team_id, {})
                 # Extract team_attributes from team_obj (may include other fields)
                 attrs = {}
-                for key in ["shot_threshold", "ft_shot_threshold", "turnover_threshold", "foul_threshold",
-                           "rebound_modifier", "momentum_score", "momentum_delta", "offensive_efficiency",
-                           "offensive_adjust", "o_tendency_reads", "d_tendency_reads", "team_chemistry"]:
+                for key in ["shot_threshold", "turnover_threshold", "foul_threshold",
+                           "rebound_modifier", "momentum_score", "offensive_efficiency",
+                           "team_chemistry", "defensive_efficiency", "fb_efficiency",
+                           "pt_efficiency", "fb_opp_modifier", "pt_opp_modifier"]:
                     if key in team_obj:
                         attrs[key] = team_obj[key]
         except Exception as e:
@@ -216,26 +223,50 @@ def load_team_attributes_from_doc(mode: str, doc_id: str, team_id: str, team_nam
     elif mode == "franchise":
         try:
             doc = franchises_collection.find_one({"_id": ObjectId(doc_id)})
-            if doc:
+            if doc and team_id:
                 team_obj = doc.get("franchise_teams", {}).get(team_id, {})
                 # Extract team_attributes from team_obj
                 attrs = {}
-                for key in ["shot_threshold", "ft_shot_threshold", "turnover_threshold", "foul_threshold",
-                           "rebound_modifier", "momentum_score", "momentum_delta", "offensive_efficiency",
-                           "offensive_adjust", "o_tendency_reads", "d_tendency_reads", "team_chemistry"]:
+                for key in ["shot_threshold", "turnover_threshold", "foul_threshold",
+                           "rebound_modifier", "momentum_score", "offensive_efficiency",
+                           "team_chemistry", "defensive_efficiency", "fb_efficiency",
+                           "pt_efficiency", "fb_opp_modifier", "pt_opp_modifier"]:
                     if key in team_obj:
                         attrs[key] = team_obj[key]
         except Exception as e:
             print(f"⚠️ Error loading team_attributes from franchise doc: {e}")
+    elif mode == "single":
+        try:
+            # For single game mode, try both UUID string and ObjectId formats
+            doc = games_collection.find_one({"_id": doc_id})
+            if not doc:
+                try:
+                    doc = games_collection.find_one({"_id": ObjectId(doc_id)})
+                except:
+                    pass
+            if doc and team_id:
+                teams_obj = doc.get("teams", {})
+                team_obj = teams_obj.get(team_id, {})
+                # Extract team_attributes from team_obj
+                attrs = {}
+                for key in ["shot_threshold", "turnover_threshold", "foul_threshold",
+                           "rebound_modifier", "momentum_score", "offensive_efficiency",
+                           "team_chemistry", "defensive_efficiency", "fb_efficiency",
+                           "pt_efficiency", "fb_opp_modifier", "pt_opp_modifier"]:
+                    if key in team_obj:
+                        attrs[key] = team_obj[key]
+        except Exception as e:
+            print(f"⚠️ Error loading team_attributes from game doc: {e}")
     
     # If no attributes found, try core teams doc as fallback
     if not attrs:
         team_doc = teams_collection.find_one({"name": team_name})
         if team_doc:
             attrs = {}
-            for key in ["shot_threshold", "ft_shot_threshold", "turnover_threshold", "foul_threshold",
-                       "rebound_modifier", "momentum_score", "momentum_delta", "offensive_efficiency",
-                       "offensive_adjust", "o_tendency_reads", "d_tendency_reads", "team_chemistry"]:
+            for key in ["shot_threshold", "turnover_threshold", "foul_threshold",
+                       "rebound_modifier", "momentum_score", "offensive_efficiency",
+                       "team_chemistry", "defensive_efficiency", "fb_efficiency",
+                       "pt_efficiency", "fb_opp_modifier", "pt_opp_modifier"]:
                 if key in team_doc:
                     attrs[key] = team_doc[key]
     
@@ -1241,11 +1272,54 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     # Get mode from request (default to "single")
                     mode = request.mode or "single"
                     
+                    # Load team attributes from tournament/franchise/single game documents if available
+                    home_team_attributes = None
+                    away_team_attributes = None
+                    
+                    if mode in ["tournament", "single"] and (request.tournament_id or request.game_id):
+                        # Load team attributes from tournament or game document
+                        home_attrs = load_team_attributes_from_doc(
+                            mode, 
+                            request.tournament_id or request.game_id, 
+                            None,  # team_id will be resolved inside the function
+                            request.home_team
+                        )
+                        away_attrs = load_team_attributes_from_doc(
+                            mode,
+                            request.tournament_id or request.game_id,
+                            None,
+                            request.away_team
+                        )
+                        if home_attrs:
+                            home_team_attributes = home_attrs
+                        if away_attrs:
+                            away_team_attributes = away_attrs
+                    elif mode == "franchise" and request.franchise_id:
+                        # Load team attributes from franchise document
+                        home_attrs = load_team_attributes_from_doc(
+                            mode,
+                            request.franchise_id,
+                            None,
+                            request.home_team
+                        )
+                        away_attrs = load_team_attributes_from_doc(
+                            mode,
+                            request.franchise_id,
+                            None,
+                            request.away_team
+                        )
+                        if home_attrs:
+                            home_team_attributes = home_attrs
+                        if away_attrs:
+                            away_team_attributes = away_attrs
+                    
                     gm = GameManager(
                         request.home_team, 
                         request.away_team,
                         home_strategy_settings=home_strategy,
                         away_strategy_settings=away_strategy,
+                        home_team_attributes=home_team_attributes,
+                        away_team_attributes=away_team_attributes,
                         mode=mode,  # Pass mode so teams can initialize plays with correct stats structure
                         user_team_side=request.user_team_side  # ✅ SS&S: Set is_user_team flags
                     )
@@ -1332,11 +1406,54 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         # Get mode from request (default to "single")
         mode = request.mode or "single"
         
+        # Load team attributes from tournament/franchise/single game documents if available
+        home_team_attributes = None
+        away_team_attributes = None
+        
+        if mode in ["tournament", "single"] and (request.tournament_id or request.game_id):
+            # Load team attributes from tournament or game document
+            home_attrs = load_team_attributes_from_doc(
+                mode, 
+                request.tournament_id or request.game_id, 
+                None,  # team_id will be resolved inside the function
+                request.home_team
+            )
+            away_attrs = load_team_attributes_from_doc(
+                mode,
+                request.tournament_id or request.game_id,
+                None,
+                request.away_team
+            )
+            if home_attrs:
+                home_team_attributes = home_attrs
+            if away_attrs:
+                away_team_attributes = away_attrs
+        elif mode == "franchise" and request.franchise_id:
+            # Load team attributes from franchise document
+            home_attrs = load_team_attributes_from_doc(
+                mode,
+                request.franchise_id,
+                None,
+                request.home_team
+            )
+            away_attrs = load_team_attributes_from_doc(
+                mode,
+                request.franchise_id,
+                None,
+                request.away_team
+            )
+            if home_attrs:
+                home_team_attributes = home_attrs
+            if away_attrs:
+                away_team_attributes = away_attrs
+        
         gm = GameManager(
             request.home_team, 
             request.away_team,
             home_strategy_settings=home_strategy,
             away_strategy_settings=away_strategy,
+            home_team_attributes=home_team_attributes,
+            away_team_attributes=away_team_attributes,
             mode=mode,  # Pass mode so teams can initialize plays with correct stats structure
             user_team_side=request.user_team_side  # ✅ SS&S: Pass user_team_side to set is_user_team flags
         )

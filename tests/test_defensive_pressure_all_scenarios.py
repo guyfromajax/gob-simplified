@@ -36,7 +36,6 @@ def mock_game():
         }
         mock_home_team.team_attributes = {
             "shot_threshold": 100,
-            "ft_shot_threshold": 100,
             "rebound_modifier": 1.0,
         }
         # Set defensive pressure settings: HCT only, no FCP
