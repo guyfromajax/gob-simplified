@@ -446,8 +446,8 @@ Similarly:
       "offensive_adjust": 50,
       "defense_threshold": 300,
       "shot_threshold": 250,
-      "turnover_threshold": 200,
-      "foul_threshold": 100,
+      "turnover_modifier": 200,
+      "foul_modifier": 100,
       "rebound_modifier": 1.0,
       
       // Scouting data

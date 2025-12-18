@@ -340,9 +340,9 @@ def get_team_thresholds(game):
     def_attr = def_team.team_attributes
 
     return {
-        "turnover_threshold": off_attr.get("turnover_threshold", 10),
-        "d_foul_threshold": def_attr.get("foul_threshold", 10),
-        "o_foul_threshold": off_attr.get("foul_threshold", 10)
+        "turnover_modifier": off_attr.get("turnover_modifier", 10),
+        "d_foul_modifier": def_attr.get("foul_modifier", 10),
+        "o_foul_modifier": off_attr.get("foul_modifier", 10)
     }
 
 def get_foul_and_turnover_positions(pass_count):

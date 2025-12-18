@@ -1123,7 +1123,7 @@ class ShotManager:
 
         aggression_level = defense_team.strategy_calls.get("aggression", 2)
         aggression_factor = AGGRESSION_FOUL_MULTIPLIER.get(aggression_level, 0.2)
-        foul_threshold = defense_team.team_attributes.get("foul_threshold", 30)
+        foul_threshold = defense_team.team_attributes.get("foul_modifier", 30)
 
         # Reduce foul likelihood on three-point shots
         if is_three:

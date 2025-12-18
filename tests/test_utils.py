@@ -76,8 +76,8 @@ def build_mock_game():
 
     default_team_attrs = {
         "shot_threshold": 100,
-        "turnover_threshold": -200,
-        "foul_threshold": 70,
+        "turnover_modifier": -200,
+        "foul_modifier": 70,
         "rebound_modifier": 1.0,
         "momentum_score": 10,
         "offensive_efficiency": 5,

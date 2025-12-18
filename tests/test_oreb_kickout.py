@@ -34,7 +34,7 @@ class TestOrebKickout:
         # High threshold to force miss on initial shot
         game.offense_team.team_attributes["shot_threshold"] = 1000
         # High foul threshold to avoid fouls
-        game.offense_team.team_attributes["foul_threshold"] = 200
+        game.offense_team.team_attributes["foul_modifier"] = 200
         
         # Force OREB and kickout (not putback)
         # The hardcode in turn_manager.py forces all OREBs to kickouts
@@ -102,8 +102,8 @@ class TestOrebKickout:
         game = build_mock_game()
         game.offense_team.team_attributes["shot_threshold"] = 1000
         # High foul threshold to avoid fouls on both teams
-        game.offense_team.team_attributes["foul_threshold"] = 200
-        game.defense_team.team_attributes["foul_threshold"] = 200
+        game.offense_team.team_attributes["foul_modifier"] = 200
+        game.defense_team.team_attributes["foul_modifier"] = 200
         
         # Test that when we get an OREB kickout, it has consistent structure
         # We'll test the structure validation logic rather than trying to force multiple instances
@@ -145,7 +145,7 @@ class TestOrebKickout:
         game = build_mock_game()
         game.offense_team.team_attributes["shot_threshold"] = 1000
         # High foul threshold to avoid fouls
-        game.offense_team.team_attributes["foul_threshold"] = 200
+        game.offense_team.team_attributes["foul_modifier"] = 200
         
         # Get the actual PG from the lineup
         pg = game.offense_team.lineup.get("PG")
@@ -174,7 +174,7 @@ class TestOrebKickout:
         game = build_mock_game()
         game.offense_team.team_attributes["shot_threshold"] = 1000
         # High foul threshold to avoid fouls
-        game.offense_team.team_attributes["foul_threshold"] = 200
+        game.offense_team.team_attributes["foul_modifier"] = 200
         
         # Force OREB kickout
         # Provide enough random values for all calls
