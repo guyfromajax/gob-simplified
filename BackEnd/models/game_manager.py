@@ -118,6 +118,7 @@ class GameManager:
 
     
     def _init_game_state(self):
+        import random
         return {
             "offense_team": self.offense_team.name,
             "defense_team": self.defense_team.name,
@@ -150,6 +151,7 @@ class GameManager:
             "free_throws": 0,
             "free_throws_remaining": 0,
             "one_and_one": False,
+            "ft_shot_threshold": random.randint(90, 110),  # Random threshold between 90-110 for each game
             "last_ball_handler": None,
             "foul_team": None,
             "foul_type": None,
