@@ -2734,16 +2734,16 @@ class TurnManager:
 
                 # Slightly bias toward foul when high activity + tempo
                 foul_margin = o_score - d_score
-                if foul_margin < off_team.team_attributes["foul_threshold"] * 0.7:
+                if foul_margin < off_team.team_attributes["foul_modifier"] * 0.7:
                     foul_risks.append(("O_FOUL", step_index, offender, defender))
-                elif d_score < def_team.team_attributes["foul_threshold"] * 1.3:
+                elif d_score < def_team.team_attributes["foul_modifier"] * 1.3:
                     foul_risks.append(("D_FOUL", step_index, offender, defender))
 
         # Step 4: Decide event
         turnover_risks.sort(key=lambda x: x[0])
         foul_risks.sort(key=lambda x: x[1])  # prioritize earlier fouls
 
-        if turnover_risks and turnover_risks[0][0] < off_team.team_attributes["turnover_threshold"]:
+        if turnover_risks and turnover_risks[0][0] < off_team.team_attributes["turnover_modifier"]:
             _, player, defender = turnover_risks[0]
             roles["event_step"] = None  # You could optionally track when
             roles["turnover_player"] = player

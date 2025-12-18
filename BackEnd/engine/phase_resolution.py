@@ -3352,7 +3352,7 @@ def calculate_foul_turnover(game, positions, roles):
     from BackEnd.utils.defense_utils import is_zone_defense
     if is_zone_defense(defense_call):
         d_foul_score *= 1.1
-    is_d_foul = d_foul_score < def_team.team_attributes["foul_threshold"] * 1.2
+    is_d_foul = d_foul_score < def_team.team_attributes["foul_modifier"] * 1.2
 
     # === Offensive Foul ===
     o_pos = positions["o_foul"]
@@ -3367,7 +3367,7 @@ def calculate_foul_turnover(game, positions, roles):
     )
 
     o_foul_score = (o_attr["IQ"] * 0.3 + o_attr["CH"] * 0.3 + o_movement) * random.randint(1, 6)
-    is_o_foul = o_foul_score < off_team.team_attributes["foul_threshold"] * 0.8
+    is_o_foul = o_foul_score < off_team.team_attributes["foul_modifier"] * 0.8
 
     # === Turnover ===
     t_pos = positions["turnover"]
@@ -3395,7 +3395,7 @@ def calculate_foul_turnover(game, positions, roles):
         pressure *= 0.9
 
     turnover_score = bh_score - pressure
-    is_turnover = turnover_score < off_team.team_attributes["turnover_threshold"]
+    is_turnover = turnover_score < off_team.team_attributes["turnover_modifier"]
 
     # === Decide event type
     decisions = {

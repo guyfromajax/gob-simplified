@@ -7066,7 +7066,7 @@ When a user accesses the Game Plan or Playbooks page for the first time in a new
      - `strategy_settings`: Default settings (all set to 2 = Normal)
      - `plays`: Populated plays from universal collection
      - **Team attributes**: Copied from the **universal `teams` collection** in MongoDB (the core/master team data):
-       - `shot_threshold`, `turnover_threshold`, `foul_threshold`
+       - `shot_threshold`, `turnover_modifier`, `foul_modifier`
        - `rebound_modifier`, `momentum_score`
        - `offensive_efficiency`, `team_chemistry`
        - `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`
@@ -7084,8 +7084,8 @@ When a user accesses the Game Plan or Playbooks page for the first time in a new
     "strategy_settings": {...},
     "plays": {...},
     "shot_threshold": 0,
-    "turnover_threshold": 0,
-    "foul_threshold": 0,
+    "turnover_modifier": 0,
+    "foul_modifier": 0,
     "rebound_modifier": 0,
     "momentum_score": 0,
     "offensive_efficiency": 0,
@@ -7272,8 +7272,8 @@ All team attributes are stored in team objects across all game modes:
 
 **Core Attributes:**
 - `shot_threshold` - Shot attempt threshold
-- `turnover_threshold` - Turnover threshold
-- `foul_threshold` - Foul threshold
+- `turnover_modifier` - Turnover modifier
+- `foul_modifier` - Foul modifier
 - `rebound_modifier` - Rebound effectiveness modifier
 - `momentum_score` - Team momentum score
 - `offensive_efficiency` - Offensive efficiency rating
@@ -7302,7 +7302,7 @@ All team attributes are stored in team objects across all game modes:
 The **universal `teams` collection** in MongoDB (`db.teams`) is the source of truth for initial team attribute values. This collection contains the master/base team data that is copied when team objects are first created in any game mode. It stores:
 
 - Team metadata (name, colors, mascot, team_id)
-- Base team attributes (shot_threshold, turnover_threshold, etc.)
+- Base team attributes (shot_threshold, turnover_modifier, etc.)
 - Initial playbook and strategy settings (if any)
 
 When team objects are created in Single Game, Tournament, or Franchise modes, they copy attribute values from this universal collection. If attributes don't exist in the universal collection, they default to `0` (for new attributes) or are generated randomly (for core attributes via `_init_team_attributes()`).

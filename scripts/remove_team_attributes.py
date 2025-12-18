@@ -38,7 +38,9 @@ ATTRIBUTES_TO_REMOVE = [
     "o_tendency_reads",
     "momentum_delta",
     "offensive_adjust",
-    "ft_shot_threshold"
+    "ft_shot_threshold",
+    "foul_threshold",
+    "turnover_threshold"
 ]
 
 # Attributes to add (with default value 0)
@@ -47,7 +49,9 @@ ATTRIBUTES_TO_ADD = {
     "fb_efficiency": 0,
     "pt_efficiency": 0,
     "fb_opp_modifier": 0,
-    "pt_opp_modifier": 0
+    "pt_opp_modifier": 0,
+    "foul_modifier": 0,
+    "turnover_modifier": 0
 }
 
 def update_teams_collection():

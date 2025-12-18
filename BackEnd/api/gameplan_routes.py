@@ -197,8 +197,8 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                     "offensive_efficiency": team.get("offensive_efficiency", 0),
                     "defense_threshold": team.get("defense_threshold", 0),
                     "shot_threshold": team.get("shot_threshold", 0),
-                    "turnover_threshold": team.get("turnover_threshold", 0),
-                    "foul_threshold": team.get("foul_threshold", 0),
+                    "turnover_modifier": team.get("turnover_modifier", 0),
+                    "foul_modifier": team.get("foul_modifier", 0),
                     "rebound_modifier": team.get("rebound_modifier", 0),
                     "defensive_efficiency": team.get("defensive_efficiency", 0),
                     "fb_efficiency": team.get("fb_efficiency", 0),
@@ -271,8 +271,8 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
             # Add team attributes from core teams collection (if available)
             if core_team:
                 team_obj["shot_threshold"] = core_team.get("shot_threshold", 0)
-                team_obj["turnover_threshold"] = core_team.get("turnover_threshold", 0)
-                team_obj["foul_threshold"] = core_team.get("foul_threshold", 0)
+                team_obj["turnover_modifier"] = core_team.get("turnover_modifier", 0)
+                team_obj["foul_modifier"] = core_team.get("foul_modifier", 0)
                 team_obj["rebound_modifier"] = core_team.get("rebound_modifier", 0)
                 team_obj["momentum_score"] = core_team.get("momentum_score", 0)
                 team_obj["offensive_efficiency"] = core_team.get("offensive_efficiency", 0)
@@ -312,8 +312,8 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                     core_team = db.teams.find_one({"name": team_id})
                 if core_team:
                     updates[f"{team_key}.shot_threshold"] = core_team.get("shot_threshold", 0)
-                    updates[f"{team_key}.turnover_threshold"] = core_team.get("turnover_threshold", 0)
-                    updates[f"{team_key}.foul_threshold"] = core_team.get("foul_threshold", 0)
+                    updates[f"{team_key}.turnover_modifier"] = core_team.get("turnover_modifier", 0)
+                    updates[f"{team_key}.foul_modifier"] = core_team.get("foul_modifier", 0)
                     updates[f"{team_key}.rebound_modifier"] = core_team.get("rebound_modifier", 0)
                     updates[f"{team_key}.momentum_score"] = core_team.get("momentum_score", 0)
                     updates[f"{team_key}.offensive_efficiency"] = core_team.get("offensive_efficiency", 0)

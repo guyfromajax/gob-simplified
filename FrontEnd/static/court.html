@@ -2145,12 +2145,12 @@
           <div class="team-tab team-tab-S3">
             <table class="team-attrs-table">
               <tbody>
-                <tr><td>Foul Threshold</td><td data-attr="foul_threshold">--</td></tr>
+                <tr><td>Foul Modifier</td><td data-attr="foul_modifier">--</td></tr>
                 <tr><td>Shots</td><td data-attr="shot_threshold">--</td></tr>
                 <tr><td>Mo Score</td><td data-attr="momentum_score">--</td></tr>
                 <tr><td>O Efficiency</td><td data-attr="offensive_efficiency">--</td></tr>
                 <tr><td>Rebounds</td><td data-attr="rebound_modifier">--</td></tr>
-                <tr><td>Turnovers</td><td data-attr="turnover_threshold">--</td></tr>
+                <tr><td>Turnovers</td><td data-attr="turnover_modifier">--</td></tr>
                 <tr><td>Chemistry</td><td data-attr="team_chemistry">--</td></tr>
               </tbody>
             </table>
@@ -2271,12 +2271,12 @@
           <div class="team-tab team-tab-S3">
             <table class="team-attrs-table">
               <tbody>
-                <tr><td>Foul Threshold</td><td data-attr="foul_threshold">--</td></tr>
+                <tr><td>Foul Modifier</td><td data-attr="foul_modifier">--</td></tr>
                 <tr><td>Shots</td><td data-attr="shot_threshold">--</td></tr>
                 <tr><td>Mo Score</td><td data-attr="momentum_score">--</td></tr>
                 <tr><td>O Efficiency</td><td data-attr="offensive_efficiency">--</td></tr>
                 <tr><td>Rebounds</td><td data-attr="rebound_modifier">--</td></tr>
-                <tr><td>Turnovers</td><td data-attr="turnover_threshold">--</td></tr>
+                <tr><td>Turnovers</td><td data-attr="turnover_modifier">--</td></tr>
                 <tr><td>Chemistry</td><td data-attr="team_chemistry">--</td></tr>
               </tbody>
             </table>
@@ -3452,12 +3452,12 @@
           const cell = root.querySelector(`[data-attr="${name}"]`);
           if (cell) cell.textContent = val == null ? '--' : String(val);
         };
-        setAttr('foul_threshold', attrs.foul_threshold);
+        setAttr('foul_modifier', attrs.foul_modifier);
         setAttr('shot_threshold', attrs.shot_threshold);
         setAttr('momentum_score', attrs.momentum_score);
         setAttr('offensive_efficiency', attrs.offensive_efficiency);
         setAttr('rebound_modifier', attrs.rebound_modifier);
-        setAttr('turnover_threshold', attrs.turnover_threshold);
+        setAttr('turnover_modifier', attrs.turnover_modifier);
         setAttr('team_chemistry', attrs.team_chemistry);
       };
       apply('home', home);
