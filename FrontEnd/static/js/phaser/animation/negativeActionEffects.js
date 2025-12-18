@@ -66,30 +66,8 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul', skip
   // Apply red tint (without opacity reduction)
   applyTintToSprite(sprite, config.tint);
   
-  // Add red screen flash effect (skip for AND-1 to avoid mixing with green flash)
-  if (!skipScreenFlash) {
-    const screenFlash = scene.add.rectangle(
-      scene.game.config.width / 2,
-      scene.game.config.height / 2,
-      scene.game.config.width,
-      scene.game.config.height,
-      0xff0000,
-      0.5  // 50% opacity red overlay (more visible)
-    );
-    screenFlash.setDepth(999); // Just below icon
-    
-    // Hold at full opacity for 1 second, then fade out slowly
-    scene.tweens.add({
-      targets: screenFlash,
-      alpha: 0,
-      duration: 1500,  // 1.5s fade out
-      delay: 1000,     // Hold at 50% opacity for 1 second first
-      ease: 'Cubic.easeOut',
-      onComplete: () => {
-        screenFlash.destroy();
-      }
-    });
-  }
+  // ✅ REMOVED: Red full screen overlay (user requested removal)
+  // Red visual feedback now only comes from announcement containers (e.g., AND-1 red box)
   
   // Shake/pulse animations removed - rely on announcement system + screen flash + sprite tint
   
@@ -129,63 +107,14 @@ export function triggerTurnoverEffect(scene, playerId) {
 
 /**
  * Trigger green flash for made shots (HCO, Fast Break, Putback)
- * No sprite effect - just screen flash
- * @param {boolean} hasAndOne - If true, creates diagonal split (green + red)
+ * ✅ REMOVED: Full screen green overlay (user requested removal)
+ * Visual feedback now only comes from announcement containers
+ * @param {boolean} hasAndOne - Unused (kept for API compatibility)
  */
 export function triggerMadeShotFlash(scene, hasAndOne = false) {
-  if (!scene) return;
-  
-  const width = scene.game.config.width;
-  const height = scene.game.config.height;
-  
-  if (hasAndOne) {
-    // AND-1: Full screen green flash (made shot)
-    // Red tint will be applied to announcement container in announcements.js
-    const screenFlash = scene.add.rectangle(
-      width / 2,
-      height / 2,
-      width,
-      height,
-      0x00ff00,  // Bright green
-      0.5        // 50% opacity
-    );
-    screenFlash.setOrigin(0.5, 0.5);
-    screenFlash.setDepth(998);
-    
-    // Hold for 1s, then fade out
-    scene.tweens.add({
-      targets: screenFlash,
-      alpha: 0,
-      duration: 1500,  // 1.5s fade out
-      delay: 1000,     // Hold at 50% opacity for 1s first
-      ease: 'Cubic.easeOut',
-      onComplete: () => {
-        screenFlash.destroy();
-      }
-    });
-  } else {
-    // Regular green flash (full screen)
-    const screenFlash = scene.add.rectangle(
-      width / 2,
-      height / 2,
-      width,
-      height,
-      0x00ff00,  // GREEN
-      0.4  // 40% opacity green overlay
-    );
-    screenFlash.setDepth(999);
-    
-    // Hold at full opacity for 0.5s, then fade out
-    scene.tweens.add({
-      targets: screenFlash,
-      alpha: 0,
-      duration: 1000,  // 1s fade out
-      delay: 500,      // Hold at 40% opacity for 0.5s first
-      ease: 'Cubic.easeOut',
-      onComplete: () => {
-        screenFlash.destroy();
-      }
-    });
-  }
+  // ✅ REMOVED: Green full screen overlay (user requested removal)
+  // Green visual feedback now only comes from announcement containers
+  // Red box for AND-1 is handled by showAndOneAnnouncement() in announcements.js
+  return;
 }
 
