@@ -7313,3 +7313,56 @@ When team objects are created in Single Game, Tournament, or Franchise modes, th
 - **Gameplay**: Team attributes are read-only during gameplay (not modified by game events)
 - **Persistence**: Changes persist to the appropriate document based on game mode
 
+## Resolution System 🚧 **IN PROGRESS** (January 2025)
+
+### Overview
+
+The Resolution System is a centralized, unified approach to determining turn outcomes across all major turn types: **HCO (Half Court Offense)**, **Fast Break**, **HCT (Half Court Trap)**, and **FCP (Full Court Press)**.
+
+### Purpose
+
+This system aims to:
+- **Unify** outcome determination logic across all turn types
+- **Simplify** the codebase by eliminating duplicate logic
+- **Increase strategic depth** by making outcomes based on matchup quality, not random chance
+- **Improve maintainability** through a single source of truth for resolution logic
+
+### Current State
+
+Currently, each turn type has its own resolution logic:
+- **HCO**: Uses `generate_logic()` (random weighted selection) + `determine_event_type()` (skeleton analysis)
+- **Fast Break**: Has its own calculation logic
+- **HCT**: Has its own calculation logic  
+- **FCP**: Has its own calculation logic
+
+### Design Goals
+
+- **Strategic**: Outcomes should reflect matchup quality, player attributes, and team attributes
+- **Simple**: Single calculation, single decision point
+- **Transparent**: Easy to understand and tune
+- **Consistent**: Same logic principles across all turn types
+
+### Key Turn Types
+
+1. **HCO (Half Court Offense)**
+2. **Fast Break**
+3. **HCT (Half Court Trap)**
+4. **FCP (Full Court Press)**
+
+### Status
+
+🚧 **In Design Phase** - Awaiting detailed design discussion and implementation plan.
+
+### Key Files
+
+- `BackEnd/engine/phase_resolution.py` - Current HCO resolution logic
+- `BackEnd/models/turn_manager.py` - Current event type determination
+- `BackEnd/engine/phase_resolution.py` - Fast Break, HCT, FCP resolution logic
+
+### Future Enhancements
+
+- Unified resolution calculation
+- Strategic outcome determination based on matchup quality
+- Simplified codebase with single source of truth
+- Improved maintainability and tunability
+
