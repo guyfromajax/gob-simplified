@@ -2145,12 +2145,8 @@
           <div class="team-tab team-tab-S3">
             <table class="team-attrs-table">
               <tbody>
-                <tr><td>D Reads</td><td data-attr="d_tendency_reads">--</td></tr>
-                <tr><td>O Reads</td><td data-attr="o_tendency_reads">--</td></tr>
                 <tr><td>Foul Threshold</td><td data-attr="foul_threshold">--</td></tr>
-                <tr><td>Free Throws</td><td data-attr="ft_shot_threshold">--</td></tr>
                 <tr><td>Shots</td><td data-attr="shot_threshold">--</td></tr>
-                <tr><td>Mo Delta</td><td data-attr="momentum_delta">--</td></tr>
                 <tr><td>Mo Score</td><td data-attr="momentum_score">--</td></tr>
                 <tr><td>O Efficiency</td><td data-attr="offensive_efficiency">--</td></tr>
                 <tr><td>Rebounds</td><td data-attr="rebound_modifier">--</td></tr>
@@ -2275,12 +2271,8 @@
           <div class="team-tab team-tab-S3">
             <table class="team-attrs-table">
               <tbody>
-                <tr><td>D Reads</td><td data-attr="d_tendency_reads">--</td></tr>
-                <tr><td>O Reads</td><td data-attr="o_tendency_reads">--</td></tr>
                 <tr><td>Foul Threshold</td><td data-attr="foul_threshold">--</td></tr>
-                <tr><td>Free Throws</td><td data-attr="ft_shot_threshold">--</td></tr>
                 <tr><td>Shots</td><td data-attr="shot_threshold">--</td></tr>
-                <tr><td>Mo Delta</td><td data-attr="momentum_delta">--</td></tr>
                 <tr><td>Mo Score</td><td data-attr="momentum_score">--</td></tr>
                 <tr><td>O Efficiency</td><td data-attr="offensive_efficiency">--</td></tr>
                 <tr><td>Rebounds</td><td data-attr="rebound_modifier">--</td></tr>
@@ -3460,12 +3452,8 @@
           const cell = root.querySelector(`[data-attr="${name}"]`);
           if (cell) cell.textContent = val == null ? '--' : String(val);
         };
-        setAttr('d_tendency_reads', attrs.d_tendency_reads);
-        setAttr('o_tendency_reads', attrs.o_tendency_reads);
         setAttr('foul_threshold', attrs.foul_threshold);
-        setAttr('ft_shot_threshold', attrs.ft_shot_threshold);
         setAttr('shot_threshold', attrs.shot_threshold);
-        setAttr('momentum_delta', attrs.momentum_delta);
         setAttr('momentum_score', attrs.momentum_score);
         setAttr('offensive_efficiency', attrs.offensive_efficiency);
         setAttr('rebound_modifier', attrs.rebound_modifier);

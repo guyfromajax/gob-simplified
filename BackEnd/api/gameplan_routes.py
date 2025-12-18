@@ -195,14 +195,16 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                 franchise_teams[tid] = {
                     "team_chemistry": team.get("team_chemistry", 0),
                     "offensive_efficiency": team.get("offensive_efficiency", 0),
-                    "offensive_adjust": team.get("offensive_adjust", 0),
                     "defense_threshold": team.get("defense_threshold", 0),
                     "shot_threshold": team.get("shot_threshold", 0),
                     "turnover_threshold": team.get("turnover_threshold", 0),
                     "foul_threshold": team.get("foul_threshold", 0),
                     "rebound_modifier": team.get("rebound_modifier", 0),
-                    "o_tendency_reads": team.get("o_tendency_reads", 0),
-                    "d_tendency_reads": team.get("d_tendency_reads", 0),
+                    "defensive_efficiency": team.get("defensive_efficiency", 0),
+                    "fb_efficiency": team.get("fb_efficiency", 0),
+                    "pt_efficiency": team.get("pt_efficiency", 0),
+                    "fb_opp_modifier": team.get("fb_opp_modifier", 0),
+                    "pt_opp_modifier": team.get("pt_opp_modifier", 0),
                     "playcall_settings": defaults["playcall_settings"].copy(),
                     "strategy_settings": defaults["strategy_settings"].copy(),
                     "plays": populated_plays.copy()
@@ -252,6 +254,11 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
         
         if not team_obj:
             # Create team object with defaults
+            # Load team attributes from core teams collection
+            core_team = db.teams.find_one({"_id": ObjectId(actual_team_id)})
+            if not core_team:
+                # Fallback: try by name
+                core_team = db.teams.find_one({"name": team_id})
             
             defaults = get_default_settings()
             populated_plays = populate_team_plays()
@@ -260,6 +267,21 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                 "strategy_settings": defaults["strategy_settings"].copy(),
                 "plays": populated_plays.copy()
             }
+            
+            # Add team attributes from core teams collection (if available)
+            if core_team:
+                team_obj["shot_threshold"] = core_team.get("shot_threshold", 0)
+                team_obj["turnover_threshold"] = core_team.get("turnover_threshold", 0)
+                team_obj["foul_threshold"] = core_team.get("foul_threshold", 0)
+                team_obj["rebound_modifier"] = core_team.get("rebound_modifier", 0)
+                team_obj["momentum_score"] = core_team.get("momentum_score", 0)
+                team_obj["offensive_efficiency"] = core_team.get("offensive_efficiency", 0)
+                team_obj["team_chemistry"] = core_team.get("team_chemistry", 0)
+                team_obj["defensive_efficiency"] = core_team.get("defensive_efficiency", 0)
+                team_obj["fb_efficiency"] = core_team.get("fb_efficiency", 0)
+                team_obj["pt_efficiency"] = core_team.get("pt_efficiency", 0)
+                team_obj["fb_opp_modifier"] = core_team.get("fb_opp_modifier", 0)
+                team_obj["pt_opp_modifier"] = core_team.get("pt_opp_modifier", 0)
             
             if mode == "single":
                 collection.update_one(
@@ -271,7 +293,7 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                     {"_id": ObjectId(doc_id)},
                     {"$set": {f"{team_key}": team_obj}}
                 )
-        elif "playcall_settings" not in team_obj or "strategy_settings" not in team_obj or not team_obj.get("plays"):
+        elif "playcall_settings" not in team_obj or "strategy_settings" not in team_obj or not team_obj.get("plays") or "shot_threshold" not in team_obj:
             # Add missing settings
             defaults = get_default_settings()
             populated_plays = populate_team_plays()
@@ -282,6 +304,25 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                 updates[f"{team_key}.strategy_settings"] = defaults["strategy_settings"].copy()
             if not team_obj.get("plays"):
                 updates[f"{team_key}.plays"] = populated_plays.copy()
+            
+            # Add missing team attributes if they don't exist (for backwards compatibility)
+            if "shot_threshold" not in team_obj:
+                core_team = db.teams.find_one({"_id": ObjectId(actual_team_id)})
+                if not core_team:
+                    core_team = db.teams.find_one({"name": team_id})
+                if core_team:
+                    updates[f"{team_key}.shot_threshold"] = core_team.get("shot_threshold", 0)
+                    updates[f"{team_key}.turnover_threshold"] = core_team.get("turnover_threshold", 0)
+                    updates[f"{team_key}.foul_threshold"] = core_team.get("foul_threshold", 0)
+                    updates[f"{team_key}.rebound_modifier"] = core_team.get("rebound_modifier", 0)
+                    updates[f"{team_key}.momentum_score"] = core_team.get("momentum_score", 0)
+                    updates[f"{team_key}.offensive_efficiency"] = core_team.get("offensive_efficiency", 0)
+                    updates[f"{team_key}.team_chemistry"] = core_team.get("team_chemistry", 0)
+                    updates[f"{team_key}.defensive_efficiency"] = core_team.get("defensive_efficiency", 0)
+                    updates[f"{team_key}.fb_efficiency"] = core_team.get("fb_efficiency", 0)
+                    updates[f"{team_key}.pt_efficiency"] = core_team.get("pt_efficiency", 0)
+                    updates[f"{team_key}.fb_opp_modifier"] = core_team.get("fb_opp_modifier", 0)
+                    updates[f"{team_key}.pt_opp_modifier"] = core_team.get("pt_opp_modifier", 0)
             
             if mode == "single":
                 collection.update_one(

@@ -30,9 +30,10 @@ def run_training(request: TrainingRequest):
     }
 
     TEAM_FIELDS = [
-        "team_chemistry", "offensive_efficiency", "offensive_adjust",
+        "team_chemistry", "offensive_efficiency",
         "defense_threshold", "shot_threshold", "turnover_threshold",
-        "foul_threshold", "rebound_modifier", "o_tendency_reads", "d_tendency_reads"
+        "foul_threshold", "rebound_modifier", "defensive_efficiency",
+        "fb_efficiency", "pt_efficiency", "fb_opp_modifier", "pt_opp_modifier"
     ]
     team_before = {k: manager.team_doc.get(k, 0) for k in TEAM_FIELDS}
 

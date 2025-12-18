@@ -163,14 +163,16 @@ class FranchiseManager:
             franchise_teams[team_id] = {
                 "team_chemistry": team.get("team_chemistry", 0),
                 "offensive_efficiency": team.get("offensive_efficiency", 0),
-                "offensive_adjust": team.get("offensive_adjust", 0),
                 "defense_threshold": team.get("defense_threshold", 0),
                 "shot_threshold": team.get("shot_threshold", 0),
                 "turnover_threshold": team.get("turnover_threshold", 0),
                 "foul_threshold": team.get("foul_threshold", 0),
                 "rebound_modifier": team.get("rebound_modifier", 0),
-                "o_tendency_reads": team.get("o_tendency_reads", 0),
-                "d_tendency_reads": team.get("d_tendency_reads", 0),
+                "defensive_efficiency": team.get("defensive_efficiency", 0),
+                "fb_efficiency": team.get("fb_efficiency", 0),
+                "pt_efficiency": team.get("pt_efficiency", 0),
+                "fb_opp_modifier": team.get("fb_opp_modifier", 0),
+                "pt_opp_modifier": team.get("pt_opp_modifier", 0),
                 # Game plan settings (all start at 2 = Normal)
                 "playcall_settings": {
                     "Base": 2,
