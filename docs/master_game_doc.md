@@ -464,6 +464,93 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
 
 ---
 
+## Free Throw System ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The Free Throw System handles free throw shot attempts and outcomes. Free throws are awarded for shooting fouls, bonus situations (5+ team fouls), and double bonus situations (10+ team fouls).
+
+**Location:** `BackEnd/engine/phase_resolution.py` - `resolve_free_throw_logic()`  
+**Status:** ✅ Fully implemented
+
+### Free Throw Threshold
+
+**Game-Level Threshold:**
+- A random threshold between **90-110** is generated at the start of each game
+- Stored in `game_state["ft_shot_threshold"]` for the duration of the game
+- This threshold represents the difficulty level for free throws in that specific game
+- Generated in `GameManager._init_game_state()` when the game is initialized
+
+### Free Throw Calculation
+
+**Formula:**
+```python
+ft_shot_score = ((attrs["FT"] * 0.7) + (attrs["IQ"] * 0.2) + attrs["MO"]) * random.randint(1, 10)
+makes_shot = ft_shot_score >= game_state["ft_shot_threshold"]
+```
+
+**Components:**
+1. **Player Attributes:**
+   - `FT` (Free Throw) - 70% weight
+   - `IQ` (Intelligence/Game IQ) - 20% weight
+   - `MO` (Momentum) - Full value added (not weighted)
+
+2. **Random Multiplier:** `random.randint(1, 10)` (1-10 range)
+
+3. **Threshold Comparison:**
+   - Compares `ft_shot_score` to `game_state["ft_shot_threshold"]` (90-110)
+   - If `ft_shot_score >= threshold` → **MAKE**
+   - If `ft_shot_score < threshold` → **MISS**
+
+**Example:**
+- Player with `FT = 80`, `IQ = 70`, `MO = 5`
+- Base score: `(80 * 0.7) + (70 * 0.2) + 5 = 56 + 14 + 5 = 75`
+- Random multiplier: `7` (1-10)
+- Final score: `75 * 7 = 525`
+- Game threshold: `100` (randomly generated 90-110)
+- Result: `525 >= 100` → **MAKE**
+
+### When Free Throws Are Awarded
+
+**Shooting Fouls:**
+- 2 free throws for 2-point shot attempts
+- 3 free throws for 3-point shot attempts
+- Always awarded regardless of team foul count
+
+**Bonus Situations (Non-Shooting Fouls):**
+- **5-9 team fouls:** 1-and-1 free throws (must make first to unlock second)
+- **10+ team fouls:** 2 free throws (double bonus)
+
+**1-and-1 Logic:**
+- First free throw must be made to unlock the second
+- If first is missed, possession changes (defensive rebound)
+
+### Free Throw Outcomes
+
+**Made Free Throw:**
+- Awards 1 point
+- Decrements `free_throws_remaining`
+- If last free throw, determines next defensive setup (pressure type)
+- Next play type: `BASELINE_INBOUND` (after made shot)
+
+**Missed Free Throw:**
+- No points awarded
+- Rebound logic determines offensive or defensive rebound
+- If defensive rebound: Next play type determined by `offensive_state`
+- If offensive rebound: OREB turn created
+
+### Key Files
+
+**Backend:**
+- `BackEnd/engine/phase_resolution.py` - `resolve_free_throw_logic()` (lines 1352-1520)
+- `BackEnd/models/game_manager.py` - `_init_game_state()` (threshold generation)
+
+**Frontend:**
+- `FrontEnd/static/js/phaser/animation/FreeThrowAnimationSystem.js` - Free throw animation
+- `FrontEnd/static/js/phaser/animation/freeThrow.js` - Free throw sequence handler
+
+---
+
 ## HCO System ✅ **COMPLETE** (January 2025)
 
 ### Overview
