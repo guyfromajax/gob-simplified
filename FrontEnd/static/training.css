@@ -152,6 +152,18 @@ body {
   max-height: 500px;
 }
 
+.panel-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+}
+
+.panel-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
 .panel-title {
   font-size: 1.5rem;
   color: var(--color-accent);
