@@ -58,6 +58,12 @@ body {
   padding: var(--spacing-md);
   border-bottom: 2px solid var(--color-border);
   margin-bottom: var(--spacing-md);
+  position: sticky;
+  top: 0;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  z-index: 100;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .header-center {
