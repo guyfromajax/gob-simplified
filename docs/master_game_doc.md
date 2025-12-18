@@ -5978,6 +5978,27 @@ The Plays Page System provides detailed views for individual plays, allowing use
 
 ---
 
+## Training System 🚧 **IN PROGRESS** (January 2025)
+
+### Overview
+
+The Training System provides a UI/UX interface for players to practice and improve their skills through various training exercises and drills.
+
+**Status:** 🚧 Layout and functionality design in progress
+
+### Purpose
+
+- Provide structured training exercises for skill development
+- Track training progress and improvements
+- Offer customizable training sessions
+- Integrate with player development systems
+
+### Key Components
+
+**To be defined based on user requirements**
+
+---
+
 ## In-Game Play Calling System ✅ **IMPLEMENTED** (January 2025)
 
 ### Overview
