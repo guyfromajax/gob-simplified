@@ -5982,20 +5982,131 @@ The Plays Page System provides detailed views for individual plays, allowing use
 
 ### Overview
 
-The Training System provides a UI/UX interface for players to practice and improve their skills through various training exercises and drills.
+The Training System provides a UI/UX interface for allocating training points across various drills and exercises to improve player and team performance. Users can allocate 24 training points across different categories and select a coaching focus style.
 
-**Status:** 🚧 Layout and functionality design in progress
+**Location:** `FrontEnd/static/training.html`  
+**Status:** 🚧 UI/UX complete, backend integration pending
 
-### Purpose
+### Page Layout
 
-- Provide structured training exercises for skill development
-- Track training progress and improvements
-- Offer customizable training sessions
-- Integrate with player development systems
+**Desktop-only page** using a 4-column grid layout. All content fits above the fold at common desktop resolutions.
 
-### Key Components
+**Header Section (Sticky on Scroll):**
+- Centered page title: "TEAM TRAINING"
+- Points Remaining display: "POINTS REMAINING: 24" (dynamic)
+- Back button (blue, upper-left corner)
+- Submit Training button (orange, upper-right corner)
+- Horizontal line below Points Remaining
 
-**To be defined based on user requirements**
+**Main Content Layout:**
+
+**Left Half - Player Drills:**
+- **Column 1:**
+  - Offense Drills (Inside Offense, Outside Offense sliders)
+  - Technical Drills (Passing, Ball Handling, Rebounding sliders)
+- **Column 2:**
+  - Defense Drills (Inside Defense, Outside Defense sliders)
+  - Weight Room (Strength, Agility sliders)
+
+**Right Half - Team Drills:**
+- **Column 1:**
+  - Offense (Offense Install slider + Current Playbook/Custom radio buttons)
+  - Fast Breaks (FB Offense Install, FB Defense Install sliders)
+- **Column 2:**
+  - Defense (Defense Install slider + Current Playbook/Custom radio buttons)
+  - Presses / Traps (P/T Defense Install, P/T Offense Install sliders)
+
+**General Section (Full Width):**
+- Four sliders in a 4-column grid:
+  - Conditioning
+  - Free Throws
+  - Film Study
+  - Breaks
+
+**Coaching Style / Focus Section (Bottom):**
+- Title: "Coaching Style / Focus (choose one)"
+- Four archetype blocks displayed horizontally (4 columns):
+  - **Authoritarian** (red header fill)
+    - Sub-options: Discipline, Rebounding, Execution, Teamwork
+  - **Systems Coach** (dark/burnt yellow header fill)
+    - Sub-options: Offense, Defense, Fast Breaks, Press / Trap
+  - **Player Maximizer** (darker green header fill)
+    - Sub-options: Top 3 Attributes, Attributes 4–6, Custom Attributes, Opportunity
+  - **Culture Builder** (purple header fill)
+    - Sub-options: Inspire, Confidence, Community Engagement, Teamwork
+
+### Slider Behavior
+
+- Each slider has discrete steps from 0 to 6
+- Default value for all sliders on page load: 0
+- Total available training points = 24
+- Moving a slider to value N subtracts N from Points Remaining
+- Prevents user from allocating more than 24 total points (clamps or reverts last interaction)
+- Points Remaining = 24 - sum(all slider values)
+
+### Coaching Focus Selection
+
+- All radios in the Coaching Focus section are part of ONE global radio group
+- Only one selection can be active at a time
+- Selecting any archetype header or sub-option clears all others
+
+**Visual Behavior:**
+- **Archetype header radio selected:**
+  - Entire archetype block gets a highlight outline in the archetype's color
+  - Header and all four sub-options appear "active" with neutral grey fill
+- **Sub-option radio selected:**
+  - Only that radio fills with the archetype's header color
+  - Archetype block shows a subtle outline in the same color (more subtle than header selection)
+
+### Submit Button Behavior
+
+- Disabled / visually muted (reduced opacity, non-clickable) until:
+  1. All 24 training points are allocated (Points Remaining = 0)
+  2. A coaching focus is selected
+- Becomes active only when both conditions are met
+
+### Data Capture
+
+On submit, captures:
+- All slider values (organized by category: player_drills, team_drills, general)
+- Offense Plays selection (Current Playbook or Custom)
+- Defense Plays selection (Current Playbook or Custom)
+- Coaching focus selection (archetype-level or specific sub-option)
+
+### Navigation
+
+**Back Button:**
+- Returns to previous page based on mode:
+  - Franchise mode → Franchise Command Center
+  - Tournament mode → Tournament Command Center
+  - Single game mode → Game Plan
+- Uses URL parameters to determine navigation path
+
+**Submit Button:**
+- Validates all requirements are met
+- Sends training data to appropriate endpoint based on mode:
+  - Franchise mode → `/api/franchise/training`
+  - Tournament mode → `/api/tournament/training`
+  - Single game mode → `/api/training`
+- Navigates back to appropriate command center after successful submission
+
+### Key Files
+
+**Frontend:**
+- `FrontEnd/static/training.html` - Page structure and layout
+- `FrontEnd/static/training.css` - Styling and visual design
+- `FrontEnd/static/training.js` - Slider logic, validation, and submission
+
+**Backend:**
+- `BackEnd/api/training_routes.py` - Training API endpoints (to be implemented)
+- `BackEnd/models/training_manager.py` - Training logic and calculations (existing)
+
+### Future Enhancements
+
+- Backend integration for training point allocation
+- Training results display
+- Training history tracking
+- Custom play selection for offense/defense plays
 
 ---
 
