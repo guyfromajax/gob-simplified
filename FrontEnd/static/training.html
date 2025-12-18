@@ -3,321 +3,370 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GOB Training</title>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./training.css">
+  <title>Team Training - GOB</title>
+  <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico" />
+  <link rel="stylesheet" href="training.css">
 </head>
 <body>
-  <h1 id="training-header">Training Allocation</h1>
-  <div id="points-remaining">Points Remaining: <span id="remaining">24</span></div>
+  <div class="training-container">
+    <!-- Header -->
+    <header class="training-header">
+      <button id="back-btn" class="back-button">Back</button>
+      <div class="header-center">
+        <h1 class="page-title">TEAM TRAINING</h1>
+        <div class="points-display">POINTS REMAINING: <span id="points-remaining">24</span></div>
+      </div>
+      <button id="submit-btn" class="submit-button" disabled>Submit Training</button>
+    </header>
 
-  <div id="training-grid">
-    <div class="category">
-      <div class="category-name">Offensive Drills</div>
-      <label>Inside
-        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="offensive-inside">
-        <span class="value">0</span>
+    <!-- Main Content: Two Panels Side-by-Side -->
+    <div class="main-content">
+      <!-- LEFT PANEL: Player Drills -->
+      <div class="panel player-drills-panel">
+        <h2 class="panel-title">Player Drills</h2>
+        
+        <!-- Offense Drills Section -->
+        <div class="section">
+          <h3 class="section-title">Offense Drills</h3>
+          <div class="slider-group">
+            <label class="slider-label">
+              <span class="label-text">Inside Offense</span>
+              <div class="slider-container">
+                <input type="range" min="0" max="6" step="1" value="0" class="slider" id="offense-inside" data-category="player-drills">
+                <span class="slider-value">0</span>
+              </div>
+            </label>
+            <label class="slider-label">
+              <span class="label-text">Outside Offense</span>
+              <div class="slider-container">
+                <input type="range" min="0" max="6" step="1" value="0" class="slider" id="offense-outside" data-category="player-drills">
+                <span class="slider-value">0</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Defense Drills Section -->
+        <div class="section">
+          <h3 class="section-title">Defense Drills</h3>
+          <div class="slider-group">
+            <label class="slider-label">
+              <span class="label-text">Inside Defense</span>
+              <div class="slider-container">
+                <input type="range" min="0" max="6" step="1" value="0" class="slider" id="defense-inside" data-category="player-drills">
+                <span class="slider-value">0</span>
+              </div>
       </label>
-      <label>Outside
-        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="offensive-outside">
-        <span class="value">0</span>
-      </label>
-    </div>
-    <div class="category">
-      <div class="category-name">Defensive Drills</div>
-      <label>Inside
-        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="defensive-inside">
-        <span class="value">0</span>
-      </label>
-      <label>Outside
-        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="defensive-outside">
-        <span class="value">0</span>
-      </label>
-    </div>
-    <div class="category">
-      <div class="category-name">Technical Drills</div>
-      <label>Passing
-        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="technical-passing">
-        <span class="value">0</span>
-      </label>
-      <label>Ball Handling
-        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="technical-ball">
-        <span class="value">0</span>
-      </label>
-      <label>Rebounding
-        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="technical-rebound">
-        <span class="value">0</span>
-      </label>
-    </div>
-    <div class="category">
-      <div class="category-name">Weight Room</div>
-      <label>Strength
-        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="weight-strength">
-        <span class="value">0</span>
-      </label>
-      <label>Agility
-        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="weight-agility">
-        <span class="value">0</span>
+            <label class="slider-label">
+              <span class="label-text">Outside Defense</span>
+              <div class="slider-container">
+                <input type="range" min="0" max="6" step="1" value="0" class="slider" id="defense-outside" data-category="player-drills">
+                <span class="slider-value">0</span>
+              </div>
       </label>
     </div>
-    <div class="category">
-      <div class="category-name">Conditioning</div>
-      <label>Conditioning
-        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="conditioning">
-        <span class="value">0</span>
+        </div>
+
+        <!-- Technical Drills Section -->
+        <div class="section">
+          <h3 class="section-title">Technical Drills</h3>
+          <div class="slider-group">
+            <label class="slider-label">
+              <span class="label-text">Passing</span>
+              <div class="slider-container">
+                <input type="range" min="0" max="6" step="1" value="0" class="slider" id="technical-passing" data-category="player-drills">
+                <span class="slider-value">0</span>
+              </div>
+            </label>
+            <label class="slider-label">
+              <span class="label-text">Ball Handling</span>
+              <div class="slider-container">
+                <input type="range" min="0" max="6" step="1" value="0" class="slider" id="technical-ball-handling" data-category="player-drills">
+                <span class="slider-value">0</span>
+              </div>
+      </label>
+            <label class="slider-label">
+              <span class="label-text">Rebounding</span>
+              <div class="slider-container">
+                <input type="range" min="0" max="6" step="1" value="0" class="slider" id="technical-rebounding" data-category="player-drills">
+                <span class="slider-value">0</span>
+              </div>
       </label>
     </div>
-    <div class="category">
-      <div class="category-name">Team Building</div>
-      <label>Team Building
-        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="team-building">
-        <span class="value">0</span>
+        </div>
+
+        <!-- Weight Room Section -->
+        <div class="section">
+          <h3 class="section-title">Weight Room</h3>
+          <div class="slider-group">
+            <label class="slider-label">
+              <span class="label-text">Strength</span>
+              <div class="slider-container">
+                <input type="range" min="0" max="6" step="1" value="0" class="slider" id="weight-strength" data-category="player-drills">
+                <span class="slider-value">0</span>
+              </div>
+      </label>
+            <label class="slider-label">
+              <span class="label-text">Agility</span>
+              <div class="slider-container">
+                <input type="range" min="0" max="6" step="1" value="0" class="slider" id="weight-agility" data-category="player-drills">
+                <span class="slider-value">0</span>
+              </div>
+      </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT PANEL: Team Drills -->
+      <div class="panel team-drills-panel">
+        <h2 class="panel-title">Team Drills</h2>
+        
+        <!-- Team Offense Section -->
+        <div class="section">
+          <h3 class="section-title">Team Offense</h3>
+          <div class="slider-group">
+            <label class="slider-label">
+              <span class="label-text">Offense Install</span>
+              <div class="slider-container">
+                <input type="range" min="0" max="6" step="1" value="0" class="slider" id="team-offense-install" data-category="team-drills">
+                <span class="slider-value">0</span>
+              </div>
       </label>
     </div>
-    <div class="category">
-      <div class="category-name">Free Throws</div>
-      <label>Free Throws
-        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="free-throws">
-        <span class="value">0</span>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="offense-plays" value="current-playbook" checked>
+              <span>Current Playbook</span>
+      </label>
+            <label class="radio-label">
+              <input type="radio" name="offense-plays" value="custom">
+              <span>Custom</span>
       </label>
     </div>
-    <div class="category">
-      <div class="category-name">Film Study</div>
-      <label>Film Study
-        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="film-study">
-        <span class="value">0</span>
+        </div>
+
+        <!-- Team Defense Section -->
+        <div class="section">
+          <h3 class="section-title">Team Defense</h3>
+          <div class="slider-group">
+            <label class="slider-label">
+              <span class="label-text">Defense Install</span>
+              <div class="slider-container">
+                <input type="range" min="0" max="6" step="1" value="0" class="slider" id="team-defense-install" data-category="team-drills">
+                <span class="slider-value">0</span>
+              </div>
       </label>
     </div>
-    <div class="category">
-      <div class="category-name">Scrimmages</div>
-      <label>Scrimmages
-        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="scrimmages">
-        <span class="value">0</span>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="defense-plays" value="current-playbook" checked>
+              <span>Current Playbook</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="defense-plays" value="custom">
+              <span>Custom</span>
       </label>
     </div>
-    <div class="category">
-      <div class="category-name">Breaks</div>
-      <label>Breaks
-        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="breaks">
-        <span class="value">0</span>
+        </div>
+
+        <!-- Fast Breaks Section -->
+        <div class="section">
+          <h3 class="section-title">Fast Breaks</h3>
+          <div class="slider-group">
+            <label class="slider-label">
+              <span class="label-text">Offense Install</span>
+              <div class="slider-container">
+                <input type="range" min="0" max="6" step="1" value="0" class="slider" id="fast-break-offense-install" data-category="team-drills">
+                <span class="slider-value">0</span>
+              </div>
+            </label>
+            <label class="slider-label">
+              <span class="label-text">Defense Install</span>
+              <div class="slider-container">
+                <input type="range" min="0" max="6" step="1" value="0" class="slider" id="fast-break-defense-install" data-category="team-drills">
+                <span class="slider-value">0</span>
+              </div>
+      </label>
+    </div>
+        </div>
+
+        <!-- Presses / Traps Section -->
+        <div class="section">
+          <h3 class="section-title">Presses / Traps</h3>
+          <div class="slider-group">
+            <label class="slider-label">
+              <span class="label-text">Defense Install</span>
+              <div class="slider-container">
+                <input type="range" min="0" max="6" step="1" value="0" class="slider" id="press-defense-install" data-category="team-drills">
+                <span class="slider-value">0</span>
+              </div>
+            </label>
+            <label class="slider-label">
+              <span class="label-text">Offense Install</span>
+              <div class="slider-container">
+                <input type="range" min="0" max="6" step="1" value="0" class="slider" id="press-offense-install" data-category="team-drills">
+                <span class="slider-value">0</span>
+              </div>
+      </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- General Section (Full Width) -->
+    <div class="general-section">
+      <h2 class="panel-title">General</h2>
+      <div class="general-grid">
+        <label class="slider-label">
+          <span class="label-text">Conditioning</span>
+          <div class="slider-container">
+            <input type="range" min="0" max="6" step="1" value="0" class="slider" id="general-conditioning" data-category="general">
+            <span class="slider-value">0</span>
+          </div>
+        </label>
+        <label class="slider-label">
+          <span class="label-text">Free Throws</span>
+          <div class="slider-container">
+            <input type="range" min="0" max="6" step="1" value="0" class="slider" id="general-free-throws" data-category="general">
+            <span class="slider-value">0</span>
+          </div>
+        </label>
+        <label class="slider-label">
+          <span class="label-text">Film Study</span>
+          <div class="slider-container">
+            <input type="range" min="0" max="6" step="1" value="0" class="slider" id="general-film-study" data-category="general">
+            <span class="slider-value">0</span>
+          </div>
+        </label>
+        <label class="slider-label">
+          <span class="label-text">Breaks</span>
+          <div class="slider-container">
+            <input type="range" min="0" max="6" step="1" value="0" class="slider" id="general-breaks" data-category="general">
+            <span class="slider-value">0</span>
+          </div>
+      </label>
+      </div>
+    </div>
+
+    <!-- Coaching Style / Focus Section -->
+    <div class="coaching-section">
+      <h2 class="coaching-title">Coaching Style / Focus (choose one)</h2>
+      <div class="archetypes-grid">
+        <!-- Authoritarian -->
+        <div class="archetype-block" data-archetype="authoritarian">
+          <div class="archetype-header">
+            <label class="archetype-radio-label">
+              <input type="radio" name="coaching-focus" value="authoritarian" class="archetype-radio">
+              <span class="archetype-name">Authoritarian</span>
+            </label>
+          </div>
+          <div class="archetype-options">
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="authoritarian-discipline" class="archetype-radio">
+              <span>Discipline</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="authoritarian-rebounding" class="archetype-radio">
+              <span>Rebounding</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="authoritarian-execution" class="archetype-radio">
+              <span>Execution</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="authoritarian-teamwork" class="archetype-radio">
+              <span>Teamwork</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Systems Coach -->
+        <div class="archetype-block" data-archetype="systems-coach">
+          <div class="archetype-header">
+            <label class="archetype-radio-label">
+              <input type="radio" name="coaching-focus" value="systems-coach" class="archetype-radio">
+              <span class="archetype-name">Systems Coach</span>
+            </label>
+          </div>
+          <div class="archetype-options">
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="systems-coach-offense" class="archetype-radio">
+              <span>Offense</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="systems-coach-defense" class="archetype-radio">
+              <span>Defense</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="systems-coach-fast-breaks" class="archetype-radio">
+              <span>Fast Breaks</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="systems-coach-press-trap" class="archetype-radio">
+              <span>Press / Trap</span>
       </label>
     </div>
   </div>
 
-  <div style="text-align:center; margin-top:20px;">
-    <button id="run-training" class="main-button" disabled>Run Training</button>
+        <!-- Player Maximizer -->
+        <div class="archetype-block" data-archetype="player-maximizer">
+          <div class="archetype-header">
+            <label class="archetype-radio-label">
+              <input type="radio" name="coaching-focus" value="player-maximizer" class="archetype-radio">
+              <span class="archetype-name">Player Maximizer</span>
+            </label>
+          </div>
+          <div class="archetype-options">
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="player-maximizer-top-3" class="archetype-radio">
+              <span>Top 3 Attributes</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="player-maximizer-attributes-4-6" class="archetype-radio">
+              <span>Attributes 4–6</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="player-maximizer-custom" class="archetype-radio">
+              <span>Custom Attributes</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="player-maximizer-opportunity" class="archetype-radio">
+              <span>Opportunity</span>
+            </label>
+          </div>
   </div>
 
-  <div style="text-align:center; margin-top:20px;">
-    <button id="toggle-mode">Toggle Dark Mode</button>
+        <!-- Culture Builder -->
+        <div class="archetype-block" data-archetype="culture-builder">
+          <div class="archetype-header">
+            <label class="archetype-radio-label">
+              <input type="radio" name="coaching-focus" value="culture-builder" class="archetype-radio">
+              <span class="archetype-name">Culture Builder</span>
+            </label>
+          </div>
+          <div class="archetype-options">
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="culture-builder-inspire" class="archetype-radio">
+              <span>Inspire</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="culture-builder-confidence" class="archetype-radio">
+              <span>Confidence</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="culture-builder-community" class="archetype-radio">
+              <span>Community Engagement</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="culture-builder-teamwork" class="archetype-radio">
+              <span>Teamwork</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div id="results" style="display:none;"></div>
-
-  <script>
-  const totalPoints = 24;
-  const remainingEl = document.getElementById('remaining');
-  const sliders = document.querySelectorAll('.slider');
-  const runBtn = document.getElementById('run-training');
-
-  function updateRemaining() {
-    let used = 0;
-    sliders.forEach(s => used += parseInt(s.value));
-    const remaining = totalPoints - used;
-    remainingEl.textContent = remaining;
-    runBtn.disabled = remaining !== 0;
-    return remaining;
-  }
-
-  sliders.forEach(slider => {
-    slider.dataset.prev = slider.value;
-    slider.addEventListener('input', function(e) {
-      let total = 0;
-      sliders.forEach(s => total += parseInt(s.value));
-      if (total > totalPoints) {
-        this.value = this.dataset.prev;
-        total = Array.from(sliders).reduce((acc,s)=> acc + parseInt(s.value),0);
-      }
-      this.dataset.prev = this.value;
-      this.parentElement.querySelector('.value').textContent = this.value;
-      updateRemaining();
-    });
-  });
-
-  updateRemaining();
-
-  document.getElementById('toggle-mode').addEventListener('click', () => {
-    document.body.classList.toggle('dark-mode');
-  });
-
-  // Get URL params for franchise mode
-  const urlParams = new URLSearchParams(window.location.search);
-  const franchiseId = urlParams.get('franchise_id');
-  const mode = urlParams.get('mode'); // 'franchise' or null
-  const sessionType = urlParams.get('session_type') || 'in-season';
-
-  async function runTraining() {
-    const allocations = {
-      offensive_drills: {
-        inside: parseInt(document.getElementById('offensive-inside').value),
-        outside: parseInt(document.getElementById('offensive-outside').value)
-      },
-      defensive_drills: {
-        inside: parseInt(document.getElementById('defensive-inside').value),
-        outside: parseInt(document.getElementById('defensive-outside').value)
-      },
-      technical_drills: {
-        PS: parseInt(document.getElementById('technical-passing').value),
-        BH: parseInt(document.getElementById('technical-ball').value),
-        RB: parseInt(document.getElementById('technical-rebound').value)
-      },
-      weight_room: {
-        ST: parseInt(document.getElementById('weight-strength').value),
-        AG: parseInt(document.getElementById('weight-agility').value)
-      },
-      conditioning: parseInt(document.getElementById('conditioning').value),
-      team_building: parseInt(document.getElementById('team-building').value),
-      free_throws: parseInt(document.getElementById('free-throws').value),
-      film_study: parseInt(document.getElementById('film-study').value),
-      scrimmage: parseInt(document.getElementById('scrimmages').value),
-      breaks: parseInt(document.getElementById('breaks').value)
-    };
-
-    let payload, endpoint;
-    
-    if (mode === 'franchise' && franchiseId) {
-      // Franchise mode - use franchise training endpoint
-      payload = {
-        franchise_id: franchiseId,
-        allocations
-      };
-      endpoint = '/franchise/run-training';
-    } else {
-      // Standalone mode - use regular training endpoint
-      payload = {
-        team_name: 'Four Corners',
-        session_type: sessionType,
-        allocations
-      };
-      endpoint = '/api/run_training';
-    }
-
-    try {
-      runBtn.disabled = true;
-      runBtn.textContent = 'Running...';
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      showResults(data);
-    } catch (err) {
-      console.error('Failed to run training', err);
-      runBtn.textContent = 'Run Training';
-      runBtn.disabled = false;
-    }
-  }
-
-  function showResults(data) {
-    console.log('Training response:', data);
-    document.getElementById('training-grid').style.display = 'none';
-    document.getElementById('points-remaining').style.display = 'none';
-    document.getElementById('training-header').style.display = 'none';
-    runBtn.style.display = 'none';
-    document.getElementById('toggle-mode').style.display = 'none';
-
-    const resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = '';
-    resultsDiv.style.display = 'block';
-    const title = document.createElement('h1');
-    title.textContent = 'Training Results';
-    resultsDiv.appendChild(title);
-
-    const traitOrder = ['SH','SC','ID','OD','PS','BH','RB','AG','ST','ND','IQ','FT'];
-
-    if (data && typeof data.player_logs === 'object') {
-      Object.entries(data.player_logs).forEach(([name, traits]) => {
-        const row = document.createElement('p');
-        const bold = document.createElement('strong');
-        bold.textContent = name + ': ';
-        row.appendChild(bold);
-
-        const parts = traitOrder.map(attr => {
-          const val = Object.hasOwn(traits, attr) ? traits[attr] : 0;
-          const sign = val > 0 ? '+' : '';
-          return `${attr} ${sign}${val}`;
-        });
-
-        row.appendChild(document.createTextNode(parts.join(', ')));
-        resultsDiv.appendChild(row);
-      });
-    } else {
-      const err = document.createElement('p');
-      err.textContent = 'Unable to display player training results.';
-      resultsDiv.appendChild(err);
-    }
-
-    if (Array.isArray(data)) {
-      const ul = document.createElement('ul');
-      ul.id = 'results-list';
-      data.forEach(line => {
-        const li = document.createElement('li');
-        li.textContent = line;
-        ul.appendChild(li);
-      });
-      resultsDiv.appendChild(ul);
-    } else if (Array.isArray(data.log)) {
-      const ul = document.createElement('ul');
-      ul.id = 'results-list';
-      data.log.forEach(line => {
-        const li = document.createElement('li');
-        li.textContent = line;
-        ul.appendChild(li);
-      });
-      resultsDiv.appendChild(ul);
-    }
-
-    if (data && typeof data.team_log === 'object') {
-      const header = document.createElement('h2');
-      header.textContent = 'Team Attributes';
-      resultsDiv.appendChild(header);
-
-      Object.entries(data.team_log).forEach(([attr, delta]) => {
-        const row = document.createElement('p');
-        const sign = delta > 0 ? '+' : '';
-        row.textContent = `${attr} ${sign}${delta}`;
-        resultsDiv.appendChild(row);
-      });
-    } else {
-      const err = document.createElement('p');
-      err.textContent = 'Team attribute data unavailable.';
-      resultsDiv.appendChild(err);
-    }
-    
-    // Add navigation button
-    const btnWrap = document.createElement('div');
-    btnWrap.style.textAlign = 'center';
-    btnWrap.style.marginTop = '20px';
-    
-    if (mode === 'franchise' && franchiseId) {
-      // Franchise mode - go back to command center
-      btnWrap.innerHTML = '<button id="locker-btn" class="main-button">Back to Command Center</button>';
-      resultsDiv.appendChild(btnWrap);
-      
-      document.addEventListener('click', (e) => {
-        if (e.target && e.target.id === 'locker-btn') {
-          window.location.href = `/static/franchise-command-center.html?franchise_id=${franchiseId}`;
-        }
-      });
-    } else {
-      // Standalone mode - original button
-      btnWrap.innerHTML = '<button id="locker-btn" class="main-button">Go To Locker Room</button>';
-      resultsDiv.appendChild(btnWrap);
-    }
-  }
-
-  runBtn.addEventListener('click', runTraining);
-  </script>
+  <script src="training.js"></script>
 </body>
 </html>
