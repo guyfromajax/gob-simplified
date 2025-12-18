@@ -27,6 +27,14 @@ function calculateTotalPoints() {
 }
 
 /**
+ * Check if coaching focus is selected
+ */
+function isCoachingFocusSelected() {
+  const selectedFocus = document.querySelector('input[name="coaching-focus"]:checked');
+  return selectedFocus !== null;
+}
+
+/**
  * Update points remaining display and submit button state
  */
 function updatePointsRemaining() {
@@ -35,8 +43,11 @@ function updatePointsRemaining() {
   
   pointsRemainingEl.textContent = remaining;
   
-  // Enable/disable submit button based on points allocation
-  if (remaining === 0) {
+  // Enable/disable submit button based on points allocation AND coaching focus selection
+  const allPointsAllocated = remaining === 0;
+  const focusSelected = isCoachingFocusSelected();
+  
+  if (allPointsAllocated && focusSelected) {
     submitBtn.disabled = false;
     submitBtn.style.opacity = '1';
   } else {
@@ -125,6 +136,9 @@ coachingRadios.forEach(radio => {
       // Sub-option selected - subtle outline on block, highlight the radio
       archetypeBlock.classList.add('active', 'sub-option-selected');
     }
+    
+    // Update submit button state when focus is selected
+    updatePointsRemaining();
   });
 });
 
@@ -223,6 +237,12 @@ submitBtn.addEventListener('click', async function() {
   const total = calculateTotalPoints();
   if (total !== TOTAL_POINTS) {
     alert(`Please allocate all ${TOTAL_POINTS} training points before submitting.`);
+    return;
+  }
+  
+  // Validate that coaching focus is selected
+  if (!isCoachingFocusSelected()) {
+    alert('Please select a Coaching Style / Focus before submitting.');
     return;
   }
   
