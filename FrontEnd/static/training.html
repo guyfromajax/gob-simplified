@@ -19,129 +19,119 @@
       <button id="submit-btn" class="submit-button" disabled>Submit Training</button>
     </header>
 
-    <!-- Main Content: Two Panels Side-by-Side -->
-    <div class="main-content">
-      <!-- LEFT PANEL: Player Drills -->
-      <div class="panel player-drills-panel">
-        <h2 class="panel-title">Player Drills</h2>
-        <div class="panel-columns">
+    <!-- Main Content: Player Drills and Team Drills -->
+    <div class="main-content-grid">
+      <!-- Player Drills Section -->
+      <div class="content-section player-drills-section">
+        <h2 class="section-header">Player Drills</h2>
+        <div class="content-columns">
           <!-- Column 1 -->
-          <div class="panel-column">
+          <div class="content-column">
             <!-- Offense Drills Section -->
-            <div class="section">
-              <h3 class="section-title">Offense Drills</h3>
-              <div class="slider-group">
-                <label class="slider-label">
-                  <span class="label-text">Inside Offense</span>
-                  <div class="slider-container">
-                    <input type="range" min="0" max="6" step="1" value="0" class="slider" id="offense-inside" data-category="player-drills">
-                    <span class="slider-value">0</span>
-                  </div>
-                </label>
-                <label class="slider-label">
-                  <span class="label-text">Outside Offense</span>
-                  <div class="slider-container">
-                    <input type="range" min="0" max="6" step="1" value="0" class="slider" id="offense-outside" data-category="player-drills">
-                    <span class="slider-value">0</span>
-                  </div>
-                </label>
-              </div>
+            <div class="drill-group">
+              <h3 class="drill-title">Offense Drills</h3>
+              <label class="slider-label">
+                <span class="label-text">Inside Offense</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="6" step="1" value="0" class="slider" id="offense-inside" data-category="player-drills">
+                  <span class="slider-value">0</span>
+                </div>
+              </label>
+              <label class="slider-label">
+                <span class="label-text">Outside Offense</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="6" step="1" value="0" class="slider" id="offense-outside" data-category="player-drills">
+                  <span class="slider-value">0</span>
+                </div>
+              </label>
             </div>
 
             <!-- Technical Drills Section -->
-            <div class="section">
-              <h3 class="section-title">Technical Drills</h3>
-              <div class="slider-group">
-                <label class="slider-label">
-                  <span class="label-text">Passing</span>
-                  <div class="slider-container">
-                    <input type="range" min="0" max="6" step="1" value="0" class="slider" id="technical-passing" data-category="player-drills">
-                    <span class="slider-value">0</span>
-                  </div>
-                </label>
-                <label class="slider-label">
-                  <span class="label-text">Ball Handling</span>
-                  <div class="slider-container">
-                    <input type="range" min="0" max="6" step="1" value="0" class="slider" id="technical-ball-handling" data-category="player-drills">
-                    <span class="slider-value">0</span>
-                  </div>
-      </label>
-                <label class="slider-label">
-                  <span class="label-text">Rebounding</span>
-                  <div class="slider-container">
-                    <input type="range" min="0" max="6" step="1" value="0" class="slider" id="technical-rebounding" data-category="player-drills">
-                    <span class="slider-value">0</span>
-                  </div>
-      </label>
-    </div>
+            <div class="drill-group">
+              <h3 class="drill-title">Technical Drills</h3>
+              <label class="slider-label">
+                <span class="label-text">Passing</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="6" step="1" value="0" class="slider" id="technical-passing" data-category="player-drills">
+                  <span class="slider-value">0</span>
+                </div>
+              </label>
+              <label class="slider-label">
+                <span class="label-text">Ball Handling</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="6" step="1" value="0" class="slider" id="technical-ball-handling" data-category="player-drills">
+                  <span class="slider-value">0</span>
+                </div>
+              </label>
+              <label class="slider-label">
+                <span class="label-text">Rebounding</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="6" step="1" value="0" class="slider" id="technical-rebounding" data-category="player-drills">
+                  <span class="slider-value">0</span>
+                </div>
+              </label>
             </div>
           </div>
 
           <!-- Column 2 -->
-          <div class="panel-column">
+          <div class="content-column">
             <!-- Defense Drills Section -->
-            <div class="section">
-              <h3 class="section-title">Defense Drills</h3>
-              <div class="slider-group">
-                <label class="slider-label">
-                  <span class="label-text">Inside Defense</span>
-                  <div class="slider-container">
-                    <input type="range" min="0" max="6" step="1" value="0" class="slider" id="defense-inside" data-category="player-drills">
-                    <span class="slider-value">0</span>
-                  </div>
-      </label>
-                <label class="slider-label">
-                  <span class="label-text">Outside Defense</span>
-                  <div class="slider-container">
-                    <input type="range" min="0" max="6" step="1" value="0" class="slider" id="defense-outside" data-category="player-drills">
-                    <span class="slider-value">0</span>
-                  </div>
-      </label>
-    </div>
+            <div class="drill-group">
+              <h3 class="drill-title">Defense Drills</h3>
+              <label class="slider-label">
+                <span class="label-text">Inside Defense</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="6" step="1" value="0" class="slider" id="defense-inside" data-category="player-drills">
+                  <span class="slider-value">0</span>
+                </div>
+              </label>
+              <label class="slider-label">
+                <span class="label-text">Outside Defense</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="6" step="1" value="0" class="slider" id="defense-outside" data-category="player-drills">
+                  <span class="slider-value">0</span>
+                </div>
+              </label>
             </div>
 
             <!-- Weight Room Section -->
-            <div class="section">
-              <h3 class="section-title">Weight Room</h3>
-              <div class="slider-group">
-                <label class="slider-label">
-                  <span class="label-text">Strength</span>
-                  <div class="slider-container">
-                    <input type="range" min="0" max="6" step="1" value="0" class="slider" id="weight-strength" data-category="player-drills">
-                    <span class="slider-value">0</span>
-                  </div>
-      </label>
-                <label class="slider-label">
-                  <span class="label-text">Agility</span>
-                  <div class="slider-container">
-                    <input type="range" min="0" max="6" step="1" value="0" class="slider" id="weight-agility" data-category="player-drills">
-                    <span class="slider-value">0</span>
-                  </div>
-      </label>
-              </div>
+            <div class="drill-group">
+              <h3 class="drill-title">Weight Room</h3>
+              <label class="slider-label">
+                <span class="label-text">Strength</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="6" step="1" value="0" class="slider" id="weight-strength" data-category="player-drills">
+                  <span class="slider-value">0</span>
+                </div>
+              </label>
+              <label class="slider-label">
+                <span class="label-text">Agility</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="6" step="1" value="0" class="slider" id="weight-agility" data-category="player-drills">
+                  <span class="slider-value">0</span>
+                </div>
+              </label>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- RIGHT PANEL: Team Drills -->
-      <div class="panel team-drills-panel">
-        <h2 class="panel-title">Team Drills</h2>
-        <div class="panel-columns">
+      <!-- Team Drills Section -->
+      <div class="content-section team-drills-section">
+        <h2 class="section-header">Team Drills</h2>
+        <div class="content-columns">
           <!-- Column 1 -->
-          <div class="panel-column">
+          <div class="content-column">
             <!-- Team Offense Section -->
-            <div class="section">
-              <h3 class="section-title">Offense</h3>
-              <div class="slider-group">
-                <label class="slider-label">
-                  <span class="label-text">Offense Install</span>
-                  <div class="slider-container">
-                    <input type="range" min="0" max="6" step="1" value="0" class="slider" id="team-offense-install" data-category="team-drills">
-                    <span class="slider-value">0</span>
-                  </div>
-                </label>
-              </div>
+            <div class="drill-group">
+              <h3 class="drill-title">Offense</h3>
+              <label class="slider-label">
+                <span class="label-text">Offense Install</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="6" step="1" value="0" class="slider" id="team-offense-install" data-category="team-drills">
+                  <span class="slider-value">0</span>
+                </div>
+              </label>
               <div class="radio-group">
                 <label class="radio-label">
                   <input type="radio" name="offense-plays" value="current-playbook" checked>
@@ -155,41 +145,37 @@
             </div>
 
             <!-- Fast Breaks Section -->
-            <div class="section">
-              <h3 class="section-title">Fast Breaks</h3>
-              <div class="slider-group">
-                <label class="slider-label">
-                  <span class="label-text">Offense Install</span>
-                  <div class="slider-container">
-                    <input type="range" min="0" max="6" step="1" value="0" class="slider" id="fast-break-offense-install" data-category="team-drills">
-                    <span class="slider-value">0</span>
-                  </div>
-                </label>
-                <label class="slider-label">
-                  <span class="label-text">Defense Install</span>
-                  <div class="slider-container">
-                    <input type="range" min="0" max="6" step="1" value="0" class="slider" id="fast-break-defense-install" data-category="team-drills">
-                    <span class="slider-value">0</span>
-                  </div>
-                </label>
-              </div>
+            <div class="drill-group">
+              <h3 class="drill-title">Fast Breaks</h3>
+              <label class="slider-label">
+                <span class="label-text">Offense Install</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="6" step="1" value="0" class="slider" id="fast-break-offense-install" data-category="team-drills">
+                  <span class="slider-value">0</span>
+                </div>
+              </label>
+              <label class="slider-label">
+                <span class="label-text">Defense Install</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="6" step="1" value="0" class="slider" id="fast-break-defense-install" data-category="team-drills">
+                  <span class="slider-value">0</span>
+                </div>
+              </label>
             </div>
           </div>
 
           <!-- Column 2 -->
-          <div class="panel-column">
+          <div class="content-column">
             <!-- Team Defense Section -->
-            <div class="section">
-              <h3 class="section-title">Defense</h3>
-              <div class="slider-group">
-                <label class="slider-label">
-                  <span class="label-text">Defense Install</span>
-                  <div class="slider-container">
-                    <input type="range" min="0" max="6" step="1" value="0" class="slider" id="team-defense-install" data-category="team-drills">
-                    <span class="slider-value">0</span>
-                  </div>
-                </label>
-              </div>
+            <div class="drill-group">
+              <h3 class="drill-title">Defense</h3>
+              <label class="slider-label">
+                <span class="label-text">Defense Install</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="6" step="1" value="0" class="slider" id="team-defense-install" data-category="team-drills">
+                  <span class="slider-value">0</span>
+                </div>
+              </label>
               <div class="radio-group">
                 <label class="radio-label">
                   <input type="radio" name="defense-plays" value="current-playbook" checked>
@@ -203,24 +189,22 @@
             </div>
 
             <!-- Presses / Traps Section -->
-            <div class="section">
-              <h3 class="section-title">Presses / Traps</h3>
-              <div class="slider-group">
-                <label class="slider-label">
-                  <span class="label-text">Defense Install</span>
-                  <div class="slider-container">
-                    <input type="range" min="0" max="6" step="1" value="0" class="slider" id="press-defense-install" data-category="team-drills">
-                    <span class="slider-value">0</span>
-                  </div>
-                </label>
-                <label class="slider-label">
-                  <span class="label-text">Offense Install</span>
-                  <div class="slider-container">
-                    <input type="range" min="0" max="6" step="1" value="0" class="slider" id="press-offense-install" data-category="team-drills">
-                    <span class="slider-value">0</span>
-                  </div>
-                </label>
-              </div>
+            <div class="drill-group">
+              <h3 class="drill-title">Presses / Traps</h3>
+              <label class="slider-label">
+                <span class="label-text">Defense Install</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="6" step="1" value="0" class="slider" id="press-defense-install" data-category="team-drills">
+                  <span class="slider-value">0</span>
+                </div>
+              </label>
+              <label class="slider-label">
+                <span class="label-text">Offense Install</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="6" step="1" value="0" class="slider" id="press-offense-install" data-category="team-drills">
+                  <span class="slider-value">0</span>
+                </div>
+              </label>
             </div>
           </div>
         </div>
@@ -228,8 +212,8 @@
     </div>
 
     <!-- General Section (Full Width) -->
-    <div class="general-section">
-      <h2 class="panel-title">General</h2>
+    <div class="content-section general-section">
+      <h2 class="section-header">General</h2>
       <div class="general-grid">
         <label class="slider-label">
           <span class="label-text">Conditioning</span>
@@ -258,7 +242,7 @@
             <input type="range" min="0" max="6" step="1" value="0" class="slider" id="general-breaks" data-category="general">
             <span class="slider-value">0</span>
           </div>
-      </label>
+        </label>
       </div>
     </div>
 

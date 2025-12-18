@@ -131,59 +131,51 @@ body {
   pointer-events: none;
 }
 
-/* Main Content: Two Panels */
-.main-content {
+/* Main Content: Player Drills and Team Drills */
+.main-content-grid {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--spacing-md);
+  gap: var(--spacing-lg);
   margin-bottom: var(--spacing-md);
 }
 
-.panel {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--spacing-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-  overflow-y: auto;
-  max-height: 500px;
-}
-
-.panel-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--spacing-md);
-}
-
-.panel-column {
+.content-section {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
 }
 
-.panel-title {
+.section-header {
   font-size: 1.5rem;
   color: var(--color-accent);
   font-weight: 600;
   margin-bottom: var(--spacing-sm);
-  text-align: center;
 }
 
-.section {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: var(--radius);
-  padding: var(--spacing-sm);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+.content-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
 }
 
-.section-title {
+.content-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.drill-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.drill-title {
   font-size: 1.1rem;
   color: var(--color-text);
   font-weight: 600;
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
 }
 
 .slider-group {
@@ -269,10 +261,6 @@ body {
 /* General Section */
 .general-section {
   grid-column: 1 / -1;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--spacing-md);
   margin-bottom: var(--spacing-md);
 }
 
