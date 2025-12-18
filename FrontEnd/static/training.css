@@ -149,7 +149,26 @@ body {
 .content-section {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
+}
+
+.section-container {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--spacing-md);
+  min-height: 450px;
+  display: flex;
+  flex-direction: column;
+}
+
+.player-drills-section .section-container,
+.team-drills-section .section-container {
+  min-height: 500px;
+}
+
+.general-section .section-container {
+  min-height: 200px;
 }
 
 .section-header {
@@ -163,6 +182,7 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--spacing-md);
+  flex: 1;
 }
 
 .content-column {
@@ -274,7 +294,7 @@ body {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--spacing-md);
-  margin-top: var(--spacing-sm);
+  flex: 1;
 }
 
 /* Coaching Section */
