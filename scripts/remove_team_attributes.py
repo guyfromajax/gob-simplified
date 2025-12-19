@@ -25,6 +25,7 @@ From:
 
 import sys
 import os
+import random
 
 # Add parent directory to path to import BackEnd modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -61,21 +62,37 @@ def update_teams_collection():
     # Remove old attributes
     unset_ops = {attr: "" for attr in ATTRIBUTES_TO_REMOVE}
     
-    # Add new attributes (only if they don't exist)
-    set_ops = {}
-    for attr, default_value in ATTRIBUTES_TO_ADD.items():
-        set_ops[attr] = default_value
+    # For universal teams collection, we need to update each team individually
+    # to set random values in the new ranges (not just 0)
+    teams = teams_collection.find({})
+    updated_count = 0
     
-    # Combine operations
-    update_ops = {}
-    if unset_ops:
-        update_ops["$unset"] = unset_ops
-    if set_ops:
-        update_ops["$set"] = set_ops
+    for team in teams:
+        set_ops = {}
+        
+        # Add new attributes with random values in new ranges (for universal teams)
+        # For foul_modifier and turnover_modifier: random.randint(-10, 10)
+        # For others: default to 0
+        set_ops["foul_modifier"] = random.randint(-10, 10)
+        set_ops["turnover_modifier"] = random.randint(-10, 10)
+        set_ops["defensive_efficiency"] = random.randint(-10, 10)
+        set_ops["fb_efficiency"] = random.randint(-10, 10)
+        set_ops["pt_efficiency"] = random.randint(-10, 10)
+        set_ops["fb_opp_modifier"] = random.randint(-10, 10)
+        set_ops["pt_opp_modifier"] = random.randint(-10, 10)
+        
+        # Combine operations
+        update_ops = {}
+        if unset_ops:
+            update_ops["$unset"] = unset_ops
+        if set_ops:
+            update_ops["$set"] = set_ops
+        
+        teams_collection.update_one({"_id": team["_id"]}, update_ops)
+        updated_count += 1
     
-    result = teams_collection.update_many({}, update_ops)
-    print(f"   ✅ Updated {result.modified_count} team documents")
-    return result.modified_count
+    print(f"   ✅ Updated {updated_count} team documents")
+    return updated_count
 
 def update_tournaments_collection():
     """Remove old attributes and add new attributes to tournaments collection (nested in teams objects)."""
