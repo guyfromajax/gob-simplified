@@ -1522,22 +1522,33 @@ def resolve_free_throw_logic(game):
     return result
 
 
-def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
+def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resolution_system=False):
 
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     ball_handler = roles["ball_handler"]
     defender = roles.get("defender")
     ball_handler.record_stat("TO")
-    # ✅ FIX: Only use random choice if turnover_type is not explicitly provided
-    # This respects the actual turnover type instead of always randomizing
-    if turnover_type == "DEAD BALL" and defender:
-        # If defender is present, could be either STEAL or DEAD BALL
-        # Use random choice only when both are possible
-        turnover_type = random.choice(["STEAL", "DEAD BALL"])
-    elif turnover_type == "DEAD BALL":
-        # No defender, must be DEAD BALL
-        turnover_type = "DEAD BALL"
-    # If turnover_type is already "STEAL", keep it as STEAL
+    
+    # ✅ FIX: Respect resolution system's determination
+    # If turnover_type comes from the resolution system, don't randomly convert it
+    if from_resolution_system:
+        # Resolution system has already determined the type, respect it
+        if turnover_type == "DEAD BALL":
+            turnover_type = "DEAD BALL"  # Keep as dead ball turnover
+        elif turnover_type == "STEAL":
+            turnover_type = "STEAL"  # Keep as steal
+        # No random conversion when from resolution system
+    else:
+        # Legacy behavior: Only use random choice if turnover_type is not explicitly provided
+        # This respects the actual turnover type instead of always randomizing
+        if turnover_type == "DEAD BALL" and defender:
+            # If defender is present, could be either STEAL or DEAD BALL
+            # Use random choice only when both are possible
+            turnover_type = random.choice(["STEAL", "DEAD BALL"])
+        elif turnover_type == "DEAD BALL":
+            # No defender, must be DEAD BALL
+            turnover_type = "DEAD BALL"
+        # If turnover_type is already "STEAL", keep it as STEAL
     game_state["last_turnover_player"] = ball_handler
 
     # Pre-compute IDs/names for logging and return payload
@@ -3564,8 +3575,16 @@ def resolve_half_court_offense_logic(game):
         #need to add animations to each of these
         if event_type == "TURNOVER":
             # Use result to determine turnover type (STEAL vs DEAD BALL)
-            turnover_type = "STEAL" if result == "STEAL" else "DEAD BALL"
-            turn_result = resolve_turnover_logic(roles, game, turnover_type=turnover_type)
+            # Convert DEAD_BALL_TURNOVER (from resolution system) to "DEAD BALL" format
+            if result == "DEAD_BALL_TURNOVER":
+                turnover_type = "DEAD BALL"
+            elif result == "STEAL":
+                turnover_type = "STEAL"
+            else:
+                # Fallback for legacy code paths
+                turnover_type = "DEAD BALL"
+            # Pass from_resolution_system=True to respect the resolution system's determination
+            turn_result = resolve_turnover_logic(roles, game, turnover_type=turnover_type, from_resolution_system=True)
             # Add skeleton and animations to result
             turn_result["skeleton"] = skeleton or {}
             turn_result["animations"] = animations

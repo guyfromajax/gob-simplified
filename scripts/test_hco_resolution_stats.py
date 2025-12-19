@@ -74,11 +74,11 @@ def run_hco_statistics_test():
         "Total Turns": 0
     }
     
-    print("\n🎯 Simulating 10 full games...")
+    print("\n🎯 Simulating 1 full game...")
     print("=" * 60)
     
-    # Simulate 10 full games
-    for game_num in range(1, 11):
+    # Simulate 1 full game
+    for game_num in range(1, 2):
         print(f"\n📊 Game {game_num}/10...")
         
         # Initialize game with Morristown and Four Corners, using loaded attributes
@@ -175,7 +175,7 @@ def run_hco_statistics_test():
                                 # Non-shooting foul (default to defensive)
                                 stats["HCO Results"]["D_FOUL (non-shooting)"] += 1
                     
-                    elif result_type == "DEAD_BALL_TURNOVER":
+                    elif result_type == "DEAD_BALL_TURNOVER" or result_type == "DEAD BALL":
                         stats["HCO Results"]["DEAD_BALL_TURNOVER"] += 1
                     
                     elif result_type == "TURNOVER":
@@ -200,7 +200,8 @@ def run_hco_statistics_test():
                         stats["HCO Results"]["STEAL"] += 1
         
         stats["Total Games"] += 1
-        print(f"   Game {game_num} complete: {stats['Total HCO Turns']} HCO turns so far")
+        if game_num % 10 == 0:
+            print(f"   Game {game_num} complete: {stats['Total HCO Turns']} HCO turns so far")
     
     # Print final statistics
     print("\n" + "=" * 60)
