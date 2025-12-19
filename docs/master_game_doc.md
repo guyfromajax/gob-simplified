@@ -4560,13 +4560,23 @@ All frontend navigation now uses a unified helper (`FrontEnd/static/js/shared/ti
 - `getGameId()`: Gets game ID from URL or localStorage
 
 **Navigation Entry Points Using Helper:**
-- `set-lineup.js`: "Play Now" button, "Game Plan" button
-- `game-plan.js`: `navigateToCourt()`, `navigateBack()`, navigation to playbooks
+- `set-lineup.js`: "Play Now" button, "Game Plan" button, "Box Score" button
+- `game-plan.js`: `navigateToCourt()`, `navigateBack()`, Playbooks button navigation
 - `playbooks.js`: `navigateToPlayDetails()`, `handleBack()` (navigation to/from play-details and game-plan)
 - `play-details.html`: `goBack()` (navigation back to playbooks)
+- `box-score.js`: `setupLockerRoomButton()` (back navigation from lineup/game-plan)
 - `timeoutButtonManager.js`: `showTimeoutPopup()` (timeout button navigation)
 - `foulOutPopup.js`: Foul out navigation to lineup
 - `gameScene.js`: Quarter end navigation
+
+**Critical Update (January 2025):**
+All navigation functions now use `TimeoutNavigationHelper` to ensure consistent parameter preservation, including `resume_from_timeout` and `clock` parameters. This fixes issues where game state was lost during navigation chains (e.g., Foul Out → Lineup → Game Plan → Playbooks → Play Details → back to court).
+
+**Previously Manual Navigation (Now Using Helper):**
+- `playbooks.js` `handleBack()`: Now uses helper for game-plan navigation (preserves timeout state)
+- `playbooks.js` `navigateToPlayDetails()`: Now uses helper (preserves timeout state)
+- `play-details.html` `goBack()`: Now uses helper (preserves timeout state)
+- `game-plan.js` Playbooks button: Now uses helper (preserves timeout state)
 
 **Helper Logic (SS&S Rules):**
 

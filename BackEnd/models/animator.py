@@ -356,17 +356,25 @@ class Animator:
             
             if hold_up:
                 # ✅ Defensive Stop: x=40-60, y=starting_y ± 6 (clamped 1-49)
+                # ✅ CLAMP: Clamp x to rim coordinates (10-90)
                 target_y = max(1, min(49, player_start_y + random.randint(-REBOUNDER_Y_RANGE, REBOUNDER_Y_RANGE)))
+                target_x = random.randint(REBOUNDER_X_MIN, REBOUNDER_X_MAX)
+                # Clamp x between rim coordinates
+                target_x = max(AWAY_RIM_COORDS["x"], min(HOME_RIM_COORDS["x"], target_x))
                 target_spot = {
-                    "x": random.randint(REBOUNDER_X_MIN, REBOUNDER_X_MAX),
+                    "x": target_x,
                     "y": target_y
                 }
             else:
                 # ✅ Shot Attempt: x=rim_x, y=rim_y ± 10 (clamped 1-49)
+                # ✅ CLAMP: Clamp x to rim coordinates (10-90)
                 rim_coords = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
                 target_y = max(1, min(49, rim_coords["y"] + random.randint(-SHOT_ATTEMPT_REBOUNDER_Y_RANGE, SHOT_ATTEMPT_REBOUNDER_Y_RANGE)))
+                target_x = rim_coords["x"]
+                # Clamp x between rim coordinates (should already be within range, but ensure it)
+                target_x = max(AWAY_RIM_COORDS["x"], min(HOME_RIM_COORDS["x"], target_x))
                 target_spot = {
-                    "x": rim_coords["x"],
+                    "x": target_x,
                     "y": target_y
                 }
             
