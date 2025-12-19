@@ -7775,7 +7775,7 @@ The HCO resolution system processes outcomes in the following order:
 **Defense Team:**
 - `defensive_efficiency`
 - `foul_modifier`
-- `aggression` setting (from `strategy_calls["aggression"]` - strings: "passive", "normal", "aggressive")
+- `aggression` setting (from `strategy_calls["aggression_call"]` - strings: "passive", "normal", "aggressive")
 
 #### Step 2: Calibrate Universal Constants
 
@@ -7843,7 +7843,7 @@ Each check returns immediately if its event occurs. If no event occurs after che
 **Process:**
 1. **Apply Aggression Modifier to Steal Attempt Rate:**
    - Base: `STEAL_ATTEMPT = 20`
-   - **Aggression from `strategy_calls["aggression"]`** (strings: "passive", "normal", "aggressive")
+   - **Aggression from `strategy_calls["aggression_call"]`** (strings: "passive", "normal", "aggressive")
    - `"aggressive"`: `STEAL_ATTEMPT += 10` (30% total)
    - `"passive"`: `STEAL_ATTEMPT -= 10` (10% total)
    - `"normal"` or any other value: No change (20% total)
@@ -8026,7 +8026,7 @@ After all modifications, ensure no value goes below **2**:
 
 **Steal Attempt Rate:**
 - Base steal attempt rate: **20%** of half court possessions
-- **Aggression from `strategy_calls["aggression"]`** (strings: "passive", "normal", "aggressive")
+- **Aggression from `strategy_calls["aggression_call"]`** (strings: "passive", "normal", "aggressive")
 - Aggression setting modifiers:
   - **"aggressive"**: `+10 percentage points` (30% total)
   - **"passive"**: `-10 percentage points` (10% total)
