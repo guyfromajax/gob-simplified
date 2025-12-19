@@ -7477,28 +7477,25 @@ DEAD_BALL_TURNOVER = 7 - int(0.5 * offense_team.turnover_modifier)
    - Determine defender using man-to-man or zone defense logic
    - Calculate ball handling score (offensive player):
      ```python
-     bh_score = (
-         attrs["BH"] * 0.5 +
-         attrs["AG"] * 0.2 +
-         attrs["IQ"] * 0.2 +
-         attrs["CH"] * 0.1
-     ) * random.randint(1, 6)
+     from BackEnd.utils.shared import calculate_ball_handling_score
+     bh_score = calculate_ball_handling_score(ball_handler)
      ```
    - Calculate defender score:
      ```python
-     defender_score = (
-         def_attrs["OD"] * 0.3 +
-         def_attrs["AG"] * 0.3 +
-         def_attrs["IQ"] * 0.2 +
-         def_attrs["CH"] * 0.2
-     ) * random.randint(1, 6)
-     if is_zone_defense(defense_call):
-         defender_score *= 0.9
+     from BackEnd.utils.shared import calculate_defender_pressure_score
+     defender_score = calculate_defender_pressure_score(defender, defense_call)
      ```
    - If `defender_score > bh_score`: **DEAD_BALL_TURNOVER result** (end resolution)
    - Else: Continue to Step 6
 
-**Note:** Both offensive and defensive values use the same calculation functions with `random.randint(1, 6)` multiplier, ensuring consistent randomization across both scores.
+**Utility Functions:**
+- `calculate_ball_handling_score(player)` - Located in `BackEnd/utils/shared.py`
+  - Formula: `(BH * 0.5 + AG * 0.2 + IQ * 0.2 + CH * 0.1) * random.randint(1, 6)`
+- `calculate_defender_pressure_score(defender, defense_call)` - Located in `BackEnd/utils/shared.py`
+  - Formula: `(OD * 0.3 + AG * 0.3 + IQ * 0.2 + CH * 0.2) * random.randint(1, 6)`
+  - Zone defense modifier: `pressure *= 0.9`
+
+**Note:** Both functions use `random.randint(1, 6)` multiplier, ensuring consistent randomization across both scores.
 
 #### Step 6: Shot Attempt
 
