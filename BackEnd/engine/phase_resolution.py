@@ -1635,93 +1635,19 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
     return result
 
 
-def resolve_hco_outcome(game, skeleton):
+def _check_standard_fouls(calibrated_o_foul, calibrated_d_foul):
     """
-    Resolve HCO turn outcome using the new Resolution System.
-    
-    Processes outcomes in sequential priority order:
-    1. Standard fouls (O_FOUL, D_FOUL)
-    2. Steal attempt
-    3. Dead ball turnover
-    4. Shot attempt (with skeleton variant selection)
+    Check for standard fouls (O_FOUL or D_FOUL).
     
     Args:
-        game: GameManager object
-        skeleton: Skeleton dict (needed for step selection and variant determination)
+        calibrated_o_foul: Calibrated offensive foul threshold
+        calibrated_d_foul: Calibrated defensive foul threshold
     
     Returns:
-        tuple: (result, variant_result)
-            - result: "SHOT", "O_FOUL", "D_FOUL", "DEAD_BALL_TURNOVER", or "STEAL"
-            - variant_result: For SHOT results, the skeleton variant ("successful", "mid_play_change", "contested", "broken")
-                          For non-SHOT results, None
+        tuple: ("O_FOUL", None) or ("D_FOUL", None) if foul occurs, None otherwise
     """
-    import random
-    from BackEnd.constants import (
-        STANDARD_D_FOUL, STANDARD_O_FOUL, HARD_STEAL, SOFT_STEAL,
-        HARD_FOUL, SOFT_FOUL, SOFT_PROB, STEAL_ATTEMPT, DEAD_BALL_TURNOVER
-    )
-    from BackEnd.utils.shared import (
-        calculate_ball_handling_score, calculate_defender_pressure_score,
-        get_player_position, unpack_game_context, get_name_safe
-    )
-    # get_ball_handler_from_skeleton is defined in this file (phase_resolution.py)
-    from BackEnd.utils.defense_utils import is_zone_defense
-    
-    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
-    
-    # Step 1: Get Team Attributes and Settings
-    off_attrs = off_team.team_attributes
-    def_attrs = def_team.team_attributes
-    
-    offensive_efficiency = off_attrs.get("offensive_efficiency", 0)
-    turnover_modifier = off_attrs.get("turnover_modifier", 0)
-    foul_modifier_off = off_attrs.get("foul_modifier", 0)
-    
-    defensive_efficiency = def_attrs.get("defensive_efficiency", 0)
-    foul_modifier_def = def_attrs.get("foul_modifier", 0)
-    
-    # Get aggression setting (0-4, where 2 is normal)
-    aggression_level = def_team.strategy_calls.get("aggression", 2)
-    
-    # 🔍 DEBUG: Step 1 - Team Attributes and Settings
-    logging.warning(f"🔍 [HCO RESOLUTION] Step 1 - Team Attributes and Settings:")
-    logging.warning(f"   Offense: efficiency={offensive_efficiency}, turnover_mod={turnover_modifier}, foul_mod={foul_modifier_off}")
-    logging.warning(f"   Defense: efficiency={defensive_efficiency}, foul_mod={foul_modifier_def}, aggression={aggression_level}")
-    
-    # Step 2: Calibrate Universal Constants
-    # Standard D Foul calibration
-    calibrated_d_foul = STANDARD_D_FOUL + int(foul_modifier_def * 0.4)
-    calibrated_d_foul = min(98, calibrated_d_foul)  # Max 98
-    
-    # Standard O Foul calibration
-    calibrated_o_foul = STANDARD_O_FOUL - foul_modifier_off
-    calibrated_o_foul = max(2, calibrated_o_foul)  # Min 2
-    
-    # Steal thresholds calibration
-    calibrated_hard_steal = HARD_STEAL - turnover_modifier
-    calibrated_soft_steal = SOFT_STEAL - turnover_modifier
-    
-    # Foul thresholds calibration (on steal attempts)
-    calibrated_hard_foul = HARD_FOUL - int(foul_modifier_def * 0.6)
-    calibrated_soft_foul = SOFT_FOUL - int(foul_modifier_def * 0.6)
-    
-    # Dead Ball Turnover calibration
-    calibrated_dead_ball_to = DEAD_BALL_TURNOVER - int(0.5 * turnover_modifier)
-    calibrated_dead_ball_to = max(2, calibrated_dead_ball_to)  # Min 2
-    
-    # 🔍 DEBUG: Step 2 - Calibrated Constants
-    logging.warning(f"🔍 [HCO RESOLUTION] Step 2 - Calibrated Constants:")
-    logging.warning(f"   STANDARD_D_FOUL: {STANDARD_D_FOUL} + int({foul_modifier_def} * 0.4) = {calibrated_d_foul} (max 98)")
-    logging.warning(f"   STANDARD_O_FOUL: {STANDARD_O_FOUL} - {foul_modifier_off} = {calibrated_o_foul} (min 2)")
-    logging.warning(f"   HARD_STEAL: {HARD_STEAL} - {turnover_modifier} = {calibrated_hard_steal}")
-    logging.warning(f"   SOFT_STEAL: {SOFT_STEAL} - {turnover_modifier} = {calibrated_soft_steal}")
-    logging.warning(f"   HARD_FOUL: {HARD_FOUL} - int({foul_modifier_def} * 0.6) = {calibrated_hard_foul}")
-    logging.warning(f"   SOFT_FOUL: {SOFT_FOUL} - int({foul_modifier_def} * 0.6) = {calibrated_soft_foul}")
-    logging.warning(f"   DEAD_BALL_TURNOVER: {DEAD_BALL_TURNOVER} - int(0.5 * {turnover_modifier}) = {calibrated_dead_ball_to} (min 2)")
-    
-    # Step 3: Calculate Standard Foul Result
     foul_roll = random.randint(1, 100)
-    logging.warning(f"🔍 [HCO RESOLUTION] Step 3 - Standard Foul Check:")
+    logging.warning(f"🔍 [HCO RESOLUTION] Standard Foul Check:")
     logging.warning(f"   Roll: {foul_roll} (1-100)")
     logging.warning(f"   O_FOUL threshold: <= {calibrated_o_foul}")
     logging.warning(f"   D_FOUL threshold: >= {calibrated_d_foul}")
@@ -1732,22 +1658,39 @@ def resolve_hco_outcome(game, skeleton):
         logging.warning(f"   ✅ RESULT: D_FOUL (roll {foul_roll} >= {calibrated_d_foul})")
         return ("D_FOUL", None)
     else:
-        logging.warning(f"   ➡️  No foul ({calibrated_o_foul} < {foul_roll} < {calibrated_d_foul}), continuing to Step 4")
+        logging.warning(f"   ➡️  No foul ({calibrated_o_foul} < {foul_roll} < {calibrated_d_foul})")
+        return None
+
+
+def _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_steal, 
+                         calibrated_hard_foul, calibrated_soft_foul, steal_attempt_rate):
+    """
+    Check for steal attempt and resolve it.
     
-    # Step 4: Calculate Steal Attempt
-    # Apply aggression modifier to steal attempt rate
-    steal_attempt_rate = STEAL_ATTEMPT
-    if aggression_level == 4:  # Aggressive
-        steal_attempt_rate += 10
-    elif aggression_level == 0:  # Passive
-        steal_attempt_rate -= 10
-    steal_attempt_rate = max(10, min(30, steal_attempt_rate))  # Clamp between 10-30
+    Args:
+        game: GameManager object
+        skeleton: Skeleton dict
+        calibrated_hard_steal: Calibrated hard steal threshold
+        calibrated_soft_steal: Calibrated soft steal threshold
+        calibrated_hard_foul: Calibrated hard foul threshold
+        calibrated_soft_foul: Calibrated soft foul threshold
+        steal_attempt_rate: Steal attempt rate percentage
+    
+    Returns:
+        tuple: ("STEAL", None), ("D_FOUL", None), or None if no event
+    """
+    from BackEnd.utils.shared import (
+        calculate_ball_handling_score, calculate_defender_pressure_score,
+        get_player_position, get_name_safe
+    )
+    from BackEnd.utils.defense_utils import is_zone_defense
+    from BackEnd.utils.shared import resolve_steal_attempt
+    
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     
     steal_roll = random.randint(1, 100)
-    logging.warning(f"🔍 [HCO RESOLUTION] Step 4 - Steal Attempt Check:")
-    logging.warning(f"   Base STEAL_ATTEMPT: {STEAL_ATTEMPT}%")
-    logging.warning(f"   Aggression level: {aggression_level} (0=passive, 2=normal, 4=aggressive)")
-    logging.warning(f"   Adjusted steal attempt rate: {steal_attempt_rate}%")
+    logging.warning(f"🔍 [HCO RESOLUTION] Steal Attempt Check:")
+    logging.warning(f"   Base STEAL_ATTEMPT: {steal_attempt_rate}%")
     logging.warning(f"   Roll: {steal_roll} (1-100)")
     if steal_roll < steal_attempt_rate:
         logging.warning(f"   ✅ Steal attempt occurs ({steal_roll} < {steal_attempt_rate})")
@@ -1766,7 +1709,7 @@ def resolve_hco_outcome(game, skeleton):
                     ball_handler_pos = get_player_position(off_lineup, ball_handler)
                     defense_call = game_state.get("defense_playcall", "Man")
                     
-                    # Get defender
+                    # Get defender (zone or man defense logic)
                     if is_zone_defense(defense_call):
                         # Zone defense: use zone assignment logic
                         from BackEnd.utils.shared_defense import (
@@ -1870,7 +1813,6 @@ def resolve_hco_outcome(game, skeleton):
                         pressure = calculate_defender_pressure_score(defender, defense_call)
                         
                         # Resolve steal attempt
-                        from BackEnd.utils.shared import resolve_steal_attempt
                         delta = bh_score - pressure
                         logging.warning(f"      Ball handler: {get_name_safe(ball_handler)} (pos: {ball_handler_pos})")
                         logging.warning(f"      Defender: {get_name_safe(defender)}")
@@ -1890,14 +1832,36 @@ def resolve_hco_outcome(game, skeleton):
                             return ("STEAL", None)
                         elif steal_result == "D_FOUL":
                             return ("D_FOUL", None)
-                        # If "NO_EVENT", continue to Step 5
-                        logging.warning(f"      ➡️  No event ({steal_result}), continuing to Step 5")
+                        # If "NO_EVENT", return None
+                        logging.warning(f"      ➡️  No event ({steal_result})")
     else:
-        logging.warning(f"   ➡️  No steal attempt ({steal_roll} >= {steal_attempt_rate}), continuing to Step 5")
+        logging.warning(f"   ➡️  No steal attempt ({steal_roll} >= {steal_attempt_rate})")
     
-    # Step 5: Calculate Dead Ball Turnover
+    return None
+
+
+def _check_dead_ball_turnover(game, skeleton, calibrated_dead_ball_to):
+    """
+    Check for dead ball turnover.
+    
+    Args:
+        game: GameManager object
+        skeleton: Skeleton dict
+        calibrated_dead_ball_to: Calibrated dead ball turnover threshold
+    
+    Returns:
+        tuple: ("DEAD_BALL_TURNOVER", None) if turnover occurs, None otherwise
+    """
+    from BackEnd.utils.shared import (
+        calculate_ball_handling_score, calculate_defender_pressure_score,
+        get_player_position, get_name_safe
+    )
+    from BackEnd.utils.defense_utils import is_zone_defense
+    
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    
     turnover_roll = random.randint(1, 100)
-    logging.warning(f"🔍 [HCO RESOLUTION] Step 5 - Dead Ball Turnover Check:")
+    logging.warning(f"🔍 [HCO RESOLUTION] Dead Ball Turnover Check:")
     logging.warning(f"   DEAD_BALL_TURNOVER threshold: < {calibrated_dead_ball_to}")
     logging.warning(f"   Roll: {turnover_roll} (1-100)")
     if turnover_roll < calibrated_dead_ball_to:
@@ -2028,10 +1992,132 @@ def resolve_hco_outcome(game, skeleton):
                         if defender_score > bh_score:
                             logging.warning(f"      ✅ RESULT: DEAD_BALL_TURNOVER (defender {defender_score} > ball handler {bh_score})")
                             return ("DEAD_BALL_TURNOVER", None)
-                        # Else continue to Step 6
-                        logging.warning(f"      ➡️  No turnover (defender {defender_score} <= ball handler {bh_score}), continuing to Step 6")
+                        # Else continue
+                        logging.warning(f"      ➡️  No turnover (defender {defender_score} <= ball handler {bh_score})")
     else:
-        logging.warning(f"   ➡️  No turnover check ({turnover_roll} >= {calibrated_dead_ball_to}), continuing to Step 6")
+        logging.warning(f"   ➡️  No turnover check ({turnover_roll} >= {calibrated_dead_ball_to})")
+    
+    return None
+
+
+def resolve_hco_outcome(game, skeleton):
+    """
+    Resolve HCO turn outcome using the new Resolution System.
+    
+    Processes outcomes in the following order:
+    1. Get team attributes and settings
+    2. Calibrate universal constants
+    3-5. Check for events in RANDOMIZED order:
+        - Standard fouls (O_FOUL, D_FOUL)
+        - Steal attempt (with resolution)
+        - Dead ball turnover
+    6. Shot attempt (with skeleton variant selection) - if no event occurred
+    
+    Args:
+        game: GameManager object
+        skeleton: Skeleton dict (needed for step selection and variant determination)
+    
+    Returns:
+        tuple: (result, variant_result)
+            - result: "SHOT", "O_FOUL", "D_FOUL", "DEAD_BALL_TURNOVER", or "STEAL"
+            - variant_result: For SHOT results, the skeleton variant ("successful", "mid_play_change", "contested", "broken")
+                          For non-SHOT results, None
+    """
+    import random
+    from BackEnd.constants import (
+        STANDARD_D_FOUL, STANDARD_O_FOUL, HARD_STEAL, SOFT_STEAL,
+        HARD_FOUL, SOFT_FOUL, SOFT_PROB, STEAL_ATTEMPT, DEAD_BALL_TURNOVER
+    )
+    from BackEnd.utils.shared import (
+        calculate_ball_handling_score, calculate_defender_pressure_score,
+        get_player_position, unpack_game_context, get_name_safe
+    )
+    # get_ball_handler_from_skeleton is defined in this file (phase_resolution.py)
+    from BackEnd.utils.defense_utils import is_zone_defense
+    
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    
+    # Step 1: Get Team Attributes and Settings
+    off_attrs = off_team.team_attributes
+    def_attrs = def_team.team_attributes
+    
+    offensive_efficiency = off_attrs.get("offensive_efficiency", 0)
+    turnover_modifier = off_attrs.get("turnover_modifier", 0)
+    foul_modifier_off = off_attrs.get("foul_modifier", 0)
+    
+    defensive_efficiency = def_attrs.get("defensive_efficiency", 0)
+    foul_modifier_def = def_attrs.get("foul_modifier", 0)
+    
+    # Get aggression setting (0-4, where 2 is normal)
+    aggression_level = def_team.strategy_calls.get("aggression", 2)
+    
+    # 🔍 DEBUG: Step 1 - Team Attributes and Settings
+    logging.warning(f"🔍 [HCO RESOLUTION] Step 1 - Team Attributes and Settings:")
+    logging.warning(f"   Offense: efficiency={offensive_efficiency}, turnover_mod={turnover_modifier}, foul_mod={foul_modifier_off}")
+    logging.warning(f"   Defense: efficiency={defensive_efficiency}, foul_mod={foul_modifier_def}, aggression={aggression_level}")
+    
+    # Step 2: Calibrate Universal Constants
+    # Standard D Foul calibration
+    calibrated_d_foul = STANDARD_D_FOUL + int(foul_modifier_def * 0.4)
+    calibrated_d_foul = min(98, calibrated_d_foul)  # Max 98
+    
+    # Standard O Foul calibration
+    calibrated_o_foul = STANDARD_O_FOUL - foul_modifier_off
+    calibrated_o_foul = max(2, calibrated_o_foul)  # Min 2
+    
+    # Steal thresholds calibration
+    calibrated_hard_steal = HARD_STEAL - turnover_modifier
+    calibrated_soft_steal = SOFT_STEAL - turnover_modifier
+    
+    # Foul thresholds calibration (on steal attempts)
+    calibrated_hard_foul = HARD_FOUL - int(foul_modifier_def * 0.6)
+    calibrated_soft_foul = SOFT_FOUL - int(foul_modifier_def * 0.6)
+    
+    # Dead Ball Turnover calibration
+    calibrated_dead_ball_to = DEAD_BALL_TURNOVER - int(0.5 * turnover_modifier)
+    calibrated_dead_ball_to = max(2, calibrated_dead_ball_to)  # Min 2
+    
+    # 🔍 DEBUG: Step 2 - Calibrated Constants
+    logging.warning(f"🔍 [HCO RESOLUTION] Step 2 - Calibrated Constants:")
+    logging.warning(f"   STANDARD_D_FOUL: {STANDARD_D_FOUL} + int({foul_modifier_def} * 0.4) = {calibrated_d_foul} (max 98)")
+    logging.warning(f"   STANDARD_O_FOUL: {STANDARD_O_FOUL} - {foul_modifier_off} = {calibrated_o_foul} (min 2)")
+    logging.warning(f"   HARD_STEAL: {HARD_STEAL} - {turnover_modifier} = {calibrated_hard_steal}")
+    logging.warning(f"   SOFT_STEAL: {SOFT_STEAL} - {turnover_modifier} = {calibrated_soft_steal}")
+    logging.warning(f"   HARD_FOUL: {HARD_FOUL} - int({foul_modifier_def} * 0.6) = {calibrated_hard_foul}")
+    logging.warning(f"   SOFT_FOUL: {SOFT_FOUL} - int({foul_modifier_def} * 0.6) = {calibrated_soft_foul}")
+    logging.warning(f"   DEAD_BALL_TURNOVER: {DEAD_BALL_TURNOVER} - int(0.5 * {turnover_modifier}) = {calibrated_dead_ball_to} (min 2)")
+    
+    # Calculate steal attempt rate (needed for steal check)
+    steal_attempt_rate = STEAL_ATTEMPT
+    if aggression_level == 4:  # Aggressive
+        steal_attempt_rate += 10
+    elif aggression_level == 0:  # Passive
+        steal_attempt_rate -= 10
+    steal_attempt_rate = max(10, min(30, steal_attempt_rate))  # Clamp between 10-30
+    
+    # Steps 3-5: Randomize order of event checks
+    # Create list of check functions with their parameters
+    check_functions = [
+        ("Standard Fouls", lambda: _check_standard_fouls(calibrated_o_foul, calibrated_d_foul)),
+        ("Steal Attempt", lambda: _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_steal, 
+                                                         calibrated_hard_foul, calibrated_soft_foul, steal_attempt_rate)),
+        ("Dead Ball Turnover", lambda: _check_dead_ball_turnover(game, skeleton, calibrated_dead_ball_to))
+    ]
+    
+    # Randomize the order
+    random.shuffle(check_functions)
+    
+    logging.warning(f"🔍 [HCO RESOLUTION] Randomized check order: {[name for name, _ in check_functions]}")
+    
+    # Execute checks in randomized order
+    for check_name, check_func in check_functions:
+        result = check_func()
+        if result is not None:
+            # Event occurred, return immediately
+            logging.warning(f"🔍 [HCO RESOLUTION] {check_name} returned result: {result[0]}")
+            return result
+    
+    # No event occurred in Steps 3-5, continue to Step 6
     
     # Step 6: Shot Attempt
     # Calculate play effectiveness scores
