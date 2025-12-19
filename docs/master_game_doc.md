@@ -669,16 +669,78 @@ if d_foul:
    - **Made shot + foul:** AND-1 situation → 1 free throw
    - **Missed shot + foul:** Shooting foul → 2 or 3 free throws (based on shot type)
 
+### Shot Location Detection (Three-Point vs Two-Point)
+
+**Purpose:** Accurately determine if a shot is a three-pointer or two-pointer based on the shooter's location at the moment of the shot attempt.
+
+**Implementation:**
+
+The system uses `_get_shooter_position_and_spot()` to extract the shooter's location from the skeleton steps:
+
+```python
+def _get_shooter_position_and_spot(self, shooter, roles):
+    # Get shooter's position from lineup
+    shooter_pos = get_position_from_lineup(shooter)
+    
+    # Find shooter's spot from the FINAL step (where they actually shoot)
+    steps = roles.get("steps", [])
+    if steps:
+        final_step = steps[-1]  # ✅ FIX: Only check final step first
+        pos_actions = final_step.get("pos_actions", {})
+        shooter_action = pos_actions.get(shooter_pos)
+        if shooter_action and shooter_action.get("action") == "shoot":
+            location_key = shooter_action.get("location") or shooter_action.get("spot", "")
+            spot = location_key.lower() if location_key else ""
+            return (shooter_pos, spot)
+    
+    # Fallback: search all steps in reverse (backwards compatibility)
+    # ...
+```
+
+**Key Design Decision:**
+
+The function **prioritizes the final step** (last step in the skeleton) to ensure it captures the actual shot location, not an earlier step that might have a different location. This is critical for:
+
+1. **Motion Plays:** Where the shooter's location may change throughout the motion sequence
+2. **Attack Shots:** Where the shooter drives to a new location before shooting
+3. **Pass-and-Shoot Sequences:** Where the shooter receives the ball and then shoots
+
+**Why This Matters:**
+
+- **Free Throw Count:** 2-point shots award 2 free throws, 3-point shots award 3 free throws
+- **Foul Calibration:** 3-pointers have a 90% chance the foul forces a miss, 2-pointers have a 50% chance
+- **Defense Score Calculation:** Different defense score formulas are used for 3-pointers vs 2-pointers
+
+**Location Matching:**
+
+The detected location string (lowercased) is compared against `THREE_POINT_SPOTS` constant:
+
+```python
+THREE_POINT_SPOTS = {
+    "key", "deep key",
+    "upper wing", "deep upper wing",
+    "lower wing", "deep lower wing",
+    "upper midwing", "lower midwing",
+    "lower midcorner", "upper midcorner",
+    "upper corner", "lower corner",
+    "deep upper baseline", "deep lower baseline"
+}
+```
+
+If the location matches any spot in this set, the shot is classified as a three-pointer.
+
 ### Key Files
 
 **Backend:**
 - `BackEnd/models/shot_manager.py`
-  - `check_defensive_foul_on_shot()` (lines 1112-1135) - Foul detection logic
-  - `calculate_shot_score()` (lines 958-1109) - Defense score calculation and foul check
-  - `resolve_shot()` (lines 240-598) - Shot resolution with foul calibration
+  - `check_defensive_foul_on_shot()` (lines 1148-1175) - Foul detection logic
+  - `calculate_shot_score()` (lines 994-1109) - Defense score calculation and foul check
+  - `resolve_shot()` (lines 243-1003) - Shot resolution with foul calibration
+  - `_get_shooter_position_and_spot()` (lines 125-188) - Shot location detection (prioritizes final step)
+  - `is_three_point_shot()` (lines 164-180) - Three-point classification
 
 **Constants:**
-- `BackEnd/constants/__init__.py` - Universal constants (`HARD_SHOOTING_FOUL_THRESHOLD`, `SOFT_SHOOTING_FOUL_THRESHOLD`, `SOFT_PROB`)
+- `BackEnd/constants/__init__.py` - Universal constants (`HARD_SHOOTING_FOUL_THRESHOLD`, `SOFT_SHOOTING_FOUL_THRESHOLD`, `SOFT_PROB`, `THREE_POINT_SPOTS`)
 
 ---
 
