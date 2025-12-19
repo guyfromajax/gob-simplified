@@ -4620,7 +4620,14 @@ All navigation functions now use `TimeoutNavigationHelper` to ensure consistent 
 - All navigation functions read URL params directly from `window.location.search` when called
 - Does NOT rely on module-level variables that might be stale (especially after async delays)
 - Helper ensures `game_id` and `resume_from_timeout` are always current when navigating
-- Prevents params from being lost during navigation chain: lineup → game-plan → court
+- Prevents params from being lost during navigation chain: lineup → game-plan → playbooks → play-details → box-score → court
+- **All navigation functions MUST use `TimeoutNavigationHelper`** - manual parameter preservation is fragile and can lose critical state (e.g., `clock` parameter)
+
+**Foul Out Navigation Fix (January 2025):**
+- Fixed issue where quarter time reset to 8 minutes after navigating through playbooks/play-details pages
+- Root cause: Manual parameter preservation only preserved params if they were truthy (`if (value)`)
+- Solution: All navigation functions now use `TimeoutNavigationHelper` which explicitly preserves `resume_from_timeout` and `clock` parameters
+- Affected functions: `playbooks.js` `handleBack()`, `playbooks.js` `navigateToPlayDetails()`, `play-details.html` `goBack()`, `game-plan.js` Playbooks button
 
 **Playcall Center Player Image Assignment (SS&S - January 2025):**
 
@@ -4699,9 +4706,10 @@ Player images in the Playcall Center are assigned once when returning to `court.
    - Works from any entry point (timeout button, foul out popup)
 
 2. **User makes lineup/game plan changes** (or keeps current settings)
-   - Can navigate between Lineup and Game Plan screens
-   - Helper preserves all parameters during back navigation
-   - All parameters maintained correctly
+   - Can navigate between Lineup, Game Plan, Playbooks, and Play Details screens
+   - Helper preserves all parameters during all navigation (including `resume_from_timeout` and `clock`)
+   - All navigation functions use `TimeoutNavigationHelper` for consistency
+   - Parameters maintained correctly through entire navigation chain
 
 3. **User navigates back to court** (with `resume_from_timeout=true` flag in URL)
    - Navigation uses unified helper for consistency
