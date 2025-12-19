@@ -179,13 +179,7 @@ class Animator:
             bh_end_y = max(1, min(49, ball_handler_outlet_y + additional_move_y))
             bh_end = {"x": bh_end_x, "y": bh_end_y}
             
-            # ✅ DEBUG: Log calculated position with full calculation
-            logging.warning(f"  Calculation: {ball_handler_outlet_x} + {additional_move_x} = {bh_end_x}")
-            logging.warning(f"  bh_end_x (HOME orientation): {bh_end_x}")
-            logging.warning(f"  bh_end_y (HOME orientation): {bh_end_y}")
-            if hold_up:
-                logging.warning(f"🛑 [DEFENSIVE STOP] Ball handler stopped at: x={bh_end_x}, y={bh_end_y} (HOME orientation)")
-                logging.warning(f"🛑 [DEFENSIVE STOP] Movement from outlet: +{additional_move_x} x, {additional_move_y:+d} y")
+            # Debug logs removed to declutter output
         else:
             # Fallback: use old logic
             if hold_up:
