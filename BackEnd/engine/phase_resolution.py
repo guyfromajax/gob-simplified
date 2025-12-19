@@ -3398,7 +3398,9 @@ def resolve_half_court_offense_logic(game):
     }
     modifier = variant_modifiers.get(variant, 0)
     
-    debug_info = f"[{off_call}] {variant}, lean:{lean_score:.2f}, modifier:{modifier:+d} | "
+    # Use variant_result from resolution system (replaces lean_score)
+    variant_display = variant_result if variant_result else variant
+    debug_info = f"[{off_call}] {variant_display}, modifier:{modifier:+d} | "
     shot_result["text"] = debug_info + shot_result.get("text", "")
     
     # Pass next_defensive_setup to animator via roles
