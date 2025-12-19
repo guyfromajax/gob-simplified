@@ -1856,8 +1856,10 @@ def _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_
                         
                         logging.warning(f"      ✅ Steal attempt result: {steal_result}")
                         if steal_result == "STEAL":
+                            logging.warning("")  # Blank line after steal attempt check
                             return ("STEAL", None)
                         elif steal_result == "D_FOUL":
+                            logging.warning("")  # Blank line after steal attempt check
                             return ("D_FOUL", None)
                         # If "NO_EVENT", return None
                         logging.warning(f"      ➡️  No event ({steal_result})")
