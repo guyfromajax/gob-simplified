@@ -7353,7 +7353,186 @@ HCO resolution starts with the following base values (derived from D1 Men's Coll
 - **Dead Ball Turnover**: 7
 - **Steal**: 6
 
-### Calculation Process
+### HCO Resolution Flow
+
+The HCO resolution system processes outcomes in a sequential priority order, checking each outcome type before moving to the next.
+
+#### Step 1: Get Team Attributes and Settings
+
+**Offense Team:**
+- `offensive_efficiency`
+- `turnover_modifier`
+- `foul_modifier`
+
+**Defense Team:**
+- `defensive_efficiency`
+- `foul_modifier`
+- `aggression` setting (for the current turn)
+
+#### Step 2: Calibrate Universal Constants
+
+**Universal Base Constants:**
+- `STANDARD_D_FOUL = 96`
+- `STANDARD_O_FOUL = 7`
+- `HARD_STEAL = -200`
+- `SOFT_STEAL = -100`
+- `HARD_FOUL = 200`
+- `SOFT_FOUL = 100`
+- `SOFT_PROB = 0.16`
+- `STEAL_ATTEMPT = 20`
+- `DEAD_BALL_TURNOVER = 7`
+
+**Calibration Formulas:**
+```python
+# Standard D Foul calibration
+STANDARD_D_FOUL = 96 + int(defense_team.foul_modifier * 0.4)
+STANDARD_D_FOUL = min(98, STANDARD_D_FOUL)  # Max 98
+
+# Standard O Foul calibration
+STANDARD_O_FOUL = 7 - offense_team.foul_modifier
+STANDARD_O_FOUL = max(2, STANDARD_O_FOUL)  # Min 2
+
+# Steal thresholds calibration
+HARD_STEAL = -200 + offense_team.turnover_modifier
+SOFT_STEAL = -100 + offense_team.turnover_modifier
+
+# Foul thresholds calibration (on steal attempts)
+HARD_FOUL = 200 - int(defense_team.foul_modifier * 0.6)
+SOFT_FOUL = 100 - int(defense_team.foul_modifier * 0.6)
+
+# Dead Ball Turnover calibration
+DEAD_BALL_TURNOVER = 7 - int(0.5 * offense_team.turnover_modifier)
+# Note: Minimum value enforcement is handled by the calibration formulas above
+# (STANDARD_O_FOUL has min 2, STANDARD_D_FOUL has max 98)
+```
+
+#### Step 3: Calculate Standard Foul Result
+
+**Process:**
+1. Roll: `result = random.randint(1, 100)`
+2. If `result <= STANDARD_O_FOUL`: **O_FOUL result** (end resolution)
+3. Elif `result >= STANDARD_D_FOUL`: **D_FOUL result** (end resolution)
+4. Else: Continue to Step 4
+
+**Note:** Standard fouls are checked first as they have the highest priority. If neither foul occurs, the turn continues to steal attempt resolution.
+
+**Range Overlap:** `STANDARD_O_FOUL` and `STANDARD_D_FOUL` will never overlap, as the maximum adjustment for either is ±10, ensuring they remain in separate ranges (O_FOUL: 2-17, D_FOUL: 92-98).
+
+#### Step 4: Calculate Steal Attempt
+
+**Process:**
+1. **Apply Aggression Modifier to Steal Attempt Rate:**
+   - Base: `STEAL_ATTEMPT = 20`
+   - Aggressive: `STEAL_ATTEMPT += 10` (30% total)
+   - Passive: `STEAL_ATTEMPT -= 10` (10% total)
+   - Normal: No change (20% total)
+
+2. **Roll for Steal Attempt:**
+   - `result = random.randint(1, 100)`
+   - If `result < STEAL_ATTEMPT`: Proceed with steal attempt
+   - Else: Continue to Step 5
+
+3. **If Steal Attempt Occurs:**
+   - Select a random step from the skeleton
+   - Determine ball handler at that step using `get_ball_handler_from_skeleton()`
+   - Determine defender using man-to-man or zone defense logic
+   - Calculate offense value (ball handler protection):
+     ```python
+     bh_score = (
+         attrs["BH"] * 0.5 +
+         attrs["AG"] * 0.2 +
+         attrs["IQ"] * 0.2 +
+         attrs["CH"] * 0.1
+     ) * random.randint(1, 6)
+     ```
+   - Calculate defense value (defender steal attempt):
+     ```python
+     pressure = (
+         def_attrs["OD"] * 0.3 +
+         def_attrs["AG"] * 0.3 +
+         def_attrs["IQ"] * 0.2 +
+         def_attrs["CH"] * 0.2
+     ) * random.randint(1, 6)
+     if is_zone_defense(defense_call):
+         pressure *= 0.9
+     ```
+   - Run `resolve_steal_attempt(offense_value, defense_value, SOFT_STEAL, HARD_STEAL, SOFT_FOUL, HARD_FOUL)`
+   - If result = `"STEAL"`: **STEAL result** (end resolution)
+   - If result = `"D_FOUL"`: **D_FOUL result** (end resolution - functionally the same as standard D_FOUL)
+   - If result = `"NO_EVENT"`: Continue to Step 5
+
+**Note:** If Step 4 triggers (steal attempt occurs), Step 5 is **not** executed. The resolution ends with either STEAL or D_FOUL, or continues to Step 6 if NO_EVENT.
+
+#### Step 5: Calculate Dead Ball Turnover
+
+**Process:**
+1. **Roll for Dead Ball Turnover:**
+   - `result = random.randint(1, 100)`
+   - If `result < DEAD_BALL_TURNOVER`: Proceed with turnover check
+   - Else: Continue to Step 6
+
+2. **If Turnover Check Occurs:**
+   - Select a random step from the skeleton (may be different from Step 4's selected step)
+   - Determine ball handler at that step using `get_ball_handler_from_skeleton()`
+   - Determine defender using man-to-man or zone defense logic
+   - Calculate ball handling score (offensive player):
+     ```python
+     bh_score = (
+         attrs["BH"] * 0.5 +
+         attrs["AG"] * 0.2 +
+         attrs["IQ"] * 0.2 +
+         attrs["CH"] * 0.1
+     ) * random.randint(1, 6)
+     ```
+   - Calculate defender score:
+     ```python
+     defender_score = (
+         def_attrs["OD"] * 0.3 +
+         def_attrs["AG"] * 0.3 +
+         def_attrs["IQ"] * 0.2 +
+         def_attrs["CH"] * 0.2
+     ) * random.randint(1, 6)
+     if is_zone_defense(defense_call):
+         defender_score *= 0.9
+     ```
+   - If `defender_score > bh_score`: **DEAD_BALL_TURNOVER result** (end resolution)
+   - Else: Continue to Step 6
+
+**Note:** Both offensive and defensive values use the same calculation functions with `random.randint(1, 6)` multiplier, ensuring consistent randomization across both scores.
+
+#### Step 6: Shot Attempt
+
+**Process:**
+1. **Calculate Play Effectiveness Scores:**
+   - `o_score = offense_play_effectiveness_score + offensive_efficiency`
+   - `d_score = defense_play_effectiveness_score + defensive_efficiency`
+   
+   **Database Structure:**
+   - **Defensive Zone Plays**: Already have `effectiveness_score` in database
+   - **Defensive Man Defense Play**: Needs to be added to database with `effectiveness_score`
+   - **Offensive Plays**: Need `effectiveness_score` added to all offensive play documents
+   
+   **Initial Implementation:**
+   - For plays without effectiveness scores, use random numbers:
+     - `o_score += random.randint(1, 100)`
+     - `d_score += random.randint(1, 100)`
+
+2. **Calculate Result:**
+   - `result = o_score - d_score`
+
+3. **Select Skeleton Variant Based on Result:**
+   - If `result > 50`: Use **successful** skeleton variant
+   - Elif `result > 0`: Use **mid_play_change** skeleton variant
+   - Elif `result > -50`: Use **contested** skeleton variant
+   - Else: Use **broken** skeleton variant
+   
+   **Note:** This replaces the previous `lean_score` system. The new result-based selection is used instead of lean_score calculations.
+
+4. **Apply Shot Result Modifiers:**
+   - Use existing shot resolution modifiers from `ShotManager.resolve_shot()`
+   - Calculate shot outcome (MAKE/MISS) based on shooter attributes, defender attributes, and playcall matchups
+
+### Legacy Calculation Process (To Be Replaced)
 
 #### Step 1: Apply Team Attribute Modifiers
 
