@@ -7733,8 +7733,8 @@ STANDARD_O_FOUL = 7 - offense_team.foul_modifier
 STANDARD_O_FOUL = max(2, STANDARD_O_FOUL)  # Min 2
 
 # Steal thresholds calibration
-HARD_STEAL = -200 + offense_team.turnover_modifier
-SOFT_STEAL = -100 + offense_team.turnover_modifier
+HARD_STEAL = -200 - offense_team.turnover_modifier
+SOFT_STEAL = -100 - offense_team.turnover_modifier
 
 # Foul thresholds calibration (on steal attempts)
 HARD_FOUL = 200 - int(defense_team.foul_modifier * 0.6)
