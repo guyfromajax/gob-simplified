@@ -142,23 +142,41 @@ class ShotManager:
                 break
         
         if not shooter_pos:
+            logging.warning(f"🔍 [SHOT LOCATION] Shooter {get_name_safe(shooter)} not found in lineup")
             return (None, None)
         
         # Find the shooter's spot from the final step (where they shoot)
         steps = roles.get("steps", [])
         if not steps:
+            logging.warning(f"🔍 [SHOT LOCATION] No steps in roles")
             return (None, None)
         
         # Check the last step for the shooter's spot
-        for step in reversed(steps):
-            pos_actions = step.get("pos_actions", {})
+        # ✅ FIX: Only check the FINAL step (last step in list) for the shooter's spot
+        # This ensures we get the actual shot location, not an earlier step
+        if steps:
+            final_step = steps[-1]
+            pos_actions = final_step.get("pos_actions", {})
             shooter_action = pos_actions.get(shooter_pos)
             if shooter_action and shooter_action.get("action") == "shoot":
                 # MongoDB skeletons use "location", old skeletons use "spot"
                 location_key = shooter_action.get("location") or shooter_action.get("spot", "")
                 spot = location_key.lower() if location_key else ""
+                logging.warning(f"🔍 [SHOT LOCATION] Shooter {get_name_safe(shooter)} (pos: {shooter_pos}) shooting from: '{spot}' (raw: '{location_key}')")
                 return (shooter_pos, spot)
+            else:
+                # Fallback: search all steps in reverse (for backwards compatibility)
+                logging.warning(f"🔍 [SHOT LOCATION] No shoot action in final step for {shooter_pos}, searching all steps...")
+                for step in reversed(steps):
+                    pos_actions = step.get("pos_actions", {})
+                    shooter_action = pos_actions.get(shooter_pos)
+                    if shooter_action and shooter_action.get("action") == "shoot":
+                        location_key = shooter_action.get("location") or shooter_action.get("spot", "")
+                        spot = location_key.lower() if location_key else ""
+                        logging.warning(f"🔍 [SHOT LOCATION] Found shoot action in earlier step: '{spot}' (raw: '{location_key}')")
+                        return (shooter_pos, spot)
         
+        logging.warning(f"🔍 [SHOT LOCATION] No shoot action found for {shooter_pos} in any step")
         return (None, None)
 
     def is_three_point_shot(self, shooter, roles):
