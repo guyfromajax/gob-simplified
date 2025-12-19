@@ -1662,8 +1662,9 @@ def resolve_hco_outcome(game, skeleton):
     )
     from BackEnd.utils.shared import (
         calculate_ball_handling_score, calculate_defender_pressure_score,
-        get_ball_handler_from_skeleton, get_player_position, unpack_game_context
+        get_player_position, unpack_game_context
     )
+    # get_ball_handler_from_skeleton is defined in this file (phase_resolution.py)
     from BackEnd.utils.defense_utils import is_zone_defense
     
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
