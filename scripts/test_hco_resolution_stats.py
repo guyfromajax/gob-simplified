@@ -137,26 +137,61 @@ def run_hco_statistics_test():
                         stats["HCO Results"]["Shot Attempt"] += 1
                         stats["Shot Attempts"] += 1
                         
-                        # Shooting foul detected if free_throws > 0 OR next_turn is FREE_THROW OR offensive_state is FREE_THROW
-                        free_throws = turn.get("free_throws", 0)
+                        # Shooting foul detected if:
+                        # 1. next_play_type is FREE_THROW (indicates shooting foul)
+                        # 2. next_turn is FREE_THROW (copied from next_play_type in turn_manager)
+                        # 3. free_throws_remaining > 0 (stored in turn dict for shooting fouls)
+                        # 4. has_and_one is True (explicit AND-1 flag)
+                        # 5. foul_player_id is present (shooting foul indicator)
+                        next_play_type = turn.get("next_play_type", "")
                         next_turn = turn.get("next_turn", "")
-                        offensive_state = gm.game_state.get("offensive_state", "")
+                        free_throws_remaining = turn.get("free_throws_remaining", 0)
+                        has_and_one = turn.get("has_and_one", False)
+                        foul_player_id = turn.get("foul_player_id")
+                        foul_team = turn.get("foul_team", "")
                         
-                        if free_throws > 0 or next_turn == "FREE_THROW" or offensive_state == "FREE_THROW":
+                        is_shooting_foul = (
+                            next_play_type == "FREE_THROW" or 
+                            next_turn == "FREE_THROW" or
+                            free_throws_remaining > 0 or 
+                            has_and_one or
+                            (foul_player_id and foul_team == "DEFENSE")
+                        )
+                        
+                        if is_shooting_foul:
                             stats["Shooting Fouls"] += 1
                             if result_type == "MAKE":
                                 # AND-1: Made shot + foul
                                 stats["Fouls + Made Shots (AND-1)"] += 1
+                                # Debug: Print first few AND-1 instances with full turn data
+                                if stats["Fouls + Made Shots (AND-1)"] <= 5:
+                                    print(f"   🎯 AND-1 DETECTED #{stats['Fouls + Made Shots (AND-1)']}:")
+                                    print(f"      result_type={result_type}, next_play_type={next_play_type}, next_turn={next_turn}")
+                                    print(f"      has_and_one={has_and_one}, free_throws_remaining={free_throws_remaining}")
+                                    print(f"      foul_player_id={foul_player_id}, foul_team={foul_team}")
+                                    print(f"      Turn keys: {list(turn.keys())}")
+                        
+                        # Debug: Check for made shots that might have shooting fouls
+                        if result_type == "MAKE" and stats["Fouls + Made Shots (AND-1)"] < 5:
+                            # Check if next turn is FREE_THROW (shooting foul indicator)
+                            next_turn_check = turn.get("next_turn", "")
+                            if next_turn_check == "FREE_THROW" and not is_shooting_foul:
+                                print(f"   ⚠️  MISSED AND-1: result_type={result_type}, next_turn={next_turn_check}")
+                                print(f"      next_play_type={next_play_type}, has_and_one={has_and_one}")
+                                print(f"      foul_player_id={foul_player_id}, foul_team={foul_team}")
+                                print(f"      Turn keys: {list(turn.keys())}")
                     
                     elif result_type == "FOUL":
                         # Foul result - check foul_team to determine O_FOUL vs D_FOUL
                         foul_team = turn.get("foul_team") or gm.game_state.get("foul_team")
-                        free_throws = turn.get("free_throws", 0)
+                        next_play_type = turn.get("next_play_type", "")
+                        free_throws_remaining = turn.get("free_throws_remaining", 0)
                 
                         if foul_team == "OFFENSE":
                             stats["HCO Results"]["O_FOUL"] += 1
                         elif foul_team == "DEFENSE":
-                            if free_throws > 0:
+                            # Check if it's a shooting foul (next_play_type would be FREE_THROW)
+                            if next_play_type == "FREE_THROW" or free_throws_remaining > 0:
                                 # Shooting foul - also counts as shot attempt
                                 stats["Shooting Fouls"] += 1
                                 stats["HCO Results"]["Shot Attempt"] += 1
@@ -165,8 +200,8 @@ def run_hco_statistics_test():
                                 # Non-shooting foul
                                 stats["HCO Results"]["D_FOUL (non-shooting)"] += 1
                         else:
-                            # Fallback: check if it's a shooting foul by free_throws
-                            if free_throws > 0:
+                            # Fallback: check if it's a shooting foul
+                            if next_play_type == "FREE_THROW" or free_throws_remaining > 0:
                                 # Likely a shooting foul
                                 stats["Shooting Fouls"] += 1
                                 stats["HCO Results"]["Shot Attempt"] += 1

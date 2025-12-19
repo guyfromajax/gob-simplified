@@ -784,36 +784,48 @@ class PlaybooksUI {
   }
   
   navigateToPlayDetails(playName) {
-    // ✅ SS&S: Preserve all game context parameters using TimeoutNavigationHelper pattern
+    // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
+    const helper = window.TimeoutNavigationHelper;
+    if (!helper) {
+      console.error('❌ [PLAYBOOKS] TimeoutNavigationHelper not loaded!');
+      return;
+    }
+    
     const urlParams = new URLSearchParams(window.location.search);
+    const currentGameId = helper.getGameId(urlParams);
+    const resumeFromTimeout = helper.getResumeFromTimeout(urlParams);
+    const currentQuarter = parseInt(urlParams.get('quarter'), 10) || 1;
+    const myTeamSide = urlParams.get('my_team');
     
-    // Build params preserving all game context
-    const params = new URLSearchParams();
-    params.set('play_name', playName);
+    // Build lineup object from URL params
+    const lineup = {};
+    if (myTeamSide) {
+      ['pg', 'sg', 'sf', 'pf', 'c'].forEach(pos => {
+        const paramKey = `${myTeamSide}_${pos}`;
+        const playerId = urlParams.get(paramKey);
+        if (playerId) {
+          lineup[pos.toUpperCase()] = playerId;
+        }
+      });
+    }
     
-    // Preserve all game context parameters
-    const gameContextParams = [
-      'home', 'away', 'home_id', 'away_id', 'my_team', 'user_team_id',
-      'game_id', 'mode', 'tournament_id', 'franchise_id', 'week',
-      'quarter', 'period', 'resume_from_timeout', 'clock',
-      'home_pg', 'home_sg', 'home_sf', 'home_pf', 'home_c',
-      'away_pg', 'away_sg', 'away_sf', 'away_pf', 'away_c',
-      'team_id', 'from', 'debug'
-    ];
-    
-    gameContextParams.forEach(param => {
-      const value = urlParams.get(param);
-      if (value) {
-        params.set(param, value);
-      }
+    // ✅ SS&S: Use TimeoutNavigationHelper to preserve all game context (including resume_from_timeout and clock)
+    const params = helper.buildGameNavigationParams({
+      sourceParams: urlParams,
+      targetQuarter: currentQuarter,
+      gameId: currentGameId,
+      resumeFromTimeout: resumeFromTimeout,
+      lineup: lineup,
+      myTeamSide: myTeamSide
     });
     
-    // For single mode, also check localStorage for game_id
-    if (params.get('mode') === 'single' && !params.get('game_id')) {
-      const gameId = typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null;
-      if (gameId) {
-        params.set('game_id', gameId);
-      }
+    // Add play-specific parameter
+    params.set('play_name', playName);
+    
+    // Preserve 'from' parameter if it exists
+    const from = urlParams.get('from');
+    if (from) {
+      params.set('from', from);
     }
     
     window.location.href = `/static/play-details.html?${params.toString()}`;
@@ -958,6 +970,13 @@ class PlaybooksUI {
   }
   
   handleBack() {
+    // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
+    const helper = window.TimeoutNavigationHelper;
+    if (!helper) {
+      console.error('❌ [PLAYBOOKS] TimeoutNavigationHelper not loaded!');
+      return;
+    }
+    
     const urlParams = new URLSearchParams(window.location.search);
     const from = urlParams.get('from');
     const mode = urlParams.get('mode') || 'single';
@@ -971,6 +990,23 @@ class PlaybooksUI {
       allParams: Object.fromEntries(urlParams.entries())
     });
     
+    const currentGameId = helper.getGameId(urlParams);
+    const resumeFromTimeout = helper.getResumeFromTimeout(urlParams);
+    const currentQuarter = parseInt(urlParams.get('quarter'), 10) || 1;
+    const myTeamSide = urlParams.get('my_team');
+    
+    // Build lineup object from URL params
+    const lineup = {};
+    if (myTeamSide) {
+      ['pg', 'sg', 'sf', 'pf', 'c'].forEach(pos => {
+        const paramKey = `${myTeamSide}_${pos}`;
+        const playerId = urlParams.get(paramKey);
+        if (playerId) {
+          lineup[pos.toUpperCase()] = playerId;
+        }
+      });
+    }
+    
     // Determine where to navigate back based on 'from' parameter
     if (from === 'tournament-command-center') {
       // Navigate back to Tournament Command Center
@@ -978,6 +1014,7 @@ class PlaybooksUI {
       const tournamentId = urlParams.get('tournament_id');
       const userTeamId = urlParams.get('team_id') || urlParams.get('user_team_id');
       
+      // For command centers, we don't need game context, just mode-specific params
       const params = new URLSearchParams();
       if (tournamentId) params.set('tournament_id', tournamentId);
       if (userTeamId) params.set('user_team_id', userTeamId);
@@ -1007,6 +1044,7 @@ class PlaybooksUI {
       
       console.log('✅ [PLAYBOOKS BACK] Navigating to Franchise Command Center');
       
+      // For command centers, we don't need game context, just mode-specific params
       const params = new URLSearchParams();
       if (franchiseId) params.set('franchise_id', franchiseId);
       if (userTeamName) params.set('user_team_name', userTeamName);
@@ -1032,33 +1070,18 @@ class PlaybooksUI {
     // Default: go back to game-plan (from === 'game-plan' or no 'from' parameter)
     console.log('✅ [PLAYBOOKS BACK] Navigating to Game Plan (default)');
     
-    // ✅ SS&S: Preserve all game context parameters when navigating to game-plan
-    const params = new URLSearchParams();
-    
-    // Preserve all game context parameters
-    const gameContextParams = [
-      'home', 'away', 'home_id', 'away_id', 'my_team', 'user_team_id',
-      'game_id', 'mode', 'tournament_id', 'franchise_id', 'week',
-      'quarter', 'period', 'resume_from_timeout', 'clock',
-      'home_pg', 'home_sg', 'home_sf', 'home_pf', 'home_c',
-      'away_pg', 'away_sg', 'away_sf', 'away_pf', 'away_c',
-      'team_id', 'debug'
-    ];
-    
-    gameContextParams.forEach(param => {
-      const value = urlParams.get(param);
-      if (value) {
-        params.set(param, value);
-      }
+    // ✅ SS&S: Use TimeoutNavigationHelper to preserve all game context (including resume_from_timeout and clock)
+    const params = helper.buildGameNavigationParams({
+      sourceParams: urlParams,
+      targetQuarter: currentQuarter,
+      gameId: currentGameId,
+      resumeFromTimeout: resumeFromTimeout,
+      lineup: lineup,
+      myTeamSide: myTeamSide
     });
     
-    // For single mode, also check localStorage for game_id
-    if (mode === 'single' && !params.get('game_id')) {
-      const gameId = typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null;
-      if (gameId) {
-        params.set('game_id', gameId);
-      }
-    }
+    // Add 'from' parameter to track navigation source
+    params.set('from', 'playbooks');
     
     window.location.href = `/static/game-plan.html?${params.toString()}`;
   }
