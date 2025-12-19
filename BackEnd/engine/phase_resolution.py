@@ -1664,12 +1664,15 @@ def _check_standard_fouls(calibrated_o_foul, calibrated_d_foul):
     logging.warning(f"   D_FOUL threshold: >= {calibrated_d_foul}")
     if foul_roll <= calibrated_o_foul:
         logging.warning(f"   ✅ RESULT: O_FOUL (roll {foul_roll} <= {calibrated_o_foul})")
+        logging.warning("")  # Blank line after standard foul check
         return ("O_FOUL", None)
     elif foul_roll >= calibrated_d_foul:
         logging.warning(f"   ✅ RESULT: D_FOUL (roll {foul_roll} >= {calibrated_d_foul})")
+        logging.warning("")  # Blank line after standard foul check
         return ("D_FOUL", None)
     else:
         logging.warning(f"   ➡️  No foul ({calibrated_o_foul} < {foul_roll} < {calibrated_d_foul})")
+        logging.warning("")  # Blank line after standard foul check
         return None
 
 
@@ -2015,11 +2018,13 @@ def _check_dead_ball_turnover(game, skeleton, calibrated_dead_ball_to):
                         
                         if defender_score > bh_score:
                             logging.warning(f"      ✅ RESULT: DEAD_BALL_TURNOVER (defender {defender_score} > ball handler {bh_score})")
+                            logging.warning("")  # Blank line after dead ball turnover check
                             return ("DEAD_BALL_TURNOVER", None)
                         # Else continue
                         logging.warning(f"      ➡️  No turnover (defender {defender_score} <= ball handler {bh_score})")
     else:
         logging.warning(f"   ➡️  No turnover check ({turnover_roll} >= {calibrated_dead_ball_to})")
+    logging.warning("")  # Blank line after dead ball turnover check
     
     return None
 
