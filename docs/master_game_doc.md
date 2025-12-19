@@ -708,7 +708,7 @@ The function **prioritizes the final step** (last step in the skeleton) to ensur
 **Why This Matters:**
 
 - **Free Throw Count:** 2-point shots award 2 free throws, 3-point shots award 3 free throws
-- **Foul Calibration:** 3-pointers have a 90% chance the foul forces a miss, 2-pointers have a 50% chance
+- **Foul Calibration:** 3-pointers have a 40% chance the foul forces a miss, 2-pointers have a 20% chance
 - **Defense Score Calculation:** Different defense score formulas are used for 3-pointers vs 2-pointers
 
 **Location Matching:**
