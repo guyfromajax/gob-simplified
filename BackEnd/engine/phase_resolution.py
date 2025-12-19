@@ -1758,7 +1758,11 @@ def resolve_hco_outcome(game, skeleton):
                         else:
                             ball_handler_coords = {"x": 64, "y": 25}  # Default to key
                         
-                        ball_handler_coords = get_away_player_coords(ball_handler_coords, game)
+                        # Determine court orientation and flip coordinates if away team is on offense
+                        is_away_offense = off_team.team_id == game.away_team.team_id
+                        if is_away_offense:
+                            ball_handler_coords = get_away_player_coords(ball_handler_coords)
+                        
                         zone_assignments = assign_all_zone_defenders(
                             defense_call, ball_handler_coords, def_lineup, game
                         )
@@ -1832,7 +1836,11 @@ def resolve_hco_outcome(game, skeleton):
                         else:
                             ball_handler_coords = {"x": 64, "y": 25}  # Default to key
                         
-                        ball_handler_coords = get_away_player_coords(ball_handler_coords, game)
+                        # Determine court orientation and flip coordinates if away team is on offense
+                        is_away_offense = off_team.team_id == game.away_team.team_id
+                        if is_away_offense:
+                            ball_handler_coords = get_away_player_coords(ball_handler_coords)
+                        
                         zone_assignments = assign_all_zone_defenders(
                             defense_call, ball_handler_coords, def_lineup, game
                         )
