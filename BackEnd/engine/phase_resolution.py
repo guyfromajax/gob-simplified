@@ -1769,7 +1769,10 @@ def resolve_hco_outcome(game, skeleton):
                     # Get defender
                     if is_zone_defense(defense_call):
                         # Zone defense: use zone assignment logic
-                        from BackEnd.utils.shared_defense import assign_all_zone_defenders
+                        from BackEnd.utils.shared_defense import (
+                            _get_23_zone_boundaries, _get_32_zone_boundaries, _get_131_zone_boundaries,
+                            assign_all_zone_defenders
+                        )
                         from BackEnd.constants import HCO_STRING_SPOTS
                         from BackEnd.utils.shared import get_away_player_coords
                         
@@ -1792,15 +1795,68 @@ def resolve_hco_outcome(game, skeleton):
                         if is_away_offense:
                             ball_handler_coords = get_away_player_coords(ball_handler_coords)
                         
-                        zone_assignments = assign_all_zone_defenders(
-                            defense_call, ball_handler_coords, def_lineup, game
+                        # Get zone boundaries based on ball location (applies shifts)
+                        if defense_call == "3-2 Zone":
+                            zone_boundaries = _get_32_zone_boundaries(ball_handler_spot, is_away_offense)
+                        elif defense_call == "1-3-1 Zone":
+                            zone_boundaries = _get_131_zone_boundaries(ball_handler_spot, is_away_offense)
+                        else:
+                            zone_boundaries = _get_23_zone_boundaries(ball_handler_spot, is_away_offense)
+                        
+                        # Build offensive players list for zone assignment
+                        ball_handler_id = getattr(ball_handler, "player_id", None)
+                        offensive_players = []
+                        for pos, player in off_lineup.items():
+                            player_id = getattr(player, "player_id", None)
+                            player_coords = getattr(player, "coords", {})
+                            # Get player's spot from skeleton if available
+                            player_spot = "key"
+                            if skeleton and "steps" in skeleton:
+                                steps = skeleton.get("steps", [])
+                                if steps and selected_step_index < len(steps):
+                                    step = steps[selected_step_index]
+                                    pos_actions = step.get("pos_actions", {})
+                                    if pos in pos_actions:
+                                        action_info = pos_actions[pos]
+                                        player_spot = action_info.get("location") or action_info.get("spot") or "key"
+                            
+                            # Convert spot to coordinates
+                            spot_coords = HCO_STRING_SPOTS.get(player_spot, {"x": 50, "y": 25})
+                            if is_away_offense:
+                                spot_coords = get_away_player_coords(spot_coords)
+                            
+                            # Use player's coords if available, otherwise use spot coords
+                            final_coords = player_coords if player_coords.get("x") and player_coords.get("y") else spot_coords
+                            
+                            offensive_players.append({
+                                "player_id": player_id,
+                                "coords": final_coords,
+                                "spot": player_spot,
+                                "is_ball_handler": (player_id == ball_handler_id)
+                            })
+                        
+                        # Get aggression level
+                        aggression_level = def_team.strategy_settings.get("aggression", 2)
+                        aggression_map = {0: "passive", 1: "passive", 2: "normal", 3: "aggressive", 4: "aggressive"}
+                        aggression = aggression_map.get(aggression_level, "normal")
+                        
+                        # Call zone assignment logic to get actual defender assignments
+                        _, defender_to_offensive_player = assign_all_zone_defenders(
+                            zone_boundaries,
+                            offensive_players,
+                            ball_handler_coords,
+                            ball_handler_spot,
+                            aggression,
+                            is_away_offense
                         )
-                        # Get first defender assigned to ball handler
+                        
+                        # Find which defender(s) are actually guarding the ball handler
                         defender = None
-                        for def_pos, guarded_player in zone_assignments.items():
-                            if guarded_player == ball_handler:
+                        for def_pos, guarded_player_id in defender_to_offensive_player.items():
+                            if guarded_player_id == ball_handler_id:
                                 defender = def_lineup.get(def_pos)
                                 break
+                        
                         if not defender:
                             # Fallback: use ball handler's position
                             defender = def_lineup.get(ball_handler_pos)
