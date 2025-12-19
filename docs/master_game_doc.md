@@ -7757,7 +7757,7 @@ HCO resolution starts with the following base values (derived from D1 Men's Coll
 
 ### HCO Resolution Flow
 
-The HCO resolution system processes outcomes in a sequential priority order, checking each outcome type before moving to the next.
+The HCO resolution system processes outcomes in the following order:
 
 #### Step 1: Get Team Attributes and Settings
 
@@ -7808,19 +7808,31 @@ DEAD_BALL_TURNOVER = 7 - int(0.5 * offense_team.turnover_modifier)
 # (STANDARD_O_FOUL has min 2, STANDARD_D_FOUL has max 98)
 ```
 
-#### Step 3: Calculate Standard Foul Result
+#### Steps 3-5: Event Checks (Randomized Order)
 
-**Process:**
-1. Roll: `result = random.randint(1, 100)`
-2. If `result <= STANDARD_O_FOUL`: **O_FOUL result** (end resolution)
-3. Elif `result >= STANDARD_D_FOUL`: **D_FOUL result** (end resolution)
-4. Else: Continue to Step 4
+The system randomizes the execution order of these three event checks to reflect the reality that these events can occur in any order during a possession:
 
-**Note:** Standard fouls are checked first as they have the highest priority. If neither foul occurs, the turn continues to steal attempt resolution.
+1. **Standard Fouls Check** (`_check_standard_fouls()`)
+2. **Steal Attempt Check** (`_check_steal_attempt()`)
+3. **Dead Ball Turnover Check** (`_check_dead_ball_turnover()`)
 
-**Range Overlap:** `STANDARD_O_FOUL` and `STANDARD_D_FOUL` will never overlap, as the maximum adjustment for either is ±10, ensuring they remain in separate ranges (O_FOUL: 2-17, D_FOUL: 92-98).
+Each check returns immediately if its event occurs. If no event occurs after checking all three, the resolution proceeds to Step 6 (Shot Attempt).
 
-#### Step 4: Calculate Steal Attempt
+**Modular Functions:**
+
+- **`_check_standard_fouls(calibrated_o_foul, calibrated_d_foul)`**
+  - Checks for offensive or defensive fouls
+  - Returns `("O_FOUL", None)`, `("D_FOUL", None)`, or `None`
+  - **Process:**
+    1. Roll: `result = random.randint(1, 100)`
+    2. If `result <= STANDARD_O_FOUL`: **O_FOUL result** (end resolution)
+    3. Elif `result >= STANDARD_D_FOUL`: **D_FOUL result** (end resolution)
+    4. Else: Return `None` (continue to next check)
+  - **Range Overlap:** `STANDARD_O_FOUL` and `STANDARD_D_FOUL` will never overlap, as the maximum adjustment for either is ±10, ensuring they remain in separate ranges (O_FOUL: 2-17, D_FOUL: 92-98).
+
+- **`_check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_steal, calibrated_hard_foul, calibrated_soft_foul, steal_attempt_rate)`**
+  - Checks for steal attempt and resolves it using `resolve_steal_attempt()`
+  - Returns `("STEAL", None)`, `("D_FOUL", None)`, or `None`
 
 **Process:**
 1. **Apply Aggression Modifier to Steal Attempt Rate:**
@@ -7873,38 +7885,37 @@ DEAD_BALL_TURNOVER = 7 - int(0.5 * offense_team.turnover_modifier)
 
 **Note:** If Step 4 triggers (steal attempt occurs), Step 5 is **not** executed. The resolution ends with either STEAL or D_FOUL, or continues to Step 6 if NO_EVENT.
 
-#### Step 5: Calculate Dead Ball Turnover
+  - **Process:**
+    1. **Roll for Dead Ball Turnover:**
+       - `result = random.randint(1, 100)`
+       - If `result < DEAD_BALL_TURNOVER`: Proceed with turnover check
+       - Else: Return `None` (continue to next check)
+    2. **If Turnover Check Occurs:**
+       - Select a random step from the skeleton (may be different from other checks' selected steps)
+       - Determine ball handler at that step using `get_ball_handler_from_skeleton()`
+       - Determine defender using man-to-man or zone defense logic:
+         - **Man Defense**: Defender matches ball handler's position
+         - **Zone Defense**: Uses `assign_all_zone_defenders()` with all 6 required arguments:
+           - Zone boundaries (calculated from ball handler's spot)
+           - Offensive players list (built from skeleton step)
+           - Ball handler coordinates
+           - Ball handler spot
+           - Aggression level (from strategy_settings)
+           - `is_away_offense` flag
+       - Calculate ball handling score (offensive player):
+         ```python
+         from BackEnd.utils.shared import calculate_ball_handling_score
+         bh_score = calculate_ball_handling_score(ball_handler)
+         ```
+       - Calculate defender score:
+         ```python
+         from BackEnd.utils.shared import calculate_defender_pressure_score
+         defender_score = calculate_defender_pressure_score(defender, defense_call)
+         ```
+       - If `defender_score > bh_score`: **DEAD_BALL_TURNOVER result** (end resolution)
+       - Else: Return `None` (continue to next check)
 
-**Process:**
-1. **Roll for Dead Ball Turnover:**
-   - `result = random.randint(1, 100)`
-   - If `result < DEAD_BALL_TURNOVER`: Proceed with turnover check
-   - Else: Continue to Step 6
-
-2. **If Turnover Check Occurs:**
-   - Select a random step from the skeleton (may be different from Step 4's selected step)
-   - Determine ball handler at that step using `get_ball_handler_from_skeleton()`
-   - Determine defender using man-to-man or zone defense logic:
-     - **Man Defense**: Defender matches ball handler's position
-     - **Zone Defense**: Uses `assign_all_zone_defenders()` with all 6 required arguments:
-       - Zone boundaries (calculated from ball handler's spot)
-       - Offensive players list (built from skeleton step)
-       - Ball handler coordinates
-       - Ball handler spot
-       - Aggression level (from strategy_settings)
-       - `is_away_offense` flag
-   - Calculate ball handling score (offensive player):
-     ```python
-     from BackEnd.utils.shared import calculate_ball_handling_score
-     bh_score = calculate_ball_handling_score(ball_handler)
-     ```
-   - Calculate defender score:
-     ```python
-     from BackEnd.utils.shared import calculate_defender_pressure_score
-     defender_score = calculate_defender_pressure_score(defender, defense_call)
-     ```
-   - If `defender_score > bh_score`: **DEAD_BALL_TURNOVER result** (end resolution)
-   - Else: Continue to Step 6
+**Important:** When the resolution system determines a `DEAD_BALL_TURNOVER`, it is converted to `"DEAD BALL"` (with a space) before calling `resolve_turnover_logic()`. The `resolve_turnover_logic()` function respects the resolution system's determination when `from_resolution_system=True`, preventing random conversion of dead ball turnovers to steals.
 
 **Utility Functions:**
 - `calculate_ball_handling_score(player)` - Located in `BackEnd/utils/shared.py`
@@ -7915,7 +7926,7 @@ DEAD_BALL_TURNOVER = 7 - int(0.5 * offense_team.turnover_modifier)
 
 **Note:** Both functions use `random.randint(1, 6)` multiplier, ensuring consistent randomization across both scores.
 
-#### Step 6: Shot Attempt
+#### Step 6: Shot Attempt (if no event occurred in Steps 3-5)
 
 **Process:**
 1. **Calculate Play Effectiveness Scores:**
@@ -8149,8 +8160,11 @@ At the start of each game, universal thresholds are adjusted based on the offens
 
 ### Status
 
-🚧 **HCO Resolution**: Design complete, implementation pending
-- Fast Break, HCT, and FCP resolution logic will be designed after HCO is implemented and tested
+✅ **HCO Resolution**: Implementation complete (January 2025)
+- Modular functions for fouls, steals, and turnovers
+- Randomized execution order for event checks
+- Respects resolution system determination (prevents random conversion of dead ball turnovers)
+- Fast Break, HCT, and FCP resolution logic will be designed after HCO is tested
 
 ### Key Files
 
