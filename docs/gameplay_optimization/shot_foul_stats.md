@@ -47,8 +47,9 @@ This document archives shot attempt and foul statistics from gameplay simulation
 
 ✅ **Shooting Foul System**: Implementation complete
 - Hard/soft thresholds with foul calibration
-- Foul calibration check forces misses (90% for 3-pointers, 50% for 2-pointers)
+- Foul calibration check forces misses (40% for 3-pointers, 20% for 2-pointers)
 - Integration with shot resolution
+- Calibration thresholds stored as constants: `THREE_POINTER_FOUL_MISS_CHANCE = 0.4`, `TWO_POINTER_FOUL_MISS_CHANCE = 0.2`
 
 ---
 
