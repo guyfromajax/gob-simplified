@@ -100,7 +100,7 @@ class Animator:
             
             # ✅ DEBUG: Log build_movement inputs
             if has_ball:  # Only log for ball handler to avoid spam
-                logging.warning(f"🏀 [FAST BREAK ANIMATION DEBUG] build_movement for ball handler:")
+                # Debug log removed to declutter output
                 logging.warning(f"  is_away_offense: {is_away_offense}")
                 logging.warning(f"  start (from outlet or player.coords): {start}")
                 logging.warning(f"  end_coords (input, HOME orientation): {end_coords}")
@@ -163,14 +163,6 @@ class Animator:
         ball_handler_outlet_y = fb_roles.get("ball_handler_outlet_y")
         ball_handler_move_x = fb_roles.get("ball_handler_move_x", 7)  # Default 7 if not set
         
-        # ✅ DEBUG: Log initial state
-        logging.warning(f"🏀 [FAST BREAK ANIMATION DEBUG] Ball handler movement calculation:")
-        logging.warning(f"  is_away_offense: {is_away_offense}")
-        logging.warning(f"  offense_team.team_id: {offense_team.team_id}")
-        logging.warning(f"  game.away_team.team_id: {self.game.away_team.team_id}")
-        logging.warning(f"  ball_handler_outlet_x: {ball_handler_outlet_x}")
-        logging.warning(f"  ball_handler_outlet_y: {ball_handler_outlet_y}")
-        
         # Calculate additional movement from outlet position
         # For defensive stops and shot attempts: 5-10 x spots (IN ADDITION to steal entry), ±3 y
         # Direction: -1 for away offense (toward x=10), +1 for home offense (toward x=90)
@@ -179,12 +171,6 @@ class Animator:
         x_direction = -1 if is_away_offense else 1  # Away: -1 (toward x=10), Home: +1 (toward x=90)
         additional_move_x = x_direction * move_distance
         additional_move_y = random.randint(-BALL_HANDLER_MOVE_Y_RANGE, BALL_HANDLER_MOVE_Y_RANGE)
-        
-        # ✅ DEBUG: Log movement values
-        logging.warning(f"  move_distance: {move_distance}")
-        logging.warning(f"  x_direction: {x_direction} ({'toward x=10 (away basket)' if is_away_offense else 'toward x=90 (home basket)'})")
-        logging.warning(f"  additional_move_x: {additional_move_x} ({x_direction} * {move_distance})")
-        logging.warning(f"  additional_move_y: {additional_move_y}")
         
         # Calculate ball handler's final position (coordinates already in correct orientation)
         if ball_handler_outlet_x is not None and ball_handler_outlet_y is not None:

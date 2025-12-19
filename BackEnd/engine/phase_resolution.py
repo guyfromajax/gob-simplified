@@ -1039,7 +1039,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         if defender_actual_x is None or defender_actual_y is None:
             defender_actual_x = getattr(defender, "coords", {}).get("x", 50)
             defender_actual_y = getattr(defender, "coords", {}).get("y", 25)
-            logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ⚠️ Using defender.coords (fallback) for defender {defender_id}: {defender_actual_x}, {defender_actual_y}")
+            # Debug log removed to declutter output
         
         # ✅ Defender position after outlet step (NO MOVEMENT - same as ball handler)
         # Defenders stay at their starting position during outlet pass, only move during defensive stop/shot attempt

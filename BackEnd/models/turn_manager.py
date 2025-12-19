@@ -510,7 +510,7 @@ class TurnManager:
                     "rebounderId": result.get("rebounderId"),  # ✅ Add rebounderId to debug output
                     "rebound_type": result.get("rebound_type")  # ✅ Add rebound_type to debug output
                 }
-                logging.warning(f"🏀 [FAST BREAK DEBUG] Turn #{turn_num} result before return: {json.dumps(debug_data, default=str)}")
+                # Debug log removed to declutter output
             
             # Note: Keeping this log for backward compatibility, but the detailed log above is more useful
             logging.info(f"🔄 [OFFENSIVE_STATE TRANSITION] Turn #{turn_num} Complete", {

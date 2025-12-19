@@ -1276,11 +1276,11 @@ class ShotManager:
         if defender_count == 0:
             # 0 defenders: 99% make chance (threshold = 1)
             shot_threshold = 1
-            print(f"⚡ Fast Break: 0 defenders, 99% make chance (threshold = 1)")
+            # Debug print removed to declutter output
         elif defender_count >= 2:
             # 2+ defenders: +300 shot threshold (much harder shot)
             shot_threshold += 300
-            print(f"⚡ Fast Break: {defender_count} defenders, +300 threshold = {shot_threshold}")
+            # Debug print removed to declutter output
 
         made = shot_score >= shot_threshold
         text += f"shot threshold: {off_team.team_attributes['shot_threshold']}"
