@@ -132,9 +132,13 @@ async function loadGamePlanSettings() {
     if (stored) {
       try {
         gamePlanSettings = JSON.parse(stored);
+        console.log('📋 Loaded game plan settings from localStorage (single game mode):', gamePlanSettings);
+        console.log('   - Aggression setting:', gamePlanSettings?.strategy_settings?.aggression);
       } catch (e) {
         console.error('Failed to parse game plan settings:', e);
       }
+    } else {
+      console.warn('⚠️ No game plan settings found in localStorage for key:', storageKey);
     }
   } else if (mode === 'franchise' && franchiseId && teamId) {
     // Franchise mode: load from database

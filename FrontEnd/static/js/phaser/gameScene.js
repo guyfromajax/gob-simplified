@@ -271,10 +271,16 @@ export function createGameScene(Phaser) {
         payload.user_team_side = this.userTeamSide;
         payload.playcall_settings = this.gamePlanSettings.playcall_settings;
         payload.strategy_settings = this.gamePlanSettings.strategy_settings;
+        console.log('🎮 [gameScene] Sending game plan settings to backend:', {
+          user_team_side: this.userTeamSide,
+          aggression: this.gamePlanSettings.strategy_settings?.aggression,
+          quarter: this.quarter
+        });
       } else if (this.quarter === 1) {
         console.warn('⚠️ [gameScene] Not sending game plan:', { 
           hasSettings: !!this.gamePlanSettings, 
-          userTeamSide: this.userTeamSide 
+          userTeamSide: this.userTeamSide,
+          gamePlanSettings: this.gamePlanSettings
         });
       }
       
