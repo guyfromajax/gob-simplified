@@ -1700,8 +1700,21 @@ def _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     
     steal_roll = random.randint(1, 100)
+    
+    # Get aggression setting for debug log
+    aggression_level = def_team.strategy_calls.get("aggression", "normal")
+    base_steal_attempt = 20  # STEAL_ATTEMPT constant
+    was_adjusted = steal_attempt_rate != base_steal_attempt
+    
     logging.warning(f"🔍 [HCO RESOLUTION] Steal Attempt Check:")
-    logging.warning(f"   Base STEAL_ATTEMPT: {steal_attempt_rate}%")
+    logging.warning(f"   Defense team aggression: {aggression_level}")
+    logging.warning(f"   Base STEAL_ATTEMPT: {base_steal_attempt}%")
+    if was_adjusted:
+        adjustment = steal_attempt_rate - base_steal_attempt
+        logging.warning(f"   ✅ Adjusted by aggression: {base_steal_attempt}% → {steal_attempt_rate}% ({adjustment:+d})")
+    else:
+        logging.warning(f"   ➡️  No adjustment (aggression: {aggression_level})")
+    logging.warning(f"   Final steal attempt rate: {steal_attempt_rate}%")
     logging.warning(f"   Roll: {steal_roll} (1-100)")
     if steal_roll < steal_attempt_rate:
         logging.warning(f"   ✅ Steal attempt occurs ({steal_roll} < {steal_attempt_rate})")
