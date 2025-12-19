@@ -1662,7 +1662,7 @@ def resolve_hco_outcome(game, skeleton):
     )
     from BackEnd.utils.shared import (
         calculate_ball_handling_score, calculate_defender_pressure_score,
-        get_player_position, unpack_game_context
+        get_player_position, unpack_game_context, get_name_safe
     )
     # get_ball_handler_from_skeleton is defined in this file (phase_resolution.py)
     from BackEnd.utils.defense_utils import is_zone_defense
@@ -1698,8 +1698,8 @@ def resolve_hco_outcome(game, skeleton):
     calibrated_o_foul = max(2, calibrated_o_foul)  # Min 2
     
     # Steal thresholds calibration
-    calibrated_hard_steal = HARD_STEAL + turnover_modifier
-    calibrated_soft_steal = SOFT_STEAL + turnover_modifier
+    calibrated_hard_steal = HARD_STEAL - turnover_modifier
+    calibrated_soft_steal = SOFT_STEAL - turnover_modifier
     
     # Foul thresholds calibration (on steal attempts)
     calibrated_hard_foul = HARD_FOUL - int(foul_modifier_def * 0.6)
@@ -1713,8 +1713,8 @@ def resolve_hco_outcome(game, skeleton):
     logging.warning(f"🔍 [HCO RESOLUTION] Step 2 - Calibrated Constants:")
     logging.warning(f"   STANDARD_D_FOUL: {STANDARD_D_FOUL} + int({foul_modifier_def} * 0.4) = {calibrated_d_foul} (max 98)")
     logging.warning(f"   STANDARD_O_FOUL: {STANDARD_O_FOUL} - {foul_modifier_off} = {calibrated_o_foul} (min 2)")
-    logging.warning(f"   HARD_STEAL: {HARD_STEAL} + {turnover_modifier} = {calibrated_hard_steal}")
-    logging.warning(f"   SOFT_STEAL: {SOFT_STEAL} + {turnover_modifier} = {calibrated_soft_steal}")
+    logging.warning(f"   HARD_STEAL: {HARD_STEAL} - {turnover_modifier} = {calibrated_hard_steal}")
+    logging.warning(f"   SOFT_STEAL: {SOFT_STEAL} - {turnover_modifier} = {calibrated_soft_steal}")
     logging.warning(f"   HARD_FOUL: {HARD_FOUL} - int({foul_modifier_def} * 0.6) = {calibrated_hard_foul}")
     logging.warning(f"   SOFT_FOUL: {SOFT_FOUL} - int({foul_modifier_def} * 0.6) = {calibrated_soft_foul}")
     logging.warning(f"   DEAD_BALL_TURNOVER: {DEAD_BALL_TURNOVER} - int(0.5 * {turnover_modifier}) = {calibrated_dead_ball_to} (min 2)")
