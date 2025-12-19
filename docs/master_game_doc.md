@@ -637,23 +637,25 @@ defense_score = (
 After the standard shot result is calculated (`made = shot_score >= shot_threshold`), if a shooting foul is detected, an additional calibration check is performed:
 
 ```python
+from BackEnd.constants import THREE_POINTER_FOUL_MISS_CHANCE, TWO_POINTER_FOUL_MISS_CHANCE
+
 if d_foul:
     foul_calibration_roll = random.random()
     if is_three:
-        # 3-pointers: 90% chance foul forces a miss
-        if foul_calibration_roll < 0.9:
+        # 3-pointers: 40% chance foul forces a miss
+        if foul_calibration_roll < THREE_POINTER_FOUL_MISS_CHANCE:  # 0.4
             made = False
         # else: standard shot result holds (could be make or miss)
     else:
-        # 2-pointers: 50% chance foul forces a miss
-        if foul_calibration_roll < 0.5:
+        # 2-pointers: 20% chance foul forces a miss
+        if foul_calibration_roll < TWO_POINTER_FOUL_MISS_CHANCE:  # 0.2
             made = False
         # else: standard shot result holds (could be make or miss)
 ```
 
 **Calibration Rates:**
-- **3-Pointers:** 90% chance the foul forces a miss (fouls are more disruptive to long-range shots)
-- **2-Pointers:** 50% chance the foul forces a miss (fouls are less disruptive to closer shots)
+- **3-Pointers:** 40% chance the foul forces a miss (fouls are more disruptive to long-range shots)
+- **2-Pointers:** 20% chance the foul forces a miss (fouls are less disruptive to closer shots)
 
 **Note:** If the calibration roll doesn't force a miss, the standard shot result (make or miss) is preserved. This allows for AND-1 situations where the shot is made despite the foul.
 
