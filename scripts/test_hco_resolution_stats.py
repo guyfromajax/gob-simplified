@@ -74,11 +74,11 @@ def run_hco_statistics_test():
         "Total Turns": 0
     }
     
-    print("\n🎯 Simulating 1 full game...")
+    print("\n🎯 Simulating 20 full games...")
     print("=" * 60)
     
-    # Simulate 1 full game
-    for game_num in range(1, 2):
+    # Simulate 20 full games
+    for game_num in range(1, 21):
         print(f"\n📊 Game {game_num}/10...")
         
         # Initialize game with Morristown and Four Corners, using loaded attributes
