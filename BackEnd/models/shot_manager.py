@@ -6,7 +6,10 @@ from BackEnd.constants import (
     PAINT_SPOTS,
     PLAYCALL_ATTRIBUTE_WEIGHTS, 
     BLOCK_PROBABILITY,
-    AGGRESSION_FOUL_MULTIPLIER
+    AGGRESSION_FOUL_MULTIPLIER,
+    HARD_SHOOTING_FOUL_THRESHOLD,
+    SOFT_SHOOTING_FOUL_THRESHOLD,
+    SOFT_PROB
 )
 from BackEnd.utils.shared import (
     apply_help_defense_if_triggered,
@@ -349,6 +352,21 @@ class ShotManager:
             game_state.pop("motion_attack_penalty", None)
 
         made = shot_score >= shot_threshold
+
+        # ✅ SHOOTING FOUL CALIBRATION: If there's a shooting foul, check if it forces a miss
+        # Fouls are significant outliers that can force missed shots
+        if d_foul:
+            foul_calibration_roll = random.random()
+            if is_three:
+                # 3-pointers: 90% chance foul forces a miss
+                if foul_calibration_roll < 0.9:
+                    made = False
+                # else: standard shot result holds (could be make or miss)
+            else:
+                # 2-pointers: 50% chance foul forces a miss
+                if foul_calibration_roll < 0.5:
+                    made = False
+                # else: standard shot result holds (could be make or miss)
 
         # Stat tracking (attempts)
         shooter.record_stat("FGA")
@@ -1111,26 +1129,28 @@ class ShotManager:
     
     def check_defensive_foul_on_shot(self, defender, defense_score, is_three=False):
         """
-        Determines if a defensive foul occurs based on defender skill and team aggression.
-        Three-point shots are less likely to result in fouls (reduced threshold).
+        Determines if a defensive foul occurs based on defender skill and team foul_modifier.
+        Uses hard and soft thresholds with universal constants.
         Returns (bool, player) → (was_foul_committed, fouling_defender)
         """
         if not defender:
             return False, None
 
         defense_team = self.game.defense_team
-        defense_attrs = defender.attributes
+        foul_modifier = defense_team.team_attributes.get("foul_modifier", 0)
 
-        aggression_level = defense_team.strategy_calls.get("aggression", 2)
-        aggression_factor = AGGRESSION_FOUL_MULTIPLIER.get(aggression_level, 0.2)
-        foul_threshold = defense_team.team_attributes.get("foul_modifier", 30)
+        # Calculate thresholds with foul_modifier adjustment
+        hard_threshold = HARD_SHOOTING_FOUL_THRESHOLD + foul_modifier
+        soft_threshold = SOFT_SHOOTING_FOUL_THRESHOLD + foul_modifier
 
-        # Reduce foul likelihood on three-point shots
-        if is_three:
-            foul_threshold *= 0.75
-
-        # Real foul calculation based on defender skill and team aggression
-        d_foul = defense_score < (foul_threshold * aggression_factor)
+        # Determine if foul occurs
+        if defense_score < hard_threshold:
+            d_foul = True
+        elif defense_score < soft_threshold:
+            # Soft foul: random chance based on SOFT_PROB
+            d_foul = random.random() < SOFT_PROB
+        else:
+            d_foul = False
         
         return d_foul, defender if d_foul else None
 
