@@ -1129,6 +1129,10 @@ The stopper system uses SS&S helper functions to populate player roles, ensuring
   - **Why:** If `resolve_non_shooting_foul()` flipped possession AND SIP setup also flipped, we'd flip twice (back to original team)
 - `resolve_turnover_logic()` sets `possession_flips: True` for all turnovers
   - Same pattern: sets flag only, actual flip happens in `game_manager.py` SIP setup
+  - **✅ FIX (January 2025):** Added `from_resolution_system` parameter to respect resolution system's determination
+    - When `from_resolution_system=True`, the function respects the `turnover_type` passed (either "STEAL" or "DEAD BALL") and does not randomly convert "DEAD BALL" to "STEAL"
+    - This ensures dead ball turnovers from the HCO Resolution System are correctly tracked and displayed
+    - Nomenclature conversion: `DEAD_BALL_TURNOVER` (from resolution system) is converted to `"DEAD BALL"` (with space) before calling `resolve_turnover_logic()`
 
 **Transition Handling:**
 - Handled by shared functions (sets `offensive_state`, `next_play_type`)
