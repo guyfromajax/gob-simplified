@@ -15,8 +15,10 @@ def _setup_game(one_and_one: bool):
         "free_throws_remaining": 1,
         "one_and_one": one_and_one,
     })
-    # ensure every FT is made (use game_state threshold, not team_attributes)
-    game.game_state["ft_shot_threshold"] = 0
+    # ensure every FT is made by setting high attributes and controlling random roll
+    shooter.attributes["FT"] = 100
+    shooter.attributes["CH"] = 100
+    shooter.attributes["MO"] = 10
     return game, shooter
 
 
@@ -101,9 +103,12 @@ def test_and_one_make_results_in_baseline_inbound():
 
 
 def test_and_one_miss_results_in_rebound(monkeypatch):
-    game, _ = _setup_game(one_and_one=False)
-    game.game_state["ft_shot_threshold"] = 999
-    monkeypatch.setattr("BackEnd.engine.phase_resolution.random.randint", lambda a, b: 1)
+    game, shooter = _setup_game(one_and_one=False)
+    # Force a miss by setting low attributes and high roll
+    shooter.attributes["FT"] = 1
+    shooter.attributes["CH"] = 1
+    shooter.attributes["MO"] = 0
+    monkeypatch.setattr("BackEnd.engine.phase_resolution.random.randint", lambda a, b: 100 if a == 1 and b == 100 else 1)
     monkeypatch.setattr("BackEnd.engine.phase_resolution.random.random", lambda: 0.0)
     monkeypatch.setattr("BackEnd.engine.phase_resolution.choose_rebounder", lambda r, s: "C")
     result = resolve_free_throw_logic(game)
@@ -120,9 +125,12 @@ def test_one_and_one_make_unlocks_second_shot():
 
 
 def test_one_and_one_miss_ends_possession(monkeypatch):
-    game, _ = _setup_game(one_and_one=True)
-    game.game_state["ft_shot_threshold"] = 999
-    monkeypatch.setattr("BackEnd.engine.phase_resolution.random.randint", lambda a, b: 1)
+    game, shooter = _setup_game(one_and_one=True)
+    # Force a miss by setting low attributes and high roll
+    shooter.attributes["FT"] = 1
+    shooter.attributes["CH"] = 1
+    shooter.attributes["MO"] = 0
+    monkeypatch.setattr("BackEnd.engine.phase_resolution.random.randint", lambda a, b: 100 if a == 1 and b == 100 else 1)
     monkeypatch.setattr("BackEnd.engine.phase_resolution.random.random", lambda: 0.0)
     monkeypatch.setattr("BackEnd.engine.phase_resolution.choose_rebounder", lambda r, s: "C")
     result = resolve_free_throw_logic(game)

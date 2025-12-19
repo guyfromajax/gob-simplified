@@ -48,15 +48,25 @@ def force_made_shot_scenario(game, scenario_type="HCO_MAKE"):
         game.game_state["one_and_one"] = False
         game.game_state["shooter"] = game.offense_team.lineup["PG"]  # Set shooter
         
-        # Lower the FT threshold to guarantee a make (use game_state, not team_attributes)
-        original_threshold = game.game_state.get("ft_shot_threshold", 100)
-        game.game_state["ft_shot_threshold"] = 1  # Very low threshold
-        
-        try:
+        # Set high attributes to guarantee a make
+        shooter = game.offense_team.lineup.get("PG")
+        if shooter:
+            original_ft = shooter.attributes.get("FT", 50)
+            original_ch = shooter.attributes.get("CH", 50)
+            original_mo = shooter.attributes.get("MO", 0)
+            shooter.attributes["FT"] = 100
+            shooter.attributes["CH"] = 100
+            shooter.attributes["MO"] = 10
+            
+            try:
+                return game.turn_manager.run_micro_turn()
+            finally:
+                # Restore original attributes
+                shooter.attributes["FT"] = original_ft
+                shooter.attributes["CH"] = original_ch
+                shooter.attributes["MO"] = original_mo
+        else:
             return game.turn_manager.run_micro_turn()
-        finally:
-            # Restore original threshold
-            game.game_state["ft_shot_threshold"] = original_threshold
     
     elif scenario_type == "PUTBACK_MAKE":
         # Force missed shot → OREB → putback make
