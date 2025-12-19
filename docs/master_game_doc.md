@@ -7315,3 +7315,168 @@ When team objects are created in Single Game, Tournament, or Franchise modes, th
 
 ## Resolution System 🚧 **IN PROGRESS** (January 2025)
 
+### Overview
+
+The Resolution System is a centralized, unified approach to determining turn outcomes across all major turn types: **HCO (Half Court Offense)**, **Fast Break**, **HCT (Half Court Trap)**, and **FCP (Full Court Press)**.
+
+The system uses **base statistical values** derived from D1 Men's College Basketball statistics, which are then modified by team attributes and in-game settings to produce final resolution values. These values are treated as **absolute base values** (not percentages), so while they may start aggregating to 100, they don't need to stay at 100 as modifications are applied.
+
+### Design Principles
+
+- **Strategic**: Outcomes reflect matchup quality, team attributes, and tactical decisions
+- **Simple**: Single calculation, linear modifications, one decision point
+- **Transparent**: Clear logic flow, easy to understand and tune
+- **SS&S**: One system for all turn types, easy to extend and maintain
+
+### Team Attributes Used
+
+The following team attributes are used in resolution calculations, with a range of **-10 to 10**:
+
+- `offensive_efficiency` - Offensive team's efficiency rating
+- `defensive_efficiency` - Defensive team's efficiency rating
+- `foul_modifier` - Team's foul tendency modifier
+- `turnover_modifier` - Team's turnover tendency modifier
+- `fb_efficiency` - Fast break efficiency (for Fast Break turns)
+- `pt_efficiency` - Press/Trap efficiency (for HCT/FCP turns)
+
+**Note**: Positive values are always positive for the team, negative values are always negative. The system must be mindful of when to add or subtract attribute modifications from base result values.
+
+### Attribute Inversion
+
+When possession changes and the other team has the ball, team attributes are **inverted** (offense & defense roles swap). The team that was on offense becomes the defense team, and vice versa.
+
+### Minimum Values
+
+All resolution result values have a **minimum value of 2**. There are no maximum values.
+
+---
+
+## HCO (Half Court Offense) Resolution System
+
+### Base Values
+
+HCO resolution starts with the following base values (derived from D1 Men's College Basketball statistics):
+
+- **Shot Attempt**: 70
+- **Offensive Foul**: 7
+- **Defensive Foul (non-shooting)**: 10
+- **Dead Ball Turnover**: 7
+- **Steal**: 6
+
+### Calculation Process
+
+#### Step 1: Apply Team Attribute Modifiers
+
+At the start of the game, team attribute modifiers are applied to the base values. These modifiers persist throughout the game (team attributes don't change during turns).
+
+**Example Calculation:**
+
+**Offense Team Attributes:**
+- `offensive_efficiency` = 8
+- `foul_modifier` = -6
+- `turnover_modifier` = 10
+
+**Defense Team Attributes:**
+- `defensive_efficiency` = 1
+- `foul_modifier` = -7
+
+**Modified Values:**
+- **Shot Attempt**: `70 + 8 (offense_efficiency) - 1 (defense_efficiency) = 78`
+- **Offensive Foul**: `7 - (-6) (offense team foul_modifier) = 13`
+- **Defensive Foul (non-shooting)**: `10 - (-7) (defense team foul_modifier) = 17`
+- **Dead Ball Turnover**: `7 - 5 (0.5 * offense team turnover_modifier) = 2`
+- **Steal**: `6 - 5 (0.5 * offense team turnover_modifier) = 1`
+
+**Turnover Modifier Split:**
+- The `turnover_modifier` is split 50/50 between Dead Ball Turnover and Steal
+- If `turnover_modifier` is odd, the extra point (positive or negative) is added to Dead Ball Turnover
+
+**Attribute Application Rules:**
+- **Shot Attempt**: `base + offensive_efficiency - defensive_efficiency`
+- **Offensive Foul**: `base - offense_team.foul_modifier` (subtracting negative = adding)
+- **Defensive Foul (non-shooting)**: `base - defense_team.foul_modifier` (subtracting negative = adding)
+- **Dead Ball Turnover**: `base - (0.5 * offense_team.turnover_modifier)` (if odd, add remainder)
+- **Steal**: `base - (0.5 * offense_team.turnover_modifier)`
+
+#### Step 2: Apply Aggression Setting Modifiers
+
+At the turn level, the defense team's aggression setting is applied. Aggression settings can change turn by turn.
+
+**Normal Aggression** (default):
+- No changes to resolution values
+
+**Aggressive Aggression**:
+- **Defensive Foul (non-shooting)**: `+4`
+- **Steal**: `+2`
+- **Dead Ball Turnover**: `+2`
+
+**Passive Aggression**:
+- **Defensive Foul (non-shooting)**: `-4`
+- **Steal**: `-2`
+- **Dead Ball Turnover**: `-2`
+
+#### Step 3: Enforce Minimum Values
+
+After all modifications, ensure no value goes below **2**:
+- If any resolution value is below 2, set it to 2
+
+#### Step 4: Generate Turn Score (Future Implementation)
+
+A score will be generated for the turn based on:
+- Player attributes of players involved in the HCO
+- Actions performed during the turn
+- This score will be scaled to match the resolution value ranges
+
+The final score will be compared against the resolution values to determine the actual outcome.
+
+### Example: Complete HCO Resolution Calculation
+
+**Initial State:**
+- Base values: Shot=70, O_Foul=7, D_Foul=10, TO=7, Steal=6
+- Offense: `offensive_efficiency=8`, `foul_modifier=-6`, `turnover_modifier=10`
+- Defense: `defensive_efficiency=1`, `foul_modifier=-7`
+- Defense Aggression: `aggressive`
+
+**After Step 1 (Team Attributes):**
+- Shot Attempt: `70 + 8 - 1 = 77`
+- Offensive Foul: `7 - (-6) = 13`
+- Defensive Foul: `10 - (-7) = 17`
+- Dead Ball Turnover: `7 - 5 = 2` (10 * 0.5 = 5)
+- Steal: `6 - 5 = 1`
+
+**After Step 2 (Aggression Setting):**
+- Shot Attempt: `77` (unchanged)
+- Offensive Foul: `13` (unchanged)
+- Defensive Foul: `17 + 4 = 21`
+- Dead Ball Turnover: `2 + 2 = 4`
+- Steal: `1 + 2 = 3`
+
+**After Step 3 (Minimum Values):**
+- All values are ≥ 2, no changes needed
+
+**Final Resolution Values:**
+- Shot Attempt: 77
+- Offensive Foul: 13
+- Defensive Foul: 21
+- Dead Ball Turnover: 4
+- Steal: 3
+
+### Key Implementation Notes
+
+1. **Team Attribute Persistence**: Team attributes are set at game start and don't change during turns (future: may change during timeouts)
+2. **Attribute Inversion**: When possession changes, offense/defense roles swap, so attribute applications are inverted
+3. **Turnover Modifier Split**: Always 50/50 between Dead Ball Turnover and Steal, with odd remainder going to Dead Ball Turnover
+4. **Minimum Value Enforcement**: Applied after all modifications to ensure no value goes below 2
+5. **Future Score Generation**: Player attributes and actions will generate a score that maps to these resolution values
+
+### Status
+
+🚧 **HCO Resolution**: Design complete, implementation pending
+- Fast Break, HCT, and FCP resolution logic will be designed after HCO is implemented and tested
+
+### Key Files
+
+- `BackEnd/engine/phase_resolution.py` - Current HCO resolution logic (to be replaced)
+- `BackEnd/models/turn_manager.py` - Current event type determination (to be replaced)
+- `BackEnd/models/team_manager.py` - Team attribute initialization
+
