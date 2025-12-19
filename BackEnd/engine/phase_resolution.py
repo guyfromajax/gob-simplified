@@ -1705,7 +1705,7 @@ def _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_
     steal_roll = random.randint(1, 100)
     
     # Get aggression setting for debug log
-    aggression_level = def_team.strategy_calls.get("aggression", "normal")
+    aggression_level = def_team.strategy_calls.get("aggression_call", "normal")
     base_steal_attempt = 20  # STEAL_ATTEMPT constant
     was_adjusted = steal_attempt_rate != base_steal_attempt
     
@@ -2080,7 +2080,7 @@ def resolve_hco_outcome(game, skeleton):
     foul_modifier_def = def_attrs.get("foul_modifier", 0)
     
     # Get aggression setting from strategy_calls (strings: "passive", "normal", "aggressive")
-    aggression_level = def_team.strategy_calls.get("aggression", "normal")
+    aggression_level = def_team.strategy_calls.get("aggression_call", "normal")
     
     # 🔍 DEBUG: Step 1 - Team Attributes and Settings
     logging.warning(f"🔍 [HCO RESOLUTION] Step 1 - Team Attributes and Settings:")
