@@ -357,16 +357,34 @@ class ShotManager:
         # Fouls are significant outliers that can force missed shots
         if d_foul:
             foul_calibration_roll = random.random()
+            original_made = made
             if is_three:
                 # 3-pointers: 90% chance foul forces a miss
+                logging.warning(f"🔍 [SHOOTING FOUL CALIBRATION] 3-pointer foul check:")
+                logging.warning(f"   Original shot result: {'MADE' if made else 'MISS'}")
+                logging.warning(f"   Calibration roll: {foul_calibration_roll:.3f}")
+                logging.warning(f"   Threshold: < 0.9 (90% chance to force miss)")
                 if foul_calibration_roll < 0.9:
                     made = False
+                    logging.warning(f"   ✅ Foul forces MISS (roll {foul_calibration_roll:.3f} < 0.9)")
+                else:
+                    logging.warning(f"   ➡️  Standard shot result holds (roll {foul_calibration_roll:.3f} >= 0.9)")
                 # else: standard shot result holds (could be make or miss)
             else:
                 # 2-pointers: 50% chance foul forces a miss
+                logging.warning(f"🔍 [SHOOTING FOUL CALIBRATION] 2-pointer foul check:")
+                logging.warning(f"   Original shot result: {'MADE' if made else 'MISS'}")
+                logging.warning(f"   Calibration roll: {foul_calibration_roll:.3f}")
+                logging.warning(f"   Threshold: < 0.5 (50% chance to force miss)")
                 if foul_calibration_roll < 0.5:
                     made = False
+                    logging.warning(f"   ✅ Foul forces MISS (roll {foul_calibration_roll:.3f} < 0.5)")
+                else:
+                    logging.warning(f"   ➡️  Standard shot result holds (roll {foul_calibration_roll:.3f} >= 0.5)")
                 # else: standard shot result holds (could be make or miss)
+            
+            if original_made != made:
+                logging.warning(f"   📊 Shot result changed: {('MADE' if original_made else 'MISS')} → {('MADE' if made else 'MISS')}")
 
         # Stat tracking (attempts)
         shooter.record_stat("FGA")
