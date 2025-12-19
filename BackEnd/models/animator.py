@@ -198,8 +198,7 @@ class Animator:
                 shooter_y = random.randint(20, 30)
                 bh_end = {"x": shooter_x, "y": shooter_y}
             
-        # ✅ DEBUG: Log final position before build_movement
-        logging.warning(f"  bh_end before build_movement: {bh_end}")
+        # Debug log removed to declutter output
         
         # Store final position for defender calculations (in HOME orientation)
         fb_roles["_bh_final_x"] = bh_end["x"]
