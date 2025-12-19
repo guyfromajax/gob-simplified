@@ -1706,7 +1706,7 @@ def _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_
     base_steal_attempt = 20  # STEAL_ATTEMPT constant
     was_adjusted = steal_attempt_rate != base_steal_attempt
     
-    logging.warning(f"🔍 [HCO RESOLUTION] Steal Attempt Check:")
+    logging.warning(f"🔥 [HCO RESOLUTION] Steal Attempt Check:")
     logging.warning(f"   Defense team aggression: {aggression_level}")
     logging.warning(f"   Base STEAL_ATTEMPT: {base_steal_attempt}%")
     if was_adjusted:
@@ -2172,7 +2172,7 @@ def resolve_hco_outcome(game, skeleton):
     
     result = o_score - d_score
     
-    logging.warning(f"🔍 [HCO RESOLUTION] Step 6 - Shot Attempt:")
+    logging.warning(f"🔥 [HCO RESOLUTION] Step 6 - Shot Attempt:")
     logging.warning(f"   Offense effectiveness: {offensive_efficiency} + {o_random} (random) = {o_score}")
     logging.warning(f"   Defense effectiveness: {defensive_efficiency} + {d_random} (random) = {d_score}")
     logging.warning(f"   Result (o_score - d_score): {o_score} - {d_score} = {result}")
