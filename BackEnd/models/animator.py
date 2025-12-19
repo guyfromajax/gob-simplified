@@ -98,11 +98,7 @@ class Animator:
                 # For non-ball handlers, use player.coords as normal
                 start = getattr(player, "coords", {"x": 25, "y": 50})
             
-            # ✅ DEBUG: Log build_movement inputs
-            if has_ball:  # Only log for ball handler to avoid spam
-                # Debug log removed to declutter output
-                logging.warning(f"  is_away_offense: {is_away_offense}")
-                # Debug logs removed to declutter output
+            # Debug logs removed to declutter output
             
             # ✅ COMMENTED OUT: Coordinate flipping removed - using coordinates as-is
             # if is_away_offense:
