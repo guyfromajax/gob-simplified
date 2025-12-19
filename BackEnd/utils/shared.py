@@ -768,6 +768,59 @@ def calculate_gravity_score(attrs):
         attrs["IQ"] * 0.4
     )
 
+
+def calculate_ball_handling_score(player):
+    """
+    Calculate ball handling score for an offensive player.
+    Used for turnover and steal attempt calculations.
+    
+    Formula: (BH * 0.5 + AG * 0.2 + IQ * 0.2 + CH * 0.1) * random(1, 6)
+    
+    Args:
+        player: Player object with attributes
+    
+    Returns:
+        int: Ball handling score
+    """
+    attrs = player.attributes
+    return (
+        attrs["BH"] * 0.5 +
+        attrs["AG"] * 0.2 +
+        attrs["IQ"] * 0.2 +
+        attrs["CH"] * 0.1
+    ) * random.randint(1, 6)
+
+
+def calculate_defender_pressure_score(defender, defense_call):
+    """
+    Calculate defensive pressure score for a defender.
+    Used for turnover and steal attempt calculations.
+    
+    Formula: (OD * 0.3 + AG * 0.3 + IQ * 0.2 + CH * 0.2) * random(1, 6)
+    Zone defense modifier: pressure *= 0.9
+    
+    Args:
+        defender: Defender player object with attributes
+        defense_call: Defense playcall string (e.g., "Man", "2-3 Zone")
+    
+    Returns:
+        int: Defender pressure score
+    """
+    from BackEnd.utils.defense_utils import is_zone_defense
+    
+    def_attrs = defender.attributes
+    pressure = (
+        def_attrs["OD"] * 0.3 +
+        def_attrs["AG"] * 0.3 +
+        def_attrs["IQ"] * 0.2 +
+        def_attrs["CH"] * 0.2
+    ) * random.randint(1, 6)
+    
+    if is_zone_defense(defense_call):
+        pressure *= 0.9
+    
+    return int(pressure)
+
 def get_away_player_coords(playerCoords):
         
         """
