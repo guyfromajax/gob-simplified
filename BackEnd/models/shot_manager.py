@@ -374,34 +374,40 @@ class ShotManager:
         # ✅ SHOOTING FOUL CALIBRATION: If there's a shooting foul, check if it forces a miss
         # Fouls are significant outliers that can force missed shots
         if d_foul:
+            from BackEnd.constants import THREE_POINTER_FOUL_MISS_CHANCE, TWO_POINTER_FOUL_MISS_CHANCE
+            
             foul_calibration_roll = random.random()
             original_made = made
             if is_three:
-                # 3-pointers: 90% chance foul forces a miss
+                # 3-pointers: 40% chance foul forces a miss
+                threshold = THREE_POINTER_FOUL_MISS_CHANCE
+                miss_chance_pct = int(THREE_POINTER_FOUL_MISS_CHANCE * 100)
                 logging.warning(f"🔍 [SHOOTING FOUL CALIBRATION] 3-pointer foul check:")
                 logging.warning(f"   Original shot result: {'MADE' if made else 'MISS'}")
                 logging.warning(f"   Calibration roll: {foul_calibration_roll:.3f}")
-                logging.warning(f"   Threshold: < 0.9 (90% chance to force miss)")
-                if foul_calibration_roll < 0.9:
+                logging.warning(f"   Threshold: < {threshold} ({miss_chance_pct}% chance to force miss)")
+                if foul_calibration_roll < threshold:
                     made = False
-                    logging.warning(f"   ✅ Foul forces MISS (roll {foul_calibration_roll:.3f} < 0.9)")
+                    logging.warning(f"   ✅ Foul forces MISS (roll {foul_calibration_roll:.3f} < {threshold})")
                 else:
                     # ✅ BUG FIX: Explicitly preserve original result when calibration doesn't force miss
                     # The original 'made' value is already correct, but we log it for clarity
-                    logging.warning(f"   ➡️  Standard shot result holds (roll {foul_calibration_roll:.3f} >= 0.9) - Result: {'MADE' if made else 'MISS'}")
+                    logging.warning(f"   ➡️  Standard shot result holds (roll {foul_calibration_roll:.3f} >= {threshold}) - Result: {'MADE' if made else 'MISS'}")
             else:
-                # 2-pointers: 50% chance foul forces a miss
+                # 2-pointers: 20% chance foul forces a miss
+                threshold = TWO_POINTER_FOUL_MISS_CHANCE
+                miss_chance_pct = int(TWO_POINTER_FOUL_MISS_CHANCE * 100)
                 logging.warning(f"🔍 [SHOOTING FOUL CALIBRATION] 2-pointer foul check:")
                 logging.warning(f"   Original shot result: {'MADE' if made else 'MISS'}")
                 logging.warning(f"   Calibration roll: {foul_calibration_roll:.3f}")
-                logging.warning(f"   Threshold: < 0.5 (50% chance to force miss)")
-                if foul_calibration_roll < 0.5:
+                logging.warning(f"   Threshold: < {threshold} ({miss_chance_pct}% chance to force miss)")
+                if foul_calibration_roll < threshold:
                     made = False
-                    logging.warning(f"   ✅ Foul forces MISS (roll {foul_calibration_roll:.3f} < 0.5)")
+                    logging.warning(f"   ✅ Foul forces MISS (roll {foul_calibration_roll:.3f} < {threshold})")
                 else:
                     # ✅ BUG FIX: Explicitly preserve original result when calibration doesn't force miss
                     # The original 'made' value is already correct, but we log it for clarity
-                    logging.warning(f"   ➡️  Standard shot result holds (roll {foul_calibration_roll:.3f} >= 0.5) - Result: {'MADE' if made else 'MISS'}")
+                    logging.warning(f"   ➡️  Standard shot result holds (roll {foul_calibration_roll:.3f} >= {threshold}) - Result: {'MADE' if made else 'MISS'}")
             
             if original_made != made:
                 logging.warning(f"   📊 Shot result changed: {('MADE' if original_made else 'MISS')} → {('MADE' if made else 'MISS')}")
@@ -604,6 +610,11 @@ class ShotManager:
             # off_team was on offense during shot, so they were attacking their target basket
             # For home team shooting: attacking away basket (x=10)
             # For away team shooting: attacking home basket (x=90)
+            # ✅ CLAMP: Clamp all rebound positions to rim coordinates (x between 10 and 90)
+            from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
+            min_x = AWAY_RIM_COORDS["x"]  # 10 (left side)
+            max_x = HOME_RIM_COORDS["x"]  # 90 (right side)
+            
             is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
             for pos in offense_rebounders:
                 rebounder_player = off_team.lineup.get(pos)
@@ -611,10 +622,13 @@ class ShotManager:
                     # Non-get-back players are near the basket after shot attempt
                     if is_home_team_shooting:
                         # Home team was shooting, so rebounders near away basket (x=10)
-                        rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                        rebounder_x = random.randint(8, 15)
                     else:
                         # Away team was shooting, so rebounders near home basket (x=90)
-                        rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
+                        rebounder_x = random.randint(85, 92)
+                    # ✅ CLAMP: Ensure x is between rim coordinates
+                    rebounder_x = max(min_x, min(max_x, rebounder_x))
+                    rebounder_coords = {"x": rebounder_x, "y": random.randint(20, 30)}
                     rebounder_player.coords = rebounder_coords.copy()
             
             # ✅ SS&S: Calculate and store release player coordinates (backend as source of truth)

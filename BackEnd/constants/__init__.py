@@ -137,6 +137,10 @@ HARD_SHOOTING_FOUL_THRESHOLD = 50
 SOFT_SHOOTING_FOUL_THRESHOLD = 110
 SOFT_PROB = 0.16
 
+# Shooting Foul Calibration constants (chance that a defensive shooting foul forces a miss)
+THREE_POINTER_FOUL_MISS_CHANCE = 0.4  # 40% chance foul forces miss on 3-pointers
+TWO_POINTER_FOUL_MISS_CHANCE = 0.2    # 20% chance foul forces miss on 2-pointers
+
 # HCO Resolution System constants
 STANDARD_D_FOUL = 96
 STANDARD_O_FOUL = 7
