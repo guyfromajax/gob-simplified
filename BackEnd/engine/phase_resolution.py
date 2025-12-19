@@ -1357,11 +1357,11 @@ def resolve_free_throw_logic(game):
     attrs = shooter.attributes
 
     # FT outcome calculation
-    # Formula: ((FT * 0.7) + (IQ * 0.2) + MO) * random(1, 10)
-    ft_shot_score = ((attrs["FT"] * 0.7) + (attrs["IQ"] * 0.2) + attrs["MO"]) * random.randint(1, 10)
-    ft_threshold = game_state.get("ft_shot_threshold", 100)  # Default to 100 if not set
-    text = f"ft_shot_score: {ft_shot_score}, threshold: {ft_threshold}  "
-    makes_shot = ft_shot_score >= ft_threshold
+    # Formula: (FT * 0.7) + (CH * 0.2) + MO
+    ft_shot_score = (attrs["FT"] * 0.7) + (attrs["CH"] * 0.2) + attrs["MO"]
+    result = random.randint(1, 100)
+    text = f"ft_shot_score: {ft_shot_score}, roll: {result}  "
+    makes_shot = result < ft_shot_score
 
     shooter.record_stat("FTA")
     text += f"{get_name_safe(shooter)} steps to the line... "

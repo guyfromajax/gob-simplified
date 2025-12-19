@@ -473,42 +473,33 @@ The Free Throw System handles free throw shot attempts and outcomes. Free throws
 **Location:** `BackEnd/engine/phase_resolution.py` - `resolve_free_throw_logic()`  
 **Status:** ✅ Fully implemented
 
-### Free Throw Threshold
-
-**Game-Level Threshold:**
-- A random threshold between **90-110** is generated at the start of each game
-- Stored in `game_state["ft_shot_threshold"]` for the duration of the game
-- This threshold represents the difficulty level for free throws in that specific game
-- Generated in `GameManager._init_game_state()` when the game is initialized
-
 ### Free Throw Calculation
 
 **Formula:**
 ```python
-ft_shot_score = ((attrs["FT"] * 0.7) + (attrs["IQ"] * 0.2) + attrs["MO"]) * random.randint(1, 10)
-makes_shot = ft_shot_score >= game_state["ft_shot_threshold"]
+ft_shot_score = (attrs["FT"] * 0.7) + (attrs["CH"] * 0.2) + attrs["MO"]
+result = random.randint(1, 100)
+makes_shot = result < ft_shot_score
 ```
 
 **Components:**
 1. **Player Attributes:**
    - `FT` (Free Throw) - 70% weight
-   - `IQ` (Intelligence/Game IQ) - 20% weight
+   - `CH` (Clutch) - 20% weight
    - `MO` (Momentum) - Full value added (not weighted)
 
-2. **Random Multiplier:** `random.randint(1, 10)` (1-10 range)
+2. **Random Roll:** `random.randint(1, 100)` (1-100 range)
 
-3. **Threshold Comparison:**
-   - Compares `ft_shot_score` to `game_state["ft_shot_threshold"]` (90-110)
-   - If `ft_shot_score >= threshold` → **MAKE**
-   - If `ft_shot_score < threshold` → **MISS**
+3. **Success Comparison:**
+   - Compares `result` (random 1-100) to `ft_shot_score` (calculated from attributes)
+   - If `result < ft_shot_score` → **MAKE**
+   - If `result >= ft_shot_score` → **MISS**
 
 **Example:**
-- Player with `FT = 80`, `IQ = 70`, `MO = 5`
-- Base score: `(80 * 0.7) + (70 * 0.2) + 5 = 56 + 14 + 5 = 75`
-- Random multiplier: `7` (1-10)
-- Final score: `75 * 7 = 525`
-- Game threshold: `100` (randomly generated 90-110)
-- Result: `525 >= 100` → **MAKE**
+- Player with `FT = 80`, `CH = 70`, `MO = 5`
+- `ft_shot_score = (80 * 0.7) + (70 * 0.2) + 5 = 56 + 14 + 5 = 75`
+- Random roll: `60` (1-100)
+- Result: `60 < 75` → **MAKE**
 
 ### When Free Throws Are Awarded
 
@@ -543,7 +534,6 @@ makes_shot = ft_shot_score >= game_state["ft_shot_threshold"]
 
 **Backend:**
 - `BackEnd/engine/phase_resolution.py` - `resolve_free_throw_logic()` (lines 1352-1520)
-- `BackEnd/models/game_manager.py` - `_init_game_state()` (threshold generation)
 
 **Frontend:**
 - `FrontEnd/static/js/phaser/animation/FreeThrowAnimationSystem.js` - Free throw animation
