@@ -386,8 +386,9 @@ class ShotManager:
                     made = False
                     logging.warning(f"   ✅ Foul forces MISS (roll {foul_calibration_roll:.3f} < 0.9)")
                 else:
-                    logging.warning(f"   ➡️  Standard shot result holds (roll {foul_calibration_roll:.3f} >= 0.9)")
-                # else: standard shot result holds (could be make or miss)
+                    # ✅ BUG FIX: Explicitly preserve original result when calibration doesn't force miss
+                    # The original 'made' value is already correct, but we log it for clarity
+                    logging.warning(f"   ➡️  Standard shot result holds (roll {foul_calibration_roll:.3f} >= 0.9) - Result: {'MADE' if made else 'MISS'}")
             else:
                 # 2-pointers: 50% chance foul forces a miss
                 logging.warning(f"🔍 [SHOOTING FOUL CALIBRATION] 2-pointer foul check:")
@@ -398,11 +399,14 @@ class ShotManager:
                     made = False
                     logging.warning(f"   ✅ Foul forces MISS (roll {foul_calibration_roll:.3f} < 0.5)")
                 else:
-                    logging.warning(f"   ➡️  Standard shot result holds (roll {foul_calibration_roll:.3f} >= 0.5)")
-                # else: standard shot result holds (could be make or miss)
+                    # ✅ BUG FIX: Explicitly preserve original result when calibration doesn't force miss
+                    # The original 'made' value is already correct, but we log it for clarity
+                    logging.warning(f"   ➡️  Standard shot result holds (roll {foul_calibration_roll:.3f} >= 0.5) - Result: {'MADE' if made else 'MISS'}")
             
             if original_made != made:
                 logging.warning(f"   📊 Shot result changed: {('MADE' if original_made else 'MISS')} → {('MADE' if made else 'MISS')}")
+            else:
+                logging.warning(f"   📊 Shot result unchanged: {'MADE' if made else 'MISS'} (calibration did not force change)")
 
         # Stat tracking (attempts)
         shooter.record_stat("FGA")
