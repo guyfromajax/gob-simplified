@@ -102,8 +102,7 @@ class Animator:
             if has_ball:  # Only log for ball handler to avoid spam
                 # Debug log removed to declutter output
                 logging.warning(f"  is_away_offense: {is_away_offense}")
-                logging.warning(f"  start (from outlet or player.coords): {start}")
-                logging.warning(f"  end_coords (input, HOME orientation): {end_coords}")
+                # Debug logs removed to declutter output
             
             # ✅ COMMENTED OUT: Coordinate flipping removed - using coordinates as-is
             # if is_away_offense:
