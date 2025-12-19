@@ -7410,14 +7410,108 @@ At the turn level, the defense team's aggression setting is applied. Aggression 
 After all modifications, ensure no value goes below **2**:
 - If any resolution value is below 2, set it to 2
 
-#### Step 4: Generate Turn Score (Future Implementation)
+#### Step 4: Steal Attempt Resolution (HCO-Specific)
 
-A score will be generated for the turn based on:
-- Player attributes of players involved in the HCO
-- Actions performed during the turn
-- This score will be scaled to match the resolution value ranges
+**Steal Attempt Rate:**
+- Base steal attempt rate: **20%** of half court possessions
+- Aggression setting modifiers:
+  - **Aggressive**: `+10 percentage points` (30% total)
+  - **Passive**: `-10 percentage points` (10% total)
+  - **Normal**: No change (20% total)
 
-The final score will be compared against the resolution values to determine the actual outcome.
+**Steal Attempt Process:**
+1. **Step Selection**: If a steal attempt occurs, select a random step from the skeleton
+2. **Ball Handler Determination**: Use `get_ball_handler_from_skeleton()` to identify the ball handler at the selected step
+3. **Defender Determination**: Use man-to-man or zone defense logic to identify the defender guarding the ball handler at that step
+   - **Man Defense**: Defender matches ball handler's position
+   - **Zone Defense**: Use zone assignment logic to find which defender(s) are guarding the ball handler's location
+
+**Offense Value Calculation (Ball Handler's Protection):**
+```python
+bh_score = (
+    attrs["BH"] * 0.5 +
+    attrs["AG"] * 0.2 +
+    attrs["IQ"] * 0.2 +
+    attrs["CH"] * 0.1
+) * random.randint(1, 6)
+```
+
+**Defense Value Calculation (Defender's Steal Attempt):**
+```python
+pressure = (
+    def_attrs["OD"] * 0.3 +
+    def_attrs["AG"] * 0.3 +
+    def_attrs["IQ"] * 0.2 +
+    def_attrs["CH"] * 0.2
+) * random.randint(1, 6)
+if is_zone_defense(defense_call):
+    pressure *= 0.9  # Zone defense reduces steal pressure
+```
+
+**Universal Threshold Constants:**
+These thresholds are base universal values, adjusted at the start of each game based on the offensive team's `turnover_modifier`:
+
+- `HARD_STEAL = -200` (defense wins decisively)
+- `SOFT_STEAL = -100` (defense wins marginally)
+- `HARD_FOUL = 200` (offense wins decisively, defender reaches)
+- `SOFT_FOUL = 100` (offense wins marginally, defender reaches)
+- `SOFT_PROB = 0.16` (probability for soft bands, calibrated so equal-strength d6 vs d6 yields 30% in soft+hard bands)
+
+**Steal Resolution Function:**
+```python
+def resolve_steal_attempt(offense_value: int, defense_value: int,
+                          soft_steal: int, hard_steal: int,
+                          soft_foul: int, hard_foul: int) -> str:
+    """
+    Resolve outcome of a steal attempt.
+    
+    Args:
+        offense_value: Ball handler's protection value (bh_score)
+        defense_value: Defender's steal attempt value (pressure)
+        soft_steal: Soft steal threshold (default: -100)
+        hard_steal: Hard steal threshold (default: -200)
+        soft_foul: Soft foul threshold (default: 100)
+        hard_foul: Hard foul threshold (default: 200)
+    
+    Returns:
+        One of:
+        - "STEAL" - Steal successful, possession changes
+        - "D_FOUL" - Defensive foul on steal attempt, offense retains possession
+        - "NO_EVENT" - No event, play continues normally
+    """
+    delta = offense_value - defense_value  # negative => defense won the contest
+    
+    # 1) Steal outcomes (defense wins)
+    if delta <= hard_steal:
+        return "STEAL"
+    if delta <= soft_steal:
+        # Soft steal band: partial probability to calibrate to baseline rates
+        if random.random() < SOFT_PROB:
+            return "STEAL"
+    
+    # 2) Defensive foul outcomes (offense wins / defender reaches)
+    if delta >= hard_foul:
+        return "D_FOUL"
+    if delta >= soft_foul:
+        if random.random() < SOFT_PROB:
+            return "D_FOUL"
+    
+    # 3) Otherwise nothing happens; possession continues
+    return "NO_EVENT"
+```
+
+**Return Value Nomenclature:**
+- `"STEAL"` - Steal successful, results in possession change and fast break opportunity
+- `"D_FOUL"` - Defensive foul on steal attempt, offense retains possession (may result in free throws if in bonus)
+- `"NO_EVENT"` - No event occurs, play continues normally to shot attempt or other outcome
+
+**Threshold Adjustment:**
+At the start of each game, universal thresholds are adjusted based on the offensive team's `turnover_modifier`:
+- Positive `turnover_modifier` (lower turnover risk) → thresholds adjusted to favor offense
+- Negative `turnover_modifier` (higher turnover risk) → thresholds adjusted to favor defense
+- Adjustment formula: `adjusted_threshold = base_threshold + (turnover_modifier * adjustment_factor)`
+
+**Note:** The exact adjustment factor will be determined during implementation to balance game outcomes with statistical baselines.
 
 ### Example: Complete HCO Resolution Calculation
 
