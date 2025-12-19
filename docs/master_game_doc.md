@@ -7773,7 +7773,7 @@ The HCO resolution system processes outcomes in the following order:
 **Defense Team:**
 - `defensive_efficiency`
 - `foul_modifier`
-- `aggression` setting (for the current turn)
+- `aggression` setting (from `strategy_calls["aggression"]` - strings: "passive", "normal", "aggressive")
 
 #### Step 2: Calibrate Universal Constants
 
@@ -7841,9 +7841,10 @@ Each check returns immediately if its event occurs. If no event occurs after che
 **Process:**
 1. **Apply Aggression Modifier to Steal Attempt Rate:**
    - Base: `STEAL_ATTEMPT = 20`
-   - Aggressive: `STEAL_ATTEMPT += 10` (30% total)
-   - Passive: `STEAL_ATTEMPT -= 10` (10% total)
-   - Normal: No change (20% total)
+   - **Aggression from `strategy_calls["aggression"]`** (strings: "passive", "normal", "aggressive")
+   - `"aggressive"`: `STEAL_ATTEMPT += 10` (30% total)
+   - `"passive"`: `STEAL_ATTEMPT -= 10` (10% total)
+   - `"normal"` or any other value: No change (20% total)
 
 2. **Roll for Steal Attempt:**
    - `result = random.randint(1, 100)`
@@ -7860,7 +7861,7 @@ Each check returns immediately if its event occurs. If no event occurs after che
        - Offensive players list (built from skeleton step)
        - Ball handler coordinates
        - Ball handler spot
-       - Aggression level (from strategy_settings)
+       - Aggression level (converted from `strategy_settings` integer to string via `aggression_map` for zone defense logic)
        - `is_away_offense` flag
    - Calculate offense value (ball handler protection):
      ```python
@@ -8023,10 +8024,11 @@ After all modifications, ensure no value goes below **2**:
 
 **Steal Attempt Rate:**
 - Base steal attempt rate: **20%** of half court possessions
+- **Aggression from `strategy_calls["aggression"]`** (strings: "passive", "normal", "aggressive")
 - Aggression setting modifiers:
-  - **Aggressive**: `+10 percentage points` (30% total)
-  - **Passive**: `-10 percentage points` (10% total)
-  - **Normal**: No change (20% total)
+  - **"aggressive"**: `+10 percentage points` (30% total)
+  - **"passive"**: `-10 percentage points` (10% total)
+  - **"normal"** or any other value: No change (20% total)
 
 **Steal Attempt Process:**
 1. **Step Selection**: If a steal attempt occurs, select a random step from the skeleton
