@@ -7775,7 +7775,15 @@ DEAD_BALL_TURNOVER = 7 - int(0.5 * offense_team.turnover_modifier)
 3. **If Steal Attempt Occurs:**
    - Select a random step from the skeleton
    - Determine ball handler at that step using `get_ball_handler_from_skeleton()`
-   - Determine defender using man-to-man or zone defense logic
+   - Determine defender using man-to-man or zone defense logic:
+     - **Man Defense**: Defender matches ball handler's position
+     - **Zone Defense**: Uses `assign_all_zone_defenders()` with all 6 required arguments:
+       - Zone boundaries (calculated from ball handler's spot)
+       - Offensive players list (built from skeleton step)
+       - Ball handler coordinates
+       - Ball handler spot
+       - Aggression level (from strategy_settings)
+       - `is_away_offense` flag
    - Calculate offense value (ball handler protection):
      ```python
      bh_score = (
@@ -7814,7 +7822,15 @@ DEAD_BALL_TURNOVER = 7 - int(0.5 * offense_team.turnover_modifier)
 2. **If Turnover Check Occurs:**
    - Select a random step from the skeleton (may be different from Step 4's selected step)
    - Determine ball handler at that step using `get_ball_handler_from_skeleton()`
-   - Determine defender using man-to-man or zone defense logic
+   - Determine defender using man-to-man or zone defense logic:
+     - **Man Defense**: Defender matches ball handler's position
+     - **Zone Defense**: Uses `assign_all_zone_defenders()` with all 6 required arguments:
+       - Zone boundaries (calculated from ball handler's spot)
+       - Offensive players list (built from skeleton step)
+       - Ball handler coordinates
+       - Ball handler spot
+       - Aggression level (from strategy_settings)
+       - `is_away_offense` flag
    - Calculate ball handling score (offensive player):
      ```python
      from BackEnd.utils.shared import calculate_ball_handling_score
