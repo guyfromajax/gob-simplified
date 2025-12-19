@@ -2059,8 +2059,8 @@ def resolve_hco_outcome(game, skeleton):
     defensive_efficiency = def_attrs.get("defensive_efficiency", 0)
     foul_modifier_def = def_attrs.get("foul_modifier", 0)
     
-    # Get aggression setting (0-4, where 2 is normal)
-    aggression_level = def_team.strategy_calls.get("aggression", 2)
+    # Get aggression setting from strategy_calls (strings: "passive", "normal", "aggressive")
+    aggression_level = def_team.strategy_calls.get("aggression", "normal")
     
     # 🔍 DEBUG: Step 1 - Team Attributes and Settings
     logging.warning(f"🔍 [HCO RESOLUTION] Step 1 - Team Attributes and Settings:")
@@ -2099,11 +2099,13 @@ def resolve_hco_outcome(game, skeleton):
     logging.warning(f"   DEAD_BALL_TURNOVER: {DEAD_BALL_TURNOVER} - int(0.5 * {turnover_modifier}) = {calibrated_dead_ball_to} (min 2)")
     
     # Calculate steal attempt rate (needed for steal check)
+    # ✅ FIX: Use strategy_calls (strings) not strategy_settings (integers)
     steal_attempt_rate = STEAL_ATTEMPT
-    if aggression_level == 4:  # Aggressive
+    if aggression_level == "aggressive":
         steal_attempt_rate += 10
-    elif aggression_level == 0:  # Passive
+    elif aggression_level == "passive":
         steal_attempt_rate -= 10
+    # "normal" or any other value: no change
     steal_attempt_rate = max(10, min(30, steal_attempt_rate))  # Clamp between 10-30
     
     # Steps 3-5: Randomize order of event checks
