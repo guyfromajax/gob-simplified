@@ -2101,12 +2101,24 @@ def resolve_hco_outcome(game, skeleton):
     # Calculate steal attempt rate (needed for steal check)
     # ✅ FIX: Use strategy_calls (strings) not strategy_settings (integers)
     steal_attempt_rate = STEAL_ATTEMPT
+    original_rate = steal_attempt_rate
     if aggression_level == "aggressive":
         steal_attempt_rate += 10
     elif aggression_level == "passive":
         steal_attempt_rate -= 10
     # "normal" or any other value: no change
     steal_attempt_rate = max(10, min(30, steal_attempt_rate))  # Clamp between 10-30
+    
+    # 🔍 DEBUG: Log aggression setting and threshold adjustment
+    if steal_attempt_rate != original_rate:
+        logging.warning(f"🔍 [HCO RESOLUTION] Steal Attempt Rate Adjustment:")
+        logging.warning(f"   Defense team aggression: {aggression_level}")
+        logging.warning(f"   Base STEAL_ATTEMPT: {original_rate}%")
+        logging.warning(f"   Adjusted rate: {steal_attempt_rate}% ({'+10' if aggression_level == 'aggressive' else '-10'} from aggression)")
+    else:
+        logging.warning(f"🔍 [HCO RESOLUTION] Steal Attempt Rate:")
+        logging.warning(f"   Defense team aggression: {aggression_level}")
+        logging.warning(f"   Base STEAL_ATTEMPT: {steal_attempt_rate}% (no adjustment)")
     
     # Steps 3-5: Randomize order of event checks
     # Create list of check functions with their parameters
