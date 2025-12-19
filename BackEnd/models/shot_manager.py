@@ -357,9 +357,13 @@ class ShotManager:
             # Debug logging removed - was cluttering logs
             # logging.debug(f"🎯 Variant modifier: {variant} → {variant_modifier:+d} (threshold: {shot_threshold})")
 
+        # Get shooter location for debug logs
+        shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
+        shooter_location_str = shooter_location if shooter_location else "unknown"
+        
         # ✅ New: returns shot_score, help defender, and foul info
         shot_score, help_defender, d_foul, foul_player = self.calculate_shot_score(
-            shooter, passer, screener, defender, playcall, defense_call, is_three, is_paint, second_defender
+            shooter, passer, screener, defender, playcall, defense_call, is_three, is_paint, second_defender, shooter_location_str
         )
         
         # ✅ MOTION OFFENSE: Apply attack penalty if applicable
@@ -1027,7 +1031,7 @@ class ShotManager:
         return result
 
     
-    def calculate_shot_score(self, shooter, passer, screener, defender, playcall, defense_call, is_three, is_paint=False, second_defender=None):
+    def calculate_shot_score(self, shooter, passer, screener, defender, playcall, defense_call, is_three, is_paint=False, second_defender=None, shooter_location=None):
         """
         Calculate shot score based on attributes, playcall, defense, gravity, etc.
         Also returns:
@@ -1085,7 +1089,7 @@ class ShotManager:
         # Track defense score for statistics
         self.defense_scores.append(defense_score)
 
-        d_foul, foul_player = self.check_defensive_foul_on_shot(defender, defense_score, is_three)
+        d_foul, foul_player = self.check_defensive_foul_on_shot(defender, defense_score, is_three, shooter, shooter_location)
 
         # Apply primary defender's defense score
         if second_defender:
@@ -1181,7 +1185,7 @@ class ShotManager:
         return shot_score, help_defender, d_foul, foul_player
 
     
-    def check_defensive_foul_on_shot(self, defender, defense_score, is_three=False):
+    def check_defensive_foul_on_shot(self, defender, defense_score, is_three=False, shooter=None, shooter_location=None):
         """
         Determines if a defensive foul occurs based on defender skill and team foul_modifier.
         Uses hard and soft thresholds with universal constants.
@@ -1200,6 +1204,10 @@ class ShotManager:
         # 🔍 DEBUG: Shooting Foul Calculation
         from BackEnd.utils.shared import get_name_safe
         logging.warning(f"🔍 [SHOOTING FOUL] Calculation:")
+        shooter_name = get_name_safe(shooter) if shooter else "Unknown"
+        shooter_loc_str = shooter_location if shooter_location else "unknown"
+        logging.warning(f"   Shooter: {shooter_name}")
+        logging.warning(f"   Shooter location: {shooter_loc_str}")
         logging.warning(f"   Defender: {get_name_safe(defender)}")
         logging.warning(f"   Defense score: {defense_score}")
         logging.warning(f"   Is 3-pointer: {is_three}")
