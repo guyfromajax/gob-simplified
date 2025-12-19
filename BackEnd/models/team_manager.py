@@ -128,17 +128,17 @@ class TeamManager:
     def _init_team_attributes(self):
         return {
             "shot_threshold": random.randint(-50, 50),
-            "turnover_modifier": random.randint(-250, -150),
-            "foul_modifier": random.randint(40, 90),
+            "turnover_modifier": random.randint(-10, 10),
+            "foul_modifier": random.randint(-10, 10),
             "rebound_modifier": random.choice([0.8, 0.9, 1.0, 1.1, 1.2]),
-            "momentum_score": random.randint(0,20),
-            "offensive_efficiency": random.randint(1,10),
+            "momentum_score": random.randint(-10,10),
+            "offensive_efficiency": random.randint(-10,10),
             "team_chemistry": random.randint(7,25),
-            "defensive_efficiency": 0,
-            "fb_efficiency": 0,
-            "pt_efficiency": 0,
-            "fb_opp_modifier": 0,
-            "pt_opp_modifier": 0
+            "defensive_efficiency": random.randint(-10,10),
+            "fb_efficiency": random.randint(-10,10),
+            "pt_efficiency": random.randint(-10,10),
+            "fb_opp_modifier": random.randint(-10,10),
+            "pt_opp_modifier": random.randint(-10,10)
         }
 
     def _create_defense_structure_template(self):
