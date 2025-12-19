@@ -92,3 +92,45 @@ This document archives shot attempt and foul statistics from gameplay simulation
 - **AND-1 Opportunities**: 0 instances in this sample (no made shots with shooting fouls)
 - **Shot Attempts**: 844 total (lower than Test 1's 904)
 
+---
+
+## Test 3
+
+**Date:** January 2025  
+**Games Simulated:** 20  
+**Total Shot Attempts:** 884  
+**Total HCO Turns:** 1,607
+
+### Shot Attempt Statistics
+
+| Metric | Value |
+|--------|-------|
+| Total Shot Attempts | 884 |
+| Shot Attempt Rate | 20.23% of all turns |
+| Shot Attempts per Game | ~44.2 |
+
+### Foul Statistics
+
+| Metric | Value |
+|--------|-------|
+| Shooting Fouls | 85 |
+| Shooting Foul Rate | 9.62% of shot attempts |
+| AND-1 Opportunities | 0 |
+
+### Foul Breakdown (Non-Shooting)
+
+| Foul Type | Count | Percentage of HCO Results |
+|-----------|-------|--------------------------|
+| O_FOUL (Offensive Foul) | 119 | 9.46% |
+| D_FOUL (Non-Shooting Defensive Foul) | 146 | 11.61% |
+| **Total Non-Shooting Fouls** | **265** | **21.07%** |
+
+### Observations
+
+- **Shooting Foul Rate**: 9.62% of shot attempts (lower than both Test 1's 12.17% and Test 2's 16.00%)
+- **Non-Shooting Fouls**: 265 total (21.07% of HCO results, between Test 1's 19.41% and Test 2's 24.07%)
+  - Offensive fouls: 119 (9.46%, higher than Test 1's 8.39%, similar to Test 2's 9.34%)
+  - Defensive fouls (non-shooting): 146 (11.61%, between Test 1's 11.02% and Test 2's 14.73%)
+- **AND-1 Opportunities**: 0 instances in this sample (no made shots with shooting fouls)
+- **Shot Attempts**: 884 total (similar to Test 1's 904, higher than Test 2's 844)
+
