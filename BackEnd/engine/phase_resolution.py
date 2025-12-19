@@ -2079,6 +2079,7 @@ def resolve_hco_outcome(game, skeleton):
     logging.warning(f"🔍 [HCO RESOLUTION] Step 1 - Team Attributes and Settings:")
     logging.warning(f"   Offense: efficiency={offensive_efficiency}, turnover_mod={turnover_modifier}, foul_mod={foul_modifier_off}")
     logging.warning(f"   Defense: efficiency={defensive_efficiency}, foul_mod={foul_modifier_def}, aggression={aggression_level}")
+    logging.warning("")  # Blank line after Step 1
     
     # Step 2: Calibrate Universal Constants
     # Standard D Foul calibration
@@ -2101,8 +2102,8 @@ def resolve_hco_outcome(game, skeleton):
     calibrated_dead_ball_to = DEAD_BALL_TURNOVER - int(0.5 * turnover_modifier)
     calibrated_dead_ball_to = max(2, calibrated_dead_ball_to)  # Min 2
     
-    # 🔍 DEBUG: Step 2 - Calibrated Constants
-    logging.warning(f"🔍 [HCO RESOLUTION] Step 2 - Calibrated Constants:")
+    # 🔥 DEBUG: Step 2 - Calibrated Constants
+    logging.warning(f"🔥 [HCO RESOLUTION] Step 2 - Calibrated Constants:")
     logging.warning(f"   STANDARD_D_FOUL: {STANDARD_D_FOUL} + int({foul_modifier_def} * 0.4) = {calibrated_d_foul} (max 98)")
     logging.warning(f"   STANDARD_O_FOUL: {STANDARD_O_FOUL} - {foul_modifier_off} = {calibrated_o_foul} (min 2)")
     logging.warning(f"   HARD_STEAL: {HARD_STEAL} - {turnover_modifier} = {calibrated_hard_steal}")
@@ -2110,6 +2111,7 @@ def resolve_hco_outcome(game, skeleton):
     logging.warning(f"   HARD_FOUL: {HARD_FOUL} - int({foul_modifier_def} * 0.6) = {calibrated_hard_foul}")
     logging.warning(f"   SOFT_FOUL: {SOFT_FOUL} - int({foul_modifier_def} * 0.6) = {calibrated_soft_foul}")
     logging.warning(f"   DEAD_BALL_TURNOVER: {DEAD_BALL_TURNOVER} - int(0.5 * {turnover_modifier}) = {calibrated_dead_ball_to} (min 2)")
+    logging.warning("")  # Blank line after Step 2
     
     # Calculate steal attempt rate (needed for steal check)
     # ✅ FIX: Use strategy_calls (strings) not strategy_settings (integers)
@@ -2146,6 +2148,7 @@ def resolve_hco_outcome(game, skeleton):
     random.shuffle(check_functions)
     
     logging.warning(f"🔍 [HCO RESOLUTION] Randomized check order: {[name for name, _ in check_functions]}")
+    logging.warning("")  # Blank line after randomized order
     
     # Execute checks in randomized order
     for check_name, check_func in check_functions:
@@ -2153,9 +2156,11 @@ def resolve_hco_outcome(game, skeleton):
         if result is not None:
             # Event occurred, return immediately
             logging.warning(f"🔍 [HCO RESOLUTION] {check_name} returned result: {result[0]}")
+            logging.warning("")  # Blank line after event result
             return result
     
     # No event occurred in Steps 3-5, continue to Step 6
+    logging.warning("")  # Blank line after Steps 3-5 (no event)
     
     # Step 6: Shot Attempt
     # Calculate play effectiveness scores
