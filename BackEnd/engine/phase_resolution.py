@@ -1635,6 +1635,249 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
     return result
 
 
+def resolve_hco_outcome(game, skeleton):
+    """
+    Resolve HCO turn outcome using the new Resolution System.
+    
+    Processes outcomes in sequential priority order:
+    1. Standard fouls (O_FOUL, D_FOUL)
+    2. Steal attempt
+    3. Dead ball turnover
+    4. Shot attempt (with skeleton variant selection)
+    
+    Args:
+        game: GameManager object
+        skeleton: Skeleton dict (needed for step selection and variant determination)
+    
+    Returns:
+        tuple: (result, variant_result)
+            - result: "SHOT", "O_FOUL", "D_FOUL", "DEAD_BALL_TURNOVER", or "STEAL"
+            - variant_result: For SHOT results, the skeleton variant ("successful", "mid_play_change", "contested", "broken")
+                          For non-SHOT results, None
+    """
+    import random
+    from BackEnd.constants import (
+        STANDARD_D_FOUL, STANDARD_O_FOUL, HARD_STEAL, SOFT_STEAL,
+        HARD_FOUL, SOFT_FOUL, SOFT_PROB, STEAL_ATTEMPT, DEAD_BALL_TURNOVER
+    )
+    from BackEnd.utils.shared import (
+        calculate_ball_handling_score, calculate_defender_pressure_score,
+        get_ball_handler_from_skeleton, get_player_position, unpack_game_context
+    )
+    from BackEnd.utils.defense_utils import is_zone_defense
+    
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    
+    # Step 1: Get Team Attributes and Settings
+    off_attrs = off_team.team_attributes
+    def_attrs = def_team.team_attributes
+    
+    offensive_efficiency = off_attrs.get("offensive_efficiency", 0)
+    turnover_modifier = off_attrs.get("turnover_modifier", 0)
+    foul_modifier_off = off_attrs.get("foul_modifier", 0)
+    
+    defensive_efficiency = def_attrs.get("defensive_efficiency", 0)
+    foul_modifier_def = def_attrs.get("foul_modifier", 0)
+    
+    # Get aggression setting (0-4, where 2 is normal)
+    aggression_level = def_team.strategy_calls.get("aggression", 2)
+    
+    # Step 2: Calibrate Universal Constants
+    # Standard D Foul calibration
+    calibrated_d_foul = STANDARD_D_FOUL + int(foul_modifier_def * 0.4)
+    calibrated_d_foul = min(98, calibrated_d_foul)  # Max 98
+    
+    # Standard O Foul calibration
+    calibrated_o_foul = STANDARD_O_FOUL - foul_modifier_off
+    calibrated_o_foul = max(2, calibrated_o_foul)  # Min 2
+    
+    # Steal thresholds calibration
+    calibrated_hard_steal = HARD_STEAL + turnover_modifier
+    calibrated_soft_steal = SOFT_STEAL + turnover_modifier
+    
+    # Foul thresholds calibration (on steal attempts)
+    calibrated_hard_foul = HARD_FOUL - int(foul_modifier_def * 0.6)
+    calibrated_soft_foul = SOFT_FOUL - int(foul_modifier_def * 0.6)
+    
+    # Dead Ball Turnover calibration
+    calibrated_dead_ball_to = DEAD_BALL_TURNOVER - int(0.5 * turnover_modifier)
+    calibrated_dead_ball_to = max(2, calibrated_dead_ball_to)  # Min 2
+    
+    # Step 3: Calculate Standard Foul Result
+    foul_roll = random.randint(1, 100)
+    if foul_roll <= calibrated_o_foul:
+        return ("O_FOUL", None)
+    elif foul_roll >= calibrated_d_foul:
+        return ("D_FOUL", None)
+    
+    # Step 4: Calculate Steal Attempt
+    # Apply aggression modifier to steal attempt rate
+    steal_attempt_rate = STEAL_ATTEMPT
+    if aggression_level == 4:  # Aggressive
+        steal_attempt_rate += 10
+    elif aggression_level == 0:  # Passive
+        steal_attempt_rate -= 10
+    steal_attempt_rate = max(10, min(30, steal_attempt_rate))  # Clamp between 10-30
+    
+    steal_roll = random.randint(1, 100)
+    if steal_roll < steal_attempt_rate:
+        # Steal attempt occurs - select random step and determine ball handler/defender
+        if skeleton and "steps" in skeleton and len(skeleton["steps"]) > 0:
+            steps = skeleton["steps"]
+            # Exclude step 0 (initial setup)
+            available_steps = [i for i in range(1, len(steps)) if i < len(steps)]
+            if available_steps:
+                selected_step_index = random.choice(available_steps)
+                game_state["steal_stop_step_index"] = selected_step_index
+                
+                # Get ball handler at selected step
+                ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=selected_step_index)
+                if ball_handler:
+                    ball_handler_pos = get_player_position(off_lineup, ball_handler)
+                    defense_call = game_state.get("defense_playcall", "Man")
+                    
+                    # Get defender
+                    if is_zone_defense(defense_call):
+                        # Zone defense: use zone assignment logic
+                        from BackEnd.utils.shared_defense import assign_all_zone_defenders
+                        from BackEnd.constants import HCO_STRING_SPOTS
+                        from BackEnd.utils.shared import get_away_player_coords
+                        
+                        # Get ball handler's location from step
+                        ball_handler_spot = "key"  # Default
+                        step = steps[selected_step_index]
+                        pos_actions = step.get("pos_actions", {})
+                        if ball_handler_pos in pos_actions:
+                            action_info = pos_actions[ball_handler_pos]
+                            ball_handler_spot = action_info.get("location") or action_info.get("spot") or "key"
+                        
+                        # Get ball handler coordinates
+                        if ball_handler_spot in HCO_STRING_SPOTS:
+                            ball_handler_coords = HCO_STRING_SPOTS[ball_handler_spot]
+                        else:
+                            ball_handler_coords = {"x": 64, "y": 25}  # Default to key
+                        
+                        ball_handler_coords = get_away_player_coords(ball_handler_coords, game)
+                        zone_assignments = assign_all_zone_defenders(
+                            defense_call, ball_handler_coords, def_lineup, game
+                        )
+                        # Get first defender assigned to ball handler
+                        defender = None
+                        for def_pos, guarded_player in zone_assignments.items():
+                            if guarded_player == ball_handler:
+                                defender = def_lineup.get(def_pos)
+                                break
+                        if not defender:
+                            # Fallback: use ball handler's position
+                            defender = def_lineup.get(ball_handler_pos)
+                    else:
+                        # Man defense: defender matches position
+                        defender = def_lineup.get(ball_handler_pos)
+                    
+                    if defender:
+                        # Calculate offense and defense values
+                        bh_score = calculate_ball_handling_score(ball_handler)
+                        pressure = calculate_defender_pressure_score(defender, defense_call)
+                        
+                        # Resolve steal attempt
+                        from BackEnd.utils.shared import resolve_steal_attempt
+                        steal_result = resolve_steal_attempt(
+                            bh_score, pressure,
+                            calibrated_soft_steal, calibrated_hard_steal,
+                            calibrated_soft_foul, calibrated_hard_foul
+                        )
+                        
+                        if steal_result == "STEAL":
+                            return ("STEAL", None)
+                        elif steal_result == "D_FOUL":
+                            return ("D_FOUL", None)
+                        # If "NO_EVENT", continue to Step 5
+    
+    # Step 5: Calculate Dead Ball Turnover
+    turnover_roll = random.randint(1, 100)
+    if turnover_roll < calibrated_dead_ball_to:
+        # Turnover check occurs - select random step (may differ from Step 4)
+        if skeleton and "steps" in skeleton and len(skeleton["steps"]) > 0:
+            steps = skeleton["steps"]
+            available_steps = [i for i in range(1, len(steps)) if i < len(steps)]
+            if available_steps:
+                selected_step_index = random.choice(available_steps)
+                game_state["turnover_stop_step_index"] = selected_step_index
+                
+                # Get ball handler at selected step
+                ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=selected_step_index)
+                if ball_handler:
+                    ball_handler_pos = get_player_position(off_lineup, ball_handler)
+                    defense_call = game_state.get("defense_playcall", "Man")
+                    
+                    # Get defender
+                    if is_zone_defense(defense_call):
+                        # Zone defense: use zone assignment logic
+                        from BackEnd.utils.shared_defense import assign_all_zone_defenders
+                        from BackEnd.constants import HCO_STRING_SPOTS
+                        from BackEnd.utils.shared import get_away_player_coords
+                        
+                        # Get ball handler's location from step
+                        ball_handler_spot = "key"  # Default
+                        step = steps[selected_step_index]
+                        pos_actions = step.get("pos_actions", {})
+                        if ball_handler_pos in pos_actions:
+                            action_info = pos_actions[ball_handler_pos]
+                            ball_handler_spot = action_info.get("location") or action_info.get("spot") or "key"
+                        
+                        # Get ball handler coordinates
+                        if ball_handler_spot in HCO_STRING_SPOTS:
+                            ball_handler_coords = HCO_STRING_SPOTS[ball_handler_spot]
+                        else:
+                            ball_handler_coords = {"x": 64, "y": 25}  # Default to key
+                        
+                        ball_handler_coords = get_away_player_coords(ball_handler_coords, game)
+                        zone_assignments = assign_all_zone_defenders(
+                            defense_call, ball_handler_coords, def_lineup, game
+                        )
+                        # Get first defender assigned to ball handler
+                        defender = None
+                        for def_pos, guarded_player in zone_assignments.items():
+                            if guarded_player == ball_handler:
+                                defender = def_lineup.get(def_pos)
+                                break
+                        if not defender:
+                            # Fallback: use ball handler's position
+                            defender = def_lineup.get(ball_handler_pos)
+                    else:
+                        # Man defense: defender matches position
+                        defender = def_lineup.get(ball_handler_pos)
+                    
+                    if defender:
+                        # Calculate scores
+                        bh_score = calculate_ball_handling_score(ball_handler)
+                        defender_score = calculate_defender_pressure_score(defender, defense_call)
+                        
+                        if defender_score > bh_score:
+                            return ("DEAD_BALL_TURNOVER", None)
+                        # Else continue to Step 6
+    
+    # Step 6: Shot Attempt
+    # Calculate play effectiveness scores
+    # For now, use random numbers until effectiveness scores are added to database
+    o_score = offensive_efficiency + random.randint(1, 100)
+    d_score = defensive_efficiency + random.randint(1, 100)
+    
+    result = o_score - d_score
+    
+    # Select skeleton variant based on result
+    if result > 50:
+        variant_result = "successful"
+    elif result > 0:
+        variant_result = "mid_play_change"
+    elif result > -50:
+        variant_result = "contested"
+    else:
+        variant_result = "broken"
+    
+    return ("SHOT", variant_result)
+
+
 def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup, game=None):
     """
     Calculate lean score based on offensive/defensive matchup.
@@ -2521,17 +2764,26 @@ def resolve_half_court_offense_logic(game):
     if not off_call or off_call == "Inside":
         logging.warning(f"⚠️ [HCO RESOLVE] WARNING: playcall is '{off_call}' - may fall back to old skeleton system")
 
-    # Generate logic to determine result and lean score
-    result, lean_score = generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup, game=game)
+    # ✅ NEW RESOLUTION SYSTEM: Get skeleton first (needed for step selection in resolution)
+    # For Motion plays, get base_loop skeleton
+    # For Set Plays, get a temporary skeleton to use for resolution (will get correct variant after)
+    offense_play_type = game_state.get("offense_play_type", "")
+    is_motion_play = offense_play_type == "motion"
     
-    # ✅ REMOVED: Test code that forced all HCO turns to be steals
+    if is_motion_play:
+        # Motion plays use base_loop skeleton
+        skeleton = get_hco_skeleton(None, game, lean_score=None)
+    else:
+        # Set Plays: Get successful variant skeleton for resolution (will get correct variant after)
+        skeleton = get_hco_skeleton(None, game, lean_score=1.0)
     
-    # Store lean_score in scouting data
-    _store_lean_score(lean_score, game, off_team, def_team)
+    # ✅ NEW RESOLUTION SYSTEM: Use new sequential resolution system
+    result, variant_result = resolve_hco_outcome(game, skeleton)
     
-    # Get skeleton from MongoDB BEFORE assigning roles, so assign_roles can use the correct skeleton
-    # Pass lean_score to select the appropriate skeleton variant
-    skeleton = get_hco_skeleton(None, game, lean_score=lean_score)
+    # ✅ REMOVED: Old generate_logic() call and lean_score storage
+    # Store variant_result for skeleton selection (replaces lean_score)
+    if variant_result:
+        game_state["_skeleton_variant"] = variant_result
     
     # 🔍 DEBUG: Log skeleton retrieval result
     if skeleton:
@@ -2544,13 +2796,37 @@ def resolve_half_court_offense_logic(game):
     if skeleton:
         skeleton = copy.deepcopy(skeleton)
     
+    # ✅ NEW RESOLUTION SYSTEM: Get correct skeleton variant based on resolution result
+    # For Motion plays, use base_loop (no variants)
+    # For Set Plays, use variant_result from resolution system
+    if is_motion_play:
+        # Motion plays use base_loop skeleton (already retrieved)
+        final_skeleton = skeleton
+    else:
+        # Set Plays: Get skeleton with correct variant based on resolution result
+        if variant_result:
+            # Map variant_result to lean_score for get_hco_skeleton
+            variant_to_lean = {
+                "successful": 1.0,
+                "mid_play_change": 0.3,
+                "contested": -0.3,
+                "broken": -1.0
+            }
+            lean_score = variant_to_lean.get(variant_result, 0.0)
+            final_skeleton = get_hco_skeleton(None, game, lean_score=lean_score)
+        else:
+            # Fallback: use successful variant
+            final_skeleton = get_hco_skeleton(None, game, lean_score=1.0)
+    
+    # CRITICAL: Always create a deep copy to avoid mutating cached skeleton
+    if final_skeleton:
+        final_skeleton = copy.deepcopy(final_skeleton)
+    
     # ✅ STOPER SYSTEM: Apply stopper system to skeleton (truncate and add stopper step if needed)
-    skeleton = apply_stopper_system_to_skeleton(skeleton, result, game_state)
+    skeleton = apply_stopper_system_to_skeleton(final_skeleton, result, game_state)
     
     # Get the successful variant to determine intended shooter (only for Set Plays)
     # Motion plays don't have variants, so we'll use the base_loop skeleton
-    offense_play_type = game_state.get("offense_play_type", "")
-    is_motion_play = offense_play_type == "motion"
     if is_motion_play:
         # For Motion plays, use the same skeleton (base_loop)
         successful_skeleton = skeleton
@@ -2568,7 +2844,13 @@ def resolve_half_court_offense_logic(game):
         # ✅ FIX: Get ball handler from the stop step where the steal/foul/turnover occurs,
         # not from roles (which may be the shooter from a different step)
         # This is critical for Motion plays where the ball handler changes throughout the motion
-        stop_step_index = game_state.get("steal_stop_step_index")
+        # Check for both steal and turnover stop step indices
+        # Also check the generic stop_step_index that apply_stopper_system_to_skeleton sets
+        stop_step_index = (
+            game_state.get("steal_stop_step_index") or 
+            game_state.get("turnover_stop_step_index") or
+            game_state.get("stop_step_index")
+        )
         if stop_step_index is not None and skeleton and "steps" in skeleton:
             # Use the actual ball handler at the stop step
             ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=stop_step_index)

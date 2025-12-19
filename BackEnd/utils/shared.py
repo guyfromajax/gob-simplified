@@ -424,6 +424,48 @@ def calculate_outlet_pass_score(outlet_passer):
     # Scale to 1-100 using universal scaling function
     return scale_score_to_100(raw_score)
 
+def resolve_steal_attempt(offense_value, defense_value, soft_steal, hard_steal, soft_foul, hard_foul):
+    """
+    Resolve outcome of a steal attempt.
+    
+    Args:
+        offense_value: Ball handler's protection value (bh_score)
+        defense_value: Defender's steal attempt value (pressure)
+        soft_steal: Soft steal threshold (default: -100)
+        hard_steal: Hard steal threshold (default: -200)
+        soft_foul: Soft foul threshold (default: 100)
+        hard_foul: Hard foul threshold (default: 200)
+    
+    Returns:
+        One of:
+        - "STEAL" - Steal successful, possession changes
+        - "D_FOUL" - Defensive foul on steal attempt, offense retains possession
+        - "NO_EVENT" - No event, play continues normally
+    """
+    import random
+    from BackEnd.constants import SOFT_PROB
+    
+    delta = offense_value - defense_value  # negative => defense won the contest
+    
+    # 1) Steal outcomes (defense wins)
+    if delta <= hard_steal:
+        return "STEAL"
+    if delta <= soft_steal:
+        # Soft steal band: partial probability to calibrate to baseline rates
+        if random.random() < SOFT_PROB:
+            return "STEAL"
+    
+    # 2) Defensive foul outcomes (offense wins / defender reaches)
+    if delta >= hard_foul:
+        return "D_FOUL"
+    if delta >= soft_foul:
+        if random.random() < SOFT_PROB:
+            return "D_FOUL"
+    
+    # 3) Otherwise nothing happens; possession continues
+    return "NO_EVENT"
+
+
 def apply_scoring(game, team, player, points, stats):
     """Record player scoring stats and update team points.
 
