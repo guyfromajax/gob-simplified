@@ -1143,14 +1143,35 @@ class ShotManager:
         hard_threshold = HARD_SHOOTING_FOUL_THRESHOLD + foul_modifier
         soft_threshold = SOFT_SHOOTING_FOUL_THRESHOLD + foul_modifier
 
+        # 🔍 DEBUG: Shooting Foul Calculation
+        from BackEnd.utils.shared import get_name_safe
+        logging.warning(f"🔍 [SHOOTING FOUL] Calculation:")
+        logging.warning(f"   Defender: {get_name_safe(defender)}")
+        logging.warning(f"   Defense score: {defense_score}")
+        logging.warning(f"   Is 3-pointer: {is_three}")
+        logging.warning(f"   Defense team foul_modifier: {foul_modifier}")
+        logging.warning(f"   Base HARD threshold: {HARD_SHOOTING_FOUL_THRESHOLD}")
+        logging.warning(f"   Base SOFT threshold: {SOFT_SHOOTING_FOUL_THRESHOLD}")
+        logging.warning(f"   Calibrated HARD threshold: {HARD_SHOOTING_FOUL_THRESHOLD} + {foul_modifier} = {hard_threshold}")
+        logging.warning(f"   Calibrated SOFT threshold: {SOFT_SHOOTING_FOUL_THRESHOLD} + {foul_modifier} = {soft_threshold}")
+
         # Determine if foul occurs
         if defense_score < hard_threshold:
             d_foul = True
+            logging.warning(f"   ✅ RESULT: HARD FOUL (defense_score {defense_score} < hard_threshold {hard_threshold})")
         elif defense_score < soft_threshold:
             # Soft foul: random chance based on SOFT_PROB
-            d_foul = random.random() < SOFT_PROB
+            soft_roll = random.random()
+            d_foul = soft_roll < SOFT_PROB
+            logging.warning(f"   Soft foul check: defense_score {defense_score} < soft_threshold {soft_threshold}")
+            logging.warning(f"   Soft roll: {soft_roll:.3f} < SOFT_PROB {SOFT_PROB} = {d_foul}")
+            if d_foul:
+                logging.warning(f"   ✅ RESULT: SOFT FOUL (roll {soft_roll:.3f} < {SOFT_PROB})")
+            else:
+                logging.warning(f"   ➡️  No foul (roll {soft_roll:.3f} >= {SOFT_PROB})")
         else:
             d_foul = False
+            logging.warning(f"   ➡️  No foul (defense_score {defense_score} >= soft_threshold {soft_threshold})")
         
         return d_foul, defender if d_foul else None
 
