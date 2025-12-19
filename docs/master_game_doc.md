@@ -7254,6 +7254,205 @@ When creating a new game instance within a franchise:
 
 ---
 
+## Team Objects ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+Team objects are the core data structure representing a team in the game engine. They are initialized when a `TeamManager` instance is created and contain all team-level data including players, lineups, attributes, strategy settings, plays, and scouting data.
+
+**Location:** `BackEnd/models/team_manager.py` - `TeamManager.__init__()`  
+**Status:** ✅ Fully implemented
+
+### Team Object Structure
+
+#### Base Fields (From Universal Teams Collection)
+
+These fields are loaded from the universal `teams` collection in MongoDB:
+
+- `name` (str) - Team name (e.g., "Morristown", "Bentley Truman")
+- `team_id` (str) - Unique team identifier (e.g., "MORRISTOWN", "BENTLEY_TRUMAN")
+- `primary_color` (str) - Primary team color (hex format, e.g., "#000000")
+- `secondary_color` (str) - Secondary team color (hex format, e.g., "#ffffff")
+- `mascot` (str) - Team mascot name
+
+#### Instance Fields (Initialized Per Game)
+
+- `is_home_team` (bool) - Whether this team is the home team
+- `is_user_team` (bool) - Whether this is the user's team (for override logic)
+
+#### Player and Lineup Data
+
+- `players` (dict) - Full roster dictionary: `{player_id: Player object}`
+  - Loaded via `_load_roster()` from roster files
+  - Contains all players on the team (not just active lineup)
+  
+- `lineup` (dict) - Active lineup dictionary: `{position: Player object}`
+  - Initialized as empty dict `{}` - populated later when lineup is set
+  - Positions: `"PG"`, `"SG"`, `"SF"`, `"PF"`, `"C"`
+
+#### Game State Fields
+
+- `points` (int) - Current game score (default: 0)
+- `points_by_quarter` (list) - Points scored per quarter: `[Q1, Q2, Q3, Q4]` (default: `[0, 0, 0, 0]`)
+- `team_fouls` (int) - Current team foul count (default: 0)
+- `timeouts` (int) - Remaining timeouts (default: 5)
+- `stats` (dict) - Team-level statistics dictionary (default: `{}`)
+- `team_stats` (dict) - Team-level tracking stats (default: `{}`)
+  - Includes: `release_instances`, `get_back_instances`, `actual_releases`
+  - Fast break defender counts: `zero_defenders_back`, `one_defender_back`, `two_defenders_back`
+
+#### Team Attributes
+
+Initialized via `_init_team_attributes()` with the following value ranges:
+
+- `shot_threshold` - `random.randint(-50, 50)`
+- `turnover_modifier` - `random.randint(-10, 10)`
+- `foul_modifier` - `random.randint(-10, 10)`
+- `rebound_modifier` - `random.choice([0.8, 0.9, 1.0, 1.1, 1.2])`
+- `momentum_score` - `random.randint(-10, 10)`
+- `offensive_efficiency` - `random.randint(-10, 10)`
+- `team_chemistry` - `random.randint(7, 25)`
+- `defensive_efficiency` - `random.randint(-10, 10)`
+- `fb_efficiency` - `random.randint(-10, 10)`
+- `pt_efficiency` - `random.randint(-10, 10)`
+- `fb_opp_modifier` - `random.randint(-10, 10)`
+- `pt_opp_modifier` - `random.randint(-10, 10)`
+
+**Note:** Team attributes can be provided during initialization (from saved games) or generated randomly if not provided.
+
+#### Strategy Settings
+
+Initialized via `_init_strategy_settings()` with randomization (0-4 scale):
+
+- `offense` - `random.randint(0, 4)`
+- `inside` - `random.randint(1, 4)` (never zero)
+- `attack` - `random.randint(1, 4)` (never zero)
+- `outside` - `random.randint(1, 4)` (never zero)
+- `tempo` - `random.randint(0, 4)`
+- `play_calling` - `random.randint(0, 4)`
+- `defense` - `2` (hardcoded for testing - 50/50 man/zone mix)
+- `aggression` - `random.randint(0, 4)`
+- `hc_trap` - `4` (temporary: hardcoded for testing)
+- `fc_press` - `4` (temporary: hardcoded for testing)
+- `rebounding` - `random.randint(0, 4)`
+
+**Note:** Strategy settings can be provided during initialization (from saved games) or generated randomly if not provided.
+
+#### Strategy Calls (User Overrides)
+
+Initialized as dictionary with override fields (None = use normal selection):
+
+- `offense_call` (str or None) - Play name string or None (user override persists until used)
+- `defense_call` (str or None) - "Man", "Zone", or None (user override persists until used)
+- `aggression_override` (str or None) - "normal", "aggressive", "passive", or None (temporary override)
+- `tempo_override` (str or None) - "slow", "normal", "fast", or None (temporary override)
+- `press_override` (str or None) - Future: FCP override
+- `trap_override` (str or None) - Future: HCT override
+
+#### Playcall Trackers
+
+- `playcall_tracker` (dict) - Offensive playcall usage tracker: `{playcall_name: count}`
+  - Initialized with all playcalls from `PLAYCALLS` constant set to 0
+  
+- `defense_playcall_tracker` (dict) - Defensive playcall usage tracker: `{"Man": 0, "Zone": 0}`
+
+#### Scouting Data
+
+Initialized via `_init_scouting_data()` with comprehensive tracking structure:
+
+**Offense Scouting:**
+- `Fast_Break_Entries` - Fast break attempt count
+- `Fast_Break_Success` - Fast break success count
+- `Playcalls` - Nested structure for Motion and Set plays:
+  - `Motion` / `Set` buckets:
+    - `overall` - Overall attempts, success, ev_scores, lean_scores
+    - `inside` / `attack` / `outside` - Focus-specific tracking
+    - `vs_man` / `vs_zone` / `vs_2-3_zone` / `vs_3-2_zone` / `vs_1-3-1_zone` - Defense-specific tracking
+  - `Cumulative` - Cross-play type focus tracking
+- `last_play_by_category` - Tracks last play run for each category (for tooltips)
+
+**Defense Scouting:**
+- `Man` / `2-3 Zone` / `3-2 Zone` / `1-3-1 Zone` - Defense type tracking:
+  - `used` - Usage count
+  - `success` - Success count
+  - `effectiveness` - Effectiveness score
+  - `game_stats` - Game-level stats (attempts, success, ev_scores, lean_scores, vs_motion/set/inside/attack/outside)
+  - `season_stats` - Season-level stats (for tournament/franchise modes)
+- `vs_Fast_Break` - Fast break defense tracking
+- `FCP` / `HCT` - Pressure defense tracking
+
+#### Plays Data
+
+Initialized via `_init_plays_from_universal()` with reference-based structure:
+
+**Structure:** `{play_name: play_data}`
+
+Each play entry contains:
+- `play_id` (str) - Reference to universal play document `_id` (the "library card")
+- `name` (str) - Play name
+- `play_type` (str) - "motion" or "set_play"
+- `play_focus` (str) - "inside", "attack", or "outside" (for set plays)
+- `game_stats` (dict) - Game-level tracking:
+  - `times_run` (int) - Number of times play was executed
+  - `shot_attempts` (int) - Shot attempts from this play
+  - `made_shots` (int) - Made shots from this play
+  - `turnovers` (int) - Turnovers from this play
+  - `offensive_fouls` (int) - Offensive fouls from this play
+  - `defensive_fouls` (int) - Defensive fouls from this play
+  - `effectiveness` (float) - Effectiveness score (initialized: `random.uniform(-10, 10)`)
+- `season_stats` (dict) - Season-level tracking (tournament/franchise modes only):
+  - Same structure as `game_stats`
+
+**Note:** Plays data does NOT include full skeletons - skeletons are fetched from the universal `plays` collection when needed (reference-based architecture).
+
+### Initialization Methods
+
+#### `_load_roster()`
+- Loads roster from roster files via `load_roster()` utility
+- Creates `Player` objects for each player
+- Returns dictionary: `{player_id: Player object}`
+
+#### `_load_lineup()`
+- Returns empty dictionary `{}`
+- Lineup is populated later when lineup is set
+
+#### `_init_team_attributes()`
+- Generates random team attributes with specified value ranges
+- Returns dictionary of all team attributes
+
+#### `_init_strategy_settings()`
+- Generates random strategy settings (0-4 scale)
+- Returns dictionary of all strategy settings
+
+#### `_init_scouting_data()`
+- Creates comprehensive scouting data structure
+- Initializes all tracking counters to 0
+- Returns nested dictionary structure for offense and defense tracking
+
+#### `_init_plays_from_universal(mode)`
+- Fetches all plays from universal `plays` collection
+- Creates reference-based play entries (no full skeletons)
+- Initializes game_stats and season_stats (if applicable)
+- Returns dictionary: `{play_name: play_data}`
+
+#### `_create_defense_structure_template()`
+- Creates standard defense structure template
+- Used for Man, 2-3 Zone, 3-2 Zone, and 1-3-1 Zone defenses
+- Eliminates code duplication (~280 lines saved)
+- Returns template dictionary with `used`, `success`, `effectiveness`, `game_stats`, `season_stats`
+
+### Key Files
+
+- `BackEnd/models/team_manager.py` - `TeamManager` class (lines 8-468)
+  - `__init__()` - Main initialization (lines 9-84)
+  - `_init_team_attributes()` - Team attribute initialization (lines 128-142)
+  - `_init_strategy_settings()` - Strategy settings initialization (lines 103-126)
+  - `_init_scouting_data()` - Scouting data initialization (lines 188-329)
+  - `_init_plays_from_universal()` - Plays initialization (lines 331-383)
+  - `_create_defense_structure_template()` - Defense template creation (lines 144-186)
+
+---
+
 ## Team Attribute Management
 
 ### Attribute List
