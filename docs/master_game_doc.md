@@ -541,6 +541,147 @@ makes_shot = result < ft_shot_score
 
 ---
 
+## Shooting Foul System ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The Shooting Foul System determines if a defensive foul occurs during a shot attempt and applies calibration logic to account for the disruptive impact of fouls on shot outcomes.
+
+**Location:** `BackEnd/models/shot_manager.py` - `check_defensive_foul_on_shot()`  
+**Status:** ✅ Fully implemented
+
+### Universal Constants
+
+```python
+HARD_SHOOTING_FOUL_THRESHOLD = 50
+SOFT_SHOOTING_FOUL_THRESHOLD = 110
+SOFT_PROB = 0.16
+```
+
+### Foul Detection Logic
+
+**Step 1: Calculate Thresholds**
+
+Both thresholds are adjusted by the defense team's `foul_modifier` attribute:
+
+```python
+hard_threshold = HARD_SHOOTING_FOUL_THRESHOLD + foul_modifier
+soft_threshold = SOFT_SHOOTING_FOUL_THRESHOLD + foul_modifier
+```
+
+**Note:** `foul_modifier` ranges from -10 to 10, so:
+- **Hard threshold range:** 40 to 60
+- **Soft threshold range:** 100 to 120
+
+**Step 2: Determine Foul Occurrence**
+
+The system uses `defense_score` (calculated from defender attributes) to determine if a foul occurs:
+
+```python
+if defense_score < hard_threshold:
+    d_foul = True  # Hard foul: always occurs
+elif defense_score < soft_threshold:
+    d_foul = random.random() < SOFT_PROB  # Soft foul: 16% chance
+else:
+    d_foul = False  # No foul
+```
+
+**Logic:**
+- **Hard Foul:** If `defense_score` is below the hard threshold, a foul always occurs (poor defensive performance)
+- **Soft Foul:** If `defense_score` is between hard and soft thresholds, there's a 16% chance of a foul (marginal defensive performance)
+- **No Foul:** If `defense_score` is above the soft threshold, no foul occurs (good defensive performance)
+
+### Defense Score Calculation
+
+`defense_score` is calculated based on shot type and defender attributes:
+
+**Paint Shots (Inside):**
+```python
+defense_score = (
+    defense_attrs["ID"] * 0.6 +
+    defense_attrs["ST"] * 0.2 +
+    defense_attrs["IQ"] * 0.1 +
+    defense_attrs["CH"] * 0.1
+) * random.randint(1, 6)
+```
+
+**Three-Point Shots:**
+```python
+defense_score = (
+    defense_attrs["OD"] * 0.8 +
+    defense_attrs["IQ"] * 0.1 +
+    defense_attrs["CH"] * 0.1
+) * random.randint(1, 6)
+```
+
+**Mid-Range Shots:**
+```python
+defense_score = (
+    defense_attrs["OD"] * 0.3 +
+    defense_attrs["ID"] * 0.3 +
+    defense_attrs["AG"] * 0.1 +
+    defense_attrs["ST"] * 0.1 +
+    defense_attrs["IQ"] * 0.1 +
+    defense_attrs["CH"] * 0.1
+) * random.randint(1, 6)
+```
+
+**Range:** `defense_score` can range from ~0 (poor defender) to ~600+ (excellent defender with high attributes × 6).
+
+### Foul Calibration (Shot Outcome Adjustment)
+
+**Purpose:** Fouls are significant outliers that can disrupt shot attempts, forcing missed shots even when the standard shot calculation would indicate a make.
+
+**Process:**
+
+After the standard shot result is calculated (`made = shot_score >= shot_threshold`), if a shooting foul is detected, an additional calibration check is performed:
+
+```python
+if d_foul:
+    foul_calibration_roll = random.random()
+    if is_three:
+        # 3-pointers: 90% chance foul forces a miss
+        if foul_calibration_roll < 0.9:
+            made = False
+        # else: standard shot result holds (could be make or miss)
+    else:
+        # 2-pointers: 50% chance foul forces a miss
+        if foul_calibration_roll < 0.5:
+            made = False
+        # else: standard shot result holds (could be make or miss)
+```
+
+**Calibration Rates:**
+- **3-Pointers:** 90% chance the foul forces a miss (fouls are more disruptive to long-range shots)
+- **2-Pointers:** 50% chance the foul forces a miss (fouls are less disruptive to closer shots)
+
+**Note:** If the calibration roll doesn't force a miss, the standard shot result (make or miss) is preserved. This allows for AND-1 situations where the shot is made despite the foul.
+
+### Integration with Shot Resolution
+
+**Flow:**
+1. `defense_score` is calculated during `calculate_shot_score()`
+2. `check_defensive_foul_on_shot()` is called to determine if a foul occurred
+3. Standard shot result is calculated: `made = shot_score >= shot_threshold`
+4. **If foul detected:** Foul calibration check is performed to potentially force a miss
+5. Shot outcome is finalized (make or miss)
+6. If foul occurred:
+   - **Made shot + foul:** AND-1 situation → 1 free throw
+   - **Missed shot + foul:** Shooting foul → 2 or 3 free throws (based on shot type)
+
+### Key Files
+
+**Backend:**
+- `BackEnd/models/shot_manager.py`
+  - `check_defensive_foul_on_shot()` (lines 1112-1135) - Foul detection logic
+  - `calculate_shot_score()` (lines 958-1109) - Defense score calculation and foul check
+  - `resolve_shot()` (lines 240-598) - Shot resolution with foul calibration
+
+**Constants:**
+- `BackEnd/constants/__init__.py` - Universal constants (`HARD_SHOOTING_FOUL_THRESHOLD`, `SOFT_SHOOTING_FOUL_THRESHOLD`, `SOFT_PROB`)
+
+---
+
 ## HCO System ✅ **COMPLETE** (January 2025)
 
 ### Overview

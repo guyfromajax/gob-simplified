@@ -132,6 +132,11 @@ AGGRESSION_FOUL_MULTIPLIER = {
     4: 1.2,
 }
 
+# Shooting Foul System constants
+HARD_SHOOTING_FOUL_THRESHOLD = 50
+SOFT_SHOOTING_FOUL_THRESHOLD = 110
+SOFT_PROB = 0.16
+
 HCO_STRING_SPOTS = {
     "key": {"x": 64, "y": 25},
     "upper midWing": {"x": 68, "y": 36}, 
