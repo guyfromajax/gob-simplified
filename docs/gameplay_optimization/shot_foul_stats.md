@@ -50,3 +50,45 @@ This document archives shot attempt and foul statistics from gameplay simulation
 - Foul calibration check forces misses (90% for 3-pointers, 50% for 2-pointers)
 - Integration with shot resolution
 
+---
+
+## Test 2
+
+**Date:** January 2025  
+**Games Simulated:** 20  
+**Total Shot Attempts:** 844  
+**Total HCO Turns:** 1,629
+
+### Shot Attempt Statistics
+
+| Metric | Value |
+|--------|-------|
+| Total Shot Attempts | 844 |
+| Shot Attempt Rate | 18.81% of all turns |
+| Shot Attempts per Game | ~42.2 |
+
+### Foul Statistics
+
+| Metric | Value |
+|--------|-------|
+| Shooting Fouls | 135 |
+| Shooting Foul Rate | 16.00% of shot attempts |
+| AND-1 Opportunities | 0 |
+
+### Foul Breakdown (Non-Shooting)
+
+| Foul Type | Count | Percentage of HCO Results |
+|-----------|-------|--------------------------|
+| O_FOUL (Offensive Foul) | 116 | 9.34% |
+| D_FOUL (Non-Shooting Defensive Foul) | 183 | 14.73% |
+| **Total Non-Shooting Fouls** | **299** | **24.07%** |
+
+### Observations
+
+- **Shooting Foul Rate**: 16.00% of shot attempts (higher than Test 1's 12.17%)
+- **Non-Shooting Fouls**: 299 total (24.07% of HCO results, higher than Test 1's 19.41%)
+  - Offensive fouls: 116 (9.34%, higher than Test 1's 8.39%)
+  - Defensive fouls (non-shooting): 183 (14.73%, higher than Test 1's 11.02%)
+- **AND-1 Opportunities**: 0 instances in this sample (no made shots with shooting fouls)
+- **Shot Attempts**: 844 total (lower than Test 1's 904)
+

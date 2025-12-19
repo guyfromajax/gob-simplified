@@ -38,3 +38,31 @@ This document archives HCO (Half Court Offense) resolution statistics from gamep
 - Respects resolution system determination (prevents random conversion of dead ball turnovers)
 - Nomenclature conversion: `DEAD_BALL_TURNOVER` → `"DEAD BALL"` when calling `resolve_turnover_logic()`
 
+---
+
+## Test 2
+
+**Date:** January 2025  
+**Games Simulated:** 20  
+**Total HCO Turns:** 1,629 (81.5 HCO turns per game)  
+**Total Turns Processed:** 4,487 across all turn types
+
+### HCO Results Breakdown
+
+| Outcome | Count | Percentage |
+|---------|-------|------------|
+| Shot Attempt | 844 | 67.95% |
+| O_FOUL (Offensive Foul) | 116 | 9.34% |
+| D_FOUL (Non-Shooting Defensive Foul) | 183 | 14.73% |
+| DEAD_BALL_TURNOVER | 48 | 3.86% |
+| STEAL | 51 | 4.11% |
+| **Total HCO Results** | **1,242** | **100%** |
+
+### Observations
+
+- Shot attempts: 67.95% (slightly lower than Test 1's 70.19%)
+- Dead ball turnovers: 48 instances (3.86%, slightly lower than Test 1's 4.66%)
+- Foul distribution: 9.34% offensive, 14.73% defensive (non-shooting) - defensive fouls higher than Test 1
+- Steals: 51 instances (4.11%, lower than Test 1's 5.75%)
+- Shot Attempt Rate: 18.81% of all turns (lower than Test 1's 22.55%)
+
