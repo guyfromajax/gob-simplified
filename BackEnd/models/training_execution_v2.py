@@ -9,8 +9,11 @@ This module implements the new training execution system with:
 """
 
 import random
+import logging
 from typing import List, Dict, Tuple, Optional
 from BackEnd.constants import ALL_ATTRS
+
+logger = logging.getLogger(__name__)
 
 
 def execute_training(
@@ -911,7 +914,10 @@ def _apply_ng_reduction_from_scrimmages(players: List[dict], scrimmage_points: i
     Returns:
         List of player names who had NG reductions
     """
+    logger.warning(f"🔋 [NG REDUCTION - SCRIMMAGES] Starting NG reduction for {len(players)} players with {scrimmage_points} scrimmage points")
+    
     if scrimmage_points not in [3, 4, 5]:
+        logger.warning(f"🔋 [NG REDUCTION - SCRIMMAGES] Skipping - scrimmage_points ({scrimmage_points}) not in [3, 4, 5]")
         return []
     
     # Define reduction lists
@@ -922,24 +928,33 @@ def _apply_ng_reduction_from_scrimmages(players: List[dict], scrimmage_points: i
     }
     
     reduced_players = []
+    skipped_high_nd = 0
+    zero_reductions = 0
     
     for player in players:
         attrs = player.get("attributes", {})
         nd = attrs.get("ND", 0)
         ng = attrs.get("NG", 1.0)
+        first_name = player.get("first_name", "")
+        last_name = player.get("last_name", "")
+        player_name = f"{first_name} {last_name}".strip()
         
         # Determine which list to use based on ND
         if nd > 79:
             # Special handling for high ND players
             if scrimmage_points == 3:
                 # Omit them (no reduction)
+                logger.warning(f"🔋 [NG REDUCTION - SCRIMMAGES] Skipping {player_name} (ND={nd} > 79, scrimmages=3)")
+                skipped_high_nd += 1
                 continue
             elif scrimmage_points == 4:
                 # Use scrimmages == 3 list
                 reduce_ng_list = reduce_ng_lists[3]
+                logger.warning(f"🔋 [NG REDUCTION - SCRIMMAGES] {player_name} (ND={nd} > 79) using scrimmages=3 list for scrimmages=4")
             elif scrimmage_points == 5:
                 # Use scrimmages == 4 list
                 reduce_ng_list = reduce_ng_lists[4]
+                logger.warning(f"🔋 [NG REDUCTION - SCRIMMAGES] {player_name} (ND={nd} > 79) using scrimmages=4 list for scrimmages=5")
         else:
             # Normal players use the list for their scrimmage points
             reduce_ng_list = reduce_ng_lists[scrimmage_points]
@@ -949,13 +964,16 @@ def _apply_ng_reduction_from_scrimmages(players: List[dict], scrimmage_points: i
         if reduction > 0:
             new_ng = max(0.0, ng - reduction)  # Clamp to 0 minimum
             attrs["NG"] = round(new_ng, 2)
+            logger.warning(f"🔋 [NG REDUCTION - SCRIMMAGES] {player_name}: NG {ng:.2f} → {attrs['NG']:.2f} (reduction: -{reduction:.2f}, ND={nd}, list={reduce_ng_list})")
             
             # Track player name for notes
-            first_name = player.get("first_name", "")
-            last_name = player.get("last_name", "")
-            player_name = f"{first_name} {last_name}".strip()
             if player_name:
                 reduced_players.append(player_name)
+        else:
+            zero_reductions += 1
+            logger.warning(f"🔋 [NG REDUCTION - SCRIMMAGES] {player_name}: No reduction (rolled 0, ND={nd}, list={reduce_ng_list})")
+    
+    logger.warning(f"🔋 [NG REDUCTION - SCRIMMAGES] Summary: {len(reduced_players)} players reduced, {skipped_high_nd} skipped (high ND), {zero_reductions} rolled zero reduction")
     
     return reduced_players
 
@@ -981,7 +999,10 @@ def _apply_ng_reduction_from_conditioning(players: List[dict], conditioning_poin
     Returns:
         List of player names who had NG reductions
     """
+    logger.warning(f"🔋 [NG REDUCTION - CONDITIONING] Starting NG reduction for {len(players)} players with {conditioning_points} conditioning points")
+    
     if conditioning_points not in [3, 4, 5]:
+        logger.warning(f"🔋 [NG REDUCTION - CONDITIONING] Skipping - conditioning_points ({conditioning_points}) not in [3, 4, 5]")
         return []
     
     # Define reduction lists (same as scrimmages)
@@ -992,24 +1013,33 @@ def _apply_ng_reduction_from_conditioning(players: List[dict], conditioning_poin
     }
     
     reduced_players = []
+    skipped_high_nd = 0
+    zero_reductions = 0
     
     for player in players:
         attrs = player.get("attributes", {})
         nd = attrs.get("ND", 0)
         ng = attrs.get("NG", 1.0)
+        first_name = player.get("first_name", "")
+        last_name = player.get("last_name", "")
+        player_name = f"{first_name} {last_name}".strip()
         
         # Determine which list to use based on ND
         if nd > 79:
             # Special handling for high ND players
             if conditioning_points == 3:
                 # Omit them (no reduction)
+                logger.warning(f"🔋 [NG REDUCTION - CONDITIONING] Skipping {player_name} (ND={nd} > 79, conditioning=3)")
+                skipped_high_nd += 1
                 continue
             elif conditioning_points == 4:
                 # Use conditioning == 3 list
                 reduce_ng_list = reduce_ng_lists[3]
+                logger.warning(f"🔋 [NG REDUCTION - CONDITIONING] {player_name} (ND={nd} > 79) using conditioning=3 list for conditioning=4")
             elif conditioning_points == 5:
                 # Use conditioning == 4 list
                 reduce_ng_list = reduce_ng_lists[4]
+                logger.warning(f"🔋 [NG REDUCTION - CONDITIONING] {player_name} (ND={nd} > 79) using conditioning=4 list for conditioning=5")
         else:
             # Normal players use the list for their conditioning points
             reduce_ng_list = reduce_ng_lists[conditioning_points]
@@ -1019,13 +1049,16 @@ def _apply_ng_reduction_from_conditioning(players: List[dict], conditioning_poin
         if reduction > 0:
             new_ng = max(0.0, ng - reduction)  # Clamp to 0 minimum
             attrs["NG"] = round(new_ng, 2)
+            logger.warning(f"🔋 [NG REDUCTION - CONDITIONING] {player_name}: NG {ng:.2f} → {attrs['NG']:.2f} (reduction: -{reduction:.2f}, ND={nd}, list={reduce_ng_list})")
             
             # Track player name for notes
-            first_name = player.get("first_name", "")
-            last_name = player.get("last_name", "")
-            player_name = f"{first_name} {last_name}".strip()
             if player_name:
                 reduced_players.append(player_name)
+        else:
+            zero_reductions += 1
+            logger.warning(f"🔋 [NG REDUCTION - CONDITIONING] {player_name}: No reduction (rolled 0, ND={nd}, list={reduce_ng_list})")
+    
+    logger.warning(f"🔋 [NG REDUCTION - CONDITIONING] Summary: {len(reduced_players)} players reduced, {skipped_high_nd} skipped (high ND), {zero_reductions} rolled zero reduction")
     
     return reduced_players
 
