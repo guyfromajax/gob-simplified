@@ -308,6 +308,11 @@ body {
   font-weight: 700;
   color: var(--color-text);
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+  display: none; /* Hide by default - pills don't show values */
+}
+
+.pill-value.show {
+  display: block; /* Only show for Team Chemistry if needed */
 }
 
 /* Team Chemistry Progress Bar */
