@@ -124,12 +124,18 @@ async function loadTrainingReport() {
     if (franchiseId) params.set('franchise_id', franchiseId);
     if (tournamentId) params.set('tournament_id', tournamentId);
     
+    console.log('🔍 [TRAINING REPORT] Loading with params:', Object.fromEntries(params.entries()));
+    
     const response = await fetch(`/franchise/training-report?${params.toString()}`);
     if (!response.ok) {
       throw new Error(`Failed to load training report: ${response.statusText}`);
     }
     
     reportData = await response.json();
+    console.log('🔍 [TRAINING REPORT] Loaded data:', reportData);
+    console.log('🔍 [TRAINING REPORT] Players count:', reportData.players?.length || 0);
+    console.log('🔍 [TRAINING REPORT] Player changes:', reportData.player_changes);
+    
     renderPage();
   } catch (error) {
     console.error('Error loading training report:', error);
@@ -160,13 +166,16 @@ function renderHeader() {
   
   let focusText = '--';
   if (archetype && subOption) {
-    const archetypeKey = archetype.replace(/-/g, '-');
-    const subKey = subOption.replace(/-/g, '-');
-    if (FOCUS_DISPLAY[archetypeKey] && FOCUS_DISPLAY[archetypeKey][subKey]) {
-      focusText = FOCUS_DISPLAY[archetypeKey][subKey];
-    } else {
-      focusText = `${archetype} - ${subOption}`;
-    }
+    // Format: "Culture Builder (Inspire)" - capitalize words, remove dashes, use parentheses
+    const formatArchetype = archetype.split('-').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+    
+    const formatSubOption = subOption.split('-').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+    
+    focusText = `${formatArchetype} (${formatSubOption})`;
   }
   
   document.getElementById('training-focus').textContent = focusText;
@@ -355,12 +364,15 @@ function createTeamAttrItem(attrKey, currentValue, change) {
     barContainer.appendChild(barText);
     item.appendChild(barContainer);
   } else if (attrKey === 'fb_opp_modifier' || attrKey === 'pt_opp_modifier') {
-    // +/- Design
-    const valueSpan = document.createElement('span');
-    valueSpan.className = 'attr-value';
+    // +/- Design - centered, bold, no value shown
+    const indicatorContainer = document.createElement('div');
+    indicatorContainer.className = 'plus-minus-container';
+    indicatorContainer.style.textAlign = 'center';
+    indicatorContainer.style.marginTop = 'var(--spacing-sm)';
     
     const indicator = document.createElement('span');
     indicator.className = 'plus-minus-indicator';
+    indicator.style.fontWeight = '700';
     
     if (currentValue >= 10) {
       indicator.textContent = '+++';
@@ -385,9 +397,8 @@ function createTeamAttrItem(attrKey, currentValue, change) {
       indicator.className += ' plus-minus-negative';
     }
     
-    valueSpan.appendChild(document.createTextNode(currentValue));
-    valueSpan.appendChild(indicator);
-    item.appendChild(valueSpan);
+    indicatorContainer.appendChild(indicator);
+    item.appendChild(indicatorContainer);
   } else {
     // Red/Green Pill Design
     const pill = createPill(currentValue, attrKey);
@@ -421,11 +432,8 @@ function createPill(originalValue, attrKey) {
     displayValue = originalValue.toFixed(2); // Show original value with 2 decimals
   }
   
-  // Value display
-  const valueDisplay = document.createElement('div');
-  valueDisplay.className = 'pill-value';
-  valueDisplay.textContent = displayValue;
-  pill.appendChild(valueDisplay);
+  // Value display - only show for Team Chemistry (handled separately)
+  // For other pills, we don't show the value on top
   
   // Fill based on value
   if (value > 0) {

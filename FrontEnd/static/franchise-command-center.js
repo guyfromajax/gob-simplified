@@ -349,9 +349,10 @@ function renderSchedule(data) {
         link.href = `/static/training-report.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}&week=${g.week}`;
         link.textContent = ' [Training Report]';
         link.className = 'training-report-link';
-        link.style.color = '#FFD700';
+        link.style.color = '#4a90e2';
         link.style.textDecoration = 'none';
         link.style.marginLeft = '8px';
+        link.style.fontSize = 'calc(1em - 2px)';
         gameDiv.appendChild(link);
       }
       
