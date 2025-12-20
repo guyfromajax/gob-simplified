@@ -2828,6 +2828,161 @@ The Play Builder (`play-builder-v2.html`) is a web-based tool for creating and e
 
 #### Final Step Checkbox (Motion Only)
 - **Visibility**: Only shown for Motion plays when building new steps
+
+---
+
+## Universal Plays and Defenses Collections ✅ **DOCUMENTED** (January 2025)
+
+### Overview
+
+The game uses two universal MongoDB collections to store play and defense definitions:
+- **`plays` collection**: Stores all offensive plays (Set Plays and Motion Plays)
+- **`defenses` collection**: Stores all defensive playcalls (Man and Zone defenses)
+
+These collections serve as the "library" of available plays and defenses. Team documents store only **references** to these universal collections, dramatically reducing document size (see Reference-Based Play Architecture).
+
+### Universal Plays Collection
+
+**Location:** MongoDB `plays` collection  
+**Purpose:** Store offensive play definitions with full skeleton data
+
+#### Play Document Structure
+
+All plays in the universal collection include the following fields:
+
+**Core Fields:**
+- `_id` (ObjectId) - Unique MongoDB document ID
+- `name` (str) - Play name (e.g., "4-1 Motion", "3-2 Motion")
+- `play_type` (str) - "motion" or "set_play"
+- `play_focus` (str | null) - "inside", "attack", "outside", "balanced" (Set Plays only), or `null` (Motion Plays)
+- `skeletons` (dict) - Full skeleton data with animation steps (see Play Builder System for structure)
+- `copy` (dict | null) - Optional descriptive text for play details page (`copy_1`, `copy_2`, `copy_3`)
+
+**Effectiveness and Cloaking Fields:**
+- `effectiveness` (float) - Play effectiveness score (default: `0`)
+  - Used for calculating play success rates and matchup evaluations
+  - Can be modified by training, in-game performance, and coaching focus
+- `cloaking` (float) - Cloaking modifier (default: `0`)
+  - Used for defensive recognition and counter-play adjustments
+  - Higher values make plays harder for defenses to recognize and counter
+
+**Stats Fields (Optional):**
+- `game_stats` (dict) - Game-level usage statistics (if tracked at collection level)
+- `season_stats` (dict) - Season-level usage statistics (if tracked at collection level)
+
+#### Example Play Document
+
+```json
+{
+  "_id": ObjectId("..."),
+  "name": "4-1 Motion",
+  "play_type": "motion",
+  "play_focus": null,
+  "effectiveness": 0,
+  "cloaking": 0,
+  "skeletons": {
+    "base_loop": {
+      "steps": [...],
+      "complete": true
+    }
+  },
+  "copy": {
+    "copy_1": "Description text...",
+    "copy_2": "More description...",
+    "copy_3": "Additional details..."
+  }
+}
+```
+
+### Universal Defenses Collection
+
+**Location:** MongoDB `defenses` collection  
+**Purpose:** Store defensive playcall definitions with zone configurations
+
+#### Defense Document Structure
+
+All defenses in the universal collection include the following fields:
+
+**Core Fields:**
+- `_id` (ObjectId) - Unique MongoDB document ID
+- `defense_id` (str) - Unique defense identifier (e.g., "man", "2-3-zone", "3-2-zone", "1-3-1-zone", "base-man")
+- `defense_type` (str) - "Man" or "Zone"
+- `name` (str) - Defense display name (e.g., "Man-to-Man", "2-3 Zone", "Base Man")
+- `description` (str) - Defense description text
+
+**Effectiveness and Cloaking Fields:**
+- `effectiveness` (float) - Defense effectiveness score (default: `0`)
+  - Used for calculating defensive success rates and matchup evaluations
+  - Can be modified by training, in-game performance, and coaching focus
+- `cloaking` (float) - Cloaking modifier (default: `0`)
+  - Used for offensive recognition and counter-play adjustments
+  - Higher values make defenses harder for offenses to recognize and counter
+
+**Zone-Specific Fields (Zone defenses only):**
+- `zone_definitions` (dict | null) - Zone positioning configurations
+  - `normal` - Default zone positions
+  - `lower_shift` - Zone positions when ball is in lower areas
+  - `upper_shift` - Zone positions when ball is in upper areas
+  - Additional shifts for 1-3-1 zone (`lower_corner_shift`, `upper_corner_shift`)
+  - `null` for Man defenses
+- `shift_triggers` (dict | null) - Ball locations that trigger zone shifts
+  - Maps shift names to arrays of location strings
+  - `null` for Man defenses
+
+**Stats Fields:**
+- `game_stats` (dict) - Game-level usage and success tracking
+  - `used` (int) - Number of times defense was used
+  - `success` (int) - Number of successful defensive stops
+  - Granular tracking: `vs_motion`, `vs_set`, `vs_inside`, `vs_attack`, `vs_outside`, etc.
+- `season_stats` (dict) - Season-level usage and success tracking (same structure as `game_stats`)
+
+#### Example Defense Document
+
+```json
+{
+  "_id": ObjectId("..."),
+  "defense_id": "2-3-zone",
+  "defense_type": "Zone",
+  "name": "2-3 Zone",
+  "description": "Standard 2-3 zone defense with two guards up top and three players in the paint",
+  "effectiveness": 0.0,
+  "cloaking": 0,
+  "zone_definitions": {
+    "normal": {...},
+    "lower_shift": {...},
+    "upper_shift": {...}
+  },
+  "shift_triggers": {
+    "lower_shift": ["lower wing", "lower midCorner", "lower corner"],
+    "upper_shift": ["upper wing", "upper midCorner", "upper corner"]
+  },
+  "game_stats": {...},
+  "season_stats": {...}
+}
+```
+
+### Field Initialization
+
+**Script:** `scripts/add_effectiveness_cloaking_fields.py`
+
+This script ensures all plays and defenses have `effectiveness` and `cloaking` fields:
+- Adds `effectiveness: 0` to all plays that don't have it
+- Adds `cloaking: 0` to all plays that don't have it
+- Adds `cloaking: 0` to all defenses that don't have it
+- Safety check: adds `effectiveness: 0` to defenses that don't have it
+
+**Usage:**
+```bash
+python scripts/add_effectiveness_cloaking_fields.py
+```
+
+### Reference-Based Architecture
+
+Team documents store only **references** to universal plays and defenses:
+- Team plays: `{play_name: {play_id: "...", game_stats: {...}}}`
+- Team defenses: Tracking stats only, no full definitions
+
+Full skeleton data and zone definitions are fetched from universal collections when needed, reducing document size by ~95% (see Reference-Based Play Architecture documentation).
 - **Function**: Marks step as loop end with `is_final_step: true` and `loop_back_to: 0`
 
 ### Animation Preview System ✅ **NEW** (January 2025)
