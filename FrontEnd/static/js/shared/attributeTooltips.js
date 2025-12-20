@@ -30,61 +30,83 @@ const ATTRIBUTE_NAMES = {
   RT: 'Rating'
 };
 
-// Inject custom tooltip CSS if not already present
+// Create a global tooltip element
+let tooltipElement = null;
+
+function createTooltipElement() {
+  if (!tooltipElement) {
+    tooltipElement = document.createElement('div');
+    tooltipElement.id = 'attribute-tooltip-bubble';
+    tooltipElement.style.cssText = `
+      position: absolute;
+      padding: 6px 10px;
+      background: rgba(0, 0, 0, 0.95);
+      color: #fff;
+      font-size: 12px;
+      white-space: nowrap;
+      border-radius: 4px;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+      z-index: 99999;
+      font-family: 'Inter', sans-serif;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    `;
+    document.body.appendChild(tooltipElement);
+  }
+  return tooltipElement;
+}
+
+// Inject tooltip CSS for cursor
 function injectTooltipStyles() {
   if (!document.getElementById('attribute-tooltip-styles')) {
     const style = document.createElement('style');
     style.id = 'attribute-tooltip-styles';
     style.textContent = `
       .attr-tooltip {
-        position: relative !important;
-        cursor: help !important;
-      }
-      .attr-tooltip::after {
-        content: attr(data-tooltip) !important;
-        position: absolute !important;
-        bottom: calc(100% + 8px) !important;
-        left: 50% !important;
-        transform: translateX(-50%) !important;
-        padding: 6px 10px !important;
-        background: rgba(0, 0, 0, 0.95) !important;
-        color: #fff !important;
-        font-size: 12px !important;
-        white-space: nowrap !important;
-        border-radius: 4px !important;
-        pointer-events: none !important;
-        opacity: 0 !important;
-        visibility: hidden !important;
-        transition: opacity 0.2s, visibility 0.2s !important;
-        z-index: 99999 !important;
-        font-family: 'Inter', sans-serif !important;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
-      }
-      .attr-tooltip::before {
-        content: '' !important;
-        position: absolute !important;
-        bottom: calc(100% + 3px) !important;
-        left: 50% !important;
-        transform: translateX(-50%) !important;
-        border: 5px solid transparent !important;
-        border-top-color: rgba(0, 0, 0, 0.95) !important;
-        pointer-events: none !important;
-        opacity: 0 !important;
-        visibility: hidden !important;
-        transition: opacity 0.2s, visibility 0.2s !important;
-        z-index: 100000 !important;
-      }
-      .attr-tooltip:hover::after,
-      .attr-tooltip:hover::before {
-        opacity: 1 !important;
-        visibility: visible !important;
+        position: relative;
+        cursor: help;
       }
     `;
     document.head.appendChild(style);
-    console.log('[TOOLTIP] ✅ Injected custom tooltip CSS styles');
-    return true;
+    console.log('[TOOLTIP] ✅ Injected tooltip CSS styles');
   }
-  return false;
+}
+
+// Show tooltip on hover
+function setupTooltipEvents(element, tooltipText) {
+  element.addEventListener('mouseenter', (e) => {
+    const tooltip = createTooltipElement();
+    tooltip.textContent = tooltipText;
+    tooltip.style.opacity = '0';
+    tooltip.style.visibility = 'visible';
+    
+    // Position tooltip above the element
+    const rect = element.getBoundingClientRect();
+    tooltip.style.left = `${rect.left + rect.width / 2}px`;
+    tooltip.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+    tooltip.style.transform = 'translateX(-50%)';
+    
+    // Force reflow, then show
+    tooltip.offsetHeight;
+    tooltip.style.opacity = '1';
+  });
+  
+  element.addEventListener('mouseleave', () => {
+    if (tooltipElement) {
+      tooltipElement.style.opacity = '0';
+      tooltipElement.style.visibility = 'hidden';
+    }
+  });
+  
+  element.addEventListener('mousemove', (e) => {
+    if (tooltipElement && tooltipElement.style.visibility === 'visible') {
+      const rect = element.getBoundingClientRect();
+      tooltipElement.style.left = `${rect.left + rect.width / 2}px`;
+      tooltipElement.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+    }
+  });
 }
 
 // Inject styles immediately when script loads
@@ -123,30 +145,21 @@ function initAttributeTooltips(container = document, selectors = []) {
         // Ensure styles are injected
         injectTooltipStyles();
         
-        // Use custom CSS tooltip (data-tooltip) instead of title attribute
-        element.setAttribute('data-tooltip', ATTRIBUTE_NAMES[upperText]);
+        // Add class and setup event listeners
         element.classList.add('attr-tooltip');
-        // Also set title as fallback
-        element.setAttribute('title', ATTRIBUTE_NAMES[upperText]);
+        element.setAttribute('title', ATTRIBUTE_NAMES[upperText]); // Fallback
+        setupTooltipEvents(element, ATTRIBUTE_NAMES[upperText]);
         tooltipCount++;
-        
-        // Verify the attributes were set
-        const hasDataTooltip = element.hasAttribute('data-tooltip');
-        const hasClass = element.classList.contains('attr-tooltip');
-        if (hasDataTooltip && hasClass) {
-          console.log(`[TOOLTIP] ✅ Set tooltip for "${text}" → "${ATTRIBUTE_NAMES[upperText]}" (data-tooltip: ${hasDataTooltip}, class: ${hasClass})`);
-        } else {
-          console.warn(`[TOOLTIP] ⚠️ Failed to set tooltip for "${text}" - data-tooltip: ${hasDataTooltip}, class: ${hasClass}`);
-        }
+        console.log(`[TOOLTIP] ✅ Set tooltip for "${text}" → "${ATTRIBUTE_NAMES[upperText]}"`);
       }
       
       // Also check data-attr attribute if present
       if (element.hasAttribute('data-attr')) {
         const attr = element.getAttribute('data-attr').toUpperCase();
         if (ATTRIBUTE_NAMES[attr]) {
-          element.setAttribute('data-tooltip', ATTRIBUTE_NAMES[attr]);
           element.classList.add('attr-tooltip');
           element.setAttribute('title', ATTRIBUTE_NAMES[attr]);
+          setupTooltipEvents(element, ATTRIBUTE_NAMES[attr]);
           tooltipCount++;
           console.log(`[TOOLTIP] ✅ Set tooltip via data-attr for "${attr}" → "${ATTRIBUTE_NAMES[attr]}"`);
         }
@@ -166,9 +179,10 @@ function initAttributeTooltips(container = document, selectors = []) {
 function addTooltip(element, abbreviation) {
   const upperAbbr = abbreviation.toUpperCase();
   if (ATTRIBUTE_NAMES[upperAbbr]) {
-    element.setAttribute('data-tooltip', ATTRIBUTE_NAMES[upperAbbr]);
+    injectTooltipStyles();
     element.classList.add('attr-tooltip');
     element.setAttribute('title', ATTRIBUTE_NAMES[upperAbbr]);
+    setupTooltipEvents(element, ATTRIBUTE_NAMES[upperAbbr]);
     console.log(`[TOOLTIP] addTooltip: "${abbreviation}" → "${ATTRIBUTE_NAMES[upperAbbr]}"`);
   } else {
     console.warn(`[TOOLTIP] No mapping found for abbreviation: "${abbreviation}"`);
