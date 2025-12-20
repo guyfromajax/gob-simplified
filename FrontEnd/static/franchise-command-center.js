@@ -151,6 +151,11 @@ function renderRecruits(data) {
     tr.innerHTML = `<td>${r.name}</td><td>${r.archetype}</td><td>${r.height}</td><td>${r.weight}</td><td>${r.pos}</td><td>${formatAttr(a.SC)}</td><td>${formatAttr(a.SH)}</td><td>${formatAttr(a.ID)}</td><td>${formatAttr(a.OD)}</td><td>${formatAttr(a.PS)}</td><td>${formatAttr(a.BH)}</td><td>${formatAttr(a.RB)}</td><td>${formatAttr(a.AG)}</td><td>${formatAttr(a.ST)}</td><td>${formatAttr(a.ND)}</td><td>${formatAttr(a.IQ)}</td><td>${formatAttr(a.FT)}</td><td>${r.rt ?? '-'}</td>`;
     tbody.appendChild(tr);
   });
+  
+  // Initialize tooltips for table cells
+  if (typeof initAttributeTooltips !== 'undefined') {
+    initAttributeTooltips(tbody, ['td']);
+  }
 }
 
 function renderTrainingResults(data) {
@@ -301,7 +306,12 @@ function renderTeam(data) {
     tbody.appendChild(tr);
     console.log(`Added row for ${p.name} to table`);
   });
-  console.log('Finished rendering all players. Table now has', tbody.children.length, 'rows');
+    console.log('Finished rendering all players. Table now has', tbody.children.length, 'rows');
+  
+  // Initialize tooltips for table cells
+  if (typeof initAttributeTooltips !== 'undefined') {
+    initAttributeTooltips(tbody, ['td']);
+  }
 }
 
 function renderSchedule(data) {
@@ -370,6 +380,14 @@ async function init() {
     renderTeamStats(await fetchJSON('/franchise/team-stats'));
     renderRecruits(await fetchJSON(`/franchise/recruits?franchise_id=${franchiseId}`));
     renderTrainingResults(await fetchJSON(`/franchise/latest-training?franchise_id=${franchiseId}`));
+    
+    // Initialize tooltips for table headers
+    if (typeof initAttributeTooltips !== 'undefined') {
+      const teamTable = document.querySelector('#team-tab .roster-table');
+      const recruitsTable = document.querySelector('#recruits-tab .roster-table');
+      if (teamTable) initAttributeTooltips(teamTable, ['th']);
+      if (recruitsTable) initAttributeTooltips(recruitsTable, ['th']);
+    }
   }
 
 function updatePlayButton(data) {

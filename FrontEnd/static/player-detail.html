@@ -473,11 +473,12 @@
       // Cap fill percentage at 100% for visual consistency
       const fillPercentage = Math.min(100, scaledValue * 10);
       
+      // Add tooltip using data attribute (will be applied by initAttributeTooltips)
       return `
         <div class="attribute-row">
           <div class="attribute-bar-container">
             <div class="attribute-bar-fill" data-width="${fillPercentage}" style="width: 0%;">
-              <span class="attribute-label">${code}</span>
+              <span class="attribute-label" data-attr="${code}">${code}</span>
             </div>
           </div>
           <div class="attribute-value">${scaledValue}</div>
@@ -572,8 +573,19 @@
     }
 
     // Load player on page load
-    window.addEventListener('DOMContentLoaded', loadPlayerData);
+    window.addEventListener('DOMContentLoaded', () => {
+      loadPlayerData();
+      
+      // Initialize tooltips after player data is loaded
+      // Use a small delay to ensure DOM is updated
+      setTimeout(() => {
+        if (typeof initAttributeTooltips !== 'undefined') {
+          initAttributeTooltips(document, ['.attribute-label']);
+        }
+      }, 500);
+    });
   </script>
+  <script src="/static/js/shared/attributeTooltips.js"></script>
 </body>
 </html>
 
