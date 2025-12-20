@@ -6,6 +6,7 @@ from bson import ObjectId
 import logging
 import random
 from typing import Any
+from datetime import datetime
 from BackEnd.main import run_simulation
 
 from BackEnd.db import db, franchise_state_collection
@@ -860,7 +861,8 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
 
 class FranchiseTrainingRequest(BaseModel):
     franchise_id: str
-    allocations: dict
+    team_id: str = None
+    training_data: dict  # Contains player_drills, team_drills, general, coaching_focus
 
 
 @router.post("/franchise/run-training")
@@ -879,22 +881,36 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
 
-    # Get training status
+    # Get training status and check for duplicate submission
     training_status = franchise_doc.get("training_status", {})
-    if training_status.get("training_completed", False):
-        raise HTTPException(status_code=400, detail="Training already completed for this week")
+    current_week = franchise_doc.get("week", 0)
+    if training_status.get("training_completed", False) and training_status.get("week") == current_week:
+        # Training already completed for this week, redirect to report
+        return {
+            "status": "already_completed",
+            "week": current_week,
+            "redirect": f"/static/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={req.team_id}&week={current_week}"
+        }
 
-    # Get user's team
-    state = franchise_state_collection.find_one({"_id": "state"}) or {}
-    team_name = state.get("team")
-    if not team_name:
-        raise HTTPException(status_code=404, detail="User team not found")
-    
-    team_doc = db.teams.find_one({"name": team_name})
-    if not team_doc:
-        raise HTTPException(status_code=404, detail="Team not found")
-    
-    team_id = str(team_doc["_id"])
+    # Get user's team (use team_id from request if provided, otherwise from state)
+    team_id = req.team_id
+    if not team_id:
+        state = franchise_state_collection.find_one({"_id": "state"}) or {}
+        team_name = state.get("team")
+        if not team_name:
+            raise HTTPException(status_code=404, detail="User team not found")
+        team_doc = db.teams.find_one({"name": team_name})
+        if not team_doc:
+            raise HTTPException(status_code=404, detail="Team not found")
+        team_id = str(team_doc["_id"])
+    else:
+        # team_id might be a name, try to resolve it
+        team_doc = db.teams.find_one({"name": team_id})
+        if team_doc:
+            team_id = str(team_doc["_id"])
+        else:
+            # Assume it's already an ID
+            pass
 
     # Get franchise-specific player data for the user's team
     franchise_players = franchise_doc.get("players", {})
@@ -925,47 +941,30 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     franchise_teams = franchise_doc.get("franchise_teams", {})
     team_stats = franchise_teams.get(team_id, {}).copy()
 
-    # Snapshot initial values for comparison
-    player_baselines = {
-        p["_id"]: {k: v for k, v in p.get("attributes", {}).items() if k.startswith("anchor_")}
-        for p in players_for_training
+    # Extract training data
+    training_data = req.training_data
+    allocations = {
+        "player_drills": training_data.get("player_drills", {}),
+        "team_drills": training_data.get("team_drills", {}),
+        "general": training_data.get("general", {})
     }
-    team_baseline = team_stats.copy()
+    coaching_focus = training_data.get("coaching_focus")
 
-    # Create and run training session
-    from BackEnd.models.training_manager import TrainingSession
-    from datetime import datetime
-    session_type = training_status.get("session_type", "in-season")
-    current_week = franchise_doc.get("week", 0)
-    session = TrainingSession(
-        session_type=session_type, 
-        date=datetime.now().strftime("%Y-%m-%d"),
-        team_id=team_id,
-        franchise_id=str(franchise_id),
-        week=current_week
+    # Execute new training system
+    # This applies pre-training conditions, then training points, and returns training report
+    from BackEnd.models.training_execution_v2 import execute_training
+    
+    # Execute training (applies pre-training conditions, then training points)
+    updated_players, updated_team, training_report = execute_training(
+        players_for_training,
+        team_stats,
+        allocations,
+        coaching_focus
     )
     
-    # Apply allocations
-    for category, allocation in req.allocations.items():
-        try:
-            session.assign_points(category, allocation)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-
-    # Apply training
-    player_updates = session.apply_training(players_for_training, team_stats)
-
-    # Apply the attribute updates to the player objects first
-    for player in players_for_training:
-        pid = player["_id"]
-        if pid in player_updates:
-            for attr, val in player_updates[pid].items():
-                # Update the player object's attributes with new values
-                player["attributes"][attr] = val
-                # Also update base attribute if this is an anchor field
-                if attr.startswith("anchor_"):
-                    base_attr = attr.replace("anchor_", "")
-                    player["attributes"][base_attr] = val
+    # Update players_for_training and team_stats with results
+    players_for_training = updated_players
+    team_stats = updated_team
 
     # Recalculate position ratings for each player after training (with updated attributes)
     from BackEnd.utils.position_ratings import compute_position_ratings
@@ -994,49 +993,22 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         new_ratings = compute_position_ratings(player_for_ratings)
         position_ratings_updates[pid] = new_ratings
 
-    # Compute player deltas for response
-    player_logs = {}
-    for player in players_for_training:
-        pid = player["_id"]
-        name = f"{player.get('first_name', '')} {player.get('last_name', '')}".strip()
-        deltas = {}
-        for anchor_field, new_val in player_updates.get(pid, {}).items():
-            old_val = player_baselines.get(pid, {}).get(anchor_field, 0)
-            delta = new_val - old_val
-            if delta != 0:
-                trait = anchor_field.replace("anchor_", "")
-                deltas[trait] = delta
-        if deltas:
-            player_logs[name] = deltas
-
-    # Compute team deltas (skip non-numeric fields like playcall_settings, strategy_settings)
-    team_log = {}
-    for field, old_val in team_baseline.items():
-        # Skip dict fields (playcall_settings, strategy_settings)
-        if isinstance(old_val, dict):
-            continue
-        new_val = team_stats.get(field, old_val)
-        # Skip if new value is also a dict
-        if isinstance(new_val, dict):
-            continue
-        delta = new_val - old_val
-        if delta != 0:
-            team_log[field] = delta
+    # Use training report data for player and team changes
+    player_logs = training_report.get("player_changes", {})
+    team_log = training_report.get("team_changes", {})
 
     # Update franchise document with new attribute values and position ratings
     franchise_update = {}
     for player in players_for_training:
         pid = player["_id"]
-        if pid in player_updates:
-            for attr, val in player_updates[pid].items():
-                # Save the anchor field
-                franchise_update[f"players.{pid}.attributes.{attr}"] = val
-                
-                # Also update the base attribute (without "anchor_" prefix)
-                # e.g., if attr is "anchor_SC", also update "SC"
-                if attr.startswith("anchor_"):
-                    base_attr = attr.replace("anchor_", "")
-                    franchise_update[f"players.{pid}.attributes.{base_attr}"] = val
+        attrs = player.get("attributes", {})
+        
+        # Update all anchor attributes and base attributes
+        for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO", "NG"]:
+            anchor_key = f"anchor_{attr}"
+            if anchor_key in attrs:
+                franchise_update[f"players.{pid}.attributes.{anchor_key}"] = attrs[anchor_key]
+                franchise_update[f"players.{pid}.attributes.{attr}"] = attrs[attr]
         
         # Update position ratings for this player
         if pid in position_ratings_updates:
@@ -1044,27 +1016,138 @@ def run_franchise_training(req: FranchiseTrainingRequest):
 
     # Update franchise team stats
     for field, value in team_stats.items():
+        # Skip non-numeric fields
+        if isinstance(value, dict):
+            continue
         franchise_update[f"franchise_teams.{team_id}.{field}"] = value
 
-    # Mark training as completed
+    # Mark training as completed and update status
+    session_type = training_status.get("session_type", "in-season")
     franchise_update["training_status.training_completed"] = True
+    franchise_update["training_status.week"] = current_week
+    franchise_update["training_status.last_training_date"] = datetime.now().strftime("%Y-%m-%d")
     
-    # Save the latest training results for display on Training tab
-    franchise_update["latest_training"] = {
-        "player_logs": player_logs,
-        "team_log": team_log,
+    # Store training report data
+    training_report_data = {
+        "week": current_week,
+        "player_changes": player_logs,
+        "team_changes": team_log,
+        "coaching_focus": training_report.get("coaching_focus", {}),
         "session_type": session_type,
-        "week": franchise_doc.get("week", 0)
+        "date": datetime.now().strftime("%Y-%m-%d")
     }
+    
+    # Store training report in franchise_teams.{team_id}.training_reports
+    franchise_update[f"franchise_teams.{team_id}.training_reports.{current_week}"] = training_report_data
+    
+    # Also save latest training for quick access
+    franchise_update["latest_training"] = training_report_data
 
     # Save to franchise document
     db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update})
-    
-    # Save training session to training_sessions collection (for analytics/history)
-    db.training_sessions.insert_one(session.to_dict())
 
     return {
-        "player_logs": player_logs, 
-        "team_log": team_log,
-        "session_type": session_type
+        "status": "success",
+        "week": current_week,
+        "player_changes": player_logs,
+        "team_changes": team_log,
+        "coaching_focus": training_report.get("coaching_focus", {}),
+        "session_type": session_type,
+        "redirect": f"/static/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={team_id}&week={current_week}"
     }
+
+
+@router.get("/franchise/training-report")
+def get_training_report(franchise_id: str = None, tournament_id: str = None, team_id: str = None, week: int = None):
+    """
+    Get training report data for display on training-report.html page.
+    Supports both franchise and tournament modes.
+    """
+    try:
+        mode = "franchise" if franchise_id else "tournament"
+        doc_id = franchise_id if franchise_id else tournament_id
+        
+        if not doc_id or not team_id or week is None:
+            raise HTTPException(status_code=400, detail="Missing required parameters")
+        
+        if mode == "franchise":
+            doc_id_obj = ObjectId(doc_id)
+            doc = db.franchises.find_one({"_id": doc_id_obj})
+            if not doc:
+                raise HTTPException(status_code=404, detail="Franchise not found")
+            
+            # Get team data from franchise_teams
+            franchise_teams = doc.get("franchise_teams", {})
+            team_data = franchise_teams.get(team_id, {})
+            
+            # Get training report for this week
+            training_reports = team_data.get("training_reports", {})
+            report_data = training_reports.get(str(week)) or doc.get("latest_training", {})
+            
+            # Get schedule to find upcoming opponent
+            schedule = doc.get("schedule", [])
+            current_week = doc.get("week", 1)
+            upcoming_opponent = None
+            
+            if current_week - 1 < len(schedule):
+                week_games = schedule[current_week - 1]
+                for away_id, home_id in week_games:
+                    if str(away_id) == team_id or str(home_id) == team_id:
+                        opponent_id = str(home_id) if str(away_id) == team_id else str(away_id)
+                        opponent_team = db.teams.find_one({"_id": ObjectId(opponent_id)}, {"name": 1})
+                        if opponent_team:
+                            upcoming_opponent = opponent_team.get("name", "")
+                        break
+            
+            # Get current player attributes (after training)
+            players = []
+            roster = team_data.get("roster", [])
+            for player_id in roster:
+                player_data = team_data.get("players", {}).get(player_id, {})
+                if player_data:
+                    attrs = player_data.get("attributes", {})
+                    players.append({
+                        "id": player_id,
+                        "name": f"{player_data.get('first_name', '')} {player_data.get('last_name', '')}".strip(),
+                        "attributes": {k.replace("anchor_", ""): v for k, v in attrs.items() if k.startswith("anchor_")}
+                    })
+            
+            # Get current team attributes (after training)
+            team_attrs = {
+                "shot_threshold": team_data.get("shot_threshold", 0),
+                "rebound_modifier": team_data.get("rebound_modifier", 1.0),
+                "offensive_efficiency": team_data.get("offensive_efficiency", 0),
+                "defensive_efficiency": team_data.get("defensive_efficiency", 0),
+                "fb_efficiency": team_data.get("fb_efficiency", 0),
+                "pt_efficiency": team_data.get("pt_efficiency", 0),
+                "foul_modifier": team_data.get("foul_modifier", 0),
+                "turnover_modifier": team_data.get("turnover_modifier", 0),
+                "momentum_score": team_data.get("momentum_score", 0),
+                "team_chemistry": team_data.get("team_chemistry", 7),
+                "fb_opp_modifier": team_data.get("fb_opp_modifier", 0),
+                "pt_opp_modifier": team_data.get("pt_opp_modifier", 0)
+            }
+            
+        else:  # tournament mode
+            # TODO: Implement tournament mode training report
+            raise HTTPException(status_code=501, detail="Tournament mode training reports not yet implemented")
+        
+        if not report_data:
+            raise HTTPException(status_code=404, detail="Training report not found for this week")
+        
+        return {
+            "status": "success",
+            "week": week,
+            "upcoming_opponent": upcoming_opponent,
+            "coaching_focus": report_data.get("coaching_focus", {}),
+            "player_changes": report_data.get("player_changes", {}),
+            "team_changes": report_data.get("team_changes", {}),
+            "players": players,
+            "team_attributes": team_attrs
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching training report: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
