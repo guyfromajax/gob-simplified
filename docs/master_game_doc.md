@@ -8483,6 +8483,7 @@ The **universal `teams` collection** in MongoDB (`db.teams`) is the source of tr
 
 - Team metadata (name, colors, mascot, team_id)
 - Base team attributes (shot_threshold, turnover_modifier, etc.)
+- Coaching attributes object (effectiveness, training focus list, archetype scores and momentum)
 - Initial playbook and strategy settings (if any)
 
 When team objects are created in Single Game, Tournament, or Franchise modes, they copy attribute values from this universal collection. If attributes don't exist in the universal collection, they default to `0` (for new attributes) or are generated randomly (for core attributes via `_init_team_attributes()`).
