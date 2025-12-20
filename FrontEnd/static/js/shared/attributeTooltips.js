@@ -56,6 +56,8 @@ function initAttributeTooltips(container = document, selectors = []) {
       if (ATTRIBUTE_NAMES[upperText]) {
         element.setAttribute('title', ATTRIBUTE_NAMES[upperText]);
         element.style.cursor = 'help';
+        // Debug log to verify tooltips are being set
+        console.log(`[TOOLTIP] Set tooltip for "${text}" → "${ATTRIBUTE_NAMES[upperText]}"`);
       }
       
       // Also check data-attr attribute if present
@@ -64,6 +66,7 @@ function initAttributeTooltips(container = document, selectors = []) {
         if (ATTRIBUTE_NAMES[attr]) {
           element.setAttribute('title', ATTRIBUTE_NAMES[attr]);
           element.style.cursor = 'help';
+          console.log(`[TOOLTIP] Set tooltip via data-attr for "${attr}" → "${ATTRIBUTE_NAMES[attr]}"`);
         }
       }
     });
@@ -80,6 +83,10 @@ function addTooltip(element, abbreviation) {
   if (ATTRIBUTE_NAMES[upperAbbr]) {
     element.setAttribute('title', ATTRIBUTE_NAMES[upperAbbr]);
     element.style.cursor = 'help';
+    // Debug log to verify tooltips are being set
+    console.log(`[TOOLTIP] addTooltip: "${abbreviation}" → "${ATTRIBUTE_NAMES[upperAbbr]}"`);
+  } else {
+    console.warn(`[TOOLTIP] No mapping found for abbreviation: "${abbreviation}"`);
   }
 }
 

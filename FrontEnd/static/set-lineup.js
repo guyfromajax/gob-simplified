@@ -421,9 +421,9 @@ function renderRoster() {
     tbody.appendChild(tr);
   });
   
-  // Initialize tooltips for table cells
+  // Initialize tooltips for table cells (td elements only - th are in thead)
   if (typeof initAttributeTooltips !== 'undefined') {
-    initAttributeTooltips(tbody, ['td', 'th']);
+    initAttributeTooltips(tbody, ['td']);
   }
 }
 
