@@ -405,13 +405,172 @@ async function refreshLeaders() {
 
 window.refreshLeaders = refreshLeaders;
 
+function renderSchedule() {
+  if (!tournament) return;
+  const container = document.getElementById('schedule-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const round1 = tournament.bracket?.round1 || [];
+  const round2 = tournament.bracket?.round2 || [];
+  const finalRound = tournament.bracket?.final || [];
+  const results = tournament.results || [];
+
+  // Build seed map from round1
+  const seedMap = {};
+  if (round1.length === 4) {
+    seedMap[round1[0].home_team] = 1;
+    seedMap[round1[0].away_team] = 8;
+    seedMap[round1[1].home_team] = 4;
+    seedMap[round1[1].away_team] = 5;
+    seedMap[round1[2].home_team] = 2;
+    seedMap[round1[2].away_team] = 7;
+    seedMap[round1[3].home_team] = 3;
+    seedMap[round1[3].away_team] = 6;
+  }
+
+  function getResult(round, index) {
+    return results.find(r => r.round === round && r.match_index === index) || null;
+  }
+
+  // First Round
+  const firstRoundDiv = document.createElement('div');
+  firstRoundDiv.className = 'schedule-round';
+  const firstRoundH3 = document.createElement('h3');
+  firstRoundH3.textContent = 'First Round';
+  firstRoundDiv.appendChild(firstRoundH3);
+
+  round1.forEach((match, index) => {
+    const res = getResult(1, index);
+    const homeScore = res?.score?.[match.home_team] ?? match.score?.[match.home_team];
+    const awayScore = res?.score?.[match.away_team] ?? match.score?.[match.away_team];
+    const winner = res?.winner ?? match.winner ?? null;
+
+    const gameDiv = document.createElement('div');
+    gameDiv.className = 'schedule-game';
+    const homeSeed = seedMap[match.home_team] || '';
+    const awaySeed = seedMap[match.away_team] || '';
+    
+    let text = `Team ${awaySeed} ${match.away_team} @ Team ${homeSeed} ${match.home_team}`;
+    if (homeScore !== undefined && awayScore !== undefined) {
+      text = `Team ${awaySeed} ${match.away_team} (${awayScore}) @ Team ${homeSeed} ${match.home_team} (${homeScore})`;
+    }
+    
+    gameDiv.innerHTML = text;
+    
+    // Add training report link if this is user's matchup and training has been run
+    const isUserMatch = match.home_team === userTeamId || match.away_team === userTeamId;
+    if (isUserMatch && tournament.training_status?.training_completed && tournament.training_status?.round === 1) {
+      const link = document.createElement('a');
+      link.href = `/static/training-report.html?mode=tournament&tournament_id=${tournament._id}&team_id=${userTeamId}&round=1`;
+      link.textContent = ' [Training Report]';
+      link.className = 'training-report-link';
+      link.style.color = '#4a90e2';
+      link.style.textDecoration = 'none';
+      link.style.marginLeft = '8px';
+      link.style.fontSize = 'calc(1em - 2px)';
+      gameDiv.appendChild(link);
+    }
+    
+    firstRoundDiv.appendChild(gameDiv);
+  });
+  container.appendChild(firstRoundDiv);
+
+  // Semifinals
+  const semiDiv = document.createElement('div');
+  semiDiv.className = 'schedule-round';
+  const semiH3 = document.createElement('h3');
+  semiH3.textContent = 'Semifinals';
+  semiDiv.appendChild(semiH3);
+
+  for (let i = 0; i < 2; i++) {
+    const gameDiv = document.createElement('div');
+    gameDiv.className = 'schedule-game';
+    
+    if (round2[i]) {
+      const match = round2[i];
+      const res = getResult(2, i);
+      const homeScore = res?.score?.[match.home_team] ?? match.score?.[match.home_team];
+      const awayScore = res?.score?.[match.away_team] ?? match.score?.[match.away_team];
+      const winner = res?.winner ?? match.winner ?? null;
+
+      let text = `${match.away_team} @ ${match.home_team}`;
+      if (homeScore !== undefined && awayScore !== undefined) {
+        text = `${match.away_team} (${awayScore}) @ ${match.home_team} (${homeScore})`;
+      }
+      gameDiv.innerHTML = text;
+      
+      // Add training report link if this is user's matchup and training has been run
+      const isUserMatch = match.home_team === userTeamId || match.away_team === userTeamId;
+      if (isUserMatch && tournament.training_status?.training_completed && tournament.training_status?.round === 2) {
+        const link = document.createElement('a');
+        link.href = `/static/training-report.html?mode=tournament&tournament_id=${tournament._id}&team_id=${userTeamId}&round=2`;
+        link.textContent = ' [Training Report]';
+        link.className = 'training-report-link';
+        link.style.color = '#4a90e2';
+        link.style.textDecoration = 'none';
+        link.style.marginLeft = '8px';
+        link.style.fontSize = 'calc(1em - 2px)';
+        gameDiv.appendChild(link);
+      }
+    } else {
+      gameDiv.innerHTML = 'TBD @ TBD';
+    }
+    
+    semiDiv.appendChild(gameDiv);
+  }
+  container.appendChild(semiDiv);
+
+  // Championship
+  const champDiv = document.createElement('div');
+  champDiv.className = 'schedule-round';
+  const champH3 = document.createElement('h3');
+  champH3.textContent = 'Championship';
+  champDiv.appendChild(champH3);
+
+  const champGameDiv = document.createElement('div');
+  champGameDiv.className = 'schedule-game';
+  
+  if (finalRound[0]) {
+    const match = finalRound[0];
+    const res = getResult(3, 0);
+    const homeScore = res?.score?.[match.home_team] ?? match.score?.[match.home_team];
+    const awayScore = res?.score?.[match.away_team] ?? match.score?.[match.away_team];
+    const winner = res?.winner ?? match.winner ?? null;
+
+    let text = `${match.away_team} @ ${match.home_team}`;
+    if (homeScore !== undefined && awayScore !== undefined) {
+      text = `${match.away_team} (${awayScore}) @ ${match.home_team} (${homeScore})`;
+    }
+    champGameDiv.innerHTML = text;
+    
+    // Add training report link if this is user's matchup and training has been run
+    const isUserMatch = match.home_team === userTeamId || match.away_team === userTeamId;
+    if (isUserMatch && tournament.training_status?.training_completed && tournament.training_status?.round === 3) {
+      const link = document.createElement('a');
+      link.href = `/static/training-report.html?mode=tournament&tournament_id=${tournament._id}&team_id=${userTeamId}&round=3`;
+      link.textContent = ' [Training Report]';
+      link.className = 'training-report-link';
+      link.style.color = '#4a90e2';
+      link.style.textDecoration = 'none';
+      link.style.marginLeft = '8px';
+      link.style.fontSize = 'calc(1em - 2px)';
+      champGameDiv.appendChild(link);
+    }
+  } else {
+    champGameDiv.innerHTML = 'TBD @ TBD';
+  }
+  
+  champDiv.appendChild(champGameDiv);
+  container.appendChild(champDiv);
+}
+
 function updateCTA() {
   const playBtn = document.getElementById('play-now');
   const simBtn = document.getElementById('sim-remaining');
   const exitBtn = document.getElementById('exit-tournament');
   const container = document.querySelector ? document.querySelector('.play-now-container') : null;
-  const opponentEl = document.getElementById('play-now-opponent');
-  if (!container || !playBtn || !simBtn || !exitBtn || !tournament || !opponentEl) return;
+  if (!container || !playBtn || !simBtn || !exitBtn || !tournament) return;
 
   if (tournament.completed) {
     playBtn.style.display = 'none';
@@ -419,7 +578,6 @@ function updateCTA() {
     simBtn.disabled = true;
     container.style.display = 'none';
     exitBtn.style.display = 'inline-block';
-    opponentEl.textContent = '';
     return;
   }
 
@@ -434,23 +592,27 @@ function updateCTA() {
   const eliminated = !userMatch || !!userMatch.winner;
   if (eliminated) {
     playBtn.style.display = 'none';
-    opponentEl.textContent = '';
     simBtn.style.display = 'inline-block';
     simBtn.disabled = false;
     return;
   }
 
-  if (!userMatch.game_id) {
-    const opponent = userMatch.home_team === userTeamId ? userMatch.away_team : userMatch.home_team;
-    playBtn.style.display = 'inline-flex';
-    opponentEl.textContent = `vs ${opponent}`;
+  // Check training status
+  const trainingStatus = tournament.training_status || {};
+  const trainingCompleted = trainingStatus.training_completed && trainingStatus.round === tournament.current_round;
+  
+  if (trainingCompleted) {
+    // Training completed, show "Play Next Game"
+    playBtn.textContent = 'Play Next Game';
+    playBtn.style.display = 'inline-block';
     simBtn.style.display = 'none';
     simBtn.disabled = true;
   } else {
-    playBtn.style.display = 'none';
-    opponentEl.textContent = '';
-    simBtn.style.display = 'inline-block';
-    simBtn.disabled = false;
+    // Training not completed, show "Run Training"
+    playBtn.textContent = 'Run Training';
+    playBtn.style.display = 'inline-block';
+    simBtn.style.display = 'none';
+    simBtn.disabled = true;
   }
 }
 
@@ -580,6 +742,7 @@ async function refreshTeamStats() {
   renderRoster();
   renderStats();
   renderBracket();
+  renderSchedule();
   updateCTA();
 }
 
@@ -595,6 +758,7 @@ function handleTournamentUpdate(doc) {
   localStorage.setItem("activeTournament", JSON.stringify(doc));
   updateTeamChemistry();
   renderBracket();
+  renderSchedule();
   renderRoster();
   renderStats();
   updateCTA();
@@ -612,6 +776,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateTeamChemistry();
   await loadRoster();
   renderBracket();
+  renderSchedule();
   renderRoster();
   renderStats();
   await refreshLeaders();
@@ -634,6 +799,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       playBtn.disabled = true;
       try {
+        // Check if training has been completed
+        const trainingStatus = tournament.training_status || {};
+        const trainingCompleted = trainingStatus.training_completed && trainingStatus.round === tournament.current_round;
+        
+        if (!trainingCompleted) {
+          // Navigate to training page
+          const url = `/static/training.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_id=${encodeURIComponent(userTeamId)}&round=${tournament.current_round}`;
+          window.location.href = url;
+          return;
+        }
+        
+        // Training completed, proceed to game
         const payload = { tournament_id: tournament._id };
         const res = await fetch('/simulate-tournament-round', {
           method: 'POST',
