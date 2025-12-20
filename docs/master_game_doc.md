@@ -6870,12 +6870,29 @@ After training is submitted, users are automatically redirected to the training 
 - Header: "Player Report"
 - Toggle between "Attributes" and "Training Changes" views
 - **Attributes View:** Shows current attribute values after training
+  - **Attribute Order:** Attributes displayed in exact order: SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, NG, EM, MO
+  - **Attribute Formatting:**
+    - **SC through FT (first 12):** Displayed as integer values
+    - **NG:** Displayed with 2 decimal places (e.g., 1.00, 0.99, 0.98, 0.90)
+    - **EM:** Displayed with emoji based on value:
+      - >= 80: 😎 (Sunglasses)
+      - >= 60: 😊 (Big smile)
+      - >= 40: 😐 (Straight face)
+      - >= 20: 😕 (Slight frown)
+      - < 20: 😞 (Sad face)
+    - **MO:** Displayed with red/green horizontal pill visualization
+      - Green fill on right side for positive momentum
+      - Red fill on left side for negative momentum
+      - Yellow center line at 50%
+      - No integer value displayed on top of pill
   - **Tooltip Feature:** Hovering over any attribute value displays the training change for that attribute
     - Green tooltip for positive changes (e.g., "+5")
     - Red tooltip for negative changes (e.g., "-3")
     - Black tooltip for zero changes
     - Tooltip appears above the attribute value
 - **Training Changes View:** Shows net changes from training
+  - **Attribute Order:** Same exact order as Attributes view (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, NG, EM, MO)
+  - Only displays attributes that have changes (maintains order)
   - Positive changes: Green text with `+` prefix
   - Negative changes: Red text with `-` prefix
   - Zero changes: Black text
