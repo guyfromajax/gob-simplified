@@ -2376,6 +2376,179 @@ Jersey numbers were not appearing in the box score display or special stats popu
 
 ---
 
+## Player Attribute Tooltips System ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The Player Attribute Tooltips System provides hover tooltips that display the full names of abbreviated player attributes and statistics across the application. This system uses JavaScript-based tooltips for reliable cross-browser support.
+
+**Key Features:**
+- Hover tooltips on attribute abbreviations (SC, SH, ID, OD, PS, BH, RB, ST, AG, FT, ND, IQ, CH, EM, MO, NG)
+- Hover tooltips on other abbreviations (POS, HT, WT, RT)
+- Works across multiple pages (Lineup Screen, Tournament Command Center, Franchise Command Center, Team Rosters, Player Detail)
+- Custom JavaScript tooltip implementation (more reliable than native `title` attribute)
+- Smooth fade-in/fade-out animations
+
+### Implementation
+
+**Location:** `FrontEnd/static/js/shared/attributeTooltips.js`
+
+**Core Components:**
+
+1. **Attribute Name Mapping:**
+```javascript
+const ATTRIBUTE_NAMES = {
+  // Attributes
+  SC: 'Scoring',
+  SH: 'Shooting',
+  ID: 'Inside Defense',
+  OD: 'Outside Defense',
+  PS: 'Passing',
+  BH: 'Ball Handling',
+  RB: 'Rebounding',
+  ST: 'Strength',
+  AG: 'Agility',
+  FT: 'Free Throw',
+  ND: 'Endurance',
+  IQ: 'Basketball IQ',
+  CH: 'Clutch',
+  EM: 'Emotion',
+  MO: 'Momentum',
+  NG: 'Energy',
+  
+  // Other abbreviations
+  POS: 'Position',
+  HT: 'Height',
+  WT: 'Weight',
+  RT: 'Rating'
+};
+```
+
+2. **Global Tooltip Element:**
+   - Single tooltip element created once and reused for all tooltips
+   - Positioned absolutely with high z-index (99999)
+   - Styled with dark background, white text, rounded corners, and shadow
+   - Uses opacity/visibility transitions for smooth animations
+
+3. **Event-Based Tooltip System:**
+   - `setupTooltipEvents(element, tooltipText)` - Attaches mouseenter, mouseleave, and mousemove listeners
+   - Tooltip appears on `mouseenter` with fade-in animation
+   - Tooltip follows mouse on `mousemove` (updates position)
+   - Tooltip disappears on `mouseleave` with fade-out animation
+   - Positioned above the element using `getBoundingClientRect()`
+
+4. **Initialization Function:**
+   - `initAttributeTooltips(container, selectors)` - Scans container for elements matching selectors
+   - Checks element text content against `ATTRIBUTE_NAMES` mapping
+   - Adds `attr-tooltip` class and sets up event listeners
+   - Also checks `data-attr` attribute for programmatic tooltip assignment
+
+5. **Helper Function:**
+   - `addTooltip(element, abbreviation)` - Manually add tooltip to a specific element
+   - Useful for dynamically created elements
+
+### Usage
+
+**Automatic Initialization (Lineup Screen):**
+```javascript
+// In set-lineup.js DOMContentLoaded
+if (typeof initAttributeTooltips !== 'undefined') {
+  const thead = document.querySelector('.roster-table thead');
+  if (thead) {
+    initAttributeTooltips(thead, ['th']);
+  }
+}
+```
+
+**Manual Initialization (Other Pages):**
+```javascript
+// Initialize tooltips for table headers
+initAttributeTooltips(document.querySelector('.roster-table'), ['th']);
+
+// Initialize tooltips for specific elements
+initAttributeTooltips(document, ['.attr-label', '[data-attr]']);
+```
+
+**Programmatic Tooltip Assignment:**
+```javascript
+// Add tooltip to a specific element
+const element = document.querySelector('.some-element');
+addTooltip(element, 'SC'); // Will show "Scoring" on hover
+```
+
+### Tooltip Styling
+
+**Visual Design:**
+- Background: `rgba(0, 0, 0, 0.95)` (dark, semi-transparent)
+- Text: White, 12px, Inter font family
+- Padding: 6px 10px
+- Border radius: 4px
+- Box shadow: `0 2px 8px rgba(0, 0, 0, 0.3)`
+- Z-index: 99999 (appears above all other content)
+
+**Positioning:**
+- Positioned above the element (8px offset)
+- Centered horizontally on the element
+- Uses `getBoundingClientRect()` for accurate positioning
+- Updates position on mouse move for smooth following
+
+**Animation:**
+- Fade-in: 0.2s opacity transition
+- Fade-out: 0.2s opacity transition
+- Uses `opacity` and `visibility` for smooth transitions
+
+### Integration Points
+
+**Pages Using Tooltips:**
+1. **Lineup Screen** (`set-lineup.html`) - Table headers (th elements)
+2. **Tournament Command Center** (`tournament.html`) - Team roster table headers
+3. **Franchise Command Center** (`franchise-command-center.html`) - Team and recruits table headers
+4. **Team Roster Pages** (`team-roster/*.html`) - Table headers and player card labels
+5. **Player Detail Page** (`player-detail.html`) - Attribute labels
+
+**Script Loading:**
+```html
+<script src="/static/js/shared/attributeTooltips.js"></script>
+```
+
+**CSS Class:**
+- Elements with tooltips get the `attr-tooltip` class
+- This class sets `cursor: help` to indicate tooltip availability
+- Also sets `position: relative` for proper tooltip positioning
+
+### Key Files
+
+**Frontend:**
+- `FrontEnd/static/js/shared/attributeTooltips.js` - Core tooltip system
+- `FrontEnd/static/set-lineup.js` - Lineup screen initialization
+- `FrontEnd/static/tournament.js` - Tournament command center initialization
+- `FrontEnd/static/franchise-command-center.js` - Franchise command center initialization
+- `FrontEnd/static/team-roster/*.html` - Team roster pages with tooltip initialization
+
+### Technical Details
+
+**Why JavaScript Tooltips Instead of CSS?**
+- Native `title` attribute tooltips have inconsistent browser support and timing
+- CSS `::after` pseudo-elements with `attr(data-tooltip)` have limited browser support
+- JavaScript tooltips provide:
+  - Consistent behavior across all browsers
+  - Better positioning control
+  - Smooth animations
+  - Ability to follow mouse movement
+
+**Performance:**
+- Single global tooltip element (created once, reused for all tooltips)
+- Event listeners attached only to elements that need tooltips
+- Efficient DOM queries using `querySelectorAll`
+- Minimal reflows/repaints during tooltip display
+
+**Accessibility:**
+- Maintains `title` attribute as fallback for screen readers
+- `cursor: help` provides visual indication of tooltip availability
+- Tooltip text is readable and descriptive
+
+---
+
 ## Lineup Selection Screen ✅ **COMPLETE** (January 2025)
 
 ### Overview
