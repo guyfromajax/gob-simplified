@@ -228,6 +228,13 @@ function collectTrainingData() {
     coaching_focus: document.querySelector('input[name="coaching-focus"]:checked')?.value || null
   };
   
+  console.log('🔋 [FRONTEND] Collected training data:', data);
+  console.log('🔋 [FRONTEND] team_drills:', data.team_drills);
+  console.log('🔋 [FRONTEND] scrimmages in team_drills:', 'scrimmages' in data.team_drills);
+  if ('scrimmages' in data.team_drills) {
+    console.log('🔋 [FRONTEND] scrimmages value:', data.team_drills.scrimmages);
+  }
+  
   return data;
 }
 
