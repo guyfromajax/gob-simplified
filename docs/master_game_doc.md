@@ -9236,6 +9236,163 @@ The coaching attributes system integrates with the Training System:
 - Training effectiveness can influence overall coaching effectiveness
 - Historical training focus list tracks coaching style evolution
 
+---
+
+## Coaching Grid ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The Coaching Grid is a desktop-only visualization page that displays a team's coaching status across four coaching archetypes. It provides a 2D grid view showing each archetype's position based on effectiveness and momentum scores.
+
+**Location:** `FrontEnd/static/coaching-grid.html`  
+**Status:** ✅ Fully implemented with placeholder data positioning  
+**Scope:** User team only (computer teams not viewable)
+
+### Layout Structure
+
+**Page Title:**
+- Centered "Coaching Grid" heading at top of page
+
+**Main Content:**
+- Large 2D grid container centered on page
+- Crosshair design with vertical and horizontal axes intersecting at center
+- Axis endpoint labels:
+  - **Top center:** "Embedded" (high effectiveness)
+  - **Bottom center:** "Fragile" (low effectiveness)
+  - **Left center:** "Stagnant" (low momentum)
+  - **Right center:** "Compounding" (high momentum)
+
+**Archetype Dots:**
+- Four circular dots positioned on the grid
+- Each dot has a text label placed near it
+- Labels: "Authoritarian", "Systems", "Player Maximizer", "Culture"
+
+### Data Mapping
+
+**Y-Axis (Effectiveness):**
+- Range: 0-100
+- Midpoint: 50 (center of grid)
+- **Top (Embedded):** 100 (maximum effectiveness)
+- **Bottom (Fragile):** 0 (minimum effectiveness)
+- Conversion: `yPercent = 100 - effectiveness`
+
+**X-Axis (Momentum):**
+- Range: 0-10
+- Midpoint: 5 (center of grid)
+- **Right (Compounding):** 10 (maximum momentum)
+- **Left (Stagnant):** 0 (minimum momentum)
+- Conversion: `xPercent = (momentum / 10) * 100`
+
+### Archetype Colors
+
+Each dot uses the same color as the corresponding coaching archetype header colors on the Training page:
+
+- **Authoritarian:** `#ff4444` (red) - `var(--color-authoritarian)`
+- **Systems:** `#d4a017` (yellow/burnt yellow) - `var(--color-systems-coach)`
+- **Player Maximizer:** `#2d8f2d` (green) - `var(--color-player-maximizer)`
+- **Culture:** `#9b59b6` (purple) - `var(--color-culture-builder)`
+
+Colors are defined as CSS variables in `coaching-grid.css`, matching `training.css` for consistency.
+
+### Visual Styling
+
+**Dots:**
+- Medium-sized (20-24px diameter)
+- Subtle border/outline (white border, shadow) for visibility on light background
+- Hover effect: Slight scale increase and enhanced shadow
+- Positioned using absolute positioning with percentage-based coordinates
+
+**Axis Lines:**
+- Thin, neutral gray (`#999`)
+- Vertical line: 1px width, full height, centered horizontally
+- Horizontal line: 1px height, full width, centered vertically
+
+**Labels:**
+- **Axis labels:** Bold-ish, larger font (1.2-1.3rem), positioned at axis endpoints
+- **Dot labels:** Smaller font (0.9-1rem), neutral gray, positioned to the right of each dot
+- Consistent spacing and alignment
+
+**Grid Container:**
+- White background with subtle border and shadow
+- Square aspect ratio (1:1)
+- Responsive sizing for desktop (max-width: 800-900px)
+
+### Data Source
+
+**Coaching Object Structure:**
+The grid reads data from the team's `coaching` object in the universal `teams` collection:
+
+```json
+{
+  "coaching": {
+    "authoritarian": {
+      "score": 24,      // effectiveness value (0-100)
+      "momentum": 0     // momentum value (0-10)
+    },
+    "systems coach": {
+      "score": 92,
+      "momentum": 5
+    },
+    "player maximizer": {
+      "score": 35,
+      "momentum": 9
+    },
+    "culture builder": {
+      "score": 50,
+      "momentum": 3
+    }
+  }
+}
+```
+
+**Field Mapping:**
+- `score` → Y-axis position (effectiveness)
+- `momentum` → X-axis position (momentum)
+
+### Implementation
+
+**Positioning Logic:**
+- `effectivenessToY(effectiveness)` - Converts effectiveness (0-100) to Y coordinate percentage
+- `momentumToX(momentum)` - Converts momentum (0-10) to X coordinate percentage
+- Dots positioned using `left` and `top` CSS properties with percentage values
+- Transform used to center dots on their coordinates (`translate(-50%, -50%)`)
+
+**Data Attributes:**
+- Each dot has `data-archetype`, `data-effectiveness`, and `data-momentum` attributes
+- Makes it easy to wire up with real data from API endpoints
+- JavaScript reads these attributes and calculates positions on page load
+
+**Placeholder Data:**
+- Authoritarian: effectiveness=24, momentum=0 (lower-left quadrant)
+- Systems: effectiveness=92, momentum=5 (upper-center)
+- Player Maximizer: effectiveness=35, momentum=9 (lower-right quadrant)
+- Culture: effectiveness=50, momentum=3 (center-left)
+
+### Key Files
+
+- `FrontEnd/static/coaching-grid.html` - Page structure and grid container
+- `FrontEnd/static/coaching-grid.css` - Styling for grid, axes, dots, and labels
+- `FrontEnd/static/coaching-grid.js` - Positioning logic and data mapping functions
+
+### Future Enhancements
+
+**Data Wiring:**
+- Connect to API endpoint to fetch user team's coaching data
+- Load coaching object from appropriate mode document (Single Game, Tournament, Franchise)
+- Update dot positions dynamically based on real data
+
+**Interactive Features:**
+- Tooltips showing exact effectiveness and momentum values on hover
+- Click dots to view detailed archetype information
+- Animation when positions change (smooth transitions)
+
+**Visual Enhancements:**
+- Grid lines or tick marks for better readability
+- Quadrant labels or shading to show different coaching zones
+- Legend explaining axis meanings
+
+---
+
 ## Resolution System 🚧 **IN PROGRESS** (January 2025)
 
 ### Overview
