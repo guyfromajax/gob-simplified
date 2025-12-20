@@ -173,6 +173,12 @@
         const card = createPlayerCard(player);
         container.appendChild(card);
       });
+      
+      // Initialize tooltips for player cards
+      if (typeof initAttributeTooltips !== 'undefined') {
+        initAttributeTooltips(container, ['.attr-label']);
+      }
+      });
     }
 
     function createRatingsDropdown(player) {
@@ -332,6 +338,10 @@
           const label = document.createElement('span');
           label.className = 'attr-label';
           label.textContent = attr;
+          // Add tooltip for attribute abbreviation
+          if (typeof addTooltip !== 'undefined') {
+            addTooltip(label, attr);
+          }
           
           const valueSpan = document.createElement('span');
           valueSpan.className = 'attr-value';
@@ -384,8 +394,17 @@
       
       // Initialize view
       switchView(currentView);
+      
+      // Initialize tooltips for table headers
+      if (typeof initAttributeTooltips !== 'undefined') {
+        const rosterTable = document.querySelector('.roster-table');
+        if (rosterTable) {
+          initAttributeTooltips(rosterTable, ['th']);
+        }
+      }
     });
   </script>
+  <script src="/static/js/shared/attributeTooltips.js"></script>
 </body>
 </html>
 

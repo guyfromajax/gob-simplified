@@ -336,6 +336,11 @@ function renderRoster() {
     
     tbody.appendChild(tr);
   });
+  
+  // Initialize tooltips for table cells
+  if (typeof initAttributeTooltips !== 'undefined') {
+    initAttributeTooltips(tbody, ['td']);
+  }
 }
 
 function renderStats() {
@@ -611,6 +616,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderStats();
   await refreshLeaders();
   updateCTA();
+  
+  // Initialize tooltips for table headers
+  if (typeof initAttributeTooltips !== 'undefined') {
+    const rosterTable = document.querySelector('#team-tab .roster-table');
+    if (rosterTable) {
+      initAttributeTooltips(rosterTable, ['th']);
+    }
+  }
 
   const playBtn = document.getElementById('play-now');
   if (playBtn) {

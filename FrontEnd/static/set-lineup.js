@@ -420,6 +420,11 @@ function renderRoster() {
     });
     tbody.appendChild(tr);
   });
+  
+  // Initialize tooltips for table cells
+  if (typeof initAttributeTooltips !== 'undefined') {
+    initAttributeTooltips(tbody, ['td', 'th']);
+  }
 }
 
 function updatePlayButton() {
@@ -1052,6 +1057,11 @@ function renderPlayerView() {
     const card = createPlayerCard(player);
     container.appendChild(card);
   });
+  
+  // Initialize tooltips for player cards
+  if (typeof initAttributeTooltips !== 'undefined') {
+    initAttributeTooltips(container, ['.attr-label']);
+  }
 }
 
 function createPlayerCard(player) {
@@ -1325,6 +1335,10 @@ function createCardBack(player) {
       const label = document.createElement('span');
       label.className = 'attr-label';
       label.textContent = key;
+      // Add tooltip for attribute abbreviation
+      if (typeof addTooltip !== 'undefined') {
+        addTooltip(label, key);
+      }
       row.appendChild(label);
       
       const value = document.createElement('span');
@@ -1363,6 +1377,10 @@ function createCardBack(player) {
   const ngLabel = document.createElement('span');
   ngLabel.className = 'attr-label';
   ngLabel.textContent = 'NG';
+  // Add tooltip for NG abbreviation
+  if (typeof addTooltip !== 'undefined') {
+    addTooltip(ngLabel, 'NG');
+  }
   ngRow.appendChild(ngLabel);
   
   const ngValue = document.createElement('span');
@@ -1627,5 +1645,13 @@ function dndLog(label, data) {
 document.addEventListener('DOMContentLoaded', () => {
   init();
   initViewToggle();
+  
+  // Initialize tooltips for table headers
+  if (typeof initAttributeTooltips !== 'undefined') {
+    const rosterTable = document.querySelector('.roster-table');
+    if (rosterTable) {
+      initAttributeTooltips(rosterTable, ['th']);
+    }
+  }
   setupSlotDragAndDrop();
 });
