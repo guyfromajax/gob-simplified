@@ -7110,7 +7110,7 @@ The Training System provides a comprehensive interface for allocating training p
 **Right Half - Team Drills:**
 - **Column 1:**
   - Offense (Offense Install slider + Current Playbook/Custom radio buttons)
-  - Fast Breaks (FB Offense Install, FB Defense Install sliders)
+  - Fast Breaks (FB Offense Install, FB Defense Install sliders, Scrimmages slider)
 - **Column 2:**
   - Defense (Defense Install slider + Current Playbook/Custom radio buttons)
   - Presses / Traps (P/T Defense Install, P/T Offense Install sliders)
@@ -7136,7 +7136,7 @@ The Training System provides a comprehensive interface for allocating training p
 
 ### Slider Behavior
 
-- Each slider has discrete steps from 0 to 6
+- Each slider has discrete steps from 0 to 5
 - Default value for all sliders on page load: 0
 - Total available training points = 24
 - Moving a slider to value N subtracts N from Points Remaining
@@ -7245,6 +7245,7 @@ The training execution system applies pre-training conditions, allocates trainin
 - Fast Break Defense Install → `fb_opp_modifier`
 - P/T Defense Install → `pt_efficiency`
 - P/T Offense Install → `pt_opp_modifier`
+- Scrimmages → Team Chemistry, Shot Threshold (decreases), Rebound Modifier, NG Reduction (if 3-5 points)
 
 #### Training Point Ranges
 

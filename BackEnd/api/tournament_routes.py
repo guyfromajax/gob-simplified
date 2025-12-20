@@ -759,11 +759,15 @@ def run_tournament_training(req: TournamentTrainingRequest):
         attrs = player.get("attributes", {})
         
         # Update all anchor attributes and base attributes
-        for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO", "NG"]:
+        for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO"]:
             anchor_key = f"anchor_{attr}"
             if anchor_key in attrs:
                 tournament_update[f"player_stats.{pid}.attributes.{anchor_key}"] = attrs[anchor_key]
                 tournament_update[f"player_stats.{pid}.attributes.{attr}"] = attrs[attr]
+        
+        # NG doesn't have an anchor_key, save it directly if it exists
+        if "NG" in attrs:
+            tournament_update[f"player_stats.{pid}.attributes.NG"] = attrs["NG"]
         
         # Update position ratings for this player (if tournament stores them)
         if pid in position_ratings_updates:
