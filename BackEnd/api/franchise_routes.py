@@ -465,6 +465,22 @@ def season_schedule(franchise_id: str):
         raise HTTPException(status_code=404, detail="Franchise not found")
     schedule = franchise_doc.get("schedule", [])
 
+    # Get user's team_id for training report links
+    state = franchise_state_collection.find_one({"_id": "state"}) or {}
+    team_name = state.get("team", "")
+    team_id = None
+    if team_name:
+        team_doc = db.teams.find_one({"name": team_name})
+        if team_doc:
+            team_id = str(team_doc["_id"])
+    
+    # Get training reports for user's team
+    franchise_teams = franchise_doc.get("franchise_teams", {})
+    training_reports = {}
+    if team_id:
+        team_data = franchise_teams.get(team_id, {})
+        training_reports = team_data.get("training_reports", {})
+
     weeks = []
     results_by_week = franchise_doc.get("results", {})
     for idx, games in enumerate(schedule, start=1):
@@ -494,18 +510,26 @@ def season_schedule(franchise_id: str):
                     status = "scheduled"
                     away_score = None
                     home_score = None
+            
+            # Check if this is the user's team's game and if training report exists
+            has_training_report = False
+            if team_id and (str(away_id) == team_id or str(home_id) == team_id):
+                has_training_report = str(idx) in training_reports
+            
             week_games.append({
                 "week": idx,
                 "away_team_id": str(away_id),
                 "home_team_id": str(home_id),
                 "away_score": away_score,
                 "home_score": home_score,
-                "status": status
+                "status": status,
+                "has_training_report": has_training_report,
+                "is_user_team": str(away_id) == team_id or str(home_id) == team_id
             })
         weeks.append(week_games)
 
     logger.info("season_schedule returning franchise_id=%s found=%s", franchise_id, found)
-    return {"schedule": weeks}
+    return {"schedule": weeks, "team_id": team_id}
 
 
 def get_leaders(

@@ -319,6 +319,7 @@ function renderSchedule(data) {
   const container = document.getElementById('schedule-container');
   if (!container) return;
   container.innerHTML = '';
+  const teamId = data.team_id;
   (data.schedule || []).forEach((weekGames, idx) => {
     const weekDiv = document.createElement('div');
     weekDiv.className = 'schedule-week';
@@ -341,6 +342,19 @@ function renderSchedule(data) {
         text = `${away} at ${home}`;
       }
       gameDiv.innerHTML = text;
+      
+      // Add training report link if this is user's team's game and training report exists
+      if (g.is_user_team && g.has_training_report) {
+        const link = document.createElement('a');
+        link.href = `/static/training-report.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}&week=${g.week}`;
+        link.textContent = ' [Training Report]';
+        link.className = 'training-report-link';
+        link.style.color = '#FFD700';
+        link.style.textDecoration = 'none';
+        link.style.marginLeft = '8px';
+        gameDiv.appendChild(link);
+      }
+      
       weekDiv.appendChild(gameDiv);
     });
     container.appendChild(weekDiv);
