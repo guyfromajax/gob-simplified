@@ -33,9 +33,12 @@ Shot type is determined **dynamically** based on player location, not hard-coded
 
 **Attack Shots:**
 - Player on non-lane spot (e.g., `upper wing`) chooses to drive
-- Drives to a closer lane spot (destination varies based on starting position)
+- **Two-step process**: 
+  1. Step 1: `action: "drive"` to destination lane spot
+  2. Step 2: `action: "shoot"` at destination lane spot
 - Shoots from that lane spot → attack shot
 - Uses `playcall = "Attack"` for shot score calculation
+- **Note**: Two-step approach ensures proper drive animation and accurate shot location detection
 
 ### 3. Focus as Influence, Not Constraint
 - Focus (Inside/Attack/Outside) **influences probability** of actions, doesn't lock players in

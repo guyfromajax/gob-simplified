@@ -705,6 +705,10 @@ The function **prioritizes the final step** (last step in the skeleton) to ensur
 
 1. **Motion Plays:** Where the shooter's location may change throughout the motion sequence
 2. **Attack Shots:** Where the shooter drives to a new location before shooting
+   - **Motion Offense Attack Shots:** Uses two-step process (drive step + shoot step) to ensure proper animation and accurate shot location detection
+   - **Step 1:** `action: "drive"` to destination lane spot
+   - **Step 2:** `action: "shoot"` at destination lane spot
+   - This two-step approach fixes animation bugs where shots appeared from wrong locations
 3. **Pass-and-Shoot Sequences:** Where the shooter receives the ball and then shoots
 
 **Why This Matters:**
@@ -6584,6 +6588,140 @@ On submit, captures:
 - Training results display
 - Training history tracking
 - Custom play selection for offense/defense plays
+
+---
+
+## Motion Offense Shot Resolution System ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The Motion Offense Shot Resolution System handles shot attempts in Motion offense plays. Unlike Set Plays which have predetermined shot locations, Motion plays dynamically determine shot type (inside/outside/attack) based on player positions and strategy settings.
+
+**Key Function:** `resolve_motion_offense_shot()` in `BackEnd/engine/phase_resolution.py`
+
+### Shot Type Determination
+
+Motion offense shots are determined dynamically based on:
+1. **Ball handler location** at the selected step
+2. **Available receivers** at inside/outside locations
+3. **Strategy settings** (inside/attack/outside weights)
+4. **Player attributes** (IQ can influence decisions)
+
+**Three Shot Types:**
+
+1. **Inside Shots:**
+   - Ball handler at inside location → shoots from current spot
+   - OR ball handler passes to receiver at inside location → receiver shoots
+   - Uses `playcall = "Inside"` for shot calculation
+
+2. **Outside Shots:**
+   - Ball handler at outside location → shoots from current spot
+   - OR ball handler passes to receiver at outside location → receiver shoots
+   - Uses `playcall = "Outside"` for shot calculation
+
+3. **Attack Shots:**
+   - Ball handler at non-lane spot chooses to drive
+   - **Two-step process** (critical for proper animation):
+     - **Step 1:** `action: "drive"` to destination lane spot
+     - **Step 2:** `action: "shoot"` at destination lane spot
+   - Uses `playcall = "Attack"` for shot calculation
+   - **Note:** Two-step approach ensures proper drive animation and accurate shot location detection
+
+### Attack Drive Implementation
+
+**Function:** `_create_attack_drive_shoot_steps()` (renamed from `_create_attack_drive_shoot_step()`)
+
+**Returns:** List of two steps `[drive_step, shoot_step]`
+
+**Drive Step:**
+```python
+{
+    "timestamp": timestamp,
+    "pos_actions": {
+        ball_handler_pos: {
+            "location": destination_location,  # e.g., "basketSpot"
+            "action": "drive"
+        }
+    },
+    "events": []
+}
+```
+
+**Shoot Step:**
+```python
+{
+    "timestamp": timestamp + 300,
+    "pos_actions": {
+        ball_handler_pos: {
+            "location": destination_location,  # Same as drive step
+            "action": "shoot"
+        }
+    },
+    "events": [{"type": "shot"}],
+    "_attack_drive": {
+        "start_location": start_location,
+        "intended_destination": destination_location,
+        "final_location": destination_location,
+        "stopped_short": False
+    }
+}
+```
+
+**Why Two Steps?**
+
+1. **Proper Animation:** Frontend animator needs separate `drive` action to create movement animation from start → destination
+2. **Accurate Shot Location:** Frontend shot detection finds `shoot` action at final location (not start location)
+3. **3-Point Detection:** Shot location detection uses final step's location, ensuring correct 3-point classification
+4. **Visual Clarity:** Users see the drive animation before the shot, making the play more realistic
+
+**Drive Destinations:**
+
+Based on starting location:
+- **Upper locations** → `["upper lowPost", "upper midPost", "upper bird", "midLane", "basketSpot"]`
+- **Lower locations** → `["lower lowPost", "lower midPost", "lower bird", "midLane", "basketSpot"]`
+- **Central locations** → All destinations (both upper and lower)
+
+### Execution Flow
+
+1. **Select Random Step:** Choose step 1-N (excluding step 0) for shot attempt
+2. **Identify Ball Handler:** Find ball handler position and location at selected step
+3. **Check Possibilities:** Determine which shot types are possible (inside/attack/outside)
+4. **Build Weighted List:** Create weighted list based on strategy settings and possibilities
+5. **Select Shot Type:** Randomly select from weighted list
+6. **Execute Shot:**
+   - **Inside:** Pass to receiver OR shoot from current location
+   - **Outside:** Pass to receiver OR shoot from current location
+   - **Attack:** Create two steps (drive + shoot) and append to skeleton
+7. **Return Results:** Modified skeleton with shot steps, shooter info, shot type, playcall
+
+### Key Files
+
+**Backend:**
+- `BackEnd/engine/phase_resolution.py`
+  - `resolve_motion_offense_shot()` (lines 2908-3100) - Main shot resolution function
+  - `_create_attack_drive_shoot_steps()` (lines 2812-2847) - Creates drive + shoot steps
+  - `_determine_attack_drive_destination()` (lines 2749-2767) - Determines valid drive destinations
+  - `_check_inside_shot_possibility()` - Checks if inside shot is possible
+  - `_check_attack_shot_possibility()` - Checks if attack shot is possible
+  - `_check_outside_shot_possibility()` - Checks if outside shot is possible
+  - `_build_shot_type_weighted_list()` - Builds weighted list for shot type selection
+
+**Frontend:**
+- `BackEnd/models/animator.py` - Converts skeleton steps to animation data
+  - Processes `drive` action to create movement animation
+  - Processes `shoot` action to trigger shot animation
+
+### Integration with Shot Detection
+
+**3-Point Detection:**
+- Uses `shooter_location` from final step (shoot step for attack shots)
+- Compares location against `THREE_POINT_SPOTS` constant
+- Two-step approach ensures correct location is detected (not start location)
+
+**Shot Calculation:**
+- Uses `playcall` parameter ("Inside", "Outside", "Attack")
+- Applies attack penalty if player was stopped short
+- Uses base shot calculation (no variant modifier for Motion plays)
 
 ---
 

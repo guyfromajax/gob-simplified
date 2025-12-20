@@ -2809,16 +2809,26 @@ def _create_shoot_step(shooter_pos, shooter_location, timestamp):
     }
 
 
-def _create_attack_drive_shoot_step(ball_handler_pos, start_location, destination_location, timestamp, is_away_offense=False):
+def _create_attack_drive_shoot_steps(ball_handler_pos, start_location, destination_location, timestamp, is_away_offense=False):
     """
-    Create a step for attack drive and shoot.
-    Player drives to destination and shoots immediately.
+    Create two steps for attack drive and shoot.
+    Step 1: Player drives to destination
+    Step 2: Player shoots at destination
+    
+    This two-step approach ensures:
+    - Proper drive animation from start to destination
+    - Correct shot location detection (frontend finds shoot action at destination)
+    - Accurate 3-point detection (uses final location)
     
     Args:
+        ball_handler_pos: Position of ball handler (e.g., "PG")
+        start_location: Starting location (e.g., "upper midCorner")
+        destination_location: Drive destination (e.g., "basketSpot")
+        timestamp: Timestamp for first step
         is_away_offense: Whether away team is on offense (for coordinate flipping)
     
     Returns:
-        dict: Step with drive and shoot actions
+        list: [drive_step, shoot_step] - Two steps to append to skeleton
     """
     from BackEnd.constants import HCO_STRING_SPOTS
     
@@ -2829,12 +2839,25 @@ def _create_attack_drive_shoot_step(ball_handler_pos, start_location, destinatio
     # For now, assume player reaches destination
     final_location = destination_location
     
-    return {
+    # Step 1: Drive to destination
+    drive_step = {
         "timestamp": timestamp,
         "pos_actions": {
             ball_handler_pos: {
                 "location": final_location,
-                "action": "shoot"  # Drive and shoot in same step
+                "action": "drive"
+            }
+        },
+        "events": []
+    }
+    
+    # Step 2: Shoot at destination (300ms after drive starts)
+    shoot_step = {
+        "timestamp": timestamp + 300,
+        "pos_actions": {
+            ball_handler_pos: {
+                "location": final_location,
+                "action": "shoot"
             }
         },
         "events": [{"type": "shot"}],
@@ -2845,6 +2868,8 @@ def _create_attack_drive_shoot_step(ball_handler_pos, start_location, destinatio
             "stopped_short": False  # TODO: Implement defensive stop logic
         }
     }
+    
+    return [drive_step, shoot_step]
 
 
 def _apply_attack_penalty(shot_location, is_away_offense):
@@ -3041,14 +3066,15 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup):
         valid_destinations = _determine_attack_drive_destination(ball_handler_location)
         destination = random.choice(valid_destinations)
         
-        # Create drive + shoot step
-        drive_shoot_step = _create_attack_drive_shoot_step(
+        # Create drive + shoot steps (two steps: drive then shoot)
+        drive_shoot_steps = _create_attack_drive_shoot_steps(
             ball_handler_pos, ball_handler_location, destination, last_timestamp + 300, is_away_offense
         )
-        new_steps.append(drive_shoot_step)
+        new_steps.extend(drive_shoot_steps)
         
-        # Get final location (may be stopped short)
-        final_location = drive_shoot_step["_attack_drive"]["final_location"]
+        # Get final location from shoot step (second step)
+        shoot_step = drive_shoot_steps[1]  # Second step has the shoot action
+        final_location = shoot_step["_attack_drive"]["final_location"]
         shooter_location = final_location
         
         # Calculate attack penalty if stopped short
