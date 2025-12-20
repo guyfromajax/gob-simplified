@@ -8513,6 +8513,99 @@ When team objects are created in Single Game, Tournament, or Franchise modes, th
 
 ---
 
+## Attributes System ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The Attributes System defines the standard display order and formatting rules for player attributes across all game interfaces. This ensures consistency in how attributes are presented to users throughout the application.
+
+**Status:** ✅ Fully implemented - Standard attribute order enforced in Training Report and other displays
+
+### Standard Attribute Display Order
+
+**CRITICAL:** When displaying all player attributes in a horizontal row, they must appear in this exact order:
+
+1. **SC** - Shooting Close
+2. **SH** - Shooting
+3. **ID** - Inside Defense
+4. **OD** - Outside Defense
+5. **PS** - Passing
+6. **BH** - Ball Handling
+7. **RB** - Rebounding
+8. **ST** - Strength
+9. **AG** - Agility
+10. **ND** - Endurance
+11. **IQ** - Intelligence Quotient
+12. **FT** - Free Throws
+13. **NG** - Nerve/Game (Energy)
+14. **EM** - Emotion
+15. **MO** - Momentum
+
+**Note:** This order applies to any horizontal display of all attributes, including:
+- Training Report Player Report section
+- Lineup screens
+- Player detail pages
+- Any other attribute grid or table displays
+
+### Attribute Display Formatting
+
+#### Standard Integer Attributes (SC through FT)
+
+The first 12 attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT) are displayed as **integer values**:
+- No decimal places
+- Direct numeric display (e.g., `85`, `72`, `50`)
+
+#### NG (Nerve/Game / Energy)
+
+- **Format:** Decimal value with 2 decimal places
+- **Range:** 0.00 to 1.00 (typically displayed as 0.90, 0.99, 1.00, etc.)
+- **Display Examples:** `1.00`, `0.99`, `0.98`, `0.90`, `0.75`
+- **Purpose:** Represents player energy level (100% = 1.00)
+
+#### EM (Emotion)
+
+- **Format:** Emoji display based on value
+- **Range:** 0-100
+- **Emoji Mapping:**
+  - **>= 80:** 😎 (Sunglasses) - Very positive
+  - **>= 60:** 😊 (Big smile) - Positive
+  - **>= 40:** 😐 (Straight face) - Neutral
+  - **>= 20:** 😕 (Slight frown) - Negative
+  - **< 20:** 😞 (Sad face) - Very negative
+- **Purpose:** Visual representation of player emotional state
+
+#### MO (Momentum)
+
+- **Format:** Red/Green horizontal pill visualization
+- **Range:** -10 to +10
+- **Visual Design:**
+  - **Container:** Horizontal pill with dark background
+  - **Center Line:** Yellow vertical line at 50% (center point)
+  - **Positive Momentum (0 to +10):** Green fill extending right from center
+    - Fill width proportional to value (e.g., +5 = 25% fill, +10 = 50% fill)
+  - **Negative Momentum (-10 to 0):** Red fill extending left from center
+    - Fill width proportional to absolute value (e.g., -5 = 25% fill, -10 = 50% fill)
+  - **No Integer Display:** The numeric value is NOT displayed on top of the pill
+- **Purpose:** Visual representation of player momentum trend
+
+### Implementation Examples
+
+**Training Report Player Report:**
+- Attributes view: Displays all 15 attributes in standard order with appropriate formatting
+- Training Changes view: Displays only changed attributes, maintaining standard order
+
+**Other Displays:**
+- Lineup screens, player cards, and detail pages should follow the same order and formatting rules
+- When displaying a subset of attributes, maintain relative order (e.g., if showing SC, SH, MO, they appear in that order)
+
+### Key Files
+
+- `FrontEnd/static/training-report.js` - Training Report attribute display implementation
+- `FrontEnd/static/training-report.css` - Momentum pill styling
+- `FrontEnd/static/set-lineup.js` - Lineup screen attribute display (reference for EM/MO formatting)
+
+---
+
 ## Coaching Attributes System ✅ **COMPLETE** (January 2025)
 
 ### Overview
