@@ -519,6 +519,16 @@ def _normalize_allocations(allocations: Dict) -> Dict:
     """
     Normalize allocations from frontend structure to backend structure.
     
+    Args:
+        allocations: Frontend allocation structure
+    
+    Returns:
+        Normalized allocation structure
+    """
+    logger.warning(f"🔋 [NORMALIZE] Input allocations keys: {list(allocations.keys())}")
+    if "team_drills" in allocations:
+        logger.warning(f"🔋 [NORMALIZE] team_drills content: {allocations['team_drills']}")
+    
     Frontend sends:
     {
         player_drills: {
@@ -572,6 +582,7 @@ def _normalize_allocations(allocations: Dict) -> Dict:
     
     if "team_drills" in allocations:
         team_drills = allocations["team_drills"]
+        logger.warning(f"🔋 [NORMALIZE] team_drills keys: {list(team_drills.keys())}")
         if "team_offense" in team_drills:
             normalized["team_offense"] = team_drills["team_offense"]
         if "team_defense" in team_drills:
@@ -581,7 +592,10 @@ def _normalize_allocations(allocations: Dict) -> Dict:
         if "presses_traps" in team_drills:
             normalized["presses_traps"] = team_drills["presses_traps"]
         if "scrimmages" in team_drills:
+            logger.warning(f"🔋 [NORMALIZE] Found scrimmages in team_drills: {team_drills['scrimmages']}")
             normalized["scrimmages"] = team_drills["scrimmages"]
+        else:
+            logger.warning(f"🔋 [NORMALIZE] scrimmages NOT in team_drills. team_drills keys: {list(team_drills.keys())}")
     
     if "general" in allocations:
         general = allocations["general"]
