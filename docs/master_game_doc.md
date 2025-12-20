@@ -7312,6 +7312,41 @@ The "Breaks" slider applies a multiplier to all positive gains (not losses):
 - 4 points: `random.choice([0.9, 0.95, 1])` + Team Chemistry `+= random.randint(-1, 1)`
 - 5 points: `random.choice([0.9, 0.95, 1])` + Team Chemistry `+= random.randint(-3, 3)`
 
+#### NG Reduction from Scrimmages and Conditioning
+
+When scrimmages or conditioning are allocated 3, 4, or 5 points, players may experience NG (Nerve/Game) reduction, which affects their energy for the next game. These reductions can stack if both scrimmages and conditioning are allocated.
+
+**Scrimmages NG Reduction:**
+- **3 points:** `reduce_ng_list = [0, 0.01, 0.01, 0.02]`
+- **4 points:** `reduce_ng_list = [0, 0.01, 0.02, 0.02, 0.03]`
+- **5 points:** `reduce_ng_list = [0.01, 0.02, 0.03, 0.03, 0.04]`
+
+**Conditioning NG Reduction:**
+- **3 points:** `reduce_ng_list = [0, 0.01, 0.01, 0.02]`
+- **4 points:** `reduce_ng_list = [0, 0.01, 0.02, 0.02, 0.03]`
+- **5 points:** `reduce_ng_list = [0.01, 0.02, 0.03, 0.03, 0.04]`
+
+**Process:**
+- For each player, `player.NG -= random.choice(reduce_ng_list)`
+- NG is clamped to a minimum of 0.0
+- NG is rounded to 2 decimal places
+
+**High Endurance (ND > 79) Special Handling:**
+Players with ND (Endurance) greater than 79 receive reduced NG penalties:
+- **Scrimmages 3:** Omitted entirely (no NG reduction)
+- **Scrimmages 4:** Uses scrimmages 3 reduction list
+- **Scrimmages 5:** Uses scrimmages 4 reduction list
+- **Conditioning 3:** Omitted entirely (no NG reduction)
+- **Conditioning 4:** Uses conditioning 3 reduction list
+- **Conditioning 5:** Uses conditioning 4 reduction list
+
+**Training Notes:**
+The training report automatically generates notes when players have NG reductions:
+- **Multiple players (conditioning):** "Multiple players will start the next game with reduced energy due to the amount of conditioning."
+- **Single player (conditioning):** "{player name} will start the next game with reduced energy due to the amount of conditioning."
+- **Multiple players (scrimmages):** "Multiple players will start the next game with reduced energy due to the amount of scrimmages."
+- **Single player (scrimmages):** "{player name} will start the next game with reduced energy due to the amount of scrimmages."
+
 ---
 
 ### Training Report Page
