@@ -260,16 +260,22 @@ submitBtn.addEventListener('click', async function() {
   if (mode === 'franchise' && franchiseId) {
     payload = {
       franchise_id: franchiseId,
-      team_id: teamId,
       training_data: trainingData
     };
+    // Only include team_id if it's not null/undefined
+    if (teamId) {
+      payload.team_id = teamId;
+    }
     endpoint = '/franchise/run-training';
   } else if (mode === 'tournament' && tournamentId) {
     payload = {
       tournament_id: tournamentId,
-      team_id: teamId,
       training_data: trainingData
     };
+    // Only include team_id if it's not null/undefined
+    if (teamId) {
+      payload.team_id = teamId;
+    }
     endpoint = '/tournament/run-training';
   } else {
     // Single game mode or default
