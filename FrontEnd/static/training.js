@@ -263,14 +263,14 @@ submitBtn.addEventListener('click', async function() {
       team_id: teamId,
       training_data: trainingData
     };
-    endpoint = '/api/franchise/run-training';
+    endpoint = '/franchise/run-training';
   } else if (mode === 'tournament' && tournamentId) {
     payload = {
       tournament_id: tournamentId,
       team_id: teamId,
       training_data: trainingData
     };
-    endpoint = '/api/tournament/run-training';
+    endpoint = '/tournament/run-training';
   } else {
     // Single game mode or default
     payload = {
@@ -282,6 +282,9 @@ submitBtn.addEventListener('click', async function() {
   try {
     this.disabled = true;
     this.textContent = 'Submitting...';
+    
+    console.log('🔍 [TRAINING] Submitting to endpoint:', endpoint);
+    console.log('🔍 [TRAINING] Payload:', payload);
     
     const response = await fetch(endpoint, {
       method: 'POST',
