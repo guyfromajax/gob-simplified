@@ -1,6 +1,7 @@
 /**
  * Shared tooltip utility for attribute abbreviations
  * Provides full names for attributes and other abbreviations on hover
+ * Uses custom CSS tooltips for better reliability than native title attribute
  */
 
 const ATTRIBUTE_NAMES = {
@@ -29,6 +30,59 @@ const ATTRIBUTE_NAMES = {
   RT: 'Rating'
 };
 
+// Inject custom tooltip CSS if not already present
+if (!document.getElementById('attribute-tooltip-styles')) {
+  const style = document.createElement('style');
+  style.id = 'attribute-tooltip-styles';
+  style.textContent = `
+    .attr-tooltip {
+      position: relative;
+      cursor: help;
+    }
+    .attr-tooltip::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-bottom: 5px;
+      padding: 6px 10px;
+      background: rgba(0, 0, 0, 0.9);
+      color: #fff;
+      font-size: 12px;
+      white-space: nowrap;
+      border-radius: 4px;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+      z-index: 10000;
+      font-family: 'Inter', sans-serif;
+    }
+    .attr-tooltip::before {
+      content: '';
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-bottom: -1px;
+      border: 5px solid transparent;
+      border-top-color: rgba(0, 0, 0, 0.9);
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+      z-index: 10001;
+    }
+    .attr-tooltip:hover::after,
+    .attr-tooltip:hover::before {
+      opacity: 1;
+      visibility: visible;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 /**
  * Initialize tooltips for attribute abbreviations
  * @param {HTMLElement} container - Container element to search for abbreviations
@@ -55,27 +109,22 @@ function initAttributeTooltips(container = document, selectors = []) {
       
       // Check if this is an attribute abbreviation
       if (ATTRIBUTE_NAMES[upperText]) {
+        // Use custom CSS tooltip (data-tooltip) instead of title attribute
+        element.setAttribute('data-tooltip', ATTRIBUTE_NAMES[upperText]);
+        element.classList.add('attr-tooltip');
+        // Also set title as fallback
         element.setAttribute('title', ATTRIBUTE_NAMES[upperText]);
-        element.style.cursor = 'help';
-        // Remove any existing title attribute that might conflict
-        element.removeAttribute('data-original-title');
         tooltipCount++;
-        
-        // Verify it was set
-        const verifyTitle = element.getAttribute('title');
-        if (verifyTitle === ATTRIBUTE_NAMES[upperText]) {
-          console.log(`[TOOLTIP] ✅ Set tooltip for "${text}" → "${ATTRIBUTE_NAMES[upperText]}"`);
-        } else {
-          console.warn(`[TOOLTIP] ⚠️ Failed to set tooltip for "${text}" - title is "${verifyTitle}"`);
-        }
+        console.log(`[TOOLTIP] ✅ Set tooltip for "${text}" → "${ATTRIBUTE_NAMES[upperText]}"`);
       }
       
       // Also check data-attr attribute if present
       if (element.hasAttribute('data-attr')) {
         const attr = element.getAttribute('data-attr').toUpperCase();
         if (ATTRIBUTE_NAMES[attr]) {
+          element.setAttribute('data-tooltip', ATTRIBUTE_NAMES[attr]);
+          element.classList.add('attr-tooltip');
           element.setAttribute('title', ATTRIBUTE_NAMES[attr]);
-          element.style.cursor = 'help';
           tooltipCount++;
           console.log(`[TOOLTIP] ✅ Set tooltip via data-attr for "${attr}" → "${ATTRIBUTE_NAMES[attr]}"`);
         }
@@ -95,9 +144,9 @@ function initAttributeTooltips(container = document, selectors = []) {
 function addTooltip(element, abbreviation) {
   const upperAbbr = abbreviation.toUpperCase();
   if (ATTRIBUTE_NAMES[upperAbbr]) {
+    element.setAttribute('data-tooltip', ATTRIBUTE_NAMES[upperAbbr]);
+    element.classList.add('attr-tooltip');
     element.setAttribute('title', ATTRIBUTE_NAMES[upperAbbr]);
-    element.style.cursor = 'help';
-    // Debug log to verify tooltips are being set
     console.log(`[TOOLTIP] addTooltip: "${abbreviation}" → "${ATTRIBUTE_NAMES[upperAbbr]}"`);
   } else {
     console.warn(`[TOOLTIP] No mapping found for abbreviation: "${abbreviation}"`);
