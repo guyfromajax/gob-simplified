@@ -212,9 +212,11 @@ function renderPlayersTable() {
   const headerRow = document.createElement('tr');
   headerRow.appendChild(createHeaderCell('Name'));
   
+  let attributeList = [];
   if (currentView === 'attributes') {
     // Attributes view: show all player attributes
-    Object.keys(ATTRIBUTE_NAMES).forEach(attr => {
+    attributeList = Object.keys(ATTRIBUTE_NAMES);
+    attributeList.forEach(attr => {
       headerRow.appendChild(createHeaderCell(attr));
     });
   } else {
@@ -224,7 +226,8 @@ function renderPlayersTable() {
       Object.keys(changes).forEach(attr => changedAttrs.add(attr));
     });
     
-    changedAttrs.forEach(attr => {
+    attributeList = Array.from(changedAttrs);
+    attributeList.forEach(attr => {
       headerRow.appendChild(createHeaderCell(attr));
     });
   }
@@ -237,10 +240,12 @@ function renderPlayersTable() {
     row.appendChild(createCell(player.name));
     
     if (currentView === 'attributes') {
-      // Show current attribute values
-      Object.keys(ATTRIBUTE_NAMES).forEach(attr => {
+      // Show current attribute values with tooltips
+      attributeList.forEach(attr => {
         const value = player.attributes[attr] || 0;
-        row.appendChild(createCell(value.toString()));
+        const changes = reportData.player_changes[player.name] || {};
+        const change = changes[attr] || 0;
+        row.appendChild(createAttributeCellWithTooltip(value, change));
       });
     } else {
       // Show changes - get all changed attributes first
@@ -250,7 +255,7 @@ function renderPlayersTable() {
       });
       
       // Show changes for this player (0 if no change)
-      allChangedAttrs.forEach(attr => {
+      attributeList.forEach(attr => {
         const changes = reportData.player_changes[player.name] || {};
         const change = changes[attr] || 0;
         row.appendChild(createChangeCell(change));
@@ -259,6 +264,25 @@ function renderPlayersTable() {
     
     tbody.appendChild(row);
   });
+  
+  // Add aggregated row for Training Changes view
+  if (currentView === 'changes' && attributeList.length > 0) {
+    const totalRow = document.createElement('tr');
+    totalRow.className = 'total-row';
+    totalRow.appendChild(createCell('Total'));
+    
+    // Calculate totals for each attribute
+    attributeList.forEach(attr => {
+      let total = 0;
+      reportData.players.forEach(player => {
+        const changes = reportData.player_changes[player.name] || {};
+        total += changes[attr] || 0;
+      });
+      totalRow.appendChild(createChangeCell(total));
+    });
+    
+    tbody.appendChild(totalRow);
+  }
 }
 
 function createHeaderCell(text) {
@@ -271,6 +295,84 @@ function createCell(text) {
   const td = document.createElement('td');
   td.textContent = text;
   return td;
+}
+
+function createAttributeCellWithTooltip(value, change) {
+  const td = document.createElement('td');
+  td.textContent = value.toString();
+  td.className = 'attribute-value-cell';
+  
+  // Add tooltip if there's a change
+  if (change !== 0) {
+    td.setAttribute('data-tooltip', formatChangeForTooltip(change));
+    td.style.cursor = 'help';
+    
+    // Add hover event listeners
+    td.addEventListener('mouseenter', showAttributeTooltip);
+    td.addEventListener('mouseleave', hideAttributeTooltip);
+    td.addEventListener('mousemove', positionAttributeTooltip);
+  }
+  
+  return td;
+}
+
+function formatChangeForTooltip(change) {
+  if (change > 0) {
+    return `+${change}`;
+  } else if (change < 0) {
+    return change.toString();
+  } else {
+    return '0';
+  }
+}
+
+function showAttributeTooltip(event) {
+  const cell = event.target;
+  const changeText = cell.getAttribute('data-tooltip');
+  if (!changeText) return;
+  
+  // Create tooltip element if it doesn't exist
+  let tooltip = document.getElementById('attribute-tooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.id = 'attribute-tooltip';
+    tooltip.className = 'attribute-tooltip';
+    document.body.appendChild(tooltip);
+  }
+  
+  // Determine color based on change value
+  const change = parseInt(changeText.replace('+', ''), 10);
+  if (change > 0) {
+    tooltip.className = 'attribute-tooltip attribute-tooltip-positive';
+  } else if (change < 0) {
+    tooltip.className = 'attribute-tooltip attribute-tooltip-negative';
+  } else {
+    tooltip.className = 'attribute-tooltip attribute-tooltip-zero';
+  }
+  
+  tooltip.textContent = changeText;
+  tooltip.style.display = 'block';
+  positionAttributeTooltip(event);
+}
+
+function hideAttributeTooltip() {
+  const tooltip = document.getElementById('attribute-tooltip');
+  if (tooltip) {
+    tooltip.style.display = 'none';
+  }
+}
+
+function positionAttributeTooltip(event) {
+  const tooltip = document.getElementById('attribute-tooltip');
+  if (!tooltip || tooltip.style.display === 'none') return;
+  
+  const cell = event.target;
+  const rect = cell.getBoundingClientRect();
+  
+  // Position tooltip above the cell
+  tooltip.style.left = `${rect.left + rect.width / 2}px`;
+  tooltip.style.top = `${rect.top - 10}px`;
+  tooltip.style.transform = 'translate(-50%, -100%)';
 }
 
 function createChangeCell(change) {

@@ -207,6 +207,51 @@ body {
   color: var(--color-text);
 }
 
+/* Total row styling */
+.players-table .total-row {
+  background: rgba(255, 215, 0, 0.1);
+  font-weight: 700;
+  border-top: 2px solid var(--color-border);
+}
+
+.players-table .total-row td {
+  border-bottom: none;
+  padding-top: var(--spacing-sm);
+  padding-bottom: var(--spacing-sm);
+}
+
+/* Attribute tooltip */
+.attribute-value-cell {
+  position: relative;
+}
+
+.attribute-tooltip {
+  position: fixed;
+  display: none;
+  background: rgba(0, 0, 0, 0.9);
+  color: #fff;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 600;
+  z-index: 10000;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.attribute-tooltip-positive {
+  color: var(--color-success);
+}
+
+.attribute-tooltip-negative {
+  color: var(--color-error);
+}
+
+.attribute-tooltip-zero {
+  color: var(--color-text);
+}
+
 /* Team Section */
 .team-section {
   background: var(--color-surface);
@@ -371,5 +416,38 @@ body {
 
 .plus-minus-zero {
   color: var(--color-warning);
+}
+
+/* Training Notes Section */
+.training-notes-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--spacing-md);
+}
+
+.training-notes-section h2 {
+  font-size: 1.8rem;
+  color: var(--color-accent);
+  font-weight: 600;
+  margin-bottom: var(--spacing-md);
+}
+
+.training-notes-container {
+  min-height: 200px;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-md);
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  line-height: 1.6;
+  overflow: visible;
+  resize: none;
+  /* Dynamic height - expands with content */
+  height: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
