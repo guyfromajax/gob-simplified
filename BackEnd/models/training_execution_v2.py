@@ -519,16 +519,6 @@ def _normalize_allocations(allocations: Dict) -> Dict:
     """
     Normalize allocations from frontend structure to backend structure.
     
-    Args:
-        allocations: Frontend allocation structure
-    
-    Returns:
-        Normalized allocation structure
-    """
-    logger.warning(f"🔋 [NORMALIZE] Input allocations keys: {list(allocations.keys())}")
-    if "team_drills" in allocations:
-        logger.warning(f"🔋 [NORMALIZE] team_drills content: {allocations['team_drills']}")
-    
     Frontend sends:
     {
         player_drills: {
