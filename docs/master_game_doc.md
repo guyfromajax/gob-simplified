@@ -6459,14 +6459,14 @@ The Plays Page System provides detailed views for individual plays, allowing use
 
 ---
 
-## Training System 🚧 **IN PROGRESS** (January 2025)
+## Training System ✅ **COMPLETE** (January 2025)
 
 ### Overview
 
-The Training System provides a UI/UX interface for allocating training points across various drills and exercises to improve player and team performance. Users can allocate 24 training points across different categories and select a coaching focus style.
+The Training System provides a comprehensive interface for allocating training points across various drills and exercises to improve player and team performance. Users can allocate 24 training points across different categories, select a coaching focus style, and view detailed training reports showing attribute changes.
 
-**Location:** `FrontEnd/static/training.html`  
-**Status:** 🚧 UI/UX complete, backend integration pending
+**Location:** `FrontEnd/static/training.html`, `FrontEnd/static/training-report.html`  
+**Status:** ✅ **COMPLETE** - UI/UX and backend integration fully implemented
 
 ### Page Layout
 
@@ -6566,28 +6566,229 @@ On submit, captures:
 **Submit Button:**
 - Validates all requirements are met
 - Sends training data to appropriate endpoint based on mode:
-  - Franchise mode → `/api/franchise/training`
-  - Tournament mode → `/api/tournament/training`
-  - Single game mode → `/api/training`
-- Navigates back to appropriate command center after successful submission
+  - Franchise mode → `/franchise/run-training`
+  - Tournament mode → `/tournament/run-training` (TODO)
+  - Single game mode → `/api/training` (TODO)
+- Redirects to training report page after successful submission
+
+---
+
+### Backend Training Execution System
+
+**Location:** `BackEnd/models/training_execution_v2.py`
+
+The training execution system applies pre-training conditions, allocates training points, applies coaching focus amplifiers, and generates training reports.
+
+#### Training Execution Flow
+
+1. **Pre-Training Conditions** (`apply_pre_training_conditions`)
+   - Applies random decreases to player attributes (excluding EM, MO, NG)
+   - Player attributes: `+= random.randint(-2, 0)` per attribute
+   - Team attributes: Random decreases based on attribute type
+   - Rebound modifier: `+= -0.1 or 0`
+   - Shot threshold: `+= random.randint(0, 15)`
+   - Other team attributes: `+= random.choice([-2, -1, 0])`
+
+2. **Training Point Application** (`apply_training_points`)
+   - Maps drill allocations to player/team attributes
+   - Applies random increases based on points allocated
+   - Applies coaching focus amplifiers
+   - Handles special cases (conditioning, film study, breaks)
+
+3. **Attribute Clamping**
+   - Player attributes: Minimum 1, no maximum
+   - Team attributes: Clamped to defined ranges (see brief)
+
+4. **Training Report Generation**
+   - Calculates changes from original baselines
+   - Returns player_changes and team_changes dictionaries
+   - Includes coaching focus information
+
+#### Drill-to-Attribute Mapping
+
+**Player Drills:**
+- Inside Offense → SC (Shooting Close)
+- Outside Offense → SH (Shooting)
+- Inside Defense → ID (Inside Defense)
+- Outside Defense → OD (Outside Defense)
+- Ball Handling → BH
+- Passing → PS
+- Rebounding → RB
+- Strength Training → ST
+- Agility Training → AG
+- Free Throws → FT
+- Conditioning → ND (Endurance), CH (Chemistry, 0.5x multiplier)
+- Film Study → IQ, CH (Chemistry, 0.5x multiplier)
+
+**Team Drills:**
+- Offense Install → `offensive_efficiency`
+- Defense Install → `defensive_efficiency`
+- Fast Break Offense Install → `fb_efficiency`
+- Fast Break Defense Install → `fb_opp_modifier`
+- P/T Defense Install → `pt_efficiency`
+- P/T Offense Install → `pt_opp_modifier`
+
+#### Training Point Ranges
+
+**Player Attributes:**
+- 1 point: `+= random.randint(1, 3)`
+- 2 points: `+= random.randint(2, 5)`
+- 3 points: `+= random.randint(3, 7)`
+- 4 points: `+= random.randint(3, 8)`
+- 5 points: `+= random.randint(3, 9)`
+
+**Team Attributes (standard):**
+- 1 point: `+= random.randint(1, 2)`
+- 2 points: `+= random.randint(2, 3)`
+- 3 points: `+= random.randint(3, 5)`
+- 4 points: `+= random.randint(3, 6)`
+- 5 points: `+= random.randint(3, 7)`
+
+**Rebound Modifier:**
+- 1 point: `+= 0.1 or 0.2`
+- 2 points: `+= 0.2 or 0.3`
+- 3 points: `+= 0.2, 0.3, or 0.4`
+- 4 points: `+= 0.2, 0.3, 0.4, or 0.5`
+- 5 points: `+= 0.3, 0.4, or 0.5`
+
+**Shot Threshold:**
+- 1 point: `-= random.randint(10, 25)`
+- 2 points: `-= random.randint(15, 35)`
+- 3 points: `-= random.randint(20, 45)`
+- 4 points: `-= random.randint(20, 55)`
+- 5 points: `-= random.randint(20, 65)`
+
+#### Coaching Focus Amplifiers
+
+**Authoritarian:**
+- Discipline: Amplifies BH, `foul_modifier`, `turnover_modifier`
+- Rebounding: Amplifies RB, `rebound_modifier`
+- Teamwork: Amplifies PS, Motion Play Effectiveness, Zone Defense Effectiveness
+- Execution: Amplifies Set Play Effectiveness, Man Defense Effectiveness
+
+**Systems Coach:**
+- Offense: Amplifies `offensive_efficiency` gains, offensive play effectiveness
+- Defense: Amplifies `defensive_efficiency` gains, defensive play effectiveness
+- Fast Breaks: Amplifies `fb_efficiency` gains, `fb_opp_modifier` gains
+- Presses/Traps: Amplifies `pt_efficiency` gains, `pt_opp_modifier` gains
+
+**Player Maximizer:**
+- Top 3 Attributes: Amplifies gains to player's top 3 attributes (excluding CH, EM, MO, NG)
+- Attributes 4-6: Amplifies gains to player's 4th-6th highest attributes
+- Custom: Amplifies gains to user-selected attributes (TODO)
+- Be Opportunistic: Improves Set Play and Motion Shot Scores (carried to next game)
+
+**Culture Builder:**
+- Inspire: Improves EM, MO by `random.randint(1, 2)`, amplifies Team Chemistry gains
+- Community Engagement: Improves EM, affects crowd factors (carried to next game)
+- Teamwork: Amplifies Team Chemistry gains, improves Motion Play and Zone Defense Effectiveness
+- Build Confidence: Improves Set Play Effectiveness, Man Defense Effectiveness
+
+#### Breaks Effect
+
+The "Breaks" slider applies a multiplier to all positive gains (not losses):
+- 0 points: `random.choice([0.85, 0.9, 0.95])`
+- 1 point: `random.choice([0.9, 0.95, 1, 1, 1])`
+- 2 points: `random.choice([0.95, 1, 1, 1, 1])`
+- 3 points: `random.choice([0.9, 0.95, 1])`
+- 4 points: `random.choice([0.9, 0.95, 1])` + Team Chemistry `+= random.randint(-1, 1)`
+- 5 points: `random.choice([0.9, 0.95, 1])` + Team Chemistry `+= random.randint(-3, 3)`
+
+---
+
+### Training Report Page
+
+**Location:** `FrontEnd/static/training-report.html`
+
+After training is submitted, users are automatically redirected to the training report page which displays detailed information about attribute changes.
+
+#### Page Layout
+
+**Header Section:**
+- Page title: "TRAINING REPORT"
+- Week number
+- Upcoming Opponent (from schedule)
+- Training Focus (archetype and sub-option)
+- Orange "Go To Locker Room" button (top-right)
+
+**Players Section:**
+- Toggle between "Attributes" and "Training Changes" views
+- **Attributes View:** Shows current attribute values after training
+- **Training Changes View:** Shows net changes from training
+  - Positive changes: Green text with `+` prefix
+  - Negative changes: Red text with `-` prefix
+  - Zero changes: Black text
+
+**Team Section:**
+- Displays all team attributes with visualizations:
+  - **Red/Green Pills:** Most attributes (Shooting, Rebounding, Offense, Defense, Fast Breaks, Press/Trap, Aggression, Discipline, Momentum)
+    - Yellow center line
+    - Green fill to the right for positive values
+    - Red fill to the left for negative values
+    - Proportional fill based on max value
+  - **Progress Bar:** Team Chemistry (0-25 scale, blue fill)
+  - **+/- Indicators:** Fast Break Defense and Press/Trap Breaks
+    - `+++` (green) for value = 10
+    - `++` (green) for values 5-9
+    - `+` (green) for values 1-4
+    - `-` (yellow) for value = 0
+    - `-` (red) for values -1 to -4
+    - `--` (red) for values -5 to -9
+    - `---` (red) for value = -10
+
+#### API Endpoints
+
+**Training Submission:**
+- `POST /franchise/run-training` - Submit training for franchise mode
+  - Request: `{franchise_id, team_id?, training_data}`
+  - Response: `{status, week, player_changes, team_changes, coaching_focus, redirect}`
+
+**Training Report:**
+- `GET /franchise/training-report` - Get training report data
+  - Query params: `franchise_id, team_id, week`
+  - Response: `{week, upcoming_opponent, coaching_focus, player_changes, team_changes, players, team_attributes}`
+
+#### Data Storage
+
+**Franchise Document:**
+- `franchise_teams.{team_id}.training_reports.{week}` - Training report for specific week
+- `latest_training` - Most recent training report (quick access)
+- `training_status.training_completed` - Boolean flag
+- `training_status.week` - Week number for last training
+
+**Player Updates:**
+- `players.{player_id}.attributes.anchor_{attr}` - Updated attribute values
+- `players.{player_id}.position_ratings` - Recalculated position ratings
+
+**Team Updates:**
+- `franchise_teams.{team_id}.{attribute_name}` - Updated team attribute values
+
+---
 
 ### Key Files
 
 **Frontend:**
-- `FrontEnd/static/training.html` - Page structure and layout
-- `FrontEnd/static/training.css` - Styling and visual design
-- `FrontEnd/static/training.js` - Slider logic, validation, and submission
+- `FrontEnd/static/training.html` - Training allocation page
+- `FrontEnd/static/training.css` - Training page styling
+- `FrontEnd/static/training.js` - Training logic and submission
+- `FrontEnd/static/training-report.html` - Training report display page
+- `FrontEnd/static/training-report.css` - Report page styling
+- `FrontEnd/static/training-report.js` - Report data loading and rendering
 
 **Backend:**
-- `BackEnd/api/training_routes.py` - Training API endpoints (to be implemented)
-- `BackEnd/models/training_manager.py` - Training logic and calculations (existing)
+- `BackEnd/models/training_execution_v2.py` - Core training execution logic
+- `BackEnd/api/franchise_routes.py` - Training API endpoints (`/franchise/run-training`, `/franchise/training-report`)
+
+---
 
 ### Future Enhancements
 
-- Backend integration for training point allocation
-- Training results display
-- Training history tracking
-- Custom play selection for offense/defense plays
+- Tournament mode training execution
+- Single game mode training
+- Training history tracking and archiving
+- Custom attribute selection for Player Maximizer focus
+- Play effectiveness score updates from training
+- Training simulation for computer teams
 
 ---
 
