@@ -3100,31 +3100,53 @@ The play selection process occurs at the start of each HCO (Half Court Offense) 
 
 ### Play Effectiveness and Momentum Tracking
 
+**Dual Storage Architecture:**
+
+Effectiveness, momentum, and cloaking values exist in **two locations**:
+
+1. **Universal Collections** (`plays` and `defenses` collections):
+   - Template/library values for all plays and defenses
+   - Initialized to `0` for all plays and defenses
+   - Serve as default starting values when team objects are created
+   - Can be modified globally (affects all teams using that play/defense)
+
+2. **Team Objects** (`teams.{team_id}.plays` and `scouting_data["defense"]`):
+   - **Per-team instances** with team-specific values
+   - Initialized from universal collection values when team object is created
+   - Can be modified independently per team by:
+     - **Training system** - Based on playbook settings and game plan mix
+     - In-game performance (future implementation)
+     - Coaching focus selections (future implementation)
+   - Allows different teams to have different effectiveness/momentum/cloaking for the same play/defense
+
 **Effectiveness:**
-- Stored in universal `plays` and `defenses` collections
-- Initialized to `0` for all plays and defenses
-- Can be modified by:
-  - Training system (future implementation)
-  - In-game performance (future implementation)
-  - Coaching focus selections (future implementation)
-- Used in matchup calculations and play selection weighting (future implementation)
+- **Per-team effectiveness** stored in `teams.{team_id}.plays.{play_name}.effectiveness`
+- **Per-team defense effectiveness** stored in `scouting_data["defense"][defense_name].effectiveness`
+- Separate from calculated effectiveness in `game_stats`/`season_stats`
+- Used in matchup calculations and play/defense selection weighting
+- Modified by training system based on:
+  - Playbook percentages (plays used more frequently get more training benefit)
+  - Game plan mix (motion vs set plays, inside vs attack vs outside focus)
+  - Defense preferences (man vs zone percentages)
 
 **Momentum:**
-- Stored in universal `plays` and `defenses` collections
-- Initialized to `0` for all plays and defenses
-- Tracks recent performance trends
+- **Per-team momentum** stored in `teams.{team_id}.plays.{play_name}.momentum`
+- **Per-team defense momentum** stored in `scouting_data["defense"][defense_name].momentum`
+- Tracks recent performance trends for this team's use of the play/defense
 - Can increase or decrease based on:
+  - Training system modifications
   - Recent success/failure rates (future implementation)
   - Coaching focus selections (future implementation)
   - Game situation and context (future implementation)
-- Used to adjust play selection probabilities dynamically (future implementation)
+- Used to adjust play/defense selection probabilities dynamically
 
 **Cloaking:**
-- Stored in universal `plays` and `defenses` collections
-- Initialized to `0` for all plays and defenses
-- Makes plays/defenses harder to recognize and counter
+- **Per-team cloaking** stored in `teams.{team_id}.plays.{play_name}.cloaking`
+- **Per-team defense cloaking** stored in `scouting_data["defense"][defense_name].cloaking`
+- Makes plays/defenses harder for opponents to recognize and counter
 - Higher values reduce opponent's ability to anticipate and adjust
-- Used in matchup calculations (future implementation)
+- Can be modified by training system
+- Used in matchup calculations and offensive/defensive recognition systems
 
 ### Database Structure
 
@@ -8910,11 +8932,27 @@ Initialized via `_init_scouting_data()` with comprehensive tracking structure:
 - `Man` / `2-3 Zone` / `3-2 Zone` / `1-3-1 Zone` - Defense type tracking:
   - `used` - Usage count
   - `success` - Success count
-  - `effectiveness` - Effectiveness score
+  - `effectiveness` (float) - **Per-team effectiveness score** (training-impacted)
+    - Initialized to `0.0` (can be modified by training system)
+    - Used in matchup calculations and defense selection weighting
+  - `momentum` (int) - **Per-team momentum score** (training-impacted)
+    - Initialized to `0` (can be modified by training system)
+    - Tracks recent performance trends for this team's use of the defense
+    - Used to adjust defense selection probabilities dynamically
+  - `cloaking` (int) - **Per-team cloaking modifier** (training-impacted)
+    - Initialized to `0` (can be modified by training system)
+    - Makes the defense harder for opponents to recognize and counter
+    - Higher values reduce opponent's ability to anticipate and adjust
   - `game_stats` - Game-level stats (attempts, success, ev_scores, lean_scores, vs_motion/set/inside/attack/outside)
   - `season_stats` - Season-level stats (for tournament/franchise modes)
 - `vs_Fast_Break` - Fast break defense tracking
 - `FCP` / `HCT` - Pressure defense tracking
+
+**Per-Team Defense Values:**
+- Each team has its own instance of every defense with per-team `effectiveness`, `momentum`, and `cloaking` values
+- Initial values are set to `0` when the team object is created
+- Per-team values can be modified by training system based on playbook settings and game plan mix
+- This allows different teams to have different effectiveness/momentum/cloaking for the same defense
 
 #### Plays Data
 
@@ -8927,6 +8965,20 @@ Each play entry contains:
 - `name` (str) - Play name
 - `play_type` (str) - "motion" or "set_play"
 - `play_focus` (str) - "inside", "attack", or "outside" (for set plays)
+- `effectiveness` (float) - **Per-team effectiveness score** (training-impacted, separate from calculated effectiveness in stats)
+  - Initialized from universal play's `effectiveness` field (defaults to `0` if not present)
+  - Can be modified by training system based on playbook settings and game plan mix
+  - Used in matchup calculations and play selection weighting
+- `momentum` (int) - **Per-team momentum score** (training-impacted)
+  - Initialized from universal play's `momentum` field (defaults to `0` if not present)
+  - Tracks recent performance trends for this team's use of the play
+  - Can be modified by training system
+  - Used to adjust play selection probabilities dynamically
+- `cloaking` (int) - **Per-team cloaking modifier** (training-impacted)
+  - Initialized from universal play's `cloaking` field (defaults to `0` if not present)
+  - Makes the play harder for opponents to recognize and counter
+  - Higher values reduce opponent's ability to anticipate and adjust
+  - Can be modified by training system
 - `game_stats` (dict) - Game-level tracking:
   - `times_run` (int) - Number of times play was executed
   - `shot_attempts` (int) - Shot attempts from this play
@@ -8934,11 +8986,17 @@ Each play entry contains:
   - `turnovers` (int) - Turnovers from this play
   - `offensive_fouls` (int) - Offensive fouls from this play
   - `defensive_fouls` (int) - Defensive fouls from this play
-  - `effectiveness` (float) - Effectiveness score (initialized: `random.uniform(-10, 10)`)
+  - `effectiveness` (float) - **Calculated effectiveness from stats** (separate from per-team effectiveness field above)
 - `season_stats` (dict) - Season-level tracking (tournament/franchise modes only):
   - Same structure as `game_stats`
 
 **Note:** Plays data does NOT include full skeletons - skeletons are fetched from the universal `plays` collection when needed (reference-based architecture).
+
+**Per-Team vs Universal Values:**
+- Each team has its own instance of every play with per-team `effectiveness`, `momentum`, and `cloaking` values
+- Initial values are copied from the universal `plays` collection when the team object is created
+- Per-team values can be modified by training, in-game performance, and coaching focus selections
+- This allows different teams to have different effectiveness/momentum/cloaking for the same play
 
 ### Initialization Methods
 
