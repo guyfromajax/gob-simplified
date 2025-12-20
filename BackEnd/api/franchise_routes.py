@@ -1307,7 +1307,7 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
         if not report_data:
             raise HTTPException(status_code=404, detail="Training report not found")
 
-    return {
+        return {
             "status": "success",
             "week": week,  # For tournament, this is the round number
             "upcoming_opponent": upcoming_opponent,
