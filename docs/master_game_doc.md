@@ -8569,11 +8569,94 @@ When creating a new game instance:
 
 ---
 
-## Tournament Mode
+## Tournament Mode ✅ **UPDATED** (January 2025)
 
 ### Overview
 
-Tournament Mode supports multi-game tournament brackets where team data persists across games within the tournament. Team attributes can be modified (e.g., through training) and persist throughout the tournament.
+Tournament Mode supports multi-game tournament brackets where team data persists across games within the tournament. Team attributes can be modified through training and persist throughout the tournament. The Tournament Command Center provides a comprehensive interface for managing tournament progression, viewing schedules, and running training sessions.
+
+**Location:** `FrontEnd/static/tournament.html`, `FrontEnd/static/tournament.js`  
+**Status:** ✅ Fully implemented with Schedule tab, training integration, and bracket management
+
+### Tournament Command Center
+
+**Tabs:**
+1. **Bracket** - Visual bracket display showing tournament progression
+2. **Schedule** - Detailed schedule view with First Round, Semifinals, and Championship matchups
+3. **Team** - Team roster and player statistics
+4. **Leaders** - Tournament leaderboards for key statistics
+
+**Header Controls:**
+- **Set Game Plan** - Navigate to Game Plan screen
+- **Playbooks** - Navigate to Playbooks page
+- **Run Training / Play Next Game** - Dynamic button that changes based on training status
+  - Shows "Run Training" if training has not been completed for the current round
+  - Shows "Play Next Game" if training has been completed for the current round
+  - Removes opponent name from button text (simplified display)
+
+### Schedule Tab
+
+**Location:** `FrontEnd/static/tournament.js` - `renderSchedule()` function
+
+**Display Structure:**
+- **First Round** - Shows all 4 matchups with seed numbers:
+  - Team 8 @ Team 1
+  - Team 5 @ Team 4
+  - Team 6 @ Team 3
+  - Team 7 @ Team 2
+- **Semifinals** - Shows 2 matchups:
+  - Initially displays "TBD @ TBD" for both matchups
+  - Dynamically filled based on First Round winners
+  - Shows scores when games are completed
+- **Championship** - Shows 1 matchup:
+  - Initially displays "TBD @ TBD"
+  - Dynamically filled based on Semifinals winners
+  - Shows scores when game is completed
+
+**Training Report Links:**
+- Training report link appears to the right of the user's matchup after training is run
+- Link format: `[Training Report]`
+- Styled in blue, smaller font size
+- Links to `/static/training-report.html` with tournament context
+
+### Training Flow
+
+**Mandatory Training:**
+- User must run training before each game in the tournament
+- Training is required for each round (First Round, Semifinals, Championship)
+- Training status is tracked per round in `tournament.training_status`
+
+**Training Status Tracking:**
+- `training_status.training_completed` - Boolean flag
+- `training_status.round` - Current round number (1, 2, or 3)
+- `training_status.last_training_date` - Date of last training session
+
+**Button Behavior:**
+- If `training_status.training_completed === false` or `training_status.round !== current_round`:
+  - Button shows "Run Training"
+  - Clicking navigates to `/static/training.html` with tournament context
+- If `training_status.training_completed === true` and `training_status.round === current_round`:
+  - Button shows "Play Next Game"
+  - Clicking proceeds to game simulation and lineup selection
+
+**Training Endpoint:**
+- **Location:** `BackEnd/api/tournament_routes.py` - `run_tournament_training()`
+- **Endpoint:** `POST /tournament/run-training`
+- **Process:**
+  1. Loads tournament document
+  2. Checks for duplicate training submission (same round)
+  3. Loads tournament-specific player attributes from `player_stats`
+  4. Executes training using `execute_training()` from `training_execution_v2.py`
+  5. Updates player attributes in tournament document
+  6. Marks training as completed for current round
+  7. Stores training report in `latest_training` field
+  8. Redirects back to Tournament Command Center
+
+**Training Report:**
+- **Location:** `BackEnd/api/franchise_routes.py` - `get_training_report()` (supports tournament mode)
+- **Endpoint:** `GET /franchise/training-report?mode=tournament&tournament_id=...&team_id=...&round=...`
+- **Data Source:** `tournament.latest_training` field
+- **Displays:** Player attribute changes, team attribute changes, coaching focus, upcoming opponent
 
 ### Team Object Lifecycle
 
@@ -8614,8 +8697,11 @@ When creating a new game instance within a tournament:
 
 - **Playbook Settings**: Saved to `tournaments.{tournament_id}.teams.{team_id}.playbook_settings`
 - **Strategy Settings**: Saved to `tournaments.{tournament_id}.teams.{team_id}.strategy_settings`
-- **Team Attributes**: Can be updated through training (future implementation)
-  - Training changes should be saved to `tournaments.{tournament_id}.teams.{team_id}.{attribute_name}`
+- **Team Attributes**: Updated through training system
+  - Training changes are stored in tournament document
+  - Player attributes updated in `tournament.player_stats.{player_id}.attributes`
+  - Team attributes can be updated (future: stored in tournament document)
+  - Training reports stored in `tournament.latest_training`
 
 #### 5. **Team Object Persistence**
 

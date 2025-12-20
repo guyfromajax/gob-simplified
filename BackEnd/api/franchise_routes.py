@@ -639,7 +639,7 @@ def team_stats():
             for stat, val in p.get("stats", {}).get("season", {}).items():
                 # Handle case where val might be a list or other non-numeric type
                 if isinstance(val, (int, float)):
-                    totals[stat] = totals.get(stat, 0) + val
+                totals[stat] = totals.get(stat, 0) + val
                 elif isinstance(val, list) and len(val) > 0:
                     # If it's a list, try to sum the numeric values
                     numeric_vals = [v for v in val if isinstance(v, (int, float))]
@@ -926,14 +926,14 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     # Get user's team (use team_id from request if provided, otherwise from state)
     team_id = req.team_id
     if not team_id:
-        state = franchise_state_collection.find_one({"_id": "state"}) or {}
-        team_name = state.get("team")
-        if not team_name:
-            raise HTTPException(status_code=404, detail="User team not found")
-        team_doc = db.teams.find_one({"name": team_name})
-        if not team_doc:
-            raise HTTPException(status_code=404, detail="Team not found")
-        team_id = str(team_doc["_id"])
+    state = franchise_state_collection.find_one({"_id": "state"}) or {}
+    team_name = state.get("team")
+    if not team_name:
+        raise HTTPException(status_code=404, detail="User team not found")
+    team_doc = db.teams.find_one({"name": team_name})
+    if not team_doc:
+        raise HTTPException(status_code=404, detail="Team not found")
+    team_id = str(team_doc["_id"])
     else:
         # team_id might be a name, try to resolve it
         team_doc = db.teams.find_one({"name": team_id})
@@ -1216,15 +1216,100 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             }
             
         else:  # tournament mode
-            # TODO: Implement tournament mode training report
-            raise HTTPException(status_code=501, detail="Tournament mode training reports not yet implemented")
+            from BackEnd.db import tournaments_collection, teams_collection
+            doc_id_obj = ObjectId(doc_id)
+            doc = tournaments_collection.find_one({"_id": doc_id_obj})
+            if not doc:
+                raise HTTPException(status_code=404, detail="Tournament not found")
+            
+            # Get training report for this round
+            report_data = doc.get("latest_training", {})
+            if report_data.get("round") != week:  # week parameter is used as round for tournament
+                report_data = {}
+            
+            # Get upcoming opponent from bracket
+            current_round = doc.get("current_round", 1)
+            round_key = "final" if current_round == 3 else f"round{current_round}"
+            matchups = doc.get("bracket", {}).get(round_key, [])
+            upcoming_opponent = None
+            
+            user_team_id = doc.get("user_team_id")
+            for matchup in matchups:
+                if user_team_id in [matchup.get("home_team"), matchup.get("away_team")]:
+                    upcoming_opponent = matchup.get("away_team") if matchup.get("home_team") == user_team_id else matchup.get("home_team")
+                    break
+            
+            # Get current player attributes (after training)
+            players = []
+            tournament_players = doc.get("player_stats", {})
+            
+            # Resolve team_id - might be a name or an ID
+            team_id_resolved = team_id
+            team_doc = teams_collection.find_one({"name": team_id})
+            if team_doc:
+                team_id_resolved = str(team_doc["_id"])
+            else:
+                try:
+                    team_id_obj = ObjectId(team_id)
+                    team_id_resolved = str(team_id_obj)
+                except:
+                    pass
+            
+            team_id_str = str(team_id_resolved)
+            team_doc = teams_collection.find_one({"_id": ObjectId(team_id_str)})
+            if not team_doc:
+                raise HTTPException(status_code=404, detail="Team not found")
+            
+            team_player_ids = team_doc.get("player_ids", [])
+            for pid in team_player_ids:
+                pid_str = str(pid)
+                tournament_player_data = tournament_players.get(pid_str, {})
+                if not tournament_player_data:
+                    continue
+                
+                # Get attributes (after training)
+                attrs = tournament_player_data.get("attributes", {})
+                
+                # Extract anchor attributes (current values after training)
+                player_attrs = {}
+                for k, v in attrs.items():
+                    if k.startswith("anchor_"):
+                        attr_name = k.replace("anchor_", "")
+                        player_attrs[attr_name] = v
+                
+                first_name = tournament_player_data.get("first_name", "")
+                last_name = tournament_player_data.get("last_name", "")
+                player_name = f"{first_name} {last_name}".strip()
+                
+                if player_name:
+                    players.append({
+                        "id": pid_str,
+                        "name": player_name,
+                        "attributes": player_attrs
+                    })
+            
+            # Get current team attributes (tournament doesn't store team attributes separately yet)
+            # For now, return empty/default values
+            team_attrs = {
+                "shot_threshold": 0,
+                "rebound_modifier": 1.0,
+                "offensive_efficiency": 0,
+                "defensive_efficiency": 0,
+                "fb_efficiency": 0,
+                "pt_efficiency": 0,
+                "foul_modifier": 0,
+                "turnover_modifier": 0,
+                "team_chemistry": 0,
+                "fb_opp_modifier": 0,
+                "pt_opp_modifier": 0
+            }
         
         if not report_data:
-            raise HTTPException(status_code=404, detail="Training report not found for this week")
-        
-        return {
+            raise HTTPException(status_code=404, detail="Training report not found")
+
+    return {
             "status": "success",
-            "week": week,
+            "week": week,  # For tournament, this is the round number
             "upcoming_opponent": upcoming_opponent,
             "coaching_focus": report_data.get("coaching_focus", {}),
             "player_changes": report_data.get("player_changes", {}),

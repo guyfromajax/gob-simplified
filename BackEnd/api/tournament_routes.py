@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 import logging
+from typing import Optional
 from BackEnd.db import (
     tournaments_collection,
     teams_collection,
@@ -32,6 +33,11 @@ class TournamentResultRequest(BaseModel):
 
 class SimulateRequest(BaseModel):
     tournament_id: str
+
+class TournamentTrainingRequest(BaseModel):
+    tournament_id: str
+    team_id: Optional[str] = None
+    training_data: dict  # Contains player_drills, team_drills, general, coaching_focus
 
 
 @router.get("/tournament/leaders")
@@ -612,3 +618,182 @@ def sim_remaining(request: SimulateRequest):
     # Ensure the document is fully JSON serializable before returning so the
     # API does not raise a 500 error when encoding ``ObjectId`` instances.
     return jsonable_encoder(final_doc, custom_encoder={ObjectId: str})
+
+
+@router.post("/tournament/run-training")
+def run_tournament_training(req: TournamentTrainingRequest):
+    """
+    Run training for a tournament team using tournament-specific player/team attributes.
+    Updates only the tournament document, not the core collections.
+    """
+    from datetime import datetime
+    from BackEnd.models.training_execution_v2 import execute_training
+    from BackEnd.utils.position_ratings import compute_position_ratings
+    
+    try:
+        tournament_id = ObjectId(req.tournament_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid tournament ID format")
+
+    # Load tournament document
+    tournament_doc = tournaments_collection.find_one({"_id": tournament_id})
+    if not tournament_doc:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    # Get training status and check for duplicate submission
+    training_status = tournament_doc.get("training_status", {})
+    current_round = tournament_doc.get("current_round", 1)
+    if training_status.get("training_completed", False) and training_status.get("round") == current_round:
+        # Training already completed for this round, redirect to report
+        return {
+            "status": "already_completed",
+            "round": current_round,
+            "redirect": f"/static/training-report.html?mode=tournament&tournament_id={req.tournament_id}&team_id={req.team_id}&round={current_round}"
+        }
+
+    # Get user's team (use team_id from request if provided, otherwise from tournament)
+    team_name = req.team_id
+    if not team_name:
+        team_name = tournament_doc.get("user_team_id")
+        if not team_name:
+            raise HTTPException(status_code=404, detail="User team not found")
+    
+    # Resolve team name to team document
+    team_doc = teams_collection.find_one({"name": team_name})
+    if not team_doc:
+        raise HTTPException(status_code=404, detail="Team not found")
+    team_id = str(team_doc["_id"])
+
+    # Get tournament-specific player data for the user's team
+    tournament_players = tournament_doc.get("player_stats", {})
+    team_player_ids = team_doc.get("player_ids", [])
+    
+    # Build player list with tournament-specific attributes
+    players_for_training = []
+    for pid in team_player_ids:
+        pid_str = str(pid)
+        tournament_player_data = tournament_players.get(pid_str, {})
+        if not tournament_player_data:
+            continue
+        
+        # Get core player data for additional fields
+        core_player = players_collection.find_one({"_id": pid}, {
+            "first_name": 1, "last_name": 1, "height": 1
+        })
+        if not core_player:
+            try:
+                core_player = players_collection.find_one({"_id": ObjectId(pid)}, {
+                    "first_name": 1, "last_name": 1, "height": 1
+                })
+            except:
+                pass
+        
+        # Build player dict for training
+        player = {
+            "_id": pid_str,
+            "first_name": tournament_player_data.get("first_name") or (core_player.get("first_name", "") if core_player else ""),
+            "last_name": tournament_player_data.get("last_name") or (core_player.get("last_name", "") if core_player else ""),
+            "team": team_name,
+            "attributes": tournament_player_data.get("attributes", {})
+        }
+        players_for_training.append(player)
+
+    if not players_for_training:
+        raise HTTPException(status_code=404, detail="No players found for training")
+
+    # Get team attributes from tournament document (if stored) or initialize
+    # For now, tournament doesn't store team attributes separately, so we'll initialize them
+    # In the future, tournament could store team attributes similar to franchise
+    from BackEnd.models.team_manager import TeamManager
+    team_stats = TeamManager.init_team_attributes(mode="tournament")
+
+    # Extract training data
+    training_data = req.training_data
+    allocations = {
+        "player_drills": training_data.get("player_drills", {}),
+        "team_drills": training_data.get("team_drills", {}),
+        "general": training_data.get("general", {})
+    }
+    coaching_focus = training_data.get("coaching_focus")
+
+    # Execute training
+    updated_players, updated_team, training_report = execute_training(
+        players_for_training,
+        team_stats,
+        allocations,
+        coaching_focus
+    )
+    
+    # Recalculate position ratings for each player after training
+    position_ratings_updates = {}
+    for player in updated_players:
+        pid = player["_id"]
+        # Get player's height
+        core_player = players_collection.find_one({"_id": pid}, {"height": 1})
+        if not core_player:
+            try:
+                core_player = players_collection.find_one({"_id": ObjectId(pid)}, {"height": 1})
+            except:
+                pass
+        height = core_player.get("height") if core_player else None
+        
+        # Build player dict for position ratings calculation
+        player_for_ratings = {
+            "attributes": player.get("attributes", {}),
+            "height": height,
+            "name": f"{player.get('first_name', '')} {player.get('last_name', '')}"
+        }
+        
+        # Compute new position ratings
+        new_ratings = compute_position_ratings(player_for_ratings)
+        position_ratings_updates[pid] = new_ratings
+
+    # Use training report data for player and team changes
+    player_logs = training_report.get("player_changes", {})
+    team_log = training_report.get("team_changes", {})
+
+    # Update tournament document with new attribute values and position ratings
+    tournament_update = {}
+    for player in updated_players:
+        pid = player["_id"]
+        attrs = player.get("attributes", {})
+        
+        # Update all anchor attributes and base attributes
+        for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO", "NG"]:
+            anchor_key = f"anchor_{attr}"
+            if anchor_key in attrs:
+                tournament_update[f"player_stats.{pid}.attributes.{anchor_key}"] = attrs[anchor_key]
+                tournament_update[f"player_stats.{pid}.attributes.{attr}"] = attrs[attr]
+        
+        # Update position ratings for this player (if tournament stores them)
+        if pid in position_ratings_updates:
+            tournament_update[f"player_stats.{pid}.position_ratings"] = position_ratings_updates[pid]
+
+    # Mark training as completed and update status
+    tournament_update["training_status.training_completed"] = True
+    tournament_update["training_status.round"] = current_round
+    tournament_update["training_status.last_training_date"] = datetime.now().strftime("%Y-%m-%d")
+    
+    # Store training report data
+    training_report_data = {
+        "round": current_round,
+        "player_changes": player_logs,
+        "team_changes": team_log,
+        "coaching_focus": training_report.get("coaching_focus", {}),
+        "date": datetime.now().strftime("%Y-%m-%d")
+    }
+    
+    # Store latest training for quick access
+    tournament_update["latest_training"] = training_report_data
+
+    # Save to tournament document
+    tournaments_collection.update_one({"_id": tournament_id}, {"$set": tournament_update})
+    
+    return {
+        "status": "success",
+        "round": current_round,
+        "player_changes": player_logs,
+        "team_changes": team_log,
+        "coaching_focus": training_report.get("coaching_focus", {}),
+        "redirect": f"/static/tournament.html?tournament_id={req.tournament_id}"
+    }

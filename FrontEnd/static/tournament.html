@@ -38,10 +38,7 @@
           <button id="playbooks-tournament" class="gameplan-btn-playbooks">Playbooks</button>
         </div>
         <div class="play-now-container">
-          <button id="play-now" class="play-now-btn">
-            <span class="play-now-main">Play Next Game</span>
-            <span id="play-now-opponent" class="play-now-opponent"></span>
-          </button>
+          <button id="play-now" class="play-now-btn">Run Training</button>
           <button id="sim-remaining" class="play-now-btn" style="display: none;">Sim Remaining Games</button>
         </div>
         <button id="exit-tournament" class="play-now-btn" style="display: none; margin-left: auto;">Exit</button>
@@ -51,6 +48,7 @@
   <div id="tournament-tabs">
     <div class="tab-buttons">
       <button data-tab="bracket-tab" class="active">Bracket</button>
+      <button data-tab="schedule-tab">Schedule</button>
       <button data-tab="team-tab">Team</button>
       <button data-tab="leaders-tab">Leaders</button>
     </div>
@@ -59,6 +57,9 @@
         <div id="bracket" class="bracket">
         </div>
       </div>
+    </div>
+    <div id="schedule-tab" class="tab-content">
+      <div id="schedule-container" class="schedule-container"></div>
     </div>
     <div id="team-tab" class="tab-content">
       <div class="scroll-x">
