@@ -6866,16 +6866,26 @@ After training is submitted, users are automatically redirected to the training 
 - Training Focus (formatted as "Archetype (Sub-Option)", e.g., "Culture Builder (Inspire)")
 - Orange "Go To Locker Room" button (top-right) - navigates to Franchise/Tournament Command Center
 
-**Players Section:**
+**Player Report Section:**
+- Header: "Player Report"
 - Toggle between "Attributes" and "Training Changes" views
 - **Attributes View:** Shows current attribute values after training
+  - **Tooltip Feature:** Hovering over any attribute value displays the training change for that attribute
+    - Green tooltip for positive changes (e.g., "+5")
+    - Red tooltip for negative changes (e.g., "-3")
+    - Black tooltip for zero changes
+    - Tooltip appears above the attribute value
 - **Training Changes View:** Shows net changes from training
   - Positive changes: Green text with `+` prefix
   - Negative changes: Red text with `-` prefix
   - Zero changes: Black text
+  - **Aggregated Total Row:** Bottom row displays "Total" in the first column and sums all attribute changes across all players
+    - Styled with gold background highlight and bold text
+    - Provides quick overview of total training impact
 - Displays all players on the team with their attribute values or changes
 
-**Team Section:**
+**Team Report Section:**
+- Header: "Team Report"
 - Displays all team attributes with visualizations:
   - **Red/Green Pills:** Most attributes (Shooting, Rebounding, Offense, Defense, Fast Breaks, Press/Trap, Aggression, Discipline, Momentum)
     - Yellow center line
@@ -6929,6 +6939,15 @@ Training report links appear next to scheduled games on the Franchise Command Ce
 - Link styled in blue (#4a90e2) with reduced font size
 - Link text: "[Training Report]"
 - Navigates to training report page with correct parameters (mode, franchise_id, team_id, week)
+
+**Training Notes Section:**
+- Header: "Training Notes"
+- Empty text container for future use
+- Same horizontal width as Player Report and Team Report sections
+- Minimum height: 200px (indicates space for future content)
+- Dynamic height: Expands automatically with content
+- No internal scrolling: All text is always visible
+- Ready for future implementation of training notes/observations
 
 #### API Endpoints
 
