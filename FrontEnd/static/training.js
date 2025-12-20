@@ -263,14 +263,14 @@ submitBtn.addEventListener('click', async function() {
       team_id: teamId,
       training_data: trainingData
     };
-    endpoint = '/api/franchise/training';
+    endpoint = '/api/franchise/run-training';
   } else if (mode === 'tournament' && tournamentId) {
     payload = {
       tournament_id: tournamentId,
       team_id: teamId,
       training_data: trainingData
     };
-    endpoint = '/api/tournament/training';
+    endpoint = '/api/tournament/run-training';
   } else {
     // Single game mode or default
     payload = {
@@ -297,8 +297,10 @@ submitBtn.addEventListener('click', async function() {
     
     const result = await response.json();
     
-    // Handle success - navigate back or show success message
-    if (mode === 'franchise' && franchiseId) {
+    // Handle success - use redirect URL from backend if provided, otherwise navigate to command center
+    if (result.redirect) {
+      window.location.href = result.redirect;
+    } else if (mode === 'franchise' && franchiseId) {
       window.location.href = `/static/franchise-command-center.html?franchise_id=${franchiseId}`;
     } else if (mode === 'tournament' && tournamentId) {
       window.location.href = `/static/tournament-command-center.html?tournament_id=${tournamentId}`;
