@@ -7,7 +7,7 @@ const ATTRIBUTE_NAMES = {
   // Attributes
   SC: 'Scoring',
   SH: 'Shooting',
-  ID: 'Interior Defense',
+  ID: 'Inside Defense',
   OD: 'Outside Defense',
   PS: 'Passing',
   BH: 'Ball Handling',
@@ -15,11 +15,11 @@ const ATTRIBUTE_NAMES = {
   ST: 'Strength',
   AG: 'Agility',
   FT: 'Free Throw',
-  ND: 'No Dumb Fouls',
+  ND: 'Endurance',
   IQ: 'Basketball IQ',
   CH: 'Clutch',
-  EM: 'Energy/Momentum',
-  MO: 'Moxie',
+  EM: 'Emotion',
+  MO: 'Momentum',
   NG: 'Energy',
   
   // Other abbreviations
@@ -48,16 +48,23 @@ function initAttributeTooltips(container = document, selectors = []) {
   
   selectors.forEach(selector => {
     const elements = container.querySelectorAll(selector);
+    console.log(`[TOOLTIP] Found ${elements.length} elements for selector "${selector}"`);
     elements.forEach(element => {
       const text = element.textContent.trim();
       const upperText = text.toUpperCase();
+      
+      // Debug: Log what we're checking
+      if (text && text.length <= 5) { // Only log short text (likely abbreviations)
+        console.log(`[TOOLTIP] Checking element with text: "${text}" (upper: "${upperText}")`);
+      }
       
       // Check if this is an attribute abbreviation
       if (ATTRIBUTE_NAMES[upperText]) {
         element.setAttribute('title', ATTRIBUTE_NAMES[upperText]);
         element.style.cursor = 'help';
-        // Debug log to verify tooltips are being set
-        console.log(`[TOOLTIP] Set tooltip for "${text}" → "${ATTRIBUTE_NAMES[upperText]}"`);
+        // Verify the title was set
+        const verifyTitle = element.getAttribute('title');
+        console.log(`[TOOLTIP] ✅ Set tooltip for "${text}" → "${ATTRIBUTE_NAMES[upperText]}" (verified: "${verifyTitle}")`);
       }
       
       // Also check data-attr attribute if present
@@ -66,7 +73,8 @@ function initAttributeTooltips(container = document, selectors = []) {
         if (ATTRIBUTE_NAMES[attr]) {
           element.setAttribute('title', ATTRIBUTE_NAMES[attr]);
           element.style.cursor = 'help';
-          console.log(`[TOOLTIP] Set tooltip via data-attr for "${attr}" → "${ATTRIBUTE_NAMES[attr]}"`);
+          const verifyTitle = element.getAttribute('title');
+          console.log(`[TOOLTIP] ✅ Set tooltip via data-attr for "${attr}" → "${ATTRIBUTE_NAMES[attr]}" (verified: "${verifyTitle}")`);
         }
       }
     });
