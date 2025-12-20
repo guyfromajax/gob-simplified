@@ -1134,12 +1134,30 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             # Players are stored at franchise level, not in franchise_teams
             players = []
             franchise_players = doc.get("players", {})
-            team_id_str = str(team_id)
+            
+            # Resolve team_id - might be a name or an ID
+            team_id_resolved = team_id
+            team_doc = db.teams.find_one({"name": team_id})
+            if team_doc:
+                team_id_resolved = str(team_doc["_id"])
+            else:
+                # Try as ObjectId
+                try:
+                    team_id_obj = ObjectId(team_id)
+                    team_id_resolved = str(team_id_obj)
+                except:
+                    pass
+            
+            team_id_str = str(team_id_resolved)
+            logger.info(f"🔍 [TRAINING REPORT] Resolved team_id: {team_id} -> {team_id_str}")
+            logger.info(f"🔍 [TRAINING REPORT] Total franchise players: {len(franchise_players)}")
             
             for player_id, player_data in franchise_players.items():
                 # Check if player belongs to this team
                 meta = player_data.get("meta", {})
-                if str(meta.get("team_id")) != team_id_str:
+                player_team_id = str(meta.get("team_id", ""))
+                
+                if player_team_id != team_id_str:
                     continue
                 
                 # Get attributes (after training)
@@ -1162,6 +1180,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                         "name": player_name,
                         "attributes": player_attrs
                     })
+            
+            logger.info(f"🔍 [TRAINING REPORT] Found {len(players)} players for team {team_id_str}")
             
             # Get current team attributes (after training)
             team_attrs = {
