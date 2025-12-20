@@ -348,14 +348,26 @@ def apply_training_points(
     # Handle scrimmages NG reduction
     if "scrimmages" in normalized_allocations:
         scrimmage_points = normalized_allocations["scrimmages"]
+        logger.warning(f"🔋 [TRAINING] Checking scrimmages NG reduction: points={scrimmage_points}, type={type(scrimmage_points)}")
         if isinstance(scrimmage_points, int) and scrimmage_points in [3, 4, 5]:
+            logger.warning(f"🔋 [TRAINING] Applying scrimmages NG reduction for {scrimmage_points} points")
             scrimmage_reduced_players = _apply_ng_reduction_from_scrimmages(players, scrimmage_points)
+        else:
+            logger.warning(f"🔋 [TRAINING] Skipping scrimmages NG reduction: points={scrimmage_points} not in [3, 4, 5]")
+    else:
+        logger.warning(f"🔋 [TRAINING] No scrimmages in normalized_allocations: {list(normalized_allocations.keys())}")
     
     # Handle conditioning NG reduction
     if "conditioning" in normalized_allocations:
         conditioning_points = normalized_allocations["conditioning"]
+        logger.warning(f"🔋 [TRAINING] Checking conditioning NG reduction: points={conditioning_points}, type={type(conditioning_points)}")
         if isinstance(conditioning_points, int) and conditioning_points in [3, 4, 5]:
+            logger.warning(f"🔋 [TRAINING] Applying conditioning NG reduction for {conditioning_points} points")
             conditioning_reduced_players = _apply_ng_reduction_from_conditioning(players, conditioning_points)
+        else:
+            logger.warning(f"🔋 [TRAINING] Skipping conditioning NG reduction: points={conditioning_points} not in [3, 4, 5]")
+    else:
+        logger.warning(f"🔋 [TRAINING] No conditioning in normalized_allocations: {list(normalized_allocations.keys())}")
     
     # Clamp all values
     for player in players:
