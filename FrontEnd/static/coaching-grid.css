@@ -32,8 +32,8 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3rem;
-  padding: 2rem;
+  gap: 1.5rem;
+  padding: 1.5rem;
 }
 
 .page-title {
@@ -46,9 +46,9 @@ body {
 .grid-wrapper {
   position: relative;
   width: 100%;
-  max-width: 800px;
+  max-width: 600px;
   aspect-ratio: 1;
-  margin: 2rem 0;
+  margin: 1rem 0;
 }
 
 /* Axis Labels */
@@ -159,20 +159,20 @@ body {
 /* Responsive adjustments for desktop */
 @media (min-width: 1024px) {
   .grid-wrapper {
-    max-width: 900px;
+    max-width: 600px;
   }
   
   .axis-label {
-    font-size: 1.3rem;
+    font-size: 1.2rem;
   }
   
   .archetype-dot {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
   }
   
   .dot-label {
-    font-size: 1rem;
+    font-size: 0.9rem;
   }
 }
 
