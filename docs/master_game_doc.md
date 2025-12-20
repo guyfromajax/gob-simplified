@@ -7457,12 +7457,14 @@ Training report links appear next to scheduled games on the Franchise Command Ce
 
 **Training Notes Section:**
 - Header: "Training Notes"
-- Empty text container for future use
+- Displays automatically generated notes about training effects
+- **NG Reduction Notes:** Automatically generated when players experience NG reduction from scrimmages or conditioning
+  - Shows message for multiple players or individual player names
+  - Notes appear as paragraphs in the container
+- **Placeholder:** If no notes are generated, displays "No training notes for this session." in italic gray text
 - Same horizontal width as Player Report and Team Report sections
-- Minimum height: 200px (indicates space for future content)
 - Dynamic height: Expands automatically with content
 - No internal scrolling: All text is always visible
-- Ready for future implementation of training notes/observations
 
 #### API Endpoints
 
