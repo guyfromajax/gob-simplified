@@ -204,7 +204,12 @@ function collectTrainingData() {
         offense_install: parseInt(document.getElementById('fast-break-offense-install').value) || 0,
         defense_install: parseInt(document.getElementById('fast-break-defense-install').value) || 0
       },
-      scrimmages: parseInt(document.getElementById('team-scrimmages').value) || 0,
+      scrimmages: (() => {
+        const elem = document.getElementById('team-scrimmages');
+        const value = elem ? parseInt(elem.value) || 0 : 0;
+        console.log('🔋 [FRONTEND] Scrimmages element:', elem, 'value:', value);
+        return value;
+      })(),
       presses_traps: {
         defense_install: parseInt(document.getElementById('press-defense-install').value) || 0,
         offense_install: parseInt(document.getElementById('press-offense-install').value) || 0
