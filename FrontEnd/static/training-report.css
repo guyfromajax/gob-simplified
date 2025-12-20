@@ -252,6 +252,11 @@ body {
   color: var(--color-text);
 }
 
+/* Momentum pill in table */
+.momentum-pill-container {
+  min-width: 80px;
+}
+
 /* Team Section */
 .team-section {
   background: var(--color-surface);

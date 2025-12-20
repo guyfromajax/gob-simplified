@@ -11,6 +11,11 @@ let reportData = null;
 let currentView = 'attributes'; // 'attributes' or 'changes'
 
 // Attribute abbreviations mapping
+// NOTE: Order is critical - this is the exact order attributes should be displayed horizontally
+const ATTRIBUTE_ORDER = [
+  'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG', 'EM', 'MO'
+];
+
 const ATTRIBUTE_NAMES = {
   'SC': 'SC',
   'SH': 'SH',
@@ -24,7 +29,9 @@ const ATTRIBUTE_NAMES = {
   'ND': 'ND',
   'IQ': 'IQ',
   'FT': 'FT',
-  'CH': 'CH'
+  'NG': 'NG',
+  'EM': 'EM',
+  'MO': 'MO'
 };
 
 // Team attribute display names
@@ -214,19 +221,20 @@ function renderPlayersTable() {
   
   let attributeList = [];
   if (currentView === 'attributes') {
-    // Attributes view: show all player attributes
-    attributeList = Object.keys(ATTRIBUTE_NAMES);
+    // Attributes view: show all player attributes in exact order
+    attributeList = ATTRIBUTE_ORDER.filter(attr => ATTRIBUTE_NAMES[attr]);
     attributeList.forEach(attr => {
       headerRow.appendChild(createHeaderCell(attr));
     });
   } else {
-    // Changes view: show only attributes that changed
+    // Changes view: show only attributes that changed, but maintain order
     const changedAttrs = new Set();
     Object.values(reportData.player_changes || {}).forEach(changes => {
       Object.keys(changes).forEach(attr => changedAttrs.add(attr));
     });
     
-    attributeList = Array.from(changedAttrs);
+    // Filter to only changed attrs, but maintain ATTRIBUTE_ORDER
+    attributeList = ATTRIBUTE_ORDER.filter(attr => changedAttrs.has(attr));
     attributeList.forEach(attr => {
       headerRow.appendChild(createHeaderCell(attr));
     });
@@ -242,18 +250,12 @@ function renderPlayersTable() {
     if (currentView === 'attributes') {
       // Show current attribute values with tooltips
       attributeList.forEach(attr => {
-        const value = player.attributes[attr] || 0;
+        const value = player.attributes[attr] || (attr === 'NG' ? 1.0 : attr === 'EM' ? 50 : attr === 'MO' ? 0 : 0);
         const changes = reportData.player_changes[player.name] || {};
         const change = changes[attr] || 0;
-        row.appendChild(createAttributeCellWithTooltip(value, change));
+        row.appendChild(createAttributeCell(attr, value, change));
       });
     } else {
-      // Show changes - get all changed attributes first
-      const allChangedAttrs = new Set();
-      Object.values(reportData.player_changes || {}).forEach(ch => {
-        Object.keys(ch).forEach(attr => allChangedAttrs.add(attr));
-      });
-      
       // Show changes for this player (0 if no change)
       attributeList.forEach(attr => {
         const changes = reportData.player_changes[player.name] || {};
@@ -297,23 +299,124 @@ function createCell(text) {
   return td;
 }
 
-function createAttributeCellWithTooltip(value, change) {
+function createAttributeCell(attr, value, change) {
   const td = document.createElement('td');
-  td.textContent = value.toString();
   td.className = 'attribute-value-cell';
   
-  // Add tooltip if there's a change
-  if (change !== 0) {
-    td.setAttribute('data-tooltip', formatChangeForTooltip(change));
-    td.style.cursor = 'help';
-    
-    // Add hover event listeners
-    td.addEventListener('mouseenter', showAttributeTooltip);
-    td.addEventListener('mouseleave', hideAttributeTooltip);
-    td.addEventListener('mousemove', positionAttributeTooltip);
+  // Special handling for NG, EM, MO
+  if (attr === 'NG') {
+    // Display with 2 decimal places
+    td.textContent = typeof value === 'number' ? value.toFixed(2) : '1.00';
+    if (change !== 0) {
+      td.setAttribute('data-tooltip', formatChangeForTooltip(change));
+      td.style.cursor = 'help';
+      td.addEventListener('mouseenter', showAttributeTooltip);
+      td.addEventListener('mouseleave', hideAttributeTooltip);
+      td.addEventListener('mousemove', positionAttributeTooltip);
+    }
+  } else if (attr === 'EM') {
+    // Display with emoji
+    const emoji = getEmotionEmoji(value);
+    td.innerHTML = emoji;
+    td.style.fontSize = '1.5rem';
+    td.style.textAlign = 'center';
+    if (change !== 0) {
+      td.setAttribute('data-tooltip', formatChangeForTooltip(change));
+      td.style.cursor = 'help';
+      td.addEventListener('mouseenter', showAttributeTooltip);
+      td.addEventListener('mouseleave', hideAttributeTooltip);
+      td.addEventListener('mousemove', positionAttributeTooltip);
+    }
+  } else if (attr === 'MO') {
+    // Display with red/green pill (no integer on top)
+    const pillContainer = createMomentumPill(value);
+    td.appendChild(pillContainer);
+    td.style.padding = 'var(--spacing-xs)';
+    if (change !== 0) {
+      td.setAttribute('data-tooltip', formatChangeForTooltip(change));
+      td.style.cursor = 'help';
+      td.addEventListener('mouseenter', showAttributeTooltip);
+      td.addEventListener('mouseleave', hideAttributeTooltip);
+      td.addEventListener('mousemove', positionAttributeTooltip);
+    }
+  } else {
+    // Standard integer display with tooltip
+    td.textContent = value.toString();
+    if (change !== 0) {
+      td.setAttribute('data-tooltip', formatChangeForTooltip(change));
+      td.style.cursor = 'help';
+      td.addEventListener('mouseenter', showAttributeTooltip);
+      td.addEventListener('mouseleave', hideAttributeTooltip);
+      td.addEventListener('mousemove', positionAttributeTooltip);
+    }
   }
   
   return td;
+}
+
+function getEmotionEmoji(em) {
+  const emValue = typeof em === 'number' ? em : 50;
+  if (emValue >= 80) return '😎';        // Sunglasses
+  else if (emValue >= 60) return '😊';   // Big smile
+  else if (emValue >= 40) return '😐';   // Straight face
+  else if (emValue >= 20) return '😕';   // Slight frown
+  else return '😞';                      // Sad face
+}
+
+function createMomentumPill(mo) {
+  const container = document.createElement('div');
+  container.className = 'momentum-pill-container';
+  container.style.position = 'relative';
+  container.style.width = '100%';
+  container.style.height = '30px';
+  container.style.background = 'rgba(0, 0, 0, 0.3)';
+  container.style.borderRadius = '15px';
+  container.style.overflow = 'hidden';
+  
+  // Center line
+  const centerLine = document.createElement('div');
+  centerLine.style.position = 'absolute';
+  centerLine.style.left = '50%';
+  centerLine.style.top = '0';
+  centerLine.style.bottom = '0';
+  centerLine.style.width = '2px';
+  centerLine.style.background = 'var(--color-warning)';
+  centerLine.style.transform = 'translateX(-50%)';
+  centerLine.style.zIndex = '2';
+  container.appendChild(centerLine);
+  
+  const moValue = typeof mo === 'number' ? mo : 0;
+  const maxValue = 10; // MO ranges from -10 to +10
+  
+  // Fill based on value
+  if (moValue > 0) {
+    const fill = document.createElement('div');
+    fill.style.position = 'absolute';
+    fill.style.left = '50%';
+    fill.style.top = '0';
+    fill.style.bottom = '0';
+    fill.style.background = 'var(--color-success)';
+    fill.style.transition = 'width 0.3s ease';
+    fill.style.zIndex = '1';
+    const percentage = Math.min((moValue / maxValue) * 50, 50); // Max 50% to the right
+    fill.style.width = `${percentage}%`;
+    container.appendChild(fill);
+  } else if (moValue < 0) {
+    const fill = document.createElement('div');
+    fill.style.position = 'absolute';
+    fill.style.right = '50%';
+    fill.style.top = '0';
+    fill.style.bottom = '0';
+    fill.style.background = 'var(--color-error)';
+    fill.style.transition = 'width 0.3s ease';
+    fill.style.zIndex = '1';
+    const absValue = Math.abs(moValue);
+    const percentage = Math.min((absValue / maxValue) * 50, 50); // Max 50% to the left
+    fill.style.width = `${percentage}%`;
+    container.appendChild(fill);
+  }
+  
+  return container;
 }
 
 function formatChangeForTooltip(change) {
