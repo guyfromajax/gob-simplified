@@ -112,11 +112,20 @@ def populate_team_plays(mode="single"):
         plays_dict = {}
         for play in all_plays:
             play_name = play["name"]
+            # Get initial values from universal play (if they exist), otherwise default to 0
+            initial_effectiveness = play.get("effectiveness", 0)
+            initial_momentum = play.get("momentum", 0)
+            initial_cloaking = play.get("cloaking", 0)
+            
             play_data = {
                 "play_id": str(play["_id"]),  # Reference to universal play (the "library card")
                 "name": play["name"],
                 "play_type": play["play_type"], 
                 "play_focus": play["play_focus"],
+                # Per-team effectiveness, momentum, and cloaking (separate from calculated effectiveness in stats)
+                "effectiveness": initial_effectiveness,
+                "momentum": initial_momentum,
+                "cloaking": initial_cloaking,
                 # NO SKELETONS - fetched from universal collection when needed
                 "game_stats": {
                     "times_run": 0,
@@ -125,7 +134,7 @@ def populate_team_plays(mode="single"):
                     "turnovers": 0,
                     "offensive_fouls": 0,
                     "defensive_fouls": 0,
-                    "effectiveness": 0.0
+                    "effectiveness": 0.0  # Calculated effectiveness from stats
                 }
             }
             
@@ -138,7 +147,7 @@ def populate_team_plays(mode="single"):
                     "turnovers": 0,
                     "offensive_fouls": 0,
                     "defensive_fouls": 0,
-                    "effectiveness": 0.0
+                    "effectiveness": 0.0  # Calculated effectiveness from stats
                 }
             
             plays_dict[play_name] = play_data

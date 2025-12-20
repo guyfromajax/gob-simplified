@@ -374,15 +374,21 @@ class TeamManager:
         universal_plays = list(plays_collection.find({}))
         
         for play in universal_plays:
-            # Initialize with random effectiveness score (-10 to 10)
-            # In future, this will be determined by team training and in-game performance
-            initial_effectiveness = round(random.uniform(-10, 10), 1)
+            # Get initial values from universal play (if they exist), otherwise default to 0
+            # In future, these will be modified by team training and in-game performance
+            initial_effectiveness = play.get("effectiveness", 0)
+            initial_momentum = play.get("momentum", 0)
+            initial_cloaking = play.get("cloaking", 0)
             
             play_data = {
                 "play_id": str(play["_id"]),  # Reference to universal play (the "library card")
                 "name": play["name"],
                 "play_type": play["play_type"], 
                 "play_focus": play["play_focus"],
+                # Per-team effectiveness, momentum, and cloaking (separate from calculated effectiveness in stats)
+                "effectiveness": initial_effectiveness,
+                "momentum": initial_momentum,
+                "cloaking": initial_cloaking,
                 # NO SKELETONS - fetched from universal collection when needed
                 "game_stats": {
                     "times_run": 0,
@@ -391,7 +397,7 @@ class TeamManager:
                     "turnovers": 0,
                     "offensive_fouls": 0,
                     "defensive_fouls": 0,
-                    "effectiveness": initial_effectiveness
+                    "effectiveness": 0.0  # Calculated effectiveness from stats
                 }
             }
             
@@ -404,7 +410,7 @@ class TeamManager:
                     "turnovers": 0,
                     "offensive_fouls": 0,
                     "defensive_fouls": 0,
-                    "effectiveness": initial_effectiveness  # Same initial value
+                    "effectiveness": 0.0  # Calculated effectiveness from stats
                 }
             
             plays_dict[play["name"]] = play_data
