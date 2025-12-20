@@ -234,9 +234,13 @@ function collectTrainingData() {
   
   console.log('🔋 [FRONTEND] Collected training data:', data);
   console.log('🔋 [FRONTEND] team_drills:', data.team_drills);
+  console.log('🔋 [FRONTEND] team_drills keys:', Object.keys(data.team_drills));
   console.log('🔋 [FRONTEND] scrimmages in team_drills:', 'scrimmages' in data.team_drills);
   if ('scrimmages' in data.team_drills) {
     console.log('🔋 [FRONTEND] scrimmages value:', data.team_drills.scrimmages);
+  } else {
+    console.error('🔋 [FRONTEND] ERROR: scrimmages NOT in team_drills!');
+    console.log('🔋 [FRONTEND] Checking element again:', document.getElementById('team-scrimmages'));
   }
   
   return data;
