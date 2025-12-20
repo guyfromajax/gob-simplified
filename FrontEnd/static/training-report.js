@@ -124,7 +124,7 @@ async function loadTrainingReport() {
     if (franchiseId) params.set('franchise_id', franchiseId);
     if (tournamentId) params.set('tournament_id', tournamentId);
     
-    const response = await fetch(`/api/franchise/training-report?${params.toString()}`);
+    const response = await fetch(`/franchise/training-report?${params.toString()}`);
     if (!response.ok) {
       throw new Error(`Failed to load training report: ${response.statusText}`);
     }
