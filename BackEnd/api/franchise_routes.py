@@ -1035,11 +1035,15 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         attrs = player.get("attributes", {})
         
         # Update all anchor attributes and base attributes
-        for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO", "NG"]:
+        for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO"]:
             anchor_key = f"anchor_{attr}"
             if anchor_key in attrs:
                 franchise_update[f"players.{pid}.attributes.{anchor_key}"] = attrs[anchor_key]
                 franchise_update[f"players.{pid}.attributes.{attr}"] = attrs[attr]
+        
+        # NG doesn't have an anchor_key, save it directly if it exists
+        if "NG" in attrs:
+            franchise_update[f"players.{pid}.attributes.NG"] = attrs["NG"]
         
         # Update position ratings for this player
         if pid in position_ratings_updates:

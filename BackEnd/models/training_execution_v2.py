@@ -565,6 +565,8 @@ def _normalize_allocations(allocations: Dict) -> Dict:
             normalized["fast_breaks"] = team_drills["fast_breaks"]
         if "presses_traps" in team_drills:
             normalized["presses_traps"] = team_drills["presses_traps"]
+        if "scrimmages" in team_drills:
+            normalized["scrimmages"] = team_drills["scrimmages"]
     
     if "general" in allocations:
         general = allocations["general"]
