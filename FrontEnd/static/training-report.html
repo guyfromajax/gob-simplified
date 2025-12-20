@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Training Report - GOB</title>
+  <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico" />
+  <link rel="stylesheet" href="/static/training-report.css">
+</head>
+<body>
+  <div class="training-report-container">
+    <!-- Header -->
+    <header class="report-header">
+      <div class="header-left">
+        <h1 class="page-title">TRAINING REPORT</h1>
+        <div class="header-info">
+          <div class="info-item">
+            <span class="info-label">Week:</span>
+            <span id="week-number" class="info-value">--</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Upcoming Opponent:</span>
+            <span id="upcoming-opponent" class="info-value">--</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Training Focus:</span>
+            <span id="training-focus" class="info-value">--</span>
+          </div>
+        </div>
+      </div>
+      <button id="locker-room-btn" class="locker-room-button">Go To Locker Room</button>
+    </header>
+
+    <!-- Players Section -->
+    <section class="players-section">
+      <div class="section-header">
+        <h2>Players</h2>
+        <div class="view-toggle">
+          <button class="toggle-btn active" data-view="attributes">Attributes</button>
+          <button class="toggle-btn" data-view="changes">Training Changes</button>
+        </div>
+      </div>
+      <div class="scroll-x">
+        <table class="players-table" id="players-table">
+          <thead id="players-thead"></thead>
+          <tbody id="players-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Team Section -->
+    <section class="team-section">
+      <h2>Team Attributes</h2>
+      <div class="team-attributes-grid" id="team-attributes-grid"></div>
+    </section>
+  </div>
+
+  <script src="/static/training-report.js"></script>
+</body>
+</html>
+
