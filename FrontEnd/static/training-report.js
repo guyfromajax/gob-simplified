@@ -161,6 +161,9 @@ function renderPage() {
   
   // Render team attributes
   renderTeamAttributes();
+  
+  // Render training notes
+  renderTrainingNotes();
 }
 
 function renderHeader() {
@@ -674,5 +677,33 @@ function createPill(originalValue, attrKey) {
   }
   
   return pill;
+}
+
+function renderTrainingNotes() {
+  if (!reportData) return;
+  
+  const container = document.getElementById('training-notes-container');
+  container.innerHTML = '';
+  
+  const training_notes = reportData.training_notes || [];
+  
+  if (training_notes.length === 0) {
+    // Show placeholder if no notes
+    const placeholder = document.createElement('p');
+    placeholder.className = 'notes-placeholder';
+    placeholder.textContent = 'No training notes for this session.';
+    placeholder.style.color = '#999';
+    placeholder.style.fontStyle = 'italic';
+    container.appendChild(placeholder);
+    return;
+  }
+  
+  // Render each note as a paragraph
+  training_notes.forEach(note => {
+    const noteElement = document.createElement('p');
+    noteElement.className = 'training-note';
+    noteElement.textContent = note;
+    container.appendChild(noteElement);
+  });
 }
 

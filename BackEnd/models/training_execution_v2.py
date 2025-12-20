@@ -337,6 +337,23 @@ def apply_training_points(
         if breaks_points is not None and breaks_points > 0:
             _apply_breaks_effect(players, team, breaks_points, player_baselines, team_baseline)
     
+    # Apply NG reductions from scrimmages and conditioning
+    # Track which players had reductions for training report notes
+    scrimmage_reduced_players = []
+    conditioning_reduced_players = []
+    
+    # Handle scrimmages NG reduction
+    if "scrimmages" in normalized_allocations:
+        scrimmage_points = normalized_allocations["scrimmages"]
+        if isinstance(scrimmage_points, int) and scrimmage_points in [3, 4, 5]:
+            scrimmage_reduced_players = _apply_ng_reduction_from_scrimmages(players, scrimmage_points)
+    
+    # Handle conditioning NG reduction
+    if "conditioning" in normalized_allocations:
+        conditioning_points = normalized_allocations["conditioning"]
+        if isinstance(conditioning_points, int) and conditioning_points in [3, 4, 5]:
+            conditioning_reduced_players = _apply_ng_reduction_from_conditioning(players, conditioning_points)
+    
     # Clamp all values
     for player in players:
         attrs = player.get("attributes", {})
@@ -376,13 +393,31 @@ def apply_training_points(
         if delta != 0:
             team_changes[attr_name] = delta
     
+    # Build training notes based on NG reductions
+    training_notes = []
+    
+    # Add conditioning notes
+    if len(conditioning_reduced_players) > 1:
+        training_notes.append("Multiple players will start the next game with reduced energy due to the amount of conditioning.")
+    elif len(conditioning_reduced_players) == 1:
+        player_name = conditioning_reduced_players[0]
+        training_notes.append(f"{player_name} will start the next game with reduced energy due to the amount of conditioning.")
+    
+    # Add scrimmages notes
+    if len(scrimmage_reduced_players) > 1:
+        training_notes.append("Multiple players will start the next game with reduced energy due to the amount of scrimmages.")
+    elif len(scrimmage_reduced_players) == 1:
+        player_name = scrimmage_reduced_players[0]
+        training_notes.append(f"{player_name} will start the next game with reduced energy due to the amount of scrimmages.")
+    
     training_report = {
         "player_changes": player_changes,
         "team_changes": team_changes,
         "coaching_focus": {
             "archetype": archetype,
             "sub_option": sub_option
-        }
+        },
+        "training_notes": training_notes
     }
     
     return players, team, training_report
@@ -541,6 +576,14 @@ def _normalize_allocations(allocations: Dict) -> Dict:
             normalized["film_study"] = general["film_study"]
         if "breaks" in general:
             normalized["breaks"] = general["breaks"]
+        if "scrimmages" in general:
+            normalized["scrimmages"] = general["scrimmages"]
+    
+    # Also check team_drills for scrimmages
+    if "team_drills" in allocations:
+        team_drills = allocations["team_drills"]
+        if "scrimmages" in team_drills:
+            normalized["scrimmages"] = team_drills["scrimmages"]
     
     return normalized
 
@@ -843,4 +886,144 @@ def _apply_breaks_effect(
                 # Calculate new value: original + (increment * multiplier)
                 new_val = original_val + int(increment * multiplier)
                 team[attr_name] = new_val
+
+
+def _apply_ng_reduction_from_scrimmages(players: List[dict], scrimmage_points: int) -> List[str]:
+    """
+    Apply NG reduction to players based on scrimmage points.
+    
+    Logic:
+    - scrimmages == 3: reduce_ng_list = [0, 0.01, 0.01, 0.02]
+    - scrimmages == 4: reduce_ng_list = [0, 0.01, 0.02, 0.02, 0.03]
+    - scrimmages == 5: reduce_ng_list = [0.01, 0.02, 0.03, 0.03, 0.04]
+    
+    Special case: If player ND > 79:
+    - scrimmages == 3: omit them (no reduction)
+    - scrimmages == 4: apply scrimmages == 3 list
+    - scrimmages == 5: apply scrimmages == 4 list
+    
+    Args:
+        players: List of player dicts with attributes
+        scrimmage_points: Number of scrimmage points (3, 4, or 5)
+    
+    Returns:
+        List of player names who had NG reductions
+    """
+    if scrimmage_points not in [3, 4, 5]:
+        return []
+    
+    # Define reduction lists
+    reduce_ng_lists = {
+        3: [0, 0.01, 0.01, 0.02],
+        4: [0, 0.01, 0.02, 0.02, 0.03],
+        5: [0.01, 0.02, 0.03, 0.03, 0.04]
+    }
+    
+    reduced_players = []
+    
+    for player in players:
+        attrs = player.get("attributes", {})
+        nd = attrs.get("ND", 0)
+        ng = attrs.get("NG", 1.0)
+        
+        # Determine which list to use based on ND
+        if nd > 79:
+            # Special handling for high ND players
+            if scrimmage_points == 3:
+                # Omit them (no reduction)
+                continue
+            elif scrimmage_points == 4:
+                # Use scrimmages == 3 list
+                reduce_ng_list = reduce_ng_lists[3]
+            elif scrimmage_points == 5:
+                # Use scrimmages == 4 list
+                reduce_ng_list = reduce_ng_lists[4]
+        else:
+            # Normal players use the list for their scrimmage points
+            reduce_ng_list = reduce_ng_lists[scrimmage_points]
+        
+        # Apply reduction
+        reduction = random.choice(reduce_ng_list)
+        if reduction > 0:
+            new_ng = max(0.0, ng - reduction)  # Clamp to 0 minimum
+            attrs["NG"] = round(new_ng, 2)
+            
+            # Track player name for notes
+            first_name = player.get("first_name", "")
+            last_name = player.get("last_name", "")
+            player_name = f"{first_name} {last_name}".strip()
+            if player_name:
+                reduced_players.append(player_name)
+    
+    return reduced_players
+
+
+def _apply_ng_reduction_from_conditioning(players: List[dict], conditioning_points: int) -> List[str]:
+    """
+    Apply NG reduction to players based on conditioning points.
+    
+    Logic:
+    - conditioning == 3: reduce_ng_list = [0, 0.01, 0.01, 0.02]
+    - conditioning == 4: reduce_ng_list = [0, 0.01, 0.02, 0.02, 0.03]
+    - conditioning == 5: reduce_ng_list = [0.01, 0.02, 0.03, 0.03, 0.04]
+    
+    Special case: If player ND > 79:
+    - conditioning == 3: omit them (no reduction)
+    - conditioning == 4: apply conditioning == 3 list
+    - conditioning == 5: apply conditioning == 4 list
+    
+    Args:
+        players: List of player dicts with attributes
+        conditioning_points: Number of conditioning points (3, 4, or 5)
+    
+    Returns:
+        List of player names who had NG reductions
+    """
+    if conditioning_points not in [3, 4, 5]:
+        return []
+    
+    # Define reduction lists (same as scrimmages)
+    reduce_ng_lists = {
+        3: [0, 0.01, 0.01, 0.02],
+        4: [0, 0.01, 0.02, 0.02, 0.03],
+        5: [0.01, 0.02, 0.03, 0.03, 0.04]
+    }
+    
+    reduced_players = []
+    
+    for player in players:
+        attrs = player.get("attributes", {})
+        nd = attrs.get("ND", 0)
+        ng = attrs.get("NG", 1.0)
+        
+        # Determine which list to use based on ND
+        if nd > 79:
+            # Special handling for high ND players
+            if conditioning_points == 3:
+                # Omit them (no reduction)
+                continue
+            elif conditioning_points == 4:
+                # Use conditioning == 3 list
+                reduce_ng_list = reduce_ng_lists[3]
+            elif conditioning_points == 5:
+                # Use conditioning == 4 list
+                reduce_ng_list = reduce_ng_lists[4]
+        else:
+            # Normal players use the list for their conditioning points
+            reduce_ng_list = reduce_ng_lists[conditioning_points]
+        
+        # Apply reduction
+        reduction = random.choice(reduce_ng_list)
+        if reduction > 0:
+            new_ng = max(0.0, ng - reduction)  # Clamp to 0 minimum
+            attrs["NG"] = round(new_ng, 2)
+            
+            # Track player name for notes
+            first_name = player.get("first_name", "")
+            last_name = player.get("last_name", "")
+            player_name = f"{first_name} {last_name}".strip()
+            if player_name:
+                reduced_players.append(player_name)
+    
+    return reduced_players
 

@@ -780,6 +780,7 @@ def run_tournament_training(req: TournamentTrainingRequest):
         "player_changes": player_logs,
         "team_changes": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
+        "training_notes": training_report.get("training_notes", []),
         "date": datetime.now().strftime("%Y-%m-%d")
     }
     
