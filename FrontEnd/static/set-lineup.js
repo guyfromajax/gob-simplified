@@ -1652,11 +1652,29 @@ document.addEventListener('DOMContentLoaded', () => {
       if (thead) {
         initAttributeTooltips(thead, ['th']);
         
-        // Verify tooltips were set by checking a sample element
-        const sampleTh = thead.querySelector('th');
-        if (sampleTh && sampleTh.textContent.trim() === 'SC') {
-          const title = sampleTh.getAttribute('title');
-          console.log(`[TOOLTIP VERIFY] Sample th "SC" has title: "${title}"`);
+        // Verify tooltips were set by checking all th elements
+        const allTh = thead.querySelectorAll('th');
+        let verifiedCount = 0;
+        allTh.forEach(th => {
+          const text = th.textContent.trim();
+          const actualTitle = th.getAttribute('title');
+          if (actualTitle) {
+            verifiedCount++;
+            console.log(`[TOOLTIP VERIFY] ✅ "${text}" has title: "${actualTitle}"`);
+          } else {
+            console.warn(`[TOOLTIP VERIFY] ❌ "${text}" has no title attribute`);
+          }
+        });
+        console.log(`[TOOLTIP VERIFY] Verified ${verifiedCount}/${allTh.length} tooltips are set`);
+        
+        // Test: Check first th element
+        const firstTh = thead.querySelector('th');
+        if (firstTh) {
+          const firstTitle = firstTh.getAttribute('title');
+          console.log(`[TOOLTIP TEST] First th "${firstTh.textContent.trim()}" has title: "${firstTitle || 'NONE'}"`);
+          if (firstTitle) {
+            console.log(`[TOOLTIP TEST] Try hovering over "${firstTh.textContent.trim()}" header - tooltip should appear after 1-2 seconds`);
+          }
         }
       } else {
         console.warn('[TOOLTIP] thead element not found');
