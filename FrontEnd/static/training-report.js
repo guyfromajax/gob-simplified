@@ -166,16 +166,33 @@ function renderHeader() {
   
   let focusText = '--';
   if (archetype && subOption) {
-    // Format: "Culture Builder (Inspire)" - capitalize words, remove dashes, use parentheses
-    const formatArchetype = archetype.split('-').map(word => 
+    // Map archetype to full name
+    const archetypeMap = {
+      'authoritarian': 'Authoritarian',
+      'systems-coach': 'Systems Coach',
+      'player-maximizer': 'Player Maximizer',
+      'culture': 'Culture Builder'
+    };
+    
+    // Get archetype display name
+    let archetypeDisplay = archetypeMap[archetype] || archetype.split('-').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
     
-    const formatSubOption = subOption.split('-').map(word => 
+    // Remove archetype prefix from sub_option (e.g., "builder-inspire" -> "inspire")
+    let subOptionClean = subOption;
+    if (subOption.startsWith(archetype + '-')) {
+      subOptionClean = subOption.substring(archetype.length + 1);
+    } else if (archetype === 'culture' && subOption.startsWith('builder-')) {
+      subOptionClean = subOption.substring('builder-'.length);
+    }
+    
+    // Format sub-option: capitalize words
+    const formatSubOption = subOptionClean.split('-').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
     
-    focusText = `${formatArchetype} (${formatSubOption})`;
+    focusText = `${archetypeDisplay} (${formatSubOption})`;
   }
   
   document.getElementById('training-focus').textContent = focusText;
