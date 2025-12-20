@@ -615,7 +615,7 @@ def team_stats():
             for stat, val in p.get("stats", {}).get("season", {}).items():
                 # Handle case where val might be a list or other non-numeric type
                 if isinstance(val, (int, float)):
-                    totals[stat] = totals.get(stat, 0) + val
+                totals[stat] = totals.get(stat, 0) + val
                 elif isinstance(val, list) and len(val) > 0:
                     # If it's a list, try to sum the numeric values
                     numeric_vals = [v for v in val if isinstance(v, (int, float))]
@@ -902,14 +902,14 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     # Get user's team (use team_id from request if provided, otherwise from state)
     team_id = req.team_id
     if not team_id:
-        state = franchise_state_collection.find_one({"_id": "state"}) or {}
-        team_name = state.get("team")
-        if not team_name:
-            raise HTTPException(status_code=404, detail="User team not found")
-        team_doc = db.teams.find_one({"name": team_name})
-        if not team_doc:
-            raise HTTPException(status_code=404, detail="Team not found")
-        team_id = str(team_doc["_id"])
+    state = franchise_state_collection.find_one({"_id": "state"}) or {}
+    team_name = state.get("team")
+    if not team_name:
+        raise HTTPException(status_code=404, detail="User team not found")
+    team_doc = db.teams.find_one({"name": team_name})
+    if not team_doc:
+        raise HTTPException(status_code=404, detail="Team not found")
+    team_id = str(team_doc["_id"])
     else:
         # team_id might be a name, try to resolve it
         team_doc = db.teams.find_one({"name": team_id})
@@ -1052,7 +1052,7 @@ def run_franchise_training(req: FranchiseTrainingRequest):
 
     # Save to franchise document
     db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update})
-
+    
     return {
         "status": "success",
         "week": current_week,
@@ -1107,16 +1107,36 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                         break
             
             # Get current player attributes (after training)
+            # Players are stored at franchise level, not in franchise_teams
             players = []
-            roster = team_data.get("roster", [])
-            for player_id in roster:
-                player_data = team_data.get("players", {}).get(player_id, {})
-                if player_data:
-                    attrs = player_data.get("attributes", {})
+            franchise_players = doc.get("players", {})
+            team_id_str = str(team_id)
+            
+            for player_id, player_data in franchise_players.items():
+                # Check if player belongs to this team
+                meta = player_data.get("meta", {})
+                if str(meta.get("team_id")) != team_id_str:
+                    continue
+                
+                # Get attributes (after training)
+                attrs = player_data.get("attributes", {})
+                
+                # Extract anchor attributes (current values after training)
+                player_attrs = {}
+                for k, v in attrs.items():
+                    if k.startswith("anchor_"):
+                        attr_name = k.replace("anchor_", "")
+                        player_attrs[attr_name] = v
+                
+                first_name = meta.get("first_name", "")
+                last_name = meta.get("last_name", "")
+                player_name = f"{first_name} {last_name}".strip()
+                
+                if player_name:  # Only add if we have a name
                     players.append({
                         "id": player_id,
-                        "name": f"{player_data.get('first_name', '')} {player_data.get('last_name', '')}".strip(),
-                        "attributes": {k.replace("anchor_", ""): v for k, v in attrs.items() if k.startswith("anchor_")}
+                        "name": player_name,
+                        "attributes": player_attrs
                     })
             
             # Get current team attributes (after training)
@@ -1141,8 +1161,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
         
         if not report_data:
             raise HTTPException(status_code=404, detail="Training report not found for this week")
-        
-        return {
+
+    return {
             "status": "success",
             "week": week,
             "upcoming_opponent": upcoming_opponent,
