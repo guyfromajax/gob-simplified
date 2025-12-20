@@ -6700,7 +6700,7 @@ The "Breaks" slider applies a multiplier to all positive gains (not losses):
 
 **Location:** `FrontEnd/static/training-report.html`
 
-After training is submitted, users are automatically redirected to the training report page which displays detailed information about attribute changes.
+After training is submitted, users are automatically redirected to the training report page which displays detailed information about attribute changes. The report can also be accessed via links on the schedule in the Franchise Command Center.
 
 #### Page Layout
 
@@ -6708,8 +6708,8 @@ After training is submitted, users are automatically redirected to the training 
 - Page title: "TRAINING REPORT"
 - Week number
 - Upcoming Opponent (from schedule)
-- Training Focus (archetype and sub-option)
-- Orange "Go To Locker Room" button (top-right)
+- Training Focus (formatted as "Archetype (Sub-Option)", e.g., "Culture Builder (Inspire)")
+- Orange "Go To Locker Room" button (top-right) - navigates to Franchise/Tournament Command Center
 
 **Players Section:**
 - Toggle between "Attributes" and "Training Changes" views
@@ -6718,6 +6718,7 @@ After training is submitted, users are automatically redirected to the training 
   - Positive changes: Green text with `+` prefix
   - Negative changes: Red text with `-` prefix
   - Zero changes: Black text
+- Displays all players on the team with their attribute values or changes
 
 **Team Section:**
 - Displays all team attributes with visualizations:
@@ -6726,8 +6727,13 @@ After training is submitted, users are automatically redirected to the training 
     - Green fill to the right for positive values
     - Red fill to the left for negative values
     - Proportional fill based on max value
+    - No value displayed on top of pill (value shown in change indicator only)
   - **Progress Bar:** Team Chemistry (0-25 scale, blue fill)
+    - Shows value as "X / 25" centered on bar
+    - Only attribute that displays its value
   - **+/- Indicators:** Fast Break Defense and Press/Trap Breaks
+    - Centered, bold indicators
+    - No value displayed next to indicators
     - `+++` (green) for value = 10
     - `++` (green) for values 5-9
     - `+` (green) for values 1-4
@@ -6735,6 +6741,39 @@ After training is submitted, users are automatically redirected to the training 
     - `-` (red) for values -1 to -4
     - `--` (red) for values -5 to -9
     - `---` (red) for value = -10
+
+#### Training Focus Display Format
+
+The training focus is formatted as "Archetype (Sub-Option)" with proper capitalization:
+- **Authoritarian** archetype options:
+  - "Authoritarian (Discipline)"
+  - "Authoritarian (Rebounding)"
+  - "Authoritarian (Teamwork)"
+  - "Authoritarian (Execution)"
+- **Systems Coach** archetype options:
+  - "Systems Coach (Offense)"
+  - "Systems Coach (Defense)"
+  - "Systems Coach (Fast Breaks)"
+  - "Systems Coach (Presses/Traps)"
+- **Player Maximizer** archetype options:
+  - "Player Maximizer (Top 3 Attributes)"
+  - "Player Maximizer (Attributes 4-6)"
+  - "Player Maximizer (Custom)"
+  - "Player Maximizer (Be Opportunistic)"
+- **Culture Builder** archetype options:
+  - "Culture Builder (Inspire)"
+  - "Culture Builder (Community Engagement)"
+  - "Culture Builder (Teamwork)"
+  - "Culture Builder (Build Confidence)"
+
+#### Schedule Integration
+
+Training report links appear next to scheduled games on the Franchise Command Center schedule:
+- Link appears only for user's team's games
+- Link appears only if training has been completed for that week
+- Link styled in blue (#4a90e2) with reduced font size
+- Link text: "[Training Report]"
+- Navigates to training report page with correct parameters (mode, franchise_id, team_id, week)
 
 #### API Endpoints
 
