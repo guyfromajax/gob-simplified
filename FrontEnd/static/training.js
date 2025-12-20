@@ -345,3 +345,19 @@ submitBtn.addEventListener('click', async function() {
 // Initialize points remaining on page load
 updatePointsRemaining();
 
+// Debug: Verify scrimmages element exists on page load
+(function() {
+  const scrimmagesElem = document.getElementById('team-scrimmages');
+  console.log('🔋 [PAGE LOAD] team-scrimmages element:', scrimmagesElem);
+  if (scrimmagesElem) {
+    console.log('🔋 [PAGE LOAD] team-scrimmages value:', scrimmagesElem.value);
+    console.log('🔋 [PAGE LOAD] team-scrimmages type:', scrimmagesElem.type);
+    console.log('🔋 [PAGE LOAD] team-scrimmages id:', scrimmagesElem.id);
+  } else {
+    console.error('🔋 [PAGE LOAD] ERROR: team-scrimmages element NOT FOUND!');
+    // Try to find it with different methods
+    console.log('🔋 [PAGE LOAD] All elements with "scrimmages" in id:', document.querySelectorAll('[id*="scrimmages"]'));
+    console.log('🔋 [PAGE LOAD] All sliders:', document.querySelectorAll('.slider[data-category="team-drills"]'));
+  }
+})();
+
