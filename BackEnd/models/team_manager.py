@@ -80,7 +80,7 @@ class TeamManager:
         if team_attributes:
             self.team_attributes = team_attributes
         else:
-            self.team_attributes = self._init_team_attributes()
+            self.team_attributes = self._init_team_attributes(mode)
 
     def _load_roster(self):
         _, players = load_roster(self.name)
@@ -125,21 +125,50 @@ class TeamManager:
             "rebounding": random.randint(0, 4)
         }
 
-    def _init_team_attributes(self):
+    @staticmethod
+    def init_team_attributes(mode="single"):
+        """
+        Initialize team attributes for a new mode instance.
+        
+        Args:
+            mode (str): Game mode ("single", "tournament", or "franchise")
+                - Single Game & Tournament: Attributes use range -10 to 10, team_chemistry 7-25
+                - Franchise: Attributes use range -3 to 3, team_chemistry 7-13
+        
+        Returns:
+            dict: Team attributes with mode-specific randomization
+        """
+        # Common attributes for all modes
+        shot_threshold = random.randint(-100, 100)
+        rebound_modifier = random.choice([0.8, 0.9, 1.0, 1.1, 1.2])
+        
+        # Mode-specific ranges
+        if mode == "franchise":
+            # Franchise mode: tighter ranges for more controlled progression
+            attr_range = (-3, 3)
+            team_chemistry = random.randint(7, 13)
+        else:
+            # Single Game & Tournament mode: wider ranges
+            attr_range = (-10, 10)
+            team_chemistry = random.randint(7, 25)
+        
         return {
-            "shot_threshold": random.randint(-50, 50),
-            "turnover_modifier": random.randint(-10, 10),
-            "foul_modifier": random.randint(-10, 10),
-            "rebound_modifier": random.choice([0.8, 0.9, 1.0, 1.1, 1.2]),
-            "momentum_score": random.randint(-10,10),
-            "offensive_efficiency": random.randint(-10,10),
-            "team_chemistry": random.randint(7,25),
-            "defensive_efficiency": random.randint(-10,10),
-            "fb_efficiency": random.randint(-10,10),
-            "pt_efficiency": random.randint(-10,10),
-            "fb_opp_modifier": random.randint(-10,10),
-            "pt_opp_modifier": random.randint(-10,10)
+            "shot_threshold": shot_threshold,
+            "turnover_modifier": random.randint(attr_range[0], attr_range[1]),
+            "foul_modifier": random.randint(attr_range[0], attr_range[1]),
+            "rebound_modifier": rebound_modifier,
+            "offensive_efficiency": random.randint(attr_range[0], attr_range[1]),
+            "team_chemistry": team_chemistry,
+            "defensive_efficiency": random.randint(attr_range[0], attr_range[1]),
+            "fb_efficiency": random.randint(attr_range[0], attr_range[1]),
+            "pt_efficiency": random.randint(attr_range[0], attr_range[1]),
+            "fb_opp_modifier": random.randint(attr_range[0], attr_range[1]),
+            "pt_opp_modifier": random.randint(attr_range[0], attr_range[1])
         }
+    
+    def _init_team_attributes(self, mode="single"):
+        """Instance method wrapper for static init_team_attributes."""
+        return TeamManager.init_team_attributes(mode)
 
     def _create_defense_structure_template(self):
         """Create the standard defense structure template used by all defense types.

@@ -189,22 +189,24 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
         # Get populated plays for all teams
         populated_plays = populate_team_plays()
         
+        from BackEnd.models.team_manager import TeamManager
         for team in teams:
             tid = str(team["_id"])
             if tid not in franchise_teams:
+                # Use mode initialization system for new franchise teams
+                team_attrs = TeamManager.init_team_attributes(mode="franchise")
                 franchise_teams[tid] = {
-                    "team_chemistry": team.get("team_chemistry", 0),
-                    "offensive_efficiency": team.get("offensive_efficiency", 0),
-                    "defense_threshold": team.get("defense_threshold", 0),
-                    "shot_threshold": team.get("shot_threshold", 0),
-                    "turnover_modifier": team.get("turnover_modifier", 0),
-                    "foul_modifier": team.get("foul_modifier", 0),
-                    "rebound_modifier": team.get("rebound_modifier", 0),
-                    "defensive_efficiency": team.get("defensive_efficiency", 0),
-                    "fb_efficiency": team.get("fb_efficiency", 0),
-                    "pt_efficiency": team.get("pt_efficiency", 0),
-                    "fb_opp_modifier": team.get("fb_opp_modifier", 0),
-                    "pt_opp_modifier": team.get("pt_opp_modifier", 0),
+                    "team_chemistry": team_attrs["team_chemistry"],
+                    "offensive_efficiency": team_attrs["offensive_efficiency"],
+                    "shot_threshold": team_attrs["shot_threshold"],
+                    "turnover_modifier": team_attrs["turnover_modifier"],
+                    "foul_modifier": team_attrs["foul_modifier"],
+                    "rebound_modifier": team_attrs["rebound_modifier"],
+                    "defensive_efficiency": team_attrs["defensive_efficiency"],
+                    "fb_efficiency": team_attrs["fb_efficiency"],
+                    "pt_efficiency": team_attrs["pt_efficiency"],
+                    "fb_opp_modifier": team_attrs["fb_opp_modifier"],
+                    "pt_opp_modifier": team_attrs["pt_opp_modifier"],
                     "playcall_settings": defaults["playcall_settings"].copy(),
                     "strategy_settings": defaults["strategy_settings"].copy(),
                     "plays": populated_plays.copy()

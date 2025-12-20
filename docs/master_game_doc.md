@@ -2831,6 +2831,151 @@ The Play Builder (`play-builder-v2.html`) is a web-based tool for creating and e
 
 ---
 
+## Mode Initialization System ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The Mode Initialization System diversifies attribute values when users create a new mode instance (Single Game, Tournament, or Franchise). This system ensures that each new game mode instance has unique player and team attributes, adding variety and replayability to the game experience.
+
+**Location:** `BackEnd/models/team_manager.py`, `BackEnd/models/player.py`  
+**Status:** ✅ Fully implemented for all three game modes  
+**Scope:** Applies only to new mode instance creation; existing instances persist their unique data
+
+### Initialization Scope
+
+**Single Game Mode:**
+- Applies to the 2 teams participating in the game instance
+- Player attributes randomized for all players on both teams
+- Team attributes randomized for both teams
+
+**Tournament Mode:**
+- Applies to all 8 teams in the tournament instance
+- Player attributes randomized for all players on all 8 teams
+- Team attributes randomized for all 8 teams
+
+**Franchise Mode:**
+- Applies to all 8 teams in the franchise instance
+- Player attributes randomized for all players on all 8 teams
+- Team attributes randomized for all 8 teams (with different ranges than Single/Tournament)
+
+### Player Attribute Initialization
+
+When a new mode instance is created, player attributes are initialized as follows:
+
+**Copied from Universal Players Collection:**
+- `SC` (Shooting Close) - Exact value from universal collection
+- `SH` (Shooting) - Exact value from universal collection
+- `ID` (Inside Defense) - Exact value from universal collection
+- `OD` (Outside Defense) - Exact value from universal collection
+- `PS` (Passing) - Exact value from universal collection
+- `BH` (Ball Handling) - Exact value from universal collection
+- `RB` (Rebounding) - Exact value from universal collection
+- `ST` (Stealing) - Exact value from universal collection
+- `AG` (Agility) - Exact value from universal collection
+- `ND` (Endurance) - Exact value from universal collection
+- `IQ` (Intelligence Quotient) - Exact value from universal collection
+- `FT` (Free Throw) - Exact value from universal collection
+
+**Randomized Values:**
+- `NG` (Energy) - Always set to `1.0` (full energy at start)
+- `CH` (Chemistry) - `random.randint(1, 100)`
+- `MO` (Momentum) - Weighted random distribution:
+  - `0`: 50% chance
+  - `-1` or `1`: 15% chance each (30% total)
+  - `-2` or `2`: 7.5% chance each (15% total)
+  - `-3` or `3`: 2.5% chance each (5% total)
+- `EM` (Emotion) - `random.randint(1, 100)`
+
+**Implementation:**
+- `Player.randomize_game_attributes()` method in `BackEnd/models/player.py`
+- Called during mode instance creation for all players
+- Updates both the attribute and its anchor value (e.g., `EM` and `anchor_EM`)
+
+### Team Attribute Initialization
+
+When a new mode instance is created, team attributes are initialized with mode-specific ranges:
+
+**Common Attributes (All Modes):**
+- `shot_threshold` - `random.randint(-100, 100)`
+- `rebound_modifier` - `random.choice([0.8, 0.9, 1.0, 1.1, 1.2])`
+
+**Team Chemistry (Mode-Specific):**
+- **Single Game & Tournament Mode:** `random.randint(7, 25)`
+- **Franchise Mode:** `random.randint(7, 13)` (lower range for more challenging progression)
+
+**All Other Team Attributes (Mode-Specific Ranges):**
+- **Single Game & Tournament Mode:** `random.randint(-10, 10)`
+  - `turnover_modifier`
+  - `foul_modifier`
+  - `offensive_efficiency`
+  - `defensive_efficiency`
+  - `fb_efficiency`
+  - `pt_efficiency`
+  - `fb_opp_modifier`
+  - `pt_opp_modifier`
+- **Franchise Mode:** `random.randint(-3, 3)` (tighter range for more controlled progression)
+  - Same attributes as above
+
+**Implementation:**
+- `TeamManager._init_team_attributes(mode)` method in `BackEnd/models/team_manager.py`
+- Accepts `mode` parameter to determine attribute ranges
+- Called during team initialization when `team_attributes` is not provided
+
+### Initialization Points
+
+**Single Game Mode:**
+- **Location:** `BackEnd/api/api.py` - `init_game()` endpoint
+- **Process:**
+  1. `GameManager` is created with team names
+  2. `TeamManager.__init__()` loads roster and initializes team attributes
+  3. `_initialize_game_stats()` randomizes player attributes (EM, CH, MO)
+  4. Game document is created with initialized attributes
+
+**Tournament Mode:**
+- **Location:** `BackEnd/tournament/tournament_manager.py` - `create_tournament()` method
+- **Process:**
+  1. Tournament document is created
+  2. All players from participating teams are loaded
+  3. `Player.randomize_game_attributes()` is called for each player
+  4. Team attributes are initialized when teams are first used in games
+
+**Franchise Mode:**
+- **Location:** `BackEnd/models/franchise_manager.py` - `initialize_season()` method
+- **Process:**
+  1. Season is initialized
+  2. All players from all teams are loaded
+  3. `Player.randomize_game_attributes()` is called for each player
+  4. Team attributes are initialized in `franchise_teams` structure with Franchise-specific ranges
+
+### Data Persistence
+
+**Important:** Once a mode instance is created, its unique attribute values persist:
+- **Single Game:** Attributes stored in game document, persist across quarters
+- **Tournament:** Attributes stored in tournament document, persist across rounds
+- **Franchise:** Attributes stored in franchise document, persist across weeks and seasons
+
+**Evolution:**
+- Attributes can change based on:
+  - Training system (Franchise/Tournament modes)
+  - In-game performance (momentum, chemistry adjustments)
+  - User interactions (coaching decisions, lineup changes)
+- Initial randomization provides the starting point; subsequent changes build upon these values
+
+### Key Files
+
+- `BackEnd/models/player.py` - `Player.randomize_game_attributes()` (lines 51-70)
+  - Player attribute initialization logic
+- `BackEnd/models/team_manager.py` - `TeamManager._init_team_attributes()` (lines 128-142)
+  - Team attribute initialization logic with mode-specific ranges
+- `BackEnd/api/api.py` - `init_game()` (lines 2099-2142)
+  - Single Game mode initialization
+- `BackEnd/tournament/tournament_manager.py` - `create_tournament()` (lines 32-86)
+  - Tournament mode initialization
+- `BackEnd/models/franchise_manager.py` - `initialize_season()` (lines 109-210)
+  - Franchise mode initialization
+
+---
+
 ## Plays System ✅ **COMPLETE** (January 2025)
 
 ### Overview

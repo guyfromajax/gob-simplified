@@ -51,22 +51,54 @@ class Player:
     @staticmethod
     def randomize_game_attributes(attributes: dict) -> dict:
         """
-        Randomize EM, CH, and MO for a new game instance.
+        Initialize player attributes for a new mode instance.
+        Copies exact values from universal collection for most attributes,
+        then randomizes NG, CH, MO, and EM according to mode initialization rules.
+        
         Should be called when initializing players for a new Single Game, Tournament, or Franchise.
         
         Args:
-            attributes: Player attributes dict
+            attributes: Player attributes dict (from universal players collection)
             
         Returns:
-            Modified attributes dict with randomized EM, CH, MO
+            Modified attributes dict with:
+            - Exact values copied for: SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT
+            - NG = 1.0
+            - CH = random.randint(1, 100)
+            - MO = weighted random (0: 50%, -1/1: 15% each, -2/2: 7.5% each, -3/3: 2.5% each)
+            - EM = random.randint(1, 100)
         """
-        attributes["EM"] = random.randint(1, 100)
+        # NG is always 1.0 at start of new mode instance
+        attributes["NG"] = 1.0
+        attributes["anchor_NG"] = 1.0
+        
+        # CH is random 1-100
         attributes["CH"] = random.randint(1, 100)
-        attributes["MO"] = random.randint(-10, 10)  # Range from -10 to +10
-        # Update anchors as well
-        attributes["anchor_EM"] = attributes["EM"]
         attributes["anchor_CH"] = attributes["CH"]
+        
+        # MO is weighted random distribution
+        # 0: 50%, -1/1: 15% each, -2/2: 7.5% each, -3/3: 2.5% each
+        mo_roll = random.random()
+        if mo_roll < 0.50:
+            attributes["MO"] = 0
+        elif mo_roll < 0.65:
+            attributes["MO"] = -1
+        elif mo_roll < 0.80:
+            attributes["MO"] = 1
+        elif mo_roll < 0.875:
+            attributes["MO"] = -2
+        elif mo_roll < 0.95:
+            attributes["MO"] = 2
+        elif mo_roll < 0.975:
+            attributes["MO"] = -3
+        else:
+            attributes["MO"] = 3
         attributes["anchor_MO"] = attributes["MO"]
+        
+        # EM is random 1-100
+        attributes["EM"] = random.randint(1, 100)
+        attributes["anchor_EM"] = attributes["EM"]
+        
         return attributes
 
     def _init_stats(self):
