@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coaching Grid - GOB</title>
+  <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico" />
+  <link rel="stylesheet" href="coaching-grid.css">
+</head>
+<body>
+  <div class="coaching-grid-container">
+    <h1 class="page-title">Coaching Grid</h1>
+    
+    <div class="grid-wrapper">
+      <!-- Axis Labels -->
+      <div class="axis-label axis-label-top">Embedded</div>
+      <div class="axis-label axis-label-bottom">Fragile</div>
+      <div class="axis-label axis-label-left">Stagnant</div>
+      <div class="axis-label axis-label-right">Compounding</div>
+      
+      <!-- Grid Container -->
+      <div class="grid-container" id="grid-container">
+        <!-- Crosshair lines -->
+        <div class="axis-line axis-vertical"></div>
+        <div class="axis-line axis-horizontal"></div>
+        
+        <!-- Archetype Dots -->
+        <div class="archetype-dot" 
+             data-archetype="authoritarian" 
+             data-effectiveness="24" 
+             data-momentum="0"
+             style="--dot-color: var(--color-authoritarian);">
+          <span class="dot-label">Authoritarian</span>
+        </div>
+        
+        <div class="archetype-dot" 
+             data-archetype="systems" 
+             data-effectiveness="92" 
+             data-momentum="5"
+             style="--dot-color: var(--color-systems-coach);">
+          <span class="dot-label">Systems</span>
+        </div>
+        
+        <div class="archetype-dot" 
+             data-archetype="player-maximizer" 
+             data-effectiveness="35" 
+             data-momentum="9"
+             style="--dot-color: var(--color-player-maximizer);">
+          <span class="dot-label">Player Maximizer</span>
+        </div>
+        
+        <div class="archetype-dot" 
+             data-archetype="culture" 
+             data-effectiveness="50" 
+             data-momentum="3"
+             style="--dot-color: var(--color-culture-builder);">
+          <span class="dot-label">Culture</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="coaching-grid.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,178 @@
+:root {
+  /* Archetype colors - matching training.css */
+  --color-authoritarian: #ff4444;
+  --color-systems-coach: #d4a017;
+  --color-player-maximizer: #2d8f2d;
+  --color-culture-builder: #9b59b6;
+  
+  /* Grid colors */
+  --color-bg: #f5f5f5;
+  --color-axis: #999;
+  --color-text: #333;
+  --color-text-muted: #666;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+.coaching-grid-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3rem;
+  padding: 2rem;
+}
+
+.page-title {
+  font-size: 2.5rem;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: center;
+}
+
+.grid-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 800px;
+  aspect-ratio: 1;
+  margin: 2rem 0;
+}
+
+/* Axis Labels */
+.axis-label {
+  position: absolute;
+  font-weight: 600;
+  font-size: 1.2rem;
+  color: var(--color-text);
+  z-index: 10;
+}
+
+.axis-label-top {
+  top: -2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.axis-label-bottom {
+  bottom: -2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.axis-label-left {
+  left: -5rem;
+  top: 50%;
+  transform: translateY(-50%) rotate(-90deg);
+  transform-origin: center;
+}
+
+.axis-label-right {
+  right: -5rem;
+  top: 50%;
+  transform: translateY(-50%) rotate(90deg);
+  transform-origin: center;
+}
+
+/* Grid Container */
+.grid-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Axis Lines (Crosshair) */
+.axis-line {
+  position: absolute;
+  background: var(--color-axis);
+  z-index: 1;
+}
+
+.axis-vertical {
+  left: 50%;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  transform: translateX(-50%);
+}
+
+.axis-horizontal {
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+/* Archetype Dots */
+.archetype-dot {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--dot-color);
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  z-index: 5;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.archetype-dot:hover {
+  transform: translate(-50%, -50%) scale(1.2);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.dot-label {
+  position: absolute;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  pointer-events: none;
+}
+
+/* Label positioning - place labels to the right and slightly above dots */
+.archetype-dot .dot-label {
+  left: 28px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Responsive adjustments for desktop */
+@media (min-width: 1024px) {
+  .grid-wrapper {
+    max-width: 900px;
+  }
+  
+  .axis-label {
+    font-size: 1.3rem;
+  }
+  
+  .archetype-dot {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .dot-label {
+    font-size: 1rem;
+  }
+}
+
