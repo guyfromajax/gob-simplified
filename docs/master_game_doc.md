@@ -6813,10 +6813,48 @@ Training report links appear next to scheduled games on the Franchise Command Ce
 - `FrontEnd/static/training-report.html` - Training report display page
 - `FrontEnd/static/training-report.css` - Report page styling
 - `FrontEnd/static/training-report.js` - Report data loading and rendering
+- `FrontEnd/static/franchise-command-center.js` - Schedule rendering with training report links
 
 **Backend:**
 - `BackEnd/models/training_execution_v2.py` - Core training execution logic
-- `BackEnd/api/franchise_routes.py` - Training API endpoints (`/franchise/run-training`, `/franchise/training-report`)
+- `BackEnd/api/franchise_routes.py` - Training API endpoints
+  - `POST /franchise/run-training` - Submit training
+  - `GET /franchise/training-report` - Get training report data
+  - `GET /franchise/schedule` - Get schedule with training report flags
+
+#### Data Flow
+
+1. **Training Submission:**
+   - User allocates 24 training points and selects coaching focus on `training.html`
+   - Frontend sends POST request to `/franchise/run-training` with training data
+   - Backend executes training (pre-conditions, point allocation, clamping)
+   - Backend stores training report in `franchise_teams.{team_id}.training_reports.{week}`
+   - Backend updates player attributes and team attributes in franchise document
+   - Backend returns redirect URL to training report page
+
+2. **Training Report Display:**
+   - Frontend loads training report data from `/franchise/training-report` endpoint
+   - Backend resolves team_id (handles both name and ID formats)
+   - Backend retrieves players from `franchise.players` collection (filtered by `meta.team_id`)
+   - Backend retrieves training report from `franchise_teams.{team_id}.training_reports.{week}`
+   - Frontend renders players table and team attributes with visualizations
+
+3. **Schedule Integration:**
+   - Schedule endpoint (`/franchise/schedule`) checks for training reports
+   - Adds `has_training_report` and `is_user_team` flags to each game
+   - Frontend renders training report links for eligible games
+
+#### Team ID Resolution
+
+The training report system handles team_id in multiple formats:
+- **Team Name:** Resolved to team `_id` via database lookup
+- **Team ID (string):** Used directly
+- **Team ID (ObjectId):** Converted to string
+
+For player loading, the system:
+- Checks `meta.team_id` first
+- Falls back to `meta.team` name lookup if `team_id` is missing
+- Compares resolved team IDs to filter players
 
 ---
 
