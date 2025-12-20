@@ -57,8 +57,17 @@ function initAttributeTooltips(container = document, selectors = []) {
       if (ATTRIBUTE_NAMES[upperText]) {
         element.setAttribute('title', ATTRIBUTE_NAMES[upperText]);
         element.style.cursor = 'help';
+        // Remove any existing title attribute that might conflict
+        element.removeAttribute('data-original-title');
         tooltipCount++;
-        console.log(`[TOOLTIP] ✅ Set tooltip for "${text}" → "${ATTRIBUTE_NAMES[upperText]}"`);
+        
+        // Verify it was set
+        const verifyTitle = element.getAttribute('title');
+        if (verifyTitle === ATTRIBUTE_NAMES[upperText]) {
+          console.log(`[TOOLTIP] ✅ Set tooltip for "${text}" → "${ATTRIBUTE_NAMES[upperText]}"`);
+        } else {
+          console.warn(`[TOOLTIP] ⚠️ Failed to set tooltip for "${text}" - title is "${verifyTitle}"`);
+        }
       }
       
       // Also check data-attr attribute if present
