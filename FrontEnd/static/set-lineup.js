@@ -1645,11 +1645,24 @@ document.addEventListener('DOMContentLoaded', () => {
   initViewToggle();
   
   // Initialize tooltips for table headers (th elements only)
-  if (typeof initAttributeTooltips !== 'undefined') {
-    const thead = document.querySelector('.roster-table thead');
-    if (thead) {
-      initAttributeTooltips(thead, ['th']);
+  // Use a small delay to ensure thead is fully rendered
+  setTimeout(() => {
+    if (typeof initAttributeTooltips !== 'undefined') {
+      const thead = document.querySelector('.roster-table thead');
+      if (thead) {
+        initAttributeTooltips(thead, ['th']);
+        
+        // Verify tooltips were set by checking a sample element
+        const sampleTh = thead.querySelector('th');
+        if (sampleTh && sampleTh.textContent.trim() === 'SC') {
+          const title = sampleTh.getAttribute('title');
+          console.log(`[TOOLTIP VERIFY] Sample th "SC" has title: "${title}"`);
+        }
+      } else {
+        console.warn('[TOOLTIP] thead element not found');
+      }
     }
-  }
+  }, 100);
+  
   setupSlotDragAndDrop();
 });
