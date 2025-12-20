@@ -197,7 +197,9 @@ def apply_training_points(
     # Normalize allocations from frontend structure to flat structure
     # Frontend sends: {player_drills: {offense: {inside: 3, outside: 2}, ...}, team_drills: {...}, general: {...}}
     # We need to flatten this to: {offensive_drills: {inside: 3, outside: 2}, ...}
+    logger.warning(f"🔋 [TRAINING] Raw allocations received: {allocations}")
     normalized_allocations = _normalize_allocations(allocations)
+    logger.warning(f"🔋 [TRAINING] Normalized allocations keys: {list(normalized_allocations.keys())}")
     
     # Map training categories to player attributes (from training_execution.md)
     player_category_map = {
