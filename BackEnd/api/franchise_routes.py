@@ -5,7 +5,7 @@ from pathlib import Path
 from bson import ObjectId
 import logging
 import random
-from typing import Any
+from typing import Any, Optional
 from datetime import datetime
 from BackEnd.main import run_simulation
 
@@ -868,7 +868,7 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
 
 class FranchiseTrainingRequest(BaseModel):
     franchise_id: str
-    team_id: str = None
+    team_id: Optional[str] = None
     training_data: dict  # Contains player_drills, team_drills, general, coaching_focus
 
 
