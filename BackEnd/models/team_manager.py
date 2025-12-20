@@ -179,7 +179,9 @@ class TeamManager:
         return {
             "used": 0,
             "success": 0,
-            "effectiveness": 0.0,
+            "effectiveness": 0.0,  # Per-team effectiveness (training-impacted)
+            "momentum": 0,          # Per-team momentum (training-impacted)
+            "cloaking": 0,          # Per-team cloaking (training-impacted)
             "game_stats": {
                 "used": 0,
                 "success": 0,
