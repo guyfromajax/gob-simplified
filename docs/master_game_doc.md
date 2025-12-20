@@ -8264,6 +8264,7 @@ These fields are loaded from the universal `teams` collection in MongoDB:
 - `primary_color` (str) - Primary team color (hex format, e.g., "#000000")
 - `secondary_color` (str) - Secondary team color (hex format, e.g., "#ffffff")
 - `mascot` (str) - Team mascot name
+- `coaching` (dict) - Coaching attributes object (see Coaching Attributes System section)
 
 #### Instance Fields (Initialized Per Game)
 
@@ -8491,6 +8492,111 @@ When team objects are created in Single Game, Tournament, or Franchise modes, th
 - **Training**: Updates team attributes in franchise mode (and future tournament mode)
 - **Gameplay**: Team attributes are read-only during gameplay (not modified by game events)
 - **Persistence**: Changes persist to the appropriate document based on game mode
+
+---
+
+## Coaching Attributes System ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The Coaching Attributes System tracks coaching effectiveness and archetype performance for each team. This system stores data about how effective a team's coaching is and tracks performance across different coaching archetypes (Authoritarian, Systems Coach, Player Maximizer, Culture Builder).
+
+**Location:** Universal `teams` collection - `coaching` field  
+**Status:** ✅ Fully implemented - All teams in universal collection have coaching structure
+
+### Coaching Object Structure
+
+Each team in the universal `teams` collection contains a `coaching` object with the following structure:
+
+```json
+{
+  "coaching": {
+    "effectiveness": 0,
+    "training_focus_list": [],
+    "authoritarian": {
+      "score": 0,
+      "momentum": 0
+    },
+    "systems coach": {
+      "score": 0,
+      "momentum": 0
+    },
+    "player maximizer": {
+      "score": 0,
+      "momentum": 0
+    },
+    "culture builder": {
+      "score": 0,
+      "momentum": 0
+    }
+  }
+}
+```
+
+### Field Descriptions
+
+#### Top-Level Fields
+
+- **`effectiveness`** (integer) - Overall coaching effectiveness score
+  - Initialized to `0`
+  - Represents the team's overall coaching quality
+  - Can be modified based on training results, game performance, and coaching focus selections
+
+- **`training_focus_list`** (array of strings) - Historical list of training focus selections
+  - Initialized as empty array `[]`
+  - Tracks which coaching focuses have been selected over time
+  - Used for pattern analysis and coaching development
+
+#### Archetype Objects
+
+Each of the four coaching archetypes has its own object with two fields:
+
+- **`score`** (integer) - Performance score for this archetype
+  - Initialized to `0`
+  - Tracks how well the team performs when using this coaching style
+  - Can increase or decrease based on training focus selections and results
+
+- **`momentum`** (integer) - Momentum score for this archetype
+  - Initialized to `0`
+  - Tracks recent performance trends for this coaching style
+  - Used to determine if a team is trending up or down with a particular approach
+
+**Archetypes:**
+1. **`authoritarian`** - Discipline, Rebounding, Execution, Teamwork focus
+2. **`systems coach`** - Offense, Defense, Fast Breaks, Presses/Traps focus
+3. **`player maximizer`** - Top 3 Attributes, Attributes 4-6, Custom, Be Opportunistic focus
+4. **`culture builder`** - Inspire, Community Engagement, Teamwork, Build Confidence focus
+
+### Initialization
+
+**Script:** `scripts/add_coaching_field_to_teams.py`
+
+This script ensures all teams in the universal `teams` collection have the complete coaching structure:
+- Adds `coaching` field to all teams that don't have it
+- Initializes all fields with default values (0 for integers, [] for arrays)
+- Validates and updates teams with incomplete coaching structures
+- Provides verification and sample output
+
+**Usage:**
+```bash
+python scripts/add_coaching_field_to_teams.py
+```
+
+### Future Use Cases
+
+The coaching attributes system is designed to support:
+- **Training Focus Tracking**: Record which coaching focuses are selected and their effectiveness
+- **Archetype Performance Analysis**: Track which coaching styles work best for each team
+- **Momentum Tracking**: Identify trends in coaching effectiveness over time
+- **Dynamic Coaching Adjustments**: Modify coaching effectiveness based on training and game results
+- **Coaching Development**: Allow teams to improve their coaching effectiveness through consistent focus selection
+
+### Integration with Training System
+
+The coaching attributes system integrates with the Training System:
+- Training focus selections can update archetype scores and momentum
+- Training effectiveness can influence overall coaching effectiveness
+- Historical training focus list tracks coaching style evolution
 
 ## Resolution System 🚧 **IN PROGRESS** (January 2025)
 
