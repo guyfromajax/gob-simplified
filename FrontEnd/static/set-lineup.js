@@ -421,10 +421,8 @@ function renderRoster() {
     tbody.appendChild(tr);
   });
   
-  // Initialize tooltips for table cells (td elements only - th are in thead)
-  if (typeof initAttributeTooltips !== 'undefined') {
-    initAttributeTooltips(tbody, ['td']);
-  }
+  // Note: Tooltips for th headers are initialized in DOMContentLoaded
+  // We don't need to initialize tooltips for td elements (they contain values, not abbreviations)
 }
 
 function updatePlayButton() {
@@ -1646,11 +1644,11 @@ document.addEventListener('DOMContentLoaded', () => {
   init();
   initViewToggle();
   
-  // Initialize tooltips for table headers
+  // Initialize tooltips for table headers (th elements only)
   if (typeof initAttributeTooltips !== 'undefined') {
-    const rosterTable = document.querySelector('.roster-table');
-    if (rosterTable) {
-      initAttributeTooltips(rosterTable, ['th']);
+    const thead = document.querySelector('.roster-table thead');
+    if (thead) {
+      initAttributeTooltips(thead, ['th']);
     }
   }
   setupSlotDragAndDrop();

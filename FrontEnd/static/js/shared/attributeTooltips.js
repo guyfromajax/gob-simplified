@@ -48,23 +48,17 @@ function initAttributeTooltips(container = document, selectors = []) {
   
   selectors.forEach(selector => {
     const elements = container.querySelectorAll(selector);
-    console.log(`[TOOLTIP] Found ${elements.length} elements for selector "${selector}"`);
+    let tooltipCount = 0;
     elements.forEach(element => {
       const text = element.textContent.trim();
       const upperText = text.toUpperCase();
-      
-      // Debug: Log what we're checking
-      if (text && text.length <= 5) { // Only log short text (likely abbreviations)
-        console.log(`[TOOLTIP] Checking element with text: "${text}" (upper: "${upperText}")`);
-      }
       
       // Check if this is an attribute abbreviation
       if (ATTRIBUTE_NAMES[upperText]) {
         element.setAttribute('title', ATTRIBUTE_NAMES[upperText]);
         element.style.cursor = 'help';
-        // Verify the title was set
-        const verifyTitle = element.getAttribute('title');
-        console.log(`[TOOLTIP] ✅ Set tooltip for "${text}" → "${ATTRIBUTE_NAMES[upperText]}" (verified: "${verifyTitle}")`);
+        tooltipCount++;
+        console.log(`[TOOLTIP] ✅ Set tooltip for "${text}" → "${ATTRIBUTE_NAMES[upperText]}"`);
       }
       
       // Also check data-attr attribute if present
@@ -73,11 +67,14 @@ function initAttributeTooltips(container = document, selectors = []) {
         if (ATTRIBUTE_NAMES[attr]) {
           element.setAttribute('title', ATTRIBUTE_NAMES[attr]);
           element.style.cursor = 'help';
-          const verifyTitle = element.getAttribute('title');
-          console.log(`[TOOLTIP] ✅ Set tooltip via data-attr for "${attr}" → "${ATTRIBUTE_NAMES[attr]}" (verified: "${verifyTitle}")`);
+          tooltipCount++;
+          console.log(`[TOOLTIP] ✅ Set tooltip via data-attr for "${attr}" → "${ATTRIBUTE_NAMES[attr]}"`);
         }
       }
     });
+    if (tooltipCount > 0) {
+      console.log(`[TOOLTIP] Initialized ${tooltipCount} tooltips for selector "${selector}"`);
+    }
   });
 }
 
