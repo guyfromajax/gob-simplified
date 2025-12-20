@@ -613,7 +613,14 @@ def team_stats():
         totals = {}
         for p in players:
             for stat, val in p.get("stats", {}).get("season", {}).items():
-                totals[stat] = totals.get(stat, 0) + val
+                # Handle case where val might be a list or other non-numeric type
+                if isinstance(val, (int, float)):
+                    totals[stat] = totals.get(stat, 0) + val
+                elif isinstance(val, list) and len(val) > 0:
+                    # If it's a list, try to sum the numeric values
+                    numeric_vals = [v for v in val if isinstance(v, (int, float))]
+                    if numeric_vals:
+                        totals[stat] = totals.get(stat, 0) + sum(numeric_vals)
         output.append({"team": t["name"], "stats": totals})
     return {"teams": output}
 
