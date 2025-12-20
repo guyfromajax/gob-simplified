@@ -926,14 +926,14 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     # Get user's team (use team_id from request if provided, otherwise from state)
     team_id = req.team_id
     if not team_id:
-    state = franchise_state_collection.find_one({"_id": "state"}) or {}
-    team_name = state.get("team")
-    if not team_name:
-        raise HTTPException(status_code=404, detail="User team not found")
-    team_doc = db.teams.find_one({"name": team_name})
-    if not team_doc:
-        raise HTTPException(status_code=404, detail="Team not found")
-    team_id = str(team_doc["_id"])
+        state = franchise_state_collection.find_one({"_id": "state"}) or {}
+        team_name = state.get("team")
+        if not team_name:
+            raise HTTPException(status_code=404, detail="User team not found")
+        team_doc = db.teams.find_one({"name": team_name})
+        if not team_doc:
+            raise HTTPException(status_code=404, detail="Team not found")
+        team_id = str(team_doc["_id"])
     else:
         # team_id might be a name, try to resolve it
         team_doc = db.teams.find_one({"name": team_id})
