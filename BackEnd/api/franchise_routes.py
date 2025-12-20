@@ -1155,8 +1155,24 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             for player_id, player_data in franchise_players.items():
                 # Check if player belongs to this team
                 meta = player_data.get("meta", {})
-                player_team_id = str(meta.get("team_id", ""))
+                player_team_id = meta.get("team_id")
                 
+                # Handle different formats: ObjectId, string, or None
+                if player_team_id is None:
+                    # Try to get team from team name in meta
+                    player_team_name = meta.get("team", "")
+                    if player_team_name:
+                        player_team_doc = db.teams.find_one({"name": player_team_name})
+                        if player_team_doc:
+                            player_team_id = str(player_team_doc["_id"])
+                        else:
+                            continue
+                    else:
+                        continue
+                else:
+                    player_team_id = str(player_team_id)
+                
+                # Compare team IDs
                 if player_team_id != team_id_str:
                     continue
                 
