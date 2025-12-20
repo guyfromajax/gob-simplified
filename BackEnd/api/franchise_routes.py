@@ -974,11 +974,19 @@ def run_franchise_training(req: FranchiseTrainingRequest):
 
     # Extract training data
     training_data = req.training_data
+    logger.warning(f"🔋 [API] training_data keys: {list(training_data.keys())}")
+    logger.warning(f"🔋 [API] team_drills in training_data: {'team_drills' in training_data}")
+    if "team_drills" in training_data:
+        logger.warning(f"🔋 [API] team_drills content: {training_data['team_drills']}")
+        logger.warning(f"🔋 [API] scrimmages in team_drills: {'scrimmages' in training_data.get('team_drills', {})}")
+        if "scrimmages" in training_data.get("team_drills", {}):
+            logger.warning(f"🔋 [API] scrimmages value: {training_data['team_drills']['scrimmages']}")
     allocations = {
         "player_drills": training_data.get("player_drills", {}),
         "team_drills": training_data.get("team_drills", {}),
         "general": training_data.get("general", {})
     }
+    logger.warning(f"🔋 [API] allocations.team_drills: {allocations.get('team_drills', {})}")
     coaching_focus = training_data.get("coaching_focus")
 
     # Execute new training system
