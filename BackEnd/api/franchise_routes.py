@@ -639,7 +639,7 @@ def team_stats():
             for stat, val in p.get("stats", {}).get("season", {}).items():
                 # Handle case where val might be a list or other non-numeric type
                 if isinstance(val, (int, float)):
-                    totals[stat] = totals.get(stat, 0) + val
+                totals[stat] = totals.get(stat, 0) + val
                 elif isinstance(val, list) and len(val) > 0:
                     # If it's a list, try to sum the numeric values
                     numeric_vals = [v for v in val if isinstance(v, (int, float))]
