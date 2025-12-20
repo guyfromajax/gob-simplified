@@ -350,11 +350,15 @@ body {
 }
 
 /* +/- Design for Fast Break Defense and Press/Trap Breaks */
+.plus-minus-container {
+  text-align: center;
+  margin-top: var(--spacing-sm);
+}
+
 .plus-minus-indicator {
   font-size: 1.5rem;
   font-weight: 700;
   display: inline-block;
-  margin-left: var(--spacing-xs);
 }
 
 .plus-minus-positive {
