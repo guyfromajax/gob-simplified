@@ -993,6 +993,9 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     team_data = franchise_teams.get(team_id, {})
     team_stats = team_data.copy()
 
+    # Extract training data
+    training_data = req.training_data
+    
     # Get plays, game plan settings, and playbook settings for training
     plays_data = team_data.get("plays", {})
     playcall_settings = team_data.get("playcall_settings", {})
@@ -1003,9 +1006,6 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     logger.warning(f"📚 [API] Loading plays_data: {len(plays_data)} plays")
     logger.warning(f"📚 [API] Loading scouting_data: {list(scouting_data.keys()) if scouting_data else 'None'}")
     logger.warning(f"📚 [API] playbook_training_mode: {training_data.get('playbook_training_mode', 'not provided')}")
-
-    # Extract training data
-    training_data = req.training_data
     logger.warning(f"🔋 [API] training_data keys: {list(training_data.keys())}")
     logger.warning(f"🔋 [API] team_drills in training_data: {'team_drills' in training_data}")
     if "team_drills" in training_data:
