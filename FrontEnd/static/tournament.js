@@ -1,5 +1,29 @@
-let tournament = JSON.parse(localStorage.getItem("activeTournament")) || null;
-let userTeamId = localStorage.getItem("userTeamId") || "";
+// Read URL parameters first (for navigation from training report, etc.)
+const urlParams = new URLSearchParams(window.location.search);
+const urlTournamentId = urlParams.get('tournament_id');
+const urlTeamId = urlParams.get('team_id');
+
+// Initialize tournament and userTeamId from URL params or localStorage
+let tournament = null;
+let userTeamId = "";
+
+// If tournament_id is in URL, use it (overrides localStorage)
+if (urlTournamentId) {
+  // Will be loaded in loadTournament() using the URL param
+  tournament = null; // Force reload from URL
+} else {
+  // Fall back to localStorage
+  tournament = JSON.parse(localStorage.getItem("activeTournament")) || null;
+}
+
+// If team_id is in URL, use it (overrides localStorage)
+if (urlTeamId) {
+  userTeamId = urlTeamId;
+  localStorage.setItem("userTeamId", userTeamId);
+} else {
+  // Fall back to localStorage
+  userTeamId = localStorage.getItem("userTeamId") || "";
+}
 
 // Match franchise command center mapping
 const teamMap = {
@@ -662,17 +686,37 @@ function initTopAssets(teamName) {
 async function loadTournament() {
   try {
     let url;
-    if (tournament && tournament._id) {
-      url = `/tournament/state/${encodeURIComponent(tournament._id)}`;
+    // Priority 1: tournament_id from URL (when navigating from training report, etc.)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlTournamentId = urlParams.get('tournament_id');
+    
+    if (urlTournamentId) {
+      url = `/tournament/state?tournament_id=${encodeURIComponent(urlTournamentId)}`;
+    } else if (tournament && tournament._id) {
+      // Priority 2: tournament from localStorage
+      url = `/tournament/state?tournament_id=${encodeURIComponent(tournament._id)}`;
     } else {
+      // Priority 3: fallback to active tournament by user_team_id
       url = `/tournament/active?user_team_id=${encodeURIComponent(userTeamId)}`;
     }
+    
     const res = await fetch(`${url}?_=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) {
+      throw new Error(`Failed to load tournament: ${res.status} ${res.statusText}`);
+    }
     tournament = await res.json();
     localStorage.setItem("activeTournament", JSON.stringify(tournament));
-    console.log("Bracket data arrives", tournament);
+    
+    // Update userTeamId from tournament if not already set
+    if (!userTeamId && tournament && tournament.user_team_id) {
+      userTeamId = tournament.user_team_id;
+      localStorage.setItem("userTeamId", userTeamId);
+    }
+    
+    console.log("✅ Tournament loaded:", tournament._id);
   } catch (err) {
-    console.error("Failed to load tournament", err);
+    console.error("❌ Failed to load tournament", err);
+    // Don't throw - allow page to continue loading even if tournament fails
   }
 }
 
@@ -772,10 +816,30 @@ window.handleTournamentUpdate = handleTournamentUpdate;
 
 document.addEventListener("DOMContentLoaded", async () => {
   await loadTournament();
-  if (!userTeamId && tournament && tournament.user_team_id) {
-    userTeamId = tournament.user_team_id;
-    localStorage.setItem("userTeamId", tournament.user_team_id);
+  
+  // Ensure tournament loaded successfully before proceeding
+  if (!tournament || !tournament._id) {
+    console.error("❌ Tournament failed to load - cannot initialize page");
+    // Show error message to user
+    const container = document.getElementById("tournament-container");
+    if (container) {
+      container.innerHTML = "<div style='padding: 20px; text-align: center;'><h2>Failed to load tournament</h2><p>Please refresh the page or return to the tournament selection.</p></div>";
+    }
+    return;
   }
+  
+  // Update userTeamId from tournament if not already set
+  if (!userTeamId && tournament.user_team_id) {
+    userTeamId = tournament.user_team_id;
+    localStorage.setItem("userTeamId", userTeamId);
+  }
+  
+  // Ensure userTeamId is set before proceeding
+  if (!userTeamId) {
+    console.error("❌ userTeamId not found - cannot load roster");
+    return;
+  }
+  
   initTopAssets(userTeamId);
   updateTeamChemistry();
   await loadRoster();
