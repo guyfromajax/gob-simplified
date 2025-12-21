@@ -610,47 +610,72 @@ async function loadTeamData() {
     let teamObj = null;
     let teamIdKey = null;
     
-    // First, try to get team_id from teams collection
-    let teamId = null;
+    // Get team_id (ObjectId) from teams collection - this is what franchise_teams keys use
+    let teamObjectId = null;
     try {
+      // First get team doc by name
       const teamDoc = await fetchJSON(`/roster/${userTeamName}`);
       if (teamDoc && teamDoc.team) {
-        // Get team_id from teams collection
-        const teamFromDb = await fetchJSON(`/teams/${encodeURIComponent(teamDoc.team)}/players`);
-        if (teamFromDb && teamFromDb.team) {
-          // Try to find team_id in the response or use team name
-          teamId = teamFromDb.team;
+        // Then get the team's ObjectId from /teams/{team_name}/players endpoint
+        const teamPlayersResponse = await fetch(`/teams/${encodeURIComponent(teamDoc.team)}/players`);
+        if (teamPlayersResponse.ok) {
+          const teamPlayersData = await teamPlayersResponse.json();
+          // The response should have team info, but we need the _id
+          // Try to get it from the team document directly
+          const allTeamsResponse = await fetch('/teams');
+          if (allTeamsResponse.ok) {
+            const allTeams = await allTeamsResponse.json();
+            const matchingTeam = allTeams.find(t => t.name === teamDoc.team || t.name === userTeamName);
+            if (matchingTeam && matchingTeam._id) {
+              teamObjectId = matchingTeam._id;
+              console.log('📊 [TEAM DATA] Found team ObjectId:', teamObjectId, 'for team:', teamDoc.team);
+            }
+          }
         }
       }
     } catch (error) {
-      console.warn('Could not fetch team doc for name resolution:', error);
+      console.warn('Could not fetch team ObjectId:', error);
     }
     
-    // Try multiple matching strategies
-    for (const [tid, team] of Object.entries(franchiseTeams)) {
-      // Strategy 1: Direct key match with team_id
-      if (tid === teamId || tid === userTeamName) {
-        teamObj = team;
-        teamIdKey = tid;
-        console.log('📊 [TEAM DATA] Found team by key match:', tid);
-        break;
+    // If we still don't have teamObjectId, try a simpler approach - use the team name from command-center/data
+    if (!teamObjectId && franchiseData && franchiseData.team) {
+      // The command-center/data endpoint might have team info
+      // Let's try to match by iterating through all teams and finding the one that matches
+      try {
+        const allTeamsResponse = await fetch('/teams');
+        if (allTeamsResponse.ok) {
+          const allTeams = await allTeamsResponse.json();
+          const matchingTeam = allTeams.find(t => t.name === userTeamName || t.name === franchiseData.team);
+          if (matchingTeam && matchingTeam._id) {
+            teamObjectId = String(matchingTeam._id);
+            console.log('📊 [TEAM DATA] Found team ObjectId via /teams endpoint:', teamObjectId);
+          }
+        }
+      } catch (error) {
+        console.warn('Could not fetch from /teams endpoint:', error);
       }
-      
-      // Strategy 2: Match team_name field
-      if (team.team_name === userTeamName || team.team_name === teamId) {
-        teamObj = team;
-        teamIdKey = tid;
-        console.log('📊 [TEAM DATA] Found team by team_name match:', team.team_name, 'key:', tid);
-        break;
+    }
+    
+    // Now match the teamObjectId to franchise_teams keys
+    if (teamObjectId) {
+      // Convert to string if needed
+      const teamIdStr = String(teamObjectId);
+      for (const [tid, team] of Object.entries(franchiseTeams)) {
+        // Match ObjectId strings (they should match exactly)
+        if (tid === teamIdStr || String(tid) === teamIdStr) {
+          teamObj = team;
+          teamIdKey = tid;
+          console.log('📊 [TEAM DATA] Found team by ObjectId match:', tid);
+          break;
+        }
       }
-      
-      // Strategy 3: Check if tid is an ObjectId string that matches team_id
-      if (teamId && tid.includes(teamId) || teamId && tid === teamId) {
-        teamObj = team;
-        teamIdKey = tid;
-        console.log('📊 [TEAM DATA] Found team by ObjectId match:', tid);
-        break;
-      }
+    }
+    
+    // Fallback: if still not found, try to match by checking all teams
+    if (!teamObj) {
+      console.warn('📊 [TEAM DATA] Could not match by ObjectId, trying fallback...');
+      // This shouldn't happen, but as a last resort, we could use the first team
+      // But that's not correct, so we'll just log and return
     }
     
     if (!teamObj) {
