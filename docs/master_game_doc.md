@@ -7560,6 +7560,11 @@ Training report links appear next to scheduled games on the Franchise Command Ce
 1. **Training Submission:**
    - User allocates 24 training points and selects coaching focus on `training.html`
    - Frontend sends POST request to `/franchise/run-training` with training data
+   - **Data Initialization (Auto-Population):**
+     - If `plays_data` is empty or missing, backend automatically populates it from the universal `plays` collection using `populate_team_plays()`
+     - If `scouting_data` is empty or missing the `defense` structure, backend automatically initializes it using `TeamManager._init_scouting_data()`
+     - Initialized data is saved to the database before training execution
+     - This ensures training works even if game plan or playbooks haven't been submitted yet
    - Backend executes training (pre-conditions, point allocation, clamping)
    - Backend stores training report in `franchise_teams.{team_id}.training_reports.{week}`
    - Backend updates player attributes and team attributes in franchise document
@@ -8747,11 +8752,16 @@ Tournament Mode supports multi-game tournament brackets where team data persists
   1. Loads tournament document
   2. Checks for duplicate training submission (same round)
   3. Loads tournament-specific player attributes from `player_stats`
-  4. Executes training using `execute_training()` from `training_execution_v2.py`
-  5. Updates player attributes in tournament document
-  6. Marks training as completed for current round
-  7. Stores training report in `latest_training` field
-  8. Redirects back to Tournament Command Center
+  4. **Data Initialization (Auto-Population):**
+     - If `plays_data` is empty or missing, backend automatically populates it from the universal `plays` collection using `populate_team_plays()`
+     - If `scouting_data` is empty or missing the `defense` structure, backend automatically initializes it using `TeamManager._init_scouting_data()`
+     - Initialized data is saved to the database before training execution
+     - This ensures training works even if game plan or playbooks haven't been submitted yet
+  5. Executes training using `execute_training()` from `training_execution_v2.py`
+  6. Updates player attributes in tournament document
+  7. Marks training as completed for current round
+  8. Stores training report in `latest_training` field
+  9. Redirects back to Tournament Command Center
 
 **Training Report:**
 - **Location:** `BackEnd/api/franchise_routes.py` - `get_training_report()` (supports tournament mode)
