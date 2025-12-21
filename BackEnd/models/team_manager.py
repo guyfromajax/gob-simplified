@@ -10,6 +10,7 @@ class TeamManager:
         self.name = name
         self.is_home_team = is_home_team
         self.is_user_team = is_user_team  # ✅ SS&S: Track if this is the user's team for override logic
+        self.mode = mode  # Store mode for use in _init_scouting_data() and other methods
         self.players = self._load_roster()
         self.lineup = self._load_lineup()
         
