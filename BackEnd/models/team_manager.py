@@ -352,7 +352,51 @@ class TeamManager:
                     "set_outside": None
                 }
             },
-            "defense": self._init_defense_structure(defense_template)
+            "defense": {
+                # Use template for all standard defense types (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone)
+                # This eliminates ~280 lines of duplicate code
+                # Use deepcopy to ensure each defense type gets its own independent dictionary
+                # For tournament mode, each defense gets its own random values
+                "Man": deepcopy(defense_template) if self.mode != "tournament" else {
+                    "used": 0,
+                    "success": 0,
+                    "effectiveness": random.randint(0, 80),
+                    "momentum": random.randint(0, 10),
+                    "cloaking": random.randint(0, 10),
+                    "game_stats": defense_template["game_stats"].copy(),
+                    "season_stats": defense_template["season_stats"].copy()
+                },
+                "2-3 Zone": deepcopy(defense_template) if self.mode != "tournament" else {
+                    "used": 0,
+                    "success": 0,
+                    "effectiveness": random.randint(0, 80),
+                    "momentum": random.randint(0, 10),
+                    "cloaking": random.randint(0, 10),
+                    "game_stats": defense_template["game_stats"].copy(),
+                    "season_stats": defense_template["season_stats"].copy()
+                },
+                "3-2 Zone": deepcopy(defense_template) if self.mode != "tournament" else {
+                    "used": 0,
+                    "success": 0,
+                    "effectiveness": random.randint(0, 80),
+                    "momentum": random.randint(0, 10),
+                    "cloaking": random.randint(0, 10),
+                    "game_stats": defense_template["game_stats"].copy(),
+                    "season_stats": defense_template["season_stats"].copy()
+                },
+                "1-3-1 Zone": deepcopy(defense_template) if self.mode != "tournament" else {
+                    "used": 0,
+                    "success": 0,
+                    "effectiveness": random.randint(0, 80),
+                    "momentum": random.randint(0, 10),
+                    "cloaking": random.randint(0, 10),
+                    "game_stats": defense_template["game_stats"].copy(),
+                    "season_stats": defense_template["season_stats"].copy()
+                },
+                "vs_Fast_Break": {"used": 0, "success": 0},
+                "FCP": {"used": 0, "success": 0},
+                "HCT": {"used": 0, "success": 0}
+            }
         }
     
     def _init_plays_from_universal(self, mode="single"):
