@@ -978,7 +978,8 @@ async function loadTeamData() {
     
     // Use the new backend endpoint that resolves team_name to team_id server-side
     // This matches the pattern used by /tournament/roster
-    const response = await fetch(`/tournament/team-data?tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(formatTeamName(userTeamId))}`);
+    // Use userTeamId directly (not formatted) to match Franchise pattern - backend handles name resolution
+    const response = await fetch(`/tournament/team-data?tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(userTeamId)}`);
     
     if (!response.ok) {
       console.error('Failed to load team data:', response.status, response.statusText);

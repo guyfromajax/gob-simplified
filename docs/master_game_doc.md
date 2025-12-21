@@ -8711,7 +8711,12 @@ Tournament Mode supports multi-game tournament brackets where team data persists
   - Shows defensive schemes (man and zone defenses) with effectiveness progress bars
   - Organized by Offense and Defense categories
   - Data loaded from tournament document: `tournaments.{tournament_id}.teams.{team_id}.plays` and `tournaments.{tournament_id}.teams.{team_id}.scouting_data`
-  - Loaded when Team tab is opened via `loadTeamData()` function
+  - **Data Loading**: Uses `/tournament/team-data` endpoint (matches pattern used by `/tournament/roster`)
+    - Endpoint resolves `team_name` to `team_id` server-side using multiple fallback strategies
+    - Handles both formatted ("ocean-city") and unformatted ("Ocean City") team names
+    - Falls back to `tournament.user_team_id` if provided team_name doesn't match
+    - Initializes `scouting_data.defense` structure if missing
+    - Defaults team attributes to 0 if not present
 
 **Header Controls:**
 - **Set Game Plan** - Navigate to Game Plan screen

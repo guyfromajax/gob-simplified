@@ -408,6 +408,9 @@ def get_tournament_team_data(tournament_id: str, team_name: str = None):
     """
     Get team data (attributes, plays, scouting_data) from tournament teams.
     Resolves team_name to team_id server-side, matching the pattern used by /tournament/roster.
+    
+    Handles both formatted team names (e.g., "ocean-city") and unformatted names (e.g., "Ocean City").
+    Falls back to tournament.user_team_id if provided team_name doesn't match.
     """
     try:
         tid = ObjectId(tournament_id)
@@ -427,9 +430,29 @@ def get_tournament_team_data(tournament_id: str, team_name: str = None):
         raise HTTPException(status_code=404, detail="Team not found")
     
     # Get team document to resolve team_name to team_id (ObjectId)
+    # Try multiple strategies to handle both formatted and unformatted team names
+    team_doc = None
+    
+    # Strategy 1: Try exact match first
     team_doc = teams_collection.find_one({"name": team_name})
+    
+    # Strategy 2: If not found, try case-insensitive match
     if not team_doc:
-        raise HTTPException(status_code=404, detail="Team not found")
+        team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_name}$", "$options": "i"}})
+    
+    # Strategy 3: If still not found, try normalized name (replace dashes with spaces, title case)
+    if not team_doc:
+        normalized_name = team_name.replace("-", " ").title()
+        team_doc = teams_collection.find_one({"name": normalized_name})
+    
+    # Strategy 4: Fallback to tournament's user_team_id
+    if not team_doc:
+        fallback_team_name = tournament_doc.get("user_team_id")
+        if fallback_team_name and fallback_team_name != team_name:
+            team_doc = teams_collection.find_one({"name": fallback_team_name})
+    
+    if not team_doc:
+        raise HTTPException(status_code=404, detail=f"Team not found: {team_name}")
     
     team_id = str(team_doc["_id"])
     
