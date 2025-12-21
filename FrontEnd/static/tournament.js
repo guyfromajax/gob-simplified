@@ -965,11 +965,6 @@ async function loadTeamData() {
   
   try {
     // First, ensure team objects exist (this will create them if missing)
-    const formatTeamName = (name) => {
-      // Format team name for API calls
-      return name.replace(/\s+/g, '-').toLowerCase();
-    };
-    
     try {
       // Call ensure_team_objects_exist via get_gameplan endpoint (it calls ensure_team_objects_exist internally)
       await fetch(`/api/gameplan?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_id=${encodeURIComponent(userTeamId)}`);
