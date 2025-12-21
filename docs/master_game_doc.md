@@ -7109,11 +7109,16 @@ The Training System provides a comprehensive interface for allocating training p
 
 **Right Half - Team Drills:**
 - **Column 1:**
-  - Offense (Offense Install slider + Current Playbook/Custom radio buttons)
+  - Offense (Offense Install slider)
   - Fast Breaks (FB Offense Install, FB Defense Install sliders, Scrimmages slider)
 - **Column 2:**
-  - Defense (Defense Install slider + Current Playbook/Custom radio buttons)
+  - Defense (Defense Install slider)
   - Presses / Traps (P/T Defense Install, P/T Offense Install sliders)
+- **Bottom of Team Drills Section:**
+  - Playbook Training Mode (radio buttons):
+    - Current Playbooks (default)
+    - All Plays / Even Distribution
+    - Custom
 
 **General Section (Full Width):**
 - Four sliders in a 4-column grid:
@@ -7168,8 +7173,7 @@ The Training System provides a comprehensive interface for allocating training p
 
 On submit, captures:
 - All slider values (organized by category: player_drills, team_drills, general)
-- Offense Plays selection (Current Playbook or Custom)
-- Defense Plays selection (Current Playbook or Custom)
+- Playbook Training Mode selection (Current Playbooks, All Plays / Even Distribution, or Custom)
 - Coaching focus selection (archetype-level or specific sub-option)
 
 ### Navigation
@@ -7213,11 +7217,17 @@ The training execution system applies pre-training conditions, allocates trainin
    - Applies coaching focus amplifiers
    - Handles special cases (conditioning, film study, breaks)
 
-3. **Attribute Clamping**
+3. **Play/Defense Training Application** (placeholder - to be implemented)
+   - Updates play effectiveness and momentum based on training allocations
+   - Updates defense effectiveness and momentum based on training allocations
+   - Uses playbook_training_mode to determine which plays/defenses receive training benefits
+   - Considers playcall_settings, strategy_settings, and playbook_settings for weighted distribution
+
+4. **Attribute Clamping**
    - Player attributes: Minimum 1, no maximum
    - Team attributes: Clamped to defined ranges (see brief)
 
-4. **Training Report Generation**
+5. **Training Report Generation**
    - Calculates changes from original baselines
    - Returns player_changes and team_changes dictionaries
    - Includes coaching focus information

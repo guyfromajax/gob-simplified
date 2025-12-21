@@ -193,12 +193,10 @@ function collectTrainingData() {
     // Team Drills
     team_drills: {
       team_offense: {
-        install: parseInt(document.getElementById('team-offense-install').value) || 0,
-        plays: document.querySelector('input[name="offense-plays"]:checked')?.value || 'current-playbook'
+        install: parseInt(document.getElementById('team-offense-install').value) || 0
       },
       team_defense: {
-        install: parseInt(document.getElementById('team-defense-install').value) || 0,
-        plays: document.querySelector('input[name="defense-plays"]:checked')?.value || 'current-playbook'
+        install: parseInt(document.getElementById('team-defense-install').value) || 0
       },
       fast_breaks: {
         offense_install: parseInt(document.getElementById('fast-break-offense-install').value) || 0,
@@ -220,7 +218,10 @@ function collectTrainingData() {
     },
     
     // Coaching Focus
-    coaching_focus: document.querySelector('input[name="coaching-focus"]:checked')?.value || null
+    coaching_focus: document.querySelector('input[name="coaching-focus"]:checked')?.value || null,
+    
+    // Playbook Training Mode
+    playbook_training_mode: document.querySelector('input[name="playbook-training-mode"]:checked')?.value || 'current-playbooks'
   };
   
   console.log('🔋 [FRONTEND] Collected training data:', data);
