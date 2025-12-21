@@ -210,21 +210,43 @@
 }
 
 .training-report-styled .playbook-row {
-  display: grid;
-  grid-template-columns: 200px 1fr;
+  display: flex;
+  align-items: flex-start;
   gap: var(--spacing-md);
-  align-items: center;
   padding: var(--spacing-sm) 0;
   border-bottom: 1px solid var(--color-border);
 }
 
 .training-report-styled .playbook-name {
+  min-width: 200px;
   font-weight: 600;
   color: var(--color-text);
+  padding-top: var(--spacing-xs);
+}
+
+.training-report-styled .playbook-metrics-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.training-report-styled .playbook-metric {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.training-report-styled .playbook-metric-title {
+  min-width: 100px;
+  color: var(--color-text);
+  font-weight: 500;
+  font-size: 0.9rem;
 }
 
 .training-report-styled .playbook-progress-container {
   flex: 1;
+  max-width: 400px;
 }
 
 .training-report-styled .playbook-progress-bar {
@@ -238,7 +260,6 @@
 
 .training-report-styled .playbook-progress-fill {
   height: 100%;
-  background: var(--color-accent-blue);
   transition: width 0.3s ease;
   border-radius: 10px;
 }
