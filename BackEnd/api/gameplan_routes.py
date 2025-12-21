@@ -320,7 +320,8 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
         elif "playcall_settings" not in team_obj or "strategy_settings" not in team_obj or not team_obj.get("plays") or "shot_threshold" not in team_obj:
             # Add missing settings
             defaults = get_default_settings()
-            populated_plays = populate_team_plays()
+            # Pass mode to populate_team_plays for tournament randomization
+            populated_plays = populate_team_plays(mode=mode)
             updates = {}
             if "playcall_settings" not in team_obj:
                 updates[f"{team_key}.playcall_settings"] = defaults["playcall_settings"].copy()

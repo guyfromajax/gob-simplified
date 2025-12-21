@@ -217,8 +217,6 @@ class TeamManager:
         }
 
     def _init_scouting_data(self):
-        import random
-        
         # Get actual play names from database
         play_names = []
         try:
