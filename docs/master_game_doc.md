@@ -8789,17 +8789,30 @@ Tournament Mode supports multi-game tournament brackets where team data persists
   8. **Training Report Storage (matches Franchise pattern):**
      - Stores training report in `teams.{team_id}.training_reports.{round}` (per-round storage)
      - Also stores in `latest_training` field (quick access)
-  9. Redirects to Training Report page: `/static/training-report.html?mode=tournament&tournament_id=...&team_id=...&round=...`
+  9. **Redirects to Training Report page (SS&S approach):**
+     - URL: `/static/training-report.html?mode=tournament&tournament_id=...&team_id=...`
+     - **Note:** `round` parameter is NOT included in redirect URL
+     - Backend determines round from `training_status.round` or `latest_training.round` when loading report
+     - This follows SS&S pattern: use URL params for navigation, backend state for data resolution
 
 **Training Report:**
 - **Location:** `BackEnd/api/franchise_routes.py` - `get_training_report()` (supports tournament mode)
-- **Endpoint:** `GET /franchise/training-report?mode=tournament&tournament_id=...&team_id=...&round=...`
-  - Also accepts `week` parameter for backward compatibility (treated as `round` for tournament mode)
+- **Endpoint:** `GET /franchise/training-report?mode=tournament&tournament_id=...&team_id=...&round=...` (round is optional)
+- **SS&S Approach:**
+  - **Navigation params (required):** `tournament_id`, `team_id`, `mode`
+  - **Round determination:**
+    - If `round` parameter provided: use it (for historical reports from schedule links)
+    - If not provided: backend determines from `training_status.round` or `latest_training.round`
+    - This allows direct navigation after training without needing round in URL
 - **Data Source:** 
   - Primary: `tournaments.{tournament_id}.teams.{team_id}.training_reports.{round}` (per-round storage)
   - Fallback: `tournament.latest_training` field (if per-round not found and round matches)
 - **Displays:** Player attribute changes, team attribute changes, coaching focus, upcoming opponent, play effectiveness changes, defense effectiveness changes
 - **Pattern:** Matches Franchise mode pattern - per-round storage with `latest_training` fallback
+- **SS&S Benefits:** 
+  - Reduces URL parameter complexity
+  - Backend state is source of truth
+  - Historical reports can still use `round` parameter for specific round lookup
 
 ---
 
