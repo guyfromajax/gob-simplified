@@ -686,21 +686,26 @@ function initTopAssets(teamName) {
 async function loadTournament() {
   try {
     let url;
+    let params;
     // Priority 1: tournament_id from URL (when navigating from training report, etc.)
     const urlParams = new URLSearchParams(window.location.search);
     const urlTournamentId = urlParams.get('tournament_id');
     
     if (urlTournamentId) {
-      url = `/tournament/state?tournament_id=${encodeURIComponent(urlTournamentId)}`;
+      params = new URLSearchParams({ tournament_id: urlTournamentId });
+      url = `/tournament/state?${params.toString()}`;
     } else if (tournament && tournament._id) {
       // Priority 2: tournament from localStorage
-      url = `/tournament/state?tournament_id=${encodeURIComponent(tournament._id)}`;
+      params = new URLSearchParams({ tournament_id: tournament._id });
+      url = `/tournament/state?${params.toString()}`;
     } else {
       // Priority 3: fallback to active tournament by user_team_id
-      url = `/tournament/active?user_team_id=${encodeURIComponent(userTeamId)}`;
+      params = new URLSearchParams({ user_team_id: userTeamId });
+      url = `/tournament/active?${params.toString()}`;
     }
     
-    const res = await fetch(`${url}?_=${Date.now()}`, { cache: "no-store" });
+    // Add cache buster using & (not ?) since URL already has query params
+    const res = await fetch(`${url}&_=${Date.now()}`, { cache: "no-store" });
     if (!res.ok) {
       throw new Error(`Failed to load tournament: ${res.status} ${res.statusText}`);
     }
