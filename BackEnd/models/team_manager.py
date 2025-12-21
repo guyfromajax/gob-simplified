@@ -217,6 +217,8 @@ class TeamManager:
         }
 
     def _init_scouting_data(self):
+        import random
+        
         # Get actual play names from database
         play_names = []
         try:
@@ -228,7 +230,14 @@ class TeamManager:
             play_names = PLAYCALLS  # Fallback to constants
         
         # Create defense structure template (used by all defense types)
+        # For tournament mode, randomize effectiveness, momentum, and cloaking for each defense
         defense_template = self._create_defense_structure_template()
+        
+        # For tournament mode, randomize defense values
+        if self.mode == "tournament":
+            defense_template["effectiveness"] = random.randint(0, 80)
+            defense_template["momentum"] = random.randint(0, 10)
+            defense_template["cloaking"] = random.randint(0, 10)
         
         # New playcall tracking structure
         return {
@@ -345,18 +354,7 @@ class TeamManager:
                     "set_outside": None
                 }
             },
-            "defense": {
-                # Use template for all standard defense types (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone)
-                # This eliminates ~280 lines of duplicate code
-                # Use deepcopy to ensure each defense type gets its own independent dictionary
-                "Man": deepcopy(defense_template),
-                "2-3 Zone": deepcopy(defense_template),
-                "3-2 Zone": deepcopy(defense_template),
-                "1-3-1 Zone": deepcopy(defense_template),
-                "vs_Fast_Break": {"used": 0, "success": 0},
-                "FCP": {"used": 0, "success": 0},
-                "HCT": {"used": 0, "success": 0}
-            }
+            "defense": self._init_defense_structure(defense_template)
         }
     
     def _init_plays_from_universal(self, mode="single"):

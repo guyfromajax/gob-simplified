@@ -8899,6 +8899,17 @@ When a tournament is first created or when a team is first accessed:
      - `playcall_settings`: Default settings (all set to 2 = Normal)
      - `strategy_settings`: Default settings (all set to 2 = Normal)
      - `plays`: Populated plays from universal collection
+       - **Tournament Mode Randomization**: Each play gets randomized values:
+         - `effectiveness`: random.randint(0, 80)
+         - `momentum`: random.randint(0, 10)
+         - `cloaking`: random.randint(0, 10)
+       - Each play and each value gets its own random roll
+     - `scouting_data`: Initialized via `TeamManager._init_scouting_data()`
+       - **Tournament Mode Randomization**: Each defense (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone) gets randomized values:
+         - `effectiveness`: random.randint(0, 80)
+         - `momentum`: random.randint(0, 10)
+         - `cloaking`: random.randint(0, 10)
+       - Each defense and each value gets its own random roll
      - **Team attributes**: Copied from the **universal `teams` collection** in MongoDB (same attributes as Single Game Mode)
 
 #### 2. **Team Object Storage**

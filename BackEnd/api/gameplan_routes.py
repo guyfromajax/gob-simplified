@@ -98,10 +98,14 @@ def populate_team_plays(mode="single"):
     
     Args:
         mode: "single", "tournament", or "franchise"
+        - For tournament mode: randomizes effectiveness (0-80), momentum (0-10), cloaking (0-10) for each play
+        - For other modes: uses initial values from universal play or defaults to 0
         
     Returns:
         dict: {play_name: play_data} with play_id reference and stats (NO skeletons)
     """
+    import random
+    
     try:
         from BackEnd.db import plays_collection
         
@@ -112,10 +116,18 @@ def populate_team_plays(mode="single"):
         plays_dict = {}
         for play in all_plays:
             play_name = play["name"]
-            # Get initial values from universal play (if they exist), otherwise default to 0
-            initial_effectiveness = play.get("effectiveness", 0)
-            initial_momentum = play.get("momentum", 0)
-            initial_cloaking = play.get("cloaking", 0)
+            
+            # For tournament mode, randomize values for each play
+            if mode == "tournament":
+                # Each play and each value gets its own random roll
+                initial_effectiveness = random.randint(0, 80)
+                initial_momentum = random.randint(0, 10)
+                initial_cloaking = random.randint(0, 10)
+            else:
+                # Get initial values from universal play (if they exist), otherwise default to 0
+                initial_effectiveness = play.get("effectiveness", 0)
+                initial_momentum = play.get("momentum", 0)
+                initial_cloaking = play.get("cloaking", 0)
             
             play_data = {
                 "play_id": str(play["_id"]),  # Reference to universal play (the "library card")
@@ -272,7 +284,8 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                 core_team = db.teams.find_one({"name": team_id})
             
             defaults = get_default_settings()
-            populated_plays = populate_team_plays()
+            # Pass mode to populate_team_plays for tournament randomization
+            populated_plays = populate_team_plays(mode=mode)
             team_obj = {
                 "playcall_settings": defaults["playcall_settings"].copy(),
                 "strategy_settings": defaults["strategy_settings"].copy(),
