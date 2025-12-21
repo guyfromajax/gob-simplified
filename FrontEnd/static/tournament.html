@@ -6,6 +6,7 @@
   <title>Tournament Mode Command Center</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/tournament.css">
+  <link rel="stylesheet" href="/static/training-report.css">
 </head>
 <body>
 
@@ -48,9 +49,10 @@
   <div id="tournament-tabs">
     <div class="tab-buttons">
       <button data-tab="bracket-tab" class="active">Bracket</button>
-      <button data-tab="schedule-tab">Schedule</button>
+      <button data-tab="roster-tab">Roster</button>
       <button data-tab="team-tab">Team</button>
-      <button data-tab="leaders-tab">Leaders</button>
+      <button data-tab="stats-tab">Stats</button>
+      <button data-tab="schedule-tab">Schedule</button>
     </div>
     <div id="bracket-tab" class="tab-content active">
       <div class="scroll-x">
@@ -58,10 +60,7 @@
         </div>
       </div>
     </div>
-    <div id="schedule-tab" class="tab-content">
-      <div id="schedule-container" class="schedule-container"></div>
-    </div>
-    <div id="team-tab" class="tab-content">
+    <div id="roster-tab" class="tab-content">
       <div class="scroll-x">
         <table class="roster-table">
           <thead>
@@ -112,8 +111,26 @@
         </table>
       </div>
     </div>
-    <div id="leaders-tab" class="tab-content">
+    <div id="team-tab" class="tab-content">
+      <!-- Team Report Section -->
+      <section class="team-section">
+        <h2>Team Report</h2>
+        <div class="team-attributes-grid" id="team-attributes-grid"></div>
+      </section>
+
+      <!-- Playbook Summary Section -->
+      <section class="playbook-summary-section">
+        <h2>Playbook Summary</h2>
+        <div class="playbook-summary-container" id="playbook-summary-container">
+          <!-- Plays will be populated here -->
+        </div>
+      </section>
+    </div>
+    <div id="stats-tab" class="tab-content">
       <div id="leaderboards"></div>
+    </div>
+    <div id="schedule-tab" class="tab-content">
+      <div id="schedule-container" class="schedule-container"></div>
     </div>
   </div>
 

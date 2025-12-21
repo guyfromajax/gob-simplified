@@ -312,6 +312,9 @@ function renderTeam(data) {
   if (typeof initAttributeTooltips !== 'undefined') {
     initAttributeTooltips(tbody, ['td']);
   }
+  
+  // Also render player stats
+  renderRosterStats(data.players || []);
 }
 
 function renderSchedule(data) {
@@ -399,11 +402,14 @@ async function init() {
     
     // Initialize tooltips for table headers
     if (typeof initAttributeTooltips !== 'undefined') {
-      const teamTable = document.querySelector('#team-tab .roster-table');
+      const rosterTable = document.querySelector('#roster-tab .roster-table');
       const recruitsTable = document.querySelector('#recruits-tab .roster-table');
-      if (teamTable) initAttributeTooltips(teamTable, ['th']);
+      if (rosterTable) initAttributeTooltips(rosterTable, ['th']);
       if (recruitsTable) initAttributeTooltips(recruitsTable, ['th']);
     }
+    
+    // Load team data for Team tab
+    await loadTeamData();
   }
 
 function updatePlayButton(data) {
@@ -513,4 +519,440 @@ window.addEventListener('DOMContentLoaded', () => {
     playNowBtn.disabled = false;
   }
   init();
+  
+  // Listen for tab changes to render Team Report when Team tab is opened
+  const tabButtons = document.querySelectorAll('.tab-buttons button');
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.tab === 'team-tab') {
+        // Load and render team data when Team tab is opened
+        if (!teamData) {
+          loadTeamData();
+        } else {
+          renderTeamReport();
+          renderPlaybookSummary();
+        }
+      }
+    });
+  });
 });
+
+// Team Report and Playbook Summary functions (adapted from training-report.js)
+const TEAM_ATTR_NAMES = {
+  'shot_threshold': 'Shooting',
+  'rebound_modifier': 'Rebounding',
+  'offensive_efficiency': 'Offense',
+  'defensive_efficiency': 'Defense',
+  'fb_efficiency': 'Fast Breaks',
+  'pt_efficiency': 'Press/Trap',
+  'foul_modifier': 'Aggression',
+  'turnover_modifier': 'Discipline',
+  'momentum_score': 'Momentum',
+  'team_chemistry': 'Team Chemistry',
+  'fb_opp_modifier': 'Fast Break Defense',
+  'pt_opp_modifier': 'Press/Trap Breaks'
+};
+
+let teamData = null;
+
+async function loadTeamData() {
+  if (!franchiseId || !userTeamName) return;
+  
+  try {
+    // Load franchise document
+    const response = await fetch(`/franchise/command-center/data?franchise_id=${franchiseId}`);
+    const franchiseData = await response.json();
+    
+    if (!franchiseData || !franchiseData.team) return;
+    
+    // Load full franchise document to get team data
+    const franchiseDocResponse = await fetch(`/franchise/state?franchise_id=${franchiseId}`);
+    const franchiseDoc = await franchiseDocResponse.json();
+    
+    if (!franchiseDoc || !franchiseDoc.franchise_teams) {
+      console.warn('No franchise_teams data found in franchise document');
+      return;
+    }
+    
+    // Find user's team in franchise document
+    let teamObj = null;
+    let teamIdKey = null;
+    
+    // Try to find team by name
+    for (const [tid, team] of Object.entries(franchiseDoc.franchise_teams)) {
+      // Try to match by team name or team_id
+      const teamDoc = await fetchJSON(`/roster/${userTeamName}`);
+      if (teamDoc && teamDoc.team) {
+        // Get team_id from teams collection
+        const teamIdResponse = await fetch(`/teams/${encodeURIComponent(teamDoc.team)}/players`);
+        if (teamIdResponse.ok) {
+          // Try to match tid with team_id
+          if (tid === userTeamName || team.team_name === userTeamName) {
+            teamObj = team;
+            teamIdKey = tid;
+            break;
+          }
+        }
+      }
+      // Fallback: try direct name match
+      if (team.team_name === userTeamName || tid === userTeamName) {
+        teamObj = team;
+        teamIdKey = tid;
+        break;
+      }
+    }
+    
+    if (!teamObj) {
+      // Try to get team_id from teams collection
+      const teamDoc = await fetchJSON(`/roster/${userTeamName}`);
+      if (teamDoc && teamDoc.team) {
+        // Look for team_id in franchise_teams keys
+        for (const [tid, team] of Object.entries(franchiseDoc.franchise_teams)) {
+          if (team.team_name === teamDoc.team || tid.includes(teamDoc.team)) {
+            teamObj = team;
+            teamIdKey = tid;
+            break;
+          }
+        }
+      }
+    }
+    
+    if (!teamObj) {
+      console.warn('User team not found in franchise document');
+      return;
+    }
+    
+    // Extract team attributes
+    const teamAttributes = {};
+    const attrKeys = ['shot_threshold', 'turnover_modifier', 'foul_modifier', 'rebound_modifier', 
+                      'momentum_score', 'offensive_efficiency', 'team_chemistry', 'defensive_efficiency',
+                      'fb_efficiency', 'pt_efficiency', 'fb_opp_modifier', 'pt_opp_modifier'];
+    attrKeys.forEach(key => {
+      if (teamObj[key] !== undefined) {
+        teamAttributes[key] = teamObj[key];
+      }
+    });
+    
+    // Load plays data
+    const playsData = teamObj.plays || {};
+    const scoutingData = teamObj.scouting_data || { defense: {} };
+    
+    teamData = {
+      team_attributes: teamAttributes,
+      plays_data: playsData,
+      scouting_data: scoutingData
+    };
+    
+    // Render if Team tab is active
+    const teamTab = document.getElementById('team-tab');
+    if (teamTab && teamTab.classList.contains('active')) {
+      renderTeamReport();
+      renderPlaybookSummary();
+    }
+  } catch (error) {
+    console.error('Failed to load team data:', error);
+  }
+}
+
+function renderTeamReport() {
+  if (!teamData) return;
+  
+  const grid = document.getElementById('team-attributes-grid');
+  if (!grid) return;
+  
+  grid.innerHTML = '';
+  
+  const teamAttrs = teamData.team_attributes || {};
+  
+  const attrOrder = [
+    'shot_threshold',
+    'rebound_modifier',
+    'offensive_efficiency',
+    'defensive_efficiency',
+    'fb_efficiency',
+    'pt_efficiency',
+    'foul_modifier',
+    'turnover_modifier',
+    'momentum_score',
+    'team_chemistry',
+    'fb_opp_modifier',
+    'pt_opp_modifier'
+  ];
+  
+  attrOrder.forEach(attrKey => {
+    const item = createTeamAttrItem(attrKey, teamAttrs[attrKey], 0);
+    if (item) grid.appendChild(item);
+  });
+}
+
+function createTeamAttrItem(attrKey, currentValue, change) {
+  const displayName = TEAM_ATTR_NAMES[attrKey];
+  if (!displayName) return null;
+  
+  if (currentValue === undefined || currentValue === null) {
+    currentValue = 0;
+  }
+  if (change === undefined || change === null) {
+    change = 0;
+  }
+  
+  const item = document.createElement('div');
+  item.className = 'team-attr-item';
+  
+  const label = document.createElement('div');
+  label.className = 'attr-label';
+  
+  const nameSpan = document.createElement('span');
+  nameSpan.textContent = displayName;
+  
+  label.appendChild(nameSpan);
+  item.appendChild(label);
+  
+  if (attrKey === 'team_chemistry') {
+    const barContainer = document.createElement('div');
+    barContainer.className = 'chemistry-bar-container';
+    
+    const barFill = document.createElement('div');
+    barFill.className = 'chemistry-bar-fill';
+    const percentage = (currentValue / 25) * 100;
+    barFill.style.width = `${percentage}%`;
+    
+    const barText = document.createElement('div');
+    barText.className = 'chemistry-bar-text';
+    barText.textContent = `${currentValue} / 25`;
+    
+    barContainer.appendChild(barFill);
+    barContainer.appendChild(barText);
+    item.appendChild(barContainer);
+  } else if (attrKey === 'fb_opp_modifier' || attrKey === 'pt_opp_modifier') {
+    const indicatorContainer = document.createElement('div');
+    indicatorContainer.className = 'plus-minus-container';
+    indicatorContainer.style.textAlign = 'center';
+    indicatorContainer.style.marginTop = 'var(--spacing-sm)';
+    
+    const indicator = document.createElement('span');
+    indicator.className = 'plus-minus-indicator';
+    indicator.style.fontWeight = '700';
+    
+    if (currentValue >= 10) {
+      indicator.textContent = '+++';
+      indicator.className += ' plus-minus-positive';
+    } else if (currentValue >= 5) {
+      indicator.textContent = '++';
+      indicator.className += ' plus-minus-positive';
+    } else if (currentValue >= 1) {
+      indicator.textContent = '+';
+      indicator.className += ' plus-minus-positive';
+    } else if (currentValue === 0) {
+      indicator.textContent = '-';
+      indicator.className += ' plus-minus-zero';
+    } else if (currentValue >= -4) {
+      indicator.textContent = '-';
+      indicator.className += ' plus-minus-negative';
+    } else if (currentValue >= -9) {
+      indicator.textContent = '--';
+      indicator.className += ' plus-minus-negative';
+    } else {
+      indicator.textContent = '---';
+      indicator.className += ' plus-minus-negative';
+    }
+    
+    indicatorContainer.appendChild(indicator);
+    item.appendChild(indicatorContainer);
+  } else {
+    const pill = createPill(currentValue, attrKey);
+    item.appendChild(pill);
+  }
+  
+  return item;
+}
+
+function createPill(originalValue, attrKey) {
+  const pill = document.createElement('div');
+  pill.className = 'attr-pill';
+  
+  const centerLine = document.createElement('div');
+  centerLine.className = 'pill-center-line';
+  pill.appendChild(centerLine);
+  
+  let maxValue = 10;
+  let value = originalValue;
+  
+  if (attrKey === 'shot_threshold') {
+    maxValue = 200;
+  } else if (attrKey === 'rebound_modifier') {
+    maxValue = 0.2;
+    value = originalValue - 1.0;
+  }
+  
+  if (value > 0) {
+    const fill = document.createElement('div');
+    fill.className = 'pill-fill-positive';
+    const percentage = Math.min((value / maxValue) * 50, 50);
+    fill.style.width = `${percentage}%`;
+    pill.insertBefore(fill, centerLine);
+  } else if (value < 0) {
+    const fill = document.createElement('div');
+    fill.className = 'pill-fill-negative';
+    const absValue = Math.abs(value);
+    const percentage = Math.min((absValue / maxValue) * 50, 50);
+    fill.style.width = `${percentage}%`;
+    pill.insertBefore(fill, centerLine);
+  }
+  
+  return pill;
+}
+
+function renderPlaybookSummary() {
+  if (!teamData) return;
+  
+  const container = document.getElementById('playbook-summary-container');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  const plays_data = teamData.plays_data || {};
+  const scouting_data = teamData.scouting_data || {};
+  
+  const motion_plays = [];
+  const set_plays = [];
+  
+  for (const [play_name, play_data] of Object.entries(plays_data)) {
+    if (typeof play_data === 'object' && play_data !== null) {
+      const play_type = play_data.play_type || '';
+      if (play_type === 'motion') {
+        motion_plays.push({ name: play_name, ...play_data });
+      } else if (play_type === 'set_play') {
+        set_plays.push({ name: play_name, ...play_data });
+      }
+    }
+  }
+  
+  motion_plays.sort((a, b) => a.name.localeCompare(b.name));
+  set_plays.sort((a, b) => a.name.localeCompare(b.name));
+  
+  const man_defenses = [];
+  const zone_defenses = [];
+  
+  if (scouting_data.defense) {
+    for (const [defense_name, defense_data] of Object.entries(scouting_data.defense)) {
+      if (typeof defense_data === 'object' && defense_data !== null) {
+        if (defense_name === 'Man') {
+          man_defenses.push({ name: defense_name, ...defense_data });
+        } else if (defense_name.includes('Zone')) {
+          zone_defenses.push({ name: defense_name, ...defense_data });
+        }
+      }
+    }
+  }
+  
+  man_defenses.sort((a, b) => a.name.localeCompare(b.name));
+  zone_defenses.sort((a, b) => a.name.localeCompare(b.name));
+  
+  const offenseSection = document.createElement('div');
+  offenseSection.className = 'playbook-category';
+  
+  const offenseTitle = document.createElement('h3');
+  offenseTitle.textContent = 'Offense';
+  offenseSection.appendChild(offenseTitle);
+  
+  if (motion_plays.length > 0) {
+    motion_plays.forEach(play => {
+      const playRow = createPlayRow(play.name, play.effectiveness || 0, 0);
+      offenseSection.appendChild(playRow);
+    });
+  }
+  
+  if (set_plays.length > 0) {
+    set_plays.forEach(play => {
+      const playRow = createPlayRow(play.name, play.effectiveness || 0, 0);
+      offenseSection.appendChild(playRow);
+    });
+  }
+  
+  const emptyRow = document.createElement('div');
+  emptyRow.className = 'playbook-empty-row';
+  offenseSection.appendChild(emptyRow);
+  
+  container.appendChild(offenseSection);
+  
+  const defenseSection = document.createElement('div');
+  defenseSection.className = 'playbook-category';
+  
+  const defenseTitle = document.createElement('h3');
+  defenseTitle.textContent = 'Defense';
+  defenseSection.appendChild(defenseTitle);
+  
+  if (man_defenses.length > 0) {
+    man_defenses.forEach(defense => {
+      const defenseRow = createPlayRow(defense.name, defense.effectiveness || 0, 0);
+      defenseSection.appendChild(defenseRow);
+    });
+  }
+  
+  if (zone_defenses.length > 0) {
+    zone_defenses.forEach(defense => {
+      const defenseRow = createPlayRow(defense.name, defense.effectiveness || 0, 0);
+      defenseSection.appendChild(defenseRow);
+    });
+  }
+  
+  container.appendChild(defenseSection);
+}
+
+function createPlayRow(playName, effectiveness, change) {
+  const row = document.createElement('div');
+  row.className = 'playbook-row';
+  
+  const nameDiv = document.createElement('div');
+  nameDiv.className = 'playbook-name';
+  nameDiv.textContent = playName;
+  row.appendChild(nameDiv);
+  
+  const progressContainer = document.createElement('div');
+  progressContainer.className = 'playbook-progress-container';
+  
+  const progressBar = document.createElement('div');
+  progressBar.className = 'playbook-progress-bar';
+  
+  const progressFill = document.createElement('div');
+  progressFill.className = 'playbook-progress-fill';
+  const percentage = Math.min(100, (effectiveness / 500) * 100);
+  progressFill.style.width = `${percentage}%`;
+  
+  progressBar.appendChild(progressFill);
+  progressContainer.appendChild(progressBar);
+  row.appendChild(progressContainer);
+  
+  return row;
+}
+
+// Update renderTeam to also render player stats
+function renderRosterStats(players) {
+  const tbody = document.getElementById('roster-stats-body');
+  if (!tbody) return;
+  
+  tbody.innerHTML = '';
+  
+  if (!players || players.length === 0) return;
+  
+  players.forEach(p => {
+    const stats = p.stats?.season || {};
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim()}</td>
+      <td>${stats.PTS || 0}</td>
+      <td>${stats.FGM || 0}/${stats.FGA || 0}</td>
+      <td>${stats.TPM || 0}/${stats.TPA || 0}</td>
+      <td>${stats.FTM || 0}/${stats.FTA || 0}</td>
+      <td>${stats.REB || 0}</td>
+      <td>${stats.AST || 0}</td>
+      <td>${stats.STL || 0}</td>
+      <td>${stats.BLK || 0}</td>
+      <td>${stats.F || 0}</td>
+      <td>${stats.MIN || 0}</td>
+      <td>${stats.TO || 0}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+

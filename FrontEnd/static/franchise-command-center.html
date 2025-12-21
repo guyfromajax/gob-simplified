@@ -7,6 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/tournament.css">
   <link rel="stylesheet" href="/static/franchise-command-center.css">
+  <link rel="stylesheet" href="/static/training-report.css">
 </head>
 <body>
   <div id="franchise-container">
@@ -43,11 +44,11 @@
     <div id="tournament-tabs">
       <div class="tab-buttons">
         <button data-tab="standings-tab" class="active">Standings</button>
+        <button data-tab="roster-tab">Roster</button>
         <button data-tab="team-tab">Team</button>
-        <button data-tab="leaders-tab">Leaders</button>
-        <button data-tab="teamstats-tab">Team Stats</button>
-        <button data-tab="recruits-tab">Recruits</button>
+        <button data-tab="stats-tab">Stats</button>
         <button data-tab="schedule-tab">Schedule</button>
+        <button data-tab="recruits-tab">Recruits</button>
       </div>
       <div id="standings-tab" class="tab-content active">
         <h3>Team Standings</h3>
@@ -60,7 +61,7 @@
           </table>
         </div>
       </div>
-      <div id="team-tab" class="tab-content">
+      <div id="roster-tab" class="tab-content">
         <div class="scroll-x">
           <table class="roster-table">
             <thead>
@@ -88,12 +89,47 @@
             <tbody id="team-body"></tbody>
           </table>
         </div>
+        <div class="scroll-x" style="margin-top: 20px;">
+          <table class="stats-table">
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>PTS</th>
+                <th>FGM/FGA</th>
+                <th>3PTM/3PTA</th>
+                <th>FTM/FTA</th>
+                <th>REB</th>
+                <th>AST</th>
+                <th>STL</th>
+                <th>BLK</th>
+                <th>F</th>
+                <th>MIN</th>
+                <th>TO</th>
+              </tr>
+            </thead>
+            <tbody id="roster-stats-body"></tbody>
+          </table>
+        </div>
       </div>
-      <div id="leaders-tab" class="tab-content">
+      <div id="team-tab" class="tab-content">
+        <!-- Team Report Section -->
+        <section class="team-section">
+          <h2>Team Report</h2>
+          <div class="team-attributes-grid" id="team-attributes-grid"></div>
+        </section>
+
+        <!-- Playbook Summary Section -->
+        <section class="playbook-summary-section">
+          <h2>Playbook Summary</h2>
+          <div class="playbook-summary-container" id="playbook-summary-container">
+            <!-- Plays will be populated here -->
+          </div>
+        </section>
+      </div>
+      <div id="stats-tab" class="tab-content">
         <div id="leaders-container"></div>
-      </div>
-      <div id="teamstats-tab" class="tab-content">
-        <div class="scroll-x">
+        <div class="scroll-x" style="margin-top: 20px;">
+          <h3>Team Stats</h3>
           <table class="stats-table">
             <thead>
               <tr><th>Team</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th></tr>
