@@ -7517,8 +7517,10 @@ Training report links appear next to scheduled games on the Franchise Command Ce
 
 **Training Report:**
 - `GET /franchise/training-report` - Get training report data
-  - Query params: `franchise_id, team_id, week`
-  - Response: `{week, upcoming_opponent, coaching_focus, player_changes, team_changes, plays_data, scouting_data, plays_effectiveness_changes, defenses_effectiveness_changes, players, team_attributes, training_notes}`
+  - **Franchise mode:** Query params: `franchise_id, team_id, week` (week is required)
+  - **Tournament mode:** Query params: `tournament_id, team_id, round` (round is optional - backend determines from state if not provided)
+  - **SS&S Approach:** Backend determines round from `training_status.round` or `latest_training.round` if not provided in URL
+  - Response: `{week, round, upcoming_opponent, coaching_focus, player_changes, team_changes, plays_data, scouting_data, plays_effectiveness_changes, defenses_effectiveness_changes, players, team_attributes, training_notes}`
 
 #### Data Storage
 
