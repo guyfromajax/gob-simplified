@@ -8969,6 +8969,16 @@ When creating a new game instance within a franchise:
   4. Attributes are passed to `GameManager()` constructor
   5. If no attributes are loaded, `TeamManager._init_team_attributes()` generates random values
 
+**Team Data API Endpoint:**
+- **Location**: `BackEnd/api/franchise_routes.py` - `get_franchise_team_data()`
+- **Endpoint**: `GET /franchise/team-data?franchise_id=...&team_name=...`
+- **Process**:
+  1. Resolves `team_name` to `team_id` server-side using `db.teams.find_one({"name": team_name})`
+  2. Returns team object from `franchises.{franchise_id}.franchise_teams.{team_id}`
+  3. Initializes `scouting_data.defense` structure if missing
+  4. Defaults team attributes to 0 if not present
+- **Pattern**: Matches the successful pattern used by `/franchise/roster` - server-side team name resolution
+
 #### 4. **Team Object Updates**
 
 - **Playbook Settings**: Saved to `franchises.{franchise_id}.franchise_teams.{team_id}.playbook_settings`

@@ -683,13 +683,14 @@ async function loadRoster() {
       console.error('No userTeamId found - cannot load roster');
       return;
     }
-    // Use tournament roster endpoint (similar to franchise/roster)
-    const tournamentId = tournament?._id;
-    if (!tournamentId) {
-      console.error('No tournament ID found - cannot load tournament roster');
+    // Ensure tournament is loaded
+    if (!tournament || !tournament._id) {
+      console.error('Tournament not loaded - cannot load roster');
       return;
     }
-    const url = `/tournament/roster?tournament_id=${encodeURIComponent(tournamentId)}&team_name=${encodeURIComponent(formatTeamName(userTeamId))}`;
+    // Use tournament roster endpoint (similar to franchise/roster)
+    // Use userTeamId directly (not formatted) - backend handles name resolution
+    const url = `/tournament/roster?tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(userTeamId)}`;
     const res = await fetch(url);
     const data = await res.json();
     console.log("Tournament team player data:", data);
