@@ -20,8 +20,14 @@ def execute_training(
     players: List[dict],
     team: dict,
     allocations: Dict,
-    coaching_focus: Optional[str] = None
-) -> Tuple[List[dict], dict, Dict]:
+    coaching_focus: Optional[str] = None,
+    plays_data: Optional[Dict] = None,
+    playcall_settings: Optional[Dict] = None,
+    strategy_settings: Optional[Dict] = None,
+    playbook_settings: Optional[Dict] = None,
+    scouting_data: Optional[Dict] = None,
+    playbook_training_mode: str = "current-playbooks"
+) -> Tuple[List[dict], dict, Dict, Dict, Dict]:
     """
     Main training execution function.
     
@@ -49,6 +55,12 @@ def execute_training(
     }
     original_team_baseline = {k: team.get(k, 0) for k in TEAM_ATTR_CLAMPS.keys()}
     
+    # Initialize plays and scouting_data if not provided
+    if plays_data is None:
+        plays_data = {}
+    if scouting_data is None:
+        scouting_data = {}
+    
     # Step 1: Apply pre-training conditions
     players, team = apply_pre_training_conditions(players, team)
     
@@ -59,7 +71,11 @@ def execute_training(
         original_team_baseline=original_team_baseline
     )
     
-    return players, team, training_report
+    # Step 3: Apply play/defense training (placeholder - will be implemented based on user instructions)
+    updated_plays = plays_data.copy()  # TODO: Apply training to plays based on playbook_training_mode
+    updated_scouting_data = scouting_data.copy()  # TODO: Apply training to defenses based on playbook_training_mode
+    
+    return players, team, updated_plays, updated_scouting_data, training_report
 
 # Player attributes excluding EM, MO, NG
 TRAINABLE_PLAYER_ATTRS = [attr for attr in ALL_ATTRS if attr not in ["EM", "MO", "NG"]]

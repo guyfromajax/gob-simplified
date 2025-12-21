@@ -927,9 +927,9 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     team_id = req.team_id
     if not team_id:
         state = franchise_state_collection.find_one({"_id": "state"}) or {}
-        team_name = state.get("team")
-        if not team_name:
-            raise HTTPException(status_code=404, detail="User team not found")
+    team_name = state.get("team")
+    if not team_name:
+        raise HTTPException(status_code=404, detail="User team not found")
         team_doc = db.teams.find_one({"name": team_name})
         if not team_doc:
             raise HTTPException(status_code=404, detail="Team not found")
@@ -939,9 +939,7 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         team_doc = db.teams.find_one({"name": team_id})
         if team_doc:
             team_id = str(team_doc["_id"])
-        else:
-            # Assume it's already an ID
-            pass
+        # Assume it's already an ID if not found
 
     # Get franchise-specific player data for the user's team
     franchise_players = franchise_doc.get("players", {})
@@ -970,7 +968,15 @@ def run_franchise_training(req: FranchiseTrainingRequest):
 
     # Get franchise-specific team stats
     franchise_teams = franchise_doc.get("franchise_teams", {})
-    team_stats = franchise_teams.get(team_id, {}).copy()
+    team_data = franchise_teams.get(team_id, {})
+    team_stats = team_data.copy()
+
+    # Get plays, game plan settings, and playbook settings for training
+    plays_data = team_data.get("plays", {})
+    playcall_settings = team_data.get("playcall_settings", {})
+    strategy_settings = team_data.get("strategy_settings", {})
+    playbook_settings = team_data.get("playbook_settings", {})
+    scouting_data = team_data.get("scouting_data", {})
 
     # Extract training data
     training_data = req.training_data
@@ -994,11 +1000,17 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     from BackEnd.models.training_execution_v2 import execute_training
     
     # Execute training (applies pre-training conditions, then training points)
-    updated_players, updated_team, training_report = execute_training(
+    updated_players, updated_team, updated_plays, updated_scouting_data, training_report = execute_training(
         players_for_training,
         team_stats,
         allocations,
-        coaching_focus
+        coaching_focus,
+        plays_data=plays_data,
+        playcall_settings=playcall_settings,
+        strategy_settings=strategy_settings,
+        playbook_settings=playbook_settings,
+        scouting_data=scouting_data,
+        playbook_training_mode=training_data.get("playbook_training_mode", "current-playbooks")
     )
     
     # Update players_for_training and team_stats with results
@@ -1063,6 +1075,14 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         if isinstance(value, dict):
             continue
         franchise_update[f"franchise_teams.{team_id}.{field}"] = value
+    
+    # Update plays data
+    if updated_plays:
+        franchise_update[f"franchise_teams.{team_id}.plays"] = updated_plays
+    
+    # Update scouting_data (defenses)
+    if updated_scouting_data:
+        franchise_update[f"franchise_teams.{team_id}.scouting_data"] = updated_scouting_data
 
     # Mark training as completed and update status
     session_type = training_status.get("session_type", "in-season")

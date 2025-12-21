@@ -701,11 +701,17 @@ def run_tournament_training(req: TournamentTrainingRequest):
     if not players_for_training:
         raise HTTPException(status_code=404, detail="No players found for training")
 
+    # Get team data from tournament document
+    tournament_teams = tournament_doc.get("teams", {})
+    team_data = tournament_teams.get(team_id, {})
+    
     # Get team attributes from tournament document (if stored) or initialize
     # For now, tournament doesn't store team attributes separately, so we'll initialize them
     # In the future, tournament could store team attributes similar to franchise
     from BackEnd.models.team_manager import TeamManager
-    team_stats = TeamManager.init_team_attributes(mode="tournament")
+    team_stats = team_data.get("team_attributes", TeamManager.init_team_attributes(mode="tournament"))
+    if not isinstance(team_stats, dict):
+        team_stats = TeamManager.init_team_attributes(mode="tournament")
 
     # Extract training data
     training_data = req.training_data
@@ -717,11 +723,24 @@ def run_tournament_training(req: TournamentTrainingRequest):
     coaching_focus = training_data.get("coaching_focus")
 
     # Execute training
-    updated_players, updated_team, training_report = execute_training(
+    # Get plays, game plan settings, and playbook settings for training
+    plays_data = team_data.get("plays", {})
+    playcall_settings = team_data.get("playcall_settings", {})
+    strategy_settings = team_data.get("strategy_settings", {})
+    playbook_settings = team_data.get("playbook_settings", {})
+    scouting_data = team_data.get("scouting_data", {})
+    
+    updated_players, updated_team, updated_plays, updated_scouting_data, training_report = execute_training(
         players_for_training,
         team_stats,
         allocations,
-        coaching_focus
+        coaching_focus,
+        plays_data=plays_data,
+        playcall_settings=playcall_settings,
+        strategy_settings=strategy_settings,
+        playbook_settings=playbook_settings,
+        scouting_data=scouting_data,
+        playbook_training_mode=training_data.get("playbook_training_mode", "current-playbooks")
     )
     
     # Recalculate position ratings for each player after training
@@ -754,6 +773,15 @@ def run_tournament_training(req: TournamentTrainingRequest):
 
     # Update tournament document with new attribute values and position ratings
     tournament_update = {}
+    
+    # Update plays data
+    if updated_plays:
+        tournament_update[f"teams.{team_id}.plays"] = updated_plays
+    
+    # Update scouting_data (defenses)
+    if updated_scouting_data:
+        tournament_update[f"teams.{team_id}.scouting_data"] = updated_scouting_data
+    
     for player in updated_players:
         pid = player["_id"]
         attrs = player.get("attributes", {})
