@@ -600,43 +600,67 @@ async function loadTeamData() {
       return;
     }
     
-    console.log('📊 [TEAM DATA] Franchise document teams:', Object.keys(franchiseDoc.franchise_teams));
+    const franchiseTeams = franchiseDoc.franchise_teams || {};
+    const teamKeys = Object.keys(franchiseTeams);
+    console.log('📊 [TEAM DATA] Franchise document teams:', teamKeys);
+    console.log('📊 [TEAM DATA] Looking for userTeamName:', userTeamName);
+    console.log('📊 [TEAM DATA] Sample team entry:', teamKeys[0] ? { key: teamKeys[0], team: franchiseTeams[teamKeys[0]] } : 'No teams');
     
     // Find user's team in franchise document
     let teamObj = null;
     let teamIdKey = null;
     
-    // Try to find team by name - iterate through franchise_teams
-    for (const [tid, team] of Object.entries(franchiseDoc.franchise_teams)) {
-      // Try direct name match first
-      if (team.team_name === userTeamName || tid === userTeamName) {
+    // First, try to get team_id from teams collection
+    let teamId = null;
+    try {
+      const teamDoc = await fetchJSON(`/roster/${userTeamName}`);
+      if (teamDoc && teamDoc.team) {
+        // Get team_id from teams collection
+        const teamFromDb = await fetchJSON(`/teams/${encodeURIComponent(teamDoc.team)}/players`);
+        if (teamFromDb && teamFromDb.team) {
+          // Try to find team_id in the response or use team name
+          teamId = teamFromDb.team;
+        }
+      }
+    } catch (error) {
+      console.warn('Could not fetch team doc for name resolution:', error);
+    }
+    
+    // Try multiple matching strategies
+    for (const [tid, team] of Object.entries(franchiseTeams)) {
+      // Strategy 1: Direct key match with team_id
+      if (tid === teamId || tid === userTeamName) {
         teamObj = team;
         teamIdKey = tid;
+        console.log('📊 [TEAM DATA] Found team by key match:', tid);
+        break;
+      }
+      
+      // Strategy 2: Match team_name field
+      if (team.team_name === userTeamName || team.team_name === teamId) {
+        teamObj = team;
+        teamIdKey = tid;
+        console.log('📊 [TEAM DATA] Found team by team_name match:', team.team_name, 'key:', tid);
+        break;
+      }
+      
+      // Strategy 3: Check if tid is an ObjectId string that matches team_id
+      if (teamId && tid.includes(teamId) || teamId && tid === teamId) {
+        teamObj = team;
+        teamIdKey = tid;
+        console.log('📊 [TEAM DATA] Found team by ObjectId match:', tid);
         break;
       }
     }
     
-    // If still not found, try to get team_id from teams collection
     if (!teamObj) {
-      try {
-        const teamDoc = await fetchJSON(`/roster/${userTeamName}`);
-        if (teamDoc && teamDoc.team) {
-          // Look for team_id in franchise_teams keys by matching team name
-          for (const [tid, team] of Object.entries(franchiseDoc.franchise_teams)) {
-            if (team.team_name === teamDoc.team) {
-              teamObj = team;
-              teamIdKey = tid;
-              break;
-            }
-          }
-        }
-      } catch (error) {
-        console.warn('Could not fetch team doc for name resolution:', error);
-      }
-    }
-    
-    if (!teamObj) {
-      console.warn('User team not found in franchise document. Available teams:', Object.keys(franchiseDoc.franchise_teams));
+      console.warn('📊 [TEAM DATA] User team not found. Available teams:', teamKeys);
+      console.warn('📊 [TEAM DATA] Team details:', teamKeys.map(key => ({
+        key,
+        team_name: franchiseTeams[key]?.team_name,
+        has_attributes: !!franchiseTeams[key]?.shot_threshold,
+        has_plays: !!franchiseTeams[key]?.plays
+      })));
       return;
     }
     
