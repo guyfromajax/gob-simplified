@@ -477,17 +477,19 @@ def get_tournament_team_data(tournament_id: str, team_name: str = None):
     # Get plays data
     plays_data = team_obj.get("plays", {})
     
-    # Get scouting data - initialize defense structure if missing
+    # Get scouting data - initialize defense structure if missing (with randomized values for tournament)
     scouting_data = team_obj.get("scouting_data", {})
     if not scouting_data.get("defense"):
-        scouting_data["defense"] = {
-            "Man": {"effectiveness": 0, "momentum": 0, "cloaking": 0},
-            "2-3 Zone": {"effectiveness": 0, "momentum": 0, "cloaking": 0},
-            "3-2 Zone": {"effectiveness": 0, "momentum": 0, "cloaking": 0},
-            "1-3-1 Zone": {"effectiveness": 0, "momentum": 0, "cloaking": 0}
-        }
+        # Initialize with randomized values using populate_scouting_data (for tournament mode)
+        from BackEnd.api.gameplan_routes import populate_scouting_data
+        scouting_data = populate_scouting_data(mode="tournament")
+        # Save initialized scouting_data back to tournament document
+        tournaments_collection.update_one(
+            {"_id": tid},
+            {"$set": {f"teams.{team_id}.scouting_data": scouting_data}}
+        )
     else:
-        # Ensure each defense has effectiveness value
+        # Ensure each defense has effectiveness value (fallback to 0 if missing)
         defenses = ["Man", "2-3 Zone", "3-2 Zone", "1-3-1 Zone"]
         for def_name in defenses:
             if def_name not in scouting_data["defense"]:

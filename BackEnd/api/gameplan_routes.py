@@ -170,6 +170,128 @@ def populate_team_plays(mode="single"):
         return {}
 
 
+def populate_scouting_data(mode="single"):
+    """
+    Populate scouting_data with defense structures.
+    This mirrors the structure created by TeamManager._init_scouting_data() but as a standalone function.
+    
+    Args:
+        mode: "single", "tournament", or "franchise"
+        - For tournament mode: randomizes effectiveness (0-80), momentum (0-10), cloaking (0-10) for each defense
+        - For other modes: uses default values (0)
+        
+    Returns:
+        dict: scouting_data structure with defense initialized
+    """
+    import random
+    from copy import deepcopy
+    
+    # Create defense structure template
+    defense_template = {
+        "used": 0,
+        "success": 0,
+        "effectiveness": 0.0,
+        "momentum": 0,
+        "cloaking": 0,
+        "game_stats": {
+            "used": 0,
+            "success": 0,
+            "ev_scores": [],
+            "lean_scores": [],
+            "vs_motion": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+            "vs_set": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+            "vs_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+            "vs_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+            "vs_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+            "vs_motion_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+            "vs_motion_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+            "vs_motion_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+            "vs_set_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+            "vs_set_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+            "vs_set_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []}
+        },
+        "season_stats": {
+            "used": 0,
+            "success": 0,
+            "vs_motion": {"attempts": 0, "success": 0},
+            "vs_set": {"attempts": 0, "success": 0},
+            "vs_inside": {"attempts": 0, "success": 0},
+            "vs_attack": {"attempts": 0, "success": 0},
+            "vs_outside": {"attempts": 0, "success": 0},
+            "vs_motion_inside": {"attempts": 0, "success": 0},
+            "vs_motion_attack": {"attempts": 0, "success": 0},
+            "vs_motion_outside": {"attempts": 0, "success": 0},
+            "vs_set_inside": {"attempts": 0, "success": 0},
+            "vs_set_attack": {"attempts": 0, "success": 0},
+            "vs_set_outside": {"attempts": 0, "success": 0}
+        }
+    }
+    
+    # Initialize defense structure
+    if mode == "tournament":
+        # For tournament mode, each defense gets its own random values
+        defense_structure = {
+            "Man": {
+                "used": 0,
+                "success": 0,
+                "effectiveness": random.randint(0, 80),
+                "momentum": random.randint(0, 10),
+                "cloaking": random.randint(0, 10),
+                "game_stats": defense_template["game_stats"].copy(),
+                "season_stats": defense_template["season_stats"].copy()
+            },
+            "2-3 Zone": {
+                "used": 0,
+                "success": 0,
+                "effectiveness": random.randint(0, 80),
+                "momentum": random.randint(0, 10),
+                "cloaking": random.randint(0, 10),
+                "game_stats": defense_template["game_stats"].copy(),
+                "season_stats": defense_template["season_stats"].copy()
+            },
+            "3-2 Zone": {
+                "used": 0,
+                "success": 0,
+                "effectiveness": random.randint(0, 80),
+                "momentum": random.randint(0, 10),
+                "cloaking": random.randint(0, 10),
+                "game_stats": defense_template["game_stats"].copy(),
+                "season_stats": defense_template["season_stats"].copy()
+            },
+            "1-3-1 Zone": {
+                "used": 0,
+                "success": 0,
+                "effectiveness": random.randint(0, 80),
+                "momentum": random.randint(0, 10),
+                "cloaking": random.randint(0, 10),
+                "game_stats": defense_template["game_stats"].copy(),
+                "season_stats": defense_template["season_stats"].copy()
+            },
+            "vs_Fast_Break": {"used": 0, "success": 0},
+            "FCP": {"used": 0, "success": 0},
+            "HCT": {"used": 0, "success": 0}
+        }
+    else:
+        # For other modes, use template with default values
+        defense_structure = {
+            "Man": deepcopy(defense_template),
+            "2-3 Zone": deepcopy(defense_template),
+            "3-2 Zone": deepcopy(defense_template),
+            "1-3-1 Zone": deepcopy(defense_template),
+            "vs_Fast_Break": {"used": 0, "success": 0},
+            "FCP": {"used": 0, "success": 0},
+            "HCT": {"used": 0, "success": 0}
+        }
+    
+    # Return minimal scouting_data structure (just defense for now)
+    # The full structure with offense tracking is created by TeamManager._init_scouting_data()
+    # but for initialization purposes, we only need defense
+    return {
+        "defense": defense_structure,
+        "offense": {}  # Will be populated by TeamManager if needed
+    }
+
+
 def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
     """Ensure team objects exist in the mode document. Create with defaults if missing."""
     collection = None
@@ -286,10 +408,13 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
             defaults = get_default_settings()
             # Pass mode to populate_team_plays for tournament randomization
             populated_plays = populate_team_plays(mode=mode)
+            # Initialize scouting_data with randomized values for tournament mode
+            scouting_data = populate_scouting_data(mode=mode)
             team_obj = {
                 "playcall_settings": defaults["playcall_settings"].copy(),
                 "strategy_settings": defaults["strategy_settings"].copy(),
-                "plays": populated_plays.copy()
+                "plays": populated_plays.copy(),
+                "scouting_data": scouting_data
             }
             
             # Add team attributes from core teams collection (if available)
