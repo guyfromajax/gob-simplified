@@ -155,7 +155,8 @@ backBtn.addEventListener('click', function() {
   if (mode === 'franchise') {
     window.location.href = '/static/franchise-command-center.html?' + urlParams.toString();
   } else if (mode === 'tournament') {
-    window.location.href = '/static/tournament-command-center.html?' + urlParams.toString();
+    // Use same pattern as franchise mode - tournament.html is the command center
+    window.location.href = '/static/tournament.html?' + urlParams.toString();
   } else if (from === 'game-plan') {
     window.location.href = '/static/game-plan.html?' + urlParams.toString();
   } else {
