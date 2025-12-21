@@ -150,7 +150,6 @@ function initAttributeTooltips(container = document, selectors = []) {
         element.setAttribute('title', ATTRIBUTE_NAMES[upperText]); // Fallback
         setupTooltipEvents(element, ATTRIBUTE_NAMES[upperText]);
         tooltipCount++;
-        console.log(`[TOOLTIP] ✅ Set tooltip for "${text}" → "${ATTRIBUTE_NAMES[upperText]}"`);
       }
       
       // Also check data-attr attribute if present
@@ -161,13 +160,9 @@ function initAttributeTooltips(container = document, selectors = []) {
           element.setAttribute('title', ATTRIBUTE_NAMES[attr]);
           setupTooltipEvents(element, ATTRIBUTE_NAMES[attr]);
           tooltipCount++;
-          console.log(`[TOOLTIP] ✅ Set tooltip via data-attr for "${attr}" → "${ATTRIBUTE_NAMES[attr]}"`);
         }
       }
     });
-    if (tooltipCount > 0) {
-      console.log(`[TOOLTIP] Initialized ${tooltipCount} tooltips for selector "${selector}"`);
-    }
   });
 }
 

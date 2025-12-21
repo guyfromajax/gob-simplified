@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from pathlib import Path
 from bson import ObjectId
