@@ -827,6 +827,83 @@ def get_franchise_state(franchise_id: str):
     return jsonable_encoder(franchise_doc, custom_encoder={ObjectId: str})
 
 
+@router.get("/franchise/team-data")
+def get_franchise_team_data(franchise_id: str, team_name: str = None):
+    """
+    Get team data (attributes, plays, scouting_data) from franchise_teams.
+    Resolves team_name to team_id server-side, matching the pattern used by /franchise/roster.
+    """
+    try:
+        fid = ObjectId(franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise ID")
+    
+    # Get team name from state if not provided
+    if not team_name:
+        state = franchise_state_collection.find_one({"_id": "state"}) or {}
+        team_name = state.get("team")
+    
+    if not team_name:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Get team document to resolve team_name to team_id (ObjectId)
+    team_doc = db.teams.find_one({"name": team_name})
+    if not team_doc:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    team_id = str(team_doc["_id"])
+    
+    # Get franchise document
+    franchise_doc = db.franchises.find_one({"_id": fid})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    
+    # Get team object from franchise_teams
+    franchise_teams = franchise_doc.get("franchise_teams", {})
+    team_obj = franchise_teams.get(team_id, {})
+    
+    if not team_obj:
+        raise HTTPException(status_code=404, detail=f"Team data not found in franchise for team: {team_name}")
+    
+    # Extract team attributes
+    team_attributes = {}
+    attr_keys = ['shot_threshold', 'turnover_modifier', 'foul_modifier', 'rebound_modifier', 
+                 'momentum_score', 'offensive_efficiency', 'team_chemistry', 'defensive_efficiency',
+                 'fb_efficiency', 'pt_efficiency', 'fb_opp_modifier', 'pt_opp_modifier']
+    for key in attr_keys:
+        if key in team_obj:
+            team_attributes[key] = team_obj[key]
+        else:
+            team_attributes[key] = 0  # Default to 0 if not present
+    
+    # Get plays data
+    plays_data = team_obj.get("plays", {})
+    
+    # Get scouting data - initialize defense structure if missing
+    scouting_data = team_obj.get("scouting_data", {})
+    if not scouting_data.get("defense"):
+        scouting_data["defense"] = {
+            "Man": {"effectiveness": 0, "momentum": 0, "cloaking": 0},
+            "2-3 Zone": {"effectiveness": 0, "momentum": 0, "cloaking": 0},
+            "3-2 Zone": {"effectiveness": 0, "momentum": 0, "cloaking": 0},
+            "1-3-1 Zone": {"effectiveness": 0, "momentum": 0, "cloaking": 0}
+        }
+    else:
+        # Ensure each defense has effectiveness value
+        defenses = ["Man", "2-3 Zone", "3-2 Zone", "1-3-1 Zone"]
+        for def_name in defenses:
+            if def_name not in scouting_data["defense"]:
+                scouting_data["defense"][def_name] = {"effectiveness": 0, "momentum": 0, "cloaking": 0}
+            elif "effectiveness" not in scouting_data["defense"][def_name]:
+                scouting_data["defense"][def_name]["effectiveness"] = 0
+    
+    return {
+        "team_attributes": team_attributes,
+        "plays_data": plays_data,
+        "scouting_data": scouting_data
+    }
+
+
 @router.get("/franchise/roster")
 def get_franchise_roster(franchise_id: str, team_name: str = None):
     """
