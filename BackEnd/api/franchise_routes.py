@@ -1516,20 +1516,20 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                         "attributes": player_attrs
                     })
             
-            # Get current team attributes (tournament doesn't store team attributes separately yet)
-            # For now, return empty/default values
+            # Get current team attributes from tournament teams (matches Franchise pattern)
             team_attrs = {
-                "shot_threshold": 0,
-                "rebound_modifier": 1.0,
-                "offensive_efficiency": 0,
-                "defensive_efficiency": 0,
-                "fb_efficiency": 0,
-                "pt_efficiency": 0,
-                "foul_modifier": 0,
-                "turnover_modifier": 0,
-                "team_chemistry": 0,
-                "fb_opp_modifier": 0,
-                "pt_opp_modifier": 0
+                "shot_threshold": team_data.get("shot_threshold", 0),
+                "rebound_modifier": team_data.get("rebound_modifier", 1.0),
+                "offensive_efficiency": team_data.get("offensive_efficiency", 0),
+                "defensive_efficiency": team_data.get("defensive_efficiency", 0),
+                "fb_efficiency": team_data.get("fb_efficiency", 0),
+                "pt_efficiency": team_data.get("pt_efficiency", 0),
+                "foul_modifier": team_data.get("foul_modifier", 0),
+                "turnover_modifier": team_data.get("turnover_modifier", 0),
+                "momentum_score": team_data.get("momentum_score", 0),
+                "team_chemistry": team_data.get("team_chemistry", 0),
+                "fb_opp_modifier": team_data.get("fb_opp_modifier", 0),
+                "pt_opp_modifier": team_data.get("pt_opp_modifier", 0)
             }
         
         if not report_data:
