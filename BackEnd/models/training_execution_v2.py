@@ -71,9 +71,16 @@ def execute_training(
         original_team_baseline=original_team_baseline
     )
     
-    # Step 3: Apply play/defense training (placeholder - will be implemented based on user instructions)
-    updated_plays = plays_data.copy()  # TODO: Apply training to plays based on playbook_training_mode
-    updated_scouting_data = scouting_data.copy()  # TODO: Apply training to defenses based on playbook_training_mode
+    # Step 3: Apply play/defense training
+    updated_plays, updated_scouting_data = apply_play_defense_training(
+        plays_data,
+        scouting_data,
+        allocations,
+        playbook_training_mode,
+        playcall_settings,
+        strategy_settings,
+        playbook_settings
+    )
     
     return players, team, updated_plays, updated_scouting_data, training_report
 
@@ -1095,4 +1102,327 @@ def _apply_ng_reduction_from_conditioning(players: List[dict], conditioning_poin
     logger.warning(f"🔋 [NG REDUCTION - CONDITIONING] Summary: {len(reduced_players)} players reduced, {skipped_high_nd} skipped (high ND), {zero_reductions} rolled zero reduction")
     
     return reduced_players
+
+
+def apply_play_defense_training(
+    plays_data: Dict,
+    scouting_data: Dict,
+    allocations: Dict,
+    playbook_training_mode: str,
+    playcall_settings: Dict,
+    strategy_settings: Dict,
+    playbook_settings: Dict
+) -> Tuple[Dict, Dict]:
+    """
+    Apply training to plays and defenses based on training mode and settings.
+    
+    Args:
+        plays_data: Dict of plays with effectiveness/momentum
+        scouting_data: Dict of scouting data with defense effectiveness/momentum
+        allocations: Training point allocations
+        playbook_training_mode: "current-playbooks", "all-plays-even", or "custom"
+        playcall_settings: Game plan playcall settings (Inside, Outside, Attack, etc.)
+        strategy_settings: Game plan strategy settings (offense, defense, etc.)
+        playbook_settings: Playbook percentage settings
+    
+    Returns:
+        Tuple of (updated_plays, updated_scouting_data)
+    """
+    import math
+    
+    updated_plays = plays_data.copy() if plays_data else {}
+    updated_scouting_data = scouting_data.copy() if scouting_data else {}
+    
+    # Get offense and defense install points
+    team_drills = allocations.get("team_drills", {})
+    offense_install = team_drills.get("team_offense", {}).get("install", 0)
+    defense_install = team_drills.get("team_defense", {}).get("install", 0)
+    
+    # Calculate total playPoints for offense and defense
+    offense_play_points = 0
+    defense_play_points = 0
+    
+    if offense_install == 1:
+        offense_play_points = random.randint(80, 120)
+    elif offense_install == 2:
+        offense_play_points = random.randint(100, 150)
+    elif offense_install == 3:
+        offense_play_points = random.randint(150, 200)
+    elif offense_install == 4:
+        offense_play_points = random.randint(150, 220)
+    elif offense_install == 5:
+        offense_play_points = random.randint(150, 250)
+    
+    if defense_install == 1:
+        defense_play_points = random.randint(80, 120)
+    elif defense_install == 2:
+        defense_play_points = random.randint(100, 150)
+    elif defense_install == 3:
+        defense_play_points = random.randint(150, 200)
+    elif defense_install == 4:
+        defense_play_points = random.randint(150, 220)
+    elif defense_install == 5:
+        defense_play_points = random.randint(150, 250)
+    
+    # Apply offense training
+    if offense_play_points > 0:
+        updated_plays = _apply_offense_play_training(
+            updated_plays,
+            offense_play_points,
+            playbook_training_mode,
+            playcall_settings,
+            strategy_settings,
+            playbook_settings
+        )
+    
+    # Apply defense training
+    if defense_play_points > 0:
+        updated_scouting_data = _apply_defense_training(
+            updated_scouting_data,
+            defense_play_points,
+            playbook_training_mode,
+            strategy_settings,
+            playbook_settings
+        )
+    
+    return updated_plays, updated_scouting_data
+
+
+def _apply_offense_play_training(
+    plays_data: Dict,
+    total_points: int,
+    playbook_training_mode: str,
+    playcall_settings: Dict,
+    strategy_settings: Dict,
+    playbook_settings: Dict
+) -> Dict:
+    """
+    Apply training points to offensive plays.
+    
+    Returns:
+        Updated plays_data dict
+    """
+    import math
+    
+    updated_plays = plays_data.copy()
+    
+    # Check if we should use playbook settings or default to even distribution
+    use_playbooks = (
+        playbook_training_mode == "current-playbooks" and
+        playbook_settings and
+        strategy_settings
+    )
+    
+    if not use_playbooks or playbook_training_mode == "all-plays-even":
+        # Even distribution across all motion plays
+        motion_plays = [p for p in updated_plays.values() if p.get("play_type") == "motion"]
+        if motion_plays:
+            points_per_play = math.floor(total_points / len(motion_plays))
+            remainder = total_points - (points_per_play * len(motion_plays))
+            
+            for i, play in enumerate(motion_plays):
+                points = points_per_play + (1 if i < remainder else 0)
+                play_name = play.get("name")
+                if play_name in updated_plays:
+                    updated_plays[play_name]["effectiveness"] = updated_plays[play_name].get("effectiveness", 0) + points
+    else:
+        # Use playbook settings with layered filtering
+        # Filter 1: strategy_settings["offense"] determines motion/set split
+        offense_setting = strategy_settings.get("offense", 2)  # Default to 50/50
+        
+        if offense_setting == 0:
+            motion_pct = 1.0
+            set_pct = 0.0
+        elif offense_setting == 1:
+            motion_pct = 0.75
+            set_pct = 0.25
+        elif offense_setting == 2:
+            motion_pct = 0.5
+            set_pct = 0.5
+        elif offense_setting == 3:
+            motion_pct = 0.25
+            set_pct = 0.75
+        else:  # offense_setting == 4
+            motion_pct = 0.0
+            set_pct = 1.0
+        
+        motion_points = math.floor(total_points * motion_pct)
+        set_points = total_points - motion_points
+        
+        # Distribute motion points
+        if motion_points > 0:
+            motion_playbook = playbook_settings.get("motion", {})
+            motion_plays = [p for p in updated_plays.values() if p.get("play_type") == "motion"]
+            
+            # Calculate total percentage for motion plays in playbook
+            total_motion_pct = sum(motion_playbook.values())
+            
+            if total_motion_pct > 0:
+                for play in motion_plays:
+                    play_name = play.get("name")
+                    play_pct = motion_playbook.get(play_name, 0) / total_motion_pct
+                    points = math.floor(motion_points * play_pct)
+                    if play_name in updated_plays and points > 0:
+                        updated_plays[play_name]["effectiveness"] = updated_plays[play_name].get("effectiveness", 0) + points
+            else:
+                # No playbook percentages, distribute evenly
+                points_per_play = math.floor(motion_points / len(motion_plays)) if motion_plays else 0
+                remainder = motion_points - (points_per_play * len(motion_plays)) if motion_plays else 0
+                for i, play in enumerate(motion_plays):
+                    points = points_per_play + (1 if i < remainder else 0)
+                    play_name = play.get("name")
+                    if play_name in updated_plays:
+                        updated_plays[play_name]["effectiveness"] = updated_plays[play_name].get("effectiveness", 0) + points
+        
+        # Distribute set play points
+        if set_points > 0:
+            # Filter 2: playcall_settings determine Inside/Outside/Attack split
+            inside_setting = playcall_settings.get("Inside", 2)
+            outside_setting = playcall_settings.get("Outside", 2)
+            attack_setting = playcall_settings.get("Attack", 2)
+            
+            total_focus = inside_setting + outside_setting + attack_setting
+            if total_focus == 0:
+                # Default to even split
+                inside_pct = 1.0 / 3.0
+                outside_pct = 1.0 / 3.0
+                attack_pct = 1.0 / 3.0
+            else:
+                inside_pct = inside_setting / total_focus
+                outside_pct = outside_setting / total_focus
+                attack_pct = attack_setting / total_focus
+            
+            inside_points = math.floor(set_points * inside_pct)
+            outside_points = math.floor(set_points * outside_pct)
+            attack_points = set_points - inside_points - outside_points
+            
+            # Distribute points for each focus
+            for focus, focus_points in [("inside", inside_points), ("outside", outside_points), ("attack", attack_points)]:
+                if focus_points > 0:
+                    set_playbook_key = f"set_play_{focus}"
+                    set_playbook = playbook_settings.get(set_playbook_key, {})
+                    set_plays = [p for p in updated_plays.values() 
+                                if p.get("play_type") == "set_play" and p.get("play_focus") == focus]
+                    
+                    # Calculate total percentage for set plays in this focus
+                    total_set_pct = sum(set_playbook.values())
+                    
+                    if total_set_pct > 0:
+                        for play in set_plays:
+                            play_name = play.get("name")
+                            play_pct = set_playbook.get(play_name, 0) / total_set_pct
+                            points = math.floor(focus_points * play_pct)
+                            if play_name in updated_plays and points > 0:
+                                updated_plays[play_name]["effectiveness"] = updated_plays[play_name].get("effectiveness", 0) + points
+                    else:
+                        # No playbook percentages, distribute evenly
+                        points_per_play = math.floor(focus_points / len(set_plays)) if set_plays else 0
+                        remainder = focus_points - (points_per_play * len(set_plays)) if set_plays else 0
+                        for i, play in enumerate(set_plays):
+                            points = points_per_play + (1 if i < remainder else 0)
+                            play_name = play.get("name")
+                            if play_name in updated_plays:
+                                updated_plays[play_name]["effectiveness"] = updated_plays[play_name].get("effectiveness", 0) + points
+    
+    return updated_plays
+
+
+def _apply_defense_training(
+    scouting_data: Dict,
+    total_points: int,
+    playbook_training_mode: str,
+    strategy_settings: Dict,
+    playbook_settings: Dict
+) -> Dict:
+    """
+    Apply training points to defensive plays.
+    
+    Returns:
+        Updated scouting_data dict
+    """
+    import math
+    
+    updated_scouting_data = scouting_data.copy() if scouting_data else {}
+    
+    # Ensure defense structure exists
+    if "defense" not in updated_scouting_data:
+        updated_scouting_data["defense"] = {}
+    
+    defense_data = updated_scouting_data["defense"]
+    
+    # Check if we should use playbook settings or default to even distribution
+    use_playbooks = (
+        playbook_training_mode == "current-playbooks" and
+        playbook_settings and
+        strategy_settings
+    )
+    
+    if not use_playbooks or playbook_training_mode == "all-plays-even":
+        # Even distribution across all defensive plays (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone)
+        defense_types = ["Man", "2-3 Zone", "3-2 Zone", "1-3-1 Zone"]
+        valid_defenses = [d for d in defense_types if d in defense_data]
+        
+        if valid_defenses:
+            points_per_defense = math.floor(total_points / len(valid_defenses))
+            remainder = total_points - (points_per_defense * len(valid_defenses))
+            
+            for i, defense_name in enumerate(valid_defenses):
+                points = points_per_defense + (1 if i < remainder else 0)
+                if defense_name in defense_data:
+                    defense_data[defense_name]["effectiveness"] = defense_data[defense_name].get("effectiveness", 0) + points
+    else:
+        # Use playbook settings with layered filtering
+        # Filter 1: strategy_settings["defense"] determines man/zone split
+        defense_setting = strategy_settings.get("defense", 2)  # Default to 50/50
+        
+        if defense_setting == 0:
+            man_pct = 1.0
+            zone_pct = 0.0
+        elif defense_setting == 1:
+            man_pct = 0.75
+            zone_pct = 0.25
+        elif defense_setting == 2:
+            man_pct = 0.5
+            zone_pct = 0.5
+        elif defense_setting == 3:
+            man_pct = 0.25
+            zone_pct = 0.75
+        else:  # defense_setting == 4
+            man_pct = 0.0
+            zone_pct = 1.0
+        
+        man_points = math.floor(total_points * man_pct)
+        zone_points = total_points - man_points
+        
+        # Distribute man defense points
+        if man_points > 0:
+            # For now, we only have one man defense ("Man")
+            # When more man defenses are added, we can use playbook_settings.get("man_defense", {})
+            if "Man" in defense_data:
+                defense_data["Man"]["effectiveness"] = defense_data["Man"].get("effectiveness", 0) + man_points
+        
+        # Distribute zone defense points
+        if zone_points > 0:
+            zone_playbook = playbook_settings.get("zone_defense", {})
+            zone_defenses = ["2-3 Zone", "3-2 Zone", "1-3-1 Zone"]
+            valid_zone_defenses = [d for d in zone_defenses if d in defense_data]
+            
+            # Calculate total percentage for zone defenses in playbook
+            total_zone_pct = sum(zone_playbook.values())
+            
+            if total_zone_pct > 0:
+                for defense_name in valid_zone_defenses:
+                    defense_pct = zone_playbook.get(defense_name, 0) / total_zone_pct
+                    points = math.floor(zone_points * defense_pct)
+                    if points > 0:
+                        defense_data[defense_name]["effectiveness"] = defense_data[defense_name].get("effectiveness", 0) + points
+            else:
+                # No playbook percentages, distribute evenly
+                points_per_defense = math.floor(zone_points / len(valid_zone_defenses)) if valid_zone_defenses else 0
+                remainder = zone_points - (points_per_defense * len(valid_zone_defenses)) if valid_zone_defenses else 0
+                for i, defense_name in enumerate(valid_zone_defenses):
+                    points = points_per_defense + (1 if i < remainder else 0)
+                    defense_data[defense_name]["effectiveness"] = defense_data[defense_name].get("effectiveness", 0) + points
+    
+    return updated_scouting_data
 
