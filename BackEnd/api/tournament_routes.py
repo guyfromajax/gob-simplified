@@ -965,7 +965,10 @@ def run_tournament_training(req: TournamentTrainingRequest):
         "date": datetime.now().strftime("%Y-%m-%d")
     }
     
-    # Store latest training for quick access
+    # Store training report in teams.{team_id}.training_reports.{round} (per-round storage, matches Franchise pattern)
+    tournament_update[f"teams.{team_id}.training_reports.{current_round}"] = training_report_data
+    
+    # Also save latest training for quick access
     tournament_update["latest_training"] = training_report_data
 
     # Save to tournament document
@@ -977,5 +980,5 @@ def run_tournament_training(req: TournamentTrainingRequest):
         "player_changes": player_logs,
         "team_changes": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
-        "redirect": f"/static/tournament.html?tournament_id={req.tournament_id}"
+        "redirect": f"/static/training-report.html?mode=tournament&tournament_id={req.tournament_id}&team_id={team_name}&round={current_round}"
     }

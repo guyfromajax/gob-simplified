@@ -80,7 +80,9 @@ const FOCUS_DISPLAY = {
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', () => {
-  if (!mode || !teamId || !week) {
+  // For tournament mode, round is required; for franchise mode, week is required
+  const hasRequiredParams = mode === 'tournament' ? (round && teamId) : (week && teamId);
+  if (!mode || !teamId || !hasRequiredParams) {
     console.error('Missing required URL parameters');
     return;
   }
@@ -124,12 +126,22 @@ async function loadTrainingReport() {
   try {
     const params = new URLSearchParams({
       mode: mode,
-      team_id: teamId,
-      week: week
+      team_id: teamId
     });
     
-    if (franchiseId) params.set('franchise_id', franchiseId);
-    if (tournamentId) params.set('tournament_id', tournamentId);
+    if (franchiseId) {
+      params.set('franchise_id', franchiseId);
+      params.set('week', week);
+    }
+    if (tournamentId) {
+      params.set('tournament_id', tournamentId);
+      // For tournament mode, use round parameter (week is also accepted for backward compatibility)
+      if (round) {
+        params.set('round', round);
+      } else if (week) {
+        params.set('week', week); // Fallback for backward compatibility
+      }
+    }
     
     console.log('🔍 [TRAINING REPORT] Loading with params:', Object.fromEntries(params.entries()));
     
@@ -174,7 +186,17 @@ function renderPage() {
 }
 
 function renderHeader() {
-  document.getElementById('week-number').textContent = reportData.week || '--';
+  // For tournament mode, display "Round X"; for franchise mode, display "Week X"
+  const periodLabel = mode === 'tournament' ? 'Round' : 'Week';
+  const periodValue = mode === 'tournament' ? (reportData.round || round) : reportData.week;
+  document.getElementById('week-number').textContent = periodValue || '--';
+  
+  // Update label
+  const weekLabel = document.getElementById('week-label');
+  if (weekLabel) {
+    weekLabel.textContent = periodLabel + ':';
+  }
+  
   document.getElementById('upcoming-opponent').textContent = reportData.upcoming_opponent || '--';
   
   const focus = reportData.coaching_focus || {};
