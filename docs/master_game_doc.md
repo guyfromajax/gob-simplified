@@ -2526,6 +2526,9 @@ addTooltip(element, 'SC'); // Will show "Scoring" on hover
 - `FrontEnd/static/js/shared/attributeTooltips.js` - Core tooltip system
 - `FrontEnd/static/set-lineup.js` - Lineup screen initialization
 - `FrontEnd/static/tournament.js` - Tournament command center initialization
+  - Reads `tournament_id` and `team_id` from URL parameters on page load
+  - Prioritizes URL parameters over localStorage for navigation from training report
+  - Uses `/tournament/state?tournament_id=...` endpoint (query parameter format)
 - `FrontEnd/static/franchise-command-center.js` - Franchise command center initialization
 - `FrontEnd/static/team-roster/*.html` - Team roster pages with tooltip initialization
 
