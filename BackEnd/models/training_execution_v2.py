@@ -79,7 +79,8 @@ def execute_training(
         playbook_training_mode,
         playcall_settings,
         strategy_settings,
-        playbook_settings
+        playbook_settings,
+        coaching_focus
     )
     
     return players, team, updated_plays, updated_scouting_data, training_report
@@ -1111,7 +1112,8 @@ def apply_play_defense_training(
     playbook_training_mode: str,
     playcall_settings: Dict,
     strategy_settings: Dict,
-    playbook_settings: Dict
+    playbook_settings: Dict,
+    coaching_focus: Optional[str] = None
 ) -> Tuple[Dict, Dict]:
     """
     Apply training to plays and defenses based on training mode and settings.
@@ -1163,6 +1165,22 @@ def apply_play_defense_training(
         defense_play_points = random.randint(150, 220)
     elif defense_install == 5:
         defense_play_points = random.randint(150, 250)
+    
+    # Apply Systems Coach focus multiplier to playPoints if applicable
+    if coaching_focus:
+        parts = coaching_focus.split("-", 1)
+        archetype = parts[0] if len(parts) > 0 else None
+        sub_option = parts[1] if len(parts) > 1 else None
+        
+        if sub_option == "systems-coach-offense" and offense_play_points > 0:
+            focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
+            offense_play_points = int(offense_play_points * focus_multiplier)
+            logger.warning(f"🎯 [SYSTEMS COACH - OFFENSE] Applied {focus_multiplier}x multiplier to offense playPoints: {offense_play_points}")
+        
+        elif sub_option == "systems-coach-defense" and defense_play_points > 0:
+            focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
+            defense_play_points = int(defense_play_points * focus_multiplier)
+            logger.warning(f"🎯 [SYSTEMS COACH - DEFENSE] Applied {focus_multiplier}x multiplier to defense playPoints: {defense_play_points}")
     
     # Apply offense training
     if offense_play_points > 0:

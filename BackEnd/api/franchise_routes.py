@@ -925,11 +925,12 @@ def run_franchise_training(req: FranchiseTrainingRequest):
 
     # Get user's team (use team_id from request if provided, otherwise from state)
     team_id = req.team_id
+    team_name = None
     if not team_id:
         state = franchise_state_collection.find_one({"_id": "state"}) or {}
-    team_name = state.get("team")
-    if not team_name:
-        raise HTTPException(status_code=404, detail="User team not found")
+        team_name = state.get("team")
+        if not team_name:
+            raise HTTPException(status_code=404, detail="User team not found")
         team_doc = db.teams.find_one({"name": team_name})
         if not team_doc:
             raise HTTPException(status_code=404, detail="Team not found")
@@ -938,12 +939,33 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         # team_id might be a name, try to resolve it
         team_doc = db.teams.find_one({"name": team_id})
         if team_doc:
+            team_name = team_doc.get("name")
             team_id = str(team_doc["_id"])
-        # Assume it's already an ID if not found
+        else:
+            # Try to look up by ID if it's already an ID
+            try:
+                team_doc = db.teams.find_one({"_id": ObjectId(team_id)})
+                if team_doc:
+                    team_name = team_doc.get("name")
+            except:
+                team_doc = None
+            # If still not found, team_doc will be None and we'll handle it below
 
     # Get franchise-specific player data for the user's team
     franchise_players = franchise_doc.get("players", {})
-    team_player_ids = team_doc.get("player_ids", [])
+    
+    # Get player_ids from team_doc if available, otherwise try to get from franchise_teams
+    if team_doc:
+        team_player_ids = team_doc.get("player_ids", [])
+    else:
+        # Fallback: try to get player_ids from franchise_teams structure
+        franchise_teams = franchise_doc.get("franchise_teams", {})
+        team_data = franchise_teams.get(team_id, {})
+        team_player_ids = team_data.get("player_ids", [])
+        
+        # If still no player_ids, raise an error
+        if not team_player_ids:
+            raise HTTPException(status_code=404, detail=f"Team not found and no player_ids available for team_id: {team_id}")
     
     # Build player list with franchise-specific attributes
     players_for_training = []
@@ -958,7 +980,7 @@ def run_franchise_training(req: FranchiseTrainingRequest):
             "_id": pid_str,
             "first_name": franchise_player_data.get("meta", {}).get("first_name", ""),
             "last_name": franchise_player_data.get("meta", {}).get("last_name", ""),
-            "team": team_name,
+            "team": team_name or team_id,  # Use team_name if available, otherwise use team_id
             "attributes": franchise_player_data.get("attributes", {})
         }
         players_for_training.append(player)
