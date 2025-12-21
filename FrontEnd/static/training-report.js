@@ -142,6 +142,10 @@ async function loadTrainingReport() {
     console.log('🔍 [TRAINING REPORT] Loaded data:', reportData);
     console.log('🔍 [TRAINING REPORT] Players count:', reportData.players?.length || 0);
     console.log('🔍 [TRAINING REPORT] Player changes:', reportData.player_changes);
+    console.log('🔍 [TRAINING REPORT] Has plays_data:', !!reportData.plays_data, 'Keys:', reportData.plays_data ? Object.keys(reportData.plays_data) : 'none');
+    console.log('🔍 [TRAINING REPORT] Has scouting_data:', !!reportData.scouting_data, 'Keys:', reportData.scouting_data ? Object.keys(reportData.scouting_data) : 'none');
+    console.log('🔍 [TRAINING REPORT] Has plays_effectiveness_changes:', !!reportData.plays_effectiveness_changes, reportData.plays_effectiveness_changes);
+    console.log('🔍 [TRAINING REPORT] Has defenses_effectiveness_changes:', !!reportData.defenses_effectiveness_changes, reportData.defenses_effectiveness_changes);
     
     renderPage();
   } catch (error) {
@@ -692,6 +696,20 @@ function renderPlaybookSummary() {
   const scouting_data = reportData.scouting_data || {};
   const plays_changes = reportData.plays_effectiveness_changes || {};
   const defenses_changes = reportData.defenses_effectiveness_changes || {};
+  
+  console.log('📚 [PLAYBOOK SUMMARY] Rendering playbook summary');
+  console.log('📚 [PLAYBOOK SUMMARY] plays_data:', plays_data);
+  console.log('📚 [PLAYBOOK SUMMARY] scouting_data:', scouting_data);
+  console.log('📚 [PLAYBOOK SUMMARY] plays_changes:', plays_changes);
+  console.log('📚 [PLAYBOOK SUMMARY] defenses_changes:', defenses_changes);
+  
+  // Debug logging
+  console.log('📊 [PLAYBOOK SUMMARY] reportData keys:', Object.keys(reportData));
+  console.log('📊 [PLAYBOOK SUMMARY] plays_data:', plays_data);
+  console.log('📊 [PLAYBOOK SUMMARY] scouting_data:', scouting_data);
+  console.log('📊 [PLAYBOOK SUMMARY] plays_changes:', plays_changes);
+  console.log('📊 [PLAYBOOK SUMMARY] defenses_changes:', defenses_changes);
+  console.log('📊 [PLAYBOOK SUMMARY] Number of plays:', Object.keys(plays_data).length);
   
   // Organize plays by type
   const motion_plays = [];
