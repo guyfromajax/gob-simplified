@@ -2937,7 +2937,9 @@ When a new mode instance is created, team attributes are initialized with mode-s
   1. Tournament document is created
   2. All players from participating teams are loaded
   3. `Player.randomize_game_attributes()` is called for each player
-  4. Team attributes are initialized when teams are first used in games
+  4. **ALL player attributes are stored** in `tournament.player_stats.{player_id}.attributes` (not just EM, CH, MO)
+  5. Team attributes are initialized when teams are first used in games
+- **Attribute Storage:** Tournament mode now uses the same architecture as Franchise mode - all attributes are stored in the tournament document to support training and evolution
 
 **Franchise Mode:**
 - **Location:** `BackEnd/models/franchise_manager.py` - `initialize_season()` method
@@ -2951,8 +2953,8 @@ When a new mode instance is created, team attributes are initialized with mode-s
 
 **Important:** Once a mode instance is created, its unique attribute values persist:
 - **Single Game:** Attributes stored in game document, persist across quarters
-- **Tournament:** Attributes stored in tournament document, persist across rounds
-- **Franchise:** Attributes stored in franchise document, persist across weeks and seasons
+- **Tournament:** **ALL attributes** stored in `tournament.player_stats.{player_id}.attributes`, persist across rounds (unified with Franchise architecture)
+- **Franchise:** **ALL attributes** stored in `franchise.players.{player_id}.attributes`, persist across weeks and seasons
 
 **Evolution:**
 - Attributes can change based on:
@@ -8780,18 +8782,19 @@ Tournament Mode supports multi-game tournament brackets where team data persists
   1. Loads tournament document
   2. Checks for duplicate training submission (same round)
   3. Loads tournament-specific player attributes from `player_stats`
-  4. **Data Initialization (Auto-Population):**
+  4. **Backward Compatibility:** If tournament only has EM, CH, MO (old format), merges with core collection attributes
+  5. **Data Initialization (Auto-Population):**
      - If `plays_data` is empty or missing, backend automatically populates it from the universal `plays` collection using `populate_team_plays()`
      - If `scouting_data` is empty or missing the `defense` structure, backend automatically initializes it using `TeamManager._init_scouting_data()`
      - Initialized data is saved to the database before training execution
      - This ensures training works even if game plan or playbooks haven't been submitted yet
-  5. Executes training using `execute_training()` from `training_execution_v2.py`
-  6. Updates player attributes in tournament document
-  7. Marks training as completed for current round
-  8. **Training Report Storage (matches Franchise pattern):**
+  6. Executes training using `execute_training()` from `training_execution_v2.py`
+  7. **Saves ALL player attributes** to tournament document (not just modified ones) - unified with Franchise architecture
+  8. Marks training as completed for current round
+  9. **Training Report Storage (matches Franchise pattern):**
      - Stores training report in `teams.{team_id}.training_reports.{round}` (per-round storage)
      - Also stores in `latest_training` field (quick access)
-  9. **Redirects to Training Report page (SS&S approach):**
+  10. **Redirects to Training Report page (SS&S approach):**
      - URL: `/static/training-report.html?mode=tournament&tournament_id=...&team_id=...`
      - **Note:** `round` parameter is NOT included in redirect URL
      - Backend determines round from `training_status.round` or `latest_training.round` when loading report
@@ -8809,12 +8812,18 @@ Tournament Mode supports multi-game tournament brackets where team data persists
 - **Data Source:** 
   - Primary: `tournaments.{tournament_id}.teams.{team_id}.training_reports.{round}` (per-round storage)
   - Fallback: `tournament.latest_training` field (if per-round not found and round matches)
+- **Attribute Extraction:**
+  - **Unified Architecture:** Tournament mode now uses the same attribute extraction pattern as Franchise mode
+  - All attributes are stored in `tournament.player_stats.{player_id}.attributes` (not just EM, CH, MO)
+  - Extraction reads directly from tournament document (no merging with core collection needed for new tournaments)
+  - **Backward Compatibility:** For old tournaments that only have EM, CH, MO, extraction merges with core collection automatically
 - **Displays:** Player attribute changes, team attribute changes, coaching focus, upcoming opponent, play effectiveness changes, defense effectiveness changes
-- **Pattern:** Matches Franchise mode pattern - per-round storage with `latest_training` fallback
+- **Pattern:** Matches Franchise mode pattern - per-round storage with `latest_training` fallback, unified attribute storage
 - **SS&S Benefits:** 
   - Reduces URL parameter complexity
   - Backend state is source of truth
   - Historical reports can still use `round` parameter for specific round lookup
+  - Unified architecture simplifies code maintenance and reduces bugs
 
 ---
 
@@ -8952,7 +8961,7 @@ When creating a new game instance within a tournament:
 - **Strategy Settings**: Saved to `tournaments.{tournament_id}.teams.{team_id}.strategy_settings`
 - **Team Attributes**: Updated through training system
   - Training changes are stored in tournament document
-  - Player attributes updated in `tournament.player_stats.{player_id}.attributes`
+  - **ALL player attributes** updated in `tournament.player_stats.{player_id}.attributes` (unified with Franchise architecture)
   - Team attributes can be updated (future: stored in tournament document)
   - Training reports stored in `tournament.latest_training`
 

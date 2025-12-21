@@ -7,10 +7,11 @@
 
 ## Overview
 
-Player data exists in **three contexts**:
+Player data exists in **four contexts**:
 1. **Universal Collection** - Baseline/permanent data (players_collection)
 2. **Game Instance** - Runtime snapshot (game.players array)
 3. **Franchise Instance** - Evolving data (franchise.players object)
+4. **Tournament Instance** - Evolving data (tournament.player_stats object) - **Unified with Franchise architecture**
 
 ---
 
@@ -231,12 +232,72 @@ Player data exists in **three contexts**:
 
 ---
 
+## 4. Tournament Players Object (Evolving Data)
+
+**Purpose:** Track player growth/evolution throughout tournament mode (unified with Franchise architecture)
+
+**Location:** `tournament_document.player_stats`
+
+### Structure:
+
+```javascript
+{
+  "player_stats": {
+    "uuid": {  // Keyed by player _id
+      "first_name": "CJ",
+      "last_name": "Castleman",
+      "team": "Bentley-Truman",
+      
+      // ==================== EVOLVED ATTRIBUTES ====================
+      "attributes": {
+        "SC": 78,  // Improved from 75 via training
+        "SH": 73,  // Improved from 70 via training
+        "IQ": 82,  // Improved from 80 via training
+        // ... all attributes (evolved from universal baseline)
+        
+        // Anchors track trained values
+        "anchor_SC": 78,
+        "anchor_SH": 73,
+        // ...
+        
+        // Game attributes (randomized per tournament)
+        "EM": 7,
+        "CH": 6,
+        "MO": 8,
+        "NG": 1.0
+      },
+      
+      // ==================== SEASON STATS ====================
+      "season": {
+        "PTS": 450,
+        "REB": 120,
+        // ... season totals (tournament-specific)
+      }
+    }
+  }
+}
+```
+
+**How Evolution Works:**
+1. **Tournament starts:** Clone ALL attributes from universal collection (not just EM, CH, MO)
+2. **Training session:** Update `attributes.anchor_X` values
+3. **Games:** Use evolved attributes from tournament doc
+4. **Tournament ends:** Attributes don't carry over to new tournaments
+
+**Unified Architecture:**
+- Tournament mode now uses the same attribute storage pattern as Franchise mode
+- All attributes are stored in the tournament document (not just EM, CH, MO)
+- This enables consistent training and attribute evolution across both modes
+- **Backward Compatibility:** Old tournaments that only have EM, CH, MO are automatically merged with core collection when accessed
+
+---
+
 ## Field-by-Field Breakdown
 
-| Field | Universal | Game Instance | Franchise | Notes |
-|-------|-----------|---------------|-----------|-------|
-| **_id / playerId** | ✅ _id | ✅ playerId | ✅ Key | Same UUID everywhere |
-| **player_id** | ❌ Remove | ❌ | ❌ | Redundant (same as _id) |
+| Field | Universal | Game Instance | Franchise | Tournament | Notes |
+|-------|-----------|---------------|-----------|------------|-------|
+| **_id / playerId** | ✅ _id | ✅ playerId | ✅ Key | ✅ Key | Same UUID everywhere |
+| **player_id** | ❌ Remove | ❌ | ❌ | ❌ | Redundant (same as _id) |
 | **first_name** | ✅ | Derived→name | Meta | |
 | **last_name** | ✅ | Derived→name | Meta | |
 | **team** | ✅ School | ✅ Side (home/away) | Meta | Different meaning! |

@@ -797,17 +797,31 @@ def run_tournament_training(req: TournamentTrainingRequest):
         if not tournament_player_data:
             continue
         
-        # Get core player data for additional fields
+        # Get core player data for additional fields and attributes
         core_player = players_collection.find_one({"_id": pid}, {
-            "first_name": 1, "last_name": 1, "height": 1
+            "first_name": 1, "last_name": 1, "height": 1, "attributes": 1
         })
         if not core_player:
             try:
                 core_player = players_collection.find_one({"_id": ObjectId(pid)}, {
-                    "first_name": 1, "last_name": 1, "height": 1
+                    "first_name": 1, "last_name": 1, "height": 1, "attributes": 1
                 })
             except:
                 pass
+        
+        # Get tournament-specific attributes
+        tournament_attributes = tournament_player_data.get("attributes", {})
+        
+        # For backward compatibility: if tournament only has EM, CH, MO (old format),
+        # merge with core attributes. New tournaments will have all attributes stored.
+        standard_attrs = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
+        has_all_attrs = all(attr in tournament_attributes for attr in standard_attrs)
+        
+        if not has_all_attrs and core_player:
+            # Merge core attributes with tournament attributes (tournament overrides core)
+            core_attributes = core_player.get("attributes", {}) if core_player else {}
+            tournament_attributes = {**core_attributes, **tournament_attributes}
+            logger.info(f"📊 [TOURNAMENT TRAINING] Merged core attributes for player {pid_str} (backward compatibility)")
         
         # Build player dict for training
         player = {
@@ -815,7 +829,7 @@ def run_tournament_training(req: TournamentTrainingRequest):
             "first_name": tournament_player_data.get("first_name") or (core_player.get("first_name", "") if core_player else ""),
             "last_name": tournament_player_data.get("last_name") or (core_player.get("last_name", "") if core_player else ""),
             "team": team_name,
-            "attributes": tournament_player_data.get("attributes", {})
+            "attributes": tournament_attributes
         }
         players_for_training.append(player)
 
@@ -934,11 +948,15 @@ def run_tournament_training(req: TournamentTrainingRequest):
         pid = player["_id"]
         attrs = player.get("attributes", {})
         
-        # Update all anchor attributes and base attributes
+        # Save ALL attributes (like franchise mode) - not just modified ones
+        # This ensures all attributes are stored in the tournament document
         for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO"]:
             anchor_key = f"anchor_{attr}"
+            # Save anchor_ value if it exists (post-training value)
             if anchor_key in attrs:
                 tournament_update[f"player_stats.{pid}.attributes.{anchor_key}"] = attrs[anchor_key]
+            # Always save base attribute value (even if no anchor_ exists)
+            if attr in attrs:
                 tournament_update[f"player_stats.{pid}.attributes.{attr}"] = attrs[attr]
         
         # NG doesn't have an anchor_key, save it directly if it exists
