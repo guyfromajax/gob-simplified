@@ -6,7 +6,7 @@
   <title>Tournament Mode Command Center</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/tournament.css">
-  <link rel="stylesheet" href="/static/training-report.css">
+  <link rel="stylesheet" href="/static/command-center-team-styles.css">
 </head>
 <body>
 
@@ -112,19 +112,21 @@
       </div>
     </div>
     <div id="team-tab" class="tab-content">
-      <!-- Team Report Section -->
-      <section class="team-section">
-        <h2>Team Report</h2>
-        <div class="team-attributes-grid" id="team-attributes-grid"></div>
-      </section>
+      <div class="training-report-styled">
+        <!-- Team Report Section -->
+        <section class="team-section">
+          <h2>Team Report</h2>
+          <div class="team-attributes-grid" id="team-attributes-grid"></div>
+        </section>
 
-      <!-- Playbook Summary Section -->
-      <section class="playbook-summary-section">
-        <h2>Playbook Summary</h2>
-        <div class="playbook-summary-container" id="playbook-summary-container">
-          <!-- Plays will be populated here -->
-        </div>
-      </section>
+        <!-- Playbook Summary Section -->
+        <section class="playbook-summary-section">
+          <h2>Playbook Summary</h2>
+          <div class="playbook-summary-container" id="playbook-summary-container">
+            <!-- Plays will be populated here -->
+          </div>
+        </section>
+      </div>
     </div>
     <div id="stats-tab" class="tab-content">
       <div id="leaderboards"></div>

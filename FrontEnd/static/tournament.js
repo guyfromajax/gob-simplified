@@ -711,7 +711,9 @@ async function loadRoster() {
     const statKeys = ["PTS","FGM","FGA","TPM","TPA","FTM","FTA","REB","AST","STL","BLK","F","MIN","TO"];
     const pstats = tournament?.player_stats || {};
     stats = roster.map(p => {
-      const season = pstats[p.id]?.stats?.Season || {};
+      // Try multiple possible stat paths
+      const playerStats = pstats[p.id] || pstats[p._id] || {};
+      const season = playerStats?.stats?.Season || playerStats?.season || playerStats?.Season || {};
       const row = { name: p.name };
       statKeys.forEach(k => {
         const val = season[k];
@@ -719,6 +721,7 @@ async function loadRoster() {
       });
       return row;
     });
+    console.log('Tournament stats loaded:', stats.length, 'players');
     if (DEBUG_TEAM_STATS && roster[0]) {
       const first = roster[0];
       const s = pstats[first.id]?.stats?.Season || {};
