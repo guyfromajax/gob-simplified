@@ -46,6 +46,7 @@ class TournamentManager:
             from BackEnd.models.player import Player
             pid = str(p.get("_id"))
             # Clone attributes and randomize EM, CH, MO for this tournament instance
+            # Store ALL attributes (like franchise mode) to support training and evolution
             attrs = p.get("attributes", {}).copy()
             attrs = Player.randomize_game_attributes(attrs)
             player_stats[pid] = {
@@ -53,11 +54,7 @@ class TournamentManager:
                 "last_name": p.get("last_name", ""),
                 "team": p.get("team", ""),
                 "season": zero_stats.copy(),
-                "attributes": {
-                    "EM": attrs.get("EM", 0),
-                    "CH": attrs.get("CH", 0),
-                    "MO": attrs.get("MO", 0)
-                }
+                "attributes": attrs  # Store all attributes (not just EM, CH, MO)
             }
 
         tournament_doc = {

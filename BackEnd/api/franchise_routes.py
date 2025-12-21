@@ -1526,6 +1526,20 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 # Get attributes (after training)
                 attrs = tournament_player_data.get("attributes", {})
                 
+                # For backward compatibility: if tournament only has EM, CH, MO (old format),
+                # merge with core attributes. New tournaments will have all attributes stored.
+                standard_attrs = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
+                has_all_attrs = all(attr in attrs for attr in standard_attrs)
+                
+                if not has_all_attrs:
+                    # Merge with core collection for backward compatibility
+                    from BackEnd.db import players_collection
+                    core_player = players_collection.find_one({"_id": ObjectId(pid_str)}, {"attributes": 1})
+                    if core_player:
+                        core_attributes = core_player.get("attributes", {})
+                        attrs = {**core_attributes, **attrs}  # Tournament attributes override core
+                        logger.info(f"📊 [TRAINING REPORT] Merged core attributes for player {pid_str} (backward compatibility)")
+                
                 # Extract anchor attributes (current values after training)
                 # Use anchor_ values if available (post-training), otherwise fallback to base values
                 player_attrs = {}
@@ -1537,7 +1551,6 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 
                 # For attributes that don't have anchor_ keys, use base values as fallback
                 # This ensures SC, SH, and other attributes are included even if they haven't been modified
-                standard_attrs = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
                 for attr in standard_attrs:
                     if attr not in player_attrs and attr in attrs:
                         player_attrs[attr] = attrs[attr]
