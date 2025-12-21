@@ -999,6 +999,10 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     strategy_settings = team_data.get("strategy_settings", {})
     playbook_settings = team_data.get("playbook_settings", {})
     scouting_data = team_data.get("scouting_data", {})
+    
+    logger.warning(f"📚 [API] Loading plays_data: {len(plays_data)} plays")
+    logger.warning(f"📚 [API] Loading scouting_data: {list(scouting_data.keys()) if scouting_data else 'None'}")
+    logger.warning(f"📚 [API] playbook_training_mode: {training_data.get('playbook_training_mode', 'not provided')}")
 
     # Extract training data
     training_data = req.training_data

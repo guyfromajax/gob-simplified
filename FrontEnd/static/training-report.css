@@ -423,22 +423,19 @@ body {
   color: var(--color-warning);
 }
 
-/* Training Notes Section */
 /* Playbook Summary Section */
 .playbook-summary-section {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   padding: var(--spacing-md);
-  margin-top: var(--spacing-lg);
 }
 
 .playbook-summary-section h2 {
+  font-size: 1.8rem;
   color: var(--color-accent);
-  font-size: 1.5rem;
+  font-weight: 600;
   margin-bottom: var(--spacing-md);
-  border-bottom: 2px solid var(--color-border);
-  padding-bottom: var(--spacing-xs);
 }
 
 .playbook-summary-container {
