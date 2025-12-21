@@ -162,6 +162,9 @@ function renderPage() {
   // Render team attributes
   renderTeamAttributes();
   
+  // Render playbook summary
+  renderPlaybookSummary();
+  
   // Render training notes
   renderTrainingNotes();
 }
@@ -677,6 +680,160 @@ function createPill(originalValue, attrKey) {
   }
   
   return pill;
+}
+
+function renderPlaybookSummary() {
+  if (!reportData) return;
+  
+  const container = document.getElementById('playbook-summary-container');
+  container.innerHTML = '';
+  
+  const plays_data = reportData.plays_data || {};
+  const scouting_data = reportData.scouting_data || {};
+  const plays_changes = reportData.plays_effectiveness_changes || {};
+  const defenses_changes = reportData.defenses_effectiveness_changes || {};
+  
+  // Organize plays by type
+  const motion_plays = [];
+  const set_plays = [];
+  
+  for (const [play_name, play_data] of Object.entries(plays_data)) {
+    if (typeof play_data === 'object' && play_data !== null) {
+      const play_type = play_data.play_type || '';
+      if (play_type === 'motion') {
+        motion_plays.push({ name: play_name, ...play_data });
+      } else if (play_type === 'set_play') {
+        set_plays.push({ name: play_name, ...play_data });
+      }
+    }
+  }
+  
+  // Sort plays by name
+  motion_plays.sort((a, b) => a.name.localeCompare(b.name));
+  set_plays.sort((a, b) => a.name.localeCompare(b.name));
+  
+  // Organize defenses
+  const man_defenses = [];
+  const zone_defenses = [];
+  
+  if (scouting_data.defense) {
+    for (const [defense_name, defense_data] of Object.entries(scouting_data.defense)) {
+      if (typeof defense_data === 'object' && defense_data !== null) {
+        if (defense_name === 'Man') {
+          man_defenses.push({ name: defense_name, ...defense_data });
+        } else if (defense_name.includes('Zone')) {
+          zone_defenses.push({ name: defense_name, ...defense_data });
+        }
+      }
+    }
+  }
+  
+  // Sort defenses by name
+  man_defenses.sort((a, b) => a.name.localeCompare(b.name));
+  zone_defenses.sort((a, b) => a.name.localeCompare(b.name));
+  
+  // Render Offense section
+  const offenseSection = document.createElement('div');
+  offenseSection.className = 'playbook-category';
+  
+  const offenseTitle = document.createElement('h3');
+  offenseTitle.textContent = 'Offense';
+  offenseSection.appendChild(offenseTitle);
+  
+  // Motion Plays
+  if (motion_plays.length > 0) {
+    motion_plays.forEach(play => {
+      const playRow = createPlayRow(play.name, play.effectiveness || 0, plays_changes[play.name] || 0);
+      offenseSection.appendChild(playRow);
+    });
+  }
+  
+  // Set Plays
+  if (set_plays.length > 0) {
+    set_plays.forEach(play => {
+      const playRow = createPlayRow(play.name, play.effectiveness || 0, plays_changes[play.name] || 0);
+      offenseSection.appendChild(playRow);
+    });
+  }
+  
+  // Empty row
+  const emptyRow = document.createElement('div');
+  emptyRow.className = 'playbook-empty-row';
+  offenseSection.appendChild(emptyRow);
+  
+  container.appendChild(offenseSection);
+  
+  // Render Defense section
+  const defenseSection = document.createElement('div');
+  defenseSection.className = 'playbook-category';
+  
+  const defenseTitle = document.createElement('h3');
+  defenseTitle.textContent = 'Defense';
+  defenseSection.appendChild(defenseTitle);
+  
+  // Man Defenses
+  if (man_defenses.length > 0) {
+    man_defenses.forEach(defense => {
+      const defenseRow = createPlayRow(defense.name, defense.effectiveness || 0, defenses_changes[defense.name] || 0);
+      defenseSection.appendChild(defenseRow);
+    });
+  }
+  
+  // Zone Defenses
+  if (zone_defenses.length > 0) {
+    zone_defenses.forEach(defense => {
+      const defenseRow = createPlayRow(defense.name, defense.effectiveness || 0, defenses_changes[defense.name] || 0);
+      defenseSection.appendChild(defenseRow);
+    });
+  }
+  
+  container.appendChild(defenseSection);
+}
+
+function createPlayRow(playName, effectiveness, change) {
+  const row = document.createElement('div');
+  row.className = 'playbook-row';
+  
+  // Play name
+  const nameDiv = document.createElement('div');
+  nameDiv.className = 'playbook-name';
+  nameDiv.textContent = playName;
+  row.appendChild(nameDiv);
+  
+  // Progress bar container
+  const progressContainer = document.createElement('div');
+  progressContainer.className = 'playbook-progress-container';
+  
+  const progressBar = document.createElement('div');
+  progressBar.className = 'playbook-progress-bar';
+  
+  const progressFill = document.createElement('div');
+  progressFill.className = 'playbook-progress-fill';
+  const percentage = Math.min(100, (effectiveness / 500) * 100);
+  progressFill.style.width = `${percentage}%`;
+  
+  progressBar.appendChild(progressFill);
+  progressContainer.appendChild(progressBar);
+  row.appendChild(progressContainer);
+  
+  // Change indicator
+  const changeDiv = document.createElement('div');
+  changeDiv.className = 'playbook-change';
+  
+  if (change > 0) {
+    changeDiv.textContent = `+${change}`;
+    changeDiv.style.color = '#4CAF50'; // Green
+  } else if (change < 0) {
+    changeDiv.textContent = `-${Math.abs(change)}`;
+    changeDiv.style.color = '#f44336'; // Red
+  } else {
+    changeDiv.textContent = '0';
+    changeDiv.style.color = '#ffffff'; // White
+  }
+  
+  row.appendChild(changeDiv);
+  
+  return row;
 }
 
 function renderTrainingNotes() {

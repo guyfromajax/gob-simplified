@@ -7203,6 +7203,12 @@ The training execution system applies pre-training conditions, allocates trainin
 
 #### Training Execution Flow
 
+0. **Pre-Training Effectiveness Decay** (`_apply_pre_training_effectiveness_decay`, `_apply_pre_training_defense_decay`)
+   - All plays and defenses with effectiveness > 0 are reduced by `random.randint(5, 15)`
+   - Minimum effectiveness is clamped to 0 (cannot be negative)
+   - This represents natural skill degradation between training sessions
+   - Original effectiveness values are tracked for change calculation
+
 1. **Pre-Training Conditions** (`apply_pre_training_conditions`)
    - Applies random decreases to player attributes (excluding EM, MO, NG)
    - Player attributes: `+= random.randint(-2, 0)` per attribute
@@ -7466,6 +7472,31 @@ Training report links appear next to scheduled games on the Franchise Command Ce
 - Link text: "[Training Report]"
 - Navigates to training report page with correct parameters (mode, franchise_id, team_id, week)
 
+**Playbook Summary Section:**
+- Header: "Playbook Summary"
+- Located between Team Report and Training Notes sections
+- Displays all plays and defenses attached to the team object
+- **Layout:**
+  - **Offense Section:**
+    - All Motion Plays (sorted alphabetically)
+    - All Set Plays (sorted alphabetically)
+    - Empty row separator
+  - **Defense Section:**
+    - All Man Defense Plays (sorted alphabetically)
+    - All Zone Defense Plays (sorted alphabetically)
+- **For each play/defense:**
+  - Play/defense name (left-aligned, min-width 200px)
+  - Horizontal progress bar (max value 500, fills proportionally based on effectiveness score)
+  - Change indicator (right-aligned, min-width 60px):
+    - **Positive changes:** Green text with "+" prefix (e.g., "+10")
+    - **Negative changes:** Red text with "-" prefix (e.g., "-5")
+    - **Zero changes:** White text (e.g., "0")
+- **Pre-Training Effectiveness Decay:**
+  - Before applying training points, all plays and defenses with effectiveness > 0 are reduced by a random value between 5-15
+  - Minimum effectiveness value is 0 (cannot be negative)
+  - This decay represents natural skill degradation between training sessions
+  - The change indicator shows the net change from the original effectiveness (before decay) to the final effectiveness (after decay + training)
+
 **Training Notes Section:**
 - Header: "Training Notes"
 - Displays automatically generated notes about training effects
@@ -7487,7 +7518,7 @@ Training report links appear next to scheduled games on the Franchise Command Ce
 **Training Report:**
 - `GET /franchise/training-report` - Get training report data
   - Query params: `franchise_id, team_id, week`
-  - Response: `{week, upcoming_opponent, coaching_focus, player_changes, team_changes, players, team_attributes}`
+  - Response: `{week, upcoming_opponent, coaching_focus, player_changes, team_changes, plays_data, scouting_data, plays_effectiveness_changes, defenses_effectiveness_changes, players, team_attributes, training_notes}`
 
 #### Data Storage
 
