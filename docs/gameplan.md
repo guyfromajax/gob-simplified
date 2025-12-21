@@ -6,9 +6,15 @@ The Game Plan screen allows users to customize their team's offensive and defens
 
 ## User Flow
 
+### From Lineup Screen (Single Game Mode)
 1. **Lineup Selection** → User sets their starting 5 players
-2. **Game Plan** → User adjusts offensive and defensive sliders (NEW)
+2. **Game Plan** → User adjusts offensive and defensive sliders
 3. **Gameplay** → Game begins with the configured game plan
+
+### From Command Center (Tournament/Franchise Mode)
+1. **Command Center** → User clicks "Set Game Plan" button
+2. **Game Plan** → User adjusts offensive and defensive sliders
+3. **Save Game Plan** → Settings saved to team's game plan, returns to Command Center
 
 ## Sliders
 
@@ -238,20 +244,51 @@ Update game plan settings for a team.
 
 ## User Actions
 
-### Save & Continue
+### Navigation Source Detection
+The Game Plan screen detects where the user came from via the `from` URL parameter:
+- `from=lineup` (default): User came from Lineup Selection screen
+- `from=command_center`: User came from Tournament or Franchise Command Center
+
+### Button Behavior by Navigation Source
+
+#### From Lineup Screen (`from=lineup`)
+- **"Back To Lineup"** button: Visible, navigates back to Lineup Selection screen (saves settings quietly)
+- **"Play Game"** button: Visible, validates and saves settings, then navigates to `court.html` to start game
+- **"Cancel"** button: Hidden
+- **"Back To Locker Room"** button: Hidden
+
+#### From Command Center (`from=command_center`)
+- **"Back To Locker Room"** button: Visible, saves settings quietly and navigates back to Command Center
+- **"Save Game Plan"** button: Visible, validates and saves settings, then navigates back to Command Center
+- **"Back To Lineup"** button: Hidden
+- **"Cancel"** button: Hidden
+
+### Save & Continue (From Lineup)
 - Validates offense settings
-- Saves to database
+- Saves to database (or localStorage for single game mode)
 - Shows toast "Game plan saved!"
 - Redirects to gameplay screen (`court.html`)
+
+### Save Game Plan (From Command Center)
+- Validates offense settings
+- Saves to database (`playcall_settings` and `strategy_settings` to team object)
+- Shows toast "Game plan saved!"
+- Redirects back to Command Center (Tournament or Franchise)
+
+### Back To Lineup (From Lineup)
+- Saves settings quietly (no validation, no toast)
+- Navigates back to Lineup Selection screen
+- Preserves all lineup and game state parameters
+
+### Back To Locker Room (From Command Center)
+- Saves settings quietly (no validation, no toast)
+- Navigates back to Command Center
+- Includes `team_id` in URL for proper command center initialization
 
 ### Reset
 - Reloads current settings from database
 - Resets all sliders to saved values
 - Shows toast "Settings reset"
-
-### Cancel
-- Navigates back to Lineup Selection screen
-- Does not save changes
 
 ## Implementation Notes
 
@@ -260,6 +297,14 @@ Update game plan settings for a team.
 - **URL Parameter Passing:** All context (mode, team, game ID, lineup, etc.) is passed via URL query parameters
 - **Slider Snapping:** Sliders have 5 discrete positions (0, 1, 2, 3, 4) with no in-between values
 - **Responsive Design:** Layout adapts for mobile/tablet viewing
+- **Team ID Resolution:** When coming from command center, uses `user_team_id` URL parameter; when from lineup, uses `home_id`/`away_id` based on `my_team` side
+- **Data Storage:** Game plan consists of two separate objects:
+  - `playcall_settings`: Offense settings (Base, Freelance, Inside, Attack, Outside, Set)
+  - `strategy_settings`: Defense/General settings (defense, tempo, aggression, half_court_trap, full_court_press)
+- **Storage Locations:**
+  - Franchise: `franchise_teams.{team_id}.playcall_settings` and `franchise_teams.{team_id}.strategy_settings`
+  - Tournament: `teams.{team_id}.playcall_settings` and `teams.{team_id}.strategy_settings`
+  - Single Game: `teams.{team_id}.playcall_settings` and `teams.{team_id}.strategy_settings`
 
 ## Future Enhancements
 
