@@ -382,8 +382,10 @@ function createAttributeCell(attr, value, change) {
       td.addEventListener('mousemove', positionAttributeTooltip);
     }
   } else {
-    // Standard integer display with tooltip
-    td.textContent = value.toString();
+    // Standard integer display with tooltip - show full value (no rounding)
+    // Ensure we display the full integer value, not a rounded version
+    const displayValue = typeof value === 'number' ? Math.floor(value) : (typeof value === 'string' ? parseInt(value, 10) || 0 : 0);
+    td.textContent = displayValue.toString();
     if (change !== 0) {
       td.setAttribute('data-tooltip', formatChangeForTooltip(change));
       td.style.cursor = 'help';
