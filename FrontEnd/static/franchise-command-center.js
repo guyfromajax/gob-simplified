@@ -612,70 +612,56 @@ async function loadTeamData() {
     
     // Get team_id (ObjectId) from teams collection - this is what franchise_teams keys use
     let teamObjectId = null;
+    
+    // Simple approach: fetch all teams and find the one matching userTeamName
     try {
-      // First get team doc by name
-      const teamDoc = await fetchJSON(`/roster/${userTeamName}`);
-      if (teamDoc && teamDoc.team) {
-        // Then get the team's ObjectId from /teams/{team_name}/players endpoint
-        const teamPlayersResponse = await fetch(`/teams/${encodeURIComponent(teamDoc.team)}/players`);
-        if (teamPlayersResponse.ok) {
-          const teamPlayersData = await teamPlayersResponse.json();
-          // The response should have team info, but we need the _id
-          // Try to get it from the team document directly
-          const allTeamsResponse = await fetch('/teams');
-          if (allTeamsResponse.ok) {
-            const allTeams = await allTeamsResponse.json();
-            const matchingTeam = allTeams.find(t => t.name === teamDoc.team || t.name === userTeamName);
-            if (matchingTeam && matchingTeam._id) {
-              teamObjectId = matchingTeam._id;
-              console.log('📊 [TEAM DATA] Found team ObjectId:', teamObjectId, 'for team:', teamDoc.team);
-            }
-          }
+      console.log('📊 [TEAM DATA] Fetching all teams to find ObjectId for:', userTeamName);
+      const allTeamsResponse = await fetch('/teams');
+      if (allTeamsResponse.ok) {
+        const allTeams = await allTeamsResponse.json();
+        console.log('📊 [TEAM DATA] Fetched', allTeams.length, 'teams from /teams endpoint');
+        
+        // Find team by name
+        const matchingTeam = allTeams.find(t => {
+          const teamName = t.name || '';
+          return teamName === userTeamName || teamName === franchiseData?.team;
+        });
+        
+        if (matchingTeam) {
+          teamObjectId = String(matchingTeam._id);
+          console.log('📊 [TEAM DATA] ✅ Found team ObjectId:', teamObjectId, 'for team:', matchingTeam.name);
+        } else {
+          console.warn('📊 [TEAM DATA] ⚠️ Team not found in /teams. Available teams:', allTeams.map(t => t.name));
         }
+      } else {
+        console.warn('📊 [TEAM DATA] ⚠️ Failed to fetch /teams:', allTeamsResponse.status);
       }
     } catch (error) {
-      console.warn('Could not fetch team ObjectId:', error);
-    }
-    
-    // If we still don't have teamObjectId, try a simpler approach - use the team name from command-center/data
-    if (!teamObjectId && franchiseData && franchiseData.team) {
-      // The command-center/data endpoint might have team info
-      // Let's try to match by iterating through all teams and finding the one that matches
-      try {
-        const allTeamsResponse = await fetch('/teams');
-        if (allTeamsResponse.ok) {
-          const allTeams = await allTeamsResponse.json();
-          const matchingTeam = allTeams.find(t => t.name === userTeamName || t.name === franchiseData.team);
-          if (matchingTeam && matchingTeam._id) {
-            teamObjectId = String(matchingTeam._id);
-            console.log('📊 [TEAM DATA] Found team ObjectId via /teams endpoint:', teamObjectId);
-          }
-        }
-      } catch (error) {
-        console.warn('Could not fetch from /teams endpoint:', error);
-      }
+      console.error('📊 [TEAM DATA] ❌ Error fetching team ObjectId:', error);
     }
     
     // Now match the teamObjectId to franchise_teams keys
     if (teamObjectId) {
-      // Convert to string if needed
       const teamIdStr = String(teamObjectId);
+      console.log('📊 [TEAM DATA] Attempting to match ObjectId:', teamIdStr, 'to franchise_teams keys');
+      
       for (const [tid, team] of Object.entries(franchiseTeams)) {
+        const tidStr = String(tid);
         // Match ObjectId strings (they should match exactly)
-        if (tid === teamIdStr || String(tid) === teamIdStr) {
+        if (tidStr === teamIdStr) {
           teamObj = team;
           teamIdKey = tid;
-          console.log('📊 [TEAM DATA] Found team by ObjectId match:', tid);
+          console.log('📊 [TEAM DATA] ✅ Found team by ObjectId match! Key:', tid);
           break;
         }
       }
-    }
-    
-    // Fallback: if still not found, try to match by checking all teams
-    if (!teamObj) {
-      console.warn('📊 [TEAM DATA] Could not match by ObjectId, trying fallback...');
-      // This shouldn't happen, but as a last resort, we could use the first team
-      // But that's not correct, so we'll just log and return
+      
+      if (!teamObj) {
+        console.warn('📊 [TEAM DATA] ⚠️ ObjectId', teamIdStr, 'not found in franchise_teams keys');
+        console.warn('📊 [TEAM DATA] Available keys:', Object.keys(franchiseTeams));
+      }
+    } else {
+      console.warn('📊 [TEAM DATA] ⚠️ Could not determine team ObjectId');
     }
     
     if (!teamObj) {
