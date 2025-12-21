@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 import logging
