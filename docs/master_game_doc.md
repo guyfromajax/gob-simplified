@@ -8705,11 +8705,13 @@ Tournament Mode supports multi-game tournament brackets where team data persists
 - **Team Report Section**: Displays team attributes in a grid layout (same as Training Report)
   - Shows team attributes: Shooting, Rebounding, Offense, Defense, Fast Breaks, Press/Trap, Aggression, Discipline, Momentum, Team Chemistry, Fast Break Defense, Press/Trap Breaks
   - Uses visual indicators (pills, progress bars, +/- indicators) matching Training Report styling
+  - Styled with scoped CSS (`command-center-team-styles.css`) to maintain light theme consistency
 - **Playbook Summary Section**: Displays play and defense effectiveness
   - Shows offensive plays (motion and set plays) with effectiveness progress bars
   - Shows defensive schemes (man and zone defenses) with effectiveness progress bars
   - Organized by Offense and Defense categories
   - Data loaded from tournament document: `tournaments.{tournament_id}.teams.{team_id}.plays` and `tournaments.{tournament_id}.teams.{team_id}.scouting_data`
+  - Loaded when Team tab is opened via `loadTeamData()` function
 
 **Header Controls:**
 - **Set Game Plan** - Navigate to Game Plan screen
@@ -8816,16 +8818,25 @@ Franchise Mode supports multi-season career mode where team and player data pers
 - Displays player statistics table for the current season (PTS, FGM/FGA, 3PTM/3PTA, FTM/FTA, REB, AST, STL, BLK, F, MIN, TO)
 - Player names are clickable links to player detail pages
 - Same content as the previous "Team" tab (renamed for clarity)
+- **Data Loading**: Roster loaded from `/franchise/roster` endpoint, stats merged from franchise document's `players` collection
 
 **Team Tab:**
 - **Team Report Section**: Displays team attributes in a grid layout (same as Training Report)
   - Shows team attributes: Shooting, Rebounding, Offense, Defense, Fast Breaks, Press/Trap, Aggression, Discipline, Momentum, Team Chemistry, Fast Break Defense, Press/Trap Breaks
   - Uses visual indicators (pills, progress bars, +/- indicators) matching Training Report styling
+  - Styled with scoped CSS (`command-center-team-styles.css`) to maintain light theme consistency
 - **Playbook Summary Section**: Displays play and defense effectiveness
   - Shows offensive plays (motion and set plays) with effectiveness progress bars
   - Shows defensive schemes (man and zone defenses) with effectiveness progress bars
   - Organized by Offense and Defense categories
   - Data loaded from franchise document: `franchises.{franchise_id}.franchise_teams.{team_id}.plays` and `franchises.{franchise_id}.franchise_teams.{team_id}.scouting_data`
+  - Loaded when Team tab is opened via `loadTeamData()` function
+
+**Styling Implementation:**
+- Team Report and Playbook Summary sections use scoped CSS (`command-center-team-styles.css`)
+- Sections wrapped in `.training-report-styled` container to prevent style conflicts
+- Maintains command center's light theme while providing Training Report-style visuals
+- CSS variables adjusted for light background (white) instead of dark gradient
 
 **Stats Tab:**
 - **Leaders Section**: Franchise leaderboards for key statistics across all teams (same as previous "Leaders" tab)
