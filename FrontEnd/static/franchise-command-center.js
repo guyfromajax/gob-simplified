@@ -585,148 +585,28 @@ async function loadTeamData() {
       console.warn('Could not ensure team objects exist:', error);
     }
     
-    // Load franchise document
-    const response = await fetch(`/franchise/command-center/data?franchise_id=${franchiseId}`);
-    const franchiseData = await response.json();
+    // Use the new backend endpoint that resolves team_name to team_id server-side
+    // This matches the pattern used by /franchise/roster
+    const response = await fetch(`/franchise/team-data?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(userTeamName)}`);
     
-    if (!franchiseData || !franchiseData.team) return;
-    
-    // Load full franchise document to get team data
-    const franchiseDocResponse = await fetch(`/franchise/state?franchise_id=${franchiseId}`);
-    const franchiseDoc = await franchiseDocResponse.json();
-    
-    if (!franchiseDoc || !franchiseDoc.franchise_teams) {
-      console.warn('No franchise_teams data found in franchise document');
+    if (!response.ok) {
+      console.error('Failed to load team data:', response.status, response.statusText);
       return;
     }
     
-    const franchiseTeams = franchiseDoc.franchise_teams || {};
-    const teamKeys = Object.keys(franchiseTeams);
-    console.log('📊 [TEAM DATA] Franchise document teams:', teamKeys);
-    console.log('📊 [TEAM DATA] Looking for userTeamName:', userTeamName);
-    console.log('📊 [TEAM DATA] Sample team entry:', teamKeys[0] ? { key: teamKeys[0], team: franchiseTeams[teamKeys[0]] } : 'No teams');
-    
-    // Find user's team in franchise document
-    let teamObj = null;
-    let teamIdKey = null;
-    
-    // Get team_id (ObjectId) from teams collection - this is what franchise_teams keys use
-    let teamObjectId = null;
-    
-    // Simple approach: fetch all teams and find the one matching userTeamName
-    try {
-      console.log('📊 [TEAM DATA] Fetching all teams to find ObjectId for:', userTeamName);
-      const allTeamsResponse = await fetch('/teams');
-      if (allTeamsResponse.ok) {
-        const allTeams = await allTeamsResponse.json();
-        console.log('📊 [TEAM DATA] Fetched', allTeams.length, 'teams from /teams endpoint');
-        
-        // Find team by name
-        const matchingTeam = allTeams.find(t => {
-          const teamName = t.name || '';
-          return teamName === userTeamName || teamName === franchiseData?.team;
-        });
-        
-        if (matchingTeam) {
-          teamObjectId = String(matchingTeam._id);
-          console.log('📊 [TEAM DATA] ✅ Found team ObjectId:', teamObjectId, 'for team:', matchingTeam.name);
-        } else {
-          console.warn('📊 [TEAM DATA] ⚠️ Team not found in /teams. Available teams:', allTeams.map(t => t.name));
-        }
-      } else {
-        console.warn('📊 [TEAM DATA] ⚠️ Failed to fetch /teams:', allTeamsResponse.status);
-      }
-    } catch (error) {
-      console.error('📊 [TEAM DATA] ❌ Error fetching team ObjectId:', error);
-    }
-    
-    // Now match the teamObjectId to franchise_teams keys
-    if (teamObjectId) {
-      const teamIdStr = String(teamObjectId);
-      console.log('📊 [TEAM DATA] Attempting to match ObjectId:', teamIdStr, 'to franchise_teams keys');
-      
-      for (const [tid, team] of Object.entries(franchiseTeams)) {
-        const tidStr = String(tid);
-        // Match ObjectId strings (they should match exactly)
-        if (tidStr === teamIdStr) {
-          teamObj = team;
-          teamIdKey = tid;
-          console.log('📊 [TEAM DATA] ✅ Found team by ObjectId match! Key:', tid);
-          break;
-        }
-      }
-      
-      if (!teamObj) {
-        console.warn('📊 [TEAM DATA] ⚠️ ObjectId', teamIdStr, 'not found in franchise_teams keys');
-        console.warn('📊 [TEAM DATA] Available keys:', Object.keys(franchiseTeams));
-      }
-    } else {
-      console.warn('📊 [TEAM DATA] ⚠️ Could not determine team ObjectId');
-    }
-    
-    if (!teamObj) {
-      console.warn('📊 [TEAM DATA] User team not found. Available teams:', teamKeys);
-      console.warn('📊 [TEAM DATA] Team details:', teamKeys.map(key => ({
-        key,
-        team_name: franchiseTeams[key]?.team_name,
-        has_attributes: !!franchiseTeams[key]?.shot_threshold,
-        has_plays: !!franchiseTeams[key]?.plays
-      })));
-      return;
-    }
-    
-    console.log('📊 [TEAM DATA] Found team object:', teamIdKey);
-    console.log('📊 [TEAM DATA] Team object keys:', Object.keys(teamObj));
-    
-    // Extract team attributes
-    const teamAttributes = {};
-    const attrKeys = ['shot_threshold', 'turnover_modifier', 'foul_modifier', 'rebound_modifier', 
-                      'momentum_score', 'offensive_efficiency', 'team_chemistry', 'defensive_efficiency',
-                      'fb_efficiency', 'pt_efficiency', 'fb_opp_modifier', 'pt_opp_modifier'];
-    attrKeys.forEach(key => {
-      if (teamObj[key] !== undefined) {
-        teamAttributes[key] = teamObj[key];
-      } else {
-        // Default to 0 if not present
-        teamAttributes[key] = 0;
-      }
-    });
-    
-    console.log('📊 [TEAM DATA] Extracted team attributes:', teamAttributes);
-    
-    // Load plays data
-    const playsData = teamObj.plays || {};
-    console.log('📊 [TEAM DATA] Plays data:', Object.keys(playsData).length, 'plays');
-    
-    // Load scouting data - initialize defense structure if missing
-    let scoutingData = teamObj.scouting_data || {};
-    if (!scoutingData.defense) {
-      // Initialize defense structure with effectiveness values
-      scoutingData.defense = {
-        "Man": { effectiveness: 0, momentum: 0, cloaking: 0 },
-        "2-3 Zone": { effectiveness: 0, momentum: 0, cloaking: 0 },
-        "3-2 Zone": { effectiveness: 0, momentum: 0, cloaking: 0 },
-        "1-3-1 Zone": { effectiveness: 0, momentum: 0, cloaking: 0 }
-      };
-    } else {
-      // Ensure each defense has effectiveness value
-      const defenses = ["Man", "2-3 Zone", "3-2 Zone", "1-3-1 Zone"];
-      defenses.forEach(defName => {
-        if (!scoutingData.defense[defName]) {
-          scoutingData.defense[defName] = { effectiveness: 0, momentum: 0, cloaking: 0 };
-        } else if (scoutingData.defense[defName].effectiveness === undefined) {
-          scoutingData.defense[defName].effectiveness = 0;
-        }
-      });
-    }
-    
-    console.log('📊 [TEAM DATA] Scouting data defense keys:', Object.keys(scoutingData.defense || {}));
+    const data = await response.json();
     
     teamData = {
-      team_attributes: teamAttributes,
-      plays_data: playsData,
-      scouting_data: scoutingData
+      team_attributes: data.team_attributes || {},
+      plays_data: data.plays_data || {},
+      scouting_data: data.scouting_data || {}
     };
+    
+    console.log('📊 [TEAM DATA] Loaded team data:', {
+      attributes: Object.keys(teamData.team_attributes).length,
+      plays: Object.keys(teamData.plays_data).length,
+      defenses: Object.keys(teamData.scouting_data?.defense || {}).length
+    });
     
     // Render if Team tab is active
     const teamTab = document.getElementById('team-tab');
