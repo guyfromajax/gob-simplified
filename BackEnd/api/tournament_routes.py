@@ -730,6 +730,33 @@ def run_tournament_training(req: TournamentTrainingRequest):
     playbook_settings = team_data.get("playbook_settings", {})
     scouting_data = team_data.get("scouting_data", {})
     
+    # Initialize plays_data if empty (first time training for this team)
+    if not plays_data:
+        logger.warning(f"📚 [API] plays_data is empty, populating from universal plays collection")
+        from BackEnd.api.gameplan_routes import populate_team_plays
+        plays_data = populate_team_plays(mode="tournament")
+        # Save to database
+        tournaments_collection.update_one(
+            {"_id": tournament_id},
+            {"$set": {f"teams.{team_id}.plays": plays_data}}
+        )
+    
+    # Initialize scouting_data if empty or missing defense structure
+    if not scouting_data or "defense" not in scouting_data:
+        logger.warning(f"📚 [API] scouting_data is empty or missing defense structure, initializing")
+        from BackEnd.models.team_manager import TeamManager
+        # Get team name for initialization
+        team_doc = teams_collection.find_one({"_id": ObjectId(team_id)})
+        team_name = team_doc.get("name", team_id) if team_doc else team_id
+        # Create a temporary TeamManager to use its initialization method
+        temp_team = TeamManager(name=team_name, mode="tournament")
+        scouting_data = temp_team.scouting_data
+        # Save to database
+        tournaments_collection.update_one(
+            {"_id": tournament_id},
+            {"$set": {f"teams.{team_id}.scouting_data": scouting_data}}
+        )
+    
     updated_players, updated_team, updated_plays, updated_scouting_data, training_report = execute_training(
         players_for_training,
         team_stats,

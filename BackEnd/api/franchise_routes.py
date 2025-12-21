@@ -1003,6 +1003,30 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     playbook_settings = team_data.get("playbook_settings", {})
     scouting_data = team_data.get("scouting_data", {})
     
+    # Initialize plays_data if empty (first time training for this team)
+    if not plays_data:
+        logger.warning(f"📚 [API] plays_data is empty, populating from universal plays collection")
+        from BackEnd.api.gameplan_routes import populate_team_plays
+        plays_data = populate_team_plays(mode="franchise")
+        # Save to database
+        db.franchises.update_one(
+            {"_id": franchise_id},
+            {"$set": {f"franchise_teams.{team_id}.plays": plays_data}}
+        )
+    
+    # Initialize scouting_data if empty or missing defense structure
+    if not scouting_data or "defense" not in scouting_data:
+        logger.warning(f"📚 [API] scouting_data is empty or missing defense structure, initializing")
+        from BackEnd.models.team_manager import TeamManager
+        # Create a temporary TeamManager to use its initialization method
+        temp_team = TeamManager(name=team_name or team_id, mode="franchise")
+        scouting_data = temp_team.scouting_data
+        # Save to database
+        db.franchises.update_one(
+            {"_id": franchise_id},
+            {"$set": {f"franchise_teams.{team_id}.scouting_data": scouting_data}}
+        )
+    
     logger.warning(f"📚 [API] Loading plays_data: {len(plays_data)} plays")
     logger.warning(f"📚 [API] Loading scouting_data: {list(scouting_data.keys()) if scouting_data else 'None'}")
     logger.warning(f"📚 [API] playbook_training_mode: {training_data.get('playbook_training_mode', 'not provided')}")
