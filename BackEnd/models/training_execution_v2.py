@@ -61,6 +61,22 @@ def execute_training(
     if scouting_data is None:
         scouting_data = {}
     
+    # Store original effectiveness values BEFORE any changes
+    original_plays_effectiveness = {}
+    for play_name, play_data in plays_data.items():
+        if isinstance(play_data, dict):
+            original_plays_effectiveness[play_name] = play_data.get("effectiveness", 0)
+    
+    original_defenses_effectiveness = {}
+    if scouting_data and "defense" in scouting_data:
+        for defense_name, defense_data in scouting_data["defense"].items():
+            if isinstance(defense_data, dict):
+                original_defenses_effectiveness[defense_name] = defense_data.get("effectiveness", 0)
+    
+    # Step 0: Reduce play/defense effectiveness by 5-15 (pre-training decay)
+    plays_data = _apply_pre_training_effectiveness_decay(plays_data)
+    scouting_data = _apply_pre_training_defense_decay(scouting_data)
+    
     # Step 1: Apply pre-training conditions
     players, team = apply_pre_training_conditions(players, team)
     
@@ -82,6 +98,26 @@ def execute_training(
         playbook_settings,
         coaching_focus
     )
+    
+    # Calculate effectiveness changes for training report
+    plays_effectiveness_changes = {}
+    for play_name, original_eff in original_plays_effectiveness.items():
+        if play_name in updated_plays:
+            new_eff = updated_plays[play_name].get("effectiveness", 0)
+            plays_effectiveness_changes[play_name] = new_eff - original_eff
+    
+    defenses_effectiveness_changes = {}
+    if updated_scouting_data and "defense" in updated_scouting_data:
+        for defense_name, original_eff in original_defenses_effectiveness.items():
+            if defense_name in updated_scouting_data["defense"]:
+                new_eff = updated_scouting_data["defense"][defense_name].get("effectiveness", 0)
+                defenses_effectiveness_changes[defense_name] = new_eff - original_eff
+    
+    # Add effectiveness changes to training report
+    training_report["plays_effectiveness_changes"] = plays_effectiveness_changes
+    training_report["defenses_effectiveness_changes"] = defenses_effectiveness_changes
+    training_report["plays_data"] = updated_plays
+    training_report["scouting_data"] = updated_scouting_data
     
     return players, team, updated_plays, updated_scouting_data, training_report
 

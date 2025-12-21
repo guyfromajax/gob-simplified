@@ -813,6 +813,10 @@ def run_tournament_training(req: TournamentTrainingRequest):
         "team_changes": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
         "training_notes": training_report.get("training_notes", []),
+        "plays_data": training_report.get("plays_data", {}),
+        "scouting_data": training_report.get("scouting_data", {}),
+        "plays_effectiveness_changes": training_report.get("plays_effectiveness_changes", {}),
+        "defenses_effectiveness_changes": training_report.get("defenses_effectiveness_changes", {}),
         "date": datetime.now().strftime("%Y-%m-%d")
     }
     

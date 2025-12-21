@@ -1119,6 +1119,10 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         "team_changes": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
         "training_notes": training_report.get("training_notes", []),
+        "plays_data": training_report.get("plays_data", {}),
+        "scouting_data": training_report.get("scouting_data", {}),
+        "plays_effectiveness_changes": training_report.get("plays_effectiveness_changes", {}),
+        "defenses_effectiveness_changes": training_report.get("defenses_effectiveness_changes", {}),
         "session_type": session_type,
         "date": datetime.now().strftime("%Y-%m-%d")
     }
@@ -1386,6 +1390,10 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             "player_changes": report_data.get("player_changes", {}),
             "team_changes": report_data.get("team_changes", {}),
             "training_notes": report_data.get("training_notes", []),
+            "plays_data": report_data.get("plays_data", {}),
+            "scouting_data": report_data.get("scouting_data", {}),
+            "plays_effectiveness_changes": report_data.get("plays_effectiveness_changes", {}),
+            "defenses_effectiveness_changes": report_data.get("defenses_effectiveness_changes", {}),
             "players": players,
             "team_attributes": team_attrs
         }
