@@ -1211,14 +1211,16 @@ function renderPlaybookSummary() {
   
   if (motion_plays.length > 0) {
     motion_plays.forEach(play => {
-      const playRow = createPlayRow(play.name, play.effectiveness || 0, 0);
+      // Pass full play object to access effectiveness, momentum, cloaking
+      const playRow = createPlayRow(play.name, play, null);
       offenseSection.appendChild(playRow);
     });
   }
   
   if (set_plays.length > 0) {
     set_plays.forEach(play => {
-      const playRow = createPlayRow(play.name, play.effectiveness || 0, 0);
+      // Pass full play object to access effectiveness, momentum, cloaking
+      const playRow = createPlayRow(play.name, play, null);
       offenseSection.appendChild(playRow);
     });
   }
@@ -1238,14 +1240,16 @@ function renderPlaybookSummary() {
   
   if (man_defenses.length > 0) {
     man_defenses.forEach(defense => {
-      const defenseRow = createPlayRow(defense.name, defense.effectiveness || 0, 0);
+      // Pass full defense object to access effectiveness, momentum, cloaking
+      const defenseRow = createPlayRow(defense.name, defense, null);
       defenseSection.appendChild(defenseRow);
     });
   }
   
   if (zone_defenses.length > 0) {
     zone_defenses.forEach(defense => {
-      const defenseRow = createPlayRow(defense.name, defense.effectiveness || 0, 0);
+      // Pass full defense object to access effectiveness, momentum, cloaking
+      const defenseRow = createPlayRow(defense.name, defense, null);
       defenseSection.appendChild(defenseRow);
     });
   }
@@ -1253,15 +1257,54 @@ function renderPlaybookSummary() {
   container.appendChild(defenseSection);
 }
 
-function createPlayRow(playName, effectiveness, change) {
+function createPlayRow(playName, playData, change) {
+  // playData can be an object with effectiveness, momentum, cloaking, or just a number (effectiveness)
+  // Handle both formats for backward compatibility
+  const effectiveness = typeof playData === 'object' ? (playData.effectiveness || 0) : (playData || 0);
+  const momentum = typeof playData === 'object' ? (playData.momentum || 0) : 0;
+  const cloaking = typeof playData === 'object' ? (playData.cloaking || 0) : 0;
+  
   const row = document.createElement('div');
   row.className = 'playbook-row';
   
+  // Play name
   const nameDiv = document.createElement('div');
   nameDiv.className = 'playbook-name';
   nameDiv.textContent = playName;
   row.appendChild(nameDiv);
   
+  // Metrics container - holds all three bars
+  const metricsContainer = document.createElement('div');
+  metricsContainer.className = 'playbook-metrics-container';
+  
+  // Command (Effectiveness) - Blue, 0-100 scale
+  const commandMetric = createMetricBar('Command', effectiveness, 100, '#4a90e2', null);
+  metricsContainer.appendChild(commandMetric);
+  
+  // Momentum - Orange, 0-10 scale
+  const momentumMetric = createMetricBar('Momentum', momentum, 10, '#ff9800', null);
+  metricsContainer.appendChild(momentumMetric);
+  
+  // Cloaking - Purple, 0-10 scale
+  const cloakingMetric = createMetricBar('Cloaking', cloaking, 10, '#9c27b0', null);
+  metricsContainer.appendChild(cloakingMetric);
+  
+  row.appendChild(metricsContainer);
+  
+  return row;
+}
+
+function createMetricBar(title, value, maxValue, color, change) {
+  const metricDiv = document.createElement('div');
+  metricDiv.className = 'playbook-metric';
+  
+  // Title
+  const titleDiv = document.createElement('div');
+  titleDiv.className = 'playbook-metric-title';
+  titleDiv.textContent = title;
+  metricDiv.appendChild(titleDiv);
+  
+  // Progress bar container
   const progressContainer = document.createElement('div');
   progressContainer.className = 'playbook-progress-container';
   
@@ -1270,14 +1313,34 @@ function createPlayRow(playName, effectiveness, change) {
   
   const progressFill = document.createElement('div');
   progressFill.className = 'playbook-progress-fill';
-  const percentage = Math.min(100, (effectiveness / 500) * 100);
+  progressFill.style.backgroundColor = color;
+  const percentage = Math.min(100, (value / maxValue) * 100);
   progressFill.style.width = `${percentage}%`;
   
   progressBar.appendChild(progressFill);
   progressContainer.appendChild(progressBar);
-  row.appendChild(progressContainer);
+  metricDiv.appendChild(progressContainer);
   
-  return row;
+  // Change indicator (only for Command/Effectiveness)
+  if (change !== null && change !== undefined) {
+    const changeDiv = document.createElement('div');
+    changeDiv.className = 'playbook-change';
+    
+    if (change > 0) {
+      changeDiv.textContent = `+${change}`;
+      changeDiv.style.color = '#4CAF50'; // Green
+    } else if (change < 0) {
+      changeDiv.textContent = `-${Math.abs(change)}`;
+      changeDiv.style.color = '#f44336'; // Red
+    } else {
+      changeDiv.textContent = '0';
+      changeDiv.style.color = '#ffffff'; // White
+    }
+    
+    metricDiv.appendChild(changeDiv);
+  }
+  
+  return metricDiv;
 }
 
 // Listen for tab changes to render Team Report when Team tab is opened
