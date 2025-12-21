@@ -976,87 +976,28 @@ async function loadTeamData() {
       console.warn('Could not ensure team objects exist:', error);
     }
     
-    // Load team data from tournament document
-    const response = await fetch(`/tournament/state?tournament_id=${encodeURIComponent(tournament._id)}`);
-    const tournamentDoc = await response.json();
+    // Use the new backend endpoint that resolves team_name to team_id server-side
+    // This matches the pattern used by /tournament/roster
+    const response = await fetch(`/tournament/team-data?tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(formatTeamName(userTeamId))}`);
     
-    if (!tournamentDoc || !tournamentDoc.teams) {
-      console.warn('No teams data found in tournament document');
+    if (!response.ok) {
+      console.error('Failed to load team data:', response.status, response.statusText);
       return;
     }
     
-    console.log('📊 [TEAM DATA] Tournament document teams:', Object.keys(tournamentDoc.teams));
-    
-    // Find user's team in tournament document
-    let teamObj = null;
-    let teamIdKey = null;
-    
-    // Try to find team by name first
-    for (const [tid, team] of Object.entries(tournamentDoc.teams)) {
-      if (team.team_name === userTeamId || tid === userTeamId) {
-        teamObj = team;
-        teamIdKey = tid;
-        break;
-      }
-    }
-    
-    if (!teamObj) {
-      console.warn('User team not found in tournament document. Available teams:', Object.keys(tournamentDoc.teams));
-      return;
-    }
-    
-    console.log('📊 [TEAM DATA] Found team object:', teamIdKey);
-    console.log('📊 [TEAM DATA] Team object keys:', Object.keys(teamObj));
-    
-    // Extract team attributes
-    const teamAttributes = {};
-    const attrKeys = ['shot_threshold', 'turnover_modifier', 'foul_modifier', 'rebound_modifier', 
-                      'momentum_score', 'offensive_efficiency', 'team_chemistry', 'defensive_efficiency',
-                      'fb_efficiency', 'pt_efficiency', 'fb_opp_modifier', 'pt_opp_modifier'];
-    attrKeys.forEach(key => {
-      if (teamObj[key] !== undefined) {
-        teamAttributes[key] = teamObj[key];
-      } else {
-        // Default to 0 if not present
-        teamAttributes[key] = 0;
-      }
-    });
-    
-    console.log('📊 [TEAM DATA] Extracted team attributes:', teamAttributes);
-    
-    // Load plays data
-    const playsData = teamObj.plays || {};
-    console.log('📊 [TEAM DATA] Plays data:', Object.keys(playsData).length, 'plays');
-    
-    // Load scouting data - initialize defense structure if missing
-    let scoutingData = teamObj.scouting_data || {};
-    if (!scoutingData.defense) {
-      // Initialize defense structure with effectiveness values
-      scoutingData.defense = {
-        "Man": { effectiveness: 0, momentum: 0, cloaking: 0 },
-        "2-3 Zone": { effectiveness: 0, momentum: 0, cloaking: 0 },
-        "3-2 Zone": { effectiveness: 0, momentum: 0, cloaking: 0 },
-        "1-3-1 Zone": { effectiveness: 0, momentum: 0, cloaking: 0 }
-      };
-    } else {
-      // Ensure each defense has effectiveness value
-      const defenses = ["Man", "2-3 Zone", "3-2 Zone", "1-3-1 Zone"];
-      defenses.forEach(defName => {
-        if (!scoutingData.defense[defName]) {
-          scoutingData.defense[defName] = { effectiveness: 0, momentum: 0, cloaking: 0 };
-        } else if (scoutingData.defense[defName].effectiveness === undefined) {
-          scoutingData.defense[defName].effectiveness = 0;
-        }
-      });
-    }
-    
-    console.log('📊 [TEAM DATA] Scouting data defense keys:', Object.keys(scoutingData.defense || {}));
+    const data = await response.json();
     
     teamData = {
-      team_attributes: teamAttributes,
-      plays_data: playsData,
-      scouting_data: scoutingData
+      team_attributes: data.team_attributes || {},
+      plays_data: data.plays_data || {},
+      scouting_data: data.scouting_data || {}
     };
+    
+    console.log('📊 [TEAM DATA] Loaded team data:', {
+      attributes: Object.keys(teamData.team_attributes).length,
+      plays: Object.keys(teamData.plays_data).length,
+      defenses: Object.keys(teamData.scouting_data?.defense || {}).length
+    });
     
     // Render if Team tab is active
     const teamTab = document.getElementById('team-tab');
