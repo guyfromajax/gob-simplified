@@ -963,6 +963,19 @@ async function loadTeamData() {
   if (!tournament || !tournament._id || !userTeamId) return;
   
   try {
+    // First, ensure team objects exist (this will create them if missing)
+    const formatTeamName = (name) => {
+      // Format team name for API calls
+      return name.replace(/\s+/g, '-').toLowerCase();
+    };
+    
+    try {
+      // Call ensure_team_objects_exist via get_gameplan endpoint (it calls ensure_team_objects_exist internally)
+      await fetch(`/api/gameplan?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_id=${encodeURIComponent(userTeamId)}`);
+    } catch (error) {
+      console.warn('Could not ensure team objects exist:', error);
+    }
+    
     // Load team data from tournament document
     const response = await fetch(`/tournament/state?tournament_id=${encodeURIComponent(tournament._id)}`);
     const tournamentDoc = await response.json();
@@ -971,6 +984,8 @@ async function loadTeamData() {
       console.warn('No teams data found in tournament document');
       return;
     }
+    
+    console.log('📊 [TEAM DATA] Tournament document teams:', Object.keys(tournamentDoc.teams));
     
     // Find user's team in tournament document
     let teamObj = null;
@@ -986,9 +1001,12 @@ async function loadTeamData() {
     }
     
     if (!teamObj) {
-      console.warn('User team not found in tournament document');
+      console.warn('User team not found in tournament document. Available teams:', Object.keys(tournamentDoc.teams));
       return;
     }
+    
+    console.log('📊 [TEAM DATA] Found team object:', teamIdKey);
+    console.log('📊 [TEAM DATA] Team object keys:', Object.keys(teamObj));
     
     // Extract team attributes
     const teamAttributes = {};
@@ -998,12 +1016,41 @@ async function loadTeamData() {
     attrKeys.forEach(key => {
       if (teamObj[key] !== undefined) {
         teamAttributes[key] = teamObj[key];
+      } else {
+        // Default to 0 if not present
+        teamAttributes[key] = 0;
       }
     });
     
+    console.log('📊 [TEAM DATA] Extracted team attributes:', teamAttributes);
+    
     // Load plays data
     const playsData = teamObj.plays || {};
-    const scoutingData = teamObj.scouting_data || { defense: {} };
+    console.log('📊 [TEAM DATA] Plays data:', Object.keys(playsData).length, 'plays');
+    
+    // Load scouting data - initialize defense structure if missing
+    let scoutingData = teamObj.scouting_data || {};
+    if (!scoutingData.defense) {
+      // Initialize defense structure with effectiveness values
+      scoutingData.defense = {
+        "Man": { effectiveness: 0, momentum: 0, cloaking: 0 },
+        "2-3 Zone": { effectiveness: 0, momentum: 0, cloaking: 0 },
+        "3-2 Zone": { effectiveness: 0, momentum: 0, cloaking: 0 },
+        "1-3-1 Zone": { effectiveness: 0, momentum: 0, cloaking: 0 }
+      };
+    } else {
+      // Ensure each defense has effectiveness value
+      const defenses = ["Man", "2-3 Zone", "3-2 Zone", "1-3-1 Zone"];
+      defenses.forEach(defName => {
+        if (!scoutingData.defense[defName]) {
+          scoutingData.defense[defName] = { effectiveness: 0, momentum: 0, cloaking: 0 };
+        } else if (scoutingData.defense[defName].effectiveness === undefined) {
+          scoutingData.defense[defName].effectiveness = 0;
+        }
+      });
+    }
+    
+    console.log('📊 [TEAM DATA] Scouting data defense keys:', Object.keys(scoutingData.defense || {}));
     
     teamData = {
       team_attributes: teamAttributes,
