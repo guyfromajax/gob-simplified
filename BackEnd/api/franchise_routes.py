@@ -1399,11 +1399,20 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 attrs = player_data.get("attributes", {})
                 
                 # Extract anchor attributes (current values after training)
+                # Use anchor_ values if available (post-training), otherwise fallback to base values
                 player_attrs = {}
+                # First, collect all anchor_ attributes
                 for k, v in attrs.items():
                     if k.startswith("anchor_"):
                         attr_name = k.replace("anchor_", "")
                         player_attrs[attr_name] = v
+                
+                # For attributes that don't have anchor_ keys, use base values as fallback
+                # This ensures SC, SH, and other attributes are included even if they haven't been modified
+                standard_attrs = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
+                for attr in standard_attrs:
+                    if attr not in player_attrs and attr in attrs:
+                        player_attrs[attr] = attrs[attr]
                 
                 # NG, EM, MO don't have anchor_ keys, add them directly
                 if "NG" in attrs:
