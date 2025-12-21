@@ -8786,14 +8786,20 @@ Tournament Mode supports multi-game tournament brackets where team data persists
   5. Executes training using `execute_training()` from `training_execution_v2.py`
   6. Updates player attributes in tournament document
   7. Marks training as completed for current round
-  8. Stores training report in `latest_training` field
-  9. Redirects back to Tournament Command Center
+  8. **Training Report Storage (matches Franchise pattern):**
+     - Stores training report in `teams.{team_id}.training_reports.{round}` (per-round storage)
+     - Also stores in `latest_training` field (quick access)
+  9. Redirects to Training Report page: `/static/training-report.html?mode=tournament&tournament_id=...&team_id=...&round=...`
 
 **Training Report:**
 - **Location:** `BackEnd/api/franchise_routes.py` - `get_training_report()` (supports tournament mode)
 - **Endpoint:** `GET /franchise/training-report?mode=tournament&tournament_id=...&team_id=...&round=...`
-- **Data Source:** `tournament.latest_training` field
-- **Displays:** Player attribute changes, team attribute changes, coaching focus, upcoming opponent
+  - Also accepts `week` parameter for backward compatibility (treated as `round` for tournament mode)
+- **Data Source:** 
+  - Primary: `tournaments.{tournament_id}.teams.{team_id}.training_reports.{round}` (per-round storage)
+  - Fallback: `tournament.latest_training` field (if per-round not found and round matches)
+- **Displays:** Player attribute changes, team attribute changes, coaching focus, upcoming opponent, play effectiveness changes, defense effectiveness changes
+- **Pattern:** Matches Franchise mode pattern - per-round storage with `latest_training` fallback
 
 ---
 

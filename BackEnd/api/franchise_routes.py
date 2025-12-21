@@ -1274,14 +1274,21 @@ def run_franchise_training(req: FranchiseTrainingRequest):
 
 
 @router.get("/franchise/training-report")
-def get_training_report(franchise_id: str = None, tournament_id: str = None, team_id: str = None, week: int = None):
+def get_training_report(franchise_id: str = None, tournament_id: str = None, team_id: str = None, week: int = None, round: int = None):
     """
     Get training report data for display on training-report.html page.
     Supports both franchise and tournament modes.
+    
+    For franchise mode: use 'week' parameter
+    For tournament mode: use 'round' parameter (week is also accepted for backward compatibility)
     """
     try:
         mode = "franchise" if franchise_id else "tournament"
         doc_id = franchise_id if franchise_id else tournament_id
+        
+        # For tournament mode, use round parameter if provided, otherwise fallback to week
+        if mode == "tournament" and round is not None:
+            week = round
         
         if not doc_id or not team_id or week is None:
             raise HTTPException(status_code=400, detail="Missing required parameters")
@@ -1415,9 +1422,29 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             if not doc:
                 raise HTTPException(status_code=404, detail="Tournament not found")
             
-            # Get training report for this round
-            report_data = doc.get("latest_training", {})
-            if report_data.get("round") != week:  # week parameter is used as round for tournament
+            # Resolve team_id to ObjectId string (matches Franchise pattern)
+            team_id_resolved = team_id
+            team_doc = teams_collection.find_one({"name": team_id})
+            if team_doc:
+                team_id_resolved = str(team_doc["_id"])
+            else:
+                try:
+                    team_id_obj = ObjectId(team_id)
+                    team_id_resolved = str(team_id_obj)
+                except:
+                    pass
+            
+            team_id_str = str(team_id_resolved)
+            current_round = week  # week parameter is used as round for tournament
+            
+            # Get training report for this round (matches Franchise pattern: try per-round storage first, then fallback)
+            tournament_teams = doc.get("teams", {})
+            team_data = tournament_teams.get(team_id_str, {})
+            training_reports = team_data.get("training_reports", {})
+            report_data = training_reports.get(str(current_round)) or doc.get("latest_training", {})
+            
+            # Verify round matches if using latest_training fallback
+            if report_data and report_data.get("round") != current_round:
                 report_data = {}
             
             # Get upcoming opponent from bracket
@@ -1510,7 +1537,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
 
         return {
             "status": "success",
-            "week": week,  # For tournament, this is the round number
+            "week": week if mode == "franchise" else None,  # Only for franchise mode
+            "round": current_round if mode == "tournament" else None,  # Only for tournament mode
             "upcoming_opponent": upcoming_opponent,
             "coaching_focus": report_data.get("coaching_focus", {}),
             "player_changes": report_data.get("player_changes", {}),
