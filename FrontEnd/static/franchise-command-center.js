@@ -316,6 +316,7 @@ function renderTeam(data) {
 
 function renderSchedule(data) {
   if (!data) return;
+  // Schedule container is now in the schedule-tab, not standings-tab
   const container = document.getElementById('schedule-container');
   if (!container) return;
   container.innerHTML = '';
