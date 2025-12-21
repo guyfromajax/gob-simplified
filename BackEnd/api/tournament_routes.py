@@ -763,10 +763,11 @@ def run_tournament_training(req: TournamentTrainingRequest):
     current_round = tournament_doc.get("current_round", 1)
     if training_status.get("training_completed", False) and training_status.get("round") == current_round:
         # Training already completed for this round, redirect to report
+        # SS&S: Only pass navigation params - backend will determine round from state
         return {
             "status": "already_completed",
             "round": current_round,
-            "redirect": f"/static/training-report.html?mode=tournament&tournament_id={req.tournament_id}&team_id={req.team_id}&round={current_round}"
+            "redirect": f"/static/training-report.html?mode=tournament&tournament_id={req.tournament_id}&team_id={req.team_id}"
         }
 
     # Get user's team (use team_id from request if provided, otherwise from tournament)
@@ -980,5 +981,6 @@ def run_tournament_training(req: TournamentTrainingRequest):
         "player_changes": player_logs,
         "team_changes": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
-        "redirect": f"/static/training-report.html?mode=tournament&tournament_id={req.tournament_id}&team_id={team_name}&round={current_round}"
+        # SS&S: Only pass navigation params (tournament_id, mode, team_id) - backend will determine round from state
+        "redirect": f"/static/training-report.html?mode=tournament&tournament_id={req.tournament_id}&team_id={team_name}"
     }

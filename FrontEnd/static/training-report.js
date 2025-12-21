@@ -6,6 +6,7 @@ const franchiseId = urlParams.get('franchise_id');
 const tournamentId = urlParams.get('tournament_id');
 const teamId = urlParams.get('team_id');
 const week = parseInt(urlParams.get('week'), 10);
+const round = parseInt(urlParams.get('round'), 10); // For tournament mode (optional - backend will determine if not provided)
 
 let reportData = null;
 let currentView = 'attributes'; // 'attributes' or 'changes'
@@ -80,12 +81,19 @@ const FOCUS_DISPLAY = {
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', () => {
-  // For tournament mode, round is required; for franchise mode, week is required
-  const hasRequiredParams = mode === 'tournament' ? (round && teamId) : (week && teamId);
-  if (!mode || !teamId || !hasRequiredParams) {
-    console.error('Missing required URL parameters');
+  // SS&S: For tournament mode, round is optional (backend will determine from state)
+  // For franchise mode, week is required
+  if (!mode || !teamId) {
+    console.error('Missing required URL parameters: mode and team_id are required');
     return;
   }
+  
+  if (mode === 'franchise' && !week) {
+    console.error('Missing required URL parameter: week is required for franchise mode');
+    return;
+  }
+  
+  // Tournament mode: round is optional - backend will determine from training_status
 
   // Set up view toggle
   setupViewToggle();
@@ -135,12 +143,13 @@ async function loadTrainingReport() {
     }
     if (tournamentId) {
       params.set('tournament_id', tournamentId);
-      // For tournament mode, use round parameter (week is also accepted for backward compatibility)
+      // SS&S: Only send round/week if provided - backend will determine from state if not provided
       if (round) {
         params.set('round', round);
       } else if (week) {
-        params.set('week', week); // Fallback for backward compatibility
+        params.set('week', week); // Backward compatibility
       }
+      // If neither round nor week provided, backend will determine from training_status
     }
     
     console.log('🔍 [TRAINING REPORT] Loading with params:', Object.fromEntries(params.entries()));

@@ -1279,19 +1279,46 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
     Get training report data for display on training-report.html page.
     Supports both franchise and tournament modes.
     
-    For franchise mode: use 'week' parameter
-    For tournament mode: use 'round' parameter (week is also accepted for backward compatibility)
+    SS&S Approach:
+    - For franchise mode: 'week' parameter is required
+    - For tournament mode: 'round' parameter is optional - if not provided, backend determines from training_status.round or latest_training.round
+    - This allows direct navigation after training without needing round in URL
+    - Historical reports from schedule links can still pass round parameter
     """
     try:
         mode = "franchise" if franchise_id else "tournament"
         doc_id = franchise_id if franchise_id else tournament_id
         
-        # For tournament mode, use round parameter if provided, otherwise fallback to week
-        if mode == "tournament" and round is not None:
-            week = round
+        if not doc_id or not team_id:
+            raise HTTPException(status_code=400, detail="Missing required parameters (doc_id, team_id)")
         
-        if not doc_id or not team_id or week is None:
-            raise HTTPException(status_code=400, detail="Missing required parameters")
+        # For tournament mode, determine round from backend state if not provided
+        if mode == "tournament":
+            if round is not None:
+                week = round  # Use round parameter if provided (for historical reports)
+            elif week is not None:
+                week = week  # Use week parameter if provided (backward compatibility)
+            else:
+                # SS&S: Determine round from backend state (training_status or latest_training)
+                from BackEnd.db import tournaments_collection
+                doc_id_obj = ObjectId(doc_id)
+                doc = tournaments_collection.find_one({"_id": doc_id_obj})
+                if not doc:
+                    raise HTTPException(status_code=404, detail="Tournament not found")
+                
+                # Try training_status.round first, then latest_training.round
+                training_status = doc.get("training_status", {})
+                week = training_status.get("round")
+                if week is None:
+                    latest_training = doc.get("latest_training", {})
+                    week = latest_training.get("round")
+                
+                if week is None:
+                    raise HTTPException(status_code=400, detail="No training round found. Please specify 'round' parameter or complete training first.")
+        
+        # For franchise mode, week is required
+        if mode == "franchise" and week is None:
+            raise HTTPException(status_code=400, detail="Missing required parameter: 'week'")
         
         if mode == "franchise":
             doc_id_obj = ObjectId(doc_id)
