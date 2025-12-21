@@ -8769,6 +8769,43 @@ Tournament Mode supports multi-game tournament brackets where team data persists
 - **Data Source:** `tournament.latest_training` field
 - **Displays:** Player attribute changes, team attribute changes, coaching focus, upcoming opponent
 
+---
+
+## Franchise Mode ✅ **UPDATED** (January 2025)
+
+### Overview
+
+Franchise Mode supports multi-season career mode where team and player data persists across games and seasons. Team attributes and player attributes can be modified through training and persist throughout the franchise. The Franchise Command Center provides a comprehensive interface for managing franchise progression, viewing schedules, standings, and running training sessions.
+
+**Location:** `FrontEnd/static/franchise-command-center.html`, `FrontEnd/static/franchise-command-center.js`  
+**Status:** ✅ Fully implemented with Schedule tab, training integration, and franchise management
+
+### Franchise Command Center
+
+**Tabs:**
+1. **Standings** - Conference standings table showing wins, losses, win percentage, points for/against, and next opponent
+2. **Team** - Team roster and player statistics with clickable player names linking to player detail pages
+3. **Leaders** - Franchise leaderboards for key statistics across all teams
+4. **Team Stats** - Team-level statistics (points, rebounds, assists, steals, blocks)
+5. **Recruits** - Recruiting pool with player attributes and position ratings
+6. **Schedule** - Season schedule view with weekly matchups and training report links
+
+**Header Controls:**
+- **Set Game Plan** - Navigate to Game Plan screen with franchise context
+- **Playbooks** - Navigate to Playbooks page with franchise context
+- **Run Training / Play Now** - Dynamic button that changes based on training status
+
+**Schedule Tab:**
+- Displays full season schedule organized by week
+- Shows completed games with scores (winner highlighted in bold)
+- Shows upcoming games without scores
+- Training report links appear next to user's team's games when training has been completed for that week
+- Also displays latest training session results below the schedule
+
+**Standings Tab:**
+- Displays conference standings table only (schedule moved to Schedule tab)
+- Shows team name, wins, losses, win percentage, points for, points against, and next opponent
+
 ### Team Object Lifecycle
 
 #### 1. **Team Object Creation**
