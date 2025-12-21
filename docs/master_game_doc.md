@@ -8899,6 +8899,20 @@ When creating a new game instance within a tournament:
   4. Attributes are passed to `GameManager()` constructor
   5. If no attributes are loaded, `TeamManager._init_team_attributes()` generates random values
 
+**Team Data API Endpoint:**
+- **Location**: `BackEnd/api/tournament_routes.py` - `get_tournament_team_data()`
+- **Endpoint**: `GET /tournament/team-data?tournament_id=...&team_name=...`
+- **Process**:
+  1. Resolves `team_name` to `team_id` server-side using multiple fallback strategies:
+     - Strategy 1: Exact name match
+     - Strategy 2: Case-insensitive match
+     - Strategy 3: Normalized name (replace dashes with spaces, title case)
+     - Strategy 4: Fallback to `tournament.user_team_id`
+  2. Returns team object from `tournaments.{tournament_id}.teams.{team_id}`
+  3. Initializes `scouting_data.defense` structure if missing
+  4. Defaults team attributes to 0 if not present
+- **Pattern**: Matches the successful pattern used by `/tournament/roster` - server-side team name resolution with robust fallback strategies
+
 #### 4. **Team Object Updates**
 
 - **Playbook Settings**: Saved to `tournaments.{tournament_id}.teams.{team_id}.playbook_settings`
