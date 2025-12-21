@@ -1141,6 +1141,53 @@ def _apply_ng_reduction_from_conditioning(players: List[dict], conditioning_poin
     return reduced_players
 
 
+def _apply_pre_training_effectiveness_decay(plays_data: Dict) -> Dict:
+    """
+    Reduce all plays' effectiveness scores by 5-15 before training.
+    Only applies to plays with effectiveness > 0.
+    Minimum value is 0 (cannot be negative).
+    
+    Returns:
+        Updated plays_data dict
+    """
+    updated_plays = plays_data.copy() if plays_data else {}
+    
+    for play_name, play_data in updated_plays.items():
+        if isinstance(play_data, dict):
+            current_effectiveness = play_data.get("effectiveness", 0)
+            if current_effectiveness > 0:
+                decay = random.randint(5, 15)
+                new_effectiveness = max(0, current_effectiveness - decay)
+                play_data["effectiveness"] = new_effectiveness
+                logger.warning(f"📉 [PLAY DECAY] {play_name}: {current_effectiveness} → {new_effectiveness} (decay: -{decay})")
+    
+    return updated_plays
+
+
+def _apply_pre_training_defense_decay(scouting_data: Dict) -> Dict:
+    """
+    Reduce all defenses' effectiveness scores by 5-15 before training.
+    Only applies to defenses with effectiveness > 0.
+    Minimum value is 0 (cannot be negative).
+    
+    Returns:
+        Updated scouting_data dict
+    """
+    updated_scouting_data = scouting_data.copy() if scouting_data else {}
+    
+    if "defense" in updated_scouting_data:
+        for defense_name, defense_data in updated_scouting_data["defense"].items():
+            if isinstance(defense_data, dict):
+                current_effectiveness = defense_data.get("effectiveness", 0)
+                if current_effectiveness > 0:
+                    decay = random.randint(5, 15)
+                    new_effectiveness = max(0, current_effectiveness - decay)
+                    defense_data["effectiveness"] = new_effectiveness
+                    logger.warning(f"📉 [DEFENSE DECAY] {defense_name}: {current_effectiveness} → {new_effectiveness} (decay: -{decay})")
+    
+    return updated_scouting_data
+
+
 def apply_play_defense_training(
     plays_data: Dict,
     scouting_data: Dict,
