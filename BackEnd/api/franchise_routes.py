@@ -806,6 +806,26 @@ def get_latest_training(franchise_id: str):
     }
 
 
+@router.get("/franchise/state")
+def get_franchise_state(franchise_id: str):
+    """
+    Get the full franchise document (for loading team data in Command Center).
+    """
+    try:
+        fid = ObjectId(franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise ID")
+    
+    franchise_doc = db.franchises.find_one({"_id": fid})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    
+    # Convert ObjectId to string for JSON serialization
+    franchise_doc["_id"] = str(franchise_doc["_id"])
+    
+    return jsonable_encoder(franchise_doc, custom_encoder={ObjectId: str})
+
+
 @router.get("/franchise/roster")
 def get_franchise_roster(franchise_id: str, team_name: str = None):
     """
