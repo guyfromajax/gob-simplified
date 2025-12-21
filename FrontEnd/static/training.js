@@ -221,7 +221,7 @@ function collectTrainingData() {
     coaching_focus: document.querySelector('input[name="coaching-focus"]:checked')?.value || null,
     
     // Playbook Training Mode
-    playbook_training_mode: document.querySelector('input[name="playbook-training-mode"]:checked')?.value || 'current-playbooks'
+    playbook_training_mode: document.querySelector('input[name="playbook-training-mode"]:checked')?.value || 'all-plays-even'
   };
   
   console.log('🔋 [FRONTEND] Collected training data:', data);
