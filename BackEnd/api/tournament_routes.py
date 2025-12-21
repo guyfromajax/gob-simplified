@@ -380,8 +380,8 @@ def save_result(request: TournamentResultRequest):
     return {"status": "success"}
 
 
-@router.get("/tournament/state/{tournament_id}")
-def tournament_state(tournament_id: str):
+@router.get("/tournament/state")
+def tournament_state(tournament_id: str = Query(...)):
     """Return the current bracket state for a tournament."""
     try:
         tid = ObjectId(tournament_id)
