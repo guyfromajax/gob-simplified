@@ -5364,7 +5364,11 @@ All frontend navigation now uses a unified helper (`FrontEnd/static/js/shared/ti
 
 **Navigation Entry Points Using Helper:**
 - `set-lineup.js`: "Play Now" button, "Game Plan" button, "Box Score" button
-- `game-plan.js`: `navigateToCourt()`, `navigateBack()`, Playbooks button navigation
+- `game-plan.js`: `navigateToCourt()`, `navigateBack()`, `navigateToCommandCenter()`, Playbooks button navigation
+  - **Navigation Source Detection:** Detects `from` URL parameter (`lineup` vs `command_center`)
+  - **Button Visibility:** Shows "Back To Lineup" or "Back To Locker Room" based on navigation source
+  - **Button Text:** "Play Game" (from lineup) or "Save Game Plan" (from command center)
+  - **Team ID Resolution:** Uses `user_team_id` when from command center, `home_id`/`away_id` when from lineup
 - `playbooks.js`: `navigateToPlayDetails()`, `handleBack()` (navigation to/from play-details and game-plan)
 - `play-details.html`: `goBack()` (navigation back to playbooks)
 - `box-score.js`: `setupLockerRoomButton()` (back navigation from lineup/game-plan)
