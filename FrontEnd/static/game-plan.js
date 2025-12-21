@@ -41,8 +41,17 @@ const pfId = myTeamSide ? urlParams.get(`${myTeamSide}_pf`) : null;
 const cId = myTeamSide ? urlParams.get(`${myTeamSide}_c`) : null;
 
 // Determine team name and ID
+// When coming from command center, use user_team_id; otherwise use lineup-based logic
 let teamName = myTeamSide === 'home' ? homeTeam : awayTeam;
 let teamId = myTeamSide === 'home' ? homeId : awayId;
+
+// If coming from command center, use user_team_id parameter
+if (modeParam && (modeParam === 'tournament' || modeParam === 'franchise')) {
+  if (userTeamIdParam) {
+    teamId = userTeamIdParam;
+    teamName = userTeamIdParam; // Will be resolved by backend if needed
+  }
+}
 
 // State
 let currentSettings = {
@@ -435,9 +444,17 @@ async function navigateToCommandCenter() {
   const mode = modeParam || 'single';
   
   if (mode === 'tournament' && tournamentId) {
-    window.location.href = `/static/tournament.html?tournament_id=${encodeURIComponent(tournamentId)}`;
+    // Include team_id in URL for tournament command center
+    const teamIdParam = teamId || userTeamIdParam || teamName;
+    const url = `/static/tournament.html?tournament_id=${encodeURIComponent(tournamentId)}`;
+    const finalUrl = teamIdParam ? `${url}&team_id=${encodeURIComponent(teamIdParam)}` : url;
+    window.location.href = finalUrl;
   } else if (mode === 'franchise' && franchiseId) {
-    window.location.href = `/static/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+    // Include team_id in URL for franchise command center
+    const teamIdParam = teamId || userTeamIdParam || teamName;
+    const url = `/static/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+    const finalUrl = teamIdParam ? `${url}&team_id=${encodeURIComponent(teamIdParam)}` : url;
+    window.location.href = finalUrl;
   } else {
     // Fallback to home
     window.location.href = '/';
@@ -463,6 +480,7 @@ async function init() {
   const btnPlaybooks = document.getElementById('btn-playbooks');
   const btnCancel = document.getElementById('btn-cancel');
   const btnBackToLineup = document.getElementById('btn-back-to-lineup');
+  const btnBackToLockerRoom = document.getElementById('btn-back-to-locker-room');
   const modalClose = document.getElementById('modal-close');
   
   // Check if lineup is valid (all 5 positions filled)
@@ -470,14 +488,16 @@ async function init() {
   
   // Show/hide buttons based on where user came from
   if (from === 'command_center') {
-    // From command center: show Cancel (→ command center), hide Back To Lineup
-    if (btnCancel) btnCancel.style.display = 'inline-block';
+    // From command center: show Back To Locker Room, hide Back To Lineup and Cancel
+    if (btnBackToLockerRoom) btnBackToLockerRoom.style.display = 'inline-block';
     if (btnBackToLineup) btnBackToLineup.style.display = 'none';
-    if (btnSave) btnSave.textContent = 'Save';  // Just save, return to command center
-  } else {
-    // From lineup: show Back To Lineup, hide Cancel
     if (btnCancel) btnCancel.style.display = 'none';
+    if (btnSave) btnSave.textContent = 'Save Game Plan';  // Save and return to command center
+  } else {
+    // From lineup: show Back To Lineup, hide Back To Locker Room and Cancel
     if (btnBackToLineup) btnBackToLineup.style.display = 'inline-block';
+    if (btnBackToLockerRoom) btnBackToLockerRoom.style.display = 'none';
+    if (btnCancel) btnCancel.style.display = 'none';
     if (btnSave) {
       btnSave.textContent = 'Play Game';  // Save and go to court
       
@@ -565,6 +585,10 @@ async function init() {
   
   if (btnBackToLineup) {
     btnBackToLineup.addEventListener('click', navigateBack);
+  }
+  
+  if (btnBackToLockerRoom) {
+    btnBackToLockerRoom.addEventListener('click', navigateToCommandCenter);
   }
   
   if (modalClose) {
