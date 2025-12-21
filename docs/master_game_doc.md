@@ -8686,11 +8686,30 @@ Tournament Mode supports multi-game tournament brackets where team data persists
 
 ### Tournament Command Center
 
-**Tabs:**
+**Tabs (in order):**
 1. **Bracket** - Visual bracket display showing tournament progression
-2. **Schedule** - Detailed schedule view with First Round, Semifinals, and Championship matchups
-3. **Team** - Team roster and player statistics
-4. **Leaders** - Tournament leaderboards for key statistics
+2. **Roster** - Team roster (player attributes) and player statistics for the current tournament
+3. **Team** - Team Report section (team attributes) and Playbook Summary section (play effectiveness)
+4. **Stats** - Tournament leaderboards for key statistics
+5. **Schedule** - Detailed schedule view with First Round, Semifinals, and Championship matchups
+
+**Tab Content Details:**
+
+**Roster Tab:**
+- Displays player roster table with attributes (SC, SH, ID, OD, PS, BH, RB, AG, ST, ND, IQ, FT, RT)
+- Displays player statistics table (PTS, FGM/FGA, 3PTM/3PTA, FTM/FTA, REB, AST, STL, BLK, F, MIN, TO)
+- Player names are clickable links to player detail pages
+- Same content as the previous "Team" tab (renamed for clarity)
+
+**Team Tab:**
+- **Team Report Section**: Displays team attributes in a grid layout (same as Training Report)
+  - Shows team attributes: Shooting, Rebounding, Offense, Defense, Fast Breaks, Press/Trap, Aggression, Discipline, Momentum, Team Chemistry, Fast Break Defense, Press/Trap Breaks
+  - Uses visual indicators (pills, progress bars, +/- indicators) matching Training Report styling
+- **Playbook Summary Section**: Displays play and defense effectiveness
+  - Shows offensive plays (motion and set plays) with effectiveness progress bars
+  - Shows defensive schemes (man and zone defenses) with effectiveness progress bars
+  - Organized by Offense and Defense categories
+  - Data loaded from tournament document: `tournaments.{tournament_id}.teams.{team_id}.plays` and `tournaments.{tournament_id}.teams.{team_id}.scouting_data`
 
 **Header Controls:**
 - **Set Game Plan** - Navigate to Game Plan screen
@@ -8782,13 +8801,36 @@ Franchise Mode supports multi-season career mode where team and player data pers
 
 ### Franchise Command Center
 
-**Tabs:**
+**Tabs (in order):**
 1. **Standings** - Conference standings table showing wins, losses, win percentage, points for/against, and next opponent
-2. **Team** - Team roster and player statistics with clickable player names linking to player detail pages
-3. **Leaders** - Franchise leaderboards for key statistics across all teams
-4. **Team Stats** - Team-level statistics (points, rebounds, assists, steals, blocks)
-5. **Recruits** - Recruiting pool with player attributes and position ratings
-6. **Schedule** - Season schedule view with weekly matchups and training report links
+2. **Roster** - Team roster (player attributes) and player statistics for the current season
+3. **Team** - Team Report section (team attributes) and Playbook Summary section (play effectiveness)
+4. **Stats** - Franchise leaderboards for key statistics across all teams, plus team-level statistics
+5. **Schedule** - Season schedule view with weekly matchups and training report links
+6. **Recruits** - Recruiting pool with player attributes and position ratings
+
+**Tab Content Details:**
+
+**Roster Tab:**
+- Displays player roster table with attributes (SC, SH, ID, OD, PS, BH, RB, AG, ST, ND, IQ, FT, RT)
+- Displays player statistics table for the current season (PTS, FGM/FGA, 3PTM/3PTA, FTM/FTA, REB, AST, STL, BLK, F, MIN, TO)
+- Player names are clickable links to player detail pages
+- Same content as the previous "Team" tab (renamed for clarity)
+
+**Team Tab:**
+- **Team Report Section**: Displays team attributes in a grid layout (same as Training Report)
+  - Shows team attributes: Shooting, Rebounding, Offense, Defense, Fast Breaks, Press/Trap, Aggression, Discipline, Momentum, Team Chemistry, Fast Break Defense, Press/Trap Breaks
+  - Uses visual indicators (pills, progress bars, +/- indicators) matching Training Report styling
+- **Playbook Summary Section**: Displays play and defense effectiveness
+  - Shows offensive plays (motion and set plays) with effectiveness progress bars
+  - Shows defensive schemes (man and zone defenses) with effectiveness progress bars
+  - Organized by Offense and Defense categories
+  - Data loaded from franchise document: `franchises.{franchise_id}.franchise_teams.{team_id}.plays` and `franchises.{franchise_id}.franchise_teams.{team_id}.scouting_data`
+
+**Stats Tab:**
+- **Leaders Section**: Franchise leaderboards for key statistics across all teams (same as previous "Leaders" tab)
+- **Team Stats Section**: Team-level statistics table (points, rebounds, assists, steals, blocks) - moved from previous "Team Stats" tab
+- Combined into single tab for better organization
 
 **Header Controls:**
 - **Set Game Plan** - Navigate to Game Plan screen with franchise context
