@@ -286,18 +286,10 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
             defaults = get_default_settings()
             # Pass mode to populate_team_plays for tournament randomization
             populated_plays = populate_team_plays(mode=mode)
-            
-            # Initialize scouting_data with randomized values for tournament mode
-            from BackEnd.models.team_manager import TeamManager
-            team_name = core_team.get("name", team_id) if core_team else team_id
-            temp_team = TeamManager(name=team_name, mode=mode)
-            scouting_data = temp_team.scouting_data
-            
             team_obj = {
                 "playcall_settings": defaults["playcall_settings"].copy(),
                 "strategy_settings": defaults["strategy_settings"].copy(),
-                "plays": populated_plays.copy(),
-                "scouting_data": scouting_data
+                "plays": populated_plays.copy()
             }
             
             # Add team attributes from core teams collection (if available)
