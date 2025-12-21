@@ -2967,6 +2967,9 @@ When a new mode instance is created, team attributes are initialized with mode-s
 
 - `BackEnd/models/player.py` - `Player.randomize_game_attributes()` (lines 51-70)
   - Player attribute initialization logic
+- `BackEnd/models/team_manager.py` - `TeamManager.__init__()` (lines 9-84)
+  - Team initialization with mode parameter stored as `self.mode`
+  - Used by `_init_scouting_data()` for tournament mode randomization
 - `BackEnd/models/team_manager.py` - `TeamManager._init_team_attributes()` (lines 128-142)
   - Team attribute initialization logic with mode-specific ranges
 - `BackEnd/api/api.py` - `init_game()` (lines 2099-2142)
@@ -8675,6 +8678,8 @@ When creating a new game instance:
 - `BackEnd/api/gameplan_routes.py` - `ensure_team_objects_exist()` (lines 152-299)
 - `BackEnd/api/api.py` - `load_team_attributes_from_doc()` (lines 196-244)
 - `BackEnd/api/api.py` - Game creation logic (lines 1246-1253, 1337-1344)
+- `BackEnd/models/team_manager.py` - `TeamManager.__init__()` (lines 9-84)
+  - Stores `mode` parameter as `self.mode` for use in `_init_scouting_data()` and other methods
 - `BackEnd/models/team_manager.py` - `_init_team_attributes()` (lines 128-141)
 
 ---
@@ -8689,6 +8694,17 @@ Tournament Mode supports multi-game tournament brackets where team data persists
 **Status:** ✅ Fully implemented with Schedule tab, training integration, and bracket management
 
 ### Tournament Command Center
+
+**Initialization:**
+- **URL Parameter Support:** Reads `tournament_id` and `team_id` from URL parameters on page load
+  - Priority 1: URL parameters (when navigating from training report, etc.)
+  - Priority 2: localStorage (for returning to page)
+  - Priority 3: Active tournament lookup by `user_team_id`
+- **Data Loading:** `loadTournament()` function prioritizes URL parameters over localStorage
+  - Uses `/tournament/state?tournament_id=...` endpoint (query parameter format)
+  - Updates `userTeamId` from tournament document if not already set
+  - Shows error message if tournament fails to load
+- **Error Handling:** Page displays error message if tournament fails to load, preventing empty data display
 
 **Tabs (in order):**
 1. **Bracket** - Visual bracket display showing tournament progression
