@@ -303,7 +303,12 @@ async function saveSettings() {
       const from = urlParams.get('from') || 'lineup';
       console.log('🚀 [GAME-PLAN] saveSettings() - from param:', from);
       
-      if (from === 'command_center') {
+      // ✅ FIX: Check for all command center variations
+      const isFromCommandCenter = from === 'command_center' || 
+                                   from === 'tournament-command-center' || 
+                                   from === 'franchise-command-center';
+      
+      if (isFromCommandCenter) {
         // Return to command center
         console.log('🚀 [GAME-PLAN] saveSettings() - Navigating to command center');
         navigateToCommandCenter();
@@ -487,7 +492,12 @@ async function init() {
   const lineupValid = pgId && sgId && sfId && pfId && cId;
   
   // Show/hide buttons based on where user came from
-  if (from === 'command_center') {
+  // ✅ FIX: Check for all command center variations (command_center, tournament-command-center, franchise-command-center)
+  const isFromCommandCenter = from === 'command_center' || 
+                               from === 'tournament-command-center' || 
+                               from === 'franchise-command-center';
+  
+  if (isFromCommandCenter) {
     // From command center: show Back To Locker Room, hide Back To Lineup and Cancel
     if (btnBackToLockerRoom) btnBackToLockerRoom.style.display = 'inline-block';
     if (btnBackToLineup) btnBackToLineup.style.display = 'none';
@@ -567,8 +577,16 @@ async function init() {
         myTeamSide: currentMyTeamSide
       });
       
-      // Add 'from' parameter to track navigation source
-      params.set('from', 'game-plan');
+      // ✅ FIX: Preserve original 'from' parameter if it indicates command center navigation
+      // This ensures that when navigating back from Playbooks, Game Plan knows the original source
+      const originalFrom = currentUrlParams.get('from');
+      if (originalFrom === 'command_center' || originalFrom === 'tournament-command-center' || originalFrom === 'franchise-command-center') {
+        // Preserve original command center source
+        params.set('from', originalFrom);
+      } else {
+        // Otherwise, set to 'game-plan' to indicate we came from Game Plan
+        params.set('from', 'game-plan');
+      }
       
       if (DEBUG) {
         params.set('debug', '1');
