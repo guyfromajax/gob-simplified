@@ -287,6 +287,23 @@ class GameManager:
             self.turns.append(timeout_turn)
             self.text_log.append(timeout_turn["text"])
             logging.info(f"⏸️ TIMEOUT: Created timeout turn for foul out - {foul_out_player_data.get('name', 'Unknown')}")
+            
+            # ✅ FOUL OUT TIMEOUT: Save game state to database immediately (same pattern as user-initiated timeout)
+            # This ensures timeout state persists even if user navigates away before simulate-turn saves
+            if self.game_id:
+                try:
+                    from BackEnd.utils.shared import summarize_game_state
+                    from BackEnd.db import games_collection
+                    db_summary = summarize_game_state(self, exclude_animations=True)
+                    games_collection.update_one({"_id": self.game_id}, {"$set": db_summary}, upsert=True)
+                    logging.info(
+                        f"💾 FOUL OUT TIMEOUT: Saved game state immediately: "
+                        f"game_id={self.game_id}, quarter={db_summary.get('quarter')}, "
+                        f"clock={db_summary.get('clock')}, next_play_type={timeout_turn.get('next_play_type')}"
+                    )
+                except Exception as e:
+                    logging.error(f"🚨 FOUL OUT TIMEOUT: Failed to save game state: {e}")
+                    # Don't fail the foul out if save fails - game continues normally
 
         # If the turn ended with a dead-ball turnover or a non-shooting foul
         # that does not result in free throws, prepare a sideline inbound

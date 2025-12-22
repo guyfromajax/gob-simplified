@@ -15,6 +15,8 @@ class MockPlayer:
         self.stats = {"game": {}}
         self.team = player_dict["team"]
         self.height = player_dict.get("height", 78)  # Default 6'6" (78 inches)
+        self.jersey = player_dict.get("jersey", 0)  # Default jersey number
+        self.player_id = player_dict.get("player_id", None)  # Player ID for database operations
         
 
     def record_stat(self, stat, amount=1):
