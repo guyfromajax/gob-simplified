@@ -1112,7 +1112,9 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     # Extract training data
     training_data = req.training_data
     
-    # Get plays, game plan settings, and playbook settings for training
+    # ✅ Get plays, game plan settings, and playbook settings for training
+    # These are the LATEST settings saved from Game Plan and Playbooks screens
+    # When playbook_training_mode == "current-playbooks", these settings will be used
     plays_data = team_data.get("plays", {})
     playcall_settings = team_data.get("playcall_settings", {})
     strategy_settings = team_data.get("strategy_settings", {})

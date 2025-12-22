@@ -1080,8 +1080,26 @@ class PlaybooksUI {
       myTeamSide: myTeamSide
     });
     
-    // Add 'from' parameter to track navigation source
-    params.set('from', 'playbooks');
+    // ✅ FIX: Preserve original 'from' parameter if it indicates command center navigation
+    // This ensures Game Plan shows correct back button (Back to Locker Room vs Back to Lineup)
+    const originalFrom = urlParams.get('from');
+    if (originalFrom === 'command_center' || originalFrom === 'tournament-command-center' || originalFrom === 'franchise-command-center') {
+      // Preserve original command center source
+      params.set('from', originalFrom);
+      console.log('✅ [PLAYBOOKS BACK] Preserving original from parameter:', originalFrom);
+    } else if (!currentGameId && (mode === 'tournament' || mode === 'franchise')) {
+      // If no game_id and in tournament/franchise mode, likely came from command center
+      // Determine which command center based on mode
+      if (mode === 'tournament') {
+        params.set('from', 'command_center');
+      } else if (mode === 'franchise') {
+        params.set('from', 'command_center');
+      }
+      console.log('✅ [PLAYBOOKS BACK] Inferring command center source (no game_id, mode:', mode);
+    } else {
+      // Otherwise, set to 'playbooks' to indicate we came from Playbooks
+      params.set('from', 'playbooks');
+    }
     
     window.location.href = `/static/game-plan.html?${params.toString()}`;
   }
