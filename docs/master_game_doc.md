@@ -5149,8 +5149,9 @@ The timeout system allows game pauses for strategic adjustments, lineup changes,
    - Player fouls out during shot resolution
    - `result["fouled_out"] = True` set in `shot_manager.py`
    - `game_manager.simulate_macro_turn()` detects `fouled_out` flag
-   - **Captures `timeout_offense_team_id`** before creating timeout turn (`BackEnd/models/game_manager.py` line 260)
+   - **Captures `timeout_offense_team_id`** before creating timeout turn (`BackEnd/models/game_manager.py` line 272)
    - Creates `TIMEOUT` turn with `timeout_reason="FOUL_OUT"`
+   - **✅ CRITICAL FIX (January 2025):** Immediately saves game state to database (same pattern as user-initiated timeout)
    - Frontend navigates with `resume_from_timeout=true` flag (`FrontEnd/static/js/phaser/utils/foulOutPopup.js`)
 
 **Timeout Turn Payload:**
@@ -5309,7 +5310,7 @@ The system handles different transition types based on game state. All navigatio
 **Key Files:**
 - `BackEnd/engine/phase_resolution.py` - Foul resolution and `foul_out_context` storage (non-shooting fouls)
 - `BackEnd/models/shot_manager.py` - Shooting foul resolution and `foul_out_context` storage
-- `BackEnd/models/game_manager.py` - Foul-out timeout creation (lines 244-283)
+- `BackEnd/models/game_manager.py` - Foul-out timeout creation and immediate database save (lines 245-304)
 - `BackEnd/models/turn_manager.py` - `setup_timeout_turn()` with `foul_out_context` support
 - `FrontEnd/static/js/phaser/utils/foulOutPopup.js` - Lineup population and navigation
 - `FrontEnd/static/js/phaser/gameScene.js` - Clock initialization on timeout resume
@@ -5318,7 +5319,9 @@ The system handles different transition types based on game state. All navigatio
 
 #### Database (Single Source of Truth)
 
-**When Timeout is Called (`BackEnd/api/api.py` `call_timeout_endpoint()`):**
+**When Timeout is Called:**
+
+**User-Initiated Timeout (`BackEnd/api/api.py` `call_timeout_endpoint()`):**
 ```python
 # Save timeout state to database
 gm.game_state["timeout_next_play_type"] = "SIDE_INBOUND"  # Always SIP (except free throws)
@@ -5328,12 +5331,23 @@ db_summary = summarize_game_state(gm, exclude_animations=True)
 games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
 ```
 
+**Foul-Out Timeout (`BackEnd/models/game_manager.py` `simulate_macro_turn()`):**
+```python
+# ✅ CRITICAL FIX (January 2025): Save timeout state immediately when foul-out timeout is created
+# This ensures timeout state persists even if user navigates away before simulate-turn saves
+if self.game_id:
+    db_summary = summarize_game_state(self, exclude_animations=True)
+    games_collection.update_one({"_id": self.game_id}, {"$set": db_summary}, upsert=True)
+```
+
 **Persisted Timeout Data:**
 - `timeout_next_play_type`: Always `"SIDE_INBOUND"` (or `"FREE_THROW"` if free throws pending)
 - `timeout_offense_team_id`: Team that had possession when timeout was called
 - `clock`: Current game clock
 - `time_remaining`: Time remaining in seconds
 - All other game state (scores, fouls, timeouts, lineups, player stats)
+
+**Key Fix:** Foul-out timeouts now save immediately to database (same as user-initiated timeouts), preventing timeout state loss when "Sim to 4th Quarter" or other operations overwrite game state before the timeout is processed.
 
 **When Timeout Resumes (`BackEnd/main.py` `simulate_quarter()`):**
 ```python
