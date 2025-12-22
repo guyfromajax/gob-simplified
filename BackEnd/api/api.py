@@ -2316,4 +2316,7 @@ def get_active_tournament(user_team_id: Optional[str] = "BENTLEY-TRUMAN"):
         doc = manager.create_tournament()
     else:
         doc["_id"] = str(doc["_id"])
-    return doc
+    # ✅ SS&S: Serialize all ObjectIds in nested structures (consistent with /tournament/state)
+    from bson import ObjectId
+    from fastapi.encoders import jsonable_encoder
+    return jsonable_encoder(doc, custom_encoder={ObjectId: str})

@@ -98,6 +98,8 @@ if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined'
 }
 const mode = urlParams.get('mode') || getMode({ tournamentId, franchiseId });
 const userTeamSide = urlParams.get('my_team');  // "home" or "away"
+// ✅ SS&S: Read team_id (ObjectId) from URL params for navigation anchor preservation
+const teamId = urlParams.get('team_id') || (userTeamSide === 'home' ? urlParams.get('home_id') : urlParams.get('away_id'));
 let quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 let gameId =
   urlParams.get('game_id') ||
@@ -318,6 +320,7 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
     gamePlanSettings,
     userTeamSide,
     mode,
+    teamId, // ✅ SS&S: Pass team_id (ObjectId) for navigation anchor preservation
   };
 
   if (game.scene.isActive('GameScene')) {

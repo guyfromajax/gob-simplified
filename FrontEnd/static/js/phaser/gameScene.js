@@ -72,6 +72,8 @@ export function createGameScene(Phaser) {
         }
         this.gamePlanSettings = data.gamePlanSettings;
         this.userTeamSide = data.userTeamSide;
+        // ✅ SS&S: Store team_id (ObjectId) for navigation anchor preservation
+        this.teamId = data.teamId;
         
         // Reset pause state for new game
         this.isPaused = false;
@@ -2069,6 +2071,7 @@ export function createGameScene(Phaser) {
             mode: mode,
             tournamentId: this.tournamentId,
             franchiseId: this.franchiseId,
+            teamId: this.teamId, // ✅ SS&S: Pass team_id (ObjectId) for navigation anchor preservation
             finalScore: finalScore
           });
           

@@ -162,6 +162,42 @@ def get_team_data(team_id: str, view_team_id: str = None, ...):
 5. **Experience Continuity:** User's team context preserved across all navigation
 6. **Future-Proof:** Pattern scales to viewing any team without breaking navigation
 
+## Game Completion Navigation
+
+When a game completes, the completion popup must preserve the complete navigation anchor set:
+
+**Pattern:**
+```javascript
+// Game Scene → Completion Popup
+showGameCompletionPopup({
+  gameId: gameId,
+  mode: mode,
+  tournamentId: this.tournamentId,  // doc_id for tournament mode
+  franchiseId: this.franchiseId,    // doc_id for franchise mode
+  teamId: this.teamId,              // team_id (ObjectId) - navigation anchor
+  finalScore: finalScore
+});
+
+// Completion Popup → Command Center URL Construction
+case 'tournament':
+  const params = new URLSearchParams();
+  if (tournamentId) params.set('tournament_id', tournamentId);
+  if (teamId) params.set('team_id', teamId);  // ✅ Preserve navigation anchor
+  lockerRoomUrl = `/static/tournament.html?${params.toString()}`;
+  break;
+```
+
+**Benefits:**
+- **Complete Context:** All three navigation parameters (mode, doc_id, team_id) preserved
+- **No Fallback Needed:** Prevents fallback to `/tournament/active?user_team_id=...` which requires ObjectId serialization
+- **Seamless Flow:** User returns to command center with full context intact
+
+**Implementation Details:**
+- `bootGame.js` reads `team_id` from URL params (or `home_id`/`away_id` fallback)
+- `gameScene.js` stores `teamId` from scene data and passes it to completion popup
+- `gameCompletionPopup.js` constructs URLs with complete navigation anchor set
+- Fallback: If `teamId` not provided, popup reads from URL params as backup
+
 ## Files Updated
 
 ### Frontend
@@ -170,11 +206,15 @@ def get_team_data(team_id: str, view_team_id: str = None, ...):
 - `FrontEnd/static/game-plan.js` - Uses ObjectId consistently
 - `FrontEnd/static/training.js` - Passes team_id in navigation
 - `FrontEnd/static/training-report.js` - Uses ObjectId from URL params
+- `FrontEnd/static/js/phaser/bootGame.js` - Reads `team_id` from URL params, passes to scene
+- `FrontEnd/static/js/phaser/gameScene.js` - Stores `teamId`, passes to completion popup
+- `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js` - Constructs URLs with complete navigation anchor
 
 ### Backend
 - `BackEnd/api/franchise_routes.py` - `/franchise/command-center/data` returns `team_id`, `/franchise/team-data` accepts `team_id`
 - `BackEnd/api/tournament_routes.py` - `/tournament/state` returns `user_team_object_id`, `/tournament/team-data` accepts `team_id`
 - `BackEnd/api/gameplan_routes.py` - `get_gameplan()` and `update_gameplan()` prefer ObjectId
+- `BackEnd/api/api.py` - `/tournament/active` serializes all ObjectIds in nested structures (consistent with `/tournament/state`)
 
 ## Migration Notes
 
