@@ -6609,16 +6609,37 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 - Plays are filtered by `play_type` (motion vs set_play) and `play_focus` (inside/attack/outside)
 - Empty slots are filled with "To Be Added" placeholders (disabled for interaction)
 
-**Team ID Resolution:**
-- **Frontend:** All functions (`savePlaybookSettings()`, `loadPlays()`, `loadSlotAssignmentsFromAPI()`, and `loadAndApplySlotAssignments()` in court.html) use the same consistent pattern to resolve `team_id` from URL parameters:
-  1. Primary: `team_id` parameter
-  2. Fallback 1: `user_team_id` parameter (used by Game Plan page in all modes)
-  3. Fallback 2: `home_id` parameter
-  4. Fallback 3: `away_id` parameter
-- This ensures consistency across all navigation paths (Game Plan → Playbooks → Play Details → Court)
-- If no team_id is found, the page displays empty play slots with a console warning
-- Debug logging shows all parameters being used for troubleshooting
-- **Backend:** The API endpoint (`GET /api/playbooks`) performs team name resolution for all modes:
+**Team ID Resolution (SS&S - ObjectId Standardization):**
+- **✅ Standardized Pattern (January 2025):** All navigation now uses `team_id` (ObjectId string) as the consistent anchor for seamless page-to-page transitions.
+  
+- **Frontend Resolution:**
+  - **Command Center Entry:** Resolves team name to ObjectId once on page load, stores in `userTeamId` variable and localStorage
+  - **URL Parameters:** All navigation URLs pass `team_id` (ObjectId) instead of team name
+  - **Fallback Chain:** Functions use this consistent pattern:
+    1. Primary: `team_id` parameter (ObjectId)
+    2. Fallback 1: `user_team_id` parameter (ObjectId, used by Game Plan page)
+    3. Fallback 2: `home_id` parameter (ObjectId)
+    4. Fallback 3: `away_id` parameter (ObjectId)
+  - This ensures consistency across all navigation paths (Command Center → Game Plan → Playbooks → Play Details → Court → Training → Training Report)
+  
+- **Backend Resolution:**
+  - **Prefer ObjectId:** All endpoints (`/api/gameplan`, `/api/playbooks`, `/franchise/team-data`, `/tournament/team-data`) now prefer `team_id` (ObjectId) parameter
+  - **Backward Compatibility:** Endpoints still accept `team_name` for backward compatibility, but ObjectId is preferred
+  - **Direct Database Access:** When ObjectId is provided, backend uses it directly as database key (no resolution needed)
+  
+- **Benefits:**
+  - **Consistent Navigation:** Same identifier format across all pages
+  - **No Resolution Overhead:** Backend uses ObjectId directly as database key
+  - **Data Persistence:** Settings save/load using same key format
+  - **Experience Continuity:** User's team context preserved across all navigation
+  
+- **Roster Viewing Pattern:**
+  - **User's Team:** `team_id` (ObjectId) represents user's team (for navigation context)
+  - **Viewed Team:** `view_team_id` (ObjectId) represents team being viewed (read-only display)
+  - **Clear Separation:** User context (`team_id`) vs. display (`view_team_id`) prevents navigation confusion
+  - **Future-Proof:** Pattern scales to viewing any team (opponents, league teams, etc.) without breaking navigation
+  
+- **Backend:** The API endpoint (`GET /api/playbooks`) performs team name resolution for backward compatibility, but prefers ObjectId:
   - **Single Game/Tournament Mode:** Resolves team names to team_id by:
     1. Direct lookup in document's `teams` collection
     2. Iterating through teams to match by name

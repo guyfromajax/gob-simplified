@@ -370,6 +370,7 @@ def command_center_data(franchise_id: str = None):
     state = franchise_state_collection.find_one({"_id": "state"}) or {}
     team_name = state.get("team", "")
     team_doc = db.teams.find_one({"name": team_name}) or {}
+    team_id = str(team_doc.get("_id", "")) if team_doc.get("_id") else None
     
     # Get training status from franchise if franchise_id provided
     training_completed = False
@@ -384,16 +385,17 @@ def command_center_data(franchise_id: str = None):
                 session_type = training_status.get("session_type", "in-season")
                 
                 # Get franchise-specific team stats if available
-                team_id = str(team_doc.get("_id"))
-                franchise_teams = franchise_doc.get("franchise_teams", {})
-                franchise_team_stats = franchise_teams.get(team_id, {})
-                if franchise_team_stats:
-                    team_doc = franchise_team_stats  # Use franchise-specific stats
+                if team_id:
+                    franchise_teams = franchise_doc.get("franchise_teams", {})
+                    franchise_team_stats = franchise_teams.get(team_id, {})
+                    if franchise_team_stats:
+                        team_doc = franchise_team_stats  # Use franchise-specific stats
         except Exception:
             pass
     
     return {
         "team": team_name,
+        "team_id": team_id,  # ✅ SS&S: Include ObjectId for consistent navigation
         "username": state.get("username", "Coach"),
         "seed": state.get("seed", 1),
         "team_chemistry": team_doc.get("team_chemistry", 0),
@@ -828,30 +830,46 @@ def get_franchise_state(franchise_id: str):
 
 
 @router.get("/franchise/team-data")
-def get_franchise_team_data(franchise_id: str, team_name: str = None):
+def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: str = None):
     """
     Get team data (attributes, plays, scouting_data) from franchise_teams.
-    Resolves team_name to team_id server-side, matching the pattern used by /franchise/roster.
+    
+    ✅ SS&S: Prefers team_id (ObjectId) for consistent navigation.
+    Falls back to team_name resolution for backward compatibility.
     """
     try:
         fid = ObjectId(franchise_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid franchise ID")
     
-    # Get team name from state if not provided
-    if not team_name:
+    # ✅ SS&S: Prefer team_id (ObjectId) if provided
+    if team_id:
+        try:
+            # Validate it's a valid ObjectId
+            ObjectId(team_id)
+            actual_team_id = team_id
+        except Exception:
+            # If not a valid ObjectId, try to resolve as team name
+            team_doc = db.teams.find_one({"name": team_id})
+            if not team_doc:
+                raise HTTPException(status_code=404, detail=f"Team not found: {team_id}")
+            actual_team_id = str(team_doc["_id"])
+    elif team_name:
+        # Fallback to team_name resolution for backward compatibility
+        team_doc = db.teams.find_one({"name": team_name})
+        if not team_doc:
+            raise HTTPException(status_code=404, detail="Team not found")
+        actual_team_id = str(team_doc["_id"])
+    else:
+        # Get team name from state if not provided
         state = franchise_state_collection.find_one({"_id": "state"}) or {}
         team_name = state.get("team")
-    
-    if not team_name:
-        raise HTTPException(status_code=404, detail="Team not found")
-    
-    # Get team document to resolve team_name to team_id (ObjectId)
-    team_doc = db.teams.find_one({"name": team_name})
-    if not team_doc:
-        raise HTTPException(status_code=404, detail="Team not found")
-    
-    team_id = str(team_doc["_id"])
+        if not team_name:
+            raise HTTPException(status_code=404, detail="Team not found")
+        team_doc = db.teams.find_one({"name": team_name})
+        if not team_doc:
+            raise HTTPException(status_code=404, detail="Team not found")
+        actual_team_id = str(team_doc["_id"])
     
     # Get franchise document
     franchise_doc = db.franchises.find_one({"_id": fid})
@@ -860,10 +878,10 @@ def get_franchise_team_data(franchise_id: str, team_name: str = None):
     
     # Get team object from franchise_teams
     franchise_teams = franchise_doc.get("franchise_teams", {})
-    team_obj = franchise_teams.get(team_id, {})
+    team_obj = franchise_teams.get(actual_team_id, {})
     
     if not team_obj:
-        raise HTTPException(status_code=404, detail=f"Team data not found in franchise for team: {team_name}")
+        raise HTTPException(status_code=404, detail=f"Team data not found in franchise for team_id: {actual_team_id}")
     
     # Extract team attributes
     team_attributes = {}

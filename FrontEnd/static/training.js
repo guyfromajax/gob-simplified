@@ -151,12 +151,21 @@ backBtn.addEventListener('click', function() {
   const mode = urlParams.get('mode');
   const from = urlParams.get('from');
   
+  // ✅ SS&S: Preserve team_id (ObjectId) in navigation for consistent flow
   // Determine back navigation based on mode/from parameter
   if (mode === 'franchise') {
-    window.location.href = '/static/franchise-command-center.html?' + urlParams.toString();
+    const franchiseId = urlParams.get('franchise_id');
+    const teamId = urlParams.get('team_id');
+    const url = `/static/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+    const finalUrl = teamId ? `${url}&team_id=${encodeURIComponent(teamId)}` : url;
+    window.location.href = finalUrl;
   } else if (mode === 'tournament') {
     // Use same pattern as franchise mode - tournament.html is the command center
-    window.location.href = '/static/tournament.html?' + urlParams.toString();
+    const tournamentId = urlParams.get('tournament_id');
+    const teamId = urlParams.get('team_id');
+    const url = `/static/tournament.html?tournament_id=${encodeURIComponent(tournamentId)}`;
+    const finalUrl = teamId ? `${url}&team_id=${encodeURIComponent(teamId)}` : url;
+    window.location.href = finalUrl;
   } else if (from === 'game-plan') {
     window.location.href = '/static/game-plan.html?' + urlParams.toString();
   } else {

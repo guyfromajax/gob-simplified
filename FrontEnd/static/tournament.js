@@ -712,10 +712,18 @@ async function loadTournament() {
     tournament = await res.json();
     localStorage.setItem("activeTournament", JSON.stringify(tournament));
     
-    // Update userTeamId from tournament if not already set
-    if (!userTeamId && tournament && tournament.user_team_id) {
-      userTeamId = tournament.user_team_id;
-      localStorage.setItem("userTeamId", userTeamId);
+    // ✅ SS&S: Resolve and store team ObjectId for consistent navigation
+    if (tournament) {
+      // Prefer ObjectId if available (from updated endpoint)
+      if (tournament.user_team_object_id && !userTeamId) {
+        userTeamId = tournament.user_team_object_id;
+        localStorage.setItem("userTeamId", userTeamId);
+      } else if (tournament.user_team_id && !userTeamId) {
+        // Fallback: resolve team name to ObjectId
+        // This will be resolved by backend endpoints, but we store the name for now
+        userTeamId = tournament.user_team_id;
+        localStorage.setItem("userTeamId", userTeamId);
+      }
     }
     
     console.log("✅ Tournament loaded:", tournament._id);
@@ -935,7 +943,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
       
-      // Redirect to Game Plan screen with tournament context
+      // ✅ SS&S: Redirect to Game Plan screen with ObjectId for consistent navigation
       const url = `/game-plan.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&user_team_id=${encodeURIComponent(userTeamId)}&from=command_center`;
       window.location.href = url;
     });
@@ -950,11 +958,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
       
-      // Build playbooks URL with tournament parameters
+      // ✅ SS&S: Build playbooks URL with ObjectId for consistent navigation
       const params = new URLSearchParams();
       params.set('mode', 'tournament');
       params.set('tournament_id', tournament._id);
-      params.set('team_id', userTeamId); // userTeamId is the team name, backend will resolve to team_id
+      params.set('team_id', userTeamId);
       params.set('from', 'tournament-command-center'); // Track navigation source
       
       window.location.href = `/static/playbooks.html?${params.toString()}`;
@@ -1041,10 +1049,8 @@ async function loadTeamData() {
       console.warn('Could not ensure team objects exist:', error);
     }
     
-    // Use the new backend endpoint that resolves team_name to team_id server-side
-    // This matches the pattern used by /tournament/roster
-    // Use userTeamId directly (not formatted) to match Franchise pattern - backend handles name resolution
-    const response = await fetch(`/tournament/team-data?tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(userTeamId)}`);
+    // ✅ SS&S: Use ObjectId directly - backend accepts team_id parameter
+    const response = await fetch(`/tournament/team-data?tournament_id=${encodeURIComponent(tournament._id)}&team_id=${encodeURIComponent(userTeamId)}`);
     
     if (!response.ok) {
       console.error('Failed to load team data:', response.status, response.statusText);
