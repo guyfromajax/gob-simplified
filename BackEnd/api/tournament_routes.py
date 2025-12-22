@@ -399,18 +399,20 @@ def tournament_state(tournament_id: str = Query(...)):
         doc["offense"] = team_doc.get("offense", "-")
         doc["defense"] = team_doc.get("defense", "-")
         doc["athleticism"] = team_doc.get("athleticism", "-")
+        # ✅ SS&S: Include team_id (ObjectId) for consistent navigation
+        if team_doc.get("_id"):
+            doc["user_team_object_id"] = str(team_doc["_id"])
     
     return jsonable_encoder(doc, custom_encoder={ObjectId: str})
 
 
 @router.get("/tournament/team-data")
-def get_tournament_team_data(tournament_id: str, team_name: str = None):
+def get_tournament_team_data(tournament_id: str, team_id: str = None, team_name: str = None):
     """
     Get team data (attributes, plays, scouting_data) from tournament teams.
-    Resolves team_name to team_id server-side, matching the pattern used by /tournament/roster.
     
-    Handles both formatted team names (e.g., "ocean-city") and unformatted names (e.g., "Ocean City").
-    Falls back to tournament.user_team_id if provided team_name doesn't match.
+    ✅ SS&S: Prefers team_id (ObjectId) for consistent navigation.
+    Falls back to team_name resolution for backward compatibility.
     """
     try:
         tid = ObjectId(tournament_id)
@@ -422,46 +424,61 @@ def get_tournament_team_data(tournament_id: str, team_name: str = None):
     if not tournament_doc:
         raise HTTPException(status_code=404, detail="Tournament not found")
     
-    # Get team name from tournament if not provided
-    if not team_name:
+    # ✅ SS&S: Prefer team_id (ObjectId) if provided
+    if team_id:
+        try:
+            # Validate it's a valid ObjectId
+            ObjectId(team_id)
+            actual_team_id = team_id
+        except Exception:
+            # If not a valid ObjectId, try to resolve as team name
+            team_doc = teams_collection.find_one({"name": team_id})
+            if not team_doc:
+                raise HTTPException(status_code=404, detail=f"Team not found: {team_id}")
+            actual_team_id = str(team_doc["_id"])
+    elif team_name:
+        # Fallback to team_name resolution for backward compatibility
+        # Try multiple strategies to handle both formatted and unformatted team names
+        team_doc = None
+        
+        # Strategy 1: Try exact match first
+        team_doc = teams_collection.find_one({"name": team_name})
+        
+        # Strategy 2: If not found, try case-insensitive match
+        if not team_doc:
+            team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_name}$", "$options": "i"}})
+        
+        # Strategy 3: If still not found, try normalized name (replace dashes with spaces, title case)
+        if not team_doc:
+            normalized_name = team_name.replace("-", " ").title()
+            team_doc = teams_collection.find_one({"name": normalized_name})
+        
+        # Strategy 4: Fallback to tournament's user_team_id
+        if not team_doc:
+            fallback_team_name = tournament_doc.get("user_team_id")
+            if fallback_team_name and fallback_team_name != team_name:
+                team_doc = teams_collection.find_one({"name": fallback_team_name})
+        
+        if not team_doc:
+            raise HTTPException(status_code=404, detail=f"Team not found: {team_name}")
+        
+        actual_team_id = str(team_doc["_id"])
+    else:
+        # Get team name from tournament if not provided
         team_name = tournament_doc.get("user_team_id")
-    
-    if not team_name:
-        raise HTTPException(status_code=404, detail="Team not found")
-    
-    # Get team document to resolve team_name to team_id (ObjectId)
-    # Try multiple strategies to handle both formatted and unformatted team names
-    team_doc = None
-    
-    # Strategy 1: Try exact match first
-    team_doc = teams_collection.find_one({"name": team_name})
-    
-    # Strategy 2: If not found, try case-insensitive match
-    if not team_doc:
-        team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_name}$", "$options": "i"}})
-    
-    # Strategy 3: If still not found, try normalized name (replace dashes with spaces, title case)
-    if not team_doc:
-        normalized_name = team_name.replace("-", " ").title()
-        team_doc = teams_collection.find_one({"name": normalized_name})
-    
-    # Strategy 4: Fallback to tournament's user_team_id
-    if not team_doc:
-        fallback_team_name = tournament_doc.get("user_team_id")
-        if fallback_team_name and fallback_team_name != team_name:
-            team_doc = teams_collection.find_one({"name": fallback_team_name})
-    
-    if not team_doc:
-        raise HTTPException(status_code=404, detail=f"Team not found: {team_name}")
-    
-    team_id = str(team_doc["_id"])
+        if not team_name:
+            raise HTTPException(status_code=404, detail="Team not found")
+        team_doc = teams_collection.find_one({"name": team_name})
+        if not team_doc:
+            raise HTTPException(status_code=404, detail="Team not found")
+        actual_team_id = str(team_doc["_id"])
     
     # Get team object from tournament teams
     tournament_teams = tournament_doc.get("teams", {})
-    team_obj = tournament_teams.get(team_id, {})
+    team_obj = tournament_teams.get(actual_team_id, {})
     
     if not team_obj:
-        raise HTTPException(status_code=404, detail=f"Team data not found in tournament for team: {team_name}")
+        raise HTTPException(status_code=404, detail=f"Team data not found in tournament for team_id: {actual_team_id}")
     
     # Extract team attributes
     team_attributes = {}
@@ -486,7 +503,7 @@ def get_tournament_team_data(tournament_id: str, team_name: str = None):
         # Save initialized scouting_data back to tournament document
         tournaments_collection.update_one(
             {"_id": tid},
-            {"$set": {f"teams.{team_id}.scouting_data": scouting_data}}
+            {"$set": {f"teams.{actual_team_id}.scouting_data": scouting_data}}
         )
     else:
         # Ensure each defense has effectiveness value (fallback to 0 if missing)

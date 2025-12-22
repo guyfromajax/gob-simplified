@@ -11,6 +11,8 @@ async function fetchJSON(url) {
 
 let franchiseId = null;
 const userTeamName = localStorage.getItem('franchise_user_team') || '';
+// ✅ SS&S: Store team ObjectId for consistent navigation
+let userTeamId = null; // Will be resolved from command center data or URL params
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
 
 const teamMap = {
@@ -306,7 +308,7 @@ function renderTeam(data) {
     tbody.appendChild(tr);
     console.log(`Added row for ${p.name} to table`);
   });
-    console.log('Finished rendering all players. Table now has', tbody.children.length, 'rows');
+  console.log('Finished rendering all players. Table now has', tbody.children.length, 'rows');
   
   // Initialize tooltips for table cells
   if (typeof initAttributeTooltips !== 'undefined') {
@@ -350,7 +352,9 @@ function renderSchedule(data) {
       // Add training report link if this is user's team's game and training report exists
       if (g.is_user_team && g.has_training_report) {
         const link = document.createElement('a');
-        link.href = `/static/training-report.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}&week=${g.week}`;
+        // ✅ SS&S: Use ObjectId for consistent navigation
+        const teamIdParam = userTeamId || teamId;
+        link.href = `/static/training-report.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamIdParam}&week=${g.week}`;
         link.textContent = ' [Training Report]';
         link.className = 'training-report-link';
         link.style.color = '#4a90e2';
@@ -367,8 +371,25 @@ function renderSchedule(data) {
 }
 
 async function init() {
+  // ✅ SS&S: Check URL params first for team_id (ObjectId) - allows seamless navigation
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlTeamId = urlParams.get('team_id');
+  if (urlTeamId) {
+    userTeamId = urlTeamId;
+    localStorage.setItem('franchise_user_team_id', userTeamId);
+  } else {
+    // Fallback to localStorage
+    userTeamId = localStorage.getItem('franchise_user_team_id');
+  }
+  
   const topData = await fetchJSON(`/franchise/command-center/data?franchise_id=${franchiseId}`);
   populateTop(topData);
+  
+  // ✅ SS&S: Resolve team_id from command center data if not already set
+  if (topData && topData.team_id && !userTeamId) {
+    userTeamId = topData.team_id;
+    localStorage.setItem('franchise_user_team_id', userTeamId);
+  }
   
   // Update button based on training status
   updatePlayButton(topData);
@@ -455,7 +476,9 @@ playNowBtn.addEventListener('click', async () => {
     // Navigate to training page
     const topData = await fetchJSON(`/franchise/command-center/data?franchise_id=${franchiseId}`);
     const sessionType = topData?.session_type || 'in-season';
-    window.location.href = `/static/training.html?franchise_id=${franchiseId}&mode=franchise&session_type=${sessionType}`;
+    // ✅ SS&S: Include team_id (ObjectId) for consistent navigation
+    const teamIdParam = userTeamId ? `&team_id=${encodeURIComponent(userTeamId)}` : '';
+    window.location.href = `/static/training.html?franchise_id=${franchiseId}&mode=franchise&session_type=${sessionType}${teamIdParam}`;
     return;
   }
   
@@ -484,7 +507,8 @@ playNowBtn.addEventListener('click', async () => {
     } catch {}
     const mySide = userTeamName === home ? 'home' : (userTeamName === away ? 'away' : '');
     let url = `/static/set-lineup.html?franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&home_id=${encodeURIComponent(home_id)}&away_id=${encodeURIComponent(away_id)}`;
-    if (userTeamName) url += `&user_team_id=${encodeURIComponent(userTeamName)}`;
+    // ✅ SS&S: Use ObjectId for consistent navigation
+    if (userTeamId) url += `&user_team_id=${encodeURIComponent(userTeamId)}`;
     if (mySide) url += `&my_team=${mySide}`;
     console.log('Navigating to', url);
     window.location.href = url;
@@ -500,13 +524,13 @@ playNowBtn.addEventListener('click', async () => {
 const setGameplanBtn = document.getElementById('set-gameplan-franchise');
 if (setGameplanBtn) {
   setGameplanBtn.addEventListener('click', () => {
-    if (!franchiseId || !userTeamName) {
+    if (!franchiseId || !userTeamId) {
       alert('Franchise or user team not loaded');
       return;
     }
     
-    // Redirect to Game Plan screen with franchise context
-    const url = `/game-plan.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&user_team_id=${encodeURIComponent(userTeamName)}&from=command_center`;
+    // ✅ SS&S: Redirect to Game Plan screen with ObjectId for consistent navigation
+    const url = `/game-plan.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&user_team_id=${encodeURIComponent(userTeamId)}&from=command_center`;
     window.location.href = url;
   });
 }
@@ -515,16 +539,16 @@ if (setGameplanBtn) {
 const playbooksBtn = document.getElementById('playbooks-franchise');
 if (playbooksBtn) {
   playbooksBtn.addEventListener('click', () => {
-    if (!franchiseId || !userTeamName) {
+    if (!franchiseId || !userTeamId) {
       alert('Franchise or user team not loaded');
       return;
     }
     
-      // Build playbooks URL with franchise parameters
+      // ✅ SS&S: Build playbooks URL with ObjectId for consistent navigation
       const params = new URLSearchParams();
       params.set('mode', 'franchise');
       params.set('franchise_id', franchiseId);
-      params.set('team_id', userTeamName); // userTeamName is the team name, backend will resolve to team_id
+      params.set('team_id', userTeamId);
       params.set('from', 'franchise-command-center'); // Track navigation source
       
       window.location.href = `/static/playbooks.html?${params.toString()}`;
@@ -574,20 +598,19 @@ const TEAM_ATTR_NAMES = {
 let teamData = null;
 
 async function loadTeamData() {
-  if (!franchiseId || !userTeamName) return;
+  if (!franchiseId || !userTeamId) return;
   
   try {
     // First, ensure team objects exist (this will create them if missing)
     try {
-      // Call ensure_team_objects_exist via get_gameplan endpoint (it calls ensure_team_objects_exist internally)
-      await fetch(`/api/gameplan?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamName)}`);
+      // ✅ SS&S: Use ObjectId directly - backend accepts it
+      await fetch(`/api/gameplan?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`);
     } catch (error) {
       console.warn('Could not ensure team objects exist:', error);
     }
     
-    // Use the new backend endpoint that resolves team_name to team_id server-side
-    // This matches the pattern used by /franchise/roster
-    const response = await fetch(`/franchise/team-data?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(userTeamName)}`);
+    // ✅ SS&S: Use ObjectId directly - backend accepts team_id parameter
+    const response = await fetch(`/franchise/team-data?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`);
     
     if (!response.ok) {
       console.error('Failed to load team data:', response.status, response.statusText);

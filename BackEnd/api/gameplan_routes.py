@@ -512,24 +512,48 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
         
+        # ✅ SS&S: Prefer ObjectId directly, resolve name only if needed
         # Ensure team objects exist (creates if missing)
         if mode == "franchise":
+            # For franchise mode, team_id should be ObjectId string
             franchise_teams = ensure_team_objects_exist(mode, doc_id, team_id)
             team_obj = franchise_teams.get(team_id, {})
         else:
+            # For tournament/single mode, try ObjectId first, then resolve name
             teams = ensure_team_objects_exist(mode, doc_id, team_id)
-            # For tournament/single mode, get the actual team ID from the teams dict
             actual_team_id = None
-            for tid in teams.keys():
-                # Find the team that matches our input team_id (could be name or ObjectId)
+            
+            # Strategy 1: Try direct ObjectId lookup
+            if team_id in teams:
+                actual_team_id = team_id
+            else:
+                # Strategy 2: Try to resolve as ObjectId
                 try:
-                    team_doc = db.teams.find_one({"_id": ObjectId(tid)})
+                    test_oid = ObjectId(team_id)
+                    if str(test_oid) in teams:
+                        actual_team_id = str(test_oid)
                 except:
-                    # If tid is not a valid ObjectId, skip this iteration
-                    continue
-                if team_doc and (team_doc["name"] == team_id or str(team_doc["_id"]) == team_id):
-                    actual_team_id = tid
-                    break
+                    pass
+                
+                # Strategy 3: Resolve team name to ObjectId
+                if not actual_team_id:
+                    for tid in teams.keys():
+                        try:
+                            team_doc = db.teams.find_one({"_id": ObjectId(tid)})
+                            if team_doc and (team_doc["name"] == team_id or str(team_doc["_id"]) == team_id):
+                                actual_team_id = tid
+                                break
+                        except:
+                            continue
+                
+                # Strategy 4: Try teams collection lookup by name
+                if not actual_team_id:
+                    team_doc = db.teams.find_one({"name": team_id})
+                    if team_doc:
+                        team_oid = str(team_doc["_id"])
+                        if team_oid in teams:
+                            actual_team_id = team_oid
+            
             team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
         # Get settings or return defaults
@@ -578,19 +602,34 @@ def update_gameplan(request: GamePlanUpdateRequest):
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode: {request.mode}")
         
+        # ✅ SS&S: Resolve team_id to ObjectId if needed (for tournament/single mode)
+        actual_team_id = request.team_id
+        if request.mode != "franchise":
+            # For tournament/single mode, resolve team_id to ObjectId
+            try:
+                # Try as ObjectId first
+                test_oid = ObjectId(request.team_id)
+                actual_team_id = str(test_oid)
+            except:
+                # If not ObjectId, resolve by name
+                team_doc = db.teams.find_one({"name": request.team_id})
+                if team_doc:
+                    actual_team_id = str(team_doc["_id"])
+                # If not found, use original (will fail in ensure_team_objects_exist if invalid)
+        
         # Ensure team objects exist first
-        ensure_team_objects_exist(request.mode, doc_id, request.team_id)
+        ensure_team_objects_exist(request.mode, doc_id, actual_team_id)
         
         # Update settings in the appropriate document
         if request.mode == "franchise":
             update_fields = {
-                f"franchise_teams.{request.team_id}.playcall_settings": request.playcall_settings,
-                f"franchise_teams.{request.team_id}.strategy_settings": request.strategy_settings
+                f"franchise_teams.{actual_team_id}.playcall_settings": request.playcall_settings,
+                f"franchise_teams.{actual_team_id}.strategy_settings": request.strategy_settings
             }
         else:
             update_fields = {
-                f"teams.{request.team_id}.playcall_settings": request.playcall_settings,
-                f"teams.{request.team_id}.strategy_settings": request.strategy_settings
+                f"teams.{actual_team_id}.playcall_settings": request.playcall_settings,
+                f"teams.{actual_team_id}.strategy_settings": request.strategy_settings
             }
         
         # Handle different ID formats for different modes
