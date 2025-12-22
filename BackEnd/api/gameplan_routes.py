@@ -399,38 +399,34 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
         
         if not team_obj:
             # Create team object with defaults
-            # Load team attributes from core teams collection
-            core_team = db.teams.find_one({"_id": ObjectId(actual_team_id)})
-            if not core_team:
-                # Fallback: try by name
-                core_team = db.teams.find_one({"name": team_id})
-            
             defaults = get_default_settings()
             # Pass mode to populate_team_plays for tournament randomization
             populated_plays = populate_team_plays(mode=mode)
             # Initialize scouting_data with randomized values for tournament mode
             scouting_data = populate_scouting_data(mode=mode)
+            
+            # ✅ SS&S: Use mode initialization system for tournament teams (matches Franchise pattern)
+            # This randomizes team attributes per Mode Initialization System documentation
+            from BackEnd.models.team_manager import TeamManager
+            team_attrs = TeamManager.init_team_attributes(mode=mode)
+            
             team_obj = {
+                "team_chemistry": team_attrs["team_chemistry"],
+                "offensive_efficiency": team_attrs["offensive_efficiency"],
+                "shot_threshold": team_attrs["shot_threshold"],
+                "turnover_modifier": team_attrs["turnover_modifier"],
+                "foul_modifier": team_attrs["foul_modifier"],
+                "rebound_modifier": team_attrs["rebound_modifier"],
+                "defensive_efficiency": team_attrs["defensive_efficiency"],
+                "fb_efficiency": team_attrs["fb_efficiency"],
+                "pt_efficiency": team_attrs["pt_efficiency"],
+                "fb_opp_modifier": team_attrs["fb_opp_modifier"],
+                "pt_opp_modifier": team_attrs["pt_opp_modifier"],
                 "playcall_settings": defaults["playcall_settings"].copy(),
                 "strategy_settings": defaults["strategy_settings"].copy(),
                 "plays": populated_plays.copy(),
                 "scouting_data": scouting_data
             }
-            
-            # Add team attributes from core teams collection (if available)
-            if core_team:
-                team_obj["shot_threshold"] = core_team.get("shot_threshold", 0)
-                team_obj["turnover_modifier"] = core_team.get("turnover_modifier", 0)
-                team_obj["foul_modifier"] = core_team.get("foul_modifier", 0)
-                team_obj["rebound_modifier"] = core_team.get("rebound_modifier", 0)
-                team_obj["momentum_score"] = core_team.get("momentum_score", 0)
-                team_obj["offensive_efficiency"] = core_team.get("offensive_efficiency", 0)
-                team_obj["team_chemistry"] = core_team.get("team_chemistry", 0)
-                team_obj["defensive_efficiency"] = core_team.get("defensive_efficiency", 0)
-                team_obj["fb_efficiency"] = core_team.get("fb_efficiency", 0)
-                team_obj["pt_efficiency"] = core_team.get("pt_efficiency", 0)
-                team_obj["fb_opp_modifier"] = core_team.get("fb_opp_modifier", 0)
-                team_obj["pt_opp_modifier"] = core_team.get("pt_opp_modifier", 0)
             
             if mode == "single":
                 collection.update_one(
@@ -456,23 +452,21 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                 updates[f"{team_key}.plays"] = populated_plays.copy()
             
             # Add missing team attributes if they don't exist (for backwards compatibility)
+            # ✅ SS&S: Use mode initialization system instead of copying from core teams collection
             if "shot_threshold" not in team_obj:
-                core_team = db.teams.find_one({"_id": ObjectId(actual_team_id)})
-                if not core_team:
-                    core_team = db.teams.find_one({"name": team_id})
-                if core_team:
-                    updates[f"{team_key}.shot_threshold"] = core_team.get("shot_threshold", 0)
-                    updates[f"{team_key}.turnover_modifier"] = core_team.get("turnover_modifier", 0)
-                    updates[f"{team_key}.foul_modifier"] = core_team.get("foul_modifier", 0)
-                    updates[f"{team_key}.rebound_modifier"] = core_team.get("rebound_modifier", 0)
-                    updates[f"{team_key}.momentum_score"] = core_team.get("momentum_score", 0)
-                    updates[f"{team_key}.offensive_efficiency"] = core_team.get("offensive_efficiency", 0)
-                    updates[f"{team_key}.team_chemistry"] = core_team.get("team_chemistry", 0)
-                    updates[f"{team_key}.defensive_efficiency"] = core_team.get("defensive_efficiency", 0)
-                    updates[f"{team_key}.fb_efficiency"] = core_team.get("fb_efficiency", 0)
-                    updates[f"{team_key}.pt_efficiency"] = core_team.get("pt_efficiency", 0)
-                    updates[f"{team_key}.fb_opp_modifier"] = core_team.get("fb_opp_modifier", 0)
-                    updates[f"{team_key}.pt_opp_modifier"] = core_team.get("pt_opp_modifier", 0)
+                from BackEnd.models.team_manager import TeamManager
+                team_attrs = TeamManager.init_team_attributes(mode=mode)
+                updates[f"{team_key}.shot_threshold"] = team_attrs["shot_threshold"]
+                updates[f"{team_key}.turnover_modifier"] = team_attrs["turnover_modifier"]
+                updates[f"{team_key}.foul_modifier"] = team_attrs["foul_modifier"]
+                updates[f"{team_key}.rebound_modifier"] = team_attrs["rebound_modifier"]
+                updates[f"{team_key}.offensive_efficiency"] = team_attrs["offensive_efficiency"]
+                updates[f"{team_key}.team_chemistry"] = team_attrs["team_chemistry"]
+                updates[f"{team_key}.defensive_efficiency"] = team_attrs["defensive_efficiency"]
+                updates[f"{team_key}.fb_efficiency"] = team_attrs["fb_efficiency"]
+                updates[f"{team_key}.pt_efficiency"] = team_attrs["pt_efficiency"]
+                updates[f"{team_key}.fb_opp_modifier"] = team_attrs["fb_opp_modifier"]
+                updates[f"{team_key}.pt_opp_modifier"] = team_attrs["pt_opp_modifier"]
             
             if mode == "single":
                 collection.update_one(
