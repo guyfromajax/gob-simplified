@@ -6650,6 +6650,34 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
     3. Looking up in `teams` collection by name and matching back to document
   - This ensures that team names (e.g., "Morristown") passed from the frontend are correctly resolved to the actual `team_id` used in the document structure
 
+**Game Completion Navigation Anchor Preservation (SS&S - January 2025):**
+- **✅ Complete Navigation Anchor Set:** When a game completes, the completion popup preserves all three navigation parameters:
+  1. **`mode`** (franchise/tournament/single) - Which collection/endpoints to use
+  2. **`doc_id`** (franchise_id/tournament_id) - Which document within that collection
+  3. **`team_id`** (ObjectId string) - Which team within that document (user's team)
+  
+- **Implementation Flow:**
+  - **`bootGame.js`:** Reads `team_id` from URL params (or `home_id`/`away_id` fallback), passes to game scene via `sceneData`
+  - **`gameScene.js`:** Stores `teamId` from scene data, passes it to completion popup when game ends
+  - **`gameCompletionPopup.js`:** Constructs command center URLs with complete navigation anchor set:
+    ```javascript
+    // Tournament mode example
+    const params = new URLSearchParams();
+    if (tournamentId) params.set('tournament_id', tournamentId);
+    if (teamId) params.set('team_id', teamId);  // ✅ Preserve navigation anchor
+    lockerRoomUrl = `/static/tournament.html?${params.toString()}`;
+    ```
+  
+- **Benefits:**
+  - **No Fallback Needed:** Prevents fallback to `/tournament/active?user_team_id=...` which requires ObjectId serialization
+  - **Complete Context:** All three navigation parameters preserved for seamless return to command center
+  - **Consistent Pattern:** Matches navigation anchor preservation pattern used throughout the application
+  
+- **Backend ObjectId Serialization:**
+  - **`/tournament/active` endpoint:** Now serializes all ObjectIds in nested structures using `jsonable_encoder(doc, custom_encoder={ObjectId: str})`
+  - **Consistent with `/tournament/state`:** Both endpoints use the same serialization pattern
+  - **Prevents 500 Errors:** Ensures nested ObjectIds (e.g., in `teams` collection) are properly serialized for JSON response
+
 ### Persistence Layer
 
 **Current Implementation:**

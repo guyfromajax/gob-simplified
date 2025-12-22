@@ -5,13 +5,20 @@
  * @param {string} options.mode - Game mode: 'single', 'tournament', or 'franchise'
  * @param {string} [options.tournamentId] - Tournament ID (for tournament mode)
  * @param {string} [options.franchiseId] - Franchise ID (for franchise mode)
+ * @param {string} [options.teamId] - Team ID (ObjectId) for navigation anchor
  * @param {Object} [options.finalScore] - Final score object with homeTeam, awayTeam, homeScore, awayScore
  */
-export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseId, finalScore, homeTeam, awayTeam }) {
+export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseId, teamId, finalScore, homeTeam, awayTeam }) {
   // Remove any existing popup
   const existingPopup = document.querySelector('.game-completion-popup');
   if (existingPopup) {
     existingPopup.remove();
+  }
+
+  // ✅ SS&S: Fallback to reading teamId from URL params if not provided
+  if (!teamId && typeof window !== 'undefined') {
+    const urlParams = new URLSearchParams(window.location.search);
+    teamId = urlParams.get('team_id') || urlParams.get('home_id') || urlParams.get('away_id');
   }
 
   // Determine locker room URL based on mode
@@ -19,14 +26,30 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
   switch (mode) {
     case 'tournament':
       lockerRoomUrl = '/static/tournament.html';
+      const tournamentParams = new URLSearchParams();
       if (tournamentId) {
-        lockerRoomUrl += `?tournament_id=${tournamentId}`;
+        tournamentParams.set('tournament_id', tournamentId);
+      }
+      // ✅ SS&S: Include team_id (ObjectId) for complete navigation anchor
+      if (teamId) {
+        tournamentParams.set('team_id', teamId);
+      }
+      if (tournamentParams.toString()) {
+        lockerRoomUrl += `?${tournamentParams.toString()}`;
       }
       break;
     case 'franchise':
-      lockerRoomUrl = '/franchise/command-center';
+      lockerRoomUrl = '/static/franchise-command-center.html';
+      const franchiseParams = new URLSearchParams();
       if (franchiseId) {
-        lockerRoomUrl += `?franchise_id=${franchiseId}`;
+        franchiseParams.set('franchise_id', franchiseId);
+      }
+      // ✅ SS&S: Include team_id (ObjectId) for complete navigation anchor
+      if (teamId) {
+        franchiseParams.set('team_id', teamId);
+      }
+      if (franchiseParams.toString()) {
+        lockerRoomUrl += `?${franchiseParams.toString()}`;
       }
       break;
     default:
