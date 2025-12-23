@@ -4,16 +4,32 @@ const TOTAL_POINTS = 24;
 // DOM Elements
 const pointsRemainingEl = document.getElementById('points-remaining');
 const submitBtn = document.getElementById('submit-btn');
+const autoTrainBtn = document.getElementById('auto-train-btn');
 const backBtn = document.getElementById('back-btn');
 const allSliders = document.querySelectorAll('.slider');
 const coachingRadios = document.querySelectorAll('input[name="coaching-focus"]');
 const offensePlaysRadios = document.querySelectorAll('input[name="offense-plays"]');
 const defensePlaysRadios = document.querySelectorAll('input[name="defense-plays"]');
+const autoTrainModal = document.getElementById('auto-train-modal');
+const autoTrainModalMessage = document.getElementById('auto-train-modal-message');
+const autoTrainModalClose = document.getElementById('auto-train-modal-close');
 
 // Track previous slider values to prevent over-allocation
 allSliders.forEach(slider => {
   slider.dataset.prev = '0';
 });
+
+/**
+ * Utility: set slider value and update display/cache
+ */
+function setSliderValue(slider, value) {
+  slider.value = value;
+  slider.dataset.prev = String(value);
+  const valueDisplay = slider.parentElement.querySelector('.slider-value');
+  if (valueDisplay) {
+    valueDisplay.textContent = value;
+  }
+}
 
 /**
  * Calculate total points allocated across all sliders
@@ -32,6 +48,24 @@ function calculateTotalPoints() {
 function isCoachingFocusSelected() {
   const selectedFocus = document.querySelector('input[name="coaching-focus"]:checked');
   return selectedFocus !== null;
+}
+
+/**
+ * Get human-friendly label text for a selected focus radio
+ */
+function getFocusLabelText(radio) {
+  if (!radio) return radio?.value || '';
+  const label = radio.closest('label');
+  if (label) return label.textContent.trim();
+  return radio.value || '';
+}
+
+function getArchetypeLabelText(radio) {
+  if (!radio) return '';
+  const block = radio.closest('.archetype-block');
+  if (!block) return '';
+  const nameEl = block.querySelector('.archetype-name');
+  return nameEl ? nameEl.textContent.trim() : '';
 }
 
 /**
@@ -93,6 +127,53 @@ allSliders.forEach(slider => {
     valueDisplay.textContent = slider.value;
   }
 });
+
+/**
+ * Auto-Train: assign all 24 points and pick a random focus
+ */
+function autoAssignTraining() {
+  const sliders = Array.from(allSliders);
+  if (sliders.length === 0) return;
+
+  // 1) Set every slider to 1 (guarantees min 1 across 20 sliders = 20 points)
+  sliders.forEach(slider => setSliderValue(slider, 1));
+
+  // 2) Pick 4 random unique sliders to set to 2 (adds 4 points → total = 24)
+  const shuffled = [...sliders].sort(() => Math.random() - 0.5);
+  shuffled.slice(0, 4).forEach(slider => setSliderValue(slider, 2));
+
+  // 3) Random coaching focus
+  let focusLabel = '';
+  let archetypeLabel = '';
+  if (coachingRadios.length > 0) {
+    const radios = Array.from(coachingRadios);
+    const randomRadio = radios[Math.floor(Math.random() * radios.length)];
+    randomRadio.checked = true;
+    randomRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    focusLabel = getFocusLabelText(randomRadio);
+    archetypeLabel = getArchetypeLabelText(randomRadio);
+  }
+
+  // 4) Update UI state (points + submit enabled)
+  updatePointsRemaining();
+
+  // 5) Show confirmation popup
+  if (autoTrainModal && autoTrainModalMessage) {
+    const focusText = focusLabel || 'Focus';
+    const archetypeText = archetypeLabel ? ` (${archetypeLabel})` : '';
+    autoTrainModalMessage.innerHTML = `Training Points Assigned<br>${focusText}${archetypeText} Focus Chosen`;
+    autoTrainModal.style.display = 'flex';
+  }
+}
+
+if (autoTrainBtn) {
+  autoTrainBtn.addEventListener('click', autoAssignTraining);
+}
+if (autoTrainModalClose && autoTrainModal) {
+  autoTrainModalClose.addEventListener('click', () => {
+    autoTrainModal.style.display = 'none';
+  });
+}
 
 /**
  * Handle coaching focus radio button selection

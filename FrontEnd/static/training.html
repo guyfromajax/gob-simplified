@@ -16,7 +16,10 @@
         <h1 class="page-title">TEAM TRAINING</h1>
         <div class="points-display">POINTS REMAINING: <span id="points-remaining">24</span></div>
       </div>
-      <button id="submit-btn" class="submit-button" disabled>Submit Training</button>
+      <div class="header-actions">
+        <button id="auto-train-btn" class="auto-train-button">Auto-Train</button>
+        <button id="submit-btn" class="submit-button" disabled>Submit Training</button>
+      </div>
     </header>
 
     <!-- Main Content: Player Drills and Team Drills -->
@@ -373,6 +376,14 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Auto-Train confirmation modal -->
+  <div id="auto-train-modal" class="auto-train-modal">
+    <div class="auto-train-modal-content">
+      <p id="auto-train-modal-message">Training Points Assigned</p>
+      <button id="auto-train-modal-close" class="auto-train-modal-close">Close</button>
     </div>
   </div>
 

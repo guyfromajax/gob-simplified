@@ -32,9 +32,12 @@ class PlayCreate(BaseModel):
     play_type: str
     play_focus: Optional[str] = None  # Optional: None for Motion plays, string for Set Plays
     skeletons: Dict[str, Any]
+    effectiveness: Optional[int] = 0  # Play effectiveness (0-100)
+    cloaking: Optional[int] = 0  # Play cloaking (0-10)
+    momentum: Optional[int] = 0  # Play momentum (0-10)
+    copy: Optional[Dict[str, str]] = None  # Optional: copy_1, copy_2, copy_3 for play details page
     game_stats: Optional[Dict[str, int]] = None
     season_stats: Optional[Dict[str, int]] = None
-    copy: Optional[Dict[str, str]] = None  # Optional: copy_1, copy_2, copy_3 for play details page
 
 
 @router.post("/api/plays")
@@ -53,6 +56,16 @@ async def create_play(play_data: PlayCreate):
     """
     # Convert to dict
     play_dict = play_data.dict()
+    
+    # Initialize play metrics if not provided (default to 0 for new plays)
+    if play_dict.get("effectiveness") is None:
+        play_dict["effectiveness"] = 0
+    if play_dict.get("cloaking") is None:
+        play_dict["cloaking"] = 0
+    if play_dict.get("momentum") is None:
+        play_dict["momentum"] = 0
+    if not play_dict.get("copy"):
+        play_dict["copy"] = {}
     
     # Initialize stats if not provided
     if not play_dict.get("game_stats"):

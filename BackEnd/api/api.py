@@ -1633,8 +1633,27 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         # ✅ FIX: Log quarter before save to debug save/load issues
         logging.info(f"💾 Saving game state: game_id={game_id}, quarter={db_summary.get('quarter')}, gm.quarter={gm.quarter}")
         
+        # ✅ TOURNAMENT MODE: Add mode and tournament_id to game document for consistency with Franchise mode
+        # Infer mode from tournament_id/franchise_id if mode not provided in request
+        mode = request.mode
+        if not mode:
+            if request.tournament_id:
+                mode = "tournament"
+            elif request.franchise_id:
+                mode = "franchise"
+            else:
+                mode = "single"
+        
+        # Add mode to game document (for consistency with init_game() pattern)
+        if mode:
+            db_summary["mode"] = mode
+        
+        # Add tournament_id to game document when in tournament mode (matches Franchise mode pattern)
+        if mode == "tournament" and request.tournament_id:
+            db_summary["tournament_id"] = str(request.tournament_id)
+        
         games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
-        logging.info(f"✅ Game state saved successfully: game_id={game_id}, quarter={db_summary.get('quarter')}")
+        logging.info(f"✅ Game state saved successfully: game_id={game_id}, quarter={db_summary.get('quarter')}, mode={mode}")
     except Exception as e:
         print("🚨 Mongo upsert failed:", e)
         traceback.print_exc()
