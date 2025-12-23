@@ -6264,6 +6264,7 @@ Computer evaluates timeout conditions in order. Each condition only checks once 
 - Computer timeout check occurs in `game_manager.simulate_macro_turn()` when creating SIP turns
 - Computer timeout check occurs in `game_manager.simulate_macro_turn()` when creating BIP turns
 - Timeout turn replaces the BIP/SIP turn if computer calls timeout
+- **Turn-by-turn mode:** The `/api/simulate-turn` endpoint checks for computer timeouts immediately after calling `simulate_macro_turn()`. If a timeout turn was created, it is returned immediately to the frontend, preventing further turn simulation until the timeout is resolved.
 - **Works during simmed quarters:** Computer timeout logic runs during "Sim To 4th Quarter" and "Sim Full Game" operations
 - **Two computer teams:** Both teams are checked for timeout conditions; first team to meet conditions calls timeout
 - **Lineup adjustments:** When computer calls timeout during simmed quarters, both team lineups are rebuilt using `build_lineup_from_mongo()` (same autoset logic as regular timeouts)

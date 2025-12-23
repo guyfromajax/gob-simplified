@@ -1771,6 +1771,39 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
         
         gm.simulate_macro_turn()
         
+        # ✅ COMPUTER TIMEOUT: Check if a timeout was just created in this call
+        # This handles computer timeouts that are created during simulate_macro_turn()
+        if gm.game_state.get("timeout_called") and gm.turns:
+            last_turn = gm.turns[-1]
+            if isinstance(last_turn, dict) and last_turn.get("result_type") == "TIMEOUT":
+                logging.warning(f"⏸️ COMPUTER TIMEOUT: Returning timeout turn created in this call (reason: {last_turn.get('timeout_reason')}, turn {len(gm.turns)})")
+                # Remove the TIMEOUT turn from turns so next API call can simulate the actual next turn
+                timeout_turn = gm.turns.pop()
+                return {
+                    "turn": timeout_turn,
+                    "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
+                    "time_remaining": gm.game_state["time_remaining"],
+                    "clock": gm.game_state.get("clock", "8:00"),
+                    "quarter_complete": False,
+                    "quarter": gm.quarter,
+                    "is_final": False,
+                    "home_score": gm.score.get(gm.home_team.name, 0),
+                    "away_score": gm.score.get(gm.away_team.name, 0),
+                    "home_team_fouls": gm.home_team.team_fouls,
+                    "away_team_fouls": gm.away_team.team_fouls,
+                    "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
+                    "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
+                    "offense_team": gm.offense_team.name,
+                    "defense_team": gm.defense_team.name,
+                    "game_id": game_id,
+                    "ineligible_players": gm.game_state.get("ineligible_players", []),
+                    "box_score": gm.get_box_score(),
+                    "team_totals": {
+                        gm.home_team.name: gm.home_team.get_team_game_stats(),
+                        gm.away_team.name: gm.away_team.get_team_game_stats()
+                    }
+                }
+        
         # Update team fouls in game state
         gm.game_state["team_fouls"] = {
             gm.home_team.name: gm.home_team.team_fouls,
