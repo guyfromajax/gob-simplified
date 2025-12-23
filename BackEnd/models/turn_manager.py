@@ -1869,8 +1869,8 @@ class TurnManager:
             }
         
         # Add current timeout counts for frontend display
-        payload["home_team_timeouts"] = getattr(game.home_team, 'timeouts', 5)
-        payload["away_team_timeouts"] = getattr(game.away_team, 'timeouts', 5)
+        payload["home_team_timeouts"] = getattr(game.home_team, 'timeouts', 4)
+        payload["away_team_timeouts"] = getattr(game.away_team, 'timeouts', 4)
         
         return payload
     
@@ -1892,7 +1892,7 @@ class TurnManager:
     
     def can_call_timeout(self, team):
         """Check if a team has timeouts remaining."""
-        return getattr(team, 'timeouts', 5) > 0
+        return getattr(team, 'timeouts', 4) > 0
 
     def resolve_offensive_rebound_turn(self):
         """

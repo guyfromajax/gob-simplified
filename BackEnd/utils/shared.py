@@ -701,7 +701,7 @@ def summarize_game_state(game, exclude_animations=True):
         "score": game.score.get(game.home_team.name, 0),
         "points_by_quarter": game.game_state["points_by_quarter"].get(game.home_team.name, [0, 0, 0, 0]),
         "team_fouls": game.home_team.team_fouls,
-        "timeouts": getattr(game.home_team, 'timeouts', 5),  # Default to 5 if not set (backward compatibility)
+        "timeouts": getattr(game.home_team, 'timeouts', 4),  # Default to 4 if not set (backward compatibility)
         
         # Team attributes (needed for S3 tab in Team Box Score)
         "attributes": getattr(game.home_team, 'team_attributes', {}),
@@ -730,7 +730,7 @@ def summarize_game_state(game, exclude_animations=True):
         "score": game.score.get(game.away_team.name, 0),
         "points_by_quarter": game.game_state["points_by_quarter"].get(game.away_team.name, [0, 0, 0, 0]),
         "team_fouls": game.away_team.team_fouls,
-        "timeouts": getattr(game.away_team, 'timeouts', 5),  # Default to 5 if not set (backward compatibility)
+        "timeouts": getattr(game.away_team, 'timeouts', 4),  # Default to 4 if not set (backward compatibility)
         
         # Team attributes (needed for S3 tab in Team Box Score)
         "attributes": getattr(game.away_team, 'team_attributes', {}),
