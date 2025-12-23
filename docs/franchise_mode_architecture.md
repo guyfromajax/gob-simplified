@@ -1,7 +1,7 @@
 # Franchise Mode Architecture
 
-**Date:** November 5, 2025  
-**Purpose:** Document how games, recruits, and training are handled in franchise mode
+**Date:** January 2025 (Last Updated)  
+**Purpose:** Document how games, recruits, training, and data persistence are handled in franchise mode
 
 ---
 
@@ -440,29 +440,110 @@ Similarly:
 {
   "franchise_teams": {
     "TEAM_ID_123": {
-      // Team attributes (evolve via training)
-      "team_chemistry": 75,
-      "offensive_efficiency": 68,
-      "offensive_adjust": 50,
-      "defense_threshold": 300,
-      "shot_threshold": 250,
-      "turnover_modifier": 200,
-      "foul_modifier": 100,
-      "rebound_modifier": 1.0,
+      // Team Attributes (mode-specific, randomized on initialization)
+      // ✅ Initialized via TeamManager.init_team_attributes(mode="franchise")
+      "team_chemistry": 7-13,              // Franchise mode range
+      "offensive_efficiency": -3 to +3,    // Franchise mode range
+      "shot_threshold": -100 to +100,      // Randomized
+      "turnover_modifier": -3 to +3,
+      "foul_modifier": -3 to +3,
+      "rebound_modifier": 0.8 | 0.9 | 1.0 | 1.1 | 1.2,
+      "defensive_efficiency": -3 to +3,
+      "fb_efficiency": -3 to +3,
+      "pt_efficiency": -3 to +3,
+      "fb_opp_modifier": -3 to +3,
+      "pt_opp_modifier": -3 to +3,
       
-      // Scouting data
-      "o_tendency_reads": {...},
-      "d_tendency_reads": {...},
+      // Strategy Settings (user-configurable, persist across all instances)
+      // ✅ Initialized with defaults (all = 2) when team objects are created
+      "strategy_settings": {
+        "offense": 0-4,
+        "inside": 0-4,
+        "attack": 0-4,
+        "outside": 0-4,
+        "tempo": 0-4,
+        "defense": 0-4,
+        "aggression": 0-4,
+        "hc_trap": 0-4,        // half-court trap
+        "fc_press": 0-4,       // full-court press
+        "rebounding": 0-4
+      },
       
-      // Strategy (per team in franchise)
-      "playcall_settings": {...},
-      "strategy_settings": {...}
+      // Plays Data (updated by training)
+      // ✅ Initialized via populate_team_plays(mode="franchise")
+      "plays": {
+        [playName]: {
+          "play_id": string,           // Reference to universal plays collection
+          "name": string,
+          "play_type": "motion" | "set_play",
+          "play_focus": "inside" | "attack" | "outside",
+          "effectiveness": 0-100,      // Updated by training
+          "momentum": 0-10,            // Updated by training
+          "cloaking": 0-10,            // Updated by training
+          "game_stats": {
+            "times_run": number,
+            "shot_attempts": number,
+            "made_shots": number,
+            "turnovers": number,
+            "offensive_fouls": number,
+            "defensive_fouls": number,
+            "effectiveness": number    // Calculated effectiveness from stats
+          },
+          "season_stats": { ... }     // Cumulative statistics
+        }
+      },
+      
+      // Scouting Data (updated by training)
+      // ✅ Initialized via populate_scouting_data(mode="franchise")
+      "scouting_data": {
+        "defense": {
+          "Man": {
+            "effectiveness": 0-100,    // Updated by training
+            "momentum": 0-10,
+            "cloaking": 0-10,
+            "game_stats": { ... },
+            "season_stats": { ... }
+          },
+          "2-3 Zone": { ... },
+          "3-2 Zone": { ... },
+          "1-3-1 Zone": { ... },
+          "vs_Fast_Break": { ... },
+          "FCP": { ... },
+          "HCT": { ... }
+        },
+        "offense": { ... }  // Optional, populated by TeamManager if needed
+      },
+      
+      // Playbook Settings (user-configurable, persist across all instances)
+      // ✅ Initialized with defaults (first play = 100% per section) via initialize_playbook_settings()
+      "playbook_settings": {
+        "motion": {[playName]: percentage},
+        "set_play_inside": {[playName]: percentage},
+        "set_play_attack": {[playName]: percentage},
+        "set_play_outside": {[playName]: percentage},
+        "zone_defense": {[zoneName]: percentage},
+        "man_defense": {"Man": 100},
+        "slot_assignments": {},       // Empty by default - user must assign
+        "motion_dropdowns": {}        // Empty by default - user must select
+      },
+      
+      // Legacy (still present for backward compatibility)
+      "playcall_settings": {
+        "Base": 0-4,
+        "Freelance": 0-4,
+        "Inside": 0-4,
+        "Attack": 0-4,
+        "Outside": 0-4,
+        "Set": 0-4
+      }
     }
   }
 }
 ```
 
-**Purpose:** Track team stat evolution (chemistry, efficiency improve with training)
+**Purpose:** Track team stat evolution (chemistry, efficiency improve with training), store user-configurable strategy and playbook settings
+
+**Initialization:** Team objects are created for all 8 teams when franchise is initialized via `FranchiseManager.initialize_season()` or lazily via `ensure_team_objects_exist()` when accessing Game Plan/Playbooks.
 
 **Size:** ~75KB per team × 8 teams = ~600KB
 
@@ -503,6 +584,92 @@ Similarly:
 
 ---
 
+## 7. NON-GAMEPLAY DATA PERSISTENCE
+
+**When:** User is in Franchise Mode but not actively playing a game (Command Center, Game Plan, Playbooks, Training, Training Report)
+
+**What Gets Persisted:**
+
+### **A. Franchise Document (`franchises` collection)**
+
+**Document ID:** `_id: ObjectId("franchise_id")`
+
+**Season Progress:**
+- `week`: Current week number (1-14)
+- `current_week`: Alias for week
+- `schedule`: Pre-generated schedule array `[[team_A_id, team_B_id], ...]` (14 weeks)
+
+**Game Results (Summaries Only):**
+- `results`: Object with weekly summaries
+  ```javascript
+  {
+    "1": [{away_id, home_id, away_score, home_score}, ...],
+    "2": [{away_id, home_id, away_score, home_score}, ...],
+    // ... up to week 14
+  }
+  ```
+
+**Training State:**
+- `training_status`: 
+  ```javascript
+  {
+    "current_week": number,
+    "training_completed": boolean,
+    "session_type": "preseason" | "in-season"
+  }
+  ```
+- `latest_training`:
+  ```javascript
+  {
+    "player_logs": {...},  // What improved
+    "team_log": {...},
+    "session_type": "preseason" | "in-season",
+    "week": number
+  }
+  ```
+
+**Stat Tracking:**
+- `applied_games`: Array of game IDs `["game_id_1", "game_id_2"]` (prevents double-counting stats)
+
+**Recruiting:**
+- `recruits`: Array of recruit objects (franchise-specific pool)
+
+### **B. Team Objects (`franchise_teams.{team_id}`)**
+
+**For each of the 8 teams in the franchise:**
+
+- **Team Attributes** (mode-specific, randomized on init, updated by training)
+- **Strategy Settings** (user-configurable, persist across all instances)
+- **Plays Data** (updated by training)
+- **Scouting Data** (updated by training)
+- **Playbook Settings** (user-configurable, persist across all instances)
+- **Legacy playcall_settings** (still present for backward compatibility)
+
+See **Section 5: FRANCHISE TEAMS** above for complete structure.
+
+### **C. Player Objects (`players.{player_id}`)**
+
+**For each player in the franchise:**
+
+- **Player Metadata** (`meta`: first_name, last_name, team, team_id)
+- **Evolved Attributes** (`attributes`: all 30+ attributes with `anchor_` prefixed versions, updated by training)
+- **Evolved Position Ratings** (`position_ratings`: PG, SG, SF, PF, C ratings, updated by training)
+- **Statistics** (`season`: season stats, `career`: career stats)
+
+See **Section 4: PLAYER EVOLUTION** above for complete structure.
+
+### **D. Additional Collections (Not in Franchise Document)**
+
+**Training Logs (`training_logs` collection):**
+- Historical training sessions (separate collection)
+- Each session includes allocations, logs, and changes
+
+**Games Collection (`games` collection):**
+- Active game documents (during gameplay)
+- Not part of franchise document during non-gameplay
+
+---
+
 ## Complete Franchise Document Structure
 
 ```javascript
@@ -536,10 +703,33 @@ Similarly:
   // Team evolution (8 teams in conference)
   "franchise_teams": {
     "TEAM_ID_1": {
-      team_chemistry: 75,
-      offensive_efficiency: 68,
-      playcall_settings: {...},
-      strategy_settings: {...}
+      // Team attributes (mode-specific, randomized on init)
+      team_chemistry: 7-13,
+      offensive_efficiency: -3 to +3,
+      shot_threshold: -100 to +100,
+      turnover_modifier: -3 to +3,
+      foul_modifier: -3 to +3,
+      rebound_modifier: 0.8-1.2,
+      defensive_efficiency: -3 to +3,
+      fb_efficiency: -3 to +3,
+      pt_efficiency: -3 to +3,
+      fb_opp_modifier: -3 to +3,
+      pt_opp_modifier: -3 to +3,
+      
+      // Strategy settings (user-configurable)
+      strategy_settings: {...},
+      
+      // Plays data (updated by training)
+      plays: {...},
+      
+      // Scouting data (updated by training)
+      scouting_data: {...},
+      
+      // Playbook settings (user-configurable)
+      playbook_settings: {...},
+      
+      // Legacy
+      playcall_settings: {...}
     }
   },
   

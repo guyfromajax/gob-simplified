@@ -9146,6 +9146,159 @@ When creating a new game instance within a franchise:
 
 ---
 
+## Data Persistence ✅ **NEW** (January 2025)
+
+### Overview
+
+This section documents what data is persisted in each game mode when the user is in non-gameplay situations (Command Center, Game Plan, Playbooks, Training, Training Report). This is critical for understanding what state needs to be maintained across navigation transitions.
+
+**Reference:** For detailed architecture documentation, see:
+- `docs/franchise_mode_architecture.md` - Complete franchise mode data structure
+- `docs/COMMON_DATA_SET.md` - Common data structure across all modes
+
+---
+
+### Franchise Mode (Non-Gameplay)
+
+**When:** User is in Franchise Mode but not actively playing a game (Command Center, Game Plan, Playbooks, Training, Training Report)
+
+**What Gets Persisted:**
+
+#### **A. Franchise Document (`franchises` collection)**
+
+**Document ID:** `_id: ObjectId("franchise_id")`
+
+**Season Progress:**
+- `week`: Current week number (1-14)
+- `current_week`: Alias for week
+- `schedule`: Pre-generated schedule array `[[team_A_id, team_B_id], ...]` (14 weeks)
+
+**Game Results (Summaries Only):**
+- `results`: Object with weekly summaries
+  ```javascript
+  {
+    "1": [{away_id, home_id, away_score, home_score}, ...],
+    "2": [{away_id, home_id, away_score, home_score}, ...],
+    // ... up to week 14
+  }
+  ```
+
+**Training State:**
+- `training_status`: 
+  ```javascript
+  {
+    "current_week": number,
+    "training_completed": boolean,
+    "session_type": "preseason" | "in-season"
+  }
+  ```
+- `latest_training`:
+  ```javascript
+  {
+    "player_logs": {...},  // What improved
+    "team_log": {...},
+    "session_type": "preseason" | "in-season",
+    "week": number
+  }
+  ```
+
+**Stat Tracking:**
+- `applied_games`: Array of game IDs `["game_id_1", "game_id_2"]` (prevents double-counting stats)
+
+**Recruiting:**
+- `recruits`: Array of recruit objects (franchise-specific pool)
+
+#### **B. Team Objects (`franchise_teams.{team_id}`)**
+
+**For each of the 8 teams in the franchise:**
+
+- **Team Attributes** (mode-specific, randomized on init, updated by training)
+  - `team_chemistry`: 7-13 (franchise mode range)
+  - `offensive_efficiency`: -3 to +3
+  - `shot_threshold`: -100 to +100
+  - `turnover_modifier`: -3 to +3
+  - `foul_modifier`: -3 to +3
+  - `rebound_modifier`: 0.8, 0.9, 1.0, 1.1, or 1.2
+  - `defensive_efficiency`: -3 to +3
+  - `fb_efficiency`: -3 to +3
+  - `pt_efficiency`: -3 to +3
+  - `fb_opp_modifier`: -3 to +3
+  - `pt_opp_modifier`: -3 to +3
+
+- **Strategy Settings** (user-configurable, persist across all instances)
+  - `strategy_settings`: `{offense, inside, attack, outside, tempo, defense, aggression, hc_trap, fc_press, rebounding}` (all 0-4)
+
+- **Plays Data** (updated by training)
+  - `plays`: Object with play data including `effectiveness`, `momentum`, `cloaking` (0-100, 0-10, 0-10), `game_stats`, `season_stats`
+
+- **Scouting Data** (updated by training)
+  - `scouting_data`: Defense structures (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone, vs_Fast_Break, FCP, HCT) with `effectiveness`, `momentum`, `cloaking`, `game_stats`, `season_stats`
+
+- **Playbook Settings** (user-configurable, persist across all instances)
+  - `playbook_settings`: `{motion, set_play_inside, set_play_attack, set_play_outside, zone_defense, man_defense, slot_assignments, motion_dropdowns}`
+
+- **Legacy playcall_settings** (still present for backward compatibility)
+
+**Initialization:** Team objects are created for all 8 teams when franchise is initialized via `FranchiseManager.initialize_season()` or lazily via `ensure_team_objects_exist()` when accessing Game Plan/Playbooks.
+
+#### **C. Player Objects (`players.{player_id}`)**
+
+**For each player in the franchise:**
+
+- **Player Metadata** (`meta`: first_name, last_name, team, team_id)
+- **Evolved Attributes** (`attributes`: all 30+ attributes with `anchor_` prefixed versions, updated by training)
+- **Evolved Position Ratings** (`position_ratings`: PG, SG, SF, PF, C ratings, updated by training)
+- **Statistics** (`season`: season stats, `career`: career stats)
+
+#### **D. Additional Collections (Not in Franchise Document)**
+
+**Training Logs (`training_logs` collection):**
+- Historical training sessions (separate collection)
+- Each session includes allocations, logs, and changes
+
+**Games Collection (`games` collection):**
+- Active game documents (during gameplay)
+- Not part of franchise document during non-gameplay
+
+**Summary:**
+- All team and player data is franchise-specific and isolated from other franchises
+- Changes to strategy settings, playbook settings, and training improvements persist across the franchise season
+- Team objects include all common data fields (attributes, strategy_settings, plays, scouting_data, playbook_settings)
+
+**For complete structure details, see:** `docs/franchise_mode_architecture.md` Section 7: NON-GAMEPLAY DATA PERSISTENCE
+
+---
+
+### Tournament Mode (Non-Gameplay)
+
+**When:** User is in Tournament Mode but not actively playing a game (Command Center, Game Plan, Playbooks, Training, Training Report)
+
+**What Gets Persisted:**
+
+*(To be documented - similar structure to Franchise Mode but with tournament-specific fields)*
+
+---
+
+### Single Game Mode (Non-Gameplay)
+
+**When:** User is in Single Game Mode but not actively playing (Lineup, Game Plan, Playbooks)
+
+**What Gets Persisted:**
+
+*(To be documented - game document structure)*
+
+---
+
+### Key Files
+
+- `BackEnd/models/franchise_manager.py` - `initialize_season()` (lines 109-235)
+- `BackEnd/api/gameplan_routes.py` - `ensure_team_objects_exist()` (lines 152-299)
+- `BackEnd/api/franchise_routes.py` - `get_franchise_team_data()` (lines 832-881)
+- `docs/franchise_mode_architecture.md` - Complete franchise mode architecture
+- `docs/COMMON_DATA_SET.md` - Common data structure across all modes
+
+---
+
 ## Team Objects ✅ **COMPLETE** (January 2025)
 
 ### Overview
