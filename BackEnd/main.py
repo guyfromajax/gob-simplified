@@ -584,7 +584,23 @@ def simulate_quarter(
                 raise RuntimeError(f"Simulation exceeded {max_turns} turns. Possible infinite loop. time_remaining={gm.game_state['time_remaining']}")
             
             previous_time = gm.game_state["time_remaining"]
+            
+            # ✅ COMPUTER TIMEOUT: Check if timeout was called in previous turn
+            if gm.game_state.get("timeout_called"):
+                last_turn = gm.turns[-1] if gm.turns else None
+                if last_turn and last_turn.get("result_type") == "TIMEOUT":
+                    logging.warning(f"⏸️ COMPUTER TIMEOUT: Stopping simulation loop - timeout turn detected (turn {len(gm.turns)}, reason: {last_turn.get('timeout_reason')})")
+                    break  # Stop simulation when timeout is called
+            
             gm.simulate_macro_turn()
+            
+            # ✅ COMPUTER TIMEOUT: Check if timeout was just called in this turn
+            if gm.game_state.get("timeout_called"):
+                last_turn = gm.turns[-1] if gm.turns else None
+                if last_turn and last_turn.get("result_type") == "TIMEOUT":
+                    logging.warning(f"⏸️ COMPUTER TIMEOUT: Stopping simulation loop - timeout turn just created (turn {len(gm.turns)}, reason: {last_turn.get('timeout_reason')})")
+                    break  # Stop simulation when timeout is called
+            
             gm.game_state["team_fouls"] = {
                 gm.home_team.name: gm.home_team.team_fouls,
                 gm.away_team.name: gm.away_team.team_fouls,
