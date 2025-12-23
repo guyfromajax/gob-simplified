@@ -1040,6 +1040,16 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         else:
                             logging.warning(f"⚠️ No user_team_side found in DB or request - override checking will not work!")
                         
+                        # ✅ TIMEOUT RESUME: Check for timeout state BEFORE calculating should_restore_stats
+                        # This ensures scores/fouls are restored when resuming from timeout
+                        # Check if timeout state exists in saved document (regardless of URL parameter)
+                        has_timeout_state = "timeout_next_play_type" in saved and saved.get("timeout_next_play_type") is not None
+                        if has_timeout_state and saved_quarter == request.quarter:
+                            # Timeout state found - ensure resume_from_timeout is set
+                            if not request.resume_from_timeout:
+                                request.resume_from_timeout = True
+                                logging.info(f"✅ TIMEOUT RESUME: Detected timeout state in saved document, setting resume_from_timeout=True (quarter {request.quarter})")
+                        
                         # Simple check: If requesting Q1 but saved game is at a later quarter, start fresh (new game)
                         # ✅ TIMEOUT: If resuming from timeout, always restore stats (we're continuing an existing game)
                         is_new_game = (request.quarter == 1 and saved_quarter > 1) and not request.resume_from_timeout
