@@ -2780,7 +2780,7 @@
             }
             
             // Extract intended shooter position from final step (same logic as backend phase_resolution.py lines 1011-1017)
-            const finalStep = successfulSkeleton.steps[successfulSkeleton.steps.length - 1];
+          const finalStep = successfulSkeleton.steps[successfulSkeleton.steps.length - 1];
             const posActions = finalStep.pos_actions || {};
             
             let intendedShooterPos = null;
@@ -2788,10 +2788,10 @@
               const action = (actionInfo.action || '').toLowerCase();
               if (action === 'shoot') {
                 intendedShooterPos = pos.toUpperCase(); // Normalize to uppercase (C, PG, SG, SF, PF)
-                break;
-              }
+              break;
             }
-            
+          }
+          
             // Map position to player ID from lineup
             if (intendedShooterPos && lineup[intendedShooterPos]) {
               shooterId = lineup[intendedShooterPos];
@@ -3736,7 +3736,7 @@
     // Initialize - show first play (will be updated after slot assignments load)
     updatePlayOptions();
     if (playOptions.length > 0) {
-      showPlay(0);
+    showPlay(0);
     }
     
     // Up button - goes to previous slot (1→2→3→4→5→6, wraps to 6)
@@ -3752,7 +3752,7 @@
       const newIndex = (currentPlayIndex + 1) % playOptions.length;
       showPlay(newIndex);
     });
-    
+
     // Wait for slot assignments to be applied, then update play options and show first play
     window.addEventListener('playcall-center-reordered', () => {
       console.log('🔍 [PLAYCALL CENTER] Received reordered event, updating play options');

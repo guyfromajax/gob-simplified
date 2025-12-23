@@ -773,8 +773,16 @@ async function setHeader() {
   }
   
   // Update header format: "Set Your Lineup -- User Team Name: User Team Score -- Opponent Team Name: Opponent Team Score"
-  const headerText = `Set Your Lineup — ${userTeamName}: ${userTeamScore} — ${opponentTeamName}: ${opponentTeamScore}`;
-  title.textContent = headerText;
+  let headerText = `Set Your Lineup — ${userTeamName}: ${userTeamScore} — ${opponentTeamName}: ${opponentTeamScore}`;
+  
+  // ✅ COMPUTER TIMEOUT: Add bold red text if computer called timeout
+  const computerTimeout = urlParams.get('computer_timeout') === 'true';
+  const computerTeamName = urlParams.get('computer_team_name');
+  if (computerTimeout && computerTeamName) {
+    headerText += ` <span style="color: red; font-weight: bold; margin-left: 20px;">${computerTeamName} Called Timeout</span>`;
+  }
+  
+  title.innerHTML = headerText; // Use innerHTML to support the span element
   console.log('[setHeader] Header updated to:', headerText);
   
   const logo = document.getElementById('team-logo');

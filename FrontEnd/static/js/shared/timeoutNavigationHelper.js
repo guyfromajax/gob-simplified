@@ -39,6 +39,8 @@
     lineup = {},
     myTeamSide = null,
     clock = null,
+    computerTimeout = false,
+    computerTeamName = null,
     overrides = {}
   }) {
     const params = new URLSearchParams();
@@ -136,7 +138,16 @@
     if (week) params.set('week', week);
     
     // ============================================
-    // 9. DEBUG PARAMS
+    // 9. COMPUTER TIMEOUT PARAMS
+    // ============================================
+    // ✅ COMPUTER TIMEOUT: Add params to indicate computer timeout for lineup screen display
+    if (computerTimeout && computerTeamName) {
+      params.set('computer_timeout', 'true');
+      params.set('computer_team_name', computerTeamName);
+    }
+    
+    // ============================================
+    // 10. DEBUG PARAMS
     // ============================================
     if (sourceParams.get('debug') === '1') {
       params.set('debug', '1');

@@ -509,7 +509,9 @@ export class AnimationEngine {
         if (this.scene.simData && turnData.clock) {
           this.scene.simData.clock = turnData.clock;
         }
-        await showTimeoutPopup(timeoutResult, gameId, this.scene);
+        // ✅ COMPUTER TIMEOUT: Navigate directly (no popup) - same flow as user timeouts
+        const computerTeamName = turnData.timeout_calling_team?.name || null;
+        await showTimeoutPopup(timeoutResult, gameId, this.scene, true, computerTeamName);
       } catch (error) {
         console.error('❌ COMPUTER TIMEOUT: Failed to navigate to lineup screen:', error);
         // Fallback: Show alert and let user navigate manually
