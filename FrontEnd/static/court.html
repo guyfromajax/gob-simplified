@@ -624,14 +624,15 @@
     .team-attrs-pills {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 0; /* No gap between rows, match S1/S2 */
       width: 100%;
       font-size: 14px; /* Match S1/S2 font size */
     }
     .team-attr-row {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
+      padding: 4px 0; /* Small padding instead of gap */
     }
     .team-attr-label {
       display: flex;
@@ -646,6 +647,23 @@
     }
     .team-attr-pill-wrapper.training-report-styled .attr-pill {
       height: 32px;
+      background: rgba(0, 0, 0, 0.3); /* Dark theme background */
+      border-radius: 16px;
+      overflow: hidden;
+      position: relative;
+    }
+    /* Override command-center-team-styles.css colors for dark theme */
+    .team-tab-S3 .training-report-styled .attr-pill {
+      background: rgba(0, 0, 0, 0.3);
+    }
+    .team-tab-S3 .training-report-styled .pill-center-line {
+      background: #ffd700; /* Yellow center line */
+    }
+    .team-tab-S3 .training-report-styled .pill-fill-positive {
+      background: #2d8f2d; /* Green for positive */
+    }
+    .team-tab-S3 .training-report-styled .pill-fill-negative {
+      background: #ff4444; /* Red for negative */
     }
     .team-chemistry-bar {
       width: 100%;
@@ -3491,9 +3509,23 @@
     function createAttrPill(originalValue, attrKey) {
       const pill = document.createElement('div');
       pill.className = 'attr-pill';
+      pill.style.position = 'relative';
+      pill.style.width = '100%';
+      pill.style.height = '32px';
+      pill.style.background = 'rgba(0, 0, 0, 0.3)';
+      pill.style.borderRadius = '16px';
+      pill.style.overflow = 'hidden';
 
       const centerLine = document.createElement('div');
       centerLine.className = 'pill-center-line';
+      centerLine.style.position = 'absolute';
+      centerLine.style.left = '50%';
+      centerLine.style.top = '0';
+      centerLine.style.bottom = '0';
+      centerLine.style.width = '2px';
+      centerLine.style.background = '#ffd700';
+      centerLine.style.transform = 'translateX(-50%)';
+      centerLine.style.zIndex = '2';
       pill.appendChild(centerLine);
 
       let maxValue = 10;
@@ -3511,6 +3543,11 @@
         fill.className = 'pill-fill-positive';
         const percentage = Math.min((value / maxValue) * 50, 50);
         fill.style.width = `${percentage}%`;
+        fill.style.position = 'absolute';
+        fill.style.left = '50%';
+        fill.style.top = '0';
+        fill.style.bottom = '0';
+        fill.style.zIndex = '1';
         pill.insertBefore(fill, centerLine);
       } else if (value < 0) {
         const fill = document.createElement('div');
@@ -3518,6 +3555,11 @@
         const absValue = Math.abs(value);
         const percentage = Math.min((absValue / maxValue) * 50, 50);
         fill.style.width = `${percentage}%`;
+        fill.style.position = 'absolute';
+        fill.style.right = '50%';
+        fill.style.top = '0';
+        fill.style.bottom = '0';
+        fill.style.zIndex = '1';
         pill.insertBefore(fill, centerLine);
       }
 
