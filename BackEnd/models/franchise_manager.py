@@ -106,7 +106,14 @@ class FranchiseManager:
     def load_teams(self):
         return list(self.db.teams.find())
 
-    def initialize_season(self):
+    def initialize_season(self, user_team_id: str | None = None, user_team_object_id: str | None = None):
+        """
+        Initialize a new franchise season.
+        
+        Args:
+            user_team_id: Team name (e.g., "Morristown") - human-readable identifier
+            user_team_object_id: Team ObjectId string (e.g., "507f1f77bcf86cd799439011") - database identifier
+        """
         # Clear any previous season game data to ensure a fresh start
         self.db.games.delete_many({})
         self.schedule = self.schedule_manager.generate_schedule()
@@ -213,15 +220,22 @@ class FranchiseManager:
         # Generate initial recruits for the franchise
         recruits = self.recruit_manager.generate_recruits_list()
         
-        self.save_season_state(
-            extra_state={
-                "players": players_map, 
-                "applied_games": [],
-                "franchise_teams": franchise_teams,
-                "training_status": training_status,
-                "recruits": recruits
-            }
-        )
+        # Store user team identifiers in franchise document
+        extra_state = {
+            "players": players_map, 
+            "applied_games": [],
+            "franchise_teams": franchise_teams,
+            "training_status": training_status,
+            "recruits": recruits
+        }
+        
+        # Add user team identifiers if provided
+        if user_team_id:
+            extra_state["user_team_id"] = user_team_id
+        if user_team_object_id:
+            extra_state["user_team_object_id"] = user_team_object_id
+        
+        self.save_season_state(extra_state=extra_state)
 
     def reset_stats(self):
         for team in self.teams:
