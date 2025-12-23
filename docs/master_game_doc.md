@@ -6206,12 +6206,17 @@ The computer timeout system enables AI-controlled teams to call timeouts during 
 - **Q4:** Computer can call maximum number of timeouts equal to remaining timeouts upon entering the quarter
 - If max timeouts are reached, all timeout percentages become 0% for that quarter
 
-### Timeout Conditions (Q1-Q3)
+### Timeout Conditions
 
-Computer evaluates timeout conditions in order. Each condition only checks once per occurrence (tracked per quarter):
+Computer evaluates timeout conditions in order. Each condition only checks once per occurrence (tracked per quarter). Conditions are quarter-specific for foul logic, but energy conditions apply to all quarters.
 
+#### Q1 Conditions
+
+**Foul Conditions:**
 1. **Player with 3 fouls:** 100% chance (immediate timeout)
 2. **Player with 2 fouls:** 30% chance (checks once at first BIP/SIP after foul)
+
+**Energy Conditions (apply to all quarters Q1-Q4):**
 3. **3 players < 80% NG:** 50% chance (checks once at first BIP/SIP after condition met)
 4. **4 players < 80% NG:** 75% chance (checks once at first BIP/SIP after condition met)
 5. **5 players < 80% NG:** 90% chance (checks once at first BIP/SIP after condition met)
@@ -6220,7 +6225,22 @@ Computer evaluates timeout conditions in order. Each condition only checks once 
 8. **5 players < 70% NG:** 95% chance (checks once at first BIP/SIP after condition met)
 9. **3 players < 60% NG:** 100% chance (immediate timeout)
 
-**Note:** Conditions are evaluated in order. If a higher-priority condition triggers (e.g., 3 fouls = 100%), lower-priority conditions are not checked.
+#### Q2 & Q3 Conditions
+
+**Foul Conditions:**
+1. **Player with 4 fouls:** 100% chance (immediate timeout)
+2. **Player with 3 fouls:** 90% chance (checks once at first BIP/SIP after foul)
+
+**Energy Conditions:** Same as Q1 (conditions 3-9 above)
+
+#### Q4 Conditions
+
+**Foul Conditions (only if time_remaining > 60 seconds):**
+1. **Player with 4 fouls:** 90% chance (checks once at first BIP/SIP after foul, only if more than 1 minute remaining)
+
+**Energy Conditions:** Same as Q1 (conditions 3-9 above)
+
+**Note:** Conditions are evaluated in order. If a higher-priority condition triggers (e.g., 4 fouls = 100% in Q2/Q3), lower-priority conditions are not checked. Energy conditions apply to all quarters (Q1-Q4).
 
 ### Implementation Details
 
