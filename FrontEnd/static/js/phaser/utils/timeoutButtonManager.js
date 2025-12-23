@@ -253,8 +253,13 @@ async function handleTimeoutButtonClick() {
 
 /**
  * Show timeout popup and navigate to lineup screen
+ * @param {Object} timeoutResult - Timeout result object
+ * @param {string} gameId - Game ID
+ * @param {Object} scene - Game scene object
+ * @param {boolean} [computerTimeout=false] - Whether this is a computer timeout
+ * @param {string} [computerTeamName] - Name of the computer team that called timeout
  */
-async function showTimeoutPopup(timeoutResult, gameId, scene) {
+async function showTimeoutPopup(timeoutResult, gameId, scene, computerTimeout = false, computerTeamName = null) {
     // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
     // Use global helper (works in both regular scripts and modules)
     const helper = window.TimeoutNavigationHelper;
@@ -309,6 +314,8 @@ async function showTimeoutPopup(timeoutResult, gameId, scene) {
         lineup: lineup,
         myTeamSide: myTeamSide || myTeamSideFallback || 'home',
         clock: clock, // ✅ TIMEOUT: Pass clock to preserve time remaining
+        computerTimeout: computerTimeout, // ✅ COMPUTER TIMEOUT: Pass flag for computer timeout
+        computerTeamName: computerTeamName, // ✅ COMPUTER TIMEOUT: Pass computer team name
         overrides: {
             home: homeTeam || homeTeamFallback || '',
             away: awayTeam || awayTeamFallback || '',
