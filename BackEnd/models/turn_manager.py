@@ -1884,7 +1884,7 @@ class TurnManager:
             return f"{team_name} calls a timeout!"
         elif timeout_reason == "COMPUTER":
             team_name = calling_team.name if calling_team else "Team"
-            return f"{team_name} calls a timeout!"
+            return f"{team_name} Calls a Timeout"
         elif timeout_reason == "QUARTER_END":
             return "End of quarter timeout."
         else:
@@ -1893,6 +1893,138 @@ class TurnManager:
     def can_call_timeout(self, team):
         """Check if a team has timeouts remaining."""
         return getattr(team, 'timeouts', 4) > 0
+    
+    def should_computer_call_timeout(self, computer_team, turn_type):
+        """
+        Check if computer team should call timeout during BIP/SIP turn.
+        
+        Args:
+            computer_team: TeamManager instance for the computer team
+            turn_type: "BASELINE_INBOUND" or "SIDE_INBOUND"
+        
+        Returns:
+            bool: True if computer should call timeout, False otherwise
+        """
+        game = self.game
+        game_state = game.game_state
+        
+        # Only check during BIP/SIP turns
+        if turn_type not in ["BASELINE_INBOUND", "SIDE_INBOUND"]:
+            return False
+        
+        # Only check for computer teams (not user teams)
+        if computer_team.is_user_team:
+            return False
+        
+        # Check if team has timeouts remaining
+        if not self.can_call_timeout(computer_team):
+            return False
+        
+        # Initialize computer timeout tracking in game_state
+        if "computer_timeouts" not in game_state:
+            game_state["computer_timeouts"] = {}
+        if computer_team.name not in game_state["computer_timeouts"]:
+            game_state["computer_timeouts"][computer_team.name] = {}
+        
+        quarter = game.quarter
+        team_timeouts = game_state["computer_timeouts"][computer_team.name]
+        
+        # Initialize quarter tracking
+        if quarter not in team_timeouts:
+            team_timeouts[quarter] = {
+                "count": 0,
+                "checked_conditions": set()
+            }
+        
+        quarter_data = team_timeouts[quarter]
+        
+        # Check max timeouts per quarter
+        max_timeouts = 1 if quarter <= 3 else computer_team.timeouts
+        if quarter_data["count"] >= max_timeouts:
+            return False  # Already at max for this quarter
+        
+        # Get all players on the team
+        all_players = computer_team.get_all_players()
+        
+        # Check conditions (each only checks once per occurrence)
+        checked = quarter_data["checked_conditions"]
+        
+        # Condition 1: Player with 3 fouls - 100% chance
+        for player in all_players:
+            fouls = player.get_stat("F", "game")
+            condition_key = f"3_fouls_{player.player_id}"
+            if fouls == 3 and condition_key not in checked:
+                checked.add(condition_key)
+                return True  # 100% chance
+        
+        # Condition 2: Player with 2 fouls - 30% chance (only check once)
+        for player in all_players:
+            fouls = player.get_stat("F", "game")
+            condition_key = f"2_fouls_{player.player_id}"
+            if fouls == 2 and condition_key not in checked:
+                checked.add(condition_key)
+                if random.random() < 0.30:
+                    return True
+        
+        # Conditions 3-9: Energy (NG) levels
+        # Count players below each threshold
+        players_below_80 = [p for p in all_players if p.attributes.get("NG", 1.0) < 0.80]
+        players_below_70 = [p for p in all_players if p.attributes.get("NG", 1.0) < 0.70]
+        players_below_60 = [p for p in all_players if p.attributes.get("NG", 1.0) < 0.60]
+        
+        count_80 = len(players_below_80)
+        count_70 = len(players_below_70)
+        count_60 = len(players_below_60)
+        
+        # Condition 3: 3 players < 80% NG - 50% chance
+        condition_key = "3_players_80_ng"
+        if count_80 >= 3 and condition_key not in checked:
+            checked.add(condition_key)
+            if random.random() < 0.50:
+                return True
+        
+        # Condition 4: 4 players < 80% NG - 75% chance
+        condition_key = "4_players_80_ng"
+        if count_80 >= 4 and condition_key not in checked:
+            checked.add(condition_key)
+            if random.random() < 0.75:
+                return True
+        
+        # Condition 5: 5 players < 80% NG - 90% chance
+        condition_key = "5_players_80_ng"
+        if count_80 >= 5 and condition_key not in checked:
+            checked.add(condition_key)
+            if random.random() < 0.90:
+                return True
+        
+        # Condition 6: 3 players < 70% NG - 80% chance
+        condition_key = "3_players_70_ng"
+        if count_70 >= 3 and condition_key not in checked:
+            checked.add(condition_key)
+            if random.random() < 0.80:
+                return True
+        
+        # Condition 7: 4 players < 70% NG - 90% chance
+        condition_key = "4_players_70_ng"
+        if count_70 >= 4 and condition_key not in checked:
+            checked.add(condition_key)
+            if random.random() < 0.90:
+                return True
+        
+        # Condition 8: 5 players < 70% NG - 95% chance
+        condition_key = "5_players_70_ng"
+        if count_70 >= 5 and condition_key not in checked:
+            checked.add(condition_key)
+            if random.random() < 0.95:
+                return True
+        
+        # Condition 9: 3 players < 60% NG - 100% chance
+        condition_key = "3_players_60_ng"
+        if count_60 >= 3 and condition_key not in checked:
+            checked.add(condition_key)
+            return True  # 100% chance
+        
+        return False
 
     def resolve_offensive_rebound_turn(self):
         """

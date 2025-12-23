@@ -326,7 +326,64 @@ class GameManager:
             
             inbound_payload = self.turn_manager.setup_side_inbound()
             logging.warning(f"✅ [SIP CREATE] Created SIDE_INBOUND, offense_team={inbound_payload.get('offense_team_id')}, result_was={result.get('current_turn')} {result.get('result_type')}")
-            self.turns.append(inbound_payload)
+            
+            # ✅ COMPUTER TIMEOUT: Check if any computer team should call timeout
+            # Check both teams if both are computer teams, otherwise check the non-user team
+            computer_teams_to_check = []
+            if not self.home_team.is_user_team:
+                computer_teams_to_check.append(self.home_team)
+            if not self.away_team.is_user_team:
+                computer_teams_to_check.append(self.away_team)
+            
+            calling_team = None
+            for computer_team in computer_teams_to_check:
+                if self.turn_manager.should_computer_call_timeout(computer_team, "SIDE_INBOUND"):
+                    calling_team = computer_team
+                    break  # First team to call timeout wins
+            
+            if calling_team:
+                # Computer calls timeout - create timeout turn instead of SIP
+                timeout_turn = self.turn_manager.setup_timeout_turn(
+                    timeout_reason="COMPUTER",
+                    calling_team=calling_team
+                )
+                # Increment computer timeout count for this quarter
+                if "computer_timeouts" not in self.game_state:
+                    self.game_state["computer_timeouts"] = {}
+                if calling_team.name not in self.game_state["computer_timeouts"]:
+                    self.game_state["computer_timeouts"][calling_team.name] = {}
+                quarter = self.quarter
+                if quarter not in self.game_state["computer_timeouts"][calling_team.name]:
+                    self.game_state["computer_timeouts"][calling_team.name][quarter] = {"count": 0, "checked_conditions": set()}
+                self.game_state["computer_timeouts"][calling_team.name][quarter]["count"] += 1
+                
+                # Store next_play_type for resume
+                self.game_state["timeout_next_play_type"] = timeout_turn.get("next_play_type", "SIDE_INBOUND")
+                self.game_state["timeout_offense_team_id"] = self.offense_team.team_id
+                
+                # ✅ COMPUTER TIMEOUT: Rebuild both team lineups during simmed quarters
+                # Check if this is a simmed quarter (full_sim mode or turn_by_turn_mode=False with time_remaining > 0)
+                from BackEnd.utils.db_utils import build_lineup_from_mongo
+                try:
+                    # Rebuild calling team's lineup
+                    calling_team.lineup = build_lineup_from_mongo(calling_team, self.game_state)
+                    logging.info(f"✅ COMPUTER TIMEOUT: Rebuilt {calling_team.name} lineup")
+                    
+                    # Rebuild other team's lineup (user team or other computer team)
+                    other_team = self.away_team if calling_team == self.home_team else self.home_team
+                    other_team.lineup = build_lineup_from_mongo(other_team, self.game_state)
+                    logging.info(f"✅ COMPUTER TIMEOUT: Rebuilt {other_team.name} lineup")
+                except Exception as e:
+                    logging.error(f"⚠️ COMPUTER TIMEOUT: Failed to rebuild lineups: {e}")
+                    # Don't fail the timeout if lineup rebuild fails
+                
+                self.turns.append(timeout_turn)
+                self.text_log.append(timeout_turn["text"])
+                logging.info(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} called timeout during SIP")
+            else:
+                # No computer timeout - proceed with SIP
+                self.turns.append(inbound_payload)
+            
             # Reset offensive state to HCO after side inbound (FCP/HCT only apply after made shots)
             self.game_state["offensive_state"] = "HCO"
 
@@ -347,8 +404,64 @@ class GameManager:
             logging.warning(f"✅ [BIP CREATE] Creating BASELINE_INBOUND, next_defensive_setup={next_defensive_setup}, offense_team={self.offense_team.name}")
             
             inbound_payload = self.turn_manager.setup_baseline_inbound(next_defensive_setup=next_defensive_setup)
-            self.turns.append(inbound_payload)
-            self.text_log.append("Baseline inbound after made shot")
+            
+            # ✅ COMPUTER TIMEOUT: Check if any computer team should call timeout
+            # Check both teams if both are computer teams, otherwise check the non-user team
+            computer_teams_to_check = []
+            if not self.home_team.is_user_team:
+                computer_teams_to_check.append(self.home_team)
+            if not self.away_team.is_user_team:
+                computer_teams_to_check.append(self.away_team)
+            
+            calling_team = None
+            for computer_team in computer_teams_to_check:
+                if self.turn_manager.should_computer_call_timeout(computer_team, "BASELINE_INBOUND"):
+                    calling_team = computer_team
+                    break  # First team to call timeout wins
+            
+            if calling_team:
+                # Computer calls timeout - create timeout turn instead of BIP
+                timeout_turn = self.turn_manager.setup_timeout_turn(
+                    timeout_reason="COMPUTER",
+                    calling_team=calling_team
+                )
+                # Increment computer timeout count for this quarter
+                if "computer_timeouts" not in self.game_state:
+                    self.game_state["computer_timeouts"] = {}
+                if calling_team.name not in self.game_state["computer_timeouts"]:
+                    self.game_state["computer_timeouts"][calling_team.name] = {}
+                quarter = self.quarter
+                if quarter not in self.game_state["computer_timeouts"][calling_team.name]:
+                    self.game_state["computer_timeouts"][calling_team.name][quarter] = {"count": 0, "checked_conditions": set()}
+                self.game_state["computer_timeouts"][calling_team.name][quarter]["count"] += 1
+                
+                # Store next_play_type for resume
+                self.game_state["timeout_next_play_type"] = timeout_turn.get("next_play_type", "BASELINE_INBOUND")
+                self.game_state["timeout_offense_team_id"] = self.offense_team.team_id
+                
+                # ✅ COMPUTER TIMEOUT: Rebuild both team lineups during simmed quarters
+                # Check if this is a simmed quarter (full_sim mode or turn_by_turn_mode=False with time_remaining > 0)
+                from BackEnd.utils.db_utils import build_lineup_from_mongo
+                try:
+                    # Rebuild calling team's lineup
+                    calling_team.lineup = build_lineup_from_mongo(calling_team, self.game_state)
+                    logging.info(f"✅ COMPUTER TIMEOUT: Rebuilt {calling_team.name} lineup")
+                    
+                    # Rebuild other team's lineup (user team or other computer team)
+                    other_team = self.away_team if calling_team == self.home_team else self.home_team
+                    other_team.lineup = build_lineup_from_mongo(other_team, self.game_state)
+                    logging.info(f"✅ COMPUTER TIMEOUT: Rebuilt {other_team.name} lineup")
+                except Exception as e:
+                    logging.error(f"⚠️ COMPUTER TIMEOUT: Failed to rebuild lineups: {e}")
+                    # Don't fail the timeout if lineup rebuild fails
+                
+                self.turns.append(timeout_turn)
+                self.text_log.append(timeout_turn["text"])
+                logging.info(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} called timeout during BIP")
+            else:
+                # No computer timeout - proceed with BIP
+                self.turns.append(inbound_payload)
+                self.text_log.append("Baseline inbound after made shot")
             
             # Preserve offensive_state for next API call
             if next_defensive_setup:

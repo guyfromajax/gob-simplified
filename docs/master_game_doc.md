@@ -6188,19 +6188,65 @@ All three flows use the same core systems:
 
 ---
 
-## Computer Timeout System 🚧 **IN PROGRESS**
+## Computer Timeout System ✅ **COMPLETE** (January 2025)
 
-The computer timeout system enables AI-controlled teams to call timeouts during gameplay. This system will be implemented to allow computer teams to strategically pause the game for lineup adjustments, game plan changes, and tactical decisions.
+The computer timeout system enables AI-controlled teams to call timeouts during gameplay. Computer teams automatically evaluate timeout conditions and call timeouts when strategic situations arise.
 
-**Status:** Implementation in progress.
+### Overview
 
-**Planned Features:**
-- Computer teams can call timeouts during gameplay
-- Timeout logic based on game situations (score differential, momentum, foul trouble, etc.)
-- Works across all gameplay modes (Play Quarter, Sim To 4th Quarter, Sim Full Game)
-- Consistent with user timeout system (same turn structure and navigation flow)
+**Timeout Timing:**
+- Computer can only call timeouts during BIP (Baseline Inbound) and SIP (Side Inbound) turns
+- Computer timeout is evaluated immediately when the BIP/SIP turn is created (backend)
+- If computer calls timeout, the turn becomes a `TIMEOUT` turn instead of BIP/SIP
+- User timeout button is only active during the 2-second pause window (after turn is received by frontend)
+- **Precedence:** If computer timeout is called, it takes precedence over user timeout (computer timeout is checked before the turn is sent to frontend)
 
-**Documentation:** To be populated upon completion of implementation.
+**Timeout Limits:**
+- **Q1-Q3:** Computer can call maximum 1 timeout per quarter
+- **Q4:** Computer can call maximum number of timeouts equal to remaining timeouts upon entering the quarter
+- If max timeouts are reached, all timeout percentages become 0% for that quarter
+
+### Timeout Conditions (Q1-Q3)
+
+Computer evaluates timeout conditions in order. Each condition only checks once per occurrence (tracked per quarter):
+
+1. **Player with 3 fouls:** 100% chance (immediate timeout)
+2. **Player with 2 fouls:** 30% chance (checks once at first BIP/SIP after foul)
+3. **3 players < 80% NG:** 50% chance (checks once at first BIP/SIP after condition met)
+4. **4 players < 80% NG:** 75% chance (checks once at first BIP/SIP after condition met)
+5. **5 players < 80% NG:** 90% chance (checks once at first BIP/SIP after condition met)
+6. **3 players < 70% NG:** 80% chance (checks once at first BIP/SIP after condition met)
+7. **4 players < 70% NG:** 90% chance (checks once at first BIP/SIP after condition met)
+8. **5 players < 70% NG:** 95% chance (checks once at first BIP/SIP after condition met)
+9. **3 players < 60% NG:** 100% chance (immediate timeout)
+
+**Note:** Conditions are evaluated in order. If a higher-priority condition triggers (e.g., 3 fouls = 100%), lower-priority conditions are not checked.
+
+### Implementation Details
+
+**Key Files:**
+- `BackEnd/models/turn_manager.py`: `should_computer_call_timeout()` method evaluates timeout conditions
+- `BackEnd/models/game_manager.py`: Integrates computer timeout check into BIP/SIP turn creation
+- `BackEnd/models/turn_manager.py`: `setup_timeout_turn()` creates timeout turn with `timeout_reason="COMPUTER"`
+
+**Timeout Turn Structure:**
+- Same structure as user timeout turns
+- `timeout_reason: "COMPUTER"`
+- `text: "{Team Name} Calls a Timeout"`
+- Computer team lineup is rebuilt using autoset lineup process (same as user timeouts)
+
+**State Tracking:**
+- Computer timeout count per quarter stored in `game_state["computer_timeouts"][team_name][quarter]["count"]`
+- Checked conditions tracked in `game_state["computer_timeouts"][team_name][quarter]["checked_conditions"]` set
+- Prevents duplicate condition checks within the same quarter
+
+**Integration Points:**
+- Computer timeout check occurs in `game_manager.simulate_macro_turn()` when creating SIP turns
+- Computer timeout check occurs in `game_manager.simulate_macro_turn()` when creating BIP turns
+- Timeout turn replaces the BIP/SIP turn if computer calls timeout
+- **Works during simmed quarters:** Computer timeout logic runs during "Sim To 4th Quarter" and "Sim Full Game" operations
+- **Two computer teams:** Both teams are checked for timeout conditions; first team to meet conditions calls timeout
+- **Lineup adjustments:** When computer calls timeout during simmed quarters, both team lineups are rebuilt using `build_lineup_from_mongo()` (same autoset logic as regular timeouts)
 
 ---
 
