@@ -259,7 +259,7 @@ async function handleTimeoutButtonClick() {
  * @param {boolean} [computerTimeout=false] - Whether this is a computer timeout
  * @param {string} [computerTeamName] - Name of the computer team that called timeout
  */
-async function showTimeoutPopup(timeoutResult, gameId, scene, computerTimeout = false, computerTeamName = null) {
+export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTimeout = false, computerTeamName = null) {
     // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
     // Use global helper (works in both regular scripts and modules)
     const helper = window.TimeoutNavigationHelper;
