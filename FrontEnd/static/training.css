@@ -73,6 +73,13 @@ body {
   gap: var(--spacing-xs);
 }
 
+.header-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  justify-content: flex-end;
+}
+
 .page-title {
   font-size: 2.5rem;
   color: var(--color-accent);
@@ -112,6 +119,7 @@ body {
   box-shadow: 0 4px 12px rgba(74, 144, 226, 0.4);
 }
 
+.auto-train-button,
 .submit-button {
   background: var(--color-accent-orange);
   color: #fff;
@@ -125,16 +133,76 @@ body {
   box-shadow: 0 2px 8px rgba(255, 122, 0, 0.3);
 }
 
+.auto-train-button {
+  background: #6c5ce7;
+  box-shadow: 0 2px 8px rgba(108, 92, 231, 0.35);
+}
+
+.auto-train-button:hover:not(:disabled) {
+  background: #7e6df0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(108, 92, 231, 0.4);
+}
+
 .submit-button:hover:not(:disabled) {
   background: #ff8a1a;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(255, 122, 0, 0.4);
 }
 
+.auto-train-button:disabled,
 .submit-button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   pointer-events: none;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Auto-Train modal */
+.auto-train-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.auto-train-modal-content {
+  background: #1f2a48;
+  padding: var(--spacing-lg);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  max-width: 420px;
+  width: 90%;
+  text-align: center;
+  border: 1px solid var(--color-border);
+}
+
+.auto-train-modal-content p {
+  margin-bottom: var(--spacing-md);
+  font-size: 1.1rem;
+  color: var(--color-text);
+}
+
+.auto-train-modal-close {
+  background: var(--color-accent-orange);
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1.4rem;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.auto-train-modal-close:hover {
+  background: #ff8f26;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 122, 0, 0.3);
 }
 
 /* Main Content: Player Drills and Team Drills */

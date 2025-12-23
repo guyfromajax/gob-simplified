@@ -4034,6 +4034,12 @@
               contested: buildVariantVersions('contested'),
               broken: buildVariantVersions('broken')
             },
+        // Initialize play metrics (all start at 0 for new plays)
+        effectiveness: 0,
+        cloaking: 0,
+        momentum: 0,
+        // Initialize copy object (for play details page)
+        copy: {},
         game_stats: {
           times_run: 0,
           shot_attempts: 0,

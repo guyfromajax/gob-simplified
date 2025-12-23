@@ -2378,6 +2378,22 @@ Jersey numbers were not appearing in the box score display or special stats popu
 - `BackEnd/models/game_manager.py` - Box score generation (`get_box_score()`)
 - `BackEnd/models/team_manager.py` - Team stat aggregation (`get_team_game_stats()`)
 
+### Court Page Team Box Score (S3) — Team Measures
+- **Location:** `FrontEnd/static/court.html` (Team tabs S3)
+- **Layout:** Horizontal pills (same style as Command Center/Training Report) in this order:
+  1. Shooting (`shot_threshold`)
+  2. Rebounding (`rebound_modifier`)
+  3. Offense Efficiency (`offensive_efficiency`)
+  4. Defense Efficiency (`defensive_efficiency`)
+  5. Fast Break Efficiency (`fb_efficiency`)
+  6. Press/Trap Efficiency (`pt_efficiency`)
+  7. Aggression (`aggression`)
+  8. Discipline (`foul_modifier`)
+  9. Momentum (`momentum_score`)
+  10. Team Chemistry (chemistry bar)
+- **Behavior:** Uses red/green pill component; Team Chemistry uses a fill bar (0–25). Values display next to labels; chemistry shows “value / 25”.
+- **Styles:** Reuses `command-center-team-styles.css` for pills; court-specific layout defined in `court.html`.
+
 ---
 
 ## Player Attribute Tooltips System ✅ **COMPLETE** (January 2025)
@@ -2790,6 +2806,95 @@ The Play Builder (`play-builder-v2.html`) is a web-based tool for creating and e
   }
 }
 ```
+
+### Play Creation Data Structure ✅ **NEW** (January 2025)
+
+When a new play is created via Play Builder V2, the following fields are automatically populated in the play document:
+
+#### Required Fields (Always Set)
+- **`_id`**: MongoDB ObjectId (auto-generated)
+- **`name`**: Play name (user-provided)
+- **`play_type`**: "motion" or "set_play" (converted from user selection)
+- **`play_focus`**: 
+  - Set Plays: "inside", "attack", "outside", or "balanced" (user-provided)
+  - Motion Plays: `null` (not applicable)
+- **`skeletons`**: Complete skeleton structure with all variants and steps
+
+#### Initialized Fields (Default Values)
+- **`effectiveness`**: `0` (0-100 scale, starts at 0 for new plays)
+- **`cloaking`**: `0` (0-10 scale, starts at 0 for new plays)
+- **`momentum`**: `0` (0-10 scale, starts at 0 for new plays)
+- **`copy`**: `{}` (empty object, for play details page copy text)
+
+#### Statistics Fields (Initialized to Zero)
+- **`game_stats`**: Object with all stats initialized to 0:
+  ```json
+  {
+    "times_run": 0,
+    "shot_attempts": 0,
+    "made_shots": 0,
+    "turnovers": 0,
+    "offensive_fouls": 0,
+    "defensive_fouls": 0
+  }
+  ```
+- **`season_stats`**: Same structure as `game_stats`, all initialized to 0
+
+#### Complete Play Document Example
+```json
+{
+  "_id": "68f919f9065f78d452557809",
+  "name": "4-1 Motion",
+  "play_type": "motion",
+  "play_focus": null,
+  "skeletons": {
+    "base_loop": {
+      "steps": [...],
+      "complete": true
+    }
+  },
+  "effectiveness": 0,
+  "cloaking": 0,
+  "momentum": 0,
+  "copy": {},
+  "game_stats": {
+    "times_run": 0,
+    "shot_attempts": 0,
+    "made_shots": 0,
+    "turnovers": 0,
+    "offensive_fouls": 0,
+    "defensive_fouls": 0
+  },
+  "season_stats": {
+    "times_run": 0,
+    "shot_attempts": 0,
+    "made_shots": 0,
+    "turnovers": 0,
+    "offensive_fouls": 0,
+    "defensive_fouls": 0
+  }
+}
+```
+
+#### Implementation Details
+
+**Frontend (`FrontEnd/static/play-builder-v2.html:4013-4053`):**
+- `savePlayToDatabase()` function builds the play data object
+- All fields are explicitly set before sending to backend
+- Metrics (`effectiveness`, `cloaking`, `momentum`) initialized to 0
+- `copy` object initialized as empty object `{}`
+
+**Backend (`BackEnd/api/play_routes.py:30-96`):**
+- `PlayCreate` Pydantic model defines accepted fields
+- `create_play()` endpoint validates and saves play data
+- Backend ensures all fields are initialized if not provided (defensive programming)
+- Uses MongoDB `upsert=True` to update existing plays or create new ones (matched by `name`)
+
+**Key Points:**
+- All play metrics start at 0 and are updated through gameplay/training
+- Statistics accumulate over time as plays are used
+- `copy` object can be populated later for play details page descriptions
+- Play documents are stored in `plays_collection` (universal plays library)
 
 ### Key Functions
 
@@ -5361,7 +5466,11 @@ games_collection.update_one(
 **Database Access by Mode:**
 - **Single Game:** `games_collection` document
 - **Tournament Game:** Nested in `tournaments_collection.games.{round}.{game_id}` (with fallback to `games_collection`)
+  - **Game Document Fields:** `tournament_id` and `mode` are always set in `games_collection` documents (matches Franchise pattern)
+  - **Implementation:** `BackEnd/api/api.py:1636-1650` - `simulate_quarter_endpoint()` adds `tournament_id` and `mode` when saving game state
 - **Franchise Game:** Nested in `franchises_collection.games.week_{week}.{game_id}` (with fallback to `games_collection`)
+  - **Game Document Fields:** `franchise_id` and `week` are always set in `games_collection` documents
+  - **Implementation:** `BackEnd/api/franchise_routes.py:365-366` - Adds `franchise_id` and `week` when saving game state
 
 #### URL Parameters (Navigation Only)
 
@@ -6701,6 +6810,7 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 **Game Initialization and Playbook Settings Persistence:**
 - When a game is initialized via `/api/init-game`, the game document is created with `mode`, `tournament_id` (for tournament mode), or `franchise_id` (for franchise mode) fields
 - These fields are set on the game document at initialization time (not just at game completion) to ensure playbook settings can be loaded during active gameplay
+- **Update (January 2025):** `tournament_id` and `mode` are now also set during `simulate_quarter_endpoint()` saves, ensuring they are always present in game documents regardless of game creation path (matches Franchise mode pattern where `franchise_id` and `week` are always set during saves)
 - **Frontend:** `set-lineup.js` passes `mode`, `tournament_id`, and `franchise_id` (when available) to `/api/init-game`
 - **Backend:** `/api/init-game` stores these fields on the game document:
   - `mode`: "single", "tournament", or "franchise"
@@ -7243,6 +7353,19 @@ The Training System provides a comprehensive interface for allocating training p
   1. All 24 training points are allocated (Points Remaining = 0)
   2. A coaching focus is selected
 - Becomes active only when both conditions are met
+
+### Auto-Train Button (New)
+
+- **Button:** “Auto-Train” (header, right side)
+- **Behavior when clicked:**
+  - Automatically assigns all 24 points across the 20 sliders
+    - Sets all 20 sliders to `1`
+    - Randomly selects four sliders to set to `2` (total = 24)
+  - Randomly selects a Coaching Focus (one of the existing focus radio options)
+  - Shows confirmation popup: `Training Points Assigned - {Focus Name} Focus Chosen`
+    - Popup has a “Close” button; closing keeps the user on the Training page
+  - After auto-assign, Points Remaining = 0 and Submit becomes eligible (provided focus set by auto-train)
+- **Files:** `FrontEnd/static/training.html`, `FrontEnd/static/training.js`, `FrontEnd/static/training.css`
 
 ### Data Capture
 

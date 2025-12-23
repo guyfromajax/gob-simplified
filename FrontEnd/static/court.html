@@ -5,6 +5,7 @@
   <meta charset="UTF-8" />
   <title>GOB Court</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="command-center-team-styles.css" />
   <style>
     :root {
       --scoreboard-height: 100px;
@@ -618,6 +619,56 @@
     .team-stats-table td, .team-attrs-table td { text-align: center; padding: 6px 4px; border-bottom: 1px solid #222; }
     .team-stats-table td:first-child, .team-attrs-table td:first-child { text-align: left; }
     .team-stats-table th:first-child { text-align: left; }
+
+    /* Team pills layout (S3 tab) */
+    .team-attrs-pills {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      font-size: 14px; /* Match S1/S2 font size */
+    }
+    .team-attr-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .team-attr-label {
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+      font-weight: 600;
+      color: #e0e0e0;
+      font-size: 14px; /* Match S1/S2 font size */
+    }
+    .team-attr-pill-wrapper.training-report-styled {
+      font-size: 14px; /* Match S1/S2 font size */
+    }
+    .team-attr-pill-wrapper.training-report-styled .attr-pill {
+      height: 32px;
+    }
+    .team-chemistry-bar {
+      width: 100%;
+    }
+    /* Override command-center-team-styles.css font sizes for S3 tab */
+    .team-tab-S3 .training-report-styled {
+      font-size: 14px;
+    }
+    .team-tab-S3 .training-report-styled .attr-label {
+      font-size: 14px;
+    }
+    .team-tab-S3 .training-report-styled .attr-value {
+      font-size: 14px;
+    }
+    /* Ensure hidden tabs don't take up space */
+    .team-tab {
+      min-height: 0;
+    }
+    /* Override any padding/margin from command-center-team-styles.css that might affect layout */
+    .team-tab-S3 {
+      padding: 0;
+      margin: 0;
+    }
 
     /* ==================== COURT CONTAINER ==================== */
     #phaser-container {
@@ -2143,17 +2194,7 @@
             </table>
           </div>
           <div class="team-tab team-tab-S3">
-            <table class="team-attrs-table">
-              <tbody>
-                <tr><td>Foul Modifier</td><td data-attr="foul_modifier">--</td></tr>
-                <tr><td>Shots</td><td data-attr="shot_threshold">--</td></tr>
-                <tr><td>Mo Score</td><td data-attr="momentum_score">--</td></tr>
-                <tr><td>O Efficiency</td><td data-attr="offensive_efficiency">--</td></tr>
-                <tr><td>Rebounds</td><td data-attr="rebound_modifier">--</td></tr>
-                <tr><td>Turnovers</td><td data-attr="turnover_modifier">--</td></tr>
-                <tr><td>Chemistry</td><td data-attr="team_chemistry">--</td></tr>
-              </tbody>
-            </table>
+            <div class="team-attrs-pills training-report-styled" data-team-attrs="away"></div>
           </div>
         </div>
       </div>
@@ -2269,17 +2310,7 @@
             </table>
           </div>
           <div class="team-tab team-tab-S3">
-            <table class="team-attrs-table">
-              <tbody>
-                <tr><td>Foul Modifier</td><td data-attr="foul_modifier">--</td></tr>
-                <tr><td>Shots</td><td data-attr="shot_threshold">--</td></tr>
-                <tr><td>Mo Score</td><td data-attr="momentum_score">--</td></tr>
-                <tr><td>O Efficiency</td><td data-attr="offensive_efficiency">--</td></tr>
-                <tr><td>Rebounds</td><td data-attr="rebound_modifier">--</td></tr>
-                <tr><td>Turnovers</td><td data-attr="turnover_modifier">--</td></tr>
-                <tr><td>Chemistry</td><td data-attr="team_chemistry">--</td></tr>
-              </tbody>
-            </table>
+            <div class="team-attrs-pills training-report-styled" data-team-attrs="home"></div>
           </div>
         </div>
       </div>
@@ -3448,20 +3479,109 @@
         setCell('fcp_attempts', fcpA);
         setCell('fcp_rate', rate(fcpS, fcpA));
         const attrs = data.attributes || {};
-        const setAttr = (name, val) => {
-          const cell = root.querySelector(`[data-attr="${name}"]`);
-          if (cell) cell.textContent = val == null ? '--' : String(val);
-        };
-        setAttr('foul_modifier', attrs.foul_modifier);
-        setAttr('shot_threshold', attrs.shot_threshold);
-        setAttr('momentum_score', attrs.momentum_score);
-        setAttr('offensive_efficiency', attrs.offensive_efficiency);
-        setAttr('rebound_modifier', attrs.rebound_modifier);
-        setAttr('turnover_modifier', attrs.turnover_modifier);
-        setAttr('team_chemistry', attrs.team_chemistry);
+        const pillsRoot = root.querySelector('.team-attrs-pills');
+        if (pillsRoot) {
+          renderTeamAttributePills(pillsRoot, attrs);
+        }
       };
       apply('home', home);
       apply('away', away);
+    }
+
+    function createAttrPill(originalValue, attrKey) {
+      const pill = document.createElement('div');
+      pill.className = 'attr-pill';
+
+      const centerLine = document.createElement('div');
+      centerLine.className = 'pill-center-line';
+      pill.appendChild(centerLine);
+
+      let maxValue = 10;
+      let value = originalValue;
+
+      if (attrKey === 'shot_threshold') {
+        maxValue = 200;
+      } else if (attrKey === 'rebound_modifier') {
+        maxValue = 0.2;
+        value = originalValue - 1.0;
+      }
+
+      if (value > 0) {
+        const fill = document.createElement('div');
+        fill.className = 'pill-fill-positive';
+        const percentage = Math.min((value / maxValue) * 50, 50);
+        fill.style.width = `${percentage}%`;
+        pill.insertBefore(fill, centerLine);
+      } else if (value < 0) {
+        const fill = document.createElement('div');
+        fill.className = 'pill-fill-negative';
+        const absValue = Math.abs(value);
+        const percentage = Math.min((absValue / maxValue) * 50, 50);
+        fill.style.width = `${percentage}%`;
+        pill.insertBefore(fill, centerLine);
+      }
+
+      return pill;
+    }
+
+    function createChemistryBar(value) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'chemistry-bar-container team-chemistry-bar';
+
+      const fill = document.createElement('div');
+      fill.className = 'chemistry-bar-fill';
+      const pct = Math.max(0, Math.min(100, (value / 25) * 100));
+      fill.style.width = `${pct}%`;
+
+      const text = document.createElement('div');
+      text.className = 'chemistry-bar-text';
+      text.textContent = `${value ?? '--'} / 25`;
+      text.style.fontSize = '14px'; /* Match S1/S2 font size */
+
+      wrapper.appendChild(fill);
+      wrapper.appendChild(text);
+      return wrapper;
+    }
+
+    function renderTeamAttributePills(root, attrs) {
+      const order = [
+        { label: 'Shooting', key: 'shot_threshold' },
+        { label: 'Rebounding', key: 'rebound_modifier' },
+        { label: 'Offense Efficiency', key: 'offensive_efficiency' },
+        { label: 'Defense Efficiency', key: 'defensive_efficiency' },
+        { label: 'Fast Break Efficiency', key: 'fb_efficiency' },
+        { label: 'Press/Trap Efficiency', key: 'pt_efficiency' },
+        { label: 'Aggression', key: 'aggression' },
+        { label: 'Discipline', key: 'foul_modifier' },
+        { label: 'Momentum', key: 'momentum_score' },
+        { label: 'Team Chemistry', key: 'team_chemistry', chemistry: true },
+      ];
+
+      root.innerHTML = '';
+
+      order.forEach(({ label, key, chemistry }) => {
+        const row = document.createElement('div');
+        row.className = 'team-attr-row';
+
+        const header = document.createElement('div');
+        header.className = 'team-attr-label';
+        const nameEl = document.createElement('span');
+        nameEl.textContent = label;
+        header.appendChild(nameEl);
+
+        const pillWrap = document.createElement('div');
+        pillWrap.className = 'team-attr-pill-wrapper training-report-styled';
+        const val = attrs[key];
+        if (chemistry) {
+          pillWrap.appendChild(createChemistryBar(val ?? 0));
+        } else {
+          pillWrap.appendChild(createAttrPill(val ?? 0, key));
+        }
+
+        row.appendChild(header);
+        row.appendChild(pillWrap);
+        root.appendChild(row);
+      });
     }
   </script>
   <script type="module">
