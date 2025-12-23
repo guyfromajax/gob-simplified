@@ -144,6 +144,15 @@
     if (computerTimeout && computerTeamName) {
       params.set('computer_timeout', 'true');
       params.set('computer_team_name', computerTeamName);
+      console.log('✅ COMPUTER TIMEOUT: Added URL params', {
+        computer_timeout: 'true',
+        computer_team_name: computerTeamName
+      });
+    } else {
+      console.warn('⚠️ COMPUTER TIMEOUT: Missing params', {
+        computerTimeout: computerTimeout,
+        computerTeamName: computerTeamName
+      });
     }
     
     // ============================================

@@ -510,7 +510,14 @@ export class AnimationEngine {
           this.scene.simData.clock = turnData.clock;
         }
         // ✅ COMPUTER TIMEOUT: Navigate directly (no popup) - same flow as user timeouts
-        const computerTeamName = turnData.timeout_calling_team?.name || null;
+        const computerTeamName = turnData.timeout_calling_team?.name || 
+                                 (typeof turnData.timeout_calling_team === 'string' ? turnData.timeout_calling_team : null) ||
+                                 null;
+        console.log('⏸️ COMPUTER TIMEOUT: Extracting team name', {
+          timeout_calling_team: turnData.timeout_calling_team,
+          computerTeamName: computerTeamName,
+          timeout_reason: turnData.timeout_reason
+        });
         await showTimeoutPopup(timeoutResult, gameId, this.scene, true, computerTeamName);
       } catch (error) {
         console.error('❌ COMPUTER TIMEOUT: Failed to navigate to lineup screen:', error);
