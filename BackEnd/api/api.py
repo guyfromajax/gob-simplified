@@ -2023,41 +2023,19 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
     
     calling_team = gm.home_team if calling_team_side == 'home' else gm.away_team
     
-    # Check if team has timeouts remaining
-    if not gm.turn_manager.can_call_timeout(calling_team):
+    # Use unified timeout creation method (same as computer timeouts)
+    timeout_turn = gm.call_timeout(
+        calling_team=calling_team,
+        timeout_reason="USER",
+        rebuild_both_lineups=False,  # User timeout only rebuilds computer team
+        game_id=None  # Don't save here - we'll save below
+    )
+    
+    if not timeout_turn:
         raise HTTPException(
             status_code=400,
             detail=f"{calling_team.name} has no timeouts remaining."
         )
-    
-    # Create a TIMEOUT turn
-    timeout_turn = gm.turn_manager.setup_timeout_turn(
-        timeout_reason="USER",
-        calling_team=calling_team
-    )
-    
-    # Store next_play_type in game_state for resume
-    gm.game_state["timeout_next_play_type"] = timeout_turn.get("next_play_type", "SIDE_INBOUND")
-    logging.info(f"✅ TIMEOUT: Stored next_play_type '{gm.game_state['timeout_next_play_type']}' to game_state for resume")
-    
-    # ✅ TIMEOUT: Capture possession team at time of timeout (for correct SIP team on resume)
-    gm.game_state["timeout_offense_team_id"] = gm.offense_team.team_id
-    logging.info(f"✅ TIMEOUT: Captured possession team '{gm.offense_team.name}' (team_id: {gm.offense_team.team_id}) for resume")
-    
-    # ✅ TIMEOUT: Rebuild computer team's lineup with energy/foul filtering
-    computer_team = gm.away_team if not gm.away_team.is_user_team else gm.home_team
-    if not computer_team.is_user_team:
-        from BackEnd.utils.db_utils import build_lineup_from_mongo
-        try:
-            computer_team.lineup = build_lineup_from_mongo(computer_team, gm.game_state)
-            logging.info(f"✅ TIMEOUT: Rebuilt computer team ({computer_team.name}) lineup with energy/foul filtering")
-        except Exception as e:
-            logging.error(f"⚠️ TIMEOUT: Failed to rebuild computer team lineup: {e}")
-            # Don't fail the timeout if lineup rebuild fails - use existing lineup
-    
-    # Append the TIMEOUT turn to the game manager's turns list
-    gm.turns.append(timeout_turn)
-    gm.text_log.append(timeout_turn["text"])
     
     # ✅ TIMEOUT: Save game state to database (reuse existing persistence pattern)
     # This ensures scores, clock, fouls, etc. are preserved when user returns from lineup screen
