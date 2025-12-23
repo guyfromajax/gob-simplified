@@ -495,7 +495,7 @@ export class AnimationEngine {
     if (gameId) {
       // Import and call showTimeoutPopup (same function used by user timeouts)
       try {
-        const { showTimeoutPopup } = await import('../../utils/timeoutButtonManager.js');
+        const { showTimeoutPopup } = await import('../utils/timeoutButtonManager.js');
         // Create a mock timeoutResult object (showTimeoutPopup expects this structure)
         const timeoutResult = {
           message: turnData.text || `${turnData.timeout_calling_team?.name || 'Team'} Calls a Timeout`,

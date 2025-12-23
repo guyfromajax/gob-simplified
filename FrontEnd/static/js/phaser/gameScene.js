@@ -1763,6 +1763,8 @@ export function createGameScene(Phaser) {
               ballSprite: this.ballSprite,
               onUpdate: updateScoreboard
             });
+            // ✅ TIMEOUT: Set flag to prevent quarter completion check after timeout
+            this.timeoutCalled = true;
             // Break out of the while loop - don't make any more API calls
             break;
           }
@@ -1927,6 +1929,13 @@ export function createGameScene(Phaser) {
           console.error('❌ Error in turn-by-turn loop:', error);
           break;
         }
+      }
+      
+      // ✅ TIMEOUT: Don't check for quarter completion if timeout was called
+      // Timeout navigation handles the flow, so we shouldn't show quarter end popup
+      if (this.timeoutCalled) {
+        console.log('⏸️ TIMEOUT: Skipping quarter completion check - timeout was called');
+        return; // Exit early - timeout navigation is handling the flow
       }
       
       console.log(`🏁 Quarter ${this.quarter} finished! Total turns: ${turnCount}`);
