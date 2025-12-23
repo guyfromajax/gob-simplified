@@ -1908,16 +1908,21 @@ class TurnManager:
         game = self.game
         game_state = game.game_state
         
+        logging.warning(f"🔍 [COMPUTER TIMEOUT CHECK] Team: {computer_team.name}, Turn Type: {turn_type}, Quarter: {game.quarter}")
+        
         # Only check during BIP/SIP turns
         if turn_type not in ["BASELINE_INBOUND", "SIDE_INBOUND"]:
+            logging.warning(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - invalid turn type: {turn_type}")
             return False
         
         # Only check for computer teams (not user teams)
         if computer_team.is_user_team:
+            logging.warning(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - user team: {computer_team.name}")
             return False
         
         # Check if team has timeouts remaining
         if not self.can_call_timeout(computer_team):
+            logging.warning(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - no timeouts remaining: {computer_team.name} (remaining: {computer_team.timeouts})")
             return False
         
         # Initialize computer timeout tracking in game_state
@@ -1941,7 +1946,10 @@ class TurnManager:
         # Check max timeouts per quarter
         max_timeouts = 1 if quarter <= 3 else computer_team.timeouts
         if quarter_data["count"] >= max_timeouts:
+            logging.warning(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - max timeouts reached: {computer_team.name} Q{quarter} (count: {quarter_data['count']}, max: {max_timeouts})")
             return False  # Already at max for this quarter
+        
+        logging.warning(f"🔍 [COMPUTER TIMEOUT CHECK] Evaluating conditions for {computer_team.name} Q{quarter} (current count: {quarter_data['count']}, max: {max_timeouts})")
         
         # Get all players on the team
         all_players = computer_team.get_all_players()
@@ -1960,6 +1968,7 @@ class TurnManager:
                 condition_key = f"3_fouls_{player.player_id}"
                 if fouls == 3 and condition_key not in checked:
                     checked.add(condition_key)
+                    logging.warning(f"✅ [COMPUTER TIMEOUT] Q1 Condition met: {player.get_name()} has 3 fouls (100% chance)")
                     return True  # 100% chance
             
             # Condition 2: Player with 2 fouls - 30% chance (only check once)
@@ -1968,8 +1977,12 @@ class TurnManager:
                 condition_key = f"2_fouls_{player.player_id}"
                 if fouls == 2 and condition_key not in checked:
                     checked.add(condition_key)
-                    if random.random() < 0.30:
+                    roll = random.random()
+                    if roll < 0.30:
+                        logging.warning(f"✅ [COMPUTER TIMEOUT] Q1 Condition met: {player.get_name()} has 2 fouls (30% chance, rolled {roll:.2f})")
                         return True
+                    else:
+                        logging.warning(f"🔍 [COMPUTER TIMEOUT] Q1 Condition checked: {player.get_name()} has 2 fouls (30% chance, rolled {roll:.2f} - no timeout)")
         
         # Q2 & Q3: Player foul logic
         elif quarter in [2, 3]:
@@ -1979,6 +1992,7 @@ class TurnManager:
                 condition_key = f"4_fouls_{player.player_id}"
                 if fouls == 4 and condition_key not in checked:
                     checked.add(condition_key)
+                    logging.warning(f"✅ [COMPUTER TIMEOUT] Q{quarter} Condition met: {player.get_name()} has 4 fouls (100% chance)")
                     return True  # 100% chance
             
             # Condition 2: Player with 3 fouls - 90% chance
@@ -1987,8 +2001,12 @@ class TurnManager:
                 condition_key = f"3_fouls_{player.player_id}"
                 if fouls == 3 and condition_key not in checked:
                     checked.add(condition_key)
-                    if random.random() < 0.90:
+                    roll = random.random()
+                    if roll < 0.90:
+                        logging.warning(f"✅ [COMPUTER TIMEOUT] Q{quarter} Condition met: {player.get_name()} has 3 fouls (90% chance, rolled {roll:.2f})")
                         return True
+                    else:
+                        logging.warning(f"🔍 [COMPUTER TIMEOUT] Q{quarter} Condition checked: {player.get_name()} has 3 fouls (90% chance, rolled {roll:.2f} - no timeout)")
         
         # Q4: Player foul logic (only if time_remaining > 60 seconds)
         elif quarter == 4:
@@ -1999,8 +2017,14 @@ class TurnManager:
                     condition_key = f"4_fouls_{player.player_id}"
                     if fouls == 4 and condition_key not in checked:
                         checked.add(condition_key)
-                        if random.random() < 0.90:
+                        roll = random.random()
+                        if roll < 0.90:
+                            logging.warning(f"✅ [COMPUTER TIMEOUT] Q4 Condition met: {player.get_name()} has 4 fouls (90% chance, rolled {roll:.2f}, time_remaining: {time_remaining}s)")
                             return True
+                        else:
+                            logging.warning(f"🔍 [COMPUTER TIMEOUT] Q4 Condition checked: {player.get_name()} has 4 fouls (90% chance, rolled {roll:.2f} - no timeout, time_remaining: {time_remaining}s)")
+            else:
+                logging.warning(f"🔍 [COMPUTER TIMEOUT] Q4 Skipping foul check - time_remaining ({time_remaining}s) <= 60s")
         
         # ========== ENERGY CONDITIONS (All Quarters Q1-Q4) ==========
         
@@ -2060,8 +2084,10 @@ class TurnManager:
         condition_key = "3_players_60_ng"
         if count_60 >= 3 and condition_key not in checked:
             checked.add(condition_key)
+            logging.warning(f"✅ [COMPUTER TIMEOUT] Energy condition met: 3 players < 60% NG (100% chance)")
             return True  # 100% chance
         
+        logging.warning(f"🔍 [COMPUTER TIMEOUT] No conditions met for {computer_team.name} Q{quarter}")
         return False
 
     def resolve_offensive_rebound_turn(self):

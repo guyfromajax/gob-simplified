@@ -165,6 +165,9 @@ class GameManager:
 
 
     def simulate_macro_turn(self): #run_simulation
+        # Clear timeout flag at start of each turn (will be set if timeout is called)
+        self.game_state["timeout_called"] = False
+        
         # Increment macro turn counter
         self.macro_turn_count += 1
         
@@ -343,6 +346,7 @@ class GameManager:
             
             if calling_team:
                 # Computer calls timeout - create timeout turn instead of SIP
+                logging.warning(f"🔍 [COMPUTER TIMEOUT] Creating timeout turn for {calling_team.name} during SIP")
                 timeout_turn = self.turn_manager.setup_timeout_turn(
                     timeout_reason="COMPUTER",
                     calling_team=calling_team
@@ -379,7 +383,12 @@ class GameManager:
                 
                 self.turns.append(timeout_turn)
                 self.text_log.append(timeout_turn["text"])
-                logging.info(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} called timeout during SIP")
+                logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} called timeout during SIP (turn {len(self.turns)}, timeout_turn: {timeout_turn.get('text')})")
+                # ✅ COMPUTER TIMEOUT: Set flag to stop simulation loop
+                self.game_state["timeout_called"] = True
+                logging.warning(f"⏸️ COMPUTER TIMEOUT: Set timeout_called=True, returning early from simulate_macro_turn()")
+                # Don't check for BIP after timeout - return early
+                return
             else:
                 # No computer timeout - proceed with SIP
                 self.turns.append(inbound_payload)
@@ -390,6 +399,11 @@ class GameManager:
         # ✅ FIX 2: Backend flip for Made Shots → Inbound (Pattern A)
         # Create BASELINE_INBOUND turns for ALL made shots (HCO, FT, FB, FCP/HCT, OREB)
         # Check LAST turn (handles OREB putbacks which append in while loop above)
+        # ✅ COMPUTER TIMEOUT: Skip BIP creation if timeout was just called
+        if self.game_state.get("timeout_called"):
+            logging.warning(f"⏸️ COMPUTER TIMEOUT: Skipping BIP creation - timeout was called")
+            return
+        
         last_turn = self.turns[-1] if self.turns else None
         if last_turn and last_turn.get("next_play_type") == "BASELINE_INBOUND":
             # ✅ Flip possession BEFORE creating BASELINE_INBOUND (gold standard pattern)
@@ -421,6 +435,7 @@ class GameManager:
             
             if calling_team:
                 # Computer calls timeout - create timeout turn instead of BIP
+                logging.warning(f"🔍 [COMPUTER TIMEOUT] Creating timeout turn for {calling_team.name} during BIP")
                 timeout_turn = self.turn_manager.setup_timeout_turn(
                     timeout_reason="COMPUTER",
                     calling_team=calling_team
@@ -457,7 +472,12 @@ class GameManager:
                 
                 self.turns.append(timeout_turn)
                 self.text_log.append(timeout_turn["text"])
-                logging.info(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} called timeout during BIP")
+                logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} called timeout during BIP (turn {len(self.turns)}, timeout_turn: {timeout_turn.get('text')})")
+                # ✅ COMPUTER TIMEOUT: Set flag to stop simulation loop
+                self.game_state["timeout_called"] = True
+                logging.warning(f"⏸️ COMPUTER TIMEOUT: Set timeout_called=True, returning early from simulate_macro_turn()")
+                # Don't continue processing after timeout
+                return
             else:
                 # No computer timeout - proceed with BIP
                 self.turns.append(inbound_payload)
