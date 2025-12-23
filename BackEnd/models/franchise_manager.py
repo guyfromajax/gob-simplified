@@ -158,6 +158,13 @@ class FranchiseManager:
 
         # Initialize franchise-specific team stats using mode initialization system
         from BackEnd.models.team_manager import TeamManager
+        from BackEnd.api.gameplan_routes import populate_team_plays, populate_scouting_data, initialize_playbook_settings
+        
+        # Get populated plays and scouting data for all teams (franchise mode)
+        populated_plays = populate_team_plays(mode="franchise")
+        scouting_data = populate_scouting_data(mode="franchise")
+        playbook_settings = initialize_playbook_settings()
+        
         franchise_teams = {}
         for team in self.teams:
             team_id = str(team["_id"])
@@ -191,7 +198,9 @@ class FranchiseManager:
                     "half_court_trap": 2,
                     "full_court_press": 2
                 },
-                "plays": {}
+                "plays": populated_plays.copy(),
+                "scouting_data": scouting_data.copy(),
+                "playbook_settings": playbook_settings.copy()
             }
 
         # Initialize training status - needs training before week 1 (training camp)

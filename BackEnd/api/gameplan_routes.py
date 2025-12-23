@@ -170,6 +170,107 @@ def populate_team_plays(mode="single"):
         return {}
 
 
+def initialize_playbook_settings():
+    """
+    Initialize playbook_settings with defaults (Option B: first play = 100%, others = 0%).
+    
+    Returns:
+        dict: playbook_settings structure with defaults:
+        - motion: {first_play_name: 100}
+        - set_play_inside: {first_play_name: 100}
+        - set_play_attack: {first_play_name: 100}
+        - set_play_outside: {first_play_name: 100}
+        - zone_defense: {"2-3 Zone": 100}
+        - man_defense: {"Man": 100}
+        - slot_assignments: {}
+        - motion_dropdowns: {}
+    """
+    try:
+        from BackEnd.db import plays_collection
+        
+        # Get all plays from universal collection
+        all_plays = list(plays_collection.find({}))
+        
+        # Initialize structure
+        playbook_settings = {
+            "motion": {},
+            "set_play_inside": {},
+            "set_play_attack": {},
+            "set_play_outside": {},
+            "zone_defense": {},
+            "man_defense": {},
+            "slot_assignments": {},
+            "motion_dropdowns": {}
+        }
+        
+        # Group plays by type and focus
+        motion_plays = []
+        set_plays_inside = []
+        set_plays_attack = []
+        set_plays_outside = []
+        
+        for play in all_plays:
+            play_name = play.get("name", "")
+            play_type = play.get("play_type", "")
+            play_focus = play.get("play_focus", "")
+            
+            # Skip "To Be Added" placeholder plays
+            if play_name == "To Be Added":
+                continue
+            
+            if play_type == "motion":
+                motion_plays.append(play_name)
+            elif play_type == "set_play":
+                if play_focus == "inside":
+                    set_plays_inside.append(play_name)
+                elif play_focus == "attack":
+                    set_plays_attack.append(play_name)
+                elif play_focus == "outside":
+                    set_plays_outside.append(play_name)
+        
+        # Sort plays by name for consistency, then set first play to 100%
+        if motion_plays:
+            motion_plays.sort()
+            playbook_settings["motion"][motion_plays[0]] = 100
+        
+        if set_plays_inside:
+            set_plays_inside.sort()
+            playbook_settings["set_play_inside"][set_plays_inside[0]] = 100
+        
+        if set_plays_attack:
+            set_plays_attack.sort()
+            playbook_settings["set_play_attack"][set_plays_attack[0]] = 100
+        
+        if set_plays_outside:
+            set_plays_outside.sort()
+            playbook_settings["set_play_outside"][set_plays_outside[0]] = 100
+        
+        # Zone defense: first zone gets 100%
+        # Zone defenses are hardcoded: "2-3 Zone", "3-2 Zone", "1-3-1 Zone"
+        zone_defenses = ["2-3 Zone", "3-2 Zone", "1-3-1 Zone"]
+        if zone_defenses:
+            playbook_settings["zone_defense"][zone_defenses[0]] = 100
+        
+        # Man defense: "Man" gets 100%
+        playbook_settings["man_defense"]["Man"] = 100
+        
+        return playbook_settings
+        
+    except Exception as e:
+        logger.error(f"🚨 Error in initialize_playbook_settings: {e}", exc_info=True)
+        # Return minimal defaults on error
+        return {
+            "motion": {},
+            "set_play_inside": {},
+            "set_play_attack": {},
+            "set_play_outside": {},
+            "zone_defense": {"2-3 Zone": 100},
+            "man_defense": {"Man": 100},
+            "slot_assignments": {},
+            "motion_dropdowns": {}
+        }
+
+
 def populate_scouting_data(mode="single"):
     """
     Populate scouting_data with defense structures.
@@ -331,6 +432,8 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
         
         # Get populated plays for all teams
         populated_plays = populate_team_plays()
+        # Initialize playbook_settings with defaults
+        playbook_settings = initialize_playbook_settings()
         
         from BackEnd.models.team_manager import TeamManager
         for team in teams:
@@ -352,10 +455,11 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                     "pt_opp_modifier": team_attrs["pt_opp_modifier"],
                     "playcall_settings": defaults["playcall_settings"].copy(),
                     "strategy_settings": defaults["strategy_settings"].copy(),
-                    "plays": populated_plays.copy()
+                    "plays": populated_plays.copy(),
+                    "playbook_settings": playbook_settings.copy()
                 }
                 updated = True
-            elif "playcall_settings" not in franchise_teams[tid] or "strategy_settings" not in franchise_teams[tid] or not franchise_teams[tid].get("plays"):
+            elif "playcall_settings" not in franchise_teams[tid] or "strategy_settings" not in franchise_teams[tid] or not franchise_teams[tid].get("plays") or "playbook_settings" not in franchise_teams[tid]:
                 # Add missing settings to existing team object
                 if "playcall_settings" not in franchise_teams[tid]:
                     franchise_teams[tid]["playcall_settings"] = defaults["playcall_settings"].copy()
@@ -363,6 +467,8 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                     franchise_teams[tid]["strategy_settings"] = defaults["strategy_settings"].copy()
                 if not franchise_teams[tid].get("plays"):
                     franchise_teams[tid]["plays"] = populated_plays.copy()
+                if "playbook_settings" not in franchise_teams[tid]:
+                    franchise_teams[tid]["playbook_settings"] = playbook_settings.copy()
                 updated = True
         
         if updated:
@@ -404,6 +510,8 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
             populated_plays = populate_team_plays(mode=mode)
             # Initialize scouting_data with randomized values for tournament mode
             scouting_data = populate_scouting_data(mode=mode)
+            # Initialize playbook_settings with defaults (first play = 100% per section)
+            playbook_settings = initialize_playbook_settings()
             
             # ✅ SS&S: Use mode initialization system for tournament teams (matches Franchise pattern)
             # This randomizes team attributes per Mode Initialization System documentation
@@ -425,7 +533,8 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                 "playcall_settings": defaults["playcall_settings"].copy(),
                 "strategy_settings": defaults["strategy_settings"].copy(),
                 "plays": populated_plays.copy(),
-                "scouting_data": scouting_data
+                "scouting_data": scouting_data,
+                "playbook_settings": playbook_settings
             }
             
             if mode == "single":
@@ -438,11 +547,14 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                     {"_id": ObjectId(doc_id)},
                     {"$set": {f"{team_key}": team_obj}}
                 )
-        elif "playcall_settings" not in team_obj or "strategy_settings" not in team_obj or not team_obj.get("plays") or "shot_threshold" not in team_obj:
+        elif "playcall_settings" not in team_obj or "strategy_settings" not in team_obj or not team_obj.get("plays") or "shot_threshold" not in team_obj or "playbook_settings" not in team_obj:
             # Add missing settings
             defaults = get_default_settings()
             # Pass mode to populate_team_plays for tournament randomization
             populated_plays = populate_team_plays(mode=mode)
+            # Initialize playbook_settings if missing
+            if "playbook_settings" not in team_obj:
+                playbook_settings = initialize_playbook_settings()
             updates = {}
             if "playcall_settings" not in team_obj:
                 updates[f"{team_key}.playcall_settings"] = defaults["playcall_settings"].copy()
@@ -450,6 +562,8 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                 updates[f"{team_key}.strategy_settings"] = defaults["strategy_settings"].copy()
             if not team_obj.get("plays"):
                 updates[f"{team_key}.plays"] = populated_plays.copy()
+            if "playbook_settings" not in team_obj:
+                updates[f"{team_key}.playbook_settings"] = playbook_settings
             
             # Add missing team attributes if they don't exist (for backwards compatibility)
             # ✅ SS&S: Use mode initialization system instead of copying from core teams collection
