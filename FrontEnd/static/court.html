@@ -624,15 +624,17 @@
     .team-attrs-pills {
       display: flex;
       flex-direction: column;
-      gap: 0; /* No gap between rows, match S1/S2 */
+      gap: 2px; /* Tight spacing between rows */
       width: 100%;
       font-size: 14px; /* Match S1/S2 font size */
     }
     .team-attr-row {
       display: flex;
-      flex-direction: column;
-      gap: 4px;
-      padding: 4px 0; /* Small padding instead of gap */
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 2px 0;
     }
     .team-attr-label {
       display: flex;
@@ -645,12 +647,19 @@
     .team-attr-pill-wrapper.training-report-styled {
       font-size: 14px; /* Match S1/S2 font size */
     }
+    .team-attr-pill-wrapper.training-report-styled {
+      width: 110px; /* Match momentum pill size */
+      display: flex;
+      justify-content: flex-end;
+    }
     .team-attr-pill-wrapper.training-report-styled .attr-pill {
-      height: 32px;
+      height: 16px; /* Match momentum pill height */
+      width: 110px; /* Match momentum pill width */
       background: rgba(0, 0, 0, 0.3); /* Dark theme background */
-      border-radius: 16px;
+      border-radius: 8px;
       overflow: hidden;
       position: relative;
+      border: 1px solid #c0c0c0; /* Silver border for contrast */
     }
     /* Override command-center-team-styles.css colors for dark theme */
     .team-tab-S3 .training-report-styled .attr-pill {
@@ -3510,11 +3519,12 @@
       const pill = document.createElement('div');
       pill.className = 'attr-pill';
       pill.style.position = 'relative';
-      pill.style.width = '100%';
-      pill.style.height = '32px';
+      pill.style.width = '110px';   // Match momentum pill width
+      pill.style.height = '16px';   // Match momentum pill height
       pill.style.background = 'rgba(0, 0, 0, 0.3)';
-      pill.style.borderRadius = '16px';
+      pill.style.borderRadius = '8px';
       pill.style.overflow = 'hidden';
+      pill.style.border = '1px solid #c0c0c0'; // Silver border for contrast
 
       const centerLine = document.createElement('div');
       centerLine.className = 'pill-center-line';
