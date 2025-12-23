@@ -1948,23 +1948,61 @@ class TurnManager:
         
         # Check conditions (each only checks once per occurrence)
         checked = quarter_data["checked_conditions"]
+        time_remaining = game_state.get("time_remaining", 0)
         
-        # Condition 1: Player with 3 fouls - 100% chance
-        for player in all_players:
-            fouls = player.get_stat("F", "game")
-            condition_key = f"3_fouls_{player.player_id}"
-            if fouls == 3 and condition_key not in checked:
-                checked.add(condition_key)
-                return True  # 100% chance
+        # ========== FOUL CONDITIONS (Quarter-Specific) ==========
         
-        # Condition 2: Player with 2 fouls - 30% chance (only check once)
-        for player in all_players:
-            fouls = player.get_stat("F", "game")
-            condition_key = f"2_fouls_{player.player_id}"
-            if fouls == 2 and condition_key not in checked:
-                checked.add(condition_key)
-                if random.random() < 0.30:
-                    return True
+        # Q1: Player foul logic
+        if quarter == 1:
+            # Condition 1: Player with 3 fouls - 100% chance
+            for player in all_players:
+                fouls = player.get_stat("F", "game")
+                condition_key = f"3_fouls_{player.player_id}"
+                if fouls == 3 and condition_key not in checked:
+                    checked.add(condition_key)
+                    return True  # 100% chance
+            
+            # Condition 2: Player with 2 fouls - 30% chance (only check once)
+            for player in all_players:
+                fouls = player.get_stat("F", "game")
+                condition_key = f"2_fouls_{player.player_id}"
+                if fouls == 2 and condition_key not in checked:
+                    checked.add(condition_key)
+                    if random.random() < 0.30:
+                        return True
+        
+        # Q2 & Q3: Player foul logic
+        elif quarter in [2, 3]:
+            # Condition 1: Player with 4 fouls - 100% chance
+            for player in all_players:
+                fouls = player.get_stat("F", "game")
+                condition_key = f"4_fouls_{player.player_id}"
+                if fouls == 4 and condition_key not in checked:
+                    checked.add(condition_key)
+                    return True  # 100% chance
+            
+            # Condition 2: Player with 3 fouls - 90% chance
+            for player in all_players:
+                fouls = player.get_stat("F", "game")
+                condition_key = f"3_fouls_{player.player_id}"
+                if fouls == 3 and condition_key not in checked:
+                    checked.add(condition_key)
+                    if random.random() < 0.90:
+                        return True
+        
+        # Q4: Player foul logic (only if time_remaining > 60 seconds)
+        elif quarter == 4:
+            if time_remaining > 60:
+                # Condition: Player with 4 fouls - 90% chance
+                for player in all_players:
+                    fouls = player.get_stat("F", "game")
+                    condition_key = f"4_fouls_{player.player_id}"
+                    if fouls == 4 and condition_key not in checked:
+                        checked.add(condition_key)
+                        if random.random() < 0.90:
+                            return True
+        
+        # ========== ENERGY CONDITIONS (All Quarters Q1-Q4) ==========
         
         # Conditions 3-9: Energy (NG) levels
         # Count players below each threshold
