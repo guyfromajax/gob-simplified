@@ -98,7 +98,7 @@
 2. **Team Objects Initialization:**
    - Franchise: All 8 teams upfront
    - Tournament: Lazy (only user team)
-   - **Recommendation:** ✅ **ALIGN** - Initialize all teams upfront in Tournament mode
+   - **Status:** ✅ **ALIGNED** - Tournament mode now initializes all teams upfront (Phase 1.1)
 
 3. **Player Objects Storage Key:**
    - Franchise: `players.{player_id}`
@@ -108,12 +108,12 @@
 4. **Player Metadata Structure:**
    - Franchise: `meta: {first_name, last_name, team, team_id}`
    - Tournament: `{first_name, last_name, team}` at root level
-   - **Recommendation:** ✅ **ALIGN** - Use `meta` wrapper in Tournament for consistency
+   - **Status:** ✅ **ALIGNED** - Tournament mode now uses `meta` wrapper (Phase 1.4)
 
 5. **Position Ratings:**
    - Franchise: ✅ Stored
    - Tournament: ❌ Not stored
-   - **Recommendation:** ✅ **ALIGN** - Add `position_ratings` to Tournament (needed for training)
+   - **Status:** ✅ **ALIGNED** - Tournament mode now stores `position_ratings` (Phase 1.3)
 
 ### 🟡 Minor Inconsistencies (Nice to Align)
 
@@ -122,22 +122,22 @@
    - `created_at`: Tournament has it, Franchise doesn't
    - `stats`/`leaderboards`: Tournament has it, Franchise doesn't
    - `completed`: Tournament has it, Franchise doesn't
-   - **Recommendation:** Add missing fields to Franchise for consistency
+   - **Status:** ✅ **ALIGNED** - Franchise mode now has `user_team_object_id`, `created_at`, `stats`/`leaderboards`, and `current_season` (Phase 1.2, 2.1)
 
 7. **Training Status Field Names:**
    - Franchise: `{current_week, training_completed, session_type}`
    - Tournament: `{training_completed, round, last_training_date}`
-   - **Recommendation:** ✅ **ALIGN** - Use consistent field names (e.g., `current_week`/`current_round`, `session_type`)
+   - **Status:** ✅ **ALIGNED** - Both modes now have `session_type` and `last_training_date` (Phase 2.2)
 
 8. **Latest Training Field Names:**
    - Franchise: `{player_logs, team_log, session_type, week}`
    - Tournament: `{player_changes, team_changes, round, ...}`
-   - **Recommendation:** ✅ **ALIGN** - Use consistent field names (e.g., `player_logs` vs `player_changes`)
+   - **Status:** ✅ **ALIGNED** - Tournament mode now uses `player_logs` and `team_log` (Phase 2.3)
 
 9. **Training Reports Storage:**
    - Franchise: Not stored per-team (only in `latest_training`)
    - Tournament: Stored in `teams.{team_id}.training_reports.{round}`
-   - **Recommendation:** ✅ **ALIGN** - Add per-week training reports to Franchise
+   - **Status:** ✅ **ALIGNED** - Franchise mode already stores per-week training reports (verified in Phase 2.4)
 
 10. **Plays/Scouting Initialization:**
     - Franchise: Uses values from universal collection or defaults to 0

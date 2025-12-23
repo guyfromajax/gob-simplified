@@ -10,7 +10,7 @@
 ## Phase 1: Critical Alignments (Must Do)
 
 ### 1.1 Tournament Mode: Initialize All Teams Upfront
-**Status:** ⏳ Pending  
+**Status:** ✅ Completed  
 **Priority:** 🔴 Critical
 
 **Current State:**
@@ -32,7 +32,7 @@
 ---
 
 ### 1.2 Franchise Mode: Add `user_team_id` and `user_team_object_id` to Document
-**Status:** ⏳ Pending  
+**Status:** ✅ Completed  
 **Priority:** 🔴 Critical
 
 **Current State:**
@@ -63,7 +63,7 @@
 ---
 
 ### 1.3 Tournament Mode: Add `position_ratings` to Player Objects
-**Status:** ⏳ Pending  
+**Status:** ✅ Completed  
 **Priority:** 🔴 Critical
 
 **Current State:**
@@ -87,7 +87,7 @@
 ---
 
 ### 1.4 Tournament Mode: Use `meta` Wrapper for Player Metadata
-**Status:** ⏳ Pending  
+**Status:** ✅ Completed  
 **Priority:** 🔴 Critical
 
 **Current State:**
@@ -115,7 +115,7 @@
 ## Phase 2: Important Alignments (Should Do)
 
 ### 2.1 Franchise Mode: Add Missing Document-Level Fields
-**Status:** ⏳ Pending  
+**Status:** ✅ Completed  
 **Priority:** 🟡 Important
 
 **Current State:**
@@ -140,7 +140,7 @@
 ---
 
 ### 2.2 Standardize Training Status Field Names
-**Status:** ⏳ Pending  
+**Status:** ✅ Completed  
 **Priority:** 🟡 Important
 
 **Current State:**
@@ -166,7 +166,7 @@
 ---
 
 ### 2.3 Standardize Latest Training Field Names
-**Status:** ⏳ Pending  
+**Status:** ✅ Completed  
 **Priority:** 🟡 Important
 
 **Current State:**
@@ -218,26 +218,26 @@
 ## Phase 3: Nice to Have (Optional)
 
 ### 3.1 Add `created_at` to Franchise Document
-**Status:** ⏳ Pending  
+**Status:** ✅ Completed (via Phase 2.1)  
 **Priority:** 🟢 Nice to Have
 
-**Note:** This is also covered in Phase 2.1, but listed separately for tracking.
+**Note:** Completed as part of Phase 2.1.
 
 ---
 
 ### 3.2 Add `stats`/`leaderboards` to Franchise Document
-**Status:** ⏳ Pending  
+**Status:** ✅ Completed (via Phase 2.1)  
 **Priority:** 🟢 Nice to Have
 
-**Note:** This is also covered in Phase 2.1, but listed separately for tracking.
+**Note:** Completed as part of Phase 2.1.
 
 ---
 
 ### 3.3 Add `current_season` Number to Franchise Document
-**Status:** ⏳ Pending  
+**Status:** ✅ Completed (via Phase 2.1)  
 **Priority:** 🟢 Nice to Have
 
-**Note:** This is also covered in Phase 2.1, but listed separately for tracking. Franchise mode uses `current_season` (number) instead of `completed` (boolean) because franchises are ongoing across multiple seasons.
+**Note:** Completed as part of Phase 2.1. Franchise mode uses `current_season` (number) instead of `completed` (boolean) because franchises are ongoing across multiple seasons.
 
 ---
 
