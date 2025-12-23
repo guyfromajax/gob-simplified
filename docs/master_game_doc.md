@@ -6248,6 +6248,19 @@ Computer evaluates timeout conditions in order. Each condition only checks once 
 - **Two computer teams:** Both teams are checked for timeout conditions; first team to meet conditions calls timeout
 - **Lineup adjustments:** When computer calls timeout during simmed quarters, both team lineups are rebuilt using `build_lineup_from_mongo()` (same autoset logic as regular timeouts)
 
+### Simmed Quarter Behavior
+
+**Sim To 4th Quarter and Sim Full Game:**
+- Computer timeout logic runs during all simmed quarters (Q1-Q3 for "Sim To 4th Quarter", Q1-Q4 for "Sim Full Game")
+- Computer teams can call timeouts during simmed quarters using the same conditions and logic as regular gameplay
+- **User team lineup handling:** When a computer timeout occurs during simmed quarters, the user team's lineup is also automatically rebuilt using the same autoset lineup process (`build_lineup_from_mongo()`). This ensures both teams have optimal lineups based on current energy levels and foul status, even though the user is not actively managing the lineup during simmed quarters.
+- **Two computer teams:** In games where both teams are computer-controlled, both teams are evaluated for timeout conditions. The first team to meet timeout conditions calls the timeout, and both team lineups are rebuilt using autoset lineup logic.
+
+**Key Implementation:**
+- Computer timeout checking happens in `game_manager.simulate_macro_turn()` which is called during the simulation loop in `simulate_quarter()`
+- When computer timeout is called during simmed quarters, both `calling_team.lineup` and `other_team.lineup` are rebuilt via `build_lineup_from_mongo()`
+- This ensures consistent lineup management across all gameplay modes (regular gameplay, simmed quarters, user timeouts, computer timeouts)
+
 ---
 
 ## Playcall Center ✅ **ACTIVE** (January 2025)
