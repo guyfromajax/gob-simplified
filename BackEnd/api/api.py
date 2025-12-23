@@ -1786,18 +1786,27 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
     
     # Simulate ONE turn
     try:
-        # Track how many turns existed before this call
-        turns_before = len(gm.turns)
-        
-        gm.simulate_macro_turn()
-        
-        # ✅ COMPUTER TIMEOUT: Check if a timeout was just created in this call
-        # This handles computer timeouts that are created during simulate_macro_turn()
-        if gm.game_state.get("timeout_called") and gm.turns:
-            last_turn = gm.turns[-1]
-            if isinstance(last_turn, dict) and last_turn.get("result_type") == "TIMEOUT":
-                logging.warning(f"⏸️ COMPUTER TIMEOUT: Returning timeout turn created in this call (reason: {last_turn.get('timeout_reason')}, turn {len(gm.turns)})")
-                
+        # ✅ DEFERRED TIMEOUT: Check for pending computer timeout at start of API call
+        # This creates the timeout turn after the previous turn has been animated
+        if gm.game_state.get("pending_computer_timeout"):
+            pending = gm.game_state["pending_computer_timeout"]
+            calling_team = pending["calling_team"]
+            turn_type = pending["turn_type"]
+            
+            logging.warning(f"⏸️ COMPUTER TIMEOUT: Creating deferred timeout turn for {calling_team.name} (turn_type: {turn_type})")
+            
+            # Create the timeout turn now (after previous turn was animated)
+            timeout_turn = gm.call_timeout(
+                calling_team=calling_team,
+                timeout_reason="COMPUTER",
+                rebuild_both_lineups=True,
+                game_id=game_id  # Pass game_id for immediate save
+            )
+            
+            # Clear pending timeout
+            del gm.game_state["pending_computer_timeout"]
+            
+            if timeout_turn:
                 # ✅ COMPUTER TIMEOUT: Save game state immediately (same as user timeouts)
                 # This ensures clock, scores, fouls, etc. are preserved when user returns from lineup screen
                 try:
@@ -1839,6 +1848,12 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
                         gm.away_team.name: gm.away_team.get_team_game_stats()
                     }
                 }
+        
+        # Track how many turns existed before this call (after deferred timeout check)
+        turns_before = len(gm.turns)
+        
+        # Simulate the next turn (unless we already returned a timeout above)
+        gm.simulate_macro_turn()
         
         # Update team fouls in game state
         gm.game_state["team_fouls"] = {

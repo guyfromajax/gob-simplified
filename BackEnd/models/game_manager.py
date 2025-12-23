@@ -409,7 +409,8 @@ class GameManager:
                     break  # First team to call timeout wins
             
             if calling_team:
-                # Computer calls timeout - use unified timeout creation method
+                # ✅ DEFERRED TIMEOUT: Store pending timeout instead of creating immediately
+                # This allows the current turn to be returned and animated before timeout is created
                 # Increment computer timeout count for this quarter
                 if "computer_timeouts" not in self.game_state:
                     self.game_state["computer_timeouts"] = {}
@@ -420,17 +421,15 @@ class GameManager:
                     self.game_state["computer_timeouts"][calling_team.name][quarter] = {"count": 0, "checked_conditions": set()}
                 self.game_state["computer_timeouts"][calling_team.name][quarter]["count"] += 1
                 
-                # Use unified timeout creation (rebuild_both_lineups=True for computer timeouts)
-                timeout_turn = self.call_timeout(
-                    calling_team=calling_team,
-                    timeout_reason="COMPUTER",
-                    rebuild_both_lineups=True,
-                    game_id=None  # Don't save here - will be saved by simulate-turn endpoint if needed
-                )
-                
-                if timeout_turn:
-                    logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} called timeout during SIP, returning early from simulate_macro_turn()")
-                    return
+                # Store pending timeout - will be created on next API call
+                self.game_state["pending_computer_timeout"] = {
+                    "calling_team": calling_team,
+                    "turn_type": "SIDE_INBOUND",
+                    "timeout_reason": "COMPUTER"
+                }
+                logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} will call timeout on next turn (deferred for animation)")
+                # Don't append SIP turn - timeout will be created instead on next API call
+                return
             else:
                 # No computer timeout - proceed with SIP
                 self.turns.append(inbound_payload)
@@ -441,9 +440,9 @@ class GameManager:
         # ✅ FIX 2: Backend flip for Made Shots → Inbound (Pattern A)
         # Create BASELINE_INBOUND turns for ALL made shots (HCO, FT, FB, FCP/HCT, OREB)
         # Check LAST turn (handles OREB putbacks which append in while loop above)
-        # ✅ COMPUTER TIMEOUT: Skip BIP creation if timeout was just called
-        if self.game_state.get("timeout_called"):
-            logging.warning(f"⏸️ COMPUTER TIMEOUT: Skipping BIP creation - timeout was called")
+        # ✅ DEFERRED TIMEOUT: Skip BIP creation if pending timeout exists
+        if self.game_state.get("pending_computer_timeout"):
+            logging.warning(f"⏸️ COMPUTER TIMEOUT: Skipping BIP creation - pending timeout exists")
             return
         
         last_turn = self.turns[-1] if self.turns else None
@@ -476,7 +475,8 @@ class GameManager:
                     break  # First team to call timeout wins
             
             if calling_team:
-                # Computer calls timeout - use unified timeout creation method
+                # ✅ DEFERRED TIMEOUT: Store pending timeout instead of creating immediately
+                # This allows the current turn to be returned and animated before timeout is created
                 # Increment computer timeout count for this quarter
                 if "computer_timeouts" not in self.game_state:
                     self.game_state["computer_timeouts"] = {}
@@ -487,17 +487,15 @@ class GameManager:
                     self.game_state["computer_timeouts"][calling_team.name][quarter] = {"count": 0, "checked_conditions": set()}
                 self.game_state["computer_timeouts"][calling_team.name][quarter]["count"] += 1
                 
-                # Use unified timeout creation (rebuild_both_lineups=True for computer timeouts)
-                timeout_turn = self.call_timeout(
-                    calling_team=calling_team,
-                    timeout_reason="COMPUTER",
-                    rebuild_both_lineups=True,
-                    game_id=None  # Don't save here - will be saved by simulate-turn endpoint if needed
-                )
-                
-                if timeout_turn:
-                    logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} called timeout during BIP, returning early from simulate_macro_turn()")
-                    return
+                # Store pending timeout - will be created on next API call
+                self.game_state["pending_computer_timeout"] = {
+                    "calling_team": calling_team,
+                    "turn_type": "BASELINE_INBOUND",
+                    "timeout_reason": "COMPUTER"
+                }
+                logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} will call timeout on next turn (deferred for animation)")
+                # Don't append BIP turn - timeout will be created instead on next API call
+                return
             else:
                 # No computer timeout - proceed with BIP
                 self.turns.append(inbound_payload)
