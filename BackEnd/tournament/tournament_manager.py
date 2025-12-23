@@ -5,6 +5,7 @@ from bson import ObjectId
 from BackEnd.db import (
     tournaments_collection as default_tournaments_collection,
     players_collection,
+    teams_collection,
 )
 from BackEnd.constants import BOX_SCORE_KEYS
 
@@ -57,6 +58,56 @@ class TournamentManager:
                 "attributes": attrs  # Store all attributes (not just EM, CH, MO)
             }
 
+        # Initialize team objects for all 8 teams upfront (matches Franchise pattern)
+        from BackEnd.models.team_manager import TeamManager
+        from BackEnd.api.gameplan_routes import populate_team_plays, populate_scouting_data, initialize_playbook_settings
+        
+        # Get populated plays and scouting data for all teams (tournament mode)
+        populated_plays = populate_team_plays(mode="tournament")
+        scouting_data = populate_scouting_data(mode="tournament")
+        playbook_settings = initialize_playbook_settings()
+        
+        # Get all teams from database
+        all_teams = list(teams_collection.find())
+        teams_obj = {}
+        
+        for team in all_teams:
+            team_id = str(team["_id"])
+            # Use TeamManager static method to generate mode-specific team attributes
+            team_attrs = TeamManager.init_team_attributes(mode="tournament")
+            teams_obj[team_id] = {
+                "team_chemistry": team_attrs["team_chemistry"],
+                "offensive_efficiency": team_attrs["offensive_efficiency"],
+                "shot_threshold": team_attrs["shot_threshold"],
+                "turnover_modifier": team_attrs["turnover_modifier"],
+                "foul_modifier": team_attrs["foul_modifier"],
+                "rebound_modifier": team_attrs["rebound_modifier"],
+                "defensive_efficiency": team_attrs["defensive_efficiency"],
+                "fb_efficiency": team_attrs["fb_efficiency"],
+                "pt_efficiency": team_attrs["pt_efficiency"],
+                "fb_opp_modifier": team_attrs["fb_opp_modifier"],
+                "pt_opp_modifier": team_attrs["pt_opp_modifier"],
+                # Game plan settings (all start at 2 = Normal)
+                "playcall_settings": {
+                    "Base": 2,
+                    "Freelance": 2,
+                    "Inside": 2,
+                    "Attack": 2,
+                    "Outside": 2,
+                    "Set": 2
+                },
+                "strategy_settings": {
+                    "defense": 2,
+                    "tempo": 2,
+                    "aggression": 2,
+                    "half_court_trap": 2,
+                    "full_court_press": 2
+                },
+                "plays": populated_plays.copy(),
+                "scouting_data": scouting_data.copy(),
+                "playbook_settings": playbook_settings.copy()
+            }
+
         tournament_doc = {
             "user_team_id": self.user_team_id,
             "created_at": datetime.utcnow(),
@@ -74,6 +125,7 @@ class TournamentManager:
                 "top_10_steals": []
             },
             "player_stats": player_stats,
+            "teams": teams_obj,  # Initialize all teams upfront
             "applied_games": [],
             "completed": False
         }
