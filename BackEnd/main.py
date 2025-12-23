@@ -590,8 +590,8 @@ def simulate_quarter(
                 gm.away_team.name: gm.away_team.team_fouls,
             }
             gm.game_state["team_timeouts"] = {
-                gm.home_team.name: getattr(gm.home_team, 'timeouts', 5),
-                gm.away_team.name: getattr(gm.away_team, 'timeouts', 5),
+                gm.home_team.name: getattr(gm.home_team, 'timeouts', 4),
+                gm.away_team.name: getattr(gm.away_team, 'timeouts', 4),
             }
             
             # Safety check: ensure time is decreasing

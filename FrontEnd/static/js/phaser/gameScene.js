@@ -1100,7 +1100,7 @@ export function createGameScene(Phaser) {
           if (awayScoreEl) awayScoreEl.textContent = 0;
           // Initialize timeout display for new games
           if (homeTolEl) homeTolEl.textContent = 'TOL: 5';
-          if (awayTolEl) awayTolEl.textContent = 'TOL: 5';
+          if (awayTolEl) awayTolEl.textContent = 'TOL: 4';
         }
       // ✅ TIMEOUT RESUME: Check team objects first (same pattern as timeouts) for consistency
       const homeFoulsFromData = homeTeamObj?.team_fouls ?? simData.fouls?.home;
@@ -1110,8 +1110,8 @@ export function createGameScene(Phaser) {
       // Extract timeouts from nested team objects or flat structure, default to 5 for new games
       const homeTimeoutsFromData = homeTeamObj?.timeouts ?? simData.timeouts?.home ?? simData.home_team_timeouts;
       const awayTimeoutsFromData = awayTeamObj?.timeouts ?? simData.timeouts?.away ?? simData.away_team_timeouts;
-      let liveHomeTimeouts = typeof homeTimeoutsFromData === 'number' ? homeTimeoutsFromData : (isNewGame ? 5 : 5);
-      let liveAwayTimeouts = typeof awayTimeoutsFromData === 'number' ? awayTimeoutsFromData : (isNewGame ? 5 : 5);
+      let liveHomeTimeouts = typeof homeTimeoutsFromData === 'number' ? homeTimeoutsFromData : (isNewGame ? 4 : 4);
+      let liveAwayTimeouts = typeof awayTimeoutsFromData === 'number' ? awayTimeoutsFromData : (isNewGame ? 4 : 4);
 
       const updateScoreboard = (turn = {}) => {
         const prevHome = liveScore[homeTeam];

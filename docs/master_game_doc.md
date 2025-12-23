@@ -6188,6 +6188,22 @@ All three flows use the same core systems:
 
 ---
 
+## Computer Timeout System 🚧 **IN PROGRESS**
+
+The computer timeout system enables AI-controlled teams to call timeouts during gameplay. This system will be implemented to allow computer teams to strategically pause the game for lineup adjustments, game plan changes, and tactical decisions.
+
+**Status:** Implementation in progress.
+
+**Planned Features:**
+- Computer teams can call timeouts during gameplay
+- Timeout logic based on game situations (score differential, momentum, foul trouble, etc.)
+- Works across all gameplay modes (Play Quarter, Sim To 4th Quarter, Sim Full Game)
+- Consistent with user timeout system (same turn structure and navigation flow)
+
+**Documentation:** To be populated upon completion of implementation.
+
+---
+
 ## Playcall Center ✅ **ACTIVE** (January 2025)
 
 ### Overview
@@ -9464,7 +9480,7 @@ These fields are loaded from the universal `teams` collection in MongoDB:
 - `points` (int) - Current game score (default: 0)
 - `points_by_quarter` (list) - Points scored per quarter: `[Q1, Q2, Q3, Q4]` (default: `[0, 0, 0, 0]`)
 - `team_fouls` (int) - Current team foul count (default: 0)
-- `timeouts` (int) - Remaining timeouts (default: 5)
+- `timeouts` (int) - Remaining timeouts (default: 4)
 - `stats` (dict) - Team-level statistics dictionary (default: `{}`)
 - `team_stats` (dict) - Team-level tracking stats (default: `{}`)
   - Includes: `release_instances`, `get_back_instances`, `actual_releases`

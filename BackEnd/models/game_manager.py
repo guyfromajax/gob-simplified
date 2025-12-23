@@ -649,8 +649,8 @@ class GameManager:
         self.away_team.update_team_stats()
         # ✅ TIMEOUT: Update team timeout counts in game_state
         self.game_state["team_timeouts"] = {
-            self.home_team.name: getattr(self.home_team, 'timeouts', 5),
-            self.away_team.name: getattr(self.away_team, 'timeouts', 5),
+            self.home_team.name: getattr(self.home_team, 'timeouts', 4),
+            self.away_team.name: getattr(self.away_team, 'timeouts', 4),
         }
 
     def print_game_statistics(self):

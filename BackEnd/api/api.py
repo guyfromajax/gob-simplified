@@ -612,13 +612,13 @@ def get_game_state(game_id: str, quarter: int | None = None):
                 "home_team": {
                     "name": gm.home_team.name,
                     "team_fouls": gm.home_team.team_fouls,
-                    "timeouts": getattr(gm.home_team, 'timeouts', 5),
+                    "timeouts": getattr(gm.home_team, 'timeouts', 4),
                     "attributes": gm.home_team.team_attributes  # Team attributes for S3 tab
                 },
                 "away_team": {
                     "name": gm.away_team.name,
                     "team_fouls": gm.away_team.team_fouls,
-                    "timeouts": getattr(gm.away_team, 'timeouts', 5),
+                    "timeouts": getattr(gm.away_team, 'timeouts', 4),
                     "attributes": gm.away_team.team_attributes  # Team attributes for S3 tab
                 }
             }
@@ -1145,15 +1145,15 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                 logging.info(f"🔄 Home team timeouts restored: {home_team_data['timeouts']}")
                             else:
                                 # Default to 5 if not in saved data (backward compatibility)
-                                gm.home_team.timeouts = 5
-                                logging.info(f"🔄 Home team timeouts set to default: 5")
+                                gm.home_team.timeouts = 4
+                                logging.info(f"🔄 Home team timeouts set to default: 4")
                             if "timeouts" in away_team_data:
                                 gm.away_team.timeouts = away_team_data["timeouts"]
                                 logging.info(f"🔄 Away team timeouts restored: {away_team_data['timeouts']}")
                             else:
                                 # Default to 5 if not in saved data (backward compatibility)
-                                gm.away_team.timeouts = 5
-                                logging.info(f"🔄 Away team timeouts set to default: 5")
+                                gm.away_team.timeouts = 4
+                                logging.info(f"🔄 Away team timeouts set to default: 4")
                             
                             # Restore team totals (aggregated stats)
                             if "totals" in home_team_data:
@@ -1180,8 +1180,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             gm.score = {gm.home_team.name: 0, gm.away_team.name: 0}
                             gm.home_team.team_fouls = 0
                             gm.away_team.team_fouls = 0
-                            gm.home_team.timeouts = 5  # New game starts with 5 timeouts
-                            gm.away_team.timeouts = 5  # New game starts with 5 timeouts
+                            gm.home_team.timeouts = 4  # New game starts with 4 timeouts
+                            gm.away_team.timeouts = 4  # New game starts with 4 timeouts
                         
                         # ✅ TIMEOUT RESUME: Apply unified timeout state restoration (if resuming from timeout)
                         # This uses the state we loaded earlier from DB (single source of truth)
@@ -1751,8 +1751,8 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             "away_score": gm.score.get(gm.away_team.name, 0),
             "home_team_fouls": gm.home_team.team_fouls,
             "away_team_fouls": gm.away_team.team_fouls,
-            "home_team_timeouts": getattr(gm.home_team, 'timeouts', 5),
-            "away_team_timeouts": getattr(gm.away_team, 'timeouts', 5),
+            "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
+            "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
             "offense_team": gm.offense_team.name,
             "defense_team": gm.defense_team.name,
             "game_id": game_id,
@@ -1841,8 +1841,8 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             "away_score": gm.score.get(gm.away_team.name, 0),
             "home_team_fouls": gm.home_team.team_fouls,
             "away_team_fouls": gm.away_team.team_fouls,
-            "home_team_timeouts": getattr(gm.home_team, 'timeouts', 5),
-            "away_team_timeouts": getattr(gm.away_team, 'timeouts', 5),
+            "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
+            "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
             "offense_team": gm.offense_team.name,
             "defense_team": gm.defense_team.name,
             "game_id": game_id,
@@ -2044,9 +2044,9 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
     return {
         "message": f"Timeout called by {calling_team.name}",
         "calling_team": calling_team.name,
-        "timeouts_remaining": getattr(calling_team, 'timeouts', 5),
-        "home_team_timeouts": getattr(gm.home_team, 'timeouts', 5),
-        "away_team_timeouts": getattr(gm.away_team, 'timeouts', 5),
+        "timeouts_remaining": getattr(calling_team, 'timeouts', 4),
+        "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
+        "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
     }
 
 

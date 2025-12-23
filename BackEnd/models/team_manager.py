@@ -26,7 +26,7 @@ class TeamManager:
         self.points = 0
         self.points_by_quarter = [0, 0, 0, 0]
         self.team_fouls = 0
-        self.timeouts = 5  # Each team starts with 5 timeouts per game
+        self.timeouts = 4  # Each team starts with 4 timeouts per game
         self.stats = {}
         self.team_stats = {}  # Team-level stats (release/get back tracking, fast break defender counts)
         
@@ -483,7 +483,7 @@ class TeamManager:
     def reset_for_new_game(self):
         self.points_by_quarter = [0, 0, 0, 0]
         self.team_fouls = 0
-        self.timeouts = 5  # Reset to 5 timeouts for new game (timeouts carry over whole game, not reset per quarter)
+        self.timeouts = 4  # Reset to 4 timeouts for new game (timeouts carry over whole game, not reset per quarter)
         self.stats = {}
         self.team_stats = {}  # Reset team-level stats
         self.scouting_data = self._init_scouting_data()
