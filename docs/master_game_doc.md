@@ -6196,10 +6196,12 @@ The computer timeout system enables AI-controlled teams to call timeouts during 
 
 **Timeout Timing:**
 - Computer can only call timeouts during BIP (Baseline Inbound) and SIP (Side Inbound) turns
-- Computer timeout is evaluated immediately when the BIP/SIP turn is created (backend)
-- If computer calls timeout, the turn becomes a `TIMEOUT` turn instead of BIP/SIP
+- Computer timeout is evaluated when the BIP/SIP turn would be created (backend)
+- **Deferred Creation:** If computer calls timeout, a pending timeout is stored in `game_state["pending_computer_timeout"]` instead of creating the timeout turn immediately
+- This allows the current turn (e.g., shot) to be returned and animated before the timeout is created
+- On the next API call (`/api/simulate-turn`), the pending timeout is created and returned immediately
 - User timeout button is only active during the 2-second pause window (after turn is received by frontend)
-- **Precedence:** If computer timeout is called, it takes precedence over user timeout (computer timeout is checked before the turn is sent to frontend)
+- **Precedence:** If computer timeout is called, it takes precedence over user timeout (computer timeout is checked before the BIP/SIP turn is created)
 
 **Timeout Limits:**
 - **Q1-Q3:** Computer can call maximum 1 timeout per quarter
@@ -6259,12 +6261,17 @@ Computer evaluates timeout conditions in order. Each condition only checks once 
 - Computer timeout count per quarter stored in `game_state["computer_timeouts"][team_name][quarter]["count"]`
 - Checked conditions tracked in `game_state["computer_timeouts"][team_name][quarter]["checked_conditions"]` set
 - Prevents duplicate condition checks within the same quarter
+- **Pending Timeout:** When computer timeout is detected, `game_state["pending_computer_timeout"]` is set with:
+  - `calling_team`: TeamManager instance for the team calling timeout
+  - `turn_type`: "BASELINE_INBOUND" or "SIDE_INBOUND"
+  - `timeout_reason`: "COMPUTER"
+- The pending timeout is cleared when the timeout turn is created on the next API call
 
 **Integration Points:**
 - Computer timeout check occurs in `game_manager.simulate_macro_turn()` when creating SIP turns
 - Computer timeout check occurs in `game_manager.simulate_macro_turn()` when creating BIP turns
-- Timeout turn replaces the BIP/SIP turn if computer calls timeout
-- **Turn-by-turn mode:** The `/api/simulate-turn` endpoint checks for computer timeouts immediately after calling `simulate_macro_turn()`. If a timeout turn was created, it is returned immediately to the frontend, preventing further turn simulation until the timeout is resolved.
+- **Deferred Timeout Creation:** If computer calls timeout, `game_state["pending_computer_timeout"]` is set with the calling team and turn type. The BIP/SIP turn is NOT appended, and the function returns normally, allowing the current turn (e.g., shot) to be returned and animated.
+- **Turn-by-turn mode:** The `/api/simulate-turn` endpoint checks for `pending_computer_timeout` at the START of the call (before calling `simulate_macro_turn()`). If a pending timeout exists, it creates the timeout turn immediately and returns it to the frontend. This ensures the previous turn has been animated before the timeout is created.
 - **Game state persistence:** When a computer timeout is returned from `/api/simulate-turn`, the game state is immediately saved to the database (same as user timeouts). This ensures clock, scores, fouls, and timeout state are preserved when the user returns from the lineup screen.
 - **Game state restoration:** When resuming from a computer timeout, the backend checks for timeout state in the saved document before calculating `should_restore_stats`. This ensures that scores, fouls, timeouts, and other team-level data are properly restored (same as user timeouts). The timeout state check happens early in the game loading process to ensure all state is restored correctly.
 - **Frontend navigation:** Computer timeout turns trigger the exact same navigation flow as user timeouts (no popup, direct navigation). The `AnimationEngine.handleTimeout()` method detects computer timeouts and automatically calls `showTimeoutPopup()` to navigate directly to the lineup screen with proper `resume_from_timeout` and `clock` parameters. The `showTimeoutPopup()` function accepts optional `computerTimeout` and `computerTeamName` parameters, which are passed as URL parameters (`computer_timeout=true` and `computer_team_name={Team Name}`) to the lineup screen.
