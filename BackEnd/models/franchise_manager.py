@@ -214,19 +214,31 @@ class FranchiseManager:
         training_status = {
             "current_week": 0,
             "training_completed": False,
-            "session_type": "preseason"  # First training is always training camp
+            "session_type": "preseason",  # First training is always training camp
+            "last_training_date": None  # No training completed yet
         }
 
         # Generate initial recruits for the franchise
         recruits = self.recruit_manager.generate_recruits_list()
         
         # Store user team identifiers in franchise document
+        from datetime import datetime
         extra_state = {
             "players": players_map, 
             "applied_games": [],
             "franchise_teams": franchise_teams,
             "training_status": training_status,
-            "recruits": recruits
+            "recruits": recruits,
+            # Add missing document-level fields (matches Tournament pattern)
+            "created_at": datetime.utcnow(),
+            "current_season": 1,  # Start at season 1
+            "stats": {
+                "top_10_points": [],
+                "top_10_rebounds": [],
+                "top_10_assists": [],
+                "top_10_blocks": [],
+                "top_10_steals": []
+            }
         }
         
         # Add user team identifiers if provided

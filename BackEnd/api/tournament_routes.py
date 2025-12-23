@@ -964,8 +964,9 @@ def run_tournament_training(req: TournamentTrainingRequest):
         position_ratings_updates[pid] = new_ratings
 
     # Use training report data for player and team changes
-    player_logs = training_report.get("player_changes", {})
-    team_log = training_report.get("team_changes", {})
+    # Support both old field names (player_changes, team_changes) and new standardized names (player_logs, team_log)
+    player_logs = training_report.get("player_logs") or training_report.get("player_changes", {})
+    team_log = training_report.get("team_log") or training_report.get("team_changes", {})
 
     # Update tournament document with new attribute values and position ratings
     tournament_update = {}
@@ -1002,15 +1003,20 @@ def run_tournament_training(req: TournamentTrainingRequest):
             tournament_update[f"player_stats.{pid}.position_ratings"] = position_ratings_updates[pid]
 
     # Mark training as completed and update status
+    # Get session_type from training data (defaults to "in-season" if not provided)
+    session_type = training_data.get("session_type", "in-season")
+    
     tournament_update["training_status.training_completed"] = True
     tournament_update["training_status.round"] = current_round
     tournament_update["training_status.last_training_date"] = datetime.now().strftime("%Y-%m-%d")
+    tournament_update["training_status.session_type"] = session_type
     
     # Store training report data
     training_report_data = {
         "round": current_round,
-        "player_changes": player_logs,
-        "team_changes": team_log,
+        "player_logs": player_logs,  # Standardized name (was player_changes)
+        "team_log": team_log,  # Standardized name (was team_changes)
+        "session_type": session_type,
         "coaching_focus": training_report.get("coaching_focus", {}),
         "training_notes": training_report.get("training_notes", []),
         "plays_data": training_report.get("plays_data", {}),
