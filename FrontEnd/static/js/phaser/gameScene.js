@@ -1098,8 +1098,8 @@ export function createGameScene(Phaser) {
           // ✅ REFACTOR: Direct DOM updates (same as other scoreboard items)
           if (homeScoreEl) homeScoreEl.textContent = 0;
           if (awayScoreEl) awayScoreEl.textContent = 0;
-          // Initialize timeout display for new games
-          if (homeTolEl) homeTolEl.textContent = 'TOL: 5';
+          // Initialize timeout display for new games (default 4)
+          if (homeTolEl) homeTolEl.textContent = 'TOL: 4';
           if (awayTolEl) awayTolEl.textContent = 'TOL: 4';
         }
       // ✅ TIMEOUT RESUME: Check team objects first (same pattern as timeouts) for consistency
