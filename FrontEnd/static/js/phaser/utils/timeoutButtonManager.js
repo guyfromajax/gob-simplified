@@ -291,6 +291,10 @@ async function showTimeoutPopup(timeoutResult, gameId, scene) {
     
     const currentQuarter = scene.simData?.quarter || scene.quarter || 1;
     
+    // ✅ TIMEOUT: Get clock from scene.simData (set by AnimationEngine for computer timeouts)
+    // or from URL params (for user timeouts)
+    const clock = scene.simData?.clock || urlParams.get('clock');
+    
     // Build lineup object from scene
     const homeLineup = scene.homeLineup || {};
     const awayLineup = scene.awayLineup || {};
@@ -304,6 +308,7 @@ async function showTimeoutPopup(timeoutResult, gameId, scene) {
         resumeFromTimeout: true, // ✅ TIMEOUT: Always resuming from timeout (any quarter)
         lineup: lineup,
         myTeamSide: myTeamSide || myTeamSideFallback || 'home',
+        clock: clock, // ✅ TIMEOUT: Pass clock to preserve time remaining
         overrides: {
             home: homeTeam || homeTeamFallback || '',
             away: awayTeam || awayTeamFallback || '',

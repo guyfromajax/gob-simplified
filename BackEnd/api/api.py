@@ -1777,6 +1777,22 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             last_turn = gm.turns[-1]
             if isinstance(last_turn, dict) and last_turn.get("result_type") == "TIMEOUT":
                 logging.warning(f"⏸️ COMPUTER TIMEOUT: Returning timeout turn created in this call (reason: {last_turn.get('timeout_reason')}, turn {len(gm.turns)})")
+                
+                # ✅ COMPUTER TIMEOUT: Save game state immediately (same as user timeouts)
+                # This ensures clock, scores, fouls, etc. are preserved when user returns from lineup screen
+                try:
+                    db_summary = summarize_game_state(gm, exclude_animations=True)
+                    games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
+                    logging.info(
+                        f"💾 COMPUTER TIMEOUT: Saved game state before returning timeout turn: "
+                        f"game_id={game_id}, quarter={db_summary.get('quarter')}, "
+                        f"clock={db_summary.get('clock')}, time_remaining={gm.game_state.get('time_remaining')}, "
+                        f"next_play_type={gm.game_state.get('timeout_next_play_type')}"
+                    )
+                except Exception as e:
+                    logging.error(f"🚨 COMPUTER TIMEOUT: Failed to save game state: {e}")
+                    # Don't fail the timeout return if save fails - game is still in memory
+                
                 # Remove the TIMEOUT turn from turns so next API call can simulate the actual next turn
                 timeout_turn = gm.turns.pop()
                 return {
