@@ -1747,6 +1747,26 @@ export function createGameScene(Phaser) {
           const turn = turnData.turn;
           let finalTurn = turn; // Track the final turn for Quick Adjust logic
           
+          // ✅ TIMEOUT: Check if this is a timeout turn - if so, stop the simulation loop
+          if (turn.result_type === "TIMEOUT") {
+            console.log('⏸️ TIMEOUT: Timeout turn detected in simulateTurnByTurn - stopping simulation loop');
+            // Animate the timeout turn (will handle navigation)
+            await animateGameTurns({
+              scene: this,
+              simData: { 
+                ...initialSimData,
+                turns: [turn],
+                home_team: initialSimData.home_team,
+                away_team: initialSimData.away_team
+              },
+              playerSprites: this.playerSprites,
+              ballSprite: this.ballSprite,
+              onUpdate: updateScoreboard
+            });
+            // Break out of the while loop - don't make any more API calls
+            break;
+          }
+          
           // Handle BATCH turns (e.g., HCO miss → OREB)
           if (turn.result_type === 'BATCH' && turn.batch_turns) {
             // ✅ REMOVED: Batch turn logging (cluttering console)
