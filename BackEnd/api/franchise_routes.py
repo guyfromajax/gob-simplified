@@ -1284,8 +1284,9 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         position_ratings_updates[pid] = new_ratings
 
     # Use training report data for player and team changes
-    player_logs = training_report.get("player_changes", {})
-    team_log = training_report.get("team_changes", {})
+    # Support both old field names (player_changes, team_changes) and new standardized names (player_logs, team_log)
+    player_logs = training_report.get("player_logs") or training_report.get("player_changes", {})
+    team_log = training_report.get("team_log") or training_report.get("team_changes", {})
 
     # Update franchise document with new attribute values and position ratings
     franchise_update = {}
@@ -1332,8 +1333,8 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     # Store training report data
     training_report_data = {
         "week": current_week,
-        "player_changes": player_logs,
-        "team_changes": team_log,
+        "player_logs": player_logs,  # Standardized name (was player_changes)
+        "team_log": team_log,  # Standardized name (was team_changes)
         "coaching_focus": training_report.get("coaching_focus", {}),
         "training_notes": training_report.get("training_notes", []),
         "plays_data": training_report.get("plays_data", {}),
@@ -1692,8 +1693,9 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             "round": current_round if mode == "tournament" else None,  # Only for tournament mode
             "upcoming_opponent": upcoming_opponent,
             "coaching_focus": report_data.get("coaching_focus", {}),
-            "player_changes": report_data.get("player_changes", {}),
-            "team_changes": report_data.get("team_changes", {}),
+            # Support both old field names (player_changes, team_changes) and new standardized names (player_logs, team_log)
+            "player_changes": report_data.get("player_logs") or report_data.get("player_changes", {}),
+            "team_changes": report_data.get("team_log") or report_data.get("team_changes", {}),
             "training_notes": report_data.get("training_notes", []),
             "plays_data": report_data.get("plays_data", {}),
             "scouting_data": report_data.get("scouting_data", {}),
