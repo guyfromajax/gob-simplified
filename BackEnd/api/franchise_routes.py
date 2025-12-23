@@ -1654,8 +1654,10 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 if "MO" in attrs:
                     player_attrs["MO"] = attrs["MO"]
                 
-                first_name = tournament_player_data.get("first_name", "")
-                last_name = tournament_player_data.get("last_name", "")
+                # Get player metadata (with meta wrapper support and backward compatibility)
+                meta = tournament_player_data.get("meta", {})
+                first_name = meta.get("first_name") or tournament_player_data.get("first_name", "")
+                last_name = meta.get("last_name") or tournament_player_data.get("last_name", "")
                 player_name = f"{first_name} {last_name}".strip()
                 
                 if player_name:

@@ -41,7 +41,7 @@ class TournamentManager:
         player_stats: dict[str, dict] = {}
         players = players_collection.find(
             {"team": {"$in": teams}},
-            {"first_name": 1, "last_name": 1, "team": 1, "attributes": 1},
+            {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1},
         )
         for p in players:
             from BackEnd.models.player import Player
@@ -50,12 +50,32 @@ class TournamentManager:
             # Store ALL attributes (like franchise mode) to support training and evolution
             attrs = p.get("attributes", {}).copy()
             attrs = Player.randomize_game_attributes(attrs)
-            player_stats[pid] = {
+            
+            # Get team_id from player document or resolve from team name
+            team_id = None
+            if p.get("team_id"):
+                team_id = str(p.get("team_id"))
+            else:
+                # Fallback: resolve team name to team_id
+                from BackEnd.db import teams_collection
+                team_doc = teams_collection.find_one({"name": p.get("team", "")})
+                if team_doc:
+                    team_id = str(team_doc.get("_id", ""))
+            
+            # Wrap metadata in meta object (matches Franchise pattern)
+            meta = {
                 "first_name": p.get("first_name", ""),
                 "last_name": p.get("last_name", ""),
                 "team": p.get("team", ""),
+            }
+            if team_id:
+                meta["team_id"] = team_id
+            
+            player_stats[pid] = {
+                "meta": meta,  # Wrap metadata in meta object (matches Franchise pattern)
                 "season": zero_stats.copy(),
-                "attributes": attrs  # Store all attributes (not just EM, CH, MO)
+                "attributes": attrs,  # Store all attributes (not just EM, CH, MO)
+                "position_ratings": p.get("position_ratings", {}).copy()  # Store position ratings (needed for training)
             }
 
         # Initialize team objects for all 8 teams upfront (matches Franchise pattern)
