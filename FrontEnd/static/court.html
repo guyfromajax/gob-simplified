@@ -661,6 +661,14 @@
       position: relative;
       border: 1px solid #c0c0c0; /* Silver border for contrast */
     }
+    .team-chemistry-bar {
+      width: 110px;        /* Match pill width */
+      height: 16px;        /* Match pill height */
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      border: 1px solid #c0c0c0; /* Silver border for contrast */
+      overflow: hidden;
+    }
     /* Override command-center-team-styles.css colors for dark theme */
     .team-tab-S3 .training-report-styled .attr-pill {
       background: rgba(0, 0, 0, 0.3);
@@ -3579,19 +3587,20 @@
     function createChemistryBar(value) {
       const wrapper = document.createElement('div');
       wrapper.className = 'chemistry-bar-container team-chemistry-bar';
+      wrapper.style.width = '110px';
+      wrapper.style.height = '16px';
+      wrapper.style.background = 'rgba(0, 0, 0, 0.3)';
+      wrapper.style.borderRadius = '8px';
+      wrapper.style.border = '1px solid #c0c0c0';
+      wrapper.style.overflow = 'hidden';
 
       const fill = document.createElement('div');
       fill.className = 'chemistry-bar-fill';
       const pct = Math.max(0, Math.min(100, (value / 25) * 100));
       fill.style.width = `${pct}%`;
-
-      const text = document.createElement('div');
-      text.className = 'chemistry-bar-text';
-      text.textContent = `${value ?? '--'} / 25`;
-      text.style.fontSize = '14px'; /* Match S1/S2 font size */
-
+      fill.style.height = '100%';
+      fill.style.background = '#4a90e2'; // Blue fill
       wrapper.appendChild(fill);
-      wrapper.appendChild(text);
       return wrapper;
     }
 
