@@ -164,6 +164,70 @@ class GameManager:
         }
 
 
+    def call_timeout(self, calling_team, timeout_reason="USER", rebuild_both_lineups=False, game_id=None):
+        """
+        Unified timeout creation method used by both user and computer timeouts.
+        This ensures consistent behavior and state management.
+        
+        Args:
+            calling_team: TeamManager instance for the team calling timeout
+            timeout_reason: "USER", "COMPUTER", or "FOUL_OUT"
+            rebuild_both_lineups: If True, rebuild both team lineups (for computer timeouts during simmed quarters)
+            game_id: Optional game_id for database save (if None, skips save)
+        
+        Returns:
+            dict: Timeout turn payload
+        """
+        # Check if team has timeouts remaining (skip for FOUL_OUT)
+        if timeout_reason != "FOUL_OUT":
+            if not self.turn_manager.can_call_timeout(calling_team):
+                logging.warning(f"⏸️ TIMEOUT: {calling_team.name} cannot call timeout (no timeouts remaining)")
+                return None
+        
+        # Create timeout turn
+        timeout_turn = self.turn_manager.setup_timeout_turn(
+            timeout_reason=timeout_reason,
+            calling_team=calling_team
+        )
+        
+        # Store next_play_type and offense_team_id for resume
+        self.game_state["timeout_next_play_type"] = timeout_turn.get("next_play_type", "SIDE_INBOUND")
+        self.game_state["timeout_offense_team_id"] = self.offense_team.team_id
+        logging.info(f"✅ TIMEOUT: Stored next_play_type '{self.game_state['timeout_next_play_type']}' and offense_team_id '{self.offense_team.team_id}' for resume")
+        
+        # Rebuild lineups
+        from BackEnd.utils.db_utils import build_lineup_from_mongo
+        try:
+            if rebuild_both_lineups:
+                # Computer timeout during simmed quarters: rebuild both teams
+                calling_team.lineup = build_lineup_from_mongo(calling_team, self.game_state)
+                other_team = self.away_team if calling_team == self.home_team else self.home_team
+                other_team.lineup = build_lineup_from_mongo(other_team, self.game_state)
+                logging.info(f"✅ TIMEOUT: Rebuilt both team lineups ({calling_team.name} and {other_team.name})")
+            elif timeout_reason == "USER":
+                # User timeout: rebuild computer team only
+                computer_team = self.away_team if not self.away_team.is_user_team else self.home_team
+                if not computer_team.is_user_team:
+                    computer_team.lineup = build_lineup_from_mongo(computer_team, self.game_state)
+                    logging.info(f"✅ TIMEOUT: Rebuilt computer team ({computer_team.name}) lineup")
+        except Exception as e:
+            logging.error(f"⚠️ TIMEOUT: Failed to rebuild lineups: {e}")
+            # Don't fail the timeout if lineup rebuild fails
+        
+        # Append timeout turn to turns list
+        self.turns.append(timeout_turn)
+        self.text_log.append(timeout_turn["text"])
+        
+        # Set timeout_called flag (for simulation loop stopping)
+        self.game_state["timeout_called"] = True
+        
+        # Save game state to database if game_id provided
+        # Note: Database save is handled by the API endpoint to avoid circular imports
+        # This method just sets up the timeout turn and state
+        
+        logging.warning(f"⏸️ TIMEOUT: {calling_team.name} called timeout (reason: {timeout_reason}, turn {len(self.turns)})")
+        return timeout_turn
+
     def simulate_macro_turn(self): #run_simulation
         # Clear timeout flag at start of each turn (will be set if timeout is called)
         self.game_state["timeout_called"] = False
@@ -345,12 +409,7 @@ class GameManager:
                     break  # First team to call timeout wins
             
             if calling_team:
-                # Computer calls timeout - create timeout turn instead of SIP
-                logging.warning(f"🔍 [COMPUTER TIMEOUT] Creating timeout turn for {calling_team.name} during SIP")
-                timeout_turn = self.turn_manager.setup_timeout_turn(
-                    timeout_reason="COMPUTER",
-                    calling_team=calling_team
-                )
+                # Computer calls timeout - use unified timeout creation method
                 # Increment computer timeout count for this quarter
                 if "computer_timeouts" not in self.game_state:
                     self.game_state["computer_timeouts"] = {}
@@ -361,34 +420,17 @@ class GameManager:
                     self.game_state["computer_timeouts"][calling_team.name][quarter] = {"count": 0, "checked_conditions": set()}
                 self.game_state["computer_timeouts"][calling_team.name][quarter]["count"] += 1
                 
-                # Store next_play_type for resume
-                self.game_state["timeout_next_play_type"] = timeout_turn.get("next_play_type", "SIDE_INBOUND")
-                self.game_state["timeout_offense_team_id"] = self.offense_team.team_id
+                # Use unified timeout creation (rebuild_both_lineups=True for computer timeouts)
+                timeout_turn = self.call_timeout(
+                    calling_team=calling_team,
+                    timeout_reason="COMPUTER",
+                    rebuild_both_lineups=True,
+                    game_id=None  # Don't save here - will be saved by simulate-turn endpoint if needed
+                )
                 
-                # ✅ COMPUTER TIMEOUT: Rebuild both team lineups during simmed quarters
-                # Check if this is a simmed quarter (full_sim mode or turn_by_turn_mode=False with time_remaining > 0)
-                from BackEnd.utils.db_utils import build_lineup_from_mongo
-                try:
-                    # Rebuild calling team's lineup
-                    calling_team.lineup = build_lineup_from_mongo(calling_team, self.game_state)
-                    logging.info(f"✅ COMPUTER TIMEOUT: Rebuilt {calling_team.name} lineup")
-                    
-                    # Rebuild other team's lineup (user team or other computer team)
-                    other_team = self.away_team if calling_team == self.home_team else self.home_team
-                    other_team.lineup = build_lineup_from_mongo(other_team, self.game_state)
-                    logging.info(f"✅ COMPUTER TIMEOUT: Rebuilt {other_team.name} lineup")
-                except Exception as e:
-                    logging.error(f"⚠️ COMPUTER TIMEOUT: Failed to rebuild lineups: {e}")
-                    # Don't fail the timeout if lineup rebuild fails
-                
-                self.turns.append(timeout_turn)
-                self.text_log.append(timeout_turn["text"])
-                logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} called timeout during SIP (turn {len(self.turns)}, timeout_turn: {timeout_turn.get('text')})")
-                # ✅ COMPUTER TIMEOUT: Set flag to stop simulation loop
-                self.game_state["timeout_called"] = True
-                logging.warning(f"⏸️ COMPUTER TIMEOUT: Set timeout_called=True, returning early from simulate_macro_turn()")
-                # Don't check for BIP after timeout - return early
-                return
+                if timeout_turn:
+                    logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} called timeout during SIP, returning early from simulate_macro_turn()")
+                    return
             else:
                 # No computer timeout - proceed with SIP
                 self.turns.append(inbound_payload)
@@ -434,12 +476,7 @@ class GameManager:
                     break  # First team to call timeout wins
             
             if calling_team:
-                # Computer calls timeout - create timeout turn instead of BIP
-                logging.warning(f"🔍 [COMPUTER TIMEOUT] Creating timeout turn for {calling_team.name} during BIP")
-                timeout_turn = self.turn_manager.setup_timeout_turn(
-                    timeout_reason="COMPUTER",
-                    calling_team=calling_team
-                )
+                # Computer calls timeout - use unified timeout creation method
                 # Increment computer timeout count for this quarter
                 if "computer_timeouts" not in self.game_state:
                     self.game_state["computer_timeouts"] = {}
@@ -450,34 +487,17 @@ class GameManager:
                     self.game_state["computer_timeouts"][calling_team.name][quarter] = {"count": 0, "checked_conditions": set()}
                 self.game_state["computer_timeouts"][calling_team.name][quarter]["count"] += 1
                 
-                # Store next_play_type for resume
-                self.game_state["timeout_next_play_type"] = timeout_turn.get("next_play_type", "BASELINE_INBOUND")
-                self.game_state["timeout_offense_team_id"] = self.offense_team.team_id
+                # Use unified timeout creation (rebuild_both_lineups=True for computer timeouts)
+                timeout_turn = self.call_timeout(
+                    calling_team=calling_team,
+                    timeout_reason="COMPUTER",
+                    rebuild_both_lineups=True,
+                    game_id=None  # Don't save here - will be saved by simulate-turn endpoint if needed
+                )
                 
-                # ✅ COMPUTER TIMEOUT: Rebuild both team lineups during simmed quarters
-                # Check if this is a simmed quarter (full_sim mode or turn_by_turn_mode=False with time_remaining > 0)
-                from BackEnd.utils.db_utils import build_lineup_from_mongo
-                try:
-                    # Rebuild calling team's lineup
-                    calling_team.lineup = build_lineup_from_mongo(calling_team, self.game_state)
-                    logging.info(f"✅ COMPUTER TIMEOUT: Rebuilt {calling_team.name} lineup")
-                    
-                    # Rebuild other team's lineup (user team or other computer team)
-                    other_team = self.away_team if calling_team == self.home_team else self.home_team
-                    other_team.lineup = build_lineup_from_mongo(other_team, self.game_state)
-                    logging.info(f"✅ COMPUTER TIMEOUT: Rebuilt {other_team.name} lineup")
-                except Exception as e:
-                    logging.error(f"⚠️ COMPUTER TIMEOUT: Failed to rebuild lineups: {e}")
-                    # Don't fail the timeout if lineup rebuild fails
-                
-                self.turns.append(timeout_turn)
-                self.text_log.append(timeout_turn["text"])
-                logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} called timeout during BIP (turn {len(self.turns)}, timeout_turn: {timeout_turn.get('text')})")
-                # ✅ COMPUTER TIMEOUT: Set flag to stop simulation loop
-                self.game_state["timeout_called"] = True
-                logging.warning(f"⏸️ COMPUTER TIMEOUT: Set timeout_called=True, returning early from simulate_macro_turn()")
-                # Don't continue processing after timeout
-                return
+                if timeout_turn:
+                    logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} called timeout during BIP, returning early from simulate_macro_turn()")
+                    return
             else:
                 # No computer timeout - proceed with BIP
                 self.turns.append(inbound_payload)
