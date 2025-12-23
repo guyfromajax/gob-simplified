@@ -278,19 +278,19 @@ After implementation:
 
 **Total Tasks:** 11 items across 3 phases
 
-**Phase 1 (Critical):** 4 items
-- Tournament: Initialize all teams upfront
-- Franchise: Add user_team_id and user_team_object_id
-- Tournament: Add position_ratings
-- Tournament: Use meta wrapper for player metadata
+**Phase 1 (Critical):** 4 items ✅ **ALL COMPLETED**
+- ✅ Tournament: Initialize all teams upfront
+- ✅ Franchise: Add user_team_id and user_team_object_id
+- ✅ Tournament: Add position_ratings
+- ✅ Tournament: Use meta wrapper for player metadata
 
-**Phase 2 (Important):** 4 items
-- Franchise: Add missing document-level fields (`created_at`, `stats`/`leaderboards`, `current_season`)
-- Standardize training status field names
-- Standardize latest training field names
-- Franchise: Add per-week training reports storage
+**Phase 2 (Important):** 4 items ✅ **ALL COMPLETED**
+- ✅ Franchise: Add missing document-level fields (`created_at`, `stats`/`leaderboards`, `current_season`)
+- ✅ Standardize training status field names
+- ✅ Standardize latest training field names
+- ✅ Franchise: Add per-week training reports storage (already implemented)
 
-**Phase 3 (Nice to Have):** 3 items (duplicates of Phase 2.1)
+**Phase 3 (Nice to Have):** 3 items ✅ **ALL COMPLETED** (via Phase 2.1)
 
 **Estimated Impact:**
 - ~15-20 files to modify
