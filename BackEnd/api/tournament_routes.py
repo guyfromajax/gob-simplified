@@ -595,8 +595,10 @@ def get_tournament_roster(tournament_id: str, team_name: str = None):
         if not core_player:
             continue
         
-        # Get position ratings from core (tournament doesn't store position ratings yet)
-        position_ratings = core_player.get("position_ratings", {})
+        # Get position ratings from tournament (with backward compatibility to core)
+        position_ratings = tournament_player_data.get("position_ratings")
+        if not position_ratings:
+            position_ratings = core_player.get("position_ratings", {})
         
         # Merge core attributes with tournament attributes (tournament overrides core)
         core_attributes = core_player.get("attributes", {}) if core_player else {}
@@ -607,9 +609,11 @@ def get_tournament_roster(tournament_id: str, team_name: str = None):
             if attr_key in merged_attributes:
                 merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
         
-        # Use tournament player data for name, fallback to core
-        first = tournament_player_data.get("first_name") or core_player.get("first_name", "")
-        last = tournament_player_data.get("last_name") or core_player.get("last_name", "")
+        # Use tournament player data for name (with meta wrapper), fallback to core
+        # Backward compatibility: check meta wrapper first, then root level, then core
+        meta = tournament_player_data.get("meta", {})
+        first = meta.get("first_name") or tournament_player_data.get("first_name") or core_player.get("first_name", "")
+        last = meta.get("last_name") or tournament_player_data.get("last_name") or core_player.get("last_name", "")
         
         player = {
             "_id": pid_str,
@@ -840,13 +844,24 @@ def run_tournament_training(req: TournamentTrainingRequest):
             tournament_attributes = {**core_attributes, **tournament_attributes}
             logger.info(f"📊 [TOURNAMENT TRAINING] Merged core attributes for player {pid_str} (backward compatibility)")
         
+        # Get player metadata (with meta wrapper support and backward compatibility)
+        meta = tournament_player_data.get("meta", {})
+        first_name = meta.get("first_name") or tournament_player_data.get("first_name") or (core_player.get("first_name", "") if core_player else "")
+        last_name = meta.get("last_name") or tournament_player_data.get("last_name") or (core_player.get("last_name", "") if core_player else "")
+        
+        # Get position ratings from tournament (with backward compatibility to core)
+        position_ratings = tournament_player_data.get("position_ratings")
+        if not position_ratings and core_player:
+            position_ratings = core_player.get("position_ratings", {})
+        
         # Build player dict for training
         player = {
             "_id": pid_str,
-            "first_name": tournament_player_data.get("first_name") or (core_player.get("first_name", "") if core_player else ""),
-            "last_name": tournament_player_data.get("last_name") or (core_player.get("last_name", "") if core_player else ""),
+            "first_name": first_name,
+            "last_name": last_name,
             "team": team_name,
-            "attributes": tournament_attributes
+            "attributes": tournament_attributes,
+            "position_ratings": position_ratings or {}
         }
         players_for_training.append(player)
 
