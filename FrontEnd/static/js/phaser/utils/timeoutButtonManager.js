@@ -305,6 +305,14 @@ async function showTimeoutPopup(timeoutResult, gameId, scene, computerTimeout = 
     const awayLineup = scene.awayLineup || {};
     const lineup = myTeamSide === 'home' ? homeLineup : awayLineup;
     
+    // ✅ COMPUTER TIMEOUT: Log parameters for debugging
+    console.log('⏸️ COMPUTER TIMEOUT: Building navigation params', {
+      computerTimeout: computerTimeout,
+      computerTeamName: computerTeamName,
+      gameId: gameId,
+      currentQuarter: currentQuarter
+    });
+    
     // ✅ SS&S: Use unified helper to build params
     const params = helper.buildGameNavigationParams({
         sourceParams: urlParams,
@@ -328,6 +336,14 @@ async function showTimeoutPopup(timeoutResult, gameId, scene, computerTimeout = 
             tournament_id: tournamentId,
             mode: modeParam
         }
+    });
+    
+    // ✅ COMPUTER TIMEOUT: Log final params to verify computer timeout params are included
+    console.log('⏸️ COMPUTER TIMEOUT: Final navigation params', {
+      hasComputerTimeout: params.has('computer_timeout'),
+      computerTimeoutValue: params.get('computer_timeout'),
+      computerTeamNameValue: params.get('computer_team_name'),
+      fullUrl: `/static/set-lineup.html?${params.toString()}`
     });
     
     try {
