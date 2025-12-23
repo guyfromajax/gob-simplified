@@ -456,6 +456,30 @@ def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
     if "time_remaining" in saved:
         gm.game_state["time_remaining"] = saved["time_remaining"]
         logging.info(f"🔄 TIMEOUT RESUME: Applied time_remaining={saved['time_remaining']}")
+    
+    # ✅ TIMEOUT RESUME: Also restore scores and team fouls from saved document
+    # These should already be restored by should_restore_stats logic, but ensure they're applied here too
+    if "score" in saved:
+        for team_name, score in saved["score"].items():
+            if team_name in gm.score:
+                gm.score[team_name] = score
+                logging.info(f"🔄 TIMEOUT RESUME: Applied score for {team_name}={score}")
+    
+    # Restore team fouls from saved document structure
+    if "home_team" in saved and "team_fouls" in saved["home_team"]:
+        gm.home_team.team_fouls = saved["home_team"]["team_fouls"]
+        logging.info(f"🔄 TIMEOUT RESUME: Applied home team fouls={saved['home_team']['team_fouls']}")
+    if "away_team" in saved and "team_fouls" in saved["away_team"]:
+        gm.away_team.team_fouls = saved["away_team"]["team_fouls"]
+        logging.info(f"🔄 TIMEOUT RESUME: Applied away team fouls={saved['away_team']['team_fouls']}")
+    
+    # Restore team timeouts
+    if "home_team" in saved and "timeouts" in saved["home_team"]:
+        gm.home_team.timeouts = saved["home_team"]["timeouts"]
+        logging.info(f"🔄 TIMEOUT RESUME: Applied home team timeouts={saved['home_team']['timeouts']}")
+    if "away_team" in saved and "timeouts" in saved["away_team"]:
+        gm.away_team.timeouts = saved["away_team"]["timeouts"]
+        logging.info(f"🔄 TIMEOUT RESUME: Applied away team timeouts={saved['away_team']['timeouts']}")
 
 # 4. Routes
 @app.get("/")
