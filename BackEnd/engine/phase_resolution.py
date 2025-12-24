@@ -4147,10 +4147,24 @@ def resolve_full_court_press_logic(game: "GameManager"):
         
         # FCP/HCT is over once shot is taken - reset to HCO
         # (Unless it's a made shot, in which case pressure might apply on the inbound)
+        # ✅ FIX: Check for shooting foul before overwriting offensive_state
+        # If there's a shooting foul (free_throws_remaining > 0), preserve FREE_THROW state
         if shot_result.get("result_type") == "MISS":
-            game_state["offensive_state"] = "HCO"
-            # Track MISS as defensive success for team
-            def_scouting["defense"]["FCP"]["success"] += 1
+            # Check if there's a shooting foul (free throws were awarded)
+            free_throws_remaining = shot_result.get("free_throws_remaining") or game_state.get("free_throws_remaining", 0)
+            if free_throws_remaining > 0:
+                # Shooting foul on miss → preserve FREE_THROW state and set next_play_type
+                game_state["offensive_state"] = "FREE_THROW"
+                shot_result["next_play_type"] = "FREE_THROW"
+                shot_result["next_turn"] = "FREE_THROW"
+                # Ensure free_throws_remaining is in result for transition system
+                shot_result["free_throws_remaining"] = free_throws_remaining
+                logging.warning(f"✅ [FCP SHOT] MISS with shooting foul → FREE_THROW (free_throws_remaining: {free_throws_remaining})")
+            else:
+                # Regular miss → reset to HCO
+                game_state["offensive_state"] = "HCO"
+                # Track MISS as defensive success for team
+                def_scouting["defense"]["FCP"]["success"] += 1
         
         # Track FCP player stats for SHOT results
         fcp_roles = {
@@ -4163,6 +4177,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         # Add FCP-specific data
         shot_result["fcp_shot"] = True
         shot_result["text"] = "PRESS! " + shot_result.get("text", "")
+        shot_result["current_turn"] = "FCP"  # ✅ SS&S: Explicit turn type for transition system
         
         # Generate animations from skeleton for the pass, then rely on standard shot animation
         # ✅ FCP/HCT SHOT: Use FCP shot skeleton with version selection (filters non-empty versions)
@@ -5072,10 +5087,24 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         
         # HCT/FCP is over once shot is taken - reset to HCO
         # (Unless it's a made shot, in which case pressure might apply on the inbound)
+        # ✅ FIX: Check for shooting foul before overwriting offensive_state
+        # If there's a shooting foul (free_throws_remaining > 0), preserve FREE_THROW state
         if shot_result.get("result_type") == "MISS":
-            game_state["offensive_state"] = "HCO"
-            # Track MISS as defensive success for team
-            def_scouting["defense"]["HCT"]["success"] += 1
+            # Check if there's a shooting foul (free throws were awarded)
+            free_throws_remaining = shot_result.get("free_throws_remaining") or game_state.get("free_throws_remaining", 0)
+            if free_throws_remaining > 0:
+                # Shooting foul on miss → preserve FREE_THROW state and set next_play_type
+                game_state["offensive_state"] = "FREE_THROW"
+                shot_result["next_play_type"] = "FREE_THROW"
+                shot_result["next_turn"] = "FREE_THROW"
+                # Ensure free_throws_remaining is in result for transition system
+                shot_result["free_throws_remaining"] = free_throws_remaining
+                logging.warning(f"✅ [HCT SHOT] MISS with shooting foul → FREE_THROW (free_throws_remaining: {free_throws_remaining})")
+            else:
+                # Regular miss → reset to HCO
+                game_state["offensive_state"] = "HCO"
+                # Track MISS as defensive success for team
+                def_scouting["defense"]["HCT"]["success"] += 1
         
         # Track HCT player stats for SHOT results
         hct_roles = {
@@ -5088,6 +5117,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         # Add HCT-specific data
         shot_result["hct_shot"] = True
         shot_result["text"] = "TRAP! " + shot_result.get("text", "")
+        shot_result["current_turn"] = "HCT"  # ✅ SS&S: Explicit turn type for transition system
         
         # Generate animations from skeleton
         from BackEnd.models.animator import Animator
