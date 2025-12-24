@@ -92,7 +92,8 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
     const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
     
     // Context announcements (situation being entered)
-    if (turn.fast_break) {
+    // ✅ FIX: Don't announce Fast Break if this turn is a steal (steal announcement takes priority)
+    if (turn.fast_break && turn.result_type !== 'STEAL' && !turn.text?.toLowerCase().includes('steal')) {
       announceGameEvent('FAST_BREAK', turn, scene);
     }
     

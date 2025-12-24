@@ -613,22 +613,41 @@ export async function shootBall({
           }
         } else if (result === "MISS" && isShootingFoul) {
           // Get foul player data from turnData
+          // ✅ FIX: Check multiple possible locations for foul_player_id
           let foulPlayerData = null;
-          if (turnData?.foul_player_id) {
-            const foulPlayerId = turnData.foul_player_id;
+          const foulPlayerId = turnData?.foul_player_id || 
+                              turnData?.foul_player?.player_id ||
+                              turnData?.events?.find(e => e.event_type === 'FOUL')?.foul_player_id;
+          
+          if (foulPlayerId && scene) {
             const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
-            const foulPlayerTeamId = foulPlayerSprite?.team_id;
-            const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-            
-            foulPlayerData = {
-              playerId: foulPlayerId,
-              photo: foulPlayerSprite?.photo || null,
-              teamName: foulPlayerTeamName
-            };
-            
-            // Trigger foul effect
-            const { triggerFoulEffect } = await import('./negativeActionEffects.js');
-            triggerFoulEffect(scene, foulPlayerId);
+            if (foulPlayerSprite) {
+              const foulPlayerTeamId = foulPlayerSprite?.team_id;
+              const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+              
+              foulPlayerData = {
+                playerId: foulPlayerId,
+                photo: foulPlayerSprite?.photo || null,
+                teamName: foulPlayerTeamName
+              };
+              
+              // Trigger foul effect
+              const { triggerFoulEffect } = await import('./negativeActionEffects.js');
+              triggerFoulEffect(scene, foulPlayerId);
+            } else {
+              // Fallback: try to get from playerInfo if sprite not found
+              const foulPlayerInfo = scene.playerInfo?.[foulPlayerId];
+              if (foulPlayerInfo) {
+                const foulPlayerTeamId = foulPlayerInfo.team_id;
+                const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+                
+                foulPlayerData = {
+                  playerId: foulPlayerId,
+                  photo: foulPlayerInfo.photo || null,
+                  teamName: foulPlayerTeamName
+                };
+              }
+            }
           }
           
           showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);

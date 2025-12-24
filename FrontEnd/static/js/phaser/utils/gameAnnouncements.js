@@ -322,14 +322,40 @@ function handleTurnoverAnnouncement(turnData, scene, context, offenseTeam) {
 
   // Determine turnover type
   const turnoverType = context.turnoverType || turnData.turnover_type;
-  const typeMap = {
-    "TRAVEL": "TRAVEL!",
-    "DOUBLE_DRIBBLE": "DOUBLE DRIBBLE!",
-    "OUT_OF_BOUNDS": "OUT OF BOUNDS!",
-    "BAD_PASS": "BAD PASS!"
-  };
   
-  const turnoverText = typeMap[turnoverType] || "TURNOVER!";
+  // ✅ FIX: For dead ball turnovers (DEAD BALL result_type), randomly choose "Travel!" or "Double Dribble!" (50/50)
+  let turnoverText;
+  if (turnData.result_type === 'DEAD BALL' || turnData.result_type === 'TURNOVER') {
+    // Check if it's a dead ball turnover (not a steal)
+    const isDeadBallTurnover = turnData.result_type === 'DEAD BALL' || 
+                               (!turnData.text?.toLowerCase().includes('steal') && 
+                                !turnData.stealer_id && 
+                                !turnData.defender_id);
+    
+    if (isDeadBallTurnover && !turnoverType) {
+      // Randomly choose between Travel and Double Dribble (50/50)
+      turnoverText = Math.random() < 0.5 ? "Travel!" : "Double Dribble!";
+    } else {
+      // Use existing type mapping
+      const typeMap = {
+        "TRAVEL": "Travel!",
+        "DOUBLE_DRIBBLE": "Double Dribble!",
+        "OUT_OF_BOUNDS": "OUT OF BOUNDS!",
+        "BAD_PASS": "BAD PASS!"
+      };
+      turnoverText = typeMap[turnoverType] || "TURNOVER!";
+    }
+  } else {
+    // Fallback for other turnover types
+    const typeMap = {
+      "TRAVEL": "Travel!",
+      "DOUBLE_DRIBBLE": "Double Dribble!",
+      "OUT_OF_BOUNDS": "OUT OF BOUNDS!",
+      "BAD_PASS": "BAD PASS!"
+    };
+    turnoverText = typeMap[turnoverType] || "TURNOVER!";
+  }
+  
   showAnnouncement(turnoverText, offenseTeam, playerData);
 
   // Trigger visual effect
