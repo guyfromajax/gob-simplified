@@ -58,6 +58,7 @@ This document analyzes what data is actually persisted to the database when the 
   - `plays` - All plays with effectiveness, momentum, cloaking
   - `attributes` - Team attributes
   - `scouting` - Scouting data (defensive plays)
+  - `playbook_settings` - Playbook settings including slot_assignments (✅ **PRESERVED** from database when saving game state)
 
 ### Players Array
 - `players[]` - Array of all players (lineup + referenced players):

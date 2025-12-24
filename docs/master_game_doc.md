@@ -6590,6 +6590,12 @@ The Playcall Center allows users to override playcalls for their team. Overrides
 
 Player headshots in the Playcall Center are assigned once when returning to `court.html` from lineup/game plan screens. The system uses different logic for Set Plays vs Motion Plays.
 
+**Slot Assignments Persistence (January 2025):**
+- ✅ **Slot assignments persist across timeout/quarter saves** - When game state is saved (timeouts, quarter breaks, etc.), `playbook_settings.slot_assignments` is preserved from the database
+- This ensures Playcall Center displays the correct plays in the correct slots when returning from timeout navigation
+- **Implementation:** `BackEnd/utils/shared.py` `summarize_game_state()` preserves `playbook_settings` when saving game state
+- **Frontend:** `FrontEnd/static/court.html` `loadAndApplySlotAssignments()` dynamically builds Playcall Center DOM from slot assignments returned by `/api/playbooks`
+
 **Process (SS&S - January 2025):**
 
 1. **Page Load:** `populatePlayHeadshots()` runs on `court.html` page load (all timeout navigation entry points)
@@ -8123,6 +8129,11 @@ The In-Game Play Calling System determines which offensive and defensive plays a
 - Each game mode maintains its own playbook settings
 - Settings from one mode don't affect another
 - Settings persist across games within the same mode
+
+**Data Persistence (January 2025):**
+- ✅ **`playbook_settings` is preserved when saving game state** - When `summarize_game_state()` saves game state (timeouts, quarter breaks, etc.), it loads existing `playbook_settings` from the database and includes them in the `teams.{team_id}` object
+- This ensures `slot_assignments` and other playbook settings persist across all game state saves
+- **Implementation:** `BackEnd/utils/shared.py` `summarize_game_state()` (lines 659-673) preserves `playbook_settings` from database when `exclude_animations=True` (database saves)
 
 ### Key Methods
 
