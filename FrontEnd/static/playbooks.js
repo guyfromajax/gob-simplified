@@ -61,9 +61,9 @@ class PlaybooksState {
   }
   
   initDefaults() {
-    // Initialize motion plays (6 slots max)
+    // Initialize motion plays (4 slots max)
     const motionPlays = this.playData.motion || [];
-    const motionSlots = 6;
+    const motionSlots = 4;
     
     for (let i = 0; i < motionSlots; i++) {
       const play = i < motionPlays.length ? motionPlays[i] : TO_BE_ADDED_PLACEHOLDER;
