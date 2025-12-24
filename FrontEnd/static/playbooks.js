@@ -968,6 +968,40 @@ class PlaybooksUI {
         this.handleBack();
       });
     }
+    
+    // Position filter button listeners
+    const positionButtons = document.querySelectorAll('.position-filter-btn');
+    positionButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.handlePositionFilterClick(btn);
+      });
+    });
+  }
+  
+  handlePositionFilterClick(button) {
+    const position = button.dataset.position;
+    const isSelected = button.classList.contains('selected');
+    
+    if (isSelected) {
+      // Deselect if already selected
+      button.classList.remove('selected');
+      this.selectedPositions = this.selectedPositions.filter(p => p !== position);
+    } else {
+      // If already have 2 selected, remove the oldest (first in array)
+      if (this.selectedPositions.length >= 2) {
+        const oldestPosition = this.selectedPositions.shift();
+        const oldestButton = document.querySelector(`.position-filter-btn[data-position="${oldestPosition}"]`);
+        if (oldestButton) {
+          oldestButton.classList.remove('selected');
+        }
+      }
+      
+      // Add new selection
+      button.classList.add('selected');
+      this.selectedPositions.push(position);
+    }
+    
+    console.log('🔍 [POSITION FILTER] Selected positions:', this.selectedPositions);
   }
   
   handleBack() {
