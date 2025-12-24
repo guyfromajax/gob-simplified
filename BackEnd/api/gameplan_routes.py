@@ -1064,6 +1064,31 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             
             team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
+        # Ensure playbook_settings exists (even if ensure_team_objects_exist missed it)
+        if team_obj and "playbook_settings" not in team_obj:
+            logger.warning(f"⚠️ [GET PLAYBOOKS] playbook_settings missing for team {actual_team_id}, adding now...")
+            playbook_settings = initialize_playbook_settings()
+            team_key = f"teams.{actual_team_id}"
+            if mode == "single":
+                collection.update_one(
+                    {"_id": doc_id},
+                    {"$set": {f"{team_key}.playbook_settings": playbook_settings}}
+                )
+            else:
+                collection.update_one(
+                    {"_id": ObjectId(doc_id)},
+                    {"$set": {f"{team_key}.playbook_settings": playbook_settings}}
+                )
+            # Reload document to get updated playbook_settings
+            if mode == "single":
+                doc = collection.find_one({"_id": doc_id})
+            else:
+                doc = collection.find_one({"_id": ObjectId(doc_id)})
+            # Reload team_obj
+            teams = doc.get("teams", {})
+            team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
+            logger.warning(f"⚠️ [GET PLAYBOOKS] playbook_settings added, reloaded team_obj has playbook_settings: {bool(team_obj.get('playbook_settings'))}")
+        
         # Check if position filters need to be populated (after ensure_team_objects_exist and document reload)
         logger.warning(f"⚠️ [GET PLAYBOOKS] Checking position filters for team {actual_team_id}, team_obj has playbook_settings: {bool(team_obj and team_obj.get('playbook_settings'))}")
         if team_obj and team_obj.get("playbook_settings"):
