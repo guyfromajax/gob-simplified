@@ -631,6 +631,27 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
             # Initialize playbook_settings if missing
             if "playbook_settings" not in team_obj:
                 playbook_settings = initialize_playbook_settings()
+            else:
+                # Check if position_filters is missing or empty, and populate if needed
+                existing_playbook_settings = team_obj.get("playbook_settings", {})
+                position_filters = existing_playbook_settings.get("position_filters", {})
+                # Check if all position filter arrays are empty
+                all_empty = True
+                if position_filters:
+                    for key in ["standard", "PG", "SG", "SF", "PF", "C"]:
+                        if position_filters.get(key) and len(position_filters[key]) > 0:
+                            all_empty = False
+                            break
+                
+                if not position_filters or all_empty:
+                    # Position filters are missing or empty, populate them
+                    logger.info(f"🔍 [TEAM OBJECTS] Position filters missing/empty for team {actual_team_id}, populating...")
+                    playbook_settings = initialize_playbook_settings()
+                    # Merge with existing playbook_settings to preserve other settings
+                    existing_playbook_settings["position_filters"] = playbook_settings["position_filters"]
+                    playbook_settings = existing_playbook_settings
+                else:
+                    playbook_settings = existing_playbook_settings
             updates = {}
             if "playcall_settings" not in team_obj:
                 updates[f"{team_key}.playcall_settings"] = defaults["playcall_settings"].copy()
