@@ -704,37 +704,53 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                 )
         
         # Always check if position_filters need to be populated (even if all other fields exist)
+        logger.info(f"🔍 [ENSURE TEAM OBJECTS] Checking position filters for team {actual_team_id}...")
         team_obj = doc.get("teams", {}).get(actual_team_id)
         if team_obj and team_obj.get("playbook_settings"):
             existing_playbook_settings = team_obj.get("playbook_settings", {})
             position_filters = existing_playbook_settings.get("position_filters", {})
+            logger.info(f"🔍 [ENSURE TEAM OBJECTS] Found playbook_settings, position_filters: {position_filters}")
+            
             # Check if all position filter arrays are empty
             all_empty = True
             if position_filters:
                 for key in ["standard", "PG", "SG", "SF", "PF", "C"]:
-                    if position_filters.get(key) and len(position_filters[key]) > 0:
+                    arr = position_filters.get(key, [])
+                    if arr and len(arr) > 0:
                         all_empty = False
+                        logger.info(f"🔍 [ENSURE TEAM OBJECTS] Position '{key}' has {len(arr)} play_ids")
                         break
+                    else:
+                        logger.info(f"🔍 [ENSURE TEAM OBJECTS] Position '{key}' is empty")
             
             if not position_filters or all_empty:
                 # Position filters are missing or empty, populate them
                 logger.info(f"🔍 [TEAM OBJECTS] Position filters missing/empty for team {actual_team_id}, populating...")
                 new_playbook_settings = initialize_playbook_settings()
+                logger.info(f"🔍 [TEAM OBJECTS] Initialized playbook_settings with position_filters: {new_playbook_settings.get('position_filters', {})}")
+                
                 # Merge with existing playbook_settings to preserve other settings
                 existing_playbook_settings["position_filters"] = new_playbook_settings["position_filters"]
                 
                 # Update the database
+                logger.info(f"🔍 [TEAM OBJECTS] Updating database for team {actual_team_id} with path: {team_key}.playbook_settings")
                 if mode == "single":
-                    collection.update_one(
+                    result = collection.update_one(
                         {"_id": doc_id},
                         {"$set": {f"{team_key}.playbook_settings": existing_playbook_settings}}
                     )
+                    logger.info(f"🔍 [TEAM OBJECTS] Database update result (single): matched={result.matched_count}, modified={result.modified_count}")
                 else:
-                    collection.update_one(
+                    result = collection.update_one(
                         {"_id": ObjectId(doc_id)},
                         {"$set": {f"{team_key}.playbook_settings": existing_playbook_settings}}
                     )
+                    logger.info(f"🔍 [TEAM OBJECTS] Database update result (tournament/franchise): matched={result.matched_count}, modified={result.modified_count}")
                 logger.info(f"✅ [TEAM OBJECTS] Position filters populated for team {actual_team_id}")
+            else:
+                logger.info(f"✅ [ENSURE TEAM OBJECTS] Position filters already populated for team {actual_team_id}")
+        else:
+            logger.info(f"🔍 [ENSURE TEAM OBJECTS] No playbook_settings found for team {actual_team_id}, will be created if needed")
         
         return doc.get("teams", {})
 
@@ -915,6 +931,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
     Returns plays organized by type (motion, set_play) and focus (inside, attack, outside).
     """
     try:
+        logger.info(f"🔍 [GET PLAYBOOKS] Called with mode={mode}, team_id={team_id}, franchise_id={franchise_id}, tournament_id={tournament_id}, game_id={game_id}")
         # Determine which collection to use
         if mode == "franchise":
             if not franchise_id:
