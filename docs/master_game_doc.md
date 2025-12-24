@@ -776,6 +776,19 @@ The **Half Court Offense (HCO)** system handles standard half-court offensive po
 - `skeleton_to_animations()` - Converts skeleton steps to animation data in `BackEnd/models/animator.py`
 - `ShotAnimationSystem` - Handles HCO shot attempt animations in frontend
 
+### Playcall Display
+
+**Playcall Popup (HCO Turn Start):**
+- At the beginning of each HCO turn, a transient HUD overlay displays the current playcall information
+- **Offense Display:** Shows the play name from the database (e.g., `"PF Post Up"`, `"3-2 Motion"`, `"Pick & Roll (Lower Wing)"`)
+  - Retrieved from `turnData.offensive_playcall` or `turnData.current_playcall`
+  - Displays the full play name as stored in the play's database object
+- **Defense Display:** Shows defensive playcall (Man, 2-3 Zone, 3-2 Zone, etc.) and aggression level
+- **EV Display:** Shows expected value score with color coding (red for negative, yellow for zero, green for positive)
+- **Intended Shooter:** Displays headshot of the intended shooter if available
+- Popup automatically hides after 2.5 seconds
+- **Implementation:** `showPlaycallReveal()` function in `court.html` (called from `playcallCenter.js`)
+
 ### When HCO Activates
 
 **Trigger Conditions:**
