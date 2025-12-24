@@ -1127,10 +1127,17 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             "C": []
         }
         position_filters = playbook_settings.get("position_filters", default_position_filters)
+        logger.info(f"🔍 [GET PLAYBOOKS] Loaded position_filters from playbook_settings: {position_filters}")
+        
         # Ensure all position keys exist (backward compatibility)
         for key in default_position_filters:
             if key not in position_filters:
                 position_filters[key] = []
+        
+        # Log the counts for each position
+        for key in ["standard", "PG", "SG", "SF", "PF", "C"]:
+            count = len(position_filters.get(key, []))
+            logger.info(f"🔍 [GET PLAYBOOKS] Position '{key}' has {count} play_ids")
         
         return {
             "motion": motion_plays,
