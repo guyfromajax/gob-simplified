@@ -406,6 +406,10 @@ class PlaybooksUI {
         
         console.log('🔍 [POSITION FILTERS] Loaded from API:', this.positionFilters);
         
+        // Store saved playbook percentages for later use
+        this.savedPlaybookPercentages = data.playbook_percentages || {};
+        console.log('🔍 [PLAYBOOKS] Loaded saved percentages from API:', this.savedPlaybookPercentages);
+        
         // Convert API response to play data format
         this.playData = {
           motion: (data.motion || []).map((play, index) => ({
@@ -462,13 +466,76 @@ class PlaybooksUI {
   }
   
   async loadState() {
-    // First try to load from API (slot assignments and motion dropdowns)
+    // First try to load from API (slot assignments, motion dropdowns, and percentages)
     await this.loadSlotAssignmentsFromAPI();
+    await this.loadPlaybookPercentagesFromAPI();
     
-    // Then load from localStorage (UI state like percentages)
+    // Then load from localStorage (UI state like percentages) - API takes precedence
     const saved = await this.persistence.load();
     if (saved) {
-      this.state.deserialize(saved);
+      // Only deserialize if we don't have API data (backward compatibility)
+      if (!this.savedPlaybookPercentages || Object.keys(this.savedPlaybookPercentages).length === 0) {
+        this.state.deserialize(saved);
+      }
+    }
+  }
+  
+  async loadPlaybookPercentagesFromAPI() {
+    // Apply saved percentages from API to state
+    if (!this.savedPlaybookPercentages || !this.state) return;
+    
+    try {
+      const percentages = this.savedPlaybookPercentages;
+      
+      // Apply motion percentages
+      if (percentages.motion && Object.keys(percentages.motion).length > 0) {
+        Object.keys(this.state.sections.motion || {}).forEach(playId => {
+          const play = this.playData.motion?.find(p => p.id === playId);
+          if (play && percentages.motion[play.name] !== undefined) {
+            this.state.sections.motion[playId].percentage = percentages.motion[play.name];
+          }
+        });
+      }
+      
+      // Apply set play percentages
+      ['set-play-inside', 'set-play-attack', 'set-play-outside'].forEach(sectionKey => {
+        const settingsKey = sectionKey.replace('set-play-', 'set_play_');
+        const sectionPercentages = percentages[settingsKey];
+        
+        if (sectionPercentages && Object.keys(sectionPercentages).length > 0) {
+          const plays = this.playData[settingsKey] || [];
+          Object.keys(this.state.sections[sectionKey] || {}).forEach(playId => {
+            const play = plays.find(p => p.id === playId);
+            if (play && sectionPercentages[play.name] !== undefined) {
+              this.state.sections[sectionKey][playId].percentage = sectionPercentages[play.name];
+            }
+          });
+        }
+      });
+      
+      // Apply zone defense percentages
+      if (percentages.zone_defense && Object.keys(percentages.zone_defense).length > 0) {
+        Object.keys(this.state.sections['zone-defense'] || {}).forEach(playId => {
+          const play = DEFENSE_PLAY_DATA['zone-defense']?.find(p => p.id === playId);
+          if (play && percentages.zone_defense[play.name] !== undefined) {
+            this.state.sections['zone-defense'][playId].percentage = percentages.zone_defense[play.name];
+          }
+        });
+      }
+      
+      // Apply man defense percentages
+      if (percentages.man_defense && Object.keys(percentages.man_defense).length > 0) {
+        Object.keys(this.state.sections['man-defense'] || {}).forEach(playId => {
+          const play = DEFENSE_PLAY_DATA['man-defense']?.find(p => p.id === playId);
+          if (play && percentages.man_defense[play.name] !== undefined) {
+            this.state.sections['man-defense'][playId].percentage = percentages.man_defense[play.name];
+          }
+        });
+      }
+      
+      console.log('✅ [PLAYBOOKS] Applied saved percentages from API to state');
+    } catch (error) {
+      console.error('❌ Error loading playbook percentages from API:', error);
     }
   }
   
@@ -1039,11 +1106,66 @@ class PlaybooksUI {
     
     console.log('🔍 [POSITION FILTER] Selected positions:', this.selectedPositions);
     
+    // Save position filter selections to localStorage
+    this.savePositionFilterSelections();
+    
     // Re-render all offense sections to apply filtering
     this.renderSection('motion');
     this.renderSection('set-play-inside');
     this.renderSection('set-play-attack');
     this.renderSection('set-play-outside');
+  }
+  
+  savePositionFilterSelections() {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const mode = urlParams.get('mode') || 'single';
+      const teamId = urlParams.get('team_id') || 
+                     urlParams.get('user_team_id') || 
+                     urlParams.get('home_id') || 
+                     urlParams.get('away_id');
+      
+      if (!teamId) return;
+      
+      // Create a unique key for this team/mode combination
+      const storageKey = `playbooks_position_filters_${mode}_${teamId}`;
+      localStorage.setItem(storageKey, JSON.stringify(this.selectedPositions));
+      console.log('💾 [POSITION FILTER] Saved selections to localStorage:', this.selectedPositions);
+    } catch (error) {
+      console.error('❌ Error saving position filter selections:', error);
+    }
+  }
+  
+  loadPositionFilterSelections() {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const mode = urlParams.get('mode') || 'single';
+      const teamId = urlParams.get('team_id') || 
+                     urlParams.get('user_team_id') || 
+                     urlParams.get('home_id') || 
+                     urlParams.get('away_id');
+      
+      if (!teamId) return;
+      
+      // Create a unique key for this team/mode combination
+      const storageKey = `playbooks_position_filters_${mode}_${teamId}`;
+      const saved = localStorage.getItem(storageKey);
+      
+      if (saved) {
+        this.selectedPositions = JSON.parse(saved);
+        console.log('📂 [POSITION FILTER] Loaded selections from localStorage:', this.selectedPositions);
+        
+        // Apply selections to UI buttons
+        this.selectedPositions.forEach(position => {
+          const button = document.querySelector(`.position-filter-btn[data-position="${position}"]`);
+          if (button) {
+            button.classList.add('selected');
+          }
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error loading position filter selections:', error);
+    }
   }
   
   /**
@@ -1327,6 +1449,16 @@ class PlaybooksUI {
       // Include slot assignments and motion dropdowns in playbook settings
       playbookSettings.slot_assignments = this.state.slotAssignments;
       playbookSettings.motion_dropdowns = this.state.motionDropdowns;
+      
+      // Include man_defense percentages (was missing before)
+      playbookSettings.man_defense = {};
+      Object.keys(this.state.sections['man-defense'] || {}).forEach(playId => {
+        const playData = this.state.sections['man-defense'][playId];
+        const play = DEFENSE_PLAY_DATA['man-defense']?.find(p => p.id === playId);
+        if (play && play.name !== 'To Be Added' && playData.percentage > 0) {
+          playbookSettings.man_defense[play.name] = playData.percentage;
+        }
+      });
       
       console.log('🔍 [PLAYBOOKS] Saving slot assignments:', this.state.slotAssignments);
       console.log('🔍 [PLAYBOOKS] Saving motion dropdowns:', this.state.motionDropdowns);
