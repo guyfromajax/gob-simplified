@@ -6844,6 +6844,7 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
   - Runs final validation
   - Saves UI state to localStorage (for UI persistence)
   - Saves playbook percentages to database via `POST /api/playbooks`
+  - Saves position filter button selections to localStorage (for session persistence)
   - Shows success toast notification ("Playbooks saved successfully")
   - On error, shows error toast with details
 
