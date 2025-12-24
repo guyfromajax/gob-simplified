@@ -2830,7 +2830,39 @@
       console.log('✅ [PLAYCALL HEADSHOTS] Populated headshots from play skeletons for user team:', userTeamSide);
     }
     
-    // Load slot assignments from playbooks and reorder Playcall Center plays
+    // Create a play option DOM element
+    function createPlayOptionElement(playName, playFocus) {
+      const playOption = document.createElement('div');
+      playOption.className = 'play-option';
+      playOption.setAttribute('data-play', playName);
+      playOption.setAttribute('data-focus', playFocus || '');
+      
+      const headshotImg = document.createElement('img');
+      headshotImg.className = 'play-headshot';
+      headshotImg.src = '';
+      headshotImg.alt = 'Shooter';
+      
+      const playInfo = document.createElement('div');
+      playInfo.className = 'play-info';
+      
+      const playNameDiv = document.createElement('div');
+      playNameDiv.className = 'play-name';
+      playNameDiv.textContent = playName;
+      
+      const playFocusDiv = document.createElement('div');
+      playFocusDiv.className = 'play-focus';
+      playFocusDiv.textContent = playFocus || '';
+      
+      playInfo.appendChild(playNameDiv);
+      playInfo.appendChild(playFocusDiv);
+      
+      playOption.appendChild(headshotImg);
+      playOption.appendChild(playInfo);
+      
+      return playOption;
+    }
+    
+    // Load slot assignments from playbooks and dynamically build Playcall Center DOM
     async function loadAndApplySlotAssignments() {
       console.log('🔍 [PLAYCALL CENTER] Starting loadAndApplySlotAssignments()');
       
@@ -2887,21 +2919,6 @@
         console.log('🔍 [PLAYCALL CENTER] Slot assignments full structure:', JSON.stringify(slotAssignments, null, 2));
         console.log('🔍 [PLAYCALL CENTER] Motion dropdowns:', motionDropdowns);
         
-        // Get all play options
-        const playOptions = Array.from(document.querySelectorAll('#offense-play-scroller .play-option'));
-        console.log('🔍 [PLAYCALL CENTER] Found play options:', playOptions.length);
-        
-        if (playOptions.length === 0) {
-          console.warn('⚠️ [PLAYCALL CENTER] No play options found');
-          return;
-        }
-        
-        // Log current play order
-        console.log('🔍 [PLAYCALL CENTER] Current play order:');
-        playOptions.forEach((play, i) => {
-          console.log(`  ${i}: ${play.getAttribute('data-play')} (focus: ${play.getAttribute('data-focus')})`);
-        });
-        
         // Get play data to map playId to play name
         const motionPlays = data.motion || [];
         const setPlayInside = data.set_play_inside || [];
@@ -2912,36 +2929,53 @@
         // The API returns plays with name, but slot assignments use frontend IDs
         // We need to reconstruct the frontend ID mapping
         const playIdToName = {};
+        const playIdToPlay = {}; // Store full play object for focus lookup
         motionPlays.forEach((play, index) => {
           const frontendId = `motion-${index + 1}`;
           playIdToName[frontendId] = play.name;
           playIdToName[play.name] = play.name; // Also map name to name for direct lookup
+          playIdToPlay[play.name] = play;
           console.log(`🔍 [PLAYCALL CENTER] Mapped ${frontendId} → ${play.name}`);
         });
         setPlayInside.forEach((play, index) => {
           const frontendId = `set-inside-${index + 1}`;
           playIdToName[frontendId] = play.name;
           playIdToName[play.name] = play.name;
+          playIdToPlay[play.name] = play;
           console.log(`🔍 [PLAYCALL CENTER] Mapped ${frontendId} → ${play.name}`);
         });
         setPlayAttack.forEach((play, index) => {
           const frontendId = `set-attack-${index + 1}`;
           playIdToName[frontendId] = play.name;
           playIdToName[play.name] = play.name;
+          playIdToPlay[play.name] = play;
           console.log(`🔍 [PLAYCALL CENTER] Mapped ${frontendId} → ${play.name}`);
         });
         setPlayOutside.forEach((play, index) => {
           const frontendId = `set-outside-${index + 1}`;
           playIdToName[frontendId] = play.name;
           playIdToName[play.name] = play.name;
+          playIdToPlay[play.name] = play;
           console.log(`🔍 [PLAYCALL CENTER] Mapped ${frontendId} → ${play.name}`);
         });
         
         console.log('🔍 [PLAYCALL CENTER] PlayId to Name mapping:', playIdToName);
         
+        // Get scroller element
+        const scroller = document.getElementById('offense-play-scroller');
+        if (!scroller) {
+          console.error('❌ [PLAYCALL CENTER] Could not find #offense-play-scroller element');
+          return;
+        }
+        
+        // Clear existing play options
+        scroller.innerHTML = '';
+        
         // Build ordered list based on slot assignments (1-6)
         const orderedPlays = [];
+        const usedPlayNames = new Set(); // Track which plays we've already added
         console.log('🔍 [PLAYCALL CENTER] Processing slot assignments...');
+        
         for (let slot = 1; slot <= 6; slot++) {
           const assignment = slotAssignments[slot];
           if (assignment) {
@@ -2949,6 +2983,8 @@
             
             // Get play name from assignment
             let playName = null;
+            let playFocus = null;
+            
             if (assignment.playName) {
               playName = assignment.playName;
               console.log(`🔍 [PLAYCALL CENTER] Slot ${slot}: Using playName from assignment: ${playName}`);
@@ -2970,37 +3006,40 @@
               continue;
             }
             
-            // Find matching play option
-            const matchingPlay = playOptions.find(play => {
-              const domPlayName = play.getAttribute('data-play');
-              const playFocus = play.getAttribute('data-focus') || '';
-              
-              // For motion plays, check dropdown variant
-              if (assignment.section === 'motion') {
-                const dropdown = assignment.dropdown || motionDropdowns[assignment.playId] || '-';
-                const matches = domPlayName === playName && 
-                       (dropdown === '-' || playFocus.toLowerCase() === dropdown.toLowerCase());
-                if (matches) {
-                  console.log(`🔍 [PLAYCALL CENTER] Slot ${slot}: Matched ${domPlayName} (focus: ${playFocus}) with dropdown: ${dropdown}`);
-                }
-                return matches;
-              } else {
-                // For set plays, match by play name
-                const matches = domPlayName === playName;
-                if (matches) {
-                  console.log(`🔍 [PLAYCALL CENTER] Slot ${slot}: Matched ${domPlayName}`);
-                }
-                return matches;
-              }
-            });
-            
-            if (matchingPlay) {
-              orderedPlays.push(matchingPlay);
-              console.log(`✅ [PLAYCALL CENTER] Slot ${slot}: Added ${playName} to ordered list`);
-            } else {
-              console.warn(`⚠️ [PLAYCALL CENTER] Could not find DOM element for slot ${slot}, play: ${playName}, focus: ${assignment.dropdown || 'N/A'}`);
-              console.warn(`⚠️ [PLAYCALL CENTER] Available DOM plays:`, playOptions.map(p => `${p.getAttribute('data-play')} (${p.getAttribute('data-focus')})`));
+            // Get play focus from play object or assignment
+            const playObj = playIdToPlay[playName];
+            if (playObj) {
+              playFocus = playObj.play_focus || '';
             }
+            
+            // For motion plays, use dropdown variant as focus
+            if (assignment.section === 'motion') {
+              const dropdown = assignment.dropdown || motionDropdowns[assignment.playId] || '-';
+              if (dropdown !== '-') {
+                playFocus = dropdown;
+              }
+            }
+            
+            // Create or find play option element
+            let playOption = null;
+            
+            // Check if we already created this play
+            const existingPlay = orderedPlays.find(p => 
+              p.getAttribute('data-play') === playName && 
+              (!playFocus || p.getAttribute('data-focus') === playFocus)
+            );
+            
+            if (existingPlay) {
+              playOption = existingPlay;
+              console.log(`🔍 [PLAYCALL CENTER] Slot ${slot}: Reusing existing play element for ${playName}`);
+            } else {
+              // Create new play option element
+              playOption = createPlayOptionElement(playName, playFocus);
+              console.log(`✅ [PLAYCALL CENTER] Slot ${slot}: Created new play element for ${playName} (focus: ${playFocus})`);
+            }
+            
+            orderedPlays.push(playOption);
+            usedPlayNames.add(playName);
           } else {
             console.log(`🔍 [PLAYCALL CENTER] Slot ${slot}: No assignment`);
           }
@@ -3008,46 +3047,43 @@
         
         console.log(`🔍 [PLAYCALL CENTER] Ordered plays count: ${orderedPlays.length}`);
         
-        // Add any unassigned plays at the end
-        playOptions.forEach(play => {
-          if (!orderedPlays.includes(play)) {
-            orderedPlays.push(play);
+        // If we have fewer than 6 plays, fill remaining slots with other available plays
+        if (orderedPlays.length < 6) {
+          const allPlays = [...motionPlays, ...setPlayInside, ...setPlayAttack, ...setPlayOutside];
+          for (const play of allPlays) {
+            if (orderedPlays.length >= 6) break;
+            if (!usedPlayNames.has(play.name)) {
+              const playOption = createPlayOptionElement(play.name, play.play_focus || '');
+              orderedPlays.push(playOption);
+              usedPlayNames.add(play.name);
+              console.log(`✅ [PLAYCALL CENTER] Added unassigned play: ${play.name}`);
+            }
           }
+        }
+        
+        // Add all play options to DOM
+        console.log('🔍 [PLAYCALL CENTER] Adding play options to DOM...');
+        orderedPlays.forEach((play, index) => {
+          scroller.appendChild(play);
+          console.log(`  ${index + 1}: ${play.getAttribute('data-play')} (focus: ${play.getAttribute('data-focus')})`);
         });
         
-        // Reorder DOM elements
-        const scroller = document.getElementById('offense-play-scroller');
-        if (scroller) {
-          console.log('🔍 [PLAYCALL CENTER] Reordering DOM elements...');
-          orderedPlays.forEach((play, index) => {
-            scroller.appendChild(play);
-            console.log(`  ${index + 1}: ${play.getAttribute('data-play')} (focus: ${play.getAttribute('data-focus')})`);
-          });
-          
-          // Add unassigned plays
-          playOptions.forEach(play => {
-            if (!orderedPlays.includes(play)) {
-              scroller.appendChild(play);
-              console.log(`  Unassigned: ${play.getAttribute('data-play')} (focus: ${play.getAttribute('data-focus')})`);
-            }
-          });
-          
-          console.log('✅ [PLAYCALL CENTER] Reordered plays based on slot assignments');
-          
-          // Verify final order
-          const finalOrder = Array.from(scroller.querySelectorAll('.play-option')).map((p, i) => 
-            `${i + 1}: ${p.getAttribute('data-play')} (${p.getAttribute('data-focus')})`
-          );
-          console.log('🔍 [PLAYCALL CENTER] Final play order:', finalOrder);
-          
-          // Trigger re-initialization of navigation after reordering
-          // Dispatch event to notify navigation code that reordering is complete
-          window.dispatchEvent(new CustomEvent('playcall-center-reordered', {
-            detail: { orderedPlays: orderedPlays.length }
-          }));
-        } else {
-          console.error('❌ [PLAYCALL CENTER] Could not find #offense-play-scroller element');
-        }
+        console.log('✅ [PLAYCALL CENTER] Built Playcall Center DOM from slot assignments');
+        
+        // Verify final order
+        const finalOrder = Array.from(scroller.querySelectorAll('.play-option')).map((p, i) => 
+          `${i + 1}: ${p.getAttribute('data-play')} (${p.getAttribute('data-focus')})`
+        );
+        console.log('🔍 [PLAYCALL CENTER] Final play order:', finalOrder);
+        
+        // Populate headshots for the new play elements
+        await populatePlayHeadshots();
+        
+        // Trigger re-initialization of navigation after building
+        // Dispatch event to notify navigation code that reordering is complete
+        window.dispatchEvent(new CustomEvent('playcall-center-reordered', {
+          detail: { orderedPlays: orderedPlays.length }
+        }));
       } catch (error) {
         console.error('❌ [PLAYCALL CENTER] Error loading slot assignments:', error);
       }
@@ -3173,11 +3209,19 @@
         }
       }
       
-      // Handle play selection (6-play scroller)
-      playOptions.forEach(option => {
-        option.addEventListener('click', async () => {
+      // Handle play selection (6-play scroller) - use event delegation for dynamically created elements
+      const playScroller = document.getElementById('offense-play-scroller');
+      if (playScroller) {
+        playScroller.addEventListener('click', async (e) => {
+          // Find the clicked play option (may be nested inside)
+          const option = e.target.closest('.play-option');
+          if (!option) return;
+          
+          // Get all play options (query dynamically each time)
+          const allPlayOptions = document.querySelectorAll('#offense-play-scroller .play-option');
+          
           // Deselect all other plays
-          playOptions.forEach(opt => opt.classList.remove('selected'));
+          allPlayOptions.forEach(opt => opt.classList.remove('selected'));
           
           // Select this play
           option.classList.add('selected');
@@ -3187,7 +3231,7 @@
           console.log(`🎮 [PLAYCALL CENTER] Offense play registered: "${playName}"`);
           await setPlaycallOverride('offense', playName);
         });
-      });
+      }
       
       // Handle defense button clicks
       defenseButtons.forEach(btn => {
