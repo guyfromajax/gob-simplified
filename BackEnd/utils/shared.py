@@ -656,19 +656,51 @@ def summarize_game_state(game, exclude_animations=True):
         print(f"🚨 Error in populate_team_plays: {e}")
         populated_plays = {}
     
+    # ✅ PRESERVE playbook_settings from database when saving game state
+    # This ensures slot_assignments and other playbook settings persist across timeout/quarter saves
+    home_playbook_settings = {}
+    away_playbook_settings = {}
+    
+    if exclude_animations and hasattr(game, 'game_id') and game.game_id:
+        # Only preserve playbook_settings when saving to database (exclude_animations=True)
+        # and game_id exists (game has been initialized)
+        try:
+            from BackEnd.db import games_collection
+            # Try both UUID string and ObjectId formats for game_id
+            saved_game = games_collection.find_one({"_id": game.game_id})
+            if not saved_game:
+                try:
+                    from bson import ObjectId
+                    saved_game = games_collection.find_one({"_id": ObjectId(game.game_id)})
+                except:
+                    pass
+            
+            if saved_game:
+                teams = saved_game.get("teams", {})
+                # Get playbook_settings for each team (if they exist)
+                home_team_data = teams.get(game.home_team.team_id, {})
+                away_team_data = teams.get(game.away_team.team_id, {})
+                home_playbook_settings = home_team_data.get("playbook_settings", {})
+                away_playbook_settings = away_team_data.get("playbook_settings", {})
+        except Exception as e:
+            # If we can't load playbook_settings, continue without them (non-critical)
+            logging.warning(f"⚠️ Could not preserve playbook_settings from database: {e}")
+    
     # Create team objects with all necessary data for game state persistence
     teams_obj = {
         game.home_team.team_id: {
             "strategy_settings": getattr(game.home_team, 'strategy_settings', {}),
             "plays": populated_plays.copy(),
             "attributes": getattr(game.home_team, 'team_attributes', {}),
-            "scouting": getattr(game.home_team, 'scouting_data', {})
+            "scouting": getattr(game.home_team, 'scouting_data', {}),
+            "playbook_settings": home_playbook_settings  # ✅ Preserve from database
         },
         game.away_team.team_id: {
             "strategy_settings": getattr(game.away_team, 'strategy_settings', {}),
             "plays": populated_plays.copy(),
             "attributes": getattr(game.away_team, 'team_attributes', {}),
-            "scouting": getattr(game.away_team, 'scouting_data', {})
+            "scouting": getattr(game.away_team, 'scouting_data', {}),
+            "playbook_settings": away_playbook_settings  # ✅ Preserve from database
         }
     }
     
