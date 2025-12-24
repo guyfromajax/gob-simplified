@@ -970,7 +970,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         # Ensure team objects exist first (this will create them if missing)
         ensure_team_objects_exist(mode, doc_id, team_id)
         
-        # Reload document to get updated team objects
+        # Reload document to get updated team objects (including any position filter updates)
         if mode == "single":
             doc = collection.find_one({"_id": doc_id})
         else:
