@@ -660,42 +660,86 @@ def summarize_game_state(game, exclude_animations=True):
     # This ensures slot_assignments and other playbook settings persist across timeout/quarter saves
     home_playbook_settings = {}
     away_playbook_settings = {}
+    home_actual_team_id = None
+    away_actual_team_id = None
     
     if exclude_animations and hasattr(game, 'game_id') and game.game_id:
         # Only preserve playbook_settings when saving to database (exclude_animations=True)
         # and game_id exists (game has been initialized)
         try:
-            from BackEnd.db import games_collection
+            from BackEnd.db import games_collection, db
+            from bson import ObjectId
+            
             # Try both UUID string and ObjectId formats for game_id
             saved_game = games_collection.find_one({"_id": game.game_id})
             if not saved_game:
                 try:
-                    from bson import ObjectId
                     saved_game = games_collection.find_one({"_id": ObjectId(game.game_id)})
                 except:
                     pass
             
             if saved_game:
                 teams = saved_game.get("teams", {})
+                
+                # ✅ Find teams by matching team name (most reliable method)
+                # Iterate through all teams in document and match by name
+                for tid in teams.keys():
+                    team_data = teams.get(tid, {})
+                    # Try to get team name from various sources
+                    team_name = None
+                    try:
+                        # Try to get team name from teams collection
+                        team_doc = db.teams.find_one({"_id": ObjectId(tid)})
+                        if not team_doc:
+                            team_doc = db.teams.find_one({"team_id": tid})
+                        if team_doc:
+                            team_name = team_doc.get("name")
+                    except:
+                        pass
+                    
+                    # Match by team name
+                    if team_name == game.home_team.name:
+                        home_actual_team_id = tid
+                    if team_name == game.away_team.name:
+                        away_actual_team_id = tid
+                
+                # Fallback: try direct lookup with team_id (in case key is team_id string)
+                if not home_actual_team_id and game.home_team.team_id in teams:
+                    home_actual_team_id = game.home_team.team_id
+                if not away_actual_team_id and game.away_team.team_id in teams:
+                    away_actual_team_id = game.away_team.team_id
+                
                 # Get playbook_settings for each team (if they exist)
-                home_team_data = teams.get(game.home_team.team_id, {})
-                away_team_data = teams.get(game.away_team.team_id, {})
-                home_playbook_settings = home_team_data.get("playbook_settings", {})
-                away_playbook_settings = away_team_data.get("playbook_settings", {})
+                if home_actual_team_id:
+                    home_team_data = teams.get(home_actual_team_id, {})
+                    home_playbook_settings = home_team_data.get("playbook_settings", {})
+                if away_actual_team_id:
+                    away_team_data = teams.get(away_actual_team_id, {})
+                    away_playbook_settings = away_team_data.get("playbook_settings", {})
+                
+                if home_playbook_settings or away_playbook_settings:
+                    logging.info(f"✅ Preserved playbook_settings: home={bool(home_playbook_settings)} (key={home_actual_team_id}), away={bool(away_playbook_settings)} (key={away_actual_team_id})")
+                else:
+                    logging.warning(f"⚠️ No playbook_settings found in database: teams keys={list(teams.keys())[:3]}, home_team.name={game.home_team.name}, away_team.name={game.away_team.name}")
         except Exception as e:
             # If we can't load playbook_settings, continue without them (non-critical)
-            logging.warning(f"⚠️ Could not preserve playbook_settings from database: {e}")
+            logging.warning(f"⚠️ Could not preserve playbook_settings from database: {e}", exc_info=True)
     
     # Create team objects with all necessary data for game state persistence
+    # ✅ Use resolved team_id keys if we found them, otherwise use game.home_team.team_id
+    # This ensures we use the same key format that was used when saving playbook_settings
+    home_key = home_actual_team_id if home_actual_team_id else game.home_team.team_id
+    away_key = away_actual_team_id if away_actual_team_id else game.away_team.team_id
+    
     teams_obj = {
-        game.home_team.team_id: {
+        home_key: {
             "strategy_settings": getattr(game.home_team, 'strategy_settings', {}),
             "plays": populated_plays.copy(),
             "attributes": getattr(game.home_team, 'team_attributes', {}),
             "scouting": getattr(game.home_team, 'scouting_data', {}),
             "playbook_settings": home_playbook_settings  # ✅ Preserve from database
         },
-        game.away_team.team_id: {
+        away_key: {
             "strategy_settings": getattr(game.away_team, 'strategy_settings', {}),
             "plays": populated_plays.copy(),
             "attributes": getattr(game.away_team, 'team_attributes', {}),
