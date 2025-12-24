@@ -1065,7 +1065,8 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
         # Ensure playbook_settings exists (even if ensure_team_objects_exist missed it)
-        if team_obj and "playbook_settings" not in team_obj:
+        # Check if team_obj exists and playbook_settings is missing (handle both None and empty dict cases)
+        if actual_team_id and (not team_obj or "playbook_settings" not in team_obj):
             logger.warning(f"⚠️ [GET PLAYBOOKS] playbook_settings missing for team {actual_team_id}, adding now...")
             playbook_settings = initialize_playbook_settings()
             team_key = f"teams.{actual_team_id}"
