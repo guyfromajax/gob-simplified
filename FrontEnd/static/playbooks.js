@@ -537,20 +537,20 @@ class PlaybooksUI {
       }
     } else if (sectionKey === 'set-play-inside') {
       const setPlays = this.playData.set_play_inside || [];
-      // Fill to 2 slots
-      for (let i = 0; i < 2; i++) {
+      // Fill to 3 slots
+      for (let i = 0; i < 3; i++) {
         plays.push(i < setPlays.length ? setPlays[i] : TO_BE_ADDED_PLACEHOLDER);
       }
     } else if (sectionKey === 'set-play-attack') {
       const setPlays = this.playData.set_play_attack || [];
-      // Fill to 2 slots
-      for (let i = 0; i < 2; i++) {
+      // Fill to 3 slots
+      for (let i = 0; i < 3; i++) {
         plays.push(i < setPlays.length ? setPlays[i] : TO_BE_ADDED_PLACEHOLDER);
       }
     } else if (sectionKey === 'set-play-outside') {
       const setPlays = this.playData.set_play_outside || [];
-      // Fill to 2 slots
-      for (let i = 0; i < 2; i++) {
+      // Fill to 3 slots
+      for (let i = 0; i < 3; i++) {
         plays.push(i < setPlays.length ? setPlays[i] : TO_BE_ADDED_PLACEHOLDER);
       }
     } else {
