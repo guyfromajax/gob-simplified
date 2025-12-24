@@ -7209,6 +7209,15 @@ teams.{team_id}.playbook_settings = {
 - `POST /api/playbooks` saves `position_filters` when included in `playbook_settings`
 - Default initialization: All position arrays start empty (can be customized later)
 
+**Initialization and Backward Compatibility:**
+- When team objects are created (Single Game, Tournament, Franchise modes), `playbook_settings` is initialized with `position_filters` populated with "Standard" and "PF" plays
+- For existing team objects that don't have `playbook_settings` or have a falsy value (None, empty dict), the system automatically:
+  1. Checks for missing/falsy `playbook_settings` in `get_playbooks()` endpoint
+  2. Creates and saves `playbook_settings` with populated `position_filters` if missing
+  3. Reloads the document to ensure fresh data is returned
+- This defensive check ensures backward compatibility with team objects created before `position_filters` were introduced
+- The check uses `not team_obj.get("playbook_settings")` to handle both missing keys and falsy values (None, empty dict)
+
 **Affected Sections:**
 - Position filtering applies to all offense play sections:
   - Motion Offense
