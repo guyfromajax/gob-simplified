@@ -401,6 +401,8 @@ class PlaybooksUI {
           C: []
         };
         
+        console.log('🔍 [POSITION FILTERS] Loaded from API:', this.positionFilters);
+        
         // Convert API response to play data format
         this.playData = {
           motion: (data.motion || []).map((play, index) => ({
@@ -587,9 +589,16 @@ class PlaybooksUI {
       if (isOffenseSection && play.name !== 'To Be Added') {
         // Use play_id (database ObjectId) for filtering
         const playDatabaseId = play.play_id;
+        console.log(`🔍 [RENDER SECTION] Checking play "${play.name}" (play_id: ${playDatabaseId})`);
         if (playDatabaseId && !this.shouldShowPlay(playDatabaseId)) {
+          console.log(`❌ [RENDER SECTION] Hiding play "${play.name}" - doesn't match position filter`);
           return; // Skip this play - it doesn't match the position filter
         }
+        if (!playDatabaseId) {
+          console.log(`❌ [RENDER SECTION] Hiding play "${play.name}" - missing play_id`);
+          return; // Skip plays without play_id
+        }
+        console.log(`✅ [RENDER SECTION] Showing play "${play.name}"`);
       }
       
       const playData = this.state.sections[sectionKey][playId] || { percentage: 0, slot: null };
@@ -1046,28 +1055,34 @@ class PlaybooksUI {
   shouldShowPlay(playId) {
     // If no positions selected, hide all plays
     if (this.selectedPositions.length === 0) {
+      console.log('🔍 [SHOULD SHOW PLAY] No positions selected, hiding play:', playId);
       return false;
     }
     
     // If play_id is missing, hide the play (can't match against filters)
     if (!playId) {
+      console.log('🔍 [SHOULD SHOW PLAY] Missing play_id, hiding play');
       return false;
     }
     
     // Union (OR) logic: play must be in ANY selected position array
     // "Standard" is treated like any other position - only shows plays in its list
     if (!this.positionFilters) {
+      console.log('🔍 [SHOULD SHOW PLAY] No positionFilters loaded, hiding play:', playId);
       return false;
     }
     
     // Check if play is in any of the selected position arrays
     for (const position of this.selectedPositions) {
       const positionPlayIds = this.positionFilters[position] || [];
+      console.log(`🔍 [SHOULD SHOW PLAY] Checking position "${position}": playIds=${JSON.stringify(positionPlayIds)}, looking for playId="${playId}"`);
       if (positionPlayIds.includes(playId)) {
+        console.log(`✅ [SHOULD SHOW PLAY] Play "${playId}" found in position "${position}"`);
         return true; // Play found in at least one selected position array
       }
     }
     
+    console.log(`❌ [SHOULD SHOW PLAY] Play "${playId}" not found in any selected position arrays`);
     return false; // Play not found in any selected position array
   }
   
