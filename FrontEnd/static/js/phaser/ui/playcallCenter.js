@@ -60,10 +60,19 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   const offenseStatusText = document.getElementById('offense-status-text');
   const defenseStatusText = document.getElementById('defense-status-text');
   
-  if (offenseStatusText && turnData.offensive_play_type && turnData.offensive_play_focus) {
-    const type = turnData.offensive_play_type === 'motion' ? 'Motion' : 'Set';
-    const focus = turnData.offensive_play_focus.charAt(0).toUpperCase() + turnData.offensive_play_focus.slice(1);
-    offenseStatusText.textContent = `${type} → ${focus}`;
+  // ✅ FIX: Display play name instead of Play Type => Play Focus
+  if (offenseStatusText) {
+    const playName = turnData.offensive_playcall || turnData.current_playcall;
+    if (playName) {
+      offenseStatusText.textContent = playName;
+    } else {
+      // Fallback to type → focus if play name not available
+      if (turnData.offensive_play_type && turnData.offensive_play_focus) {
+        const type = turnData.offensive_play_type === 'motion' ? 'Motion' : 'Set';
+        const focus = turnData.offensive_play_focus.charAt(0).toUpperCase() + turnData.offensive_play_focus.slice(1);
+        offenseStatusText.textContent = `${type} → ${focus}`;
+      }
+    }
   }
   
   if (defenseStatusText) {
@@ -89,8 +98,8 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
 
   // ==================== TRIGGER PLAYCALL REVEAL HUD ====================
   // Show transient HUD overlay with playcall info
-  const playType = turnData.offensive_play_type;
-  const playFocus = turnData.offensive_play_focus;
+  // ✅ FIX: Use play name instead of Play Type => Play Focus
+  const playName = turnData.offensive_playcall || turnData.current_playcall;
   // Use defensive_playcall if available (contains full name like "2-3 Zone" or "3-2 Zone")
   // Otherwise fall back to defensive_play_type (just "Man" or "Zone")
   const defensePlaycall = turnData.defensive_playcall || turnData.defense_playcall;
@@ -98,7 +107,7 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   // ✅ SS&S: Use defense_aggression_call from backend (set by set_strategy_calls)
   const aggression = turnData.defense_aggression_call || turnData.aggression || 'normal';
   
-  if (typeof window.showPlaycallReveal === 'function' && playType && playFocus && defenseType) {
+  if (typeof window.showPlaycallReveal === 'function' && playName && defenseType) {
     // Get EV from backend calculation (if available), otherwise fallback to random
     // Backend now returns EV as percentage (-99 to +99), so we use it directly
     const ev = turnData.ev !== undefined ? parseFloat(turnData.ev) : ((Math.random() * 4) - 2) * 50; // Fallback: convert old range to percentage
@@ -108,8 +117,7 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     
     window.showPlaycallReveal({
       offense: {
-        type: playType,
-        focus: playFocus
+        name: playName  // ✅ FIX: Pass play name instead of type and focus
       },
       defense: {
         type: defenseType,
