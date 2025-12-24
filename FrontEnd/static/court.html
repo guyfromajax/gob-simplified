@@ -3959,18 +3959,10 @@
       // Color: Man = gray, any Zone = purple
       defenseEl.style.color = isZone ? '#BB86FC' : (defenseTypeLower === 'man' ? '#D0D0D0' : '#999');
 
-      // Offense (Type → Focus)
-      const offenseType = data.offense.type || 'MOTION';
-      const offenseFocus = data.offense.focus || 'INSIDE';
-      const focusColors = {
-        'inside': '#00FF88',
-        'attack': '#007BFF',
-        'outside': '#FF3B30'
-      };
-      offenseEl.innerHTML = `
-        <span style="color: #FFD700">${offenseType.toUpperCase()}</span> → 
-        <span style="color: ${focusColors[offenseFocus.toLowerCase()] || '#FFD700'}">${offenseFocus.toUpperCase()}</span>
-      `;
+      // ✅ FIX: Offense - Display play name instead of Type → Focus
+      const playName = data.offense.name || 'PLAY';
+      offenseEl.textContent = playName.toUpperCase();
+      offenseEl.style.color = '#FFD700'; // Gold color for play name
 
       // EV + Hot Player (optional)
       const hot = data.hotPlayer ? `${data.hotPlayer.pos} #${data.hotPlayer.jersey} ` : '';

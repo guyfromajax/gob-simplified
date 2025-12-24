@@ -6326,10 +6326,11 @@ The Playcall Center consists of three main components:
 #### 1. Top Row: Status Displays
 
 **Offense Status:**
-- Format: `"Motion → Inside"` or `"Set → Attack"`
-- Shows offensive play type (Motion/Set) and focus (Inside/Attack/Outside)
-- Updated from `turnData.offensive_play_type` and `turnData.offensive_play_focus`
+- Format: Play name from database (e.g., `"PF Post Up"`, `"3-2 Motion"`, `"Pick & Roll (Lower Wing)"`)
+- Shows the full offensive play name from the play's database object
+- Updated from `turnData.offensive_playcall` or `turnData.current_playcall`
 - Displays the actual playcall being executed in the current turn
+- Falls back to `"Play Type → Focus"` format if play name is not available
 
 **Defense Status:**
 - Format: `"Man Normal"` or `"2-3 Zone Normal"`
