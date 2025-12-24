@@ -183,14 +183,18 @@ def get_play_ids_by_names(play_names):
     try:
         from BackEnd.db import plays_collection
         
+        logger.info(f"🔍 [POSITION FILTERS] Looking up {len(play_names)} play names: {play_names}")
         play_ids = []
         for play_name in play_names:
             play = plays_collection.find_one({"name": play_name})
             if play and play.get("_id"):
-                play_ids.append(str(play["_id"]))
+                play_id_str = str(play["_id"])
+                play_ids.append(play_id_str)
+                logger.info(f"✅ [POSITION FILTERS] Found play '{play_name}' → play_id: {play_id_str}")
             else:
                 logger.warning(f"⚠️ [POSITION FILTERS] Play '{play_name}' not found in database")
         
+        logger.info(f"🔍 [POSITION FILTERS] Resolved {len(play_ids)}/{len(play_names)} plays to play_ids: {play_ids}")
         return play_ids
     except Exception as e:
         logger.error(f"🚨 Error in get_play_ids_by_names: {e}", exc_info=True)
@@ -291,6 +295,8 @@ def initialize_playbook_settings():
         playbook_settings["man_defense"]["Man"] = 100
         
         # Initialize position filters with play assignments
+        logger.info("🔍 [INITIALIZE PLAYBOOK] Starting position filter population...")
+        
         # Standard: All basic plays
         standard_plays = [
             # Motion
@@ -304,7 +310,9 @@ def initialize_playbook_settings():
             # Set Play Outside
             "Double Screen for SG"
         ]
-        playbook_settings["position_filters"]["standard"] = get_play_ids_by_names(standard_plays)
+        standard_play_ids = get_play_ids_by_names(standard_plays)
+        playbook_settings["position_filters"]["standard"] = standard_play_ids
+        logger.info(f"✅ [INITIALIZE PLAYBOOK] Standard position filter populated with {len(standard_play_ids)} play_ids")
         
         # PF: Power Forward specific plays
         pf_plays = [
@@ -318,7 +326,9 @@ def initialize_playbook_settings():
             "PF Corner Shot",
             "PF Quick Jumper"
         ]
-        playbook_settings["position_filters"]["PF"] = get_play_ids_by_names(pf_plays)
+        pf_play_ids = get_play_ids_by_names(pf_plays)
+        playbook_settings["position_filters"]["PF"] = pf_play_ids
+        logger.info(f"✅ [INITIALIZE PLAYBOOK] PF position filter populated with {len(pf_play_ids)} play_ids")
         
         # PG, SG, SF, C remain empty for now (can be populated later)
         
