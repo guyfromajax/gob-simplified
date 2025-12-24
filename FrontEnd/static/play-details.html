@@ -654,7 +654,8 @@
       const isSetPlayFinalStep = playState.type === 'Set Play' && isFinalStep;
       
       if (isSetPlayFinalStep && !isShotAnimating) {
-        // Find the shooter's position (player with ball in final step)
+        // Find the shooter's position (player with ball-handling action in final step)
+        // In set plays, the final step always has one player with a ball-handling action (shooter)
         const shooterEntry = Object.entries(currentStepAssignments).find(
           ([pos, assignment]) => BALL_HANDLING_ACTIONS.includes(assignment.action)
         );
