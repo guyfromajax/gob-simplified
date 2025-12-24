@@ -57,6 +57,14 @@ async def create_play(play_data: PlayCreate):
     # Convert to dict
     play_dict = play_data.dict()
     
+    # ✅ PRESERVE existing copy from database if not provided in update
+    # This prevents Plays Builder from losing copy when Play Builder V2 saves
+    existing_copy = None
+    if play_dict.get("name"):
+        existing_play = plays_collection.find_one({"name": play_dict["name"]})
+        if existing_play and existing_play.get("copy"):
+            existing_copy = existing_play.get("copy")
+    
     # Initialize play metrics if not provided (default to 0 for new plays)
     if play_dict.get("effectiveness") is None:
         play_dict["effectiveness"] = 0
@@ -64,8 +72,14 @@ async def create_play(play_data: PlayCreate):
         play_dict["cloaking"] = 0
     if play_dict.get("momentum") is None:
         play_dict["momentum"] = 0
+    
+    # ✅ Only set copy to {} if it's truly missing AND no existing copy exists
+    # If copy is provided in update, use it. Otherwise, preserve existing copy.
     if not play_dict.get("copy"):
-        play_dict["copy"] = {}
+        if existing_copy:
+            play_dict["copy"] = existing_copy  # Preserve existing copy
+        else:
+            play_dict["copy"] = {}  # Only set to empty if no existing copy
     
     # Initialize stats if not provided
     if not play_dict.get("game_stats"):

@@ -1188,6 +1188,7 @@
       type: "",
       focus: "",
       playId: null, // For editing existing plays
+      existingCopy: null, // Preserve copy when editing existing plays
       variants: {
         // For Motion: base_loop (or successful renamed)
         // For Set Play: successful, mid_play_change, contested, broken
@@ -1338,6 +1339,8 @@
       playState.type = playData.play_type === 'motion' ? 'Motion' : 'Set Play';
       playState.focus = playData.play_focus ? playData.play_focus.charAt(0).toUpperCase() + playData.play_focus.slice(1) : '';
       playState.playId = playData._id;
+      // ✅ Preserve existing copy (if any) to prevent overwriting when saving
+      playState.existingCopy = playData.copy || null;
       
       // Load variants based on play type
       const skeletons = playData.skeletons || {};
@@ -4038,8 +4041,9 @@
         effectiveness: 0,
         cloaking: 0,
         momentum: 0,
-        // Initialize copy object (for play details page)
-        copy: {},
+        // ✅ Preserve existing copy if editing, otherwise initialize as empty
+        // Backend will also preserve copy if not provided, but this is more explicit
+        copy: playState.existingCopy || {},
         game_stats: {
           times_run: 0,
           shot_attempts: 0,
