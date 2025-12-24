@@ -214,14 +214,27 @@ Every turn result from the backend contains data organized into **three distinct
 **timing='start'** - Context announcements (situation being entered):
 - "Press!" - FCP pressure applied (BASELINE_INBOUND with `next_defensive_setup='FCP'`)
 - "Trap!" - HCT pressure applied (BASELINE_INBOUND with `next_defensive_setup='HCT'`)
-- "Fast Break!" - Fast break initiated
+- "Fast Break!" - Fast break initiated (only if not following a steal)
 
 **timing='end'** - Result announcements (outcome of turn):
 - "It's Good!" - Made shot (ballManager.js, when ball reaches rim)
-- "STEAL!" - Steal occurred
-- "TRAVEL!" / "OUT OF BOUNDS!" / etc. - Turnover types
-- "OFFENSIVE FOUL!" / "DEFENSIVE FOUL!" - Foul types
-- "Rebound!" - Defensive rebound (ballManager.js, when ball reaches rebounder)
+- "STEAL!" - Steal occurred (takes priority over Fast Break announcement)
+- "Travel!" / "Double Dribble!" - Dead ball turnovers (randomly chosen 50/50)
+- "OUT OF BOUNDS!" / "BAD PASS!" / etc. - Other turnover types
+- "OFFENSIVE FOUL!" / "DEFENSIVE FOUL!" / "Shooting Foul!" - Foul types (with fouling player headshot)
+
+**Visual Styling:**
+- **Foul Announcements:** Dark yellow text (`#b8860b`) with silver border (`#c0c0c0`)
+- **All Other Announcements:** Dark silver text (`#a8a8a8`) with black border (`#000000`)
+- **Special Cases:** "DOUBLE TEAM!" uses red text (`#ff0000`)
+
+**Steal → Fast Break Flow:**
+- When a steal leads to a fast break, only the "STEAL!" announcement is shown
+- Fast Break announcement is suppressed to avoid duplicate announcements
+
+**Dead Ball Turnover Randomization:**
+- Dead ball turnovers (non-steal turnovers) randomly display either "Travel!" or "Double Dribble!" (50/50 chance)
+- This applies when `result_type` is `DEAD BALL` or `TURNOVER` without steal indicators
 
 **Idempotent Design:**
 - `prepareTurnForAnimation()` may be called multiple times (animateGameTurns + AnimationRouter)
@@ -233,9 +246,11 @@ Every turn result from the backend contains data organized into **three distinct
 - ✅ No duplicate announcements (flags prevent)
 - ✅ Clear separation (context at start, result at end)
 - ✅ Works across all turn types
+- ✅ Consistent visual styling for different announcement types
 
 **See:** `turnPreparation.js` - `prepareTurnForAnimation()` and `finalizeTurnAfterAnimation()`  
-**See:** `announcements.js` - `announceFromTurnData()` function
+**See:** `announcements.js` - `announceFromTurnData()` and `showAnnouncement()` functions  
+**See:** `gameAnnouncements.js` - `handleTurnoverAnnouncement()` function
 
 ---
 

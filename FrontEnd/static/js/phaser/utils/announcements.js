@@ -177,6 +177,9 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
   const announcement = document.createElement('div');
   announcement.className = 'game-announcement';
   
+  // Check if this is a foul announcement
+  const isFoulAnnouncement = text.includes('FOUL') || text.includes('Foul');
+  
   // Apply team-specific styling
   if (team === 'home') {
     announcement.classList.add('home-team');
@@ -192,11 +195,39 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
   const textSpan = document.createElement('span');
   textSpan.textContent = text;
   
-  // Special styling for "DOUBLE TEAM!" - red text
-  if (text === "DOUBLE TEAM!") {
+  // Special styling for foul announcements: dark yellow with silver border
+  if (isFoulAnnouncement) {
+    textSpan.style.color = '#b8860b'; // Dark yellow (darkgoldenrod)
+    textSpan.style.textShadow = `
+      -2px -2px 0 #c0c0c0,
+      2px -2px 0 #c0c0c0,
+      -2px 2px 0 #c0c0c0,
+      2px 2px 0 #c0c0c0,
+      -2px 0 0 #c0c0c0,
+      2px 0 0 #c0c0c0,
+      0 -2px 0 #c0c0c0,
+      0 2px 0 #c0c0c0
+    `;
+    textSpan.style.fontWeight = 'bold';
+  } else if (text === "DOUBLE TEAM!") {
+    // Special styling for "DOUBLE TEAM!" - red text
     textSpan.style.color = '#ff0000'; // Red text
     textSpan.style.fontWeight = 'bold';
     textSpan.style.fontSize = '2.5rem';
+  } else {
+    // All other announcements: dark silver with black border
+    textSpan.style.color = '#a8a8a8'; // Dark silver
+    textSpan.style.textShadow = `
+      -2px -2px 0 #000000,
+      2px -2px 0 #000000,
+      -2px 2px 0 #000000,
+      2px 2px 0 #000000,
+      -2px 0 0 #000000,
+      2px 0 0 #000000,
+      0 -2px 0 #000000,
+      0 2px 0 #000000
+    `;
+    textSpan.style.fontWeight = 'bold';
   }
   
   announcement.appendChild(textSpan);
