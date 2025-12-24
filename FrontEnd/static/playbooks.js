@@ -317,6 +317,7 @@ class PlaybooksUI {
     this.debounceTimer = null;
     this.playData = null;
     this.selectedPositions = []; // Array to track selected positions (max 2, FIFO)
+    this.positionFilters = null; // Position filter mappings from API (play_id → position arrays)
   }
   
   async init() {
@@ -386,9 +387,19 @@ class PlaybooksUI {
         params.set('franchise_id', franchiseId);
       }
       
-      const response = await fetch(`/api/playbooks?${params.toString()}`);
+        const response = await fetch(`/api/playbooks?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
+        
+        // Store position filters from API
+        this.positionFilters = data.position_filters || {
+          standard: [],
+          PG: [],
+          SG: [],
+          SF: [],
+          PF: [],
+          C: []
+        };
         
         // Convert API response to play data format
         this.playData = {
@@ -532,8 +543,8 @@ class PlaybooksUI {
     // Get plays based on section
     if (sectionKey === 'motion') {
       const motionPlays = this.playData.motion || [];
-      // Fill to 6 slots
-      for (let i = 0; i < 6; i++) {
+      // Fill to 4 slots
+      for (let i = 0; i < 4; i++) {
         plays.push(i < motionPlays.length ? motionPlays[i] : TO_BE_ADDED_PLACEHOLDER);
       }
     } else if (sectionKey === 'set-play-inside') {
@@ -555,11 +566,14 @@ class PlaybooksUI {
         plays.push(i < setPlays.length ? setPlays[i] : TO_BE_ADDED_PLACEHOLDER);
       }
     } else {
-      // Defense plays (hardcoded)
+      // Defense plays (hardcoded) - not filtered by position
       plays = DEFENSE_PLAY_DATA[sectionKey] || [];
     }
     
     container.innerHTML = '';
+    
+    // Filter offense plays by position (defense plays are not filtered)
+    const isOffenseSection = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'].includes(sectionKey);
     
     plays.forEach((play, index) => {
       // Generate play ID if it's a placeholder
@@ -568,6 +582,16 @@ class PlaybooksUI {
       if (play.name === 'To Be Added') {
         playId = sectionKey === 'motion' ? `motion-tba-${index + 1}` : `${sectionKey}-tba-${index + 1}`;
       }
+      
+      // Apply position filtering for offense sections
+      if (isOffenseSection && play.name !== 'To Be Added') {
+        // Use play_id (database ObjectId) for filtering
+        const playDatabaseId = play.play_id;
+        if (playDatabaseId && !this.shouldShowPlay(playDatabaseId)) {
+          return; // Skip this play - it doesn't match the position filter
+        }
+      }
+      
       const playData = this.state.sections[sectionKey][playId] || { percentage: 0, slot: null };
       const row = this.createPlayRow(sectionKey, { ...play, id: playId }, playData);
       container.appendChild(row);
@@ -1002,6 +1026,47 @@ class PlaybooksUI {
     }
     
     console.log('🔍 [POSITION FILTER] Selected positions:', this.selectedPositions);
+    
+    // Re-render all offense sections to apply filtering
+    this.renderSection('motion');
+    this.renderSection('set-play-inside');
+    this.renderSection('set-play-attack');
+    this.renderSection('set-play-outside');
+  }
+  
+  /**
+   * Check if a play should be shown based on selected position filters.
+   * Uses intersection (AND) logic: play must be in ALL selected position arrays.
+   * If "standard" is selected, show all plays (ignore other filters).
+   * If no positions selected, hide all plays.
+   * 
+   * @param {string} playId - The play's database play_id (ObjectId string)
+   * @returns {boolean} - True if play should be shown
+   */
+  shouldShowPlay(playId) {
+    // If no positions selected, hide all plays
+    if (this.selectedPositions.length === 0) {
+      return false;
+    }
+    
+    // If "standard" is selected, show all plays
+    if (this.selectedPositions.includes('standard')) {
+      return true;
+    }
+    
+    // Intersection (AND) logic: play must be in ALL selected position arrays
+    if (!this.positionFilters) {
+      return false;
+    }
+    
+    for (const position of this.selectedPositions) {
+      const positionPlayIds = this.positionFilters[position] || [];
+      if (!positionPlayIds.includes(playId)) {
+        return false; // Play not in this position's list
+      }
+    }
+    
+    return true; // Play is in all selected position arrays
   }
   
   handleBack() {

@@ -7008,6 +7008,27 @@ teams.{team_id}.playbook_settings = {
     "2-3 Zone": 40,
     "3-2 Zone": 35,
     "1-3-1 Zone": 25
+  },
+  "man_defense": {
+    "Man": 100
+  },
+  "slot_assignments": {
+    "1": { "section": "motion", "playId": "motion-1", "dropdown": "Inside" },
+    "2": { "section": "set-play-inside", "playId": "set-inside-1" },
+    // ... other slot assignments
+  },
+  "motion_dropdowns": {
+    "motion-1": "Inside",
+    "motion-2": "Attack",
+    // ... other motion dropdown selections
+  },
+  "position_filters": {
+    "standard": [],
+    "PG": ["68f919f9065f78d452557809", "68f919f9065f78d452557810", ...],  // play_id (ObjectId strings)
+    "SG": ["68f919f9065f78d452557811", ...],
+    "SF": [...],
+    "PF": [...],
+    "C": [...]
   }
 }
 ```
@@ -7104,6 +7125,65 @@ teams.{team_id}.playbook_settings = {
 - Slots remain assigned when dropdown changes
 - Example: If Slot 1 is assigned to "5-0 Motion (Inside)" and user changes dropdown to "Attack", checkbox stays highlighted with "I" badge (showing it's still assigned to Inside variant)
 - Badge shows the **assigned** dropdown variant, not the current dropdown selection
+
+### Position Filter Buttons ✅ **IMPLEMENTED** (January 2025)
+
+**Location:** Header row, horizontally centered below page title  
+**Buttons:** "Standard", "PG", "SG", "SF", "PF", "C"  
+**Purpose:** Filter offense plays by position to help users organize their playbook
+
+**Button Styling:**
+- **Unpressed:** Silver border, clear fill, bold silver copy
+- **Selected:** Gold border, dark black fill, bold gold copy
+- Same size and shape as the "Back" button
+
+**Selection Rules:**
+- Maximum **2 buttons** can be selected at once
+- If a third button is selected, the oldest selection is automatically unselected (FIFO - First In, First Out)
+- Users can deselect a button by clicking it again
+
+**Filtering Logic:**
+- **Initial State:** No buttons selected - **all offense plays are hidden**
+- **"Standard" Selected:** Shows all offense plays (ignores other position filters)
+- **Position Buttons Selected:** Uses **intersection (AND) logic** - play must be in **ALL** selected position arrays
+  - Example: If "PG" and "SG" are selected, only plays that are in BOTH the PG list AND the SG list are shown
+  - This allows users to "marry" two types of plays into their playbook
+- **Defense Plays:** Not affected by position filters (always visible)
+
+**Storage:**
+- Position filters are stored per team in `playbook_settings.position_filters`
+- Structure:
+  ```javascript
+  position_filters: {
+    "standard": [],  // Empty = show all plays when selected
+    "PG": [play_id_1, play_id_2, ...],  // Array of play_id (ObjectId strings)
+    "SG": [play_id_3, play_id_4, ...],
+    "SF": [play_id_5, play_id_6, ...],
+    "PF": [play_id_7, play_id_8, ...],
+    "C": [play_id_9, play_id_10, ...]
+  }
+  ```
+- **Play ID Format:** Uses database `play_id` (ObjectId string) for consistency and stability
+  - Matches the pattern used for other database object references throughout the game engine
+  - Stored as strings in the database (e.g., `"68f919f9065f78d452557809"`)
+  - Frontend displays play names, but filtering uses `play_id` for matching
+
+**API Integration:**
+- `GET /api/playbooks` returns `position_filters` in the response
+- `POST /api/playbooks` saves `position_filters` when included in `playbook_settings`
+- Default initialization: All position arrays start empty (can be customized later)
+
+**Affected Sections:**
+- Position filtering applies to all offense play sections:
+  - Motion Offense
+  - Set Play Inside Offense
+  - Set Play Attack Offense
+  - Set Play Outside Offense
+- Defense sections are not filtered (always visible)
+
+**Implementation:**
+- Frontend: `FrontEnd/static/playbooks.js` - `handlePositionFilterClick()`, `shouldShowPlay()`, `renderSection()`
+- Backend: `BackEnd/api/gameplan_routes.py` - `initialize_playbook_settings()`, `get_playbooks()`, `save_playbooks()`
 
 ### Assigned Plays 1-6 List
 
