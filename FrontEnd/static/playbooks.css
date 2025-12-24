@@ -129,28 +129,26 @@ body {
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-lg);
   padding: var(--spacing-md);
-  background: var(--color-surface);
-  border-radius: var(--radius);
-  border: 1px solid var(--color-border);
 }
 
 .position-filter-btn {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--color-text);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 0.75rem 1.5rem;
-  border-radius: var(--radius);
-  font-size: 1rem;
-  font-weight: 600;
+  background: transparent;
+  color: #c0c0c0; /* Silver text */
+  border: 1px solid #c0c0c0; /* Silver border */
+  padding: 0.75rem 1.5rem; /* Same as Back button */
+  border-radius: var(--radius); /* Same as Back button */
+  font-size: 1rem; /* Same as Back button */
+  font-weight: 600; /* Bold */
   cursor: pointer;
   transition: all 0.2s;
-  min-width: 100px;
+  box-shadow: 0 2px 8px rgba(192, 192, 192, 0.2);
 }
 
 .position-filter-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: var(--color-accent);
+  background: rgba(192, 192, 192, 0.1);
+  border-color: #d0d0d0;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(192, 192, 192, 0.3);
 }
 
 .position-filter-btn:active {
@@ -158,14 +156,16 @@ body {
 }
 
 .position-filter-btn.selected {
-  background: var(--color-accent);
-  color: #000;
-  border-color: var(--color-accent);
+  background: rgba(0, 0, 0, 0.3); /* Dark fill */
+  color: var(--color-accent); /* Gold text */
+  border-color: var(--color-accent); /* Gold border */
+  font-weight: 700; /* Bold gold text */
   box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
 }
 
 .position-filter-btn.selected:hover {
-  background: #ffed4e;
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
 }
 
 /* 4-Column Grid (Offense and Defense each span 2 columns) */

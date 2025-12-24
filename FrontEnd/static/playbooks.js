@@ -316,6 +316,7 @@ class PlaybooksUI {
     this.persistence = new PlaybooksPersistence();
     this.debounceTimer = null;
     this.playData = null;
+    this.selectedPositions = []; // Array to track selected positions (max 2, FIFO)
   }
   
   async init() {
