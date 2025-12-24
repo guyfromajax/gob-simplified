@@ -643,14 +643,6 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                 playbook_settings = initialize_playbook_settings()
                 logger.warning(f"⚠️ [ENSURE TEAM OBJECTS] playbook_settings missing for team {actual_team_id}, initializing...")
             else:
-            # Add missing settings
-            defaults = get_default_settings()
-            # Pass mode to populate_team_plays for tournament randomization
-            populated_plays = populate_team_plays(mode=mode)
-            # Initialize playbook_settings if missing
-            if "playbook_settings" not in team_obj:
-                playbook_settings = initialize_playbook_settings()
-            else:
                 # Check if position_filters is missing or empty, and populate if needed
                 existing_playbook_settings = team_obj.get("playbook_settings", {})
                 position_filters = existing_playbook_settings.get("position_filters", {})
