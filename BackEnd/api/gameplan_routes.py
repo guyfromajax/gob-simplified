@@ -184,6 +184,7 @@ def initialize_playbook_settings():
         - man_defense: {"Man": 100}
         - slot_assignments: {}
         - motion_dropdowns: {}
+        - position_filters: {standard: [], PG: [], SG: [], SF: [], PF: [], C: []}
     """
     try:
         from BackEnd.db import plays_collection
@@ -200,7 +201,15 @@ def initialize_playbook_settings():
             "zone_defense": {},
             "man_defense": {},
             "slot_assignments": {},
-            "motion_dropdowns": {}
+            "motion_dropdowns": {},
+            "position_filters": {
+                "standard": [],  # Empty = show all plays when selected
+                "PG": [],        # Point Guard plays (play_id ObjectId strings)
+                "SG": [],        # Shooting Guard plays (play_id ObjectId strings)
+                "SF": [],        # Small Forward plays (play_id ObjectId strings)
+                "PF": [],        # Power Forward plays (play_id ObjectId strings)
+                "C": []          # Center plays (play_id ObjectId strings)
+            }
         }
         
         # Group plays by type and focus
@@ -267,7 +276,15 @@ def initialize_playbook_settings():
             "zone_defense": {"2-3 Zone": 100},
             "man_defense": {"Man": 100},
             "slot_assignments": {},
-            "motion_dropdowns": {}
+            "motion_dropdowns": {},
+            "position_filters": {
+                "standard": [],
+                "PG": [],
+                "SG": [],
+                "SF": [],
+                "PF": [],
+                "C": []
+            }
         }
 
 
@@ -952,10 +969,25 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         set_plays_attack.sort(key=lambda x: x["name"])
         set_plays_outside.sort(key=lambda x: x["name"])
         
-        # Get playbook settings (percentages, slot assignments, and motion dropdowns)
+        # Get playbook settings (percentages, slot assignments, motion dropdowns, and position filters)
         playbook_settings = team_obj.get("playbook_settings", {})
         slot_assignments = playbook_settings.get("slot_assignments", {})
         motion_dropdowns = playbook_settings.get("motion_dropdowns", {})
+        
+        # Get position filters (merge with defaults if missing)
+        default_position_filters = {
+            "standard": [],
+            "PG": [],
+            "SG": [],
+            "SF": [],
+            "PF": [],
+            "C": []
+        }
+        position_filters = playbook_settings.get("position_filters", default_position_filters)
+        # Ensure all position keys exist (backward compatibility)
+        for key in default_position_filters:
+            if key not in position_filters:
+                position_filters[key] = []
         
         return {
             "motion": motion_plays,
@@ -963,7 +995,8 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             "set_play_attack": set_plays_attack,
             "set_play_outside": set_plays_outside,
             "slot_assignments": slot_assignments,
-            "motion_dropdowns": motion_dropdowns
+            "motion_dropdowns": motion_dropdowns,
+            "position_filters": position_filters
         }
     
     except HTTPException:
