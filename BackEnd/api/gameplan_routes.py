@@ -1064,6 +1064,9 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             
             team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
+        # DEBUG: Log actual_team_id and team_obj state before check
+        logger.warning(f"🔍 [DEBUG] Before playbook_settings check: actual_team_id={actual_team_id}, team_obj type={type(team_obj)}, team_obj keys={list(team_obj.keys()) if isinstance(team_obj, dict) else 'N/A'}, has playbook_settings={'playbook_settings' in team_obj if isinstance(team_obj, dict) else False}")
+        
         # Ensure playbook_settings exists (even if ensure_team_objects_exist missed it)
         # Check if team_obj exists and playbook_settings is missing (handle both None and empty dict cases)
         if actual_team_id and (not team_obj or "playbook_settings" not in team_obj):
