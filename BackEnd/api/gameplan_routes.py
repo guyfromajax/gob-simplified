@@ -1064,6 +1064,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
         # Check if position filters need to be populated (after ensure_team_objects_exist and document reload)
+        logger.warning(f"⚠️ [GET PLAYBOOKS] Checking position filters for team {actual_team_id}, team_obj has playbook_settings: {bool(team_obj and team_obj.get('playbook_settings'))}")
         if team_obj and team_obj.get("playbook_settings"):
             existing_playbook_settings = team_obj.get("playbook_settings", {})
             position_filters = existing_playbook_settings.get("position_filters", {})
