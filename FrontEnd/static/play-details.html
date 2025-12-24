@@ -165,6 +165,10 @@
       transition: left 0.5s ease, top 0.5s ease;
     }
 
+    .ball-icon.shooting {
+      transition: none; /* Disable transition during shot animation */
+    }
+
     .loading {
       text-align: center;
       padding: 40px;
@@ -335,6 +339,7 @@
     let previousStepAssignments = {};
     let positionOffsets = {};
     let currentBallHandler = null;
+    let isShotAnimating = false; // Track if shot animation is in progress
 
     // Get play name and team info from URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -580,7 +585,7 @@
     }
 
     // Animate next step
-    function animateNextStep() {
+    async function animateNextStep() {
       if (!isAnimating || isPaused) {
         return;
       }
@@ -642,6 +647,38 @@
           }
         }
       });
+
+      // ✅ SS&S: For set plays, the final step is always the shot step
+      // Leverage this structural guarantee instead of searching for "shoot" action
+      const isFinalStep = animationStepIndex === steps.length - 1;
+      const isSetPlayFinalStep = playState.type === 'Set Play' && isFinalStep;
+      
+      if (isSetPlayFinalStep && !isShotAnimating) {
+        // Find the shooter's position (player with ball in final step)
+        const shooterEntry = Object.entries(currentStepAssignments).find(
+          ([pos, assignment]) => BALL_HANDLING_ACTIONS.includes(assignment.action)
+        );
+        
+        if (shooterEntry) {
+          const [shooterPos, shooterAssignment] = shooterEntry;
+          const shooterCoords = positionOffsets[shooterPos] 
+            ? OFFSET_SPOTS[shooterAssignment.location] 
+            : HCO_STRING_SPOTS[shooterAssignment.location];
+          
+          if (shooterCoords) {
+            // Render the step first to show players in position
+            renderCourtVisualization();
+            
+            // Animate the shot
+            await animateShotAttempt(shooterCoords);
+            
+            // Move to next step after shot animation completes
+            animationStepIndex++;
+            animationIntervalId = setTimeout(() => animateNextStep(), 500);
+            return;
+          }
+        }
+      }
 
       // Render the step
       renderCourtVisualization();
@@ -789,8 +826,9 @@
             currentBallHandler = receiverPos;
           }
         }
-      } else if (ballLocation === 'basket') {
-        finalBallLeft = '90%';
+      } else if (ballLocation === 'basket' && !isShotAnimating) {
+        // Only set to basket if not currently animating a shot
+        finalBallLeft = '91%';
         finalBallTop = '50%';
       } else if (currentBallHandler) {
         const handlerAssignment = currentStepAssignments[currentBallHandler] || previousStepAssignments[currentBallHandler];
@@ -803,7 +841,8 @@
         }
       }
 
-      if (finalBallLeft !== null && finalBallTop !== null) {
+      if (finalBallLeft !== null && finalBallTop !== null && !isShotAnimating) {
+        // Only position ball if not currently animating a shot
         if (!ballIcon) {
           ballIcon = document.createElement('div');
           ballIcon.className = 'ball-icon';
@@ -811,9 +850,83 @@
         }
         ballIcon.style.left = finalBallLeft;
         ballIcon.style.top = finalBallTop;
-      } else if (ballIcon) {
-        ballIcon.remove();
+        ballIcon.style.display = 'block';
+      } else if (ballIcon && !isShotAnimating) {
+        // Don't remove ball icon during shot animation
+        ballIcon.style.display = 'none';
       }
+    }
+
+    /**
+     * Animate shot attempt from shooter position to rim with parabolic arc
+     * @param {Object} shooterCoords - {x, y} coordinates of shooter in grid system (0-100)
+     */
+    async function animateShotAttempt(shooterCoords) {
+      if (isShotAnimating) return; // Prevent multiple simultaneous shots
+      
+      isShotAnimating = true;
+      const container = document.getElementById('player-icons-container');
+      let ballIcon = container.querySelector('.ball-icon');
+      
+      if (!ballIcon) {
+        ballIcon = document.createElement('div');
+        ballIcon.className = 'ball-icon shooting';
+        container.appendChild(ballIcon);
+      } else {
+        ballIcon.classList.add('shooting');
+      }
+      
+      // Convert shooter grid coordinates to percentage
+      const startX = shooterCoords.x;
+      const startY = (50 - shooterCoords.y) * 2; // Convert grid Y to percentage
+      
+      // Rim coordinates (home rim - right side of court)
+      const rimX = 91; // From HOME_RIM_COORDS
+      const rimY = 50; // (50 - 25) * 2 = 50%
+      
+      // Calculate arc height (parabolic trajectory)
+      const distance = Math.sqrt(Math.pow(rimX - startX, 2) + Math.pow(rimY - startY, 2));
+      const arcHeight = Math.max(15, distance * 0.3); // Minimum 15%, or 30% of distance
+      const peakY = Math.min(startY, rimY) - arcHeight; // Peak above the lower of start/end
+      
+      // Animation parameters
+      const duration = 800; // 800ms for shot animation
+      const startTime = performance.now();
+      
+      return new Promise((resolve) => {
+        function animate(currentTime) {
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          
+          // Easing function (ease-out for natural arc)
+          const easeOut = 1 - Math.pow(1 - progress, 3);
+          
+          // Calculate position along line from start to rim
+          const currentX = startX + (rimX - startX) * easeOut;
+          const currentY = startY + (rimY - startY) * easeOut;
+          
+          // Apply parabolic arc (higher at peak, lower at start/end)
+          const arcProgress = Math.sin(progress * Math.PI); // 0 at start/end, 1 at middle
+          const arcOffset = arcHeight * arcProgress;
+          const finalY = currentY - arcOffset;
+          
+          // Update ball position
+          ballIcon.style.left = `${currentX}%`;
+          ballIcon.style.top = `${finalY}%`;
+          ballIcon.style.display = 'block';
+          
+          if (progress < 1) {
+            requestAnimationFrame(animate);
+          } else {
+            // Animation complete
+            ballIcon.classList.remove('shooting');
+            isShotAnimating = false;
+            resolve();
+          }
+        }
+        
+        requestAnimationFrame(animate);
+      });
     }
 
     // Initialize on page load
