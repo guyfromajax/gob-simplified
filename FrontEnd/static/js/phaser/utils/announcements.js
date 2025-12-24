@@ -439,13 +439,24 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
       }
       
       // Determine turnover type from dedicated field or text parsing
+      // ✅ FIX: For dead ball turnovers, randomly choose "Travel!" or "Double Dribble!" (50/50)
       let turnoverText = "TURNOVER!";
       
-      // Check if backend provides specific turnover_type field
-      if (turnData.turnover_type) {
+      // Check if this is a dead ball turnover (not a steal)
+      const isDeadBallTurnover = turnData.result_type === 'DEAD BALL' || 
+                                 (turnData.result_type === 'TURNOVER' && 
+                                  !turnData.text?.toLowerCase().includes('steal') && 
+                                  !turnData.stealer_id && 
+                                  !turnData.defender_id);
+      
+      if (isDeadBallTurnover && !turnData.turnover_type) {
+        // Randomly choose between Travel and Double Dribble (50/50)
+        turnoverText = Math.random() < 0.5 ? "Travel!" : "Double Dribble!";
+      } else if (turnData.turnover_type) {
+        // Check if backend provides specific turnover_type field
         const typeMap = {
-          "TRAVEL": "TRAVEL!",
-          "DOUBLE_DRIBBLE": "DOUBLE DRIBBLE!",
+          "TRAVEL": "Travel!",
+          "DOUBLE_DRIBBLE": "Double Dribble!",
           "OUT_OF_BOUNDS": "OUT OF BOUNDS!",
           "BAD_PASS": "BAD PASS!",
           "PALMING": "PALMING!",
@@ -458,9 +469,9 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         // Fallback: parse from text
         const textLower = turnData.text?.toLowerCase() || '';
         if (textLower.includes('travel')) {
-          turnoverText = "TRAVEL!";
+          turnoverText = "Travel!";
         } else if (textLower.includes('double dribble')) {
-          turnoverText = "DOUBLE DRIBBLE!";
+          turnoverText = "Double Dribble!";
         } else if (textLower.includes('out of bounds')) {
           turnoverText = "OUT OF BOUNDS!";
         } else if (textLower.includes('errant pass') || textLower.includes('bad pass')) {
