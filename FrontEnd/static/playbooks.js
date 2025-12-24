@@ -1037,7 +1037,7 @@ class PlaybooksUI {
   /**
    * Check if a play should be shown based on selected position filters.
    * Uses intersection (AND) logic: play must be in ALL selected position arrays.
-   * If "standard" is selected, show all plays (ignore other filters).
+   * "Standard" is treated like any other position filter - only shows plays in the Standard list.
    * If no positions selected, hide all plays.
    * 
    * @param {string} playId - The play's database play_id (ObjectId string)
@@ -1049,12 +1049,8 @@ class PlaybooksUI {
       return false;
     }
     
-    // If "standard" is selected, show all plays
-    if (this.selectedPositions.includes('standard')) {
-      return true;
-    }
-    
     // Intersection (AND) logic: play must be in ALL selected position arrays
+    // "Standard" is treated like any other position - only shows plays in its list
     if (!this.positionFilters) {
       return false;
     }
