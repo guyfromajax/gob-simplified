@@ -661,6 +661,9 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                 updates[f"{team_key}.plays"] = populated_plays.copy()
             if "playbook_settings" not in team_obj:
                 updates[f"{team_key}.playbook_settings"] = playbook_settings
+            elif playbook_settings != existing_playbook_settings:
+                # Position filters were populated, update them
+                updates[f"{team_key}.playbook_settings"] = playbook_settings
             
             # Add missing team attributes if they don't exist (for backwards compatibility)
             # ✅ SS&S: Use mode initialization system instead of copying from core teams collection
