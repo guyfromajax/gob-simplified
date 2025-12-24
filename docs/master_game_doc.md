@@ -3085,6 +3085,38 @@ When a new mode instance is created, team attributes are initialized with mode-s
   3. `Player.randomize_game_attributes()` is called for each player
   4. Team attributes are initialized in `franchise_teams` structure with Franchise-specific ranges
 
+### Playbook Settings Initialization
+
+When a new mode instance is created, `playbook_settings` are initialized for all teams with default values:
+
+**Initialization Function:**
+- `BackEnd/api/gameplan_routes.py` - `initialize_playbook_settings()`
+- Called during team object creation in all three modes:
+  - **Single Game:** `ensure_team_objects_exist()` (lazy initialization when teams are first accessed)
+  - **Tournament:** `create_tournament()` (all 8 teams initialized upfront)
+  - **Franchise:** `initialize_season()` (all 8 teams initialized upfront)
+
+**Default Playbook Settings:**
+- **Percentage Distributions:** First play in each section gets 100%, all others get 0%
+  - Motion: First motion play = 100%
+  - Set Play Inside: First inside play = 100%
+  - Set Play Attack: First attack play = 100%
+  - Set Play Outside: First outside play = 100%
+  - Zone Defense: "2-3 Zone" = 100%
+  - Man Defense: "Man" = 100%
+- **Slot Assignments:** Empty (no plays assigned to priority slots 1-6)
+- **Motion Dropdowns:** Empty (all motion plays default to "-")
+- **Position Filters:** Pre-populated with play assignments:
+  - **Standard:** All basic plays (3-2 Motion, 4-1 Motion, 5-0 Motion, Base Post Play, Pick & Roll (Lower Wing), Double Screen for SG)
+  - **PF:** Power Forward specific plays (PF Post Motion, PF Post Up, PF High Post Drive, PF Corner Shot, PF Quick Jumper)
+  - **PG, SG, SF, C:** Empty (can be customized later)
+
+**Position Filter Storage:**
+- Position filters store `play_id` (ObjectId strings) for each play
+- Play names are mapped to `play_id` by querying the universal `plays` collection
+- If a play name is not found in the database, a warning is logged and the play is skipped
+- This ensures consistency and stability across the game engine
+
 ### Data Persistence
 
 **Important:** Once a mode instance is created, its unique attribute values persist:
