@@ -4075,8 +4075,23 @@
         console.log('Play saved:', result);
         
         // Show notification but stay in editor
-        const variantsWithSteps = Object.keys(playData.skeletons).filter(v => playData.skeletons[v].steps.length > 0).length;
-        alert(`✅ Saved to database!\n\nPlay: ${playData.name}\nVariants with steps: ${variantsWithSteps}/4`);
+        // ✅ FIX: Handle both steps (direct) and versions (array) structures
+        const variantsWithSteps = Object.keys(playData.skeletons).filter(v => {
+          const variant = playData.skeletons[v];
+          // Check if variant has steps directly (Motion base_loop, Set Play successful)
+          if (variant.steps && Array.isArray(variant.steps) && variant.steps.length > 0) {
+            return true;
+          }
+          // Check if variant has versions array (Set Play mid_play_change, contested, broken)
+          if (variant.versions && Array.isArray(variant.versions)) {
+            // Check if any version has steps
+            return variant.versions.some(version => version.steps && Array.isArray(version.steps) && version.steps.length > 0);
+          }
+          return false;
+        }).length;
+        
+        const totalVariants = Object.keys(playData.skeletons).length;
+        alert(`✅ Saved to database!\n\nPlay: ${playData.name}\nVariants with steps: ${variantsWithSteps}/${totalVariants}`);
         
         // Reload plays list in case this was a new play
         loadAvailablePlays();
