@@ -170,6 +170,33 @@ def populate_team_plays(mode="single"):
         return {}
 
 
+def get_play_ids_by_names(play_names):
+    """
+    Get play_id (ObjectId strings) for a list of play names.
+    
+    Args:
+        play_names: List of play name strings
+        
+    Returns:
+        List of play_id strings (ObjectId as string), or empty list if play not found
+    """
+    try:
+        from BackEnd.db import plays_collection
+        
+        play_ids = []
+        for play_name in play_names:
+            play = plays_collection.find_one({"name": play_name})
+            if play and play.get("_id"):
+                play_ids.append(str(play["_id"]))
+            else:
+                logger.warning(f"⚠️ [POSITION FILTERS] Play '{play_name}' not found in database")
+        
+        return play_ids
+    except Exception as e:
+        logger.error(f"🚨 Error in get_play_ids_by_names: {e}", exc_info=True)
+        return []
+
+
 def initialize_playbook_settings():
     """
     Initialize playbook_settings with defaults (Option B: first play = 100%, others = 0%).
@@ -184,7 +211,7 @@ def initialize_playbook_settings():
         - man_defense: {"Man": 100}
         - slot_assignments: {}
         - motion_dropdowns: {}
-        - position_filters: {standard: [], PG: [], SG: [], SF: [], PF: [], C: []}
+        - position_filters: {standard: [...], PG: [], SG: [], SF: [], PF: [...], C: []}
     """
     try:
         from BackEnd.db import plays_collection
@@ -262,6 +289,38 @@ def initialize_playbook_settings():
         
         # Man defense: "Man" gets 100%
         playbook_settings["man_defense"]["Man"] = 100
+        
+        # Initialize position filters with play assignments
+        # Standard: All basic plays
+        standard_plays = [
+            # Motion
+            "3-2 Motion",
+            "4-1 Motion",
+            "5-0 Motion",
+            # Set Play Inside
+            "Base Post Play",
+            # Set Play Attack
+            "Pick & Roll (Lower Wing)",
+            # Set Play Outside
+            "Double Screen for SG"
+        ]
+        playbook_settings["position_filters"]["standard"] = get_play_ids_by_names(standard_plays)
+        
+        # PF: Power Forward specific plays
+        pf_plays = [
+            # Motion
+            "PF Post Motion",
+            # Set Play Inside
+            "PF Post Up",
+            # Set Play Attack
+            "PF High Post Drive",
+            # Set Play Outside
+            "PF Corner Shot",
+            "PF Quick Jumper"
+        ]
+        playbook_settings["position_filters"]["PF"] = get_play_ids_by_names(pf_plays)
+        
+        # PG, SG, SF, C remain empty for now (can be populated later)
         
         return playbook_settings
         
