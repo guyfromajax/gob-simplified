@@ -693,6 +693,39 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                     {"$set": updates}
                 )
         
+        # Always check if position_filters need to be populated (even if all other fields exist)
+        team_obj = doc.get("teams", {}).get(actual_team_id)
+        if team_obj and team_obj.get("playbook_settings"):
+            existing_playbook_settings = team_obj.get("playbook_settings", {})
+            position_filters = existing_playbook_settings.get("position_filters", {})
+            # Check if all position filter arrays are empty
+            all_empty = True
+            if position_filters:
+                for key in ["standard", "PG", "SG", "SF", "PF", "C"]:
+                    if position_filters.get(key) and len(position_filters[key]) > 0:
+                        all_empty = False
+                        break
+            
+            if not position_filters or all_empty:
+                # Position filters are missing or empty, populate them
+                logger.info(f"🔍 [TEAM OBJECTS] Position filters missing/empty for team {actual_team_id}, populating...")
+                new_playbook_settings = initialize_playbook_settings()
+                # Merge with existing playbook_settings to preserve other settings
+                existing_playbook_settings["position_filters"] = new_playbook_settings["position_filters"]
+                
+                # Update the database
+                if mode == "single":
+                    collection.update_one(
+                        {"_id": doc_id},
+                        {"$set": {f"{team_key}.playbook_settings": existing_playbook_settings}}
+                    )
+                else:
+                    collection.update_one(
+                        {"_id": ObjectId(doc_id)},
+                        {"$set": {f"{team_key}.playbook_settings": existing_playbook_settings}}
+                    )
+                logger.info(f"✅ [TEAM OBJECTS] Position filters populated for team {actual_team_id}")
+        
         return doc.get("teams", {})
 
 
