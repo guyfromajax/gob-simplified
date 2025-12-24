@@ -1063,6 +1063,56 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             
             team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
+        # Check if position filters need to be populated (after ensure_team_objects_exist and document reload)
+        if team_obj and team_obj.get("playbook_settings"):
+            existing_playbook_settings = team_obj.get("playbook_settings", {})
+            position_filters = existing_playbook_settings.get("position_filters", {})
+            
+            # Check if all position filter arrays are empty
+            all_empty = True
+            if position_filters:
+                for key in ["standard", "PG", "SG", "SF", "PF", "C"]:
+                    arr = position_filters.get(key, [])
+                    if arr and len(arr) > 0:
+                        all_empty = False
+                        break
+            
+            if not position_filters or all_empty:
+                # Position filters are missing or empty, populate them
+                logger.warning(f"⚠️ [GET PLAYBOOKS] Position filters empty, populating now for team {actual_team_id}...")
+                new_playbook_settings = initialize_playbook_settings()
+                existing_playbook_settings["position_filters"] = new_playbook_settings["position_filters"]
+                
+                # Update the database
+                if mode == "franchise":
+                    team_key = f"franchise_teams.{actual_team_id}"
+                else:
+                    team_key = f"teams.{actual_team_id}"
+                
+                if mode == "single":
+                    result = collection.update_one(
+                        {"_id": doc_id},
+                        {"$set": {f"{team_key}.playbook_settings": existing_playbook_settings}}
+                    )
+                else:
+                    result = collection.update_one(
+                        {"_id": ObjectId(doc_id)},
+                        {"$set": {f"{team_key}.playbook_settings": existing_playbook_settings}}
+                    )
+                logger.warning(f"⚠️ [GET PLAYBOOKS] Position filters populated, update result: matched={result.matched_count}, modified={result.modified_count}")
+                
+                # Reload document again to get the updated position filters
+                if mode == "single":
+                    doc = collection.find_one({"_id": doc_id})
+                else:
+                    doc = collection.find_one({"_id": ObjectId(doc_id)})
+                
+                # Reload team_obj with updated position filters
+                if mode == "franchise":
+                    team_obj = doc.get("franchise_teams", {}).get(actual_team_id, {})
+                else:
+                    team_obj = doc.get("teams", {}).get(actual_team_id, {})
+        
         plays = team_obj.get("plays", {})
         logger.info(f"🔍 [PLAYBOOKS] Found {len(plays)} plays for team")
         
