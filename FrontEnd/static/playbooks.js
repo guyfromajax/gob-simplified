@@ -83,7 +83,7 @@ class PlaybooksState {
       }
     }
     
-    // Initialize set play sections (2 slots each)
+    // Initialize set play sections (3 slots each)
     const setPlaySections = [
       { key: 'set-play-inside', plays: this.playData.set_play_inside || [] },
       { key: 'set-play-attack', plays: this.playData.set_play_attack || [] },
@@ -91,7 +91,7 @@ class PlaybooksState {
     ];
     
     setPlaySections.forEach(({ key, plays }) => {
-      for (let i = 0; i < 2; i++) {
+      for (let i = 0; i < 3; i++) {
         const play = i < plays.length ? plays[i] : TO_BE_ADDED_PLACEHOLDER;
         const playId = play.id || `${key}-${i + 1}`;
         // For "To Be Added" placeholders, use unique ID
