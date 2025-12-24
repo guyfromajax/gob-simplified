@@ -885,13 +885,8 @@
       const rimX = 91; // From HOME_RIM_COORDS
       const rimY = 50; // (50 - 25) * 2 = 50%
       
-      // Calculate arc height (parabolic trajectory)
-      const distance = Math.sqrt(Math.pow(rimX - startX, 2) + Math.pow(rimY - startY, 2));
-      const arcHeight = Math.max(15, distance * 0.3); // Minimum 15%, or 30% of distance
-      const peakY = Math.min(startY, rimY) - arcHeight; // Peak above the lower of start/end
-      
       // Animation parameters
-      const duration = 800; // 800ms for shot animation
+      const duration = 600; // 600ms for shot animation (straight path is faster)
       const startTime = performance.now();
       
       return new Promise((resolve) => {
@@ -899,21 +894,13 @@
           const elapsed = currentTime - startTime;
           const progress = Math.min(elapsed / duration, 1);
           
-          // Easing function (ease-out for natural arc)
-          const easeOut = 1 - Math.pow(1 - progress, 3);
-          
-          // Calculate position along line from start to rim
-          const currentX = startX + (rimX - startX) * easeOut;
-          const currentY = startY + (rimY - startY) * easeOut;
-          
-          // Apply parabolic arc (higher at peak, lower at start/end)
-          const arcProgress = Math.sin(progress * Math.PI); // 0 at start/end, 1 at middle
-          const arcOffset = arcHeight * arcProgress;
-          const finalY = currentY - arcOffset;
+          // Linear interpolation (straight line from shooter to rim)
+          const currentX = startX + (rimX - startX) * progress;
+          const currentY = startY + (rimY - startY) * progress;
           
           // Update ball position
           ballIcon.style.left = `${currentX}%`;
-          ballIcon.style.top = `${finalY}%`;
+          ballIcon.style.top = `${currentY}%`;
           ballIcon.style.display = 'block';
           
           if (progress < 1) {
