@@ -308,7 +308,7 @@ def initialize_playbook_settings():
             # Set Play Attack
             "Pick & Roll (Lower Wing)",
             # Set Play Outside
-            "Double Screen for SG"
+            "Double Screen For SG"
         ]
         standard_play_ids = get_play_ids_by_names(standard_plays)
         playbook_settings["position_filters"]["standard"] = standard_play_ids
