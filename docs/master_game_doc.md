@@ -7176,10 +7176,14 @@ teams.{team_id}.playbook_settings = {
 
 **Filtering Logic:**
 - **Initial State:** No buttons selected - **all offense plays are hidden**
-- **"Standard" Selected:** Shows all offense plays (ignores other position filters)
-- **Position Buttons Selected:** Uses **intersection (AND) logic** - play must be in **ALL** selected position arrays
-  - Example: If "PG" and "SG" are selected, only plays that are in BOTH the PG list AND the SG list are shown
-  - This allows users to "marry" two types of plays into their playbook
+- **Single Button Selected:** Shows only plays in that position's array
+  - Example: "Standard" selected → shows only Standard plays
+  - Example: "PF" selected → shows only PF plays
+- **Multiple Buttons Selected:** Uses **union (OR) logic** - play must be in **ANY** selected position array
+  - Example: "Standard" and "PF" selected → shows plays in Standard array OR PF array (both sets combined)
+  - Example: "PF" and "SG" selected → shows plays in PF array OR SG array (both sets combined)
+  - Plays are added cumulatively as buttons are selected
+  - Plays are removed when their position button is unselected
 - **Defense Plays:** Not affected by position filters (always visible)
 
 **Storage:**

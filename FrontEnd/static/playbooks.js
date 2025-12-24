@@ -1036,7 +1036,7 @@ class PlaybooksUI {
   
   /**
    * Check if a play should be shown based on selected position filters.
-   * Uses intersection (AND) logic: play must be in ALL selected position arrays.
+   * Uses union (OR) logic: play must be in ANY selected position array.
    * "Standard" is treated like any other position filter - only shows plays in the Standard list.
    * If no positions selected, hide all plays.
    * 
@@ -1049,20 +1049,26 @@ class PlaybooksUI {
       return false;
     }
     
-    // Intersection (AND) logic: play must be in ALL selected position arrays
+    // If play_id is missing, hide the play (can't match against filters)
+    if (!playId) {
+      return false;
+    }
+    
+    // Union (OR) logic: play must be in ANY selected position array
     // "Standard" is treated like any other position - only shows plays in its list
     if (!this.positionFilters) {
       return false;
     }
     
+    // Check if play is in any of the selected position arrays
     for (const position of this.selectedPositions) {
       const positionPlayIds = this.positionFilters[position] || [];
-      if (!positionPlayIds.includes(playId)) {
-        return false; // Play not in this position's list
+      if (positionPlayIds.includes(playId)) {
+        return true; // Play found in at least one selected position array
       }
     }
     
-    return true; // Play is in all selected position arrays
+    return false; // Play not found in any selected position array
   }
   
   handleBack() {
