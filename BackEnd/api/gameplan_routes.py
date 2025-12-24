@@ -1221,6 +1221,14 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             count = len(position_filters.get(key, []))
             logger.info(f"🔍 [GET PLAYBOOKS] Position '{key}' has {count} play_ids")
         
+        # Get saved playbook percentages (motion, set_play, zone_defense)
+        motion_percentages = playbook_settings.get("motion", {})
+        set_play_inside_percentages = playbook_settings.get("set_play_inside", {})
+        set_play_attack_percentages = playbook_settings.get("set_play_attack", {})
+        set_play_outside_percentages = playbook_settings.get("set_play_outside", {})
+        zone_defense_percentages = playbook_settings.get("zone_defense", {})
+        man_defense_percentages = playbook_settings.get("man_defense", {})
+        
         return {
             "motion": motion_plays,
             "set_play_inside": set_plays_inside,
@@ -1228,7 +1236,15 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             "set_play_outside": set_plays_outside,
             "slot_assignments": slot_assignments,
             "motion_dropdowns": motion_dropdowns,
-            "position_filters": position_filters
+            "position_filters": position_filters,
+            "playbook_percentages": {
+                "motion": motion_percentages,
+                "set_play_inside": set_play_inside_percentages,
+                "set_play_attack": set_play_attack_percentages,
+                "set_play_outside": set_play_outside_percentages,
+                "zone_defense": zone_defense_percentages,
+                "man_defense": man_defense_percentages
+            }
         }
     
     except HTTPException:

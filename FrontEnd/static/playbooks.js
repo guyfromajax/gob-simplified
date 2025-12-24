@@ -330,6 +330,9 @@ class PlaybooksUI {
     // Load saved state (if any)
     await this.loadState();
     
+    // Load position filter button selections from localStorage
+    this.loadPositionFilterSelections();
+    
     this.renderAll();
     this.attachEventListeners();
     this.updateSubmitButton();
