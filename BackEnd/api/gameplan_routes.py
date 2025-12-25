@@ -1218,6 +1218,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                         # Also update the game document with these settings for consistency
                         try:
                             if mode == "single":
+                                from BackEnd.db import games_collection
                                 games_collection.update_one(
                                     {"_id": doc_id},
                                     {"$set": {f"teams.{actual_team_id}.playbook_settings": playbook_settings}}
