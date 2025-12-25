@@ -484,11 +484,7 @@ class PlaybooksUI {
   }
   
   async loadState() {
-    // First try to load from API (slot assignments, motion dropdowns, and percentages)
-    await this.loadSlotAssignmentsFromAPI();
-    await this.loadPlaybookPercentagesFromAPI();
-    
-    // Try to load full state from localStorage (includes toggles, position filters, etc.)
+    // Check if we have full state in localStorage first (indicates returning from play details)
     const urlParams = new URLSearchParams(window.location.search);
     const mode = urlParams.get('mode') || 'single';
     const teamId = urlParams.get('team_id') || 
@@ -496,6 +492,7 @@ class PlaybooksUI {
                    urlParams.get('home_id') || 
                    urlParams.get('away_id');
     
+    let hasFullState = false;
     if (teamId) {
       const storageKey = `playbooks_full_state_${mode}_${teamId}`;
       const savedFullState = localStorage.getItem(storageKey);
@@ -503,42 +500,60 @@ class PlaybooksUI {
       if (savedFullState) {
         try {
           const fullState = JSON.parse(savedFullState);
+          hasFullState = true;
           
           // Restore Even Distribution toggles
           if (fullState.evenDistributionEnabled) {
             this.evenDistributionEnabled = { ...this.evenDistributionEnabled, ...fullState.evenDistributionEnabled };
-            // Update button visual states
-            Object.keys(this.evenDistributionEnabled).forEach(sectionKey => {
-              this.updateEvenDistributionButton(sectionKey);
-            });
           }
           
-          // Restore position filter selections (will be applied in loadPositionFilterSelections, but we store it here too)
+          // Restore position filter selections
           if (fullState.selectedPositions) {
             this.selectedPositions = fullState.selectedPositions;
           }
           
-          // Restore state (percentages, slots, dropdowns) - API takes precedence
+          // Restore state (percentages, slots, dropdowns) - localStorage takes precedence when returning from play details
           if (fullState.state) {
-            if (!this.savedPlaybookPercentages || Object.keys(this.savedPlaybookPercentages).length === 0) {
-              this.state.deserialize(fullState.state);
-            }
+            this.state.deserialize(fullState.state);
+            console.log('📂 [PLAYBOOKS] Restored full state from localStorage (returning from play details)');
           }
           
-          console.log('📂 [PLAYBOOKS] Restored full state from localStorage');
+          // Restore slot assignments from full state
+          if (fullState.state && fullState.state.slotAssignments) {
+            this.state.slotAssignments = fullState.state.slotAssignments;
+          }
+          
+          // Restore motion dropdowns from full state
+          if (fullState.state && fullState.state.motionDropdowns) {
+            this.state.motionDropdowns = fullState.state.motionDropdowns;
+          }
+          
         } catch (error) {
           console.error('❌ Error loading full state from localStorage:', error);
+          hasFullState = false;
         }
       }
     }
     
-    // Fallback to old localStorage format if full state not found
-    const saved = await this.persistence.load();
-    if (saved) {
-      // Only deserialize if we don't have API data (backward compatibility)
-      if (!this.savedPlaybookPercentages || Object.keys(this.savedPlaybookPercentages).length === 0) {
-        this.state.deserialize(saved);
+    // Only load from API if we don't have full state in localStorage (first load or after submit)
+    if (!hasFullState) {
+      // Load from API (slot assignments, motion dropdowns, and percentages)
+      await this.loadSlotAssignmentsFromAPI();
+      await this.loadPlaybookPercentagesFromAPI();
+      
+      // Fallback to old localStorage format if API data not found
+      const saved = await this.persistence.load();
+      if (saved) {
+        // Only deserialize if we don't have API data (backward compatibility)
+        if (!this.savedPlaybookPercentages || Object.keys(this.savedPlaybookPercentages).length === 0) {
+          this.state.deserialize(saved);
+        }
       }
+    } else {
+      // We restored from localStorage, but still need to update button visual states
+      Object.keys(this.evenDistributionEnabled).forEach(sectionKey => {
+        this.updateEvenDistributionButton(sectionKey);
+      });
     }
   }
   
@@ -1119,7 +1134,7 @@ class PlaybooksUI {
   saveStateToLocalStorage() {
     // Save complete state including toggles, position filters, percentages, slots, dropdowns
     const fullState = {
-      state: this.state.serialize(),
+      state: this.state.serialize(), // This includes sections (percentages), slotAssignments, and motionDropdowns
       evenDistributionEnabled: this.evenDistributionEnabled,
       selectedPositions: this.selectedPositions,
       hasUnsavedChanges: this.hasUnsavedChanges
@@ -1135,7 +1150,11 @@ class PlaybooksUI {
     if (teamId) {
       const storageKey = `playbooks_full_state_${mode}_${teamId}`;
       localStorage.setItem(storageKey, JSON.stringify(fullState));
-      console.log('💾 [PLAYBOOKS] Saved full state to localStorage before navigation');
+      console.log('💾 [PLAYBOOKS] Saved full state to localStorage before navigation:', {
+        percentages: Object.keys(this.state.sections).map(s => `${s}: ${Object.keys(this.state.sections[s]).length} plays`),
+        slotAssignments: Object.keys(this.state.slotAssignments).length,
+        motionDropdowns: Object.keys(this.state.motionDropdowns).length
+      });
     }
   }
 
