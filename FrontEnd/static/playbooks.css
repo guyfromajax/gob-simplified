@@ -252,6 +252,17 @@ body {
   background: rgba(255, 255, 255, 0.2);
 }
 
+.even-distribution-btn.active {
+  background: rgba(255, 122, 0, 0.2);
+  border-color: #ff7a00;
+  color: #ff7a00;
+  font-weight: 600;
+}
+
+.even-distribution-btn.active:hover {
+  background: rgba(255, 122, 0, 0.3);
+}
+
 .rows-container {
   display: flex;
   flex-direction: column;

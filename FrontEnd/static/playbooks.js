@@ -318,6 +318,15 @@ class PlaybooksUI {
     this.playData = null;
     this.selectedPositions = []; // Array to track selected positions (max 2, FIFO)
     this.positionFilters = null; // Position filter mappings from API (play_id → position arrays)
+    this.evenDistributionEnabled = {
+      motion: false,
+      'set-play-inside': false,
+      'set-play-attack': false,
+      'set-play-outside': false,
+      'man-defense': false,
+      'zone-defense': false
+    }; // Track which sections have Even Distribution enabled
+    this.hasUnsavedChanges = false; // Track if user has made changes since last submit
   }
   
   async init() {
@@ -338,6 +347,12 @@ class PlaybooksUI {
     
     this.renderAll();
     this.attachEventListeners();
+    
+    // Update Even Distribution button states after rendering (restored from localStorage)
+    Object.keys(this.evenDistributionEnabled).forEach(sectionKey => {
+      this.updateEvenDistributionButton(sectionKey);
+    });
+    
     this.updateSubmitButton();
   }
   
@@ -473,7 +488,51 @@ class PlaybooksUI {
     await this.loadSlotAssignmentsFromAPI();
     await this.loadPlaybookPercentagesFromAPI();
     
-    // Then load from localStorage (UI state like percentages) - API takes precedence
+    // Try to load full state from localStorage (includes toggles, position filters, etc.)
+    const urlParams = new URLSearchParams(window.location.search);
+    const mode = urlParams.get('mode') || 'single';
+    const teamId = urlParams.get('team_id') || 
+                   urlParams.get('user_team_id') || 
+                   urlParams.get('home_id') || 
+                   urlParams.get('away_id');
+    
+    if (teamId) {
+      const storageKey = `playbooks_full_state_${mode}_${teamId}`;
+      const savedFullState = localStorage.getItem(storageKey);
+      
+      if (savedFullState) {
+        try {
+          const fullState = JSON.parse(savedFullState);
+          
+          // Restore Even Distribution toggles
+          if (fullState.evenDistributionEnabled) {
+            this.evenDistributionEnabled = { ...this.evenDistributionEnabled, ...fullState.evenDistributionEnabled };
+            // Update button visual states
+            Object.keys(this.evenDistributionEnabled).forEach(sectionKey => {
+              this.updateEvenDistributionButton(sectionKey);
+            });
+          }
+          
+          // Restore position filter selections (will be applied in loadPositionFilterSelections, but we store it here too)
+          if (fullState.selectedPositions) {
+            this.selectedPositions = fullState.selectedPositions;
+          }
+          
+          // Restore state (percentages, slots, dropdowns) - API takes precedence
+          if (fullState.state) {
+            if (!this.savedPlaybookPercentages || Object.keys(this.savedPlaybookPercentages).length === 0) {
+              this.state.deserialize(fullState.state);
+            }
+          }
+          
+          console.log('📂 [PLAYBOOKS] Restored full state from localStorage');
+        } catch (error) {
+          console.error('❌ Error loading full state from localStorage:', error);
+        }
+      }
+    }
+    
+    // Fallback to old localStorage format if full state not found
     const saved = await this.persistence.load();
     if (saved) {
       // Only deserialize if we don't have API data (backward compatibility)
@@ -988,18 +1047,28 @@ class PlaybooksUI {
     
     this.renderSection('motion');
     this.renderAssignedPlays();
-    this.debouncedSave();
+    this.markUnsavedChanges();
   }
   
   handlePercentageChange(sectionKey, playId, value) {
     const numValue = Math.max(0, Math.min(100, parseInt(value) || 0));
     this.state.sections[sectionKey][playId].percentage = numValue;
     
+    // Disable Even Distribution toggle if user manually edits
+    if (this.evenDistributionEnabled[sectionKey]) {
+      this.evenDistributionEnabled[sectionKey] = false;
+      this.updateEvenDistributionButton(sectionKey);
+    }
+    
     this.updateSectionTotal(sectionKey);
     this.updateSubmitButton();
+    this.markUnsavedChanges();
   }
   
   navigateToPlayDetails(playName) {
+    // Save current state to localStorage before navigating (so it persists when user returns)
+    this.saveStateToLocalStorage();
+    
     // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
     const helper = window.TimeoutNavigationHelper;
     if (!helper) {
@@ -1046,6 +1115,29 @@ class PlaybooksUI {
     
     window.location.href = `/static/play-details.html?${params.toString()}`;
   }
+  
+  saveStateToLocalStorage() {
+    // Save complete state including toggles, position filters, percentages, slots, dropdowns
+    const fullState = {
+      state: this.state.serialize(),
+      evenDistributionEnabled: this.evenDistributionEnabled,
+      selectedPositions: this.selectedPositions,
+      hasUnsavedChanges: this.hasUnsavedChanges
+    };
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const mode = urlParams.get('mode') || 'single';
+    const teamId = urlParams.get('team_id') || 
+                   urlParams.get('user_team_id') || 
+                   urlParams.get('home_id') || 
+                   urlParams.get('away_id');
+    
+    if (teamId) {
+      const storageKey = `playbooks_full_state_${mode}_${teamId}`;
+      localStorage.setItem(storageKey, JSON.stringify(fullState));
+      console.log('💾 [PLAYBOOKS] Saved full state to localStorage before navigation');
+    }
+  }
 
   handleSlotClick(slotNumber, sectionKey, playId) {
     const dropdown = sectionKey === 'motion' 
@@ -1078,7 +1170,7 @@ class PlaybooksUI {
       this.renderSection(assignment.section);
     }
     this.renderAssignedPlays();
-    this.debouncedSave();
+    this.markUnsavedChanges();
   }
   
   updateSectionTotal(sectionKey) {
@@ -1203,8 +1295,26 @@ class PlaybooksUI {
   }
   
   handleEvenDistribution(sectionKey) {
+    // Toggle Even Distribution for this section
+    this.evenDistributionEnabled[sectionKey] = !this.evenDistributionEnabled[sectionKey];
+    
+    if (!this.evenDistributionEnabled[sectionKey]) {
+      // Disabling - just update button visual state
+      this.updateEvenDistributionButton(sectionKey);
+      console.log(`🔍 [EVEN DISTRIBUTION] Disabled for section: ${sectionKey}`);
+      this.markUnsavedChanges();
+      return;
+    }
+    
+    // Enabling - distribute percentages
     console.log(`🔍 [EVEN DISTRIBUTION] Distributing percentages for section: ${sectionKey}`);
     
+    this.distributePercentagesEvenly(sectionKey);
+    this.updateEvenDistributionButton(sectionKey);
+    this.markUnsavedChanges();
+  }
+  
+  distributePercentagesEvenly(sectionKey) {
     // Get all plays in this section (excluding "To Be Added" placeholders)
     let plays = [];
     
@@ -1288,9 +1398,25 @@ class PlaybooksUI {
     this.renderSection(sectionKey);
     this.updateSectionTotal(sectionKey);
     this.updateSubmitButton();
-    this.debouncedSave();
     
     console.log(`✅ [EVEN DISTRIBUTION] Complete for section: ${sectionKey}`);
+  }
+  
+  updateEvenDistributionButton(sectionKey) {
+    const button = document.querySelector(`.even-distribution-btn[data-section="${sectionKey}"]`);
+    if (button) {
+      if (this.evenDistributionEnabled[sectionKey]) {
+        button.classList.add('active');
+        button.textContent = 'Even Distribution ✓';
+      } else {
+        button.classList.remove('active');
+        button.textContent = 'Even Distribution';
+      }
+    }
+  }
+  
+  markUnsavedChanges() {
+    this.hasUnsavedChanges = true;
   }
   
   handlePositionFilterClick(button) {
@@ -1326,6 +1452,19 @@ class PlaybooksUI {
     this.renderSection('set-play-inside');
     this.renderSection('set-play-attack');
     this.renderSection('set-play-outside');
+    
+    // Auto-recalculate percentages if Even Distribution is enabled for any section
+    const offenseSections = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'];
+    offenseSections.forEach(sectionKey => {
+      if (this.evenDistributionEnabled[sectionKey]) {
+        console.log(`🔄 [POSITION FILTER] Auto-recalculating ${sectionKey} (Even Distribution enabled)`);
+        this.distributePercentagesEvenly(sectionKey);
+        this.updateSectionTotal(sectionKey);
+      }
+    });
+    
+    this.updateSubmitButton();
+    this.markUnsavedChanges();
   }
   
   savePositionFilterSelections() {
@@ -1424,6 +1563,153 @@ class PlaybooksUI {
   }
   
   handleBack() {
+    // Check if there are unsaved changes and show warning popup
+    if (this.hasUnsavedChanges) {
+      const suppressWarning = sessionStorage.getItem('playbooks_suppress_warning') === 'true';
+      if (!suppressWarning) {
+        this.showUnsavedChangesWarning();
+        return;
+      }
+    }
+    
+    // No unsaved changes or warning suppressed - proceed with navigation
+    this.executeBackNavigation();
+  }
+  
+  showUnsavedChangesWarning() {
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'playbooks-warning-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    `;
+    
+    // Create modal
+    const modal = document.createElement('div');
+    modal.className = 'playbooks-warning-modal';
+    modal.style.cssText = `
+      background: #1a1a1a;
+      border: 2px solid #ff7a00;
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 500px;
+      width: 90%;
+      color: #fff;
+    `;
+    
+    // Message
+    const message = document.createElement('p');
+    message.textContent = "You haven't submitted playbook changes.";
+    message.style.cssText = `
+      font-size: 1.125rem;
+      margin-bottom: 20px;
+      font-weight: 600;
+    `;
+    
+    // Checkbox
+    const checkboxContainer = document.createElement('div');
+    checkboxContainer.style.cssText = 'margin-bottom: 20px;';
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = 'playbooks-suppress-warning';
+    checkbox.style.cssText = 'margin-right: 8px;';
+    
+    const checkboxLabel = document.createElement('label');
+    checkboxLabel.htmlFor = 'playbooks-suppress-warning';
+    checkboxLabel.textContent = "Don't show this message again";
+    checkboxLabel.style.cssText = 'color: #fff; cursor: pointer;';
+    
+    checkboxContainer.appendChild(checkbox);
+    checkboxContainer.appendChild(checkboxLabel);
+    
+    // Buttons container
+    const buttonsContainer = document.createElement('div');
+    buttonsContainer.style.cssText = `
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    `;
+    
+    // Submit Playbooks button
+    const submitBtn = document.createElement('button');
+    submitBtn.textContent = 'Submit Playbooks';
+    submitBtn.style.cssText = `
+      padding: 10px 20px;
+      background: #ff7a00;
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      font-weight: 600;
+      cursor: pointer;
+    `;
+    submitBtn.addEventListener('click', async () => {
+      if (checkbox.checked) {
+        sessionStorage.setItem('playbooks_suppress_warning', 'true');
+      }
+      overlay.remove();
+      await this.handleSubmit();
+      // After successful submit, navigate back
+      if (!this.hasUnsavedChanges) {
+        this.executeBackNavigation();
+      }
+    });
+    
+    // Leave Without Submitting button
+    const leaveBtn = document.createElement('button');
+    leaveBtn.textContent = 'Leave Without Submitting';
+    leaveBtn.style.cssText = `
+      padding: 10px 20px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+      font-weight: 600;
+      cursor: pointer;
+    `;
+    leaveBtn.addEventListener('click', () => {
+      if (checkbox.checked) {
+        sessionStorage.setItem('playbooks_suppress_warning', 'true');
+      }
+      
+      // Clear full state from localStorage
+      const urlParams = new URLSearchParams(window.location.search);
+      const mode = urlParams.get('mode') || 'single';
+      const teamId = urlParams.get('team_id') || 
+                     urlParams.get('user_team_id') || 
+                     urlParams.get('home_id') || 
+                     urlParams.get('away_id');
+      
+      if (teamId) {
+        const storageKey = `playbooks_full_state_${mode}_${teamId}`;
+        localStorage.removeItem(storageKey);
+      }
+      
+      overlay.remove();
+      this.hasUnsavedChanges = false;
+      this.executeBackNavigation();
+    });
+    
+    buttonsContainer.appendChild(submitBtn);
+    buttonsContainer.appendChild(leaveBtn);
+    
+    modal.appendChild(message);
+    modal.appendChild(checkboxContainer);
+    modal.appendChild(buttonsContainer);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+  }
+  
+  executeBackNavigation() {
     // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
     const helper = window.TimeoutNavigationHelper;
     if (!helper) {
@@ -1577,6 +1863,22 @@ class PlaybooksUI {
     const success = await this.savePlaybookSettings();
     
     if (success) {
+      // Clear unsaved changes flag after successful save
+      this.hasUnsavedChanges = false;
+      
+      // Clear full state from localStorage (since it's now saved to DB)
+      const urlParams = new URLSearchParams(window.location.search);
+      const mode = urlParams.get('mode') || 'single';
+      const teamId = urlParams.get('team_id') || 
+                     urlParams.get('user_team_id') || 
+                     urlParams.get('home_id') || 
+                     urlParams.get('away_id');
+      
+      if (teamId) {
+        const storageKey = `playbooks_full_state_${mode}_${teamId}`;
+        localStorage.removeItem(storageKey);
+      }
+      
       this.showToast('Playbooks saved successfully');
     } else {
       this.showToast('Error saving playbooks', true);
