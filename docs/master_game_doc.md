@@ -2737,8 +2737,8 @@ The Play Builder (`play-builder-v2.html`) is a web-based tool for creating and e
 - **Structure**: Four skeleton variants (`successful`, `mid_play_change`, `contested`, `broken`)
 - **Focus**: Required - must select Inside, Attack, Outside, or Balanced
 - **Variants**: 
-  - `successful`: Direct `steps` array (no versions)
-  - `mid_play_change`, `contested`, `broken`: `versions` dictionary (v1-v6), each with a `steps` array
+  - `successful`: `versions` array (v0-v6), each with a `steps` array (migrated from direct steps format)
+  - `mid_play_change`, `contested`, `broken`: `versions` array (v0-v6), each with a `steps` array
 - **Final Step Requirement**: Must have a `shoot` action in the final step
 - **Shooter Validation**: Shots only allowed in final step
 
