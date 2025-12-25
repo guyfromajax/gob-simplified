@@ -2021,23 +2021,32 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 
 **Expected Value (EV) and Execution Score Tracking:**
 - **EV Scores** (`ev_scores`): Expected Value percentage (-99.0 to +99.0) calculated for each playcall matchup
-  - Stored in `off_scouting["offense"]["Playcalls"][type_label]["overall"]["ev_scores"]` and focus-specific buckets
-  - Also stored in `def_scouting["defense"][tracking_name]["game_stats"]["ev_scores"]` and vs_* buckets
-  - Calculated via `calculate_ev()` in `turn_manager.py` and stored via `_store_ev_score()`
-  - **Key Fix (January 2025)**: Uses `calls.get("offense_play_type")` (not `"offense_type"`) to match the key used in `set_playcalls()`
+  - **Calculation**: Calculated via `calculate_ev()` in `turn_manager.py` before play execution
+    - **For Motion Plays**: Uses `game_state["offense_play_focus"]` (chosen focus from strategy settings: inside/attack/outside)
+    - **For Set Plays**: Uses `play_doc.get("play_focus")` (intended focus from database)
+    - Motion plays have `play_focus = null` in database, so chosen focus from strategy settings is used
+  - **Storage**: Stored in `off_scouting["offense"]["Playcalls"][type_label]["overall"]["ev_scores"]` and focus-specific buckets
+    - Also stored in `def_scouting["defense"][tracking_name]["game_stats"]["ev_scores"]` and vs_* buckets
+    - Stored via `_store_ev_score()` after EV calculation
+    - **Key Fix (January 2025)**: Uses `calls.get("offense_play_type")` (not `"offense_type"`) to match the key used in `set_playcalls()`
+  - **Focus Usage**: EV uses the **chosen focus** (from strategy settings) for both Motion and Set Plays
+    - This represents the intended offensive strategy before execution
 - **Execution Scores** (`lean_scores`): Execution quality score (0-100) representing how well the play was executed
   - **Calculation**: Calculated in `resolve_hco_outcome()` during HCO turn resolution
     - Step 1: Calculate `result = (offensive_efficiency + o_random) - (defensive_efficiency + d_random)`
     - Step 2: Cap `result` at -100 to +100 range
     - Step 3: Scale to 0-100: `execution_score = (capped_result + 100) / 2`
     - Formula maps: -100 → 0%, 0 → 50%, +100 → 100%
+    - **Note**: Execution score calculation does NOT use focus - it's based solely on team efficiency attributes
   - **Storage**: Stored as `lean_scores` (converted to -1.0 to +1.0 format for backward compatibility)
     - Stored in `off_scouting["offense"]["Playcalls"][type_label]["overall"]["lean_scores"]` and focus-specific buckets
     - Also stored in `def_scouting["defense"][tracking_name]["game_stats"]["lean_scores"]` and vs_* buckets
     - Conversion: `lean_score = (execution_score - 50) / 50` (maps 0-100 to -1.0 to +1.0)
-  - **For Motion Plays**: Uses actual shot type (`motion_shot_type`) as focus for tracking
-  - **For Set Plays**: Uses intended focus from strategy settings
-  - Calculated and stored via `_store_execution_score()` in `phase_resolution.py` after shot resolution
+    - Calculated and stored via `_store_execution_score()` in `phase_resolution.py` after shot resolution
+  - **Focus Usage**: Execution scores use the **actual shot type** for focus tracking
+    - **For Motion Plays**: Uses actual shot type (`motion_shot_type`: inside/attack/outside) determined during execution
+    - **For Set Plays**: Uses intended focus from strategy settings (same as EV)
+    - This means Motion Plays can have EV stored under one focus (chosen) and execution score stored under a different focus (actual)
 
 **Defensive Success Tracking:**
 - **`def_scouting["defense"][tracking_name]["used"]`**: Incremented each time defense is used (by defensive playcall: Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone)
