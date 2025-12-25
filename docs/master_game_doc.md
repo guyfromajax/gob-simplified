@@ -6905,6 +6905,87 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 - **Suppression:** If user checks "Don't show again", warning is suppressed for the current browser session
 - **State Persistence:** Settings are saved to localStorage when navigating to play details, so they persist when user returns to Playbooks page
 
+**Data Persistence Strategy (January 2025):**
+- **Core Principle:** Preserve user work during navigation, minimize database calls, only save to database on explicit user action
+- **localStorage-First for Navigation:** When returning from play details page, restore ALL state from localStorage (percentages, slot assignments, motion dropdowns, toggles, position filters) - this preserves user's work during navigation
+- **API-First for Initial Load:** On first page load (or after submit), load from database API - this ensures user sees their last saved settings
+- **Full State Persistence:** When navigating to play details, save complete state to localStorage:
+  - Percentages (all sections)
+  - Slot assignments (Playcall Center 1-6)
+  - Motion dropdowns (Inside/Attack/Outside selections)
+  - Even Distribution toggle states
+  - Position filter selections (Standard/PG/SG/SF/PF/C)
+  - Unsaved changes flag
+- **Database Save Only on Submit:** Only save to database when user explicitly clicks "Submit Playbooks" - this minimizes database calls and gives user control
+- **State Cleanup:** After successful submit, clear localStorage full state (since it's now persisted in database)
+- **Priority Order:**
+  1. **Returning from Navigation:** localStorage full state (preserves work in progress)
+  2. **First Load / After Submit:** Database API (shows last saved settings)
+  3. **Fallback:** Old localStorage format (backward compatibility)
+
+**Data Persistence Strategy (January 2025):**
+
+**Core Principle:** User work should persist during navigation, but only be saved to database on explicit user action (Submit Playbooks). This minimizes database calls and gives users control over when their work is persisted.
+
+**Key Preferences:**
+1. **Preserve Work During Navigation:** All user work (percentages, slot assignments, toggles, filters) must persist when navigating between pages (e.g., Playbooks → Play Details → Playbooks)
+2. **Database Save Only on Submit:** Only save to database when user explicitly clicks "Submit Playbooks" - no auto-saves to database
+3. **localStorage for Navigation:** Use localStorage to preserve work in progress during navigation
+4. **Database for Persistence:** Use database as source of truth for saved settings (after Submit)
+5. **Minimize Database Calls:** Avoid unnecessary database reads/writes - only read on initial load (when no localStorage), only write on Submit
+
+**Persistence Behavior:**
+
+1. **Initial Page Load:**
+   - **Priority 1:** Check for full state in localStorage (`playbooks_full_state_{mode}_{teamId}`)
+     - If exists: Restore everything from localStorage (percentages, slot assignments, motion dropdowns, Even Distribution toggles, position filter selections)
+     - This indicates user is returning from play details page or has unsaved work
+     - **Skip API call** to avoid overwriting user's current work
+   - **Priority 2:** If no localStorage full state, load from API (database)
+     - Loads slot assignments, motion dropdowns, and percentages from `teams.{team_id}.playbook_settings`
+     - This is the source of truth for persisted settings (after Submit)
+   - **Priority 3:** Fallback to old localStorage format (backward compatibility)
+
+2. **Navigation to Play Details:**
+   - **Before navigating:** Save complete state to localStorage (`playbooks_full_state_{mode}_{teamId}`)
+   - **Includes:** 
+     - Percentages (all sections)
+     - Slot assignments (Playcall Center 1-6)
+     - Motion dropdowns (Inside/Attack/Outside selections)
+     - Even Distribution toggles (active/inactive per section)
+     - Position filter selections (Standard/PG/SG/SF/PF/C active buttons)
+     - Unsaved changes flag
+   - **Purpose:** Preserve all user work during navigation
+   - **No database call:** Only saves to localStorage
+
+3. **Returning from Play Details:**
+   - **Restore from localStorage:** All components restored from full state:
+     - ✅ Percentages (all sections) - restored from `fullState.state.sections`
+     - ✅ Slot assignments (Playcall Center 1-6) - restored from `fullState.state.slotAssignments`
+     - ✅ Motion dropdowns (Inside/Attack/Outside selections) - restored from `fullState.state.motionDropdowns`
+     - ✅ Even Distribution toggles (active/inactive per section) - restored from `fullState.evenDistributionEnabled`
+     - ✅ Position filter selections (Standard/PG/SG/SF/PF/C active buttons) - restored from `fullState.selectedPositions`
+   - **No API call:** Skips API loading to avoid overwriting user's current work
+   - **Implementation:** `loadState()` checks localStorage first, only loads from API if localStorage full state doesn't exist
+
+4. **Submit Playbooks:**
+   - **Saves to database:** All settings saved to `teams.{team_id}.playbook_settings` in appropriate mode document
+   - **Clears localStorage:** Removes full state from localStorage (since it's now persisted in database)
+   - **Clears unsaved changes flag:** Resets `hasUnsavedChanges` to `false`
+   - **Database becomes source of truth:** Next page load will use database data (since localStorage is cleared)
+
+5. **Back Button (Without Submit):**
+   - **If unsaved changes exist:** Shows warning popup
+   - **If "Leave Without Submitting":** Clears localStorage full state and navigates away
+   - **User's work is lost:** Not saved to database, localStorage cleared
+
+**Key Design Decisions:**
+- **localStorage for navigation persistence:** Preserves user work during page-to-page navigation
+- **Database for long-term persistence:** Only updated on explicit "Submit Playbooks" action
+- **localStorage-first on return:** When returning from play details, localStorage takes precedence over API to preserve current work
+- **API-first on initial load:** When no localStorage state exists, API (database) is the source of truth
+- **Clear separation:** Navigation persistence (localStorage) vs. long-term persistence (database)
+
 ### Back Button
 
 **Location:** Top-right of page header (next to Submit button)  
