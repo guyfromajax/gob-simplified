@@ -6847,11 +6847,19 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 - **Man Defense (3 plays):** Base = 33%, remainder = 1% → Top play gets 34%, remaining 2 plays get 33%
 - **Zone Defense (5 plays):** Base = 20%, remainder = 0% → All plays get 20%
 
+**Toggle Behavior (January 2025):**
+- **Toggle On/Off:** Clicking the button toggles Even Distribution for that section
+- **Visual Indicator:** When enabled, button shows "Even Distribution ✓" with orange highlight
+- **Auto-Recalculate:** When position filters change, sections with Even Distribution enabled automatically recalculate percentages for the currently visible plays
+- **Manual Edit Disables:** If a user manually edits a percentage in a section with Even Distribution enabled, the toggle is automatically disabled for that section
+
 **Implementation Details:**
-- **Frontend:** `handleEvenDistribution(sectionKey)` method in `PlaybooksUI` class
+- **Frontend:** `handleEvenDistribution(sectionKey)` method in `PlaybooksUI` class toggles state
+- **State Tracking:** `this.evenDistributionEnabled` object tracks which sections have Even Distribution enabled
+- **Distribution Logic:** `distributePercentagesEvenly(sectionKey)` method performs the actual distribution
 - **State Update:** Updates `this.state.sections[sectionKey][playId].percentage` for each play
 - **Re-render:** Automatically re-renders the section and updates totals after distribution
-- **Auto-save:** Triggers debounced save to persist changes
+- **Position Filter Integration:** When position filters change, `handlePositionFilterClick()` checks if Even Distribution is enabled and auto-recalculates percentages
 
 ### Default Values (First-Time User)
 
@@ -6885,6 +6893,17 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 4. Validates required parameters before sending
 5. Backend resolves team_id (name to ID) and ensures team objects exist
 6. Saves to `teams.{team_id}.playbook_settings` in appropriate mode document
+7. **After successful save:** Clears unsaved changes flag and removes full state from localStorage (since it's now persisted in database)
+
+**Unsaved Changes Warning (January 2025):**
+- **Tracking:** `hasUnsavedChanges` flag tracks if user has made any changes since last submit
+- **Warning Popup:** When user clicks "Back" button with unsaved changes, a modal popup appears:
+  - **Message:** "You haven't submitted playbook changes."
+  - **"Submit Playbooks" Button:** Saves changes to database, then navigates back
+  - **"Leave Without Submitting" Button:** Clears localStorage state and navigates back without saving
+  - **"Don't show this message again" Checkbox:** Stores preference in `sessionStorage` (session-based for now, will migrate to user accounts later)
+- **Suppression:** If user checks "Don't show again", warning is suppressed for the current browser session
+- **State Persistence:** Settings are saved to localStorage when navigating to play details, so they persist when user returns to Playbooks page
 
 ### Back Button
 
