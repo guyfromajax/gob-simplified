@@ -333,6 +333,9 @@ class PlaybooksUI {
     // Load position filter button selections from localStorage
     this.loadPositionFilterSelections();
     
+    // Re-render assigned plays to ensure slot assignments are displayed
+    this.renderAssignedPlays();
+    
     this.renderAll();
     this.attachEventListeners();
     this.updateSubmitButton();
@@ -482,19 +485,36 @@ class PlaybooksUI {
   
   async loadPlaybookPercentagesFromAPI() {
     // Apply saved percentages from API to state
-    if (!this.savedPlaybookPercentages || !this.state) return;
+    if (!this.savedPlaybookPercentages || !this.state) {
+      console.log('⚠️ [PLAYBOOKS] Cannot load percentages: savedPlaybookPercentages=', this.savedPlaybookPercentages, 'state=', !!this.state);
+      return;
+    }
     
     try {
       const percentages = this.savedPlaybookPercentages;
+      console.log('🔍 [PLAYBOOKS] Loading percentages from API:', percentages);
+      
+      let appliedCount = 0;
       
       // Apply motion percentages
       if (percentages.motion && Object.keys(percentages.motion).length > 0) {
+        console.log('🔍 [PLAYBOOKS] Applying motion percentages:', percentages.motion);
         Object.keys(this.state.sections.motion || {}).forEach(playId => {
           const play = this.playData.motion?.find(p => p.id === playId);
-          if (play && percentages.motion[play.name] !== undefined) {
-            this.state.sections.motion[playId].percentage = percentages.motion[play.name];
+          if (play) {
+            if (percentages.motion[play.name] !== undefined) {
+              this.state.sections.motion[playId].percentage = percentages.motion[play.name];
+              appliedCount++;
+              console.log(`✅ [PLAYBOOKS] Applied motion percentage: ${play.name} = ${percentages.motion[play.name]}%`);
+            } else {
+              console.log(`⚠️ [PLAYBOOKS] Motion play "${play.name}" (id: ${playId}) not found in saved percentages`);
+            }
+          } else {
+            console.log(`⚠️ [PLAYBOOKS] Motion play with id "${playId}" not found in playData`);
           }
         });
+      } else {
+        console.log('⚠️ [PLAYBOOKS] No motion percentages in saved data');
       }
       
       // Apply set play percentages
@@ -503,37 +523,66 @@ class PlaybooksUI {
         const sectionPercentages = percentages[settingsKey];
         
         if (sectionPercentages && Object.keys(sectionPercentages).length > 0) {
+          console.log(`🔍 [PLAYBOOKS] Applying ${settingsKey} percentages:`, sectionPercentages);
           const plays = this.playData[settingsKey] || [];
           Object.keys(this.state.sections[sectionKey] || {}).forEach(playId => {
             const play = plays.find(p => p.id === playId);
-            if (play && sectionPercentages[play.name] !== undefined) {
-              this.state.sections[sectionKey][playId].percentage = sectionPercentages[play.name];
+            if (play) {
+              if (sectionPercentages[play.name] !== undefined) {
+                this.state.sections[sectionKey][playId].percentage = sectionPercentages[play.name];
+                appliedCount++;
+                console.log(`✅ [PLAYBOOKS] Applied ${settingsKey} percentage: ${play.name} = ${sectionPercentages[play.name]}%`);
+              } else {
+                console.log(`⚠️ [PLAYBOOKS] ${settingsKey} play "${play.name}" (id: ${playId}) not found in saved percentages`);
+              }
+            } else {
+              console.log(`⚠️ [PLAYBOOKS] ${settingsKey} play with id "${playId}" not found in playData`);
             }
           });
+        } else {
+          console.log(`⚠️ [PLAYBOOKS] No ${settingsKey} percentages in saved data`);
         }
       });
       
       // Apply zone defense percentages
       if (percentages.zone_defense && Object.keys(percentages.zone_defense).length > 0) {
+        console.log('🔍 [PLAYBOOKS] Applying zone_defense percentages:', percentages.zone_defense);
         Object.keys(this.state.sections['zone-defense'] || {}).forEach(playId => {
           const play = DEFENSE_PLAY_DATA['zone-defense']?.find(p => p.id === playId);
-          if (play && percentages.zone_defense[play.name] !== undefined) {
-            this.state.sections['zone-defense'][playId].percentage = percentages.zone_defense[play.name];
+          if (play) {
+            if (percentages.zone_defense[play.name] !== undefined) {
+              this.state.sections['zone-defense'][playId].percentage = percentages.zone_defense[play.name];
+              appliedCount++;
+              console.log(`✅ [PLAYBOOKS] Applied zone_defense percentage: ${play.name} = ${percentages.zone_defense[play.name]}%`);
+            } else {
+              console.log(`⚠️ [PLAYBOOKS] Zone defense play "${play.name}" (id: ${playId}) not found in saved percentages`);
+            }
           }
         });
+      } else {
+        console.log('⚠️ [PLAYBOOKS] No zone_defense percentages in saved data');
       }
       
       // Apply man defense percentages
       if (percentages.man_defense && Object.keys(percentages.man_defense).length > 0) {
+        console.log('🔍 [PLAYBOOKS] Applying man_defense percentages:', percentages.man_defense);
         Object.keys(this.state.sections['man-defense'] || {}).forEach(playId => {
           const play = DEFENSE_PLAY_DATA['man-defense']?.find(p => p.id === playId);
-          if (play && percentages.man_defense[play.name] !== undefined) {
-            this.state.sections['man-defense'][playId].percentage = percentages.man_defense[play.name];
+          if (play) {
+            if (percentages.man_defense[play.name] !== undefined) {
+              this.state.sections['man-defense'][playId].percentage = percentages.man_defense[play.name];
+              appliedCount++;
+              console.log(`✅ [PLAYBOOKS] Applied man_defense percentage: ${play.name} = ${percentages.man_defense[play.name]}%`);
+            } else {
+              console.log(`⚠️ [PLAYBOOKS] Man defense play "${play.name}" (id: ${playId}) not found in saved percentages`);
+            }
           }
         });
+      } else {
+        console.log('⚠️ [PLAYBOOKS] No man_defense percentages in saved data');
       }
       
-      console.log('✅ [PLAYBOOKS] Applied saved percentages from API to state');
+      console.log(`✅ [PLAYBOOKS] Applied ${appliedCount} saved percentages from API to state`);
     } catch (error) {
       console.error('❌ Error loading playbook percentages from API:', error);
     }
@@ -555,7 +604,10 @@ class PlaybooksUI {
       const tournamentId = urlParams.get('tournament_id');
       const franchiseId = urlParams.get('franchise_id');
       
-      if (!teamId) return;
+      if (!teamId) {
+        console.warn('⚠️ [PLAYBOOKS] No teamId found, cannot load slot assignments');
+        return;
+      }
       
       const params = new URLSearchParams();
       params.set('mode', mode);
@@ -568,16 +620,76 @@ class PlaybooksUI {
         params.set('franchise_id', franchiseId);
       }
       
+      console.log('🔍 [PLAYBOOKS] Loading slot assignments from API:', params.toString());
       const response = await fetch(`/api/playbooks?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
+        console.log('🔍 [PLAYBOOKS] API response for slot assignments:', data);
+        
         if (data.slot_assignments && this.state) {
-          this.state.slotAssignments = data.slot_assignments;
+          // Convert slot assignments to use play names if they use playIds
+          const convertedAssignments = {};
+          Object.keys(data.slot_assignments).forEach(slotNum => {
+            const assignment = data.slot_assignments[slotNum];
+            if (assignment) {
+              // If assignment has playName, use it directly
+              // If it only has playId, try to find the play name
+              if (assignment.playName) {
+                convertedAssignments[slotNum] = assignment;
+              } else if (assignment.playId) {
+                // Try to find play name from playId
+                let playName = null;
+                const allPlays = [
+                  ...(this.playData.motion || []),
+                  ...(this.playData.set_play_inside || []),
+                  ...(this.playData.set_play_attack || []),
+                  ...(this.playData.set_play_outside || [])
+                ];
+                const play = allPlays.find(p => p.id === assignment.playId);
+                if (play) {
+                  playName = play.name;
+                }
+                convertedAssignments[slotNum] = {
+                  ...assignment,
+                  playName: playName || assignment.playId
+                };
+              } else {
+                convertedAssignments[slotNum] = assignment;
+              }
+            }
+          });
+          
+          this.state.slotAssignments = convertedAssignments;
+          console.log('✅ [PLAYBOOKS] Loaded slot assignments:', this.state.slotAssignments);
+          
+          // Apply slot assignments to section state (for non-motion plays)
+          Object.keys(this.state.slotAssignments).forEach(slotNum => {
+            const assignment = this.state.slotAssignments[slotNum];
+            if (assignment && assignment.section !== 'motion') {
+              // Find play by name in the section
+              const section = this.state.sections[assignment.section];
+              if (section) {
+                const playId = Object.keys(section).find(id => {
+                  const play = this.playData[assignment.section.replace('set-play-', 'set_play_')]?.find(p => p.id === id);
+                  return play && play.name === assignment.playName;
+                });
+                if (playId && section[playId]) {
+                  section[playId].slot = parseInt(slotNum);
+                }
+              }
+            }
+          });
+        } else {
+          console.log('⚠️ [PLAYBOOKS] No slot_assignments in API response or state not initialized');
         }
+        
         if (data.motion_dropdowns && this.state) {
           // Merge API motion dropdowns with state (API takes precedence)
           this.state.motionDropdowns = { ...this.state.motionDropdowns, ...data.motion_dropdowns };
+          console.log('✅ [PLAYBOOKS] Loaded motion dropdowns:', this.state.motionDropdowns);
         }
+      } else {
+        console.error('❌ [PLAYBOOKS] Failed to load slot assignments:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('❌ Error loading slot assignments from API:', error);

@@ -1196,6 +1196,37 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         
         # Get playbook settings (percentages, slot assignments, motion dropdowns, and position filters)
         playbook_settings = team_obj.get("playbook_settings", {})
+        
+        # ✅ SINGLE GAME CROSS-INSTANCE PERSISTENCE: Check core teams collection if game document has no settings
+        if mode == "single" and (not playbook_settings or len(playbook_settings) == 0 or not any(playbook_settings.get(k) for k in ["motion", "set_play_inside", "set_play_attack", "set_play_outside", "zone_defense", "man_defense", "slot_assignments"])):
+            try:
+                # Try to load from core teams collection
+                team_doc = db.teams.find_one({"name": team_id})
+                if not team_doc:
+                    team_doc = db.teams.find_one({"team_id": team_id})
+                if not team_doc:
+                    try:
+                        team_doc = db.teams.find_one({"_id": ObjectId(team_id)})
+                    except:
+                        pass
+                
+                if team_doc:
+                    core_playbook_settings = team_doc.get("playbook_settings", {})
+                    if core_playbook_settings and any(core_playbook_settings.get(k) for k in ["motion", "set_play_inside", "set_play_attack", "set_play_outside", "zone_defense", "man_defense", "slot_assignments"]):
+                        playbook_settings = core_playbook_settings
+                        logger.info(f"✅ Loaded playbook settings from core teams collection for team {team_id} (cross-instance persistence)")
+                        # Also update the game document with these settings for consistency
+                        try:
+                            if mode == "single":
+                                games_collection.update_one(
+                                    {"_id": doc_id},
+                                    {"$set": {f"teams.{actual_team_id}.playbook_settings": playbook_settings}}
+                                )
+                        except:
+                            pass  # Non-critical
+            except Exception as e:
+                logger.warning(f"⚠️ Error loading from core teams collection (non-critical): {e}")
+        
         slot_assignments = playbook_settings.get("slot_assignments", {})
         motion_dropdowns = playbook_settings.get("motion_dropdowns", {})
         
@@ -1381,7 +1412,10 @@ def save_playbooks(request: PlaybookSettingsRequest):
         
         # For single game mode, try both UUID string and ObjectId formats
         if request.mode == "single":
-            # Try UUID string first
+            # ✅ SINGLE GAME CROSS-INSTANCE PERSISTENCE: Save to both game document AND core teams collection
+            # This ensures settings persist across Single Game instances
+            
+            # 1. Save to game document (for current game instance)
             result = collection.update_one(
                 {"_id": doc_id},
                 {"$set": {update_path: request.playbook_settings}}
@@ -1395,13 +1429,42 @@ def save_playbooks(request: PlaybookSettingsRequest):
                     )
                 except:
                     pass
+            
+            # 2. Save to core teams collection (for cross-instance persistence)
+            # Resolve team_id to ObjectId for teams collection lookup
+            team_obj_id = actual_team_id
+            try:
+                # Try to find team in core teams collection
+                team_doc = db.teams.find_one({"name": request.team_id})
+                if not team_doc:
+                    # Try by team_id
+                    team_doc = db.teams.find_one({"team_id": request.team_id})
+                if not team_doc:
+                    # Try as ObjectId
+                    try:
+                        team_doc = db.teams.find_one({"_id": ObjectId(actual_team_id)})
+                    except:
+                        pass
+                
+                if team_doc:
+                    team_obj_id = str(team_doc.get("_id"))
+                    db.teams.update_one(
+                        {"_id": ObjectId(team_obj_id)},
+                        {"$set": {"playbook_settings": request.playbook_settings}},
+                        upsert=False  # Don't create if doesn't exist
+                    )
+                    logger.info(f"✅ Saved playbook settings to core teams collection for team {team_obj_id} (cross-instance persistence)")
+                else:
+                    logger.warning(f"⚠️ Could not find team in core teams collection for cross-instance persistence: {request.team_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ Error saving to core teams collection (non-critical): {e}")
         else:
             result = collection.update_one(
                 {"_id": ObjectId(doc_id)},
                 {"$set": {update_path: request.playbook_settings}}
             )
         
-        if result.matched_count == 0:
+        if request.mode != "single" and result.matched_count == 0:
             raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
         
         logger.info(f"✅ Saved playbook settings for team {actual_team_id} in {request.mode} mode")
