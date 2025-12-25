@@ -6807,10 +6807,10 @@ The Playbooks page allows users to configure their team's offensive and defensiv
 Each section contains multiple rows with numeric percentage inputs (0-100) and must total exactly 100%:
 
 **Offense Sections:**
-1. **Motion Offense** - 6 slots (loads from database, fills empty slots with "To Be Added")
-2. **Set Play Inside Offense** - 2 slots (loads from database, fills empty slots with "To Be Added")
-3. **Set Play Attack Offense** - 2 slots (loads from database, fills empty slots with "To Be Added")
-4. **Set Play Outside Offense** - 2 slots (loads from database, fills empty slots with "To Be Added")
+1. **Motion Offense** - 4 slots (loads from database, fills empty slots with "To Be Added")
+2. **Set Play Inside Offense** - 3 slots (loads from database, fills empty slots with "To Be Added")
+3. **Set Play Attack Offense** - 3 slots (loads from database, fills empty slots with "To Be Added")
+4. **Set Play Outside Offense** - 3 slots (loads from database, fills empty slots with "To Be Added")
 
 **Defense Sections:**
 5. **Man Defense** - 3 plays (Man Defense, Man Defense Variant 2, Man Defense Variant 3)
@@ -6822,6 +6822,36 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 - Inline error message: "This section must total 100%. You're over by X%."
 - Warning state (subtle color + helper text) when section total ≠ 100%
 - Submit button disabled unless ALL six sections total exactly 100%
+
+### Even Distribution Button ✅ **IMPLEMENTED** (January 2025)
+
+**Location:** Right-aligned in each section header, next to the section title  
+**Styling:** Silver border, semi-transparent background, matches other UI buttons  
+**Purpose:** Automatically distribute percentages evenly across all plays in a section
+
+**Behavior:**
+- **Button Text:** "Even Distribution"
+- **Click Action:** Distributes percentages evenly across all plays in that section (excluding "To Be Added" placeholders)
+- **Position Filtering:** For offense sections, only distributes to plays that match the selected position filters
+
+**Distribution Logic:**
+1. **Calculate Base Percentage:** `Math.floor(100 / num_plays)`
+2. **Calculate Remainder:** `100 - (base * num_plays)`
+3. **Assign Base:** All plays receive the base percentage
+4. **Distribute Remainder:** Remainder is distributed one percentage point at a time to the top plays (in order) until remainder is exhausted
+
+**Examples:**
+- **Motion Offense (4 plays):** Each play gets 25% (100 ÷ 4 = 25, no remainder)
+- **Set Play Inside (6 plays):** Base = 16%, remainder = 4% → Top 2 plays get 17%, remaining 4 plays get 16%
+- **Set Play Attack (3 plays):** Base = 33%, remainder = 1% → Top play gets 34%, remaining 2 plays get 33%
+- **Man Defense (3 plays):** Base = 33%, remainder = 1% → Top play gets 34%, remaining 2 plays get 33%
+- **Zone Defense (5 plays):** Base = 20%, remainder = 0% → All plays get 20%
+
+**Implementation Details:**
+- **Frontend:** `handleEvenDistribution(sectionKey)` method in `PlaybooksUI` class
+- **State Update:** Updates `this.state.sections[sectionKey][playId].percentage` for each play
+- **Re-render:** Automatically re-renders the section and updates totals after distribution
+- **Auto-save:** Triggers debounced save to persist changes
 
 ### Default Values (First-Time User)
 

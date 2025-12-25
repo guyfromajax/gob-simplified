@@ -1177,6 +1177,15 @@ class PlaybooksUI {
       });
     }
     
+    // Even Distribution buttons
+    const evenDistributionBtns = document.querySelectorAll('.even-distribution-btn');
+    evenDistributionBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const sectionKey = e.target.dataset.section;
+        this.handleEvenDistribution(sectionKey);
+      });
+    });
+    
     const backBtn = document.getElementById('back-btn');
     if (backBtn) {
       backBtn.addEventListener('click', () => {
@@ -1191,6 +1200,97 @@ class PlaybooksUI {
         this.handlePositionFilterClick(btn);
       });
     });
+  }
+  
+  handleEvenDistribution(sectionKey) {
+    console.log(`🔍 [EVEN DISTRIBUTION] Distributing percentages for section: ${sectionKey}`);
+    
+    // Get all plays in this section (excluding "To Be Added" placeholders)
+    let plays = [];
+    
+    if (sectionKey === 'motion') {
+      const motionPlays = this.playData.motion || [];
+      plays = motionPlays.filter(play => play.name !== 'To Be Added');
+    } else if (sectionKey === 'set-play-inside') {
+      const setPlays = this.playData.set_play_inside || [];
+      plays = setPlays.filter(play => play.name !== 'To Be Added');
+    } else if (sectionKey === 'set-play-attack') {
+      const setPlays = this.playData.set_play_attack || [];
+      plays = setPlays.filter(play => play.name !== 'To Be Added');
+    } else if (sectionKey === 'set-play-outside') {
+      const setPlays = this.playData.set_play_outside || [];
+      plays = setPlays.filter(play => play.name !== 'To Be Added');
+    } else if (sectionKey === 'man-defense' || sectionKey === 'zone-defense') {
+      plays = DEFENSE_PLAY_DATA[sectionKey] || [];
+    }
+    
+    // Filter by position if offense section
+    const isOffenseSection = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'].includes(sectionKey);
+    if (isOffenseSection) {
+      plays = plays.filter(play => {
+        const playDatabaseId = play.play_id;
+        if (!playDatabaseId) return false;
+        return this.shouldShowPlay(playDatabaseId);
+      });
+    }
+    
+    if (plays.length === 0) {
+      console.warn(`⚠️ [EVEN DISTRIBUTION] No plays found for section: ${sectionKey}`);
+      return;
+    }
+    
+    // Calculate base percentage and remainder
+    const basePercentage = Math.floor(100 / plays.length);
+    const remainder = 100 - (basePercentage * plays.length);
+    
+    console.log(`📊 [EVEN DISTRIBUTION] ${plays.length} plays, base: ${basePercentage}%, remainder: ${remainder}%`);
+    
+    // Assign percentages
+    plays.forEach((play, index) => {
+      // Generate play ID if needed
+      let playId = play.id;
+      if (!playId) {
+        if (sectionKey === 'motion') {
+          playId = `motion-${index + 1}`;
+        } else if (sectionKey.startsWith('set-play-')) {
+          playId = `${sectionKey}-${index + 1}`;
+        } else {
+          playId = play.id;
+        }
+      }
+      
+      // For "To Be Added" placeholders, use unique ID
+      if (play.name === 'To Be Added') {
+        playId = sectionKey === 'motion' ? `motion-tba-${index + 1}` : `${sectionKey}-tba-${index + 1}`;
+      }
+      
+      // Ensure play exists in state
+      if (!this.state.sections[sectionKey][playId]) {
+        this.state.sections[sectionKey][playId] = {
+          percentage: 0,
+          slot: null,
+        };
+      }
+      
+      // Assign base percentage
+      let percentage = basePercentage;
+      
+      // Distribute remainder to top plays (one at a time)
+      if (index < remainder) {
+        percentage += 1;
+      }
+      
+      this.state.sections[sectionKey][playId].percentage = percentage;
+      console.log(`  ✅ ${play.name}: ${percentage}%`);
+    });
+    
+    // Re-render section and update totals
+    this.renderSection(sectionKey);
+    this.updateSectionTotal(sectionKey);
+    this.updateSubmitButton();
+    this.debouncedSave();
+    
+    console.log(`✅ [EVEN DISTRIBUTION] Complete for section: ${sectionKey}`);
   }
   
   handlePositionFilterClick(button) {
