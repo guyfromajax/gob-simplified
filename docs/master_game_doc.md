@@ -2019,17 +2019,25 @@ The Statistics System tracks comprehensive player-level and team-level statistic
   - This ensures attempts and successes are tracked consistently for the same shot type
   - Example: If a Motion play starts with "Outside" focus but player chooses "Attack" shot, both attempt and success are tracked under "Attack"
 
-**Expected Value (EV) and Average Execution Tracking:**
+**Expected Value (EV) and Execution Score Tracking:**
 - **EV Scores** (`ev_scores`): Expected Value percentage (-99.0 to +99.0) calculated for each playcall matchup
   - Stored in `off_scouting["offense"]["Playcalls"][type_label]["overall"]["ev_scores"]` and focus-specific buckets
   - Also stored in `def_scouting["defense"][tracking_name]["game_stats"]["ev_scores"]` and vs_* buckets
   - Calculated via `calculate_ev()` in `turn_manager.py` and stored via `_store_ev_score()`
   - **Key Fix (January 2025)**: Uses `calls.get("offense_play_type")` (not `"offense_type"`) to match the key used in `set_playcalls()`
-- **Average Execution** (`lean_scores`): Lean score (-1.0 to +1.0) representing execution quality
-  - Stored in `off_scouting["offense"]["Playcalls"][type_label]["overall"]["lean_scores"]` and focus-specific buckets
-  - Also stored in `def_scouting["defense"][tracking_name]["game_stats"]["lean_scores"]` and vs_* buckets
-  - Calculated via `generate_logic()` in `phase_resolution.py` and stored via `_store_lean_score()`
-  - Uses `game_state["offense_play_type"]` (set correctly in `turn_manager.py`)
+- **Execution Scores** (`lean_scores`): Execution quality score (0-100) representing how well the play was executed
+  - **Calculation**: Calculated in `resolve_hco_outcome()` during HCO turn resolution
+    - Step 1: Calculate `result = (offensive_efficiency + o_random) - (defensive_efficiency + d_random)`
+    - Step 2: Cap `result` at -100 to +100 range
+    - Step 3: Scale to 0-100: `execution_score = (capped_result + 100) / 2`
+    - Formula maps: -100 → 0%, 0 → 50%, +100 → 100%
+  - **Storage**: Stored as `lean_scores` (converted to -1.0 to +1.0 format for backward compatibility)
+    - Stored in `off_scouting["offense"]["Playcalls"][type_label]["overall"]["lean_scores"]` and focus-specific buckets
+    - Also stored in `def_scouting["defense"][tracking_name]["game_stats"]["lean_scores"]` and vs_* buckets
+    - Conversion: `lean_score = (execution_score - 50) / 50` (maps 0-100 to -1.0 to +1.0)
+  - **For Motion Plays**: Uses actual shot type (`motion_shot_type`) as focus for tracking
+  - **For Set Plays**: Uses intended focus from strategy settings
+  - Calculated and stored via `_store_execution_score()` in `phase_resolution.py` after shot resolution
 
 **Defensive Success Tracking:**
 - **`def_scouting["defense"][tracking_name]["used"]`**: Incremented each time defense is used (by defensive playcall: Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone)
@@ -10681,6 +10689,40 @@ Each check returns immediately if its event occurs. If no event occurs after che
   - Zone defense modifier: `pressure *= 0.9`
 
 **Note:** Both functions use `random.randint(1, 6)` multiplier, ensuring consistent randomization across both scores.
+
+#### Step 6: Shot Attempt and Execution Score Calculation
+
+**Execution Score Calculation:**
+- **Step 6a: Calculate Effectiveness Scores**
+  - `o_random = random.randint(1, 100)`
+  - `d_random = random.randint(1, 100)`
+  - `o_score = offensive_efficiency + o_random`
+  - `d_score = defensive_efficiency + d_random`
+  - `result = o_score - d_score`
+  
+- **Step 6b: Cap Result for Execution Score**
+  - If `result > 100`: `result = 100`
+  - If `result < -100`: `result = -100`
+  - This caps the execution score calculation range to -100 to +100
+  
+- **Step 6c: Scale to Execution Score (0-100)**
+  - Formula: `execution_score = (capped_result + 100) / 2`
+  - Maps: -100 → 0%, 0 → 50%, +100 → 100%
+  - Execution score represents play execution quality (0% = worst, 100% = best)
+  
+- **Step 6d: Store Execution Score**
+  - Execution score is stored in `game_state["execution_score"]` for later stat tracking
+  - Converted to `lean_score` format (-1.0 to +1.0) for storage in scouting data
+  - Conversion: `lean_score = (execution_score - 50) / 50`
+  - Stored via `_store_execution_score()` after shot resolution
+
+**Skeleton Variant Selection:**
+- Uses original uncapped `result` value (not execution_score)
+- Variant thresholds:
+  - `result > 50` → "successful"
+  - `0 < result <= 50` → "mid_play_change"
+  - `-50 < result <= 0` → "contested"
+  - `result <= -50` → "broken"
 
 #### Step 6: Shot Attempt (if no event occurred in Steps 3-5)
 

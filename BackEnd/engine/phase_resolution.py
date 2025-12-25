@@ -1665,11 +1665,11 @@ def _check_standard_fouls(calibrated_o_foul, calibrated_d_foul):
     if foul_roll <= calibrated_o_foul:
         logging.warning(f"   ✅ RESULT: O_FOUL (roll {foul_roll} <= {calibrated_o_foul})")
         logging.warning("")  # Blank line after standard foul check
-        return ("O_FOUL", None)
+        return ("O_FOUL", None, None)
     elif foul_roll >= calibrated_d_foul:
         logging.warning(f"   ✅ RESULT: D_FOUL (roll {foul_roll} >= {calibrated_d_foul})")
         logging.warning("")  # Blank line after standard foul check
-        return ("D_FOUL", None)
+        return ("D_FOUL", None, None)
     else:
         logging.warning(f"   ➡️  No foul ({calibrated_o_foul} < {foul_roll} < {calibrated_d_foul})")
         logging.warning("")  # Blank line after standard foul check
@@ -1857,10 +1857,10 @@ def _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_
                         logging.warning(f"      ✅ Steal attempt result: {steal_result}")
                         if steal_result == "STEAL":
                             logging.warning("")  # Blank line after steal attempt check
-                            return ("STEAL", None)
+                            return ("STEAL", None, None)
                         elif steal_result == "D_FOUL":
                             logging.warning("")  # Blank line after steal attempt check
-                            return ("D_FOUL", None)
+                            return ("D_FOUL", None, None)
                         # If "NO_EVENT", return None
                         logging.warning(f"      ➡️  No event ({steal_result})")
     else:
@@ -2021,7 +2021,7 @@ def _check_dead_ball_turnover(game, skeleton, calibrated_dead_ball_to):
                         if defender_score > bh_score:
                             logging.warning(f"      ✅ RESULT: DEAD_BALL_TURNOVER (defender {defender_score} > ball handler {bh_score})")
                             logging.warning("")  # Blank line after dead ball turnover check
-                            return ("DEAD_BALL_TURNOVER", None)
+                            return ("DEAD_BALL_TURNOVER", None, None)
                         # Else continue
                         logging.warning(f"      ➡️  No turnover (defender {defender_score} <= ball handler {bh_score})")
     else:
@@ -2049,9 +2049,11 @@ def resolve_hco_outcome(game, skeleton):
         skeleton: Skeleton dict (needed for step selection and variant determination)
     
     Returns:
-        tuple: (result, variant_result)
+        tuple: (result, variant_result, execution_score)
             - result: "SHOT", "O_FOUL", "D_FOUL", "DEAD_BALL_TURNOVER", or "STEAL"
             - variant_result: For SHOT results, the skeleton variant ("successful", "mid_play_change", "contested", "broken")
+                          For non-SHOT results, None
+            - execution_score: For SHOT results, execution score (0-100) calculated from result
                           For non-SHOT results, None
     """
     import random
@@ -2164,7 +2166,13 @@ def resolve_hco_outcome(game, skeleton):
             # Event occurred, return immediately
             logging.warning(f"🔍 [HCO RESOLUTION] {check_name} returned result: {result[0]}")
             logging.warning("")  # Blank line after event result
-            return result
+            # For non-SHOT results, return None for variant_result and execution_score
+            if len(result) == 2:
+                return (result[0], result[1], None)
+            elif len(result) == 3:
+                return result
+            else:
+                return (result[0], None, None)
     
     # No event occurred in Steps 3-5, continue to Step 6
     logging.warning("")  # Blank line after Steps 3-5 (no event)
@@ -2184,7 +2192,24 @@ def resolve_hco_outcome(game, skeleton):
     logging.warning(f"   Defense effectiveness: {defensive_efficiency} + {d_random} (random) = {d_score}")
     logging.warning(f"   Result (o_score - d_score): {o_score} - {d_score} = {result}")
     
-    # Select skeleton variant based on result
+    # ✅ EXECUTION SCORE CALCULATION: Cap result and scale to 0-100
+    # Cap result at -100 to +100 for execution score calculation
+    capped_result = result
+    if capped_result > 100:
+        capped_result = 100
+    elif capped_result < -100:
+        capped_result = -100
+    
+    # Scale from -100 to +100 range to 0-100 Execution Score
+    # Formula: execution_score = (capped_result + 100) / 2
+    execution_score = (capped_result + 100) / 2
+    
+    logging.warning(f"   📊 Execution Score: {result} → {capped_result} (capped) → {execution_score:.1f}% (scaled 0-100)")
+    
+    # Store execution_score in game_state for later storage in scouting data
+    game_state["execution_score"] = execution_score
+    
+    # Select skeleton variant based on result (using original uncapped result)
     if result > 50:
         variant_result = "successful"
         logging.warning(f"   ✅ Variant: {variant_result} (result {result} > 50)")
@@ -2198,8 +2223,8 @@ def resolve_hco_outcome(game, skeleton):
         variant_result = "broken"
         logging.warning(f"   ✅ Variant: {variant_result} (result {result} <= -50)")
     
-    logging.warning(f"🔍 [HCO RESOLUTION] Final Result: SHOT with variant '{variant_result}'")
-    return ("SHOT", variant_result)
+    logging.warning(f"🔍 [HCO RESOLUTION] Final Result: SHOT with variant '{variant_result}', execution_score={execution_score:.1f}%")
+    return ("SHOT", variant_result, execution_score)
 
 
 def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup, game=None):
@@ -2399,6 +2424,32 @@ def _store_lean_score(lean_score, game, offense_team, defense_team):
     except Exception as e:
         # Silently handle errors to avoid disrupting gameplay
         pass
+
+# ✅ ALIAS: Keep _store_lean_score for backward compatibility (accepts execution_score or lean_score)
+def _store_lean_score(score, game, offense_team, defense_team):
+    """
+    Store execution score or lean score in scouting data.
+    
+    If score is 0-100, treats it as execution_score and converts to lean_score.
+    If score is -1.0 to 1.0, treats it as lean_score directly.
+    
+    Args:
+        score (float): Execution score (0-100) or lean score (-1.0 to 1.0)
+        game: Game context object
+        offense_team: Offensive team object
+        defense_team: Defensive team object
+    """
+    # If score is in execution_score range (0-100), convert to lean_score
+    if 0 <= score <= 100:
+        lean_score = (score - 50) / 50
+    else:
+        # Assume it's already a lean_score
+        lean_score = score
+    
+    _store_lean_score_internal(lean_score, game, offense_team, defense_team)
+
+# ✅ ALIAS: Keep _store_lean_score for backward compatibility
+_store_lean_score = _store_execution_score
 
 
 def apply_stopper_system_to_skeleton(skeleton, result, game_state):
@@ -3128,12 +3179,16 @@ def resolve_half_court_offense_logic(game):
         skeleton = get_hco_skeleton(None, game, lean_score=1.0)
     
     # ✅ NEW RESOLUTION SYSTEM: Use new sequential resolution system
-    result, variant_result = resolve_hco_outcome(game, skeleton)
+    result, variant_result, execution_score = resolve_hco_outcome(game, skeleton)
     
     # ✅ REMOVED: Old generate_logic() call and lean_score storage
     # Store variant_result for skeleton selection (replaces lean_score)
     if variant_result:
         game_state["_skeleton_variant"] = variant_result
+    
+    # ✅ EXECUTION SCORE: Store execution_score in game_state for stat tracking
+    if execution_score is not None:
+        game_state["execution_score"] = execution_score
     
     # 🔍 DEBUG: Log skeleton retrieval result
     if skeleton:
@@ -3817,6 +3872,9 @@ def resolve_half_court_offense_logic(game):
             # For Motion plays, use the actual shot type that was attempted
             motion_shot_type = roles.get("motion_shot_type")  # 'inside', 'attack', or 'outside'
             focus = motion_shot_type if motion_shot_type in ["inside", "attack", "outside"] else game.game_state.get("offense_play_focus", "")
+            # Set offense_play_focus to motion_shot_type for execution score storage
+            if motion_shot_type in ["inside", "attack", "outside"]:
+                game.game_state["offense_play_focus"] = motion_shot_type
         else:
             # For Set Plays, use the intended focus from strategy settings
             focus = game.game_state.get("offense_play_focus")     # 'inside' | 'attack' | 'outside'
