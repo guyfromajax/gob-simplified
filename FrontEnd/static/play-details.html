@@ -514,7 +514,27 @@
         if (playState.type === 'Motion') {
           playState.skeleton = playData.skeletons?.base_loop;
         } else {
-          playState.skeleton = playData.skeletons?.successful;
+          // Set Play: Access successful skeleton v0 from versions array
+          const successfulVariant = playData.skeletons?.successful;
+          if (successfulVariant) {
+            // Check if it has versions array structure (new format)
+            if (successfulVariant.versions && Array.isArray(successfulVariant.versions) && successfulVariant.versions.length > 0) {
+              // Find v0 version
+              const v0Version = successfulVariant.versions.find(v => v.version === 'v0');
+              if (v0Version && v0Version.steps) {
+                playState.skeleton = { steps: v0Version.steps };
+              } else {
+                // Fallback to first version if v0 not found
+                const firstVersion = successfulVariant.versions.find(v => v.steps && v.steps.length > 0);
+                if (firstVersion) {
+                  playState.skeleton = { steps: firstVersion.steps };
+                }
+              }
+            } else if (successfulVariant.steps) {
+              // Old format: direct steps array
+              playState.skeleton = { steps: successfulVariant.steps };
+            }
+          }
         }
 
         if (!playState.skeleton || !playState.skeleton.steps || playState.skeleton.steps.length === 0) {
