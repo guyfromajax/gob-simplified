@@ -2770,17 +2770,41 @@
               console.warn(`⚠️ [PLAYCALL HEADSHOTS] No player found for Motion play '${playName}' focus '${focusLower}'. Inside opportunities:`, playerInsideOpportunities, 'Outside opportunities:', playerOutsideOpportunities);
             }
           } else {
-            // ✅ SET PLAYS: Use existing logic (intended shooter from successful skeleton)
+            // ✅ SET PLAYS: Use existing logic (intended shooter from successful skeleton v0)
             const skeletons = playDoc.skeletons || {};
-            const successfulSkeleton = skeletons.successful;
+            const successfulVariant = skeletons.successful;
+            
+            if (!successfulVariant) {
+              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No successful variant for play '${playName}'`);
+              continue;
+            }
+            
+            // Access successful skeleton v0 from versions array (new structure)
+            let successfulSkeleton = null;
+            if (successfulVariant.versions && Array.isArray(successfulVariant.versions) && successfulVariant.versions.length > 0) {
+              // New format: versions array - find v0
+              const v0Version = successfulVariant.versions.find(v => v.version === 'v0');
+              if (v0Version && v0Version.steps) {
+                successfulSkeleton = { steps: v0Version.steps };
+              } else {
+                // Fallback to first version if v0 not found
+                const firstVersion = successfulVariant.versions.find(v => v.steps && v.steps.length > 0);
+                if (firstVersion) {
+                  successfulSkeleton = { steps: firstVersion.steps };
+                }
+              }
+            } else if (successfulVariant.steps) {
+              // Old format: direct steps array (backward compatibility)
+              successfulSkeleton = { steps: successfulVariant.steps };
+            }
             
             if (!successfulSkeleton || !successfulSkeleton.steps || successfulSkeleton.steps.length === 0) {
-              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No successful skeleton for play '${playName}'`);
+              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No successful skeleton (v0) for play '${playName}'`);
               continue;
             }
             
             // Extract intended shooter position from final step (same logic as backend phase_resolution.py lines 1011-1017)
-          const finalStep = successfulSkeleton.steps[successfulSkeleton.steps.length - 1];
+            const finalStep = successfulSkeleton.steps[successfulSkeleton.steps.length - 1];
             const posActions = finalStep.pos_actions || {};
             
             let intendedShooterPos = null;
@@ -2788,9 +2812,9 @@
               const action = (actionInfo.action || '').toLowerCase();
               if (action === 'shoot') {
                 intendedShooterPos = pos.toUpperCase(); // Normalize to uppercase (C, PG, SG, SF, PF)
-              break;
+                break;
+              }
             }
-          }
           
             // Map position to player ID from lineup
             if (intendedShooterPos && lineup[intendedShooterPos]) {
