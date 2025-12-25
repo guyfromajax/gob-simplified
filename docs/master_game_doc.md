@@ -10701,6 +10701,14 @@ Each check returns immediately if its event occurs. If no event occurs after che
 
 #### Step 6: Shot Attempt and Execution Score Calculation
 
+**EV Calculation (Before Execution):**
+- **EV Calculation**: Calculated in `turn_manager.py` via `calculate_ev()` before play execution
+  - **For Motion Plays**: Uses `game_state["offense_play_focus"]` (chosen focus from strategy settings: inside/attack/outside)
+  - **For Set Plays**: Uses `play_doc.get("play_focus")` (intended focus from database)
+  - Motion plays have `play_focus = null` in database, so chosen focus from strategy settings is used
+  - EV represents expected value based on the **chosen/intended focus** before execution
+  - Stored via `_store_ev_score()` after EV calculation
+
 **Execution Score Calculation:**
 - **Step 6a: Calculate Effectiveness Scores**
   - `o_random = random.randint(1, 100)`
@@ -10724,6 +10732,10 @@ Each check returns immediately if its event occurs. If no event occurs after che
   - Converted to `lean_score` format (-1.0 to +1.0) for storage in scouting data
   - Conversion: `lean_score = (execution_score - 50) / 50`
   - Stored via `_store_execution_score()` after shot resolution
+  - **Focus for Storage**:
+    - **Motion Plays**: Uses actual shot type (`motion_shot_type`) determined during execution
+    - **Set Plays**: Uses intended focus from strategy settings
+    - This means Motion Plays can have EV stored under one focus (chosen) and execution score stored under a different focus (actual)
 
 **Skeleton Variant Selection:**
 - Uses original uncapped `result` value (not execution_score)
