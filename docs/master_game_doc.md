@@ -7589,7 +7589,9 @@ The Plays Page System provides detailed views for individual plays, allowing use
 1. Extract `play_name` from URL parameters
 2. Fetch play data from `/api/play/{play_name}` endpoint
 3. Display play name and type in header
-4. Load skeleton data (Motion: `base_loop`, Set Play: `successful`)
+4. Load skeleton data:
+   - **Motion:** `base_loop` (direct steps array)
+   - **Set Play:** `successful` variant, version v0 from `versions` array (or direct steps for backward compatibility)
 5. Initialize animation state
 6. Auto-start animation
 
