@@ -1473,7 +1473,14 @@ class TurnManager:
             return 0.0
         
         play_type = play_doc.get("play_type", "motion")
-        play_focus = play_doc.get("play_focus", "inside")
+        
+        # ✅ FIX: For Motion plays, use game_state["offense_play_focus"] (chosen focus)
+        # For Set Plays, use play_doc.get("play_focus") (intended focus from database)
+        # Motion plays have play_focus = null in database, but focus is chosen before execution
+        if play_type == "motion":
+            play_focus = self.game.game_state.get("offense_play_focus", "inside")
+        else:
+            play_focus = play_doc.get("play_focus", "inside")
         
         # ✅ FIX: Normalize play_focus to ensure it's always one of the expected values
         if play_focus not in ["inside", "attack", "outside"]:
