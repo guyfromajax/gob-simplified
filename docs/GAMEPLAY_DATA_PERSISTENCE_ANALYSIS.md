@@ -58,7 +58,14 @@ This document analyzes what data is actually persisted to the database when the 
   - `plays` - All plays with effectiveness, momentum, cloaking
   - `attributes` - Team attributes
   - `scouting` - Scouting data (defensive plays)
-  - `playbook_settings` - Playbook settings including slot_assignments (✅ **PRESERVED** from database when saving game state)
+  - `playbook_settings` - Playbook settings including:
+    - `motion`, `set_play_inside`, `set_play_attack`, `set_play_outside` - Play percentages by section
+    - `zone_defense`, `man_defense` - Defense play percentages
+    - `slot_assignments` - Playcall Center six plays (slots 1-6)
+    - `motion_dropdowns` - Motion play dropdown selections (Inside/Attack/Outside)
+    - `position_filters` - Position filter button assignments
+    - ✅ **PRESERVED** from database when saving game state
+    - ✅ **CROSS-INSTANCE PERSISTENCE (Single Game)**: Settings saved to core `teams` collection for persistence across Single Game instances
 
 ### Players Array
 - `players[]` - Array of all players (lineup + referenced players):
