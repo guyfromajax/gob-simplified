@@ -8276,19 +8276,29 @@ The In-Game Play Calling System determines which offensive and defensive plays a
 ### Storage and Mode Support
 
 **Storage Location:**
-- **Single Game:** `games_collection` → `game_doc.teams.{team_id}.playbook_settings`
+- **Single Game:** 
+  - `games_collection` → `game_doc.teams.{team_id}.playbook_settings` (per game instance)
+  - `teams_collection` → `team_doc.playbook_settings` (shared across all Single Game instances for the same team)
+  - **Cross-Instance Persistence:** Settings saved to both locations. When loading, checks game document first, then falls back to core `teams` collection if game document has no settings.
 - **Tournament:** `tournaments_collection` → `tournament_doc.teams.{team_id}.playbook_settings`
-- **Franchise:** `franchises_collection` → `franchise_doc.teams.{team_id}.playbook_settings`
+- **Franchise:** `franchises_collection` → `franchise_doc.franchise_teams.{team_id}.playbook_settings`
 
 **Mode Isolation:**
 - Each game mode maintains its own playbook settings
 - Settings from one mode don't affect another
 - Settings persist across games within the same mode
+- **Single Game Mode:** Settings persist across Single Game instances for the same team (via core `teams` collection)
 
 **Data Persistence (January 2025):**
 - ✅ **`playbook_settings` is preserved when saving game state** - When `summarize_game_state()` saves game state (timeouts, quarter breaks, etc.), it loads existing `playbook_settings` from the database and includes them in the `teams.{team_id}` object
-- This ensures `slot_assignments` and other playbook settings persist across all game state saves
-- **Implementation:** `BackEnd/utils/shared.py` `summarize_game_state()` (lines 659-673) preserves `playbook_settings` from database when `exclude_animations=True` (database saves)
+- ✅ **Settings persist across navigation** - When navigating Playbooks → Game Plan → Lineup → Gameplay, settings are preserved. When returning to Playbooks page, settings are loaded from API and applied to UI state.
+- ✅ **Cross-Instance Persistence (Single Game)** - Settings set in one Single Game instance persist to the next Single Game instance for the same team (stored in core `teams` collection)
+- This ensures `slot_assignments`, percentages, and other playbook settings persist across all game state saves and page navigation
+- **Implementation:** 
+  - `BackEnd/utils/shared.py` `summarize_game_state()` (lines 659-726) preserves `playbook_settings` from database when `exclude_animations=True` (database saves)
+  - `BackEnd/api/gameplan_routes.py` `save_playbooks()` saves to both game document and core `teams` collection (Single Game mode)
+  - `BackEnd/api/gameplan_routes.py` `get_playbooks()` checks core `teams` collection if game document has no settings (Single Game mode)
+  - `FrontEnd/static/playbooks.js` `loadPlaybookPercentagesFromAPI()` and `loadSlotAssignmentsFromAPI()` load and apply settings to UI state
 
 ### Key Methods
 
