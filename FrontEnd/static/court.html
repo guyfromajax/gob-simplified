@@ -2655,10 +2655,34 @@
           if (isMotionPlay) {
             // ✅ MOTION PLAYS: Analyze steps 1-6 to find most likely shooter for each shot type
             const skeletons = playDoc.skeletons || {};
-            const baseLoopSkeleton = skeletons.base_loop;
+            const baseLoopVariant = skeletons.base_loop;
+            
+            if (!baseLoopVariant) {
+              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No base_loop skeleton for Motion play '${playName}'`);
+              continue;
+            }
+            
+            // Access base_loop from versions array (new format) or direct steps (old format)
+            let baseLoopSkeleton = null;
+            if (baseLoopVariant.versions && Array.isArray(baseLoopVariant.versions) && baseLoopVariant.versions.length > 0) {
+              // New format: versions array - use v0 for headshot determination
+              const v0Version = baseLoopVariant.versions.find(v => v.version === 'v0');
+              if (v0Version && v0Version.steps) {
+                baseLoopSkeleton = { steps: v0Version.steps };
+              } else {
+                // Fallback to first version if v0 not found
+                const firstVersion = baseLoopVariant.versions.find(v => v.steps && v.steps.length > 0);
+                if (firstVersion) {
+                  baseLoopSkeleton = { steps: firstVersion.steps };
+                }
+              }
+            } else if (baseLoopVariant.steps) {
+              // Old format: direct steps array (backward compatibility)
+              baseLoopSkeleton = { steps: baseLoopVariant.steps };
+            }
             
             if (!baseLoopSkeleton || !baseLoopSkeleton.steps || baseLoopSkeleton.steps.length === 0) {
-              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No base_loop skeleton for Motion play '${playName}'`);
+              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No base_loop skeleton (v0) for Motion play '${playName}'`);
               continue;
             }
             
