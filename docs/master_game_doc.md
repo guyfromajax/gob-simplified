@@ -6906,24 +6906,6 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 - **State Persistence:** Settings are saved to localStorage when navigating to play details, so they persist when user returns to Playbooks page
 
 **Data Persistence Strategy (January 2025):**
-- **Core Principle:** Preserve user work during navigation, minimize database calls, only save to database on explicit user action
-- **localStorage-First for Navigation:** When returning from play details page, restore ALL state from localStorage (percentages, slot assignments, motion dropdowns, toggles, position filters) - this preserves user's work during navigation
-- **API-First for Initial Load:** On first page load (or after submit), load from database API - this ensures user sees their last saved settings
-- **Full State Persistence:** When navigating to play details, save complete state to localStorage:
-  - Percentages (all sections)
-  - Slot assignments (Playcall Center 1-6)
-  - Motion dropdowns (Inside/Attack/Outside selections)
-  - Even Distribution toggle states
-  - Position filter selections (Standard/PG/SG/SF/PF/C)
-  - Unsaved changes flag
-- **Database Save Only on Submit:** Only save to database when user explicitly clicks "Submit Playbooks" - this minimizes database calls and gives user control
-- **State Cleanup:** After successful submit, clear localStorage full state (since it's now persisted in database)
-- **Priority Order:**
-  1. **Returning from Navigation:** localStorage full state (preserves work in progress)
-  2. **First Load / After Submit:** Database API (shows last saved settings)
-  3. **Fallback:** Old localStorage format (backward compatibility)
-
-**Data Persistence Strategy (January 2025):**
 
 **Core Principle:** User work should persist during navigation, but only be saved to database on explicit user action (Submit Playbooks). This minimizes database calls and gives users control over when their work is persisted.
 
