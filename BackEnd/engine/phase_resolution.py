@@ -2312,9 +2312,9 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
     return result, lean_score
 
 
-def _store_lean_score(lean_score, game, offense_team, defense_team):
+def _store_lean_score_internal(lean_score, game, offense_team, defense_team):
     """
-    Store lean_score in offense and defense scouting data.
+    Internal function to store lean_score in offense and defense scouting data.
     
     Args:
         lean_score (float): Lean score from -1.0 to 1.0
@@ -2425,6 +2425,26 @@ def _store_lean_score(lean_score, game, offense_team, defense_team):
         # Silently handle errors to avoid disrupting gameplay
         pass
 
+def _store_execution_score(execution_score, game, offense_team, defense_team):
+    """
+    Store execution_score in offense and defense scouting data as lean_scores.
+    
+    Converts execution_score (0-100) to lean_score format (-1.0 to 1.0) for storage.
+    Formula: lean_score = (execution_score - 50) / 50
+    
+    Args:
+        execution_score (float): Execution score from 0.0 to 100.0
+        game: Game context object
+        offense_team: Offensive team object
+        defense_team: Defensive team object
+    """
+    # Convert execution_score (0-100) to lean_score (-1.0 to 1.0) for storage
+    # Formula: lean_score = (execution_score - 50) / 50
+    # This maps: 0 → -1.0, 50 → 0.0, 100 → 1.0
+    lean_score = (execution_score - 50) / 50
+    _store_lean_score_internal(lean_score, game, offense_team, defense_team)
+
+
 # ✅ ALIAS: Keep _store_lean_score for backward compatibility (accepts execution_score or lean_score)
 def _store_lean_score(score, game, offense_team, defense_team):
     """
@@ -2447,9 +2467,6 @@ def _store_lean_score(score, game, offense_team, defense_team):
         lean_score = score
     
     _store_lean_score_internal(lean_score, game, offense_team, defense_team)
-
-# ✅ ALIAS: Keep _store_lean_score for backward compatibility
-_store_lean_score = _store_execution_score
 
 
 def apply_stopper_system_to_skeleton(skeleton, result, game_state):
