@@ -543,9 +543,32 @@
         return;
       }
 
-      const skeleton = currentPlay.play_type === 'motion' 
-        ? currentPlay.skeletons?.base_loop 
-        : currentPlay.skeletons?.successful;
+      let skeleton = null;
+      if (currentPlay.play_type === 'motion') {
+        skeleton = currentPlay.skeletons?.base_loop;
+      } else {
+        // Set Play: Access successful skeleton v0 from versions array
+        const successfulVariant = currentPlay.skeletons?.successful;
+        if (successfulVariant) {
+          // Check if it has versions array structure (new format)
+          if (successfulVariant.versions && Array.isArray(successfulVariant.versions) && successfulVariant.versions.length > 0) {
+            // Find v0 version
+            const v0Version = successfulVariant.versions.find(v => v.version === 'v0');
+            if (v0Version && v0Version.steps) {
+              skeleton = { steps: v0Version.steps };
+            } else {
+              // Fallback to first version if v0 not found
+              const firstVersion = successfulVariant.versions.find(v => v.steps && v.steps.length > 0);
+              if (firstVersion) {
+                skeleton = { steps: firstVersion.steps };
+              }
+            }
+          } else if (successfulVariant.steps) {
+            // Old format: direct steps array
+            skeleton = { steps: successfulVariant.steps };
+          }
+        }
+      }
       
       if (!skeleton || !skeleton.steps) return;
 

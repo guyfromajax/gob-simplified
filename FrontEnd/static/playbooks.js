@@ -1477,13 +1477,66 @@ class PlaybooksUI {
     offenseSections.forEach(sectionKey => {
       if (this.evenDistributionEnabled[sectionKey]) {
         console.log(`🔄 [POSITION FILTER] Auto-recalculating ${sectionKey} (Even Distribution enabled)`);
+        // First, reset percentages for plays that are no longer visible (hidden by position filter)
+        this.resetHiddenPlayPercentages(sectionKey);
+        // Then, distribute percentages evenly among visible plays
         this.distributePercentagesEvenly(sectionKey);
+        this.updateSectionTotal(sectionKey);
+      } else {
+        // Even if Even Distribution is not enabled, reset percentages for hidden plays
+        this.resetHiddenPlayPercentages(sectionKey);
         this.updateSectionTotal(sectionKey);
       }
     });
     
     this.updateSubmitButton();
     this.markUnsavedChanges();
+  }
+  
+  resetHiddenPlayPercentages(sectionKey) {
+    // Get all plays in this section (excluding "To Be Added" placeholders)
+    let allPlays = [];
+    
+    if (sectionKey === 'motion') {
+      const motionPlays = this.playData.motion || [];
+      allPlays = motionPlays.filter(play => play.name !== 'To Be Added');
+    } else if (sectionKey === 'set-play-inside') {
+      const setPlays = this.playData.set_play_inside || [];
+      allPlays = setPlays.filter(play => play.name !== 'To Be Added');
+    } else if (sectionKey === 'set-play-attack') {
+      const setPlays = this.playData.set_play_attack || [];
+      allPlays = setPlays.filter(play => play.name !== 'To Be Added');
+    } else if (sectionKey === 'set-play-outside') {
+      const setPlays = this.playData.set_play_outside || [];
+      allPlays = setPlays.filter(play => play.name !== 'To Be Added');
+    }
+    
+    // Reset percentages for plays that are not visible (don't match current position filters)
+    allPlays.forEach((play, index) => {
+      const playDatabaseId = play.play_id;
+      if (!playDatabaseId) return;
+      
+      // Check if this play should be visible with current position filters
+      const shouldBeVisible = this.shouldShowPlay(playDatabaseId);
+      
+      if (!shouldBeVisible) {
+        // Play is hidden - reset its percentage to 0
+        let playId = play.id;
+        if (!playId) {
+          if (sectionKey === 'motion') {
+            playId = `motion-${index + 1}`;
+          } else if (sectionKey.startsWith('set-play-')) {
+            playId = `${sectionKey}-${index + 1}`;
+          }
+        }
+        
+        // Ensure play exists in state
+        if (this.state.sections[sectionKey][playId]) {
+          this.state.sections[sectionKey][playId].percentage = 0;
+          console.log(`🔄 [POSITION FILTER] Reset percentage to 0 for hidden play: ${play.name}`);
+        }
+      }
+    });
   }
   
   savePositionFilterSelections() {
