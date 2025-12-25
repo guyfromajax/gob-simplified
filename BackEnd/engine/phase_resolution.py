@@ -4685,8 +4685,8 @@ def get_skeleton_by_lean(play_doc, lean_score):
     # Get the skeleton, fallback to successful if variant doesn't exist
     skeleton = skeletons.get(variant)
     
-    # Handle multi-version variants (v1-v6 for non-successful)
-    if skeleton and variant != "successful":
+    # Handle multi-version variants (v1-v6 for all variants including successful)
+    if skeleton:
         # Check if this variant has multiple versions
         if "versions" in skeleton and isinstance(skeleton["versions"], list):
             # Filter to only non-empty versions
@@ -4703,20 +4703,33 @@ def get_skeleton_by_lean(play_doc, lean_score):
                 }
                 logging.debug(f"Selected {selected_version.get('version')} for {variant} (from {len(non_empty_versions)} available)")
             else:
-                # No non-empty versions available, fallback to successful
-                logging.debug(f"No non-empty versions for {variant}, falling back to successful")
-                skeleton = skeletons.get("successful")
-                variant = "successful"
+                # No non-empty versions available
+                if variant == "successful":
+                    # Can't fallback to successful if we're already processing successful
+                    logging.warning(f"No non-empty versions for {variant}, skeleton will be None")
+                    skeleton = None
+                else:
+                    # Fallback to successful for non-successful variants
+                    logging.debug(f"No non-empty versions for {variant}, falling back to successful")
+                    skeleton = skeletons.get("successful")
+                    variant = "successful"
         # Old format (single steps array) - maintain backwards compatibility
         elif not skeleton.get("steps"):
-            # Empty skeleton, fallback to successful
-            skeleton = skeletons.get("successful")
-            variant = "successful"
+            # Empty skeleton
+            if variant == "successful":
+                # Can't fallback to successful if we're already processing successful
+                logging.warning(f"Empty skeleton for {variant}, skeleton will be None")
+                skeleton = None
+            else:
+                # Fallback to successful for non-successful variants
+                skeleton = skeletons.get("successful")
+                variant = "successful"
     
-    # If selected variant is empty or None, fallback to successful
+    # If selected variant is empty or None, fallback to successful (only if not already successful)
     if not skeleton or not skeleton.get("steps"):
-        skeleton = skeletons.get("successful")
-        variant = "successful"  # Update variant to match fallback
+        if variant != "successful":
+            skeleton = skeletons.get("successful")
+            variant = "successful"  # Update variant to match fallback
     
     return skeleton, variant
 
