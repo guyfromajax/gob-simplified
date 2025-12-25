@@ -4770,12 +4770,30 @@ def get_hco_skeleton(result_type, game_context, lean_score=None):
         play_type = play_doc.get("play_type", "set_play")
         
         if play_type == "motion":
-            # Motion plays: use base_loop skeleton (no variant selection)
+            # Motion plays: use base_loop skeleton with random version selection
             skeletons = play_doc.get("skeletons", {})
             if "base_loop" in skeletons:
-                skeleton = skeletons["base_loop"]
-                if skeleton and skeleton.get("steps"):
-                    return skeleton
+                base_loop = skeletons["base_loop"]
+                
+                # Check if base_loop has versions array (new format)
+                if "versions" in base_loop and isinstance(base_loop["versions"], list):
+                    # Filter to only non-empty versions
+                    versions_list = base_loop["versions"]
+                    non_empty_versions = [v for v in versions_list if v.get("steps") and len(v.get("steps", [])) > 0]
+                    
+                    if non_empty_versions:
+                        # Randomly select one non-empty version
+                        selected_version = random.choice(non_empty_versions)
+                        # Create skeleton dict with the selected version's steps
+                        skeleton = {
+                            "steps": selected_version.get("steps", []),
+                            "version": selected_version.get("version", "v0")
+                        }
+                        logging.debug(f"Selected {selected_version.get('version')} for motion play base_loop (from {len(non_empty_versions)} available)")
+                        return skeleton
+                # Old format (direct steps array) - maintain backwards compatibility
+                elif base_loop.get("steps"):
+                    return base_loop
         
         # Set Play: Use lean score to select skeleton variant if provided
         if lean_score is not None:
@@ -4894,12 +4912,30 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=No
     play_type = play_doc.get("play_type", "set_play")
     
     if play_type == "motion":
-        # Motion plays: use base_loop skeleton (no variant selection, ignore lean_score)
+        # Motion plays: use base_loop skeleton with random version selection
         skeletons = play_doc.get("skeletons", {})
         if "base_loop" in skeletons:
-            skeleton = skeletons["base_loop"]
-            if skeleton and skeleton.get("steps"):
-                return skeleton
+            base_loop = skeletons["base_loop"]
+            
+            # Check if base_loop has versions array (new format)
+            if "versions" in base_loop and isinstance(base_loop["versions"], list):
+                # Filter to only non-empty versions
+                versions_list = base_loop["versions"]
+                non_empty_versions = [v for v in versions_list if v.get("steps") and len(v.get("steps", [])) > 0]
+                
+                if non_empty_versions:
+                    # Randomly select one non-empty version
+                    selected_version = random.choice(non_empty_versions)
+                    # Create skeleton dict with the selected version's steps
+                    skeleton = {
+                        "steps": selected_version.get("steps", []),
+                        "version": selected_version.get("version", "v0")
+                    }
+                    logging.debug(f"Selected {selected_version.get('version')} for motion play base_loop (from {len(non_empty_versions)} available)")
+                    return skeleton
+            # Old format (direct steps array) - maintain backwards compatibility
+            elif base_loop.get("steps"):
+                return base_loop
         return None
     
     # Set Play: Select skeleton variant based on lean score
