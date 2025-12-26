@@ -1712,9 +1712,10 @@ export function createGameScene(Phaser) {
           
           const turnData = await response.json();
           
-          // Check if quarter is complete
-          if (turnData.quarter_complete || !turnData.turn) {
-            console.log('✅ Quarter complete!', {
+          // ✅ FIX: Only break if there's no turn to animate
+          // If quarter_complete is True but turn exists, animate the turn first (it's the final turn of the quarter)
+          if (!turnData.turn) {
+            console.log('✅ Quarter complete! (no turn returned)', {
               time_remaining: turnData.time_remaining,
               turnCount,
               home_score: turnData.home_score,
@@ -1751,6 +1752,13 @@ export function createGameScene(Phaser) {
           
           // Animate this single turn (or batch of turns)
           const turn = turnData.turn;
+          
+          // ✅ FIX: Check if this is the final turn of the quarter AFTER getting the turn
+          // This ensures the final turn is animated before handling quarter completion
+          if (turnData.quarter_complete) {
+            // Mark that this is the final turn - we'll handle quarter completion after animation
+            turn.is_final_turn_of_quarter = true;
+          }
           let finalTurn = turn; // Track the final turn for Quick Adjust logic
           
           // ✅ TIMEOUT: Check if this is a timeout turn - if so, stop the simulation loop
@@ -1925,6 +1933,44 @@ export function createGameScene(Phaser) {
             });
           }
           */
+          
+          // ✅ FIX: Check if quarter is complete AFTER animating the turn
+          // This ensures the final turn of the quarter is animated before handling quarter completion
+          if (turnData.quarter_complete) {
+            console.log('✅ Quarter complete! (after final turn animation)', {
+              time_remaining: turnData.time_remaining,
+              turnCount,
+              home_score: turnData.home_score,
+              away_score: turnData.away_score,
+              is_final: turnData.is_final
+            });
+            quarterComplete = true;
+            lastTurnData = turnData; // Store last turn data for game completion check
+            
+            // Update final scores
+            updateScoreboard({
+              home_score: turnData.home_score,
+              away_score: turnData.away_score,
+              home_team_fouls: turnData.home_team_fouls,
+              away_team_fouls: turnData.away_team_fouls,
+              clock: turnData.clock
+            });
+            
+            // Update tracked scores from final turnData
+            if (turnData.home_score !== undefined) {
+              lastHomeScore = turnData.home_score;
+            }
+            if (turnData.away_score !== undefined) {
+              lastAwayScore = turnData.away_score;
+            }
+            
+            // Track the next quarter number from backend
+            if (turnData.quarter !== undefined) {
+              nextQuarterNumber = turnData.quarter;
+            }
+            
+            break;
+          }
           
           // Small delay between turns for readability (optional)
           await new Promise(resolve => setTimeout(resolve, 100));
