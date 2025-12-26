@@ -142,8 +142,8 @@ THREE_POINTER_FOUL_MISS_CHANCE = 0.4  # 40% chance foul forces miss on 3-pointer
 TWO_POINTER_FOUL_MISS_CHANCE = 0.2    # 20% chance foul forces miss on 2-pointers
 
 # HCO Resolution System constants
-STANDARD_D_FOUL = 96
-STANDARD_O_FOUL = 7
+STANDARD_D_FOUL = 95
+STANDARD_O_FOUL = 5
 HARD_STEAL = -200
 SOFT_STEAL = -100
 HARD_FOUL = 200
