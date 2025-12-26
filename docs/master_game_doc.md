@@ -1386,16 +1386,26 @@ if skeleton:
 
 ### Future Enhancements
 
-**Strategic Step Selection for Turnovers/Steals:**
-- Currently uses middle step as placeholder
-- TODO: Implement logic to dynamically determine `stop_step_index` based on:
-  - Ball handler's BH (Ball Handling) attribute
-  - Defender's ST (Steal) attribute
-  - Defender's IQ (Intelligence) attribute
-  - Player positions and actions in the skeleton
-  - This would make turnovers feel more organic and less random
+**1. Strategic Step Selection for Turnovers/Steals**
 
-**Defensive Player Selection for Steals:**
+**Current State:**
+- Turnovers (`DEAD_BALL_TURNOVER`) and steals (`STEAL`) currently use the middle step as a placeholder (`len(steps) // 2`)
+- Fouls use random step selection (which is appropriate)
+
+**Enhancement Needed:**
+- Implement strategic step selection based on:
+  - Player attributes (ball handler's `BH` vs defender's `ST`)
+  - Player dynamics at each step
+  - Defensive matchup effectiveness
+  - Game situation (score, time, quarter)
+
+**Location:** `BackEnd/engine/phase_resolution.py` (line ~1667)
+
+**Rationale:** Turnovers are more likely during high-pressure situations (passes, drives), so the stop step should reflect the most likely point of failure based on player attributes and game context.
+
+**2. Defensive Player Selection for Steals**
+
+**Current State:**
 - ✅ **COMPLETE** (January 2025): Defender assignment for steals is now implemented
   - For non-shot outcomes (steals, turnovers, fouls), defender is determined based on ball handler's position, not shooter's position
   - **Man-to-Man**: Defender matches ball handler position
@@ -1403,6 +1413,17 @@ if skeleton:
   - Handles overlapping zones correctly (uses defender actually assigned to guard ball handler)
   - Stopper system preserves the correctly set defender (prevents overwriting)
   - See "Defender Determination" section above for full implementation details
+
+**Future Enhancement:**
+- The stopper step itself doesn't specify which defensive player makes the steal in the skeleton's `pos_actions`
+- Currently, the defender is determined in `assign_roles()` based on ball handler position
+- **Enhancement Needed:** Add the defensive player to the stopper step's `pos_actions` with "steal" action based on:
+  - Defensive positioning at the stop step
+  - Player attributes (defender's `ST` vs ball handler's `BH`)
+  - Matchup analysis
+  - Proximity to ball handler
+
+**Location:** `BackEnd/engine/phase_resolution.py` (line ~1727)
 
 **Pass Interception Logic:**
 - Currently treats all steals as steals from the ball handler
