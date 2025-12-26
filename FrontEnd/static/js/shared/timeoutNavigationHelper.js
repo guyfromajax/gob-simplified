@@ -59,6 +59,9 @@
     const homeId = overrides.home_id || sourceParams.get('home_id');
     const awayId = overrides.away_id || sourceParams.get('away_id');
     const myTeam = overrides.my_team || sourceParams.get('my_team');
+    // ✅ SS&S: Preserve team_id (standardized) - prefer team_id over user_team_id
+    const teamId = overrides.team_id || sourceParams.get('team_id') || 
+                   overrides.user_team_id || sourceParams.get('user_team_id');
     const userTeamId = overrides.user_team_id || sourceParams.get('user_team_id');
     
     if (home) params.set('home', home);
@@ -66,7 +69,10 @@
     if (homeId) params.set('home_id', homeId);
     if (awayId) params.set('away_id', awayId);
     if (myTeam) params.set('my_team', myTeam);
-    if (userTeamId) params.set('user_team_id', userTeamId);
+    // ✅ SS&S: Preserve team_id (standardized parameter name)
+    if (teamId) params.set('team_id', teamId);
+    // Keep user_team_id for backward compatibility (if different from team_id)
+    if (userTeamId && userTeamId !== teamId) params.set('user_team_id', userTeamId);
     
     // ============================================
     // 3. GAME ID LOGIC (SS&S Rules)
