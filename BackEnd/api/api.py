@@ -1851,9 +1851,12 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
         
         # Track how many turns existed before this call (after deferred timeout check)
         turns_before = len(gm.turns)
+        time_before_turn = gm.game_state["time_remaining"]
         
         # Simulate the next turn (unless we already returned a timeout above)
         gm.simulate_macro_turn()
+        
+        time_after_turn = gm.game_state["time_remaining"]
         
         # Update team fouls in game state
         gm.game_state["team_fouls"] = {
@@ -1885,7 +1888,10 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
         
         # Debug logging for quarter completion check
         if quarter_complete:
-            logging.info(f"✅ Quarter complete! time_remaining={gm.game_state['time_remaining']}, clock={gm.game_state.get('clock', 'N/A')}")
+            turn_type = latest_turn.get("result_type", "UNKNOWN") if latest_turn else "NONE"
+            turn_text = latest_turn.get("text", "")[:50] if latest_turn else ""
+            time_elapsed = time_before_turn - time_after_turn
+            logging.info(f"✅ [FINAL TURN DEBUG] Quarter complete! time_before_turn={time_before_turn}s, time_after_turn={time_after_turn}s, time_elapsed={time_elapsed}s, clock={gm.game_state.get('clock', 'N/A')}, turn_type={turn_type}, turn_text={turn_text}")
         
         # If quarter is complete, increment quarter number
         if quarter_complete:
