@@ -115,6 +115,25 @@ body {
   border-radius: 4px;
 }
 
+/* ========== INELIGIBLE (FOULED-OUT) PLAYERS ========== */
+.roster-table tr.ineligible {
+  background-color: #d3d3d3 !important;  /* Light grey background tint */
+  opacity: 0.7;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.roster-table tr.ineligible td {
+  color: #666;
+}
+
+.player-card.ineligible {
+  background-color: #d3d3d3 !important;  /* Light grey background tint */
+  opacity: 0.7;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
 /* ========== VIEW TOGGLE ========== */
 .view-toggle {
   margin-left: auto;
