@@ -2123,6 +2123,22 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 - **SCR_A** (Screen Attempts): Incremented for screener on screen attempts
 - **SCR_S** (Screen Success): Incremented for screener when screen leads to made shot (50% chance per attempt)
 - **HELP_D** (Help Defense): Tracked for help defenders in zone defense
+- **MIN** (Minutes Played): Tracked for all active players (both teams) at the end of each turn
+  - **Tracking Logic:**
+    - At the end of each turn, `time_elapsed` (in seconds) is added to `player.stats["game"]["MIN"]` for all players in the active lineup (both home and away teams, 10 players total)
+    - Only tracked if `time_elapsed > 0` (timeouts and other 0-time turns are skipped)
+    - **Location:** `BackEnd/models/turn_manager.py` - `update_clock_and_possession()` method
+  - **Storage Format:**
+    - **Game Stats:** Stored in **seconds** (e.g., 240 seconds = 4 minutes of gameplay)
+    - **Season/Career Stats:** Stored in **minutes** (e.g., 4 minutes) - converted from game seconds using integer division (`// 60`) at end of game
+  - **Display Format:**
+    - **Box Score:** Displays integer minutes only (e.g., "4", not "4:00" or "4 min")
+    - **Command Centers (TCC/FCC):** Displays season stats directly (already in minutes format)
+    - **Conversion:** `Math.floor(game_minutes / 60)` for game stats display
+  - **End of Game Accumulation:**
+    - **Tournament Mode:** Game MIN (seconds) converted to minutes (`// 60`) and added to `season.MIN`
+    - **Franchise Mode:** Game MIN (seconds) converted to minutes (`// 60`) and added to both `season.MIN` and `career.MIN`
+    - **Location:** `BackEnd/utils/stat_updater.py` - `apply_stats_from_summary()` and `finalize_game()` functions
 
 **Team-Level Stats (Scouting Data):**
 

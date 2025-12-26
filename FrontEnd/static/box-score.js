@@ -486,13 +486,10 @@ function renderPlayerStatsTable(team, players) {
   }
 }
 
-// Format minutes (convert seconds to MM:SS or just minutes)
+// Format minutes (convert seconds to integer minutes only)
 function formatMinutes(seconds) {
   if (!seconds) return '0';
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  if (secs === 0) return mins.toString();
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  return Math.floor(seconds / 60).toString();
 }
 
 // Helper function to create table cell
