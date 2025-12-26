@@ -189,25 +189,8 @@ async function loadRoster() {
                 player.fouled_out = true;
                 console.log(`Marked ${player.name} as ineligible (fouled out)`);
                 
-                // Remove from current lineup if in lineup
-                Object.keys(lineup).forEach(pos => {
-                  if (lineup[pos] === playerId) {
-                    console.log(`Removing ${player.name} from lineup position ${pos} (fouled out)`);
-                    lineup[pos] = null;
-                    const slot = document.querySelector(`.slot[data-pos="${pos}"]`);
-                    if (slot) {
-                      const slotContent = slot.querySelector('.slot-content');
-                      if (slotContent) {
-                        slotContent.innerHTML = '';
-                        slotContent.classList.add('empty');
-                        slot.classList.remove('filled');
-                        slot.draggable = false;
-                        const removeBtn = slot.querySelector('.remove-btn');
-                        if (removeBtn) removeBtn.hidden = true;
-                      }
-                    }
-                  }
-                });
+                // Note: Lineup removal will happen in removeIneligiblePlayersFromLineup()
+                // which is called after restoreLineupFromUrl() to ensure proper order
               }
             });
             // Re-render views to show visual indicators
@@ -329,10 +312,12 @@ function renderRoster() {
     const tr = document.createElement('tr');
     tr.draggable = !p.ineligible;  // Disable drag for ineligible players
     tr.dataset.playerId = p._id;
-    if (p.ineligible) {
+    if (p.ineligible || p.fouled_out) {
       tr.classList.add('ineligible');  // Add class for styling
-      tr.style.opacity = '0.5';  // Shade out
+      tr.style.backgroundColor = '#d3d3d3';  // Light grey background tint
+      tr.style.opacity = '0.7';  // Slight opacity reduction
       tr.style.pointerEvents = 'none';  // Disable interactions
+      tr.style.cursor = 'not-allowed';  // Show not-allowed cursor
     }
     tr.addEventListener('dragstart', e => {
       e.dataTransfer.setData('text/plain', p._id);
@@ -816,6 +801,51 @@ function restoreLineupFromUrl() {
   console.log(`[restoreLineupFromUrl] Restored ${restoredCount} players from URL`);
 }
 
+/**
+ * Remove ineligible (fouled-out) players from the lineup
+ * Called after lineup is restored from URL to ensure fouled-out players are removed
+ */
+function removeIneligiblePlayersFromLineup() {
+  const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+  let removedCount = 0;
+  
+  positions.forEach(pos => {
+    const playerId = lineup[pos];
+    if (!playerId) return;
+    
+    // Find player in roster
+    const player = roster.find(p => {
+      const pId = p._id || p.playerId || p.player_id;
+      return String(pId) === String(playerId);
+    });
+    
+    // If player is ineligible (fouled out), remove from lineup
+    if (player && (player.ineligible || player.fouled_out)) {
+      console.log(`✅ [FOUL-OUT] Removing ${player.name} from ${pos} slot (fouled out)`);
+      lineup[pos] = null;
+      removedCount++;
+      
+      // Clear the slot display
+      const slot = document.querySelector(`.slot[data-pos="${pos}"]`);
+      if (slot) {
+        const slotContent = slot.querySelector('.slot-content');
+        if (slotContent) {
+          slotContent.innerHTML = '';
+          slotContent.classList.add('empty');
+          slot.classList.remove('filled');
+          slot.draggable = false;
+          const removeBtn = slot.querySelector('.remove-btn');
+          if (removeBtn) removeBtn.hidden = true;
+        }
+      }
+    }
+  });
+  
+  if (removedCount > 0) {
+    console.log(`✅ [FOUL-OUT] Removed ${removedCount} fouled-out player(s) from lineup`);
+  }
+}
+
 async function init() {
   if (!resolveTeam()) {
     alert("Can't determine your team for this game. Please return and relaunch.");
@@ -830,6 +860,10 @@ async function init() {
   
   // Restore lineup from URL AFTER setupSlots (which clears the lineup)
   restoreLineupFromUrl();
+  
+  // ✅ FOUL OUT: Remove ineligible players from lineup AFTER restoring from URL
+  // This ensures fouled-out players are removed even if they were in the URL params
+  removeIneligiblePlayersFromLineup();
   
   updateAllSlotDisplays(); // Display restored lineup in slots
   updatePlayButton(); // Update play button state based on restored lineup
@@ -1072,15 +1106,16 @@ function renderPlayerView() {
 
 function createPlayerCard(player) {
   const card = document.createElement('div');
+  card.className = 'player-card';
   
   // Add ineligible styling for fouled-out players
   if (player.ineligible || player.fouled_out) {
     card.classList.add('ineligible');
-    card.style.opacity = '0.5';
+    card.style.backgroundColor = '#d3d3d3';  // Light grey background tint
+    card.style.opacity = '0.7';
     card.style.pointerEvents = 'none';
     card.style.cursor = 'not-allowed';
   }
-  card.className = 'player-card';
   card.dataset.playerId = player._id;
   
   // Check if selected
@@ -1506,17 +1541,19 @@ renderRoster = function() {
       }
       
       // Add click handler to fill next slot (only if not ineligible)
-      if (!p.ineligible) {
+      if (!p.ineligible && !p.fouled_out) {
         row.addEventListener('click', (e) => {
           if (!selectedIds.includes(p._id)) {
             fillNextSlot(p._id);
           }
         });
-      } else {
-        // Mark ineligible rows
+      } else if (p.ineligible || p.fouled_out) {
+        // Mark ineligible rows with grey tint
         row.classList.add('ineligible');
-        row.style.opacity = '0.5';
+        row.style.backgroundColor = '#d3d3d3';  // Light grey background tint
+        row.style.opacity = '0.7';
         row.style.pointerEvents = 'none';
+        row.style.cursor = 'not-allowed';
       }
     }
   });
