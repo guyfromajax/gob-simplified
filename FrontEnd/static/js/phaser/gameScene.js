@@ -1150,7 +1150,13 @@ export function createGameScene(Phaser) {
         if (typeof homeT === 'number') liveHomeTimeouts = homeT;
         if (typeof awayT === 'number') liveAwayTimeouts = awayT;
 
-        if (turn.clock || turn.game_clock) liveClock = turn.clock || turn.game_clock;
+        if (turn.clock || turn.game_clock) {
+          liveClock = turn.clock || turn.game_clock;
+          // ✅ TIMEOUT: Update scene.simData.clock so it's accessible for timeout navigation
+          if (this.simData) {
+            this.simData.clock = liveClock;
+          }
+        }
         if (turn.quarter != null) liveQuarter = turn.quarter;
         if (turn.period_label) {
           livePeriodLabel = turn.period_label;

@@ -296,9 +296,45 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
     
     const currentQuarter = scene.simData?.quarter || scene.quarter || 1;
     
-    // ✅ TIMEOUT: Get clock from scene.simData (set by AnimationEngine for computer timeouts)
-    // or from URL params (for user timeouts)
-    const clock = scene.simData?.clock || urlParams.get('clock');
+    // ✅ TIMEOUT: Get clock from DOM element first (most reliable - what's actually displayed)
+    // Then fall back to scene.simData.clock (updated by updateScoreboard), then URL params
+    let clock = null;
+    const clockEl = document.getElementById('game-clock');
+    if (clockEl && clockEl.textContent && clockEl.textContent.trim()) {
+        clock = clockEl.textContent.trim();
+        console.log(`✅ TIMEOUT: Using clock from DOM element: ${clock}`);
+    }
+    
+    // Fallback to scene.simData.clock (updated by updateScoreboard as turns are processed)
+    if (!clock) {
+        clock = scene.simData?.clock || null;
+        if (clock) {
+            console.log(`✅ TIMEOUT: Using clock from scene.simData: ${clock}`);
+        }
+    }
+    
+    // Fallback to last processed turn (if turns array exists)
+    if (!clock && scene.simData?.turns && Array.isArray(scene.simData.turns) && scene.simData.turns.length > 0) {
+        const lastTurn = scene.simData.turns[scene.simData.turns.length - 1];
+        clock = lastTurn?.clock || lastTurn?.game_clock || null;
+        if (clock) {
+            console.log(`✅ TIMEOUT: Using clock from last processed turn: ${clock}`);
+        }
+    }
+    
+    // Fallback to URL params (for initial load scenarios)
+    if (!clock) {
+        clock = urlParams.get('clock');
+        if (clock) {
+            console.log(`✅ TIMEOUT: Using clock from URL params: ${clock}`);
+        }
+    }
+    
+    // Final fallback: default to 8:00 if no clock found
+    if (!clock) {
+        clock = '8:00';
+        console.warn(`⚠️ TIMEOUT: No clock found, defaulting to ${clock}`);
+    }
     
     // Build lineup object from scene
     const homeLineup = scene.homeLineup || {};

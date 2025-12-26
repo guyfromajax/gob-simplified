@@ -5610,6 +5610,16 @@ The system handles different transition types based on game state. All navigatio
 - **Logic:** Clock is initialized immediately on page load using first turn's clock data from backend
 - **Ensures:** Correct time remaining displays immediately when returning from lineup/game plan screens, not a stale value that updates only after the next turn
 
+**Clock Preservation for Timeout Navigation:**
+- **Location:** `FrontEnd/static/js/phaser/utils/timeoutButtonManager.js` `showTimeoutPopup()` function
+- **Logic:** Clock is retrieved using a prioritized fallback chain:
+  1. **DOM Element** (`#game-clock`): Most reliable - what's actually displayed to the user
+  2. **scene.simData.clock**: Updated by `updateScoreboard()` as turns are processed (lines 1153-1158 in `gameScene.js`)
+  3. **Last Processed Turn**: If turns array exists, get clock from the last turn's `clock` or `game_clock` field
+  4. **URL Parameters**: Fallback for initial load scenarios
+  5. **Default**: `8:00` if no clock found (should never happen in normal flow)
+- **Key Fix (February 2025):** Previously, `scene.simData.clock` was only set on initial load and never updated, causing stale clock values (e.g., showing 7:56 from opening tip instead of current time like 4:31). Now `scene.simData.clock` is updated in `updateScoreboard()` whenever a turn's clock is processed, ensuring the timeout navigation always uses the current clock value.
+
 **Key Files:**
 - `BackEnd/engine/phase_resolution.py` - Foul resolution and `foul_out_context` storage (non-shooting fouls)
 - `BackEnd/models/shot_manager.py` - Shooting foul resolution and `foul_out_context` storage
@@ -5738,6 +5748,8 @@ All navigation functions now use `TimeoutNavigationHelper` to ensure consistent 
 - `week`: Week number (franchise mode)
 - Lineup parameters: `home_pg`, `home_sg`, etc.
 - `clock`: Clock time (preserved for foul out/timeout)
+  - **Retrieval Priority:** DOM element → scene.simData.clock → last processed turn → URL params → default
+  - **Updated in:** `updateScoreboard()` updates `scene.simData.clock` as turns are processed
 
 **Frontend Resilience:**
 - Frontend checks database as fallback if URL parameter is missing (`bootGame.js` lines 825-841)
