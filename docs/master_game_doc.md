@@ -5613,12 +5613,15 @@ The system handles different transition types based on game state. All navigatio
 **Clock Preservation for Timeout Navigation:**
 - **Location:** `FrontEnd/static/js/phaser/utils/timeoutButtonManager.js` `showTimeoutPopup()` function
 - **Logic:** Clock is retrieved using a prioritized fallback chain:
-  1. **DOM Element** (`#game-clock`): Most reliable - what's actually displayed to the user
-  2. **scene.simData.clock**: Updated by `updateScoreboard()` as turns are processed (lines 1153-1158 in `gameScene.js`)
-  3. **Last Processed Turn**: If turns array exists, get clock from the last turn's `clock` or `game_clock` field
-  4. **URL Parameters**: Fallback for initial load scenarios
-  5. **Default**: `8:00` if no clock found (should never happen in normal flow)
-- **Key Fix (February 2025):** Previously, `scene.simData.clock` was only set on initial load and never updated, causing stale clock values (e.g., showing 7:56 from opening tip instead of current time like 4:31). Now `scene.simData.clock` is updated in `updateScoreboard()` whenever a turn's clock is processed, ensuring the timeout navigation always uses the current clock value.
+  1. **API Response** (`timeoutResult.clock`): **Most reliable** - backend source of truth, returned by `/api/call-timeout` endpoint at the moment the timeout is called
+  2. **DOM Element** (`#game-clock`): What's actually displayed to the user
+  3. **scene.simData.clock**: Updated by `updateScoreboard()` as turns are processed (lines 1153-1158 in `gameScene.js`)
+  4. **Last Processed Turn**: If turns array exists, get clock from the last turn's `clock` or `game_clock` field
+  5. **URL Parameters**: Fallback for initial load scenarios
+  6. **Default**: `8:00` if no clock found (should never happen in normal flow)
+- **Key Fix (February 2025):** 
+  - **Initial Fix:** `scene.simData.clock` was only set on initial load and never updated, causing stale clock values. Fixed by updating `scene.simData.clock` in `updateScoreboard()` whenever a turn's clock is processed.
+  - **Final Fix:** The `/api/call-timeout` endpoint now returns the current clock value (`gm.game_state.get("clock")`) in its response, ensuring the frontend always has the accurate clock at the moment the timeout is called. This prevents timing issues where the DOM or scene state might be stale when the timeout button is pressed.
 
 **Key Files:**
 - `BackEnd/engine/phase_resolution.py` - Foul resolution and `foul_out_context` storage (non-shooting fouls)
@@ -5642,6 +5645,17 @@ gm.game_state["timeout_offense_team_id"] = gm.offense_team.team_id  # Capture po
 
 db_summary = summarize_game_state(gm, exclude_animations=True)
 games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
+
+# Return timeout response with current clock (backend source of truth)
+return {
+    "message": f"Timeout called by {calling_team.name}",
+    "calling_team": calling_team.name,
+    "timeouts_remaining": getattr(calling_team, 'timeouts', 4),
+    "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
+    "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
+    "clock": gm.game_state.get("clock", "8:00"),  # ✅ Current clock at timeout moment
+    "time_remaining": gm.game_state.get("time_remaining", 480),  # Also include time_remaining
+}
 ```
 
 **Foul-Out Timeout (`BackEnd/models/game_manager.py` `simulate_macro_turn()`):**
