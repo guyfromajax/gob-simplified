@@ -223,6 +223,12 @@ Every turn result from the backend contains data organized into **three distinct
 - "OUT OF BOUNDS!" / "BAD PASS!" / etc. - Other turnover types
 - "OFFENSIVE FOUL!" / "DEFENSIVE FOUL!" / "Shooting Foul!" - Foul types (with fouling player headshot)
 
+**Shooting Foul Detection:**
+- **Location:** `FrontEnd/static/js/phaser/animation/ballManager.js` - Detected when ball reaches rim
+- **Defensive Shooting Foul on Miss:** Detected when `foul_player_id` exists, `foul_team === "DEFENSE"`, and `result === "MISS"`
+- **AND-1 (Made Shot + Foul):** Detected when text includes "AND-1" OR (`foul_player_id` exists + `result === "MAKE"` + `foul_team === "DEFENSE"`)
+- **Announcement:** "Shooting Foul!" displayed with fouling player's headshot (dark yellow text with silver border)
+
 **Visual Styling:**
 - **Foul Announcements:** Dark yellow text (`#b8860b`) with silver border (`#c0c0c0`)
 - **All Other Announcements:** Dark silver text (`#a8a8a8`) with black border (`#000000`)
