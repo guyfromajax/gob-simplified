@@ -56,11 +56,16 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
       lockerRoomUrl = '/static/mode-select.html';
   }
 
-  // Box Score URL - include team names for better data loading
+  // Box Score URL - include mode, IDs, and team names for proper navigation
   const boxScoreParams = new URLSearchParams();
   if (gameId) boxScoreParams.set('game_id', gameId);
   if (homeTeam) boxScoreParams.set('home', homeTeam);
   if (awayTeam) boxScoreParams.set('away', awayTeam);
+  // ✅ SS&S: Include mode and mode-specific IDs for proper "Go To Locker Room" navigation
+  if (mode) boxScoreParams.set('mode', mode);
+  if (tournamentId) boxScoreParams.set('tournament_id', tournamentId);
+  if (franchiseId) boxScoreParams.set('franchise_id', franchiseId);
+  if (teamId) boxScoreParams.set('team_id', teamId);
   const boxScoreUrl = `/static/box-score.html?${boxScoreParams.toString()}`;
   
   console.log('📊 Box Score URL constructed:', {

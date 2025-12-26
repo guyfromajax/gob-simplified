@@ -1032,6 +1032,8 @@ function setupLockerRoomButton() {
   // Determine mode from URL params or localStorage
   const urlParams = new URLSearchParams(window.location.search);
   const from = urlParams.get('from');
+  // ✅ SS&S: Read mode parameter first (most reliable), then fall back to IDs
+  const mode = urlParams.get('mode');
   const tournamentId = urlParams.get('tournament_id');
   const franchiseId = urlParams.get('franchise_id');
   const home = urlParams.get('home');
@@ -1041,7 +1043,6 @@ function setupLockerRoomButton() {
   const myTeam = urlParams.get('my_team');
   const userTeamId = urlParams.get('user_team_id');
   const week = urlParams.get('week');
-  const mode = urlParams.get('mode');
   const quarter = urlParams.get('quarter');
   const period = urlParams.get('period');
   const startWithInbound = urlParams.get('start_with_inbound');
@@ -1111,26 +1112,65 @@ function setupLockerRoomButton() {
     return;
   }
 
-  // Otherwise, behave like a post-game \"Go To Locker Room\" button
-  let navMode = 'single';
+  // Otherwise, behave like a post-game "Go To Locker Room" button
+  // ✅ SS&S: Prioritize mode parameter from URL (most reliable), then check IDs, then localStorage
+  let navMode = mode || 'single';
   let lockerRoomUrl;
   
-  if (tournamentId || (typeof localStorage !== 'undefined' && localStorage.getItem('activeTournament'))) {
+  // Determine mode and IDs with priority: URL params > localStorage
+  const urlTournamentId = tournamentId || urlParams.get('tournament_id');
+  const urlFranchiseId = franchiseId || urlParams.get('franchise_id');
+  const urlTeamId = urlParams.get('team_id');
+  
+  // If mode is explicitly set in URL, use it
+  if (navMode === 'tournament' || (navMode === 'single' && urlTournamentId)) {
     navMode = 'tournament';
     lockerRoomUrl = '/static/tournament.html';
-    if (tournamentId) {
-      lockerRoomUrl += `?tournament_id=${tournamentId}`;
+    const tournamentParams = new URLSearchParams();
+    if (urlTournamentId) {
+      tournamentParams.set('tournament_id', urlTournamentId);
     }
-  } else if (franchiseId || (typeof localStorage !== 'undefined' && localStorage.getItem('franchise_id'))) {
+    if (urlTeamId) {
+      tournamentParams.set('team_id', urlTeamId);
+    }
+    if (tournamentParams.toString()) {
+      lockerRoomUrl += `?${tournamentParams.toString()}`;
+    }
+  } else if (navMode === 'franchise' || (navMode === 'single' && urlFranchiseId)) {
     navMode = 'franchise';
-    const storedFranchiseId = franchiseId || (typeof localStorage !== 'undefined' ? localStorage.getItem('franchise_id') : null);
-    lockerRoomUrl = '/franchise/command-center';
-    if (storedFranchiseId) {
-      lockerRoomUrl += `?franchise_id=${storedFranchiseId}`;
+    // ✅ FIX: Use correct franchise command center path
+    lockerRoomUrl = '/static/franchise-command-center.html';
+    const franchiseParams = new URLSearchParams();
+    const finalFranchiseId = urlFranchiseId || (typeof localStorage !== 'undefined' ? localStorage.getItem('franchise_id') : null);
+    if (finalFranchiseId) {
+      franchiseParams.set('franchise_id', finalFranchiseId);
+    }
+    if (urlTeamId) {
+      franchiseParams.set('team_id', urlTeamId);
+    }
+    if (franchiseParams.toString()) {
+      lockerRoomUrl += `?${franchiseParams.toString()}`;
     }
   } else {
-    navMode = 'single';
-    lockerRoomUrl = '/static/mode-select.html';
+    // Fallback: Check localStorage as last resort (for backward compatibility)
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('activeTournament')) {
+      navMode = 'tournament';
+      lockerRoomUrl = '/static/tournament.html';
+      const storedTournamentId = localStorage.getItem('activeTournament');
+      if (storedTournamentId) {
+        lockerRoomUrl += `?tournament_id=${storedTournamentId}`;
+      }
+    } else if (typeof localStorage !== 'undefined' && localStorage.getItem('franchise_id')) {
+      navMode = 'franchise';
+      lockerRoomUrl = '/static/franchise-command-center.html';
+      const storedFranchiseId = localStorage.getItem('franchise_id');
+      if (storedFranchiseId) {
+        lockerRoomUrl += `?franchise_id=${storedFranchiseId}`;
+      }
+    } else {
+      navMode = 'single';
+      lockerRoomUrl = '/static/mode-select.html';
+    }
   }
 
   button.addEventListener('click', () => {
