@@ -5445,6 +5445,37 @@ Quarter start BASELINE_INBOUND turns are handled identically to post-shot BASELI
 
 ---
 
+## Turn-by-Turn Simulation System ✅ **COMPLETE** (February 2025)
+
+The turn-by-turn simulation system processes gameplay one turn at a time, allowing for real-time animation and user interaction. Each turn is fetched from the backend, animated, and then the next turn is requested.
+
+### Quarter Completion Handling
+
+**Critical Pattern:** The final turn of each quarter (the turn that consumes all remaining time) must be animated before quarter completion is handled.
+
+**Backend Behavior:**
+- When a turn is simulated that consumes all remaining time (`time_remaining <= 0`), the backend:
+  1. Creates the turn normally (with full animation data)
+  2. Sets `quarter_complete: True` in the response
+  3. Returns the turn with `quarter_complete: True`
+
+**Frontend Behavior:**
+- The frontend checks for `quarter_complete` **AFTER** animating the turn, not before
+- If `!turnData.turn` (no turn returned), the frontend breaks immediately (quarter already ended)
+- If `turnData.turn` exists but `quarter_complete: True`, the frontend:
+  1. Animates the turn first (it's the final turn of the quarter)
+  2. Checks `quarter_complete` after animation completes
+  3. Handles quarter completion (updates scores, breaks loop, etc.)
+
+**Implementation Location:**
+- `FrontEnd/static/js/phaser/gameScene.js` `simulateTurnByTurn()` method
+- Lines 1715-1750: Early break only if `!turnData.turn`
+- Lines 1937-1970: Quarter completion check after animation
+
+**Key Point:** This ensures the final turn of each quarter is always animated, providing a complete visual experience for the user.
+
+---
+
 ## Timeout System ✅ **COMPLETE** (January 2025)
 
 The timeout system allows game pauses for strategic adjustments, lineup changes, and game plan modifications. Timeouts are treated as standard game turns and integrate seamlessly with the existing transition system.
