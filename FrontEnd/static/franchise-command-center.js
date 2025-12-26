@@ -437,7 +437,7 @@ async function init() {
     renderLeaders(await fetchJSON(`/franchise/leaders?franchise_id=${franchiseId}`));
     renderTeamStats(await fetchJSON('/franchise/team-stats'));
     renderRecruits(await fetchJSON(`/franchise/recruits?franchise_id=${franchiseId}`));
-    renderTrainingResults(await fetchJSON(`/franchise/latest-training?franchise_id=${franchiseId}`));
+    // ✅ Removed: renderTrainingResults - Training Reports are now linked directly on Schedule page
     
     // Initialize tooltips for table headers
     if (typeof initAttributeTooltips !== 'undefined') {

@@ -117,10 +117,11 @@ These three variables form the foundation for seamless navigation across all GMO
    - **What it does:** Identifies the user's team (ObjectId format) - this is your team anchor that ensures all navigation and data access points to the correct team
    - **Where it lives:**
      - URL parameter (e.g., `?team_id=507f1f77bcf86cd799439011`)
-     - Database: Stored as `user_team_object_id` in the franchise document
+     - Database: Stored as `user_team_object_id` in the franchise document (source of truth)
      - localStorage (as fallback, stored as `franchise_user_team_id`)
    - **Nested?** No - top-level field in the franchise document (as `user_team_object_id`)
    - **Note:** Always ObjectId format, never team name
+   - **⚠️ CRITICAL:** The franchise document's `user_team_object_id` is the **authoritative source of truth**. Always resolve `team_id` from the franchise document, not from URL parameters. URL parameters are for navigation only - the database value is authoritative.
    - **Example:** `team_id=507f1f77bcf86cd799439011`
 
 **Document-Level Variables (Stored in franchise document):**
@@ -138,6 +139,7 @@ These variables are stored in the database franchise document and track the curr
    - **Where it lives:** Database: `franchises.{franchise_id}.user_team_object_id`
    - **Nested?** No - top-level field in the franchise document
    - **Relationship:** `user_team_object_id === team_id` (URL param)
+   - **⚠️ CRITICAL - SOURCE OF TRUTH:** This is the **authoritative value** for the user's team. All backend operations (training, training reports, schedule lookups) must use this value from the franchise document, not from URL parameters. If URL `team_id` doesn't match `user_team_object_id`, use the franchise document value.
    - **Example:** `user_team_object_id="507f1f77bcf86cd799439011"`
 
 6. **`week` / `current_week`** (integer)
@@ -231,7 +233,28 @@ These variables provide additional context for navigation but aren't required fo
 - `stats` / `leaderboards` - Document-level aggregated statistics
 - `created_at` - Document creation timestamp
 - `user_team_id` - User's team name (string)
-- `user_team_object_id` - User's team ObjectId (string)
+- `user_team_object_id` - User's team ObjectId (string) - **⚠️ SOURCE OF TRUTH for all team operations**
+
+**Team ID Resolution Pattern (SS&S):**
+- **Always resolve `team_id` from `user_team_object_id` in the franchise document**
+- **Never trust URL parameters alone** - verify against franchise document
+- **Backend pattern:**
+  ```python
+  # ✅ CORRECT: Always use franchise document as source of truth
+  user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+  authoritative_team_id = user_team_object_id  # Use this for all operations
+  
+  # ❌ WRONG: Don't trust URL params
+  team_id = req.team_id  # Might be wrong!
+  ```
+- **Frontend pattern:**
+  ```javascript
+  // ✅ CORRECT: Load from command-center/data endpoint (uses franchise document)
+  const topData = await fetchJSON(`/franchise/command-center/data?franchise_id=${franchiseId}`);
+  const authoritativeTeamId = topData.team_id;  // This comes from user_team_object_id
+  
+  // Use authoritativeTeamId for all API calls and navigation
+  ```
 
 #### Data Flow
 

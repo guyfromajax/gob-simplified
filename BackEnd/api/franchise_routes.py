@@ -527,13 +527,23 @@ def season_schedule(franchise_id: str):
         raise HTTPException(status_code=404, detail="Franchise not found")
     schedule = franchise_doc.get("schedule", [])
 
-    # Get user's team_id for training report links (with backward compatibility)
-    user_team_id, team_id = get_user_team_from_franchise(franchise_doc)
-    team_name = user_team_id
-    if team_name:
-        team_doc = db.teams.find_one({"name": team_name})
-        if team_doc:
-            team_id = str(team_doc["_id"])
+    # ✅ SS&S: Always use user_team_object_id from franchise document as source of truth
+    user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_id or not user_team_object_id:
+        # Fallback: try to resolve from team name if user_team_object_id is missing
+        team_name = user_team_id
+        if team_name:
+            team_doc = db.teams.find_one({"name": team_name})
+            if team_doc:
+                team_id = str(team_doc["_id"])
+            else:
+                team_id = None
+        else:
+            team_id = None
+    else:
+        # Use franchise document's user_team_object_id directly (authoritative)
+        team_id = user_team_object_id
+        team_name = user_team_id
     
     # Get training reports for user's team
     franchise_teams = franchise_doc.get("franchise_teams", {})
@@ -1102,41 +1112,33 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     current_week = franchise_doc.get("week", 0)
     if training_status.get("training_completed", False) and training_status.get("week") == current_week:
         # Training already completed for this week, redirect to report
+        # ✅ SS&S: Use user_team_object_id from franchise document for redirect (authoritative)
+        user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+        redirect_team_id = user_team_object_id if user_team_object_id else req.team_id
         return {
             "status": "already_completed",
             "week": current_week,
-            "redirect": f"/static/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={req.team_id}&week={current_week}"
+            "redirect": f"/static/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={redirect_team_id}&week={current_week}"
         }
 
-    # Get user's team (use team_id from request if provided, otherwise from franchise document)
-    team_id = req.team_id
-    team_name = None
-    if not team_id:
-        # Get user team info from franchise document (with backward compatibility)
-        user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
-        team_name = user_team_id
-        team_id = user_team_object_id
-        if not team_name:
-            raise HTTPException(status_code=404, detail="User team not found")
-        team_doc = db.teams.find_one({"name": team_name})
-        if not team_doc:
-            raise HTTPException(status_code=404, detail="Team not found")
-        team_id = str(team_doc["_id"])
-    else:
-        # team_id might be a name, try to resolve it
-        team_doc = db.teams.find_one({"name": team_id})
-        if team_doc:
-            team_name = team_doc.get("name")
-            team_id = str(team_doc["_id"])
-        else:
-            # Try to look up by ID if it's already an ID
-            try:
-                team_doc = db.teams.find_one({"_id": ObjectId(team_id)})
-                if team_doc:
-                    team_name = team_doc.get("name")
-            except:
-                team_doc = None
-            # If still not found, team_doc will be None and we'll handle it below
+    # ✅ SS&S: Always use user_team_object_id from franchise document as source of truth
+    # This ensures we're always using the correct team, even if URL params are wrong
+    user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_id or not user_team_object_id:
+        raise HTTPException(status_code=404, detail="User team not found in franchise document")
+    
+    # Use franchise document's user_team_object_id as authoritative team_id
+    team_id = user_team_object_id
+    team_name = user_team_id
+    
+    # Verify team exists in teams collection
+    team_doc = db.teams.find_one({"_id": ObjectId(team_id)})
+    if not team_doc:
+        raise HTTPException(status_code=404, detail=f"Team not found: {team_id}")
+    
+    # Log if req.team_id was provided but doesn't match (for debugging)
+    if req.team_id and req.team_id != team_id:
+        logger.warning(f"⚠️ [TRAINING] Request team_id ({req.team_id}) doesn't match franchise document user_team_object_id ({team_id}). Using franchise document value.")
 
     # Get franchise-specific player data for the user's team
     franchise_players = franchise_doc.get("players", {})
@@ -1418,9 +1420,22 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             if not doc:
                 raise HTTPException(status_code=404, detail="Franchise not found")
             
-            # Get team data from franchise_teams
+            # ✅ SS&S: Always use user_team_object_id from franchise document as source of truth
+            # This ensures we're always using the correct team, even if URL params are wrong
+            user_team_id_name, user_team_object_id = get_user_team_from_franchise(doc)
+            if not user_team_id_name or not user_team_object_id:
+                raise HTTPException(status_code=404, detail="User team not found in franchise document")
+            
+            # Use franchise document's user_team_object_id as authoritative team_id
+            authoritative_team_id = user_team_object_id
+            
+            # Log if URL team_id doesn't match (for debugging)
+            if team_id and team_id != authoritative_team_id:
+                logger.warning(f"⚠️ [TRAINING REPORT] URL team_id ({team_id}) doesn't match franchise document user_team_object_id ({authoritative_team_id}). Using franchise document value.")
+            
+            # Get team data from franchise_teams using authoritative team_id
             franchise_teams = doc.get("franchise_teams", {})
-            team_data = franchise_teams.get(team_id, {})
+            team_data = franchise_teams.get(authoritative_team_id, {})
             
             # Get training report for this week
             training_reports = team_data.get("training_reports", {})
@@ -1434,8 +1449,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             if current_week - 1 < len(schedule):
                 week_games = schedule[current_week - 1]
                 for away_id, home_id in week_games:
-                    if str(away_id) == team_id or str(home_id) == team_id:
-                        opponent_id = str(home_id) if str(away_id) == team_id else str(away_id)
+                    if str(away_id) == authoritative_team_id or str(home_id) == authoritative_team_id:
+                        opponent_id = str(home_id) if str(away_id) == authoritative_team_id else str(away_id)
                         opponent_team = db.teams.find_one({"_id": ObjectId(opponent_id)}, {"name": 1})
                         if opponent_team:
                             upcoming_opponent = opponent_team.get("name", "")
@@ -1446,20 +1461,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             players = []
             franchise_players = doc.get("players", {})
             
-            # Resolve team_id - might be a name or an ID
-            team_id_resolved = team_id
-            team_doc = db.teams.find_one({"name": team_id})
-            if team_doc:
-                team_id_resolved = str(team_doc["_id"])
-            else:
-                # Try as ObjectId
-                try:
-                    team_id_obj = ObjectId(team_id)
-                    team_id_resolved = str(team_id_obj)
-                except:
-                    pass
-            
-            team_id_str = str(team_id_resolved)
+            # Use authoritative team_id for player filtering
+            team_id_str = str(authoritative_team_id)
             logger.info(f"🔍 [TRAINING REPORT] Resolved team_id: {team_id} -> {team_id_str}")
             logger.info(f"🔍 [TRAINING REPORT] Total franchise players: {len(franchise_players)}")
             
