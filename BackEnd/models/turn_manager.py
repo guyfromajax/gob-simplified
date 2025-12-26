@@ -2596,66 +2596,6 @@ class TurnManager:
         from BackEnd.playcall_skeletons.set_play_skeletons import SET_PLAY_SCENES
         from BackEnd.playcall_skeletons.freelance_skeletons import FREELANCE_SCENES
         from BackEnd.playcall_skeletons.base_skeletons import BASE_SCENES
-            
-            Criteria:
-            1. Last player to make a pass to the shooter
-            2. Pass and receive happened in the same step
-            3. Pass was within 5 steps of the shot
-            
-            Args:
-                steps: List of skeleton steps
-                shooter_pos: Position of the shooter (e.g., "PG", "SG")
-            
-            Returns:
-                passer_pos: Position of the passer, or None if no valid passer found
-            """
-            if not shooter_pos or not steps:
-                return None
-            
-            passer_pos = None
-            shot_step_index = len(steps) - 1
-            last_pass_step_index = None
-            
-            # Find the last step where shooter received a pass (within last 5 steps)
-            search_start = max(0, shot_step_index - 5)
-            for step_index in range(shot_step_index - 1, search_start - 1, -1):
-                if step_index < 0:
-                    break
-                
-                step = steps[step_index]
-                pos_actions = step.get("pos_actions", {})
-                
-                # Check if shooter has "receive" action in this step
-                shooter_action_info = pos_actions.get(shooter_pos)
-                if shooter_action_info:
-                    shooter_action = shooter_action_info.get("action", "").lower()
-                    
-                    if shooter_action == "receive":
-                        # Shooter received the ball - now find who passed it
-                        for pos, action_info in pos_actions.items():
-                            if pos == shooter_pos:
-                                continue  # Skip shooter themselves
-                            
-                            action = action_info.get("action", "").lower()
-                            if action == "pass":
-                                # Found a pass in the same step as shooter receiving
-                                last_pass_step_index = step_index
-                                passer_pos = pos
-                                break
-                        
-                        # If we found a pass, stop searching (we want the LAST pass to the shooter)
-                        if last_pass_step_index is not None:
-                            break
-            
-            # Verify the pass was within 5 steps of the shot
-            if last_pass_step_index is not None:
-                steps_from_shot = shot_step_index - last_pass_step_index
-                if steps_from_shot <= 5:
-                    return passer_pos  # Valid passer found
-                else:
-                    return None  # Pass too far, no assist
-            else:
-                return None  # No pass found, no assist
         
         def derive_roles_from_steps(steps, off_lineup):
             """
