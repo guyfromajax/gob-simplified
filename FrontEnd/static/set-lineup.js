@@ -531,11 +531,12 @@ function updateSlotDisplay(slot) {
     const momentum = player.attributes?.MO ?? player.MO ?? 0;
     const moValue = typeof momentum === 'number' ? momentum : 0;
     
+    // ✅ UNIFIED: Use same thresholds as Player Grid and Player Box Score (70/80/89%)
     // Determine energy color class
     let energyClass = 'high';
-    if (energyPercent < 25) energyClass = 'critical';
-    else if (energyPercent < 50) energyClass = 'low';
-    else if (energyPercent < 75) energyClass = 'medium';
+    if (energyPercent < 70) energyClass = 'critical';
+    else if (energyPercent < 80) energyClass = 'low';
+    else if (energyPercent < 89) energyClass = 'medium';
     
     // Calculate momentum bar widths
     let leftWidth = '0%';
