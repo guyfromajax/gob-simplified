@@ -768,6 +768,35 @@ async function setHeader() {
     headerText += ` <span style="color: red; font-weight: bold; margin-left: 20px;">${computerTeamName} Called Timeout</span>`;
   }
   
+  // ✅ TIME REMAINING: Get clock from URL params and display to the right
+  const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+  let clockTime = urlParams.get('clock');
+  
+  // ✅ QUARTER BREAK FIX: If not a timeout and clock is 0:00 or missing, show correct time for upcoming quarter
+  if (!resumeFromTimeout && (!clockTime || clockTime === '0:00')) {
+    // Determine if it's overtime (4:00) or regular quarter (8:00)
+    const currentQuarter = parseInt(urlParams.get('quarter'), 10) || quarter || 1;
+    clockTime = currentQuarter > 4 ? '4:00' : '8:00'; // OT = 4:00, regular = 8:00
+  }
+  
+  // Format clock time (ensure MM:SS format)
+  if (clockTime) {
+    // Handle different clock formats (e.g., "8:00", "480" seconds, etc.)
+    let formattedClock = clockTime;
+    if (!clockTime.includes(':')) {
+      // If it's just a number (seconds), convert to MM:SS
+      const totalSeconds = parseInt(clockTime, 10);
+      if (!isNaN(totalSeconds)) {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        formattedClock = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      }
+    }
+    
+    // Add time remaining to the right of header content
+    headerText += ` <span style="margin-left: 20px; font-weight: bold;">Time: ${formattedClock}</span>`;
+  }
+  
   title.innerHTML = headerText; // Use innerHTML to support the span element
   console.log('[setHeader] Header updated to:', headerText);
   
