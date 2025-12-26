@@ -436,11 +436,12 @@ def simulate_quarter(
         from BackEnd.utils.opening_tip import execute_opening_tip
         _, _, tip_turn = execute_opening_tip(gm)
         gm.turns.append(tip_turn)
+        # ✅ TEMPORARILY DISABLED: Opening tip no longer consumes time to avoid clock issues
         # Update clock for tip time elapsed
-        gm.game_state["time_remaining"] -= tip_turn["time_elapsed"]
-        minutes = gm.game_state["time_remaining"] // 60
-        seconds = gm.game_state["time_remaining"] % 60
-        gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
+        # gm.game_state["time_remaining"] -= tip_turn["time_elapsed"]
+        # minutes = gm.game_state["time_remaining"] // 60
+        # seconds = gm.game_state["time_remaining"] % 60
+        # gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
     elif q == 2:
         # Q2: Team that didn't win opening tip gets possession via BASELINE_INBOUND
         opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
