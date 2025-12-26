@@ -2032,12 +2032,16 @@ The Statistics System tracks comprehensive player-level and team-level statistic
   - **Focus Usage**: EV uses the **chosen focus** (from strategy settings) for both Motion and Set Plays
     - This represents the intended offensive strategy before execution
 - **Execution Scores** (`lean_scores`): Execution quality score (0-100) representing how well the play was executed
-  - **Calculation**: Calculated in `resolve_hco_outcome()` during HCO turn resolution
-    - Step 1: Calculate `result = (offensive_efficiency + o_random) - (defensive_efficiency + d_random)`
-    - Step 2: Cap `result` at -100 to +100 range
-    - Step 3: Scale to 0-100: `execution_score = (capped_result + 100) / 2`
+  - **Calculation**: Calculated in `resolve_hco_outcome()` during HCO turn resolution (for ALL HCO results: SHOT, O_FOUL, D_FOUL, STEAL, DEAD_BALL_TURNOVER)
+    - Step 1: Calculate raw `result = (offensive_efficiency + o_random) - (defensive_efficiency + d_random)`
+    - Step 2: Cap `result` at -100 to +100 range: `capped_result = max(-100, min(100, result))`
+    - Step 3: Store `capped_result` in `game_state["lean_result_value"]` for lean meter display (-100 to +100)
+    - Step 4: Scale to 0-100 for stat tracking: `execution_score = (capped_result + 100) / 2`
     - Formula maps: -100 → 0%, 0 → 50%, +100 → 100%
     - **Note**: Execution score calculation does NOT use focus - it's based solely on team efficiency attributes
+  - **Lean Meter Display**: Uses the raw `capped_result` value (-100 to +100) directly, not the scaled execution_score
+    - Stored in `game_state["lean_result_value"]` and added to turn text as `"lean:XX.X"` for frontend parsing
+    - Frontend `animateLeanMeter()` receives the -100 to +100 value and scales it to visual fill percentage
   - **Storage**: Stored as `lean_scores` (converted to -1.0 to +1.0 format for backward compatibility)
     - Stored in `off_scouting["offense"]["Playcalls"][type_label]["overall"]["lean_scores"]` and focus-specific buckets
     - Also stored in `def_scouting["defense"][tracking_name]["game_stats"]["lean_scores"]` and vs_* buckets
@@ -6468,12 +6472,17 @@ The lean meter provides real-time visual feedback on how well the offensive play
 
 #### Lean Score Range
 
-**Range:** -1.0 to +1.0
-- **+1.0**: Maximum positive (offense executing perfectly) → Full green fill upward (50% of container)
-- **+0.5 to +0.99**: Positive (play working well) → Partial green fill
-- **0.0**: Neutral (balanced) → No fill, just yellow center line
-- **-0.5 to -0.01**: Negative (defense engaged) → Partial red fill downward
-- **-1.0**: Maximum negative (defense disrupting) → Full red fill downward (50% of container)
+**Range:** -100 to +100 (raw result value from execution score calculation)
+- **+100**: Maximum positive (offense executing perfectly) → Full green fill upward (50% of container)
+- **+50 to +99**: Positive (play working well) → Partial green fill
+- **0**: Neutral (balanced) → No fill, just yellow center line
+- **-50 to -1**: Negative (defense engaged) → Partial red fill downward
+- **-100**: Maximum negative (defense disrupting) → Full red fill downward (50% of container)
+
+**Calculation:**
+- Raw result: `result = (offensive_efficiency + o_random) - (defensive_efficiency + d_random)`
+- Capped at -100 to +100: `capped_result = max(-100, min(100, result))`
+- This capped value is stored in `game_state["lean_result_value"]` and added to turn text as `"lean:XX.X"`
 
 #### Animation Timing
 
@@ -6488,18 +6497,20 @@ The lean meter provides real-time visual feedback on how well the offensive play
 
 #### Fill Calculation
 
-The lean meter fills proportionally based on the lean score value:
+The lean meter fills proportionally based on the lean score value (-100 to +100):
 
 **Positive Scores (Green Fill Upward):**
 ```javascript
-fillPercentage = Math.abs(leanScore) * 50; // 0-50% of container
-// Example: 0.47 → 23.5% fill (47% of the space from center to top)
+fillPercentage = (Math.abs(leanScore) / 100) * 50; // 0-50% of container
+// Example: 47 → 23.5% fill (47% of the space from center to top)
+// Example: 100 → 50% fill (full green fill)
 ```
 
 **Negative Scores (Red Fill Downward):**
 ```javascript
-fillPercentage = Math.abs(leanScore) * 50; // 0-50% of container
-// Example: -0.88 → 44% fill (88% of the space from center to bottom)
+fillPercentage = (Math.abs(leanScore) / 100) * 50; // 0-50% of container
+// Example: -88 → 44% fill (88% of the space from center to bottom)
+// Example: -100 → 50% fill (full red fill)
 ```
 
 **CSS Positioning:**
