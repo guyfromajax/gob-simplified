@@ -1405,8 +1405,6 @@ if skeleton:
   - `select_foul_player()` - SS&S helper (lines 163-204)
 - `BackEnd/models/animator.py`
   - `skeleton_to_animations()` - Converts truncated skeleton to animations
-- `docs/To Do/stopper_system.md`
-  - Future enhancement tracking
 
 ---
 
