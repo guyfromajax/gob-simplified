@@ -1958,8 +1958,9 @@ class TurnManager:
         
         logging.warning(f"🔍 [COMPUTER TIMEOUT CHECK] Evaluating conditions for {computer_team.name} Q{quarter} (current count: {quarter_data['count']}, max: {max_timeouts})")
         
-        # Get all players on the team
-        all_players = computer_team.get_all_players()
+        # ✅ FIX: Only check players in the active lineup (not all players on the team)
+        # This aligns with autoset lineup logic - we only care about players currently playing
+        active_players = [player for player in computer_team.lineup.values() if player is not None]
         
         # Check conditions (each only checks once per occurrence)
         checked = quarter_data["checked_conditions"]
@@ -1970,7 +1971,7 @@ class TurnManager:
         # Q1: Player foul logic
         if quarter == 1:
             # Condition 1: Player with 3 fouls - 100% chance
-            for player in all_players:
+            for player in active_players:
                 fouls = player.get_stat("F", "game")
                 condition_key = f"3_fouls_{player.player_id}"
                 if fouls == 3 and condition_key not in checked:
@@ -1979,7 +1980,7 @@ class TurnManager:
                     return True  # 100% chance
             
             # Condition 2: Player with 2 fouls - 30% chance
-            for player in all_players:
+            for player in active_players:
                 fouls = player.get_stat("F", "game")
                 condition_key = f"2_fouls_{player.player_id}"
                 if fouls == 2 and condition_key not in checked:
@@ -1994,7 +1995,7 @@ class TurnManager:
         # Q2 & Q3: Player foul logic
         elif quarter in [2, 3]:
             # Condition 1: Player with 4 fouls - 100% chance
-            for player in all_players:
+            for player in active_players:
                 fouls = player.get_stat("F", "game")
                 condition_key = f"4_fouls_{player.player_id}"
                 if fouls == 4 and condition_key not in checked:
@@ -2003,7 +2004,7 @@ class TurnManager:
                     return True  # 100% chance
             
             # Condition 2: Player with 3 fouls - 90% chance
-            for player in all_players:
+            for player in active_players:
                 fouls = player.get_stat("F", "game")
                 condition_key = f"3_fouls_{player.player_id}"
                 if fouls == 3 and condition_key not in checked:
@@ -2019,7 +2020,7 @@ class TurnManager:
         elif quarter == 4:
             if time_remaining > 60:
                 # Condition: Player with 4 fouls - 90% chance
-                for player in all_players:
+                for player in active_players:
                     fouls = player.get_stat("F", "game")
                     condition_key = f"4_fouls_{player.player_id}"
                     if fouls == 4 and condition_key not in checked:
@@ -2036,10 +2037,10 @@ class TurnManager:
         # ========== ENERGY CONDITIONS (All Quarters Q1-Q4) ==========
         
         # Conditions 3-9: Energy (NG) levels
-        # Count players below each threshold
-        players_below_80 = [p for p in all_players if p.attributes.get("NG", 1.0) < 0.80]
-        players_below_70 = [p for p in all_players if p.attributes.get("NG", 1.0) < 0.70]
-        players_below_60 = [p for p in all_players if p.attributes.get("NG", 1.0) < 0.60]
+        # Count players below each threshold (only from active lineup)
+        players_below_80 = [p for p in active_players if p.attributes.get("NG", 1.0) < 0.80]
+        players_below_70 = [p for p in active_players if p.attributes.get("NG", 1.0) < 0.70]
+        players_below_60 = [p for p in active_players if p.attributes.get("NG", 1.0) < 0.60]
         
         count_80 = len(players_below_80)
         count_70 = len(players_below_70)

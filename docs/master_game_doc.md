@@ -6466,6 +6466,8 @@ The computer timeout system enables AI-controlled teams to call timeouts during 
 
 Computer evaluates timeout conditions in order. Each condition only checks once per occurrence (tracked per quarter). Conditions are quarter-specific for foul logic, but energy conditions apply to all quarters.
 
+**Important:** Timeout conditions are evaluated **only for players in the active lineup** (not all players on the team). This aligns with the autoset lineup logic - the computer only evaluates timeout conditions for players who are currently playing. This prevents timeouts from being triggered by players who were already excluded from the lineup at quarter breaks due to foul or energy restrictions.
+
 #### Q1 Conditions
 
 **Foul Conditions:**
