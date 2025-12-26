@@ -627,11 +627,11 @@ export async function shootBall({
         } else if (result === "MISS" && isShootingFoul) {
           // Get foul player data from turnData
           // ✅ FIX: Check multiple possible locations for foul_player_id
-          let foulPlayerData = null;
           const foulPlayerId = turnData?.foul_player_id || 
                               turnData?.foul_player?.player_id ||
                               turnData?.events?.find(e => e.event_type === 'FOUL')?.foul_player_id;
           
+          let foulPlayerData = null;
           if (foulPlayerId && scene) {
             const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
             if (foulPlayerSprite) {
@@ -647,6 +647,9 @@ export async function shootBall({
               // Trigger foul effect
               const { triggerFoulEffect } = await import('./negativeActionEffects.js');
               triggerFoulEffect(scene, foulPlayerId);
+              
+              // Show announcement with player data
+              showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
             } else {
               // Fallback: try to get from playerInfo if sprite not found
               const foulPlayerInfo = scene.playerInfo?.[foulPlayerId];
@@ -659,11 +662,22 @@ export async function shootBall({
                   photo: foulPlayerInfo.photo || null,
                   teamName: foulPlayerTeamName
                 };
+                
+                // Trigger foul effect even if sprite not found
+                const { triggerFoulEffect } = await import('./negativeActionEffects.js');
+                triggerFoulEffect(scene, foulPlayerId);
+                
+                // Show announcement with player data from playerInfo
+                showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
+              } else {
+                // ✅ FIX: Fallback announcement if player data not found (matches AND-1 pattern)
+                showAnnouncement("Shooting Foul!", 'neutral', null);
               }
             }
+          } else {
+            // ✅ FIX: Fallback announcement if foulPlayerId not found (matches AND-1 pattern)
+            showAnnouncement("Shooting Foul!", 'neutral', null);
           }
-          
-          showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
         }
         
         // ✅ PHASE 2.3: Use BallController lifecycle method for shot end
