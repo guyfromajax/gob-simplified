@@ -1758,6 +1758,14 @@ export function createGameScene(Phaser) {
           if (turnData.quarter_complete) {
             // Mark that this is the final turn - we'll handle quarter completion after animation
             turn.is_final_turn_of_quarter = true;
+            console.log('🔍 [FINAL TURN DEBUG] Received turn with quarter_complete=true BEFORE animation', {
+              turn_result_type: turn.result_type,
+              turn_text: turn.text?.substring(0, 50),
+              time_remaining_before_turn: turnData.time_remaining,
+              clock_before_turn: turnData.clock,
+              turnCount,
+              will_animate: true
+            });
           }
           let finalTurn = turn; // Track the final turn for Quick Adjust logic
           
@@ -1838,6 +1846,12 @@ export function createGameScene(Phaser) {
             }
             
             // Wrap single turn in array for animateGameTurns
+            if (turn.is_final_turn_of_quarter) {
+              console.log('🎬 [FINAL TURN DEBUG] Starting animation of final turn', {
+                turn_result_type: turn.result_type,
+                turn_text: turn.text?.substring(0, 50)
+              });
+            }
             await animateGameTurns({
               scene: this,
               simData: { 
@@ -1850,6 +1864,12 @@ export function createGameScene(Phaser) {
               ballSprite: this.ballSprite,
               onUpdate: updateScoreboard
             });
+            if (turn.is_final_turn_of_quarter) {
+              console.log('✅ [FINAL TURN DEBUG] Animation of final turn completed', {
+                turn_result_type: turn.result_type,
+                turn_text: turn.text?.substring(0, 50)
+              });
+            }
           }
           
           // Update scores and game state after each turn
@@ -1937,12 +1957,16 @@ export function createGameScene(Phaser) {
           // ✅ FIX: Check if quarter is complete AFTER animating the turn
           // This ensures the final turn of the quarter is animated before handling quarter completion
           if (turnData.quarter_complete) {
-            console.log('✅ Quarter complete! (after final turn animation)', {
-              time_remaining: turnData.time_remaining,
+            console.log('✅ [FINAL TURN DEBUG] Quarter complete! (after final turn animation)', {
+              turn_result_type: turn?.result_type,
+              turn_text: turn?.text?.substring(0, 50),
+              time_remaining_after_turn: turnData.time_remaining,
+              clock_after_turn: turnData.clock,
               turnCount,
               home_score: turnData.home_score,
               away_score: turnData.away_score,
-              is_final: turnData.is_final
+              is_final: turnData.is_final,
+              animation_completed: true
             });
             quarterComplete = true;
             lastTurnData = turnData; // Store last turn data for game completion check
