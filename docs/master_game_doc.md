@@ -8695,15 +8695,16 @@ The In-Game Play Calling System determines which offensive and defensive plays a
 - Settings persist across games within the same mode
 - **Single Game Mode:** Settings persist across Single Game instances for the same team (via core `teams` collection)
 
-**Data Persistence (January 2025):**
-- ✅ **`playbook_settings` is preserved when saving game state** - When `summarize_game_state()` saves game state (timeouts, quarter breaks, etc.), it loads existing `playbook_settings` from the database and includes them in the `teams.{team_id}` object
+**Data Persistence (January 2025, Updated February 2025):**
+- ✅ **`playbook_settings` is preserved when saving game state** - When `summarize_game_state()` saves game state (timeouts, quarter breaks, etc.), it loads existing `playbook_settings` from the database and includes them in the `teams.{team_id}` object (or `franchise_teams.{team_id}` for franchise mode)
 - ✅ **Settings persist across navigation** - When navigating Playbooks → Game Plan → Lineup → Gameplay, settings are preserved. When returning to Playbooks page, settings are loaded from API and applied to UI state.
 - ✅ **Cross-Instance Persistence (Single Game)** - Settings set in one Single Game instance persist to the next Single Game instance for the same team (stored in core `teams` collection)
+- ✅ **Mode-Specific Path Handling** - The `get_playbooks()` function correctly uses `franchise_teams.{team_id}` for franchise mode and `teams.{team_id}` for tournament/single mode when initializing missing `playbook_settings` and reloading team objects. This ensures settings saved from Command Centers (FCC/TCC) are correctly loaded during gameplay.
 - This ensures `slot_assignments`, percentages, and other playbook settings persist across all game state saves and page navigation
 - **Implementation:** 
   - `BackEnd/utils/shared.py` `summarize_game_state()` (lines 659-726) preserves `playbook_settings` from database when `exclude_animations=True` (database saves)
-  - `BackEnd/api/gameplan_routes.py` `save_playbooks()` saves to both game document and core `teams` collection (Single Game mode)
-  - `BackEnd/api/gameplan_routes.py` `get_playbooks()` checks core `teams` collection if game document has no settings (Single Game mode)
+  - `BackEnd/api/gameplan_routes.py` `save_playbooks()` saves to both game document and core `teams` collection (Single Game mode), or to `franchise_teams.{team_id}` (Franchise mode) or `teams.{team_id}` (Tournament mode)
+  - `BackEnd/api/gameplan_routes.py` `get_playbooks()` (lines 1070-1095) correctly initializes missing `playbook_settings` using mode-specific paths (`franchise_teams` for franchise, `teams` for tournament/single) and reloads from the correct location
   - `FrontEnd/static/playbooks.js` `loadPlaybookPercentagesFromAPI()` and `loadSlotAssignmentsFromAPI()` load and apply settings to UI state
 
 ### Key Methods
