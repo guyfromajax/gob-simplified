@@ -3834,6 +3834,27 @@ def resolve_half_court_offense_logic(game):
             roles["motion_playcall"] = motion_shot_info["playcall"]
             roles["motion_attack_penalty"] = motion_shot_info["attack_penalty"]
             
+            # ✅ FIX: Re-derive passer from modified skeleton (Motion plays add pass/receive steps)
+            # Use the same criteria as Set Plays: last pass to shooter within 5 steps, pass/receive in same step
+            # This ensures assists are tracked correctly for Motion plays, matching Set Play behavior
+            if "steps" in skeleton and roles.get("shooter_pos"):
+                passer_pos = game.turn_manager.derive_passer_from_steps(skeleton["steps"], roles["shooter_pos"])
+                
+                if passer_pos:
+                    # Convert passer_pos to Player object
+                    passer = off_lineup.get(passer_pos)
+                    if passer:
+                        roles["passer"] = passer
+                        roles["passer_pos"] = passer_pos
+                    else:
+                        # Fallback: passer_pos not found in lineup (shouldn't happen, but safety check)
+                        roles["passer"] = None
+                        roles["passer_pos"] = None
+                else:
+                    # No valid passer found (pass too far or no pass to shooter)
+                    roles["passer"] = None
+                    roles["passer_pos"] = None
+            
             # Store attack penalty in game_state for shot calculation
             if motion_shot_info["attack_penalty"] > 0:
                 game_state["motion_attack_penalty"] = motion_shot_info["attack_penalty"]

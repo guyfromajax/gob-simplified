@@ -2106,6 +2106,14 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 - **3PTM** (Three-Pointers Made): Incremented for shooter when three-pointer is made (via `apply_scoring()`)
 - **PTS** (Points): Automatically calculated from FGM, 3PTM, FTM
 - **AST** (Assists): Incremented for passer when shot is made (if passer exists)
+  - **Passer Identification Criteria (applies to both Set Plays and Motion Plays):**
+    1. Last player to make a pass to the shooter
+    2. Pass and receive happened in the same step (passer has "pass" action, shooter has "receive" action)
+    3. Pass was within 5 steps of the shot being taken
+  - **Implementation:**
+    - **Set Plays:** Passer identified during `assign_roles()` via `derive_roles_from_steps()` function
+    - **Motion Plays:** Passer re-derived after `resolve_motion_offense_shot()` modifies skeleton and adds pass/receive steps (uses same `derive_passer_from_steps()` logic)
+    - **Location:** `BackEnd/models/turn_manager.py` - `derive_passer_from_steps()` method, called from `BackEnd/engine/phase_resolution.py` for Motion plays
 - **PIP** (Points in Paint): Incremented for shooter when shot is made from paint (amount = points scored)
 - **TO** (Turnovers): Incremented for ball handler on dead ball turnovers
 - **F** (Fouls): Incremented for foul player (offensive or defensive)
