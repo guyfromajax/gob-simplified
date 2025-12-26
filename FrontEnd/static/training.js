@@ -237,7 +237,7 @@ backBtn.addEventListener('click', function() {
   if (mode === 'franchise') {
     const franchiseId = urlParams.get('franchise_id');
     const teamId = urlParams.get('team_id');
-    const url = `/static/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+    const url = `/static/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}`;
     const finalUrl = teamId ? `${url}&team_id=${encodeURIComponent(teamId)}` : url;
     window.location.href = finalUrl;
   } else if (mode === 'tournament') {

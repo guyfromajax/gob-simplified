@@ -506,9 +506,9 @@ playNowBtn.addEventListener('click', async () => {
       localStorage.setItem('franchise_week', week);
     } catch {}
     const mySide = userTeamName === home ? 'home' : (userTeamName === away ? 'away' : '');
-    let url = `/static/set-lineup.html?franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&home_id=${encodeURIComponent(home_id)}&away_id=${encodeURIComponent(away_id)}`;
+    let url = `/static/set-lineup.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&home_id=${encodeURIComponent(home_id)}&away_id=${encodeURIComponent(away_id)}`;
     // ✅ SS&S: Use ObjectId for consistent navigation
-    if (userTeamId) url += `&user_team_id=${encodeURIComponent(userTeamId)}`;
+    if (userTeamId) url += `&team_id=${encodeURIComponent(userTeamId)}`;
     if (mySide) url += `&my_team=${mySide}`;
     console.log('Navigating to', url);
     window.location.href = url;
@@ -530,7 +530,7 @@ if (setGameplanBtn) {
     }
     
     // ✅ SS&S: Redirect to Game Plan screen with ObjectId for consistent navigation
-    const url = `/game-plan.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&user_team_id=${encodeURIComponent(userTeamId)}&from=command_center`;
+    const url = `/game-plan.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=command_center`;
     window.location.href = url;
   });
 }

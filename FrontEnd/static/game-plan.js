@@ -457,7 +457,7 @@ async function navigateToCommandCenter() {
   } else if (mode === 'franchise' && franchiseId) {
     // Include team_id in URL for franchise command center
     const teamIdParam = teamId || userTeamIdParam || teamName;
-    const url = `/static/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+    const url = `/static/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}`;
     const finalUrl = teamIdParam ? `${url}&team_id=${encodeURIComponent(teamIdParam)}` : url;
     window.location.href = finalUrl;
   } else {

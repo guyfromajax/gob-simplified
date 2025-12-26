@@ -1852,14 +1852,15 @@ class PlaybooksUI {
     if (from === 'franchise-command-center') {
       // Navigate back to Franchise Command Center
       const franchiseId = urlParams.get('franchise_id');
-      const userTeamName = urlParams.get('team_id') || urlParams.get('user_team_id');
+      const teamId = urlParams.get('team_id') || urlParams.get('user_team_id'); // Support both for backward compatibility
       
       console.log('✅ [PLAYBOOKS BACK] Navigating to Franchise Command Center');
       
       // For command centers, we don't need game context, just mode-specific params
       const params = new URLSearchParams();
+      params.set('mode', 'franchise'); // Always include mode for consistency
       if (franchiseId) params.set('franchise_id', franchiseId);
-      if (userTeamName) params.set('user_team_name', userTeamName);
+      if (teamId) params.set('team_id', teamId); // Use team_id (ObjectId), not user_team_name
       
       window.location.href = `/static/franchise-command-center.html?${params.toString()}`;
       return;
@@ -1869,11 +1870,12 @@ class PlaybooksUI {
     if (mode === 'franchise' && !from) {
       console.log('⚠️ [PLAYBOOKS BACK] No "from" parameter, but mode is franchise - assuming franchise-command-center');
       const franchiseId = urlParams.get('franchise_id');
-      const userTeamName = urlParams.get('team_id') || urlParams.get('user_team_id');
+      const teamId = urlParams.get('team_id') || urlParams.get('user_team_id'); // Support both for backward compatibility
       
       const params = new URLSearchParams();
+      params.set('mode', 'franchise'); // Always include mode for consistency
       if (franchiseId) params.set('franchise_id', franchiseId);
-      if (userTeamName) params.set('user_team_name', userTeamName);
+      if (teamId) params.set('team_id', teamId); // Use team_id (ObjectId), not user_team_name
       
       window.location.href = `/static/franchise-command-center.html?${params.toString()}`;
       return;
