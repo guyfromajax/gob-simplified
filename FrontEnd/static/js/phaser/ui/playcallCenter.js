@@ -144,15 +144,15 @@ export function resetLeanMeter() {
 
 /**
  * Animate lean meter based on lean score
- * @param {number} leanScore - Score from -1.0 to 1.0
+ * @param {number} leanScore - Score from -100 to 100 (raw result value)
  */
 export function animateLeanMeter(leanScore) {
   if (leanScore == null || isNaN(leanScore)) {
     return;
   }
 
-  // Clamp to -1 to 1 range
-  const clampedScore = Math.max(-1, Math.min(1, leanScore));
+  // Clamp to -100 to 100 range
+  const clampedScore = Math.max(-100, Math.min(100, leanScore));
 
   const posFill = document.getElementById('lean-fill-positive');
   const negFill = document.getElementById('lean-fill-negative');
@@ -164,15 +164,17 @@ export function animateLeanMeter(leanScore) {
   if (clampedScore > 0) {
     // Positive score: fill upward (green)
     // Fill percentage of the space from center (50%) to top (100%)
-    // So 0.47 fills 47% of the 50% space = 23.5% of container height
-    const fillPercentage = Math.abs(clampedScore) * 50; // 0-50% of container
+    // Map -100 to 100 range to 0-50% fill (half the container)
+    // Formula: fillPercentage = (clampedScore / 100) * 50
+    const fillPercentage = (Math.abs(clampedScore) / 100) * 50; // 0-50% of container
     posFill.style.height = `${fillPercentage}%`;
     negFill.style.height = '0%';
   } else if (clampedScore < 0) {
     // Negative score: fill downward (red)
     // Fill percentage of the space from center (50%) to bottom (0%)
-    // So -0.88 fills 88% of the 50% space = 44% of container height
-    const fillPercentage = Math.abs(clampedScore) * 50; // 0-50% of container
+    // Map -100 to 100 range to 0-50% fill (half the container)
+    // Formula: fillPercentage = (Math.abs(clampedScore) / 100) * 50
+    const fillPercentage = (Math.abs(clampedScore) / 100) * 50; // 0-50% of container
     posFill.style.height = '0%';
     negFill.style.height = `${fillPercentage}%`;
   } else {

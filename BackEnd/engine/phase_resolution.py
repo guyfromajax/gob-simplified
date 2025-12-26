@@ -2144,6 +2144,39 @@ def resolve_hco_outcome(game, skeleton):
         logging.warning(f"   Defense team aggression: {aggression_level}")
         logging.warning(f"   Base STEAL_ATTEMPT: {steal_attempt_rate}% (no adjustment)")
     
+    # ✅ EXECUTION SCORE CALCULATION: Calculate once for all outcomes
+    # Calculate play effectiveness scores (same calculation used for all HCO results)
+    o_random = random.randint(1, 100)
+    d_random = random.randint(1, 100)
+    o_score = offensive_efficiency + o_random
+    d_score = defensive_efficiency + d_random
+    
+    result_value = o_score - d_score
+    
+    # Cap result at -100 to +100 for execution score calculation
+    capped_result = result_value
+    if capped_result > 100:
+        capped_result = 100
+    elif capped_result < -100:
+        capped_result = -100
+    
+    # Scale from -100 to +100 range to 0-100 Execution Score
+    # Formula: execution_score = (capped_result + 100) / 2
+    execution_score = (capped_result + 100) / 2
+    
+    # Store execution_score in game_state for later storage in scouting data
+    game_state["execution_score"] = execution_score
+    # ✅ STORE RAW RESULT VALUE: Store capped_result (-100 to +100) for lean meter display
+    game_state["lean_result_value"] = capped_result
+    
+    logging.warning(f"📊 [HCO RESOLUTION] Execution Score Calculation (for all outcomes):")
+    logging.warning(f"   Offense effectiveness: {offensive_efficiency} + {o_random} (random) = {o_score}")
+    logging.warning(f"   Defense effectiveness: {defensive_efficiency} + {d_random} (random) = {d_score}")
+    logging.warning(f"   Result (o_score - d_score): {o_score} - {d_score} = {result_value}")
+    logging.warning(f"   Execution Score: {result_value} → {capped_result} (capped) → {execution_score:.1f}% (scaled 0-100)")
+    logging.warning(f"   Lean Meter Value: {capped_result} (raw -100 to +100)")
+    logging.warning("")  # Blank line after execution score calculation
+    
     # Steps 3-5: Randomize order of event checks
     # Create list of check functions with their parameters
     check_functions = [
@@ -2163,65 +2196,41 @@ def resolve_hco_outcome(game, skeleton):
     for check_name, check_func in check_functions:
         result = check_func()
         if result is not None:
-            # Event occurred, return immediately
+            # Event occurred, return immediately with execution_score
             logging.warning(f"🔍 [HCO RESOLUTION] {check_name} returned result: {result[0]}")
+            logging.warning(f"   📊 Execution Score: {execution_score:.1f}% (calculated for all outcomes)")
             logging.warning("")  # Blank line after event result
-            # For non-SHOT results, return None for variant_result and execution_score
+            # For non-SHOT results, return execution_score but None for variant_result
             if len(result) == 2:
-                return (result[0], result[1], None)
+                return (result[0], result[1], execution_score)
             elif len(result) == 3:
-                return result
+                # If result already has 3 elements, replace the third with execution_score
+                return (result[0], result[1], execution_score)
             else:
-                return (result[0], None, None)
+                return (result[0], None, execution_score)
     
     # No event occurred in Steps 3-5, continue to Step 6
     logging.warning("")  # Blank line after Steps 3-5 (no event)
     
     # Step 6: Shot Attempt
-    # Calculate play effectiveness scores
-    # For now, use random numbers until effectiveness scores are added to database
-    o_random = random.randint(1, 100)
-    d_random = random.randint(1, 100)
-    o_score = offensive_efficiency + o_random
-    d_score = defensive_efficiency + d_random
-    
-    result = o_score - d_score
-    
+    # Execution score already calculated above (used for all outcomes)
+    # Use the same result_value for variant selection
     logging.warning(f"🔥 [HCO RESOLUTION] Step 6 - Shot Attempt:")
-    logging.warning(f"   Offense effectiveness: {offensive_efficiency} + {o_random} (random) = {o_score}")
-    logging.warning(f"   Defense effectiveness: {defensive_efficiency} + {d_random} (random) = {d_score}")
-    logging.warning(f"   Result (o_score - d_score): {o_score} - {d_score} = {result}")
+    logging.warning(f"   Using execution score already calculated: {execution_score:.1f}%")
     
-    # ✅ EXECUTION SCORE CALCULATION: Cap result and scale to 0-100
-    # Cap result at -100 to +100 for execution score calculation
-    capped_result = result
-    if capped_result > 100:
-        capped_result = 100
-    elif capped_result < -100:
-        capped_result = -100
-    
-    # Scale from -100 to +100 range to 0-100 Execution Score
-    # Formula: execution_score = (capped_result + 100) / 2
-    execution_score = (capped_result + 100) / 2
-    
-    logging.warning(f"   📊 Execution Score: {result} → {capped_result} (capped) → {execution_score:.1f}% (scaled 0-100)")
-    
-    # Store execution_score in game_state for later storage in scouting data
-    game_state["execution_score"] = execution_score
-    
-    # Select skeleton variant based on result (using original uncapped result)
-    if result > 50:
+    # Select skeleton variant based on result_value (using original uncapped result)
+    if result_value > 50:
         variant_result = "successful"
-        logging.warning(f"   ✅ Variant: {variant_result} (result {result} > 50)")
-    elif result > 0:
+        logging.warning(f"   ✅ Variant: {variant_result} (result {result_value} > 50)")
+    elif result_value > 0:
         variant_result = "mid_play_change"
-        logging.warning(f"   ✅ Variant: {variant_result} (0 < result {result} <= 50)")
-    elif result > -50:
+        logging.warning(f"   ✅ Variant: {variant_result} (0 < result {result_value} <= 50)")
+    elif result_value > -50:
         variant_result = "contested"
-        logging.warning(f"   ✅ Variant: {variant_result} (-50 < result {result} <= 0)")
+        logging.warning(f"   ✅ Variant: {variant_result} (-50 < result {result_value} <= 0)")
     else:
         variant_result = "broken"
-        logging.warning(f"   ✅ Variant: {variant_result} (result {result} <= -50)")
+        logging.warning(f"   ✅ Variant: {variant_result} (result {result_value} <= -50)")
     
     logging.warning(f"🔍 [HCO RESOLUTION] Final Result: SHOT with variant '{variant_result}', execution_score={execution_score:.1f}%")
     return ("SHOT", variant_result, execution_score)
@@ -3204,8 +3213,11 @@ def resolve_half_court_offense_logic(game):
         game_state["_skeleton_variant"] = variant_result
     
     # ✅ EXECUTION SCORE: Store execution_score in game_state for stat tracking
+    # Note: execution_score is now calculated for ALL HCO results (SHOT, O_FOUL, D_FOUL, STEAL, DEAD_BALL_TURNOVER)
     if execution_score is not None:
         game_state["execution_score"] = execution_score
+        # ✅ STORE EXECUTION SCORE: Persist to scouting data for stat tracking (all HCO results)
+        _store_execution_score(execution_score, game, off_team, def_team)
     
     # 🔍 DEBUG: Log skeleton retrieval result
     if skeleton:
@@ -3725,6 +3737,10 @@ def resolve_half_court_offense_logic(game):
             # Add skeleton and animations to result
             turn_result["skeleton"] = skeleton or {}
             turn_result["animations"] = animations
+            # ✅ ADD LEAN METER VALUE: Add raw result value (-100 to +100) to text for frontend parsing
+            lean_value = game_state.get("lean_result_value", 0)
+            if "lean:" not in turn_result.get("text", ""):
+                turn_result["text"] = turn_result.get("text", "") + f" lean:{lean_value:.1f}"
             # ✅ FIX: Add serializable roles data (only include fields needed for frontend, not Player objects)
             serializable_roles = {}
             if roles.get("is_steal_hco_setup"):
@@ -3748,6 +3764,10 @@ def resolve_half_court_offense_logic(game):
             # Add skeleton and animations to result
             foul_result["skeleton"] = skeleton or {}
             foul_result["animations"] = animations
+            # ✅ ADD LEAN METER VALUE: Add raw result value (-100 to +100) to text for frontend parsing
+            lean_value = game_state.get("lean_result_value", 0)
+            if "lean:" not in foul_result.get("text", ""):
+                foul_result["text"] = foul_result.get("text", "") + f" lean:{lean_value:.1f}"
             # ✅ FIX: Add serializable roles data (only include fields needed for frontend, not Player objects)
             serializable_roles = {}
             if roles.get("is_steal_hco_setup"):
@@ -3769,6 +3789,10 @@ def resolve_half_court_offense_logic(game):
             # Add skeleton and animations to result
             foul_result["skeleton"] = skeleton or {}
             foul_result["animations"] = animations
+            # ✅ ADD LEAN METER VALUE: Add raw result value (-100 to +100) to text for frontend parsing
+            lean_value = game_state.get("lean_result_value", 0)
+            if "lean:" not in foul_result.get("text", ""):
+                foul_result["text"] = foul_result.get("text", "") + f" lean:{lean_value:.1f}"
             # ✅ FIX: Add serializable roles data (only include fields needed for frontend, not Player objects)
             serializable_roles = {}
             if roles.get("is_steal_hco_setup"):
@@ -3831,6 +3855,11 @@ def resolve_half_court_offense_logic(game):
     variant_display = variant_result if variant_result else variant
     debug_info = f"[{off_call}] {variant_display}, modifier:{modifier:+d} | "
     shot_result["text"] = debug_info + shot_result.get("text", "")
+    
+    # ✅ ADD LEAN METER VALUE: Add raw result value (-100 to +100) to text for frontend parsing
+    lean_value = game_state.get("lean_result_value", 0)
+    if "lean:" not in shot_result.get("text", ""):
+        shot_result["text"] = shot_result.get("text", "") + f" lean:{lean_value:.1f}"
     
     # Pass next_defensive_setup to animator via roles
     if "next_defensive_setup" in shot_result:
