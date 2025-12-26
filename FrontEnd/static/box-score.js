@@ -1138,6 +1138,7 @@ function setupLockerRoomButton() {
     // ✅ FIX: Use correct franchise command center path
     lockerRoomUrl = '/static/franchise-command-center.html';
     const franchiseParams = new URLSearchParams();
+    franchiseParams.set('mode', 'franchise'); // ✅ Always include mode for consistency
     const finalFranchiseId = urlFranchiseId || (typeof localStorage !== 'undefined' ? localStorage.getItem('franchise_id') : null);
     if (finalFranchiseId) {
       franchiseParams.set('franchise_id', finalFranchiseId);

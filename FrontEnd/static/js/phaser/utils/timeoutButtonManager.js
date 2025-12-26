@@ -288,7 +288,8 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
     const myTeamSideFallback = urlParams.get('my_team');
     const homeId = urlParams.get('home_id');
     const awayId = urlParams.get('away_id');
-    const userTeamIdParam = urlParams.get('user_team_id');
+    const teamId = urlParams.get('team_id'); // ✅ SS&S: Prefer team_id (standardized)
+    const userTeamIdParam = urlParams.get('user_team_id'); // Keep for backward compatibility
     const franchiseId = urlParams.get('franchise_id');
     const weekParam = urlParams.get('week');
     const tournamentId = urlParams.get('tournament_id');
@@ -374,7 +375,8 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
             home_id: homeId,
             away_id: awayId,
             my_team: myTeamSide || myTeamSideFallback || 'home',
-            user_team_id: userTeamIdParam,
+            team_id: teamId || userTeamIdParam, // ✅ SS&S: Prefer team_id, fallback to user_team_id
+            user_team_id: userTeamIdParam, // Keep for backward compatibility
             franchise_id: franchiseId,
             week: weekParam,
             tournament_id: tournamentId,
