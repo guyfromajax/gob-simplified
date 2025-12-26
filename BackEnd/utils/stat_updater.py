@@ -147,6 +147,10 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
         inc_fields: Dict[str, Any] = {}
         set_fields: Dict[str, Any] = {}
         for stat, val in _clean_stat_block(stat_block).items():
+            # ✅ MIN special handling: Convert seconds to minutes (integer division)
+            # Game MIN is tracked in seconds, but season/career MIN should be in minutes
+            if stat == "MIN":
+                val = val // 60  # Convert seconds to minutes (integer division)
             inc_fields[f"stats.season.{stat}"] = val
             inc_fields[f"stats.career.{stat}"] = val
             set_fields[f"stats.game.{stat}"] = 0
@@ -344,6 +348,10 @@ def rollup_game_to_franchise(franchise_id: str | ObjectId, game_id: str | Object
             continue
         stat_block = box_score.get(team_name, {}).get(pos, p.get("stats", {}))
         for stat, val in _clean_stat_block(stat_block).items():
+            # ✅ MIN special handling: Convert seconds to minutes (integer division)
+            # Game MIN is tracked in seconds, but season/career MIN should be in minutes
+            if stat == "MIN":
+                val = val // 60  # Convert seconds to minutes (integer division)
             inc_doc[f"player_stats.{pid}.season.{stat}"] = inc_doc.get(
                 f"player_stats.{pid}.season.{stat}", 0
             ) + val
@@ -609,6 +617,10 @@ def finalize_game(
                 continue
             stat_block = box_score.get(team_name, {}).get(pos, p.get("stats", {}))
             for stat, val in _clean_stat_block(stat_block).items():
+                # ✅ MIN special handling: Convert seconds to minutes (integer division)
+                # Game MIN is tracked in seconds, but season/career MIN should be in minutes
+                if stat == "MIN":
+                    val = val // 60  # Convert seconds to minutes (integer division)
                 inc_doc[f"players.{pid}.season.{stat}"] = inc_doc.get(
                     f"players.{pid}.season.{stat}", 0
                 ) + val
