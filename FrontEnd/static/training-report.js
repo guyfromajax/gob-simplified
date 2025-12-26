@@ -463,11 +463,16 @@ function createMomentumPill(mo) {
   return container;
 }
 
-function formatChangeForTooltip(change) {
+function formatChangeForTooltip(change, attrKey = null) {
+  // ✅ FIX: Format rebound_modifier changes to 2 decimal places
+  const formattedChange = attrKey === 'rebound_modifier' 
+    ? (change > 0 ? `+${change.toFixed(2)}` : change.toFixed(2))
+    : (change > 0 ? `+${change}` : change.toString());
+  
   if (change > 0) {
-    return `+${change}`;
+    return formattedChange;
   } else if (change < 0) {
-    return change.toString();
+    return formattedChange;
   } else {
     return '0';
   }
@@ -595,11 +600,16 @@ function createTeamAttrItem(attrKey, currentValue, change) {
   changeSpan.className = 'attr-change';
   
   if (change !== 0) {
+    // ✅ FIX: Format rebound_modifier changes to 2 decimal places
+    const formattedChange = attrKey === 'rebound_modifier' 
+      ? (change > 0 ? `+${change.toFixed(2)}` : change.toFixed(2))
+      : (change > 0 ? `+${change}` : change.toString());
+    
     if (change > 0) {
-      changeSpan.textContent = `+${change}`;
+      changeSpan.textContent = formattedChange;
       changeSpan.className += ' change-positive';
     } else {
-      changeSpan.textContent = change.toString();
+      changeSpan.textContent = formattedChange;
       changeSpan.className += ' change-negative';
     }
   } else {
