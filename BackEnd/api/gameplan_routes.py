@@ -1073,7 +1073,12 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         if actual_team_id and (not team_obj or not team_obj.get("playbook_settings")):
             logger.warning(f"⚠️ [GET PLAYBOOKS] playbook_settings missing for team {actual_team_id}, adding now...")
             playbook_settings = initialize_playbook_settings()
-            team_key = f"teams.{actual_team_id}"
+            # ✅ FIX: Use correct path based on mode (franchise_teams for franchise, teams for tournament/single)
+            if mode == "franchise":
+                team_key = f"franchise_teams.{actual_team_id}"
+            else:
+                team_key = f"teams.{actual_team_id}"
+            
             if mode == "single":
                 collection.update_one(
                     {"_id": doc_id},
@@ -1089,9 +1094,13 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 doc = collection.find_one({"_id": doc_id})
             else:
                 doc = collection.find_one({"_id": ObjectId(doc_id)})
-            # Reload team_obj
-            teams = doc.get("teams", {})
-            team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
+            # ✅ FIX: Reload team_obj from correct location based on mode
+            if mode == "franchise":
+                franchise_teams = doc.get("franchise_teams", {})
+                team_obj = franchise_teams.get(actual_team_id, {}) if actual_team_id else {}
+            else:
+                teams = doc.get("teams", {})
+                team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
             logger.warning(f"⚠️ [GET PLAYBOOKS] playbook_settings added, reloaded team_obj has playbook_settings: {bool(team_obj.get('playbook_settings'))}")
         
         # Check if position filters need to be populated (after ensure_team_objects_exist and document reload)
