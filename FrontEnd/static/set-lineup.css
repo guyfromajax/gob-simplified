@@ -613,20 +613,21 @@ body {
   font-weight: bold;
 }
 
+/* ✅ UNIFIED: Same colors and thresholds as Player Grid and Player Box Score */
 .player-energy.high {
-  color: #4caf50; /* Green: 75-100% */
+  color: #00aa00; /* Green: 89-100% */
 }
 
 .player-energy.medium {
-  color: #ffeb3b; /* Yellow: 50-74% */
+  color: #cccc00; /* Yellow: 80-89% */
 }
 
 .player-energy.low {
-  color: #ff9800; /* Orange: 25-49% */
+  color: #ff8800; /* Orange: 70-80% */
 }
 
 .player-energy.critical {
-  color: #f44336; /* Red: 0-24% */
+  color: #cc0000; /* Red: 0-70% */
 }
 
 .player-fouls {

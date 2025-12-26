@@ -260,6 +260,117 @@ Every turn result from the backend contains data organized into **three distinct
 
 ---
 
+## Font Color System ✅ **UNIFIED** (January 2025)
+
+### Overview
+
+The Font Color System provides consistent visual feedback for player energy (NG - Nerve/Game) levels across all game interfaces. Energy levels are displayed using color-coded text to quickly identify player fatigue status.
+
+**Status:** ✅ Unified across all interfaces (Lineup Rows, Player Grid, Player Box Score)
+
+### Universal Thresholds
+
+All interfaces use the same energy thresholds and color values:
+
+**Thresholds:**
+- **Green:** > 0.89 (89-100%) - High energy
+- **Yellow:** 0.8-0.89 (80-89%) - Medium-high energy
+- **Orange:** 0.7-0.79 (70-80%) - Medium-low energy
+- **Red:** < 0.7 (0-70%) - Low energy
+
+**Color Values:**
+- **Green:** `#00aa00` (Dark green)
+- **Yellow:** `#cccc00` (Dark yellow)
+- **Orange:** `#ff8800` (Orange)
+- **Red:** `#cc0000` (Dark red)
+
+### Implementation by Interface
+
+#### 1. Lineup Rows (5 Slots)
+
+**Location:** `FrontEnd/static/set-lineup.js` - `updateSlotDisplay()` (lines 534-575)  
+**Location:** `FrontEnd/static/set-lineup.css` - `.player-energy` classes (lines 610-630)
+
+**System:** CSS classes with font color
+- **Classes:** `high`, `medium`, `low`, `critical`
+- **Application:** Font color applied to energy percentage text
+- **Element:** `<div class="player-energy ${energyClass}">${energyPercent}%</div>`
+
+**Threshold Mapping:**
+- `high`: 89-100% → Green (`#00aa00`)
+- `medium`: 80-89% → Yellow (`#cccc00`)
+- `low`: 70-80% → Orange (`#ff8800`)
+- `critical`: 0-70% → Red (`#cc0000`)
+
+#### 2. Player Grid (Roster Table)
+
+**Location:** `FrontEnd/static/set-lineup.js` - `renderRoster()` (lines 360-402)
+
+**System:** Direct background color with white font
+- **Application:** Background color applied to:
+  1. NG cell (always)
+  2. Player name cell (if NG ≤ 0.89)
+- **Font Color:** White (`#fff`) on colored backgrounds
+- **Font Weight:** Bold for player name when colored
+
+**Threshold Logic:**
+```javascript
+if (ng > 0.89) energyBgColor = '#00aa00';      // Green
+else if (ng >= 0.8) energyBgColor = '#cccc00'; // Yellow
+else if (ng >= 0.7) energyBgColor = '#ff8800'; // Orange
+else energyBgColor = '#cc0000';                // Red
+```
+
+#### 3. Player Box Score (Court Page)
+
+**Location:** `FrontEnd/static/js/phaser/gameScene.js` - `getEnergyColor()` (lines 489-494)  
+**Location:** `FrontEnd/static/js/phaser/gameScene.js` - `applyPlayerStats()` (lines 980-1003)
+
+**System:** Direct font color application
+- **Application:** Font color applied to all cells in the player's row (name, PTS, REB, AST, FOULS, STL, BLK, TO, DEF_A, DEF_S, DEF_PCT)
+- **Update Frequency:** Updated dynamically as player energy changes during gameplay
+
+**Function:**
+```javascript
+const getEnergyColor = (ng) => {
+  if (ng > 0.89) return '#00aa00';      // Green
+  if (ng >= 0.8) return '#cccc00';      // Yellow
+  if (ng >= 0.7) return '#ff8800';      // Orange
+  return '#cc0000';                      // Red
+};
+```
+
+### Design Rationale
+
+**Consistency:**
+- All three interfaces use identical thresholds (70/80/89%) and color values
+- Provides consistent visual language across the entire game experience
+- Players can quickly identify energy status regardless of which screen they're viewing
+
+**Visual Hierarchy:**
+- **Lineup Rows:** Font color only (subtle, doesn't interfere with other information)
+- **Player Grid:** Background color (more prominent, helps identify low-energy players in roster)
+- **Player Box Score:** Font color on all cells (comprehensive, updates in real-time during gameplay)
+
+**Color Psychology:**
+- Green = Good (high energy, ready to play)
+- Yellow = Caution (moderate energy, monitor)
+- Orange = Warning (low energy, consider substitution)
+- Red = Critical (very low energy, should be substituted)
+
+### Key Files
+
+**Frontend:**
+- `FrontEnd/static/set-lineup.js` - Lineup Rows and Player Grid logic
+- `FrontEnd/static/set-lineup.css` - Lineup Rows CSS classes
+- `FrontEnd/static/js/phaser/gameScene.js` - Player Box Score color application
+
+**Backend:**
+- `BackEnd/models/player.py` - Player NG attribute storage
+- `BackEnd/models/game_manager.py` - Energy updates during gameplay
+
+---
+
 ## FCP/HCT System ✅ **COMPLETE** (January 2025)
 
 ### Overview
