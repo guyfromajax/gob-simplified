@@ -1322,6 +1322,42 @@ The stopper system uses SS&S helper functions to populate player roles, ensuring
 - Result structure includes all necessary IDs:
   - `foul_player_id` - For foul announcements
   - `victim_id`, `victim_name` - For turnover announcements
+
+### Future Enhancements
+
+**1. Strategic Step Selection for Turnovers/Steals**
+
+**Current State:**
+- Turnovers (`DEAD_BALL_TURNOVER`) and steals (`STEAL`) currently use the middle step as a placeholder (`len(steps) // 2`)
+- Fouls use random step selection (which is appropriate)
+
+**Enhancement Needed:**
+- Implement strategic step selection based on:
+  - Player attributes (ball handler's `BH` vs defender's `ST`)
+  - Player dynamics at each step
+  - Defensive matchup effectiveness
+  - Game situation (score, time, quarter)
+
+**Location:** `BackEnd/engine/phase_resolution.py` (line ~1667)
+
+**Rationale:** Turnovers are more likely during high-pressure situations (passes, drives), so the stop step should reflect the most likely point of failure based on player attributes and game context.
+
+**2. Defensive Player Selection for Steals**
+
+**Current State:**
+- Steal stopper step is created but doesn't specify which defensive player makes the steal
+- Placeholder comment exists in code
+
+**Enhancement Needed:**
+- Determine which defensive player makes the steal based on:
+  - Defensive positioning at the stop step
+  - Player attributes (defender's `ST` vs ball handler's `BH`)
+  - Matchup analysis
+  - Proximity to ball handler
+
+**Location:** `BackEnd/engine/phase_resolution.py` (line ~1727)
+
+**Implementation:** Find defensive player closest to ball handler at stop step, consider defensive positioning and ST attribute, add defensive player to stopper step `pos_actions` with "steal" action.
   - `stealer_id`, `stealer_name` - For steal announcements
   - `foul_team` - For foul type determination
 
