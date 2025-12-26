@@ -226,8 +226,11 @@ Every turn result from the backend contains data organized into **three distinct
 **Shooting Foul Detection:**
 - **Location:** `FrontEnd/static/js/phaser/animation/ballManager.js` - Detected when ball reaches rim
 - **Defensive Shooting Foul on Miss:** Detected when `foul_player_id` exists, `foul_team === "DEFENSE"`, and `result === "MISS"`
+  - **Fallback Pattern:** Always displays announcement even if player sprite/info is missing (matches AND-1 pattern for consistency)
+  - **Announcement:** "Shooting Foul!" displayed with fouling player's headshot if available, otherwise without headshot (dark yellow text with silver border)
 - **AND-1 (Made Shot + Foul):** Detected when text includes "AND-1" OR (`foul_player_id` exists + `result === "MAKE"` + `foul_team === "DEFENSE"`)
-- **Announcement:** "Shooting Foul!" displayed with fouling player's headshot (dark yellow text with silver border)
+  - **Fallback Pattern:** Always displays announcement even if player data is missing
+  - **Announcement:** "It's Good! And 1!" or two-row announcement with shooter and fouler headshots (dark yellow text with silver border)
 
 **Visual Styling:**
 - **Foul Announcements:** Dark yellow text (`#b8860b`) with silver border (`#c0c0c0`)
@@ -237,6 +240,9 @@ Every turn result from the backend contains data organized into **three distinct
 **Steal → Fast Break Flow:**
 - When a steal leads to a fast break, only the "STEAL!" announcement is shown
 - Fast Break announcement is suppressed to avoid duplicate announcements
+- **Implementation:** `FrontEnd/static/js/phaser/animation/turnPreparation.js` checks `turn.roles?.is_steal_entry` flag
+  - If `is_steal_entry` is true, Fast Break announcement is suppressed (steal announcement takes priority)
+  - Backend sets `is_steal_entry` flag on Fast Break turns that originated from a steal
 
 **Dead Ball Turnover Randomization:**
 - Dead ball turnovers (non-steal turnovers) randomly display either "Travel!" or "Double Dribble!" (50/50 chance)
