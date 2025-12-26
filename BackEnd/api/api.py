@@ -2102,13 +2102,15 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
         logging.error(f"🚨 TIMEOUT: Failed to save game state: {e}")
         # Don't fail the timeout call if save fails - game is still in memory
     
-    # Return current timeout counts for frontend display
+    # Return current timeout counts and clock for frontend display
     return {
         "message": f"Timeout called by {calling_team.name}",
         "calling_team": calling_team.name,
         "timeouts_remaining": getattr(calling_team, 'timeouts', 4),
         "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
         "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
+        "clock": gm.game_state.get("clock", "8:00"),  # ✅ TIMEOUT: Include current clock (backend source of truth)
+        "time_remaining": gm.game_state.get("time_remaining", 480),  # Also include time_remaining for consistency
     }
 
 

@@ -296,13 +296,21 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
     
     const currentQuarter = scene.simData?.quarter || scene.quarter || 1;
     
-    // ✅ TIMEOUT: Get clock from DOM element first (most reliable - what's actually displayed)
-    // Then fall back to scene.simData.clock (updated by updateScoreboard), then URL params
+    // ✅ TIMEOUT: Get clock from API response first (backend source of truth - most reliable)
+    // The /api/call-timeout endpoint returns the current clock at the moment the timeout is called
     let clock = null;
-    const clockEl = document.getElementById('game-clock');
-    if (clockEl && clockEl.textContent && clockEl.textContent.trim()) {
-        clock = clockEl.textContent.trim();
-        console.log(`✅ TIMEOUT: Using clock from DOM element: ${clock}`);
+    if (timeoutResult && timeoutResult.clock) {
+        clock = timeoutResult.clock;
+        console.log(`✅ TIMEOUT: Using clock from API response: ${clock}`);
+    }
+    
+    // Fallback to DOM element (what's actually displayed to user)
+    if (!clock) {
+        const clockEl = document.getElementById('game-clock');
+        if (clockEl && clockEl.textContent && clockEl.textContent.trim()) {
+            clock = clockEl.textContent.trim();
+            console.log(`✅ TIMEOUT: Using clock from DOM element: ${clock}`);
+        }
     }
     
     // Fallback to scene.simData.clock (updated by updateScoreboard as turns are processed)
