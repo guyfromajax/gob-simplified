@@ -561,8 +561,21 @@ export async function shootBall({
         const teamStyle = isHomeTeam ? 'home' : 'away';
         
         // Check if this is a shooting foul (AND-1 or foul on shot)
-        const isShootingFoul = turnData?.text?.includes('AND-1') || 
-                              turnData?.text?.includes('fouls') && turnData?.text?.includes('on the shot');
+        // ✅ FIX: Use more reliable detection - check for foul_player_id + foul_team
+        // For defensive shooting fouls on MISS: foul_player_id exists, foul_team === "DEFENSE", result === "MISS"
+        // For AND-1 (MAKE + foul): text includes "AND-1" OR (foul_player_id exists + result === "MAKE" + foul_team === "DEFENSE")
+        const hasFoulPlayer = !!(turnData?.foul_player_id || turnData?.foul_player?.player_id);
+        const isDefensiveShootingFoulOnMiss = hasFoulPlayer && 
+                                             turnData?.foul_team === "DEFENSE" && 
+                                             result === "MISS";
+        const isAndOne = turnData?.text?.includes('AND-1') || 
+                        (hasFoulPlayer && result === "MAKE" && turnData?.foul_team === "DEFENSE");
+        const isShootingFoul = isAndOne || isDefensiveShootingFoulOnMiss;
+        
+        // ✅ DEBUG: Log shooting foul detection for defensive fouls on misses
+        if (result === "MISS" && hasFoulPlayer && turnData?.foul_team === "DEFENSE") {
+          console.log(`🔍 [SHOOTING FOUL DETECTION] Result: ${result}, hasFoulPlayer: ${hasFoulPlayer}, foul_team: ${turnData?.foul_team}, isDefensiveShootingFoulOnMiss: ${isDefensiveShootingFoulOnMiss}, isShootingFoul: ${isShootingFoul}`);
+        }
         
         // Get shooter/foul player data for announcements
         const shooterSprite = scene.playerSprites?.[shooterId];
