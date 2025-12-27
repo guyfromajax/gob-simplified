@@ -349,6 +349,19 @@ function renderSchedule(data) {
       }
       gameDiv.innerHTML = text;
       
+      // ✅ SS&S: Add box score link for all completed games
+      if (g.status === 'complete' && g.game_id) {
+        const boxScoreLink = document.createElement('a');
+        boxScoreLink.href = `/static/box-score.html?mode=franchise&franchise_id=${franchiseId}&game_id=${g.game_id}`;
+        boxScoreLink.textContent = ' [Box Score]';
+        boxScoreLink.className = 'box-score-link';
+        boxScoreLink.style.color = '#4a90e2';
+        boxScoreLink.style.textDecoration = 'none';
+        boxScoreLink.style.marginLeft = '8px';
+        boxScoreLink.style.fontSize = 'calc(1em - 2px)';
+        gameDiv.appendChild(boxScoreLink);
+      }
+      
       // Add training report link if this is user's team's game and training report exists
       if (g.is_user_team && g.has_training_report) {
         const link = document.createElement('a');
@@ -435,7 +448,7 @@ async function init() {
     const scheduleData = await fetchJSON(`/franchise/schedule?franchise_id=${franchiseId}`);
     renderSchedule(scheduleData);
     renderLeaders(await fetchJSON(`/franchise/leaders?franchise_id=${franchiseId}`));
-    renderTeamStats(await fetchJSON('/franchise/team-stats'));
+    renderTeamStats(await fetchJSON(`/franchise/team-stats?franchise_id=${franchiseId}`));
     renderRecruits(await fetchJSON(`/franchise/recruits?franchise_id=${franchiseId}`));
     // ✅ Removed: renderTrainingResults - Training Reports are now linked directly on Schedule page
     

@@ -352,39 +352,46 @@ def rollup_game_to_franchise(franchise_id: str | ObjectId, game_id: str | Object
             # Game MIN is tracked in seconds, but season/career MIN should be in minutes
             if stat == "MIN":
                 val = val // 60  # Convert seconds to minutes (integer division)
-            inc_doc[f"player_stats.{pid}.season.{stat}"] = inc_doc.get(
-                f"player_stats.{pid}.season.{stat}", 0
+            # ✅ SS&S: Write to players object (single source of truth), not player_stats
+            inc_doc[f"players.{pid}.season.{stat}"] = inc_doc.get(
+                f"players.{pid}.season.{stat}", 0
             ) + val
-            inc_doc[f"player_stats.{pid}.career.{stat}"] = inc_doc.get(
-                f"player_stats.{pid}.career.{stat}", 0
+            inc_doc[f"players.{pid}.career.{stat}"] = inc_doc.get(
+                f"players.{pid}.career.{stat}", 0
             ) + val
-        inc_doc[f"player_stats.{pid}.season.GP"] = inc_doc.get(
-            f"player_stats.{pid}.season.GP", 0
+        inc_doc[f"players.{pid}.season.GP"] = inc_doc.get(
+            f"players.{pid}.season.GP", 0
         ) + 1
-        inc_doc[f"player_stats.{pid}.career.GP"] = inc_doc.get(
-            f"player_stats.{pid}.career.GP", 0
+        inc_doc[f"players.{pid}.career.GP"] = inc_doc.get(
+            f"players.{pid}.career.GP", 0
         ) + 1
 
+        # ✅ SS&S: Set meta in players object if not already present
         meta = players_collection.find_one(
-            {"_id": pid}, {"first_name": 1, "last_name": 1, "team": 1}
+            {"_id": pid}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1}
         )
         if meta:
-            set_doc[f"player_stats.{pid}.first_name"] = meta.get("first_name", "")
-            set_doc[f"player_stats.{pid}.last_name"] = meta.get("last_name", "")
-            set_doc[f"player_stats.{pid}.team"] = meta.get("team", "")
+            # Only set meta if it doesn't already exist (preserve existing meta)
+            set_doc[f"players.{pid}.meta.first_name"] = meta.get("first_name", "")
+            set_doc[f"players.{pid}.meta.last_name"] = meta.get("last_name", "")
+            set_doc[f"players.{pid}.meta.team"] = meta.get("team", "")
+            if meta.get("team_id"):
+                set_doc[f"players.{pid}.meta.team_id"] = str(meta.get("team_id"))
 
     if not inc_doc:
         return
 
+    # ✅ SS&S: Use applied_games (not processed_games) for consistency with finalize_game()
     update_doc: Dict[str, Any] = {
         "$inc": inc_doc,
-        "$addToSet": {"processed_games": game_id},
+        "$addToSet": {"applied_games": game_id},
     }
     if set_doc:
         update_doc["$set"] = set_doc
 
+    # ✅ SS&S: Use applied_games (not processed_games) for consistency with finalize_game()
     result = db.franchises.find_one_and_update(
-        {"_id": fid, "processed_games": {"$ne": game_id}},
+        {"_id": fid, "applied_games": {"$ne": game_id}},
         update_doc,
         return_document=ReturnDocument.AFTER,
     )
@@ -392,16 +399,18 @@ def rollup_game_to_franchise(franchise_id: str | ObjectId, game_id: str | Object
     if not result:
         return
 
+    # ✅ SS&S: Calculate per_game and percentages from players object (not player_stats)
     stats_doc: Dict[str, Any] = {}
     for p in players:
         pid = str(p.get("playerId"))
-        pdata = result.get("player_stats", {}).get(pid, {})
+        pdata = result.get("players", {}).get(pid, {})
         season_totals = pdata.get("season", {})
         career_totals = pdata.get("career", {})
-        stats_doc[f"player_stats.{pid}.season.per_game"] = _per_game_block(season_totals)
-        stats_doc[f"player_stats.{pid}.career.per_game"] = _per_game_block(career_totals)
-        stats_doc[f"player_stats.{pid}.season.percentages"] = _pct_block(season_totals)
-        stats_doc[f"player_stats.{pid}.career.percentages"] = _pct_block(career_totals)
+        # Store per_game and percentages in players object for easy access
+        stats_doc[f"players.{pid}.season.per_game"] = _per_game_block(season_totals)
+        stats_doc[f"players.{pid}.career.per_game"] = _per_game_block(career_totals)
+        stats_doc[f"players.{pid}.season.percentages"] = _pct_block(season_totals)
+        stats_doc[f"players.{pid}.career.percentages"] = _pct_block(career_totals)
 
     if stats_doc:
         db.franchises.update_one({"_id": fid}, {"$set": stats_doc})

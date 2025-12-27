@@ -587,6 +587,11 @@ def season_schedule(franchise_id: str):
             if team_id and (str(away_id) == team_id or str(home_id) == team_id):
                 has_training_report = str(idx) in training_reports
             
+            # ✅ SS&S: Include game_id for completed games (needed for box score links)
+            game_id = None
+            if status == "complete" and game_doc:
+                game_id = str(game_doc.get("_id", ""))
+            
             week_games.append({
                 "week": idx,
                 "away_team_id": str(away_id),
@@ -595,7 +600,8 @@ def season_schedule(franchise_id: str):
                 "home_score": home_score,
                 "status": status,
                 "has_training_report": has_training_report,
-                "is_user_team": str(away_id) == team_id or str(home_id) == team_id
+                "is_user_team": str(away_id) == team_id or str(home_id) == team_id,
+                "game_id": game_id  # ✅ SS&S: Include game_id for box score links
             })
         weeks.append(week_games)
 
@@ -629,9 +635,9 @@ def get_leaders(
         rows: list[dict[str, Any]] = []
         for pid, pdata in players.items():
             meta = pdata.get("meta", {})
+            # ✅ SS&S: Read stats directly from players.{pid}.season.{stat} (no totals wrapper)
             block = pdata.get(scope, {}) or {}
-            totals = block.get("totals", block)
-            value = totals.get(stat, 0)
+            value = block.get(stat, 0)
             rows.append(
                 {
                     "player_id": pid,
@@ -645,6 +651,7 @@ def get_leaders(
         rows.sort(key=lambda r: r["value"], reverse=True)
         return rows[:limit]
 
+    # ✅ SS&S: Read stats directly from players.{pid}.season.{stat} (no totals wrapper)
     pipeline = [
         {"$match": {"_id": fid}},
         {"$project": {"players": {"$objectToArray": "$players"}}},
@@ -653,7 +660,7 @@ def get_leaders(
             "$project": {
                 "player_id": "$players.k",
                 "meta": "$players.v.meta",
-                "value": f"$players.v.{scope}.totals.{stat}",
+                "value": f"$players.v.{scope}.{stat}",  # Direct stat access, no totals wrapper
             }
         },
         {"$sort": {"value": -1}},
@@ -700,23 +707,72 @@ def leaders(
 
 
 @router.get("/franchise/team-stats")
-def team_stats():
-    teams = list(db.teams.find({}, {"name": 1}))
+def team_stats(franchise_id: str):
+    """Get team stats by aggregating player stats from franchise document.
+    
+    ✅ SS&S: Aggregates from franchise.players object (franchise-specific stats),
+    not from universal players_collection.
+    """
+    try:
+        fid = ObjectId(franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise_id")
+    
+    franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 1, "franchise_teams": 1})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    
+    players = franchise_doc.get("players", {})
+    franchise_teams = franchise_doc.get("franchise_teams", {})
+    
+    # Get all team IDs from franchise_teams
+    team_stats_map: Dict[str, Dict[str, int]] = {}
+    
+    # Initialize team stats for all teams in franchise
+    # ✅ SS&S: Normalize team_id keys to strings for consistent comparison
+    for team_id in franchise_teams.keys():
+        team_id_str = str(team_id)
+        team_stats_map[team_id_str] = {
+            "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
+            "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
+            "TO": 0, "F": 0
+        }
+    
+    # Aggregate stats from players object
+    for pid, pdata in players.items():
+        meta = pdata.get("meta", {})
+        team_id = meta.get("team_id")
+        if not team_id:
+            continue
+        
+        # ✅ SS&S: Normalize team_id to string for consistent comparison
+        team_id_str = str(team_id)
+        
+        season_stats = pdata.get("season", {})
+        if team_id_str not in team_stats_map:
+            team_stats_map[team_id_str] = {
+                "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
+                "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
+                "TO": 0, "F": 0
+            }
+        
+        # Sum all stats for this team
+        for stat, val in season_stats.items():
+            if isinstance(val, (int, float)) and stat in team_stats_map[team_id_str]:
+                team_stats_map[team_id_str][stat] += val
+    
+    # Convert to output format with team names
     output = []
-    for t in teams:
-        players = list(db.players.find({"team": t["name"]}))
-        totals = {}
-        for p in players:
-            for stat, val in p.get("stats", {}).get("season", {}).items():
-                # Handle case where val might be a list or other non-numeric type
-                if isinstance(val, (int, float)):
-                    totals[stat] = totals.get(stat, 0) + val
-                elif isinstance(val, list) and len(val) > 0:
-                    # If it's a list, try to sum the numeric values
-                    numeric_vals = [v for v in val if isinstance(v, (int, float))]
-                    if numeric_vals:
-                        totals[stat] = totals.get(stat, 0) + sum(numeric_vals)
-        output.append({"team": t["name"], "stats": totals})
+    for team_id_str, stats in team_stats_map.items():
+        # Get team name from teams collection
+        try:
+            team_doc = db.teams.find_one({"_id": ObjectId(team_id_str)}, {"name": 1})
+            team_name = team_doc.get("name", team_id_str) if team_doc else team_id_str
+        except Exception:
+            # Fallback if team_id_str is not a valid ObjectId
+            team_name = team_id_str
+        output.append({"team": team_name, "stats": stats})
+    
     return {"teams": output}
 
 

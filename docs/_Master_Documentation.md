@@ -92,6 +92,126 @@
    - Even distribution toggles: Per-container toggle state
    - Persist across all GMO and GP instances until changed
 
+#### Stats Tracking
+
+**Storage Path:** `franchise_document.players.{player_id}`
+
+**⚠️ CRITICAL - Single Source of Truth:** All player stats (season and career) are stored in the `players` object, NOT in `player_stats`. The `players` object is the authoritative location for:
+- Player metadata (`meta`: first_name, last_name, team, team_id)
+- Evolved attributes (`attributes`: all 30+ attributes with `anchor_` prefixed versions)
+- Evolved position ratings (`position_ratings`: PG, SG, SF, PF, C ratings)
+- Season stats (`season`: PTS, REB, AST, etc. - direct totals)
+- Career stats (`career`: PTS, REB, AST, etc. - direct totals)
+
+**Structure:**
+```javascript
+{
+  players: {
+    "player_id": {  // Keyed by player ObjectId (string)
+      "meta": {
+        "first_name": "CJ",
+        "last_name": "Castleman",
+        "team": "Bentley-Truman",
+        "team_id": "BENTLEY_TRUMAN"
+      },
+      "attributes": {
+        "SC": 78,  // Evolved from training
+        "SH": 73,
+        "anchor_SC": 78,
+        // ... all 30+ attributes
+      },
+      "position_ratings": {
+        "PG": 70,
+        "SG": 85,
+        "SF": 92,
+        "PF": 72,
+        "C": 55
+      },
+      "season": {
+        "PTS": 450,
+        "REB": 120,
+        "AST": 85,
+        "FGM": 180,
+        "FGA": 400,
+        "GP": 5,
+        // ... all stat fields (direct totals, no wrapper)
+      },
+      "career": {
+        "PTS": 1234,
+        "REB": 456,
+        // ... all stat fields (direct totals, no wrapper)
+      }
+    }
+  }
+}
+```
+
+**Stats Rollup Process:**
+
+1. **After Game Completion:**
+   - `finalize_game()` increments `players.{pid}.season.{stat}` and `players.{pid}.career.{stat}`
+   - `rollup_game_to_franchise()` should also write to `players.{pid}.season.{stat}` (not `player_stats`)
+   - Both functions use `$inc` operator to increment totals
+   - `applied_games` array prevents double-counting (game_id added after rollup)
+
+2. **Stat Fields:**
+   - All standard box score stats: `PTS`, `REB`, `AST`, `STL`, `BLK`, `FGM`, `FGA`, `TPM`, `TPA`, `FTM`, `FTA`, `TO`, `F`, `MIN`, etc.
+   - `MIN` is converted from seconds (game) to minutes (season/career) during rollup
+   - `GP` (Games Played) is incremented by 1 for each game
+
+3. **Team Stats Aggregation:**
+   - Team stats are calculated by aggregating all player stats from `players` object
+   - Filter by `meta.team_id` to get players for a specific team
+   - Sum all stat fields across players on that team
+   - Stored in `franchise_teams.{team_id}` or computed on-demand for display
+
+**Why `players` and Not `player_stats`:**
+
+- **`players`** is the complete player data structure used throughout the system:
+  - Training system writes to `players.{pid}.attributes`
+  - Frontend expects `franchiseDoc.players[playerId].season`
+  - `get_leaders()` reads from `players.{pid}`
+  - Architecture documentation specifies `players` structure
+  - Single unified location for all player data (attributes + stats)
+
+- **`player_stats`** was an incomplete migration attempt:
+  - Only contains stats (no attributes, no position_ratings)
+  - Not used by training system
+  - Not expected by frontend
+  - Creates dual storage paths = inconsistency
+
+**API Endpoints for Stats:**
+
+- `GET /franchise/state` - Returns full franchise document including `players` object
+- `GET /franchise/roster` - Returns roster with player attributes (stats loaded separately from `players`)
+- `GET /franchise/leaders` - Reads from `players.{pid}.{scope}` to get category leaders
+- `GET /franchise/team-stats` - Should aggregate from `players` object (currently broken - reads from wrong source)
+
+**Frontend Loading Pattern:**
+
+```javascript
+// ✅ CORRECT: Load stats from players object
+const franchiseDoc = await fetchJSON(`/franchise/state?franchise_id=${franchiseId}`);
+const playerStats = franchiseDoc.players[playerId];
+const seasonStats = playerStats?.season || {};
+const careerStats = playerStats?.career || {};
+```
+
+**Backend Rollup Pattern:**
+
+```python
+# ✅ CORRECT: Write to players object
+inc_doc[f"players.{pid}.season.{stat}"] = val
+inc_doc[f"players.{pid}.career.{stat}"] = val
+inc_doc[f"players.{pid}.season.GP"] = 1
+inc_doc[f"players.{pid}.career.GP"] = 1
+
+db.franchises.update_one(
+    {"_id": fid, "applied_games": {"$ne": game_id}},
+    {"$inc": inc_doc, "$addToSet": {"applied_games": game_id}}
+)
+```
+
 #### Key Variables
 
 **Core Navigation Anchor Set (Required for all navigation):**
