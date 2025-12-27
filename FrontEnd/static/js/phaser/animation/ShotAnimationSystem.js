@@ -380,9 +380,29 @@ export class ShotAnimationSystem {
     // TODO: Remove if this fix doesn't resolve the animation sync issue
     this._skeletonDefensivePlayerIds = [];
     
+    // 🔍 DEBUG: Log team_id format mismatch detection
+    const sampleSprite = turnData.animations.length > 0 ? this.playerSprites[turnData.animations[0]?.playerId] : null;
+    if (sampleSprite && offenseTeamId) {
+      console.log('🔍 [ShotAnimationSystem] Team ID Comparison Debug:', {
+        spriteTeamId: sampleSprite.team_id,
+        spriteTeamIdType: typeof sampleSprite.team_id,
+        spriteTeamIdIsObjectId: /^[0-9a-f]{24}$/i.test(String(sampleSprite.team_id)),
+        offenseTeamId: offenseTeamId,
+        offenseTeamIdType: typeof offenseTeamId,
+        offenseTeamIdIsObjectId: /^[0-9a-f]{24}$/i.test(String(offenseTeamId)),
+        match: String(sampleSprite.team_id) === String(offenseTeamId),
+        resultType: turnData?.result_type,
+        turnIndex: turnData?.index,
+        playerSpritesCount: Object.keys(this.playerSprites).length
+      });
+    }
+    
     for (const anim of turnData.animations) {
       const sprite = this.playerSprites[anim.playerId];
-      if (!sprite) continue;
+      if (!sprite) {
+        console.warn('⚠️ [ShotAnimationSystem] Missing sprite for playerId:', anim.playerId);
+        continue;
+      }
       
       const isOffensivePlayer = offenseTeamId ? String(sprite.team_id) === String(offenseTeamId) : false;
       playerClassifications[anim.playerId] = isOffensivePlayer ? 'offense' : 'defense';
@@ -402,9 +422,16 @@ export class ShotAnimationSystem {
         offensiveCount,
         defensiveCount,
         offenseTeamId,
+        offenseTeamIdType: typeof offenseTeamId,
+        offenseTeamIdIsObjectId: /^[0-9a-f]{24}$/i.test(String(offenseTeamId)),
         turnDataId: turnData?.id,
         resultType: turnData?.result_type,
-        totalAnimations: turnData.animations?.length
+        totalAnimations: turnData.animations?.length,
+        playerSpritesKeys: Object.keys(this.playerSprites),
+        sampleSpriteTeamIds: turnData.animations.slice(0, 3).map(a => {
+          const s = this.playerSprites[a.playerId];
+          return s ? { playerId: a.playerId, team_id: s.team_id, type: typeof s.team_id } : null;
+        }).filter(Boolean)
       });
     }
     
@@ -1092,6 +1119,18 @@ export class ShotAnimationSystem {
       
       // Handle the rebound within the shot turn
       await this.handleEmbeddedRebound(turnData);
+      
+      // 🔍 DEBUG: Verify playerSprites state after embedded rebound
+      console.log('🔍 [MISS HANDLER] After handleEmbeddedRebound() - playerSprites state:', {
+        playerSpritesCount: Object.keys(this.playerSprites).length,
+        samplePlayerIds: Object.keys(this.playerSprites).slice(0, 5),
+        sampleTeamIds: Object.keys(this.playerSprites).slice(0, 5).map(id => {
+          const sprite = this.playerSprites[id];
+          return sprite ? { id, team_id: sprite.team_id, type: typeof sprite.team_id } : null;
+        }).filter(Boolean),
+        resultType: turnData?.result_type,
+        turnIndex: turnData?.index
+      });
     } else {
       // ✅ PRIORITY 2 FIX: Add defensive logging when rebound data is missing
       console.warn('🎬 ShotAnimationSystem: Rebound data missing, skipping embedded rebound', {

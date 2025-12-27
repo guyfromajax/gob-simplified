@@ -2170,9 +2170,29 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   let offensiveCount = 0;
   let defensiveCount = 0;
   
+  // 🔍 DEBUG: Log team_id format mismatch detection
+  const sampleSprite = turnData.animations.length > 0 ? playerSprites[turnData.animations[0]?.playerId] : null;
+  if (sampleSprite && offenseTeamId) {
+    console.log('🔍 [turnAnimation] Team ID Comparison Debug:', {
+      spriteTeamId: sampleSprite.team_id,
+      spriteTeamIdType: typeof sampleSprite.team_id,
+      spriteTeamIdIsObjectId: /^[0-9a-f]{24}$/i.test(String(sampleSprite.team_id)),
+      offenseTeamId: offenseTeamId,
+      offenseTeamIdType: typeof offenseTeamId,
+      offenseTeamIdIsObjectId: /^[0-9a-f]{24}$/i.test(String(offenseTeamId)),
+      match: String(sampleSprite.team_id) === String(offenseTeamId),
+      resultType: turnData?.result_type,
+      turnIndex: turnData?.index,
+      playerSpritesCount: Object.keys(playerSprites).length
+    });
+  }
+  
   for (const anim of turnData.animations) {
     const sprite = playerSprites[anim.playerId];
-    if (!sprite) continue;
+    if (!sprite) {
+      console.warn('⚠️ [turnAnimation] Missing sprite for playerId:', anim.playerId);
+      continue;
+    }
     
     const isOffensivePlayer = offenseTeamId ? String(sprite.team_id) === String(offenseTeamId) : false;
     playerClassifications[anim.playerId] = isOffensivePlayer ? 'offense' : 'defense';
@@ -2190,9 +2210,16 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       offensiveCount,
       defensiveCount,
       offenseTeamId,
+      offenseTeamIdType: typeof offenseTeamId,
+      offenseTeamIdIsObjectId: /^[0-9a-f]{24}$/i.test(String(offenseTeamId)),
       turnDataId: turnData?.id,
       resultType: turnData?.result_type,
-      totalAnimations: turnData.animations?.length
+      totalAnimations: turnData.animations?.length,
+      playerSpritesKeys: Object.keys(playerSprites),
+      sampleSpriteTeamIds: turnData.animations.slice(0, 3).map(a => {
+        const s = playerSprites[a.playerId];
+        return s ? { playerId: a.playerId, team_id: s.team_id, type: typeof s.team_id } : null;
+      }).filter(Boolean)
     });
   }
 
