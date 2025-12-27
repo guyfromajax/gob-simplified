@@ -950,6 +950,10 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         away_scouting = away_team_data.get("scouting")
                         home_strategy = home_team_data.get("strategy_settings")
                         away_strategy = away_team_data.get("strategy_settings")  # Fixed: was reading from home_team_data
+                        # ✅ SS&S: Restore strategy_calls (playcall overrides) from database
+                        home_strategy_calls = home_team_data.get("strategy_calls")
+                        away_strategy_calls = away_team_data.get("strategy_calls")
+                        away_strategy_calls = away_team_data.get("strategy_calls")
                         
                         # Fallback to old flat structure if teams object doesn't exist (backwards compatibility)
                         if not home_plays and not teams_obj:
@@ -1014,6 +1018,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             away_scouting_data=away_scouting,
                             home_plays_data=home_plays,
                             away_plays_data=away_plays,
+                            home_strategy_calls=home_strategy_calls,  # ✅ SS&S: Restore playcall overrides
+                            away_strategy_calls=away_strategy_calls,  # ✅ SS&S: Restore playcall overrides
                             mode="single",  # Loaded games are always single mode from games_collection
                             user_team_side=request.user_team_side  # ✅ SS&S: Set is_user_team flags
                         )
