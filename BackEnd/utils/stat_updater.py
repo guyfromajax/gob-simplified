@@ -598,33 +598,67 @@ def finalize_game(
         return
 
     if mode == "franchise" and franchise_id:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"🔍 [FINALIZE_GAME] Starting franchise stats rollup: game_id={game_id}, franchise_id={franchise_id}")
+        
         try:
             fid = ObjectId(franchise_id)
-        except Exception:
+        except Exception as e:
+            logger.error(f"❌ [FINALIZE_GAME] Invalid franchise_id format: {franchise_id}, error: {e}")
             return
 
+        # Try to find game by game_id (could be ObjectId or string)
         game = games_collection.find_one({"_id": game_id})
         if not game and isinstance(game_id, str):
             try:
                 game = games_collection.find_one({"_id": ObjectId(game_id)})
-            except Exception:
+                logger.info(f"🔍 [FINALIZE_GAME] Found game using ObjectId conversion: {game_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ [FINALIZE_GAME] Could not convert game_id to ObjectId: {game_id}, error: {e}")
                 game = None
+        
         if not game:
+            logger.error(f"❌ [FINALIZE_GAME] Game not found in games collection: game_id={game_id}")
+            # Try alternative lookup by week and teams
+            logger.info(f"🔍 [FINALIZE_GAME] Attempting alternative lookup...")
             return
+
+        logger.info(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, home={game.get('home_team', {}).get('name') if isinstance(game.get('home_team'), dict) else game.get('home_team')}, away={game.get('away_team', {}).get('name') if isinstance(game.get('away_team'), dict) else game.get('away_team')}")
 
         players = game.get("players", [])
         box_score = game.get("box_score", {})
         team_map = {"home": game.get("home_team"), "away": game.get("away_team")}
+        
+        # Extract team names from team_map (handle both dict and string)
+        home_team_name = team_map.get("home")
+        if isinstance(home_team_name, dict):
+            home_team_name = home_team_name.get("name")
+        away_team_name = team_map.get("away")
+        if isinstance(away_team_name, dict):
+            away_team_name = away_team_name.get("name")
+        
+        logger.info(f"🔍 [FINALIZE_GAME] Processing {len(players)} players, box_score keys: {list(box_score.keys())}, home_team: {home_team_name}, away_team: {away_team_name}")
 
         inc_doc: Dict[str, Any] = {}
+        players_processed = 0
         for p in players:
             pid = p.get("playerId")
             team_side = p.get("team")
             pos = p.get("pos")
             team_name = team_map.get(team_side)
+            if isinstance(team_name, dict):
+                team_name = team_name.get("name")
             if not pid or not team_name:
+                logger.warning(f"⚠️ [FINALIZE_GAME] Skipping player: pid={pid}, team_side={team_side}, team_name={team_name}")
                 continue
+            
             stat_block = box_score.get(team_name, {}).get(pos, p.get("stats", {}))
+            if not stat_block:
+                logger.warning(f"⚠️ [FINALIZE_GAME] No stats found for player {pid} (pos={pos}, team={team_name})")
+                continue
+            
+            players_processed += 1
             for stat, val in _clean_stat_block(stat_block).items():
                 # ✅ MIN special handling: Convert seconds to minutes (integer division)
                 # Game MIN is tracked in seconds, but season/career MIN should be in minutes
@@ -636,17 +670,33 @@ def finalize_game(
                 inc_doc[f"players.{pid}.career.{stat}"] = inc_doc.get(
                     f"players.{pid}.career.{stat}", 0
                 ) + val
+        
+        logger.info(f"🔍 [FINALIZE_GAME] Processed {players_processed} players, {len(inc_doc)} stat increments")
 
         update: Dict[str, Any] = {"$addToSet": {"applied_games": game_id}}
         if inc_doc:
             update["$inc"] = inc_doc
+            logger.info(f"🔍 [FINALIZE_GAME] Update doc has {len(inc_doc)} stat increments")
+        else:
+            logger.warning(f"⚠️ [FINALIZE_GAME] No stats to increment (inc_doc is empty)")
 
         result = db.franchises.update_one(
             {"_id": fid, "applied_games": {"$ne": game_id}},
             update,
         )
         if result.modified_count == 0:
+            logger.warning(f"⚠️ [FINALIZE_GAME] Update had no effect (modified_count=0). Game may already be in applied_games or franchise not found.")
+            # Check if game is already applied
+            franchise_check = db.franchises.find_one({"_id": fid}, {"applied_games": 1})
+            if franchise_check:
+                applied = franchise_check.get("applied_games", [])
+                if game_id in applied:
+                    logger.info(f"ℹ️ [FINALIZE_GAME] Game {game_id} already in applied_games, skipping (idempotent)")
+                else:
+                    logger.error(f"❌ [FINALIZE_GAME] Franchise found but update failed. applied_games={applied}, game_id={game_id}")
             return
+        
+        logger.info(f"✅ [FINALIZE_GAME] Successfully updated franchise document: modified_count={result.modified_count}")
 
         apply_stats_from_summary(game, game_id)
         
