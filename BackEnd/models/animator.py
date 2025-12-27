@@ -621,12 +621,19 @@ class Animator:
         # Check if next play will be FCP/HCT (set after made shots)
         next_defensive_setup = roles.get("next_defensive_setup")
 
-
-        steps = roles["steps"]
-        action_timeline = roles["action_timeline"]
+        # ✅ FIX: Handle missing "steps" or "action_timeline" keys gracefully
+        # This can happen when serializable_roles is created without these fields
+        steps = roles.get("steps", [])
+        action_timeline = roles.get("action_timeline", {})
         logging.debug("action_timeline: %s", action_timeline)
-        shooter = roles["shooter"]
-        ball_handler = roles["ball_handler"]
+        shooter = roles.get("shooter")
+        ball_handler = roles.get("ball_handler")
+
+        # If required fields are missing, return empty animations
+        if not steps or shooter is None or ball_handler is None:
+            logging.warning(f"capture_halfcourt_animation: missing required fields (steps={bool(steps)}, shooter={shooter is not None}, ball_handler={ball_handler is not None})")
+            self.latest_packet = []
+            return []
 
         if event_step is not None:
             steps = steps[:event_step + 1]

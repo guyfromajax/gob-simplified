@@ -548,10 +548,17 @@ class TurnManager:
             if state == "FAST_BREAK":
                 self.logger.log("fb:end")
                 self.game.game_state["fastBreakInProgress"] = False
-        # If animations weren’t assigned yet (e.g. fast break, free throw), use fallback
+        # If animations weren't assigned yet (e.g. fast break, free throw), use fallback
         if "animations" not in result:
             roles = result.get("roles")
             if roles:
+                # ✅ FIX: Reconstruct player references if they're missing from serializable_roles
+                # serializable_roles may not include Player objects, but capture_halfcourt_animation needs them
+                if "shooter" not in roles and result.get("shooter"):
+                    roles["shooter"] = result["shooter"]
+                if "ball_handler" not in roles and result.get("ball_handler"):
+                    roles["ball_handler"] = result["ball_handler"]
+                
                 from BackEnd.models.animator import Animator
                 animator = Animator(self.game)
                 result["animations"] = animator.capture_halfcourt_animation(

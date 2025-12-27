@@ -3742,6 +3742,7 @@ def resolve_half_court_offense_logic(game):
             if "lean:" not in turn_result.get("text", ""):
                 turn_result["text"] = turn_result.get("text", "") + f" lean:{lean_value:.1f}"
             # ✅ FIX: Add serializable roles data (only include fields needed for frontend, not Player objects)
+            # Include steps and action_timeline if they exist (needed for capture_halfcourt_animation fallback)
             serializable_roles = {}
             if roles.get("is_steal_hco_setup"):
                 serializable_roles["is_steal_hco_setup"] = True
@@ -3752,6 +3753,11 @@ def resolve_half_court_offense_logic(game):
                 serializable_roles["ball_handler_id"] = roles.get("ball_handler_id")
                 serializable_roles["other_players_hco_setup_movements"] = roles.get("other_players_hco_setup_movements", [])
                 serializable_roles["hco_setup_x_direction"] = roles.get("hco_setup_x_direction")
+            # ✅ FIX: Include steps and action_timeline if they exist (needed for animation fallback)
+            if "steps" in roles:
+                serializable_roles["steps"] = roles["steps"]
+            if "action_timeline" in roles:
+                serializable_roles["action_timeline"] = roles["action_timeline"]
             if serializable_roles:
                 turn_result["roles"] = serializable_roles
             return turn_result
@@ -3769,6 +3775,7 @@ def resolve_half_court_offense_logic(game):
             if "lean:" not in foul_result.get("text", ""):
                 foul_result["text"] = foul_result.get("text", "") + f" lean:{lean_value:.1f}"
             # ✅ FIX: Add serializable roles data (only include fields needed for frontend, not Player objects)
+            # Include steps and action_timeline if they exist (needed for capture_halfcourt_animation fallback)
             serializable_roles = {}
             if roles.get("is_steal_hco_setup"):
                 serializable_roles["is_steal_hco_setup"] = True
@@ -3779,6 +3786,11 @@ def resolve_half_court_offense_logic(game):
                 serializable_roles["ball_handler_id"] = roles.get("ball_handler_id")
                 serializable_roles["other_players_hco_setup_movements"] = roles.get("other_players_hco_setup_movements", [])
                 serializable_roles["hco_setup_x_direction"] = roles.get("hco_setup_x_direction")
+            # ✅ FIX: Include steps and action_timeline if they exist (needed for animation fallback)
+            if "steps" in roles:
+                serializable_roles["steps"] = roles["steps"]
+            if "action_timeline" in roles:
+                serializable_roles["action_timeline"] = roles["action_timeline"]
             if serializable_roles:
                 foul_result["roles"] = serializable_roles
             return foul_result
@@ -3794,6 +3806,7 @@ def resolve_half_court_offense_logic(game):
             if "lean:" not in foul_result.get("text", ""):
                 foul_result["text"] = foul_result.get("text", "") + f" lean:{lean_value:.1f}"
             # ✅ FIX: Add serializable roles data (only include fields needed for frontend, not Player objects)
+            # Include steps and action_timeline if they exist (needed for capture_halfcourt_animation fallback)
             serializable_roles = {}
             if roles.get("is_steal_hco_setup"):
                 serializable_roles["is_steal_hco_setup"] = True
@@ -3804,6 +3817,11 @@ def resolve_half_court_offense_logic(game):
                 serializable_roles["ball_handler_id"] = roles.get("ball_handler_id")
                 serializable_roles["other_players_hco_setup_movements"] = roles.get("other_players_hco_setup_movements", [])
                 serializable_roles["hco_setup_x_direction"] = roles.get("hco_setup_x_direction")
+            # ✅ FIX: Include steps and action_timeline if they exist (needed for animation fallback)
+            if "steps" in roles:
+                serializable_roles["steps"] = roles["steps"]
+            if "action_timeline" in roles:
+                serializable_roles["action_timeline"] = roles["action_timeline"]
             if serializable_roles:
                 foul_result["roles"] = serializable_roles
             return foul_result
@@ -3905,6 +3923,7 @@ def resolve_half_court_offense_logic(game):
     # Only include serializable fields, not player objects
     # Note: turn_manager.convert_players() will handle player objects in other result fields,
     # but we only store the specific fields we need here to avoid serialization issues
+    # ✅ FIX: Include steps and action_timeline if they exist (needed for capture_halfcourt_animation fallback)
     serializable_roles = {}
     if roles.get("is_steal_hco_setup"):
         serializable_roles["is_steal_hco_setup"] = True
@@ -3917,6 +3936,11 @@ def resolve_half_court_offense_logic(game):
         serializable_roles["next_defensive_setup"] = roles.get("next_defensive_setup")
     if roles.get("intended_shooter_pos"):
         serializable_roles["intended_shooter_pos"] = roles.get("intended_shooter_pos")
+    # ✅ FIX: Include steps and action_timeline if they exist (needed for animation fallback)
+    if "steps" in roles:
+        serializable_roles["steps"] = roles["steps"]
+    if "action_timeline" in roles:
+        serializable_roles["action_timeline"] = roles["action_timeline"]
     if serializable_roles:  # Only add roles if we have something to add
         shot_result["roles"] = serializable_roles
     
