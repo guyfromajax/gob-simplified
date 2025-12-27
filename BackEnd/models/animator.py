@@ -765,6 +765,26 @@ class Animator:
         bh_timeline = action_timeline.get(ball_handler, []) if action_timeline else []
         bh_first_spot = bh_timeline[0][2] if bh_timeline else None
         bh_last_spot = bh_timeline[-1][2] if bh_timeline else None
+        
+        # ✅ FIX: Extract ball_handler_end_coords from steps if action_timeline is missing
+        # This handles the case where serializable_roles doesn't have action_timeline
+        if ball_handler_end_coords is None and steps:
+            # Try to extract from steps - find last step where ball handler has the ball
+            for step in reversed(steps):
+                pos_actions = step.get("pos_actions", {})
+                if bh_pos in pos_actions:
+                    action_info = pos_actions[bh_pos]
+                    location_key = action_info.get("location") or action_info.get("spot", "key")
+                    ball_handler_end_coords = HCO_STRING_SPOTS.get(location_key, HCO_STRING_SPOTS["key"])
+                    if not bh_last_spot:
+                        bh_last_spot = location_key
+                    if not bh_first_spot:
+                        bh_first_spot = location_key
+                    break
+        
+        # ✅ FIX: Ensure ball_handler_end_coords has a default value
+        if ball_handler_end_coords is None:
+            ball_handler_end_coords = HCO_STRING_SPOTS["key"]
 
         for pos, defender in def_lineup.items():
             def_coords = None
@@ -773,8 +793,9 @@ class Animator:
             hasBallAtStep = [ball_owner_by_step[i] is defender for i in range(len(ball_owner_by_step))]
 
             if pos == bh_pos:
-                first_coords = HCO_STRING_SPOTS.get(bh_first_spot, ball_handler_end_coords)
-                final_coords = HCO_STRING_SPOTS.get(bh_last_spot, ball_handler_end_coords)
+                # ✅ FIX: Ensure final_coords and first_coords always have valid values
+                first_coords = HCO_STRING_SPOTS.get(bh_first_spot, ball_handler_end_coords) if bh_first_spot else ball_handler_end_coords
+                final_coords = HCO_STRING_SPOTS.get(bh_last_spot, ball_handler_end_coords) if bh_last_spot else ball_handler_end_coords
                 
                 # Flip to away orientation if needed (wrapper expects coords in current orientation)
                 if is_away_offense:
