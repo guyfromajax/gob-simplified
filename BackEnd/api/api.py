@@ -561,6 +561,7 @@ def get_game_state(game_id: str, quarter: int | None = None):
                  returns empty stats (new game scenario)
     """
     try:
+        logging.info(f"🔍 [BOX_SCORE] Loading game: game_id={game_id}, quarter={quarter}")
         # Check ongoing games first
         gm = ongoing_games.get(game_id)
         logging.info(f"📊 /api/game/{game_id} - GameManager in memory: {gm is not None}, quarter param: {quarter}")
@@ -625,8 +626,18 @@ def get_game_state(game_id: str, quarter: int | None = None):
         
         # Check database
         if games_collection is not None:
+            logging.info(f"🔍 [BOX_SCORE] Checking database for game_id={game_id}")
+            # Try both string and ObjectId lookups
             saved = games_collection.find_one({"_id": game_id})
+            if not saved and isinstance(game_id, str):
+                try:
+                    saved = games_collection.find_one({"_id": ObjectId(game_id)})
+                    logging.info(f"✅ [BOX_SCORE] Found game using ObjectId conversion")
+                except Exception as e:
+                    logging.warning(f"⚠️ [BOX_SCORE] Could not convert game_id to ObjectId: {e}")
+            
             if saved:
+                logging.info(f"✅ [BOX_SCORE] Found game in database: quarter={saved.get('quarter')}, is_final={saved.get('is_final')}, has_box_score={bool(saved.get('box_score'))}, has_players={bool(saved.get('players'))}")
                 saved_quarter = saved.get("quarter", 1)
                 
                 # Check if this is a "new game" scenario: user requesting Q1 but saved game is Q2+
@@ -758,6 +769,11 @@ def get_game_state(game_id: str, quarter: int | None = None):
                     }
                 }
         
+            logging.error(f"❌ [BOX_SCORE] Game not found in database: game_id={game_id}")
+            # Try to find any games with similar IDs for debugging
+            if isinstance(game_id, str) and len(game_id) > 10:
+                similar = list(games_collection.find({"_id": {"$regex": game_id[:10]}}).limit(5))
+                logging.info(f"🔍 [BOX_SCORE] Found {len(similar)} similar game IDs (first 10 chars): {[str(g.get('_id')) for g in similar]}")
         raise HTTPException(status_code=404, detail=f"Game {game_id} not found")
     except Exception as e:
         logging.exception(f"Error fetching game state for {game_id}")

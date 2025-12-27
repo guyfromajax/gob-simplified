@@ -333,6 +333,7 @@ def complete_week(req: CompleteWeekRequest):
     })
     
     # ✅ SS&S: Find user's game and call finalize_game() to rollup stats to franchise document
+    logger.info(f"🔍 [COMPLETE_WEEK] Looking for user's game: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
     user_game = db.games.find_one({
         "week": req.week,
         "$or": [
@@ -343,10 +344,16 @@ def complete_week(req: CompleteWeekRequest):
     })
     if user_game:
         user_game_id = str(user_game.get("_id", ""))
+        logger.info(f"✅ [COMPLETE_WEEK] Found user's game: game_id={user_game_id}, _id type={type(user_game.get('_id'))}")
         if user_game_id:
+            logger.info(f"🔍 [COMPLETE_WEEK] Calling finalize_game() for user's game: game_id={user_game_id}")
             stat_updater.finalize_game(
                 user_game_id, mode="franchise", franchise_id=req.franchise_id
             )
+        else:
+            logger.error(f"❌ [COMPLETE_WEEK] User game found but _id is empty: {user_game}")
+    else:
+        logger.error(f"❌ [COMPLETE_WEEK] User's game not found in games collection. Query: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
 
     for away_id, home_id in week_games:
         if {str(away_id), str(home_id)} == {str(team1_id), str(team2_id)}:

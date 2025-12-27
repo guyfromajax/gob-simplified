@@ -420,23 +420,47 @@ async function init() {
       
       // Load player stats separately from franchise document
       const franchiseDoc = await fetchJSON(`/franchise/state?franchise_id=${franchiseId}`);
+      console.log('🔍 [FCC] Franchise document loaded:', {
+        hasPlayers: !!franchiseDoc?.players,
+        playerCount: franchiseDoc?.players ? Object.keys(franchiseDoc.players).length : 0,
+        firstPlayerId: franchiseDoc?.players ? Object.keys(franchiseDoc.players)[0] : null,
+        firstPlayerData: franchiseDoc?.players ? Object.keys(franchiseDoc.players).length > 0 ? franchiseDoc.players[Object.keys(franchiseDoc.players)[0]] : null : null
+      });
+      
       if (franchiseDoc && franchiseDoc.players && rosterData.players) {
         // Merge stats into player data
+        let statsFound = 0;
+        let statsMissing = 0;
         rosterData.players = rosterData.players.map(player => {
           const playerId = player._id;
           const franchisePlayer = franchiseDoc.players[playerId];
           if (franchisePlayer && franchisePlayer.season) {
             player.stats = { season: franchisePlayer.season };
+            statsFound++;
+            console.log(`✅ [FCC] Stats found for player ${player.name} (${playerId}):`, franchisePlayer.season);
           } else {
             player.stats = { season: {} };
+            statsMissing++;
+            console.log(`❌ [FCC] No stats found for player ${player.name} (${playerId}). Franchise player data:`, franchisePlayer);
           }
           return player;
+        });
+        console.log(`🔍 [FCC] Stats merge complete: ${statsFound} found, ${statsMissing} missing`);
+      } else {
+        console.error('❌ [FCC] Cannot merge stats:', {
+          hasFranchiseDoc: !!franchiseDoc,
+          hasPlayers: !!franchiseDoc?.players,
+          hasRosterPlayers: !!rosterData?.players
         });
       }
       
       if (rosterData.players && rosterData.players.length > 0) {
-        console.log('First player attributes:', rosterData.players[0].attributes);
-        console.log('First player stats:', rosterData.players[0].stats);
+        console.log('🔍 [FCC] First player data:', {
+          name: rosterData.players[0].name,
+          id: rosterData.players[0]._id,
+          attributes: rosterData.players[0].attributes,
+          stats: rosterData.players[0].stats
+        });
       }
       renderTeam(rosterData);
     } catch (error) {
