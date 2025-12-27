@@ -992,3 +992,149 @@ These variables track the current game state and are required when in an active 
 
 ---
 
+## Data & Settings Persistence
+
+> **Last Updated:** February 2025  
+> **Purpose:** Documents the single source of truth architecture for data persistence across all game modes
+
+### Single Source of Truth Principle
+
+**Core Principle:** The database (API) is the **single source of truth** for all persistent data. localStorage is reserved **only** for temporary UI preferences that don't affect gameplay or data consistency.
+
+**Why This Matters:**
+- **Consistency:** Eliminates synchronization bugs between localStorage and database
+- **Reliability:** Database is authoritative - no stale data from localStorage cache
+- **Simplicity:** One code path for all modes (no mode-specific localStorage logic)
+- **Stability:** Settings persist correctly across all navigation scenarios (timeouts, quarter breaks, gameplay breaks)
+
+### What Uses Database (Persistent Data)
+
+**All persistent data is stored in the database and loaded via API:**
+
+1. **Game Plan Settings (`strategy_settings`)**
+   - Stored in: `franchise_teams.{team_id}.strategy_settings` (Franchise), `teams.{team_id}.strategy_settings` (Tournament/Single)
+   - Loaded via: `GET /api/gameplan`
+   - Saved via: `PUT /api/gameplan`
+   - **All modes:** Single, Tournament, Franchise
+
+2. **Playbooks Settings (`playbook_settings`)**
+   - Stored in: `franchise_teams.{team_id}.playbook_settings` (Franchise), `teams.{team_id}.playbook_settings` (Tournament/Single)
+   - Loaded via: `GET /api/playbooks`
+   - Saved via: `POST /api/playbooks`
+   - Includes: Percentages, slot assignments, motion dropdowns, position filters
+   - **All modes:** Single, Tournament, Franchise
+
+3. **Game State**
+   - Stored in: `games_collection` (game documents)
+   - Includes: Scores, quarter, clock, lineups, player stats, box score
+   - **All modes:** Single, Tournament, Franchise
+
+4. **Team/Player Data**
+   - Stored in: Franchise/Tournament documents, `teams_collection`, `players_collection`
+   - Includes: Attributes, stats, plays data, scouting data
+   - **All modes:** Single, Tournament, Franchise
+
+### What Uses localStorage (Temporary UI State Only)
+
+**localStorage is used ONLY for ephemeral UI preferences that don't affect data consistency:**
+
+1. **Position Filter Selections** (Playbooks)
+   - Key: `playbooks_position_filters_{mode}_{teamId}`
+   - Purpose: Remembers which position filter buttons are selected (Standard, PG, SG, SF, PF, C)
+   - **Why localStorage:** UI preference only - doesn't affect saved playbook percentages
+   - **Location:** `playbooks.js` - `savePositionFilterSelections()`, `loadPositionFilterSelections()`
+
+2. **Even Distribution Toggle States** (Playbooks)
+   - Stored in: Playbooks UI state (not persisted to database)
+   - Purpose: Remembers toggle state for "Even Distribution" buttons per container
+   - **Why localStorage:** UI preference only - percentages are what matter, not toggle state
+   - **Note:** Toggle state is not saved to database (only the resulting percentages are saved)
+
+3. **Navigation Context** (Fallback only)
+   - Keys: `franchise_id`, `franchise_week`, `game_id` (as fallback if URL params missing)
+   - Purpose: Fallback for navigation if URL parameters are lost
+   - **Why localStorage:** Navigation convenience only - database is still source of truth
+   - **Note:** URL parameters are primary, localStorage is fallback only
+
+### What Does NOT Use localStorage
+
+**The following were previously using localStorage but now use database exclusively:**
+
+1. ❌ **Game Plan Settings** - Now uses database for all modes (previously localStorage for single mode)
+2. ❌ **Playbooks Settings** - Now uses database for all modes (previously localStorage cache)
+3. ❌ **Playbook Percentages** - Now uses database (previously localStorage full state cache)
+4. ❌ **Slot Assignments** - Now uses database (previously localStorage full state cache)
+5. ❌ **Motion Dropdowns** - Now uses database (previously localStorage full state cache)
+
+### Implementation Details
+
+**Loading Pattern (All Modes):**
+```javascript
+// ✅ CORRECT: Always load from database
+const params = new URLSearchParams();
+params.set('mode', mode);
+params.set('team_id', teamId);
+if (mode === 'franchise' && franchiseId) params.set('franchise_id', franchiseId);
+if (mode === 'tournament' && tournamentId) params.set('tournament_id', tournamentId);
+if (mode === 'single' && gameId) params.set('game_id', gameId);
+
+const res = await fetch(`/api/gameplan?${params.toString()}`);
+const settings = await res.json();
+```
+
+**Saving Pattern (All Modes):**
+```javascript
+// ✅ CORRECT: Always save to database
+const payload = {
+  mode,
+  team_id: teamId,
+  playcall_settings: currentSettings.playcall_settings,
+  strategy_settings: currentSettings.strategy_settings
+};
+if (mode === 'franchise' && franchiseId) payload.franchise_id = franchiseId;
+if (mode === 'tournament' && tournamentId) payload.tournament_id = tournamentId;
+if (mode === 'single' && gameId) payload.game_id = gameId;
+
+await fetch('/api/gameplan', {
+  method: 'PUT',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(payload)
+});
+```
+
+**❌ WRONG Patterns (Removed):**
+```javascript
+// ❌ WRONG: Don't use localStorage for persistent data
+localStorage.setItem(`gameplan_${teamName}`, JSON.stringify(settings));
+
+// ❌ WRONG: Don't use URL params for settings data
+params.set('game_plan_settings', JSON.stringify(settings));
+
+// ❌ WRONG: Don't cache playbook data in localStorage
+localStorage.setItem(`playbooks_full_state_${mode}_${teamId}`, JSON.stringify(fullState));
+```
+
+### Benefits of This Architecture
+
+1. **No Synchronization Bugs:** Database is always authoritative - no localStorage/database conflicts
+2. **Consistent Behavior:** Same code path for all modes (no mode-specific localStorage logic)
+3. **Reliable Persistence:** Settings persist correctly across all navigation scenarios
+4. **Simpler Code:** One source of truth = less code complexity
+5. **Easier Debugging:** Single source makes it easier to trace data flow
+
+### Migration Notes
+
+**Refactored (February 2025):**
+- Removed localStorage caching for playbook settings (percentages, slots, dropdowns)
+- Removed localStorage for game plan settings in single mode
+- Removed URL param approach for `game_plan_settings`
+- All modes now use database exclusively for persistent data
+- localStorage reserved only for temporary UI preferences
+
+**Files Updated:**
+- `FrontEnd/static/playbooks.js` - Removed full state localStorage caching
+- `FrontEnd/static/game-plan.js` - Removed localStorage for single mode, removed URL param approach
+- `FrontEnd/static/js/phaser/bootGame.js` - Always load from database for all modes
+- `FrontEnd/static/js/phaser/utils/timeoutButtonManager.js` - Removed URL param approach
+
+---
