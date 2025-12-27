@@ -7,6 +7,7 @@ import logging
 from typing import Optional
 
 from BackEnd.db import db
+from BackEnd.api.franchise_routes import get_user_team_from_franchise
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -978,49 +979,23 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             doc = collection.find_one({"_id": ObjectId(doc_id)})
         
         # Get team plays
-        # ✅ Handle team name resolution (team_id might be a name, need to find actual team_id)
+        # ✅ SS&S: For franchise mode, use franchise document's user_team_object_id as authoritative source
         if mode == "franchise":
+            # Always use franchise document's user_team_object_id as source of truth
+            user_team_id_name, user_team_object_id = get_user_team_from_franchise(doc)
+            if not user_team_id_name or not user_team_object_id:
+                raise HTTPException(status_code=404, detail="User team not found in franchise document")
+            
+            # Use franchise document's user_team_object_id as authoritative team_id
+            authoritative_team_id = user_team_object_id
+            
+            # Log if URL team_id doesn't match (for debugging)
+            if team_id and team_id != authoritative_team_id:
+                logger.warning(f"⚠️ [GET PLAYBOOKS] URL team_id ({team_id}) doesn't match franchise document user_team_object_id ({authoritative_team_id}). Using franchise document value.")
+            
             franchise_teams = doc.get("franchise_teams", {})
-            logger.info(f"🔍 [PLAYBOOKS] Looking for team_id='{team_id}' in franchise document with {len(franchise_teams)} teams")
-            logger.info(f"🔍 [PLAYBOOKS] Available franchise team keys: {list(franchise_teams.keys())[:5]}...")  # Log first 5 keys
-            
-            # Try to resolve team name to team_id (same logic as tournament/single mode)
-            actual_team_id = None
-            # First try direct lookup
-            if team_id in franchise_teams:
-                actual_team_id = team_id
-                logger.info(f"✅ [PLAYBOOKS] Found franchise team_id directly: {actual_team_id}")
-            else:
-                # Try to find by team name - iterate through franchise_teams to find match
-                for tid in franchise_teams.keys():
-                    # Find the team that matches our input team_id (could be name or ObjectId)
-                    try:
-                        team_doc = db.teams.find_one({"_id": ObjectId(tid)})
-                    except:
-                        # If tid is not a valid ObjectId, try as team_id string
-                        team_doc = db.teams.find_one({"team_id": tid})
-                    if team_doc and (team_doc.get("name") == team_id or str(team_doc.get("_id")) == team_id or team_doc.get("team_id") == team_id):
-                        actual_team_id = tid
-                        logger.info(f"✅ [PLAYBOOKS] Found franchise team by name lookup: {actual_team_id} (team name: {team_doc.get('name')})")
-                        break
-                # If still not found, try teams collection lookup by name
-                if not actual_team_id:
-                    team_doc = db.teams.find_one({"name": team_id})
-                    if team_doc:
-                        team_id_from_doc = team_doc.get("team_id")
-                        logger.info(f"🔍 [PLAYBOOKS] Found franchise team in teams collection: {team_doc.get('name')}, team_id={team_id_from_doc}, _id={team_doc.get('_id')}")
-                        # Try to find this team_id in the document's franchise_teams
-                        for tid in franchise_teams.keys():
-                            if tid == team_id_from_doc or str(tid) == str(team_doc.get("_id")):
-                                actual_team_id = tid
-                                logger.info(f"✅ [PLAYBOOKS] Matched franchise team in document: {actual_team_id}")
-                                break
-            
-            if not actual_team_id:
-                logger.warning(f"⚠️ [PLAYBOOKS] Could not resolve franchise team_id '{team_id}' to a team in the document")
-                logger.warning(f"⚠️ [PLAYBOOKS] Available franchise teams in document: {list(franchise_teams.keys())}")
-            
-            team_obj = franchise_teams.get(actual_team_id, {}) if actual_team_id else {}
+            team_obj = franchise_teams.get(authoritative_team_id, {})
+            actual_team_id = authoritative_team_id
         else:
             teams = doc.get("teams", {})
             logger.info(f"🔍 [PLAYBOOKS] Looking for team_id='{team_id}' in document with {len(teams)} teams")
@@ -1351,40 +1326,18 @@ def save_playbooks(request: PlaybookSettingsRequest):
             raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
         
         if request.mode == "franchise":
-            # For franchise mode, resolve team name to team_id (same logic as get_playbooks)
-            franchise_teams = doc.get("franchise_teams", {})
-            logger.info(f"🔍 [PLAYBOOKS SAVE] Looking for franchise team_id='{request.team_id}' in document with {len(franchise_teams)} teams")
+            # ✅ SS&S: Always use franchise document's user_team_object_id as source of truth
+            # This ensures we're always using the correct team, even if URL params are wrong
+            user_team_id_name, user_team_object_id = get_user_team_from_franchise(doc)
+            if not user_team_id_name or not user_team_object_id:
+                raise HTTPException(status_code=404, detail="User team not found in franchise document")
             
-            # First try direct lookup
-            if request.team_id in franchise_teams:
-                actual_team_id = request.team_id
-                logger.info(f"✅ [PLAYBOOKS SAVE] Found franchise team_id directly: {actual_team_id}")
-            else:
-                # Try to find by team name - iterate through franchise_teams to find match
-                for tid in franchise_teams.keys():
-                    try:
-                        team_doc = db.teams.find_one({"_id": ObjectId(tid)})
-                    except:
-                        team_doc = db.teams.find_one({"team_id": tid})
-                    if team_doc and (team_doc.get("name") == request.team_id or str(team_doc.get("_id")) == request.team_id or team_doc.get("team_id") == request.team_id):
-                        actual_team_id = tid
-                        logger.info(f"✅ [PLAYBOOKS SAVE] Found franchise team by name lookup: {actual_team_id} (team name: {team_doc.get('name')})")
-                        break
-                # If still not found, try teams collection lookup by name
-                if not actual_team_id:
-                    team_doc = db.teams.find_one({"name": request.team_id})
-                    if team_doc:
-                        team_id_from_doc = team_doc.get("team_id")
-                        logger.info(f"🔍 [PLAYBOOKS SAVE] Found franchise team in teams collection: {team_doc.get('name')}, team_id={team_id_from_doc}")
-                        for tid in franchise_teams.keys():
-                            if tid == team_id_from_doc or str(tid) == str(team_doc.get("_id")):
-                                actual_team_id = tid
-                                logger.info(f"✅ [PLAYBOOKS SAVE] Matched franchise team in document: {actual_team_id}")
-                                break
+            # Use franchise document's user_team_object_id as authoritative team_id
+            actual_team_id = user_team_object_id
             
-            if not actual_team_id:
-                logger.warning(f"⚠️ [PLAYBOOKS SAVE] Could not resolve franchise team_id '{request.team_id}' to a team in the document")
-                logger.warning(f"⚠️ [PLAYBOOKS SAVE] Available franchise teams: {list(franchise_teams.keys())}")
+            # Log if URL team_id doesn't match (for debugging)
+            if request.team_id and request.team_id != actual_team_id:
+                logger.warning(f"⚠️ [PLAYBOOKS SAVE] URL team_id ({request.team_id}) doesn't match franchise document user_team_object_id ({actual_team_id}). Using franchise document value.")
         else:
             # For tournament/single mode, try to resolve team name to team_id
             teams = doc.get("teams", {})

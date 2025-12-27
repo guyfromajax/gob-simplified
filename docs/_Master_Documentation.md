@@ -259,7 +259,9 @@ These variables provide additional context for navigation but aren't required fo
 #### Data Flow
 
 **GMO → GP (Starting a Game):**
-- Game Plan and Playbooks settings are loaded from `franchise_teams.{team_id}`
+- Game Plan and Playbooks settings are loaded from `franchise_teams.{user_team_object_id}`
+  - **✅ SS&S:** Backend uses `get_user_team_from_franchise()` to get authoritative `user_team_object_id`
+  - **✅ SS&S:** URL `team_id` parameter is ignored if it doesn't match franchise document
 - Settings are applied to game document when game is created
 - Game document is created in `games_collection` with `franchise_id` reference
 
@@ -280,9 +282,15 @@ These variables provide additional context for navigation but aren't required fo
 - `GET /api/gameplan` - Loads Game Plan settings (`strategy_settings`)
 - `PUT /api/gameplan` - Saves Game Plan settings
 - `GET /api/playbooks` - Loads Playbooks settings (`playbook_settings`)
+  - **✅ SS&S:** Uses `user_team_object_id` from franchise document as authoritative source
+  - **✅ SS&S:** Ignores URL `team_id` parameter if it doesn't match franchise document
 - `POST /api/playbooks` - Saves Playbooks settings
+  - **✅ SS&S:** Uses `user_team_object_id` from franchise document as authoritative source
+  - **✅ SS&S:** Ignores URL `team_id` parameter if it doesn't match franchise document
 - `POST /api/franchise/training` - Runs training session, updates attributes/stats
+  - **✅ SS&S:** Uses `user_team_object_id` from franchise document as authoritative source
 - `GET /api/training-report` - Loads training report data
+  - **✅ SS&S:** Uses `user_team_object_id` from franchise document as authoritative source
 
 #### User Actions
 
@@ -863,7 +871,9 @@ These variables track the current game state and are required when in an active 
 - User clicks "Play Next Game" from FCC
 - Navigate to Lineup Select Experience with `mode`, `franchise_id`, `team_id`, `week`
 - User sets lineup, then navigates to Game Plan or directly to Gameplay Screen
-- Game Plan and Playbooks settings are loaded from `franchise_teams.{team_id}`
+- Game Plan and Playbooks settings are loaded from `franchise_teams.{user_team_object_id}`
+  - **✅ SS&S:** Backend uses `get_user_team_from_franchise()` to get authoritative `user_team_object_id`
+  - **✅ SS&S:** URL `team_id` parameter is ignored if it doesn't match franchise document
 - Game is initialized via `/api/init-game` endpoint
 - Game document is created in `games_collection` with `franchise_id`, `week` references
 - Settings are applied to game document when game starts
@@ -907,7 +917,11 @@ These variables track the current game state and are required when in an active 
 - `GET /api/gameplan` - Loads Game Plan settings (`strategy_settings`)
 - `PUT /api/gameplan` - Saves Game Plan settings
 - `GET /api/playbooks` - Loads Playbooks settings (`playbook_settings`)
+  - **✅ SS&S:** Uses `user_team_object_id` from franchise document as authoritative source
+  - **✅ SS&S:** Ignores URL `team_id` parameter if it doesn't match franchise document
 - `POST /api/playbooks` - Saves Playbooks settings
+  - **✅ SS&S:** Uses `user_team_object_id` from franchise document as authoritative source
+  - **✅ SS&S:** Ignores URL `team_id` parameter if it doesn't match franchise document
 - `POST /franchise/complete-week` - Completes game, rolls up stats to franchise
 
 #### User Actions

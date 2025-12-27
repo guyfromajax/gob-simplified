@@ -21,19 +21,43 @@ export function resolveOffenseTeamId({ scene, turnData, playerSprites = null, pa
   // Priority 1: turnData.possession_team_id (backend guarantee - always set for every turn)
   // Represents the team on offense DURING this turn (set before any possession flips)
   if (turnData?.possession_team_id) {
-    return turnData.possession_team_id;
+    const resolved = turnData.possession_team_id;
+    console.log('🔍 [offenseTeamIdResolver] Path 1: turnData.possession_team_id', {
+      value: resolved,
+      type: typeof resolved,
+      isObjectId: /^[0-9a-f]{24}$/i.test(String(resolved)),
+      resultType: turnData?.result_type,
+      turnIndex: turnData?.index
+    });
+    return resolved;
   }
   
   // Priority 2: scene.offenseTeamId (scene state - kept in sync by PossessionManager)
   if (scene?.offenseTeamId) {
-    return scene.offenseTeamId;
+    const resolved = scene.offenseTeamId;
+    console.log('🔍 [offenseTeamIdResolver] Path 2: scene.offenseTeamId', {
+      value: resolved,
+      type: typeof resolved,
+      isObjectId: /^[0-9a-f]{24}$/i.test(String(resolved)),
+      resultType: turnData?.result_type,
+      turnIndex: turnData?.index
+    });
+    return resolved;
   }
   
   // Priority 3: Derive from passInfo - find passer's team_id from playerSprites
   if (passInfo?.passerId && playerSprites) {
     const passerSprite = playerSprites[passInfo.passerId];
     if (passerSprite?.team_id) {
-      return passerSprite.team_id;
+      const resolved = passerSprite.team_id;
+      console.log('🔍 [offenseTeamIdResolver] Path 3: passInfo.passerId', {
+        value: resolved,
+        type: typeof resolved,
+        isObjectId: /^[0-9a-f]{24}$/i.test(String(resolved)),
+        resultType: turnData?.result_type,
+        turnIndex: turnData?.index
+      });
+      return resolved;
     }
   }
   
@@ -44,7 +68,15 @@ export function resolveOffenseTeamId({ scene, turnData, playerSprites = null, pa
       if (anim.hasBallAtStep && anim.hasBallAtStep[0] === true) {
         const sprite = playerSprites[anim.playerId];
         if (sprite?.team_id) {
-          return sprite.team_id;
+          const resolved = sprite.team_id;
+          console.log('🔍 [offenseTeamIdResolver] Path 4a: ball handler from animations', {
+            value: resolved,
+            type: typeof resolved,
+            isObjectId: /^[0-9a-f]{24}$/i.test(String(resolved)),
+            resultType: turnData?.result_type,
+            turnIndex: turnData?.index
+          });
+          return resolved;
         }
       }
     }
@@ -53,7 +85,15 @@ export function resolveOffenseTeamId({ scene, turnData, playerSprites = null, pa
       const firstAnim = turnData.animations[0];
       const sprite = playerSprites[firstAnim.playerId];
       if (sprite?.team_id) {
-        return sprite.team_id;
+        const resolved = sprite.team_id;
+        console.log('🔍 [offenseTeamIdResolver] Path 4b: first animation player', {
+          value: resolved,
+          type: typeof resolved,
+          isObjectId: /^[0-9a-f]{24}$/i.test(String(resolved)),
+          resultType: turnData?.result_type,
+          turnIndex: turnData?.index
+        });
+        return resolved;
       }
     }
   }
@@ -71,28 +111,56 @@ export function resolveOffenseTeamId({ scene, turnData, playerSprites = null, pa
           (p.playerId ?? p.player_id) === firstAnim.playerId
         );
         if (player?.team_id) {
-          return player.team_id;
+          const resolved = player.team_id;
+          console.log('🔍 [offenseTeamIdResolver] Path 5a: simData.players[].team_id', {
+            value: resolved,
+            type: typeof resolved,
+            isObjectId: /^[0-9a-f]{24}$/i.test(String(resolved)),
+            resultType: turnData?.result_type,
+            turnIndex: turnData?.index
+          });
+          return resolved;
         }
         // Fallback: use team field to determine team_id
         if (player?.team === "home" && simData.home_team_id) {
-          return simData.home_team_id;
+          const resolved = simData.home_team_id;
+          console.log('🔍 [offenseTeamIdResolver] Path 5b: simData.home_team_id', {
+            value: resolved,
+            type: typeof resolved,
+            isObjectId: /^[0-9a-f]{24}$/i.test(String(resolved)),
+            resultType: turnData?.result_type,
+            turnIndex: turnData?.index
+          });
+          return resolved;
         }
         if (player?.team === "away" && simData.away_team_id) {
-          return simData.away_team_id;
+          const resolved = simData.away_team_id;
+          console.log('🔍 [offenseTeamIdResolver] Path 5c: simData.away_team_id', {
+            value: resolved,
+            type: typeof resolved,
+            isObjectId: /^[0-9a-f]{24}$/i.test(String(resolved)),
+            resultType: turnData?.result_type,
+            turnIndex: turnData?.index
+          });
+          return resolved;
         }
       }
     }
     
     // Last resort: use home_team_id (should never reach here)
     if (simData.home_team_id) {
-      console.warn('⚠️ [offenseTeamIdResolver] Using home_team_id as last resort - this should not happen!', {
+      const resolved = simData.home_team_id;
+      console.warn('⚠️ [offenseTeamIdResolver] Path 6: Using home_team_id as last resort - this should not happen!', {
+        value: resolved,
+        type: typeof resolved,
+        isObjectId: /^[0-9a-f]{24}$/i.test(String(resolved)),
         turnData: {
           possession_team_id: turnData?.possession_team_id,
           result_type: turnData?.result_type
         },
         sceneOffenseTeamId: scene?.offenseTeamId
       });
-      return simData.home_team_id;
+      return resolved;
     }
   }
   
