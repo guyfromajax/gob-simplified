@@ -644,7 +644,26 @@ def finalize_game(
         
         logger.info(f"🔍 [FINALIZE_GAME] Processing {len(players)} players, box_score keys: {list(box_score.keys())}, home_team: {home_team_name}, away_team: {away_team_name}")
 
+        # ✅ SS&S: Build team_name -> team_id map from franchise_teams
+        franchise_doc = db.franchises.find_one({"_id": fid}, {"franchise_teams": 1})
+        franchise_teams = franchise_doc.get("franchise_teams", {}) if franchise_doc else {}
+        team_name_to_id: Dict[str, str] = {}
+        for team_id_str, team_data in franchise_teams.items():
+            # Look up team name from teams collection
+            try:
+                team_obj_id = ObjectId(team_id_str)
+                team_doc = teams_collection.find_one({"_id": team_obj_id}, {"name": 1})
+                if team_doc:
+                    team_name = team_doc.get("name")
+                    if team_name:
+                        team_name_to_id[team_name] = team_id_str
+            except Exception:
+                continue
+        
+        logger.info(f"🔍 [FINALIZE_GAME] Built team_name_to_id map: {team_name_to_id}")
+
         inc_doc: Dict[str, Any] = {}
+        set_doc: Dict[str, Any] = {}
         players_processed = 0
         for p in players:
             pid = p.get("playerId")
@@ -674,8 +693,13 @@ def finalize_game(
                 inc_doc[f"players.{pid}.career.{stat}"] = inc_doc.get(
                     f"players.{pid}.career.{stat}", 0
                 ) + val
+            
+            # ✅ SS&S: Set meta.team_id if team_name is in our map
+            if team_name in team_name_to_id:
+                set_doc[f"players.{pid}.meta.team_id"] = team_name_to_id[team_name]
+                logger.debug(f"🔍 [FINALIZE_GAME] Setting meta.team_id for player {pid}: {team_name_to_id[team_name]}")
         
-        logger.info(f"🔍 [FINALIZE_GAME] Processed {players_processed} players, {len(inc_doc)} stat increments")
+        logger.info(f"🔍 [FINALIZE_GAME] Processed {players_processed} players, {len(inc_doc)} stat increments, {len(set_doc)} meta fields to set")
 
         update: Dict[str, Any] = {"$addToSet": {"applied_games": game_id}}
         if inc_doc:
@@ -683,6 +707,11 @@ def finalize_game(
             logger.info(f"🔍 [FINALIZE_GAME] Update doc has {len(inc_doc)} stat increments")
         else:
             logger.warning(f"⚠️ [FINALIZE_GAME] No stats to increment (inc_doc is empty)")
+        
+        # ✅ SS&S: Set meta fields (including team_id) if any
+        if set_doc:
+            update["$set"] = set_doc
+            logger.info(f"🔍 [FINALIZE_GAME] Update doc has {len(set_doc)} meta fields to set")
 
         result = db.franchises.update_one(
             {"_id": fid, "applied_games": {"$ne": game_id}},
