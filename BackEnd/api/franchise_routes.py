@@ -324,13 +324,29 @@ def complete_week(req: CompleteWeekRequest):
     user = req.result
     team1_id = _normalize_team_id(user.team1_id)
     team2_id = _normalize_team_id(user.team2_id)
-    user_res = _save_game_result(team1_id, team2_id, user.team1_score, user.team2_score, req.week)
+    user_res = _save_game_result(team1_id, team2_id, user.team1_score, user.team2_score, req.week, franchise_id=req.franchise_id)
     results.append({
         "away_id": user_res["team1_id"],
         "home_id": user_res["team2_id"],
         "away_score": user_res["team1_score"],
         "home_score": user_res["team2_score"],
     })
+    
+    # ✅ SS&S: Find user's game and call finalize_game() to rollup stats to franchise document
+    user_game = db.games.find_one({
+        "week": req.week,
+        "$or": [
+            {"team1_id": team1_id, "team2_id": team2_id},
+            {"team1_id": team2_id, "team2_id": team1_id},
+        ],
+        "franchise_id": str(req.franchise_id)
+    })
+    if user_game:
+        user_game_id = str(user_game.get("_id", ""))
+        if user_game_id:
+            stat_updater.finalize_game(
+                user_game_id, mode="franchise", franchise_id=req.franchise_id
+            )
 
     for away_id, home_id in week_games:
         if {str(away_id), str(home_id)} == {str(team1_id), str(team2_id)}:
@@ -563,9 +579,13 @@ def season_schedule(franchise_id: str):
         for away_id, home_id in games:
             res = week_results.get((str(away_id), str(home_id))) or \
                   week_results.get((str(home_id), str(away_id)))
+            game_doc = None  # ✅ SS&S: Initialize game_doc before conditional
             if res:
                 away_score, home_score = res
                 status = "complete"
+                # ✅ SS&S: Try to find game_doc even when status comes from results
+                game_doc = db.games.find_one({"week": idx, "team1_id": away_id, "team2_id": home_id}) or \
+                           db.games.find_one({"week": idx, "team1_id": home_id, "team2_id": away_id})
             else:
                 game_doc = db.games.find_one({"week": idx, "team1_id": away_id, "team2_id": home_id}) or \
                            db.games.find_one({"week": idx, "team1_id": home_id, "team2_id": away_id})
