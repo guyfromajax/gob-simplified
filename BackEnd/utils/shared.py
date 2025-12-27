@@ -734,6 +734,7 @@ def summarize_game_state(game, exclude_animations=True):
     teams_obj = {
         home_key: {
             "strategy_settings": getattr(game.home_team, 'strategy_settings', {}),
+            "strategy_calls": getattr(game.home_team, 'strategy_calls', {}),  # ✅ SS&S: Persist playcall overrides
             "plays": populated_plays.copy(),
             "attributes": getattr(game.home_team, 'team_attributes', {}),
             "scouting": getattr(game.home_team, 'scouting_data', {}),
@@ -741,6 +742,7 @@ def summarize_game_state(game, exclude_animations=True):
         },
         away_key: {
             "strategy_settings": getattr(game.away_team, 'strategy_settings', {}),
+            "strategy_calls": getattr(game.away_team, 'strategy_calls', {}),  # ✅ SS&S: Persist playcall overrides
             "plays": populated_plays.copy(),
             "attributes": getattr(game.away_team, 'team_attributes', {}),
             "scouting": getattr(game.away_team, 'scouting_data', {}),

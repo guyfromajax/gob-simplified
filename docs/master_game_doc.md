@@ -6875,15 +6875,17 @@ The Playcall Center allows users to override playcalls for their team. Overrides
 
 #### Override Persistence
 
-**Current State:**
-- Overrides stored in `team.strategy_calls` (in-memory only)
-- Lost on server restart or game reload
-- **Note:** Database persistence was attempted but reverted due to breaking changes
+**Current State (January 2025):**
+- ✅ **IMPLEMENTED:** Overrides stored in `team.strategy_calls` and persisted to database
+- ✅ **IMPLEMENTED:** `strategy_calls` saved in `summarize_game_state()` to `teams.{team_id}.strategy_calls`
+- ✅ **IMPLEMENTED:** `strategy_calls` restored when loading games from database
+- ✅ **IMPLEMENTED:** Overrides survive server restarts, game reloads, and state restoration (timeouts, quarter breaks, SIP/BIP transitions)
 
-**Future Enhancement:**
-- Persist `strategy_calls` to database in `summarize_game_state()`
-- Restore `strategy_calls` when loading games from database
-- Ensure overrides survive server restarts and game reloads
+**Implementation Details:**
+- **Save:** `summarize_game_state()` includes `strategy_calls` in `teams_obj` structure
+- **Restore:** `simulate_quarter_endpoint()` extracts `strategy_calls` from saved game and passes to `TeamManager.__init__()`
+- **TeamManager:** Accepts `strategy_calls` parameter and merges with defaults (ensures all keys exist)
+- **GameManager:** Passes `home_strategy_calls` and `away_strategy_calls` to `TeamManager` constructors
 
 #### Override Timing
 
@@ -7023,7 +7025,6 @@ Player headshots in the Playcall Center are assigned once when returning to `cou
 
 ### Future Enhancements
 
-- **Database Persistence:** Restore `strategy_calls` persistence to database (reverted due to breaking changes)
 - **Real Lean Score Logic:** Replace placeholder random calculation with actual tactical evaluation
 - **Skeleton Variant Selection:** Use lean score to select appropriate skeleton variant (successful, mid_play_change, contested, broken)
 - **Specific Zone Selection:** Allow users to select specific zone types (2-3 Zone, 3-2 Zone, 1-3-1 Zone) instead of generic "Zone"
