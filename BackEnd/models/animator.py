@@ -760,6 +760,12 @@ class Animator:
                 "duration": timeline[-1][0]
             })
 
+        # ✅ FIX: Extract ball handler timeline spots BEFORE the loop
+        # This ensures bh_first_spot and bh_last_spot are available for all defenders
+        bh_timeline = action_timeline.get(ball_handler, []) if action_timeline else []
+        bh_first_spot = bh_timeline[0][2] if bh_timeline else None
+        bh_last_spot = bh_timeline[-1][2] if bh_timeline else None
+
         for pos, defender in def_lineup.items():
             def_coords = None
             action_type = ACTIONS["GUARD_OFFBALL"]
@@ -767,9 +773,6 @@ class Animator:
             hasBallAtStep = [ball_owner_by_step[i] is defender for i in range(len(ball_owner_by_step))]
 
             if pos == bh_pos:
-                bh_timeline = action_timeline.get(ball_handler, [])
-                bh_first_spot = bh_timeline[0][2] if bh_timeline else None
-                bh_last_spot = bh_timeline[-1][2] if bh_timeline else None
                 first_coords = HCO_STRING_SPOTS.get(bh_first_spot, ball_handler_end_coords)
                 final_coords = HCO_STRING_SPOTS.get(bh_last_spot, ball_handler_end_coords)
                 
