@@ -1577,17 +1577,17 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
         if "last_stealer_coords" in game_state and game_state["last_stealer_coords"]:
             stealer_coords = game_state["last_stealer_coords"]
             defender.coords = stealer_coords.copy()
-            logging.warning(f"🏀 [STEAL POSITION] Using stored stealer position: x={stealer_coords['x']}, y={stealer_coords['y']}")
+            logging.debug(f"🏀 [STEAL POSITION] Using stored stealer position: x={stealer_coords['x']}, y={stealer_coords['y']}")
         else:
-            logging.warning(f"⚠️ [STEAL POSITION] No stored stealer position, using defender.coords: x={getattr(defender, 'coords', {}).get('x', 'N/A')}, y={getattr(defender, 'coords', {}).get('y', 'N/A')}")
+            logging.debug(f"⚠️ [STEAL POSITION] No stored stealer position, using defender.coords: x={getattr(defender, 'coords', {}).get('x', 'N/A')}, y={getattr(defender, 'coords', {}).get('y', 'N/A')}")
         
         # ✅ DEBUG: Log steal flow for HCO steals
-        logging.warning(f"🏀 [STEAL FLOW] HCO Steal detected:")
-        logging.warning(f"  Stealer: {get_name_safe(defender)} (ID: {stealer_id})")
-        logging.warning(f"  Victim: {get_name_safe(ball_handler)} (ID: {victim_id})")
-        logging.warning(f"  Fast break chance: {fast_break_chance:.2%}, Roll: {fast_break_roll:.3f}")
-        logging.warning(f"  Next offensive_state: {game_state['offensive_state']}")
-        logging.warning(f"  last_stealer SET: {get_name_safe(defender)} (ID: {stealer_id})")
+        logging.debug(f"🏀 [STEAL FLOW] HCO Steal detected:")
+        logging.debug(f"  Stealer: {get_name_safe(defender)} (ID: {stealer_id})")
+        logging.debug(f"  Victim: {get_name_safe(ball_handler)} (ID: {victim_id})")
+        logging.debug(f"  Fast break chance: {fast_break_chance:.2%}, Roll: {fast_break_roll:.3f}")
+        logging.debug(f"  Next offensive_state: {game_state['offensive_state']}")
+        logging.debug(f"  last_stealer SET: {get_name_safe(defender)} (ID: {stealer_id})")
 
         events.append({
             "event_type": "STEAL",
@@ -2085,10 +2085,10 @@ def resolve_hco_outcome(game, skeleton):
     aggression_level = def_team.strategy_calls.get("aggression_call", "normal")
     
     # 🔍 DEBUG: Step 1 - Team Attributes and Settings
-    logging.warning(f"🔍 [HCO RESOLUTION] Step 1 - Team Attributes and Settings:")
-    logging.warning(f"   Offense: efficiency={offensive_efficiency}, turnover_mod={turnover_modifier}, foul_mod={foul_modifier_off}")
-    logging.warning(f"   Defense: efficiency={defensive_efficiency}, foul_mod={foul_modifier_def}, aggression={aggression_level}")
-    logging.warning("")  # Blank line after Step 1
+    logging.debug(f"🔍 [HCO RESOLUTION] Step 1 - Team Attributes and Settings:")
+    logging.debug(f"   Offense: efficiency={offensive_efficiency}, turnover_mod={turnover_modifier}, foul_mod={foul_modifier_off}")
+    logging.debug(f"   Defense: efficiency={defensive_efficiency}, foul_mod={foul_modifier_def}, aggression={aggression_level}")
+    logging.debug("")  # Blank line after Step 1
     
     # Step 2: Calibrate Universal Constants
     # Standard D Foul calibration
@@ -2112,15 +2112,15 @@ def resolve_hco_outcome(game, skeleton):
     calibrated_dead_ball_to = max(2, calibrated_dead_ball_to)  # Min 2
     
     # 🔥 DEBUG: Step 2 - Calibrated Constants
-    logging.warning(f"🔥 [HCO RESOLUTION] Step 2 - Calibrated Constants:")
-    logging.warning(f"   STANDARD_D_FOUL: {STANDARD_D_FOUL} + int({foul_modifier_def} * 0.4) = {calibrated_d_foul} (max 98)")
-    logging.warning(f"   STANDARD_O_FOUL: {STANDARD_O_FOUL} - {foul_modifier_off} = {calibrated_o_foul} (min 2)")
-    logging.warning(f"   HARD_STEAL: {HARD_STEAL} - {turnover_modifier} = {calibrated_hard_steal}")
-    logging.warning(f"   SOFT_STEAL: {SOFT_STEAL} - {turnover_modifier} = {calibrated_soft_steal}")
-    logging.warning(f"   HARD_FOUL: {HARD_FOUL} - int({foul_modifier_def} * 0.6) = {calibrated_hard_foul}")
-    logging.warning(f"   SOFT_FOUL: {SOFT_FOUL} - int({foul_modifier_def} * 0.6) = {calibrated_soft_foul}")
-    logging.warning(f"   DEAD_BALL_TURNOVER: {DEAD_BALL_TURNOVER} - int(0.5 * {turnover_modifier}) = {calibrated_dead_ball_to} (min 2)")
-    logging.warning("")  # Blank line after Step 2
+    logging.debug(f"🔥 [HCO RESOLUTION] Step 2 - Calibrated Constants:")
+    logging.debug(f"   STANDARD_D_FOUL: {STANDARD_D_FOUL} + int({foul_modifier_def} * 0.4) = {calibrated_d_foul} (max 98)")
+    logging.debug(f"   STANDARD_O_FOUL: {STANDARD_O_FOUL} - {foul_modifier_off} = {calibrated_o_foul} (min 2)")
+    logging.debug(f"   HARD_STEAL: {HARD_STEAL} - {turnover_modifier} = {calibrated_hard_steal}")
+    logging.debug(f"   SOFT_STEAL: {SOFT_STEAL} - {turnover_modifier} = {calibrated_soft_steal}")
+    logging.debug(f"   HARD_FOUL: {HARD_FOUL} - int({foul_modifier_def} * 0.6) = {calibrated_hard_foul}")
+    logging.debug(f"   SOFT_FOUL: {SOFT_FOUL} - int({foul_modifier_def} * 0.6) = {calibrated_soft_foul}")
+    logging.debug(f"   DEAD_BALL_TURNOVER: {DEAD_BALL_TURNOVER} - int(0.5 * {turnover_modifier}) = {calibrated_dead_ball_to} (min 2)")
+    logging.debug("")  # Blank line after Step 2
     
     # Calculate steal attempt rate (needed for steal check)
     # ✅ FIX: Use strategy_calls (strings) not strategy_settings (integers)
@@ -2135,14 +2135,14 @@ def resolve_hco_outcome(game, skeleton):
     
     # 🔍 DEBUG: Log aggression setting and threshold adjustment
     if steal_attempt_rate != original_rate:
-        logging.warning(f"🔍 [HCO RESOLUTION] Steal Attempt Rate Adjustment:")
-        logging.warning(f"   Defense team aggression: {aggression_level}")
-        logging.warning(f"   Base STEAL_ATTEMPT: {original_rate}%")
-        logging.warning(f"   Adjusted rate: {steal_attempt_rate}% ({'+10' if aggression_level == 'aggressive' else '-10'} from aggression)")
+        logging.debug(f"🔍 [HCO RESOLUTION] Steal Attempt Rate Adjustment:")
+        logging.debug(f"   Defense team aggression: {aggression_level}")
+        logging.debug(f"   Base STEAL_ATTEMPT: {original_rate}%")
+        logging.debug(f"   Adjusted rate: {steal_attempt_rate}% ({'+10' if aggression_level == 'aggressive' else '-10'} from aggression)")
     else:
-        logging.warning(f"🔍 [HCO RESOLUTION] Steal Attempt Rate:")
-        logging.warning(f"   Defense team aggression: {aggression_level}")
-        logging.warning(f"   Base STEAL_ATTEMPT: {steal_attempt_rate}% (no adjustment)")
+        logging.debug(f"🔍 [HCO RESOLUTION] Steal Attempt Rate:")
+        logging.debug(f"   Defense team aggression: {aggression_level}")
+        logging.debug(f"   Base STEAL_ATTEMPT: {steal_attempt_rate}% (no adjustment)")
     
     # ✅ EXECUTION SCORE CALCULATION: Calculate once for all outcomes
     # Calculate play effectiveness scores (same calculation used for all HCO results)
@@ -2169,13 +2169,13 @@ def resolve_hco_outcome(game, skeleton):
     # ✅ STORE RAW RESULT VALUE: Store capped_result (-100 to +100) for lean meter display
     game_state["lean_result_value"] = capped_result
     
-    logging.warning(f"📊 [HCO RESOLUTION] Execution Score Calculation (for all outcomes):")
-    logging.warning(f"   Offense effectiveness: {offensive_efficiency} + {o_random} (random) = {o_score}")
-    logging.warning(f"   Defense effectiveness: {defensive_efficiency} + {d_random} (random) = {d_score}")
-    logging.warning(f"   Result (o_score - d_score): {o_score} - {d_score} = {result_value}")
-    logging.warning(f"   Execution Score: {result_value} → {capped_result} (capped) → {execution_score:.1f}% (scaled 0-100)")
-    logging.warning(f"   Lean Meter Value: {capped_result} (raw -100 to +100)")
-    logging.warning("")  # Blank line after execution score calculation
+    logging.debug(f"📊 [HCO RESOLUTION] Execution Score Calculation (for all outcomes):")
+    logging.debug(f"   Offense effectiveness: {offensive_efficiency} + {o_random} (random) = {o_score}")
+    logging.debug(f"   Defense effectiveness: {defensive_efficiency} + {d_random} (random) = {d_score}")
+    logging.debug(f"   Result (o_score - d_score): {o_score} - {d_score} = {result_value}")
+    logging.debug(f"   Execution Score: {result_value} → {capped_result} (capped) → {execution_score:.1f}% (scaled 0-100)")
+    logging.debug(f"   Lean Meter Value: {capped_result} (raw -100 to +100)")
+    logging.debug("")  # Blank line after execution score calculation
     
     # Steps 3-5: Randomize order of event checks
     # Create list of check functions with their parameters
@@ -2189,17 +2189,17 @@ def resolve_hco_outcome(game, skeleton):
     # Randomize the order
     random.shuffle(check_functions)
     
-    logging.warning(f"🔍 [HCO RESOLUTION] Randomized check order: {[name for name, _ in check_functions]}")
-    logging.warning("")  # Blank line after randomized order
+    logging.debug(f"🔍 [HCO RESOLUTION] Randomized check order: {[name for name, _ in check_functions]}")
+    logging.debug("")  # Blank line after randomized order
     
     # Execute checks in randomized order
     for check_name, check_func in check_functions:
         result = check_func()
         if result is not None:
             # Event occurred, return immediately with execution_score
-            logging.warning(f"🔍 [HCO RESOLUTION] {check_name} returned result: {result[0]}")
-            logging.warning(f"   📊 Execution Score: {execution_score:.1f}% (calculated for all outcomes)")
-            logging.warning("")  # Blank line after event result
+            logging.debug(f"🔍 [HCO RESOLUTION] {check_name} returned result: {result[0]}")
+            logging.debug(f"   📊 Execution Score: {execution_score:.1f}% (calculated for all outcomes)")
+            logging.debug("")  # Blank line after event result
             # For non-SHOT results, return execution_score but None for variant_result
             if len(result) == 2:
                 return (result[0], result[1], execution_score)
@@ -2210,29 +2210,29 @@ def resolve_hco_outcome(game, skeleton):
                 return (result[0], None, execution_score)
     
     # No event occurred in Steps 3-5, continue to Step 6
-    logging.warning("")  # Blank line after Steps 3-5 (no event)
+    logging.debug("")  # Blank line after Steps 3-5 (no event)
     
     # Step 6: Shot Attempt
     # Execution score already calculated above (used for all outcomes)
     # Use the same result_value for variant selection
-    logging.warning(f"🔥 [HCO RESOLUTION] Step 6 - Shot Attempt:")
-    logging.warning(f"   Using execution score already calculated: {execution_score:.1f}%")
+    logging.debug(f"🔥 [HCO RESOLUTION] Step 6 - Shot Attempt:")
+    logging.debug(f"   Using execution score already calculated: {execution_score:.1f}%")
     
     # Select skeleton variant based on result_value (using original uncapped result)
     if result_value > 50:
         variant_result = "successful"
-        logging.warning(f"   ✅ Variant: {variant_result} (result {result_value} > 50)")
+        logging.debug(f"   ✅ Variant: {variant_result} (result {result_value} > 50)")
     elif result_value > 0:
         variant_result = "mid_play_change"
-        logging.warning(f"   ✅ Variant: {variant_result} (0 < result {result_value} <= 50)")
+        logging.debug(f"   ✅ Variant: {variant_result} (0 < result {result_value} <= 50)")
     elif result_value > -50:
         variant_result = "contested"
-        logging.warning(f"   ✅ Variant: {variant_result} (-50 < result {result_value} <= 0)")
+        logging.debug(f"   ✅ Variant: {variant_result} (-50 < result {result_value} <= 0)")
     else:
         variant_result = "broken"
-        logging.warning(f"   ✅ Variant: {variant_result} (result {result_value} <= -50)")
+        logging.debug(f"   ✅ Variant: {variant_result} (result {result_value} <= -50)")
     
-    logging.warning(f"🔍 [HCO RESOLUTION] Final Result: SHOT with variant '{variant_result}', execution_score={execution_score:.1f}%")
+    logging.debug(f"🔍 [HCO RESOLUTION] Final Result: SHOT with variant '{variant_result}', execution_score={execution_score:.1f}%")
     return ("SHOT", variant_result, execution_score)
 
 
@@ -2669,22 +2669,22 @@ def _check_inside_shot_possibility(selected_step, ball_handler_location, off_lin
     
     # Find players at viable inside locations
     pos_actions = selected_step.get("pos_actions", {})
-    logging.warning(f"🔍 [INSIDE CHECK] Ball handler at: {ball_handler_location}, Viable inside locations: {viable_inside_locations}")
-    logging.warning(f"🔍 [INSIDE CHECK] All players in step: {[(pos, action_info.get('location', '')) for pos, action_info in pos_actions.items()]}")
+    logging.debug(f"🔍 [INSIDE CHECK] Ball handler at: {ball_handler_location}, Viable inside locations: {viable_inside_locations}")
+    logging.debug(f"🔍 [INSIDE CHECK] All players in step: {[(pos, action_info.get('location', '')) for pos, action_info in pos_actions.items()]}")
     
     for pos, action_info in pos_actions.items():
         location = action_info.get("location", "")
         if location in viable_inside_locations:
             player = off_lineup.get(pos)
             if player:
-                logging.warning(f"🔍 [INSIDE CHECK] Found viable receiver: {pos} at {location}")
+                logging.debug(f"🔍 [INSIDE CHECK] Found viable receiver: {pos} at {location}")
                 viable_receivers.append({
                     "position": pos,
                     "player": player,
                     "location": location
                 })
     
-    logging.warning(f"🔍 [INSIDE CHECK] Total viable receivers: {len(viable_receivers)}")
+    logging.debug(f"🔍 [INSIDE CHECK] Total viable receivers: {len(viable_receivers)}")
     return len(viable_receivers) > 0, viable_receivers
 
 
@@ -3062,12 +3062,12 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup):
     ball_handler_at_inside = _is_inside_location(ball_handler_location)
     
     # 🔍 DEBUG: Log shot possibilities
-    logging.warning(f"🎯 [MOTION SHOT] Step {shot_step_index}, Ball handler: {ball_handler_pos} at {ball_handler_location}")
-    logging.warning(f"🎯 [MOTION SHOT] Inside possible: {inside_possible}, Receivers: {len(inside_receivers)}")
+    logging.debug(f"🎯 [MOTION SHOT] Step {shot_step_index}, Ball handler: {ball_handler_pos} at {ball_handler_location}")
+    logging.debug(f"🎯 [MOTION SHOT] Inside possible: {inside_possible}, Receivers: {len(inside_receivers)}")
     if inside_receivers:
-        logging.warning(f"🎯 [MOTION SHOT] Inside receivers: {[(r['position'], r['location']) for r in inside_receivers]}")
-    logging.warning(f"🎯 [MOTION SHOT] Attack possible: {attack_possible}, Outside possible: {outside_possible}")
-    logging.warning(f"🎯 [MOTION SHOT] Ball handler at inside: {ball_handler_at_inside}")
+        logging.debug(f"🎯 [MOTION SHOT] Inside receivers: {[(r['position'], r['location']) for r in inside_receivers]}")
+    logging.debug(f"🎯 [MOTION SHOT] Attack possible: {attack_possible}, Outside possible: {outside_possible}")
+    logging.debug(f"🎯 [MOTION SHOT] Ball handler at inside: {ball_handler_at_inside}")
     
     # Phase 4: Get strategy settings and build weighted list
     strategy_settings = off_team.strategy_settings
@@ -3075,11 +3075,11 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup):
         strategy_settings, inside_possible, attack_possible, outside_possible, ball_handler_at_inside
     )
     
-    logging.warning(f"🎯 [MOTION SHOT] Weighted list: {weighted_list} (inside_weight={strategy_settings.get('inside', 2)}, attack_weight={strategy_settings.get('attack', 2)}, outside_weight={strategy_settings.get('outside', 2)})")
+    logging.debug(f"🎯 [MOTION SHOT] Weighted list: {weighted_list} (inside_weight={strategy_settings.get('inside', 2)}, attack_weight={strategy_settings.get('attack', 2)}, outside_weight={strategy_settings.get('outside', 2)})")
     
     # Phase 5: Select shot type
     selected_shot_type = random.choice(weighted_list)
-    logging.warning(f"🎯 [MOTION SHOT] Selected shot type: {selected_shot_type}")
+    logging.debug(f"🎯 [MOTION SHOT] Selected shot type: {selected_shot_type}")
     
     # Phase 6: Execute shot - build additional steps
     new_steps = []
@@ -3187,9 +3187,9 @@ def resolve_half_court_offense_logic(game):
     def_call = game_state.get("defense_playcall", "Man")
     
     # 🔍 DEBUG: Log playcall being used
-    logging.warning(f"🔍 [HCO RESOLVE] Using playcall: '{off_call}' (from game_state['current_playcall'])")
+    logging.debug(f"🔍 [HCO RESOLVE] Using playcall: '{off_call}' (from game_state['current_playcall'])")
     if not off_call or off_call == "Inside":
-        logging.warning(f"⚠️ [HCO RESOLVE] WARNING: playcall is '{off_call}' - may fall back to old skeleton system")
+        logging.debug(f"⚠️ [HCO RESOLVE] WARNING: playcall is '{off_call}' - may fall back to old skeleton system")
 
     # ✅ NEW RESOLUTION SYSTEM: Get skeleton first (needed for step selection in resolution)
     # For Motion plays, get base_loop skeleton
@@ -3221,9 +3221,9 @@ def resolve_half_court_offense_logic(game):
     
     # 🔍 DEBUG: Log skeleton retrieval result
     if skeleton:
-        logging.warning(f"✅ [HCO RESOLVE] Skeleton retrieved successfully: {len(skeleton.get('steps', []))} steps")
+        logging.debug(f"✅ [HCO RESOLVE] Skeleton retrieved successfully: {len(skeleton.get('steps', []))} steps")
     else:
-        logging.warning(f"⚠️ [HCO RESOLVE] WARNING: No skeleton retrieved! Will fall back to old system")
+        logging.debug(f"⚠️ [HCO RESOLVE] WARNING: No skeleton retrieved! Will fall back to old system")
     
     # CRITICAL: Always create a deep copy to avoid mutating cached skeleton
     # This prevents any modifications (from stopper system or elsewhere) from affecting future turns

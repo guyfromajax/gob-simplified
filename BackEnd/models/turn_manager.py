@@ -311,7 +311,7 @@ class TurnManager:
         # ✅ LOG: Check for Playcall Center overrides at start of turn
         # ✅ SS&S: Use game_state["user_team_side"] instead of is_user_team flag (more reliable, persists to DB)
         user_team_side = self.game.game_state.get("user_team_side")
-        logging.warning(f"🔍 [TURN START DEBUG] user_team_side from game_state: {user_team_side}")
+        logging.debug(f"🔍 [TURN START DEBUG] user_team_side from game_state: {user_team_side}")
         user_team = None
         if user_team_side == "home":
             user_team = self.game.home_team
@@ -327,9 +327,9 @@ class TurnManager:
             defense_source = "PLAYCALL CENTER" if defense_override else "STANDARD LOGIC"
             aggression_source = "PLAYCALL CENTER" if aggression_override else "STANDARD LOGIC"
             
-            logging.warning(f"🎮 [TURN START] Playcall sources - Offense: {offense_source} ({offense_override or 'N/A'}), Defense: {defense_source} ({defense_override or 'N/A'}), Aggression: {aggression_source} ({aggression_override or 'N/A'})")
+            logging.debug(f"🎮 [TURN START] Playcall sources - Offense: {offense_source} ({offense_override or 'N/A'}), Defense: {defense_source} ({defense_override or 'N/A'}), Aggression: {aggression_source} ({aggression_override or 'N/A'})")
         else:
-            logging.warning(f"🎮 [TURN START] No user team found (user_team_side={user_team_side}) - all playcalls using STANDARD LOGIC")
+            logging.debug(f"🎮 [TURN START] No user team found (user_team_side={user_team_side}) - all playcalls using STANDARD LOGIC")
 
         # ✅ DEBUG: Log offensive_state transition (previous turn → current turn)
         # This is the critical transition point where offensive_state determines routing
@@ -814,24 +814,24 @@ class TurnManager:
         user_team_side = self.game.game_state.get("user_team_side")
         is_offense_user = (user_team_side == "home" and self.game.offense_team.is_home_team) or (user_team_side == "away" and not self.game.offense_team.is_home_team)
         
-        logging.warning(f"🎮 [PLAYCALL CHECK] Checking for overrides in set_playcalls()")
-        logging.warning(f"   - Offense team: {self.game.offense_team.name} (team_id: {self.game.offense_team.team_id}, object_id: {id(self.game.offense_team)}, is_home_team: {self.game.offense_team.is_home_team})")
-        logging.warning(f"   - Home team: {self.game.home_team.name} (team_id: {self.game.home_team.team_id}, object_id: {id(self.game.home_team)})")
-        logging.warning(f"   - Away team: {self.game.away_team.name} (team_id: {self.game.away_team.team_id}, object_id: {id(self.game.away_team)})")
-        logging.warning(f"   - user_team_side={user_team_side}, is_offense_user={is_offense_user}")
-        logging.warning(f"   - game_object_id: {id(self.game)}")
+        logging.debug(f"🎮 [PLAYCALL CHECK] Checking for overrides in set_playcalls()")
+        logging.debug(f"   - Offense team: {self.game.offense_team.name} (team_id: {self.game.offense_team.team_id}, object_id: {id(self.game.offense_team)}, is_home_team: {self.game.offense_team.is_home_team})")
+        logging.debug(f"   - Home team: {self.game.home_team.name} (team_id: {self.game.home_team.team_id}, object_id: {id(self.game.home_team)})")
+        logging.debug(f"   - Away team: {self.game.away_team.name} (team_id: {self.game.away_team.team_id}, object_id: {id(self.game.away_team)})")
+        logging.debug(f"   - user_team_side={user_team_side}, is_offense_user={is_offense_user}")
+        logging.debug(f"   - game_object_id: {id(self.game)}")
         if is_offense_user:
             offense_call = self.game.offense_team.strategy_calls.get("offense_call")
-            logging.warning(f"🎮 [PLAYCALL CHECK] Checking offense_team.strategy_calls for offense_call")
-            logging.warning(f"   - offense_call value: {offense_call}, type: {type(offense_call)}")
-            logging.warning(f"   - Full strategy_calls: {self.game.offense_team.strategy_calls}")
-            logging.warning(f"   - Team object_id: {id(self.game.offense_team)}")
+            logging.debug(f"🎮 [PLAYCALL CHECK] Checking offense_team.strategy_calls for offense_call")
+            logging.debug(f"   - offense_call value: {offense_call}, type: {type(offense_call)}")
+            logging.debug(f"   - Full strategy_calls: {self.game.offense_team.strategy_calls}")
+            logging.debug(f"   - Team object_id: {id(self.game.offense_team)}")
             if offense_call:
-                logging.warning(f"🎮 [PLAYCALL CHECK] ✅ Found user offense call: '{offense_call}'")
+                logging.debug(f"🎮 [PLAYCALL CHECK] ✅ Found user offense call: '{offense_call}'")
             else:
-                logging.warning(f"🎮 [PLAYCALL CHECK] ❌ No user offense call found (offense_call is None)")
+                logging.debug(f"🎮 [PLAYCALL CHECK] ❌ No user offense call found (offense_call is None)")
         else:
-            logging.info(f"🎮 [PLAYCALL DEBUG] Offense team {self.game.offense_team.name} is NOT user team (user_team_side={user_team_side}), skipping offense_call check")
+            logging.debug(f"🎮 [PLAYCALL DEBUG] Offense team {self.game.offense_team.name} is NOT user team (user_team_side={user_team_side}), skipping offense_call check")
         
         # Check if user team has defense_call set (regardless of current offense/defense)
         # Defense override can be set when user is on offense (for next time they're on defense)
@@ -844,16 +844,16 @@ class TurnManager:
         
         if user_team:
             defense_call = user_team.strategy_calls.get("defense_call")
-            logging.warning(f"🎮 [PLAYCALL CHECK] Checking user_team.strategy_calls for defense_call")
-            logging.warning(f"   - User team: {user_team.name} (team_id: {user_team.team_id}, object_id: {id(user_team)})")
-            logging.warning(f"   - defense_call value: {defense_call}, type: {type(defense_call)}")
-            logging.warning(f"   - Full strategy_calls: {user_team.strategy_calls}")
+            logging.debug(f"🎮 [PLAYCALL CHECK] Checking user_team.strategy_calls for defense_call")
+            logging.debug(f"   - User team: {user_team.name} (team_id: {user_team.team_id}, object_id: {id(user_team)})")
+            logging.debug(f"   - defense_call value: {defense_call}, type: {type(defense_call)}")
+            logging.debug(f"   - Full strategy_calls: {user_team.strategy_calls}")
             if defense_call:
-                logging.warning(f"🎮 [PLAYCALL CHECK] ✅ Found user defense call: '{defense_call}'")
+                logging.debug(f"🎮 [PLAYCALL CHECK] ✅ Found user defense call: '{defense_call}'")
             else:
-                logging.warning(f"🎮 [PLAYCALL CHECK] ❌ No user defense call found (defense_call is None)")
+                logging.debug(f"🎮 [PLAYCALL CHECK] ❌ No user defense call found (defense_call is None)")
         else:
-            logging.warning(f"🎮 [PLAYCALL CHECK] ❌ No user team found (user_team_side={user_team_side}), skipping defense_call check")
+            logging.debug(f"🎮 [PLAYCALL CHECK] ❌ No user team found (user_team_side={user_team_side}), skipping defense_call check")
         
         # Legacy support: Also check game_state for backward compatibility (will be removed)
         user_offense = self.game.game_state.get("user_offense_override") or offense_call
@@ -1922,21 +1922,21 @@ class TurnManager:
         game = self.game
         game_state = game.game_state
         
-        logging.warning(f"🔍 [COMPUTER TIMEOUT CHECK] Team: {computer_team.name}, Turn Type: {turn_type}, Quarter: {game.quarter}")
+        logging.debug(f"🔍 [COMPUTER TIMEOUT CHECK] Team: {computer_team.name}, Turn Type: {turn_type}, Quarter: {game.quarter}")
         
         # Only check during BIP/SIP turns
         if turn_type not in ["BASELINE_INBOUND", "SIDE_INBOUND"]:
-            logging.warning(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - invalid turn type: {turn_type}")
+            logging.debug(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - invalid turn type: {turn_type}")
             return False
         
         # Only check for computer teams (not user teams)
         if computer_team.is_user_team:
-            logging.warning(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - user team: {computer_team.name}")
+            logging.debug(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - user team: {computer_team.name}")
             return False
         
         # Check if team has timeouts remaining
         if not self.can_call_timeout(computer_team):
-            logging.warning(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - no timeouts remaining: {computer_team.name} (remaining: {computer_team.timeouts})")
+            logging.debug(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - no timeouts remaining: {computer_team.name} (remaining: {computer_team.timeouts})")
             return False
         
         # Initialize computer timeout tracking in game_state
@@ -1960,10 +1960,10 @@ class TurnManager:
         # Check max timeouts per quarter
         max_timeouts = 1 if quarter <= 3 else computer_team.timeouts
         if quarter_data["count"] >= max_timeouts:
-            logging.warning(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - max timeouts reached: {computer_team.name} Q{quarter} (count: {quarter_data['count']}, max: {max_timeouts})")
+            logging.debug(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - max timeouts reached: {computer_team.name} Q{quarter} (count: {quarter_data['count']}, max: {max_timeouts})")
             return False  # Already at max for this quarter
         
-        logging.warning(f"🔍 [COMPUTER TIMEOUT CHECK] Evaluating conditions for {computer_team.name} Q{quarter} (current count: {quarter_data['count']}, max: {max_timeouts})")
+        logging.debug(f"🔍 [COMPUTER TIMEOUT CHECK] Evaluating conditions for {computer_team.name} Q{quarter} (current count: {quarter_data['count']}, max: {max_timeouts})")
         
         # ✅ FIX: Only check players in the active lineup (not all players on the team)
         # This aligns with autoset lineup logic - we only care about players currently playing
@@ -1983,7 +1983,7 @@ class TurnManager:
                 condition_key = f"3_fouls_{player.player_id}"
                 if fouls == 3 and condition_key not in checked:
                     checked.add(condition_key)
-                    logging.warning(f"✅ [COMPUTER TIMEOUT] Q1 Condition met: {player.get_name()} has 3 fouls (100% chance)")
+                    logging.debug(f"✅ [COMPUTER TIMEOUT] Q1 Condition met: {player.get_name()} has 3 fouls (100% chance)")
                     return True  # 100% chance
             
             # Condition 2: Player with 2 fouls - 30% chance
@@ -1994,10 +1994,10 @@ class TurnManager:
                     checked.add(condition_key)
                     roll = random.random()
                     if roll < 0.30:
-                        logging.warning(f"✅ [COMPUTER TIMEOUT] Q1 Condition met: {player.get_name()} has 2 fouls (30% chance, rolled {roll:.2f})")
+                        logging.debug(f"✅ [COMPUTER TIMEOUT] Q1 Condition met: {player.get_name()} has 2 fouls (30% chance, rolled {roll:.2f})")
                         return True
                     else:
-                        logging.warning(f"🔍 [COMPUTER TIMEOUT] Q1 Condition checked: {player.get_name()} has 2 fouls (30% chance, rolled {roll:.2f} - no timeout)")
+                        logging.debug(f"🔍 [COMPUTER TIMEOUT] Q1 Condition checked: {player.get_name()} has 2 fouls (30% chance, rolled {roll:.2f} - no timeout)")
         
         # Q2 & Q3: Player foul logic
         elif quarter in [2, 3]:
@@ -2007,7 +2007,7 @@ class TurnManager:
                 condition_key = f"4_fouls_{player.player_id}"
                 if fouls == 4 and condition_key not in checked:
                     checked.add(condition_key)
-                    logging.warning(f"✅ [COMPUTER TIMEOUT] Q{quarter} Condition met: {player.get_name()} has 4 fouls (100% chance)")
+                    logging.debug(f"✅ [COMPUTER TIMEOUT] Q{quarter} Condition met: {player.get_name()} has 4 fouls (100% chance)")
                     return True  # 100% chance
             
             # Condition 2: Player with 3 fouls - 90% chance
@@ -2018,10 +2018,10 @@ class TurnManager:
                     checked.add(condition_key)
                     roll = random.random()
                     if roll < 0.90:
-                        logging.warning(f"✅ [COMPUTER TIMEOUT] Q{quarter} Condition met: {player.get_name()} has 3 fouls (90% chance, rolled {roll:.2f})")
+                        logging.debug(f"✅ [COMPUTER TIMEOUT] Q{quarter} Condition met: {player.get_name()} has 3 fouls (90% chance, rolled {roll:.2f})")
                         return True
                     else:
-                        logging.warning(f"🔍 [COMPUTER TIMEOUT] Q{quarter} Condition checked: {player.get_name()} has 3 fouls (90% chance, rolled {roll:.2f} - no timeout)")
+                        logging.debug(f"🔍 [COMPUTER TIMEOUT] Q{quarter} Condition checked: {player.get_name()} has 3 fouls (90% chance, rolled {roll:.2f} - no timeout)")
         
         # Q4: Player foul logic (only if time_remaining > 60 seconds)
         elif quarter == 4:
@@ -2034,12 +2034,12 @@ class TurnManager:
                         checked.add(condition_key)
                         roll = random.random()
                         if roll < 0.90:
-                            logging.warning(f"✅ [COMPUTER TIMEOUT] Q4 Condition met: {player.get_name()} has 4 fouls (90% chance, rolled {roll:.2f}, time_remaining: {time_remaining}s)")
+                            logging.debug(f"✅ [COMPUTER TIMEOUT] Q4 Condition met: {player.get_name()} has 4 fouls (90% chance, rolled {roll:.2f}, time_remaining: {time_remaining}s)")
                             return True
                         else:
-                            logging.warning(f"🔍 [COMPUTER TIMEOUT] Q4 Condition checked: {player.get_name()} has 4 fouls (90% chance, rolled {roll:.2f} - no timeout, time_remaining: {time_remaining}s)")
+                            logging.debug(f"🔍 [COMPUTER TIMEOUT] Q4 Condition checked: {player.get_name()} has 4 fouls (90% chance, rolled {roll:.2f} - no timeout, time_remaining: {time_remaining}s)")
             else:
-                logging.warning(f"🔍 [COMPUTER TIMEOUT] Q4 Skipping foul check - time_remaining ({time_remaining}s) <= 60s")
+                logging.debug(f"🔍 [COMPUTER TIMEOUT] Q4 Skipping foul check - time_remaining ({time_remaining}s) <= 60s")
         
         # ========== ENERGY CONDITIONS (All Quarters Q1-Q4) ==========
         
@@ -2059,10 +2059,10 @@ class TurnManager:
             checked.add(condition_key)
             roll = random.random()
             if roll < 0.50:
-                logging.warning(f"✅ [COMPUTER TIMEOUT] Energy condition met: 3 players < 80% NG (50% chance, rolled {roll:.2f})")
+                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 3 players < 80% NG (50% chance, rolled {roll:.2f})")
                 return True
             else:
-                logging.warning(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 3 players < 80% NG (50% chance, rolled {roll:.2f} - no timeout)")
+                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 3 players < 80% NG (50% chance, rolled {roll:.2f} - no timeout)")
         
         # Condition 4: 4 players < 80% NG - 75% chance
         condition_key = "4_players_80_ng"
@@ -2070,10 +2070,10 @@ class TurnManager:
             checked.add(condition_key)
             roll = random.random()
             if roll < 0.75:
-                logging.warning(f"✅ [COMPUTER TIMEOUT] Energy condition met: 4 players < 80% NG (75% chance, rolled {roll:.2f})")
+                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 4 players < 80% NG (75% chance, rolled {roll:.2f})")
                 return True
             else:
-                logging.warning(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 4 players < 80% NG (75% chance, rolled {roll:.2f} - no timeout)")
+                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 4 players < 80% NG (75% chance, rolled {roll:.2f} - no timeout)")
         
         # Condition 5: 5 players < 80% NG - 90% chance
         condition_key = "5_players_80_ng"
@@ -2081,10 +2081,10 @@ class TurnManager:
             checked.add(condition_key)
             roll = random.random()
             if roll < 0.90:
-                logging.warning(f"✅ [COMPUTER TIMEOUT] Energy condition met: 5 players < 80% NG (90% chance, rolled {roll:.2f})")
+                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 5 players < 80% NG (90% chance, rolled {roll:.2f})")
                 return True
             else:
-                logging.warning(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 5 players < 80% NG (90% chance, rolled {roll:.2f} - no timeout)")
+                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 5 players < 80% NG (90% chance, rolled {roll:.2f} - no timeout)")
         
         # Condition 6: 3 players < 70% NG - 80% chance
         condition_key = "3_players_70_ng"
@@ -2092,10 +2092,10 @@ class TurnManager:
             checked.add(condition_key)
             roll = random.random()
             if roll < 0.80:
-                logging.warning(f"✅ [COMPUTER TIMEOUT] Energy condition met: 3 players < 70% NG (80% chance, rolled {roll:.2f})")
+                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 3 players < 70% NG (80% chance, rolled {roll:.2f})")
                 return True
             else:
-                logging.warning(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 3 players < 70% NG (80% chance, rolled {roll:.2f} - no timeout)")
+                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 3 players < 70% NG (80% chance, rolled {roll:.2f} - no timeout)")
         
         # Condition 7: 4 players < 70% NG - 90% chance
         condition_key = "4_players_70_ng"
@@ -2103,10 +2103,10 @@ class TurnManager:
             checked.add(condition_key)
             roll = random.random()
             if roll < 0.90:
-                logging.warning(f"✅ [COMPUTER TIMEOUT] Energy condition met: 4 players < 70% NG (90% chance, rolled {roll:.2f})")
+                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 4 players < 70% NG (90% chance, rolled {roll:.2f})")
                 return True
             else:
-                logging.warning(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 4 players < 70% NG (90% chance, rolled {roll:.2f} - no timeout)")
+                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 4 players < 70% NG (90% chance, rolled {roll:.2f} - no timeout)")
         
         # Condition 8: 5 players < 70% NG - 95% chance
         condition_key = "5_players_70_ng"
@@ -2114,19 +2114,19 @@ class TurnManager:
             checked.add(condition_key)
             roll = random.random()
             if roll < 0.95:
-                logging.warning(f"✅ [COMPUTER TIMEOUT] Energy condition met: 5 players < 70% NG (95% chance, rolled {roll:.2f})")
+                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 5 players < 70% NG (95% chance, rolled {roll:.2f})")
                 return True
             else:
-                logging.warning(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 5 players < 70% NG (95% chance, rolled {roll:.2f} - no timeout)")
+                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 5 players < 70% NG (95% chance, rolled {roll:.2f} - no timeout)")
         
         # Condition 9: 3 players < 60% NG - 100% chance
         condition_key = "3_players_60_ng"
         if count_60 >= 3 and condition_key not in checked:
             checked.add(condition_key)
-            logging.warning(f"✅ [COMPUTER TIMEOUT] Energy condition met: 3 players < 60% NG (100% chance)")
+            logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 3 players < 60% NG (100% chance)")
             return True  # 100% chance
         
-        logging.warning(f"🔍 [COMPUTER TIMEOUT] No conditions met for {computer_team.name} Q{quarter}")
+        logging.debug(f"🔍 [COMPUTER TIMEOUT] No conditions met for {computer_team.name} Q{quarter}")
         return False
 
     def resolve_offensive_rebound_turn(self):
