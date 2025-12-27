@@ -688,9 +688,11 @@ class Animator:
             ball_owner_by_step.append(owner)
 
         # Extend ball ownership to cover any additional timeline steps
+        # ✅ FIX: Handle missing action_timeline (not serializable, so may be absent)
+        timeline_lengths = [len(tl) for tl in action_timeline.values()] if action_timeline else []
         max_timeline_len = max(
-            [len(tl) for tl in action_timeline.values()] + [len(ball_owner_by_step)]
-        )
+            timeline_lengths + [len(ball_owner_by_step)]
+        ) if timeline_lengths or ball_owner_by_step else 0
         if len(ball_owner_by_step) < max_timeline_len:
             filler = rebounder or (ball_owner_by_step[-1] if ball_owner_by_step else None)
             ball_owner_by_step.extend([filler] * (max_timeline_len - len(ball_owner_by_step)))
