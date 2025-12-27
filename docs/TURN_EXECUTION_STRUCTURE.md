@@ -31,41 +31,42 @@ This document maps the execution structure of each turn type to identify pattern
 
 ### 2. FCP / HCT (Full Court Press / Half Court Trap)
 
-**Structure**: `Skeleton Animation (Result-Dependent Steps) + Result Handling`
+**Structure**: `Skeleton Animation + Result Handling` (Same as HCO)
 
 **Execution Flow**:
 1. **Setup**: Players move to step 0 positions (from inbound or previous pressure turn)
-2. **Skeleton Animation**: Animate skeleton steps UP TO result_type-specific end_timestamp
-   - **Result Type Determines Steps**: `get_fcp_skeleton()` / `get_hct_skeleton()` filter by `result_type`
-   - Different result types = different number of skeleton steps animated
-   - Examples:
-     - `SHOT` result → animate to shot step
-     - `HCO` result → animate to press break step
-     - `FOUL` result → animate to foul step
-     - `STEAL` result → animate to steal step
+2. **Skeleton Animation**: Animate all skeleton steps (full skeleton, same as HCO)
+   - Uses press break skeletons (different data from playcall skeletons, but same animation system)
+   - Full skeleton animation (all steps) - same pattern as HCO
 3. **Result Handling**: 
    - **Unique Results**: Press Break/Trap Break to HCO (unique to FCP/HCT)
-   - **Common Results**: STEAL, DEAD_BALL_TURNOVER, O_FOUL, D_FOUL
-   - **Note**: Result handling is NOT identical to HCO (HCO doesn't have press break)
+   - **Common Results**: MAKE, MISS, STEAL, DEAD_BALL_TURNOVER, FOUL, TURNOVER
+   - Same result handling pattern as HCO (routed through same handlers)
 
 **Key Characteristics**:
-- **NOT a perfect replica of HCO** - skeleton steps are filtered by result type
-- Result is determined BEFORE skeleton animation (unlike HCO)
-- Skeleton end_timestamp varies by result_type
-- Uses press break skeletons (different from playcall skeletons)
-- **⚠️ ISSUE**: This timestamp filtering approach causes skeleton animation bugs
+- ✅ **Uses same execution pattern as HCO** - Routes through AnimationRouter
+- ✅ Full skeleton animation (all steps) - same as HCO
+- ✅ Uses press break skeletons (different data, but same animation system)
+- ✅ Routes to SHOT_ATTEMPT handler (for MAKE/MISS) or respective handlers (FOUL, TURNOVER, etc.)
+- ✅ No special routing needed - unified with HCO system
 
 **Code Locations**:
-- Backend: `resolve_full_court_press_logic()` / `resolve_half_court_trap_logic()` → `get_fcp_skeleton()` / `get_hct_skeleton()`
-- Frontend: `AnimationRouter` → `playTurnAnimation()` (for skeleton) → Result handlers
+- Backend: `resolve_full_court_press_logic()` / `resolve_half_court_trap_logic()` → Press break skeleton data
+- Frontend: `AnimationRouter` → Routes to same handlers as HCO (SHOT_ATTEMPT, FOUL, TURNOVER, etc.)
+- Frontend: `playTurnAnimation()` → Same skeleton animation system as HCO
 
-**Differences from HCO**:
-- ✅ Result type determines skeleton steps (HCO: full skeleton, then result)
-- ✅ Uses press break skeletons (HCO: uses playcall skeletons)
-- ✅ Result determined before animation (HCO: result determined after animation)
-- ❌ **Different execution pattern** (not SS&S - causes bugs)
+**Similarities to HCO**:
+- ✅ Full skeleton animation (all steps)
+- ✅ Routes through AnimationRouter
+- ✅ Same result handling pattern
+- ✅ Same animation system (`playTurnAnimation()`)
+- ✅ Only difference: Uses press break skeleton data (not playcall skeleton data)
 
-**⚠️ RECOMMENDATION**: Switch to result-based skeleton selection (like HCO) - see `FCP_HCT_SKELETON_ANALYSIS.md`
+**State Management**:
+- FCP/HCT state set via `next_defensive_setup` on BASELINE_INBOUND turns
+- `scene.currentPressureType` tracks active pressure type ("FCP" or "HCT")
+- `scene.pressureSequenceActive` tracks if pressure sequence is active
+- State cleared when sequence completes (shot attempt completes, foul, turnover, or transition to HCO)
 
 ---
 
@@ -84,25 +85,33 @@ This document maps the execution structure of each turn type to identify pattern
    - **MISS**: Ball bounce from rim → Rebound handling (OREB or DREB)
 
 **Bonus vs Set Number Handling**:
-- **1-and-1 Bonus**: 
-  - First shot: If made → Second shot (free_throws_remaining: 1)
-  - If missed → Rebound
-  - Second shot: If made → Inbound pass, If missed → Rebound
-- **2-Shot Bonus**: 
-  - First shot: If made → Second shot (free_throws_remaining: 1)
-  - Second shot: If made → Inbound pass, If missed → Rebound
-- **3-Shot Bonus**: 
-  - First shot: If made → Second shot (free_throws_remaining: 2)
-  - Second shot: If made → Third shot (free_throws_remaining: 1)
-  - Third shot: If made → Inbound pass, If missed → Rebound
-- **Set Number (Non-Bonus)**: 
-  - Each shot: If made → Next shot (if more remain) OR Inbound pass (if final)
-  - If missed → Rebound
+- **Turn-by-Turn Mode** (Preferred):
+  - Uses `free_throws_remaining` field (number of FTs remaining after this turn)
+  - If `free_throws_remaining > 0`: More shots remain
+  - If `free_throws_remaining === 0`: This was the final shot
+  - Works for all bonus types (1-and-1, 2-shot, 3-shot) and set number FTs
+- **Batch Mode** (Fallback):
+  - Uses `ftContext` (ftIndex, ftTotal, bonusType) if `free_throws_remaining` is undefined
+  - **1-and-1 Bonus**: 
+    - First shot: If made → Second shot (ftIndex: 1, ftTotal: 2)
+    - If missed → Rebound
+    - Second shot: If made → Inbound pass, If missed → Rebound
+  - **2-Shot Bonus**: 
+    - First shot: If made → Second shot (ftIndex: 1, ftTotal: 2)
+    - Second shot: If made → Inbound pass, If missed → Rebound
+  - **3-Shot Bonus**: 
+    - First shot: If made → Second shot (ftIndex: 1, ftTotal: 3)
+    - Second shot: If made → Third shot (ftIndex: 2, ftTotal: 3)
+    - Third shot: If made → Inbound pass, If missed → Rebound
+  - **Set Number (Non-Bonus)**: 
+    - Each shot: If made → Next shot (if more remain) OR Inbound pass (if final)
+    - If missed → Rebound
 
 **Key Characteristics**:
 - Setup is always the same (FT line positions)
 - Result handling varies by bonus type and remaining shots
-- Uses `free_throws_remaining` to determine if more shots remain
+- **Turn-by-turn mode**: Uses `free_throws_remaining` to determine if more shots remain (preferred)
+- **Batch mode**: Uses `ftContext` (ftIndex, ftTotal) if `free_throws_remaining` is undefined (fallback)
 
 **Code Locations**:
 - Backend: `resolve_free_throw_logic()` → `capture_free_throw_animation()`
@@ -259,10 +268,10 @@ Based on `transition_registry.py`, all turn types are:
 
 ### 1. **Skeleton Animation System**
 - **Shared by**: HCO, FCP, HCT
-- **Differences**: 
-  - HCO: Full skeleton (all steps)
-  - FCP/HCT: Filtered skeleton (result-dependent steps)
-- **Streamlining**: Could unify skeleton animation logic, with step filtering as a parameter
+- **Unified**: All use full skeleton animation (all steps)
+  - HCO: Uses playcall skeletons
+  - FCP/HCT: Uses press break skeletons (different data, same animation system)
+- **Status**: ✅ **Unified** - All use `playTurnAnimation()` with full skeleton animation
 
 ### 2. **Result Handling**
 - **Shared by**: HCO, FCP, HCT, Fast Break, OREB Putback
@@ -308,20 +317,24 @@ Based on `transition_registry.py`, all turn types are:
 - ⚠️ **Future**: More result types (fouls, turnovers) - structure supports this
 
 ### FCP/HCT Execution Cases:
-- ✅ SHOT (MAKE/MISS) → Result handling (same as HCO)
+- ✅ MAKE/MISS → Routes to SHOT_ATTEMPT handler (same as HCO)
 - ✅ HCO (press break) → HCO (no PC)
-- ✅ FOUL → Free throw OR Side inbound
-- ✅ TURNOVER → Side inbound (PC) OR Fast Break (PC)
-- ✅ STEAL → HCO (PC) OR Fast Break (PC)
-- ✅ DEAD BALL → Side inbound (PC)
-- ⚠️ **Issue**: Skeleton animation sometimes skipped (routing issue, not structure issue)
+- ✅ FOUL → Routes to FOUL handler (same as HCO)
+- ✅ TURNOVER → Routes to TURNOVER handler (same as HCO)
+- ✅ STEAL → Routes to STEAL handler (same as HCO)
+- ✅ DEAD BALL → Routes to DEAD_BALL handler (same as HCO)
+- ✅ **Fixed**: Now routes through AnimationRouter (same as HCO) - no special routing needed
 
 ### Free Throw Execution Cases:
-- ✅ Single FT → Make/Miss → Rebound OR Inbound
-- ✅ 1-and-1 Bonus → First shot → Second shot (if made) OR Rebound (if missed)
-- ✅ 2-Shot Bonus → First shot → Second shot (if made) OR Rebound (if missed)
-- ✅ 3-Shot Bonus → First → Second → Third → Rebound OR Inbound
-- ✅ Set Number → Each shot → Next (if more) OR Rebound/Inbound (if final)
+- ✅ **Turn-by-turn mode**: Uses `free_throws_remaining` field
+  - If `free_throws_remaining > 0`: More shots remain → Next free throw
+  - If `free_throws_remaining === 0`: Final shot → Rebound OR Inbound
+- ✅ **Batch mode**: Uses `ftContext` (ftIndex, ftTotal, bonusType) if `free_throws_remaining` is undefined
+  - Single FT → Make/Miss → Rebound OR Inbound
+  - 1-and-1 Bonus → First shot → Second shot (if made) OR Rebound (if missed)
+  - 2-Shot Bonus → First shot → Second shot (if made) OR Rebound (if missed)
+  - 3-Shot Bonus → First → Second → Third → Rebound OR Inbound
+  - Set Number → Each shot → Next (if more) OR Rebound/Inbound (if final)
 - ✅ **Fixed**: Inbound pass timing (now flips possession before inbound)
 
 ### Fast Break Execution Cases:
@@ -385,7 +398,7 @@ Based on `transition_registry.py`, all turn types are:
 **Turn Types Covered**: 9 (all from transition registry)
 
 **Execution Patterns Identified**:
-1. **Skeleton + Result** (HCO, FCP, HCT)
+1. **Skeleton + Result** (HCO, FCP, HCT) - All use same pattern (AnimationRouter)
 2. **Setup + Result** (Free Throw)
 3. **Standard Animation** (BIP, SIP, Opening Tip)
 4. **Multi-Phase** (Fast Break: outlet + resolution)
@@ -396,8 +409,8 @@ Based on `transition_registry.py`, all turn types are:
 **Execution Case Coverage**: All cases documented, some issues identified (FCP/HCT skeleton skipping)
 
 **Next Steps**: 
-1. Fix FCP/HCT skeleton animation routing issue
-2. Implement unified skeleton animation system
-3. Implement unified result handler
-4. Create execution structure template
+1. ✅ **Completed**: FCP/HCT now routes through AnimationRouter (unified with HCO)
+2. ✅ **Completed**: Unified skeleton animation system (`playTurnAnimation()`)
+3. ✅ **Completed**: Unified result handler (AnimationRouter routes to appropriate handlers)
+4. Consider: Create execution structure template (optional future enhancement)
 

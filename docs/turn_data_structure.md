@@ -14,7 +14,9 @@ the result before it is serialised to JSON and sent to the client.
   "turn_count": 42,
   "result_type": "MAKE" | "DREB" | "OREB" | "TURNOVER" | "FOUL" | "FREE_THROW" | "HCO" | "FAST_BREAK",
   "time_elapsed": 1280,
-  "possession_team_id": "TEAM_UUID",
+  "offense_team_id": "TEAM_UUID",
+  "current_turn": "HCO" | "FCP" | "HCT" | "FAST_BREAK" | "FREE_THROW" | "OREB" | "BASELINE_INBOUND" | "SIDE_INBOUND" | "OPENING_TIP" | "TIMEOUT",
+  "next_turn": "HCO" | "FCP" | "HCT" | "FAST_BREAK" | "FREE_THROW" | "BASELINE_INBOUND" | "SIDE_INBOUND",
   "possession_flips": true,
   "score": { "Home": 44, "Away": 40 },
 
@@ -77,7 +79,9 @@ instances.
 | `turn_count` | int | Sequential counter for micro-turns. |
 | `result_type` | string | Primary routing key (MAKE/DREB/OREB/TURNOVER/FOUL/FREE_THROW/HCO/FAST_BREAK). |
 | `time_elapsed` | int | Milliseconds deducted from the game clock. |
-| `possession_team_id` | string | Team that started the turn on offense. |
+| `offense_team_id` | string | **SS&S Standard:** Team on offense during this turn (authoritative). Replaces deprecated `possession_team_id`. |
+| `current_turn` | string | Explicit turn type identifier (HCO/FCP/HCT/FAST_BREAK/FREE_THROW/OREB/BASELINE_INBOUND/SIDE_INBOUND/OPENING_TIP/TIMEOUT). Used for routing and debugging. |
+| `next_turn` | string | Explicit next turn type (set by `game_manager.determine_next_turn()`). Used for transition logic. |
 | `possession_flips` | bool | If true, backend flips possession immediately after the turn. |
 | `score` | object | Authoritative team scores after the turn. Always use this rather than re-adding `points`. |
 | `text` | string | Guaranteed non-empty narrative for the play-by-play ticker. |
@@ -100,13 +104,14 @@ into simple strings.
 - **`roles`** – Optional map describing offensive/defensive roles for the turn
   (ball handler, rebounder, outlet receiver, etc.).
 - **`next_play_type`** – Hint about what the backend expects next (`HCO`,
-  `FAST_BREAK`, `FREE_THROW`), useful when staging transitions.
+  `FAST_BREAK`, `FREE_THROW`), useful when staging transitions. (Note: `next_turn` is the authoritative value set by `game_manager.determine_next_turn()`)
 
 ## Free Throw Metadata
 
 - **`attempts`** – Ordered results of each free throw (`MAKE` or `MISS`).
+- **`free_throws_remaining`** – Number of free throws remaining after this turn (turn-by-turn mode). If undefined, fall back to `ftContext`.
 - **`ftContext`** – Added by `animateGameTurns.annotateFreeThrowTurns` to expose
-  attempt index/total and bonus type for UI copy.
+  attempt index/total and bonus type for UI copy (batch mode fallback).
 
 ## Rebounds
 
@@ -129,6 +134,27 @@ When an offensive rebound occurs, the backend now emits *two* turns:
 - **`clock`**, **`quarter`**, **`period_label`** – Human-readable game-clock
   state after the turn.
 
+## Team Data
+
+- **`team_stats`** – Current team stats from scouting_data (offense/defense effectiveness).
+  Structure: `{"Team Name": {"offense": {...}, "defense": {...}}}`
+- **`team_totals`** – Cumulative team game stats (aggregated from all players).
+  Structure: `{"Team Name": {/* team game stats */}}`
+- **`team_plays`** – Play data for tooltips (effectiveness and tracking).
+  Structure: `{"Team Name": [/* array of play objects */]}`
+
+## Player State
+
+- **`player_energy`** – Energy levels (NG attribute) for all active players (fatigue display).
+  Structure: `{"PLAYER_UUID": {"NG": 1.0, "team": "Team Name"}}`
+
+## Strategy Calls
+
+- **`offense_tempo_call`** – Actual tempo call made by offense team (for strategy bars).
+- **`offense_aggression_call`** – Actual aggression call made by offense team (for strategy bars).
+- **`defense_tempo_call`** – Actual tempo call made by defense team (for strategy bars).
+- **`defense_aggression_call`** – Actual aggression call made by defense team (for strategy bars).
+
 ## Flags & Routing Helpers
 
 - **`fast_break`** – Set when the backend is resolving a transition play. Paired
@@ -146,7 +172,9 @@ When an offensive rebound occurs, the backend now emits *two* turns:
     "shooter_id": "player-123",
     "shooter": "John Smith",
     "time_elapsed": 1820,
-    "possession_team_id": "TEAM_HOME",
+    "offense_team_id": "TEAM_HOME",
+    "current_turn": "HCO",
+    "next_turn": "BASELINE_INBOUND",
     "possession_flips": true,
     "score": {"Home": 44, "Away": 40},
     "is_three_pointer": false,
@@ -169,7 +197,9 @@ When an offensive rebound occurs, the backend now emits *two* turns:
     "result_type": "DREB",
     "shooter_id": "player-321",
     "time_elapsed": 860,
-    "possession_team_id": "TEAM_AWAY",
+    "offense_team_id": "TEAM_AWAY",
+    "current_turn": "HCO",
+    "next_turn": "FAST_BREAK",
     "possession_flips": true,
     "score": {"Home": 44, "Away": 40},
     "rebound_type": "DREB",
@@ -191,11 +221,14 @@ When an offensive rebound occurs, the backend now emits *two* turns:
     "result_type": "FREE_THROW",
     "shooter_id": "player-123",
     "time_elapsed": 0,
-    "possession_team_id": "TEAM_HOME",
+    "offense_team_id": "TEAM_HOME",
+    "current_turn": "FREE_THROW",
+    "next_turn": "HCO",
     "possession_flips": true,
     "score": {"Home": 45, "Away": 40},
     "attempts": ["MISS"],
-    "ftContext": {"ftIndex": 1, "ftTotal": 2, "bonusType": "REGULAR"},
+    "free_throws_remaining": 0,  # Turn-by-turn mode: 0 means this was the final FT
+    "ftContext": {"ftIndex": 1, "ftTotal": 2, "bonusType": "REGULAR"},  # Batch mode fallback
     "rebound_type": "DREB",
     "rebounder_id": "player-789",
     "next_play_type": "HCO",
@@ -212,11 +245,15 @@ When an offensive rebound occurs, the backend now emits *two* turns:
   add it), treat it as informational only.
 - **No generic "MISS"** – Missed shots resolve to either `DREB` or `OREB`. Use
   `rebound_type` to differentiate defensive/offensive rebounds.
+- **SS&S Possession System** – Use `offense_team_id` (not deprecated `possession_team_id`) as the authoritative team on offense. Backend flips possession based on `possession_flips` flag.
+- **Turn Type Identification** – Use `current_turn` to identify turn type and `next_turn` for transition logic (both set by backend).
+- **Free Throw Modes** – Backend supports both turn-by-turn mode (`free_throws_remaining`) and batch mode (`ftContext`). Frontend should prefer `free_throws_remaining` if available.
 - **Frontend annotations** – The frontend may append helper context (currently
   `ftContext`). Do not mutate core fields that the backend controls.
 - **Telemetry** – With `window.DEBUG_ANIM = true` the Possession Runner emits
   `possessionRunner:*` events to help reason about timeline stalls and FSM
   transitions.
+- **Debug Fields** – `debug_turn_start` and `debug_turn_result` are optional debug-only fields (only present if backend DEBUG flag is enabled).
 
 Keep this document in sync whenever backend fields change so frontend and
 instrumentation work remain aligned.

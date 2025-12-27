@@ -433,12 +433,9 @@ async function handleButtonClick(animate) {
     console.error('Error starting game:', err);
     console.error('Error details:', err.message, err.stack);
   } finally {
-    if (isSimulating) {
-      isSimulating = false;
-      if (playBtn) playBtn.style.display = '';
-      if (simFullBtn) simFullBtn.style.display = '';
-      if (sim4Btn && quarter < 4) sim4Btn.style.display = '';
-    }
+    // ✅ FIX: Only reset isSimulating flag - buttons are already removed and game is complete
+    // The pre-game container was removed at line 415, and completion popup handles navigation
+    isSimulating = false;
   }
 }
 
@@ -487,6 +484,15 @@ async function handleSimToFourth() {
         quarter: currentQ,
         game_id: gameId, // Always pass gameId for tournament games
       };
+      
+      // ✅ SS&S: Add mode-specific parameters for franchise mode
+      if (mode === 'franchise' && franchiseId) {
+        payload.mode = 'franchise';
+        payload.franchise_id = franchiseId;
+        if (weekParam && !Number.isNaN(weekParam)) {
+          payload.week = weekParam;
+        }
+      }
       
       // Q1: Use user's set lineup
       // Q2-Q3: Auto-set lineups for both teams
@@ -580,8 +586,11 @@ async function handleSimToFourth() {
     params.set('home_id', urlParams.get('home_id') || homeTeam);
     params.set('away_id', urlParams.get('away_id') || awayTeam);
     params.set('mode', mode);
+    // ✅ SS&S: Preserve franchise mode navigation anchor set
+    if (franchiseId) params.set('franchise_id', franchiseId);
+    if (weekParam && !Number.isNaN(weekParam)) params.set('week', weekParam);
+    if (teamId) params.set('team_id', teamId);
     params.set('my_team', userTeamSide || 'home');
-    params.set('user_team_id', userTeamSide === 'home' ? homeTeam : awayTeam);
     params.set('quarter', 4);
     params.set('period', 'Q4');
     params.set('game_id', gameId);
@@ -658,6 +667,15 @@ async function handleSimFullGame() {
         quarter: currentQ,
       };
       if (gId) payload.game_id = gId;
+      
+      // ✅ SS&S: Add mode-specific parameters for franchise mode
+      if (mode === 'franchise' && franchiseId) {
+        payload.mode = 'franchise';
+        payload.franchise_id = franchiseId;
+        if (weekParam && !Number.isNaN(weekParam)) {
+          payload.week = weekParam;
+        }
+      }
       
       // Q1: Use user's set lineup
       // Q2-Q4: Auto-set lineups for both teams
@@ -797,6 +815,7 @@ async function handleSimFullGame() {
       mode: popupMode,
       tournamentId: tournamentId,
       franchiseId: franchiseId,
+      teamId: teamId, // ✅ SS&S: Include team_id (ObjectId) for navigation anchor preservation
       finalScore: finalScore,
       homeTeam: homeTeam,
       awayTeam: awayTeam
@@ -823,6 +842,11 @@ async function handleSimFullGame() {
     showStatus(errorMessage);
     // Also show in alert for better visibility
     alert(`Simulation Error: ${errorMessage}`);
+    // ✅ FIX: Query for buttons again if they exist (defensive check)
+    // Buttons may have been removed, so query DOM instead of using out-of-scope variables
+    const playBtn = document.querySelector('.play-button');
+    const simFullBtn = document.querySelector('.sim-full-game-button');
+    const sim4Btn = document.querySelector('.sim-to-fourth-button');
     [playBtn, simFullBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = false; });
   } finally {
     isSimulating = false;
