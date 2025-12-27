@@ -162,21 +162,21 @@ class ShotManager:
                 # MongoDB skeletons use "location", old skeletons use "spot"
                 location_key = shooter_action.get("location") or shooter_action.get("spot", "")
                 spot = location_key.lower() if location_key else ""
-                logging.warning(f"🔍 [SHOT LOCATION] Shooter {get_name_safe(shooter)} (pos: {shooter_pos}) shooting from: '{spot}' (raw: '{location_key}')")
+                logging.debug(f"🔍 [SHOT LOCATION] Shooter {get_name_safe(shooter)} (pos: {shooter_pos}) shooting from: '{spot}' (raw: '{location_key}')")
                 return (shooter_pos, spot)
             else:
                 # Fallback: search all steps in reverse (for backwards compatibility)
-                logging.warning(f"🔍 [SHOT LOCATION] No shoot action in final step for {shooter_pos}, searching all steps...")
+                logging.debug(f"🔍 [SHOT LOCATION] No shoot action in final step for {shooter_pos}, searching all steps...")
                 for step in reversed(steps):
                     pos_actions = step.get("pos_actions", {})
                     shooter_action = pos_actions.get(shooter_pos)
                     if shooter_action and shooter_action.get("action") == "shoot":
                         location_key = shooter_action.get("location") or shooter_action.get("spot", "")
                         spot = location_key.lower() if location_key else ""
-                        logging.warning(f"🔍 [SHOT LOCATION] Found shoot action in earlier step: '{spot}' (raw: '{location_key}')")
+                        logging.debug(f"🔍 [SHOT LOCATION] Found shoot action in earlier step: '{spot}' (raw: '{location_key}')")
                         return (shooter_pos, spot)
         
-        logging.warning(f"🔍 [SHOT LOCATION] No shoot action found for {shooter_pos} in any step")
+        logging.debug(f"🔍 [SHOT LOCATION] No shoot action found for {shooter_pos} in any step")
         return (None, None)
 
     def is_three_point_shot(self, shooter, roles):
@@ -1203,19 +1203,19 @@ class ShotManager:
 
         # 🔍 DEBUG: Shooting Foul Calculation
         from BackEnd.utils.shared import get_name_safe
-        logging.warning(f"🔍 [SHOOTING FOUL] Calculation:")
+        logging.debug(f"🔍 [SHOOTING FOUL] Calculation:")
         shooter_name = get_name_safe(shooter) if shooter else "Unknown"
         shooter_loc_str = shooter_location if shooter_location else "unknown"
-        logging.warning(f"   Shooter: {shooter_name}")
-        logging.warning(f"   Shooter location: {shooter_loc_str}")
-        logging.warning(f"   Defender: {get_name_safe(defender)}")
-        logging.warning(f"   Defense score: {defense_score}")
-        logging.warning(f"   Is 3-pointer: {is_three}")
-        logging.warning(f"   Defense team foul_modifier: {foul_modifier}")
-        logging.warning(f"   Base HARD threshold: {HARD_SHOOTING_FOUL_THRESHOLD}")
-        logging.warning(f"   Base SOFT threshold: {SOFT_SHOOTING_FOUL_THRESHOLD}")
-        logging.warning(f"   Calibrated HARD threshold: {HARD_SHOOTING_FOUL_THRESHOLD} + {foul_modifier} = {hard_threshold}")
-        logging.warning(f"   Calibrated SOFT threshold: {SOFT_SHOOTING_FOUL_THRESHOLD} + {foul_modifier} = {soft_threshold}")
+        logging.debug(f"   Shooter: {shooter_name}")
+        logging.debug(f"   Shooter location: {shooter_loc_str}")
+        logging.debug(f"   Defender: {get_name_safe(defender)}")
+        logging.debug(f"   Defense score: {defense_score}")
+        logging.debug(f"   Is 3-pointer: {is_three}")
+        logging.debug(f"   Defense team foul_modifier: {foul_modifier}")
+        logging.debug(f"   Base HARD threshold: {HARD_SHOOTING_FOUL_THRESHOLD}")
+        logging.debug(f"   Base SOFT threshold: {SOFT_SHOOTING_FOUL_THRESHOLD}")
+        logging.debug(f"   Calibrated HARD threshold: {HARD_SHOOTING_FOUL_THRESHOLD} + {foul_modifier} = {hard_threshold}")
+        logging.debug(f"   Calibrated SOFT threshold: {SOFT_SHOOTING_FOUL_THRESHOLD} + {foul_modifier} = {soft_threshold}")
 
         # Determine if foul occurs
         if defense_score < hard_threshold:

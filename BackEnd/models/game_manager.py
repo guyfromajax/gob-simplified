@@ -296,7 +296,7 @@ class GameManager:
             result["possession_flips"] = False
             # ✅ CRITICAL FIX: Update offense_team_id AFTER flip (was set to old team in turn_manager)
             result["offense_team_id"] = self.offense_team.team_id
-            logging.warning(f"🔄 [DREB→HCO] Flipped possession before HCO: {old_offense} → {self.offense_team.name}, updated offense_team_id={result['offense_team_id']}")
+            logging.debug(f"🔄 [DREB→HCO] Flipped possession before HCO: {old_offense} → {self.offense_team.name}, updated offense_team_id={result['offense_team_id']}")
 
         # ✅ FIX 4: Backend flip for DREB → Fast Break (Pattern C)
         # Handle possession flips for DREB transitions that go to Fast Break
@@ -307,7 +307,7 @@ class GameManager:
             result["possession_flips"] = False
             # ✅ CRITICAL FIX: Update offense_team_id AFTER flip (was set to old team in turn_manager)
             result["offense_team_id"] = self.offense_team.team_id
-            logging.warning(f"🔄 [DREB→FB] Flipped possession before Fast Break: {old_offense} → {self.offense_team.name}, updated offense_team_id={result['offense_team_id']}")
+            logging.debug(f"🔄 [DREB→FB] Flipped possession before Fast Break: {old_offense} → {self.offense_team.name}, updated offense_team_id={result['offense_team_id']}")
 
         # ✅ TIMEOUT: Check for foul out and create timeout turn
         if result.get("fouled_out"):
@@ -442,7 +442,7 @@ class GameManager:
         # Check LAST turn (handles OREB putbacks which append in while loop above)
         # ✅ DEFERRED TIMEOUT: Skip BIP creation if pending timeout exists
         if self.game_state.get("pending_computer_timeout"):
-            logging.warning(f"⏸️ COMPUTER TIMEOUT: Skipping BIP creation - pending timeout exists")
+            logging.debug(f"⏸️ COMPUTER TIMEOUT: Skipping BIP creation - pending timeout exists")
             return
         
         last_turn = self.turns[-1] if self.turns else None
@@ -493,7 +493,7 @@ class GameManager:
                     "turn_type": "BASELINE_INBOUND",
                     "timeout_reason": "COMPUTER"
                 }
-                logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} will call timeout on next turn (deferred for animation)")
+                logging.debug(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} will call timeout on next turn (deferred for animation)")
                 # Don't append BIP turn - timeout will be created instead on next API call
                 return
             else:

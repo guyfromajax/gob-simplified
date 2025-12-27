@@ -1815,7 +1815,7 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             calling_team = pending["calling_team"]
             turn_type = pending["turn_type"]
             
-            logging.warning(f"⏸️ COMPUTER TIMEOUT: Creating deferred timeout turn for {calling_team.name} (turn_type: {turn_type})")
+            logging.debug(f"⏸️ COMPUTER TIMEOUT: Creating deferred timeout turn for {calling_team.name} (turn_type: {turn_type})")
             
             # Create the timeout turn now (after previous turn was animated)
             timeout_turn = gm.call_timeout(

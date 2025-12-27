@@ -333,6 +333,7 @@ def complete_week(req: CompleteWeekRequest):
     })
     
     # ✅ SS&S: Find user's game and call finalize_game() to rollup stats to franchise document
+    print(f"🔍 [COMPLETE_WEEK] Looking for user's game: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
     logger.info(f"🔍 [COMPLETE_WEEK] Looking for user's game: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
     user_game = db.games.find_one({
         "week": req.week,
@@ -664,7 +665,13 @@ def get_leaders(
             meta = pdata.get("meta", {})
             # ✅ SS&S: Read stats directly from players.{pid}.season.{stat} (no totals wrapper)
             block = pdata.get(scope, {}) or {}
-            value = block.get(stat, 0)
+            # ✅ FIX: Map TPM to 3PTM (box score uses 3PTM, but leaders endpoint uses TPM)
+            if stat == "TPM":
+                value = block.get("3PTM", 0)
+            elif stat == "TPA":
+                value = block.get("3PTA", 0)
+            else:
+                value = block.get(stat, 0)
             rows.append(
                 {
                     "player_id": pid,
@@ -679,6 +686,13 @@ def get_leaders(
         return rows[:limit]
 
     # ✅ SS&S: Read stats directly from players.{pid}.season.{stat} (no totals wrapper)
+    # ✅ FIX: Map TPM to 3PTM for aggregation pipeline
+    stat_field = stat
+    if stat == "TPM":
+        stat_field = "3PTM"
+    elif stat == "TPA":
+        stat_field = "3PTA"
+    
     pipeline = [
         {"$match": {"_id": fid}},
         {"$project": {"players": {"$objectToArray": "$players"}}},
@@ -687,7 +701,7 @@ def get_leaders(
             "$project": {
                 "player_id": "$players.k",
                 "meta": "$players.v.meta",
-                "value": f"$players.v.{scope}.{stat}",  # Direct stat access, no totals wrapper
+                "value": f"$players.v.{scope}.{stat_field}",  # Direct stat access, no totals wrapper
             }
         },
         {"$sort": {"value": -1}},
@@ -740,6 +754,7 @@ def team_stats(franchise_id: str):
     ✅ SS&S: Aggregates from franchise.players object (franchise-specific stats),
     not from universal players_collection.
     """
+    print(f"🔍 [TEAM_STATS] Called with franchise_id={franchise_id}")
     try:
         fid = ObjectId(franchise_id)
     except Exception:
@@ -751,6 +766,8 @@ def team_stats(franchise_id: str):
     
     players = franchise_doc.get("players", {})
     franchise_teams = franchise_doc.get("franchise_teams", {})
+    
+    print(f"🔍 [TEAM_STATS] Found {len(players)} players, {len(franchise_teams)} teams")
     
     # Get all team IDs from franchise_teams
     team_stats_map: Dict[str, Dict[str, int]] = {}
@@ -766,16 +783,22 @@ def team_stats(franchise_id: str):
         }
     
     # Aggregate stats from players object
+    players_with_stats = 0
+    players_without_team_id = 0
     for pid, pdata in players.items():
         meta = pdata.get("meta", {})
         team_id = meta.get("team_id")
         if not team_id:
+            players_without_team_id += 1
             continue
         
         # ✅ SS&S: Normalize team_id to string for consistent comparison
         team_id_str = str(team_id)
         
         season_stats = pdata.get("season", {})
+        if not season_stats:
+            continue
+        
         if team_id_str not in team_stats_map:
             team_stats_map[team_id_str] = {
                 "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
@@ -783,10 +806,21 @@ def team_stats(franchise_id: str):
                 "TO": 0, "F": 0
             }
         
-        # Sum all stats for this team
+        players_with_stats += 1
+        # Sum all stats for this team (map 3PTM to TPM for output)
         for stat, val in season_stats.items():
-            if isinstance(val, (int, float)) and stat in team_stats_map[team_id_str]:
-                team_stats_map[team_id_str][stat] += val
+            if isinstance(val, (int, float)):
+                # Map 3PTM/3PTA to TPM/TPA for output consistency
+                output_stat = stat
+                if stat == "3PTM":
+                    output_stat = "TPM"
+                elif stat == "3PTA":
+                    output_stat = "TPA"
+                
+                if output_stat in team_stats_map[team_id_str]:
+                    team_stats_map[team_id_str][output_stat] += val
+    
+    print(f"🔍 [TEAM_STATS] Processed {players_with_stats} players with stats, {players_without_team_id} without team_id")
     
     # Convert to output format with team names
     output = []
@@ -798,6 +832,7 @@ def team_stats(franchise_id: str):
         except Exception:
             # Fallback if team_id_str is not a valid ObjectId
             team_name = team_id_str
+        print(f"🔍 [TEAM_STATS] Team {team_name}: PTS={stats.get('PTS')}, REB={stats.get('REB')}, AST={stats.get('AST')}")
         output.append({"team": team_name, "stats": stats})
     
     return {"teams": output}

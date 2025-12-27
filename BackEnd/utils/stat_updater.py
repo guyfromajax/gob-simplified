@@ -600,6 +600,7 @@ def finalize_game(
     if mode == "franchise" and franchise_id:
         import logging
         logger = logging.getLogger(__name__)
+        print(f"🔍 [FINALIZE_GAME] Starting franchise stats rollup: game_id={game_id}, franchise_id={franchise_id}")
         logger.info(f"🔍 [FINALIZE_GAME] Starting franchise stats rollup: game_id={game_id}, franchise_id={franchise_id}")
         
         try:
@@ -624,7 +625,10 @@ def finalize_game(
             logger.info(f"🔍 [FINALIZE_GAME] Attempting alternative lookup...")
             return
 
-        logger.info(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, home={game.get('home_team', {}).get('name') if isinstance(game.get('home_team'), dict) else game.get('home_team')}, away={game.get('away_team', {}).get('name') if isinstance(game.get('away_team'), dict) else game.get('away_team')}")
+        home_name = game.get('home_team', {}).get('name') if isinstance(game.get('home_team'), dict) else game.get('home_team')
+        away_name = game.get('away_team', {}).get('name') if isinstance(game.get('away_team'), dict) else game.get('away_team')
+        print(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, home={home_name}, away={away_name}")
+        logger.info(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, home={home_name}, away={away_name}")
 
         players = game.get("players", [])
         box_score = game.get("box_score", {})
@@ -696,6 +700,7 @@ def finalize_game(
                     logger.error(f"❌ [FINALIZE_GAME] Franchise found but update failed. applied_games={applied}, game_id={game_id}")
             return
         
+        print(f"✅ [FINALIZE_GAME] Successfully updated franchise document: modified_count={result.modified_count}")
         logger.info(f"✅ [FINALIZE_GAME] Successfully updated franchise document: modified_count={result.modified_count}")
 
         apply_stats_from_summary(game, game_id)
