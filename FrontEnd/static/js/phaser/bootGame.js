@@ -124,60 +124,32 @@ async function loadGamePlanSettings() {
     return;
   }
   
-  const teamName = userTeamSide === 'home' ? homeTeam : awayTeam;
   const teamId = userTeamSide === 'home' ? urlParams.get('home_id') : urlParams.get('away_id');
   
-  if (mode === 'single' && typeof localStorage !== 'undefined') {
-    // Single game mode: load from localStorage (persist by team, not matchup)
-    const storageKey = `gameplan_${teamName}`;
-    const stored = localStorage.getItem(storageKey);
-    if (stored) {
-      try {
-        gamePlanSettings = JSON.parse(stored);
-        console.log('📋 Loaded game plan settings from localStorage (single game mode):', gamePlanSettings);
-        console.log('   - Aggression setting:', gamePlanSettings?.strategy_settings?.aggression);
-      } catch (e) {
-        console.error('Failed to parse game plan settings:', e);
-      }
-    } else {
-      console.warn('⚠️ No game plan settings found in localStorage for key:', storageKey);
-    }
-  } else if (mode === 'franchise' && franchiseId && teamId) {
-    // Franchise mode: load from database
-    try {
-      const params = new URLSearchParams();
-      params.set('mode', 'franchise');
+  // ✅ SS&S: Always load from database (single source of truth for all modes)
+  try {
+    const params = new URLSearchParams();
+    params.set('mode', mode);
+    params.set('team_id', teamId);
+    
+    if (mode === 'franchise' && franchiseId) {
       params.set('franchise_id', franchiseId);
-      params.set('team_id', teamId);
-      
-      const res = await fetch(`/api/gameplan?${params.toString()}`);
-      if (res.ok) {
-        gamePlanSettings = await res.json();
-        console.log('📋 Loaded game plan settings from database (franchise mode):', gamePlanSettings);
-      } else {
-        console.error('Failed to load franchise game plan settings');
-      }
-    } catch (e) {
-      console.error('Error loading franchise game plan:', e);
-    }
-  } else if (mode === 'tournament' && tournamentId && teamId) {
-    // Tournament mode: load from database
-    try {
-      const params = new URLSearchParams();
-      params.set('mode', 'tournament');
+    } else if (mode === 'tournament' && tournamentId) {
       params.set('tournament_id', tournamentId);
-      params.set('team_id', teamId);
-      
-      const res = await fetch(`/api/gameplan?${params.toString()}`);
-      if (res.ok) {
-        gamePlanSettings = await res.json();
-        console.log('📋 Loaded game plan settings from database (tournament mode):', gamePlanSettings);
-      } else {
-        console.error('Failed to load tournament game plan settings');
-      }
-    } catch (e) {
-      console.error('Error loading tournament game plan:', e);
+    } else if (mode === 'single' && gameId) {
+      params.set('game_id', gameId);
     }
+    
+    const res = await fetch(`/api/gameplan?${params.toString()}`);
+    if (res.ok) {
+      gamePlanSettings = await res.json();
+      console.log(`📋 Loaded game plan settings from database (${mode} mode):`, gamePlanSettings);
+      console.log('   - Aggression setting:', gamePlanSettings?.strategy_settings?.aggression);
+    } else {
+      console.error(`❌ Failed to load game plan settings (${mode} mode), status:`, res.status);
+    }
+  } catch (e) {
+    console.error(`❌ Error loading game plan settings (${mode} mode):`, e);
   }
 }
 let periodLabel = urlParams.get('period') || `Q${quarter}`;

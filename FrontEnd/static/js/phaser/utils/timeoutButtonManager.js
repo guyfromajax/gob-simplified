@@ -406,21 +406,8 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
             if (playerId) params.set(`${otherTeamSide}_${pos.toLowerCase()}`, playerId);
         });
         
-        // ✅ TIMEOUT: Fetch current game plan settings (same as quarter breaks)
-        const teamId = myTeamSide === 'home' ? homeId : awayId;
-        if (teamId && modeParam === 'single') {
-            const gameplanParams = new URLSearchParams();
-            gameplanParams.set('mode', 'single');
-            gameplanParams.set('game_id', gameId);
-            gameplanParams.set('team_id', teamId);
-            
-            const gameplanRes = await fetch(`/api/gameplan?${gameplanParams.toString()}`);
-            if (gameplanRes.ok) {
-                const gameplanData = await gameplanRes.json();
-                // Pass game plan settings as URL param (JSON string) - same pattern as quarter breaks
-                params.set('game_plan_settings', JSON.stringify(gameplanData));
-            }
-        }
+        // ✅ SS&S: Removed URL param approach - database is single source of truth
+        // Game plan settings will be loaded from database when Game Plan page loads
     } catch (error) {
         console.error('❌ TIMEOUT: Error fetching lineup/game plan:', error);
         // Continue navigation even if fetch fails

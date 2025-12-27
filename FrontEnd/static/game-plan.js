@@ -143,71 +143,37 @@ async function loadSettings() {
   try {
     let mode = modeParam || 'single';
     
-    // ✅ TIMEOUT: Check for game_plan_settings in URL params first (same as quarter breaks)
-    // This allows pre-populating settings when resuming from timeout
-    const gamePlanSettingsParam = urlParams.get('game_plan_settings');
-    if (gamePlanSettingsParam) {
-      try {
-        currentSettings = JSON.parse(gamePlanSettingsParam);
-        console.log('✅ Loaded game plan settings from URL params (timeout resume):', currentSettings);
-        // Update UI with loaded values
-        for (const [key, sliderId] of Object.entries(strategySliders)) {
-          const slider = document.getElementById(sliderId);
-          const valueDisplay = document.getElementById(`value-${sliderId.replace('slider-', '')}`);
-          // ✅ FIX: Use nullish coalescing to preserve 0 values (|| treats 0 as falsy)
-          const value = currentSettings.strategy_settings[key] ?? 2;
-          if (slider) slider.value = value;
-          if (valueDisplay) valueDisplay.textContent = value;
-        }
-        return; // Skip further loading if we got settings from URL
-      } catch (e) {
-        console.error('Error parsing game_plan_settings from URL:', e);
-        // Fall through to normal loading
-      }
+    // ✅ SS&S: Always load from database (single source of truth for all modes)
+    const params = new URLSearchParams();
+    params.set('mode', mode);
+    params.set('team_id', teamId);
+    
+    if (mode === 'franchise' && franchiseId) {
+      params.set('franchise_id', franchiseId);
+    } else if (mode === 'tournament' && tournamentId) {
+      params.set('tournament_id', tournamentId);
+    } else if (mode === 'single' && gameId) {
+      params.set('game_id', gameId);
     }
     
-    // For single game mode, use localStorage (persist by team, not matchup)
-    if (mode === 'single') {
-      const storageKey = `gameplan_${teamName}`;
-      const stored = localStorage.getItem(storageKey);
-      
-      if (stored) {
-        currentSettings = JSON.parse(stored);
-      } else {
-        // Use defaults
-        const defaults = {
-          playcall_settings: {},
-          strategy_settings: {
-            'offense': 2, 'inside': 2, 'attack': 2, 'outside': 2, 'tempo': 2,
-            'defense': 2, 'aggression': 2, 'hc_trap': 2, 'fc_press': 2, 'rebounding': 2
-          }
-        };
-        currentSettings = defaults;
-      }
-    } else {
-      // For franchise/tournament, fetch from database
-      const params = new URLSearchParams();
-      params.set('mode', mode);
-      params.set('team_id', teamId);
-      
-      if (mode === 'franchise' && franchiseId) {
-        params.set('franchise_id', franchiseId);
-      } else if (mode === 'tournament' && tournamentId) {
-        params.set('tournament_id', tournamentId);
-      } else if (mode === 'single' && gameId) {
-        params.set('game_id', gameId);
-      }
-      
-      console.log('🔍 Gameplan API call params:', params.toString());
-      const res = await fetch(`/api/gameplan?${params.toString()}`);
-      if (!res.ok) {
-        console.error('Failed to load game plan settings, status:', res.status);
-        return;
-      }
-      
-      const data = await res.json();
-      currentSettings = data;
+    console.log('🔍 [GAME-PLAN] Loading settings from database:', params.toString());
+    const res = await fetch(`/api/gameplan?${params.toString()}`);
+    if (!res.ok) {
+      console.error('❌ [GAME-PLAN] Failed to load game plan settings, status:', res.status);
+      // Use defaults if API fails
+      currentSettings = {
+        playcall_settings: {},
+        strategy_settings: {
+          'offense': 2, 'inside': 2, 'attack': 2, 'outside': 2, 'tempo': 2,
+          'defense': 2, 'aggression': 2, 'hc_trap': 2, 'fc_press': 2, 'rebounding': 2
+        }
+      };
+      return;
     }
+    
+    const data = await res.json();
+    currentSettings = data;
+    console.log('✅ [GAME-PLAN] Loaded settings from database:', currentSettings);
     
     // Update UI with loaded values AND ensure currentSettings is fully populated
     for (const [key, sliderId] of Object.entries(strategySliders)) {
@@ -234,42 +200,37 @@ async function saveSettingsQuietly() {
   try {
     let mode = modeParam || 'single';
     
-    // For single game mode, save to localStorage (persist by team, not matchup)
-    if (mode === 'single') {
-      const storageKey = `gameplan_${teamName}`;
-      localStorage.setItem(storageKey, JSON.stringify(currentSettings));
-      console.log('✅ Saved game plan to localStorage (quietly)');
-    } else {
-      // For franchise/tournament, save to database
-      const payload = {
-        mode,
-        team_id: teamId,
-        playcall_settings: currentSettings.playcall_settings,
-        strategy_settings: currentSettings.strategy_settings
-      };
-      
-      if (mode === 'franchise' && franchiseId) {
-        payload.franchise_id = franchiseId;
-      } else if (mode === 'tournament' && tournamentId) {
-        payload.tournament_id = tournamentId;
-      }
-      
-      const res = await fetch('/api/gameplan', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      
-      if (!res.ok) {
-        console.warn('Failed to save game plan quietly:', await res.text());
-        return false;
-      }
-      
-      console.log('✅ Saved game plan to database (quietly)');
+    // ✅ SS&S: Always save to database (single source of truth for all modes)
+    const payload = {
+      mode,
+      team_id: teamId,
+      playcall_settings: currentSettings.playcall_settings,
+      strategy_settings: currentSettings.strategy_settings
+    };
+    
+    if (mode === 'franchise' && franchiseId) {
+      payload.franchise_id = franchiseId;
+    } else if (mode === 'tournament' && tournamentId) {
+      payload.tournament_id = tournamentId;
+    } else if (mode === 'single' && gameId) {
+      payload.game_id = gameId;
     }
+    
+    const res = await fetch('/api/gameplan', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    if (!res.ok) {
+      console.warn('❌ [GAME-PLAN] Failed to save game plan quietly:', await res.text());
+      return false;
+    }
+    
+    console.log('✅ [GAME-PLAN] Saved game plan to database (quietly)');
     return true;
   } catch (err) {
-    console.error('Error saving settings quietly:', err);
+    console.error('❌ [GAME-PLAN] Error saving settings quietly:', err);
     return false;
   }
 }
