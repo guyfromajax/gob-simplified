@@ -241,7 +241,7 @@ class TestJSONSerialization:
     
     def test_turn_result_json_serializable(self):
         """Test that a typical turn result can be JSON serialized."""
-        from BackEnd.utils.shared import jsonable_encoder
+        # Use standard json module, not a non-existent jsonable_encoder
         
         # Create a typical turn result structure
         turn_result = {
@@ -294,7 +294,9 @@ class TestFranchiseModeEdgeCases:
     
     def test_zero_step_skeleton_handling(self):
         """Test that 0-step skeletons don't cause crashes."""
-        gm = GameManager("Home", "Away")
+        from tests.test_utils import build_mock_game
+        
+        gm = build_mock_game()
         animator = Animator(gm)
         
         # Simulate a skeleton with 0 steps (what we saw in franchise mode)
