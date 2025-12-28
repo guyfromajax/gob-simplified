@@ -149,17 +149,60 @@
 **Stats Rollup Process:**
 
 1. **After Game Completion:**
+   - `finalize_game()` reads from game document's `box_score` to get all player stats
    - `finalize_game()` increments `players.{pid}.season.{stat}` and `players.{pid}.career.{stat}`
    - `rollup_game_to_franchise()` should also write to `players.{pid}.season.{stat}` (not `player_stats`)
    - Both functions use `$inc` operator to increment totals
    - `applied_games` array prevents double-counting (game_id added after rollup)
 
-2. **Stat Fields:**
-   - All standard box score stats: `PTS`, `REB`, `AST`, `STL`, `BLK`, `FGM`, `FGA`, `TPM`, `TPA`, `FTM`, `FTA`, `TO`, `F`, `MIN`, etc.
+2. **Box Score Structure (Game Documents):**
+   
+   **Storage Location:** `games_collection` game documents
+   
+   **Structure:** `box_score` is stored nested under team objects in the game document:
+   ```javascript
+   {
+     home_team: {
+       name: "Morristown",
+       box_score: {
+         "PG": { name: "Player Name", playerId: "...", jersey: 1, FGM: 5, FGA: 10, PTS: 12, ... },
+         "SG": { ... },
+         "SF": { ... },
+         "PF": { ... },
+         "C": { ... },
+         "BENCH_1234...": { ... },  // Bench players with unique keys
+         // ... all 12 players (lineup + bench)
+       }
+     },
+     away_team: {
+       name: "Bentley-Truman",
+       box_score: { ... }
+     }
+   }
+   ```
+   
+   **⚠️ IMPORTANT:** `box_score` is NOT stored at the top level of the game document. It's nested under `home_team["box_score"]` and `away_team["box_score"]`.
+   
+   **How Box Score is Generated:**
+   - `GameManager.get_box_score()` is called during game completion
+   - Includes **all players** from `team.players.values()` (lineup + bench), not just active lineup
+   - First adds lineup players with their positions (PG, SG, SF, PF, C)
+   - Then adds bench players (players not in current lineup)
+   - Bench players use their position attribute or default to "BENCH"
+   - If multiple bench players have the same position, keys are made unique by appending player_id
+   
+   **Retrieval Pattern:**
+   - `/api/game/{game_id}` endpoint builds `box_score` from nested structure if not found at top level
+   - `finalize_game()` builds `box_score` from nested structure when processing stats rollup
+   - Frontend box score page displays all players from `box_score` (merges with roster for complete player info)
+
+3. **Stat Fields:**
+   - All standard box score stats: `PTS`, `REB`, `AST`, `STL`, `BLK`, `FGM`, `FGA`, `3PTM`, `3PTA`, `FTM`, `FTA`, `TO`, `F`, `MIN`, etc.
    - `MIN` is converted from seconds (game) to minutes (season/career) during rollup
    - `GP` (Games Played) is incremented by 1 for each game
+   - **Note:** Frontend displays `3PTM`/`3PTA` but maps to `TPM`/`TPA` for display compatibility
 
-3. **Team Stats Aggregation:**
+4. **Team Stats Aggregation:**
    - Team stats are calculated by aggregating all player stats from `players` object
    - Filter by `meta.team_id` to get players for a specific team
    - Sum all stat fields across players on that team
@@ -185,7 +228,10 @@
 - `GET /franchise/state` - Returns full franchise document including `players` object
 - `GET /franchise/roster` - Returns roster with player attributes (stats loaded separately from `players`)
 - `GET /franchise/leaders` - Reads from `players.{pid}.{scope}` to get category leaders
-- `GET /franchise/team-stats` - Should aggregate from `players` object (currently broken - reads from wrong source)
+- `GET /franchise/team-stats` - Aggregates from `players` object, filters by `meta.team_id`
+- `GET /api/game/{game_id}` - Returns game state including `box_score`
+  - **Box Score Handling:** Builds `box_score` from nested `home_team["box_score"]` and `away_team["box_score"]` if not found at top level
+  - **Includes:** All players (lineup + bench) with game stats for display
 
 **Frontend Loading Pattern:**
 
@@ -1109,6 +1155,352 @@ These variables track the current game state and are required when in an active 
 - Remove `game_id` from navigation anchor set (game is complete)
 - Stats rolled up to franchise document
 - Navigate to FCC
+
+---
+
+## Gameplay (GP) - Single Game Mode
+
+**Definition:** User is actively playing a single game (not part of a franchise or tournament).
+
+**Sub-categories:**
+- **GP - Single Game Mode:** Lineup Select Experience, Game Plan, Playbooks, Play Details, Gameplay Screen, Box Score
+
+**Examples:**
+- Lineup Select Experience (set-lineup.html)
+- Game Plan screen (during game)
+- Playbooks screen (during game)
+- Play Details pages (individual play pages)
+- Gameplay Screen (court.html)
+- Box Score screen (after game)
+
+### GP - Single Game Mode
+
+#### Data Persistence
+
+**Game State (Per Game):**
+1. **Game Document** (`games_collection`)
+   - Game ID (ObjectId format)
+   - Scores, quarter, clock, time_remaining
+   - Full player stats (accumulated per quarter)
+   - Box score data
+   - Game metadata (mode: "single")
+
+2. **Game Settings** (Applied to Game Document)
+   - Game Plan settings (`strategy_settings`) - Loaded from game document or team document
+   - Playbooks settings (`playbook_settings`) - Loaded from game document or team document
+   - Lineups (home_lineup, away_lineup) - Set by user during game
+
+**User Settings (Persist Across GP Instances):**
+1. **Game Plan Settings (`strategy_settings`)**
+   - `offense`, `inside`, `attack`, `outside` (0-4)
+   - `tempo`, `defense`, `aggression` (0-4)
+   - `hc_trap`, `fc_press`, `rebounding` (0-4)
+   - Stored in `teams.{team_id}.strategy_settings`, persist across all GP screens until changed
+
+2. **Playbooks Settings (`playbook_settings`)**
+   - Percentage distributions: `motion`, `set_play_inside`, `set_play_attack`, `set_play_outside`, `zone_defense`, `man_defense`
+   - Slot assignments: `slot_assignments` (for Playcall Center slots 1-6)
+   - Motion dropdowns: `motion_dropdowns` (Inside/Attack/Outside for motion plays)
+   - Position filters: `position_filters` (Standard, PG, SG, SF, PF, C play assignments)
+   - Even distribution toggles: Per-container toggle state
+   - Stored in `teams.{team_id}.playbook_settings`, persist across all GP screens until changed
+
+**Game Context (During Active Game):**
+- Current quarter, clock, scores
+- Lineup selections (home_lineup, away_lineup)
+- Timeout state (if resuming from timeout)
+- Game ID (identifies active game document)
+
+#### Key Variables
+
+**Core Navigation Variables (Required for all GP navigation):**
+
+1. **`mode`** (string)
+   - **What it does:** Tells the system you're in single game mode (versus tournament or franchise mode)
+   - **Where it lives:** URL parameter (e.g., `?mode=single`)
+   - **Nested?** No - standalone string value
+   - **Example:** `mode=single`
+
+2. **`team_id`** (string - team name format)
+   - **What it does:** Identifies the user's team (team name format, e.g., "Four Corners") - used for loading/saving settings
+   - **Where it lives:**
+     - URL parameter (e.g., `?team_id=Four+Corners`)
+     - Database: Team name in `teams_collection` or game document
+   - **Nested?** No - standalone string value
+   - **Note:** In Single Game mode, `team_id` is the team name (not ObjectId format like Franchise/Tournament)
+   - **Example:** `team_id=Four+Corners`
+
+**Game-Specific Variables (Required when game is active):**
+
+3. **`game_id`** (ObjectId string)
+   - **What it does:** Identifies the active game document
+   - **Where it lives:**
+     - URL parameter (e.g., `?game_id=507f1f77bcf86cd799439011`)
+     - Database: `_id` field of the game document in `games_collection`
+     - localStorage (as fallback)
+   - **Nested?** No - top-level field in the game document
+   - **When Required:** Always required when game is active (quarter > 1, or resuming from timeout, or during gameplay)
+   - **Example:** `game_id=507f1f77bcf86cd799439011`
+
+4. **`quarter`** (integer)
+   - **What it does:** Tracks current quarter number (1-4, or higher for overtime)
+   - **Where it lives:**
+     - URL parameter (e.g., `?quarter=2`)
+     - Database: `games.{game_id}.quarter`
+   - **Nested?** No - top-level field in the game document
+   - **When Required:** Always required during gameplay
+   - **Example:** `quarter=2`
+
+**Lineup Variables (Required for lineup management):**
+
+5. **`my_team`** (string)
+   - **What it does:** Identifies which side the user's team is on ("home" or "away")
+   - **Where it lives:** URL parameter (e.g., `?my_team=home`)
+   - **Nested?** No - standalone string value
+   - **Example:** `my_team=home`
+
+6. **`home`** (string)
+   - **What it does:** Home team name for display (e.g., "Four Corners")
+   - **Where it lives:** URL parameter (e.g., `?home=Four+Corners`)
+   - **Nested?** No - standalone string value
+   - **Example:** `home=Four+Corners`
+
+7. **`away`** (string)
+   - **What it does:** Away team name for display (e.g., "Ocean City")
+   - **Where it lives:** URL parameter (e.g., `?away=Ocean+City`)
+   - **Nested?** No - standalone string value
+   - **Example:** `away=Ocean+City`
+
+8. **`home_id`** (ObjectId string, optional)
+   - **What it does:** Home team ObjectId for backend lookups (may not be present in Single Game mode)
+   - **Where it lives:** URL parameter (e.g., `?home_id=507f1f77bcf86cd799439011`)
+   - **Nested?** No - standalone ObjectId string
+   - **Note:** May not be present in Single Game mode - `team_id` (team name) is used instead
+   - **Example:** `home_id=507f1f77bcf86cd799439011`
+
+9. **`away_id`** (ObjectId string, optional)
+   - **What it does:** Away team ObjectId for backend lookups (may not be present in Single Game mode)
+   - **Where it lives:** URL parameter (e.g., `?away_id=507f1f77bcf86cd799439012`)
+   - **Nested?** No - standalone ObjectId string
+   - **Note:** May not be present in Single Game mode - `team_id` (team name) is used instead
+   - **Example:** `away_id=507f1f77bcf86cd799439012`
+
+10. **Lineup Position Parameters** (optional, but recommended)
+    - **Format:** `{my_team}_{position}` (e.g., `home_pg`, `away_sg`)
+    - **Positions:** `pg`, `sg`, `sf`, `pf`, `c`
+    - **What it does:** Preserves lineup selections during navigation (which players are in which positions)
+    - **Where it lives:** URL parameters
+    - **Nested?** No - individual URL parameters per position
+    - **When Required:** When lineup is set (user has selected players)
+    - **Example:** `home_pg=507f...&home_sg=507f...&home_sf=507f...&home_pf=507f...&home_c=507f...`
+
+**Timeout/Resume Variables (Conditionally required):**
+
+11. **`resume_from_timeout`** (boolean, optional)
+    - **What it does:** Indicates game is resuming from a timeout (true) or not (false/missing)
+    - **Where it lives:** URL parameter (e.g., `?resume_from_timeout=true`)
+    - **Nested?** No - standalone boolean string value
+    - **When Required:** Only when resuming from timeout
+    - **Example:** `resume_from_timeout=true`
+
+12. **`clock`** (string, optional)
+    - **What it does:** Preserves game clock time during timeout navigation (e.g., "12:00", "8:34")
+    - **Where it lives:** URL parameter (e.g., `?clock=8:34`)
+    - **Nested?** No - standalone string value
+    - **When Required:** Only when resuming from timeout (to restore clock position)
+    - **Example:** `clock=8:34`
+
+**Context Variables (Optional, for navigation context):**
+
+13. **`from`** (string, optional)
+    - **What it does:** Tracks where you came from (e.g., "lineup", "game-plan", "playbooks") - used to determine back navigation behavior
+    - **Where it lives:** URL parameter only (e.g., `?from=lineup`)
+    - **Nested?** No - standalone string value
+    - **Example:** Game Plan uses this to show "Back to Lineup" vs "Back to Locker Room" button
+
+14. **`play_name`** (string, optional)
+    - **What it does:** Identifies which play to display when on Play Details page (e.g., "3-2 Motion", "Base Post Play")
+    - **Where it lives:** URL parameter only (e.g., `?play_name=3-2 Motion`)
+    - **Nested?** No - standalone string value
+    - **When Required:** Only when viewing Play Details page
+    - **Example:** `play_name=3-2 Motion`
+
+**Summary:**
+- **Core Two:** `mode` and `team_id` form the navigation anchor set for Single Game mode
+- **Game State:** `game_id`, `quarter` track the active game
+- **Lineup State:** `my_team`, `home`, `away`, lineup position parameters preserve lineup selections
+- **Timeout State:** `resume_from_timeout`, `clock` preserve timeout resume context
+- **Navigation Context:** `from`, `play_name` provide navigation context
+- **Key Difference from Franchise/Tournament:** `team_id` is team name (string) in Single Game mode, not ObjectId format
+
+#### Navigation Requirements
+
+**Navigation Anchor Set (Required):**
+- **Mode:** `"single"` (determines collection/endpoints)
+- **Team ID:** `team_id` (team name string) - User's team anchor
+- **Game ID:** `game_id` (ObjectId string) - Required when game is active
+
+**Validation:**
+- `mode` must be `"single"`
+- `team_id` required for settings loading/saving (team name format, not ObjectId)
+- `game_id` required when `quarter > 1` or `resume_from_timeout=true` or during active gameplay
+- `game_id` must exist in database
+
+#### State Management
+
+**Game State (Stored in game document):**
+- `game_id` - ObjectId format
+- `quarter` - Current quarter number (1-4+)
+- `clock` - Current game clock display (e.g., "12:00")
+- `time_remaining` - Time remaining in seconds
+- `score` - Current scores `{home_team: X, away_team: Y}`
+- `home_lineup` / `away_lineup` - Current lineups (player IDs by position)
+- `mode` - "single"
+- `players[]` - Player stats (accumulated per quarter)
+- `box_score` - Box score data structure
+- `is_final` - Boolean flag (true when game is complete)
+
+**Team Context (Stored in team document or game document):**
+- Game Plan settings (`teams.{team_id}.strategy_settings`)
+- Playbooks settings (`teams.{team_id}.playbook_settings`)
+
+**Timeout State (Stored in game document):**
+- `timeout_next_play_type` - "SIDE_INBOUND" or "FREE_THROW"
+- `timeout_offense_team_id` - Team that had possession
+- `timeout_calling_team` - Team that called timeout
+
+#### Data Flow
+
+**Starting a Game:**
+- User selects teams and navigates to Lineup Select Experience
+- User sets lineup, then navigates to Game Plan or directly to Gameplay Screen
+- Game Plan and Playbooks settings are loaded from `teams.{team_id}`
+- Game is initialized via `/api/init-game` endpoint
+- Game document is created in `games_collection` with `mode: "single"`
+- Settings are applied to game document when game starts
+
+**GP → GP (Navigation Between GP Screens):**
+- All settings and state persist via URL parameters
+- Core navigation anchor set (`mode`, `team_id`) preserved
+- Game state (`game_id`, `quarter`, `clock`) preserved when game is active
+- Lineup state preserved via position parameters
+- Settings persist via database (loaded from team document on each screen)
+
+**GP → GP (Timeout Navigation):**
+- Game state saved to database with `timeout_next_play_type`, `timeout_offense_team_id`
+- Navigate to Lineup Select Experience with `game_id`, `quarter`, `clock`, `resume_from_timeout=true`
+- All game context preserved via `TimeoutNavigationHelper.buildGameNavigationParams()`
+- Backend restores timeout state from database on resume
+
+**GP → GP (Quarter Breaks):**
+- Game state persists in database
+- Navigate to Lineup Select Experience for next quarter
+- `game_id`, `quarter` (incremented), lineup parameters preserved
+- Game continues with same game document
+
+**GP → GP (Game Completion):**
+- Final stats available in game document
+- Box Score shows final game stats
+- Game document remains in database for review
+
+#### API Endpoints
+
+**Key Endpoints:**
+- `POST /api/init-game` - Initializes new game, creates game document
+- `POST /api/simulate-quarter` - Simulates a quarter, returns turn data
+- `GET /api/game/{game_id}` - Loads game state from database
+- `GET /api/gameplan` - Loads Game Plan settings (`strategy_settings`)
+  - **Parameters:** `mode=single`, `team_id={team_name}`, `game_id={game_id}`
+- `PUT /api/gameplan` - Saves Game Plan settings
+  - **Parameters:** `mode=single`, `team_id={team_name}`, `game_id={game_id}` (optional)
+- `GET /api/playbooks` - Loads Playbooks settings (`playbook_settings`)
+  - **Parameters:** `mode=single`, `team_id={team_name}`, `game_id={game_id}`
+- `POST /api/playbooks` - Saves Playbooks settings
+  - **Parameters:** `mode=single`, `team_id={team_name}`, `game_id={game_id}` (optional)
+
+#### User Actions
+
+**Available Actions:**
+- Set Lineup (select players for home/away teams)
+- Configure Game Plan (strategy settings) - persists to team document
+- Configure Playbooks (playbook settings, slot assignments) - persists to team document
+- View Play Details (individual play information)
+- Start Game (navigate to Gameplay Screen)
+- Resume from Timeout (continue game after timeout)
+- View Box Score (after game completion)
+- Navigate Between GP Screens (Lineup ↔ Game Plan ↔ Playbooks ↔ Play Details ↔ Gameplay)
+
+#### Validation Rules
+
+**Navigation Validation:**
+- `mode` must be `"single"`
+- `team_id` must be valid team name (string format)
+- `game_id` must exist in `games_collection` when game is active
+- `game_id` required when `quarter > 1` or `resume_from_timeout=true`
+
+**Game State Validation:**
+- `quarter` must be valid (1-4, or higher for overtime)
+- `game_id` required when `quarter > 1` or `resume_from_timeout=true`
+- Lineup must have 5 players per team (if set)
+
+**Data Validation:**
+- Game Plan: At least one offense setting must be > 0
+- Playbooks: Container totals must sum to 100% (after filtering)
+- Lineup: Each position must have a valid player ID (if lineup is set)
+
+#### Transition Patterns
+
+**Starting Game:**
+- Navigate to Lineup Select Experience with `mode=single`, `team_id={team_name}`
+- Initialize game document via `/api/init-game`
+- Add `game_id` to navigation anchor set after initialization
+
+**GP → GP (Between GP Screens):**
+- Preserve navigation anchor set (`mode`, `team_id`)
+- Preserve `game_id` if game is active
+- Preserve `quarter`, `clock`, `resume_from_timeout` if applicable
+- Preserve lineup parameters if lineup is set
+- Preserve `from` parameter for back navigation context
+- Use `TimeoutNavigationHelper.buildGameNavigationParams()` for consistency
+
+**GP → GP (Timeout Navigation):**
+- Preserve navigation anchor set (`mode`, `team_id`)
+- Preserve `game_id`, `quarter`, `clock`
+- Add `resume_from_timeout=true`
+- Preserve all lineup parameters
+- Backend saves timeout state to database
+
+**GP → GP (Quarter Breaks):**
+- Preserve navigation anchor set (`mode`, `team_id`)
+- Preserve `game_id`
+- Increment `quarter` parameter
+- Preserve lineup parameters (or allow user to change lineup)
+
+#### Known Issues & Fixes
+
+**Issue (February 2025):** `team_id` parameter not being extracted correctly in Single Game mode when navigating from Playbooks → Game Plan.
+
+**Root Cause:**
+- In Single Game mode, the URL has `team_id=Four+Corners` (team name format)
+- The code was only checking for `home_id`/`away_id` or `user_team_id` (for Tournament/Franchise modes)
+- Single Game mode was not checking for `team_id` parameter
+
+**Fix Applied:**
+- Added check for `team_id` parameter in Single Game mode (lines 55-60 in `game-plan.js`)
+- Ensures `team_id` is extracted from URL when `mode=single`
+- Allows Game Plan settings to load/save correctly in Single Game mode
+
+**Code Pattern:**
+```javascript
+// ✅ CORRECT: Check for team_id parameter in Single Game mode
+if (modeParam === 'single') {
+  const teamIdParam = urlParams.get('team_id');
+  if (teamIdParam) {
+    teamId = teamIdParam;
+    teamName = teamIdParam; // In single mode, team_id is the team name
+  }
+}
+```
 
 ---
 
