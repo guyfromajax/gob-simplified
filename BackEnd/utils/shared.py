@@ -646,15 +646,27 @@ def summarize_game_state(game, exclude_animations=True):
 
     cumulative_box = game.get_box_score()
 
-    # Get populated plays for team objects
-    try:
-        from BackEnd.api.gameplan_routes import populate_team_plays
-        populated_plays = populate_team_plays()
-        # print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams")
-        # print(f"🔍 DEBUG: Play keys: {list(populated_plays.keys())}")
-    except Exception as e:
-        print(f"🚨 Error in populate_team_plays: {e}")
-        populated_plays = {}
+    # ✅ FIX: Use in-memory plays from team objects (they have updated game_stats)
+    # Instead of creating fresh copies from database, use the plays that were updated during gameplay
+    # This preserves game_stats (times_run, successes, player_points) that were tracked during the game
+    from copy import deepcopy
+    
+    # Get plays from home team (in-memory, with updated game_stats)
+    home_plays = deepcopy(getattr(game.home_team, 'plays', {}))
+    # Get plays from away team (in-memory, with updated game_stats)
+    away_plays = deepcopy(getattr(game.away_team, 'plays', {}))
+    
+    # If teams don't have plays loaded, fallback to database (shouldn't happen in normal flow)
+    if not home_plays and not away_plays:
+        try:
+            from BackEnd.api.gameplan_routes import populate_team_plays
+            populated_plays = populate_team_plays()
+            home_plays = populated_plays.copy()
+            away_plays = populated_plays.copy()
+        except Exception as e:
+            print(f"🚨 Error in populate_team_plays: {e}")
+            home_plays = {}
+            away_plays = {}
     
     # ✅ PRESERVE playbook_settings from database when saving game state
     # This ensures slot_assignments and other playbook settings persist across timeout/quarter saves
@@ -735,7 +747,7 @@ def summarize_game_state(game, exclude_animations=True):
         home_key: {
             "strategy_settings": getattr(game.home_team, 'strategy_settings', {}),
             "strategy_calls": getattr(game.home_team, 'strategy_calls', {}),  # ✅ SS&S: Persist playcall overrides
-            "plays": populated_plays.copy(),
+            "plays": home_plays,  # ✅ FIX: Use in-memory plays with updated game_stats
             "attributes": getattr(game.home_team, 'team_attributes', {}),
             "scouting": getattr(game.home_team, 'scouting_data', {}),
             "playbook_settings": home_playbook_settings  # ✅ Preserve from database
@@ -743,7 +755,7 @@ def summarize_game_state(game, exclude_animations=True):
         away_key: {
             "strategy_settings": getattr(game.away_team, 'strategy_settings', {}),
             "strategy_calls": getattr(game.away_team, 'strategy_calls', {}),  # ✅ SS&S: Persist playcall overrides
-            "plays": populated_plays.copy(),
+            "plays": away_plays,  # ✅ FIX: Use in-memory plays with updated game_stats
             "attributes": getattr(game.away_team, 'team_attributes', {}),
             "scouting": getattr(game.away_team, 'scouting_data', {}),
             "playbook_settings": away_playbook_settings  # ✅ Preserve from database
