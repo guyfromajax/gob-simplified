@@ -609,9 +609,7 @@ def simulate_quarter(
                 gm.home_team.name: gm.home_team.team_fouls,
                 gm.away_team.name: gm.away_team.team_fouls,
             }
-        
-        # Clear full simulation flag after loop completes
-        gm.game_state.pop("_is_full_simulation", None)
+            
             gm.game_state["team_timeouts"] = {
                 gm.home_team.name: getattr(gm.home_team, 'timeouts', 4),
                 gm.away_team.name: getattr(gm.away_team, 'timeouts', 4),
@@ -621,6 +619,9 @@ def simulate_quarter(
             if gm.game_state["time_remaining"] >= previous_time and turn_count > 10:
                 logging.warning(f"⚠️ Time not decreasing! previous={previous_time}, current={gm.game_state['time_remaining']}, turn={turn_count}")
                 # Don't break here, might be legitimate (e.g., fouls, timeouts)
+        
+        # Clear full simulation flag after loop completes
+        gm.game_state.pop("_is_full_simulation", None)
         
         logging.info(f"✅ Full simulation complete: Q{gm.quarter} finished after {turn_count} turns, final time_remaining={gm.game_state['time_remaining']}")
         gm.quarter += 1
