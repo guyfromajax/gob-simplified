@@ -4092,11 +4092,15 @@ def resolve_half_court_offense_logic(game):
                     # Track player points if shot was made (rt == "MAKE")
                     if rt == "MAKE":
                         shooter = roles.get("shooter")
+                        # 🔍 DEBUG: Log shooter tracking for player_points
+                        logging.warning(f"🔍 [PLAYER_POINTS DEBUG] Play: '{current_playcall}', rt=MAKE, shooter={shooter}, shooter_type={type(shooter)}")
                         if shooter:
                             shooter_id = getattr(shooter, "player_id", None)
+                            logging.warning(f"🔍 [PLAYER_POINTS DEBUG] shooter_id={shooter_id}, shooter_id_type={type(shooter_id)}")
                             if shooter_id:
                                 # Get points from shot_result (2 or 3)
                                 points = shot_result.get("points", 0)
+                                logging.warning(f"🔍 [PLAYER_POINTS DEBUG] points={points}")
                                 if points > 0:
                                     # Initialize player_points dict if needed
                                     if "game_stats" not in play_obj:
@@ -4106,7 +4110,13 @@ def resolve_half_court_offense_logic(game):
                                     
                                     # Increment player's points for this play
                                     player_points = play_obj["game_stats"]["player_points"]
-                                    player_points[shooter_id] = player_points.get(shooter_id, 0) + points
+                                    old_points = player_points.get(shooter_id, 0)
+                                    player_points[shooter_id] = old_points + points
+                                    logging.warning(f"🔍 [PLAYER_POINTS DEBUG] Updated player_points: {shooter_id}: {old_points} -> {player_points[shooter_id]}")
+                            else:
+                                logging.warning(f"⚠️ [PLAYER_POINTS DEBUG] shooter_id is None or missing!")
+                        else:
+                            logging.warning(f"⚠️ [PLAYER_POINTS DEBUG] shooter is None or missing from roles!")
             
             # Track defensive playcall success with granular tracking
             defense_playcall = game.game_state.get("defense_playcall", "Man")  # "Man", "2-3 Zone", etc.
