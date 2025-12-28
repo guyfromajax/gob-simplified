@@ -901,14 +901,19 @@ class TurnManager:
             # Lookup play details from database to get play_type and play_focus
             play_doc = plays_collection.find_one({"name": chosen_playcall})
             
+            # 🔍 DEBUG: Log play document lookup for override
+            logging.warning(f"🔍 [PLAYCALL OVERRIDE DEBUG] Looking up play: '{chosen_playcall}'")
+            logging.warning(f"🔍 [PLAYCALL OVERRIDE DEBUG] Play document found: {play_doc is not None}")
             if play_doc:
                 chosen_play_type = play_doc.get("play_type", "motion")
                 user_focus = play_doc.get("play_focus", "inside")
+                logging.warning(f"🔍 [PLAYCALL OVERRIDE DEBUG] Play document data: play_type='{chosen_play_type}', play_focus='{user_focus}'")
             else:
                 # Fallback if play not found
                 logging.warning(f"⚠️ [PLAYCALL OVERRIDE] Play '{chosen_playcall}' not found in database, using fallback")
                 chosen_play_type = "motion"
                 user_focus = "inside"
+                logging.warning(f"🔍 [PLAYCALL OVERRIDE DEBUG] Using fallback: play_type='{chosen_play_type}', play_focus='{user_focus}'")
             
             # Still need to choose defense normally
             if user_defense:
@@ -1173,6 +1178,10 @@ class TurnManager:
             pass
 
         # Persist play type/focus to game_state for later success attribution
+        # 🔍 DEBUG: Log when offense_play_type is set
+        logging.warning(f"🔍 [SET_PLAYCALLS DEBUG] Setting game_state['offense_play_type'] = '{chosen_play_type}'")
+        logging.warning(f"🔍 [SET_PLAYCALLS DEBUG] Setting game_state['offense_play_focus'] = '{chosen_focus}'")
+        logging.warning(f"🔍 [SET_PLAYCALLS DEBUG] Current playcall: '{calls.get('offense') if 'calls' in locals() else 'N/A'}'")
         self.game.game_state["offense_play_type"] = chosen_play_type
         self.game.game_state["offense_play_focus"] = chosen_focus
         

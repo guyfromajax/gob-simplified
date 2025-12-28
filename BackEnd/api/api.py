@@ -1073,6 +1073,13 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         else:
                             logging.warning(f"⚠️ No user_team_side found in DB or request - override checking will not work!")
                         
+                        # 🔍 DEBUG: Log offense_play_type in saved state (if present)
+                        if "offense_play_type" in saved:
+                            gm.game_state["offense_play_type"] = saved["offense_play_type"]
+                            logging.warning(f"🔍 [GAME LOAD DEBUG] Restored offense_play_type from DB: '{saved['offense_play_type']}'")
+                        else:
+                            logging.warning(f"🔍 [GAME LOAD DEBUG] offense_play_type NOT in saved state (will be set by set_playcalls())")
+                        
                         # ✅ TIMEOUT RESUME: Check for timeout state BEFORE calculating should_restore_stats
                         # This ensures scores/fouls are restored when resuming from timeout
                         # Check if timeout state exists in saved document (regardless of URL parameter)

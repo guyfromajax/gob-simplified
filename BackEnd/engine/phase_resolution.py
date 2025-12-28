@@ -3197,6 +3197,11 @@ def resolve_half_court_offense_logic(game):
     offense_play_type = game_state.get("offense_play_type", "")
     is_motion_play = offense_play_type == "motion"
     
+    # 🔍 DEBUG: Log offense_play_type read (FIRST READ - skeleton selection)
+    logging.warning(f"🔍 [HCO RESOLVE DEBUG] FIRST READ - offense_play_type from game_state: '{offense_play_type}' (type: {type(offense_play_type)})")
+    logging.warning(f"🔍 [HCO RESOLVE DEBUG] FIRST READ - is_motion_play: {is_motion_play}")
+    logging.warning(f"🔍 [HCO RESOLVE DEBUG] FIRST READ - current_playcall: '{game_state.get('current_playcall', 'N/A')}'")
+    
     if is_motion_play:
         # Motion plays use base_loop skeleton
         skeleton = get_hco_skeleton(None, game, lean_score=None)
@@ -3830,6 +3835,12 @@ def resolve_half_court_offense_logic(game):
     # ✅ MOTION OFFENSE: Check if this is a Motion play and route to Motion shot logic
     offense_play_type = game_state.get("offense_play_type", "")
     is_motion_play = offense_play_type == "motion"
+    
+    # 🔍 DEBUG: Log offense_play_type read (SECOND READ - shot routing)
+    logging.warning(f"🔍 [HCO RESOLVE DEBUG] SECOND READ - offense_play_type from game_state: '{offense_play_type}' (type: {type(offense_play_type)})")
+    logging.warning(f"🔍 [HCO RESOLVE DEBUG] SECOND READ - is_motion_play: {is_motion_play}")
+    logging.warning(f"🔍 [HCO RESOLVE DEBUG] SECOND READ - event_type: '{event_type}'")
+    logging.warning(f"🔍 [HCO RESOLVE DEBUG] SECOND READ - Will call resolve_motion_offense_shot: {is_motion_play and event_type == 'SHOT'}")
     
     if is_motion_play and event_type == "SHOT":
         # Motion play shot resolution
