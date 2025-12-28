@@ -397,6 +397,18 @@ export class ShotAnimationSystem {
       });
     }
     
+    // 🔍 DEBUG: Log offenseTeamId before classification
+    console.warn('🔍 [PLAYER CLASSIFICATION DEBUG] Before classification:', {
+      offenseTeamId,
+      offenseTeamIdType: typeof offenseTeamId,
+      resultType: turnData?.result_type,
+      currentTurn: turnData?.current_turn,
+      nextTurn: turnData?.next_turn,
+      offensivePlaycall: turnData?.offensive_playcall,
+      offensivePlayType: turnData?.offensive_play_type,
+      totalAnimations: turnData.animations?.length
+    });
+    
     for (const anim of turnData.animations) {
       const sprite = this.playerSprites[anim.playerId];
       if (!sprite) {
@@ -406,6 +418,19 @@ export class ShotAnimationSystem {
       
       const isOffensivePlayer = offenseTeamId ? String(sprite.team_id) === String(offenseTeamId) : false;
       playerClassifications[anim.playerId] = isOffensivePlayer ? 'offense' : 'defense';
+      
+      // 🔍 DEBUG: Log first few player classifications
+      if (Object.keys(playerClassifications).length <= 3) {
+        console.warn('🔍 [PLAYER CLASSIFICATION DEBUG] Player:', {
+          playerId: anim.playerId,
+          spriteTeamId: sprite.team_id,
+          spriteTeamIdType: typeof sprite.team_id,
+          offenseTeamId,
+          offenseTeamIdType: typeof offenseTeamId,
+          match: String(sprite.team_id) === String(offenseTeamId),
+          isOffensivePlayer
+        });
+      }
       
       if (isOffensivePlayer) {
         offensiveCount++;
@@ -426,6 +451,10 @@ export class ShotAnimationSystem {
         offenseTeamIdIsObjectId: /^[0-9a-f]{24}$/i.test(String(offenseTeamId)),
         turnDataId: turnData?.id,
         resultType: turnData?.result_type,
+        currentTurn: turnData?.current_turn,
+        nextTurn: turnData?.next_turn,
+        offensivePlaycall: turnData?.offensive_playcall,
+        offensivePlayType: turnData?.offensive_play_type,
         totalAnimations: turnData.animations?.length,
         playerSpritesKeys: Object.keys(this.playerSprites),
         sampleSpriteTeamIds: turnData.animations.slice(0, 3).map(a => {

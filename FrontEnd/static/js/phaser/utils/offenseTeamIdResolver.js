@@ -27,7 +27,11 @@ export function resolveOffenseTeamId({ scene, turnData, playerSprites = null, pa
       type: typeof resolved,
       isObjectId: /^[0-9a-f]{24}$/i.test(String(resolved)),
       resultType: turnData?.result_type,
-      turnIndex: turnData?.index
+      turnIndex: turnData?.index,
+      // 🔍 DEBUG: Add more context for SIP/override debugging
+      currentTurn: turnData?.current_turn,
+      nextTurn: turnData?.next_turn,
+      offensivePlaycall: turnData?.offensive_playcall
     });
     return resolved;
   }
