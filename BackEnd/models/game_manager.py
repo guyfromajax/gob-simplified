@@ -434,6 +434,9 @@ class GameManager:
                     )
                     if timeout_turn:
                         logging.info(f"✅ COMPUTER TIMEOUT: Created timeout turn and rebuilt lineups for {calling_team.name}")
+                        # Clear timeout_called flag so simulation continues normally
+                        # The timeout turn is just one turn - simulation should continue
+                        self.game_state["timeout_called"] = False
                     # Don't append SIP turn - timeout turn was created instead
                     return
                 else:
@@ -519,6 +522,9 @@ class GameManager:
                     )
                     if timeout_turn:
                         logging.info(f"✅ COMPUTER TIMEOUT: Created timeout turn and rebuilt lineups for {calling_team.name}")
+                        # Clear timeout_called flag so simulation continues normally
+                        # The timeout turn is just one turn - simulation should continue
+                        self.game_state["timeout_called"] = False
                     # Don't append BIP turn - timeout turn was created instead
                     return
                 else:

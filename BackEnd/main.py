@@ -589,21 +589,12 @@ def simulate_quarter(
             
             previous_time = gm.game_state["time_remaining"]
             
-            # ✅ COMPUTER TIMEOUT: Check if timeout was called in previous turn
-            if gm.game_state.get("timeout_called"):
-                last_turn = gm.turns[-1] if gm.turns else None
-                if last_turn and last_turn.get("result_type") == "TIMEOUT":
-                    logging.warning(f"⏸️ COMPUTER TIMEOUT: Stopping simulation loop - timeout turn detected (turn {len(gm.turns)}, reason: {last_turn.get('timeout_reason')})")
-                    break  # Stop simulation when timeout is called
+            # ✅ FULL SIMULATION: Timeouts are just turns - continue simulation
+            # Timeout turns are created and lineups are rebuilt, but simulation continues
+            # until time_remaining <= 0. The break logic only applies to turn-by-turn mode
+            # where the user needs to interact with the timeout.
             
             gm.simulate_macro_turn()
-            
-            # ✅ COMPUTER TIMEOUT: Check if timeout was just called in this turn
-            if gm.game_state.get("timeout_called"):
-                last_turn = gm.turns[-1] if gm.turns else None
-                if last_turn and last_turn.get("result_type") == "TIMEOUT":
-                    logging.warning(f"⏸️ COMPUTER TIMEOUT: Stopping simulation loop - timeout turn just created (turn {len(gm.turns)}, reason: {last_turn.get('timeout_reason')})")
-                    break  # Stop simulation when timeout is called
             
             gm.game_state["team_fouls"] = {
                 gm.home_team.name: gm.home_team.team_fouls,
