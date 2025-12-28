@@ -83,11 +83,16 @@ def get_default_settings():
             "Set": 2
         },
         "strategy_settings": {
-            "defense": 2,
+            "offense": 2,  # Motion vs Set Play split (0=motion only, 4=set plays only)
+            "inside": 2,   # Inside focus preference
+            "attack": 2,  # Attack focus preference
+            "outside": 2, # Outside focus preference
             "tempo": 2,
+            "defense": 2,
             "aggression": 2,
-            "half_court_trap": 2,
-            "full_court_press": 2
+            "hc_trap": 2,  # Half court trap (matches frontend key)
+            "fc_press": 2, # Full court press (matches frontend key)
+            "rebounding": 2
         }
     }
 
@@ -830,9 +835,20 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
         playcall_settings = team_obj.get("playcall_settings", defaults["playcall_settings"])
         strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
         
+        # ✅ FIX: Normalize legacy keys and ensure all required fields exist
+        # Map old key names to new ones (for backward compatibility)
+        if "half_court_trap" in strategy_settings and "hc_trap" not in strategy_settings:
+            strategy_settings["hc_trap"] = strategy_settings.pop("half_court_trap")
+        if "full_court_press" in strategy_settings and "fc_press" not in strategy_settings:
+            strategy_settings["fc_press"] = strategy_settings.pop("full_court_press")
+        
+        # Ensure all required fields exist (merge with defaults)
+        normalized_strategy_settings = defaults["strategy_settings"].copy()
+        normalized_strategy_settings.update(strategy_settings)
+        
         return {
             "playcall_settings": playcall_settings,
-            "strategy_settings": strategy_settings
+            "strategy_settings": normalized_strategy_settings
         }
     
     except HTTPException:
@@ -871,9 +887,37 @@ def update_gameplan(request: GamePlanUpdateRequest):
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode: {request.mode}")
         
-        # ✅ SS&S: Resolve team_id to ObjectId if needed (for tournament/single mode)
+        # ✅ SS&S: Resolve team_id to ObjectId if needed
         actual_team_id = request.team_id
-        if request.mode != "franchise":
+        
+        # Load document for team resolution
+        if request.mode == "single":
+            doc = collection.find_one({"_id": doc_id})
+            if not doc:
+                # Try as ObjectId if UUID string lookup failed
+                try:
+                    doc = collection.find_one({"_id": ObjectId(doc_id)})
+                except:
+                    pass
+        else:
+            doc = collection.find_one({"_id": ObjectId(doc_id)})
+        if not doc:
+            raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
+        
+        if request.mode == "franchise":
+            # ✅ SS&S: Always use franchise document's user_team_object_id as source of truth
+            # This ensures we're always using the correct team, even if URL params are wrong
+            user_team_id_name, user_team_object_id = get_user_team_from_franchise(doc)
+            if not user_team_id_name or not user_team_object_id:
+                raise HTTPException(status_code=404, detail="User team not found in franchise document")
+            
+            # Use franchise document's user_team_object_id as authoritative team_id
+            actual_team_id = user_team_object_id
+            
+            # Log if URL team_id doesn't match (for debugging)
+            if request.team_id and request.team_id != actual_team_id:
+                logger.warning(f"⚠️ [GAME PLAN SAVE] URL team_id ({request.team_id}) doesn't match franchise document user_team_object_id ({actual_team_id}). Using franchise document value.")
+        else:
             # For tournament/single mode, resolve team_id to ObjectId
             try:
                 # Try as ObjectId first

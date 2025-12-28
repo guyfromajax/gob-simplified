@@ -1333,25 +1333,26 @@ def _apply_offense_play_training(
     )
     
     if not use_playbooks or playbook_training_mode == "all-plays-even":
-        # Even distribution across all motion plays
+        # Even distribution across ALL plays (motion AND set plays)
         # plays_data is a dict where keys are play names and values are play data
-        motion_plays = []
+        all_plays = []
         for play_name, play_data in updated_plays.items():
-            if isinstance(play_data, dict) and play_data.get("play_type") == "motion":
-                motion_plays.append((play_name, play_data))
+            if isinstance(play_data, dict):
+                all_plays.append((play_name, play_data))
         
-        logger.warning(f"🎯 [PLAY TRAINING] Found {len(motion_plays)} motion plays for even distribution")
+        logger.warning(f"🎯 [PLAY TRAINING] Found {len(all_plays)} total plays for even distribution (all-plays-even mode)")
         
-        if motion_plays:
-            points_per_play = math.floor(total_points / len(motion_plays))
-            remainder = total_points - (points_per_play * len(motion_plays))
+        if all_plays:
+            points_per_play = math.floor(total_points / len(all_plays))
+            remainder = total_points - (points_per_play * len(all_plays))
             
-            for i, (play_name, play_data) in enumerate(motion_plays):
+            for i, (play_name, play_data) in enumerate(all_plays):
                 points = points_per_play + (1 if i < remainder else 0)
                 old_effectiveness = play_data.get("effectiveness", 0)
                 new_effectiveness = old_effectiveness + points
                 updated_plays[play_name]["effectiveness"] = new_effectiveness
-                logger.warning(f"🎯 [PLAY TRAINING] {play_name}: {old_effectiveness} → {new_effectiveness} (+{points})")
+                play_type = play_data.get("play_type", "unknown")
+                logger.warning(f"🎯 [PLAY TRAINING] {play_name} ({play_type}): {old_effectiveness} → {new_effectiveness} (+{points})")
     else:
         # Use playbook settings with layered filtering
         # Filter 1: strategy_settings["offense"] determines motion/set split
