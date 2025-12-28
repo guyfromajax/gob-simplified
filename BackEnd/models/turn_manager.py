@@ -994,6 +994,14 @@ class TurnManager:
                 # Silently handle errors to avoid disrupting gameplay
                 logging.warning(f"⚠️ [PLAYCALL TRACKING] Error tracking override offense stats: {e}")
             
+            # ✅ FIX: Set offense_play_type in game_state BEFORE returning (needed for resolve_half_court_offense_logic)
+            # This ensures that when resolve_half_court_offense_logic() reads game_state["offense_play_type"],
+            # it gets the correct value ("set_play" or "motion") instead of defaulting to empty/motion
+            logging.warning(f"🔍 [SET_PLAYCALLS DEBUG] Setting game_state['offense_play_type'] = '{chosen_play_type}' (OVERRIDE PATH)")
+            logging.warning(f"🔍 [SET_PLAYCALLS DEBUG] Setting game_state['offense_play_focus'] = '{user_focus}' (OVERRIDE PATH)")
+            self.game.game_state["offense_play_type"] = chosen_play_type
+            self.game.game_state["offense_play_focus"] = user_focus
+            
             # Return early with user's choices
             logging.info(f"🎮 [PLAYCALL RETURN] Returning user playcall: offense='{chosen_playcall}', defense='{chosen_defense}'")
             return {
