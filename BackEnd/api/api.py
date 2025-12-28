@@ -740,10 +740,21 @@ def get_game_state(game_id: str, quarter: int | None = None):
                     }
                 }
                 
+                # Build box_score from nested structure (summarize_game_state stores it under home_team/away_team)
+                box_score = saved.get("box_score", {})
+                if not box_score:
+                    # Build from nested structure
+                    home_team_name = home_team_data.get("name")
+                    away_team_name = away_team_data.get("name")
+                    if home_team_name and "box_score" in home_team_data:
+                        box_score[home_team_name] = home_team_data.get("box_score", {})
+                    if away_team_name and "box_score" in away_team_data:
+                        box_score[away_team_name] = away_team_data.get("box_score", {})
+                
                 return {
                     "game_id": game_id,
                     "score": saved.get("score", {}),
-                    "box_score": saved.get("box_score", {}),
+                    "box_score": box_score,
                     "quarter": saved.get("quarter", 1),
                     "clock": saved.get("clock", "8:00"),
                     "players": players_with_energy,
