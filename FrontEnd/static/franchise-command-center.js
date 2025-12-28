@@ -656,10 +656,23 @@ async function loadTeamData() {
     
     const data = await response.json();
     
+    // Also load players for top scorer lookup
+    let players = [];
+    try {
+      const rosterResponse = await fetch(`/franchise/roster?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(data.team_name || '')}`);
+      if (rosterResponse.ok) {
+        const rosterData = await rosterResponse.json();
+        players = rosterData.players || [];
+      }
+    } catch (error) {
+      console.warn('Could not load players for team data:', error);
+    }
+    
     teamData = {
       team_attributes: data.team_attributes || {},
       plays_data: data.plays_data || {},
-      scouting_data: data.scouting_data || {}
+      scouting_data: data.scouting_data || {},
+      players: players
     };
     
     console.log('📊 [TEAM DATA] Loaded team data:', {
@@ -881,18 +894,21 @@ function renderPlaybookSummary() {
   offenseTitle.textContent = 'Offense';
   offenseSection.appendChild(offenseTitle);
   
+  // Get players data for top scorer lookup (only for offensive plays)
+  const players = teamData.players || [];
+  
   if (motion_plays.length > 0) {
     motion_plays.forEach(play => {
-      // Pass full play object to access effectiveness, momentum, cloaking
-      const playRow = createPlayRow(play.name, play, null);
+      // Pass full play object to access effectiveness, momentum, cloaking, and season_stats
+      const playRow = createPlayRow(play.name, play, null, players);
       offenseSection.appendChild(playRow);
     });
   }
   
   if (set_plays.length > 0) {
     set_plays.forEach(play => {
-      // Pass full play object to access effectiveness, momentum, cloaking
-      const playRow = createPlayRow(play.name, play, null);
+      // Pass full play object to access effectiveness, momentum, cloaking, and season_stats
+      const playRow = createPlayRow(play.name, play, null, players);
       offenseSection.appendChild(playRow);
     });
   }
@@ -929,12 +945,16 @@ function renderPlaybookSummary() {
   container.appendChild(defenseSection);
 }
 
-function createPlayRow(playName, playData, change) {
+function createPlayRow(playName, playData, change, players = []) {
   // playData can be an object with effectiveness, momentum, cloaking, or just a number (effectiveness)
   // Handle both formats for backward compatibility
   const effectiveness = typeof playData === 'object' ? (playData.effectiveness || 0) : (playData || 0);
   const momentum = typeof playData === 'object' ? (playData.momentum || 0) : 0;
   const cloaking = typeof playData === 'object' ? (playData.cloaking || 0) : 0;
+  
+  // Check if this is an offensive play (motion or set_play) to show success rate and top scorer
+  const isOffensivePlay = typeof playData === 'object' && 
+    (playData.play_type === 'motion' || playData.play_type === 'set_play');
   
   const row = document.createElement('div');
   row.className = 'playbook-row';
@@ -962,6 +982,55 @@ function createPlayRow(playName, playData, change) {
   metricsContainer.appendChild(cloakingMetric);
   
   row.appendChild(metricsContainer);
+  
+  // Success Rate and Top Scorer column (only for offensive plays)
+  if (isOffensivePlay) {
+    const statsContainer = document.createElement('div');
+    statsContainer.className = 'playbook-stats-container';
+    statsContainer.style.display = 'flex';
+    statsContainer.style.flexDirection = 'column';
+    statsContainer.style.gap = '8px';
+    
+    // Calculate success rate from season_stats
+    const seasonStats = playData.season_stats || {};
+    const timesRun = seasonStats.times_run || 0;
+    const successes = seasonStats.successes || 0;
+    const successRate = timesRun > 0 ? Math.round((successes / timesRun) * 100) : 0;
+    
+    // Success Rate
+    const successRateDiv = document.createElement('div');
+    successRateDiv.className = 'playbook-success-rate';
+    successRateDiv.textContent = `Success Rate: ${successRate}%`;
+    statsContainer.appendChild(successRateDiv);
+    
+    // Top Scorer
+    const topScorerDiv = document.createElement('div');
+    topScorerDiv.className = 'playbook-top-scorer';
+    
+    const playerPoints = seasonStats.player_points || {};
+    let topScorerId = null;
+    let topScorerPoints = 0;
+    
+    // Find top scorer
+    for (const [playerId, points] of Object.entries(playerPoints)) {
+      if (points > topScorerPoints) {
+        topScorerPoints = points;
+        topScorerId = playerId;
+      }
+    }
+    
+    if (topScorerId && topScorerPoints > 0) {
+      // Find player name
+      const player = players.find(p => p._id === topScorerId || p.id === topScorerId);
+      const playerName = player ? (player.name || `${player.first_name || ''} ${player.last_name || ''}`.trim()) : 'Unknown Player';
+      topScorerDiv.textContent = `Top Scorer: ${playerName}, ${topScorerPoints} PTS`;
+    } else {
+      topScorerDiv.textContent = 'Top Scorer: N/A';
+    }
+    
+    statsContainer.appendChild(topScorerDiv);
+    row.appendChild(statsContainer);
+  }
   
   return row;
 }

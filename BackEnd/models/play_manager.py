@@ -48,21 +48,15 @@ class Play:
         # Game-level stats (reset at start of each game)
         self.game_stats = {
             "times_run": 0,
-            "shot_attempts": 0,
-            "made_shots": 0,
-            "turnovers": 0,
-            "offensive_fouls": 0,
-            "defensive_fouls": 0
+            "successes": 0,
+            "player_points": {}  # {player_id: total_points} - tracks points scored per player on this play
         }
         
         # Season/Tournament stats (persist across games)
         self.season_stats = {
             "times_run": 0,
-            "shot_attempts": 0,
-            "made_shots": 0,
-            "turnovers": 0,
-            "offensive_fouls": 0,
-            "defensive_fouls": 0
+            "successes": 0,
+            "player_points": {}  # {player_id: total_points} - tracks points scored per player on this play
         }
     
     def get_skeleton(self, variant="successful"):
@@ -77,68 +71,68 @@ class Play:
         """
         return self.skeletons.get(variant) or self.skeletons.get("successful")
     
-    def record_execution(self, result_type, season_mode=False):
+    def record_execution(self, result_type, season_mode=False, shooter=None, points=0):
         """
         Record that this play was run and track the outcome.
         
         Args:
-            result_type (str): The result of the play - "SHOT", "MAKE", "MISS", 
-                              "O_FOUL", "D_FOUL", "TURNOVER", etc.
+            result_type (str): The result of the play - "MAKE", "MISS", etc.
             season_mode (bool): If True, also update season_stats
+            shooter: Player object who scored (for tracking player_points)
+            points: Points scored (2 or 3, for tracking player_points)
         """
         # Update game stats
-        self.game_stats["times_run"] += 1
+        self.game_stats["times_run"] = self.game_stats.get("times_run", 0) + 1
         
-        if result_type in ["SHOT", "MAKE", "MISS"]:
-            self.game_stats["shot_attempts"] += 1
+        # Track success (MAKE or defensive foul = success)
+        # Note: This is a simplified version - actual tracking happens in phase_resolution.py
+        # where we have access to foul_team from game_state
         if result_type == "MAKE":
-            self.game_stats["made_shots"] += 1
-        elif result_type in ["TURNOVER", "DEAD BALL"]:
-            self.game_stats["turnovers"] += 1
-        elif result_type == "O_FOUL":
-            self.game_stats["offensive_fouls"] += 1
-        elif result_type == "D_FOUL":
-            self.game_stats["defensive_fouls"] += 1
+            self.game_stats["successes"] = self.game_stats.get("successes", 0) + 1
+            # Track player points if shooter and points provided
+            if shooter and points > 0:
+                shooter_id = getattr(shooter, "player_id", None)
+                if shooter_id:
+                    if "player_points" not in self.game_stats:
+                        self.game_stats["player_points"] = {}
+                    self.game_stats["player_points"][shooter_id] = self.game_stats["player_points"].get(shooter_id, 0) + points
         
         # Update season stats if applicable
         if season_mode:
-            self.season_stats["times_run"] += 1
-            if result_type in ["SHOT", "MAKE", "MISS"]:
-                self.season_stats["shot_attempts"] += 1
+            self.season_stats["times_run"] = self.season_stats.get("times_run", 0) + 1
             if result_type == "MAKE":
-                self.season_stats["made_shots"] += 1
-            elif result_type in ["TURNOVER", "DEAD BALL"]:
-                self.season_stats["turnovers"] += 1
-            elif result_type == "O_FOUL":
-                self.season_stats["offensive_fouls"] += 1
-            elif result_type == "D_FOUL":
-                self.season_stats["defensive_fouls"] += 1
+                self.season_stats["successes"] = self.season_stats.get("successes", 0) + 1
+                # Track player points if shooter and points provided
+                if shooter and points > 0:
+                    shooter_id = getattr(shooter, "player_id", None)
+                    if shooter_id:
+                        if "player_points" not in self.season_stats:
+                            self.season_stats["player_points"] = {}
+                        self.season_stats["player_points"][shooter_id] = self.season_stats["player_points"].get(shooter_id, 0) + points
     
     def get_success_rate(self, season_mode=False):
         """
-        Calculate success rate (made shots / shot attempts).
+        Calculate success rate (successes / times_run).
         
         Args:
             season_mode (bool): If True, use season_stats; otherwise use game_stats
             
         Returns:
-            float: Success rate (0.0 - 1.0), or 0.0 if no attempts
+            float: Success rate (0.0 - 1.0), or 0.0 if no runs
         """
         stats = self.season_stats if season_mode else self.game_stats
-        attempts = stats["shot_attempts"]
-        if attempts == 0:
+        times_run = stats.get("times_run", 0)
+        if times_run == 0:
             return 0.0
-        return stats["made_shots"] / attempts
+        successes = stats.get("successes", 0)
+        return successes / times_run
     
     def reset_game_stats(self):
         """Reset game-level stats at the start of a new game."""
         self.game_stats = {
             "times_run": 0,
-            "shot_attempts": 0,
-            "made_shots": 0,
-            "turnovers": 0,
-            "offensive_fouls": 0,
-            "defensive_fouls": 0
+            "successes": 0,
+            "player_points": {}  # Reset player_points dict for new game
         }
     
     def to_dict(self):

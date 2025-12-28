@@ -77,6 +77,81 @@
    - Also stored in `latest_training` at document level for quick access
    - Includes player changes, team changes, coaching focus, session type, week
 
+#### Training System
+
+**Location:** `BackEnd/models/training_execution_v2.py`
+
+**Overview:**
+The Training System applies training points to player attributes, team attributes, and plays/defenses based on user allocations. Training points are distributed across drills, and the system applies coaching focus amplifiers and generates training reports.
+
+**Training Modes:**
+
+1. **Current Playbooks Mode** (`playbook_training_mode: "current-playbooks"`)
+   - Distributes training points only to plays currently in the user's playbook settings
+   - Respects playbook percentages and slot assignments
+   - Uses `strategy_settings['offense']` to determine motion vs set play split
+   - **Requires:** `strategy_settings['offense']` must be set (not `None`)
+
+2. **All Plays Even Distribution Mode** (`playbook_training_mode: "all-plays-even"`)
+   - **✅ FIXED (February 2025):** Now distributes training points evenly across **ALL plays** (motion AND set plays)
+   - **Previous Bug:** Only distributed to motion plays, completely ignoring set plays
+   - **Fix Applied:** Removed `play_type == "motion"` filter, now includes all plays regardless of type
+   - **Code Location:** `BackEnd/models/training_execution_v2.py` - `_apply_offense_play_training()` (lines 1335-1354)
+
+3. **Custom Mode** (`playbook_training_mode: "custom"`)
+   - User manually selects which plays receive training points
+   - Uses custom play selection logic
+
+**Critical Settings:**
+
+- **`strategy_settings['offense']`** (Required for playbook-based training)
+  - **What it does:** Determines the split between motion plays and set plays (0-4 scale)
+  - **Where it lives:** `franchise_teams.{team_id}.strategy_settings.offense`
+  - **Default Value:** `2` (balanced split)
+  - **⚠️ CRITICAL:** If `None`, playbook-based training will fail
+  - **✅ FIXED (February 2025):** `get_default_settings()` now includes `'offense'` with default value of `2`
+  - **Code Location:** `BackEnd/api/gameplan_routes.py` - `get_default_settings()` (lines 77-96)
+
+**Training Point Distribution Logic:**
+
+```python
+# ✅ CORRECT: "all-plays-even" includes ALL plays (motion + set plays)
+if not use_playbooks or playbook_training_mode == "all-plays-even":
+    all_plays = []
+    for play_name, play_data in updated_plays.items():
+        if isinstance(play_data, dict):  # No play_type filter!
+            all_plays.append((play_name, play_data))
+    
+    # Distribute evenly across all plays
+    points_per_play = total_points / len(all_plays) if all_plays else 0
+```
+
+**Previous Bug (Fixed February 2025):**
+
+```python
+# ❌ WRONG: Only included motion plays
+if not use_playbooks or playbook_training_mode == "all-plays-even":
+    motion_plays = []
+    for play_name, play_data in updated_plays.items():
+        if isinstance(play_data, dict) and play_data.get("play_type") == "motion":
+            motion_plays.append((play_name, play_data))  # Set plays excluded!
+```
+
+**Game Plan Settings Persistence:**
+
+- **✅ FIXED (February 2025):** Game Plan settings now save correctly from Franchise Command Center
+- **Root Cause:** `update_gameplan` endpoint was not correctly resolving `team_id` for franchise mode
+- **Fix Applied:** Uses `get_user_team_from_franchise()` to get authoritative `user_team_object_id`
+- **Code Location:** `BackEnd/api/gameplan_routes.py` - `update_gameplan()` (lines 889-896)
+- **Result:** Settings now persist correctly, ensuring `strategy_settings['offense']` is available for training
+
+**Key Normalization:**
+
+- **Legacy Keys:** `'half_court_trap'`, `'full_court_press'` (old format)
+- **Current Keys:** `'hc_trap'`, `'fc_press'` (normalized format)
+- **Fix Applied:** `get_gameplan()` now normalizes legacy keys when loading settings
+- **Code Location:** `BackEnd/api/gameplan_routes.py` - `get_gameplan()` (lines 830-831)
+
 **User Inputs (User Team Only):**
 1. **Game Plan Settings (`strategy_settings`)**
    - `offense`, `inside`, `attack`, `outside` (0-4)

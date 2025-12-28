@@ -4074,6 +4074,40 @@ def resolve_half_court_offense_logic(game):
                 # We don't increment offense success; defensive success can be tracked separately if needed
                 pass
             
+            # ✅ Track offensive play stats (times_run, successes, player_points)
+            # Get current playcall name and offensive team's plays dict
+            current_playcall = game.game_state.get("current_playcall")
+            if current_playcall and hasattr(off_team, 'plays') and off_team.plays:
+                play_obj = off_team.plays.get(current_playcall)
+                if play_obj:
+                    # Always increment times_run
+                    if "game_stats" in play_obj:
+                        play_obj["game_stats"]["times_run"] = play_obj["game_stats"].get("times_run", 0) + 1
+                    
+                    # Track success if offense succeeded
+                    if offense_success:
+                        if "game_stats" in play_obj:
+                            play_obj["game_stats"]["successes"] = play_obj["game_stats"].get("successes", 0) + 1
+                    
+                    # Track player points if shot was made (rt == "MAKE")
+                    if rt == "MAKE":
+                        shooter = roles.get("shooter")
+                        if shooter:
+                            shooter_id = getattr(shooter, "player_id", None)
+                            if shooter_id:
+                                # Get points from shot_result (2 or 3)
+                                points = shot_result.get("points", 0)
+                                if points > 0:
+                                    # Initialize player_points dict if needed
+                                    if "game_stats" not in play_obj:
+                                        play_obj["game_stats"] = {}
+                                    if "player_points" not in play_obj["game_stats"]:
+                                        play_obj["game_stats"]["player_points"] = {}
+                                    
+                                    # Increment player's points for this play
+                                    player_points = play_obj["game_stats"]["player_points"]
+                                    player_points[shooter_id] = player_points.get(shooter_id, 0) + points
+            
             # Track defensive playcall success with granular tracking
             defense_playcall = game.game_state.get("defense_playcall", "Man")  # "Man", "2-3 Zone", etc.
             # Defense playcall is now stored as specific name (e.g., "2-3 Zone")
