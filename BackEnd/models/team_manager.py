@@ -449,11 +449,8 @@ class TeamManager:
                 # NO SKELETONS - fetched from universal collection when needed
                 "game_stats": {
                     "times_run": 0,
-                    "shot_attempts": 0,
-                    "made_shots": 0,
-                    "turnovers": 0,
-                    "offensive_fouls": 0,
-                    "defensive_fouls": 0,
+                    "successes": 0,
+                    "player_points": {},  # {player_id: total_points} - tracks points scored per player on this play
                     "effectiveness": 0.0  # Calculated effectiveness from stats
                 }
             }
@@ -462,11 +459,8 @@ class TeamManager:
             if mode in ["tournament", "franchise"]:
                 play_data["season_stats"] = {
                     "times_run": 0,
-                    "shot_attempts": 0,
-                    "made_shots": 0,
-                    "turnovers": 0,
-                    "offensive_fouls": 0,
-                    "defensive_fouls": 0,
+                    "successes": 0,
+                    "player_points": {},  # {player_id: total_points} - tracks points scored per player on this play
                     "effectiveness": 0.0  # Calculated effectiveness from stats
                 }
             

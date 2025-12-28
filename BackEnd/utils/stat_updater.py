@@ -416,6 +416,78 @@ def rollup_game_to_franchise(franchise_id: str | ObjectId, game_id: str | Object
         db.franchises.update_one({"_id": fid}, {"$set": stats_doc})
 
 
+def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id: str | ObjectId) -> None:
+    """Update offensive play season_stats from game_stats for both teams.
+    
+    Extracts plays data from the game document and rolls up game_stats
+    to season_stats for each offensive play. This is called at the end
+    of games in tournament and franchise modes.
+    
+    Args:
+        game: Game document from games collection
+        mode: "tournament" or "franchise"
+        doc_id: Tournament or franchise document ID
+    """
+    teams_obj = game.get("teams", {})
+    if not teams_obj:
+        return
+    
+    from BackEnd.db import tournaments_collection, franchises_collection
+    
+    for team_id, team_data in teams_obj.items():
+        plays = team_data.get("plays", {})
+        if not plays:
+            continue
+        
+        # Build update operations for all plays
+        inc_doc: Dict[str, Any] = {}
+        set_doc: Dict[str, Any] = {}
+        
+        for play_name, play_data in plays.items():
+            game_stats = play_data.get("game_stats", {})
+            if not game_stats:
+                continue
+            
+            # Base path for this play in the document
+            if mode == "franchise":
+                base_path = f"franchise_teams.{team_id}.plays.{play_name}.season_stats"
+            else:  # tournament
+                base_path = f"teams.{team_id}.plays.{play_name}.season_stats"
+            
+            # Increment times_run and successes
+            if "times_run" in game_stats:
+                inc_doc[f"{base_path}.times_run"] = game_stats["times_run"]
+            if "successes" in game_stats:
+                inc_doc[f"{base_path}.successes"] = game_stats["successes"]
+            
+            # Merge player_points dict (increment each player's points)
+            player_points = game_stats.get("player_points", {})
+            if player_points:
+                for player_id, points in player_points.items():
+                    inc_doc[f"{base_path}.player_points.{player_id}"] = points
+        
+        # Update the document if we have any stats to increment
+        if inc_doc or set_doc:
+            try:
+                doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
+            except Exception:
+                return
+            
+            collection = franchises_collection if mode == "franchise" else tournaments_collection
+            
+            update_doc: Dict[str, Any] = {}
+            if inc_doc:
+                update_doc["$inc"] = inc_doc
+            if set_doc:
+                update_doc["$set"] = set_doc
+            
+            if update_doc:
+                collection.update_one(
+                    {"_id": doc_obj_id},
+                    update_doc
+                )
+
+
 def _update_defensive_playcall_season_stats(game: Dict[str, Any]) -> None:
     """Update defensive playcall season_stats from game_stats for both teams.
     
@@ -594,6 +666,9 @@ def finalize_game(
         
         # Update defensive playcall season_stats from game_stats
         _update_defensive_playcall_season_stats(game)
+        
+        # Update offensive play season_stats from game_stats
+        _update_offensive_play_season_stats(game, "tournament", tid)
 
         return
 
@@ -780,6 +855,9 @@ def finalize_game(
         
         # Update defensive playcall season_stats from game_stats
         _update_defensive_playcall_season_stats(game)
+        
+        # Update offensive play season_stats from game_stats
+        _update_offensive_play_season_stats(game, "franchise", fid)
 
         return
 

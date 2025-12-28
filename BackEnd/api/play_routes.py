@@ -81,26 +81,13 @@ async def create_play(play_data: PlayCreate):
         else:
             play_dict["copy"] = {}  # Only set to empty if no existing copy
     
-    # Initialize stats if not provided
-    if not play_dict.get("game_stats"):
-        play_dict["game_stats"] = {
-            "times_run": 0,
-            "shot_attempts": 0,
-            "made_shots": 0,
-            "turnovers": 0,
-            "offensive_fouls": 0,
-            "defensive_fouls": 0
-        }
-    
-    if not play_dict.get("season_stats"):
-        play_dict["season_stats"] = {
-            "times_run": 0,
-            "shot_attempts": 0,
-            "made_shots": 0,
-            "turnovers": 0,
-            "offensive_fouls": 0,
-            "defensive_fouls": 0
-        }
+    # ✅ Universal plays collection should NOT have game_stats or season_stats
+    # Stats are only stored in team-specific play objects (franchise_teams.{team_id}.plays or teams.{team_id}.plays)
+    # Remove stats if they exist (they shouldn't be in universal collection)
+    if "game_stats" in play_dict:
+        del play_dict["game_stats"]
+    if "season_stats" in play_dict:
+        del play_dict["season_stats"]
     
     # UPSERT: Update if exists (by name), insert if new
     # This allows overwriting plays during development
