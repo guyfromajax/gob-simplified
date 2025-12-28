@@ -631,7 +631,6 @@ def finalize_game(
         logger.info(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, home={home_name}, away={away_name}")
 
         players = game.get("players", [])
-        box_score = game.get("box_score", {})
         team_map = {"home": game.get("home_team"), "away": game.get("away_team")}
         
         # Extract team names from team_map (handle both dict and string)
@@ -641,6 +640,22 @@ def finalize_game(
         away_team_name = team_map.get("away")
         if isinstance(away_team_name, dict):
             away_team_name = away_team_name.get("name")
+        
+        # ✅ SS&S: Build box_score from top level OR nested structure (like apply_stats_from_summary does)
+        # summarize_game_state() stores box_score nested under home_team/away_team, not at top level
+        box_score = game.get("box_score", {})
+        if not box_score:
+            # Build box_score from nested team objects (new structure from summarize_game_state)
+            home_team_obj = game.get("home_team", {})
+            away_team_obj = game.get("away_team", {})
+            if home_team_obj and isinstance(home_team_obj, dict):
+                home_team_name_from_obj = home_team_obj.get("name")
+                if home_team_name_from_obj and "box_score" in home_team_obj:
+                    box_score[home_team_name_from_obj] = home_team_obj.get("box_score", {})
+            if away_team_obj and isinstance(away_team_obj, dict):
+                away_team_name_from_obj = away_team_obj.get("name")
+                if away_team_name_from_obj and "box_score" in away_team_obj:
+                    box_score[away_team_name_from_obj] = away_team_obj.get("box_score", {})
         
         logger.info(f"🔍 [FINALIZE_GAME] Processing {len(players)} players, box_score keys: {list(box_score.keys())}, home_team: {home_team_name}, away_team: {away_team_name}")
 
