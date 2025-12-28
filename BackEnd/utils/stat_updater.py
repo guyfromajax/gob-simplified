@@ -665,39 +665,68 @@ def finalize_game(
         inc_doc: Dict[str, Any] = {}
         set_doc: Dict[str, Any] = {}
         players_processed = 0
-        for p in players:
-            pid = p.get("playerId")
-            team_side = p.get("team")
-            pos = p.get("pos")
-            team_name = team_map.get(team_side)
-            if isinstance(team_name, dict):
-                team_name = team_name.get("name")
-            if not pid or not team_name:
-                logger.warning(f"⚠️ [FINALIZE_GAME] Skipping player: pid={pid}, team_side={team_side}, team_name={team_name}")
+        
+        # ✅ SS&S: Process ALL players from box_score (not just lineup players from players array)
+        # box_score structure: {team_name: {pos: {playerId, name, jersey, stats...}, ...}, ...}
+        # This includes all players who participated (lineup + bench), not just final lineup
+        processed_player_ids = set()  # Track processed players to avoid double-counting
+        
+        for team_name in [home_team_name, away_team_name]:
+            if not team_name:
+                continue
+            team_box = box_score.get(team_name, {})
+            if not team_box:
+                logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team: {team_name}")
                 continue
             
-            stat_block = box_score.get(team_name, {}).get(pos, p.get("stats", {}))
-            if not stat_block:
-                logger.warning(f"⚠️ [FINALIZE_GAME] No stats found for player {pid} (pos={pos}, team={team_name})")
-                continue
-            
-            players_processed += 1
-            for stat, val in _clean_stat_block(stat_block).items():
-                # ✅ MIN special handling: Convert seconds to minutes (integer division)
-                # Game MIN is tracked in seconds, but season/career MIN should be in minutes
-                if stat == "MIN":
-                    val = val // 60  # Convert seconds to minutes (integer division)
-                inc_doc[f"players.{pid}.season.{stat}"] = inc_doc.get(
-                    f"players.{pid}.season.{stat}", 0
-                ) + val
-                inc_doc[f"players.{pid}.career.{stat}"] = inc_doc.get(
-                    f"players.{pid}.career.{stat}", 0
-                ) + val
-            
-            # ✅ SS&S: Set meta.team_id if team_name is in our map
-            if team_name in team_name_to_id:
-                set_doc[f"players.{pid}.meta.team_id"] = team_name_to_id[team_name]
-                logger.debug(f"🔍 [FINALIZE_GAME] Setting meta.team_id for player {pid}: {team_name_to_id[team_name]}")
+            # Process all players in this team's box_score
+            for pos_key, player_data in team_box.items():
+                if not isinstance(player_data, dict):
+                    continue
+                pid = player_data.get("playerId")
+                if not pid:
+                    continue
+                pid_str = str(pid)
+                
+                # Skip if already processed (avoid double-counting if same player appears multiple times)
+                if pid_str in processed_player_ids:
+                    continue
+                processed_player_ids.add(pid_str)
+                
+                # Get stats from player_data (box_score includes all stats)
+                stat_block = player_data
+                if not stat_block:
+                    logger.warning(f"⚠️ [FINALIZE_GAME] No stats found for player {pid_str} (team={team_name}, pos={pos_key})")
+                    continue
+                
+                players_processed += 1
+                for stat, val in _clean_stat_block(stat_block).items():
+                    # Skip non-stat fields (playerId, name, jersey, etc.)
+                    if stat in ["playerId", "name", "jersey", "x", "y", "coords", "team", "pos"]:
+                        continue
+                    # ✅ MIN special handling: Convert seconds to minutes (integer division)
+                    # Game MIN is tracked in seconds, but season/career MIN should be in minutes
+                    if stat == "MIN":
+                        val = val // 60  # Convert seconds to minutes (integer division)
+                    inc_doc[f"players.{pid_str}.season.{stat}"] = inc_doc.get(
+                        f"players.{pid_str}.season.{stat}", 0
+                    ) + val
+                    inc_doc[f"players.{pid_str}.career.{stat}"] = inc_doc.get(
+                        f"players.{pid_str}.career.{stat}", 0
+                    ) + val
+                
+                # ✅ SS&S: Increment GP (games played) for all players who participated
+                inc_doc[f"players.{pid_str}.season.GP"] = inc_doc.get(
+                    f"players.{pid_str}.season.GP", 0
+                ) + 1
+                inc_doc[f"players.{pid_str}.career.GP"] = inc_doc.get(
+                    f"players.{pid_str}.career.GP", 0
+                ) + 1
+                
+                # ✅ SS&S: Set meta.team_id if team_name is in our map
+                if team_name in team_name_to_id:
+                    set_doc[f"players.{pid_str}.meta.team_id"] = team_name_to_id[team_name]
+                    logger.debug(f"🔍 [FINALIZE_GAME] Setting meta.team_id for player {pid_str}: {team_name_to_id[team_name]}")
         
         logger.info(f"🔍 [FINALIZE_GAME] Processed {players_processed} players, {len(inc_doc)} stat increments, {len(set_doc)} meta fields to set")
 
