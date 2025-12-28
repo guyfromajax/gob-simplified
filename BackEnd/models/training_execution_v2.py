@@ -1376,6 +1376,13 @@ def _apply_offense_play_training(
         motion_points = math.floor(total_points * motion_pct)
         set_points = total_points - motion_points
         
+        # 🔍 DEBUG: Log motion/set split
+        logger.warning(f"🔍 [PLAY TRAINING DEBUG] Motion/Set split:")
+        logger.warning(f"   - total_points: {total_points}")
+        logger.warning(f"   - motion_pct: {motion_pct}, motion_points: {motion_points}")
+        logger.warning(f"   - set_pct: {set_pct}, set_points: {set_points}")
+        logger.warning(f"   - strategy_settings['offense']: {strategy_settings.get('offense') if strategy_settings else 'N/A'}")
+        
         # Distribute motion points
         if motion_points > 0:
             motion_playbook = playbook_settings.get("motion", {})
@@ -1417,6 +1424,10 @@ def _apply_offense_play_training(
             outside_setting = playcall_settings.get("Outside", 2)
             attack_setting = playcall_settings.get("Attack", 2)
             
+            # 🔍 DEBUG: Log set play distribution
+            logger.warning(f"🔍 [SET PLAY TRAINING DEBUG] set_points: {set_points}")
+            logger.warning(f"🔍 [SET PLAY TRAINING DEBUG] playcall_settings: Inside={inside_setting}, Outside={outside_setting}, Attack={attack_setting}")
+            
             total_focus = inside_setting + outside_setting + attack_setting
             if total_focus == 0:
                 # Default to even split
@@ -1437,15 +1448,26 @@ def _apply_offense_play_training(
                 if focus_points > 0:
                     set_playbook_key = f"set_play_{focus}"
                     set_playbook = playbook_settings.get(set_playbook_key, {})
+                    
+                    # 🔍 DEBUG: Log set playbook lookup
+                    logger.warning(f"🔍 [SET PLAY TRAINING DEBUG] {focus} focus:")
+                    logger.warning(f"   - focus_points: {focus_points}")
+                    logger.warning(f"   - set_playbook_key: '{set_playbook_key}'")
+                    logger.warning(f"   - set_playbook found: {bool(set_playbook)}")
+                    logger.warning(f"   - set_playbook keys: {list(set_playbook.keys()) if set_playbook else 'EMPTY'}")
+                    
                     set_plays = []
                     for play_name, play_data in updated_plays.items():
                         if isinstance(play_data, dict) and play_data.get("play_type") == "set_play" and play_data.get("play_focus") == focus:
                             set_plays.append((play_name, play_data))
                     
                     logger.warning(f"🎯 [PLAY TRAINING] {focus} focus points: {focus_points}, found {len(set_plays)} set plays")
+                    if set_plays:
+                        logger.warning(f"🔍 [SET PLAY TRAINING DEBUG] Set plays found: {[name for name, _ in set_plays]}")
                     
                     # Calculate total percentage for set plays in this focus
                     total_set_pct = sum(set_playbook.values())
+                    logger.warning(f"🔍 [SET PLAY TRAINING DEBUG] total_set_pct: {total_set_pct}")
                     
                     if total_set_pct > 0:
                         for play_name, play_data in set_plays:

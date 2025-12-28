@@ -1361,6 +1361,19 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     playbook_settings = team_data.get("playbook_settings", {})
     scouting_data = team_data.get("scouting_data", {})
     
+    # 🔍 DEBUG: Log settings loaded for training
+    logger.warning(f"🔍 [TRAINING DEBUG] team_id used: {team_id}")
+    logger.warning(f"🔍 [TRAINING DEBUG] playcall_settings keys: {list(playcall_settings.keys()) if playcall_settings else 'EMPTY/NONE'}")
+    logger.warning(f"🔍 [TRAINING DEBUG] strategy_settings keys: {list(strategy_settings.keys()) if strategy_settings else 'EMPTY/NONE'}")
+    logger.warning(f"🔍 [TRAINING DEBUG] strategy_settings['offense']: {strategy_settings.get('offense') if strategy_settings else 'N/A'}")
+    logger.warning(f"🔍 [TRAINING DEBUG] playbook_settings keys: {list(playbook_settings.keys()) if playbook_settings else 'EMPTY/NONE'}")
+    if playbook_settings:
+        logger.warning(f"🔍 [TRAINING DEBUG] playbook_settings['motion'] keys: {list(playbook_settings.get('motion', {}).keys())}")
+        logger.warning(f"🔍 [TRAINING DEBUG] playbook_settings['set_play_inside'] keys: {list(playbook_settings.get('set_play_inside', {}).keys())}")
+        logger.warning(f"🔍 [TRAINING DEBUG] playbook_settings['set_play_outside'] keys: {list(playbook_settings.get('set_play_outside', {}).keys())}")
+        logger.warning(f"🔍 [TRAINING DEBUG] playbook_settings['set_play_attack'] keys: {list(playbook_settings.get('set_play_attack', {}).keys())}")
+    logger.warning(f"🔍 [TRAINING DEBUG] playbook_training_mode: {training_data.get('playbook_training_mode', 'not provided')}")
+    
     # Initialize plays_data if empty (first time training for this team)
     if not plays_data:
         logger.warning(f"📚 [API] plays_data is empty, populating from universal plays collection")
