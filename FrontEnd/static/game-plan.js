@@ -45,11 +45,20 @@ const cId = myTeamSide ? urlParams.get(`${myTeamSide}_c`) : null;
 let teamName = myTeamSide === 'home' ? homeTeam : awayTeam;
 let teamId = myTeamSide === 'home' ? homeId : awayId;
 
-// If coming from command center, use user_team_id parameter
+// If coming from command center, use user_team_id parameter (Tournament/Franchise modes)
 if (modeParam && (modeParam === 'tournament' || modeParam === 'franchise')) {
   if (userTeamIdParam) {
     teamId = userTeamIdParam;
     teamName = userTeamIdParam; // Will be resolved by backend if needed
+  }
+}
+
+// ✅ FIX: For Single Game mode, check for team_id parameter (team name format)
+if (modeParam === 'single') {
+  const teamIdParam = urlParams.get('team_id');
+  if (teamIdParam) {
+    teamId = teamIdParam;
+    teamName = teamIdParam; // In single mode, team_id is the team name
   }
 }
 
