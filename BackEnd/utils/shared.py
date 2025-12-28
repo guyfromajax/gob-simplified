@@ -650,11 +650,28 @@ def summarize_game_state(game, exclude_animations=True):
     # Instead of creating fresh copies from database, use the plays that were updated during gameplay
     # This preserves game_stats (times_run, successes, player_points) that were tracked during the game
     from copy import deepcopy
+    import logging
     
     # Get plays from home team (in-memory, with updated game_stats)
     home_plays = deepcopy(getattr(game.home_team, 'plays', {}))
     # Get plays from away team (in-memory, with updated game_stats)
     away_plays = deepcopy(getattr(game.away_team, 'plays', {}))
+    
+    # 🔍 DEBUG: Log game_stats in plays
+    home_plays_with_stats = {name: play for name, play in home_plays.items() if play.get("game_stats", {}).get("times_run", 0) > 0}
+    away_plays_with_stats = {name: play for name, play in away_plays.items() if play.get("game_stats", {}).get("times_run", 0) > 0}
+    if home_plays_with_stats:
+        logging.warning(f"🔍 [SUMMARIZE_GAME_STATE] Home team plays with game_stats: {list(home_plays_with_stats.keys())}")
+        for play_name, play_data in list(home_plays_with_stats.items())[:3]:  # Log first 3
+            game_stats = play_data.get("game_stats", {})
+            logging.warning(f"🔍 [SUMMARIZE_GAME_STATE] Home play '{play_name}': times_run={game_stats.get('times_run', 0)}, successes={game_stats.get('successes', 0)}, player_points={len(game_stats.get('player_points', {}))} players")
+    if away_plays_with_stats:
+        logging.warning(f"🔍 [SUMMARIZE_GAME_STATE] Away team plays with game_stats: {list(away_plays_with_stats.keys())}")
+        for play_name, play_data in list(away_plays_with_stats.items())[:3]:  # Log first 3
+            game_stats = play_data.get("game_stats", {})
+            logging.warning(f"🔍 [SUMMARIZE_GAME_STATE] Away play '{play_name}': times_run={game_stats.get('times_run', 0)}, successes={game_stats.get('successes', 0)}, player_points={len(game_stats.get('player_points', {}))} players")
+    if not home_plays_with_stats and not away_plays_with_stats:
+        logging.warning(f"⚠️ [SUMMARIZE_GAME_STATE] No plays with game_stats found! home_plays count: {len(home_plays)}, away_plays count: {len(away_plays)}")
     
     # If teams don't have plays loaded, fallback to database (shouldn't happen in normal flow)
     if not home_plays and not away_plays:
@@ -663,6 +680,7 @@ def summarize_game_state(game, exclude_animations=True):
             populated_plays = populate_team_plays()
             home_plays = populated_plays.copy()
             away_plays = populated_plays.copy()
+            logging.warning(f"⚠️ [SUMMARIZE_GAME_STATE] Fallback to populate_team_plays() - no in-memory plays found")
         except Exception as e:
             print(f"🚨 Error in populate_team_plays: {e}")
             home_plays = {}

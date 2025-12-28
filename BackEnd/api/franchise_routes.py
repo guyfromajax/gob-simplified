@@ -1141,6 +1141,25 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
     # Get plays data
     plays_data = team_obj.get("plays", {})
     
+    # 🔍 DEBUG: Log plays with season_stats
+    plays_with_season_stats = {name: play for name, play in plays_data.items() if play.get("season_stats", {}).get("times_run", 0) > 0}
+    if plays_with_season_stats:
+        logger.warning(f"🔍 [TEAM_DATA API] Team {actual_team_id} has {len(plays_with_season_stats)} plays with season_stats: {list(plays_with_season_stats.keys())}")
+        for play_name, play_data in list(plays_with_season_stats.items())[:3]:  # Log first 3
+            season_stats = play_data.get("season_stats", {})
+            logger.warning(f"🔍 [TEAM_DATA API] Play '{play_name}': times_run={season_stats.get('times_run', 0)}, successes={season_stats.get('successes', 0)}, player_points={len(season_stats.get('player_points', {}))} players")
+    else:
+        logger.warning(f"⚠️ [TEAM_DATA API] Team {actual_team_id} has {len(plays_data)} plays but NONE have season_stats with times_run > 0")
+        # Log sample play structure to see what we have
+        if plays_data:
+            sample_play_name = list(plays_data.keys())[0]
+            sample_play = plays_data[sample_play_name]
+            logger.warning(f"🔍 [TEAM_DATA API] Sample play '{sample_play_name}' keys: {list(sample_play.keys())}")
+            if "season_stats" in sample_play:
+                logger.warning(f"🔍 [TEAM_DATA API] Sample play '{sample_play_name}' season_stats keys: {list(sample_play['season_stats'].keys())}")
+            else:
+                logger.warning(f"⚠️ [TEAM_DATA API] Sample play '{sample_play_name}' has NO season_stats key!")
+    
     # Get scouting data - initialize defense structure if missing
     scouting_data = team_obj.get("scouting_data", {})
     if not scouting_data.get("defense"):
