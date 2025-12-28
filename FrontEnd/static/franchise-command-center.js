@@ -997,16 +997,6 @@ function createPlayRow(playName, playData, change, players = []) {
     const successes = seasonStats.successes || 0;
     const successRate = timesRun > 0 ? Math.round((successes / timesRun) * 100) : 0;
     
-    // 🔍 DEBUG: Log play stats data
-    console.log(`🔍 [PLAYBOOK UI] Play '${playName}':`, {
-      hasSeasonStats: !!playData.season_stats,
-      timesRun: timesRun,
-      successes: successes,
-      successRate: successRate,
-      playerPoints: Object.keys(seasonStats.player_points || {}).length,
-      seasonStatsKeys: Object.keys(seasonStats)
-    });
-    
     // Success Rate
     const successRateDiv = document.createElement('div');
     successRateDiv.className = 'playbook-success-rate';
@@ -1034,10 +1024,8 @@ function createPlayRow(playName, playData, change, players = []) {
       const player = players.find(p => p._id === topScorerId || p.id === topScorerId);
       const playerName = player ? (player.name || `${player.first_name || ''} ${player.last_name || ''}`.trim()) : 'Unknown Player';
       topScorerDiv.textContent = `Top Scorer: ${playerName}, ${topScorerPoints} PTS`;
-      console.log(`🔍 [PLAYBOOK UI] Top scorer for '${playName}': ${playerName} (${topScorerPoints} PTS)`);
     } else {
       topScorerDiv.textContent = 'Top Scorer: N/A';
-      console.log(`⚠️ [PLAYBOOK UI] No top scorer for '${playName}': playerPoints=${JSON.stringify(playerPoints)}, players array length=${players.length}`);
     }
     
     statsContainer.appendChild(topScorerDiv);
