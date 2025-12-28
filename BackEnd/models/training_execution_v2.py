@@ -1457,13 +1457,22 @@ def _apply_offense_play_training(
                     logger.warning(f"   - set_playbook keys: {list(set_playbook.keys()) if set_playbook else 'EMPTY'}")
                     
                     set_plays = []
+                    # 🔍 DEBUG: First, log all set plays and their play_focus values
+                    all_set_plays = []
                     for play_name, play_data in updated_plays.items():
-                        if isinstance(play_data, dict) and play_data.get("play_type") == "set_play" and play_data.get("play_focus") == focus:
-                            set_plays.append((play_name, play_data))
+                        if isinstance(play_data, dict) and play_data.get("play_type") == "set_play":
+                            all_set_plays.append((play_name, play_data.get("play_focus", "MISSING")))
+                            if play_data.get("play_focus") == focus:
+                                set_plays.append((play_name, play_data))
+                    
+                    if all_set_plays:
+                        logger.warning(f"🔍 [SET PLAY TRAINING DEBUG] All set plays in plays_data: {[(name, focus) for name, focus in all_set_plays]}")
                     
                     logger.warning(f"🎯 [PLAY TRAINING] {focus} focus points: {focus_points}, found {len(set_plays)} set plays")
                     if set_plays:
                         logger.warning(f"🔍 [SET PLAY TRAINING DEBUG] Set plays found: {[name for name, _ in set_plays]}")
+                    elif all_set_plays:
+                        logger.warning(f"⚠️ [SET PLAY TRAINING DEBUG] No set plays matched focus '{focus}'! Available focuses: {set([f for _, f in all_set_plays])}")
                     
                     # Calculate total percentage for set plays in this focus
                     total_set_pct = sum(set_playbook.values())
