@@ -428,25 +428,44 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
         mode: "tournament" or "franchise"
         doc_id: Tournament or franchise document ID
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     teams_obj = game.get("teams", {})
     if not teams_obj:
+        logger.warning(f"⚠️ [UPDATE_PLAY_STATS] No teams object in game document")
         return
+    
+    logger.info(f"🔍 [UPDATE_PLAY_STATS] Processing {len(teams_obj)} teams, mode={mode}, doc_id={doc_id}")
+    logger.info(f"🔍 [UPDATE_PLAY_STATS] Teams keys: {list(teams_obj.keys())}")
     
     from BackEnd.db import tournaments_collection, franchises_collection
     
     for team_id, team_data in teams_obj.items():
         plays = team_data.get("plays", {})
         if not plays:
+            logger.warning(f"⚠️ [UPDATE_PLAY_STATS] No plays found for team_id={team_id}")
             continue
+        
+        logger.info(f"🔍 [UPDATE_PLAY_STATS] Team {team_id} has {len(plays)} plays")
         
         # Build update operations for all plays
         inc_doc: Dict[str, Any] = {}
         set_doc: Dict[str, Any] = {}
+        plays_with_stats = 0
         
         for play_name, play_data in plays.items():
             game_stats = play_data.get("game_stats", {})
             if not game_stats:
                 continue
+            
+            times_run = game_stats.get("times_run", 0)
+            successes = game_stats.get("successes", 0)
+            player_points = game_stats.get("player_points", {})
+            
+            if times_run > 0 or successes > 0 or player_points:
+                plays_with_stats += 1
+                logger.info(f"🔍 [UPDATE_PLAY_STATS] Play '{play_name}' (team={team_id}): times_run={times_run}, successes={successes}, player_points={len(player_points)} players")
             
             # Base path for this play in the document
             if mode == "franchise":
@@ -455,22 +474,25 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
                 base_path = f"teams.{team_id}.plays.{play_name}.season_stats"
             
             # Increment times_run and successes
-            if "times_run" in game_stats:
+            if "times_run" in game_stats and game_stats["times_run"] > 0:
                 inc_doc[f"{base_path}.times_run"] = game_stats["times_run"]
-            if "successes" in game_stats:
+            if "successes" in game_stats and game_stats["successes"] > 0:
                 inc_doc[f"{base_path}.successes"] = game_stats["successes"]
             
             # Merge player_points dict (increment each player's points)
-            player_points = game_stats.get("player_points", {})
             if player_points:
                 for player_id, points in player_points.items():
-                    inc_doc[f"{base_path}.player_points.{player_id}"] = points
+                    if points > 0:
+                        inc_doc[f"{base_path}.player_points.{player_id}"] = points
+        
+        logger.info(f"🔍 [UPDATE_PLAY_STATS] Team {team_id}: {plays_with_stats} plays with stats, {len(inc_doc)} update operations")
         
         # Update the document if we have any stats to increment
         if inc_doc or set_doc:
             try:
                 doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
-            except Exception:
+            except Exception as e:
+                logger.error(f"❌ [UPDATE_PLAY_STATS] Invalid doc_id format: {doc_id}, error: {e}")
                 return
             
             collection = franchises_collection if mode == "franchise" else tournaments_collection
@@ -482,10 +504,16 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
                 update_doc["$set"] = set_doc
             
             if update_doc:
-                collection.update_one(
+                logger.info(f"🔍 [UPDATE_PLAY_STATS] Updating {mode} document {doc_obj_id} with {len(inc_doc)} increments")
+                result = collection.update_one(
                     {"_id": doc_obj_id},
                     update_doc
                 )
+                logger.info(f"✅ [UPDATE_PLAY_STATS] Update result: matched={result.matched_count}, modified={result.modified_count}")
+            else:
+                logger.warning(f"⚠️ [UPDATE_PLAY_STATS] No update operations to perform (inc_doc and set_doc both empty)")
+        else:
+            logger.warning(f"⚠️ [UPDATE_PLAY_STATS] No stats to increment for team {team_id} (inc_doc and set_doc both empty)")
 
 
 def _update_defensive_playcall_season_stats(game: Dict[str, Any]) -> None:
