@@ -439,10 +439,12 @@ def complete_week(req: CompleteWeekRequest):
             stat_updater.finalize_game(
                 computer_game_id, mode="franchise", franchise_id=req.franchise_id
             )
+            # ✅ SS&S: Pass computer_game_id to _save_game_result so schedule endpoint can find it
+            sim_res = _save_game_result(away_id, home_id, away_score, home_score, req.week, franchise_id=req.franchise_id, game_id=computer_game_id)
         except Exception:
             away_score = random.randint(50, 90)
             home_score = random.randint(50, 90)
-        sim_res = _save_game_result(away_id, home_id, away_score, home_score, req.week, franchise_id=req.franchise_id)
+            sim_res = _save_game_result(away_id, home_id, away_score, home_score, req.week, franchise_id=req.franchise_id)
         results.append({
             "away_id": sim_res["team1_id"],
             "home_id": sim_res["team2_id"],

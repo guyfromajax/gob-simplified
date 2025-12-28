@@ -1026,12 +1026,15 @@ function renderRosterStats(players) {
   
   players.forEach(p => {
     const stats = p.stats?.season || {};
+    // ✅ FIX: Map 3PTM/3PTA to TPM/TPA for display (database stores as 3PTM/3PTA, frontend expects TPM/TPA)
+    const tpm = stats['3PTM'] || stats.TPM || 0;
+    const tpa = stats['3PTA'] || stats.TPA || 0;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim()}</td>
       <td>${stats.PTS || 0}</td>
       <td>${stats.FGM || 0}/${stats.FGA || 0}</td>
-      <td>${stats.TPM || 0}/${stats.TPA || 0}</td>
+      <td>${tpm}/${tpa}</td>
       <td>${stats.FTM || 0}/${stats.FTA || 0}</td>
       <td>${stats.REB || 0}</td>
       <td>${stats.AST || 0}</td>
