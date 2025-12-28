@@ -13,6 +13,8 @@ let franchiseId = null;
 const userTeamName = localStorage.getItem('franchise_user_team') || '';
 // ✅ SS&S: Store team ObjectId for consistent navigation
 let userTeamId = null; // Will be resolved from command center data or URL params
+let userTeamNameForLeaders = null; // Store user team name for leaderboard highlighting
+let teamColorCache = null; // Cache for team primary colors
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
 
 const teamMap = {
@@ -74,11 +76,36 @@ function renderStandings(data) {
   });
 }
 
+// Helper function to initialize team color cache
+async function initializeTeamColorCache() {
+  if (teamColorCache) return; // Already initialized
+  
+  try {
+    const res = await fetch('/teams');
+    const teamData = await res.json();
+    teamColorCache = {};
+    teamData.forEach(t => {
+      teamColorCache[t.name] = t.primary_color;
+    });
+  } catch (err) {
+    console.warn('Failed to load team colors:', err);
+    teamColorCache = {};
+  }
+}
+
+// Helper function to get team primary color (synchronous, uses cache)
+function getTeamPrimaryColor(teamName) {
+  if (!teamName || !teamColorCache) return null;
+  return teamColorCache[teamName] || null;
+}
+
 function renderLeaders(data) {
   if (!data) return;
   const container = document.getElementById('leaders-container');
   container.innerHTML = '';
   const categories = Object.keys(data);
+  const primaryColor = getTeamPrimaryColor(userTeamNameForLeaders);
+  
   categories.forEach(cat => {
     const section = document.createElement('div');
     const h3 = document.createElement('h3');
@@ -92,7 +119,30 @@ function renderLeaders(data) {
     const body = document.createElement('tbody');
     (data[cat] || []).forEach((p, idx) => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${idx + 1}</td><td>${p.name}</td><td>${p.team}</td><td>${p.value}</td>`;
+      const isUserTeam = userTeamNameForLeaders && p.team === userTeamNameForLeaders;
+      
+      // Create cells individually to apply styling
+      const rankCell = document.createElement('td');
+      rankCell.textContent = idx + 1;
+      const playerCell = document.createElement('td');
+      playerCell.textContent = p.name;
+      const teamCell = document.createElement('td');
+      teamCell.textContent = p.team;
+      const valueCell = document.createElement('td');
+      valueCell.textContent = p.value;
+      
+      // Apply bold and color if user team player
+      if (isUserTeam && primaryColor) {
+        [rankCell, playerCell, teamCell, valueCell].forEach(cell => {
+          cell.style.fontWeight = 'bold';
+          cell.style.color = primaryColor;
+        });
+      }
+      
+      tr.appendChild(rankCell);
+      tr.appendChild(playerCell);
+      tr.appendChild(teamCell);
+      tr.appendChild(valueCell);
       body.appendChild(tr);
     });
     table.appendChild(body);
@@ -403,6 +453,14 @@ async function init() {
     userTeamId = topData.team_id;
     localStorage.setItem('franchise_user_team_id', userTeamId);
   }
+  
+  // Store user team name for leaderboard highlighting
+  if (topData && topData.team) {
+    userTeamNameForLeaders = topData.team;
+  }
+  
+  // Initialize team color cache for leaderboard highlighting
+  await initializeTeamColorCache();
   
   // Update button based on training status
   updatePlayButton(topData);

@@ -6,6 +6,7 @@ const urlTeamId = urlParams.get('team_id');
 // Initialize tournament and userTeamId from URL params or localStorage
 let tournament = null;
 let userTeamId = "";
+let teamColorCache = null; // Cache for team primary colors
 
 // If tournament_id is in URL, use it (overrides localStorage)
 if (urlTournamentId) {
@@ -382,9 +383,34 @@ function renderStats() {
   });
 }
 
+// Helper function to initialize team color cache
+async function initializeTeamColorCache() {
+  if (teamColorCache) return; // Already initialized
+  
+  try {
+    const res = await fetch('/teams');
+    const teamData = await res.json();
+    teamColorCache = {};
+    teamData.forEach(t => {
+      teamColorCache[t.name] = t.primary_color;
+    });
+  } catch (err) {
+    console.warn('Failed to load team colors:', err);
+    teamColorCache = {};
+  }
+}
+
+// Helper function to get team primary color (synchronous, uses cache)
+function getTeamPrimaryColor(teamName) {
+  if (!teamName || !teamColorCache) return null;
+  return teamColorCache[teamName] || null;
+}
+
 function renderLeaderboards() {
   const container = document.getElementById("leaderboards");
   container.innerHTML = "";
+  const primaryColor = getTeamPrimaryColor(userTeamId);
+  
   leaderBoards.forEach(board => {
     const section = document.createElement("div");
     section.className = "leaderboard-section";
@@ -402,7 +428,30 @@ function renderLeaderboards() {
       const entry = rows[i];
       const tr = document.createElement("tr");
       if (entry) {
-        tr.innerHTML = `<td>${entry.rank}</td><td>${entry.first_name} ${entry.last_name}</td><td>${entry.team_name}</td><td>${entry.value}</td>`;
+        const isUserTeam = userTeamId && entry.team_name === userTeamId;
+        
+        // Create cells individually to apply styling
+        const rankCell = document.createElement('td');
+        rankCell.textContent = entry.rank;
+        const playerCell = document.createElement('td');
+        playerCell.textContent = `${entry.first_name} ${entry.last_name}`;
+        const teamCell = document.createElement('td');
+        teamCell.textContent = entry.team_name;
+        const valueCell = document.createElement('td');
+        valueCell.textContent = entry.value;
+        
+        // Apply bold and color if user team player
+        if (isUserTeam && primaryColor) {
+          [rankCell, playerCell, teamCell, valueCell].forEach(cell => {
+            cell.style.fontWeight = 'bold';
+            cell.style.color = primaryColor;
+          });
+        }
+        
+        tr.appendChild(rankCell);
+        tr.appendChild(playerCell);
+        tr.appendChild(teamCell);
+        tr.appendChild(valueCell);
       } else {
         tr.innerHTML = `<td>${i + 1}</td><td>—</td><td>—</td><td>—</td>`;
       }
@@ -855,6 +904,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   initTopAssets(userTeamId);
   updateTeamChemistry();
+  
+  // Initialize team color cache for leaderboard highlighting
+  await initializeTeamColorCache();
+  
   await loadRoster();
   renderBracket();
   renderSchedule();
