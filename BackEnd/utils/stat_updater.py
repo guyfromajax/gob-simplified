@@ -439,19 +439,84 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
     logger.info(f"🔍 [UPDATE_PLAY_STATS] Processing {len(teams_obj)} teams, mode={mode}, doc_id={doc_id}")
     logger.info(f"🔍 [UPDATE_PLAY_STATS] Teams keys: {list(teams_obj.keys())}")
     
-    from BackEnd.db import tournaments_collection, franchises_collection
+    from BackEnd.db import tournaments_collection, franchises_collection, teams_collection
     
-    for team_id, team_data in teams_obj.items():
+    # ✅ FIX: For franchise mode, build team_name -> ObjectId team_id map (same as finalize_game)
+    # Game document uses team_id strings (like "LITTLE_YORK") as keys, but franchise document
+    # uses ObjectId strings (like "68c98b09674d3f9b04546b35") as keys in franchise_teams
+    team_name_to_franchise_id: Dict[str, str] = {}
+    game_key_to_franchise_id: Dict[str, str] = {}  # Map game document keys to franchise ObjectIds
+    if mode == "franchise":
+        try:
+            doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
+            franchise_doc = franchises_collection.find_one({"_id": doc_obj_id}, {"franchise_teams": 1})
+            if franchise_doc:
+                franchise_teams = franchise_doc.get("franchise_teams", {})
+                for team_id_str, team_data in franchise_teams.items():
+                    # Look up team name from teams collection
+                    try:
+                        team_obj_id = ObjectId(team_id_str)
+                        team_doc = teams_collection.find_one({"_id": team_obj_id}, {"name": 1, "team_id": 1})
+                        if team_doc:
+                            team_name = team_doc.get("name")
+                            team_id_field = team_doc.get("team_id")  # e.g., "LITTLE_YORK"
+                            if team_name:
+                                team_name_to_franchise_id[team_name] = team_id_str
+                            if team_id_field:
+                                game_key_to_franchise_id[team_id_field] = team_id_str
+                    except Exception:
+                        continue
+                logger.info(f"🔍 [UPDATE_PLAY_STATS] Built team_name_to_franchise_id map: {team_name_to_franchise_id}")
+                logger.info(f"🔍 [UPDATE_PLAY_STATS] Built game_key_to_franchise_id map: {game_key_to_franchise_id}")
+        except Exception as e:
+            logger.error(f"❌ [UPDATE_PLAY_STATS] Error building team_name map: {e}")
+    
+    # Get team names from game document for matching
+    home_team_data = game.get("home_team", {})
+    away_team_data = game.get("away_team", {})
+    home_team_name = home_team_data.get("name") if isinstance(home_team_data, dict) else None
+    away_team_name = away_team_data.get("name") if isinstance(away_team_data, dict) else None
+    home_team_id_key = game.get("home_team_id")  # e.g., "LITTLE_YORK"
+    away_team_id_key = game.get("away_team_id")  # e.g., "FOUR_CORNERS"
+    
+    # Build update operations for all teams
+    all_inc_doc: Dict[str, Any] = {}
+    all_set_doc: Dict[str, Any] = {}
+    
+    for game_team_key, team_data in teams_obj.items():
         plays = team_data.get("plays", {})
         if not plays:
-            logger.warning(f"⚠️ [UPDATE_PLAY_STATS] No plays found for team_id={team_id}")
+            logger.warning(f"⚠️ [UPDATE_PLAY_STATS] No plays found for team_key={game_team_key}")
             continue
         
-        logger.info(f"🔍 [UPDATE_PLAY_STATS] Team {team_id} has {len(plays)} plays")
+        logger.info(f"🔍 [UPDATE_PLAY_STATS] Team {game_team_key} has {len(plays)} plays")
         
-        # Build update operations for all plays
-        inc_doc: Dict[str, Any] = {}
-        set_doc: Dict[str, Any] = {}
+        # ✅ FIX: Resolve actual franchise team_id (ObjectId string) from game team key
+        # Game document keys are team_id strings (like "LITTLE_YORK") or team names
+        # We need to map to the ObjectId string used in franchise_teams
+        actual_team_id = game_team_key  # Default to game key (works for tournament mode)
+        if mode == "franchise":
+            # Try multiple matching strategies
+            if game_team_key in game_key_to_franchise_id:
+                # Direct match: game_team_key is a team_id string (e.g., "LITTLE_YORK")
+                actual_team_id = game_key_to_franchise_id[game_team_key]
+                logger.info(f"🔍 [UPDATE_PLAY_STATS] Mapped team_id '{game_team_key}' → franchise_id={actual_team_id}")
+            elif game_team_key == home_team_id_key and home_team_name and home_team_name in team_name_to_franchise_id:
+                # Match via home team name
+                actual_team_id = team_name_to_franchise_id[home_team_name]
+                logger.info(f"🔍 [UPDATE_PLAY_STATS] Mapped home team '{home_team_name}' (key={game_team_key}) → franchise_id={actual_team_id}")
+            elif game_team_key == away_team_id_key and away_team_name and away_team_name in team_name_to_franchise_id:
+                # Match via away team name
+                actual_team_id = team_name_to_franchise_id[away_team_name]
+                logger.info(f"🔍 [UPDATE_PLAY_STATS] Mapped away team '{away_team_name}' (key={game_team_key}) → franchise_id={actual_team_id}")
+            elif game_team_key in team_name_to_franchise_id:
+                # Direct match: game_team_key is a team name
+                actual_team_id = team_name_to_franchise_id[game_team_key]
+                logger.info(f"🔍 [UPDATE_PLAY_STATS] Mapped team name '{game_team_key}' → franchise_id={actual_team_id}")
+            else:
+                logger.warning(f"⚠️ [UPDATE_PLAY_STATS] Could not map team '{game_team_key}' to franchise_id, using game_key as-is (update will likely fail)")
+                actual_team_id = game_team_key
+        
         plays_with_stats = 0
         
         for play_name, play_data in plays.items():
@@ -465,55 +530,57 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
             
             if times_run > 0 or successes > 0 or player_points:
                 plays_with_stats += 1
-                logger.info(f"🔍 [UPDATE_PLAY_STATS] Play '{play_name}' (team={team_id}): times_run={times_run}, successes={successes}, player_points={len(player_points)} players")
+                logger.info(f"🔍 [UPDATE_PLAY_STATS] Play '{play_name}' (team={actual_team_id}): times_run={times_run}, successes={successes}, player_points={len(player_points)} players")
             
-            # Base path for this play in the document
+            # Base path for this play in the document (use actual_team_id, not game_team_key)
             if mode == "franchise":
-                base_path = f"franchise_teams.{team_id}.plays.{play_name}.season_stats"
+                base_path = f"franchise_teams.{actual_team_id}.plays.{play_name}.season_stats"
             else:  # tournament
-                base_path = f"teams.{team_id}.plays.{play_name}.season_stats"
+                base_path = f"teams.{actual_team_id}.plays.{play_name}.season_stats"
             
             # Increment times_run and successes
             if "times_run" in game_stats and game_stats["times_run"] > 0:
-                inc_doc[f"{base_path}.times_run"] = game_stats["times_run"]
+                all_inc_doc[f"{base_path}.times_run"] = game_stats["times_run"]
             if "successes" in game_stats and game_stats["successes"] > 0:
-                inc_doc[f"{base_path}.successes"] = game_stats["successes"]
+                all_inc_doc[f"{base_path}.successes"] = game_stats["successes"]
             
             # Merge player_points dict (increment each player's points)
             if player_points:
                 for player_id, points in player_points.items():
                     if points > 0:
-                        inc_doc[f"{base_path}.player_points.{player_id}"] = points
+                        all_inc_doc[f"{base_path}.player_points.{player_id}"] = points
         
-        logger.info(f"🔍 [UPDATE_PLAY_STATS] Team {team_id}: {plays_with_stats} plays with stats, {len(inc_doc)} update operations")
+        logger.info(f"🔍 [UPDATE_PLAY_STATS] Team {actual_team_id}: {plays_with_stats} plays with stats")
+    
+    logger.info(f"🔍 [UPDATE_PLAY_STATS] Total: {len(all_inc_doc)} update operations across all teams")
+    
+    # Update the document if we have any stats to increment
+    if all_inc_doc or all_set_doc:
+        try:
+            doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
+        except Exception as e:
+            logger.error(f"❌ [UPDATE_PLAY_STATS] Invalid doc_id format: {doc_id}, error: {e}")
+            return
         
-        # Update the document if we have any stats to increment
-        if inc_doc or set_doc:
-            try:
-                doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
-            except Exception as e:
-                logger.error(f"❌ [UPDATE_PLAY_STATS] Invalid doc_id format: {doc_id}, error: {e}")
-                return
-            
-            collection = franchises_collection if mode == "franchise" else tournaments_collection
-            
-            update_doc: Dict[str, Any] = {}
-            if inc_doc:
-                update_doc["$inc"] = inc_doc
-            if set_doc:
-                update_doc["$set"] = set_doc
-            
-            if update_doc:
-                logger.info(f"🔍 [UPDATE_PLAY_STATS] Updating {mode} document {doc_obj_id} with {len(inc_doc)} increments")
-                result = collection.update_one(
-                    {"_id": doc_obj_id},
-                    update_doc
-                )
-                logger.info(f"✅ [UPDATE_PLAY_STATS] Update result: matched={result.matched_count}, modified={result.modified_count}")
-            else:
-                logger.warning(f"⚠️ [UPDATE_PLAY_STATS] No update operations to perform (inc_doc and set_doc both empty)")
+        collection = franchises_collection if mode == "franchise" else tournaments_collection
+        
+        update_doc: Dict[str, Any] = {}
+        if all_inc_doc:
+            update_doc["$inc"] = all_inc_doc
+        if all_set_doc:
+            update_doc["$set"] = all_set_doc
+        
+        if update_doc:
+            logger.info(f"🔍 [UPDATE_PLAY_STATS] Updating {mode} document {doc_obj_id} with {len(all_inc_doc)} increments")
+            result = collection.update_one(
+                {"_id": doc_obj_id},
+                update_doc
+            )
+            logger.info(f"✅ [UPDATE_PLAY_STATS] Update result: matched={result.matched_count}, modified={result.modified_count}")
         else:
-            logger.warning(f"⚠️ [UPDATE_PLAY_STATS] No stats to increment for team {team_id} (inc_doc and set_doc both empty)")
+            logger.warning(f"⚠️ [UPDATE_PLAY_STATS] No update operations to perform (inc_doc and set_doc both empty)")
+    else:
+        logger.warning(f"⚠️ [UPDATE_PLAY_STATS] No stats to increment (all_inc_doc and all_set_doc both empty)")
 
 
 def _update_defensive_playcall_season_stats(game: Dict[str, Any]) -> None:
