@@ -142,6 +142,9 @@ THREE_POINTER_FOUL_MISS_CHANCE = 0.4  # 40% chance foul forces miss on 3-pointer
 TWO_POINTER_FOUL_MISS_CHANCE = 0.2    # 20% chance foul forces miss on 2-pointers
 
 # HCO Resolution System constants
+# Target averages per game:
+# - 60 field goal attempts per team per game
+# - Average target FG% of 45%
 STANDARD_D_FOUL = 95
 STANDARD_O_FOUL = 5
 HARD_STEAL = -200
