@@ -58,7 +58,7 @@ def is_player_eligible_for_lineup(player, game_state=None, ineligible_player_ids
     
     # Determine energy threshold based on quarter and time
     is_late_q4_or_ot = (quarter == 4 and time_remaining < 240) or quarter > 4
-    energy_threshold = 0.69 if is_late_q4_or_ot else 0.8
+    energy_threshold = 0.64 if is_late_q4_or_ot else 0.8
     
     if ng < energy_threshold:
         return False
@@ -129,12 +129,18 @@ def build_lineup_from_mongo(team: Union[str, TeamManager], game_state=None) -> D
     available_players = eligible_players.copy()
     lineup: Dict[str, Player] = {}
 
-    for pos in position_order:
+    for idx, pos in enumerate(position_order):
         traits = POSITION_TRAITS[pos]
         rated = [(p, get_player_rating(p, traits)) for p in available_players]
         rated.sort(key=lambda tup: tup[1], reverse=True)
 
-        top_candidates = rated[:3] if len(rated) >= 3 else rated
+        # First 4 positions: choose from top 2 candidates
+        # 5th position: choose from top 3 candidates
+        if idx < 4:  # First 4 positions
+            top_candidates = rated[:2] if len(rated) >= 2 else rated
+        else:  # 5th position
+            top_candidates = rated[:3] if len(rated) >= 3 else rated
+        
         chosen_player = random.choice(top_candidates)[0]
 
         lineup[pos] = chosen_player

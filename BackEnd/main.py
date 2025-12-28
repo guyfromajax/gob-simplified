@@ -572,6 +572,9 @@ def simulate_quarter(
     # TURN-BY-TURN MODE: If enabled, skip the full simulation loop
     # Frontend will call /api/simulate-turn repeatedly instead
     if not turn_by_turn_mode:
+        # Set flag to indicate we're in full simulation mode (for immediate timeout handling)
+        gm.game_state["_is_full_simulation"] = True
+        
         # Safety guard: prevent infinite loops
         max_turns = 200  # Reasonable limit for a quarter (480 seconds / ~2-3 seconds per turn)
         turn_count = 0
@@ -606,6 +609,9 @@ def simulate_quarter(
                 gm.home_team.name: gm.home_team.team_fouls,
                 gm.away_team.name: gm.away_team.team_fouls,
             }
+        
+        # Clear full simulation flag after loop completes
+        gm.game_state.pop("_is_full_simulation", None)
             gm.game_state["team_timeouts"] = {
                 gm.home_team.name: getattr(gm.home_team, 'timeouts', 4),
                 gm.away_team.name: getattr(gm.away_team, 'timeouts', 4),
