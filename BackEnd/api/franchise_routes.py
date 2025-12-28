@@ -90,6 +90,7 @@ class CompleteWeekRequest(BaseModel):
     franchise_id: str
     week: int
     result: GameResult
+    game_id: str | None = None  # Optional: actual gameplay game_id (ObjectId format)
 
 
 def _normalize_team_id(team_id: str):
@@ -115,20 +116,55 @@ def _apply_team_result(team1_id, team2_id, team1_score, team2_score, sign=1):
         db.teams.update_one({"_id": team1_id}, {"$inc": {"record.L": sign}})
 
 
-def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franchise_id=None):
-    existing = db.games.find_one({
-        "week": week,
-        "$or": [
-            {"team1_id": team1_id, "team2_id": team2_id},
-            {"team1_id": team2_id, "team2_id": team1_id},
-        ],
-    })
+def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franchise_id=None, game_id=None):
+    """
+    Save or update game result in games collection.
+    
+    Args:
+        team1_id: Team 1 ObjectId
+        team2_id: Team 2 ObjectId
+        team1_score: Team 1 score
+        team2_score: Team 2 score
+        week: Week number
+        franchise_id: Optional franchise ID
+        game_id: Optional game_id (ObjectId format). If provided, updates that specific game document.
+                 If None, uses legacy lookup by week + team IDs.
+    
+    Returns:
+        Dictionary with team IDs and scores
+    """
+    # ✅ SS&S: If game_id is provided, use it directly (this is the actual gameplay document)
+    if game_id:
+        try:
+            # Try as ObjectId first
+            game_oid = ObjectId(game_id) if isinstance(game_id, str) else game_id
+            existing = db.games.find_one({"_id": game_oid})
+            if existing:
+                # Update existing game document with result fields
+                _apply_team_result(existing.get("team1_id"), existing.get("team2_id"), existing.get("team1_score", 0), existing.get("team2_score", 0), sign=-1)
+                filter_doc = {"_id": game_oid}
+            else:
+                # Game document doesn't exist yet, create it
+                filter_doc = {"_id": game_oid}
+        except Exception as e:
+            logger.warning(f"⚠️ [_SAVE_GAME_RESULT] Invalid game_id format: {game_id}, error: {e}. Falling back to legacy lookup.")
+            game_id = None  # Fall through to legacy logic
+    
+    # Legacy lookup (when game_id not provided or invalid)
+    if not game_id:
+        existing = db.games.find_one({
+            "week": week,
+            "$or": [
+                {"team1_id": team1_id, "team2_id": team2_id},
+                {"team1_id": team2_id, "team2_id": team1_id},
+            ],
+        })
 
-    if existing:
-        _apply_team_result(existing["team1_id"], existing["team2_id"], existing["team1_score"], existing["team2_score"], sign=-1)
-        filter_doc = {"_id": existing["_id"]}
-    else:
-        filter_doc = {"week": week, "team1_id": team1_id, "team2_id": team2_id}
+        if existing:
+            _apply_team_result(existing["team1_id"], existing["team2_id"], existing["team1_score"], existing["team2_score"], sign=-1)
+            filter_doc = {"_id": existing["_id"]}
+        else:
+            filter_doc = {"week": week, "team1_id": team1_id, "team2_id": team2_id}
 
     _apply_team_result(team1_id, team2_id, team1_score, team2_score, sign=1)
 
@@ -324,7 +360,10 @@ def complete_week(req: CompleteWeekRequest):
     user = req.result
     team1_id = _normalize_team_id(user.team1_id)
     team2_id = _normalize_team_id(user.team2_id)
-    user_res = _save_game_result(team1_id, team2_id, user.team1_score, user.team2_score, req.week, franchise_id=req.franchise_id)
+    
+    # ✅ SS&S: Use provided game_id if available (this is the actual gameplay document with box_score)
+    user_game_id = req.game_id
+    user_res = _save_game_result(team1_id, team2_id, user.team1_score, user.team2_score, req.week, franchise_id=req.franchise_id, game_id=user_game_id)
     results.append({
         "away_id": user_res["team1_id"],
         "home_id": user_res["team2_id"],
@@ -332,29 +371,35 @@ def complete_week(req: CompleteWeekRequest):
         "home_score": user_res["team2_score"],
     })
     
-    # ✅ SS&S: Find user's game and call finalize_game() to rollup stats to franchise document
-    print(f"🔍 [COMPLETE_WEEK] Looking for user's game: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
-    logger.info(f"🔍 [COMPLETE_WEEK] Looking for user's game: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
-    user_game = db.games.find_one({
-        "week": req.week,
-        "$or": [
-            {"team1_id": team1_id, "team2_id": team2_id},
-            {"team1_id": team2_id, "team2_id": team1_id},
-        ],
-        "franchise_id": str(req.franchise_id)
-    })
-    if user_game:
-        user_game_id = str(user_game.get("_id", ""))
-        logger.info(f"✅ [COMPLETE_WEEK] Found user's game: game_id={user_game_id}, _id type={type(user_game.get('_id'))}")
-        if user_game_id:
-            logger.info(f"🔍 [COMPLETE_WEEK] Calling finalize_game() for user's game: game_id={user_game_id}")
-            stat_updater.finalize_game(
-                user_game_id, mode="franchise", franchise_id=req.franchise_id
-            )
-        else:
-            logger.error(f"❌ [COMPLETE_WEEK] User game found but _id is empty: {user_game}")
+    # ✅ SS&S: Call finalize_game() with the actual gameplay game_id (if provided)
+    if user_game_id:
+        logger.info(f"🔍 [COMPLETE_WEEK] Calling finalize_game() for user's game with provided game_id: {user_game_id}")
+        stat_updater.finalize_game(
+            user_game_id, mode="franchise", franchise_id=req.franchise_id
+        )
     else:
-        logger.error(f"❌ [COMPLETE_WEEK] User's game not found in games collection. Query: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
+        # Fallback: Try to find game by week + team IDs (legacy behavior)
+        logger.warning(f"⚠️ [COMPLETE_WEEK] No game_id provided, attempting legacy lookup: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
+        user_game = db.games.find_one({
+            "week": req.week,
+            "$or": [
+                {"team1_id": team1_id, "team2_id": team2_id},
+                {"team1_id": team2_id, "team2_id": team1_id},
+            ],
+            "franchise_id": str(req.franchise_id)
+        })
+        if user_game:
+            user_game_id = str(user_game.get("_id", ""))
+            logger.info(f"✅ [COMPLETE_WEEK] Found user's game via legacy lookup: game_id={user_game_id}")
+            if user_game_id:
+                logger.info(f"🔍 [COMPLETE_WEEK] Calling finalize_game() for user's game: game_id={user_game_id}")
+                stat_updater.finalize_game(
+                    user_game_id, mode="franchise", franchise_id=req.franchise_id
+                )
+            else:
+                logger.error(f"❌ [COMPLETE_WEEK] User game found but _id is empty: {user_game}")
+        else:
+            logger.error(f"❌ [COMPLETE_WEEK] User's game not found in games collection. Query: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
 
     for away_id, home_id in week_games:
         if {str(away_id), str(home_id)} == {str(team1_id), str(team2_id)}:
@@ -384,13 +429,15 @@ def complete_week(req: CompleteWeekRequest):
             away_score = gm.score.get(away_name, 0)
             home_score = gm.score.get(home_name, 0)
             summary = summarize_game_state(gm)
-            token = f"{req.week}-{away_id}-{home_id}"
-            summary["_id"] = token
+            # ✅ SS&S: Use ObjectId format for game_id (consistent with user games)
+            from BackEnd.utils.game_id_utils import generate_game_id
+            computer_game_id = generate_game_id()
+            summary["_id"] = computer_game_id
             summary["franchise_id"] = str(req.franchise_id)
             summary["week"] = req.week
-            db.games.update_one({"_id": token}, {"$set": summary}, upsert=True)
+            db.games.update_one({"_id": computer_game_id}, {"$set": summary}, upsert=True)
             stat_updater.finalize_game(
-                token, mode="franchise", franchise_id=req.franchise_id
+                computer_game_id, mode="franchise", franchise_id=req.franchise_id
             )
         except Exception:
             away_score = random.randint(50, 90)

@@ -128,8 +128,10 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
         simData.homeTeamId ||
         homeTeamObj.name ||
         simData.home_team;
+      // ✅ SS&S: Extract game_id from simData (actual gameplay document ID)
+      const gameId = simData.game_id || simData._id;
       console.log(
-        `📡 Saving franchise game: franchiseId=${franchiseId}, week=${week}, away=${awayTeamObj.name}, home=${homeTeamObj.name}`
+        `📡 Saving franchise game: franchiseId=${franchiseId}, week=${week}, game_id=${gameId}, away=${awayTeamObj.name}, home=${homeTeamObj.name}`
       );
       const res = await fetch("/franchise/complete-week", {
         method: "POST",
@@ -137,6 +139,7 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
         body: JSON.stringify({
           franchise_id: franchiseId,
           week: week,
+          game_id: gameId,  // ✅ SS&S: Pass actual gameplay game_id
           result: {
             team1_id: team1Id,
             team2_id: team2Id,
