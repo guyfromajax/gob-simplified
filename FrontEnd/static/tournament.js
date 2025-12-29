@@ -418,7 +418,9 @@ function renderStatsTable(playerStats) {
       <td>${s.FTM || 0}</td>
       <td>${s.FTA || 0}</td>
       <td>${ftPct}%</td>
-      <td>${s.REB || 0}</td>
+      <td>${s.DREB || 0}</td>
+      <td>${s.OREB || 0}</td>
+      <td>${s.TREB || (s.DREB || 0) + (s.OREB || 0)}</td>
       <td>${s.AST || 0}</td>
       <td>${s.STL || 0}</td>
       <td>${s.BLK || 0}</td>
@@ -443,7 +445,9 @@ function sortPlayerStats(statKey) {
     'FTM': 'FTM',
     'FTA': 'FTA',
     'FT%': 'FT%',
-    'REB': 'REB',
+    'DREB': 'DREB',
+    'OREB': 'OREB',
+    'TREB': 'TREB',
     'AST': 'AST',
     'STL': 'STL',
     'BLK': 'BLK',
@@ -471,6 +475,10 @@ function sortPlayerStats(statKey) {
     } else if (dataKey === 'FT%') {
       val1 = a.FTA > 0 ? (a.FTM || 0) / a.FTA : 0;
       val2 = b.FTA > 0 ? (b.FTM || 0) / b.FTA : 0;
+    } else if (dataKey === 'TREB') {
+      // Calculate TREB from DREB + OREB if not directly available
+      val1 = a.TREB || (a.DREB || 0) + (a.OREB || 0);
+      val2 = b.TREB || (b.DREB || 0) + (b.OREB || 0);
     } else {
       val1 = a[dataKey] || 0;
       val2 = b[dataKey] || 0;
