@@ -45,9 +45,14 @@ const cId = myTeamSide ? urlParams.get(`${myTeamSide}_c`) : null;
 let teamName = myTeamSide === 'home' ? homeTeam : awayTeam;
 let teamId = myTeamSide === 'home' ? homeId : awayId;
 
-// If coming from command center, use user_team_id parameter (Tournament/Franchise modes)
+// If coming from command center, use team_id or user_team_id parameter (Tournament/Franchise modes)
 if (modeParam && (modeParam === 'tournament' || modeParam === 'franchise')) {
-  if (userTeamIdParam) {
+  // Check for team_id first (standardized format), then fallback to user_team_id (legacy)
+  const teamIdParam = urlParams.get('team_id');
+  if (teamIdParam) {
+    teamId = teamIdParam;
+    teamName = teamIdParam; // Will be resolved by backend if needed
+  } else if (userTeamIdParam) {
     teamId = userTeamIdParam;
     teamName = userTeamIdParam; // Will be resolved by backend if needed
   }
