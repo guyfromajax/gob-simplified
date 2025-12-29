@@ -51,6 +51,7 @@
 1. **Team Stats, Team Attributes**
    - Team Stats: Aggregation of player stats and play stats (Offense, Defense, Fast Break, Press Trap)
    - Team Attributes: `team_chemistry`, `offensive_efficiency`, `shot_threshold`, `turnover_modifier`, `foul_modifier`, `rebound_modifier`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
+   - **Initialization Range:** `shot_threshold` is initialized with `random.randint(-10, 190)` for all game modes (center at 90 for pill display)
 
 2. **Player Stats, Player Attributes**
    - Player Stats: Season and career statistics (PTS, REB, AST, etc.)
@@ -586,6 +587,7 @@ These variables provide additional context for navigation but aren't required fo
 1. **Team Stats, Team Attributes**
    - Team Stats: Aggregation of player stats and play stats (Offense, Defense, Fast Break, Press Trap)
    - Team Attributes: `team_chemistry`, `offensive_efficiency`, `shot_threshold`, `turnover_modifier`, `foul_modifier`, `rebound_modifier`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
+   - **Initialization Range:** `shot_threshold` is initialized with `random.randint(-10, 190)` for all game modes (center at 90 for pill display)
 
 2. **Player Stats, Player Attributes**
    - Player Stats: Tournament statistics (PTS, REB, AST, etc.)
@@ -1797,7 +1799,7 @@ oreb_threshold = 0
 made = shot_score >= oreb_threshold
 ```
 
-**Note:** This is different from regular shots, which use the team's `shot_threshold` attribute (0-200 range). Putbacks use a fixed threshold of 0, making them more dependent on player attributes and defensive pressure.
+**Note:** This is different from regular shots, which use the team's `shot_threshold` attribute (-10 to 190 range, center at 90). Putbacks use a fixed threshold of 0, making them more dependent on player attributes and defensive pressure.
 
 #### Putback vs Kickout Decision
 
@@ -1839,6 +1841,136 @@ made = shot_score >= oreb_threshold
 | **Kickout Chance** | 10% |
 | **Points** | Always 2 (putbacks are from paint) |
 | **Time Elapsed** | 2-5 seconds |
+
+---
+
+### Free Throw System
+
+**Location:** `BackEnd/engine/phase_resolution.py` - `resolve_free_throw_logic()` function
+
+**Overview:**
+The Free Throw System handles free throw shot attempts and outcomes. Free throws are awarded for shooting fouls, bonus situations (5+ team fouls), and double bonus situations (10+ team fouls).
+
+#### Free Throw Calculation
+
+**Primary Calculation:**
+```python
+ft_shot_score = (attrs["FT"] * 0.7) + (attrs["CH"] * 0.2) + attrs["MO"]
+result = random.randint(1, 100)
+makes_shot = result < ft_shot_score
+```
+
+**Components:**
+1. **Player Attributes:**
+   - `FT` (Free Throw) - 70% weight
+   - `CH` (Clutch) - 20% weight
+   - `MO` (Momentum) - Full value added (not weighted)
+
+2. **Random Roll:** `random.randint(1, 100)` (1-100 range)
+
+3. **Success Comparison:**
+   - Compares `result` (random 1-100) to `ft_shot_score` (calculated from attributes)
+   - If `result < ft_shot_score` → **MAKE**
+   - If `result >= ft_shot_score` → **MISS**
+
+**Secondary Check (Miss-to-Make Conversion):**
+After the initial calculation, if the free throw is a miss, there is a **40% chance** to convert it to a make:
+```python
+if not makes_shot:
+    if random.random() < 0.40:
+        makes_shot = True
+```
+
+This secondary check provides a "second chance" mechanic that increases overall free throw percentage, helping to achieve the target FT% of 72% per game.
+
+**Code Location:** `BackEnd/engine/phase_resolution.py` - `resolve_free_throw_logic()` (lines 1365-1371)
+
+**Example:**
+- Player with `FT = 80`, `CH = 70`, `MO = 5`
+- `ft_shot_score = (80 * 0.7) + (70 * 0.2) + 5 = 56 + 14 + 5 = 75`
+- Random roll: `80` (1-100)
+- Initial result: `80 >= 75` → **MISS**
+- Secondary check: `random.random() = 0.35` (35% < 40%) → **CONVERTED TO MAKE**
+- Final result: **MAKE**
+
+#### When Free Throws Are Awarded
+
+**Shooting Fouls:**
+- 2 free throws for 2-point shot attempts
+- 3 free throws for 3-point shot attempts
+- Always awarded regardless of team foul count
+
+**Bonus Situations (Non-Shooting Fouls):**
+- **5-9 team fouls:** 1-and-1 free throws (must make first to unlock second)
+- **10+ team fouls:** 2 free throws (double bonus)
+
+**1-and-1 Logic:**
+- First free throw must be made to unlock the second
+- If first is missed, possession changes (defensive rebound)
+
+#### Free Throw Outcomes
+
+**Made Free Throw:**
+- Awards 1 point
+- Decrements `free_throws_remaining`
+- If last free throw, determines next defensive setup (pressure type)
+- Next play type: `BASELINE_INBOUND` (after made shot)
+
+**Missed Free Throw:**
+- Rebound determined (offensive or defensive)
+- If defensive rebound: possession flips, next play type determined by fast break chance
+- If offensive rebound: stored for separate OREB turn processing
+- Time elapsed: 0 seconds (clock does not run during free throws)
+
+#### Summary
+
+| Aspect | Details |
+|--------|---------|
+| **Shot Score Formula** | FT × 0.7 + CH × 0.2 + MO |
+| **Random Roll** | 1-100 |
+| **Primary Success** | `result < ft_shot_score` |
+| **Secondary Check** | 40% chance to convert miss to make |
+| **Points** | Always 1 (free throws are worth 1 point) |
+| **Time Elapsed** | 0 seconds (clock does not run) |
+| **Target FT%** | 72% (per Statistical Game Base Values) |
+
+---
+
+## Statistical Game Base Values
+
+**Location:** `BackEnd/constants/__init__.py` - HCO Resolution System constants section
+
+**Overview:**
+These are the target statistical averages per team, per game that the game engine is calibrated to achieve. These values are used as reference points for system calibration and balancing.
+
+**Per Team / Per Game Targets:**
+
+| Statistic | Target Value |
+|-----------|--------------|
+| **FGA** (Field Goal Attempts) | 60 |
+| **FG%** (Field Goal Percentage) | 45% |
+| **3PTA** (3-Point Attempts) | 23 |
+| **3PT%** (3-Point Percentage) | 35% |
+| **FTA** (Free Throw Attempts) | 20 |
+| **FT%** (Free Throw Percentage) | 72% |
+
+**Code Location:**
+```python
+# BackEnd/constants/__init__.py (lines 145-147)
+# HCO Resolution System constants
+# Target averages per game:
+# - 60 field goal attempts per team per game
+# - Average target FG% of 45%
+```
+
+**Usage:**
+These values serve as calibration targets for:
+- HCO Resolution System constants (`STANDARD_D_FOUL`, `STANDARD_O_FOUL`, `HARD_STEAL`, etc.)
+- Shot attempt frequency calculations
+- Shot success rate balancing
+- Overall game flow and pacing
+
+**Note:** These are target averages - actual game results will vary based on team attributes, player matchups, strategy settings, and game situations.
 
 ---
 

@@ -181,7 +181,7 @@ class TeamManager:
             dict: Team attributes with mode-specific randomization
         """
         # Common attributes for all modes
-        shot_threshold = random.randint(0, 200)
+        shot_threshold = random.randint(-10, 190)
         rebound_modifier = random.choice([0.8, 0.9, 1.0, 1.1, 1.2])
         
         # Mode-specific ranges
