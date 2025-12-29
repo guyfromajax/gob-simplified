@@ -23,7 +23,10 @@ from BackEnd.utils.shared import (
     get_name_safe,
     calculate_gravity_score,
     unpack_game_context,
+    calculate_ball_handling_score,
+    calculate_defender_pressure_score,
 )
+from BackEnd.constants.fast_break_constants import DEFENSIVE_STOP_Y_RANGE
 
 
 class ShotManager:
@@ -1251,7 +1254,79 @@ class ShotManager:
             passer = None
         
         attrs = shooter.attributes
-        defender_count = fb_roles.get("defender_count", len(fb_roles["defense"]))
+        
+        # ✅ RECALIBRATE DEFENDER COUNT: After outlet pass is received, only count defenders ahead of ball handler
+        # Get ball handler outlet position (after receiving outlet pass)
+        ball_handler = fb_roles.get("ball_handler", shooter)  # Ball handler is typically the outlet receiver
+        ball_handler_outlet_x = fb_roles.get("ball_handler_outlet_x")
+        ball_handler_outlet_y = fb_roles.get("ball_handler_outlet_y")
+        
+        # Determine if away offense or home offense (for x-coord comparison)
+        is_away_offense = off_team.team_id == self.game.away_team.team_id
+        
+        # Filter defenders to only those ahead of ball handler (via x-coords check)
+        # Also check for defensive stop challenges (±6 y-coords and ahead)
+        valid_defenders = []
+        defense_call = self.game_state.get("defense_playcall", "Man")
+        
+        if ball_handler_outlet_x is not None and ball_handler_outlet_y is not None:
+            for defender in fb_roles.get("defense", []):
+                # Get defender outlet position (stored in defender.outlet_coords)
+                defender_outlet_coords = getattr(defender, "outlet_coords", {})
+                defender_outlet_x = defender_outlet_coords.get("x")
+                defender_outlet_y = defender_outlet_coords.get("y")
+                
+                # Fallback to current coords if outlet_coords not available
+                if defender_outlet_x is None or defender_outlet_y is None:
+                    defender_coords = getattr(defender, "coords", {})
+                    defender_outlet_x = defender_coords.get("x", 50)
+                    defender_outlet_y = defender_coords.get("y", 25)
+                
+                # Check if defender is ahead of ball handler (x-coords check)
+                if is_away_offense:
+                    # Away offense: basket at x=10 in HOME orientation, smaller x is closer
+                    # Defender ahead if defender_x <= ball_handler_x
+                    is_ahead = defender_outlet_x <= ball_handler_outlet_x
+                else:
+                    # Home offense: basket at x=90 in HOME orientation, larger x is closer
+                    # Defender ahead if defender_x >= ball_handler_x
+                    is_ahead = defender_outlet_x >= ball_handler_outlet_x
+                
+                if not is_ahead:
+                    # Defender is not ahead, skip them
+                    continue
+                
+                # Check if defender is within ±6 y-coords (defensive stop position)
+                y_diff = abs(defender_outlet_y - ball_handler_outlet_y)
+                is_within_y_range = y_diff <= DEFENSIVE_STOP_Y_RANGE
+                
+                if is_within_y_range:
+                    # Defender is in position to attempt defensive stop - run challenge
+                    defender_score = calculate_defender_pressure_score(defender, defense_call)
+                    offender_score = calculate_ball_handling_score(ball_handler)
+                    
+                    # If offender wins (offender_score > defender_score), they pass the defender
+                    # Remove defender from count (they won't defend the shot)
+                    if offender_score > defender_score:
+                        # Offender wins - defender is passed, don't include in count
+                        logging.debug(f"🏀 [FAST BREAK CHALLENGE] {get_name_safe(ball_handler)} (BH={offender_score}) beats {get_name_safe(defender)} (Pressure={defender_score}) - defender passed, continuing to shot")
+                        continue
+                    else:
+                        # Defender wins - this should have been a defensive stop
+                        # If we're here, it means we're in shot resolution, so log warning but include them
+                        # (This shouldn't happen if phase_resolution.py logic is correct)
+                        logging.warning(f"⚠️ [FAST BREAK CHALLENGE] {get_name_safe(defender)} (Pressure={defender_score}) should have stopped {get_name_safe(ball_handler)} (BH={offender_score}) but reached shot resolution - including in count")
+                
+                # Defender is ahead and either not in stop position or lost challenge - include in count
+                valid_defenders.append(defender)
+        else:
+            # Fallback: use original defender list if outlet positions not available
+            valid_defenders = fb_roles.get("defense", [])
+            logging.warning(f"⚠️ [FAST BREAK] Ball handler outlet position not available, using original defender count")
+        
+        # Update fb_roles["defense"] with filtered list
+        fb_roles["defense"] = valid_defenders
+        defender_count = len(valid_defenders)
         
         shot_score = (attrs["SC"] * 0.6 + attrs["AG"] * 0.2 + attrs["IQ"] * 0.2) * random.randint(1, 6)
         text = f"fast break shot_score: {shot_score}"
@@ -1301,7 +1376,7 @@ class ShotManager:
             # Debug print removed to declutter output
         elif defender_count >= 2:
             # 2+ defenders: +300 shot threshold (much harder shot)
-            shot_threshold += 300
+            shot_threshold += 100
             # Debug print removed to declutter output
 
         made = shot_score >= shot_threshold
