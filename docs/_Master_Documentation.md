@@ -1945,12 +1945,19 @@ The Balancing System prevents games from getting too out of hand by temporarily 
 
 #### Lead Thresholds by Quarter
 
-**Base Thresholds:**
+**Trailing Team Thresholds (to trigger -10 shot_threshold):**
 - **Q1:** 6 points
 - **Q2:** 9 points
 - **Q3:** 12 points
 - **Q4:** 15 points
 - **Overtime:** Uses Q4 threshold (15 points)
+
+**Leading Team Thresholds (to trigger 190 shot_threshold):**
+- **Q1:** 9 points
+- **Q2:** 12 points
+- **Q3:** 15 points
+- **Q4:** 18 points
+- **Overtime:** Uses Q4 threshold (18 points)
 
 #### Threshold Adjustments
 
@@ -2035,23 +2042,24 @@ else:
 
 **Scenario 3: Q2, Leading Team**
 - Score: Offense 25, Defense 15 (leading by 10)
-- Base threshold: 9
+- Base threshold: 12 (leading threshold)
 - `discipline`: -4
-- Adjusted threshold: 9 + (-4) = 5
-- 10 >= 5 → **Balancing triggered** → `shot_threshold = 190`
+- Adjusted threshold: 12 + (-4) = 8
+- 10 >= 8 → **Balancing triggered** → `shot_threshold = 190`
 
-**Scenario 4: Q4, Leading Team (High Turnover Modifier)**
+**Scenario 4: Q4, Leading Team (High Discipline)**
 - Score: Offense 60, Defense 45 (leading by 15)
-- Base threshold: 15
+- Base threshold: 18 (leading threshold)
 - `discipline`: +8
-- Adjusted threshold: 15 + 8 = 23
-- 15 < 23 → **No balancing** (high discipline makes it harder to trigger)
+- Adjusted threshold: 18 + 8 = 26
+- 15 < 26 → **No balancing** (high discipline makes it harder to trigger)
 
 #### Summary
 
 | Aspect | Details |
 |--------|---------|
-| **Base Thresholds** | Q1: 6, Q2: 9, Q3: 12, Q4: 15, OT: 15 |
+| **Trailing Base Thresholds** | Q1: 6, Q2: 9, Q3: 12, Q4: 15, OT: 15 |
+| **Leading Base Thresholds** | Q1: 9, Q2: 12, Q3: 15, Q4: 18, OT: 18 |
 | **Trailing Adjustment** | Base - `fight` |
 | **Leading Adjustment** | Base + `discipline` |
 | **Trailing Override** | `shot_threshold = -10` (easier shots) |
