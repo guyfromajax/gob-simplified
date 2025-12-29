@@ -398,7 +398,7 @@ def apply_training_points(
             # Apply to Team Chemistry
             _apply_team_training_points(team, "team_chemistry", scrimmage_points, archetype, sub_option)
             # Apply to Shot Threshold (decreases)
-            _apply_shot_threshold_training(team, scrimmage_points)
+            _apply_shot_threshold_training(team, scrimmage_points, archetype, sub_option)
             # Apply to Rebounding (rebound_modifier)
             _apply_rebound_modifier_training(team, scrimmage_points, archetype, sub_option)
     
@@ -767,7 +767,7 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
     team["rebound_modifier"] = current_val + final_increase
 
 
-def _apply_shot_threshold_training(team: dict, points: int):
+def _apply_shot_threshold_training(team: dict, points: int, archetype: Optional[str] = None, sub_option: Optional[str] = None):
     """
     Apply training points to shot_threshold (decreases threshold, lower is better).
     
@@ -777,7 +777,7 @@ def _apply_shot_threshold_training(team: dict, points: int):
     - 3 points: -= random.randint(20, 45)
     - 4 points: -= random.randint(20, 55)
     - 5 points: -= random.randint(20, 65)
-    - Amplifier: *= random.choice([1.3, 1.4, 1.5, 1.6])
+    - Amplifier: *= random.choice([1.3, 1.4, 1.5, 1.6]) (only if "authoritarian-discipline" or "culture-builder-confidence" focus is selected)
     """
     if points == 0:
         return
@@ -796,9 +796,11 @@ def _apply_shot_threshold_training(team: dict, points: int):
     else:
         decrease = random.randint(20, 65)
     
-    # Apply amplifier (multiply)
-    amplifier = random.choice([1.3, 1.4, 1.5, 1.6])
-    final_decrease = int(decrease * amplifier)
+    # Apply amplifier (multiply) - only if specific coaching focus is selected
+    final_decrease = decrease
+    if sub_option in ["authoritarian-discipline", "culture-builder-confidence"]:
+        amplifier = random.choice([1.3, 1.4, 1.5, 1.6])
+        final_decrease = int(decrease * amplifier)
     
     # Apply to team (subtract, lower is better)
     current_val = team.get("shot_threshold", 0)

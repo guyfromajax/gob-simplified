@@ -600,17 +600,29 @@ function createTeamAttrItem(attrKey, currentValue, change) {
   changeSpan.className = 'attr-change';
   
   if (change !== 0) {
-    // ✅ FIX: Format rebound_modifier changes to 2 decimal places
-    const formattedChange = attrKey === 'rebound_modifier' 
-      ? (change > 0 ? `+${change.toFixed(2)}` : change.toFixed(2))
-      : (change > 0 ? `+${change}` : change.toString());
-    
-    if (change > 0) {
+    // Special handling for shot_threshold: negative change (decrease) is good, positive change (increase) is bad
+    if (attrKey === 'shot_threshold') {
+      // Invert: negative change (good) shows as green with +, positive change (bad) shows as red with -
+      const absChange = Math.abs(change);
+      if (change < 0) {
+        // Decrease is good - show as green with +
+        changeSpan.textContent = `+${absChange}`;
+        changeSpan.className += ' change-positive';
+      } else {
+        // Increase is bad - show as red with -
+        changeSpan.textContent = `-${absChange}`;
+        changeSpan.className += ' change-negative';
+      }
+    } else if (attrKey === 'rebound_modifier') {
+      // Format rebound_modifier changes to 2 decimal places
+      const formattedChange = change > 0 ? `+${change.toFixed(2)}` : change.toFixed(2);
       changeSpan.textContent = formattedChange;
-      changeSpan.className += ' change-positive';
+      changeSpan.className += change > 0 ? ' change-positive' : ' change-negative';
     } else {
+      // Standard handling for other attributes
+      const formattedChange = change > 0 ? `+${change}` : change.toString();
       changeSpan.textContent = formattedChange;
-      changeSpan.className += ' change-negative';
+      changeSpan.className += change > 0 ? ' change-positive' : ' change-negative';
     }
   } else {
     changeSpan.textContent = 'No change';
