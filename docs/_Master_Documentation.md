@@ -1655,6 +1655,190 @@ The `get_fatigue_decay_amount()` method in `BackEnd/models/player.py` uses the p
 
 ---
 
+### Computer Team Strategy Settings
+
+**Location:** `BackEnd/models/team_manager.py` - `_init_strategy_settings()` method
+
+**Overview:**
+When computer teams are initialized (for all game modes: Single Game, Tournament, Franchise), their `strategy_settings` are randomly generated using weighted distributions. This ensures most teams play with balanced strategies (value = 2), while some teams have more extreme preferences.
+
+**Initialization Method:**
+- **Code Location:** `BackEnd/models/team_manager.py` - `_init_strategy_settings()` (lines 118-141)
+- **When Called:** During `TeamManager.__init__()` when `strategy_settings` is not provided or is empty
+- **Applies To:** All game modes (Single Game, Tournament, Franchise)
+
+#### Strategy Settings Distribution
+
+**Weighted Distribution (Most Settings):**
+The following settings use a weighted random distribution that favors balanced play (value = 2):
+- `offense` - Motion vs Set Play split (0=motion only, 4=set plays only)
+- `tempo` - Pace of play preference
+- `defense` - Man vs Zone defense preference (0=man only, 4=zone only)
+- `aggression` - Defensive aggression level
+- `hc_trap` - Half court trap usage preference
+- `fc_press` - Full court press usage preference
+- `rebounding` - Crash boards vs get back preference
+
+**Weighted Distribution Probabilities:**
+- **5% chance** for value **0** (extreme low)
+- **15% chance** for value **1** (low)
+- **60% chance** for value **2** (normal/balanced) ⭐
+- **15% chance** for value **3** (high)
+- **5% chance** for value **4** (extreme high)
+
+**Uniform Distribution (Shot Focus Settings):**
+The following settings use uniform random distribution (1-4, never zero):
+- `inside` - Inside shot focus preference
+- `attack` - Attack shot focus preference
+- `outside` - Outside shot focus preference
+
+**Uniform Distribution Range:**
+- Random integer from **1 to 4** (inclusive)
+- **Never zero** - ensures teams always have some preference for each shot type
+
+#### Implementation Details
+
+**Code Pattern:**
+```python
+# Weighted distribution for most settings
+weighted_choice = random.choices(
+    [0, 1, 2, 3, 4],
+    weights=[5, 15, 60, 15, 5],  # 5%, 15%, 60%, 15%, 5%
+    k=1
+)[0]
+
+# Uniform distribution for shot focus settings
+inside = random.randint(1, 4)  # Never zero
+```
+
+**Future Enhancements:**
+- Current implementation uses simple weighted randomization
+- Future versions may implement more strategic AI that considers:
+  - Team strengths/weaknesses
+  - Opponent tendencies
+  - Game situation (score, time remaining)
+  - Player matchups
+
+#### Summary Table
+
+| Setting | Distribution | Range | Notes |
+|---------|-------------|-------|-------|
+| `offense` | Weighted | 0-4 | 60% chance of 2 (balanced) |
+| `inside` | Uniform | 1-4 | Never zero |
+| `attack` | Uniform | 1-4 | Never zero |
+| `outside` | Uniform | 1-4 | Never zero |
+| `tempo` | Weighted | 0-4 | 60% chance of 2 (balanced) |
+| `defense` | Weighted | 0-4 | 60% chance of 2 (balanced) |
+| `aggression` | Weighted | 0-4 | 60% chance of 2 (balanced) |
+| `hc_trap` | Weighted | 0-4 | 60% chance of 2 (balanced) |
+| `fc_press` | Weighted | 0-4 | 60% chance of 2 (balanced) |
+| `rebounding` | Weighted | 0-4 | 60% chance of 2 (balanced) |
+
+---
+
+### OREB System
+
+**Location:** `BackEnd/utils/shared.py` - `resolve_offensive_rebound()` and `oreb_shot_attempt()` functions
+
+**Overview:**
+The OREB (Offensive Rebound) System handles offensive rebounds and putback attempts. When a player secures an offensive rebound, they have a 90% chance to attempt a putback shot and a 10% chance to kick the ball out to reset the offense.
+
+#### Putback Shot Calculation
+
+**Shot Score Formula:**
+Putback attempts use a dedicated `oreb_shot_attempt()` function that calculates shot score based on finishing ability:
+- **SC (Shooting Close)** × 0.5
+- **ST (Strength)** × 0.3
+- **CH (Clutch)** × 0.2
+- Multiplied by random die roll (1-6)
+
+**Code Location:** `BackEnd/utils/shared.py` - `oreb_shot_attempt()` function (lines 118-130)
+
+**Formula:**
+```python
+shot_score = (
+    player_attrs["SC"] * 0.5 +
+    player_attrs["ST"] * 0.3 +
+    player_attrs["CH"] * 0.2
+) * random.randint(1, 6)
+```
+
+#### Defense Penalty
+
+After calculating the base shot score, a defense penalty is applied:
+- Defender is randomly selected (weighted toward bigs: C, C, C, PF, PF, SF, SF, SG, PG)
+- Defense penalty formula:
+  - **ID (Interior Defense)** × 0.6
+  - **ST (Strength)** × 0.2
+  - **IQ (Intelligence)** × 0.1
+  - **CH (Clutch)** × 0.1
+  - Multiplied by random die roll (1-6) × 0.7
+- Defense penalty is subtracted from shot score
+
+**Code Location:** `BackEnd/utils/shared.py` - `resolve_offensive_rebound()` function (lines 145-154)
+
+#### Shot Threshold
+
+**Uniform Threshold:** All OREB putback attempts use a **uniform shot threshold of 0**.
+
+This means putback success is determined purely by:
+- Player's finishing ability (SC, ST, CH)
+- Defender's defensive ability (ID, ST, IQ, CH)
+- Random die rolls
+
+**Code Location:** `BackEnd/utils/shared.py` - `resolve_offensive_rebound()` function (line 159)
+
+**Comparison:**
+```python
+oreb_threshold = 0
+made = shot_score >= oreb_threshold
+```
+
+**Note:** This is different from regular shots, which use the team's `shot_threshold` attribute (0-200 range). Putbacks use a fixed threshold of 0, making them more dependent on player attributes and defensive pressure.
+
+#### Putback vs Kickout Decision
+
+**90% Putback Attempt:**
+- Player attempts immediate putback shot
+- Uses `oreb_shot_attempt()` calculation
+- Threshold = 0
+
+**10% Kickout:**
+- Player passes ball out to PG
+- Resets offense (no shot attempt)
+- Time elapsed: 1-3 seconds
+
+**Code Location:** `BackEnd/utils/shared.py` - `resolve_offensive_rebound()` function (line 136)
+
+#### Putback Outcomes
+
+**Make:**
+- 2 points scored
+- FGM, FGA, PTS, PIP stats recorded
+- Possession flips (defense gets ball)
+- Time elapsed: 2-5 seconds
+
+**Miss:**
+- DEF_S stat recorded for defender
+- Rebound determined (can be OREB or DREB)
+- If DREB: possession flips
+- If OREB: same team continues (can result in consecutive putback attempts)
+- Time elapsed: 2-5 seconds
+
+#### Summary
+
+| Aspect | Details |
+|--------|---------|
+| **Shot Score Formula** | SC × 0.5 + ST × 0.3 + CH × 0.2, multiplied by die roll (1-6) |
+| **Defense Penalty** | ID × 0.6 + ST × 0.2 + IQ × 0.1 + CH × 0.1, multiplied by die roll (1-6) × 0.7 |
+| **Shot Threshold** | **0** (uniform for all putback attempts) |
+| **Putback Chance** | 90% |
+| **Kickout Chance** | 10% |
+| **Points** | Always 2 (putbacks are from paint) |
+| **Time Elapsed** | 2-5 seconds |
+
+---
+
 ## Data & Settings Persistence
 
 > **Last Updated:** February 2025  

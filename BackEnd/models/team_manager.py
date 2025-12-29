@@ -117,27 +117,38 @@ class TeamManager:
 
     def _init_strategy_settings(self):
         """
-        Initialize strategy settings with randomization for CPU teams (0-4 scale).
+        Initialize strategy settings with weighted randomization for CPU teams (0-4 scale).
         If team document has strategy_settings, those will be used instead via constructor.
         
-        Randomization:
-        - inside, attack, outside: 1-4 (never zero)
-        - all others: 0-4
+        Weighted Distribution (for offense, tempo, defense, aggression, hc_trap, fc_press, rebounding):
+        - 5% chance for 0
+        - 15% chance for 1
+        - 60% chance for 2 (normal/balanced)
+        - 15% chance for 3
+        - 5% chance for 4
         
-        ✅ TEMPORARY: Hardcoded FCP and HCT to 4 for testing
+        Uniform Distribution (for inside, attack, outside):
+        - Random 1-4 (never zero, ensures at least some focus on each area)
         """
+        # Weighted distribution: 5% for 0/4, 15% for 1/3, 60% for 2
+        weighted_choice = random.choices(
+            [0, 1, 2, 3, 4],
+            weights=[5, 15, 60, 15, 5],
+            k=1
+        )[0]
+        
         return {
-            "offense": random.randint(0, 4),
-            "inside": random.randint(1, 4),
-            "attack": random.randint(1, 4),
-            "outside": random.randint(1, 4),
-            "tempo": random.randint(0, 4),
-            "play_calling": random.randint(0, 4),
-            "defense": 2,  # Hardcoded to 2 for testing (50/50 man/zone mix)
-            "aggression": random.randint(0, 4),
-            "hc_trap": 4,  # ✅ TEMPORARY: Hardcoded to 4 for testing
-            "fc_press": 4,  # ✅ TEMPORARY: Hardcoded to 4 for testing
-            "rebounding": random.randint(0, 4)
+            "offense": weighted_choice,
+            "inside": random.randint(1, 4),  # Uniform 1-4 (never zero)
+            "attack": random.randint(1, 4),  # Uniform 1-4 (never zero)
+            "outside": random.randint(1, 4),  # Uniform 1-4 (never zero)
+            "tempo": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
+            "play_calling": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
+            "defense": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
+            "aggression": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
+            "hc_trap": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
+            "fc_press": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
+            "rebounding": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0]
         }
 
     @staticmethod
