@@ -772,10 +772,18 @@ async function setHeader() {
   const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
   let clockTime = urlParams.get('clock');
   
-  // ✅ QUARTER BREAK FIX: If not a timeout and clock is 0:00 or missing, show correct time for upcoming quarter
-  if (!resumeFromTimeout && (!clockTime || clockTime === '0:00')) {
-    // Determine if it's overtime (4:00) or regular quarter (8:00)
-    const currentQuarter = parseInt(urlParams.get('quarter'), 10) || quarter || 1;
+  // ✅ QUARTER BREAK FIX: Detect quarter breaks reliably and always set correct clock
+  // Quarter break = NOT a timeout resume AND quarter > 1 (starting a new quarter)
+  const currentQuarter = parseInt(urlParams.get('quarter'), 10) || quarter || 1;
+  const isQuarterBreak = !resumeFromTimeout && currentQuarter > 1;
+  
+  if (isQuarterBreak) {
+    // During quarter breaks, always set clock to start of new quarter
+    // OT = 4:00, regular quarters = 8:00
+    clockTime = currentQuarter > 4 ? '4:00' : '8:00';
+    console.log(`✅ QUARTER BREAK: Setting clock to ${clockTime} for Q${currentQuarter}`);
+  } else if (!resumeFromTimeout && (!clockTime || clockTime === '0:00')) {
+    // Fallback: If not a timeout and clock is 0:00 or missing, show correct time for upcoming quarter
     clockTime = currentQuarter > 4 ? '4:00' : '8:00'; // OT = 4:00, regular = 8:00
   }
   

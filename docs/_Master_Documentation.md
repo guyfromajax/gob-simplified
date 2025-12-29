@@ -1224,6 +1224,7 @@ These variables track the current game state and are required when in an active 
 - Preserve `game_id`
 - Increment `quarter` parameter
 - Preserve lineup parameters (or allow user to change lineup)
+- **Clock Display Fix (February 2025):** During quarter breaks, the lineup screen automatically detects quarter breaks (when `resume_from_timeout=false` AND `quarter > 1`) and displays the correct clock time for the upcoming quarter (8:00 for regular quarters, 4:00 for OT), regardless of what clock value may be in the URL from the previous quarter. This ensures users always see the correct time remaining when setting their lineup for a new quarter.
 
 **GP → GMO (Returning to FCC):**
 - Preserve all navigation anchor set (`mode`, `franchise_id`, `team_id`)
@@ -1472,6 +1473,7 @@ These variables track the current game state and are required when in an active 
 - Navigate to Lineup Select Experience for next quarter
 - `game_id`, `quarter` (incremented), lineup parameters preserved
 - Game continues with same game document
+- **Clock Display Fix (February 2025):** The lineup screen automatically detects quarter breaks (when `resume_from_timeout=false` AND `quarter > 1`) and displays the correct clock time for the upcoming quarter (8:00 for regular quarters, 4:00 for OT), regardless of what clock value may be in the URL from the previous quarter. This ensures users always see the correct time remaining when setting their lineup for a new quarter.
 
 **GP → GP (Game Completion):**
 - Final stats available in game document
@@ -1550,6 +1552,7 @@ These variables track the current game state and are required when in an active 
 - Preserve `game_id`
 - Increment `quarter` parameter
 - Preserve lineup parameters (or allow user to change lineup)
+- **Clock Display Fix (February 2025):** The lineup screen automatically detects quarter breaks (when `resume_from_timeout=false` AND `quarter > 1`) and displays the correct clock time for the upcoming quarter (8:00 for regular quarters, 4:00 for OT), regardless of what clock value may be in the URL from the previous quarter. This ensures users always see the correct time remaining when setting their lineup for a new quarter.
 
 #### Known Issues & Fixes
 
