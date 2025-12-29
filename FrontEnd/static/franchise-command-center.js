@@ -1313,16 +1313,25 @@ function renderRosterStatsTable(players) {
     // ✅ FIX: Map 3PTM/3PTA to TPM/TPA for display (database stores as 3PTM/3PTA, frontend expects TPM/TPA)
     const tpm = stats['3PTM'] || stats.TPM || 0;
     const tpa = stats['3PTA'] || stats.TPA || 0;
+    
+    // Calculate percentages
+    const fgPct = stats.FGA > 0 ? ((stats.FGM || 0) / stats.FGA * 100).toFixed(1) : '0.0';
+    const threePct = tpa > 0 ? (tpm / tpa * 100).toFixed(1) : '0.0';
+    const ftPct = stats.FTA > 0 ? ((stats.FTM || 0) / stats.FTA * 100).toFixed(1) : '0.0';
+    
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim()}</td>
       <td>${stats.PTS || 0}</td>
       <td>${stats.FGM || 0}</td>
       <td>${stats.FGA || 0}</td>
+      <td>${fgPct}%</td>
       <td>${tpm}</td>
       <td>${tpa}</td>
+      <td>${threePct}%</td>
       <td>${stats.FTM || 0}</td>
       <td>${stats.FTA || 0}</td>
+      <td>${ftPct}%</td>
       <td>${stats.REB || 0}</td>
       <td>${stats.AST || 0}</td>
       <td>${stats.STL || 0}</td>
@@ -1341,10 +1350,13 @@ function sortRosterStats(statKey) {
     'PTS': 'PTS',
     'FGM': 'FGM',
     'FGA': 'FGA',
+    'FG%': 'FG%',
     'TPM': 'TPM',
     'TPA': 'TPA',
+    '3PT%': '3PT%',
     'FTM': 'FTM',
     'FTA': 'FTA',
+    'FT%': 'FT%',
     'REB': 'REB',
     'AST': 'AST',
     'STL': 'STL',
@@ -1368,8 +1380,21 @@ function sortRosterStats(statKey) {
       const stats1 = a.stats?.season || {};
       const stats2 = b.stats?.season || {};
       
-      // Handle 3PTM/3PTA mapping
-      if (dataKey === 'TPM') {
+      // Handle percentage calculations
+      if (dataKey === 'FG%') {
+        val1 = stats1.FGA > 0 ? (stats1.FGM || 0) / stats1.FGA : 0;
+        val2 = stats2.FGA > 0 ? (stats2.FGM || 0) / stats2.FGA : 0;
+      } else if (dataKey === '3PT%') {
+        const tpa1 = stats1['3PTA'] || stats1.TPA || 0;
+        const tpa2 = stats2['3PTA'] || stats2.TPA || 0;
+        const tpm1 = stats1['3PTM'] || stats1.TPM || 0;
+        const tpm2 = stats2['3PTM'] || stats2.TPM || 0;
+        val1 = tpa1 > 0 ? tpm1 / tpa1 : 0;
+        val2 = tpa2 > 0 ? tpm2 / tpa2 : 0;
+      } else if (dataKey === 'FT%') {
+        val1 = stats1.FTA > 0 ? (stats1.FTM || 0) / stats1.FTA : 0;
+        val2 = stats2.FTA > 0 ? (stats2.FTM || 0) / stats2.FTA : 0;
+      } else if (dataKey === 'TPM') {
         val1 = stats1['3PTM'] || stats1.TPM || 0;
         val2 = stats2['3PTM'] || stats2.TPM || 0;
       } else if (dataKey === 'TPA') {
