@@ -688,8 +688,7 @@ def resolve_fast_break_logic(game: "GameManager"):
     # ✅ Apply energy decay for active players during Fast Break
     apply_energy_decay(off_lineup, def_lineup)
     
-    # ✅ Recharge energy for bench players during Fast Break
-    apply_bench_energy_recharge(game)
+    # ✅ NOTE: Bench recharge does NOT happen during Fast Break turns (only during HCO turns)
     
     off_scouting = off_team.scouting_data
     def_scouting = def_team.scouting_data

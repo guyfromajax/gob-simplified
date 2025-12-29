@@ -1579,6 +1579,82 @@ if (modeParam === 'single') {
 
 ---
 
+## GP Supporting Systems
+
+### Energy System
+
+**Location:** `BackEnd/utils/energy_system.py`, `BackEnd/main.py`, `BackEnd/models/game_manager.py`, `BackEnd/engine/phase_resolution.py`
+
+**Overview:**
+The Energy System manages player energy depletion during active gameplay and energy restoration during breaks (quarter breaks, halftime, timeouts). Energy affects player performance through the NG (Natural Growth) attribute, which scales other attributes.
+
+#### Energy Replenishment
+
+**1. Quarter Break Recharge (Non-Halftime)**
+- **When:** Between Q1→Q2, Q3→Q4, or before any overtime quarters
+- **Who:** All active lineup players (10 players total)
+- **Amount:** Random per player from `[0.7, 0.8, 0.9, 1.0, 1.1, 1.2]`
+- **Code Location:** `BackEnd/main.py` - `simulate_quarter()` (lines 414-422)
+
+**2. Halftime Break Recharge**
+- **When:** Between Q2→Q3 (halftime break)
+- **Who:** All active lineup players (10 players total)
+- **Amount:** Random per player from `[1.5, 1.6, 1.7, 1.8, 1.9, 2.0]`
+- **Code Location:** `BackEnd/main.py` - `simulate_quarter()` (lines 416-418)
+
+**3. Timeout Break Recharge**
+- **When:** At the start of any timeout (user-initiated, computer-initiated, or foul out)
+- **Who:** All players (active lineup + bench players)
+- **Amount:** Random per player from `[0.03, 0.04, 0.05, 0.06]`
+- **Code Location:** `BackEnd/models/game_manager.py` - `call_timeout()` (lines 217-225)
+- **Note:** Recharge happens before lineup selection screen, so user sees updated energy values
+
+**4. Bench Recharge**
+- **When:** During HCO (Half Court Offense) turns only
+- **Who:** All bench players (players not in active lineup)
+- **Amount:** Per turn, per bench player:
+  - 20% chance: no recharge (0)
+  - 70% chance: +0.01 energy
+  - 10% chance: +0.02 energy
+- **Code Location:** `BackEnd/engine/phase_resolution.py` - `apply_bench_energy_recharge()` (lines 80-113), called from `resolve_half_court_offense_logic()` (line 3630)
+- **⚠️ IMPORTANT:** Bench recharge does NOT happen during Fast Break, FCP, or HCT turns - only during HCO turns
+
+#### Energy Depletion
+
+**When:** Applied to all 10 active lineup players during the following turn types:
+- **HCO** (Half Court Offense) turns
+- **Fast Break** turns
+- **FCP** (Full Court Press) turns
+- **HCT** (Half Court Trap) turns
+
+**Amount:** Determined by each player's `get_fatigue_decay_amount()` method, which is based on their **ND (Natural Durability)** attribute.
+
+**Code Locations:**
+- `BackEnd/engine/phase_resolution.py` - `apply_energy_decay()` (lines 60-77)
+- Called from:
+  - `resolve_half_court_offense_logic()` (line 3627)
+  - `resolve_fast_break_logic()` (line 689)
+  - `resolve_full_court_press_logic()` (line 4279)
+  - `resolve_half_court_trap_logic()` (line 5272)
+
+**Depletion Calculation:**
+The `get_fatigue_decay_amount()` method in `BackEnd/models/player.py` uses the player's ND attribute to determine depletion:
+- Higher ND = less energy depletion per turn
+- Lower ND = more energy depletion per turn
+- Returns a random amount based on ND thresholds
+
+#### Summary
+
+| Situation | Who | Amount | Frequency |
+|-----------|-----|--------|-----------|
+| Quarter Break (non-halftime) | Active lineup | Random: [0.7, 0.8, 0.9, 1.0, 1.1, 1.2] | Per quarter break |
+| Halftime Break | Active lineup | Random: [1.5, 1.6, 1.7, 1.8, 1.9, 2.0] | Once per game |
+| Timeout | All players | Random: [0.03, 0.04, 0.05, 0.06] | Per timeout |
+| Bench Recharge | Bench players | 20%: 0, 70%: +0.01, 10%: +0.02 | Per HCO turn only |
+| Energy Depletion | Active lineup | ND-based (via `get_fatigue_decay_amount()`) | Per HCO/Fast Break/FCP/HCT turn |
+
+---
+
 ## Data & Settings Persistence
 
 > **Last Updated:** February 2025  
