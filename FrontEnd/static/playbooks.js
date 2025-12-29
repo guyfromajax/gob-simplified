@@ -353,6 +353,9 @@ class PlaybooksUI {
       this.updateEvenDistributionButton(sectionKey);
     });
     
+    // Update "Even Distribution - All" button state
+    this.updateEvenDistributionAllButton();
+    
     this.updateSubmitButton();
   }
   
@@ -1011,6 +1014,8 @@ class PlaybooksUI {
     if (this.evenDistributionEnabled[sectionKey]) {
       this.evenDistributionEnabled[sectionKey] = false;
       this.updateEvenDistributionButton(sectionKey);
+      // Update "Even Distribution - All" button state since one section was disabled
+      this.updateEvenDistributionAllButton();
     }
     
     this.updateSectionTotal(sectionKey);
@@ -1211,6 +1216,14 @@ class PlaybooksUI {
       });
     });
     
+    // Even Distribution - All button (for offense sections)
+    const evenDistributionAllBtn = document.getElementById('even-distribution-all-btn');
+    if (evenDistributionAllBtn) {
+      evenDistributionAllBtn.addEventListener('click', () => {
+        this.handleEvenDistributionAll();
+      });
+    }
+    
     const backBtn = document.getElementById('back-btn');
     if (backBtn) {
       backBtn.addEventListener('click', () => {
@@ -1245,6 +1258,47 @@ class PlaybooksUI {
     this.distributePercentagesEvenly(sectionKey);
     this.updateEvenDistributionButton(sectionKey);
     this.markUnsavedChanges();
+  }
+  
+  handleEvenDistributionAll() {
+    // Apply Even Distribution to all offense sections
+    const offenseSections = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'];
+    
+    console.log('🔍 [EVEN DISTRIBUTION ALL] Applying to all offense sections');
+    
+    offenseSections.forEach(sectionKey => {
+      // Enable Even Distribution for this section
+      this.evenDistributionEnabled[sectionKey] = true;
+      
+      // Distribute percentages evenly
+      this.distributePercentagesEvenly(sectionKey);
+      
+      // Update button visual state
+      this.updateEvenDistributionButton(sectionKey);
+    });
+    
+    // Update the "Even Distribution - All" button visual state
+    this.updateEvenDistributionAllButton();
+    
+    this.markUnsavedChanges();
+    console.log('✅ [EVEN DISTRIBUTION ALL] Complete for all offense sections');
+  }
+  
+  updateEvenDistributionAllButton() {
+    const button = document.getElementById('even-distribution-all-btn');
+    if (!button) return;
+    
+    // Check if all offense sections have Even Distribution enabled
+    const offenseSections = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'];
+    const allEnabled = offenseSections.every(sectionKey => this.evenDistributionEnabled[sectionKey]);
+    
+    if (allEnabled) {
+      button.classList.add('active');
+      button.textContent = 'Even Distribution - All ✓';
+    } else {
+      button.classList.remove('active');
+      button.textContent = 'Even Distribution - All';
+    }
   }
   
   distributePercentagesEvenly(sectionKey) {
@@ -1346,6 +1400,9 @@ class PlaybooksUI {
         button.textContent = 'Even Distribution';
       }
     }
+    
+    // Also update "Even Distribution - All" button state when individual sections change
+    this.updateEvenDistributionAllButton();
   }
   
   markUnsavedChanges() {

@@ -633,7 +633,7 @@ def initialize_team_attributes():
     for team in ["Lancaster", "Bentley-Truman"]:
         # Initialize dictionary for each team
         team_settings = {
-            "shot_threshold": random.randint(0, 200),
+            "shot_threshold": random.randint(-10, 190),
             "turnover_modifier": random.randint(-250, -150),
             "foul_modifier": random.randint(40, 90),
             "rebound_modifier": random.choice([0.8, 0.9, 1.0, 1.1, 1.2]),

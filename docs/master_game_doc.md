@@ -7114,6 +7114,23 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 - **Re-render:** Automatically re-renders the section and updates totals after distribution
 - **Position Filter Integration:** When position filters change, `handlePositionFilterClick()` checks if Even Distribution is enabled and auto-recalculates percentages
 
+### Even Distribution - All Button ✅ **IMPLEMENTED** (January 2025)
+
+**Location:** Right-aligned next to the "Offense" column title header  
+**Styling:** Matches individual Even Distribution buttons (silver border, semi-transparent background)  
+**Purpose:** Apply Even Distribution to all offense sections (Motion, Set Play Inside, Set Play Attack, Set Play Outside) with a single click
+
+**Behavior:**
+- **Button Text:** "Even Distribution - All"
+- **Click Action:** Enables Even Distribution for all four offense sections and distributes percentages evenly across all plays in each section
+- **Visual Indicator:** When all offense sections have Even Distribution enabled, button shows "Even Distribution - All ✓" with orange highlight
+- **State Synchronization:** Button state automatically updates when individual section Even Distribution toggles change (e.g., if user manually edits a percentage and disables one section, the "All" button reflects this)
+
+**Implementation Details:**
+- **Frontend:** `handleEvenDistributionAll()` method in `PlaybooksUI` class applies Even Distribution to all offense sections
+- **State Tracking:** `updateEvenDistributionAllButton()` method checks if all offense sections have Even Distribution enabled and updates button visual state accordingly
+- **Integration:** Button state is updated whenever individual section Even Distribution states change (via `updateEvenDistributionButton()`)
+
 ### Default Values (First-Time User)
 
 **If no saved settings exist:**

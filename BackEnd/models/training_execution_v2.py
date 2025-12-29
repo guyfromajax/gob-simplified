@@ -136,7 +136,7 @@ TRAINABLE_PLAYER_ATTRS = [attr for attr in ALL_ATTRS if attr not in ["EM", "MO",
 
 # Team attribute clamps (lower, upper)
 TEAM_ATTR_CLAMPS = {
-    "shot_threshold": (0, 200),
+    "shot_threshold": (-10, 190),
     "turnover_modifier": (-10, 10),
     "foul_modifier": (-10, 10),
     "rebound_modifier": (0.8, 1.2),

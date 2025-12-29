@@ -1369,6 +1369,11 @@ def resolve_free_throw_logic(game):
     text = f"ft_shot_score: {ft_shot_score}, roll: {result}  "
     makes_shot = result < ft_shot_score
 
+    # Secondary check: 40% chance to convert miss to make
+    if not makes_shot:
+        if random.random() < 0.40:
+            makes_shot = True
+
     shooter.record_stat("FTA")
     text += f"{get_name_safe(shooter)} steps to the line... "
     possession_flips = False
