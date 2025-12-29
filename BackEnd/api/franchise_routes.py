@@ -828,7 +828,9 @@ def team_stats(franchise_id: str):
         team_stats_map[team_id_str] = {
             "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
             "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
-            "TO": 0, "F": 0
+            "DREB": 0, "OREB": 0, "TREB": 0,
+            "TO": 0, "F": 0,
+            "DEF_A": 0, "DEF_S": 0, "SCR_A": 0, "SCR_S": 0
         }
     
     # Aggregate stats from players object
@@ -852,7 +854,9 @@ def team_stats(franchise_id: str):
             team_stats_map[team_id_str] = {
                 "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
                 "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
-                "TO": 0, "F": 0
+                "DREB": 0, "OREB": 0, "TREB": 0,
+                "TO": 0, "F": 0,
+                "DEF_A": 0, "DEF_S": 0, "SCR_A": 0, "SCR_S": 0
             }
         
         players_with_stats += 1
@@ -871,6 +875,16 @@ def team_stats(franchise_id: str):
     
     print(f"🔍 [TEAM_STATS] Processed {players_with_stats} players with stats, {players_without_team_id} without team_id")
     
+    # Get PF/PA from standings (teams collection)
+    standings_data = {}
+    teams_list = list(db.teams.find({}, {"name": 1, "PF": 1, "PA": 1, "_id": 1}))
+    for t in teams_list:
+        team_id_str = str(t["_id"])
+        standings_data[team_id_str] = {
+            "PF": t.get("PF", 0),
+            "PA": t.get("PA", 0)
+        }
+    
     # Convert to output format with team names
     output = []
     for team_id_str, stats in team_stats_map.items():
@@ -881,6 +895,18 @@ def team_stats(franchise_id: str):
         except Exception:
             # Fallback if team_id_str is not a valid ObjectId
             team_name = team_id_str
+        
+        # Add PF/PA from standings
+        if team_id_str in standings_data:
+            stats["PF"] = standings_data[team_id_str]["PF"]
+            stats["PA"] = standings_data[team_id_str]["PA"]
+        else:
+            stats["PF"] = 0
+            stats["PA"] = 0
+        
+        # Calculate TREB from DREB + OREB
+        stats["TREB"] = stats.get("DREB", 0) + stats.get("OREB", 0)
+        
         print(f"🔍 [TEAM_STATS] Team {team_name}: PTS={stats.get('PTS')}, REB={stats.get('REB')}, AST={stats.get('AST')}")
         output.append({"team": team_name, "stats": stats})
     
