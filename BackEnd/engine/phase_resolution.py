@@ -2547,6 +2547,7 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
     stop_step = truncated_steps[-1]
     ball_handler_pos = None
     ball_handler_location = "key"  # Default location
+    ball_handler_action_info = None  # Store full action_info to preserve opp, coords, etc.
     
     # Find ball handler in the stop step
     pos_actions = stop_step.get("pos_actions", {})
@@ -2555,6 +2556,7 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
         if action in ["handle_ball", "receive", "pass"]:
             ball_handler_pos = pos
             ball_handler_location = action_info.get("location", "key")
+            ball_handler_action_info = action_info  # Store full action_info
             break
     
     # If no ball handler found in stop step, check previous step
@@ -2566,6 +2568,7 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
             if action in ["handle_ball", "receive"]:
                 ball_handler_pos = pos
                 ball_handler_location = action_info.get("location", "key")
+                ball_handler_action_info = action_info  # Store full action_info
                 break
     
     # Create stopper step as final step
@@ -2588,11 +2591,22 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
     }
     
     # Add ball handler position (if found) - ball remains with them until stopper
+    # ✅ FIX: Preserve opp, coords, and other fields from original action_info
     if ball_handler_pos:
-        stopper_step["pos_actions"][ball_handler_pos] = {
+        stopper_action_info = {
             "location": ball_handler_location,
             "action": "handle_ball"  # Ball still with them
         }
+        
+        # Preserve opp field if it exists (critical for FCP/HCT press breaks)
+        if ball_handler_action_info and "opp" in ball_handler_action_info:
+            stopper_action_info["opp"] = ball_handler_action_info["opp"]
+        
+        # Preserve coords if they exist
+        if ball_handler_action_info and "coords" in ball_handler_action_info:
+            stopper_action_info["coords"] = ball_handler_action_info["coords"]
+        
+        stopper_step["pos_actions"][ball_handler_pos] = stopper_action_info
     
     # ✅ FIX: Store stop_step_index for later use in determining ball handler and defender
     # This ensures we use the actual ball handler at the step where the steal/foul/turnover occurred
