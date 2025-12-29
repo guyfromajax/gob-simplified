@@ -684,6 +684,13 @@ def resolve_fast_break_logic(game: "GameManager"):
     from BackEnd.models.game_manager import GameManager
     # print("Entering resolve_fast_break()")
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    
+    # ✅ Apply energy decay for active players during Fast Break
+    apply_energy_decay(off_lineup, def_lineup)
+    
+    # ✅ Recharge energy for bench players during Fast Break
+    apply_bench_energy_recharge(game)
+    
     off_scouting = off_team.scouting_data
     def_scouting = def_team.scouting_data
     off_scouting["offense"]["Fast_Break_Entries"] += 1
@@ -4268,6 +4275,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
     """
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     
+    # ✅ Apply energy decay for active players during FCP
+    apply_energy_decay(off_lineup, def_lineup)
+    
     # Track FCP attempt (defensive team)
     def_scouting = def_team.scouting_data
     def_scouting["defense"]["FCP"]["used"] += 1
@@ -5257,6 +5267,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     Returns turn data with HCT result and potential progression to HCO.
     """
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    
+    # ✅ Apply energy decay for active players during HCT
+    apply_energy_decay(off_lineup, def_lineup)
     
     # Track HCT attempt (defensive team)
     def_scouting = def_team.scouting_data
