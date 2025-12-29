@@ -400,16 +400,24 @@ function renderStatsTable(playerStats) {
   if (!tbody) return;
   tbody.innerHTML = "";
   playerStats.forEach(s => {
+    // Calculate percentages
+    const fgPct = s.FGA > 0 ? ((s.FGM || 0) / s.FGA * 100).toFixed(1) : '0.0';
+    const threePct = s.TPA > 0 ? ((s.TPM || 0) / s.TPA * 100).toFixed(1) : '0.0';
+    const ftPct = s.FTA > 0 ? ((s.FTM || 0) / s.FTA * 100).toFixed(1) : '0.0';
+    
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${s.name}</td>
       <td>${s.PTS || 0}</td>
       <td>${s.FGM || 0}</td>
       <td>${s.FGA || 0}</td>
+      <td>${fgPct}%</td>
       <td>${s.TPM || 0}</td>
       <td>${s.TPA || 0}</td>
+      <td>${threePct}%</td>
       <td>${s.FTM || 0}</td>
       <td>${s.FTA || 0}</td>
+      <td>${ftPct}%</td>
       <td>${s.REB || 0}</td>
       <td>${s.AST || 0}</td>
       <td>${s.STL || 0}</td>
@@ -428,10 +436,13 @@ function sortPlayerStats(statKey) {
     'PTS': 'PTS',
     'FGM': 'FGM',
     'FGA': 'FGA',
+    'FG%': 'FG%',
     'TPM': 'TPM',
     'TPA': 'TPA',
+    '3PT%': '3PT%',
     'FTM': 'FTM',
     'FTA': 'FTA',
+    'FT%': 'FT%',
     'REB': 'REB',
     'AST': 'AST',
     'STL': 'STL',
@@ -451,6 +462,15 @@ function sortPlayerStats(statKey) {
       val1 = a.name || '';
       val2 = b.name || '';
       return val2.localeCompare(val1); // Reverse for descending
+    } else if (dataKey === 'FG%') {
+      val1 = a.FGA > 0 ? (a.FGM || 0) / a.FGA : 0;
+      val2 = b.FGA > 0 ? (b.FGM || 0) / b.FGA : 0;
+    } else if (dataKey === '3PT%') {
+      val1 = a.TPA > 0 ? (a.TPM || 0) / a.TPA : 0;
+      val2 = b.TPA > 0 ? (b.TPM || 0) / b.TPA : 0;
+    } else if (dataKey === 'FT%') {
+      val1 = a.FTA > 0 ? (a.FTM || 0) / a.FTA : 0;
+      val2 = b.FTA > 0 ? (b.FTM || 0) / b.FTA : 0;
     } else {
       val1 = a[dataKey] || 0;
       val2 = b[dataKey] || 0;
