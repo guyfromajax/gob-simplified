@@ -11,9 +11,9 @@ This document details how time elapsed is calculated for each turn type in the g
 **Calculation:**
 - **Normal HCO (without pressure phase):**
   - Uses `get_time_elapsed(tempo_call)` function based on offensive tempo setting
-  - **Slow tempo:** `int(max(5, min(35, random.gauss(28, 6))))` seconds
-  - **Normal tempo:** `int(max(5, min(35, random.gauss(22, 6))))` seconds
-  - **Fast tempo:** `int(max(4, min(15, random.gauss(16, 4))))` seconds
+  - **Slow tempo:** `int(max(5, min(35, random.gauss(24, 6))))` seconds (mean = 24)
+  - **Normal tempo:** `int(max(5, min(35, random.gauss(18, 6))))` seconds (mean = 18)
+  - **Fast tempo:** `int(max(4, min(15, random.gauss(12, 4))))` seconds (mean = 12)
 
 - **HCO after FCP/HCT (with pressure phase):**
   - If `pressure_phase_time > 0` (set by previous FCP/HCT turn):
@@ -37,6 +37,28 @@ else:
 ```
 
 **Helper Function:** `BackEnd/utils/shared.py` - `get_time_elapsed(tempo_call)` (lines 108-116)
+
+**Function Details:**
+- Uses a Gaussian (normal) distribution to generate time elapsed values
+- The first parameter is the **mean** (most likely value), the second is the **standard deviation**
+- Values are clamped to prevent outliers:
+  - **Slow tempo:** Mean = 24 seconds, std dev = 6, clamped to 5-35 seconds
+  - **Normal tempo:** Mean = 18 seconds, std dev = 6, clamped to 5-35 seconds
+  - **Fast tempo:** Mean = 12 seconds, std dev = 4, clamped to 4-15 seconds
+- Fallback (invalid tempo_call): Uses normal tempo values (mean = 18, std dev = 6, clamped to 5-35)
+
+**Code Reference:**
+```python
+def get_time_elapsed(tempo_call):
+    if tempo_call == "slow":
+        return int(max(5, min(35, random.gauss(24, 6))))
+    elif tempo_call == "normal":
+        return int(max(5, min(35, random.gauss(18, 6))))
+    elif tempo_call == "fast":
+        return int(max(4, min(15, random.gauss(12, 4))))
+    else:
+        return int(max(5, min(35, random.gauss(18, 6))))  # Fallback
+```
 
 #### How `tempo_call` is Determined
 
