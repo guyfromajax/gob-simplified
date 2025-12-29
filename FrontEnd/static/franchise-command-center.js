@@ -181,9 +181,38 @@ function renderTeamStatsTable(teams) {
   if (!tbody) return;
   tbody.innerHTML = '';
   
+  // Calculate totals for all teams
+  const totals = {
+    PF: 0, PA: 0, FGM: 0, FGA: 0, TPM: 0, TPA: 0, FTM: 0, FTA: 0,
+    DREB: 0, OREB: 0, TREB: 0, AST: 0, STL: 0, BLK: 0, F: 0, TO: 0,
+    DEF_A: 0, DEF_S: 0, SCR_A: 0, SCR_S: 0
+  };
+  
   teams.forEach(t => {
     const tr = document.createElement('tr');
     const s = t.stats || {};
+    
+    // Accumulate totals
+    totals.PF += s.PF || 0;
+    totals.PA += s.PA || 0;
+    totals.FGM += s.FGM || 0;
+    totals.FGA += s.FGA || 0;
+    totals.TPM += s.TPM || 0;
+    totals.TPA += s.TPA || 0;
+    totals.FTM += s.FTM || 0;
+    totals.FTA += s.FTA || 0;
+    totals.DREB += s.DREB || 0;
+    totals.OREB += s.OREB || 0;
+    totals.TREB += s.TREB || 0;
+    totals.AST += s.AST || 0;
+    totals.STL += s.STL || 0;
+    totals.BLK += s.BLK || 0;
+    totals.F += s.F || 0;
+    totals.TO += s.TO || 0;
+    totals.DEF_A += s.DEF_A || 0;
+    totals.DEF_S += s.DEF_S || 0;
+    totals.SCR_A += s.SCR_A || 0;
+    totals.SCR_S += s.SCR_S || 0;
     
     // Calculate percentages
     const fgPct = s.FGA > 0 ? ((s.FGM || 0) / s.FGA * 100).toFixed(1) : '0.0';
@@ -220,6 +249,48 @@ function renderTeamStatsTable(teams) {
     `;
     tbody.appendChild(tr);
   });
+  
+  // Add totals row
+  const totalsTr = document.createElement('tr');
+  totalsTr.className = 'totals-row';
+  totalsTr.style.fontWeight = 'bold';
+  totalsTr.style.backgroundColor = '#2a2a2a';
+  totalsTr.style.pointerEvents = 'none'; // Prevent any click interactions
+  
+  // Calculate total percentages
+  const totalFgPct = totals.FGA > 0 ? (totals.FGM / totals.FGA * 100).toFixed(1) : '0.0';
+  const totalThreePct = totals.TPA > 0 ? (totals.TPM / totals.TPA * 100).toFixed(1) : '0.0';
+  const totalFtPct = totals.FTA > 0 ? (totals.FTM / totals.FTA * 100).toFixed(1) : '0.0';
+  const totalDefPct = totals.DEF_A > 0 ? (totals.DEF_S / totals.DEF_A * 100).toFixed(1) : '0.0';
+  const totalScrPct = totals.SCR_A > 0 ? (totals.SCR_S / totals.SCR_A * 100).toFixed(1) : '0.0';
+  
+  totalsTr.innerHTML = `
+    <td>TOTALS</td>
+    <td>${totals.PF}</td>
+    <td>${totals.PA}</td>
+    <td>${totals.FGM}</td>
+    <td>${totals.FGA}</td>
+    <td>${totalFgPct}%</td>
+    <td>${totals.TPM}</td>
+    <td>${totals.TPA}</td>
+    <td>${totalThreePct}%</td>
+    <td>${totals.FTM}</td>
+    <td>${totals.FTA}</td>
+    <td>${totalFtPct}%</td>
+    <td>${totals.DREB}</td>
+    <td>${totals.OREB}</td>
+    <td>${totals.TREB}</td>
+    <td>${totals.AST}</td>
+    <td>${totals.STL}</td>
+    <td>${totals.BLK}</td>
+    <td>${totals.F}</td>
+    <td>${totals.TO}</td>
+    <td>${totals.DEF_A}</td>
+    <td>${totalDefPct}%</td>
+    <td>${totals.SCR_A}</td>
+    <td>${totalScrPct}%</td>
+  `;
+  tbody.appendChild(totalsTr);
 }
 
 function sortTeamStats(statKey) {
