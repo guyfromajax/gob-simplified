@@ -196,8 +196,8 @@ class TeamManager:
         
         return {
             "shot_threshold": shot_threshold,
-            "turnover_modifier": random.randint(attr_range[0], attr_range[1]),
-            "foul_modifier": random.randint(attr_range[0], attr_range[1]),
+            "discipline": random.randint(attr_range[0], attr_range[1]),
+            "fight": random.randint(attr_range[0], attr_range[1]),
             "rebound_modifier": rebound_modifier,
             "offensive_efficiency": random.randint(attr_range[0], attr_range[1]),
             "team_chemistry": team_chemistry,

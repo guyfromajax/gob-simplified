@@ -50,7 +50,7 @@
 **Data Evolutions (All Teams):**
 1. **Team Stats, Team Attributes**
    - Team Stats: Aggregation of player stats and play stats (Offense, Defense, Fast Break, Press Trap)
-   - Team Attributes: `team_chemistry`, `offensive_efficiency`, `shot_threshold`, `turnover_modifier`, `foul_modifier`, `rebound_modifier`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
+   - Team Attributes: `team_chemistry`, `offensive_efficiency`, `shot_threshold`, `discipline`, `fight`, `rebound_modifier`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
    - **Initialization Range:** `shot_threshold` is initialized with `random.randint(-10, 190)` for all game modes (center at 90 for pill display)
 
 2. **Player Stats, Player Attributes**
@@ -586,7 +586,7 @@ These variables provide additional context for navigation but aren't required fo
 **Data Evolutions (All Teams):**
 1. **Team Stats, Team Attributes**
    - Team Stats: Aggregation of player stats and play stats (Offense, Defense, Fast Break, Press Trap)
-   - Team Attributes: `team_chemistry`, `offensive_efficiency`, `shot_threshold`, `turnover_modifier`, `foul_modifier`, `rebound_modifier`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
+   - Team Attributes: `team_chemistry`, `offensive_efficiency`, `shot_threshold`, `discipline`, `fight`, `rebound_modifier`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
    - **Initialization Range:** `shot_threshold` is initialized with `random.randint(-10, 190)` for all game modes (center at 90 for pill display)
 
 2. **Player Stats, Player Attributes**
@@ -1933,6 +1933,132 @@ This secondary check provides a "second chance" mechanic that increases overall 
 | **Points** | Always 1 (free throws are worth 1 point) |
 | **Time Elapsed** | 0 seconds (clock does not run) |
 | **Target FT%** | 72% (per Statistical Game Base Values) |
+
+---
+
+### Balancing System
+
+**Location:** `BackEnd/engine/phase_resolution.py` - `apply_balancing_system()` function, `BackEnd/models/shot_manager.py` - `resolve_shot()` method
+
+**Overview:**
+The Balancing System prevents games from getting too out of hand by temporarily adjusting shot difficulty when one team has a significant lead. When a team is leading or trailing by the adjusted threshold amount or more, their `shot_threshold` is temporarily overridden for that HCO turn to make shots easier (trailing team) or harder (leading team).
+
+#### Lead Thresholds by Quarter
+
+**Base Thresholds:**
+- **Q1:** 6 points
+- **Q2:** 9 points
+- **Q3:** 12 points
+- **Q4:** 15 points
+- **Overtime:** Uses Q4 threshold (15 points)
+
+#### Threshold Adjustments
+
+The base threshold is adjusted based on the offense team's attributes:
+
+**When Offense Team is Trailing:**
+- **Adjusted Threshold = max(1, Base Threshold - `fight`)**
+- Example: Q1 base threshold is 6, `fight` is -4 → adjusted threshold = 6 - (-4) = 10
+- Negative `fight` values make it harder to trigger balancing (higher threshold)
+- Positive `fight` values make it easier to trigger balancing (lower threshold)
+- **Minimum threshold is clamped to 1** (prevents threshold from going below 1)
+
+**When Offense Team is Leading:**
+- **Adjusted Threshold = max(1, Base Threshold + `discipline`)**
+- Example: Q2 base threshold is 9, `discipline` is -4 → adjusted threshold = 9 + (-4) = 5
+- Negative `discipline` values make it easier to trigger balancing (lower threshold)
+- Positive `discipline` values make it harder to trigger balancing (higher threshold)
+- **Minimum threshold is clamped to 1** (prevents threshold from going below 1)
+
+#### Shot Threshold Override
+
+When the score difference meets or exceeds the adjusted threshold, the offense team's `shot_threshold` is temporarily overridden for that HCO turn:
+
+**Trailing Team (Easier Shots):**
+- `shot_threshold = -10` (very easy shots, almost guaranteed makes)
+- Applied when offense team is trailing by adjusted threshold or more
+
+**Leading Team (Harder Shots):**
+- `shot_threshold = 190` (very difficult shots, almost guaranteed misses)
+- Applied when offense team is leading by adjusted threshold or more
+
+**Note:** The override is applied before the 3-point adjustment (+100), so:
+- Trailing team 3-pointer: -10 + 100 = 90 (still easier than normal)
+- Leading team 3-pointer: 190 + 100 = 290 (very difficult)
+
+#### Activation
+
+**When:** Only during HCO (Half Court Offense) turns
+- **Not applied during:** Fast Break, FCP, HCT, Free Throw, or other turn types
+- **Applied at:** Start of each HCO turn, before shot resolution
+
+**How It Works:**
+1. At the start of `resolve_half_court_offense_logic()`, `apply_balancing_system()` is called
+2. Function calculates score difference and adjusted threshold
+3. If threshold is met, stores override in `game_state["balancing_shot_threshold_override"]`
+4. In `shot_manager.resolve_shot()`, override is checked before reading team attribute
+5. Override is cleared after use (one-time per turn)
+
+#### Code Flow
+
+**Balancing Check (HCO Turn Start):**
+```python
+# BackEnd/engine/phase_resolution.py - resolve_half_court_offense_logic()
+apply_balancing_system(game, game_state, off_team, def_team)
+```
+
+**Shot Resolution (Uses Override if Present):**
+```python
+# BackEnd/models/shot_manager.py - resolve_shot()
+if "balancing_shot_threshold_override" in game_state:
+    shot_threshold = game_state["balancing_shot_threshold_override"]
+    game_state.pop("balancing_shot_threshold_override", None)  # Clear after use
+else:
+    shot_threshold = off_team.team_attributes["shot_threshold"]
+```
+
+#### Example Scenarios
+
+**Scenario 1: Q1, Trailing Team**
+- Score: Offense 8, Defense 16 (trailing by 8)
+- Base threshold: 6
+- `foul_modifier`: -4
+- Adjusted threshold: 6 - (-4) = 10
+- 8 < 10 → **No balancing** (not enough of a deficit)
+
+**Scenario 2: Q1, Trailing Team (Balancing Triggered)**
+- Score: Offense 5, Defense 15 (trailing by 10)
+- Base threshold: 6
+- `fight`: -4
+- Adjusted threshold: 6 - (-4) = 10
+- 10 >= 10 → **Balancing triggered** → `shot_threshold = -10`
+
+**Scenario 3: Q2, Leading Team**
+- Score: Offense 25, Defense 15 (leading by 10)
+- Base threshold: 9
+- `discipline`: -4
+- Adjusted threshold: 9 + (-4) = 5
+- 10 >= 5 → **Balancing triggered** → `shot_threshold = 190`
+
+**Scenario 4: Q4, Leading Team (High Turnover Modifier)**
+- Score: Offense 60, Defense 45 (leading by 15)
+- Base threshold: 15
+- `discipline`: +8
+- Adjusted threshold: 15 + 8 = 23
+- 15 < 23 → **No balancing** (high discipline makes it harder to trigger)
+
+#### Summary
+
+| Aspect | Details |
+|--------|---------|
+| **Base Thresholds** | Q1: 6, Q2: 9, Q3: 12, Q4: 15, OT: 15 |
+| **Trailing Adjustment** | Base - `fight` |
+| **Leading Adjustment** | Base + `discipline` |
+| **Trailing Override** | `shot_threshold = -10` (easier shots) |
+| **Leading Override** | `shot_threshold = 190` (harder shots) |
+| **Activation** | HCO turns only, at start of turn |
+| **Duration** | One turn only (cleared after shot resolution) |
+| **3-Point Adjustment** | Applied after override (+100) |
 
 ---
 

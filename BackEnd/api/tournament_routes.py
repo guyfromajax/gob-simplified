@@ -587,7 +587,7 @@ def get_tournament_team_data(tournament_id: str, team_id: str = None, team_name:
     
     # Extract team attributes
     team_attributes = {}
-    attr_keys = ['shot_threshold', 'turnover_modifier', 'foul_modifier', 'rebound_modifier', 
+    attr_keys = ['shot_threshold', 'discipline', 'fight', 'rebound_modifier', 
                  'momentum_score', 'offensive_efficiency', 'team_chemistry', 'defensive_efficiency',
                  'fb_efficiency', 'pt_efficiency', 'fb_opp_modifier', 'pt_opp_modifier']
     for key in attr_keys:

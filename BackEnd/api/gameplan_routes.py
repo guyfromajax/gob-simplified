@@ -532,8 +532,8 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                     "team_chemistry": team_attrs["team_chemistry"],
                     "offensive_efficiency": team_attrs["offensive_efficiency"],
                     "shot_threshold": team_attrs["shot_threshold"],
-                    "turnover_modifier": team_attrs["turnover_modifier"],
-                    "foul_modifier": team_attrs["foul_modifier"],
+                    "discipline": team_attrs["discipline"],
+                    "fight": team_attrs["fight"],
                     "rebound_modifier": team_attrs["rebound_modifier"],
                     "defensive_efficiency": team_attrs["defensive_efficiency"],
                     "fb_efficiency": team_attrs["fb_efficiency"],
@@ -609,8 +609,8 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                 "team_chemistry": team_attrs["team_chemistry"],
                 "offensive_efficiency": team_attrs["offensive_efficiency"],
                 "shot_threshold": team_attrs["shot_threshold"],
-                "turnover_modifier": team_attrs["turnover_modifier"],
-                "foul_modifier": team_attrs["foul_modifier"],
+                "discipline": team_attrs["discipline"],
+                "fight": team_attrs["fight"],
                 "rebound_modifier": team_attrs["rebound_modifier"],
                 "defensive_efficiency": team_attrs["defensive_efficiency"],
                 "fb_efficiency": team_attrs["fb_efficiency"],
@@ -683,8 +683,8 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                 from BackEnd.models.team_manager import TeamManager
                 team_attrs = TeamManager.init_team_attributes(mode=mode)
                 updates[f"{team_key}.shot_threshold"] = team_attrs["shot_threshold"]
-                updates[f"{team_key}.turnover_modifier"] = team_attrs["turnover_modifier"]
-                updates[f"{team_key}.foul_modifier"] = team_attrs["foul_modifier"]
+                updates[f"{team_key}.discipline"] = team_attrs["discipline"]
+                updates[f"{team_key}.fight"] = team_attrs["fight"]
                 updates[f"{team_key}.rebound_modifier"] = team_attrs["rebound_modifier"]
                 updates[f"{team_key}.offensive_efficiency"] = team_attrs["offensive_efficiency"]
                 updates[f"{team_key}.team_chemistry"] = team_attrs["team_chemistry"]
