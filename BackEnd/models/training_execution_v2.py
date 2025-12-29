@@ -137,8 +137,8 @@ TRAINABLE_PLAYER_ATTRS = [attr for attr in ALL_ATTRS if attr not in ["EM", "MO",
 # Team attribute clamps (lower, upper)
 TEAM_ATTR_CLAMPS = {
     "shot_threshold": (-10, 190),
-    "turnover_modifier": (-10, 10),
-    "foul_modifier": (-10, 10),
+    "discipline": (-10, 10),
+    "fight": (-10, 10),
     "rebound_modifier": (0.8, 1.2),
     "momentum_score": (-10, 10),
     "offensive_efficiency": (-10, 10),
@@ -818,7 +818,7 @@ def _should_amplify_player_attr(attr: str, archetype: Optional[str], sub_option:
     
     # Authoritarian Options
     if sub_option == "authoritarian-discipline":
-        return attr in ["BH"]  # Amplifies BH, foul_modifier, turnover_modifier
+        return attr in ["BH"]  # Amplifies BH, fight, discipline
     elif sub_option == "authoritarian-rebounding":
         return attr == "RB"  # Amplifies RB, rebound_modifier
     elif sub_option == "authoritarian-teamwork":
@@ -875,7 +875,7 @@ def _should_amplify_team_attr(team_attr: str, archetype: Optional[str], sub_opti
     
     # Authoritarian Options
     if sub_option == "authoritarian-discipline":
-        return team_attr in ["foul_modifier", "turnover_modifier"]  # Amplifies BH, foul_modifier, turnover_modifier
+        return team_attr in ["fight", "discipline"]  # Amplifies BH, fight, discipline
     elif sub_option == "authoritarian-rebounding":
         return team_attr == "rebound_modifier"  # Amplifies RB, rebound_modifier
     

@@ -2086,51 +2086,51 @@ def resolve_hco_outcome(game, skeleton):
     def_attrs = def_team.team_attributes
     
     offensive_efficiency = off_attrs.get("offensive_efficiency", 0)
-    turnover_modifier = off_attrs.get("turnover_modifier", 0)
-    foul_modifier_off = off_attrs.get("foul_modifier", 0)
+    discipline = off_attrs.get("discipline", 0)
+    fight_off = off_attrs.get("fight", 0)
     
     defensive_efficiency = def_attrs.get("defensive_efficiency", 0)
-    foul_modifier_def = def_attrs.get("foul_modifier", 0)
+    fight_def = def_attrs.get("fight", 0)
     
     # Get aggression setting from strategy_calls (strings: "passive", "normal", "aggressive")
     aggression_level = def_team.strategy_calls.get("aggression_call", "normal")
     
     # 🔍 DEBUG: Step 1 - Team Attributes and Settings
     logging.debug(f"🔍 [HCO RESOLUTION] Step 1 - Team Attributes and Settings:")
-    logging.debug(f"   Offense: efficiency={offensive_efficiency}, turnover_mod={turnover_modifier}, foul_mod={foul_modifier_off}")
-    logging.debug(f"   Defense: efficiency={defensive_efficiency}, foul_mod={foul_modifier_def}, aggression={aggression_level}")
+    logging.debug(f"   Offense: efficiency={offensive_efficiency}, discipline={discipline}, fight={fight_off}")
+    logging.debug(f"   Defense: efficiency={defensive_efficiency}, fight={fight_def}, aggression_level={aggression_level}")
     logging.debug("")  # Blank line after Step 1
     
     # Step 2: Calibrate Universal Constants
     # Standard D Foul calibration
-    calibrated_d_foul = STANDARD_D_FOUL + int(foul_modifier_def * 0.4)
+    calibrated_d_foul = STANDARD_D_FOUL + int(fight_def * 0.4)
     calibrated_d_foul = min(98, calibrated_d_foul)  # Max 98
     
     # Standard O Foul calibration
-    calibrated_o_foul = STANDARD_O_FOUL - foul_modifier_off
+    calibrated_o_foul = STANDARD_O_FOUL - fight_off
     calibrated_o_foul = max(2, calibrated_o_foul)  # Min 2
     
     # Steal thresholds calibration
-    calibrated_hard_steal = HARD_STEAL - turnover_modifier
-    calibrated_soft_steal = SOFT_STEAL - turnover_modifier
+    calibrated_hard_steal = HARD_STEAL - discipline
+    calibrated_soft_steal = SOFT_STEAL - discipline
     
     # Foul thresholds calibration (on steal attempts)
-    calibrated_hard_foul = HARD_FOUL - int(foul_modifier_def * 0.6)
-    calibrated_soft_foul = SOFT_FOUL - int(foul_modifier_def * 0.6)
+    calibrated_hard_foul = HARD_FOUL - int(fight_def * 0.6)
+    calibrated_soft_foul = SOFT_FOUL - int(fight_def * 0.6)
     
     # Dead Ball Turnover calibration
-    calibrated_dead_ball_to = DEAD_BALL_TURNOVER - int(0.5 * turnover_modifier)
+    calibrated_dead_ball_to = DEAD_BALL_TURNOVER - int(0.5 * discipline)
     calibrated_dead_ball_to = max(2, calibrated_dead_ball_to)  # Min 2
     
     # 🔥 DEBUG: Step 2 - Calibrated Constants
     logging.debug(f"🔥 [HCO RESOLUTION] Step 2 - Calibrated Constants:")
-    logging.debug(f"   STANDARD_D_FOUL: {STANDARD_D_FOUL} + int({foul_modifier_def} * 0.4) = {calibrated_d_foul} (max 98)")
-    logging.debug(f"   STANDARD_O_FOUL: {STANDARD_O_FOUL} - {foul_modifier_off} = {calibrated_o_foul} (min 2)")
-    logging.debug(f"   HARD_STEAL: {HARD_STEAL} - {turnover_modifier} = {calibrated_hard_steal}")
-    logging.debug(f"   SOFT_STEAL: {SOFT_STEAL} - {turnover_modifier} = {calibrated_soft_steal}")
-    logging.debug(f"   HARD_FOUL: {HARD_FOUL} - int({foul_modifier_def} * 0.6) = {calibrated_hard_foul}")
-    logging.debug(f"   SOFT_FOUL: {SOFT_FOUL} - int({foul_modifier_def} * 0.6) = {calibrated_soft_foul}")
-    logging.debug(f"   DEAD_BALL_TURNOVER: {DEAD_BALL_TURNOVER} - int(0.5 * {turnover_modifier}) = {calibrated_dead_ball_to} (min 2)")
+    logging.debug(f"   STANDARD_D_FOUL: {STANDARD_D_FOUL} + int({fight_def} * 0.4) = {calibrated_d_foul} (max 98)")
+    logging.debug(f"   STANDARD_O_FOUL: {STANDARD_O_FOUL} - {fight_off} = {calibrated_o_foul} (min 2)")
+    logging.debug(f"   HARD_STEAL: {HARD_STEAL} - {discipline} = {calibrated_hard_steal}")
+    logging.debug(f"   SOFT_STEAL: {SOFT_STEAL} - {discipline} = {calibrated_soft_steal}")
+    logging.debug(f"   HARD_FOUL: {HARD_FOUL} - int({fight_def} * 0.6) = {calibrated_hard_foul}")
+    logging.debug(f"   SOFT_FOUL: {SOFT_FOUL} - int({fight_def} * 0.6) = {calibrated_soft_foul}")
+    logging.debug(f"   DEAD_BALL_TURNOVER: {DEAD_BALL_TURNOVER} - int(0.5 * {discipline}) = {calibrated_dead_ball_to} (min 2)")
     logging.debug("")  # Blank line after Step 2
     
     # Calculate steal attempt rate (needed for steal check)
@@ -2487,6 +2487,83 @@ def _store_lean_score(score, game, offense_team, defense_team):
         lean_score = score
     
     _store_lean_score_internal(lean_score, game, offense_team, defense_team)
+
+
+def apply_balancing_system(game, game_state, off_team, def_team):
+    """
+    Apply balancing system to prevent games from getting too out of hand.
+    
+    If a team is leading or trailing by the adjusted threshold amount or more,
+    temporarily override shot_threshold for that HCO turn:
+    - Trailing team: shot_threshold = -10 (easier shots)
+    - Leading team: shot_threshold = 190 (harder shots)
+    
+    Args:
+        game: GameManager object
+        game_state: Game state dict
+        off_team: Offensive team object
+        def_team: Defensive team object
+    
+    Returns:
+        None (modifies game_state with balancing_shot_threshold_override if applicable)
+    """
+    # Get current quarter
+    quarter = game_state.get("quarter", 1)
+    
+    # Base thresholds by quarter
+    base_thresholds = {
+        1: 6,
+        2: 9,
+        3: 12,
+        4: 15
+    }
+    
+    # Use Q4 threshold for overtime quarters
+    base_threshold = base_thresholds.get(quarter, 15)
+    
+    # Get team attributes
+    off_attrs = off_team.team_attributes
+    fight = off_attrs.get("fight", 0)
+    discipline = off_attrs.get("discipline", 0)
+    
+    # Get current scores from game.score dict
+    offense_score = game.score.get(off_team.name, 0)
+    defense_score = game.score.get(def_team.name, 0)
+    score_diff = offense_score - defense_score
+    
+    # Determine if offense is leading or trailing
+    is_trailing = score_diff < 0
+    is_leading = score_diff > 0
+    abs_score_diff = abs(score_diff)
+    
+    # Calculate adjusted threshold
+    if is_trailing:
+        # Trailing: subtract fight from threshold
+        adjusted_threshold = base_threshold - fight
+    elif is_leading:
+        # Leading: add discipline to threshold
+        adjusted_threshold = base_threshold + discipline
+    else:
+        # Tied game, no balancing needed
+        return
+    
+    # Clamp minimum threshold to 1
+    adjusted_threshold = max(1, adjusted_threshold)
+    
+    # Check if threshold is met
+    if abs_score_diff >= adjusted_threshold:
+        # Apply balancing override
+        if is_trailing:
+            # Trailing team gets easier shots
+            game_state["balancing_shot_threshold_override"] = -10
+            logging.warning(f"⚖️ [BALANCING] Q{quarter}: {off_team.name} trailing by {abs_score_diff} (threshold: {adjusted_threshold}, fight: {fight}) → shot_threshold = -10")
+        else:  # is_leading
+            # Leading team gets harder shots
+            game_state["balancing_shot_threshold_override"] = 190
+            logging.warning(f"⚖️ [BALANCING] Q{quarter}: {off_team.name} leading by {abs_score_diff} (threshold: {adjusted_threshold}, discipline: {discipline}) → shot_threshold = 190")
+    else:
+        # Clear any previous override if threshold not met
+        game_state.pop("balancing_shot_threshold_override", None)
 
 
 def apply_stopper_system_to_skeleton(skeleton, result, game_state):
@@ -3206,6 +3283,9 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup):
 
 def resolve_half_court_offense_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+
+    # ✅ BALANCING SYSTEM: Apply balancing system at start of HCO turn
+    apply_balancing_system(game, game_state, off_team, def_team)
 
     # 1. Tactical Setup
     off_call = game_state.get("current_playcall", "Inside")
@@ -4214,7 +4294,7 @@ def calculate_foul_turnover(game, positions, roles):
     from BackEnd.utils.defense_utils import is_zone_defense
     if is_zone_defense(defense_call):
         d_foul_score *= 1.1
-    is_d_foul = d_foul_score < def_team.team_attributes["foul_modifier"] * 1.2
+    is_d_foul = d_foul_score < def_team.team_attributes["fight"] * 1.2
 
     # === Offensive Foul ===
     o_pos = positions["o_foul"]
@@ -4229,7 +4309,7 @@ def calculate_foul_turnover(game, positions, roles):
     )
 
     o_foul_score = (o_attr["IQ"] * 0.3 + o_attr["CH"] * 0.3 + o_movement) * random.randint(1, 6)
-    is_o_foul = o_foul_score < off_team.team_attributes["foul_modifier"] * 0.8
+    is_o_foul = o_foul_score < off_team.team_attributes["fight"] * 0.8
 
     # === Turnover ===
     t_pos = positions["turnover"]
@@ -4257,7 +4337,7 @@ def calculate_foul_turnover(game, positions, roles):
         pressure *= 0.9
 
     turnover_score = bh_score - pressure
-    is_turnover = turnover_score < off_team.team_attributes["turnover_modifier"]
+    is_turnover = turnover_score < off_team.team_attributes["discipline"]
 
     # === Decide event type
     decisions = {

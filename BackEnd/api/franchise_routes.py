@@ -1155,7 +1155,7 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
     
     # Extract team attributes
     team_attributes = {}
-    attr_keys = ['shot_threshold', 'turnover_modifier', 'foul_modifier', 'rebound_modifier', 
+    attr_keys = ['shot_threshold', 'discipline', 'fight', 'rebound_modifier', 
                  'momentum_score', 'offensive_efficiency', 'team_chemistry', 'defensive_efficiency',
                  'fb_efficiency', 'pt_efficiency', 'fb_opp_modifier', 'pt_opp_modifier']
     for key in attr_keys:
@@ -1763,8 +1763,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 "defensive_efficiency": team_data.get("defensive_efficiency", 0),
                 "fb_efficiency": team_data.get("fb_efficiency", 0),
                 "pt_efficiency": team_data.get("pt_efficiency", 0),
-                "foul_modifier": team_data.get("foul_modifier", 0),
-                "turnover_modifier": team_data.get("turnover_modifier", 0),
+                "fight": team_data.get("fight", 0),
+                "discipline": team_data.get("discipline", 0),
                 "momentum_score": team_data.get("momentum_score", 0),
                 "team_chemistry": team_data.get("team_chemistry", 7),
                 "fb_opp_modifier": team_data.get("fb_opp_modifier", 0),
@@ -1904,8 +1904,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 "defensive_efficiency": team_data.get("defensive_efficiency", 0),
                 "fb_efficiency": team_data.get("fb_efficiency", 0),
                 "pt_efficiency": team_data.get("pt_efficiency", 0),
-                "foul_modifier": team_data.get("foul_modifier", 0),
-                "turnover_modifier": team_data.get("turnover_modifier", 0),
+                "fight": team_data.get("fight", 0),
+                "discipline": team_data.get("discipline", 0),
                 "momentum_score": team_data.get("momentum_score", 0),
                 "team_chemistry": team_data.get("team_chemistry", 0),
                 "fb_opp_modifier": team_data.get("fb_opp_modifier", 0),

@@ -337,7 +337,14 @@ class ShotManager:
         # Determine if shot is from the paint (PIP)
         is_paint = self.is_paint_shot(shooter, roles)
         
-        shot_threshold = off_team.team_attributes["shot_threshold"]
+        # ✅ BALANCING SYSTEM: Check for balancing override first
+        if "balancing_shot_threshold_override" in game_state:
+            shot_threshold = game_state["balancing_shot_threshold_override"]
+            # Clear override after use (one-time per turn)
+            game_state.pop("balancing_shot_threshold_override", None)
+        else:
+            shot_threshold = off_team.team_attributes["shot_threshold"]
+        
         if is_three:
             shot_threshold += 100
         if playcall == "Set":
@@ -1190,7 +1197,7 @@ class ShotManager:
     
     def check_defensive_foul_on_shot(self, defender, defense_score, is_three=False, shooter=None, shooter_location=None):
         """
-        Determines if a defensive foul occurs based on defender skill and team foul_modifier.
+        Determines if a defensive foul occurs based on defender skill and team fight.
         Uses hard and soft thresholds with universal constants.
         Returns (bool, player) → (was_foul_committed, fouling_defender)
         """
@@ -1198,11 +1205,11 @@ class ShotManager:
             return False, None
 
         defense_team = self.game.defense_team
-        foul_modifier = defense_team.team_attributes.get("foul_modifier", 0)
+        fight = defense_team.team_attributes.get("fight", 0)
 
-        # Calculate thresholds with foul_modifier adjustment
-        hard_threshold = HARD_SHOOTING_FOUL_THRESHOLD + foul_modifier
-        soft_threshold = SOFT_SHOOTING_FOUL_THRESHOLD + foul_modifier
+        # Calculate thresholds with fight adjustment
+        hard_threshold = HARD_SHOOTING_FOUL_THRESHOLD + fight
+        soft_threshold = SOFT_SHOOTING_FOUL_THRESHOLD + fight
 
         # 🔍 DEBUG: Shooting Foul Calculation
         from BackEnd.utils.shared import get_name_safe
@@ -1214,11 +1221,11 @@ class ShotManager:
         logging.debug(f"   Defender: {get_name_safe(defender)}")
         logging.debug(f"   Defense score: {defense_score}")
         logging.debug(f"   Is 3-pointer: {is_three}")
-        logging.debug(f"   Defense team foul_modifier: {foul_modifier}")
+        logging.debug(f"   Defense team fight: {fight}")
         logging.debug(f"   Base HARD threshold: {HARD_SHOOTING_FOUL_THRESHOLD}")
         logging.debug(f"   Base SOFT threshold: {SOFT_SHOOTING_FOUL_THRESHOLD}")
-        logging.debug(f"   Calibrated HARD threshold: {HARD_SHOOTING_FOUL_THRESHOLD} + {foul_modifier} = {hard_threshold}")
-        logging.debug(f"   Calibrated SOFT threshold: {SOFT_SHOOTING_FOUL_THRESHOLD} + {foul_modifier} = {soft_threshold}")
+        logging.debug(f"   Calibrated HARD threshold: {HARD_SHOOTING_FOUL_THRESHOLD} + {fight} = {hard_threshold}")
+        logging.debug(f"   Calibrated SOFT threshold: {SOFT_SHOOTING_FOUL_THRESHOLD} + {fight} = {soft_threshold}")
 
         # Determine if foul occurs
         if defense_score < hard_threshold:

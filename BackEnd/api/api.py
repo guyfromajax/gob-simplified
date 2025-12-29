@@ -212,7 +212,7 @@ def load_team_attributes_from_doc(mode: str, doc_id: str, team_id: str, team_nam
                 team_obj = doc.get("teams", {}).get(team_id, {})
                 # Extract team_attributes from team_obj (may include other fields)
                 attrs = {}
-                for key in ["shot_threshold", "turnover_modifier", "foul_modifier",
+                for key in ["shot_threshold", "discipline", "fight",
                            "rebound_modifier", "momentum_score", "offensive_efficiency",
                            "team_chemistry", "defensive_efficiency", "fb_efficiency",
                            "pt_efficiency", "fb_opp_modifier", "pt_opp_modifier"]:
@@ -227,7 +227,7 @@ def load_team_attributes_from_doc(mode: str, doc_id: str, team_id: str, team_nam
                 team_obj = doc.get("franchise_teams", {}).get(team_id, {})
                 # Extract team_attributes from team_obj
                 attrs = {}
-                for key in ["shot_threshold", "turnover_modifier", "foul_modifier",
+                for key in ["shot_threshold", "discipline", "fight",
                            "rebound_modifier", "momentum_score", "offensive_efficiency",
                            "team_chemistry", "defensive_efficiency", "fb_efficiency",
                            "pt_efficiency", "fb_opp_modifier", "pt_opp_modifier"]:
@@ -249,7 +249,7 @@ def load_team_attributes_from_doc(mode: str, doc_id: str, team_id: str, team_nam
                 team_obj = teams_obj.get(team_id, {})
                 # Extract team_attributes from team_obj
                 attrs = {}
-                for key in ["shot_threshold", "turnover_modifier", "foul_modifier",
+                for key in ["shot_threshold", "discipline", "fight",
                            "rebound_modifier", "momentum_score", "offensive_efficiency",
                            "team_chemistry", "defensive_efficiency", "fb_efficiency",
                            "pt_efficiency", "fb_opp_modifier", "pt_opp_modifier"]:
@@ -263,7 +263,7 @@ def load_team_attributes_from_doc(mode: str, doc_id: str, team_id: str, team_nam
         team_doc = teams_collection.find_one({"name": team_name})
         if team_doc:
             attrs = {}
-            for key in ["shot_threshold", "turnover_modifier", "foul_modifier",
+            for key in ["shot_threshold", "discipline", "fight",
                        "rebound_modifier", "momentum_score", "offensive_efficiency",
                        "team_chemistry", "defensive_efficiency", "fb_efficiency",
                        "pt_efficiency", "fb_opp_modifier", "pt_opp_modifier"]:
