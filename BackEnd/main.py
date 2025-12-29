@@ -410,12 +410,16 @@ def simulate_quarter(
     # Note: timeouts do NOT reset per quarter - they carry over the whole game
 
     # Recharge energy between quarters
-    # After Q1, Q3, Q4: +10% | After Q2 (halftime): +20%
+    # Each player gets a random amount from the appropriate list
+    # Q1->Q2, Q3->Q4, or before OT: [0.03, 0.04, 0.05, 0.06]
+    # Q2->Q3 (halftime): [0.08, 0.09, 0.1, 0.11, 0.12]
     if q == 3:
-        recharge_amount = 0.2  # After Q2 (halftime)
+        # Halftime break (between Q2 and Q3)
+        recharge_amounts = [0.08, 0.09, 0.1, 0.11, 0.12]
     else:
-        recharge_amount = 0.1  # After Q1, Q3, Q4
-    recharge_lineups(gm, recharge_amount)
+        # Regular quarter break (Q1->Q2, Q3->Q4, or before OT)
+        recharge_amounts = [0.03, 0.04, 0.05, 0.06]
+    recharge_lineups(gm, recharge_amounts)
 
     # Handle quarter start possession
     if start_with_inbound and starting_possession:

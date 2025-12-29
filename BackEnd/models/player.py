@@ -125,25 +125,25 @@ class Player:
         nd = self.attributes.get("ND", 50)  # Default to 50 if not set
 
         if nd >= 89:
-            return random.choice([0, 0, 0, 0.01])
+            return random.choice([0, 0.01])
         elif nd >= 79:
-            return random.choice([0, 0, 0.01, 0.01])
+            return random.choice([0, 0.01, 0.01])
         elif nd >= 69:
-            return random.choice([0,0, 0.00, 0.01, 0.02])
+            return random.choice([0,0, 0.01, 0.01, 0.01])
         elif nd >= 59:
             return random.choice([0,0, 0.01, 0.01, 0.02])
         elif nd >= 49:
-            return random.choice([0, 0.01, 0.02, 0.02])
+            return random.choice([0, 0.01, 0.01, 0.01, 0.02])
         elif nd >= 39:
-            return random.choice([0, 0.01, 0.02, 0.03])
+            return random.choice([0, 0.01, 0.01, 0.02, 0.02])
         elif nd >= 29:
-            return random.choice([0, 0.01, 0.02, 0.02, 0.03])
+            return random.choice([0, 0.01, 0.01, 0.02, 0.03])
         elif nd >= 19:
-            return random.choice([0, 0.01, 0.02, 0.03, 0.03])
+            return random.choice([0, 0.01, 0.02, 0.02, 0.03])
         elif nd >= 9:
-            return random.choice([0, 0.01, 0.02, 0.02, 0.03, 0.03])
+            return random.choice([0, 0.01, 0.02, 0.02, 0.02, 0.03])
         else:
-            return random.choice([0, 0.01, 0.02, 0.03, 0.03, 0.03])
+            return random.choice([0, 0.01, 0.02, 0.02, 0.03, 0.03])
     
     def decay_energy(self, amount):
         self.attributes["NG"] = max(0.1, round(self.attributes["NG"] - amount, 3))
