@@ -411,14 +411,14 @@ def simulate_quarter(
 
     # Recharge energy between quarters
     # Each player gets a random amount from the appropriate list
-    # Q1->Q2, Q3->Q4, or before OT: [0.03, 0.04, 0.05, 0.06]
-    # Q2->Q3 (halftime): [0.08, 0.09, 0.1, 0.11, 0.12]
+    # Q1->Q2, Q3->Q4, or before OT: [0.7, 0.8, 0.9, 1.0, 1.1, 1.2]
+    # Q2->Q3 (halftime): [1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
     if q == 3:
         # Halftime break (between Q2 and Q3)
-        recharge_amounts = [0.08, 0.09, 0.1, 0.11, 0.12]
+        recharge_amounts = [1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
     else:
         # Regular quarter break (Q1->Q2, Q3->Q4, or before OT)
-        recharge_amounts = [0.03, 0.04, 0.05, 0.06]
+        recharge_amounts = [0.7, 0.8, 0.9, 1.0, 1.1, 1.2]
     recharge_lineups(gm, recharge_amounts)
 
     # Handle quarter start possession

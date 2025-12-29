@@ -217,7 +217,7 @@ class GameManager:
         # ✅ TIMEOUT ENERGY RECHARGE: All players get random recharge at start of timeout
         # This happens before lineup selection screen, so user sees updated energy values
         import random
-        timeout_recharge_amounts = [0.02, 0.03, 0.04, 0.05]
+        timeout_recharge_amounts = [0.03, 0.04, 0.05, 0.06]
         for team in [self.home_team, self.away_team]:
             for player in team.get_all_players():
                 recharge_amount = random.choice(timeout_recharge_amounts)
