@@ -115,12 +115,24 @@ class TeamManager:
     def get_all_players(self):
         return self.players.values()
 
+    @staticmethod
+    def init_tempo_random():
+        """
+        Initialize tempo randomly per game with specified distribution:
+        - 10% chance for 0
+        - 20% chance for 1
+        - 50% chance for 2
+        - 20% chance for 3
+        - 10% chance for 4
+        """
+        return random.choices([0, 1, 2, 3, 4], weights=[10, 20, 50, 20, 10], k=1)[0]
+    
     def _init_strategy_settings(self):
         """
         Initialize strategy settings with weighted randomization for CPU teams (0-4 scale).
         If team document has strategy_settings, those will be used instead via constructor.
         
-        Weighted Distribution (for offense, tempo, defense, aggression, hc_trap, fc_press, rebounding):
+        Weighted Distribution (for offense, fast_breaks, defense, aggression, hc_trap, fc_press, rebounding):
         - 5% chance for 0
         - 15% chance for 1
         - 60% chance for 2 (normal/balanced)
@@ -129,6 +141,8 @@ class TeamManager:
         
         Uniform Distribution (for inside, attack, outside):
         - Random 1-4 (never zero, ensures at least some focus on each area)
+        
+        Note: tempo is NOT initialized here - it's initialized randomly per game via init_tempo_random()
         """
         # Weighted distribution: 5% for 0/4, 15% for 1/3, 60% for 2
         weighted_choice = random.choices(
@@ -142,13 +156,15 @@ class TeamManager:
             "inside": random.randint(1, 4),  # Uniform 1-4 (never zero)
             "attack": random.randint(1, 4),  # Uniform 1-4 (never zero)
             "outside": random.randint(1, 4),  # Uniform 1-4 (never zero)
-            "tempo": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
+            "fast_breaks": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
             "play_calling": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
             "defense": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
             "aggression": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
             "hc_trap": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
             "fc_press": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
-            "rebounding": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0]
+            "rebounding": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
+            # tempo is initialized per game, not per team
+            "tempo": TeamManager.init_tempo_random()
         }
 
     @staticmethod

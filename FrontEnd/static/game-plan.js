@@ -79,7 +79,7 @@ const strategySliders = {
   'inside': 'slider-inside',
   'attack': 'slider-attack',
   'outside': 'slider-outside',
-  'tempo': 'slider-tempo',
+  'fast_breaks': 'slider-fast_breaks',
   'defense': 'slider-defense',
   'aggression': 'slider-aggression',
   'hc_trap': 'slider-hc-trap',
@@ -178,7 +178,7 @@ async function loadSettings() {
       currentSettings = {
         playcall_settings: {},
         strategy_settings: {
-          'offense': 2, 'inside': 2, 'attack': 2, 'outside': 2, 'tempo': 2,
+          'offense': 2, 'inside': 2, 'attack': 2, 'outside': 2, 'fast_breaks': 2,
           'defense': 2, 'aggression': 2, 'hc_trap': 2, 'fc_press': 2, 'rebounding': 2
         }
       };

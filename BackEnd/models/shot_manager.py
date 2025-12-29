@@ -434,7 +434,7 @@ class ShotManager:
         # Get strategy settings directly as numeric values (0-4)
         # No need for string conversion - we just need the numbers for probability calculations
         offense_reb_value = off_team.strategy_settings.get("rebounding", 2)  # Crash boards vs get back
-        defense_tempo_value = def_team.strategy_settings.get("tempo", 2)  # Stay vs release for FB
+        defense_fast_breaks_value = def_team.strategy_settings.get("fast_breaks", 2)  # Stay vs release for FB
         
         # Import for debug logging (logging already imported at top of file)
         from BackEnd.utils.shared import get_name_safe
@@ -444,7 +444,7 @@ class ShotManager:
         from BackEnd.engine.fast_break_trigger import FastBreakTrigger
         
         defense_releases, defense_release_list, defense_rebounders = FastBreakTrigger.can_trigger_from_dreb(
-            defense_tempo_value=defense_tempo_value,
+            defense_tempo_value=defense_fast_breaks_value,  # Note: parameter name kept as defense_tempo_value for backward compatibility
             shooter_pos=shooter_pos,
             def_team_lineup=def_team.lineup
         )
