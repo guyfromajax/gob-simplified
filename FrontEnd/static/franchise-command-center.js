@@ -1269,14 +1269,44 @@ function createMetricBar(title, value, maxValue, color, change) {
   return metricDiv;
 }
 
+// Store players data for sorting (roster stats)
+let rosterPlayersDataForSorting = [];
+
 // Update renderTeam to also render player stats
 function renderRosterStats(players) {
+  if (!players || players.length === 0) {
+    const tbody = document.getElementById('roster-stats-body');
+    if (tbody) tbody.innerHTML = '';
+    return;
+  }
+  
+  rosterPlayersDataForSorting = JSON.parse(JSON.stringify(players)); // Deep copy for sorting
+  renderRosterStatsTable(rosterPlayersDataForSorting);
+  
+  // Add click handlers to sortable headers (only once) - target only the stats table
+  const statsTable = document.querySelector('#roster-tab .stats-table');
+  if (statsTable) {
+    const sortableHeaders = statsTable.querySelectorAll('thead .sortable');
+    sortableHeaders.forEach(header => {
+      // Remove existing listeners to avoid duplicates
+      const newHeader = header.cloneNode(true);
+      header.parentNode.replaceChild(newHeader, header);
+      
+      newHeader.style.cursor = 'pointer';
+      newHeader.style.userSelect = 'none';
+      newHeader.addEventListener('click', () => {
+        const stat = newHeader.dataset.stat;
+        sortRosterStats(stat);
+      });
+    });
+  }
+}
+
+function renderRosterStatsTable(players) {
   const tbody = document.getElementById('roster-stats-body');
   if (!tbody) return;
   
   tbody.innerHTML = '';
-  
-  if (!players || players.length === 0) return;
   
   players.forEach(p => {
     const stats = p.stats?.season || {};
@@ -1287,9 +1317,12 @@ function renderRosterStats(players) {
     tr.innerHTML = `
       <td>${p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim()}</td>
       <td>${stats.PTS || 0}</td>
-      <td>${stats.FGM || 0}/${stats.FGA || 0}</td>
-      <td>${tpm}/${tpa}</td>
-      <td>${stats.FTM || 0}/${stats.FTA || 0}</td>
+      <td>${stats.FGM || 0}</td>
+      <td>${stats.FGA || 0}</td>
+      <td>${tpm}</td>
+      <td>${tpa}</td>
+      <td>${stats.FTM || 0}</td>
+      <td>${stats.FTA || 0}</td>
       <td>${stats.REB || 0}</td>
       <td>${stats.AST || 0}</td>
       <td>${stats.STL || 0}</td>
@@ -1299,5 +1332,59 @@ function renderRosterStats(players) {
       <td>${stats.TO || 0}</td>`;
     tbody.appendChild(tr);
   });
+}
+
+function sortRosterStats(statKey) {
+  // Map display stat names to data stat keys
+  const statMap = {
+    'name': 'name',
+    'PTS': 'PTS',
+    'FGM': 'FGM',
+    'FGA': 'FGA',
+    'TPM': 'TPM',
+    'TPA': 'TPA',
+    'FTM': 'FTM',
+    'FTA': 'FTA',
+    'REB': 'REB',
+    'AST': 'AST',
+    'STL': 'STL',
+    'BLK': 'BLK',
+    'F': 'F',
+    'MIN': 'MIN',
+    'TO': 'TO'
+  };
+  
+  const dataKey = statMap[statKey] || statKey;
+  
+  // Sort players by the selected stat (descending order)
+  rosterPlayersDataForSorting.sort((a, b) => {
+    let val1, val2;
+    
+    if (dataKey === 'name') {
+      const name1 = a.name || `${a.first_name || ''} ${a.last_name || ''}`.trim() || '';
+      const name2 = b.name || `${b.first_name || ''} ${b.last_name || ''}`.trim() || '';
+      return name2.localeCompare(name1); // Reverse for descending
+    } else {
+      const stats1 = a.stats?.season || {};
+      const stats2 = b.stats?.season || {};
+      
+      // Handle 3PTM/3PTA mapping
+      if (dataKey === 'TPM') {
+        val1 = stats1['3PTM'] || stats1.TPM || 0;
+        val2 = stats2['3PTM'] || stats2.TPM || 0;
+      } else if (dataKey === 'TPA') {
+        val1 = stats1['3PTA'] || stats1.TPA || 0;
+        val2 = stats2['3PTA'] || stats2.TPA || 0;
+      } else {
+        val1 = stats1[dataKey] || 0;
+        val2 = stats2[dataKey] || 0;
+      }
+    }
+    
+    return val2 - val1; // Descending order
+  });
+  
+  // Re-render with sorted data
+  renderRosterStatsTable(rosterPlayersDataForSorting);
 }
 

@@ -368,19 +368,99 @@ function renderRoster() {
   }
 }
 
+// Store player stats data for sorting (tournament)
+let tournamentPlayerStatsDataForSorting = [];
+
 function renderStats() {
-  const tbody = document.getElementById("stats-body");
   console.log("Inside renderStats");
+  tournamentPlayerStatsDataForSorting = JSON.parse(JSON.stringify(stats || [])); // Deep copy for sorting
+  renderStatsTable(tournamentPlayerStatsDataForSorting);
+  
+  // Add click handlers to sortable headers (only once) - target only the stats table
+  const statsTable = document.querySelector('#roster-tab .stats-table');
+  if (statsTable) {
+    const sortableHeaders = statsTable.querySelectorAll('thead .sortable');
+    sortableHeaders.forEach(header => {
+      // Remove existing listeners to avoid duplicates
+      const newHeader = header.cloneNode(true);
+      header.parentNode.replaceChild(newHeader, header);
+      
+      newHeader.style.cursor = 'pointer';
+      newHeader.style.userSelect = 'none';
+      newHeader.addEventListener('click', () => {
+        const stat = newHeader.dataset.stat;
+        sortPlayerStats(stat);
+      });
+    });
+  }
+}
+
+function renderStatsTable(playerStats) {
+  const tbody = document.getElementById("stats-body");
+  if (!tbody) return;
   tbody.innerHTML = "";
-  stats.forEach(s => {
+  playerStats.forEach(s => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${s.name}</td><td>${s.PTS}</td><td>${s.FGM}/${s.FGA}</td>
-      <td>${s.TPM}/${s.TPA}</td><td>${s.FTM}/${s.FTA}</td><td>${s.REB}</td>
-      <td>${s.AST}</td><td>${s.STL}</td><td>${s.BLK}</td><td>${s.F}</td>
-      <td>${s.MIN}</td><td>${s.TO}</td>`;
+      <td>${s.name}</td>
+      <td>${s.PTS || 0}</td>
+      <td>${s.FGM || 0}</td>
+      <td>${s.FGA || 0}</td>
+      <td>${s.TPM || 0}</td>
+      <td>${s.TPA || 0}</td>
+      <td>${s.FTM || 0}</td>
+      <td>${s.FTA || 0}</td>
+      <td>${s.REB || 0}</td>
+      <td>${s.AST || 0}</td>
+      <td>${s.STL || 0}</td>
+      <td>${s.BLK || 0}</td>
+      <td>${s.F || 0}</td>
+      <td>${s.MIN || 0}</td>
+      <td>${s.TO || 0}</td>`;
     tbody.appendChild(tr);
   });
+}
+
+function sortPlayerStats(statKey) {
+  // Map display stat names to data stat keys
+  const statMap = {
+    'name': 'name',
+    'PTS': 'PTS',
+    'FGM': 'FGM',
+    'FGA': 'FGA',
+    'TPM': 'TPM',
+    'TPA': 'TPA',
+    'FTM': 'FTM',
+    'FTA': 'FTA',
+    'REB': 'REB',
+    'AST': 'AST',
+    'STL': 'STL',
+    'BLK': 'BLK',
+    'F': 'F',
+    'MIN': 'MIN',
+    'TO': 'TO'
+  };
+  
+  const dataKey = statMap[statKey] || statKey;
+  
+  // Sort players by the selected stat (descending order)
+  tournamentPlayerStatsDataForSorting.sort((a, b) => {
+    let val1, val2;
+    
+    if (dataKey === 'name') {
+      val1 = a.name || '';
+      val2 = b.name || '';
+      return val2.localeCompare(val1); // Reverse for descending
+    } else {
+      val1 = a[dataKey] || 0;
+      val2 = b[dataKey] || 0;
+    }
+    
+    return val2 - val1; // Descending order
+  });
+  
+  // Re-render with sorted data
+  renderStatsTable(tournamentPlayerStatsDataForSorting);
 }
 
 // Helper function to initialize team color cache
