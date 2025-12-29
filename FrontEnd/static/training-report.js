@@ -699,7 +699,8 @@ function createPill(originalValue, attrKey) {
   let value = originalValue;
   
   if (attrKey === 'shot_threshold') {
-    maxValue = 200;
+    maxValue = 100; // Range is 100-300, center at 200, so max deviation is 100
+    value = originalValue - 200; // Center at 0 for fill calculation
   } else if (attrKey === 'rebound_modifier') {
     // Rebound modifier is 0.8-1.2, center at 1.0
     // We'll show deviation from 1.0
