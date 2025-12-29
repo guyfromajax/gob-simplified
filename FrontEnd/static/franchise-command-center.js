@@ -152,16 +152,143 @@ function renderLeaders(data) {
   });
 }
 
+// Store teams data for sorting
+let teamsDataForSorting = [];
+
 function renderTeamStats(data) {
   if (!data) return;
+  teamsDataForSorting = JSON.parse(JSON.stringify(data.teams || [])); // Deep copy for sorting
+  renderTeamStatsTable(teamsDataForSorting);
+  
+  // Add click handlers to sortable headers (only once)
+  const sortableHeaders = document.querySelectorAll('#stats-tab .sortable');
+  sortableHeaders.forEach(header => {
+    // Remove existing listeners to avoid duplicates
+    const newHeader = header.cloneNode(true);
+    header.parentNode.replaceChild(newHeader, header);
+    
+    newHeader.style.cursor = 'pointer';
+    newHeader.style.userSelect = 'none';
+    newHeader.addEventListener('click', () => {
+      const stat = newHeader.dataset.stat;
+      sortTeamStats(stat);
+    });
+  });
+}
+
+function renderTeamStatsTable(teams) {
   const tbody = document.getElementById('teamstats-body');
+  if (!tbody) return;
   tbody.innerHTML = '';
-  data.teams.forEach(t => {
+  
+  teams.forEach(t => {
     const tr = document.createElement('tr');
     const s = t.stats || {};
-    tr.innerHTML = `<td>${t.team}</td><td>${s.PTS || 0}</td><td>${s.REB || 0}</td><td>${s.AST || 0}</td><td>${s.STL || 0}</td><td>${s.BLK || 0}</td>`;
+    
+    // Calculate percentages
+    const fgPct = s.FGA > 0 ? ((s.FGM || 0) / s.FGA * 100).toFixed(1) : '0.0';
+    const threePct = s.TPA > 0 ? ((s.TPM || 0) / s.TPA * 100).toFixed(1) : '0.0';
+    const ftPct = s.FTA > 0 ? ((s.FTM || 0) / s.FTA * 100).toFixed(1) : '0.0';
+    const defPct = s.DEF_A > 0 ? ((s.DEF_S || 0) / s.DEF_A * 100).toFixed(1) : '0.0';
+    const scrPct = s.SCR_A > 0 ? ((s.SCR_S || 0) / s.SCR_A * 100).toFixed(1) : '0.0';
+    
+    tr.innerHTML = `
+      <td>${t.team}</td>
+      <td>${s.PF || 0}</td>
+      <td>${s.PA || 0}</td>
+      <td>${s.FGM || 0}</td>
+      <td>${s.FGA || 0}</td>
+      <td>${fgPct}%</td>
+      <td>${s.TPM || 0}</td>
+      <td>${s.TPA || 0}</td>
+      <td>${threePct}%</td>
+      <td>${s.FTM || 0}</td>
+      <td>${s.FTA || 0}</td>
+      <td>${ftPct}%</td>
+      <td>${s.DREB || 0}</td>
+      <td>${s.OREB || 0}</td>
+      <td>${s.TREB || 0}</td>
+      <td>${s.AST || 0}</td>
+      <td>${s.STL || 0}</td>
+      <td>${s.BLK || 0}</td>
+      <td>${s.F || 0}</td>
+      <td>${s.TO || 0}</td>
+      <td>${s.DEF_A || 0}</td>
+      <td>${defPct}%</td>
+      <td>${s.SCR_A || 0}</td>
+      <td>${scrPct}%</td>
+    `;
     tbody.appendChild(tr);
   });
+}
+
+function sortTeamStats(statKey) {
+  // Map display stat names to data stat keys
+  const statMap = {
+    'team': 'team',
+    'PF': 'PF',
+    'PA': 'PA',
+    'FGM': 'FGM',
+    'FGA': 'FGA',
+    'FG%': 'FG%',
+    'TPM': 'TPM',
+    'TPA': 'TPA',
+    '3PT%': '3PT%',
+    'FTM': 'FTM',
+    'FTA': 'FTA',
+    'FT%': 'FT%',
+    'DREB': 'DREB',
+    'OREB': 'OREB',
+    'TREB': 'TREB',
+    'AST': 'AST',
+    'STL': 'STL',
+    'BLK': 'BLK',
+    'F': 'F',
+    'TO': 'TO',
+    'DEF_A': 'DEF_A',
+    'DEF%': 'DEF%',
+    'SCR_A': 'SCR_A',
+    'SCR%': 'SCR%'
+  };
+  
+  const dataKey = statMap[statKey] || statKey;
+  
+  // Sort teams by the selected stat (descending order)
+  teamsDataForSorting.sort((a, b) => {
+    const s1 = a.stats || {};
+    const s2 = b.stats || {};
+    
+    let val1, val2;
+    
+    if (dataKey === 'team') {
+      val1 = a.team || '';
+      val2 = b.team || '';
+      return val2.localeCompare(val1); // Reverse for descending
+    } else if (dataKey === 'FG%') {
+      val1 = s1.FGA > 0 ? (s1.FGM || 0) / s1.FGA : 0;
+      val2 = s2.FGA > 0 ? (s2.FGM || 0) / s2.FGA : 0;
+    } else if (dataKey === '3PT%') {
+      val1 = s1.TPA > 0 ? (s1.TPM || 0) / s1.TPA : 0;
+      val2 = s2.TPA > 0 ? (s2.TPM || 0) / s2.TPA : 0;
+    } else if (dataKey === 'FT%') {
+      val1 = s1.FTA > 0 ? (s1.FTM || 0) / s1.FTA : 0;
+      val2 = s2.FTA > 0 ? (s2.FTM || 0) / s2.FTA : 0;
+    } else if (dataKey === 'DEF%') {
+      val1 = s1.DEF_A > 0 ? (s1.DEF_S || 0) / s1.DEF_A : 0;
+      val2 = s2.DEF_A > 0 ? (s2.DEF_S || 0) / s2.DEF_A : 0;
+    } else if (dataKey === 'SCR%') {
+      val1 = s1.SCR_A > 0 ? (s1.SCR_S || 0) / s1.SCR_A : 0;
+      val2 = s2.SCR_A > 0 ? (s2.SCR_S || 0) / s2.SCR_A : 0;
+    } else {
+      val1 = s1[dataKey] || 0;
+      val2 = s2[dataKey] || 0;
+    }
+    
+    return val2 - val1; // Descending order
+  });
+  
+  // Re-render with sorted data
+  renderTeamStatsTable(teamsDataForSorting);
 }
 
 function renderRecruits(data) {

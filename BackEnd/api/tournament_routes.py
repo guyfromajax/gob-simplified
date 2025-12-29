@@ -40,6 +40,111 @@ class TournamentTrainingRequest(BaseModel):
     training_data: dict  # Contains player_drills, team_drills, general, coaching_focus
 
 
+@router.get("/tournament/team-stats")
+def tournament_team_stats(tournament_id: str):
+    """Get team stats by aggregating player stats from tournament document.
+    
+    ✅ SS&S: Aggregates from tournament.players object (tournament-specific stats),
+    not from universal players_collection.
+    """
+    try:
+        tid = ObjectId(tournament_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid tournament_id")
+    
+    tournament_doc = tournaments_collection.find_one({"_id": tid}, {"players": 1, "teams": 1})
+    if not tournament_doc:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    
+    players = tournament_doc.get("players", {})
+    tournament_teams = tournament_doc.get("teams", {})
+    
+    # Get all team IDs from tournament_teams
+    team_stats_map: dict[str, dict[str, int]] = {}
+    
+    # Initialize team stats for all teams in tournament
+    for team_id in tournament_teams.keys():
+        team_id_str = str(team_id)
+        team_stats_map[team_id_str] = {
+            "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
+            "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
+            "DREB": 0, "OREB": 0, "TREB": 0,
+            "TO": 0, "F": 0,
+            "DEF_A": 0, "DEF_S": 0, "SCR_A": 0, "SCR_S": 0
+        }
+    
+    # Aggregate stats from players object
+    players_with_stats = 0
+    players_without_team_id = 0
+    for pid, pdata in players.items():
+        meta = pdata.get("meta", {})
+        team_id = meta.get("team_id")
+        if not team_id:
+            players_without_team_id += 1
+            continue
+        
+        team_id_str = str(team_id)
+        season_stats = pdata.get("season", {})
+        if not season_stats:
+            continue
+        
+        if team_id_str not in team_stats_map:
+            team_stats_map[team_id_str] = {
+                "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
+                "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
+                "DREB": 0, "OREB": 0, "TREB": 0,
+                "TO": 0, "F": 0,
+                "DEF_A": 0, "DEF_S": 0, "SCR_A": 0, "SCR_S": 0
+            }
+        
+        players_with_stats += 1
+        # Sum all stats for this team (map 3PTM to TPM for output)
+        for stat, val in season_stats.items():
+            if isinstance(val, (int, float)):
+                output_stat = stat
+                if stat == "3PTM":
+                    output_stat = "TPM"
+                elif stat == "3PTA":
+                    output_stat = "TPA"
+                
+                if output_stat in team_stats_map[team_id_str]:
+                    team_stats_map[team_id_str][output_stat] += val
+    
+    # Get PF/PA from standings (teams collection)
+    standings_data = {}
+    teams_list = list(teams_collection.find({}, {"name": 1, "PF": 1, "PA": 1, "_id": 1}))
+    for t in teams_list:
+        team_id_str = str(t["_id"])
+        standings_data[team_id_str] = {
+            "PF": t.get("PF", 0),
+            "PA": t.get("PA", 0)
+        }
+    
+    # Convert to output format with team names
+    output = []
+    for team_id_str, stats in team_stats_map.items():
+        try:
+            team_doc = teams_collection.find_one({"_id": ObjectId(team_id_str)}, {"name": 1})
+            team_name = team_doc.get("name", team_id_str) if team_doc else team_id_str
+        except Exception:
+            team_name = team_id_str
+        
+        # Add PF/PA from standings
+        if team_id_str in standings_data:
+            stats["PF"] = standings_data[team_id_str]["PF"]
+            stats["PA"] = standings_data[team_id_str]["PA"]
+        else:
+            stats["PF"] = 0
+            stats["PA"] = 0
+        
+        # Calculate TREB from DREB + OREB
+        stats["TREB"] = stats.get("DREB", 0) + stats.get("OREB", 0)
+        
+        output.append({"team": team_name, "stats": stats})
+    
+    return {"teams": output}
+
+
 @router.get("/tournament/leaders")
 def get_tournament_leaders(tournament_id: str, recompute: bool = False):
     """Return top leaders for key stats within a tournament.
