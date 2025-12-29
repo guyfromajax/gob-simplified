@@ -161,9 +161,13 @@ def generate_report(analysis: Dict) -> str:
     
     # Generate report for each team
     for team_name in team_names:
-        report_lines.append(f"{team_name}:")
-        
         team_attrs = teams[team_name]["attributes"]
+        
+        # Calculate overall attribute total
+        overall_total = sum(team_attrs.values())
+        
+        report_lines.append(f"{team_name} ({overall_total:,}):")
+        
         attr_strings = []
         
         for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "CH"]:
