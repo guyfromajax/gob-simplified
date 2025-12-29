@@ -87,12 +87,13 @@ def get_default_settings():
             "inside": 2,   # Inside focus preference
             "attack": 2,  # Attack focus preference
             "outside": 2, # Outside focus preference
-            "tempo": 2,
+            "fast_breaks": 2,
             "defense": 2,
             "aggression": 2,
             "hc_trap": 2,  # Half court trap (matches frontend key)
             "fc_press": 2, # Full court press (matches frontend key)
             "rebounding": 2
+            # Note: tempo is initialized randomly per game, not stored in game plan settings
         }
     }
 

@@ -200,10 +200,11 @@ class FranchiseManager:
                 },
                 "strategy_settings": {
                     "defense": 2,
-                    "tempo": 2,
+                    "fast_breaks": 2,
                     "aggression": 2,
                     "half_court_trap": 2,
                     "full_court_press": 2
+                    # Note: tempo is initialized randomly per game, not stored in franchise document
                 },
                 "plays": populated_plays.copy(),
                 "scouting_data": scouting_data.copy(),

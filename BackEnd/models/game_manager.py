@@ -22,6 +22,14 @@ class GameManager:
         self.home_team = TeamManager(home_team_name, is_home_team=True, strategy_settings=home_strategy_settings, team_attributes=home_team_attributes, scouting_data=home_scouting_data, plays_data=home_plays_data, strategy_calls=home_strategy_calls, mode=mode, is_user_team=is_home_user)
         self.away_team = TeamManager(away_team_name, is_home_team=False, strategy_settings=away_strategy_settings, team_attributes=away_team_attributes, scouting_data=away_scouting_data, plays_data=away_plays_data, strategy_calls=away_strategy_calls, mode=mode, is_user_team=is_away_user)
 
+        # ✅ Initialize tempo randomly per game (not per team)
+        # Tempo is used for time_elapsed calculations, not fast break logic
+        tempo_value = TeamManager.init_tempo_random()
+        if "tempo" not in self.home_team.strategy_settings:
+            self.home_team.strategy_settings["tempo"] = tempo_value
+        if "tempo" not in self.away_team.strategy_settings:
+            self.away_team.strategy_settings["tempo"] = tempo_value
+
         # Recalculate position ratings for all players (attributes may have changed)
         self._update_position_ratings()
 

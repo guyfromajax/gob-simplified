@@ -12,12 +12,12 @@ from typing import List, Optional, Tuple
 class FastBreakTrigger:
     """Handles fast break trigger determination logic."""
     
-    # Defense release chances based on tempo value (0-4)
+    # Defense release chances based on fast_breaks value (0-4)
     DEFENSE_RELEASE_CHANCES = {0: 0.0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0}
     
     @staticmethod
     def can_trigger_from_dreb(
-        defense_tempo_value: int,
+        defense_tempo_value: int,  # Note: parameter name kept for backward compatibility, but now uses fast_breaks setting
         shooter_pos: str,
         def_team_lineup: dict
     ) -> Tuple[bool, List[str], List[str]]:
@@ -25,7 +25,7 @@ class FastBreakTrigger:
         Determine if a fast break can be triggered from a defensive rebound.
         
         Args:
-            defense_tempo_value: Defense tempo value (0-4)
+            defense_tempo_value: Defense fast_breaks value (0-4) - parameter name kept for backward compatibility
             shooter_pos: Position of the shooter (to avoid releasing same position)
             def_team_lineup: Dictionary of defensive team lineup positions
         
@@ -35,7 +35,7 @@ class FastBreakTrigger:
             - defense_release_list: List of positions releasing for fast break
             - defense_rebounders: List of positions staying for rebound
         """
-        # Get release chance based on tempo
+        # Get release chance based on fast_breaks setting
         release_chance = FastBreakTrigger.DEFENSE_RELEASE_CHANCES.get(
             defense_tempo_value, 
             0.0
