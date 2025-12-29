@@ -698,7 +698,6 @@ function renderTeamStatsTable(teams) {
   const totalsTr = document.createElement('tr');
   totalsTr.className = 'totals-row';
   totalsTr.style.fontWeight = 'bold';
-  totalsTr.style.backgroundColor = '#2a2a2a';
   totalsTr.style.pointerEvents = 'none'; // Prevent any click interactions
   
   // Calculate total percentages
