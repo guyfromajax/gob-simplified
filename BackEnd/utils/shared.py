@@ -115,6 +115,28 @@ def get_time_elapsed(tempo_call):
     else:
         return int(max(5, min(35, random.gauss(22, 6))))  # Fallback
 
+def oreb_shot_attempt(player_attrs):
+    """
+    Calculate shot score for OREB putback attempts.
+    
+    Uses a simplified formula focused on finishing ability:
+    - SC (Shooting Close) * 0.5
+    - ST (Strength) * 0.3
+    - CH (Clutch) * 0.2
+    
+    Args:
+        player_attrs: Player attributes dictionary
+        
+    Returns:
+        float: Shot score for putback attempt
+    """
+    return (
+        player_attrs["SC"] * 0.5 +
+        player_attrs["ST"] * 0.3 +
+        player_attrs["CH"] * 0.2
+    ) * random.randint(1, 6)
+
+
 def resolve_offensive_rebound(game, rebounder):
     """Resolve an offensive rebound by choosing a putback or a kick-out.
 
@@ -135,11 +157,8 @@ def resolve_offensive_rebound(game, rebounder):
 
     if random.random() < 0.90:  # 90% putback attempt, 10% kickout
         attrs = rebounder.attributes
-        shot_score = (
-            attrs["SC"] * 0.6 +
-            attrs["CH"] * 0.2 +
-            attrs["IQ"] * 0.2
-        ) * random.randint(1, 6)
+        # ✅ NEW: Use dedicated OREB shot attempt function
+        shot_score = oreb_shot_attempt(attrs)
         time_elapsed = random.randint(2, 5)
 
         defender_pos = random.choice(["C", "C", "C", "PF", "PF", "SF", "SF", "SG", "PG"])
@@ -156,7 +175,9 @@ def resolve_offensive_rebound(game, rebounder):
         # Track defensive attempt for putback
         defender.record_stat("DEF_A")
 
-        made = shot_score >= off_team.team_attributes["shot_threshold"]
+        # ✅ NEW: Uniform shot threshold of 0 for all OREB putback attempts
+        oreb_threshold = 0
+        made = shot_score >= oreb_threshold
         
         rebounder.record_stat("FGA")
         # print(f"📦 PUTBACK FGA: Recorded FGA for {get_name_safe(rebounder)}")
