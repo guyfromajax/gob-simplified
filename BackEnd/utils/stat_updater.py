@@ -868,17 +868,49 @@ def finalize_game(
         # Explicitly skip aggregation for scrimmages and unspecified modes.
         return
     if mode == "tournament" and tournament_id:
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"🔍 [FINALIZE_GAME] Tournament mode: game_id={game_id}, tournament_id={tournament_id}")
+        
         try:
             tid = ObjectId(tournament_id)
-        except Exception:
+        except Exception as e:
+            logger.error(f"❌ [FINALIZE_GAME] Invalid tournament_id format: {tournament_id}, error: {e}")
             return
 
+        # Check if game is already in applied_games
+        tournament_doc = tournaments_collection.find_one({"_id": tid}, {"applied_games": 1})
+        if tournament_doc:
+            applied_games = tournament_doc.get("applied_games", [])
+            logger.info(f"🔍 [FINALIZE_GAME] Tournament {tournament_id} has {len(applied_games)} games in applied_games")
+            if game_id in applied_games or str(game_id) in [str(g) for g in applied_games]:
+                logger.warning(f"⚠️ [FINALIZE_GAME] Game {game_id} already in applied_games, skipping (idempotent)")
+                return
+        else:
+            logger.error(f"❌ [FINALIZE_GAME] Tournament {tournament_id} not found")
+            return
+
+        logger.info(f"🔍 [FINALIZE_GAME] Attempting to add game_id to applied_games (format: {type(game_id).__name__})")
         result = tournaments_collection.update_one(
             {"_id": tid, "applied_games": {"$ne": game_id}},
             {"$addToSet": {"applied_games": game_id}},
         )
 
+        logger.info(f"🔍 [FINALIZE_GAME] Update result: matched={result.matched_count}, modified={result.modified_count}")
+        
         if result.modified_count == 0:
+            # Check why it failed
+            check_doc = tournaments_collection.find_one({"_id": tid}, {"applied_games": 1})
+            if check_doc:
+                applied = check_doc.get("applied_games", [])
+                logger.warning(f"⚠️ [FINALIZE_GAME] Update had no effect. Tournament applied_games: {applied}, game_id={game_id} (type: {type(game_id).__name__})")
+                # Try string comparison
+                game_id_str = str(game_id)
+                if game_id_str in [str(g) for g in applied]:
+                    logger.warning(f"⚠️ [FINALIZE_GAME] Game_id found in applied_games as string match, skipping")
+                else:
+                    logger.error(f"❌ [FINALIZE_GAME] Game_id NOT in applied_games but update failed - possible format mismatch")
             return
 
         try:
@@ -886,15 +918,29 @@ def finalize_game(
         except Exception:
             gid = game_id
 
+        logger.info(f"🔍 [FINALIZE_GAME] Loading game document: game_id={game_id}, gid={gid}")
         game = games_collection.find_one({"_id": gid}) or {}
+        
+        if not game:
+            logger.error(f"❌ [FINALIZE_GAME] Game document not found: game_id={game_id}, gid={gid}")
+            return
+        
+        logger.info(f"✅ [FINALIZE_GAME] Game document found, calling apply_stats_from_summary")
+        logger.info(f"🔍 [FINALIZE_GAME] Game has {len(game.get('players', []))} players in summary")
+        
         apply_stats_from_summary(game, game_id, tournament_id)
+        logger.info(f"✅ [FINALIZE_GAME] apply_stats_from_summary completed")
+        
         recompute_tournament_leaders(tournament_id)
+        logger.info(f"✅ [FINALIZE_GAME] recompute_tournament_leaders completed")
         
         # Update defensive playcall season_stats from game_stats
         _update_defensive_playcall_season_stats(game)
         
         # Update offensive play season_stats from game_stats
         _update_offensive_play_season_stats(game, "tournament", tid)
+        
+        logger.info(f"✅ [FINALIZE_GAME] Tournament stats finalization complete for game_id={game_id}")
 
         return
 

@@ -147,7 +147,7 @@ def _ensure_complete_lineup(team, game_state=None) -> None:
     # First, remove any ineligible players from the lineup
     for pos, player in list(team.lineup.items()):
         if player and hasattr(player, "player_id") and player.player_id in ineligible_player_ids:
-            logging.warning(f"⚠️ Removing ineligible player {player.player_id} from {team.name} {pos} position")
+            # logging.warning(f"⚠️ Removing ineligible player {player.player_id} from {team.name} {pos} position")
             team.lineup[pos] = None
     
     # Now find missing positions (including those we just cleared)
