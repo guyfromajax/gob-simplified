@@ -23,19 +23,28 @@ logger = logging.getLogger(__name__)
 
 def get_user_team_from_tournament(tournament_doc: dict) -> tuple[str | None, str | None]:
     """
-    Get user team identifiers from tournament document.
+    Get user team identifiers from tournament document with backward compatibility.
     
     ✅ MIGRATION (February 2025): Created to align with Franchise mode pattern.
     Uses tournament document's user_team_object_id as authoritative source.
+    Includes backward compatibility for old tournaments missing user_team_object_id.
     
     Returns:
         tuple: (user_team_id: team name, user_team_object_id: ObjectId string)
     """
+    # Try tournament document first (new approach)
     user_team_id = tournament_doc.get("user_team_id")
     user_team_object_id = tournament_doc.get("user_team_object_id")
     
     if user_team_id and user_team_object_id:
         return (user_team_id, user_team_object_id)
+    
+    # ✅ BACKWARD COMPATIBILITY: If user_team_object_id is missing, resolve from user_team_id
+    # This handles old tournaments created before the migration
+    if user_team_id and not user_team_object_id:
+        team_doc = teams_collection.find_one({"name": user_team_id})
+        if team_doc:
+            return (user_team_id, str(team_doc["_id"]))
     
     # If not found, return None values
     return (None, None)
