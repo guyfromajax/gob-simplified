@@ -2022,19 +2022,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             # ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
             tournament_players = doc.get("players", {}) or doc.get("player_stats", {})  # Backward compatibility
             
-            # Resolve team_id - might be a name or an ID
-            team_id_resolved = team_id
-            team_doc = teams_collection.find_one({"name": team_id})
-            if team_doc:
-                team_id_resolved = str(team_doc["_id"])
-            else:
-                try:
-                    team_id_obj = ObjectId(team_id)
-                    team_id_resolved = str(team_id_obj)
-                except:
-                    pass
-            
-            team_id_str = str(team_id_resolved)
+            # ✅ MIGRATION: Use authoritative_team_id (already resolved from tournament document)
+            # No need to resolve again - we already have the correct ObjectId
             team_doc = teams_collection.find_one({"_id": ObjectId(team_id_str)})
             if not team_doc:
                 raise HTTPException(status_code=404, detail="Team not found")
