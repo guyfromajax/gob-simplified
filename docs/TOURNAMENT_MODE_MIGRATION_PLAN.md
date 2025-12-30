@@ -28,7 +28,7 @@ Migrate Tournament Mode to align with Franchise Mode's SS&S (Simple, Stable, Sca
 - Settings persistence: Database-only (no localStorage for persistent data)
 - Navigation: `user_team_object_id` as authoritative source of truth
 - Training reports: `training_reports.{round}` (keep - correct for tournament)
-- Stats rollup: Same patterns as Franchise (single source of truth)
+- Stats rollup: Same patterns as Franchise (single source of truth) #comment -- no need to track player career stats in Tournament mode
 
 ---
 
@@ -87,6 +87,7 @@ Migrate Tournament Mode to align with Franchise Mode's SS&S (Simple, Stable, Sca
 **Current State:**
 - Tournament initializes all 8 teams upfront (✅ already aligned)
 - But may not use same initialization pattern as Franchise
+#comment, for all teams (computer and user), let's init playbooks wtih Standard and PF plays enabled, and adjust default percnages to be evenly distributed across all plays in each container -- htis is a change from our current defaule of the top play in each container set to 100% and all other plays set to 0%. (note, let's apply this init change to new franchise mode instance creations as well)
 
 **Changes Required:**
 1. **Backend:**
@@ -97,7 +98,7 @@ Migrate Tournament Mode to align with Franchise Mode's SS&S (Simple, Stable, Sca
      - `strategy_settings` (defaults: all = 2)
      - `plays` (via `populate_team_plays(mode="tournament")`)
      - `scouting_data` (via `populate_scouting_data(mode="tournament")`)
-     - `playbook_settings` (defaults: first play = 100% per section)
+     - `playbook_settings` (defaults: first play = 100% per section) #comment, see note above about adjustmetns to default settings
 
 2. **Verification:**
    - Compare team object structure between Tournament and Franchise
@@ -549,9 +550,44 @@ Migrate Tournament Mode to align with Franchise Mode's SS&S (Simple, Stable, Sca
 
 ---
 
-### Phase 8: Testing & Validation
+### Phase 8: Bug Fixes
 
-#### Task 8.1: Create Migration Test Plan
+#### Task 8.1: Fix Tournament Bracket Auto-Simulation Bug
+**Priority:** Critical  
+**Status:** Pending
+
+**Bug Description:**
+When user simulates remaining games in a round (e.g., sim rest of Round 1), the system incorrectly auto-simulates subsequent rounds where the user's team is still active. For example:
+- User plays Round 1 game and wins
+- User sims rest of Round 1 games
+- System incorrectly auto-sims Round 2 games (including user's team's game)
+- User is cued to run training for championship instead of playing Round 2 game
+
+**Expected Behavior:**
+- When simulating remaining games in a round, only simulate games where the user's team is NOT involved
+- If user's team advances to next round, cue user to play their game (not auto-simulate it)
+- User should only be cued for training/championship after they've played all their games
+
+**Root Cause Analysis Needed:**
+- Check `sim_remaining` or similar simulation endpoints
+- Verify bracket advancement logic stops when user's team is involved
+- Check if there's logic that auto-sims all rounds instead of just the current round
+
+**Files to Review:**
+- `BackEnd/api/tournament_routes.py` - `sim_remaining()` or similar endpoints
+- `BackEnd/tournament/bracket_logic.py` - Bracket advancement logic
+- Any auto-simulation logic that processes multiple rounds
+
+**Fix Required:**
+- Ensure simulation only processes current round
+- Stop simulation when user's team's game is encountered
+- Cue user to play their game instead of auto-simulating
+
+---
+
+### Phase 9: Testing & Validation
+
+#### Task 9.1: Create Migration Test Plan
 **Priority:** Critical  
 **Status:** Pending
 

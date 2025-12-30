@@ -204,16 +204,19 @@ def get_play_ids_by_names(play_names):
 
 def initialize_playbook_settings():
     """
-    Initialize playbook_settings with defaults (Option B: first play = 100%, others = 0%).
+    Initialize playbook_settings with defaults: Even distribution across all plays in each container.
+    
+    ✅ UPDATED (February 2025): Changed from first play = 100% to even distribution.
+    Standard and PF position filters are enabled by default.
     
     Returns:
         dict: playbook_settings structure with defaults:
-        - motion: {first_play_name: 100}
-        - set_play_inside: {first_play_name: 100}
-        - set_play_attack: {first_play_name: 100}
-        - set_play_outside: {first_play_name: 100}
-        - zone_defense: {"2-3 Zone": 100}
-        - man_defense: {"Man": 100}
+        - motion: {play_name: percentage} - Evenly distributed across all motion plays
+        - set_play_inside: {play_name: percentage} - Evenly distributed across all inside set plays
+        - set_play_attack: {play_name: percentage} - Evenly distributed across all attack set plays
+        - set_play_outside: {play_name: percentage} - Evenly distributed across all outside set plays
+        - zone_defense: {defense_name: percentage} - Evenly distributed across all zone defenses
+        - man_defense: {"Man": 100} - Only one man defense exists
         - slot_assignments: {}
         - motion_dropdowns: {}
         - position_filters: {standard: [...], PG: [], SG: [], SF: [], PF: [...], C: []}
@@ -269,30 +272,68 @@ def initialize_playbook_settings():
                 elif play_focus == "outside":
                     set_plays_outside.append(play_name)
         
-        # Sort plays by name for consistency, then set first play to 100%
+        # ✅ UPDATED (February 2025): Even distribution across all plays in each container
+        # Sort plays by name for consistency, then distribute evenly
         if motion_plays:
             motion_plays.sort()
-            playbook_settings["motion"][motion_plays[0]] = 100
+            percentage_per_play = 100.0 / len(motion_plays)
+            # Distribute with rounding to ensure total = 100%
+            remainder = 100.0
+            for i, play_name in enumerate(motion_plays):
+                if i == len(motion_plays) - 1:
+                    # Last play gets remainder to ensure total = 100%
+                    playbook_settings["motion"][play_name] = round(remainder)
+                else:
+                    playbook_settings["motion"][play_name] = round(percentage_per_play)
+                    remainder -= round(percentage_per_play)
         
         if set_plays_inside:
             set_plays_inside.sort()
-            playbook_settings["set_play_inside"][set_plays_inside[0]] = 100
+            percentage_per_play = 100.0 / len(set_plays_inside)
+            remainder = 100.0
+            for i, play_name in enumerate(set_plays_inside):
+                if i == len(set_plays_inside) - 1:
+                    playbook_settings["set_play_inside"][play_name] = round(remainder)
+                else:
+                    playbook_settings["set_play_inside"][play_name] = round(percentage_per_play)
+                    remainder -= round(percentage_per_play)
         
         if set_plays_attack:
             set_plays_attack.sort()
-            playbook_settings["set_play_attack"][set_plays_attack[0]] = 100
+            percentage_per_play = 100.0 / len(set_plays_attack)
+            remainder = 100.0
+            for i, play_name in enumerate(set_plays_attack):
+                if i == len(set_plays_attack) - 1:
+                    playbook_settings["set_play_attack"][play_name] = round(remainder)
+                else:
+                    playbook_settings["set_play_attack"][play_name] = round(percentage_per_play)
+                    remainder -= round(percentage_per_play)
         
         if set_plays_outside:
             set_plays_outside.sort()
-            playbook_settings["set_play_outside"][set_plays_outside[0]] = 100
+            percentage_per_play = 100.0 / len(set_plays_outside)
+            remainder = 100.0
+            for i, play_name in enumerate(set_plays_outside):
+                if i == len(set_plays_outside) - 1:
+                    playbook_settings["set_play_outside"][play_name] = round(remainder)
+                else:
+                    playbook_settings["set_play_outside"][play_name] = round(percentage_per_play)
+                    remainder -= round(percentage_per_play)
         
-        # Zone defense: first zone gets 100%
+        # Zone defense: Even distribution across all zone defenses
         # Zone defenses are hardcoded: "2-3 Zone", "3-2 Zone", "1-3-1 Zone"
         zone_defenses = ["2-3 Zone", "3-2 Zone", "1-3-1 Zone"]
         if zone_defenses:
-            playbook_settings["zone_defense"][zone_defenses[0]] = 100
+            percentage_per_defense = 100.0 / len(zone_defenses)
+            remainder = 100.0
+            for i, defense_name in enumerate(zone_defenses):
+                if i == len(zone_defenses) - 1:
+                    playbook_settings["zone_defense"][defense_name] = round(remainder)
+                else:
+                    playbook_settings["zone_defense"][defense_name] = round(percentage_per_defense)
+                    remainder -= round(percentage_per_defense)
         
-        # Man defense: "Man" gets 100%
+        # Man defense: "Man" gets 100% (only one man defense exists)
         playbook_settings["man_defense"]["Man"] = 100
         
         # Initialize position filters with play assignments
