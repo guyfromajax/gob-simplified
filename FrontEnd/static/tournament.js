@@ -1163,7 +1163,8 @@ async function loadRoster() {
     console.log('Tournament stats loaded:', stats.length, 'players');
     if (DEBUG_TEAM_STATS && roster[0]) {
       const first = roster[0];
-      const s = pstats[first.id]?.stats?.Season || {};
+      // ✅ MIGRATION: Read from season key (aligns with Franchise)
+      const s = pstats[first.id]?.season || pstats[first.id]?.stats?.Season || {};
       console.log("[DebugTournamentStats]", {
         tournamentId: tournament?._id,
         teamId: userTeamId,
