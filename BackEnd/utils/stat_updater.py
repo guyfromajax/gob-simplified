@@ -299,6 +299,7 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                 # ✅ FIX: After incrementing, calculate per_game and percentages from updated stats
                 # Only do this if the update was successful
                 if result.modified_count > 0:
+                    logger.info(f"✅ [APPLY-STATS] Tournament mode - Player {query_pid}: Stats updated successfully, reloading to calculate per_game and percentages")
                     # Reload the tournament document to get updated season stats
                     updated_tournament_doc = tournaments_collection.find_one(
                         {"_id": tid},
@@ -307,10 +308,12 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                     if updated_tournament_doc:
                         updated_player = updated_tournament_doc.get("players", {}).get(str(query_pid), {})
                         updated_season = updated_player.get("season", {})
+                        logger.info(f"🔍 [APPLY-STATS] Tournament mode - Player {query_pid}: Updated season stats - GP: {updated_season.get('GP', 0)}, PTS: {updated_season.get('PTS', 0)}")
                         
                         # Calculate per_game and percentages
                         season_per_game = _per_game_block(updated_season)
                         season_percentages = _pct_block(updated_season)
+                        logger.info(f"🔍 [APPLY-STATS] Tournament mode - Player {query_pid}: Calculated per_game and percentages, updating tournament document")
                         
                         # Update with calculated fields and mark as applied
                         tournaments_collection.update_one(
@@ -325,6 +328,11 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                                 }
                             }
                         )
+                        logger.info(f"✅ [APPLY-STATS] Tournament mode - Player {query_pid}: per_game and percentages updated successfully")
+                    else:
+                        logger.error(f"❌ [APPLY-STATS] Tournament mode - Player {query_pid}: Failed to reload updated tournament document")
+                else:
+                    logger.warning(f"⚠️ [APPLY-STATS] Tournament mode - Player {query_pid}: Update did not modify document (matched_count: {result.matched_count}, modified_count: {result.modified_count})")
 
 
 def recompute_tournament_leaders(tournament_id: str, limit: int = 10) -> Dict[str, Any]:
