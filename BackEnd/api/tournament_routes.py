@@ -514,9 +514,71 @@ def save_result(request: TournamentResultRequest):
     return {"status": "success"}
 
 
+@router.get("/tournament/command-center/data")
+def tournament_command_center_data(tournament_id: str = Query(...)):
+    """
+    Return structured command center data for a tournament.
+    
+    ✅ MIGRATION (Task 4.1): Aligned with Franchise mode pattern.
+    Returns structured response matching /franchise/command-center/data format.
+    """
+    try:
+        tid = ObjectId(tournament_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid tournament_id")
+    
+    doc = tournaments_collection.find_one({"_id": tid})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    
+    # Get user team identifiers from tournament document
+    user_team_id_name, user_team_object_id = get_user_team_from_tournament(doc)
+    
+    # Get training status
+    training_status = doc.get("training_status", {})
+    training_completed = training_status.get("training_completed", False)
+    session_type = training_status.get("session_type", "pre-tournament")
+    current_round = training_status.get("round", doc.get("current_round", 1))
+    
+    # Get team stats from tournament teams object or universal teams collection
+    team_doc = {}
+    if user_team_object_id:
+        # Try tournament-specific team object first
+        tournament_teams = doc.get("teams", {})
+        tournament_team_obj = tournament_teams.get(user_team_object_id, {})
+        if tournament_team_obj:
+            team_doc = tournament_team_obj.get("team_attributes", {})
+        else:
+            # Fallback to universal team doc
+            team_doc = teams_collection.find_one({"_id": ObjectId(user_team_object_id)}) or {}
+    elif user_team_id_name:
+        # Fallback: resolve by team name
+        team_doc = teams_collection.find_one({"name": user_team_id_name}) or {}
+    
+    response = {
+        "team": user_team_id_name,
+        "team_id": user_team_object_id,  # ✅ SS&S: Include ObjectId for consistent navigation
+        "team_chemistry": team_doc.get("team_chemistry", 0),
+        "offense": team_doc.get("offense", "-"),
+        "defense": team_doc.get("defense", "-"),
+        "athleticism": team_doc.get("athleticism", "-"),
+        "training_completed": training_completed,
+        "session_type": session_type,
+        "current_round": doc.get("current_round", 1),
+        "completed": doc.get("completed", False),
+        "bracket": doc.get("bracket", {}),
+    }
+    
+    return response
+
+
 @router.get("/tournament/state")
 def tournament_state(tournament_id: str = Query(...)):
-    """Return the current bracket state for a tournament."""
+    """Return the current bracket state for a tournament.
+    
+    ⚠️ DEPRECATED: Use /tournament/command-center/data for structured response.
+    This endpoint is kept for backward compatibility and returns the full tournament document.
+    """
     try:
         tid = ObjectId(tournament_id)
     except Exception:
