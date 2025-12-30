@@ -221,15 +221,27 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                 # ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
                 # Wrap metadata in meta object (matches Franchise pattern)
                 # ✅ FIX: Preserve existing meta.team_id from tournament document if it exists
+                # ✅ FIX: Ensure team name matches bracket team names (for leaders filtering)
+                # Use player_doc team name as source of truth (it matches teams collection)
+                # This ensures meta.team matches bracket team names exactly
+                team_name = player_doc.get("team", existing_meta.get("team", ""))
                 meta = {
                     "first_name": player_doc.get("first_name", existing_meta.get("first_name", "")),
                     "last_name": player_doc.get("last_name", existing_meta.get("last_name", "")),
-                    "team": player_doc.get("team", existing_meta.get("team", "")),
+                    "team": team_name,  # ✅ FIX: Use player_doc team name to match bracket
                 }
                 # ✅ FIX: Preserve team_id from tournament document first, then fallback to player_doc
+                # This ensures team_id is always set (required for team stats aggregation)
                 team_id = existing_meta.get("team_id") or player_doc.get("team_id")
                 if team_id:
                     meta["team_id"] = str(team_id)
+                elif player_doc.get("team"):
+                    # ✅ FIX: If team_id not found, resolve from team name to ensure it's set
+                    # teams_collection is already imported at module level
+                    team_doc = teams_collection.find_one({"name": player_doc.get("team")})
+                    if team_doc and team_doc.get("_id"):
+                        meta["team_id"] = str(team_doc["_id"])
+                        team_id = meta["team_id"]
                 
                 # Update tournament document with stat increments and metadata
                 tournament_update: Dict[str, Any] = {
