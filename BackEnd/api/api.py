@@ -135,8 +135,10 @@ def load_player_attributes_from_doc(mode: str, doc_id: str, player_id: str):
         try:
             doc = tournaments_collection.find_one({"_id": ObjectId(doc_id)})
             if doc:
-                player_stats = doc.get("player_stats", {}).get(player_id, {})
-                attrs = player_stats.get("attributes", {})
+                # ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
+                tournament_players = doc.get("players", {}) or doc.get("player_stats", {})  # Backward compatibility
+                player_data = tournament_players.get(player_id, {})
+                attrs = player_data.get("attributes", {})
                 if attrs:
                     return {
                         "EM": attrs.get("EM"),

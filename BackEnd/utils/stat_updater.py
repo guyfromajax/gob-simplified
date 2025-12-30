@@ -182,15 +182,25 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                 season_stats = (
                     player_doc.get("stats", {}).get("season", {}) if isinstance(player_doc, dict) else {}
                 )
-                player_entry = {
+                # ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
+                # Wrap metadata in meta object (matches Franchise pattern)
+                meta = {
                     "first_name": player_doc.get("first_name", ""),
                     "last_name": player_doc.get("last_name", ""),
                     "team": player_doc.get("team", ""),
-                    "season": season_stats,
+                }
+                # Get team_id if available
+                team_id = player_doc.get("team_id")
+                if team_id:
+                    meta["team_id"] = str(team_id)
+                
+                player_entry = {
+                    "meta": meta,  # ✅ MIGRATION: Wrap metadata in meta object
+                    "season": season_stats,  # ✅ MIGRATION: Tournament only tracks season stats (no career)
                 }
                 tournaments_collection.update_one(
                     {"_id": tid},
-                    {"$set": {f"player_stats.{str(query_pid)}": player_entry}},
+                    {"$set": {f"players.{str(query_pid)}": player_entry}},
                 )
 
 
@@ -218,16 +228,26 @@ def recompute_tournament_leaders(tournament_id: str, limit: int = 10) -> Dict[st
     teams.discard(None)
 
     players: list[Dict[str, Any]] = []
-    for pid, pdata in tourney.get("player_stats", {}).items():
-        if pdata.get("team") not in teams:
+    # ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
+    tournament_players = tourney.get("players", {}) or tourney.get("player_stats", {})  # Backward compatibility
+    for pid, pdata in tournament_players.items():
+        # ✅ MIGRATION: Support both old (direct fields) and new (meta wrapper) structures
+        meta = pdata.get("meta", {})
+        team_name = meta.get("team") or pdata.get("team", "")
+        if team_name not in teams:
             continue
+        
+        first_name = meta.get("first_name") or pdata.get("first_name", "")
+        last_name = meta.get("last_name") or pdata.get("last_name", "")
+        season_stats = pdata.get("season", {})
+        
         players.append(
             {
                 "player_id": str(pid),
-                "first_name": pdata.get("first_name", ""),
-                "last_name": pdata.get("last_name", ""),
-                "team_name": pdata.get("team", ""),
-                "stats": pdata.get("season", {}),
+                "first_name": first_name,
+                "last_name": last_name,
+                "team_name": team_name,
+                "stats": season_stats,
             }
         )
 

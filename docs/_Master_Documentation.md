@@ -896,9 +896,10 @@ These variables provide additional context for navigation but aren't required fo
    - **Initialization Range:** `shot_threshold` is initialized with `random.randint(-10, 190)` for all game modes (center at 90 for pill display)
 
 2. **Player Stats, Player Attributes**
-   - Player Stats: Tournament statistics (PTS, REB, AST, etc.)
+   - Player Stats: Tournament statistics (PTS, REB, AST, etc.) - **✅ MIGRATION (February 2025):** Stored in `players.{player_id}` (not `player_stats`)
    - Player Attributes: All 30+ attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, NG, EM, MO, CH, etc.) with `anchor_` prefixed versions
    - Position Ratings: PG, SG, SF, PF, C ratings
+   - **Note:** Tournament mode only tracks season stats (no career stats, unlike Franchise mode)
 
 3. **Plays Data**
    - `plays[playName].effectiveness` (0-100) - Evolves via training and gameplay
@@ -916,7 +917,7 @@ These variables provide additional context for navigation but aren't required fo
    - Defense Types: Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone, vs_Fast_Break, FCP, HCT
 
 5. **Training Reports (User Team Only)**
-   - Stored in `teams.{user_team_id}.training_reports.{round}`
+   - Stored in `teams.{user_team_object_id}.training_reports.{round}` (keyed by ObjectId, not team name)
    - Also stored in `latest_training` at document level for quick access
    - Includes player changes, team changes, coaching focus, session type, round
 
@@ -1059,7 +1060,17 @@ These variables provide additional context for navigation but aren't required fo
       }
     },
     players: {                                 // nested object
-      // player data
+      "player_id": {                          // Keyed by player ObjectId (string)
+        "meta": {
+          "first_name": "...",
+          "last_name": "...",
+          "team": "...",
+          "team_id": "..."                     // ObjectId string
+        },
+        "attributes": {...},                   // All 30+ attributes with anchor_ prefixed versions
+        "position_ratings": {...},            // PG, SG, SF, PF, C ratings
+        "season": {...}                        // Tournament statistics (no career stats)
+      }
     }
   }
   ```
@@ -1106,8 +1117,9 @@ These variables provide additional context for navigation but aren't required fo
 - Game document is created in `games_collection` with `tournament_id` reference
 
 **GP → GMO (Returning from Gameplay):**
-- Game stats are rolled up to tournament document via `rollup_game_to_tournament()`
-- Player stats, team stats, plays stats, scouting stats are aggregated
+- Game stats are rolled up to tournament document via `finalize_game()` → `apply_stats_from_summary()`
+- Player stats written to `players.{pid}.season` (✅ MIGRATION: changed from `player_stats` in February 2025)
+- Team stats, plays stats, scouting stats are aggregated
 - Game Plan and Playbooks settings persist (unchanged unless user modified during gameplay)
 
 **GMO → GMO (Navigation Between Screens):**
@@ -1167,7 +1179,152 @@ These variables provide additional context for navigation but aren't required fo
 **From GP (Returning to GMO):**
 - Preserve `mode`, `tournament_id`, `team_id`
 - Remove `game_id` from navigation anchor set
-- Stats rolled up to tournament document
+- Stats rolled up to tournament document via `finalize_game()` → `apply_stats_from_summary()`
+
+#### Stats Tracking
+
+**Storage Path:** `tournament_document.players.{player_id}`
+
+**⚠️ CRITICAL - Single Source of Truth:** All player stats (season only) are stored in the `players` object, NOT in `player_stats`. The `players` object is the authoritative location for:
+- Player metadata (`meta`: first_name, last_name, team, team_id)
+- Evolved attributes (`attributes`: all 30+ attributes with `anchor_` prefixed versions)
+- Evolved position ratings (`position_ratings`: PG, SG, SF, PF, C ratings)
+- Season stats (`season`: PTS, REB, AST, etc. - direct totals)
+- **Note:** Tournament mode does NOT track career stats (unlike Franchise mode)
+
+**Structure:**
+```javascript
+{
+  players: {
+    "player_id": {  // Keyed by player ObjectId (string)
+      "meta": {
+        "first_name": "CJ",
+        "last_name": "Castleman",
+        "team": "Bentley-Truman",
+        "team_id": "BENTLEY_TRUMAN"
+      },
+      "attributes": {
+        "SC": 78,  // Evolved from training
+        "SH": 73,
+        "anchor_SC": 78,
+        // ... all 30+ attributes
+      },
+      "position_ratings": {
+        "PG": 70,
+        "SG": 85,
+        "SF": 92,
+        "PF": 72,
+        "C": 55
+      },
+      "season": {
+        "PTS": 450,
+        "REB": 120,
+        "AST": 85,
+        "FGM": 180,
+        "FGA": 400,
+        "GP": 5,
+        // ... all stat fields (direct totals, no wrapper)
+      }
+    }
+  }
+}
+```
+
+**Stats Rollup Process:**
+
+1. **After Game Completion:**
+   - `finalize_game()` reads from game document's `box_score` to get all player stats
+   - `apply_stats_from_summary()` increments `players.{pid}.season.{stat}` for tournament mode
+   - Both functions use `$inc` operator to increment totals
+   - `applied_games` array prevents double-counting (game_id added after rollup)
+
+2. **Box Score Structure (Game Documents):**
+   
+   **Storage Location:** `games_collection` game documents
+   
+   **Structure:** `box_score` is stored nested under team objects in the game document (same as Franchise mode):
+   ```javascript
+   {
+     home_team: {
+       name: "Morristown",
+       box_score: {
+         "PG": { name: "Player Name", playerId: "...", jersey: 1, FGM: 5, FGA: 10, PTS: 12, ... },
+         "SG": { ... },
+         // ... all 12 players (lineup + bench)
+       }
+     },
+     away_team: {
+       name: "Bentley-Truman",
+       box_score: { ... }
+     }
+   }
+   ```
+
+3. **Stat Fields:**
+   - All standard box score stats: `PTS`, `REB`, `AST`, `STL`, `BLK`, `FGM`, `FGA`, `3PTM`, `3PTA`, `FTM`, `FTA`, `TO`, `F`, `MIN`, etc.
+   - `MIN` is converted from seconds (game) to minutes (season) during rollup
+   - `GP` (Games Played) is incremented by 1 for each game
+   - **Note:** Frontend displays `3PTM`/`3PTA` but maps to `TPM`/`TPA` for display compatibility
+
+4. **Team Stats Aggregation:**
+   - Team stats are calculated by aggregating all player stats from `players` object
+   - Filter by `meta.team_id` to get players for a specific team
+   - Sum all stat fields across players on that team
+   - Stored in `tournament_teams.{team_id}` or computed on-demand for display
+
+**Why `players` and Not `player_stats`:**
+
+- **`players`** is the complete player data structure used throughout the system:
+  - Training system writes to `players.{pid}.attributes`
+  - Frontend expects `tournamentDoc.players[playerId].season`
+  - `recompute_tournament_leaders()` reads from `players.{pid}`
+  - Architecture documentation specifies `players` structure
+  - Single unified location for all player data (attributes + stats)
+  - **✅ MIGRATION (February 2025):** Aligned with Franchise mode structure for consistency
+
+- **`player_stats`** was the old structure (pre-migration):
+  - Only contained stats (no attributes, no position_ratings)
+  - Not used by training system
+  - Not expected by frontend
+  - Created dual storage paths = inconsistency
+  - **Status:** Deprecated, migration script available to convert existing tournaments
+
+**API Endpoints for Stats:**
+
+- `GET /api/tournament/state` - Returns full tournament document including `players` object
+- `GET /api/tournament/roster` - Returns roster with player attributes (stats loaded separately from `players`)
+- `GET /api/tournament/team-stats` - Aggregates from `players` object, filters by `meta.team_id`
+- `GET /api/game/{game_id}` - Returns game state including `box_score`
+  - **Box Score Handling:** Builds `box_score` from nested `home_team["box_score"]` and `away_team["box_score"]` if not found at top level
+  - **Includes:** All players (lineup + bench) with game stats for display
+
+**Frontend Loading Pattern:**
+
+```javascript
+// ✅ CORRECT: Load stats from players object
+const tournamentDoc = await fetchJSON(`/api/tournament/state?tournament_id=${tournamentId}`);
+const playerStats = tournamentDoc.players[playerId];
+const seasonStats = playerStats?.season || {};
+```
+
+**Backend Rollup Pattern:**
+
+```python
+# ✅ CORRECT: Write to players object
+inc_doc[f"players.{pid}.season.{stat}"] = val
+inc_doc[f"players.{pid}.season.GP"] = 1
+
+tournaments_collection.update_one(
+    {"_id": tid, "applied_games": {"$ne": game_id}},
+    {"$inc": inc_doc, "$addToSet": {"applied_games": game_id}}
+)
+```
+
+**Key Differences from Franchise Mode:**
+
+- **Career Stats:** Tournament mode does NOT track career stats (only season stats)
+- **Storage Key:** Uses `players` (same as Franchise, aligned in February 2025 migration)
+- **Stats Scope:** Only tournament-specific stats (no cross-season tracking)
 
 ---
 
