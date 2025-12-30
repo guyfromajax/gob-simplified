@@ -658,6 +658,7 @@ class GameManager:
                         #         "possession_change": possession_changed,
                         #     }
                         # )
+                        pass  # Event validation logging commented out
                     elif detected_event:
                         # Log successful event detection (info level, not warning)
                         # Use len(turns) to match frontend turnCount (turn has already been added at this point)
