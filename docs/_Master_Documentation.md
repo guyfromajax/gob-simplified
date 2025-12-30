@@ -978,10 +978,13 @@ These variables are stored in the database tournament document and track the cur
    - **Example:** `user_team_id="Morristown"`
 
 5. **`user_team_object_id`** (ObjectId string)
-   - **What it does:** Database ObjectId for the user's team (same value as `team_id` in URLs) - the database key that matches the URL parameter
+   - **What it does:** User's team ObjectId (database identifier) - the authoritative source of truth for team operations
    - **Where it lives:** Database: `tournaments.{tournament_id}.user_team_object_id`
    - **Nested?** No - top-level field in the tournament document
    - **Relationship:** `user_team_object_id === team_id` (URL param)
+   - **⚠️ CRITICAL - SOURCE OF TRUTH:** This is the **authoritative value** for the user's team. All backend operations (training, training reports, game plan, playbooks) must use this value from the tournament document, not from URL parameters. If URL `team_id` doesn't match `user_team_object_id`, use the tournament document value.
+   - **Initialization:** When a tournament is created, `user_team_object_id` is automatically resolved from `user_team_id` (team name) by looking up the team in the `teams` collection. This matches the Franchise mode pattern.
+   - **Backward Compatibility:** For old tournaments missing this field, `get_user_team_from_tournament()` will automatically resolve it from `user_team_id` (team name) when needed.
    - **Example:** `user_team_object_id="507f1f77bcf86cd799439011"`
 
 6. **`current_round`** (integer)
