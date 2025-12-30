@@ -1097,15 +1097,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         if not doc:
             raise HTTPException(status_code=404, detail=f"{mode.capitalize()} document not found")
         
-        # Ensure team objects exist first (this will create them if missing)
-        ensure_team_objects_exist(mode, doc_id, team_id)
-        
-        # Reload document to get updated team objects (including any position filter updates)
-        if mode == "single":
-            doc = collection.find_one({"_id": doc_id})
-        else:
-            doc = collection.find_one({"_id": ObjectId(doc_id)})
-        
+        # ✅ FIX: Get authoritative team_id FIRST, then ensure team objects exist
         # Get team plays
         # ✅ SS&S: Use document's user_team_object_id as authoritative source (aligns with Franchise pattern)
         if mode == "franchise":
@@ -1120,10 +1112,6 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             # Log if URL team_id doesn't match (for debugging)
             if team_id and team_id != authoritative_team_id:
                 logger.warning(f"⚠️ [GET PLAYBOOKS] URL team_id ({team_id}) doesn't match franchise document user_team_object_id ({authoritative_team_id}). Using franchise document value.")
-            
-            franchise_teams = doc.get("franchise_teams", {})
-            team_obj = franchise_teams.get(authoritative_team_id, {})
-            actual_team_id = authoritative_team_id
         elif mode == "tournament":
             # ✅ MIGRATION: Use tournament document's user_team_object_id as source of truth
             user_team_id_name, user_team_object_id = get_user_team_from_tournament(doc)
@@ -1136,7 +1124,25 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             # Log if URL team_id doesn't match (for debugging)
             if team_id and team_id != authoritative_team_id:
                 logger.warning(f"⚠️ [GET PLAYBOOKS] URL team_id ({team_id}) doesn't match tournament document user_team_object_id ({authoritative_team_id}). Using tournament document value.")
-            
+        else:
+            # For single mode, use the provided team_id
+            authoritative_team_id = team_id
+        
+        # ✅ FIX: Now ensure team objects exist with the authoritative team_id
+        ensure_team_objects_exist(mode, doc_id, authoritative_team_id)
+        
+        # Reload document to get updated team objects (including any position filter updates)
+        if mode == "single":
+            doc = collection.find_one({"_id": doc_id})
+        else:
+            doc = collection.find_one({"_id": ObjectId(doc_id)})
+        
+        # Get team_obj using authoritative team_id
+        if mode == "franchise":
+            franchise_teams = doc.get("franchise_teams", {})
+            team_obj = franchise_teams.get(authoritative_team_id, {})
+            actual_team_id = authoritative_team_id
+        elif mode == "tournament":
             teams = doc.get("teams", {})
             team_obj = teams.get(authoritative_team_id, {})
             actual_team_id = authoritative_team_id
