@@ -1,10 +1,13 @@
 from typing import Any, Dict
+import logging
 
 from bson import ObjectId
 from pymongo import ReturnDocument
 
 from BackEnd.constants import BOX_SCORE_KEYS
 from BackEnd.db import db, players_collection, tournaments_collection, games_collection, teams_collection
+
+logger = logging.getLogger(__name__)
 
 
 def _clean_stat_block(stats: Dict[str, Any]) -> Dict[str, float]:
@@ -185,14 +188,17 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
             except Exception:
                 tid = None
             if tid:
+                logger.info(f"🔍 [APPLY-STATS] Tournament mode - Processing player {query_pid} for tournament {tournament_id}")
                 # ✅ FIX: Get existing player entry from tournament document to preserve meta.team_id
                 tournament_doc = tournaments_collection.find_one(
                     {"_id": tid},
                     {f"players.{str(query_pid)}": 1}
                 )
+                logger.info(f"🔍 [APPLY-STATS] Tournament mode - Found tournament doc: {bool(tournament_doc)}, has players key: {bool(tournament_doc.get('players') if tournament_doc else False)}")
                 existing_player = tournament_doc.get("players", {}).get(str(query_pid), {}) if tournament_doc else {}
                 existing_meta = existing_player.get("meta", {})
                 existing_season = existing_player.get("season", {})
+                logger.info(f"🔍 [APPLY-STATS] Tournament mode - Player {query_pid}: existing_meta.team: {existing_meta.get('team')}, existing_meta.team_id: {existing_meta.get('team_id')}, existing_season.GP: {existing_season.get('GP', 0)}")
                 
                 # ✅ FIX: For tournament mode, accumulate stats from game summary (not from players_collection)
                 # This ensures tournament stats only include tournament games, not all games
@@ -259,6 +265,7 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                 
                 # ✅ FIX: Check if game already applied (idempotency check)
                 # Check if applied_games array exists and contains this token
+                logger.info(f"🔍 [APPLY-STATS] Tournament mode - Player {query_pid}: Checking idempotency, token: {token}")
                 check_doc = tournaments_collection.find_one(
                     {"_id": tid},
                     {f"players.{str(query_pid)}.season.applied_games": 1}
@@ -267,12 +274,16 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                     player_data = check_doc.get("players", {}).get(str(query_pid), {})
                     season_data = player_data.get("season", {})
                     applied_games = season_data.get("applied_games", [])
+                    logger.info(f"🔍 [APPLY-STATS] Tournament mode - Player {query_pid}: Existing applied_games: {applied_games}")
                     if isinstance(applied_games, list) and token in applied_games:
+                        logger.warning(f"⚠️ [APPLY-STATS] Tournament mode - Player {query_pid}: Game {token} already in applied_games, skipping (idempotent)")
                         continue  # Already applied, skip
                 
                 # Apply the update with idempotency check
                 # Use $nin (not in) to check if token is not in the applied_games array
                 # Also handle case where applied_games doesn't exist yet
+                logger.info(f"🔍 [APPLY-STATS] Tournament mode - Player {query_pid}: Executing update_one with idempotency check (token not in applied_games)")
+                logger.info(f"🔍 [APPLY-STATS] Tournament mode - Player {query_pid}: tournament_inc_doc has {len(tournament_inc_doc)} fields to increment")
                 result = tournaments_collection.update_one(
                     {
                         "_id": tid,
@@ -283,6 +294,7 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                     },
                     tournament_update,
                 )
+                logger.info(f"🔍 [APPLY-STATS] Tournament mode - Player {query_pid}: Update result - matched_count: {result.matched_count}, modified_count: {result.modified_count}")
                 
                 # ✅ FIX: After incrementing, calculate per_game and percentages from updated stats
                 # Only do this if the update was successful

@@ -492,11 +492,11 @@ class GameManager:
                 old_offense = self.offense_team.name
                 self.switch_possession()
                 last_turn["possession_flips"] = False  # Clear flag
-                logging.warning(f"🔄 [MAKE→BIP] Flipped possession before BASELINE_INBOUND: {old_offense} → {self.offense_team.name}")
+                # logging.warning(f"🔄 [MAKE→BIP] Flipped possession before BASELINE_INBOUND: {old_offense} → {self.offense_team.name}")
             
             # Get next_defensive_setup from the made shot turn
             next_defensive_setup = last_turn.get("next_defensive_setup")
-            logging.warning(f"✅ [BIP CREATE] Creating BASELINE_INBOUND, next_defensive_setup={next_defensive_setup}, offense_team={self.offense_team.name}")
+            # logging.warning(f"✅ [BIP CREATE] Creating BASELINE_INBOUND, next_defensive_setup={next_defensive_setup}, offense_team={self.offense_team.name}")
             
             inbound_payload = self.turn_manager.setup_baseline_inbound(next_defensive_setup=next_defensive_setup)
             
@@ -604,9 +604,9 @@ class GameManager:
             if not is_valid and error_msg:
                 # Use len(turns) to match frontend turnCount (turn has already been added at this point)
                 turn_num = len(self.turns)
-                logging.warning(
-                    f"⚠️ [TRANSITION VALIDATION] Invalid transition detected in turn #{turn_num}: {error_msg}",
-                    extra={
+                # logging.warning(
+                #     f"⚠️ [TRANSITION VALIDATION] Invalid transition detected in turn #{turn_num}: {error_msg}",
+                #     extra={
                         "turn_number": turn_num,
                         "from_result_type": from_result.get("result_type"),
                         "from_result_text": from_result.get("text", "")[:50],
@@ -648,9 +648,9 @@ class GameManager:
                     )
                     
                     if not event_valid and event_error:
-                        logging.warning(
-                            f"⚠️ [EVENT VALIDATION] {event_error}",
-                            extra={
+                        # logging.warning(
+                        #     f"⚠️ [EVENT VALIDATION] {event_error}",
+                        #     extra={
                                 "turn_number": len(self.turns),
                                 "detected_event": detected_event,
                                 "from_turn_type": from_turn_type.value,

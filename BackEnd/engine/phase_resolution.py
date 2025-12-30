@@ -1670,16 +1670,16 @@ def _check_standard_fouls(calibrated_o_foul, calibrated_d_foul):
     """
     foul_roll = random.randint(1, 100)
     # logging.warning(f"🔍 [HCO RESOLUTION] Standard Foul Check:")
-    logging.warning(f"   Roll: {foul_roll} (1-100)")
-    logging.warning(f"   O_FOUL threshold: <= {calibrated_o_foul}")
-    logging.warning(f"   D_FOUL threshold: >= {calibrated_d_foul}")
+    # logging.warning(f"   Roll: {foul_roll} (1-100)")
+    # logging.warning(f"   O_FOUL threshold: <= {calibrated_o_foul}")
+    # logging.warning(f"   D_FOUL threshold: >= {calibrated_d_foul}")
     if foul_roll <= calibrated_o_foul:
         logging.warning(f"   ✅ RESULT: O_FOUL (roll {foul_roll} <= {calibrated_o_foul})")
         logging.warning("")  # Blank line after standard foul check
         return ("O_FOUL", None, None)
     elif foul_roll >= calibrated_d_foul:
-        logging.warning(f"   ✅ RESULT: D_FOUL (roll {foul_roll} >= {calibrated_d_foul})")
-        logging.warning("")  # Blank line after standard foul check
+        # logging.warning(f"   ✅ RESULT: D_FOUL (roll {foul_roll} >= {calibrated_d_foul})")
+        # logging.warning("")  # Blank line after standard foul check
         return ("D_FOUL", None, None)
     else:
         logging.warning(f"   ➡️  No foul ({calibrated_o_foul} < {foul_roll} < {calibrated_d_foul})")
@@ -1721,17 +1721,17 @@ def _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_
     was_adjusted = steal_attempt_rate != base_steal_attempt
     
     # logging.warning(f"🔥 [HCO RESOLUTION] Steal Attempt Check:")
-    logging.warning(f"   Defense team aggression: {aggression_level}")
-    logging.warning(f"   Base STEAL_ATTEMPT: {base_steal_attempt}%")
+    # logging.warning(f"   Defense team aggression: {aggression_level}")
+    # logging.warning(f"   Base STEAL_ATTEMPT: {base_steal_attempt}%")
     if was_adjusted:
         adjustment = steal_attempt_rate - base_steal_attempt
-        logging.warning(f"   ✅ Adjusted by aggression: {base_steal_attempt}% → {steal_attempt_rate}% ({adjustment:+d})")
-    else:
-        logging.warning(f"   ➡️  No adjustment (aggression: {aggression_level})")
-    logging.warning(f"   Final steal attempt rate: {steal_attempt_rate}%")
-    logging.warning(f"   Roll: {steal_roll} (1-100)")
+        # logging.warning(f"   ✅ Adjusted by aggression: {base_steal_attempt}% → {steal_attempt_rate}% ({adjustment:+d})")
+    # else:
+    #     logging.warning(f"   ➡️  No adjustment (aggression: {aggression_level})")
+    # logging.warning(f"   Final steal attempt rate: {steal_attempt_rate}%")
+    # logging.warning(f"   Roll: {steal_roll} (1-100)")
     if steal_roll < steal_attempt_rate:
-        logging.warning(f"   ✅ Steal attempt occurs ({steal_roll} < {steal_attempt_rate})")
+        # logging.warning(f"   ✅ Steal attempt occurs ({steal_roll} < {steal_attempt_rate})")
         # Steal attempt occurs - select random step and determine ball handler/defender
         if skeleton and "steps" in skeleton and len(skeleton["steps"]) > 0:
             steps = skeleton["steps"]
@@ -2562,11 +2562,11 @@ def apply_balancing_system(game, game_state, off_team, def_team):
         if is_trailing:
             # Trailing team gets easier shots
             game_state["balancing_shot_threshold_override"] = -10
-            logging.warning(f"⚖️ [BALANCING] Q{quarter}: {off_team.name} trailing by {abs_score_diff} (threshold: {adjusted_threshold}, fight: {fight}) → shot_threshold = -10")
+            # logging.warning(f"⚖️ [BALANCING] Q{quarter}: {off_team.name} trailing by {abs_score_diff} (threshold: {adjusted_threshold}, fight: {fight}) → shot_threshold = -10")
         else:  # is_leading
             # Leading team gets harder shots
             game_state["balancing_shot_threshold_override"] = 190
-            logging.warning(f"⚖️ [BALANCING] Q{quarter}: {off_team.name} leading by {abs_score_diff} (threshold: {adjusted_threshold}, discipline: {discipline}) → shot_threshold = 190")
+            # logging.warning(f"⚖️ [BALANCING] Q{quarter}: {off_team.name} leading by {abs_score_diff} (threshold: {adjusted_threshold}, discipline: {discipline}) → shot_threshold = 190")
     else:
         # Clear any previous override if threshold not met
         game_state.pop("balancing_shot_threshold_override", None)
