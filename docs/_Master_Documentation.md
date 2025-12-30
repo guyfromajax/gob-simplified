@@ -1111,8 +1111,8 @@ These variables provide additional context for navigation but aren't required fo
 - `applied_games` - Array of game IDs (prevents double-counting stats)
 - `stats` / `leaderboards` - Document-level aggregated statistics
 - `created_at` - Document creation timestamp
-- `user_team_id` - User's team name (string)
-- `user_team_object_id` - User's team ObjectId (string) - **⚠️ SOURCE OF TRUTH for all team operations**
+- `user_team_id` - User's team name (string) - Human-readable identifier
+- `user_team_object_id` - User's team ObjectId (string) - **⚠️ SOURCE OF TRUTH for all team operations** - Automatically resolved from `user_team_id` when tournament is created (matches Franchise mode pattern)
 
 #### Data Flow
 
