@@ -21,6 +21,26 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def get_user_team_from_tournament(tournament_doc: dict) -> tuple[str | None, str | None]:
+    """
+    Get user team identifiers from tournament document.
+    
+    ✅ MIGRATION (February 2025): Created to align with Franchise mode pattern.
+    Uses tournament document's user_team_object_id as authoritative source.
+    
+    Returns:
+        tuple: (user_team_id: team name, user_team_object_id: ObjectId string)
+    """
+    user_team_id = tournament_doc.get("user_team_id")
+    user_team_object_id = tournament_doc.get("user_team_object_id")
+    
+    if user_team_id and user_team_object_id:
+        return (user_team_id, user_team_object_id)
+    
+    # If not found, return None values
+    return (None, None)
+
+
 class StartTournamentRequest(BaseModel):
     """Payload for creating a new tournament."""
     user_team_id: str
