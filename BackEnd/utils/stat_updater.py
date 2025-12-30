@@ -180,16 +180,32 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                 )
                 existing_player = tournament_doc.get("players", {}).get(str(query_pid), {}) if tournament_doc else {}
                 existing_meta = existing_player.get("meta", {})
+                existing_season = existing_player.get("season", {})
                 
+                # ✅ FIX: For tournament mode, accumulate stats from game summary (not from players_collection)
+                # This ensures tournament stats only include tournament games, not all games
+                # Get stats from the game summary's box_score (already processed above)
+                game_stats = _clean_stat_block(stat_block)
+                
+                # Initialize increment document for tournament document
+                tournament_inc_doc: Dict[str, Any] = {}
+                for stat, val in game_stats.items():
+                    # ✅ MIN special handling: Convert seconds to minutes (integer division)
+                    if stat == "MIN":
+                        val = val // 60  # Convert seconds to minutes (integer division)
+                    tournament_inc_doc[f"players.{str(query_pid)}.season.{stat}"] = val
+                
+                # Increment GP (games played)
+                tournament_inc_doc[f"players.{str(query_pid)}.season.GP"] = 1
+                
+                # Get player metadata from players_collection (for name, team, etc.)
                 player_doc = players_collection.find_one(
                     {"_id": query_pid},
-                    {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "stats.season": 1},
+                    {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1},
                 )
                 if not player_doc:
                     continue
-                season_stats = (
-                    player_doc.get("stats", {}).get("season", {}) if isinstance(player_doc, dict) else {}
-                )
+                
                 # ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
                 # Wrap metadata in meta object (matches Franchise pattern)
                 # ✅ FIX: Preserve existing meta.team_id from tournament document if it exists
@@ -203,29 +219,76 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                 if team_id:
                     meta["team_id"] = str(team_id)
                 
-                # ✅ MIGRATION: Calculate per_game and percentages (matches Franchise pattern)
-                # Tournament only tracks season stats (no career), so only calculate season per_game/percentages
-                season_per_game = _per_game_block(season_stats)
-                season_percentages = _pct_block(season_stats)
-                
-                player_entry = {
-                    "meta": meta,  # ✅ MIGRATION: Wrap metadata in meta object
-                    "season": {
-                        **season_stats,  # ✅ MIGRATION: Tournament only tracks season stats (no career)
-                        "per_game": season_per_game,  # ✅ MIGRATION: Calculate per_game averages
-                        "percentages": season_percentages,  # ✅ MIGRATION: Calculate shooting percentages
-                    },
+                # Update tournament document with stat increments and metadata
+                tournament_update: Dict[str, Any] = {
+                    "$inc": tournament_inc_doc,
+                    "$set": {
+                        f"players.{str(query_pid)}.meta": meta,
+                    }
                 }
+                
                 # ✅ FIX: Preserve existing attributes and position_ratings if they exist
                 if "attributes" in existing_player:
-                    player_entry["attributes"] = existing_player["attributes"]
+                    tournament_update["$set"][f"players.{str(query_pid)}.attributes"] = existing_player["attributes"]
                 if "position_ratings" in existing_player:
-                    player_entry["position_ratings"] = existing_player["position_ratings"]
+                    tournament_update["$set"][f"players.{str(query_pid)}.position_ratings"] = existing_player["position_ratings"]
                 
-                tournaments_collection.update_one(
+                # ✅ FIX: Check if game already applied (idempotency check)
+                # Check if applied_games array exists and contains this token
+                check_doc = tournaments_collection.find_one(
                     {"_id": tid},
-                    {"$set": {f"players.{str(query_pid)}": player_entry}},
+                    {f"players.{str(query_pid)}.season.applied_games": 1}
                 )
+                if check_doc:
+                    player_data = check_doc.get("players", {}).get(str(query_pid), {})
+                    season_data = player_data.get("season", {})
+                    applied_games = season_data.get("applied_games", [])
+                    if isinstance(applied_games, list) and token in applied_games:
+                        continue  # Already applied, skip
+                
+                # Apply the update with idempotency check
+                # Use $nin (not in) to check if token is not in the applied_games array
+                # Also handle case where applied_games doesn't exist yet
+                result = tournaments_collection.update_one(
+                    {
+                        "_id": tid,
+                        "$or": [
+                            {f"players.{str(query_pid)}.season.applied_games": {"$exists": False}},
+                            {f"players.{str(query_pid)}.season.applied_games": {"$nin": [token]}}
+                        ]
+                    },
+                    tournament_update,
+                )
+                
+                # ✅ FIX: After incrementing, calculate per_game and percentages from updated stats
+                # Only do this if the update was successful
+                if result.modified_count > 0:
+                    # Reload the tournament document to get updated season stats
+                    updated_tournament_doc = tournaments_collection.find_one(
+                        {"_id": tid},
+                        {f"players.{str(query_pid)}": 1}
+                    )
+                    if updated_tournament_doc:
+                        updated_player = updated_tournament_doc.get("players", {}).get(str(query_pid), {})
+                        updated_season = updated_player.get("season", {})
+                        
+                        # Calculate per_game and percentages
+                        season_per_game = _per_game_block(updated_season)
+                        season_percentages = _pct_block(updated_season)
+                        
+                        # Update with calculated fields and mark as applied
+                        tournaments_collection.update_one(
+                            {"_id": tid},
+                            {
+                                "$set": {
+                                    f"players.{str(query_pid)}.season.per_game": season_per_game,
+                                    f"players.{str(query_pid)}.season.percentages": season_percentages,
+                                },
+                                "$addToSet": {
+                                    f"players.{str(query_pid)}.season.applied_games": token,
+                                }
+                            }
+                        )
 
 
 def recompute_tournament_leaders(tournament_id: str, limit: int = 10) -> Dict[str, Any]:

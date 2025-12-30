@@ -1385,6 +1385,8 @@ function handleTournamentUpdate(doc) {
   renderSchedule();
   renderRoster();
   renderStats();
+  // ✅ FIX: Reload team data to refresh player stats on Team tab
+  loadTeamData();
   updateCTA();
 }
 
