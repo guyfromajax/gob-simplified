@@ -8,6 +8,7 @@ from typing import Optional
 
 from BackEnd.db import db
 from BackEnd.api.franchise_routes import get_user_team_from_franchise
+from BackEnd.api.tournament_routes import get_user_team_from_tournament
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -822,14 +823,48 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
         
-        # ✅ SS&S: Prefer ObjectId directly, resolve name only if needed
-        # Ensure team objects exist (creates if missing)
+        # ✅ SS&S: Use document's user_team_object_id as authoritative source (aligns with Franchise pattern)
+        # Load document to get authoritative team_id
         if mode == "franchise":
-            # For franchise mode, team_id should be ObjectId string
-            franchise_teams = ensure_team_objects_exist(mode, doc_id, team_id)
-            team_obj = franchise_teams.get(team_id, {})
+            doc = collection.find_one({"_id": ObjectId(doc_id)})
+            if not doc:
+                raise HTTPException(status_code=404, detail="Franchise document not found")
+            # ✅ SS&S: Always use franchise document's user_team_object_id as source of truth
+            user_team_id_name, user_team_object_id = get_user_team_from_franchise(doc)
+            if not user_team_id_name or not user_team_object_id:
+                raise HTTPException(status_code=404, detail="User team not found in franchise document")
+            
+            # Use franchise document's user_team_object_id as authoritative team_id
+            authoritative_team_id = user_team_object_id
+            
+            # Log if URL team_id doesn't match (for debugging)
+            if team_id and team_id != authoritative_team_id:
+                logger.warning(f"⚠️ [GET GAMEPLAN] URL team_id ({team_id}) doesn't match franchise document user_team_object_id ({authoritative_team_id}). Using franchise document value.")
+            
+            # Ensure team objects exist (creates if missing)
+            franchise_teams = ensure_team_objects_exist(mode, doc_id, authoritative_team_id)
+            team_obj = franchise_teams.get(authoritative_team_id, {})
+        elif mode == "tournament":
+            doc = collection.find_one({"_id": ObjectId(doc_id)})
+            if not doc:
+                raise HTTPException(status_code=404, detail="Tournament document not found")
+            # ✅ MIGRATION: Use tournament document's user_team_object_id as source of truth
+            user_team_id_name, user_team_object_id = get_user_team_from_tournament(doc)
+            if not user_team_id_name or not user_team_object_id:
+                raise HTTPException(status_code=404, detail="User team not found in tournament document")
+            
+            # Use tournament document's user_team_object_id as authoritative team_id
+            authoritative_team_id = user_team_object_id
+            
+            # Log if URL team_id doesn't match (for debugging)
+            if team_id and team_id != authoritative_team_id:
+                logger.warning(f"⚠️ [GET GAMEPLAN] URL team_id ({team_id}) doesn't match tournament document user_team_object_id ({authoritative_team_id}). Using tournament document value.")
+            
+            # Ensure team objects exist (creates if missing)
+            teams = ensure_team_objects_exist(mode, doc_id, authoritative_team_id)
+            team_obj = teams.get(authoritative_team_id, {})
         else:
-            # For tournament/single mode, try ObjectId first, then resolve name
+            # For single mode, try ObjectId first, then resolve name
             teams = ensure_team_objects_exist(mode, doc_id, team_id)
             actual_team_id = None
             
@@ -953,8 +988,21 @@ def update_gameplan(request: GamePlanUpdateRequest):
             # Log if URL team_id doesn't match (for debugging)
             if request.team_id and request.team_id != actual_team_id:
                 logger.warning(f"⚠️ [GAME PLAN SAVE] URL team_id ({request.team_id}) doesn't match franchise document user_team_object_id ({actual_team_id}). Using franchise document value.")
+        elif request.mode == "tournament":
+            # ✅ MIGRATION: Use tournament document's user_team_object_id as source of truth
+            # This ensures we're always using the correct team, even if URL params are wrong
+            user_team_id_name, user_team_object_id = get_user_team_from_tournament(doc)
+            if not user_team_id_name or not user_team_object_id:
+                raise HTTPException(status_code=404, detail="User team not found in tournament document")
+            
+            # Use tournament document's user_team_object_id as authoritative team_id
+            actual_team_id = user_team_object_id
+            
+            # Log if URL team_id doesn't match (for debugging)
+            if request.team_id and request.team_id != actual_team_id:
+                logger.warning(f"⚠️ [GAME PLAN SAVE] URL team_id ({request.team_id}) doesn't match tournament document user_team_object_id ({actual_team_id}). Using tournament document value.")
         else:
-            # For tournament/single mode, resolve team_id to ObjectId
+            # For single mode, resolve team_id to ObjectId
             try:
                 # Try as ObjectId first
                 test_oid = ObjectId(request.team_id)
