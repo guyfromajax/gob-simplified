@@ -4712,7 +4712,14 @@ def resolve_full_court_press_logic(game: "GameManager"):
         # This prevents duplicate FCP turns (offensive_state must change from "FCP" to "HCO")
         next_play_type = "HCO"
         game_state["offensive_state"] = "HCO"
-    # For DEAD BALL, O_FOUL, D_FOUL: next_play_type stays None (will use side inbound → HCO)
+    elif result_type in ["FOUL", "DEAD BALL"]:
+        # ✅ FIX: Set next_play_type to SIDE_INBOUND for O_FOUL, D_FOUL (non-bonus), and DEAD_BALL_TURNOVER
+        # This ensures frontend knows to transition to side inbound pass, not loop back to FCP
+        # Note: result_type is "FOUL" for both O_FOUL and D_FOUL (converted earlier)
+        # For defensive fouls in bonus, offensive_state is already set to FREE_THROW above
+        if game_state.get("offensive_state") != "FREE_THROW":
+            next_play_type = "SIDE_INBOUND"
+    # For DEAD BALL, O_FOUL, D_FOUL: next_play_type is now set to SIDE_INBOUND (unless FREE_THROW)
     
     # Calculate time elapsed for FCP phase
     fcp_time_elapsed = random.randint(5, 9)
@@ -5685,7 +5692,14 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         # This prevents duplicate HCT turns (offensive_state must change from "HCT" to "HCO")
         next_play_type = "HCO"
         game_state["offensive_state"] = "HCO"
-    # For DEAD BALL, O_FOUL, D_FOUL: next_play_type stays None (will use side inbound → HCO)
+    elif result_type in ["FOUL", "DEAD BALL"]:
+        # ✅ FIX: Set next_play_type to SIDE_INBOUND for O_FOUL, D_FOUL (non-bonus), and DEAD_BALL_TURNOVER
+        # This ensures frontend knows to transition to side inbound pass, not loop back to HCT
+        # Note: result_type is "FOUL" for both O_FOUL and D_FOUL (converted earlier)
+        # For defensive fouls in bonus, offensive_state is already set to FREE_THROW above
+        if game_state.get("offensive_state") != "FREE_THROW":
+            next_play_type = "SIDE_INBOUND"
+    # For DEAD BALL, O_FOUL, D_FOUL: next_play_type is now set to SIDE_INBOUND (unless FREE_THROW)
     
     # Calculate time elapsed for HCT phase
     hct_time_elapsed = random.randint(5, 9)
