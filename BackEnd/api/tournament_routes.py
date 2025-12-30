@@ -415,22 +415,36 @@ def save_result(request: TournamentResultRequest):
                 else request.game_id
             )
             logger.info(f"🔍 [SAVE-RESULT] User game - game_id from request: {request.game_id} (type: {type(request.game_id)}), converted gid: {gid} (type: {type(gid)})")
+            
+            # Try multiple formats to find the game document
+            summary = None
+            # First try: Use gid as-is (ObjectId if conversion succeeded, string otherwise)
             summary = games_collection.find_one({"_id": gid}) or {}
-            logger.info(f"🔍 [SAVE-RESULT] User game - Found game document: {bool(summary)}, has _id: {bool(summary.get('_id'))}, _id value: {summary.get('_id')}")
             if not summary or not summary.get("_id"):
-                logger.error(f"❌ [SAVE-RESULT] User game - Game document not found in games_collection for game_id: {request.game_id}, gid: {gid}")
-                logger.error(f"❌ [SAVE-RESULT] Attempting to find game by string ID: {str(request.game_id)}")
-                # Try finding by string ID as fallback
+                logger.warning(f"⚠️ [SAVE-RESULT] Game not found with gid={gid}, trying string format")
+                # Second try: Use string format
                 try:
-                    summary = games_collection.find_one({"_id": ObjectId(request.game_id)}) or {}
+                    summary = games_collection.find_one({"_id": request.game_id}) or {}
+                except Exception:
+                    pass
+            if not summary or not summary.get("_id"):
+                logger.warning(f"⚠️ [SAVE-RESULT] Game not found with string format, trying ObjectId conversion")
+                # Third try: Convert string to ObjectId
+                try:
+                    oid = ObjectId(request.game_id)
+                    summary = games_collection.find_one({"_id": oid}) or {}
                     if summary and summary.get("_id"):
-                        logger.info(f"✅ [SAVE-RESULT] Found game document using ObjectId conversion")
                         gid = summary.get("_id")
-                    else:
-                        logger.error(f"❌ [SAVE-RESULT] Game document still not found after ObjectId conversion. Cannot proceed with stat finalization.")
-                        # Continue without finalize_game - stats will be lost but game result will be saved
+                        logger.info(f"✅ [SAVE-RESULT] Found game document using ObjectId conversion: {gid}")
                 except Exception as e:
                     logger.error(f"❌ [SAVE-RESULT] Error converting game_id to ObjectId: {e}")
+            
+            logger.info(f"🔍 [SAVE-RESULT] User game - Final lookup result: Found={bool(summary and summary.get('_id'))}, _id={summary.get('_id') if summary else None}")
+            
+            if not summary or not summary.get("_id"):
+                logger.error(f"❌ [SAVE-RESULT] Game document not found in games_collection after all attempts. game_id: {request.game_id}, gid: {gid}")
+                logger.error(f"❌ [SAVE-RESULT] This likely means the game document was never saved to the database.")
+                logger.error(f"❌ [SAVE-RESULT] Check if simulate_quarter_endpoint successfully saved the game document.")
             score_map = (
                 summary.get("score")
                 or summary.get("final_score")
