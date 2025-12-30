@@ -574,10 +574,22 @@ function renderSchedule(data) {
   container.innerHTML = '';
   const teamId = data.team_id;
   (data.schedule || []).forEach((weekGames, idx) => {
+    if (!weekGames || weekGames.length === 0) return; // Skip empty weeks
+    
     const weekDiv = document.createElement('div');
     weekDiv.className = 'schedule-week';
     const h4 = document.createElement('h4');
-    h4.textContent = `Week ${idx + 1}`;
+    
+    // ✅ EOS TOURNAMENT: Check if this is a tournament game
+    const isTournamentWeek = weekGames[0]?.is_tournament || false;
+    const roundName = weekGames[0]?.round || '';
+    
+    if (isTournamentWeek && roundName) {
+      h4.textContent = `Week ${idx + 1} - ${roundName}`;
+      weekDiv.classList.add('tournament-week');
+    } else {
+      h4.textContent = `Week ${idx + 1}`;
+    }
     weekDiv.appendChild(h4);
     weekGames.forEach(g => {
       const gameDiv = document.createElement('div');
@@ -747,15 +759,50 @@ function updatePlayButton(data) {
   const playNowBtn = document.getElementById('play-now');
   if (!data) return;
   
-  const trainingCompleted = data.training_completed || false;
-  const sessionType = data.session_type || 'in-season';
+  // ✅ EOS TOURNAMENT: Check if tournament is active
+  const eosTournamentActive = data.eos_tournament_active || false;
+  const eosTournament = data.eos_tournament;
+  const week = data.week || 1;
   
-  if (!trainingCompleted) {
-    playNowBtn.textContent = sessionType === 'preseason' ? 'Run Training Camp' : 'Run Training';
-    playNowBtn.dataset.mode = 'training';
+  // Check if user team is eliminated
+  let userTeamEliminated = false;
+  if (eosTournamentActive && eosTournament && userTeamId) {
+    const bracket = eosTournament.bracket || {};
+    const round1 = bracket.round1 || [];
+    const round2 = bracket.round2 || [];
+    const final = bracket.final || [];
+    
+    // Check if user team is in any active matchup
+    const allMatchups = [...round1, ...round2, ...final];
+    const userInMatchup = allMatchups.some(m => 
+      m.home_team === userTeamId || m.away_team === userTeamId
+    );
+    userTeamEliminated = !userInMatchup && week >= 15;
+  }
+  
+  // Check if tournament is complete
+  const tournamentComplete = eosTournament?.completed || false;
+  
+  if (tournamentComplete && week >= 17) {
+    // Tournament complete - show Finish Season button
+    playNowBtn.textContent = 'Finish Current Season';
+    playNowBtn.dataset.mode = 'finish-season';
+  } else if (userTeamEliminated && eosTournamentActive) {
+    // User team eliminated - show Sim Rest of Tournament
+    playNowBtn.textContent = 'Sim Rest of Tournament';
+    playNowBtn.dataset.mode = 'sim-rest-tournament';
   } else {
-    playNowBtn.textContent = 'Play Now';
-    playNowBtn.dataset.mode = 'play';
+    // Normal flow
+    const trainingCompleted = data.training_completed || false;
+    const sessionType = data.session_type || 'in-season';
+    
+    if (!trainingCompleted) {
+      playNowBtn.textContent = sessionType === 'preseason' ? 'Run Training Camp' : 'Run Training';
+      playNowBtn.dataset.mode = 'training';
+    } else {
+      playNowBtn.textContent = 'Play Now';
+      playNowBtn.dataset.mode = 'play';
+    }
   }
 }
 
@@ -771,6 +818,98 @@ playNowBtn.addEventListener('click', async () => {
     // ✅ SS&S: Include team_id (ObjectId) for consistent navigation
     const teamIdParam = userTeamId ? `&team_id=${encodeURIComponent(userTeamId)}` : '';
     window.location.href = `/static/training.html?franchise_id=${franchiseId}&mode=franchise&session_type=${sessionType}${teamIdParam}`;
+    return;
+  }
+  
+  // ✅ EOS TOURNAMENT: Handle sim rest of tournament
+  if (mode === 'sim-rest-tournament') {
+    const originalText = playNowBtn.textContent;
+    playNowBtn.disabled = true;
+    playNowBtn.textContent = 'Simulating...';
+    
+    try {
+      const res = await fetch('/franchise/sim-rest-of-tournament', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ franchise_id: franchiseId })
+      });
+      if (!res.ok) throw new Error('Simulation failed');
+      const result = await res.json();
+      
+      // Check if championship needs to be simmed
+      const topData = await fetchJSON(`/franchise/command-center/data?franchise_id=${franchiseId}`);
+      const eosTournament = topData?.eos_tournament;
+      const currentRound = eosTournament?.current_round;
+      
+      if (currentRound === 2 && eosTournament?.bracket?.round2) {
+        // Show popup with results and Sim Championship button
+        const popup = document.createElement('div');
+        popup.className = 'sim-popup';
+        popup.innerHTML = `
+          <div class="sim-popup-content">
+            <h3>Semifinals Complete</h3>
+            <p>Round 2 results have been simulated.</p>
+            <button id="sim-championship-btn">Sim Championship Game</button>
+            <button id="close-sim-popup">Close</button>
+          </div>
+        `;
+        document.body.appendChild(popup);
+        
+        document.getElementById('sim-championship-btn').addEventListener('click', async () => {
+          try {
+            const champRes = await fetch('/franchise/sim-championship', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ franchise_id: franchiseId })
+            });
+            if (!champRes.ok) throw new Error('Championship simulation failed');
+            document.body.removeChild(popup);
+            location.reload(); // Reload to show updated bracket
+          } catch (err) {
+            console.error(err);
+            alert('Unable to simulate championship');
+          }
+        });
+        
+        document.getElementById('close-sim-popup').addEventListener('click', () => {
+          document.body.removeChild(popup);
+          location.reload();
+        });
+      } else {
+        location.reload(); // Reload to show updated bracket
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Unable to simulate tournament');
+      playNowBtn.disabled = false;
+      playNowBtn.textContent = originalText;
+    }
+    return;
+  }
+  
+  // ✅ EOS TOURNAMENT: Handle finish season
+  if (mode === 'finish-season') {
+    if (!confirm('Finish current season and start a new season?')) return;
+    
+    const originalText = playNowBtn.textContent;
+    playNowBtn.disabled = true;
+    playNowBtn.textContent = 'Finishing Season...';
+    
+    try {
+      const res = await fetch('/franchise/finish-season', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ franchise_id: franchiseId })
+      });
+      if (!res.ok) throw new Error('Finish season failed');
+      const result = await res.json();
+      location.reload(); // Reload to show new season
+    } catch (err) {
+      console.error(err);
+      alert('Unable to finish season');
+      playNowBtn.disabled = false;
+      playNowBtn.textContent = originalText;
+    }
     return;
   }
   
@@ -858,6 +997,10 @@ window.addEventListener('DOMContentLoaded', () => {
   const tabButtons = document.querySelectorAll('.tab-buttons button');
   tabButtons.forEach(btn => {
     btn.addEventListener('click', () => {
+      // ✅ EOS TOURNAMENT: Render bracket when Tournament tab is opened
+      if (btn.dataset.tab === 'tournament-tab') {
+        renderTournamentBracket();
+      }
       if (btn.dataset.tab === 'team-tab') {
         // Load and render team data when Team tab is opened
         if (!teamData) {
@@ -1490,5 +1633,96 @@ function sortRosterStats(statKey) {
   
   // Re-render with sorted data
   renderRosterStatsTable(rosterPlayersDataForSorting);
+}
+
+// ✅ EOS TOURNAMENT: Render tournament bracket
+async function renderTournamentBracket() {
+  const container = document.getElementById('tournament-bracket-container');
+  if (!container) return;
+  
+  const topData = await fetchJSON(`/franchise/command-center/data?franchise_id=${franchiseId}`);
+  const eosTournament = topData?.eos_tournament;
+  
+  if (!eosTournament) {
+    container.innerHTML = '<p>Tournament bracket not available.</p>';
+    return;
+  }
+  
+  const bracket = eosTournament.bracket || {};
+  const seeds = eosTournament.seeds || {};
+  const round1 = bracket.round1 || [];
+  const round2 = bracket.round2 || [];
+  const final = bracket.final || [];
+  const currentRound = eosTournament.current_round || 1;
+  
+  // Get team names
+  const teamNames = {};
+  for (const teamId in seeds) {
+        const teamRes = await fetchJSON(`/teams`);
+        if (teamRes) {
+          const team = teamRes.find(t => t._id === teamId || t.id === teamId);
+          if (team) teamNames[teamId] = team.name;
+        }
+  }
+  
+  let html = '<div class="tournament-bracket">';
+  
+  // Round 1 (Quarterfinals)
+  html += '<div class="bracket-round"><h4>Quarterfinals</h4>';
+  round1.forEach((matchup, i) => {
+    const homeName = teamNames[matchup.home_team] || matchup.home_team;
+    const awayName = teamNames[matchup.away_team] || matchup.away_team;
+    const homeSeed = seeds[matchup.home_team] || '';
+    const awaySeed = seeds[matchup.away_team] || '';
+    const winner = matchup.winner;
+    const score = matchup.score || {};
+    const isComplete = !!winner;
+    
+    html += `<div class="bracket-matchup ${isComplete ? 'complete' : ''}">`;
+    html += `<div class="team ${winner === matchup.home_team ? 'winner' : ''}">${homeSeed}. ${homeName} ${score.home || ''}</div>`;
+    html += `<div class="team ${winner === matchup.away_team ? 'winner' : ''}">${awaySeed}. ${awayName} ${score.away || ''}</div>`;
+    html += '</div>';
+  });
+  html += '</div>';
+  
+  // Round 2 (Semifinals)
+  if (round2.length > 0 || currentRound >= 2) {
+    html += '<div class="bracket-round"><h4>Semifinals</h4>';
+    (round2.length > 0 ? round2 : []).forEach((matchup, i) => {
+      const homeName = teamNames[matchup.home_team] || matchup.home_team;
+      const awayName = teamNames[matchup.away_team] || matchup.away_team;
+      const winner = matchup.winner;
+      const score = matchup.score || {};
+      const isComplete = !!winner;
+      
+      html += `<div class="bracket-matchup ${isComplete ? 'complete' : ''}">`;
+      html += `<div class="team ${winner === matchup.home_team ? 'winner' : ''}">${homeName} ${score.home || ''}</div>`;
+      html += `<div class="team ${winner === matchup.away_team ? 'winner' : ''}">${awayName} ${score.away || ''}</div>`;
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+  
+  // Final (Championship)
+  if (final.length > 0 || currentRound >= 3) {
+    html += '<div class="bracket-round"><h4>Championship</h4>';
+    if (final.length > 0) {
+      const matchup = final[0];
+      const homeName = teamNames[matchup.home_team] || matchup.home_team;
+      const awayName = teamNames[matchup.away_team] || matchup.away_team;
+      const winner = matchup.winner;
+      const score = matchup.score || {};
+      const isComplete = !!winner;
+      
+      html += `<div class="bracket-matchup final ${isComplete ? 'complete' : ''}">`;
+      html += `<div class="team ${winner === matchup.home_team ? 'winner' : ''}">${homeName} ${score.home || ''}</div>`;
+      html += `<div class="team ${winner === matchup.away_team ? 'winner' : ''}">${awayName} ${score.away || ''}</div>`;
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  
+  html += '</div>';
+  container.innerHTML = html;
 }
 
