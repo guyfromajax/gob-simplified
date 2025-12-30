@@ -1714,8 +1714,21 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         if mode == "tournament" and request.tournament_id:
             db_summary["tournament_id"] = str(request.tournament_id)
         
-        games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
-        logging.info(f"✅ Game state saved successfully: game_id={game_id}, quarter={db_summary.get('quarter')}, mode={mode}")
+        # ✅ FIX: Ensure game_id is converted to ObjectId for consistent database storage
+        # This ensures the _id format matches when we try to find it later
+        try:
+            if isinstance(game_id, str) and ObjectId.is_valid(game_id):
+                game_id_oid = ObjectId(game_id)
+            else:
+                game_id_oid = game_id
+        except Exception:
+            game_id_oid = game_id
+        
+        # Ensure _id is set in db_summary for upsert to work correctly
+        db_summary["_id"] = game_id_oid
+        
+        games_collection.update_one({"_id": game_id_oid}, {"$set": db_summary}, upsert=True)
+        logging.info(f"✅ Game state saved successfully: game_id={game_id} (ObjectId: {game_id_oid}), quarter={db_summary.get('quarter')}, mode={mode}")
     except Exception as e:
         print("🚨 Mongo upsert failed:", e)
         traceback.print_exc()
