@@ -607,15 +607,15 @@ class GameManager:
                 # logging.warning(
                 #     f"⚠️ [TRANSITION VALIDATION] Invalid transition detected in turn #{turn_num}: {error_msg}",
                 #     extra={
-                        "turn_number": turn_num,
-                        "from_result_type": from_result.get("result_type"),
-                        "from_result_text": from_result.get("text", "")[:50],
-                        "to_offensive_state": to_offensive_state,
-                        "possession_changed": possession_changed,
-                        "previous_offensive_state": previous_offensive_state,
-                        "current_result_type": result.get("result_type"),
-                    }
-                )
+                #         "turn_number": turn_num,
+                #         "from_result_type": from_result.get("result_type"),
+                #         "from_result_text": from_result.get("text", "")[:50],
+                #         "to_offensive_state": to_offensive_state,
+                #         "possession_changed": possession_changed,
+                #         "previous_offensive_state": previous_offensive_state,
+                #         "current_result_type": result.get("result_type"),
+                #     }
+                # )
             
             # ✅ OPTIONAL: Enhanced event detection and validation
             # This provides additional observability but is not required for game functionality
@@ -651,13 +651,13 @@ class GameManager:
                         # logging.warning(
                         #     f"⚠️ [EVENT VALIDATION] {event_error}",
                         #     extra={
-                                "turn_number": len(self.turns),
-                                "detected_event": detected_event,
-                                "from_turn_type": from_turn_type.value,
-                                "to_turn_type": to_turn_type.value,
-                                "possession_change": possession_changed,
-                            }
-                        )
+                        #         "turn_number": len(self.turns),
+                        #         "detected_event": detected_event,
+                        #         "from_turn_type": from_turn_type.value,
+                        #         "to_turn_type": to_turn_type.value,
+                        #         "possession_change": possession_changed,
+                        #     }
+                        # )
                     elif detected_event:
                         # Log successful event detection (info level, not warning)
                         # Use len(turns) to match frontend turnCount (turn has already been added at this point)
