@@ -194,9 +194,18 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                 if team_id:
                     meta["team_id"] = str(team_id)
                 
+                # ✅ MIGRATION: Calculate per_game and percentages (matches Franchise pattern)
+                # Tournament only tracks season stats (no career), so only calculate season per_game/percentages
+                season_per_game = _per_game_block(season_stats)
+                season_percentages = _pct_block(season_stats)
+                
                 player_entry = {
                     "meta": meta,  # ✅ MIGRATION: Wrap metadata in meta object
-                    "season": season_stats,  # ✅ MIGRATION: Tournament only tracks season stats (no career)
+                    "season": {
+                        **season_stats,  # ✅ MIGRATION: Tournament only tracks season stats (no career)
+                        "per_game": season_per_game,  # ✅ MIGRATION: Calculate per_game averages
+                        "percentages": season_percentages,  # ✅ MIGRATION: Calculate shooting percentages
+                    },
                 }
                 tournaments_collection.update_one(
                     {"_id": tid},
