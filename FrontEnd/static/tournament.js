@@ -1650,6 +1650,25 @@ async function loadTeamData() {
   if (!tournament || !tournament._id || !userTeamId) return;
   
   try {
+    // ✅ FIX: Reload tournament document fresh (like FCC does with /franchise/state)
+    // This ensures we have the latest stats after games complete
+    let freshTournamentDoc = null;
+    try {
+      const tournamentStateRes = await fetch(`/tournament/state?tournament_id=${encodeURIComponent(tournament._id)}`);
+      if (tournamentStateRes.ok) {
+        freshTournamentDoc = await tournamentStateRes.json();
+        console.log('✅ [TCC] Reloaded tournament document for fresh stats:', {
+          hasPlayers: !!freshTournamentDoc?.players,
+          playerCount: freshTournamentDoc?.players ? Object.keys(freshTournamentDoc.players).length : 0
+        });
+      }
+    } catch (error) {
+      console.warn('⚠️ [TCC] Could not reload tournament document, using cached:', error);
+    }
+    
+    // Use fresh document if available, otherwise fall back to cached tournament
+    const tournamentDoc = freshTournamentDoc || tournament;
+    
     // First, ensure team objects exist (this will create them if missing)
     try {
       // Call ensure_team_objects_exist via get_gameplan endpoint (it calls ensure_team_objects_exist internally)
@@ -1668,12 +1687,14 @@ async function loadTeamData() {
     
     const data = await response.json();
     
-    // ✅ FIX: Merge player stats from tournament document (aligns with FCC pattern)
+    // ✅ FIX: Merge player stats from fresh tournament document (aligns with FCC pattern)
     let playersWithStats = [];
-    if (roster && roster.length > 0 && tournament && tournament.players) {
+    if (roster && roster.length > 0 && tournamentDoc && tournamentDoc.players) {
       // ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
-      const tournamentPlayers = tournament.players || tournament.player_stats || {}; // Backward compatibility
+      const tournamentPlayers = tournamentDoc.players || tournamentDoc.player_stats || {}; // Backward compatibility
       
+      let statsFound = 0;
+      let statsMissing = 0;
       playersWithStats = roster.map(player => {
         const playerId = player.id || player._id;
         const tournamentPlayer = tournamentPlayers[playerId];
@@ -1681,14 +1702,25 @@ async function loadTeamData() {
         if (tournamentPlayer && tournamentPlayer.season) {
           // Merge stats from tournament document
           player.stats = { season: tournamentPlayer.season };
+          statsFound++;
+          console.log(`✅ [TCC] Stats found for player ${player.name} (${playerId}):`, tournamentPlayer.season);
         } else {
           // No stats found, use empty object
           player.stats = { season: {} };
+          statsMissing++;
+          console.log(`❌ [TCC] No stats found for player ${player.name} (${playerId}). Tournament player data:`, tournamentPlayer);
         }
         return player;
       });
+      console.log(`🔍 [TCC] Stats merge complete: ${statsFound} found, ${statsMissing} missing`);
     } else {
       playersWithStats = roster || [];
+      console.warn('⚠️ [TCC] Cannot merge stats:', {
+        hasRoster: !!roster,
+        rosterLength: roster?.length || 0,
+        hasTournamentDoc: !!tournamentDoc,
+        hasPlayers: !!tournamentDoc?.players
+      });
     }
     
     teamData = {
