@@ -105,6 +105,7 @@ def tournament_team_stats(tournament_id: str):
     # Aggregate stats from players object
     players_with_stats = 0
     players_without_team_id = 0
+    players_without_stats = 0
     for pid, pdata in players.items():
         meta = pdata.get("meta", {})
         team_id = meta.get("team_id")
@@ -115,6 +116,7 @@ def tournament_team_stats(tournament_id: str):
         team_id_str = str(team_id)
         season_stats = pdata.get("season", {})
         if not season_stats:
+            players_without_stats += 1
             continue
         
         if team_id_str not in team_stats_map:
@@ -170,6 +172,9 @@ def tournament_team_stats(tournament_id: str):
         stats["TREB"] = stats.get("DREB", 0) + stats.get("OREB", 0)
         
         output.append({"team": team_name, "stats": stats})
+    
+    # Log for debugging
+    print(f"🔍 [TOURNAMENT_TEAM_STATS] Processed {players_with_stats} players with stats, {players_without_team_id} without team_id, {players_without_stats} without stats")
     
     return {"teams": output}
 
