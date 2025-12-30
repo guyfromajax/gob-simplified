@@ -1187,9 +1187,9 @@ class TurnManager:
 
         # Persist play type/focus to game_state for later success attribution
         # 🔍 DEBUG: Log when offense_play_type is set
-        logging.warning(f"🔍 [SET_PLAYCALLS DEBUG] Setting game_state['offense_play_type'] = '{chosen_play_type}'")
-        logging.warning(f"🔍 [SET_PLAYCALLS DEBUG] Setting game_state['offense_play_focus'] = '{chosen_focus}'")
-        logging.warning(f"🔍 [SET_PLAYCALLS DEBUG] Current playcall: '{calls.get('offense') if 'calls' in locals() else 'N/A'}'")
+        # logging.warning(f"🔍 [SET_PLAYCALLS DEBUG] Setting game_state['offense_play_type'] = '{chosen_play_type}'")
+        # logging.warning(f"🔍 [SET_PLAYCALLS DEBUG] Setting game_state['offense_play_focus'] = '{chosen_focus}'")
+        # logging.warning(f"🔍 [SET_PLAYCALLS DEBUG] Current playcall: '{calls.get('offense') if 'calls' in locals() else 'N/A'}'")
         self.game.game_state["offense_play_type"] = chosen_play_type
         self.game.game_state["offense_play_focus"] = chosen_focus
         

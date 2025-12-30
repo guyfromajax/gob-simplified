@@ -1669,7 +1669,7 @@ def _check_standard_fouls(calibrated_o_foul, calibrated_d_foul):
         tuple: ("O_FOUL", None) or ("D_FOUL", None) if foul occurs, None otherwise
     """
     foul_roll = random.randint(1, 100)
-    logging.warning(f"🔍 [HCO RESOLUTION] Standard Foul Check:")
+    # logging.warning(f"🔍 [HCO RESOLUTION] Standard Foul Check:")
     logging.warning(f"   Roll: {foul_roll} (1-100)")
     logging.warning(f"   O_FOUL threshold: <= {calibrated_o_foul}")
     logging.warning(f"   D_FOUL threshold: >= {calibrated_d_foul}")
@@ -1720,7 +1720,7 @@ def _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_
     base_steal_attempt = 20  # STEAL_ATTEMPT constant
     was_adjusted = steal_attempt_rate != base_steal_attempt
     
-    logging.warning(f"🔥 [HCO RESOLUTION] Steal Attempt Check:")
+    # logging.warning(f"🔥 [HCO RESOLUTION] Steal Attempt Check:")
     logging.warning(f"   Defense team aggression: {aggression_level}")
     logging.warning(f"   Base STEAL_ATTEMPT: {base_steal_attempt}%")
     if was_adjusted:
@@ -1901,7 +1901,7 @@ def _check_dead_ball_turnover(game, skeleton, calibrated_dead_ball_to):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     
     turnover_roll = random.randint(1, 100)
-    logging.warning(f"🔍 [HCO RESOLUTION] Dead Ball Turnover Check:")
+    # logging.warning(f"🔍 [HCO RESOLUTION] Dead Ball Turnover Check:")
     logging.warning(f"   DEAD_BALL_TURNOVER threshold: < {calibrated_dead_ball_to}")
     logging.warning(f"   Roll: {turnover_roll} (1-100)")
     if turnover_roll < calibrated_dead_ball_to:
@@ -3309,9 +3309,9 @@ def resolve_half_court_offense_logic(game):
     is_motion_play = offense_play_type == "motion"
     
     # 🔍 DEBUG: Log offense_play_type read (FIRST READ - skeleton selection)
-    logging.warning(f"🔍 [HCO RESOLVE DEBUG] FIRST READ - offense_play_type from game_state: '{offense_play_type}' (type: {type(offense_play_type)})")
-    logging.warning(f"🔍 [HCO RESOLVE DEBUG] FIRST READ - is_motion_play: {is_motion_play}")
-    logging.warning(f"🔍 [HCO RESOLVE DEBUG] FIRST READ - current_playcall: '{game_state.get('current_playcall', 'N/A')}'")
+    # logging.warning(f"🔍 [HCO RESOLVE DEBUG] FIRST READ - offense_play_type from game_state: '{offense_play_type}' (type: {type(offense_play_type)})")
+    # logging.warning(f"🔍 [HCO RESOLVE DEBUG] FIRST READ - is_motion_play: {is_motion_play}")
+    # logging.warning(f"🔍 [HCO RESOLVE DEBUG] FIRST READ - current_playcall: '{game_state.get('current_playcall', 'N/A')}'")
     
     if is_motion_play:
         # Motion plays use base_loop skeleton
@@ -3948,10 +3948,10 @@ def resolve_half_court_offense_logic(game):
     is_motion_play = offense_play_type == "motion"
     
     # 🔍 DEBUG: Log offense_play_type read (SECOND READ - shot routing)
-    logging.warning(f"🔍 [HCO RESOLVE DEBUG] SECOND READ - offense_play_type from game_state: '{offense_play_type}' (type: {type(offense_play_type)})")
-    logging.warning(f"🔍 [HCO RESOLVE DEBUG] SECOND READ - is_motion_play: {is_motion_play}")
-    logging.warning(f"🔍 [HCO RESOLVE DEBUG] SECOND READ - event_type: '{event_type}'")
-    logging.warning(f"🔍 [HCO RESOLVE DEBUG] SECOND READ - Will call resolve_motion_offense_shot: {is_motion_play and event_type == 'SHOT'}")
+    # logging.warning(f"🔍 [HCO RESOLVE DEBUG] SECOND READ - offense_play_type from game_state: '{offense_play_type}' (type: {type(offense_play_type)})")
+    # logging.warning(f"🔍 [HCO RESOLVE DEBUG] SECOND READ - is_motion_play: {is_motion_play}")
+    # logging.warning(f"🔍 [HCO RESOLVE DEBUG] SECOND READ - event_type: '{event_type}'")
+    # logging.warning(f"🔍 [HCO RESOLVE DEBUG] SECOND READ - Will call resolve_motion_offense_shot: {is_motion_play and event_type == 'SHOT'}")
     
     if is_motion_play and event_type == "SHOT":
         # Motion play shot resolution

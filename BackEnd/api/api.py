@@ -909,7 +909,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     logging.info(f"🔍 TIMEOUT RESUME: Game not in memory, will apply after DB load")
             else:
                 # Stale timeout data (quarter mismatch or missing next_play_type) - ignore it
-                logging.warning(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={request.quarter}, next_play_type={timeout_next_play_type})")
+                # logging.warning(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={request.quarter}, next_play_type={timeout_next_play_type})")
                 timeout_saved_state = None  # Clear invalid timeout state
                 # ✅ QUARTER BREAK: Clear resume_from_timeout flag if no valid timeout state
                 # This handles cases where resume_from_timeout was incorrectly preserved across quarter boundaries

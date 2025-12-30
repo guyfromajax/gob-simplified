@@ -243,7 +243,7 @@ class GameManager:
         # Note: Database save is handled by the API endpoint to avoid circular imports
         # This method just sets up the timeout turn and state
         
-        logging.warning(f"⏸️ TIMEOUT: {calling_team.name} called timeout (reason: {timeout_reason}, turn {len(self.turns)})")
+        # logging.warning(f"⏸️ TIMEOUT: {calling_team.name} called timeout (reason: {timeout_reason}, turn {len(self.turns)})")
         return timeout_turn
 
     def simulate_macro_turn(self): #run_simulation
@@ -399,18 +399,18 @@ class GameManager:
         ):
             # ✅ FIX: Flip possession BEFORE setup_side_inbound so correct team inbounds
             # Dead ball turnovers and offensive fouls always flip possession
-            logging.warning(f"🔍 [SIP SETUP] Checking possession flip: result_type={result.get('result_type')}, possession_flips={result.get('possession_flips')}, current_turn={result.get('current_turn')}, current_offense={self.offense_team.name}")
+            # logging.warning(f"🔍 [SIP SETUP] Checking possession flip: result_type={result.get('result_type')}, possession_flips={result.get('possession_flips')}, current_turn={result.get('current_turn')}, current_offense={self.offense_team.name}")
             if result.get("possession_flips"):
                 old_offense = self.offense_team.name
                 self.switch_possession()
                 # ✅ FIX: Clear possession_flips flag after flipping to prevent frontend double flip
                 result["possession_flips"] = False
-                logging.warning(f"🔄 [SIP] Flipped possession before SIP: {old_offense} → {self.offense_team.name}, set possession_flips=False")
-            else:
-                logging.warning(f"⏭️ [SIP] No possession flip needed (possession_flips={result.get('possession_flips')})")
+                # logging.warning(f"🔄 [SIP] Flipped possession before SIP: {old_offense} → {self.offense_team.name}, set possession_flips=False")
+            # else:
+            #     logging.warning(f"⏭️ [SIP] No possession flip needed (possession_flips={result.get('possession_flips')})")
             
             inbound_payload = self.turn_manager.setup_side_inbound()
-            logging.warning(f"✅ [SIP CREATE] Created SIDE_INBOUND, offense_team={inbound_payload.get('offense_team_id')}, result_was={result.get('current_turn')} {result.get('result_type')}")
+            # logging.warning(f"✅ [SIP CREATE] Created SIDE_INBOUND, offense_team={inbound_payload.get('offense_team_id')}, result_was={result.get('current_turn')} {result.get('result_type')}")
             
             # ✅ COMPUTER TIMEOUT: Check if any computer team should call timeout
             # Check both teams if both are computer teams, otherwise check the non-user team
@@ -443,7 +443,7 @@ class GameManager:
                 
                 if is_full_simulation:
                     # Full simulation mode: Create timeout immediately and rebuild lineups
-                    logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} calling timeout immediately (full simulation mode)")
+                    # logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} calling timeout immediately (full simulation mode)")
                     timeout_turn = self.call_timeout(
                         calling_team=calling_team,
                         timeout_reason="COMPUTER",
@@ -531,7 +531,7 @@ class GameManager:
                 
                 if is_full_simulation:
                     # Full simulation mode: Create timeout immediately and rebuild lineups
-                    logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} calling timeout immediately (full simulation mode)")
+                    # logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} calling timeout immediately (full simulation mode)")
                     timeout_turn = self.call_timeout(
                         calling_team=calling_team,
                         timeout_reason="COMPUTER",
