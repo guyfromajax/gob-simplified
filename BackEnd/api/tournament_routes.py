@@ -919,18 +919,23 @@ def run_tournament_training(req: TournamentTrainingRequest):
             "redirect": f"/static/training-report.html?mode=tournament&tournament_id={req.tournament_id}&team_id={req.team_id}"
         }
 
-    # Get user's team (use team_id from request if provided, otherwise from tournament)
-    team_name = req.team_id
-    if not team_name:
-        team_name = tournament_doc.get("user_team_id")
-        if not team_name:
-            raise HTTPException(status_code=404, detail="User team not found")
+    # ✅ MIGRATION: Use tournament document's user_team_object_id as source of truth
+    # This ensures we're always using the correct team, even if URL params are wrong
+    user_team_id_name, user_team_object_id = get_user_team_from_tournament(tournament_doc)
+    if not user_team_id_name or not user_team_object_id:
+        raise HTTPException(status_code=404, detail="User team not found in tournament document")
     
-    # Resolve team name to team document
-    team_doc = teams_collection.find_one({"name": team_name})
+    # Use tournament document's user_team_object_id as authoritative team_id
+    team_id = user_team_object_id
+    
+    # Log if URL team_id doesn't match (for debugging)
+    if req.team_id and req.team_id != team_id:
+        logger.warning(f"⚠️ [TOURNAMENT TRAINING] URL team_id ({req.team_id}) doesn't match tournament document user_team_object_id ({team_id}). Using tournament document value.")
+    
+    # Get team document for player_ids lookup
+    team_doc = teams_collection.find_one({"_id": ObjectId(team_id)})
     if not team_doc:
         raise HTTPException(status_code=404, detail="Team not found")
-    team_id = str(team_doc["_id"])
 
     # ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
     tournament_players = tournament_doc.get("players", {}) or tournament_doc.get("player_stats", {})  # Backward compatibility
