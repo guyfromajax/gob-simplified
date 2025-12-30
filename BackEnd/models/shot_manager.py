@@ -900,10 +900,10 @@ class ShotManager:
                 #     "offense_getback_positions": offense_getback_list,
                 #     "offense_getback_player_ids": result["offense_getback"],
                 #     "count": len(result["offense_getback"]),
-                    "shooter_pos": shooter_pos,
-                    "offense_reb_value": offense_reb_value,
-                    "note": "This should match frontend logs"
-                })
+                #     "shooter_pos": shooter_pos,
+                #     "offense_reb_value": offense_reb_value,
+                #     "note": "This should match frontend logs"
+                # })
                 
                 # ==================== OLD REBOUND SYSTEM (COMMENTED OUT) ====================
                 # rebounder_dict = {

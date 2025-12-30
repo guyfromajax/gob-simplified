@@ -3083,6 +3083,7 @@ class TurnManager:
                 strategies["HCO"] = max(0, strategies["HCO"] - hct_value)
         else:
             # logging.warning(f"   - ⚠️ HCT value is {hct_value} (0 or invalid), NOT adding to strategies")
+            pass  # HCT logging commented out
         
         # Only add FCP if value is > 0 (user wants it enabled)
         if fcp_value and fcp_value > 0:
