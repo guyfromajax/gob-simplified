@@ -265,46 +265,9 @@ class PlaybooksState {
 // PERSISTENCE LAYER
 // ============================================================================
 
-class PlaybooksPersistence {
-  constructor() {
-    this.storageKey = 'gob_playbooks';
-    this.apiEndpoint = '/api/playbooks'; // Placeholder - can be swapped later
-  }
-  
-  async load() {
-    try {
-      // Try API first (stubbed for now)
-      // const response = await fetch(this.apiEndpoint);
-      // if (response.ok) return await response.json();
-      
-      // Fallback to localStorage
-      const stored = localStorage.getItem(this.storageKey);
-      return stored ? JSON.parse(stored) : null;
-    } catch (error) {
-      console.error('Error loading playbooks:', error);
-      return null;
-    }
-  }
-  
-  async save(data) {
-    try {
-      // Try API first (stubbed for now)
-      // const response = await fetch(this.apiEndpoint, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(data),
-      // });
-      // if (response.ok) return true;
-      
-      // Fallback to localStorage
-      localStorage.setItem(this.storageKey, JSON.stringify(data));
-      return true;
-    } catch (error) {
-      console.error('Error saving playbooks:', error);
-      return false;
-    }
-  }
-}
+// ✅ MIGRATION (Task 6.2): Removed PlaybooksPersistence class
+// Settings are now loaded/saved from database only (single source of truth)
+// localStorage is only used for UI preferences (position filters, even distribution button states)
 
 // ============================================================================
 // UI CONTROLLER
@@ -313,7 +276,7 @@ class PlaybooksPersistence {
 class PlaybooksUI {
   constructor() {
     this.state = null; // Will be initialized after loading plays
-    this.persistence = new PlaybooksPersistence();
+    // ✅ MIGRATION (Task 6.2): Removed persistence - settings loaded from database only
     this.debounceTimer = null;
     this.playData = null;
     this.selectedPositions = []; // Array to track selected positions (max 2, FIFO)
@@ -711,8 +674,11 @@ class PlaybooksUI {
     }
   }
   
+  // ✅ MIGRATION (Task 6.2): Removed saveState() - settings are saved to database only
+  // No need for localStorage persistence since database is single source of truth
   async saveState() {
-    await this.persistence.save(this.state.serialize());
+    // No-op: Settings are saved to database via savePlaybookSettings()
+    // This method is kept for backward compatibility but does nothing
   }
   
   renderAll() {
@@ -1901,29 +1867,13 @@ class PlaybooksUI {
       return;
     }
     
-    // Save to localStorage (for UI state)
-    await this.saveState();
-    
-    // Save playbook settings to database
+    // ✅ MIGRATION (Task 6.2): Save playbook settings to database (single source of truth)
+    // No localStorage persistence needed - database is authoritative
     const success = await this.savePlaybookSettings();
     
     if (success) {
       // Clear unsaved changes flag after successful save
       this.hasUnsavedChanges = false;
-      
-      // Clear full state from localStorage (since it's now saved to DB)
-      const urlParams = new URLSearchParams(window.location.search);
-      const mode = urlParams.get('mode') || 'single';
-      const teamId = urlParams.get('team_id') || 
-                     urlParams.get('user_team_id') || 
-                     urlParams.get('home_id') || 
-                     urlParams.get('away_id');
-      
-      if (teamId) {
-        const storageKey = `playbooks_full_state_${mode}_${teamId}`;
-        localStorage.removeItem(storageKey);
-      }
-      
       this.showToast('Playbooks saved successfully');
     } else {
       this.showToast('Error saving playbooks', true);
