@@ -77,7 +77,7 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
       } else {
         console.log("✅ Tournament result saved.");
         try {
-          const updated = await fetch(`/tournament/state/${tournamentId}`).then((r) =>
+          const updated = await fetch(`/tournament/state?tournament_id=${encodeURIComponent(tournamentId)}`).then((r) =>
             r.json()
           );
           if (window.opener && window.opener.handleTournamentUpdate) {
@@ -109,8 +109,8 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
     }
   }
 
-  // POST to /franchise/complete-week if needed
-  if (franchiseId && Number.isInteger(week) && week >= 1) {
+  // POST to /franchise/complete-week if needed (only if NOT in tournament mode)
+  if (franchiseId && !tournamentId && Number.isInteger(week) && week >= 1) {
     try {
       const team1Id =
         awayIdParam ||
