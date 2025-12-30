@@ -29,7 +29,19 @@ def _per_game_block(totals: Dict[str, Any]) -> Dict[str, float]:
     gp = totals.get("GP", 0)
     if not gp:
         return {stat: 0 for stat in BOX_SCORE_KEYS}
-    return {stat: totals.get(stat, 0) / gp for stat in BOX_SCORE_KEYS}
+    
+    # ✅ FIX: Filter out non-numeric stats (like Outlet_Score_List which is a list)
+    result = {}
+    for stat in BOX_SCORE_KEYS:
+        val = totals.get(stat, 0)
+        # Only calculate per-game for numeric values (int or float)
+        if isinstance(val, (int, float)):
+            result[stat] = val / gp
+        else:
+            # For non-numeric stats (lists, etc.), just return 0 or skip
+            result[stat] = 0
+    
+    return result
 
 
 def _pct_block(totals: Dict[str, Any]) -> Dict[str, float]:
