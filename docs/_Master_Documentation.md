@@ -1101,13 +1101,15 @@ These variables provide additional context for navigation but aren't required fo
 - `current_round` - Current round number (1-3)
 - `completed` - Whether tournament is finished (boolean)
 - `bracket` - Tournament bracket structure `{round1: [...], round2: [...], final: [...]}`
+- `players` - Player data object `{player_id: {meta, attributes, position_ratings, season}}` (✅ MIGRATION: changed from `player_stats` in February 2025)
+- `teams` - Team data objects `{team_id: {team_attributes, strategy_settings, plays, scouting_data, playbook_settings}}`
 - `training_status` - `{round, training_completed, session_type, last_training_date}`
 - `latest_training` - `{round, player_logs, team_log, session_type}`
 - `applied_games` - Array of game IDs (prevents double-counting stats)
 - `stats` / `leaderboards` - Document-level aggregated statistics
 - `created_at` - Document creation timestamp
 - `user_team_id` - User's team name (string)
-- `user_team_object_id` - User's team ObjectId (string)
+- `user_team_object_id` - User's team ObjectId (string) - **⚠️ SOURCE OF TRUTH for all team operations**
 
 #### Data Flow
 
