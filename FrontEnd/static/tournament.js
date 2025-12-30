@@ -5,7 +5,8 @@ const urlTeamId = urlParams.get('team_id');
 
 // Initialize tournament and userTeamId from URL params or localStorage
 let tournament = null;
-let userTeamId = "";
+let userTeamId = ""; // ObjectId for API calls
+let userTeamName = ""; // Team name for bracket comparisons
 let teamColorCache = null; // Cache for team primary colors
 
 // If tournament_id is in URL, use it (overrides localStorage)
@@ -39,7 +40,8 @@ const teamMap = {
 };
 
 function isUserTeam(teamName) {
-  return teamName === userTeamId;
+  // Compare with team name (bracket uses team names, not ObjectIds)
+  return teamName === userTeamName || teamName === userTeamId;
 }
 
 // Map full team names to bracket logo filenames
@@ -536,7 +538,8 @@ function renderLeaderboards() {
       const entry = rows[i];
       const tr = document.createElement("tr");
       if (entry) {
-        const isUserTeam = userTeamId && entry.team_name === userTeamId;
+        // Compare with team name (leaderboard uses team names, not ObjectIds)
+        const isUserTeam = userTeamName && entry.team_name === userTeamName;
         
         // Create cells individually to apply styling
         const rankCell = document.createElement('td');
@@ -988,7 +991,8 @@ function updateCTA() {
 
   const roundKey = tournament.current_round === 3 ? 'final' : `round${tournament.current_round}`;
   const matchups = tournament.bracket?.[roundKey] || [];
-  const userMatch = matchups.find(m => m.home_team === userTeamId || m.away_team === userTeamId);
+  // Compare with team name (bracket uses team names, not ObjectIds)
+  const userMatch = matchups.find(m => m.home_team === userTeamName || m.away_team === userTeamName);
 
   // user is out of the tournament when no matchup exists or their matchup is finished
   const eliminated = !userMatch || !!userMatch.winner;
@@ -1090,9 +1094,15 @@ async function loadTournament() {
     tournament = await res.json();
     localStorage.setItem("activeTournament", JSON.stringify(tournament));
     
-    // ✅ SS&S: Resolve and store team ObjectId for consistent navigation
+    // ✅ SS&S: Resolve and store team ObjectId and name for consistent navigation
     // Navigation anchor set requires team_id to be ObjectId format (not team name)
+    // But bracket comparisons need team name, so we store both
     if (tournament) {
+      // Store team name for bracket comparisons
+      if (tournament.user_team_id) {
+        userTeamName = tournament.user_team_id; // Team name (e.g., "Morristown")
+      }
+      
       // Prefer ObjectId if available (from updated endpoint)
       if (tournament.user_team_object_id) {
         // Always use ObjectId for navigation anchor (Task 3.2: Navigation Anchor Set Consistency)
@@ -1226,8 +1236,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
   
-  // Update userTeamId from tournament if not already set
-  if (!userTeamId && tournament.user_team_id) {
+  // Update userTeamId and userTeamName from tournament if not already set
+  if (tournament.user_team_id) {
+    userTeamName = tournament.user_team_id; // Team name for bracket comparisons
+  }
+  if (!userTeamId && tournament.user_team_object_id) {
+    userTeamId = tournament.user_team_object_id; // ObjectId for API calls
+    localStorage.setItem("userTeamId", userTeamId);
+  } else if (!userTeamId && tournament.user_team_id) {
+    // Fallback: use team name if ObjectId not available
     userTeamId = tournament.user_team_id;
     localStorage.setItem("userTeamId", userTeamId);
   }
@@ -1308,7 +1325,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         await refreshLeaders();
         const { home, away } = data;
         if (!home || !away) throw new Error('Matchup not found');
-        const mySide = home === userTeamId ? 'home' : (away === userTeamId ? 'away' : '');
+        // Compare with team name (bracket uses team names, not ObjectIds)
+        const mySide = home === userTeamName ? 'home' : (away === userTeamName ? 'away' : '');
         let url = `/static/set-lineup.html?tournament_id=${encodeURIComponent(tournament._id)}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`;
         // Add team IDs for gameplan API compatibility
         url += `&home_id=${encodeURIComponent(home)}&away_id=${encodeURIComponent(away)}`;
