@@ -6,6 +6,7 @@ from pymongo import ReturnDocument
 
 from BackEnd.constants import BOX_SCORE_KEYS
 from BackEnd.db import db, players_collection, tournaments_collection, games_collection, teams_collection
+from BackEnd.utils.roster_loader import load_roster
 
 logger = logging.getLogger(__name__)
 
@@ -333,6 +334,128 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                         logger.error(f"❌ [APPLY-STATS] Tournament mode - Player {query_pid}: Failed to reload updated tournament document")
                 else:
                     logger.warning(f"⚠️ [APPLY-STATS] Tournament mode - Player {query_pid}: Update did not modify document (matched_count: {result.matched_count}, modified_count: {result.modified_count})")
+    
+    # ✅ FIX: After processing all players from game summary, ensure ALL roster players from both teams are initialized
+    # This ensures bench players (who didn't play) also have stats entries (with zeros)
+    if tournament_id:
+        try:
+            tid = ObjectId(tournament_id)
+        except Exception:
+            tid = None
+        if tid:
+            _ensure_all_roster_players_initialized(summary, tid)
+
+
+def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_id: ObjectId) -> None:
+    """
+    Ensure all players from both teams' rosters are initialized in the tournament document.
+    This ensures bench players (who didn't play) also have stats entries with zeros.
+    
+    Args:
+        summary: Game summary with home_team and away_team
+        tournament_id: Tournament ObjectId
+    """
+    home_team_obj = summary.get("home_team")
+    away_team_obj = summary.get("away_team")
+    
+    # Extract team names
+    home_team_name = None
+    away_team_name = None
+    
+    if isinstance(home_team_obj, dict):
+        home_team_name = home_team_obj.get("name")
+    elif isinstance(home_team_obj, str):
+        home_team_name = home_team_obj
+    
+    if isinstance(away_team_obj, dict):
+        away_team_name = away_team_obj.get("name")
+    elif isinstance(away_team_obj, str):
+        away_team_name = away_team_obj
+    
+    if not home_team_name or not away_team_name:
+        logger.warning(f"⚠️ [ENSURE-ROSTER] Cannot get team names from summary: home={home_team_name}, away={away_team_name}")
+        return
+    
+    # Get tournament document to check existing players
+    tournament_doc = tournaments_collection.find_one({"_id": tournament_id}, {"players": 1})
+    existing_players = tournament_doc.get("players", {}) if tournament_doc else {}
+    
+    # Load rosters for both teams
+    _, home_roster = load_roster(home_team_name)
+    _, away_roster = load_roster(away_team_name)
+    
+    # Get team documents to resolve team_id
+    home_team_doc = teams_collection.find_one({"name": home_team_name})
+    away_team_doc = teams_collection.find_one({"name": away_team_name})
+    
+    home_team_id = str(home_team_doc["_id"]) if home_team_doc and home_team_doc.get("_id") else None
+    away_team_id = str(away_team_doc["_id"]) if away_team_doc and away_team_doc.get("_id") else None
+    
+    players_initialized = 0
+    players_already_exist = 0
+    
+    # Initialize all home team players
+    for player in home_roster:
+        pid = str(player.get("_id"))
+        if pid in existing_players:
+            players_already_exist += 1
+            continue
+        
+        # Initialize player with zero stats and metadata
+        meta = {
+            "first_name": player.get("first_name", ""),
+            "last_name": player.get("last_name", ""),
+            "team": home_team_name,
+        }
+        if home_team_id:
+            meta["team_id"] = home_team_id
+        
+        tournaments_collection.update_one(
+            {"_id": tournament_id},
+            {
+                "$set": {
+                    f"players.{pid}.meta": meta,
+                    f"players.{pid}.season": {},
+                    f"players.{pid}.attributes": player.get("attributes", {}),
+                    f"players.{pid}.position_ratings": player.get("position_ratings", {}),
+                }
+            },
+            upsert=True
+        )
+        players_initialized += 1
+    
+    # Initialize all away team players
+    for player in away_roster:
+        pid = str(player.get("_id"))
+        if pid in existing_players:
+            players_already_exist += 1
+            continue
+        
+        # Initialize player with zero stats and metadata
+        meta = {
+            "first_name": player.get("first_name", ""),
+            "last_name": player.get("last_name", ""),
+            "team": away_team_name,
+        }
+        if away_team_id:
+            meta["team_id"] = away_team_id
+        
+        tournaments_collection.update_one(
+            {"_id": tournament_id},
+            {
+                "$set": {
+                    f"players.{pid}.meta": meta,
+                    f"players.{pid}.season": {},
+                    f"players.{pid}.attributes": player.get("attributes", {}),
+                    f"players.{pid}.position_ratings": player.get("position_ratings", {}),
+                }
+            },
+            upsert=True
+        )
+        players_initialized += 1
+    
+    if players_initialized > 0:
+        logger.info(f"✅ [ENSURE-ROSTER] Initialized {players_initialized} roster players, {players_already_exist} already existed")
 
 
 def recompute_tournament_leaders(tournament_id: str, limit: int = 10) -> Dict[str, Any]:

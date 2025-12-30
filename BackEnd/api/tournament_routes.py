@@ -174,7 +174,10 @@ def tournament_team_stats(tournament_id: str):
         output.append({"team": team_name, "stats": stats})
     
     # Log for debugging
-    print(f"🔍 [TOURNAMENT_TEAM_STATS] Processed {players_with_stats} players with stats, {players_without_team_id} without team_id, {players_without_stats} without stats")
+    logger.info(f"🔍 [TOURNAMENT_TEAM_STATS] Processed {players_with_stats} players with stats, {players_without_team_id} without team_id, {players_without_stats} without stats")
+    logger.info(f"🔍 [TOURNAMENT_TEAM_STATS] Returning {len(output)} teams")
+    for team_data in output:
+        logger.info(f"🔍 [TOURNAMENT_TEAM_STATS] Team: {team_data.get('team')}, PTS: {team_data.get('stats', {}).get('PTS', 0)}, FGM: {team_data.get('stats', {}).get('FGM', 0)}")
     
     return {"teams": output}
 
