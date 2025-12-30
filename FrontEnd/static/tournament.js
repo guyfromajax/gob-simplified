@@ -1148,9 +1148,11 @@ async function loadRoster() {
     // ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
     const pstats = tournament?.players || tournament?.player_stats || {};  // Backward compatibility
     stats = roster.map(p => {
-      // Try multiple possible stat paths
+      // ✅ MIGRATION: Use players key structure (aligns with Franchise)
+      // Player structure: { meta: {...}, season: {...}, attributes: {...}, position_ratings: {...} }
       const playerStats = pstats[p.id] || pstats[p._id] || {};
-      const season = playerStats?.stats?.Season || playerStats?.season || playerStats?.Season || {};
+      // ✅ MIGRATION: Read from season key (not stats.Season or stats.season)
+      const season = playerStats?.season || playerStats?.stats?.Season || playerStats?.stats?.season || playerStats?.Season || {};
       const row = { name: p.name };
       statKeys.forEach(k => {
         const val = season[k];
