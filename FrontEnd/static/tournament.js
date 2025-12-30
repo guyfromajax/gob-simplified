@@ -1091,14 +1091,17 @@ async function loadTournament() {
     localStorage.setItem("activeTournament", JSON.stringify(tournament));
     
     // ✅ SS&S: Resolve and store team ObjectId for consistent navigation
+    // Navigation anchor set requires team_id to be ObjectId format (not team name)
     if (tournament) {
       // Prefer ObjectId if available (from updated endpoint)
-      if (tournament.user_team_object_id && !userTeamId) {
+      if (tournament.user_team_object_id) {
+        // Always use ObjectId for navigation anchor (Task 3.2: Navigation Anchor Set Consistency)
         userTeamId = tournament.user_team_object_id;
         localStorage.setItem("userTeamId", userTeamId);
       } else if (tournament.user_team_id && !userTeamId) {
-        // Fallback: resolve team name to ObjectId
-        // This will be resolved by backend endpoints, but we store the name for now
+        // Fallback: If ObjectId not available, store team name temporarily
+        // Backend endpoints will resolve this, but we should prefer ObjectId
+        // Note: This is backward compatibility - new tournaments should always have user_team_object_id
         userTeamId = tournament.user_team_id;
         localStorage.setItem("userTeamId", userTeamId);
       }
