@@ -1107,7 +1107,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             doc = collection.find_one({"_id": ObjectId(doc_id)})
         
         # Get team plays
-        # ✅ SS&S: For franchise mode, use franchise document's user_team_object_id as authoritative source
+        # ✅ SS&S: Use document's user_team_object_id as authoritative source (aligns with Franchise pattern)
         if mode == "franchise":
             # Always use franchise document's user_team_object_id as source of truth
             user_team_id_name, user_team_object_id = get_user_team_from_franchise(doc)
@@ -1123,6 +1123,22 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             
             franchise_teams = doc.get("franchise_teams", {})
             team_obj = franchise_teams.get(authoritative_team_id, {})
+            actual_team_id = authoritative_team_id
+        elif mode == "tournament":
+            # ✅ MIGRATION: Use tournament document's user_team_object_id as source of truth
+            user_team_id_name, user_team_object_id = get_user_team_from_tournament(doc)
+            if not user_team_id_name or not user_team_object_id:
+                raise HTTPException(status_code=404, detail="User team not found in tournament document")
+            
+            # Use tournament document's user_team_object_id as authoritative team_id
+            authoritative_team_id = user_team_object_id
+            
+            # Log if URL team_id doesn't match (for debugging)
+            if team_id and team_id != authoritative_team_id:
+                logger.warning(f"⚠️ [GET PLAYBOOKS] URL team_id ({team_id}) doesn't match tournament document user_team_object_id ({authoritative_team_id}). Using tournament document value.")
+            
+            teams = doc.get("teams", {})
+            team_obj = teams.get(authoritative_team_id, {})
             actual_team_id = authoritative_team_id
         else:
             teams = doc.get("teams", {})
@@ -1201,6 +1217,9 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             if mode == "franchise":
                 franchise_teams = doc.get("franchise_teams", {})
                 team_obj = franchise_teams.get(actual_team_id, {}) if actual_team_id else {}
+            elif mode == "tournament":
+                teams = doc.get("teams", {})
+                team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
             else:
                 teams = doc.get("teams", {})
                 team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
@@ -1254,6 +1273,8 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 # Reload team_obj with updated position filters
                 if mode == "franchise":
                     team_obj = doc.get("franchise_teams", {}).get(actual_team_id, {})
+                elif mode == "tournament":
+                    team_obj = doc.get("teams", {}).get(actual_team_id, {})
                 else:
                     team_obj = doc.get("teams", {}).get(actual_team_id, {})
         
@@ -1466,6 +1487,19 @@ def save_playbooks(request: PlaybookSettingsRequest):
             # Log if URL team_id doesn't match (for debugging)
             if request.team_id and request.team_id != actual_team_id:
                 logger.warning(f"⚠️ [PLAYBOOKS SAVE] URL team_id ({request.team_id}) doesn't match franchise document user_team_object_id ({actual_team_id}). Using franchise document value.")
+        elif request.mode == "tournament":
+            # ✅ MIGRATION: Use tournament document's user_team_object_id as source of truth
+            # This ensures we're always using the correct team, even if URL params are wrong
+            user_team_id_name, user_team_object_id = get_user_team_from_tournament(doc)
+            if not user_team_id_name or not user_team_object_id:
+                raise HTTPException(status_code=404, detail="User team not found in tournament document")
+            
+            # Use tournament document's user_team_object_id as authoritative team_id
+            actual_team_id = user_team_object_id
+            
+            # Log if URL team_id doesn't match (for debugging)
+            if request.team_id and request.team_id != actual_team_id:
+                logger.warning(f"⚠️ [PLAYBOOKS SAVE] URL team_id ({request.team_id}) doesn't match tournament document user_team_object_id ({actual_team_id}). Using tournament document value.")
         else:
             # For tournament/single mode, try to resolve team name to team_id
             teams = doc.get("teams", {})
