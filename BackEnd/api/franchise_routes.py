@@ -2005,7 +2005,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             
             # Get current player attributes (after training)
             players = []
-            tournament_players = doc.get("player_stats", {})
+            # ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
+            tournament_players = doc.get("players", {}) or doc.get("player_stats", {})  # Backward compatibility
             
             # Resolve team_id - might be a name or an ID
             team_id_resolved = team_id

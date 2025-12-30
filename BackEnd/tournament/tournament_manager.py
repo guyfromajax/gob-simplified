@@ -38,7 +38,7 @@ class TournamentManager:
 
         zero_stats = {key: 0 for key in BOX_SCORE_KEYS}
         zero_stats["Outlet_Score_List"] = []  # Outlet_Score_List is an array, not an integer
-        player_stats: dict[str, dict] = {}
+        players_dict: dict[str, dict] = {}  # ✅ MIGRATION: Changed from player_stats to players_dict
         players = players_collection.find(
             {"team": {"$in": teams}},
             {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1},
@@ -71,9 +71,9 @@ class TournamentManager:
             if team_id:
                 meta["team_id"] = team_id
             
-            player_stats[pid] = {
+            players_dict[pid] = {
                 "meta": meta,  # Wrap metadata in meta object (matches Franchise pattern)
-                "season": zero_stats.copy(),
+                "season": zero_stats.copy(),  # ✅ MIGRATION: Tournament only tracks season stats (no career)
                 "attributes": attrs,  # Store all attributes (not just EM, CH, MO)
                 "position_ratings": p.get("position_ratings", {}).copy()  # Store position ratings (needed for training)
             }
@@ -145,7 +145,7 @@ class TournamentManager:
                 "top_10_blocks": [],
                 "top_10_steals": []
             },
-            "player_stats": player_stats,
+            "players": players_dict,  # ✅ MIGRATION: Changed from player_stats to players (aligns with Franchise)
             "teams": teams_obj,  # Initialize all teams upfront
             "applied_games": [],
             "completed": False

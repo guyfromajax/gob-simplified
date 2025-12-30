@@ -1145,7 +1145,8 @@ async function loadRoster() {
       };
     });
     const statKeys = ["PTS","FGM","FGA","TPM","TPA","FTM","FTA","REB","AST","STL","BLK","F","MIN","TO"];
-    const pstats = tournament?.player_stats || {};
+    // ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
+    const pstats = tournament?.players || tournament?.player_stats || {};  // Backward compatibility
     stats = roster.map(p => {
       // Try multiple possible stat paths
       const playerStats = pstats[p.id] || pstats[p._id] || {};

@@ -676,7 +676,8 @@ def get_tournament_roster(tournament_id: str, team_name: str = None):
     if not team_doc:
         raise HTTPException(status_code=404, detail=f"Team not found: {team_name}")
     
-    tournament_players = tournament_doc.get("player_stats", {})
+    # ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
+    tournament_players = tournament_doc.get("players", {}) or tournament_doc.get("player_stats", {})  # Backward compatibility
     team_player_ids = team_doc.get("player_ids", [])
     
     # Build player list with tournament-specific attributes
@@ -911,8 +912,8 @@ def run_tournament_training(req: TournamentTrainingRequest):
         raise HTTPException(status_code=404, detail="Team not found")
     team_id = str(team_doc["_id"])
 
-    # Get tournament-specific player data for the user's team
-    tournament_players = tournament_doc.get("player_stats", {})
+    # ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
+    tournament_players = tournament_doc.get("players", {}) or tournament_doc.get("player_stats", {})  # Backward compatibility
     team_player_ids = team_doc.get("player_ids", [])
     
     # Build player list with tournament-specific attributes
@@ -1088,24 +1089,25 @@ def run_tournament_training(req: TournamentTrainingRequest):
         pid = player["_id"]
         attrs = player.get("attributes", {})
         
+        # ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
         # Save ALL attributes (like franchise mode) - not just modified ones
         # This ensures all attributes are stored in the tournament document
         for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO"]:
             anchor_key = f"anchor_{attr}"
             # Save anchor_ value if it exists (post-training value)
             if anchor_key in attrs:
-                tournament_update[f"player_stats.{pid}.attributes.{anchor_key}"] = attrs[anchor_key]
+                tournament_update[f"players.{pid}.attributes.{anchor_key}"] = attrs[anchor_key]
             # Always save base attribute value (even if no anchor_ exists)
             if attr in attrs:
-                tournament_update[f"player_stats.{pid}.attributes.{attr}"] = attrs[attr]
+                tournament_update[f"players.{pid}.attributes.{attr}"] = attrs[attr]
         
         # NG doesn't have an anchor_key, save it directly if it exists
         if "NG" in attrs:
-            tournament_update[f"player_stats.{pid}.attributes.NG"] = attrs["NG"]
+            tournament_update[f"players.{pid}.attributes.NG"] = attrs["NG"]
         
         # Update position ratings for this player (if tournament stores them)
         if pid in position_ratings_updates:
-            tournament_update[f"player_stats.{pid}.position_ratings"] = position_ratings_updates[pid]
+            tournament_update[f"players.{pid}.position_ratings"] = position_ratings_updates[pid]
 
     # Mark training as completed and update status
     # Get session_type from training data (defaults to "in-season" if not provided)
