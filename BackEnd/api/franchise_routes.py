@@ -1801,18 +1801,31 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
         
         # For tournament mode, determine round from backend state if not provided
         if mode == "tournament":
+            from BackEnd.db import tournaments_collection
+            from BackEnd.api.tournament_routes import get_user_team_from_tournament
+            doc_id_obj = ObjectId(doc_id)
+            doc = tournaments_collection.find_one({"_id": doc_id_obj})
+            if not doc:
+                raise HTTPException(status_code=404, detail="Tournament not found")
+            
+            # ✅ MIGRATION: Use tournament document's user_team_object_id as source of truth
+            user_team_id_name, user_team_object_id = get_user_team_from_tournament(doc)
+            if not user_team_id_name or not user_team_object_id:
+                raise HTTPException(status_code=404, detail="User team not found in tournament document")
+            
+            # Use tournament document's user_team_object_id as authoritative team_id
+            authoritative_team_id = user_team_object_id
+            
+            # Log if URL team_id doesn't match (for debugging)
+            if team_id and team_id != authoritative_team_id:
+                logger.warning(f"⚠️ [TRAINING REPORT] URL team_id ({team_id}) doesn't match tournament document user_team_object_id ({authoritative_team_id}). Using tournament document value.")
+            
             if round is not None:
                 week = round  # Use round parameter if provided (for historical reports)
             elif week is not None:
                 week = week  # Use week parameter if provided (backward compatibility)
             else:
                 # SS&S: Determine round from backend state (training_status or latest_training)
-                from BackEnd.db import tournaments_collection
-                doc_id_obj = ObjectId(doc_id)
-                doc = tournaments_collection.find_one({"_id": doc_id_obj})
-                if not doc:
-                    raise HTTPException(status_code=404, detail="Tournament not found")
-                
                 # Try training_status.round first, then latest_training.round
                 training_status = doc.get("training_status", {})
                 week = training_status.get("round")
@@ -1961,24 +1974,25 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             
         else:  # tournament mode
             from BackEnd.db import tournaments_collection, teams_collection
+            from BackEnd.api.tournament_routes import get_user_team_from_tournament
             doc_id_obj = ObjectId(doc_id)
             doc = tournaments_collection.find_one({"_id": doc_id_obj})
             if not doc:
                 raise HTTPException(status_code=404, detail="Tournament not found")
             
-            # Resolve team_id to ObjectId string (matches Franchise pattern)
-            team_id_resolved = team_id
-            team_doc = teams_collection.find_one({"name": team_id})
-            if team_doc:
-                team_id_resolved = str(team_doc["_id"])
-            else:
-                try:
-                    team_id_obj = ObjectId(team_id)
-                    team_id_resolved = str(team_id_obj)
-                except:
-                    pass
+            # ✅ MIGRATION: Use tournament document's user_team_object_id as source of truth
+            user_team_id_name, user_team_object_id = get_user_team_from_tournament(doc)
+            if not user_team_id_name or not user_team_object_id:
+                raise HTTPException(status_code=404, detail="User team not found in tournament document")
             
-            team_id_str = str(team_id_resolved)
+            # Use tournament document's user_team_object_id as authoritative team_id
+            authoritative_team_id = user_team_object_id
+            
+            # Log if URL team_id doesn't match (for debugging)
+            if team_id and team_id != authoritative_team_id:
+                logger.warning(f"⚠️ [TRAINING REPORT] URL team_id ({team_id}) doesn't match tournament document user_team_object_id ({authoritative_team_id}). Using tournament document value.")
+            
+            team_id_str = str(authoritative_team_id)
             current_round = week  # week parameter is used as round for tournament
             
             # Get training report for this round (matches Franchise pattern: try per-round storage first, then fallback)
