@@ -936,6 +936,7 @@ def run_tournament_training(req: TournamentTrainingRequest):
     
     # Use tournament document's user_team_object_id as authoritative team_id
     team_id = user_team_object_id
+    team_name = user_team_id_name  # ✅ FIX: Use team name from tournament document
     
     # Log if URL team_id doesn't match (for debugging)
     if req.team_id and req.team_id != team_id:
