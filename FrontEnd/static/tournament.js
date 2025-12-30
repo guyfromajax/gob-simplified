@@ -863,6 +863,20 @@ function renderSchedule() {
     
     gameDiv.innerHTML = text;
     
+    // ✅ FIX: Add box score link for completed games (aligns with FCC)
+    const gameId = res?.game_id || match.game_id;
+    if (gameId && homeScore !== undefined && awayScore !== undefined) {
+      const boxScoreLink = document.createElement('a');
+      boxScoreLink.href = `/static/box-score.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&game_id=${encodeURIComponent(gameId)}`;
+      boxScoreLink.textContent = ' [Box Score]';
+      boxScoreLink.className = 'box-score-link';
+      boxScoreLink.style.color = '#4a90e2';
+      boxScoreLink.style.textDecoration = 'none';
+      boxScoreLink.style.marginLeft = '8px';
+      boxScoreLink.style.fontSize = 'calc(1em - 2px)';
+      gameDiv.appendChild(boxScoreLink);
+    }
+    
     // Add training report link if this is user's matchup and training has been run
     // Compare with team name (bracket uses team names, not ObjectIds)
     const isUserMatch = match.home_team === userTeamName || match.away_team === userTeamName;
@@ -905,6 +919,20 @@ function renderSchedule() {
         text = `${match.away_team} (${awayScore}) @ ${match.home_team} (${homeScore})`;
       }
       gameDiv.innerHTML = text;
+      
+      // ✅ FIX: Add box score link for completed games (aligns with FCC)
+      const gameId = res?.game_id || match.game_id;
+      if (gameId && homeScore !== undefined && awayScore !== undefined) {
+        const boxScoreLink = document.createElement('a');
+        boxScoreLink.href = `/static/box-score.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&game_id=${encodeURIComponent(gameId)}`;
+        boxScoreLink.textContent = ' [Box Score]';
+        boxScoreLink.className = 'box-score-link';
+        boxScoreLink.style.color = '#4a90e2';
+        boxScoreLink.style.textDecoration = 'none';
+        boxScoreLink.style.marginLeft = '8px';
+        boxScoreLink.style.fontSize = 'calc(1em - 2px)';
+        gameDiv.appendChild(boxScoreLink);
+      }
       
       // Add training report link if this is user's matchup and training has been run
       // Compare with team name (bracket uses team names, not ObjectIds)
@@ -950,6 +978,20 @@ function renderSchedule() {
       text = `${match.away_team} (${awayScore}) @ ${match.home_team} (${homeScore})`;
     }
     champGameDiv.innerHTML = text;
+    
+    // ✅ FIX: Add box score link for completed games (aligns with FCC)
+    const gameId = res?.game_id || match.game_id;
+    if (gameId && homeScore !== undefined && awayScore !== undefined) {
+      const boxScoreLink = document.createElement('a');
+      boxScoreLink.href = `/static/box-score.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&game_id=${encodeURIComponent(gameId)}`;
+      boxScoreLink.textContent = ' [Box Score]';
+      boxScoreLink.className = 'box-score-link';
+      boxScoreLink.style.color = '#4a90e2';
+      boxScoreLink.style.textDecoration = 'none';
+      boxScoreLink.style.marginLeft = '8px';
+      boxScoreLink.style.fontSize = 'calc(1em - 2px)';
+      champGameDiv.appendChild(boxScoreLink);
+    }
     
     // Add training report link if this is user's matchup and training has been run
     // Compare with team name (bracket uses team names, not ObjectIds)
@@ -1624,23 +1666,49 @@ async function loadTeamData() {
     
     const data = await response.json();
     
+    // ✅ FIX: Merge player stats from tournament document (aligns with FCC pattern)
+    let playersWithStats = [];
+    if (roster && roster.length > 0 && tournament && tournament.players) {
+      // ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
+      const tournamentPlayers = tournament.players || tournament.player_stats || {}; // Backward compatibility
+      
+      playersWithStats = roster.map(player => {
+        const playerId = player.id || player._id;
+        const tournamentPlayer = tournamentPlayers[playerId];
+        
+        if (tournamentPlayer && tournamentPlayer.season) {
+          // Merge stats from tournament document
+          player.stats = { season: tournamentPlayer.season };
+        } else {
+          // No stats found, use empty object
+          player.stats = { season: {} };
+        }
+        return player;
+      });
+    } else {
+      playersWithStats = roster || [];
+    }
+    
     teamData = {
       team_attributes: data.team_attributes || {},
       plays_data: data.plays_data || {},
       scouting_data: data.scouting_data || {},
-      players: roster || [] // Use roster from loadRoster() if available
+      players: playersWithStats
     };
     
     console.log('📊 [TEAM DATA] Loaded team data:', {
       attributes: Object.keys(teamData.team_attributes).length,
       plays: Object.keys(teamData.plays_data).length,
-      defenses: Object.keys(teamData.scouting_data?.defense || {}).length
+      defenses: Object.keys(teamData.scouting_data?.defense || {}).length,
+      players: playersWithStats.length,
+      playersWithStats: playersWithStats.filter(p => p.stats?.season && Object.keys(p.stats.season).length > 0).length
     });
     
     // Render if Team tab is active
     const teamTab = document.getElementById('team-tab');
     if (teamTab && teamTab.classList.contains('active')) {
       renderTeamReport();
+      renderRosterStats(playersWithStats);
       renderPlaybookSummary();
     }
   } catch (error) {
@@ -1796,6 +1864,144 @@ function createPill(originalValue, attrKey) {
   }
   
   return pill;
+}
+
+// ✅ FIX: Add player stats rendering to Team tab (aligns with FCC)
+function renderRosterStats(players) {
+  if (!players || players.length === 0) {
+    const tbody = document.getElementById('roster-stats-body');
+    if (tbody) tbody.innerHTML = '';
+    return;
+  }
+  
+  renderRosterStatsTable(players);
+  
+  // Add click handlers to sortable headers
+  const statsTable = document.querySelector('#team-tab .stats-table');
+  if (statsTable) {
+    const sortableHeaders = statsTable.querySelectorAll('thead .sortable');
+    sortableHeaders.forEach(header => {
+      const newHeader = header.cloneNode(true);
+      header.parentNode.replaceChild(newHeader, header);
+      
+      newHeader.style.cursor = 'pointer';
+      newHeader.style.userSelect = 'none';
+      newHeader.addEventListener('click', () => {
+        const stat = newHeader.dataset.stat;
+        sortRosterStats(stat);
+      });
+    });
+  }
+}
+
+// Store roster stats data for sorting
+let rosterPlayersDataForSorting = [];
+
+function renderRosterStatsTable(players) {
+  const tbody = document.getElementById('roster-stats-body');
+  if (!tbody) return;
+  
+  tbody.innerHTML = '';
+  rosterPlayersDataForSorting = JSON.parse(JSON.stringify(players)); // Deep copy for sorting
+  
+  players.forEach(p => {
+    const stats = p.stats?.season || {};
+    // ✅ FIX: Map 3PTM/3PTA to TPM/TPA for display (database stores as 3PTM/3PTA, frontend expects TPM/TPA)
+    const tpm = stats['3PTM'] || stats.TPM || 0;
+    const tpa = stats['3PTA'] || stats.TPA || 0;
+    
+    // Calculate percentages
+    const fgPct = stats.FGA > 0 ? ((stats.FGM || 0) / stats.FGA * 100).toFixed(1) : '0.0';
+    const threePct = tpa > 0 ? (tpm / tpa * 100).toFixed(1) : '0.0';
+    const ftPct = stats.FTA > 0 ? ((stats.FTM || 0) / stats.FTA * 100).toFixed(1) : '0.0';
+    
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim()}</td>
+      <td>${stats.PTS || 0}</td>
+      <td>${stats.FGM || 0}</td>
+      <td>${stats.FGA || 0}</td>
+      <td>${fgPct}%</td>
+      <td>${tpm}</td>
+      <td>${tpa}</td>
+      <td>${threePct}%</td>
+      <td>${stats.FTM || 0}</td>
+      <td>${stats.FTA || 0}</td>
+      <td>${ftPct}%</td>
+      <td>${stats.DREB || 0}</td>
+      <td>${stats.OREB || 0}</td>
+      <td>${stats.TREB || (stats.DREB || 0) + (stats.OREB || 0)}</td>
+      <td>${stats.AST || 0}</td>
+      <td>${stats.STL || 0}</td>
+      <td>${stats.BLK || 0}</td>
+      <td>${stats.F || 0}</td>
+      <td>${stats.MIN || 0}</td>
+      <td>${stats.TO || 0}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function sortRosterStats(statKey) {
+  // Map display stat names to data stat keys
+  const statMap = {
+    'name': 'name',
+    'PTS': 'PTS',
+    'FGM': 'FGM',
+    'FGA': 'FGA',
+    'FG%': 'FG%',
+    'TPM': 'TPM',
+    'TPA': 'TPA',
+    '3PT%': '3PT%',
+    'FTM': 'FTM',
+    'FTA': 'FTA',
+    'FT%': 'FT%',
+    'DREB': 'DREB',
+    'OREB': 'OREB',
+    'TREB': 'TREB',
+    'AST': 'AST',
+    'STL': 'STL',
+    'BLK': 'BLK',
+    'F': 'F',
+    'MIN': 'MIN',
+    'TO': 'TO'
+  };
+  
+  const dataKey = statMap[statKey] || statKey;
+  
+  // Sort players by the selected stat (descending order)
+  rosterPlayersDataForSorting.sort((a, b) => {
+    let val1, val2;
+    const statsA = a.stats?.season || {};
+    const statsB = b.stats?.season || {};
+    
+    if (dataKey === 'name') {
+      val1 = a.name || '';
+      val2 = b.name || '';
+      return val2.localeCompare(val1); // Reverse for descending
+    } else if (dataKey === 'FG%') {
+      val1 = statsA.FGA > 0 ? (statsA.FGM || 0) / statsA.FGA : 0;
+      val2 = statsB.FGA > 0 ? (statsB.FGM || 0) / statsB.FGA : 0;
+    } else if (dataKey === '3PT%') {
+      const tpaA = statsA['3PTA'] || statsA.TPA || 0;
+      const tpaB = statsB['3PTA'] || statsB.TPA || 0;
+      val1 = tpaA > 0 ? ((statsA['3PTM'] || statsA.TPM || 0) / tpaA) : 0;
+      val2 = tpaB > 0 ? ((statsB['3PTM'] || statsB.TPM || 0) / tpaB) : 0;
+    } else if (dataKey === 'FT%') {
+      val1 = statsA.FTA > 0 ? (statsA.FTM || 0) / statsA.FTA : 0;
+      val2 = statsB.FTA > 0 ? (statsB.FTM || 0) / statsB.FTA : 0;
+    } else if (dataKey === 'TREB') {
+      val1 = statsA.TREB || (statsA.DREB || 0) + (statsA.OREB || 0);
+      val2 = statsB.TREB || (statsB.DREB || 0) + (statsB.OREB || 0);
+    } else {
+      val1 = statsA[dataKey] || 0;
+      val2 = statsB[dataKey] || 0;
+    }
+    
+    return val2 - val1; // Descending order
+  });
+  
+  // Re-render with sorted data
+  renderRosterStatsTable(rosterPlayersDataForSorting);
 }
 
 function renderPlaybookSummary() {
@@ -2052,6 +2258,7 @@ document.addEventListener('DOMContentLoaded', () => {
           loadTeamData();
         } else {
           renderTeamReport();
+          renderRosterStats(teamData.players || []);
           renderPlaybookSummary();
         }
       }

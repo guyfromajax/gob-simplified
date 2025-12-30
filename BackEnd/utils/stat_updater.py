@@ -173,9 +173,17 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
             except Exception:
                 tid = None
             if tid:
+                # ✅ FIX: Get existing player entry from tournament document to preserve meta.team_id
+                tournament_doc = tournaments_collection.find_one(
+                    {"_id": tid},
+                    {f"players.{str(query_pid)}": 1}
+                )
+                existing_player = tournament_doc.get("players", {}).get(str(query_pid), {}) if tournament_doc else {}
+                existing_meta = existing_player.get("meta", {})
+                
                 player_doc = players_collection.find_one(
                     {"_id": query_pid},
-                    {"first_name": 1, "last_name": 1, "team": 1, "stats.season": 1},
+                    {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "stats.season": 1},
                 )
                 if not player_doc:
                     continue
@@ -184,13 +192,14 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                 )
                 # ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
                 # Wrap metadata in meta object (matches Franchise pattern)
+                # ✅ FIX: Preserve existing meta.team_id from tournament document if it exists
                 meta = {
-                    "first_name": player_doc.get("first_name", ""),
-                    "last_name": player_doc.get("last_name", ""),
-                    "team": player_doc.get("team", ""),
+                    "first_name": player_doc.get("first_name", existing_meta.get("first_name", "")),
+                    "last_name": player_doc.get("last_name", existing_meta.get("last_name", "")),
+                    "team": player_doc.get("team", existing_meta.get("team", "")),
                 }
-                # Get team_id if available
-                team_id = player_doc.get("team_id")
+                # ✅ FIX: Preserve team_id from tournament document first, then fallback to player_doc
+                team_id = existing_meta.get("team_id") or player_doc.get("team_id")
                 if team_id:
                     meta["team_id"] = str(team_id)
                 
@@ -207,6 +216,12 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                         "percentages": season_percentages,  # ✅ MIGRATION: Calculate shooting percentages
                     },
                 }
+                # ✅ FIX: Preserve existing attributes and position_ratings if they exist
+                if "attributes" in existing_player:
+                    player_entry["attributes"] = existing_player["attributes"]
+                if "position_ratings" in existing_player:
+                    player_entry["position_ratings"] = existing_player["position_ratings"]
+                
                 tournaments_collection.update_one(
                     {"_id": tid},
                     {"$set": {f"players.{str(query_pid)}": player_entry}},
