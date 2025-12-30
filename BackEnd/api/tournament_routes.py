@@ -277,6 +277,7 @@ def simulate_round(request: SimulateRequest):
             summary = summarize_game_state(game)
             print(f"🔍 Summary created, type: {type(summary)}")
             game_id = games_collection.insert_one(summary).inserted_id
+            logger.info(f"✅ [SIMULATE-ROUND] Game document inserted for round {tournament_doc['current_round']} match {i}, game_id: {game_id} (type: {type(game_id)}), _id in summary: {summary.get('_id')}")
             #add a print statement here to show team name and score for each team after the game is simulated
             print(f"Home team: {matchup['home_team']} - Score: {summary['score'][matchup['home_team']]}")
             print(f"Away team: {matchup['away_team']} - Score: {summary['score'][matchup['away_team']]}")
@@ -286,11 +287,11 @@ def simulate_round(request: SimulateRequest):
                 else matchup["away_team"]
             )
             manager.save_game_result(round_name, i, str(game_id), winner)
-            print(f"🔍 About to finalize game stats for game_id: {str(game_id)}")
+            logger.info(f"🔍 [SIMULATE-ROUND] About to finalize game stats for game_id: {str(game_id)} (type: {type(str(game_id))}), tournament_id: {request.tournament_id}")
             stat_updater.finalize_game(
                 str(game_id), mode="tournament", tournament_id=request.tournament_id
             )
-            print(f"🔍 Game stats finalized successfully")
+            logger.info(f"✅ [SIMULATE-ROUND] Game stats finalized successfully for game_id: {str(game_id)}")
             result_doc = {
                 "home_team": matchup["home_team"],
                 "away_team": matchup["away_team"],
@@ -413,7 +414,11 @@ def save_result(request: TournamentResultRequest):
                 if ObjectId.is_valid(request.game_id)
                 else request.game_id
             )
+            logger.info(f"🔍 [SAVE-RESULT] User game - game_id from request: {request.game_id} (type: {type(request.game_id)}), converted gid: {gid} (type: {type(gid)})")
             summary = games_collection.find_one({"_id": gid}) or {}
+            logger.info(f"🔍 [SAVE-RESULT] User game - Found game document: {bool(summary)}, has _id: {bool(summary.get('_id'))}, _id value: {summary.get('_id')}")
+            if not summary or not summary.get("_id"):
+                logger.error(f"❌ [SAVE-RESULT] User game - Game document not found in games_collection for game_id: {request.game_id}, gid: {gid}")
             score_map = (
                 summary.get("score")
                 or summary.get("final_score")
@@ -422,11 +427,13 @@ def save_result(request: TournamentResultRequest):
             manager.save_game_result(
                 round_key, i, request.game_id, request.winner, score_map
             )
+            logger.info(f"🔍 [SAVE-RESULT] User game - About to call finalize_game with game_id: {str(gid)} (type: {type(gid)}), tournament_id: {request.tournament_id}")
             stat_updater.finalize_game(
-                gid,
+                str(gid),  # ✅ FIX: Ensure game_id is always a string
                 mode="tournament",
                 tournament_id=request.tournament_id,
             )
+            logger.info(f"✅ [SAVE-RESULT] User game - finalize_game completed for game_id: {str(gid)}")
             user_result = {
                 "home_team": home_team,
                 "away_team": away_team,

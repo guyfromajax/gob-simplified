@@ -281,7 +281,7 @@ class TurnManager:
                 step_0 = skeleton["steps"][0]
                 if "pos_actions" in step_0 and step_0["pos_actions"]:
                     payload["offense_setup_positions"] = step_0["pos_actions"]
-                    logging.warning(f"✅ [BASELINE_INBOUND] Including {len(step_0['pos_actions'])} skeleton step 0 positions for {next_defensive_setup} setup")
+                    # logging.warning(f"✅ [BASELINE_INBOUND] Including {len(step_0['pos_actions'])} skeleton step 0 positions for {next_defensive_setup} setup")
 
         return payload
 
@@ -3082,7 +3082,7 @@ class TurnManager:
             elif not hco_removed:
                 strategies["HCO"] = max(0, strategies["HCO"] - hct_value)
         else:
-            logging.warning(f"   - ⚠️ HCT value is {hct_value} (0 or invalid), NOT adding to strategies")
+            # logging.warning(f"   - ⚠️ HCT value is {hct_value} (0 or invalid), NOT adding to strategies")
         
         # Only add FCP if value is > 0 (user wants it enabled)
         if fcp_value and fcp_value > 0:

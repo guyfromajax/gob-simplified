@@ -896,10 +896,10 @@ class ShotManager:
                         rebounder_player.coords = rebounder_coords.copy()
                 
                 # Debug log to verify offense_getback is populated
-                print(f"🔍 [BACKEND GET BACK DEBUG] MISS shot - offense_getback populated:", {
-                    "offense_getback_positions": offense_getback_list,
-                    "offense_getback_player_ids": result["offense_getback"],
-                    "count": len(result["offense_getback"]),
+                # print(f"🔍 [BACKEND GET BACK DEBUG] MISS shot - offense_getback populated:", {
+                #     "offense_getback_positions": offense_getback_list,
+                #     "offense_getback_player_ids": result["offense_getback"],
+                #     "count": len(result["offense_getback"]),
                     "shooter_pos": shooter_pos,
                     "offense_reb_value": offense_reb_value,
                     "note": "This should match frontend logs"
