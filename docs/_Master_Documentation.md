@@ -579,6 +579,312 @@ These variables provide additional context for navigation but aren't required fo
 
 ---
 
+### GMO EOS Tournament - Franchise Mode
+
+**Definition:** User is in the End-of-Season (EOS) Conference Tournament within Franchise Mode. This is a special tournament phase that occurs after the regular season (weeks 1-14) and uses weeks 15-17 for the tournament bracket.
+
+**Sub-categories:**
+- **GMO EOS Tournament - Franchise Mode:** Tournament Command Center, Training, Playbooks, Game Plan, Team Roster, Standings/Stats, Bracket View
+
+**Examples:**
+- Tournament Command Center (bracket view, standings)
+- Training screen (before/after gameplay)
+- Training Report screen
+- Playbooks screen
+- Game Plan screen
+- Team Roster screen
+- Standings/Stats screens
+
+#### Tournament Structure
+
+**Weeks:**
+- **Week 15:** Quarterfinals (Round 1) - 4 matchups, 8 teams
+- **Week 16:** Semifinals (Round 2) - 2 matchups, 4 teams
+- **Week 17:** Championship (Final Round) - 1 matchup, 2 teams
+
+**Bracket Format:**
+- **8 teams** seeded 1-8 based on regular season finish
+- Uses same bracket structure as Tournament Mode (adapted for 8 teams instead of 16)
+- Bracket structure: `{round1: [...], round2: [...], final: [...]}`
+  - `round1`: 4 matchups (8 teams → 4 winners)
+  - `round2`: 2 matchups (4 teams → 2 winners)
+  - `final`: 1 matchup (2 teams → 1 champion)
+
+#### Seeding Logic
+
+**Conference Standings Determination (Regular Season Finish):**
+1. **Primary:** Total Wins (higher wins = better seed)
+2. **Tiebreaker 1:** Higher PF-PA delta (Points For minus Points Against) - calculated across all 14 regular season games
+3. **Tiebreaker 2:** Random (if still tied after wins and PF-PA delta)
+
+**Seeding Process:**
+- After week 14 regular season completion, calculate standings
+- Sort teams by: Wins (desc), PF-PA delta (desc), Random
+- Assign seeds 1-8 (1 = best record, 8 = worst record)
+- Generate bracket matchups:
+  - Seed 1 vs Seed 8
+  - Seed 2 vs Seed 7
+  - Seed 3 vs Seed 6
+  - Seed 4 vs Seed 5
+- Tournament games added to Schedule tab once seeds are determined
+
+#### Data Persistence
+
+**Tournament State (Stored in Franchise Document):**
+- `eos_tournament` (object) - Tournament bracket and state
+  - `bracket` (object) - Bracket structure: `{round1: [...], round2: [...], final: [...]}`
+  - `current_round` (integer) - Current round number (1-3)
+  - `completed` (boolean) - Whether tournament is finished
+  - `champion` (ObjectId string) - Winning team ObjectId (set after final)
+  - `seeds` (object) - Team seeds mapping: `{team_id: seed_number}`
+  - `results` (array) - Game results: `[{round, match_index, winner, score, game_id}]`
+- `week` (integer) - Current week (15-17 during tournament)
+- `eos_tournament_active` (boolean) - Flag indicating tournament is in progress
+
+**Game State:**
+- Tournament games stored in `games_collection` with `mode: "franchise"` and `week: 15/16/17`
+- Games reference franchise document via `franchise_id`
+- Box scores and stats tracked per game
+
+**Stats Tracking:**
+- Tournament game stats roll up to franchise document (same as regular season)
+- Player stats: Added to `players.{pid}.season` and `players.{pid}.career` (same rollup process as regular season)
+- Team stats: Aggregated in `franchise_teams.{team_id}`
+- Tournament games count toward season and career stats (no separate tournament stats)
+
+#### Championship Celebration
+
+**When:** At conclusion of Week 17 game (championship game)
+
+**Display:**
+- Fireworks animation on screen
+- End-of-Game (EOG) popup displaying:
+  - "{Team Name} has won the conference championship."
+  - Team logo
+  - Fireworks animation overlay
+  - Two buttons: "Box Score" and "Return to Locker Room"
+- Popup appears immediately on gameplay screen after final game completion
+- Popup dismisses when user clicks either "Box Score" or "Return to Locker Room" button
+
+**Implementation Notes:**
+- Fireworks assets/files to be provided later
+- Popup triggered immediately after final game completion (on gameplay screen)
+- Both navigation buttons are in the popup (not separate from popup)
+
+#### Key Variables
+
+**Core Navigation Anchor Set (Required for all navigation):**
+- Same as GMO - Franchise Mode: `mode`, `franchise_id`, `team_id`
+- Additional context: `week` (15-17 during tournament)
+
+**Tournament-Specific Variables:**
+- `eos_tournament.current_round` (integer) - Current round (1-3)
+- `eos_tournament.completed` (boolean) - Tournament finished
+- `eos_tournament.champion` (ObjectId) - Winning team
+
+#### Navigation Requirements
+
+**Navigation Anchor Set (Required):**
+- **Mode:** `"franchise"` (same as regular franchise mode)
+- **Doc ID:** `franchise_id` (ObjectId string)
+- **Team ID:** `team_id` (ObjectId string) - User's team anchor
+- **Week:** `week` (15-17 during tournament)
+
+**Validation:**
+- All three core parameters must be present
+- `week` must be 15, 16, or 17 during tournament
+- `eos_tournament_active` must be `true` in franchise document
+
+#### State Management
+
+**Tournament State (Stored in franchise document):**
+- `eos_tournament` - Complete tournament bracket and state
+- `week` - Current week (15-17)
+- `eos_tournament_active` - Boolean flag for tournament phase
+
+**Transition from Regular Season:**
+- After week 14 completion, calculate standings and seeds
+- Initialize `eos_tournament` bracket structure
+- Set `eos_tournament_active = true`
+- Set `week = 15`
+
+**Transition to Next Season (After Tournament):**
+- After week 17 completion, set `eos_tournament.completed = true`
+- Set `eos_tournament_active = false`
+- Increment `current_season`
+- Reset `week = 1` for new season
+- Archive tournament results (TBD: separate collection or keep in franchise doc?)
+
+#### Data Flow
+
+**Regular Season → EOS Tournament:**
+- After week 14 completion, calculate standings
+- Generate seeds 1-8 based on standings logic
+- Create bracket structure in `eos_tournament.bracket`
+- Set `eos_tournament_active = true`
+- Set `week = 15`
+
+**EOS Tournament → Next Season:**
+- After week 17 completion, set `eos_tournament.completed = true`
+- Set `eos_tournament_active = false`
+- Increment `current_season`
+- Reset `week = 1`
+- Archive tournament results (TBD)
+
+**GMO → GP (Starting Tournament Game):**
+- Same as regular season: Load Game Plan and Playbooks from franchise document
+- Create game document with `week: 15/16/17` and tournament context
+- Game results saved to `eos_tournament.results`
+
+**GP → GMO (Returning from Tournament Game):**
+- Game stats rolled up to franchise document (same as regular season)
+- Tournament bracket advanced if round is complete
+- Update `eos_tournament.current_round` if all matchups in round are finished
+
+#### API Endpoints
+
+**Key Endpoints:**
+- `GET /franchise/state` - Loads franchise state including `eos_tournament`
+- `GET /franchise/command-center-data` - Loads tournament bracket and standings
+- `POST /api/init-game` - Initializes tournament game (week 15/16/17)
+- `POST /franchise/complete-week` - Completes tournament week, advances bracket
+- `GET /api/gameplan` - Loads Game Plan settings (same as regular season)
+- `PUT /api/gameplan` - Saves Game Plan settings (same as regular season)
+- `GET /api/playbooks` - Loads Playbooks settings (same as regular season)
+- `POST /api/playbooks` - Saves Playbooks settings (same as regular season)
+- `POST /franchise/training` - Runs training session (same as regular season)
+
+#### User Actions
+
+**Available Actions:**
+- View Tournament Bracket (seeds, matchups, results) - via Tournament tab in FCC
+- View Standings (regular season final standings, seeds)
+- Configure Game Plan (strategy settings)
+- Configure Playbooks (playbook settings)
+- Run Training (allocate training points, select coaching focus) - only if user team still in tournament
+- View Training Report (see attribute changes)
+- View Team Roster (player attributes, stats)
+- Start Tournament Game (navigate to GP instance) - only if user team still in tournament
+- Sim Rest of Tournament (if user team eliminated) - sims all remaining games in current round
+- Sim Championship Game (if multiple rounds remain after elimination) - sims final game
+- View Championship Celebration (after week 17 completion)
+- Finish Current Season (after tournament completion) - starts new season (week 1)
+
+**Eliminated Team Actions:**
+- When user team is eliminated, "Sim Rest of Tournament" button appears in top right (replaces training/play next game button)
+- Clicking "Sim Rest of Tournament" sims all remaining games in current round
+- If multiple rounds remain (e.g., eliminated in Round 1, but Round 2 and Final still pending):
+  - After Round 2 sim completes, show popup with results
+  - Popup includes "Sim Championship Game" button
+  - Clicking "Sim Championship Game" sims final game
+  - User returns to FCC with full EOS Tournament results
+  - Can view all box scores in Schedule tab
+
+#### Validation Rules
+
+**Navigation Validation:**
+- `franchise_id` must exist in `franchises_collection`
+- `team_id` must exist in `franchise_teams` dict
+- `week` must be 15, 16, or 17 during tournament
+- `eos_tournament_active` must be `true` in franchise document
+
+**Tournament State Validation:**
+- `eos_tournament.bracket` must exist and be valid structure
+- `eos_tournament.current_round` must be 1, 2, or 3
+- All previous round matchups must have winners before advancing
+
+**Seeding Validation:**
+- Exactly 8 teams must be seeded
+- Seeds must be 1-8 (no duplicates, no gaps)
+- Standings calculation must complete successfully
+
+#### Transition Patterns
+
+**Regular Season → EOS Tournament:**
+- After week 14 completion, calculate standings
+- Generate seeds and bracket
+- Set `eos_tournament_active = true`
+- Set `week = 15`
+- Add tournament games to Schedule tab
+- Navigate to Franchise Command Center (Tournament tab available)
+
+**EOS Tournament → Next Season:**
+- After week 17 completion, show championship celebration
+- Set `eos_tournament.completed = true`
+- Set `eos_tournament_active = false`
+- "Finish Current Season" button appears in top right
+- Clicking "Finish Current Season":
+  - Increments `current_season`
+  - Resets `week = 1`
+  - Runs general season init code (same as previous season initialization)
+  - Navigate to Franchise Command Center (new season)
+
+**GMO → GP (Tournament Game):**
+- Preserve navigation anchor set (`mode`, `franchise_id`, `team_id`)
+- Add `week` (15/16/17) and `game_id` to navigation
+- Initialize tournament game via `/api/init-game`
+
+**GP → GMO (Returning from Tournament Game):**
+- Preserve navigation anchor set
+- Remove `game_id` from navigation
+- Stats rolled up to franchise document
+- Tournament bracket advanced if round complete
+
+#### UI Components
+
+**Tournament Tab:**
+- New tab in Franchise Command Center (to the right of Recruits tab)
+- Displays EOS Tournament bracket, seeds, and results
+- Same bracket view structure as Tournament Mode
+- Shows all rounds: Round 1 (Quarterfinals), Round 2 (Semifinals), Final (Championship)
+- Displays seeds, matchups, winners, and scores
+
+**Schedule Tab:**
+- Tournament games added to Schedule tab once seeds are determined (after week 14)
+- Shows all tournament games (weeks 15-17) with box scores
+- Same display format as regular season games
+
+**Top Right Button States:**
+- **User Team Still in Tournament:** "Run Training" or "Play Next Game" (same as regular season)
+- **User Team Eliminated:** "Sim Rest of Tournament" (replaces training/play button)
+- **After Tournament Completion:** "Finish Current Season" (replaces other buttons)
+
+**Simulation Flow (Eliminated Teams):**
+1. User team eliminated → "Sim Rest of Tournament" button appears
+2. User clicks button → All remaining games in current round are simulated
+3. If multiple rounds remain:
+   - After Round 2 sim completes, popup appears with results
+   - Popup shows "Sim Championship Game" button
+   - User clicks "Sim Championship Game" → Final game simulated
+   - User returns to FCC with full tournament results
+4. User can view all box scores in Schedule tab
+
+#### Implementation Notes
+
+**Training:**
+- Training works same as regular season
+- Only available if user team is still in tournament
+- Training occurs before upcoming tournament game (same flow as regular season)
+
+**Stats Rollup:**
+- Tournament games use same stats rollup process as regular season
+- Stats added to `players.{pid}.season` and `players.{pid}.career`
+- No separate tournament stats tracking
+
+**Season Transition:**
+- "Finish Current Season" button triggers new season initialization
+- Uses same general season init code as previous season
+- Resets `week = 1`, increments `current_season`
+- EOS Tournament logic details to be provided later
+
+**Fireworks Implementation:**
+- Fireworks assets/files to be provided later
+- Celebration popup appears immediately on gameplay screen after final game completion
+- Popup includes "Box Score" and "Return to Locker Room" buttons
+- Popup dismisses when either button is clicked
+
+---
+
 ### GMO - Tournament Mode
 
 #### Data Persistence

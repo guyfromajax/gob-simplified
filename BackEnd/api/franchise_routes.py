@@ -14,6 +14,12 @@ from BackEnd.db import db, franchise_state_collection
 from BackEnd.utils.shared import summarize_game_state
 from BackEnd.utils import stat_updater
 from BackEnd.models.franchise_manager import FranchiseManager
+from BackEnd.tournament.eos_tournament import (
+    initialize_eos_tournament,
+    advance_tournament_round,
+    save_tournament_game_result,
+    get_round_name
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -457,15 +463,68 @@ def complete_week(req: CompleteWeekRequest):
     
     # Reset training status for next week
     next_week = req.week + 1
+    
+    # ✅ EOS TOURNAMENT: Initialize tournament after week 14 completion
+    update_fields = {
+        "results": existing_results,
+        "week": next_week,
+        "training_status.current_week": next_week,
+        "training_status.training_completed": False,
+        "training_status.session_type": "in-season"
+    }
+    
+    if req.week == 14:
+        # Week 14 complete - initialize EOS Tournament
+        logger.info(f"🎯 [EOS TOURNAMENT] Week 14 complete, initializing tournament")
+        tournament_state = initialize_eos_tournament(franchise_doc, db.teams)
+        update_fields["eos_tournament"] = tournament_state
+        update_fields["eos_tournament_active"] = True
+        logger.info(f"✅ [EOS TOURNAMENT] Tournament initialized, week set to 15")
+    elif req.week in [15, 16, 17]:
+        # Tournament week - save game result and advance round if needed
+        eos_tournament = franchise_doc.get("eos_tournament", {})
+        if eos_tournament:
+            current_round = eos_tournament.get("current_round", 1)
+            bracket = eos_tournament.get("bracket", {})
+            round_name = get_round_name(current_round)
+            matchups = bracket.get(round_name, [])
+            
+            # Find which matchup this game belongs to
+            matchup_index = None
+            for i, matchup in enumerate(matchups):
+                if (str(matchup.get("home_team")) == str(team1_id) and str(matchup.get("away_team")) == str(team2_id)) or \
+                   (str(matchup.get("home_team")) == str(team2_id) and str(matchup.get("away_team")) == str(team1_id)):
+                    matchup_index = i
+                    break
+            
+            if matchup_index is not None and user_game_id:
+                # Determine winner
+                winner_id = team1_id if user.team1_score > user.team2_score else team2_id
+                
+                # Save tournament game result
+                save_tournament_game_result(
+                    franchise_doc,
+                    current_round,
+                    matchup_index,
+                    user_game_id,
+                    str(winner_id),
+                    {"home": user.team1_score if str(team1_id) == str(matchup.get("home_team")) else user.team2_score,
+                     "away": user.team2_score if str(team1_id) == str(matchup.get("home_team")) else user.team1_score}
+                )
+                
+                # Reload franchise doc to get updated tournament state
+                franchise_doc = db.franchises.find_one({"_id": franchise_id})
+                eos_tournament = franchise_doc.get("eos_tournament", {})
+                
+                # Advance round if all matchups complete
+                eos_tournament = advance_tournament_round(franchise_doc, db.teams)
+                update_fields["eos_tournament"] = eos_tournament
+                
+                logger.info(f"✅ [EOS TOURNAMENT] Saved tournament game result for Round {current_round}, Matchup {matchup_index}")
+    
     db.franchises.update_one(
         {"_id": franchise_id},
-        {"$set": {
-            "results": existing_results, 
-            "week": next_week,
-            "training_status.current_week": next_week,
-            "training_status.training_completed": False,
-            "training_status.session_type": "in-season"
-        }},
+        {"$set": update_fields},
     )
 
     id_to_name = {str(t["_id"]): t.get("name", "") for t in db.teams.find({}, {"name": 1})}
@@ -525,7 +584,22 @@ def command_center_data(franchise_id: str = None):
     # Get username and seed from state (backward compatibility)
     state = franchise_state_collection.find_one({"_id": "state"}) or {}
     
-    return {
+    # ✅ EOS TOURNAMENT: Include tournament data if active
+    eos_tournament = None
+    eos_tournament_active = False
+    week = None
+    if franchise_id:
+        try:
+            fid = ObjectId(franchise_id)
+            franchise_doc = db.franchises.find_one({"_id": fid})
+            if franchise_doc:
+                eos_tournament = franchise_doc.get("eos_tournament")
+                eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
+                week = franchise_doc.get("week", 1)
+        except Exception:
+            pass
+    
+    response = {
         "team": team_name,
         "team_id": team_id,  # ✅ SS&S: Include ObjectId for consistent navigation
         "username": state.get("username", "Coach"),
@@ -540,6 +614,14 @@ def command_center_data(franchise_id: str = None):
         "training_completed": training_completed,
         "session_type": session_type
     }
+    
+    # Add tournament data if active
+    if eos_tournament_active and eos_tournament:
+        response["eos_tournament"] = eos_tournament
+        response["eos_tournament_active"] = True
+        response["week"] = week
+    
+    return response
 
 
 @router.get("/franchise/standings")
@@ -682,6 +764,112 @@ def season_schedule(franchise_id: str):
             })
         weeks.append(week_games)
 
+    # ✅ EOS TOURNAMENT: Add tournament games (weeks 15-17) if tournament is active
+    eos_tournament = franchise_doc.get("eos_tournament")
+    eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
+    
+    if eos_tournament_active and eos_tournament:
+        bracket = eos_tournament.get("bracket", {})
+        seeds = eos_tournament.get("seeds", {})
+        
+        # Week 15: Round 1 (Quarterfinals)
+        round1 = bracket.get("round1", [])
+        week15_games = []
+        for matchup in round1:
+            game_doc = None
+            if matchup.get("game_id"):
+                game_doc = db.games.find_one({"_id": ObjectId(matchup["game_id"])})
+            
+            score = matchup.get("score", {})
+            away_score = score.get("away")
+            home_score = score.get("home")
+            status = "complete" if matchup.get("winner") else "scheduled"
+            
+            has_training_report = False
+            if team_id and (str(matchup["away_team"]) == team_id or str(matchup["home_team"]) == team_id):
+                # Check if training report exists for week 15
+                has_training_report = "15" in training_reports
+            
+            week15_games.append({
+                "week": 15,
+                "away_team_id": str(matchup["away_team"]),
+                "home_team_id": str(matchup["home_team"]),
+                "away_score": away_score,
+                "home_score": home_score,
+                "status": status,
+                "has_training_report": has_training_report,
+                "is_user_team": str(matchup["away_team"]) == team_id or str(matchup["home_team"]) == team_id,
+                "game_id": matchup.get("game_id"),
+                "is_tournament": True,
+                "round": "Quarterfinals"
+            })
+        weeks.append(week15_games)
+        
+        # Week 16: Round 2 (Semifinals)
+        round2 = bracket.get("round2", [])
+        week16_games = []
+        for matchup in round2:
+            game_doc = None
+            if matchup.get("game_id"):
+                game_doc = db.games.find_one({"_id": ObjectId(matchup["game_id"])})
+            
+            score = matchup.get("score", {})
+            away_score = score.get("away")
+            home_score = score.get("home")
+            status = "complete" if matchup.get("winner") else "scheduled"
+            
+            has_training_report = False
+            if team_id and (str(matchup["away_team"]) == team_id or str(matchup["home_team"]) == team_id):
+                has_training_report = "16" in training_reports
+            
+            week16_games.append({
+                "week": 16,
+                "away_team_id": str(matchup["away_team"]),
+                "home_team_id": str(matchup["home_team"]),
+                "away_score": away_score,
+                "home_score": home_score,
+                "status": status,
+                "has_training_report": has_training_report,
+                "is_user_team": str(matchup["away_team"]) == team_id or str(matchup["home_team"]) == team_id,
+                "game_id": matchup.get("game_id"),
+                "is_tournament": True,
+                "round": "Semifinals"
+            })
+        weeks.append(week16_games)
+        
+        # Week 17: Final (Championship)
+        final = bracket.get("final", [])
+        week17_games = []
+        if final and len(final) > 0:
+            matchup = final[0]
+            game_doc = None
+            if matchup.get("game_id"):
+                game_doc = db.games.find_one({"_id": ObjectId(matchup["game_id"])})
+            
+            score = matchup.get("score", {})
+            away_score = score.get("away")
+            home_score = score.get("home")
+            status = "complete" if matchup.get("winner") else "scheduled"
+            
+            has_training_report = False
+            if team_id and (str(matchup["away_team"]) == team_id or str(matchup["home_team"]) == team_id):
+                has_training_report = "17" in training_reports
+            
+            week17_games.append({
+                "week": 17,
+                "away_team_id": str(matchup["away_team"]),
+                "home_team_id": str(matchup["home_team"]),
+                "away_score": away_score,
+                "home_score": home_score,
+                "status": status,
+                "has_training_report": has_training_report,
+                "is_user_team": str(matchup["away_team"]) == team_id or str(matchup["home_team"]) == team_id,
+                "game_id": matchup.get("game_id"),
+                "is_tournament": True,
+                "round": "Championship"
+            })
+        weeks.append(week17_games)
+    
     logger.info("season_schedule returning franchise_id=%s found=%s", franchise_id, found)
     return {"schedule": weeks, "team_id": team_id}
 
@@ -1938,3 +2126,251 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
     except Exception as e:
         logger.error(f"Error fetching training report: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class SimRestOfTournamentRequest(BaseModel):
+    franchise_id: str
+
+
+class SimChampionshipRequest(BaseModel):
+    franchise_id: str
+
+
+class FinishSeasonRequest(BaseModel):
+    franchise_id: str
+
+
+@router.post("/franchise/sim-rest-of-tournament")
+def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
+    """Simulate all remaining games in the current tournament round."""
+    try:
+        franchise_id = ObjectId(req.franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise_id format")
+    
+    franchise_doc = db.franchises.find_one({"_id": franchise_id})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    
+    eos_tournament = franchise_doc.get("eos_tournament", {})
+    if not eos_tournament:
+        raise HTTPException(status_code=400, detail="EOS Tournament not initialized")
+    
+    current_round = eos_tournament.get("current_round", 1)
+    bracket = eos_tournament.get("bracket", {})
+    round_name = get_round_name(current_round)
+    matchups = bracket.get(round_name, [])
+    
+    # Get current week (15, 16, or 17)
+    week = franchise_doc.get("week", 15)
+    
+    # Simulate all incomplete matchups in current round
+    for i, matchup in enumerate(matchups):
+        if matchup.get("winner"):
+            continue  # Already completed
+        
+        home_id = ObjectId(matchup["home_team"])
+        away_id = ObjectId(matchup["away_team"])
+        
+        home_doc = db.teams.find_one({"_id": home_id}, {"name": 1}) or {}
+        away_doc = db.teams.find_one({"_id": away_id}, {"name": 1}) or {}
+        home_name = home_doc.get("name", "")
+        away_name = away_doc.get("name", "")
+        
+        if not home_name or not away_name:
+            logger.error(f"❌ [EOS TOURNAMENT] Could not find team names for matchup {i}")
+            continue
+        
+        try:
+            # Run simulation
+            gm = run_simulation(home_name, away_name)
+            home_score = gm.score.get(home_name, 0)
+            away_score = gm.score.get(away_name, 0)
+            summary = summarize_game_state(gm)
+            
+            # Save game to database
+            from BackEnd.utils.game_id_utils import generate_game_id
+            game_id = generate_game_id()
+            summary["_id"] = game_id
+            summary["franchise_id"] = str(franchise_id)
+            summary["week"] = week
+            db.games.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
+            
+            # Finalize game stats
+            stat_updater.finalize_game(game_id, mode="franchise", franchise_id=str(franchise_id))
+            
+            # Determine winner
+            winner_id = home_id if home_score > away_score else away_id
+            
+            # Save result to bracket
+            save_tournament_game_result(
+                franchise_doc,
+                current_round,
+                i,
+                str(game_id),
+                str(winner_id),
+                {"home": home_score, "away": away_score}
+            )
+            
+            # Update franchise document
+            db.franchises.update_one(
+                {"_id": franchise_id},
+                {"$set": {"eos_tournament": eos_tournament}}
+            )
+            
+            logger.info(f"✅ [EOS TOURNAMENT] Simulated Round {current_round}, Matchup {i}: {home_name} vs {away_name}")
+        
+        except Exception as e:
+            logger.error(f"❌ [EOS TOURNAMENT] Error simulating matchup {i}: {e}", exc_info=True)
+            continue
+    
+    # Advance round if all matchups complete
+    franchise_doc = db.franchises.find_one({"_id": franchise_id})
+    eos_tournament = advance_tournament_round(franchise_doc, db.teams)
+    db.franchises.update_one(
+        {"_id": franchise_id},
+        {"$set": {"eos_tournament": eos_tournament}}
+    )
+    
+    return {"status": "success", "round": current_round}
+
+
+@router.post("/franchise/sim-championship")
+def sim_championship(req: SimChampionshipRequest):
+    """Simulate the championship game (Final round)."""
+    try:
+        franchise_id = ObjectId(req.franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise_id format")
+    
+    franchise_doc = db.franchises.find_one({"_id": franchise_id})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    
+    eos_tournament = franchise_doc.get("eos_tournament", {})
+    if not eos_tournament:
+        raise HTTPException(status_code=400, detail="EOS Tournament not initialized")
+    
+    bracket = eos_tournament.get("bracket", {})
+    final = bracket.get("final", [])
+    
+    if not final or len(final) == 0:
+        raise HTTPException(status_code=400, detail="Final round not ready")
+    
+    if final[0].get("winner"):
+        raise HTTPException(status_code=400, detail="Championship already completed")
+    
+    matchup = final[0]
+    home_id = ObjectId(matchup["home_team"])
+    away_id = ObjectId(matchup["away_team"])
+    
+    home_doc = db.teams.find_one({"_id": home_id}, {"name": 1}) or {}
+    away_doc = db.teams.find_one({"_id": away_id}, {"name": 1}) or {}
+    home_name = home_doc.get("name", "")
+    away_name = away_doc.get("name", "")
+    
+    if not home_name or not away_name:
+        raise HTTPException(status_code=400, detail="Could not find team names")
+    
+    week = 17  # Championship is always week 17
+    
+    try:
+        # Run simulation
+        gm = run_simulation(home_name, away_name)
+        home_score = gm.score.get(home_name, 0)
+        away_score = gm.score.get(away_name, 0)
+        summary = summarize_game_state(gm)
+        
+        # Save game to database
+        from BackEnd.utils.game_id_utils import generate_game_id
+        game_id = generate_game_id()
+        summary["_id"] = game_id
+        summary["franchise_id"] = str(franchise_id)
+        summary["week"] = week
+        db.games.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
+        
+        # Finalize game stats
+        stat_updater.finalize_game(game_id, mode="franchise", franchise_id=str(franchise_id))
+        
+        # Determine winner
+        winner_id = home_id if home_score > away_score else away_id
+        
+        # Save result to bracket
+        save_tournament_game_result(
+            franchise_doc,
+            3,  # Final round
+            0,  # Only one matchup
+            str(game_id),
+            str(winner_id),
+            {"home": home_score, "away": away_score}
+        )
+        
+        # Mark tournament as complete
+        eos_tournament["completed"] = True
+        eos_tournament["champion"] = str(winner_id)
+        
+        # Update franchise document
+        db.franchises.update_one(
+            {"_id": franchise_id},
+            {"$set": {"eos_tournament": eos_tournament}}
+        )
+        
+        logger.info(f"✅ [EOS TOURNAMENT] Championship complete! Winner: {str(winner_id)}")
+        
+        return {
+            "status": "success",
+            "winner": str(winner_id),
+            "home_score": home_score,
+            "away_score": away_score
+        }
+    
+    except Exception as e:
+        logger.error(f"❌ [EOS TOURNAMENT] Error simulating championship: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/franchise/finish-season")
+def finish_season(req: FinishSeasonRequest):
+    """Finish current season and start new season."""
+    try:
+        franchise_id = ObjectId(req.franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise_id format")
+    
+    franchise_doc = db.franchises.find_one({"_id": franchise_id})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    
+    # Get current season
+    current_season = franchise_doc.get("current_season", 1)
+    next_season = current_season + 1
+    
+    # Initialize new season (same logic as initial season initialization)
+    from BackEnd.models.franchise_manager import FranchiseManager
+    fm = FranchiseManager(db)
+    
+    # Get user team info
+    user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    
+    # Initialize new season
+    fm.initialize_season(
+        user_team_id=user_team_id,
+        user_team_object_id=user_team_object_id
+    )
+    
+    # Update franchise document
+    db.franchises.update_one(
+        {"_id": franchise_id},
+        {"$set": {
+            "current_season": next_season,
+            "week": 1,
+            "eos_tournament_active": False,
+            "training_status.current_week": 1,
+            "training_status.training_completed": False,
+            "training_status.session_type": "preseason"
+        }}
+    )
+    
+    logger.info(f"✅ [FINISH SEASON] Started season {next_season}")
+    
+    return {"status": "success", "season": next_season, "week": 1}
