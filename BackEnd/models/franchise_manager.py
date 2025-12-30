@@ -199,12 +199,16 @@ class FranchiseManager:
                     "Set": 2
                 },
                 "strategy_settings": {
-                    "defense": 2,
-                    "fast_breaks": 2,
-                    "aggression": 2,
-                    "half_court_trap": 2,
-                    "full_court_press": 2
-                    # Note: tempo is initialized randomly per game, not stored in franchise document
+                    "offense": 2,  # Motion vs Set Play split (0=motion only, 4=set plays only)
+                    "inside": 2,   # Inside focus preference
+                    "attack": 2,   # Attack focus preference
+                    "outside": 2,  # Outside focus preference
+                    "tempo": 2,    # Tempo preference
+                    "defense": 2,  # Man vs Zone defense preference
+                    "aggression": 2,  # Defensive aggression level
+                    "hc_trap": 2,  # Half court trap usage (matches frontend key)
+                    "fc_press": 2, # Full court press usage (matches frontend key)
+                    "rebounding": 2  # Crash boards vs get back preference
                 },
                 "plays": populated_plays.copy(),
                 "scouting_data": scouting_data.copy(),
