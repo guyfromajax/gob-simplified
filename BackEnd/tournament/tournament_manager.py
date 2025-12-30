@@ -133,8 +133,20 @@ class TournamentManager:
                 "playbook_settings": playbook_settings.copy()
             }
 
+        # ✅ MIGRATION: Resolve user_team_id (team name) to user_team_object_id (ObjectId)
+        # This matches Franchise mode pattern for consistent team ID resolution
+        user_team_object_id = None
+        if self.user_team_id:
+            from BackEnd.db import teams_collection
+            team_doc = teams_collection.find_one({"name": self.user_team_id})
+            if team_doc:
+                user_team_object_id = str(team_doc["_id"])
+            else:
+                logger.warning(f"⚠️ [TOURNAMENT] Could not resolve user_team_id '{self.user_team_id}' to ObjectId")
+        
         tournament_doc = {
             "user_team_id": self.user_team_id,
+            "user_team_object_id": user_team_object_id,  # ✅ MIGRATION: Store ObjectId for authoritative team resolution
             "created_at": datetime.utcnow(),
             "bracket": {
                 "round1": round1,
