@@ -864,7 +864,8 @@ function renderSchedule() {
     gameDiv.innerHTML = text;
     
     // Add training report link if this is user's matchup and training has been run
-    const isUserMatch = match.home_team === userTeamId || match.away_team === userTeamId;
+    // Compare with team name (bracket uses team names, not ObjectIds)
+    const isUserMatch = match.home_team === userTeamName || match.away_team === userTeamName;
     if (isUserMatch && tournament.training_status?.training_completed && tournament.training_status?.round === 1) {
       const link = document.createElement('a');
       link.href = `/static/training-report.html?mode=tournament&tournament_id=${tournament._id}&team_id=${userTeamId}&round=1`;
@@ -906,7 +907,8 @@ function renderSchedule() {
       gameDiv.innerHTML = text;
       
       // Add training report link if this is user's matchup and training has been run
-      const isUserMatch = match.home_team === userTeamId || match.away_team === userTeamId;
+      // Compare with team name (bracket uses team names, not ObjectIds)
+      const isUserMatch = match.home_team === userTeamName || match.away_team === userTeamName;
       if (isUserMatch && tournament.training_status?.training_completed && tournament.training_status?.round === 2) {
         const link = document.createElement('a');
         link.href = `/static/training-report.html?mode=tournament&tournament_id=${tournament._id}&team_id=${userTeamId}&round=2`;
@@ -950,7 +952,8 @@ function renderSchedule() {
     champGameDiv.innerHTML = text;
     
     // Add training report link if this is user's matchup and training has been run
-    const isUserMatch = match.home_team === userTeamId || match.away_team === userTeamId;
+    // Compare with team name (bracket uses team names, not ObjectIds)
+    const isUserMatch = match.home_team === userTeamName || match.away_team === userTeamName;
     if (isUserMatch && tournament.training_status?.training_completed && tournament.training_status?.round === 3) {
       const link = document.createElement('a');
       link.href = `/static/training-report.html?mode=tournament&tournament_id=${tournament._id}&team_id=${userTeamId}&round=3`;
