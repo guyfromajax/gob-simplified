@@ -892,6 +892,7 @@ async function init() {
   
   // Update button based on training status
   updatePlayButton(topData);
+  updateScoutingButton(topData);
   
   if (topData && topData.team) {
     // Use franchise-specific roster endpoint to get updated player attributes
@@ -1943,5 +1944,188 @@ async function renderTournamentBracket() {
   
   html += '</div>';
   container.innerHTML = html;
+}
+
+// Scouting Report functionality
+let upcomingOpponent = null;
+let upcomingOpponentId = null;
+
+function updateScoutingButton(data) {
+  const scoutingBtn = document.getElementById('scouting-report-btn');
+  if (!scoutingBtn) return;
+  
+  // Show button only if there's an upcoming game
+  if (data && data.week && data.week <= 14) {
+    // Get upcoming opponent from play-next-game endpoint
+    fetch('/franchise/play-next-game', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ franchise_id: franchiseId })
+    })
+    .then(res => res.json())
+    .then(matchup => {
+      if (matchup && matchup.home && matchup.away) {
+        // Determine opponent
+        if (userTeamName === matchup.home) {
+          upcomingOpponent = matchup.away;
+          upcomingOpponentId = matchup.away_id;
+        } else if (userTeamName === matchup.away) {
+          upcomingOpponent = matchup.home;
+          upcomingOpponentId = matchup.home_id;
+        }
+        
+        if (upcomingOpponent) {
+          scoutingBtn.style.display = 'block';
+        } else {
+          scoutingBtn.style.display = 'none';
+        }
+      } else {
+        scoutingBtn.style.display = 'none';
+      }
+    })
+    .catch(err => {
+      console.warn('Could not determine upcoming opponent:', err);
+      scoutingBtn.style.display = 'none';
+    });
+  } else {
+    scoutingBtn.style.display = 'none';
+  }
+}
+
+async function loadScoutingReport() {
+  if (!upcomingOpponent || !franchiseId) {
+    alert('No upcoming opponent found');
+    return;
+  }
+  
+  const modal = document.getElementById('scouting-report-modal');
+  const loading = document.getElementById('scouting-loading');
+  const content = document.getElementById('scouting-content');
+  const title = document.getElementById('scouting-report-title');
+  
+  modal.style.display = 'flex';
+  loading.style.display = 'block';
+  content.style.display = 'none';
+  title.textContent = `Scouting Report: ${upcomingOpponent}`;
+  
+  try {
+    // Load opponent team data and last game play usage
+    const [teamDataRes, playUsageRes] = await Promise.all([
+      fetch(`/franchise/team-data?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(upcomingOpponent)}`),
+      fetch(`/franchise/scouting-report?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(upcomingOpponent)}`)
+    ]);
+    
+    if (!teamDataRes.ok) throw new Error('Failed to load team data');
+    if (!playUsageRes.ok) throw new Error('Failed to load play usage');
+    
+    const teamData = await teamDataRes.json();
+    const playUsage = await playUsageRes.json();
+    
+    // Render Team Report
+    renderScoutingTeamReport(teamData.team_attributes || {});
+    
+    // Render Play Usage
+    renderPlayUsage(playUsage.plays || []);
+    
+    loading.style.display = 'none';
+    content.style.display = 'block';
+  } catch (error) {
+    console.error('Error loading scouting report:', error);
+    loading.textContent = `Error loading scouting report: ${error.message}`;
+  }
+}
+
+function renderScoutingTeamReport(teamAttrs) {
+  const grid = document.getElementById('scouting-team-attributes-grid');
+  if (!grid) return;
+  
+  grid.innerHTML = '';
+  
+  const attrOrder = [
+    'shot_threshold',
+    'rebound_modifier',
+    'offensive_efficiency',
+    'defensive_efficiency',
+    'fb_efficiency',
+    'pt_efficiency',
+    'fight',
+    'discipline',
+    'momentum_score',
+    'team_chemistry',
+    'fb_opp_modifier',
+    'pt_opp_modifier'
+  ];
+  
+  attrOrder.forEach(attrKey => {
+    const item = createTeamAttrItem(attrKey, teamAttrs[attrKey], 0);
+    if (item) grid.appendChild(item);
+  });
+}
+
+function renderPlayUsage(plays) {
+  const tbody = document.getElementById('play-usage-body');
+  if (!tbody) return;
+  
+  tbody.innerHTML = '';
+  
+  if (plays.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4">No play usage data available</td></tr>';
+    return;
+  }
+  
+  // Calculate total playcalls for usage %
+  const totalPlaycalls = plays.reduce((sum, p) => sum + (p.times_run || 0), 0);
+  
+  // Sort by times_run descending
+  plays.sort((a, b) => (b.times_run || 0) - (a.times_run || 0));
+  
+  plays.forEach(play => {
+    const timesRun = play.times_run || 0;
+    const successes = play.successes || 0;
+    const successRate = timesRun > 0 ? ((successes / timesRun) * 100).toFixed(1) : '0.0';
+    const usagePct = totalPlaycalls > 0 ? ((timesRun / totalPlaycalls) * 100).toFixed(1) : '0.0';
+    
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${play.name || 'Unknown'}</td>
+      <td>${timesRun}</td>
+      <td>${successRate}%</td>
+      <td>${usagePct}%</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Setup scouting report button (run after DOM is ready)
+function setupScoutingReport() {
+  const scoutingBtn = document.getElementById('scouting-report-btn');
+  const modal = document.getElementById('scouting-report-modal');
+  const closeBtn = document.querySelector('.scouting-modal-close');
+  
+  if (scoutingBtn) {
+    scoutingBtn.addEventListener('click', loadScoutingReport);
+  }
+  
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      if (modal) modal.style.display = 'none';
+    });
+  }
+  
+  // Close modal when clicking outside
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.style.display = 'none';
+      }
+    });
+  }
+}
+
+// Initialize on DOMContentLoaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupScoutingReport);
+} else {
+  setupScoutingReport();
 }
 

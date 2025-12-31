@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/static/tournament.css">
   <link rel="stylesheet" href="/static/franchise-command-center.css">
   <link rel="stylesheet" href="/static/command-center-team-styles.css">
+  <link rel="stylesheet" href="/static/scouting-report.css">
 </head>
 <body>
   <div id="franchise-container">
@@ -37,6 +38,7 @@
         </div>
         <div class="play-now-container">
           <button id="play-now" class="play-now-btn">Run Training</button>
+          <button id="scouting-report-btn" class="scouting-report-btn" style="display: none;">Scouting Report</button>
         </div>
       </div>
     </div>
@@ -191,6 +193,45 @@
       <div id="tournament-tab" class="tab-content">
         <h3>End-of-Season Tournament</h3>
         <div id="tournament-bracket-container" class="tournament-bracket-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scouting Report Modal -->
+  <div id="scouting-report-modal" class="scouting-modal" style="display: none;">
+    <div class="scouting-modal-content">
+      <div class="scouting-modal-header">
+        <h2 id="scouting-report-title">Scouting Report</h2>
+        <button class="scouting-modal-close">&times;</button>
+      </div>
+      <div class="scouting-modal-body">
+        <div id="scouting-loading" class="scouting-loading">Loading scouting report...</div>
+        <div id="scouting-content" style="display: none;">
+          <!-- Team Report Section -->
+          <section class="team-section">
+            <h2>Team Report</h2>
+            <div class="team-attributes-grid" id="scouting-team-attributes-grid"></div>
+          </section>
+          
+          <!-- Play Usage Section -->
+          <section class="play-usage-section">
+            <h2>Play Usage (Last Game)</h2>
+            <div class="scroll-x">
+              <table class="play-usage-table" id="play-usage-table">
+                <thead>
+                  <tr>
+                    <th>Play Name</th>
+                    <th>Times Run</th>
+                    <th>Success Rate</th>
+                    <th>Usage %</th>
+                  </tr>
+                </thead>
+                <tbody id="play-usage-body">
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   </div>
