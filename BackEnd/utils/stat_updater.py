@@ -343,7 +343,12 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
         except Exception:
             tid = None
         if tid:
+            # ✅ TASK 2: Log before calling to verify execution flow
+            logger.info(f"🔍 [APPLY-STATS] About to call _ensure_all_roster_players_initialized for tournament_id: {tid}")
+            print(f"🔍 [APPLY-STATS] About to call _ensure_all_roster_players_initialized for tournament_id: {tid}")
             _ensure_all_roster_players_initialized(summary, tid)
+            logger.info(f"✅ [APPLY-STATS] _ensure_all_roster_players_initialized completed")
+            print(f"✅ [APPLY-STATS] _ensure_all_roster_players_initialized completed")
 
 
 def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_id: ObjectId) -> None:
@@ -355,6 +360,10 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
         summary: Game summary with home_team and away_team
         tournament_id: Tournament ObjectId
     """
+    # ✅ TASK 2: Add logging to verify function is called
+    logger.info(f"🔍 [ENSURE-ROSTER] Function called for tournament_id: {tournament_id}")
+    print(f"🔍 [ENSURE-ROSTER] Function called for tournament_id: {tournament_id}")
+    
     home_team_obj = summary.get("home_team")
     away_team_obj = summary.get("away_team")
     
@@ -374,15 +383,26 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
     
     if not home_team_name or not away_team_name:
         logger.warning(f"⚠️ [ENSURE-ROSTER] Cannot get team names from summary: home={home_team_name}, away={away_team_name}")
+        print(f"⚠️ [ENSURE-ROSTER] Cannot get team names from summary: home={home_team_name}, away={away_team_name}")
         return
+    
+    logger.info(f"🔍 [ENSURE-ROSTER] Processing teams: {home_team_name} vs {away_team_name}")
+    print(f"🔍 [ENSURE-ROSTER] Processing teams: {home_team_name} vs {away_team_name}")
     
     # Get tournament document to check existing players
     tournament_doc = tournaments_collection.find_one({"_id": tournament_id}, {"players": 1})
     existing_players = tournament_doc.get("players", {}) if tournament_doc else {}
+    existing_count = len(existing_players)
+    logger.info(f"🔍 [ENSURE-ROSTER] Tournament document has {existing_count} existing players")
+    print(f"🔍 [ENSURE-ROSTER] Tournament document has {existing_count} existing players")
     
     # Load rosters for both teams
     _, home_roster = load_roster(home_team_name)
     _, away_roster = load_roster(away_team_name)
+    home_roster_size = len(home_roster) if home_roster else 0
+    away_roster_size = len(away_roster) if away_roster else 0
+    logger.info(f"🔍 [ENSURE-ROSTER] Roster sizes: {home_team_name}={home_roster_size}, {away_team_name}={away_roster_size}")
+    print(f"🔍 [ENSURE-ROSTER] Roster sizes: {home_team_name}={home_roster_size}, {away_team_name}={away_roster_size}")
     
     # Get team documents to resolve team_id
     home_team_doc = teams_collection.find_one({"name": home_team_name})
@@ -393,6 +413,7 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
     
     players_initialized = 0
     players_already_exist = 0
+    players_team_id_updated = 0
     
     # Initialize all home team players
     for player in home_roster:
@@ -408,6 +429,7 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
                     {"_id": tournament_id},
                     {"$set": {f"players.{pid}.meta.team_id": home_team_id}}
                 )
+                players_team_id_updated += 1
             players_already_exist += 1
             continue
         
@@ -451,6 +473,7 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
                     {"_id": tournament_id},
                     {"$set": {f"players.{pid}.meta.team_id": away_team_id}}
                 )
+                players_team_id_updated += 1
             players_already_exist += 1
             continue
         
@@ -480,8 +503,10 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
         )
         players_initialized += 1
     
-    if players_initialized > 0:
-        logger.info(f"✅ [ENSURE-ROSTER] Initialized {players_initialized} roster players, {players_already_exist} already existed")
+    # ✅ TASK 2: Always log results, even if no new players initialized
+    total_players_checked = home_roster_size + away_roster_size
+    logger.info(f"✅ [ENSURE-ROSTER] Complete - Initialized: {players_initialized}, Already existed: {players_already_exist}, Team ID updated: {players_team_id_updated}, Total checked: {total_players_checked}")
+    print(f"✅ [ENSURE-ROSTER] Complete - Initialized: {players_initialized}, Already existed: {players_already_exist}, Team ID updated: {players_team_id_updated}, Total checked: {total_players_checked}")
 
 
 def recompute_tournament_leaders(tournament_id: str, limit: int = 10) -> Dict[str, Any]:
