@@ -106,10 +106,16 @@ function renderLeaders(data) {
   const categories = Object.keys(data);
   const primaryColor = getTeamPrimaryColor(userTeamNameForLeaders);
   
+  // Map category names for display
+  const categoryNameMap = {
+    'TPM': '3PTM',
+    'TPA': '3PTA'
+  };
+  
   categories.forEach(cat => {
     const section = document.createElement('div');
     const h3 = document.createElement('h3');
-    h3.textContent = cat;
+    h3.textContent = categoryNameMap[cat] || cat;
     section.appendChild(h3);
     const div = document.createElement('div');
     div.className = 'scroll-x';
@@ -1720,7 +1726,7 @@ function sortRosterStats(statKey) {
     'FGM': 'FGM',
     'FGA': 'FGA',
     'FG%': 'FG%',
-    'TPM': 'TPM',
+    '3PTM': 'TPM',
     'TPA': 'TPA',
     '3PT%': '3PT%',
     'FTM': 'FTM',
