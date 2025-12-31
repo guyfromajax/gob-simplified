@@ -7,6 +7,7 @@ const urlTeamId = urlParams.get('team_id');
 let tournament = null;
 let userTeamId = ""; // ObjectId for API calls
 let userTeamName = ""; // Team name for bracket comparisons
+let userTeamNameForLeaders = null; // Store user team name for leaderboard highlighting (matches Franchise pattern)
 let teamColorCache = null; // Cache for team primary colors
 
 // If tournament_id is in URL, use it (overrides localStorage)
@@ -551,7 +552,8 @@ function getTeamPrimaryColor(teamName) {
 function renderLeaderboards() {
   const container = document.getElementById("leaderboards");
   container.innerHTML = "";
-  const primaryColor = getTeamPrimaryColor(userTeamId);
+  // ✅ FIX: Use userTeamNameForLeaders (matches Franchise pattern)
+  const primaryColor = getTeamPrimaryColor(userTeamNameForLeaders);
   
   leaderBoards.forEach(board => {
     const section = document.createElement("div");
@@ -570,10 +572,9 @@ function renderLeaderboards() {
       const entry = rows[i];
       const tr = document.createElement("tr");
       if (entry) {
+        // ✅ FIX: Use userTeamNameForLeaders (matches Franchise pattern)
         // Compare with team name (leaderboard uses team names, not ObjectIds)
-        // ✅ FIX: Also check against userTeamId (ObjectId) for backward compatibility
-        const isUserTeam = (userTeamName && entry.team_name === userTeamName) || 
-                          (userTeamId && entry.team_name === userTeamId);
+        const isUserTeam = userTeamNameForLeaders && entry.team_name === userTeamNameForLeaders;
         
         // Create cells individually to apply styling
         const rankCell = document.createElement('td');
@@ -1461,6 +1462,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       userTeamId = commandCenterData.team_id; // ObjectId for API calls
       localStorage.setItem("userTeamId", userTeamId);
     }
+    
+    // ✅ FIX: Store user team name for leaderboard highlighting (matches Franchise pattern)
+    if (commandCenterData.team) {
+      userTeamNameForLeaders = commandCenterData.team;
+    }
   } else {
     // Fallback: Update from tournament object (backward compatibility)
     if (tournament.user_team_id) {
@@ -1478,6 +1484,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Fallback: Update top bar from tournament object
     initTopAssets(userTeamId);
     updateTeamChemistry();
+    
+    // ✅ FIX: Fallback: Store user team name for leaderboard highlighting (matches Franchise pattern)
+    if (tournament.user_team_id) {
+      userTeamNameForLeaders = tournament.user_team_id;
+    }
   }
   
   // Ensure userTeamId is set before proceeding
@@ -1495,6 +1506,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderRoster();
   renderStats();
   await refreshLeaders();
+  
+  // ✅ FIX: Call renderTeamStats directly in DOMContentLoaded (matches Franchise pattern)
+  // Franchise calls it directly in init(), not just in refreshLeaders()
+  if (tournament && tournament._id) {
+    try {
+      const res = await fetch(`/tournament/team-stats?tournament_id=${encodeURIComponent(tournament._id)}`);
+      const data = await res.json();
+      renderTeamStats(data);
+    } catch (err) {
+      console.error("Failed to load team stats", err);
+    }
+  }
   
   // ✅ MIGRATION: Update CTA using command center data (aligns with Franchise)
   updateCTA(commandCenterData);
