@@ -106,17 +106,26 @@ def tournament_team_stats(tournament_id: str):
     players_with_stats = 0
     players_without_team_id = 0
     players_without_stats = 0
+    players_with_empty_stats = 0
     for pid, pdata in players.items():
         meta = pdata.get("meta", {})
         team_id = meta.get("team_id")
         if not team_id:
             players_without_team_id += 1
+            logger.warning(f"⚠️ [TOURNAMENT_TEAM_STATS] Player {pid} missing team_id in meta: {meta}")
             continue
         
         team_id_str = str(team_id)
         season_stats = pdata.get("season", {})
         if not season_stats:
             players_without_stats += 1
+            continue
+        
+        # ✅ FIX: Include players with empty stats (zeros) - they still count for team aggregation
+        # Empty stats object means player hasn't played yet, but they're still on the roster
+        if len(season_stats) == 0:
+            players_with_empty_stats += 1
+            # Continue to next player - empty stats don't contribute to team totals
             continue
         
         if team_id_str not in team_stats_map:
@@ -174,10 +183,11 @@ def tournament_team_stats(tournament_id: str):
         output.append({"team": team_name, "stats": stats})
     
     # Log for debugging
-    logger.info(f"🔍 [TOURNAMENT_TEAM_STATS] Processed {players_with_stats} players with stats, {players_without_team_id} without team_id, {players_without_stats} without stats")
+    logger.info(f"🔍 [TOURNAMENT_TEAM_STATS] Processed {players_with_stats} players with stats, {players_without_team_id} without team_id, {players_without_stats} without season key, {players_with_empty_stats} with empty stats")
     logger.info(f"🔍 [TOURNAMENT_TEAM_STATS] Returning {len(output)} teams")
     for team_data in output:
-        logger.info(f"🔍 [TOURNAMENT_TEAM_STATS] Team: {team_data.get('team')}, PTS: {team_data.get('stats', {}).get('PTS', 0)}, FGM: {team_data.get('stats', {}).get('FGM', 0)}")
+        stats = team_data.get('stats', {})
+        logger.info(f"🔍 [TOURNAMENT_TEAM_STATS] Team: {team_data.get('team')}, PTS: {stats.get('PTS', 0)}, FGM: {stats.get('FGM', 0)}, FGA: {stats.get('FGA', 0)}, REB: {stats.get('REB', 0)}")
     
     return {"teams": output}
 

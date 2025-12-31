@@ -397,7 +397,17 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
     # Initialize all home team players
     for player in home_roster:
         pid = str(player.get("_id"))
+        # ✅ FIX: Always ensure meta.team_id is set, even if player already exists
+        # This ensures team stats aggregation works correctly
         if pid in existing_players:
+            existing_player = existing_players[pid]
+            existing_meta = existing_player.get("meta", {})
+            # Update team_id if missing
+            if not existing_meta.get("team_id") and home_team_id:
+                tournaments_collection.update_one(
+                    {"_id": tournament_id},
+                    {"$set": {f"players.{pid}.meta.team_id": home_team_id}}
+                )
             players_already_exist += 1
             continue
         
@@ -405,7 +415,7 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
         meta = {
             "first_name": player.get("first_name", ""),
             "last_name": player.get("last_name", ""),
-            "team": home_team_name,
+            "team": home_team_name,  # ✅ FIX: Store team name (not ObjectId) for bracket matching
         }
         if home_team_id:
             meta["team_id"] = home_team_id
@@ -427,7 +437,17 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
     # Initialize all away team players
     for player in away_roster:
         pid = str(player.get("_id"))
+        # ✅ FIX: Always ensure meta.team_id is set, even if player already exists
+        # This ensures team stats aggregation works correctly
         if pid in existing_players:
+            existing_player = existing_players[pid]
+            existing_meta = existing_player.get("meta", {})
+            # Update team_id if missing
+            if not existing_meta.get("team_id") and away_team_id:
+                tournaments_collection.update_one(
+                    {"_id": tournament_id},
+                    {"$set": {f"players.{pid}.meta.team_id": away_team_id}}
+                )
             players_already_exist += 1
             continue
         
@@ -435,7 +455,7 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
         meta = {
             "first_name": player.get("first_name", ""),
             "last_name": player.get("last_name", ""),
-            "team": away_team_name,
+            "team": away_team_name,  # ✅ FIX: Store team name (not ObjectId) for bracket matching
         }
         if away_team_id:
             meta["team_id"] = away_team_id
