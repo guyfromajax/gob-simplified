@@ -682,23 +682,34 @@ def command_center_data(franchise_id: str = None):
                 if team_id:
                     franchise_teams = franchise_doc.get("franchise_teams", {})
                     franchise_team_stats = franchise_teams.get(team_id, {})
-                    if franchise_team_stats:
-                        team_doc = franchise_team_stats  # Use franchise-specific stats
+                    
+                    # ✅ SS&S: ALWAYS prioritize franchise_teams for team_chemistry (same source as Team tab)
+                    # This ensures consistency between top bar and Team tab displays
+                    # Get team_chemistry FIRST from franchise_teams, before any fallback logic
+                    # This prevents stale values from universal team doc on initial franchise load
+                    team_chemistry_value = None
+                    if franchise_team_stats and isinstance(franchise_team_stats, dict):
+                        # Check if team_chemistry exists in franchise_team_stats
+                        if "team_chemistry" in franchise_team_stats:
+                            team_chemistry_value = franchise_team_stats.get("team_chemistry")
+                    
+                    # Build team_doc from franchise_team_stats if available, otherwise fallback to universal
+                    if franchise_team_stats and isinstance(franchise_team_stats, dict) and len(franchise_team_stats) > 0:
+                        team_doc = franchise_team_stats.copy()  # Use franchise-specific stats
                     else:
-                        # Fallback to universal team doc
+                        # Fallback to universal team doc (but we'll override team_chemistry below)
                         team_doc = db.teams.find_one({"_id": ObjectId(team_id)}) or {}
                     
-                    # ✅ FIX: Always get team_chemistry from franchise_teams (same source as Team tab)
-                    # This ensures consistency between top bar and Team tab displays
-                    # Explicitly extract team_chemistry from franchise_team_stats to avoid stale values
-                    if franchise_team_stats:
-                        # Get team_chemistry directly from franchise_team_stats (matches /franchise/team-data pattern)
-                        team_chemistry_value = franchise_team_stats.get("team_chemistry")
-                        if team_chemistry_value is not None:
-                            team_doc["team_chemistry"] = team_chemistry_value
-                        else:
-                            # If not in franchise_team_stats, default to 0 (matches /franchise/team-data pattern)
-                            team_doc["team_chemistry"] = 0
+                    # ✅ SS&S: ALWAYS override team_chemistry with franchise_teams value (or 0 if not found)
+                    # This prevents stale values from universal team doc, especially on initial franchise load
+                    # where franchise_teams might not be fully populated yet
+                    if team_chemistry_value is not None:
+                        team_doc["team_chemistry"] = team_chemistry_value
+                    else:
+                        # If not in franchise_teams, default to 0 (NEVER use universal team doc value)
+                        # This ensures consistency - if franchise_teams doesn't have it, we default to 0
+                        # rather than using a potentially stale value from universal team doc
+                        team_doc["team_chemistry"] = 0
                 else:
                     team_doc = {}
         except Exception:
