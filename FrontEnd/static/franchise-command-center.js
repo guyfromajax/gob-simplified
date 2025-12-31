@@ -71,7 +71,26 @@ function renderStandings(data) {
   (data.standings || []).forEach(t => {
     teamIdNameMap[t.team_id] = t.name;
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${t.name}</td><td>${t.W}</td><td>${t.L}</td><td>${t.pct.toFixed(3)}</td><td>${t.PF}</td><td>${t.PA}</td><td>${t.next}</td>`;
+    
+    // Make team name clickable
+    const teamNameTd = document.createElement('td');
+    const teamLink = document.createElement('a');
+    const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
+    teamLink.href = `/static/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(t.team_id)}&team_name=${encodeURIComponent(t.name)}&return_tab=standings-tab&return_url=${returnUrl}`;
+    teamLink.textContent = t.name;
+    teamLink.style.color = '#4a90e2';
+    teamLink.style.textDecoration = 'none';
+    teamLink.style.cursor = 'pointer';
+    teamLink.addEventListener('mouseenter', () => {
+      teamLink.style.textDecoration = 'underline';
+    });
+    teamLink.addEventListener('mouseleave', () => {
+      teamLink.style.textDecoration = 'none';
+    });
+    teamNameTd.appendChild(teamLink);
+    
+    tr.appendChild(teamNameTd);
+    tr.innerHTML += `<td>${t.W}</td><td>${t.L}</td><td>${t.pct.toFixed(3)}</td><td>${t.PF}</td><td>${t.PA}</td><td>${t.next}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -750,22 +769,63 @@ function renderSchedule(data) {
       h4.textContent = `Week ${idx + 1}`;
     }
     weekDiv.appendChild(h4);
-    weekGames.forEach(g => {
+      weekGames.forEach(g => {
       const gameDiv = document.createElement('div');
       gameDiv.className = 'schedule-game';
       const away = teamIdNameMap[g.away_team_id] || g.away_team_id;
       const home = teamIdNameMap[g.home_team_id] || g.home_team_id;
-      let text = '';
+      
+      // Create clickable team links
+      const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
+      const createTeamLink = (teamName, teamId) => {
+        const link = document.createElement('a');
+        link.href = `/static/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(teamId || teamName)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
+        link.textContent = teamName;
+        link.style.color = '#4a90e2';
+        link.style.textDecoration = 'none';
+        link.style.cursor = 'pointer';
+        link.addEventListener('mouseenter', () => {
+          link.style.textDecoration = 'underline';
+        });
+        link.addEventListener('mouseleave', () => {
+          link.style.textDecoration = 'none';
+        });
+        return link;
+      };
+      
       if (g.status === 'complete') {
-        let awayStr = `${away} (${g.away_score})`;
-        let homeStr = `${home} (${g.home_score})`;
-        if (g.away_score > g.home_score) awayStr = `<strong>${awayStr}</strong>`;
-        if (g.home_score > g.away_score) homeStr = `<strong>${homeStr}</strong>`;
-        text = `${awayStr} at ${homeStr}`;
+        const awayLink = createTeamLink(away, g.away_team_id);
+        const homeLink = createTeamLink(home, g.home_team_id);
+        const awayText = document.createTextNode(` (${g.away_score})`);
+        const homeText = document.createTextNode(` (${g.home_score})`);
+        const atText = document.createTextNode(' at ');
+        
+        const awayContainer = document.createElement('span');
+        if (g.away_score > g.home_score) {
+          awayContainer.style.fontWeight = 'bold';
+        }
+        awayContainer.appendChild(awayLink);
+        awayContainer.appendChild(awayText);
+        
+        const homeContainer = document.createElement('span');
+        if (g.home_score > g.away_score) {
+          homeContainer.style.fontWeight = 'bold';
+        }
+        homeContainer.appendChild(homeLink);
+        homeContainer.appendChild(homeText);
+        
+        gameDiv.appendChild(awayContainer);
+        gameDiv.appendChild(atText);
+        gameDiv.appendChild(homeContainer);
       } else {
-        text = `${away} at ${home}`;
+        const awayLink = createTeamLink(away, g.away_team_id);
+        const homeLink = createTeamLink(home, g.home_team_id);
+        const atText = document.createTextNode(' at ');
+        
+        gameDiv.appendChild(awayLink);
+        gameDiv.appendChild(atText);
+        gameDiv.appendChild(homeLink);
       }
-      gameDiv.innerHTML = text;
       
       // ✅ SS&S: Add box score link for all completed games
       if (g.status === 'complete' && g.game_id) {
