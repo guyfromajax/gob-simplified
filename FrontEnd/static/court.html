@@ -2915,7 +2915,26 @@
       console.log('🔍 [PLAYCALL CENTER] Starting loadAndApplySlotAssignments()');
       
       const urlParams = new URLSearchParams(window.location.search);
-      const mode = urlParams.get('mode') || 'single';
+      // ✅ FIX: Mode detection with fallback logic (matches Franchise pattern)
+      // Priority: 1) URL param, 2) tournament_id present → 'tournament', 3) franchise_id present → 'franchise', 4) default 'single'
+      // This ensures mode is correctly detected even if mode param is missing from URL
+      const tournamentId = urlParams.get('tournament_id');
+      const franchiseId = urlParams.get('franchise_id');
+      let mode = urlParams.get('mode');
+      if (!mode) {
+        // Fallback: detect mode from tournament_id or franchise_id
+        if (tournamentId) {
+          mode = 'tournament';
+          console.log('🔍 [PLAYCALL CENTER] Mode not in URL, detected from tournament_id:', mode);
+        } else if (franchiseId) {
+          mode = 'franchise';
+          console.log('🔍 [PLAYCALL CENTER] Mode not in URL, detected from franchise_id:', mode);
+        } else {
+          mode = 'single';
+          console.log('🔍 [PLAYCALL CENTER] Mode not in URL, defaulting to:', mode);
+        }
+      }
+      
       // Check multiple possible team_id parameter names (different pages use different names)
       let teamId = urlParams.get('team_id') || 
                    urlParams.get('user_team_id') || 
@@ -2925,8 +2944,6 @@
       if (!gameId && mode === 'single' && typeof localStorage !== 'undefined') {
         gameId = localStorage.getItem('game_id');
       }
-      const tournamentId = urlParams.get('tournament_id');
-      const franchiseId = urlParams.get('franchise_id');
       
       console.log('🔍 [PLAYCALL CENTER] URL params:', { mode, teamId, gameId, tournamentId, franchiseId });
       
