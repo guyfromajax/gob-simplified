@@ -476,6 +476,7 @@ These variables provide additional context for navigation but aren't required fo
 - `created_at` - Document creation timestamp
 - `user_team_id` - User's team name (string)
 - `user_team_object_id` - User's team ObjectId (string) - **⚠️ SOURCE OF TRUTH for all team operations**
+- `franchise_teams` - Team data objects `{team_id: {team_attributes, strategy_settings, plays, scouting_data, playbook_settings}}` - **✅ INITIALIZATION:** All 8 teams are initialized upfront when franchise season is created (via `initialize_season()`)
 
 **Team ID Resolution Pattern (SS&S):**
 - **Always resolve `team_id` from `user_team_object_id` in the franchise document**
@@ -1105,7 +1106,7 @@ These variables provide additional context for navigation but aren't required fo
 - `completed` - Whether tournament is finished (boolean)
 - `bracket` - Tournament bracket structure `{round1: [...], round2: [...], final: [...]}`
 - `players` - Player data object `{player_id: {meta, attributes, position_ratings, season}}` (✅ MIGRATION: changed from `player_stats` in February 2025)
-- `teams` - Team data objects `{team_id: {team_attributes, strategy_settings, plays, scouting_data, playbook_settings}}`
+- `teams` - Team data objects `{team_id: {team_attributes, strategy_settings, plays, scouting_data, playbook_settings}}` - **✅ INITIALIZATION (February 2025):** All 8 teams are initialized upfront when tournament is created (matches Franchise mode pattern)
 - `training_status` - `{round, training_completed, session_type, last_training_date}`
 - `latest_training` - `{round, player_logs, team_log, session_type}`
 - `applied_games` - Array of game IDs (prevents double-counting stats)
@@ -1113,7 +1114,6 @@ These variables provide additional context for navigation but aren't required fo
 - `created_at` - Document creation timestamp
 - `user_team_id` - User's team name (string) - Human-readable identifier
 - `user_team_object_id` - User's team ObjectId (string) - **⚠️ SOURCE OF TRUTH for all team operations** - Automatically resolved from `user_team_id` when tournament is created (matches Franchise mode pattern)
-
 #### Data Flow
 
 **GMO → GP (Starting a Game):**

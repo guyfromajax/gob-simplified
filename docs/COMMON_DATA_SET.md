@@ -172,11 +172,13 @@ The following fields from the universal `teams` collection are **NOT** copied to
 
 ### When Team Objects Are Created
 
-Team objects are created **lazily** when needed via `ensure_team_objects_exist()`:
+**✅ UPDATED (February 2025):** Tournament mode now matches Franchise mode initialization pattern.
 
-1. **Franchise Mode:** All 8 teams are initialized when franchise is first accessed
-2. **Tournament Mode:** Team objects are created when first accessed (e.g., when loading game plan)
-3. **Single Game Mode:** Team objects are created when game is initialized
+1. **Franchise Mode:** All 8 teams are initialized upfront when franchise season is created (`initialize_season()`)
+2. **Tournament Mode:** All 8 teams are initialized upfront when tournament is created (`create_tournament()`) - **✅ UPDATED: Now matches Franchise pattern**
+3. **Single Game Mode:** Team objects are created when game is initialized (lazy initialization)
+
+**Note:** `ensure_team_objects_exist()` is still used as a safety net for edge cases, but Tournament and Franchise modes now initialize all teams upfront, eliminating race conditions and lazy initialization issues.
 
 ### What Gets Initialized
 

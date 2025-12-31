@@ -1,5 +1,6 @@
 from datetime import datetime
 import random
+import logging
 from bson import ObjectId
 
 from BackEnd.db import (
@@ -8,6 +9,8 @@ from BackEnd.db import (
     teams_collection,
 )
 from BackEnd.constants import BOX_SCORE_KEYS
+
+logger = logging.getLogger(__name__)
 
 class TournamentManager:
     """Manage tournament creation and progression."""
@@ -78,7 +81,8 @@ class TournamentManager:
                 "position_ratings": p.get("position_ratings", {}).copy()  # Store position ratings (needed for training)
             }
 
-        # Initialize team objects for all 8 teams upfront (matches Franchise pattern)
+        # ✅ INITIALIZATION: Initialize team objects for all 8 teams upfront (matches Franchise pattern)
+        # This ensures all team objects exist from the start, eliminating race conditions and lazy initialization issues
         from BackEnd.models.team_manager import TeamManager
         from BackEnd.api.gameplan_routes import populate_team_plays, populate_scouting_data, initialize_playbook_settings
         
@@ -87,12 +91,17 @@ class TournamentManager:
         scouting_data = populate_scouting_data(mode="tournament")
         playbook_settings = initialize_playbook_settings()
         
-        # Get all teams from database
-        all_teams = list(teams_collection.find())
+        # ✅ FIX: Only initialize the 8 teams in the tournament (matches Franchise pattern)
+        # Franchise mode initializes only the 8 teams in self.teams, not all teams from database
         teams_obj = {}
         
-        for team in all_teams:
-            team_id = str(team["_id"])
+        for team_name in teams:  # teams is the list of 8 team names in the tournament
+            # Resolve team name to team document and ObjectId
+            team_doc = teams_collection.find_one({"name": team_name})
+            if not team_doc:
+                continue  # Skip if team not found
+            
+            team_id = str(team_doc["_id"])
             # Use TeamManager static method to generate mode-specific team attributes
             team_attrs = TeamManager.init_team_attributes(mode="tournament")
             teams_obj[team_id] = {
