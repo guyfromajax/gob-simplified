@@ -1975,7 +1975,16 @@ class TurnManager:
         quarter_data = team_timeouts[quarter]
         
         # Check max timeouts per quarter
-        max_timeouts = 1 if quarter <= 3 else computer_team.timeouts
+        # Q1-Q2: Maximum 1 timeout per quarter
+        # Q3: Maximum = remaining timeouts - 1 when quarter starts
+        # Q4: Maximum = remaining timeouts when quarter starts
+        if quarter <= 2:
+            max_timeouts = 1
+        elif quarter == 3:
+            max_timeouts = max(0, computer_team.timeouts - 1)  # Ensure non-negative
+        else:  # Q4
+            max_timeouts = computer_team.timeouts
+        
         if quarter_data["count"] >= max_timeouts:
             logging.debug(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - max timeouts reached: {computer_team.name} Q{quarter} (count: {quarter_data['count']}, max: {max_timeouts})")
             return False  # Already at max for this quarter
