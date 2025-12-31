@@ -612,14 +612,19 @@ def command_center_data(franchise_id: str = None):
         "prestige": team_doc.get("prestige", "-"),
         "rank": team_doc.get("rank", "-"),
         "training_completed": training_completed,
-        "session_type": session_type
+        "session_type": session_type,
+        "week": week if week is not None else 1,  # ✅ Always include week (defaults to 1)
+        "training_status": {
+            "current_week": franchise_doc.get("training_status", {}).get("current_week", week if week is not None else 1),
+            "training_completed": training_completed,
+            "session_type": session_type
+        } if franchise_id and franchise_doc else {}
     }
     
     # Add tournament data if active
     if eos_tournament_active and eos_tournament:
         response["eos_tournament"] = eos_tournament
         response["eos_tournament_active"] = True
-        response["week"] = week
     
     return response
 
