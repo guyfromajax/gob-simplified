@@ -414,9 +414,12 @@ def save_result(request: TournamentResultRequest):
                 f"❌ Failed to save result for round {result_doc['round']} match {result_doc['match_index']}: {e}"
             )
 
-    # Save user's game result
+    # ✅ TASK 1: Re-order to match Franchise mode pattern
+    # Step 1: Find and finalize user's game FIRST (matches Franchise mode)
     user_match_index = None
     home_team = away_team = None
+    user_game_id = None
+    
     for i, match in enumerate(tournament["bracket"][round_key]):
         if request.winner in [match["home_team"], match["away_team"]]:
             user_match_index = i
@@ -468,20 +471,23 @@ def save_result(request: TournamentResultRequest):
             manager.save_game_result(
                 round_key, i, request.game_id, request.winner, score_map
             )
-            # Only call finalize_game if we found the game document
+            
+            # ✅ FINALIZE USER'S GAME FIRST (matches Franchise mode pattern)
             if summary and summary.get("_id"):
-                logger.info(f"🔍 [SAVE-RESULT] User game - About to call finalize_game with game_id: {str(gid)} (type: {type(gid)}), tournament_id: {request.tournament_id}")
-                print(f"🔍 [SAVE-RESULT] User game - About to call finalize_game with game_id: {str(gid)} (type: {type(gid)}), tournament_id: {request.tournament_id}")
+                user_game_id = str(gid)
+                logger.info(f"🎯 [SAVE-RESULT] Finalizing user's game FIRST (matches Franchise pattern) - game_id: {user_game_id}")
+                print(f"🎯 [SAVE-RESULT] Finalizing user's game FIRST (matches Franchise pattern) - game_id: {user_game_id}")
                 stat_updater.finalize_game(
-                    str(gid),  # ✅ FIX: Ensure game_id is always a string
+                    user_game_id,
                     mode="tournament",
                     tournament_id=request.tournament_id,
                 )
-                logger.info(f"✅ [SAVE-RESULT] User game - finalize_game completed for game_id: {str(gid)}")
-                print(f"✅ [SAVE-RESULT] User game - finalize_game completed for game_id: {str(gid)}")
+                logger.info(f"✅ [SAVE-RESULT] User game - finalize_game completed for game_id: {user_game_id}")
+                print(f"✅ [SAVE-RESULT] User game - finalize_game completed for game_id: {user_game_id}")
             else:
                 logger.error(f"❌ [SAVE-RESULT] Skipping finalize_game - game document not found. Stats will not be applied.")
                 print(f"❌ [SAVE-RESULT] Skipping finalize_game - game document not found. Stats will not be applied.")
+            
             user_result = {
                 "home_team": home_team,
                 "away_team": away_team,
@@ -496,10 +502,15 @@ def save_result(request: TournamentResultRequest):
     if user_match_index is None:
         raise HTTPException(status_code=400, detail="User matchup not found")
 
-    # Ensure all match results are recorded
+    # ✅ Step 2: THEN simulate and finalize computer games (matches Franchise mode pattern)
+    logger.info(f"🎯 [SAVE-RESULT] User's game finalized. Now processing computer games...")
+    print(f"🎯 [SAVE-RESULT] User's game finalized. Now processing computer games...")
+    
     for i, match in enumerate(manager.tournament["bracket"][round_key]):
         if i == user_match_index:
-            continue
+            continue  # Skip user's game (already finalized)
+        
+        # Check if this game already exists (from previous simulation)
         if match.get("game_id"):
             gid = (
                 ObjectId(match["game_id"])
@@ -508,6 +519,8 @@ def save_result(request: TournamentResultRequest):
             )
             summary = games_collection.find_one({"_id": gid}) or {}
             score_map = summary.get("score") or summary.get("final_score")
+            
+            # Save result to bracket
             manager.save_game_result(
                 round_key,
                 i,
@@ -515,11 +528,15 @@ def save_result(request: TournamentResultRequest):
                 match["winner"],
                 score_map,
             )
+            
+            # Finalize game (idempotency check will skip if already finalized)
+            logger.info(f"🔍 [SAVE-RESULT] Finalizing existing computer game {i} - game_id: {str(gid)}")
             stat_updater.finalize_game(
-                gid,
+                str(gid),
                 mode="tournament",
                 tournament_id=request.tournament_id,
             )
+            
             result_doc = {
                 "home_team": match["home_team"],
                 "away_team": match["away_team"],
@@ -531,7 +548,9 @@ def save_result(request: TournamentResultRequest):
             _log_result(result_doc)
             continue
 
+        # Simulate new computer game
         try:
+            logger.info(f"🔍 [SAVE-RESULT] Simulating computer game {i} - {match['home_team']} vs {match['away_team']}")
             game = run_simulation(match["home_team"], match["away_team"])
             summary = summarize_game_state(game)
             summary["tournament_id"] = str(request.tournament_id)
@@ -539,18 +558,22 @@ def save_result(request: TournamentResultRequest):
             summary["match_index"] = i
             insert_result = games_collection.insert_one(summary)
             game_id = insert_result.inserted_id
+            
+            # Finalize game immediately after simulation (matches Franchise pattern)
+            logger.info(f"🔍 [SAVE-RESULT] Finalizing new computer game {i} - game_id: {str(game_id)}")
             stat_updater.finalize_game(
                 str(game_id),
                 mode="tournament",
                 tournament_id=request.tournament_id,
             )
-            print(f"✅ Game document inserted for round {round_num} match {i}")
+            print(f"✅ Game document inserted and finalized for round {round_num} match {i}")
         except Exception as e:
             print(
                 f"❌ Failed to simulate or insert game for round {round_num} match {i}: {e}"
             )
             continue
 
+        # Save result to bracket
         home = match["home_team"]
         away = match["away_team"]
         score_map = summary.get("score") or summary.get("final_score")
