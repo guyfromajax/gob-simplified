@@ -2148,16 +2148,26 @@ The following settings use a weighted random distribution that favors balanced p
 - `tempo` - Pace of play preference
 - `defense` - Man vs Zone defense preference (0=man only, 4=zone only)
 - `aggression` - Defensive aggression level
-- `hc_trap` - Half court trap usage preference
-- `fc_press` - Full court press usage preference
 - `rebounding` - Crash boards vs get back preference
 
-**Weighted Distribution Probabilities:**
+**Weighted Distribution Probabilities (Most Settings):**
 - **5% chance** for value **0** (extreme low)
 - **15% chance** for value **1** (low)
 - **60% chance** for value **2** (normal/balanced) ⭐
 - **15% chance** for value **3** (high)
 - **5% chance** for value **4** (extreme high)
+
+**Weighted Distribution (hc_trap, fc_press):**
+The following settings use a different weighted distribution that favors lower values:
+- `hc_trap` - Half court trap usage preference
+- `fc_press` - Full court press usage preference
+
+**Weighted Distribution Probabilities (hc_trap, fc_press):**
+- **10% chance** for value **0** (no usage)
+- **40% chance** for value **1** (low usage)
+- **35% chance** for value **2** (moderate usage)
+- **10% chance** for value **3** (high usage)
+- **5% chance** for value **4** (extreme usage)
 
 **Uniform Distribution (Shot Focus Settings):**
 The following settings use uniform random distribution (1-4, never zero):
