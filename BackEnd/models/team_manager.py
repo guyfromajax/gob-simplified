@@ -132,11 +132,18 @@ class TeamManager:
         Initialize strategy settings with weighted randomization for CPU teams (0-4 scale).
         If team document has strategy_settings, those will be used instead via constructor.
         
-        Weighted Distribution (for offense, fast_breaks, defense, aggression, hc_trap, fc_press, rebounding):
+        Weighted Distribution (for offense, fast_breaks, defense, aggression, rebounding):
         - 5% chance for 0
         - 15% chance for 1
         - 60% chance for 2 (normal/balanced)
         - 15% chance for 3
+        - 5% chance for 4
+        
+        Weighted Distribution (for hc_trap, fc_press):
+        - 10% chance for 0
+        - 40% chance for 1
+        - 35% chance for 2
+        - 10% chance for 3
         - 5% chance for 4
         
         Uniform Distribution (for inside, attack, outside):
@@ -151,6 +158,13 @@ class TeamManager:
             k=1
         )[0]
         
+        # Special weighted distribution for hc_trap and fc_press
+        trap_press_choice = random.choices(
+            [0, 1, 2, 3, 4],
+            weights=[10, 40, 35, 10, 5],
+            k=1
+        )[0]
+        
         return {
             "offense": weighted_choice,
             "inside": random.randint(1, 4),  # Uniform 1-4 (never zero)
@@ -160,8 +174,8 @@ class TeamManager:
             "play_calling": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
             "defense": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
             "aggression": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
-            "hc_trap": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
-            "fc_press": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
+            "hc_trap": trap_press_choice,
+            "fc_press": trap_press_choice,
             "rebounding": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
             # tempo is initialized per game, not per team
             "tempo": TeamManager.init_tempo_random()
