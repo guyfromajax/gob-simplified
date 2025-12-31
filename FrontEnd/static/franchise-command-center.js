@@ -1954,8 +1954,10 @@ function updateScoutingButton(data) {
   const scoutingBtn = document.getElementById('scouting-report-btn');
   if (!scoutingBtn) return;
   
-  // Show button only if there's an upcoming game
-  if (data && data.week && data.week <= 14) {
+  // Show button only if there's an upcoming game (weeks 1-14, regular season)
+  // Also show during preseason (week 0 or undefined) if there's a schedule
+  const week = data?.week || data?.training_status?.current_week || 0;
+  if (data && week >= 0 && week <= 14) {
     // Get upcoming opponent from play-next-game endpoint
     fetch('/franchise/play-next-game', {
       method: 'POST',
