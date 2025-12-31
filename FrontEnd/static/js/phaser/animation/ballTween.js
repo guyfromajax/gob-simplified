@@ -29,7 +29,7 @@ export const PASS_DEBUG = false;
 // Animation speed constants (pixels per second)
 // Based on learnings from WIP_GOB repository for smooth, consistent animations
 // Speed can be changed dynamically via gameSpeedManager
-const DEFAULT_BALL_SPEED = 350; // Default speed (Normal preset)
+const DEFAULT_BALL_SPEED = 450; // Default speed (Normal preset)
 const MAX_BALL_DURATION = 1000; // ms - cap for very long passes
 
 /**

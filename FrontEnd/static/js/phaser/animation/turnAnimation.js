@@ -67,8 +67,8 @@ const MAX_TRANSITION_DURATION = 3000; // ms - for transition movements (DREB, in
 // Based on learnings from WIP_GOB repository for smooth, consistent animations
 // These ensure consistent speeds regardless of distance, making animations feel natural
 // Speed can be changed dynamically via gameSpeedManager
-const DEFAULT_PLAYER_SPEED = 350; // Default speed (Normal preset)
-const DEFAULT_BALL_SPEED = 350; // Default speed (Normal preset)
+const DEFAULT_PLAYER_SPEED = 450; // Default speed (Normal preset)
+const DEFAULT_BALL_SPEED = 450; // Default speed (Normal preset)
 
 /**
  * Get current player speed (can be changed dynamically)
