@@ -1534,6 +1534,16 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # Create a summary with new nested team structure
                         summary = summarize_game_state(gm)
                         
+                        # ✅ FIX: Merge playbook_settings from teams_obj into summary before saving
+                        # This ensures playbook_settings loaded from tournament/franchise document are preserved
+                        # summarize_game_state tries to load from DB, but on first save (Q1), they're not there yet
+                        if "teams" in summary and teams_obj:
+                            for team_id, team_data in teams_obj.items():
+                                if team_id in summary["teams"]:
+                                    # Merge playbook_settings if they exist in teams_obj but not in summary
+                                    if "playbook_settings" in team_data and team_data["playbook_settings"]:
+                                        summary["teams"][team_id]["playbook_settings"] = team_data["playbook_settings"]
+                        
                         # Save to database
                         games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
                         # print(f"🔍 DEBUG: Saved teams object to database with game_id: {game_id}")
@@ -1739,6 +1749,16 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             
             # Create a summary with new nested team structure
             summary = summarize_game_state(gm)
+            
+            # ✅ FIX: Merge playbook_settings from teams_obj into summary before saving
+            # This ensures playbook_settings loaded from tournament/franchise document are preserved
+            # summarize_game_state tries to load from DB, but on first save (Q1), they're not there yet
+            if "teams" in summary and teams_obj:
+                for team_id, team_data in teams_obj.items():
+                    if team_id in summary["teams"]:
+                        # Merge playbook_settings if they exist in teams_obj but not in summary
+                        if "playbook_settings" in team_data and team_data["playbook_settings"]:
+                            summary["teams"][team_id]["playbook_settings"] = team_data["playbook_settings"]
             
             # Save to database
             games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)

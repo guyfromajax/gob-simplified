@@ -1552,7 +1552,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!home || !away) throw new Error('Matchup not found');
         // Compare with team name (bracket uses team names, not ObjectIds)
         const mySide = home === userTeamName ? 'home' : (away === userTeamName ? 'away' : '');
-        let url = `/static/set-lineup.html?tournament_id=${encodeURIComponent(tournament._id)}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`;
+        // ✅ FIX: Add mode=tournament parameter (matches Franchise pattern)
+        // This ensures mode is preserved through navigation chain: TCC → Lineup → Game Plan → Court
+        let url = `/static/set-lineup.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`;
         // Add team IDs for gameplan API compatibility
         url += `&home_id=${encodeURIComponent(home)}&away_id=${encodeURIComponent(away)}`;
         if (userTeamId) url += `&user_team_id=${encodeURIComponent(userTeamId)}`;

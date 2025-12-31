@@ -2652,11 +2652,39 @@ These values serve as calibration targets for:
 
 ### Implementation Details
 
+**Mode Detection (Critical for Persistence):**
+
+**✅ FIXED (February 2025):** Mode detection with fallback logic ensures correct mode is used even if `mode` parameter is missing from URL.
+
+**Frontend Mode Detection Pattern:**
+```javascript
+// ✅ CORRECT: Mode detection with fallback logic
+const tournamentId = urlParams.get('tournament_id');
+const franchiseId = urlParams.get('franchise_id');
+let mode = urlParams.get('mode');
+if (!mode) {
+  // Fallback: detect mode from tournament_id or franchise_id
+  if (tournamentId) mode = 'tournament';
+  else if (franchiseId) mode = 'franchise';
+  else mode = 'single';
+}
+```
+
+**Navigation Pattern (All Modes):**
+- **Franchise Mode:** Always passes `mode=franchise` when navigating to `set-lineup.html`
+- **Tournament Mode:** Always passes `mode=tournament` when navigating to `set-lineup.html` (✅ FIXED February 2025)
+- **Single Game Mode:** Uses `mode=single` (default)
+
+**Why This Matters:**
+- Without correct mode detection, `/api/playbooks` and `/api/gameplan` endpoints load from wrong source
+- Tournament mode without `mode=tournament` defaults to `mode=single`, which loads from game document instead of tournament document
+- This causes empty slot assignments and missing playbook settings
+
 **Loading Pattern (All Modes):**
 ```javascript
-// ✅ CORRECT: Always load from database
+// ✅ CORRECT: Always load from database with correct mode
 const params = new URLSearchParams();
-params.set('mode', mode);
+params.set('mode', mode);  // Must be correctly detected (see Mode Detection above)
 params.set('team_id', teamId);
 if (mode === 'franchise' && franchiseId) params.set('franchise_id', franchiseId);
 if (mode === 'tournament' && tournamentId) params.set('tournament_id', tournamentId);
@@ -2698,6 +2726,44 @@ params.set('game_plan_settings', JSON.stringify(settings));
 localStorage.setItem(`playbooks_full_state_${mode}_${teamId}`, JSON.stringify(fullState));
 ```
 
+### Playbook Settings Persistence Flow
+
+**✅ FIXED (February 2025):** Complete playbook settings persistence flow across all game modes.
+
+**GMO → GP Flow (Starting a Game):**
+
+1. **User Sets Playbooks in Command Center:**
+   - Settings saved to: `franchise_teams.{team_id}.playbook_settings` (Franchise) or `teams.{team_id}.playbook_settings` (Tournament)
+   - Includes: Percentages, slot assignments, motion dropdowns, position filters
+
+2. **User Navigates to Lineup Screen:**
+   - **Franchise:** URL includes `mode=franchise&franchise_id=...`
+   - **Tournament:** URL includes `mode=tournament&tournament_id=...` (✅ FIXED: Now matches Franchise pattern)
+
+3. **User Navigates to Game Plan Screen:**
+   - `TimeoutNavigationHelper.buildGameNavigationParams()` preserves `mode` and `tournament_id`/`franchise_id`
+   - Settings loaded from tournament/franchise document via `/api/gameplan`
+
+4. **User Navigates to Court (Gameplay):**
+   - **Mode Detection:** If `mode` param missing, fallback detects from `tournament_id` or `franchise_id` (✅ FIXED)
+   - **Backend Game Initialization:**
+     - `load_team_settings_from_doc()` loads `playbook_settings` from tournament/franchise document
+     - `playbook_settings` stored in game document's `teams.{team_id}` object during Q1 initialization
+     - `summarize_game_state()` preserves `playbook_settings` from game document on subsequent saves
+   - **Frontend Playcall Center:**
+     - Calls `/api/playbooks` with correct `mode` parameter
+     - Loads `slot_assignments` from game document's `teams.{team_id}.playbook_settings`
+
+5. **During Gameplay (Q2-Q4 Resumes):**
+   - `simulate_quarter_endpoint` extracts `playbook_settings` from game document's `teams` object
+   - `summarize_game_state()` preserves `playbook_settings` when saving game state
+
+**Critical Fixes Applied (February 2025):**
+
+1. **Tournament Mode Navigation:** Added `mode=tournament` parameter when navigating to `set-lineup.html` (matches Franchise pattern)
+2. **Mode Detection Fallback:** Added fallback logic in `court.html` to detect mode from `tournament_id`/`franchise_id` if `mode` param is missing
+3. **Backend Playbook Settings Merge:** Modified `simulate_quarter_endpoint` to merge `playbook_settings` from tournament/franchise document into game document's `teams` object before first save
+
 ### Benefits of This Architecture
 
 1. **No Synchronization Bugs:** Database is always authoritative - no localStorage/database conflicts
@@ -2714,11 +2780,17 @@ localStorage.setItem(`playbooks_full_state_${mode}_${teamId}`, JSON.stringify(fu
 - Removed URL param approach for `game_plan_settings`
 - All modes now use database exclusively for persistent data
 - localStorage reserved only for temporary UI preferences
+- **✅ FIXED:** Tournament mode navigation now passes `mode=tournament` parameter (matches Franchise pattern)
+- **✅ FIXED:** Mode detection fallback ensures correct mode even if `mode` param is missing from URL
+- **✅ FIXED:** Backend properly merges playbook_settings from tournament/franchise document into game document
 
 **Files Updated:**
 - `FrontEnd/static/playbooks.js` - Removed full state localStorage caching
 - `FrontEnd/static/game-plan.js` - Removed localStorage for single mode, removed URL param approach
 - `FrontEnd/static/js/phaser/bootGame.js` - Always load from database for all modes
 - `FrontEnd/static/js/phaser/utils/timeoutButtonManager.js` - Removed URL param approach
+- `FrontEnd/static/tournament.js` - Added `mode=tournament` parameter to navigation
+- `FrontEnd/static/court.html` - Added mode detection fallback logic
+- `BackEnd/api/api.py` - Added playbook_settings merge logic
 
 ---
