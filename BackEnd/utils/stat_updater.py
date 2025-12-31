@@ -1090,6 +1090,7 @@ def finalize_game(
         
         logger.info(f"✅ [FINALIZE_GAME] Game document found, calling apply_stats_from_summary")
         logger.info(f"🔍 [FINALIZE_GAME] Game has {len(game.get('players', []))} players in summary")
+        logger.info(f"🔍 [FINALIZE_GAME] Tournament ID: {tournament_id}, will call _ensure_all_roster_players_initialized")
         
         apply_stats_from_summary(game, game_id, tournament_id)
         logger.info(f"✅ [FINALIZE_GAME] apply_stats_from_summary completed")
