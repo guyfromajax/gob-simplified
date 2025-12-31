@@ -161,21 +161,73 @@ def tournament_team_stats(tournament_id: str):
         }
     
     # Convert to output format with team names
+    # ✅ FIX: Deduplicate by team name to avoid duplicate entries
+    # Some teams might be keyed by ObjectId, others by team name string
     output = []
+    seen_team_names = set()
+    
     for team_id_str, stats in team_stats_map.items():
+        # ✅ FIX: Try multiple lookup strategies to get team name
+        team_name = None
         try:
+            # Strategy 1: Try as ObjectId
             team_doc = teams_collection.find_one({"_id": ObjectId(team_id_str)}, {"name": 1})
-            team_name = team_doc.get("name", team_id_str) if team_doc else team_id_str
+            if team_doc:
+                team_name = team_doc.get("name")
         except Exception:
-            team_name = team_id_str
+            pass
+        
+        if not team_name:
+            # Strategy 2: Try as team name (if team_id_str is already a team name)
+            team_doc = teams_collection.find_one({"name": team_id_str}, {"name": 1})
+            if team_doc:
+                team_name = team_doc.get("name")
+        
+        if not team_name:
+            # Strategy 3: Fallback to team_id_str (but normalize if it's an underscore format)
+            # Convert "OCEAN_CITY" to "Ocean City" if possible
+            if "_" in team_id_str:
+                # Try to find team by converting underscore format to proper name
+                normalized = team_id_str.replace("_", " ").title()
+                team_doc = teams_collection.find_one({"name": normalized}, {"name": 1})
+                if team_doc:
+                    team_name = team_doc.get("name")
+                else:
+                    team_name = team_id_str
+            else:
+                team_name = team_id_str
+        
+        # ✅ FIX: Skip if we've already seen this team name (deduplicate)
+        if team_name in seen_team_names:
+            continue
+        seen_team_names.add(team_name)
+        
+        # ✅ FIX: Only include teams with actual stats (non-zero totals)
+        # Check if team has any meaningful stats (not all zeros)
+        has_stats = any(
+            stats.get(stat, 0) > 0 
+            for stat in ["PTS", "FGM", "FGA", "REB", "AST", "STL", "BLK", "TO", "F"]
+        )
+        if not has_stats:
+            continue
         
         # Add PF/PA from standings
         if team_id_str in standings_data:
             stats["PF"] = standings_data[team_id_str]["PF"]
             stats["PA"] = standings_data[team_id_str]["PA"]
         else:
-            stats["PF"] = 0
-            stats["PA"] = 0
+            # ✅ FIX: Try to find PF/PA by team name if team_id_str lookup failed
+            try:
+                team_doc_for_standings = teams_collection.find_one({"name": team_name}, {"PF": 1, "PA": 1, "_id": 1})
+                if team_doc_for_standings:
+                    stats["PF"] = team_doc_for_standings.get("PF", 0)
+                    stats["PA"] = team_doc_for_standings.get("PA", 0)
+                else:
+                    stats["PF"] = 0
+                    stats["PA"] = 0
+            except Exception:
+                stats["PF"] = 0
+                stats["PA"] = 0
         
         # Calculate TREB from DREB + OREB
         stats["TREB"] = stats.get("DREB", 0) + stats.get("OREB", 0)
