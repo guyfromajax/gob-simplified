@@ -571,10 +571,17 @@ def command_center_data(franchise_id: str = None):
                         # Fallback to universal team doc
                         team_doc = db.teams.find_one({"_id": ObjectId(team_id)}) or {}
                     
-                    # ✅ FIX: Ensure team_chemistry comes from franchise_teams (same source as Team tab)
+                    # ✅ FIX: Always get team_chemistry from franchise_teams (same source as Team tab)
                     # This ensures consistency between top bar and Team tab displays
-                    if franchise_team_stats and "team_chemistry" in franchise_team_stats:
-                        team_doc["team_chemistry"] = franchise_team_stats["team_chemistry"]
+                    # Explicitly extract team_chemistry from franchise_team_stats to avoid stale values
+                    if franchise_team_stats:
+                        # Get team_chemistry directly from franchise_team_stats (matches /franchise/team-data pattern)
+                        team_chemistry_value = franchise_team_stats.get("team_chemistry")
+                        if team_chemistry_value is not None:
+                            team_doc["team_chemistry"] = team_chemistry_value
+                        else:
+                            # If not in franchise_team_stats, default to 0 (matches /franchise/team-data pattern)
+                            team_doc["team_chemistry"] = 0
                 else:
                     team_doc = {}
         except Exception:
