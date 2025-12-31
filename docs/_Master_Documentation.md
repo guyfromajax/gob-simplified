@@ -2183,10 +2183,17 @@ The following settings use uniform random distribution (1-4, never zero):
 
 **Code Pattern:**
 ```python
-# Weighted distribution for most settings
+# Weighted distribution for most settings (offense, defense, aggression, rebounding)
 weighted_choice = random.choices(
     [0, 1, 2, 3, 4],
     weights=[5, 15, 60, 15, 5],  # 5%, 15%, 60%, 15%, 5%
+    k=1
+)[0]
+
+# Special weighted distribution for hc_trap and fc_press
+trap_press_choice = random.choices(
+    [0, 1, 2, 3, 4],
+    weights=[10, 40, 35, 10, 5],  # 10%, 40%, 35%, 10%, 5%
     k=1
 )[0]
 
