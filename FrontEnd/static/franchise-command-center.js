@@ -2069,7 +2069,7 @@ function renderPlayUsage(plays) {
   tbody.innerHTML = '';
   
   if (plays.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4">No play usage data available</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #666;">No previous game data available. Opponent has not played a game yet this season.</td></tr>';
     return;
   }
   
