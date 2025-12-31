@@ -1928,6 +1928,9 @@ function renderRosterStats(players) {
     console.log(`🔍 [RENDER-ROSTER-STATS] DOM state BEFORE: ${rowsBefore.length} rows in tbody`);
   }
   
+  // ✅ DEBUG: Set up observer before rendering
+  setupRosterStatsObserver();
+  
   renderRosterStatsTable(players);
   
   // ✅ DEBUG: Check DOM state after rendering
