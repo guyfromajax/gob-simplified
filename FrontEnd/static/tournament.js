@@ -374,8 +374,20 @@ function renderRoster() {
 let tournamentPlayerStatsDataForSorting = [];
 
 function renderStats() {
-  console.log("Inside renderStats");
+  console.log("🔍 [RENDER-STATS] ========== FUNCTION CALLED ==========");
+  console.log("🔍 [RENDER-STATS] stats array length:", stats?.length || 0);
+  console.log("🔍 [RENDER-STATS] stats array:", stats);
+  console.trace("🔍 [RENDER-STATS] Call stack:");
+  
   tournamentPlayerStatsDataForSorting = JSON.parse(JSON.stringify(stats || [])); // Deep copy for sorting
+  console.log("🔍 [RENDER-STATS] tournamentPlayerStatsDataForSorting length:", tournamentPlayerStatsDataForSorting.length);
+  console.log("🔍 [RENDER-STATS] tournamentPlayerStatsDataForSorting:", tournamentPlayerStatsDataForSorting.map(s => ({
+    name: s.name,
+    PTS: s.PTS,
+    MIN: s.MIN,
+    FGA: s.FGA
+  })));
+  
   renderStatsTable(tournamentPlayerStatsDataForSorting);
   
   // Add click handlers to sortable headers (only once) - target only the stats table
@@ -398,10 +410,23 @@ function renderStats() {
 }
 
 function renderStatsTable(playerStats) {
+  console.log("🔍 [RENDER-STATS-TABLE] ========== FUNCTION CALLED ==========");
+  console.log("🔍 [RENDER-STATS-TABLE] playerStats array length:", playerStats?.length || 0);
+  console.trace("🔍 [RENDER-STATS-TABLE] Call stack:");
+  
   const tbody = document.getElementById("stats-body");
-  if (!tbody) return;
+  if (!tbody) {
+    console.error("❌ [RENDER-STATS-TABLE] stats-body tbody not found");
+    return;
+  }
+  
+  console.log("🔍 [RENDER-STATS-TABLE] Rows in DOM before clear:", tbody.querySelectorAll('tr').length);
   tbody.innerHTML = "";
-  playerStats.forEach(s => {
+  console.log("🔍 [RENDER-STATS-TABLE] Rows in DOM after clear:", tbody.querySelectorAll('tr').length);
+  
+  let rowsAdded = 0;
+  playerStats.forEach((s, index) => {
+    console.log(`🔍 [RENDER-STATS-TABLE] Processing player ${index + 1}/${playerStats.length}: ${s.name} (PTS: ${s.PTS}, MIN: ${s.MIN})`);
     // Calculate percentages
     const fgPct = s.FGA > 0 ? ((s.FGM || 0) / s.FGA * 100).toFixed(1) : '0.0';
     const threePct = s.TPA > 0 ? ((s.TPM || 0) / s.TPA * 100).toFixed(1) : '0.0';
@@ -430,7 +455,14 @@ function renderStatsTable(playerStats) {
       <td>${s.MIN || 0}</td>
       <td>${s.TO || 0}</td>`;
     tbody.appendChild(tr);
+    rowsAdded++;
+    
+    const rowsAfterAdd = tbody.querySelectorAll('tr');
+    console.log(`🔍 [RENDER-STATS-TABLE] After adding ${s.name}: ${rowsAfterAdd.length} rows in DOM (expected ${rowsAdded})`);
   });
+  
+  console.log(`✅ [RENDER-STATS-TABLE] Added ${rowsAdded} rows to table (expected ${playerStats.length})`);
+  console.log("🔍 [RENDER-STATS-TABLE] Final DOM state:", tbody.querySelectorAll('tr').length, "rows");
 }
 
 function sortPlayerStats(statKey) {
@@ -1743,7 +1775,14 @@ async function loadTeamData() {
     // ✅ FIX: Always render Team Report (matches FCC pattern)
     // FCC calls renderTeam() which always renders, not conditionally
     renderTeamReport();
-    renderRosterStats(playersWithStats);
+    
+    // ✅ FIX: Only render stats if Team tab is active (matches FCC pattern)
+    // FCC checks if tab is active before rendering
+    const teamTab = document.getElementById('team-tab');
+    if (teamTab && teamTab.classList.contains('active')) {
+      renderRosterStats(playersWithStats);
+    }
+    
     renderPlaybookSummary();
   } catch (error) {
     console.error('Failed to load team data:', error);
