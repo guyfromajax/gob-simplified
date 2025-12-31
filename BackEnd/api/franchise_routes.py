@@ -570,6 +570,11 @@ def command_center_data(franchise_id: str = None):
                     else:
                         # Fallback to universal team doc
                         team_doc = db.teams.find_one({"_id": ObjectId(team_id)}) or {}
+                    
+                    # ✅ FIX: Ensure team_chemistry comes from franchise_teams (same source as Team tab)
+                    # This ensures consistency between top bar and Team tab displays
+                    if franchise_team_stats and "team_chemistry" in franchise_team_stats:
+                        team_doc["team_chemistry"] = franchise_team_stats["team_chemistry"]
                 else:
                     team_doc = {}
         except Exception:
