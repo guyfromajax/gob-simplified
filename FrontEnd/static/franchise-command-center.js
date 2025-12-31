@@ -511,18 +511,14 @@ function renderTrainingResults(data) {
 }
 
 function renderTeam(data) {
-  console.log('renderTeam called with data:', data);
   if (!data) {
-    console.log('No data provided to renderTeam');
     return;
   }
   const tbody = document.getElementById('team-body');
   if (!tbody) {
-    console.log('team-body element not found');
     return;
   }
   tbody.innerHTML = '';
-  console.log('Players data:', data.players);
   let players = (data.players || []).map(p => {
     try {
       const best = getBestPosition(p.position_ratings || {});
@@ -537,7 +533,6 @@ function renderTeam(data) {
         attributes: p.attributes || {},
         rt: best.rating,
       };
-      console.log('Mapped player:', player);
       return player;
     } catch (error) {
       console.error('Error mapping player:', p, error);
@@ -545,14 +540,11 @@ function renderTeam(data) {
     }
   }).filter(p => p !== null);
   players.sort((a, b) => (b.rt ?? -1) - (a.rt ?? -1));
-  console.log('Sorted players:', players);
-  console.log('About to render', players.length, 'players');
   
   // Store for sorting
   rosterTableDataForSorting = JSON.parse(JSON.stringify(players));
   
   players.forEach((p, index) => {
-    console.log(`Rendering player ${index + 1}:`, p.name);
     const tr = document.createElement('tr');
     
     // Create player name as clickable link
@@ -587,7 +579,6 @@ function renderTeam(data) {
       const attrs = p.attributes || {};
       // Use anchor attribute (base value) as fallback, same as lineup screen
       const rawVal = attrs[`anchor_${h}`] ?? attrs[h];
-      console.log(`  ${h}: anchor_${h}=${attrs[`anchor_${h}`]}, ${h}=${attrs[h]}, rawVal=${rawVal}`);
       // Convert to 0-12 scale, except NG which stays as decimal
       const displayVal = h === 'NG' 
         ? (rawVal != null ? rawVal.toFixed(2) : '--')
@@ -597,9 +588,7 @@ function renderTeam(data) {
     addCell(p.rt ?? '-');
     
     tbody.appendChild(tr);
-    console.log(`Added row for ${p.name} to table`);
   });
-  console.log('Finished rendering all players. Table now has', tbody.children.length, 'rows');
   
   // Initialize tooltips for table cells
   if (typeof initAttributeTooltips !== 'undefined') {
@@ -918,50 +907,21 @@ async function init() {
     }
     try {
       const rosterData = await fetchJSON(`/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(topData.team)}`);
-      console.log('Franchise roster data:', rosterData);
       
       // Load player stats separately from franchise document
       const franchiseDoc = await fetchJSON(`/franchise/state?franchise_id=${franchiseId}`);
-      console.log('🔍 [FCC] Franchise document loaded:', {
-        hasPlayers: !!franchiseDoc?.players,
-        playerCount: franchiseDoc?.players ? Object.keys(franchiseDoc.players).length : 0,
-        firstPlayerId: franchiseDoc?.players ? Object.keys(franchiseDoc.players)[0] : null,
-        firstPlayerData: franchiseDoc?.players ? Object.keys(franchiseDoc.players).length > 0 ? franchiseDoc.players[Object.keys(franchiseDoc.players)[0]] : null : null
-      });
       
       if (franchiseDoc && franchiseDoc.players && rosterData.players) {
         // Merge stats into player data
-        let statsFound = 0;
-        let statsMissing = 0;
         rosterData.players = rosterData.players.map(player => {
           const playerId = player._id;
           const franchisePlayer = franchiseDoc.players[playerId];
           if (franchisePlayer && franchisePlayer.season) {
             player.stats = { season: franchisePlayer.season };
-            statsFound++;
-            console.log(`✅ [FCC] Stats found for player ${player.name} (${playerId}):`, franchisePlayer.season);
           } else {
             player.stats = { season: {} };
-            statsMissing++;
-            console.log(`❌ [FCC] No stats found for player ${player.name} (${playerId}). Franchise player data:`, franchisePlayer);
           }
           return player;
-        });
-        console.log(`🔍 [FCC] Stats merge complete: ${statsFound} found, ${statsMissing} missing`);
-      } else {
-        console.error('❌ [FCC] Cannot merge stats:', {
-          hasFranchiseDoc: !!franchiseDoc,
-          hasPlayers: !!franchiseDoc?.players,
-          hasRosterPlayers: !!rosterData?.players
-        });
-      }
-      
-      if (rosterData.players && rosterData.players.length > 0) {
-        console.log('🔍 [FCC] First player data:', {
-          name: rosterData.players[0].name,
-          id: rosterData.players[0]._id,
-          attributes: rosterData.players[0].attributes,
-          stats: rosterData.players[0].stats
         });
       }
       renderTeam(rosterData);
@@ -1308,11 +1268,8 @@ async function loadTeamData() {
       players: players
     };
     
-    console.log('📊 [TEAM DATA] Loaded team data:', {
-      attributes: Object.keys(teamData.team_attributes).length,
-      plays: Object.keys(teamData.plays_data).length,
-      defenses: Object.keys(teamData.scouting_data?.defense || {}).length
-    });
+    // Log all team attribute values on page load
+    console.log('📊 [TEAM ATTRIBUTES] All team attribute values:', teamData.team_attributes);
     
     // Render if Team tab is active
     const teamTab = document.getElementById('team-tab');

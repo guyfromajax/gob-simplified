@@ -100,7 +100,7 @@ h1, h2, h3, h4, h5, h6 {
   top: 50%;
   transform: translate(-50%, -50%);
   z-index: 2;
-  color: #708090; /* Dark silver */
+  color: #000000; /* Black */
   font-weight: bold;
   font-size: 14px;
   pointer-events: none;
