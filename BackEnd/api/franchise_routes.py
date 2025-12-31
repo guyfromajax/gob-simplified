@@ -339,121 +339,36 @@ def save_result(req: FranchiseResultRequest):
         upsert=True,
     )
     
-    # ✅ FIX: Ensure game document has box_score structure before finalize_game()
-    # User games may not have box_score yet (it's created by summarize_game_state for computer games)
-    # Build box_score from players array if it doesn't exist
+    # ✅ FIX: Verify box_score exists before finalize_game()
+    # box_score should already exist from summarize_game_state() which calls game.get_box_score()
+    # (includes all players: lineup + bench). If it's missing/incomplete, log error but don't rebuild
+    # from players array (which only has final 5 players per team).
     game_doc_updated = db.games.find_one({"_id": game_id})
     if game_doc_updated:
         box_score = game_doc_updated.get("box_score", {})
         home_team_obj = game_doc_updated.get("home_team", {})
         away_team_obj = game_doc_updated.get("away_team", {})
         
-        # Check if box_score exists in nested structure
+        # Check if box_score exists in nested structure (where summarize_game_state stores it)
         if not box_score:
             if isinstance(home_team_obj, dict) and "box_score" in home_team_obj:
-                box_score[home_team_obj.get("name")] = home_team_obj.get("box_score", {})
+                home_team_name = home_team_obj.get("name")
+                if home_team_name:
+                    box_score[home_team_name] = home_team_obj.get("box_score", {})
             if isinstance(away_team_obj, dict) and "box_score" in away_team_obj:
-                box_score[away_team_obj.get("name")] = away_team_obj.get("box_score", {})
+                away_team_name = away_team_obj.get("name")
+                if away_team_name:
+                    box_score[away_team_name] = away_team_obj.get("box_score", {})
         
-        # If still no box_score, build it from players array
-        if not box_score:
-            players = game_doc_updated.get("players", [])
-            if players:
-                logger.info(f"🔍 [SAVE-RESULT] Building box_score from players array for game_id={game_id}")
-                box_score = {}
-                
-                # Get team names
-                home_team_name = home_name
-                away_team_name = away_name
-                
-                # Initialize box_score structure
-                box_score[home_team_name] = {}
-                box_score[away_team_name] = {}
-                
-                # Build box_score from players array
-                for player in players:
-                    player_team = player.get("team")  # "home" or "away"
-                    player_pos = player.get("pos")
-                    player_stats = player.get("stats", {})
-                    
-                    # Determine which team this player belongs to
-                    if player_team == "home":
-                        team_name = home_team_name
-                    elif player_team == "away":
-                        team_name = away_team_name
-                    else:
-                        # Fallback: check team_id (handle both ObjectId and string)
-                        player_team_id = player.get("team_id")
-                        if player_team_id:
-                            # Convert to string for comparison
-                            player_team_id_str = str(player_team_id)
-                            home_id_str = str(home_id)
-                            away_id_str = str(away_id)
-                            if player_team_id_str == home_id_str:
-                                team_name = home_team_name
-                            elif player_team_id_str == away_id_str:
-                                team_name = away_team_name
-                            else:
-                                continue
-                        else:
-                            continue
-                    
-                    # Get game stats (could be nested under "game" key)
-                    game_stats = player_stats.get("game", player_stats) if isinstance(player_stats, dict) else {}
-                    
-                    # Build player entry for box_score
-                    player_entry = {
-                        "playerId": player.get("playerId"),
-                        "name": player.get("name", ""),
-                        "jersey": player.get("jersey", 0),
-                        **game_stats
-                    }
-                    
-                    # Use position as key, handle duplicates
-                    pos_key = player_pos or "BENCH"
-                    if pos_key in box_score[team_name]:
-                        # Handle duplicate positions by appending player_id
-                        pos_key = f"{pos_key}_{str(player.get('playerId', ''))[:8]}"
-                    
-                    box_score[team_name][pos_key] = player_entry
-                
-                # Update game document with box_score
-                if box_score:
-                    # Also update home_team and away_team objects with box_score
-                    update_doc = {
-                        "box_score": box_score
-                    }
-                    
-                    # Update nested structure if home_team/away_team are dicts
-                    if isinstance(home_team_obj, dict):
-                        home_team_obj["box_score"] = box_score.get(home_team_name, {})
-                        update_doc["home_team"] = home_team_obj
-                    else:
-                        # If home_team is not a dict, create dict structure
-                        update_doc["home_team"] = {
-                            "name": home_team_name,
-                            "team_id": home_id,
-                            "score": home_score,
-                            "box_score": box_score.get(home_team_name, {})
-                        }
-                    
-                    if isinstance(away_team_obj, dict):
-                        away_team_obj["box_score"] = box_score.get(away_team_name, {})
-                        update_doc["away_team"] = away_team_obj
-                    else:
-                        # If away_team is not a dict, create dict structure
-                        update_doc["away_team"] = {
-                            "name": away_team_name,
-                            "team_id": away_id,
-                            "score": away_score,
-                            "box_score": box_score.get(away_team_name, {})
-                        }
-                    
-                    db.games.update_one(
-                        {"_id": game_id},
-                        {"$set": update_doc}
-                    )
-                    logger.info(f"✅ [SAVE-RESULT] Built and saved box_score for game_id={game_id}, teams: {list(box_score.keys())}")
+        # Verify box_score is complete (has reasonable number of players per team)
+        # Expected: ~12 players per team (5 starters + 7 bench), minimum 5 (just starters)
+        if box_score:
+            for team_name, team_box in box_score.items():
+                player_count = len(team_box) if isinstance(team_box, dict) else 0
+                if player_count < 5:
+                    logger.warning(f"⚠️ [SAVE-RESULT] box_score for {team_name} has only {player_count} players (expected 12). Game_id={game_id}")
+        else:
+            logger.error(f"❌ [SAVE-RESULT] No box_score found in game document (game_id={game_id}). finalize_game() may fail or produce incomplete stats.")
     
     stat_updater.finalize_game(
         req.game_id, mode="franchise", franchise_id=req.franchise_id
