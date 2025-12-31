@@ -301,7 +301,7 @@ function sortTeamStats(statKey) {
     'FGM': 'FGM',
     'FGA': 'FGA',
     'FG%': 'FG%',
-    'TPM': 'TPM',
+    '3PTM': 'TPM',
     'TPA': 'TPA',
     '3PT%': '3PT%',
     'FTM': 'FTM',
@@ -507,6 +507,10 @@ function renderTeam(data) {
   players.sort((a, b) => (b.rt ?? -1) - (a.rt ?? -1));
   console.log('Sorted players:', players);
   console.log('About to render', players.length, 'players');
+  
+  // Store for sorting
+  rosterTableDataForSorting = JSON.parse(JSON.stringify(players));
+  
   players.forEach((p, index) => {
     console.log(`Rendering player ${index + 1}:`, p.name);
     const tr = document.createElement('tr');
@@ -562,8 +566,157 @@ function renderTeam(data) {
     initAttributeTooltips(tbody, ['td']);
   }
   
+  // Add click handlers to sortable headers
+  const sortableHeaders = document.querySelectorAll('#roster-tab .roster-table thead th');
+  let rosterSortColumn = 'RT';
+  let rosterSortDirection = 'desc';
+  
+  sortableHeaders.forEach((header, index) => {
+    // Remove existing listeners
+    const newHeader = header.cloneNode(true);
+    header.parentNode.replaceChild(newHeader, header);
+    
+    newHeader.style.cursor = 'pointer';
+    newHeader.style.userSelect = 'none';
+    newHeader.addEventListener('click', () => {
+      const columnNames = ['Name', 'POS', 'Year', 'Height', 'Weight', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT', 'RT'];
+      const columnName = columnNames[index];
+      
+      // Toggle sort direction if clicking the same column
+      if (rosterSortColumn === columnName) {
+        rosterSortDirection = rosterSortDirection === 'desc' ? 'asc' : 'desc';
+      } else {
+        rosterSortColumn = columnName;
+        rosterSortDirection = 'desc';
+      }
+      
+      sortRosterTable(columnName, rosterSortDirection);
+    });
+  });
+  
   // Also render player stats
   renderRosterStats(data.players || []);
+}
+
+// Store roster data for sorting
+let rosterTableDataForSorting = [];
+
+function sortRosterTable(columnName, direction) {
+  const tbody = document.getElementById('team-body');
+  if (!tbody || !rosterTableDataForSorting.length) return;
+  
+  const columnMap = {
+    'Name': 'name',
+    'POS': 'pos',
+    'Year': 'year',
+    'Height': 'height',
+    'Weight': 'weight',
+    'SC': 'SC',
+    'SH': 'SH',
+    'ID': 'ID',
+    'OD': 'OD',
+    'PS': 'PS',
+    'BH': 'BH',
+    'RB': 'RB',
+    'AG': 'AG',
+    'ST': 'ST',
+    'ND': 'ND',
+    'IQ': 'IQ',
+    'FT': 'FT',
+    'RT': 'RT'
+  };
+  
+  const dataKey = columnMap[columnName] || columnName;
+  
+  rosterTableDataForSorting.sort((a, b) => {
+    let val1, val2;
+    
+    if (dataKey === 'name') {
+      val1 = a.name || '';
+      val2 = b.name || '';
+      return direction === 'desc' ? val2.localeCompare(val1) : val1.localeCompare(val2);
+    } else if (dataKey === 'RT') {
+      val1 = a.rt ?? -Infinity;
+      val2 = b.rt ?? -Infinity;
+    } else if (dataKey === 'year') {
+      const yearOrder = { 'FR': 1, 'SO': 2, 'JR': 3, 'SR': 4 };
+      val1 = yearOrder[a.year] || 0;
+      val2 = yearOrder[b.year] || 0;
+    } else if (dataKey === 'height') {
+      const parseHeight = (h) => {
+        if (!h || h === '--') return 0;
+        const match = h.match(/(\d+)'(\d+)"/);
+        return match ? parseInt(match[1]) * 12 + parseInt(match[2]) : 0;
+      };
+      val1 = parseHeight(a.height);
+      val2 = parseHeight(b.height);
+    } else if (dataKey === 'weight') {
+      val1 = parseInt(a.weight) || 0;
+      val2 = parseInt(b.weight) || 0;
+    } else {
+      // Attribute columns
+      const attrsA = a.attributes || {};
+      const attrsB = b.attributes || {};
+      const rawValA = attrsA[`anchor_${dataKey}`] ?? attrsA[dataKey] ?? 0;
+      const rawValB = attrsB[`anchor_${dataKey}`] ?? attrsB[dataKey] ?? 0;
+      val1 = Math.floor(rawValA / 10);
+      val2 = Math.floor(rawValB / 10);
+    }
+    
+    if (direction === 'desc') {
+      return val2 - val1;
+    } else {
+      return val1 - val2;
+    }
+  });
+  
+  // Re-render the table
+  tbody.innerHTML = '';
+  rosterTableDataForSorting.forEach((p, index) => {
+    const tr = document.createElement('tr');
+    
+    const nameTd = document.createElement("td");
+    const nameLink = document.createElement("a");
+    nameLink.href = `/static/player-detail.html?id=${p._id}`;
+    nameLink.textContent = p.name;
+    nameLink.style.color = 'inherit';
+    nameLink.style.textDecoration = 'none';
+    nameLink.addEventListener('mouseenter', () => {
+      nameLink.style.textDecoration = 'underline';
+    });
+    nameLink.addEventListener('mouseleave', () => {
+      nameLink.style.textDecoration = 'none';
+    });
+    nameTd.appendChild(nameLink);
+    tr.appendChild(nameTd);
+    
+    const addCell = (content) => {
+      const td = document.createElement('td');
+      td.textContent = content;
+      tr.appendChild(td);
+    };
+    
+    addCell(p.pos);
+    addCell(p.year);
+    addCell(p.height);
+    addCell(p.weight);
+    
+    ATTR_HEADERS.forEach(h => {
+      const attrs = p.attributes || {};
+      const rawVal = attrs[`anchor_${h}`] ?? attrs[h];
+      const displayVal = h === 'NG' 
+        ? (rawVal != null ? rawVal.toFixed(2) : '--')
+        : (rawVal != null ? Math.floor(rawVal / 10) : '--');
+      addCell(displayVal);
+    });
+    addCell(p.rt ?? '-');
+    
+    tbody.appendChild(tr);
+  });
+  
+  if (typeof initAttributeTooltips !== 'undefined') {
+    initAttributeTooltips(tbody, ['td']);
+  }
 }
 
 function renderSchedule(data) {

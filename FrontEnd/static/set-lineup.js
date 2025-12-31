@@ -304,11 +304,30 @@ async function loadRoster() {
   renderRoster();
 }
 
+// Store roster data for sorting
+let rosterDataForSorting = [];
+let currentSortColumn = 'RT';
+let currentSortDirection = 'desc'; // 'desc' or 'asc'
+
 function renderRoster() {
   const tbody = document.getElementById('roster-body');
   if (!tbody) return;
   tbody.innerHTML = '';
-  roster.forEach(p => {
+  
+  // Calculate RT for each player and store for sorting
+  rosterDataForSorting = roster.map(p => {
+    const posRatings = p.position_ratings || {};
+    const rtValues = Object.values(posRatings);
+    const highestRT = rtValues.length > 0 ? Math.max(...rtValues) : -Infinity;
+    return { ...p, highestRT };
+  });
+  
+  // Default sort by RT (descending)
+  if (currentSortColumn === 'RT' && currentSortDirection === 'desc') {
+    rosterDataForSorting.sort((a, b) => (b.highestRT ?? -Infinity) - (a.highestRT ?? -Infinity));
+  }
+  
+  rosterDataForSorting.forEach(p => {
     const tr = document.createElement('tr');
     tr.draggable = !p.ineligible;  // Disable drag for ineligible players
     tr.dataset.playerId = p._id;
@@ -406,8 +425,113 @@ function renderRoster() {
     tbody.appendChild(tr);
   });
   
+  // Add click handlers to sortable headers
+  const sortableHeaders = document.querySelectorAll('.roster-table thead th');
+  sortableHeaders.forEach((header, index) => {
+    // Remove existing listeners
+    const newHeader = header.cloneNode(true);
+    header.parentNode.replaceChild(newHeader, header);
+    
+    newHeader.style.cursor = 'pointer';
+    newHeader.style.userSelect = 'none';
+    newHeader.addEventListener('click', () => {
+      const columnNames = ['Player Name', 'Pos', 'HT', 'WT', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG', 'RT'];
+      const columnName = columnNames[index];
+      sortRoster(columnName);
+    });
+  });
+  
   // Note: Tooltips for th headers are initialized in DOMContentLoaded
   // We don't need to initialize tooltips for td elements (they contain values, not abbreviations)
+}
+
+function sortRoster(columnName) {
+  // Toggle sort direction if clicking the same column
+  if (currentSortColumn === columnName) {
+    currentSortDirection = currentSortDirection === 'desc' ? 'asc' : 'desc';
+  } else {
+    currentSortColumn = columnName;
+    currentSortDirection = 'desc'; // Default to descending
+  }
+  
+  const columnMap = {
+    'Player Name': 'name',
+    'Pos': 'pos',
+    'HT': 'height',
+    'WT': 'weight',
+    'SC': 'SC',
+    'SH': 'SH',
+    'ID': 'ID',
+    'OD': 'OD',
+    'PS': 'PS',
+    'BH': 'BH',
+    'RB': 'RB',
+    'ST': 'ST',
+    'AG': 'AG',
+    'ND': 'ND',
+    'IQ': 'IQ',
+    'FT': 'FT',
+    'NG': 'NG',
+    'RT': 'RT'
+  };
+  
+  const dataKey = columnMap[columnName] || columnName;
+  
+  rosterDataForSorting.sort((a, b) => {
+    let val1, val2;
+    
+    if (dataKey === 'name') {
+      val1 = a.name || '';
+      val2 = b.name || '';
+      return currentSortDirection === 'desc' ? val2.localeCompare(val1) : val1.localeCompare(val2);
+    } else if (dataKey === 'RT') {
+      val1 = a.highestRT ?? -Infinity;
+      val2 = b.highestRT ?? -Infinity;
+    } else if (dataKey === 'pos') {
+      const posOrder = ['PG', 'SG', 'SF', 'PF', 'C'];
+      const posRatingsA = a.position_ratings || {};
+      const posRatingsB = b.position_ratings || {};
+      const entriesA = Object.entries(posRatingsA);
+      const entriesB = Object.entries(posRatingsB);
+      const bestA = entriesA.length ? entriesA.reduce((a, b) => b[1] > a[1] ? b : a)[0] : '';
+      const bestB = entriesB.length ? entriesB.reduce((a, b) => b[1] > a[1] ? b : a)[0] : '';
+      val1 = posOrder.indexOf(bestA);
+      val2 = posOrder.indexOf(bestB);
+    } else if (dataKey === 'height') {
+      // Parse height (e.g., "6'8\"")
+      const parseHeight = (h) => {
+        if (!h || h === '--') return 0;
+        const match = h.match(/(\d+)'(\d+)"/);
+        return match ? parseInt(match[1]) * 12 + parseInt(match[2]) : 0;
+      };
+      val1 = parseHeight(a.height);
+      val2 = parseHeight(b.height);
+    } else if (dataKey === 'weight') {
+      val1 = parseInt(a.weight) || 0;
+      val2 = parseInt(b.weight) || 0;
+    } else if (dataKey === 'NG') {
+      const attrsA = a.attributes || {};
+      const attrsB = b.attributes || {};
+      val1 = attrsA.NG ?? 1.0;
+      val2 = attrsB.NG ?? 1.0;
+    } else {
+      // Attribute columns (SC, SH, ID, etc.)
+      const attrsA = a.attributes || {};
+      const attrsB = b.attributes || {};
+      const rawValA = attrsA[`anchor_${dataKey}`] ?? attrsA[dataKey] ?? 0;
+      const rawValB = attrsB[`anchor_${dataKey}`] ?? attrsB[dataKey] ?? 0;
+      val1 = Math.floor(rawValA / 10);
+      val2 = Math.floor(rawValB / 10);
+    }
+    
+    if (currentSortDirection === 'desc') {
+      return val2 - val1;
+    } else {
+      return val1 - val2;
+    }
+  });
+  
+  renderRoster();
 }
 
 function updatePlayButton() {

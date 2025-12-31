@@ -307,6 +307,11 @@ function renderBracket() {
   updateCTA();
 }
 
+// Store roster data for sorting
+let tournamentRosterDataForSorting = [];
+let tournamentRosterSortColumn = 'RT';
+let tournamentRosterSortDirection = 'desc';
+
 function renderRoster() {
   const tbody = document.getElementById("roster-body");
   console.log("Inside renderRoster, roster data:", roster);
@@ -319,7 +324,21 @@ function renderRoster() {
     console.log("No roster data to render");
     return;
   }
-  roster.forEach(p => {
+  
+  // Calculate RT for each player and store for sorting
+  tournamentRosterDataForSorting = roster.map(p => {
+    const posRatings = p.position_ratings || {};
+    const rtValues = Object.values(posRatings);
+    const highestRT = rtValues.length > 0 ? Math.max(...rtValues) : -Infinity;
+    return { ...p, highestRT };
+  });
+  
+  // Default sort by RT (descending)
+  if (tournamentRosterSortColumn === 'RT' && tournamentRosterSortDirection === 'desc') {
+    tournamentRosterDataForSorting.sort((a, b) => (b.highestRT ?? -Infinity) - (a.highestRT ?? -Infinity));
+  }
+  
+  tournamentRosterDataForSorting.forEach(p => {
     const tr = document.createElement("tr");
     
     // Create player name as clickable link
@@ -366,6 +385,149 @@ function renderRoster() {
   });
   
   // Initialize tooltips for table cells
+  if (typeof initAttributeTooltips !== 'undefined') {
+    initAttributeTooltips(tbody, ['td']);
+  }
+  
+  // Add click handlers to sortable headers
+  const sortableHeaders = document.querySelectorAll('#roster-tab .roster-table thead th');
+  sortableHeaders.forEach((header, index) => {
+    // Remove existing listeners
+    const newHeader = header.cloneNode(true);
+    header.parentNode.replaceChild(newHeader, header);
+    
+    newHeader.style.cursor = 'pointer';
+    newHeader.style.userSelect = 'none';
+    newHeader.addEventListener('click', () => {
+      const columnNames = ['Name', 'POS', 'Year', 'Height', 'Weight', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT', 'RT'];
+      const columnName = columnNames[index];
+      
+      // Toggle sort direction if clicking the same column
+      if (tournamentRosterSortColumn === columnName) {
+        tournamentRosterSortDirection = tournamentRosterSortDirection === 'desc' ? 'asc' : 'desc';
+      } else {
+        tournamentRosterSortColumn = columnName;
+        tournamentRosterSortDirection = 'desc';
+      }
+      
+      sortTournamentRoster(columnName, tournamentRosterSortDirection);
+    });
+  });
+}
+
+function sortTournamentRoster(columnName, direction) {
+  const tbody = document.getElementById("roster-body");
+  if (!tbody || !tournamentRosterDataForSorting.length) return;
+  
+  const columnMap = {
+    'Name': 'name',
+    'POS': 'pos',
+    'Year': 'year',
+    'Height': 'height',
+    'Weight': 'weight',
+    'SC': 'SC',
+    'SH': 'SH',
+    'ID': 'ID',
+    'OD': 'OD',
+    'PS': 'PS',
+    'BH': 'BH',
+    'RB': 'RB',
+    'AG': 'AG',
+    'ST': 'ST',
+    'ND': 'ND',
+    'IQ': 'IQ',
+    'FT': 'FT',
+    'RT': 'RT'
+  };
+  
+  const dataKey = columnMap[columnName] || columnName;
+  
+  tournamentRosterDataForSorting.sort((a, b) => {
+    let val1, val2;
+    
+    if (dataKey === 'name') {
+      val1 = a.name || '';
+      val2 = b.name || '';
+      return direction === 'desc' ? val2.localeCompare(val1) : val1.localeCompare(val2);
+    } else if (dataKey === 'RT') {
+      val1 = a.highestRT ?? -Infinity;
+      val2 = b.highestRT ?? -Infinity;
+    } else if (dataKey === 'year') {
+      const yearOrder = { 'FR': 1, 'SO': 2, 'JR': 3, 'SR': 4 };
+      val1 = yearOrder[a.year] || 0;
+      val2 = yearOrder[b.year] || 0;
+    } else if (dataKey === 'height') {
+      const parseHeight = (h) => {
+        if (!h || h === '--') return 0;
+        const match = h.match(/(\d+)'(\d+)"/);
+        return match ? parseInt(match[1]) * 12 + parseInt(match[2]) : 0;
+      };
+      val1 = parseHeight(a.height);
+      val2 = parseHeight(b.height);
+    } else if (dataKey === 'weight') {
+      val1 = parseInt(a.weight) || 0;
+      val2 = parseInt(b.weight) || 0;
+    } else {
+      // Attribute columns
+      const attrsA = a.attributes || {};
+      const attrsB = b.attributes || {};
+      const rawValA = attrsA[`anchor_${dataKey}`] ?? attrsA[dataKey] ?? 0;
+      const rawValB = attrsB[`anchor_${dataKey}`] ?? attrsB[dataKey] ?? 0;
+      val1 = Math.floor(rawValA / 10);
+      val2 = Math.floor(rawValB / 10);
+    }
+    
+    if (direction === 'desc') {
+      return val2 - val1;
+    } else {
+      return val1 - val2;
+    }
+  });
+  
+  // Re-render the table
+  tbody.innerHTML = "";
+  tournamentRosterDataForSorting.forEach(p => {
+    const tr = document.createElement("tr");
+    
+    const nameTd = document.createElement("td");
+    const nameLink = document.createElement("a");
+    nameLink.href = `/static/player-detail.html?id=${p._id}`;
+    nameLink.textContent = p.name;
+    nameLink.style.color = 'inherit';
+    nameLink.style.textDecoration = 'none';
+    nameLink.addEventListener('mouseenter', () => {
+      nameLink.style.textDecoration = 'underline';
+    });
+    nameLink.addEventListener('mouseleave', () => {
+      nameLink.style.textDecoration = 'none';
+    });
+    nameTd.appendChild(nameLink);
+    tr.appendChild(nameTd);
+    
+    const addCell = (content) => {
+      const td = document.createElement('td');
+      td.textContent = content;
+      tr.appendChild(td);
+    };
+    
+    addCell(p.pos);
+    addCell(p.year);
+    addCell(p.height);
+    addCell(p.weight);
+    
+    ATTR_HEADERS.forEach(h => {
+      const attrs = p.attributes || {};
+      const rawVal = attrs[`anchor_${h}`] ?? attrs[h];
+      const displayVal = h === 'NG' 
+        ? (rawVal != null ? rawVal.toFixed(2) : '--')
+        : (rawVal != null ? Math.floor(rawVal / 10) : '--');
+      addCell(displayVal);
+    });
+    addCell(p.highestRT !== -Infinity ? p.highestRT : '-');
+    
+    tbody.appendChild(tr);
+  });
+  
   if (typeof initAttributeTooltips !== 'undefined') {
     initAttributeTooltips(tbody, ['td']);
   }
@@ -755,7 +917,7 @@ function sortTeamStats(statKey) {
     'FGM': 'FGM',
     'FGA': 'FGA',
     'FG%': 'FG%',
-    'TPM': 'TPM',
+    '3PTM': 'TPM',
     'TPA': 'TPA',
     '3PT%': '3PT%',
     'FTM': 'FTM',
