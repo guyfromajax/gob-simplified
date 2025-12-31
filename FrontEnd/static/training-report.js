@@ -228,12 +228,17 @@ function renderHeader() {
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
     
-    // Remove archetype prefix from sub_option (e.g., "builder-inspire" -> "inspire")
+    // Remove archetype prefix from sub_option (e.g., "systems-coach-offense" -> "offense")
     let subOptionClean = subOption;
     if (subOption.startsWith(archetype + '-')) {
       subOptionClean = subOption.substring(archetype.length + 1);
     } else if (archetype === 'culture' && subOption.startsWith('builder-')) {
       subOptionClean = subOption.substring('builder-'.length);
+    }
+    
+    // Special handling for systems-coach: remove "coach-" prefix if present
+    if (archetype === 'systems-coach' && subOptionClean.startsWith('coach-')) {
+      subOptionClean = subOptionClean.substring('coach-'.length);
     }
     
     // Format sub-option: capitalize words
