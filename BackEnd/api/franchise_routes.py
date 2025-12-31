@@ -1485,6 +1485,118 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
     return {"players": players}
 
 
+@router.get("/franchise/scouting-report")
+def get_scouting_report(franchise_id: str, team_name: str):
+    """
+    Get scouting report for a team, including last game's play usage data.
+    
+    Returns:
+    - team_attributes: Team attribute values
+    - plays: Array of plays with game_stats from last completed game
+    """
+    try:
+        fid = ObjectId(franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise ID")
+    
+    # Get franchise document
+    franchise_doc = db.franchises.find_one({"_id": fid})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    
+    # Get team document to resolve ObjectId
+    team_doc = db.teams.find_one({"name": team_name})
+    if not team_doc:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    team_object_id = str(team_doc["_id"])
+    
+    # Get team attributes from franchise document
+    franchise_teams = franchise_doc.get("franchise_teams", {})
+    team_obj = franchise_teams.get(team_object_id, {})
+    team_attributes = team_obj.get("attributes", {})
+    
+    # Find last completed game for this team
+    # Look for games where this team played (as team1_id or team2_id)
+    last_game = db.games.find_one(
+        {
+            "franchise_id": str(franchise_id),
+            "$or": [
+                {"team1_id": team_object_id},
+                {"team2_id": team_object_id}
+            ]
+        },
+        sort=[("_id", -1)]  # Most recent first
+    )
+    
+    plays_data = []
+    
+    if last_game:
+        # Extract play usage from game document
+        teams_obj = last_game.get("teams", {})
+        
+        # Game documents use team_id strings (like "LITTLE_YORK") as keys, not ObjectIds
+        # We need to find the team key by matching team name or team_id
+        team_key = None
+        
+        # Get team_id field from team document (e.g., "LITTLE_YORK")
+        team_id_field = team_doc.get("team_id")
+        
+        # Try multiple matching strategies
+        for key in teams_obj.keys():
+            # Strategy 1: Match by team_id field (e.g., "LITTLE_YORK")
+            if team_id_field and key == team_id_field:
+                team_key = key
+                break
+            # Strategy 2: Match by team name
+            if key == team_name:
+                team_key = key
+                break
+            # Strategy 3: Try to match by ObjectId (if key is an ObjectId string)
+            try:
+                if len(key) == 24:  # ObjectId string length
+                    key_obj_id = ObjectId(key)
+                    if key_obj_id == ObjectId(team_object_id):
+                        team_key = key
+                        break
+                    # Also check if this ObjectId matches our team
+                    key_team_doc = db.teams.find_one({"_id": key_obj_id})
+                    if key_team_doc and key_team_doc.get("name") == team_name:
+                        team_key = key
+                        break
+            except Exception:
+                pass
+        
+        if team_key:
+            team_plays = teams_obj.get(team_key, {}).get("plays", {})
+            
+            # Calculate total playcalls for usage %
+            total_playcalls = 0
+            for play_name, play_data in team_plays.items():
+                game_stats = play_data.get("game_stats", {})
+                times_run = game_stats.get("times_run", 0)
+                total_playcalls += times_run
+            
+            # Build plays array
+            for play_name, play_data in team_plays.items():
+                game_stats = play_data.get("game_stats", {})
+                times_run = game_stats.get("times_run", 0)
+                successes = game_stats.get("successes", 0)
+                
+                if times_run > 0:  # Only include plays that were actually run
+                    plays_data.append({
+                        "name": play_name,
+                        "times_run": times_run,
+                        "successes": successes,
+                        "total_playcalls": total_playcalls
+                    })
+    
+    return {
+        "team_attributes": team_attributes,
+        "plays": plays_data
+    }
+
+
 class FranchiseTrainingRequest(BaseModel):
     franchise_id: str
     team_id: Optional[str] = None
