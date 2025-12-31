@@ -412,6 +412,28 @@ def complete_week(req: CompleteWeekRequest):
     # ✅ SS&S: Call finalize_game() with the actual gameplay game_id (if provided)
     if user_game_id:
         logger.info(f"🔍 [COMPLETE_WEEK] Calling finalize_game() for user's game with provided game_id: {user_game_id}")
+        
+        # ✅ FIX: Ensure final box_score is saved before finalize_game()
+        # Computer games call summarize_game_state() right before finalize_game(), but user games
+        # rely on periodic saves. If game is still in memory, save final state now.
+        try:
+            # Import inside function to avoid circular import (api.py imports franchise_routes)
+            from BackEnd.api.api import ongoing_games
+            
+            # Convert game_id to string for dictionary lookup (ongoing_games uses string keys)
+            game_id_str = str(user_game_id)
+            gm = ongoing_games.get(game_id_str)
+            
+            if gm:
+                logger.info(f"💾 [COMPLETE_WEEK] Game still in memory, saving final state before finalize_game()")
+                db_summary = summarize_game_state(gm, exclude_animations=True)
+                db.games.update_one({"_id": ObjectId(user_game_id)}, {"$set": db_summary}, upsert=True)
+                logger.info(f"✅ [COMPLETE_WEEK] Final game state saved with box_score (game_id={user_game_id})")
+            else:
+                logger.info(f"ℹ️ [COMPLETE_WEEK] Game not in memory, using existing database state (game_id={user_game_id})")
+        except Exception as e:
+            logger.warning(f"⚠️ [COMPLETE_WEEK] Failed to save final state from memory: {e}. Proceeding with finalize_game() anyway.")
+        
         stat_updater.finalize_game(
             user_game_id, mode="franchise", franchise_id=req.franchise_id
         )
