@@ -1902,11 +1902,21 @@ function createPill(originalValue, attrKey) {
 
 // ✅ FIX: Add player stats rendering to Team tab (aligns with FCC)
 function renderRosterStats(players) {
+  console.log(`🔍 [RENDER-ROSTER-STATS] Called with ${players?.length || 0} players`);
   if (!players || players.length === 0) {
     const tbody = document.getElementById('roster-stats-body');
     if (tbody) tbody.innerHTML = '';
+    console.warn('⚠️ [RENDER-ROSTER-STATS] No players provided or empty array');
     return;
   }
+  
+  // ✅ DEBUG: Log player names to see what we're rendering
+  console.log(`🔍 [RENDER-ROSTER-STATS] Player names:`, players.map(p => ({
+    name: p.name,
+    hasStats: !!p.stats?.season,
+    statsKeys: p.stats?.season ? Object.keys(p.stats.season).length : 0,
+    GP: p.stats?.season?.GP || 0
+  })));
   
   renderRosterStatsTable(players);
   
@@ -1933,11 +1943,16 @@ let rosterPlayersDataForSorting = [];
 
 function renderRosterStatsTable(players) {
   const tbody = document.getElementById('roster-stats-body');
-  if (!tbody) return;
+  if (!tbody) {
+    console.error('❌ [RENDER-ROSTER-STATS-TABLE] tbody element not found');
+    return;
+  }
   
+  console.log(`🔍 [RENDER-ROSTER-STATS-TABLE] Rendering ${players.length} players`);
   tbody.innerHTML = '';
   rosterPlayersDataForSorting = JSON.parse(JSON.stringify(players)); // Deep copy for sorting
   
+  let rowsAdded = 0;
   players.forEach(p => {
     const stats = p.stats?.season || {};
     // ✅ FIX: Map 3PTM/3PTA to TPM/TPA for display (database stores as 3PTM/3PTA, frontend expects TPM/TPA)
@@ -1972,7 +1987,9 @@ function renderRosterStatsTable(players) {
       <td>${stats.MIN || 0}</td>
       <td>${stats.TO || 0}</td>`;
     tbody.appendChild(tr);
+    rowsAdded++;
   });
+  console.log(`✅ [RENDER-ROSTER-STATS-TABLE] Added ${rowsAdded} rows to table (expected ${players.length})`);
 }
 
 function sortRosterStats(statKey) {
@@ -2291,9 +2308,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!teamData) {
           loadTeamData();
         } else {
-          renderTeamReport();
-          renderRosterStats(teamData.players || []);
-          renderPlaybookSummary();
+          // ✅ FIX: Always reload to ensure fresh data (don't use stale teamData)
+          loadTeamData();
         }
       }
     });
