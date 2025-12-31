@@ -136,59 +136,98 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
             if away_team_name and "box_score" in away_team_obj:
                 box_score[away_team_name] = away_team_obj.get("box_score", {})
     
-    players = summary.get("players", [])
+    # ✅ FIX: Process ALL players from box_score (not just lineup players from players array)
+    # box_score structure: {team_name: {pos: {playerId, name, jersey, stats...}, ...}, ...}
+    # This includes all players who participated (lineup + bench), not just final lineup
+    # Matches franchise mode pattern (lines 1230-1285)
     team_map = {
         "home": summary.get("home_team"),
         "away": summary.get("away_team"),
     }
-
-    for p in players:
-        raw_pid = p.get("playerId")
-        query_pid = ObjectId(raw_pid) if ObjectId.is_valid(raw_pid) else raw_pid
-        team_side = p.get("team")
-        pos = p.get("pos")
-        team_obj = team_map.get(team_side)
-        if not raw_pid or not team_obj:
-            continue
-        
-        # Extract team name from team object (handle both dict and string for backward compatibility)
-        if isinstance(team_obj, dict):
-            team_name = team_obj.get("name")
-        else:
-            team_name = team_obj  # Backward compatibility: if it's already a string
-        
+    
+    # Extract team names from team_map
+    home_team_obj = team_map.get("home")
+    away_team_obj = team_map.get("away")
+    home_team_name = None
+    away_team_name = None
+    
+    if isinstance(home_team_obj, dict):
+        home_team_name = home_team_obj.get("name")
+    elif isinstance(home_team_obj, str):
+        home_team_name = home_team_obj
+    
+    if isinstance(away_team_obj, dict):
+        away_team_name = away_team_obj.get("name")
+    elif isinstance(away_team_obj, str):
+        away_team_name = away_team_obj
+    
+    processed_player_ids = set()  # Track processed players to avoid double-counting
+    
+    # Process all players from box_score (all players who played, not just final lineup)
+    for team_name in [home_team_name, away_team_name]:
         if not team_name:
             continue
-        stat_block = box_score.get(team_name, {}).get(pos, {})
-        inc_fields: Dict[str, Any] = {}
-        set_fields: Dict[str, Any] = {}
-        for stat, val in _clean_stat_block(stat_block).items():
-            # ✅ MIN special handling: Convert seconds to minutes (integer division)
-            # Game MIN is tracked in seconds, but season/career MIN should be in minutes
-            if stat == "MIN":
-                val = val // 60  # Convert seconds to minutes (integer division)
-            inc_fields[f"stats.season.{stat}"] = val
-            inc_fields[f"stats.career.{stat}"] = val
-            set_fields[f"stats.game.{stat}"] = 0
-        if not inc_fields and not set_fields:
+        team_box = box_score.get(team_name, {})
+        if not team_box:
+            logger.warning(f"⚠️ [APPLY-STATS] No box_score data for team: {team_name}")
             continue
-        update_doc: Dict[str, Any] = {"$addToSet": {"stats.applied_games": token}}
-        if inc_fields:
-            update_doc["$inc"] = inc_fields
-        if set_fields:
-            update_doc["$set"] = set_fields
-        players_collection.update_one(
-            {"_id": query_pid, "stats.applied_games": {"$ne": token}},
-            update_doc,
-        )
+        
+        # Process all players in this team's box_score
+        for pos_key, player_data in team_box.items():
+            if not isinstance(player_data, dict):
+                continue
+            raw_pid = player_data.get("playerId")
+            if not raw_pid:
+                continue
+            query_pid = ObjectId(raw_pid) if ObjectId.is_valid(raw_pid) else raw_pid
+            pid_str = str(query_pid)
+            
+            # Skip if already processed (avoid double-counting if same player appears multiple times)
+            if pid_str in processed_player_ids:
+                continue
+            processed_player_ids.add(pid_str)
+            
+            # Get stats from player_data (box_score includes all stats)
+            stat_block = player_data
+            if not stat_block:
+                logger.warning(f"⚠️ [APPLY-STATS] No stats found for player {pid_str} (team={team_name}, pos={pos_key})")
+                continue
+            
+            # Clean stat block and filter out non-stat fields
+            cleaned_stats = _clean_stat_block(stat_block)
+            inc_fields: Dict[str, Any] = {}
+            set_fields: Dict[str, Any] = {}
+            for stat, val in cleaned_stats.items():
+                # Skip non-stat fields (playerId, name, jersey, etc.)
+                if stat in ["playerId", "name", "jersey", "x", "y", "coords", "team", "pos"]:
+                    continue
+                # ✅ MIN special handling: Convert seconds to minutes (integer division)
+                # Game MIN is tracked in seconds, but season/career MIN should be in minutes
+                if stat == "MIN":
+                    val = val // 60  # Convert seconds to minutes (integer division)
+                inc_fields[f"stats.season.{stat}"] = val
+                inc_fields[f"stats.career.{stat}"] = val
+                set_fields[f"stats.game.{stat}"] = 0
+            if not inc_fields and not set_fields:
+                continue
+            
+            update_doc: Dict[str, Any] = {"$addToSet": {"stats.applied_games": token}}
+            if inc_fields:
+                update_doc["$inc"] = inc_fields
+            if set_fields:
+                update_doc["$set"] = set_fields
+            players_collection.update_one(
+                {"_id": query_pid, "stats.applied_games": {"$ne": token}},
+                update_doc,
+            )
 
-        # Persist the latest season stats to the tournament document if applicable.
-        if tournament_id:
-            try:
-                tid = ObjectId(tournament_id)
-            except Exception:
-                tid = None
-            if tid:
+            # Persist the latest season stats to the tournament document if applicable.
+            if tournament_id:
+                try:
+                    tid = ObjectId(tournament_id)
+                except Exception:
+                    tid = None
+                if tid:
                 logger.info(f"🔍 [APPLY-STATS] Tournament mode - Processing player {query_pid} for tournament {tournament_id}")
                 # ✅ FIX: Get existing player entry from tournament document to preserve meta.team_id
                 tournament_doc = tournaments_collection.find_one(
@@ -204,7 +243,11 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                 # ✅ FIX: For tournament mode, accumulate stats from game summary (not from players_collection)
                 # This ensures tournament stats only include tournament games, not all games
                 # Get stats from the game summary's box_score (already processed above)
-                game_stats = _clean_stat_block(stat_block)
+                # Filter out non-stat fields (playerId, name, jersey, etc.)
+                game_stats = {}
+                for stat, val in cleaned_stats.items():
+                    if stat not in ["playerId", "name", "jersey", "x", "y", "coords", "team", "pos"]:
+                        game_stats[stat] = val
                 
                 # Initialize increment document for tournament document
                 tournament_inc_doc: Dict[str, Any] = {}
