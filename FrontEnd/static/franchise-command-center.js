@@ -880,6 +880,9 @@ async function init() {
   const topData = await fetchJSON(`/franchise/command-center/data?franchise_id=${franchiseId}`);
   populateTop(topData);
   
+  // Log team chemistry value from command center data
+  console.log('📊 [TEAM CHEMISTRY] Top bar value:', topData.team_chemistry);
+  
   // ✅ SS&S: Resolve team_id from command center data if not already set
   if (topData && topData.team_id && !userTeamId) {
     userTeamId = topData.team_id;
