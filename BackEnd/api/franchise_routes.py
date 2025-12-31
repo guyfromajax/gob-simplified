@@ -339,57 +339,36 @@ def save_result(req: FranchiseResultRequest):
         upsert=True,
     )
     
-    # ✅ FIX: Ensure final game state is saved before finalize_game() (matches computer game pattern)
-    # For computer games: run_simulation() → summarize_game_state() → save → finalize_game()
-    # For user games: game played turn-by-turn → periodic saves → game ends → NEED final save → finalize_game()
-    # Check if game is still in memory (ongoing_games), and if so, save final state before finalizing
-    from BackEnd.api.api import ongoing_games
-    from BackEnd.utils.shared import summarize_game_state
-    
-    game_id_str = str(game_id)
-    gm = ongoing_games.get(game_id_str)
-    
-    if gm:
-        # Game is still in memory - save final state before finalizing
-        logger.info(f"💾 [SAVE-RESULT] Game still in memory, saving final state before finalize_game() for game_id={game_id}")
-        try:
-            final_summary = summarize_game_state(gm, exclude_animations=True)
-            # Ensure game_id is set correctly
-            final_summary["_id"] = game_id
-            # Save final state to database
-            db.games.update_one({"_id": game_id}, {"$set": final_summary}, upsert=True)
-            logger.info(f"✅ [SAVE-RESULT] Saved final game state before finalize_game() for game_id={game_id}")
-        except Exception as e:
-            logger.error(f"❌ [SAVE-RESULT] Failed to save final game state: {e}", exc_info=True)
-            # Continue anyway - maybe game document already has final state
-    else:
-        # Game not in memory - check if box_score exists and is complete
-        game_doc_updated = db.games.find_one({"_id": game_id})
-        if game_doc_updated:
-            box_score = game_doc_updated.get("box_score", {})
-            home_team_obj = game_doc_updated.get("home_team", {})
-            away_team_obj = game_doc_updated.get("away_team", {})
-            
-            # Check if box_score exists in nested structure (where summarize_game_state stores it)
-            if not box_score:
-                if isinstance(home_team_obj, dict) and "box_score" in home_team_obj:
-                    home_team_name = home_team_obj.get("name")
-                    if home_team_name:
-                        box_score[home_team_name] = home_team_obj.get("box_score", {})
-                if isinstance(away_team_obj, dict) and "box_score" in away_team_obj:
-                    away_team_name = away_team_obj.get("name")
-                    if away_team_name:
-                        box_score[away_team_name] = away_team_obj.get("box_score", {})
-            
-            # Verify box_score is complete (has reasonable number of players per team)
-            # Expected: ~12 players per team (5 starters + 7 bench), minimum 5 (just starters)
-            if box_score:
-                for team_name, team_box in box_score.items():
-                    player_count = len(team_box) if isinstance(team_box, dict) else 0
-                    if player_count < 5:
-                        logger.warning(f"⚠️ [SAVE-RESULT] box_score for {team_name} has only {player_count} players (expected 12). Game_id={game_id}")
-            else:
-                logger.warning(f"⚠️ [SAVE-RESULT] No box_score found in game document (game_id={game_id}). finalize_game() may fail or produce incomplete stats.")
+    # ✅ FIX: Verify box_score exists before finalize_game()
+    # box_score should already exist from summarize_game_state() which calls game.get_box_score()
+    # (includes all players: lineup + bench). If it's missing/incomplete, log error but don't rebuild
+    # from players array (which only has final 5 players per team).
+    game_doc_updated = db.games.find_one({"_id": game_id})
+    if game_doc_updated:
+        box_score = game_doc_updated.get("box_score", {})
+        home_team_obj = game_doc_updated.get("home_team", {})
+        away_team_obj = game_doc_updated.get("away_team", {})
+        
+        # Check if box_score exists in nested structure (where summarize_game_state stores it)
+        if not box_score:
+            if isinstance(home_team_obj, dict) and "box_score" in home_team_obj:
+                home_team_name = home_team_obj.get("name")
+                if home_team_name:
+                    box_score[home_team_name] = home_team_obj.get("box_score", {})
+            if isinstance(away_team_obj, dict) and "box_score" in away_team_obj:
+                away_team_name = away_team_obj.get("name")
+                if away_team_name:
+                    box_score[away_team_name] = away_team_obj.get("box_score", {})
+        
+        # Verify box_score is complete (has reasonable number of players per team)
+        # Expected: ~12 players per team (5 starters + 7 bench), minimum 5 (just starters)
+        if box_score:
+            for team_name, team_box in box_score.items():
+                player_count = len(team_box) if isinstance(team_box, dict) else 0
+                if player_count < 5:
+                    logger.warning(f"⚠️ [SAVE-RESULT] box_score for {team_name} has only {player_count} players (expected 12). Game_id={game_id}")
+        else:
+            logger.error(f"❌ [SAVE-RESULT] No box_score found in game document (game_id={game_id}). finalize_game() may fail or produce incomplete stats.")
     
     stat_updater.finalize_game(
         req.game_id, mode="franchise", franchise_id=req.franchise_id
