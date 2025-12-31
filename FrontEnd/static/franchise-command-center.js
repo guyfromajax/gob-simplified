@@ -878,16 +878,32 @@ async function init() {
   }
   
   const topData = await fetchJSON(`/franchise/command-center/data?franchise_id=${franchiseId}`);
-  populateTop(topData);
-  
-  // Log team chemistry value from command center data
-  console.log('📊 [TEAM CHEMISTRY] Top bar value:', topData.team_chemistry);
   
   // ✅ SS&S: Resolve team_id from command center data if not already set
   if (topData && topData.team_id && !userTeamId) {
     userTeamId = topData.team_id;
     localStorage.setItem('franchise_user_team_id', userTeamId);
   }
+  
+  // ✅ FIX: Use EXACT same source as Team tab - fetch team_chemistry from /franchise/team-data
+  // This ensures 100% consistency between header and Team tab
+  if (franchiseId && userTeamId) {
+    try {
+      const teamDataResponse = await fetch(`/franchise/team-data?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`);
+      if (teamDataResponse.ok) {
+        const teamData = await teamDataResponse.json();
+        // Override team_chemistry with value from team-data endpoint (same as Team tab uses)
+        if (teamData && teamData.team_attributes && teamData.team_attributes.team_chemistry !== undefined) {
+          topData.team_chemistry = teamData.team_attributes.team_chemistry;
+          console.log('📊 [TEAM CHEMISTRY] Top bar value (from team-data):', topData.team_chemistry);
+        }
+      }
+    } catch (error) {
+      console.warn('Could not fetch team_chemistry from team-data endpoint:', error);
+    }
+  }
+  
+  populateTop(topData);
   
   // Store user team name for leaderboard highlighting
   if (topData && topData.team) {
