@@ -1740,13 +1740,11 @@ async function loadTeamData() {
       playersWithStats: playersWithStats.filter(p => p.stats?.season && Object.keys(p.stats.season).length > 0).length
     });
     
-    // Render if Team tab is active
-    const teamTab = document.getElementById('team-tab');
-    if (teamTab && teamTab.classList.contains('active')) {
-      renderTeamReport();
-      renderRosterStats(playersWithStats);
-      renderPlaybookSummary();
-    }
+    // ✅ FIX: Always render Team Report (matches FCC pattern)
+    // FCC calls renderTeam() which always renders, not conditionally
+    renderTeamReport();
+    renderRosterStats(playersWithStats);
+    renderPlaybookSummary();
   } catch (error) {
     console.error('Failed to load team data:', error);
   }
