@@ -70,11 +70,21 @@ async function loadRoster() {
     let url = '';
     if (mode === 'franchise' && franchiseId) {
       url = `/franchise/roster?franchise_id=${franchiseId}`;
-      if (teamId) url += `&team_name=${encodeURIComponent(teamId)}`;
+      // Use teamName (team display name) for the API call, not teamId (ObjectId)
+      if (teamName) {
+        url += `&team_name=${encodeURIComponent(teamName)}`;
+      } else if (teamId) {
+        // Fallback to teamId if teamName not provided (shouldn't happen, but just in case)
+        url += `&team_name=${encodeURIComponent(teamId)}`;
+      }
     } else if (mode === 'tournament' && tournamentId) {
       url = `/tournament/roster?tournament_id=${tournamentId}`;
-      if (teamId || teamName) {
-        url += `&team_name=${encodeURIComponent(teamId || teamName)}`;
+      // Use teamName (team display name) for the API call, not teamId (ObjectId)
+      if (teamName) {
+        url += `&team_name=${encodeURIComponent(teamName)}`;
+      } else if (teamId) {
+        // Fallback to teamId if teamName not provided
+        url += `&team_name=${encodeURIComponent(teamId)}`;
       }
     } else {
       document.getElementById('roster-body').innerHTML = '<tr><td colspan="18">Invalid mode or missing IDs</td></tr>';
@@ -141,19 +151,37 @@ async function loadStats() {
     
     let url = '';
     if (mode === 'franchise' && franchiseId) {
-      // Use team-player-stats endpoint if we have team_id, otherwise use user team endpoint
-      if (teamId) {
+      // For franchise mode, we need to resolve team_id (ObjectId) from team_name
+      // First, try to get team document to resolve ObjectId
+      if (teamId && teamId.match(/^[0-9a-fA-F]{24}$/)) {
+        // teamId is already an ObjectId string, use it
         url = `/franchise/team-player-stats/${encodeURIComponent(teamId)}?franchise_id=${franchiseId}&scope=season`;
+      } else if (teamName) {
+        // Resolve team_id from team_name by fetching team document
+        try {
+          const teamsResponse = await fetch('/teams');
+          const teams = await teamsResponse.json();
+          const teamDoc = teams.find(t => t.name === teamName);
+          if (teamDoc && teamDoc._id) {
+            url = `/franchise/team-player-stats/${encodeURIComponent(teamDoc._id)}?franchise_id=${franchiseId}&scope=season`;
+          } else {
+            // Fallback: use leaders endpoint and filter by team
+            url = `/franchise/leaders?franchise_id=${franchiseId}&scope=season`;
+          }
+        } catch (e) {
+          // Fallback: use leaders endpoint
+          url = `/franchise/leaders?franchise_id=${franchiseId}&scope=season`;
+        }
       } else {
+        // Fallback: use user team endpoint
         url = `/franchise/team-player-stats?franchise_id=${franchiseId}&scope=season`;
       }
     } else if (mode === 'tournament' && tournamentId) {
-      // Tournament mode - get stats from tournament document
-      // We'll need to extract from the roster data since tournament doesn't have a direct player-stats endpoint
-      url = `/tournament/roster?tournament_id=${tournamentId}`;
-      if (teamId || teamName) {
-        url += `&team_name=${encodeURIComponent(teamId || teamName)}`;
-      }
+      // Tournament mode - stats are stored in tournament.players[pid].season
+      // We'll extract from the roster data we already have, or fetch roster again
+      // The tournament roster endpoint doesn't return stats, so we need to get them from tournament document
+      // For now, we'll use the leaders endpoint and filter
+      url = `/tournament/leaders?tournament_id=${tournamentId}`;
     } else {
       document.getElementById('stats-body').innerHTML = '<tr><td colspan="23">Invalid mode or missing IDs</td></tr>';
       return;
@@ -166,26 +194,51 @@ async function loadStats() {
     statsData = [];
     
     if (mode === 'franchise') {
-      // Franchise mode - data.players is array of player stats
-      statsData = (data.players || []).map(p => ({
-        _id: p.player_id,
-        name: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
-        stats: p.stats || {}
-      }));
+      if (url.includes('/team-player-stats/')) {
+        // Direct team stats endpoint
+        statsData = (data.players || []).map(p => ({
+          _id: p.player_id,
+          name: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+          stats: p.stats || {}
+        }));
+      } else {
+        // Leaders endpoint - need to filter by team and aggregate
+        // Leaders endpoint returns stats by category, we need to extract all players
+        const allPlayers = new Map();
+        Object.values(data).forEach(category => {
+          if (Array.isArray(category)) {
+            category.forEach(player => {
+              if (teamPlayerIds.includes(player._id)) {
+                if (!allPlayers.has(player._id)) {
+                  allPlayers.set(player._id, { _id: player._id, name: player.name, stats: {} });
+                }
+                const playerData = allPlayers.get(player._id);
+                // Merge stats from this category
+                Object.assign(playerData.stats, player.stats || {});
+              }
+            });
+          }
+        });
+        statsData = Array.from(allPlayers.values());
+      }
     } else if (mode === 'tournament') {
-      // Tournament mode - stats are in the roster data
-      // Extract season stats from roster players
-      const rosterResponse = await fetch(url);
-      const rosterData = await rosterResponse.json();
-      (rosterData.players || []).forEach(p => {
-        if (teamPlayerIds.includes(p._id)) {
-          statsData.push({
-            _id: p._id,
-            name: p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
-            stats: p.stats?.season || {}
+      // Tournament mode - leaders endpoint returns stats by category
+      const allPlayers = new Map();
+      Object.values(data).forEach(category => {
+        if (Array.isArray(category)) {
+          category.forEach(player => {
+            if (teamPlayerIds.includes(player._id)) {
+              if (!allPlayers.has(player._id)) {
+                allPlayers.set(player._id, { _id: player._id, name: player.name, stats: {} });
+              }
+              const playerData = allPlayers.get(player._id);
+              // Merge stats from this category
+              Object.assign(playerData.stats, player.stats || {});
+            }
           });
         }
       });
+      statsData = Array.from(allPlayers.values());
     }
     
     renderStats();
