@@ -402,7 +402,7 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
         if pid in existing_players:
             existing_player = existing_players[pid]
             existing_meta = existing_player.get("meta", {})
-            # Update team_id if missing
+            # Update team_id if missing (preserve existing season stats)
             if not existing_meta.get("team_id") and home_team_id:
                 tournaments_collection.update_one(
                     {"_id": tournament_id},
@@ -411,7 +411,8 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
             players_already_exist += 1
             continue
         
-        # Initialize player with zero stats and metadata
+        # ✅ FIX: Only initialize if player doesn't exist (players should already be initialized in create_tournament)
+        # But if somehow missing, initialize with empty season stats (preserve structure from create_tournament)
         meta = {
             "first_name": player.get("first_name", ""),
             "last_name": player.get("last_name", ""),
@@ -420,10 +421,12 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
         if home_team_id:
             meta["team_id"] = home_team_id
         
+        # ✅ FIX: Initialize season as empty dict (not zero_stats) to match create_tournament pattern
+        # But preserve any existing season stats if player was partially initialized
         tournaments_collection.update_one(
             {"_id": tournament_id},
             {
-                "$set": {
+                "$setOnInsert": {  # ✅ FIX: Only set if player doesn't exist (preserve existing data)
                     f"players.{pid}.meta": meta,
                     f"players.{pid}.season": {},
                     f"players.{pid}.attributes": player.get("attributes", {}),
@@ -442,7 +445,7 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
         if pid in existing_players:
             existing_player = existing_players[pid]
             existing_meta = existing_player.get("meta", {})
-            # Update team_id if missing
+            # Update team_id if missing (preserve existing season stats)
             if not existing_meta.get("team_id") and away_team_id:
                 tournaments_collection.update_one(
                     {"_id": tournament_id},
@@ -451,7 +454,8 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
             players_already_exist += 1
             continue
         
-        # Initialize player with zero stats and metadata
+        # ✅ FIX: Only initialize if player doesn't exist (players should already be initialized in create_tournament)
+        # But if somehow missing, initialize with empty season stats (preserve structure from create_tournament)
         meta = {
             "first_name": player.get("first_name", ""),
             "last_name": player.get("last_name", ""),
@@ -460,10 +464,12 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
         if away_team_id:
             meta["team_id"] = away_team_id
         
+        # ✅ FIX: Initialize season as empty dict (not zero_stats) to match create_tournament pattern
+        # But preserve any existing season stats if player was partially initialized
         tournaments_collection.update_one(
             {"_id": tournament_id},
             {
-                "$set": {
+                "$setOnInsert": {  # ✅ FIX: Only set if player doesn't exist (preserve existing data)
                     f"players.{pid}.meta": meta,
                     f"players.{pid}.season": {},
                     f"players.{pid}.attributes": player.get("attributes", {}),
