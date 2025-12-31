@@ -539,11 +539,13 @@ function renderLeaderboards() {
       const tr = document.createElement("tr");
       if (entry) {
         // Compare with team name (leaderboard uses team names, not ObjectIds)
-        const isUserTeam = userTeamName && entry.team_name === userTeamName;
+        // ✅ FIX: Also check against userTeamId (ObjectId) for backward compatibility
+        const isUserTeam = (userTeamName && entry.team_name === userTeamName) || 
+                          (userTeamId && entry.team_name === userTeamId);
         
         // Create cells individually to apply styling
         const rankCell = document.createElement('td');
-        rankCell.textContent = entry.rank;
+        rankCell.textContent = entry.rank || (i + 1);
         const playerCell = document.createElement('td');
         playerCell.textContent = `${entry.first_name} ${entry.last_name}`;
         const teamCell = document.createElement('td');
@@ -551,7 +553,7 @@ function renderLeaderboards() {
         const valueCell = document.createElement('td');
         valueCell.textContent = entry.value;
         
-        // Apply bold and color if user team player
+        // ✅ FIX: Apply bold and color to ALL columns if user team player (matches FCC format)
         if (isUserTeam && primaryColor) {
           [rankCell, playerCell, teamCell, valueCell].forEach(cell => {
             cell.style.fontWeight = 'bold';
