@@ -9103,21 +9103,21 @@ The animation system uses a unified distance-based duration calculation that ens
   - Formula: `duration = (distance / speed) * 1000` (converts to milliseconds)
   - **Note**: The `isTransition` parameter is accepted but currently unused (distance fully determines time, no upper cap)
   - Minimum duration: 50ms (to avoid zero-length tweens)
-  - Default speed: 350 pixels/second (Normal preset)
+  - Default speed: 450 pixels/second (Normal preset)
 
 - **`getBallDuration(ballSprite, targetX, targetY)`** (`ballTween.js`)
   - Calculates ball movement duration based on distance from current position to target
   - Uses `getBallSpeed()` which checks `window.__GAME_SPEED` for dynamic speed settings
   - Formula: `duration = (distance / speed) * 1000` (converts to milliseconds)
-  - Default speed: 350 pixels/second (Normal preset)
+  - Default speed: 450 pixels/second (Normal preset)
   - Clamped between 50ms (minimum) and 1000ms (maximum)
 
 #### Game Speed Integration
 
 **Speed Presets** (`gameSpeedManager.js`):
-- **Slow**: 250 pixels/second
-- **Normal**: 350 pixels/second (default)
-- **Fast**: 450 pixels/second
+- **Slow**: 350 pixels/second
+- **Normal**: 450 pixels/second (default)
+- **Fast**: 550 pixels/second
 
 **How It Works**:
 1. User selects speed via UI buttons (Slow/Normal/Fast)
