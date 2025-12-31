@@ -249,8 +249,12 @@ def start_tournament(request: StartTournamentRequest):
 
 @router.post("/simulate-tournament-round")
 def simulate_round(request: SimulateRequest):
-    """Simulate all non-user games for the current round and return the user's
-    matchup. If the user game has already been played, a flag is returned."""
+    """Return the user's matchup without simulating computer games.
+    
+    ✅ TASK 1 FIX: Matches Franchise mode pattern - computer games are simulated
+    AFTER the user completes their game (in /tournament/save-result), not before.
+    
+    If the user game has already been played, a flag is returned."""
 
     try:
         try:
@@ -262,84 +266,31 @@ def simulate_round(request: SimulateRequest):
         if not tournament_doc:
             raise HTTPException(status_code=404, detail="Tournament not found")
 
-        manager = TournamentManager(tournaments_collection=tournaments_collection)
-        manager.tournament = tournament_doc
-        manager.tournament_id = tournament_id
-
-        round_name = f"round{tournament_doc['current_round']}"
+        round_name = f"round{tournament_doc['current_round']}" if tournament_doc['current_round'] != 3 else "final"
         matchups = tournament_doc["bracket"].get(round_name, [])
 
         user_team_id = tournament_doc.get("user_team_id")
         user_matchup = None
         already_played = False
 
+        # ✅ TASK 1 FIX: Only find user's matchup, don't simulate computer games
+        # Computer games will be simulated AFTER user completes their game (in /tournament/save-result)
+        logger.info(f"🔍 [SIMULATE-ROUND] Finding user matchup (no computer games simulated - matches Franchise pattern)")
+        print(f"🔍 [SIMULATE-ROUND] Finding user matchup (no computer games simulated - matches Franchise pattern)")
+        
         for i, matchup in enumerate(matchups):
             if user_team_id in [matchup["home_team"], matchup["away_team"]]:
                 user_matchup = {"home": matchup["home_team"], "away": matchup["away_team"]}
                 if matchup.get("game_id"):
                     already_played = True
-                continue  # skip sim for user game
-
-            # Skip games already simulated
-            if matchup.get("game_id"):
-                continue
-
-            print(f"🔍 About to run simulation: {matchup['home_team']} vs {matchup['away_team']}")
-            game = run_simulation(matchup["home_team"], matchup["away_team"])
-            print(f"🔍 Simulation completed, game type: {type(game)}")
-            summary = summarize_game_state(game)
-            print(f"🔍 Summary created, type: {type(summary)}")
-            game_id = games_collection.insert_one(summary).inserted_id
-            logger.info(f"✅ [SIMULATE-ROUND] Game document inserted for round {tournament_doc['current_round']} match {i}, game_id: {game_id} (type: {type(game_id)}), _id in summary: {summary.get('_id')}")
-            #add a print statement here to show team name and score for each team after the game is simulated
-            print(f"Home team: {matchup['home_team']} - Score: {summary['score'][matchup['home_team']]}")
-            print(f"Away team: {matchup['away_team']} - Score: {summary['score'][matchup['away_team']]}")
-            winner = (
-                matchup["home_team"]
-                if summary["score"][matchup["home_team"]] > summary["score"][matchup["away_team"]]
-                else matchup["away_team"]
-            )
-            manager.save_game_result(round_name, i, str(game_id), winner)
-            logger.info(f"🔍 [SIMULATE-ROUND] About to finalize game stats for game_id: {str(game_id)} (type: {type(str(game_id))}), tournament_id: {request.tournament_id}")
-            stat_updater.finalize_game(
-                str(game_id), mode="tournament", tournament_id=request.tournament_id
-            )
-            logger.info(f"✅ [SIMULATE-ROUND] Game stats finalized successfully for game_id: {str(game_id)}")
-            result_doc = {
-                "home_team": matchup["home_team"],
-                "away_team": matchup["away_team"],
-                "score": summary.get("score", {}),
-                "winner": winner,
-                "round": tournament_doc["current_round"],
-                "match_index": i,
-            }
-            tournaments_collection.update_one(
-                {"_id": tournament_id}, {"$push": {"results": result_doc}}
-            )
-
-        # Reload tournament to check if round is complete
-        updated_doc = tournaments_collection.find_one({"_id": tournament_id})
-        if updated_doc:
-            all_done = all(m.get("winner") for m in updated_doc["bracket"].get(round_name, []))
-            if all_done:
-                manager.tournament = updated_doc
-                manager.advance_round()
-
-        # Sync bracket state with stored results
-        update_bracket_from_results(
-            tournament_id, tournaments_collection=tournaments_collection
-        )
+                break  # Found user matchup, no need to continue
 
         if already_played:
             return {"already_played": True}
         if user_matchup:
             return user_matchup
 
-        current_round = (
-            manager.tournament.get("current_round")
-            if getattr(manager, "tournament", None)
-            else None
-        )
+        current_round = tournament_doc.get("current_round")
         logger.error(
             "User matchup not found: tournament_id=%s current_round=%s user_team_id=%s",
             str(tournament_id),
