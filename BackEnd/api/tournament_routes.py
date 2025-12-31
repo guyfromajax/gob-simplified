@@ -453,9 +453,11 @@ def save_result(request: TournamentResultRequest):
                     logger.error(f"❌ [SAVE-RESULT] Error converting game_id to ObjectId: {e}")
             
             logger.info(f"🔍 [SAVE-RESULT] User game - Final lookup result: Found={bool(summary and summary.get('_id'))}, _id={summary.get('_id') if summary else None}")
+            print(f"🔍 [SAVE-RESULT] User game - Final lookup result: Found={bool(summary and summary.get('_id'))}, _id={summary.get('_id') if summary else None}")
             
             if not summary or not summary.get("_id"):
                 logger.error(f"❌ [SAVE-RESULT] Game document not found in games_collection after all attempts. game_id: {request.game_id}, gid: {gid}")
+                print(f"❌ [SAVE-RESULT] Game document not found in games_collection after all attempts. game_id: {request.game_id}, gid: {gid}")
                 logger.error(f"❌ [SAVE-RESULT] This likely means the game document was never saved to the database.")
                 logger.error(f"❌ [SAVE-RESULT] Check if simulate_quarter_endpoint successfully saved the game document.")
             score_map = (
@@ -469,14 +471,17 @@ def save_result(request: TournamentResultRequest):
             # Only call finalize_game if we found the game document
             if summary and summary.get("_id"):
                 logger.info(f"🔍 [SAVE-RESULT] User game - About to call finalize_game with game_id: {str(gid)} (type: {type(gid)}), tournament_id: {request.tournament_id}")
+                print(f"🔍 [SAVE-RESULT] User game - About to call finalize_game with game_id: {str(gid)} (type: {type(gid)}), tournament_id: {request.tournament_id}")
                 stat_updater.finalize_game(
                     str(gid),  # ✅ FIX: Ensure game_id is always a string
                     mode="tournament",
                     tournament_id=request.tournament_id,
                 )
                 logger.info(f"✅ [SAVE-RESULT] User game - finalize_game completed for game_id: {str(gid)}")
+                print(f"✅ [SAVE-RESULT] User game - finalize_game completed for game_id: {str(gid)}")
             else:
                 logger.error(f"❌ [SAVE-RESULT] Skipping finalize_game - game document not found. Stats will not be applied.")
+                print(f"❌ [SAVE-RESULT] Skipping finalize_game - game document not found. Stats will not be applied.")
             user_result = {
                 "home_team": home_team,
                 "away_team": away_team,
