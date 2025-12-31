@@ -1751,13 +1751,6 @@ async function loadTeamData() {
     // FCC calls renderTeam() which always renders, not conditionally
     renderTeamReport();
     
-    // ✅ FIX: Only render stats if Team tab is active (matches FCC pattern)
-    // FCC checks if tab is active before rendering
-    const teamTab = document.getElementById('team-tab');
-    if (teamTab && teamTab.classList.contains('active')) {
-      renderRosterStats(playersWithStats);
-    }
-    
     renderPlaybookSummary();
   } catch (error) {
     console.error('Failed to load team data:', error);
@@ -1915,32 +1908,7 @@ function createPill(originalValue, attrKey) {
 }
 
 // ✅ FIX: Add player stats rendering to Team tab (aligns with FCC)
-function renderRosterStats(players) {
-  if (!players || players.length === 0) {
-    const tbody = document.getElementById('roster-stats-body');
-    if (tbody) tbody.innerHTML = '';
-    return;
-  }
-  
-  renderRosterStatsTable(players);
-  
-  // Add click handlers to sortable headers
-  const statsTable = document.querySelector('#team-tab .stats-table');
-  if (statsTable) {
-    const sortableHeaders = statsTable.querySelectorAll('thead .sortable');
-    sortableHeaders.forEach(header => {
-      const newHeader = header.cloneNode(true);
-      header.parentNode.replaceChild(newHeader, header);
-      
-      newHeader.style.cursor = 'pointer';
-      newHeader.style.userSelect = 'none';
-      newHeader.addEventListener('click', () => {
-        const stat = newHeader.dataset.stat;
-        sortRosterStats(stat);
-      });
-    });
-  }
-}
+// Note: renderRosterStats() removed - player stats are only on Roster tab, not Team tab
 
 // Store roster stats data for sorting
 let rosterPlayersDataForSorting = [];

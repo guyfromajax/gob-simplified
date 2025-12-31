@@ -274,6 +274,59 @@ def load_team_attributes_from_doc(mode: str, doc_id: str, team_id: str, team_nam
     
     return attrs if attrs else None
 
+def load_team_settings_from_doc(mode: str, doc_id: str, team_id: str, team_name: str):
+    """Load strategy_settings and playbook_settings from tournament/franchise doc."""
+    from BackEnd.db import franchises_collection
+    
+    # Resolve team_id from team_name if not provided
+    if not team_id and team_name:
+        team_doc = teams_collection.find_one({"name": team_name})
+        if team_doc:
+            team_id = str(team_doc.get("_id"))
+    
+    strategy_settings = None
+    playbook_settings = None
+    
+    if mode == "tournament":
+        try:
+            doc = tournaments_collection.find_one({"_id": ObjectId(doc_id)})
+            if doc and team_id:
+                team_obj = doc.get("teams", {}).get(team_id, {})
+                strategy_settings = team_obj.get("strategy_settings")
+                playbook_settings = team_obj.get("playbook_settings")
+        except Exception as e:
+            logging.warning(f"⚠️ Error loading team settings from tournament doc: {e}")
+    elif mode == "franchise":
+        try:
+            doc = franchises_collection.find_one({"_id": ObjectId(doc_id)})
+            if doc and team_id:
+                team_obj = doc.get("franchise_teams", {}).get(team_id, {})
+                strategy_settings = team_obj.get("strategy_settings")
+                playbook_settings = team_obj.get("playbook_settings")
+        except Exception as e:
+            logging.warning(f"⚠️ Error loading team settings from franchise doc: {e}")
+    elif mode == "single":
+        try:
+            # For single game mode, try both UUID string and ObjectId formats
+            doc = games_collection.find_one({"_id": doc_id})
+            if not doc:
+                try:
+                    doc = games_collection.find_one({"_id": ObjectId(doc_id)})
+                except:
+                    pass
+            if doc and team_id:
+                teams_obj = doc.get("teams", {})
+                team_obj = teams_obj.get(team_id, {}) if teams_obj else {}
+                strategy_settings = team_obj.get("strategy_settings")
+                playbook_settings = team_obj.get("playbook_settings")
+        except Exception as e:
+            logging.warning(f"⚠️ Error loading team settings from game doc: {e}")
+    
+    return {
+        "strategy_settings": strategy_settings,
+        "playbook_settings": playbook_settings
+    }
+
 def load_game_from_nested_structure(mode: str, doc_id: str, game_id: str, round_key: str = None, week: int = None):
     """Load game data from tournament/franchise nested structure."""
     from BackEnd.db import franchises_collection
@@ -982,7 +1035,10 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # ✅ SS&S: Restore strategy_calls (playcall overrides) from database
                         home_strategy_calls = home_team_data.get("strategy_calls")
                         away_strategy_calls = away_team_data.get("strategy_calls")
-                        away_strategy_calls = away_team_data.get("strategy_calls")
+                        # ✅ FIX: Extract playbook_settings from game document when resuming
+                        # This ensures playbook_settings are available when resuming games (Q2-Q4)
+                        home_playbook_settings = home_team_data.get("playbook_settings", {})
+                        away_playbook_settings = away_team_data.get("playbook_settings", {})
                         
                         # Fallback to old flat structure if teams object doesn't exist (backwards compatibility)
                         if not home_plays and not teams_obj:
@@ -1417,18 +1473,57 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # Get populated plays for team objects (with game_stats and optionally season_stats)
                         populated_plays = populate_team_plays(mode=mode)
                         
-                        # print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams in simulate_quarter_endpoint (Q1, mode={mode})")
-                        # print(f"🔍 DEBUG: Play keys: {list(populated_plays.keys())}")
+                        # ✅ FIX: Load playbook_settings from tournament/franchise document for new Q1 games
+                        # This ensures playbook_settings are stored in game document from the start
+                        home_playbook_settings = {}
+                        away_playbook_settings = {}
                         
-                        # Create team objects with plays for skeleton lookup
+                        if mode == "tournament" and request.tournament_id:
+                            home_settings = load_team_settings_from_doc(
+                                mode,
+                                request.tournament_id,
+                                None,
+                                request.home_team
+                            )
+                            away_settings = load_team_settings_from_doc(
+                                mode,
+                                request.tournament_id,
+                                None,
+                                request.away_team
+                            )
+                            if home_settings:
+                                home_playbook_settings = home_settings.get("playbook_settings", {})
+                            if away_settings:
+                                away_playbook_settings = away_settings.get("playbook_settings", {})
+                        elif mode == "franchise" and request.franchise_id:
+                            home_settings = load_team_settings_from_doc(
+                                mode,
+                                request.franchise_id,
+                                None,
+                                request.home_team
+                            )
+                            away_settings = load_team_settings_from_doc(
+                                mode,
+                                request.franchise_id,
+                                None,
+                                request.away_team
+                            )
+                            if home_settings:
+                                home_playbook_settings = home_settings.get("playbook_settings", {})
+                            if away_settings:
+                                away_playbook_settings = away_settings.get("playbook_settings", {})
+                        
+                        # Create team objects with plays and playbook_settings for skeleton lookup
                         teams_obj = {
                             gm.home_team.team_id: {
                                 "strategy_settings": getattr(gm.home_team, 'strategy_settings', {}),
-                                "plays": populated_plays.copy()
+                                "plays": populated_plays.copy(),
+                                "playbook_settings": home_playbook_settings
                             },
                             gm.away_team.team_id: {
                                 "strategy_settings": getattr(gm.away_team, 'strategy_settings', {}),
-                                "plays": populated_plays.copy()
+                                "plays": populated_plays.copy(),
+                                "playbook_settings": away_playbook_settings
                             }
                         }
                         
@@ -1472,6 +1567,11 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         home_team_attributes = None
         away_team_attributes = None
         
+        # ✅ FIX: Load strategy_settings and playbook_settings from tournament/franchise documents
+        # This ensures settings persist from TCC to gameplay (matches Franchise mode pattern)
+        home_settings = None
+        away_settings = None
+        
         if mode in ["tournament", "single"] and (request.tournament_id or request.game_id):
             # Load team attributes from tournament or game document
             home_attrs = load_team_attributes_from_doc(
@@ -1490,6 +1590,26 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 home_team_attributes = home_attrs
             if away_attrs:
                 away_team_attributes = away_attrs
+            
+            # Load strategy_settings and playbook_settings from tournament document
+            if request.tournament_id:
+                home_settings = load_team_settings_from_doc(
+                    mode,
+                    request.tournament_id,
+                    None,
+                    request.home_team
+                )
+                away_settings = load_team_settings_from_doc(
+                    mode,
+                    request.tournament_id,
+                    None,
+                    request.away_team
+                )
+                # Override strategy_settings if loaded from tournament (unless request has them)
+                if home_settings.get("strategy_settings") and not home_strategy:
+                    home_strategy = home_settings.get("strategy_settings")
+                if away_settings.get("strategy_settings") and not away_strategy:
+                    away_strategy = away_settings.get("strategy_settings")
         elif mode == "franchise" and request.franchise_id:
             # Load team attributes from franchise document
             home_attrs = load_team_attributes_from_doc(
@@ -1508,6 +1628,25 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 home_team_attributes = home_attrs
             if away_attrs:
                 away_team_attributes = away_attrs
+            
+            # Load strategy_settings and playbook_settings from franchise document
+            home_settings = load_team_settings_from_doc(
+                mode,
+                request.franchise_id,
+                None,
+                request.home_team
+            )
+            away_settings = load_team_settings_from_doc(
+                mode,
+                request.franchise_id,
+                None,
+                request.away_team
+            )
+            # Override strategy_settings if loaded from franchise (unless request has them)
+            if home_settings.get("strategy_settings") and not home_strategy:
+                home_strategy = home_settings.get("strategy_settings")
+            if away_settings.get("strategy_settings") and not away_strategy:
+                away_strategy = away_settings.get("strategy_settings")
         
         gm = GameManager(
             request.home_team, 
@@ -1540,18 +1679,57 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             # Get populated plays for team objects (with game_stats and optionally season_stats)
             populated_plays = populate_team_plays(mode=mode)
             
-            # print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams in simulate_quarter_endpoint (no game_id, mode={mode})")
-            # print(f"🔍 DEBUG: Play keys: {list(populated_plays.keys())}")
+            # ✅ FIX: Load playbook_settings from tournament/franchise document for new Q1 games
+            # This ensures playbook_settings are stored in game document from the start
+            home_playbook_settings = {}
+            away_playbook_settings = {}
             
-            # Create team objects with plays for skeleton lookup
+            if mode == "tournament" and request.tournament_id:
+                home_settings = load_team_settings_from_doc(
+                    mode,
+                    request.tournament_id,
+                    None,
+                    request.home_team
+                )
+                away_settings = load_team_settings_from_doc(
+                    mode,
+                    request.tournament_id,
+                    None,
+                    request.away_team
+                )
+                if home_settings:
+                    home_playbook_settings = home_settings.get("playbook_settings", {})
+                if away_settings:
+                    away_playbook_settings = away_settings.get("playbook_settings", {})
+            elif mode == "franchise" and request.franchise_id:
+                home_settings = load_team_settings_from_doc(
+                    mode,
+                    request.franchise_id,
+                    None,
+                    request.home_team
+                )
+                away_settings = load_team_settings_from_doc(
+                    mode,
+                    request.franchise_id,
+                    None,
+                    request.away_team
+                )
+                if home_settings:
+                    home_playbook_settings = home_settings.get("playbook_settings", {})
+                if away_settings:
+                    away_playbook_settings = away_settings.get("playbook_settings", {})
+            
+            # Create team objects with plays and playbook_settings for skeleton lookup
             teams_obj = {
                 gm.home_team.team_id: {
                     "strategy_settings": getattr(gm.home_team, 'strategy_settings', {}),
-                    "plays": populated_plays.copy()
+                    "plays": populated_plays.copy(),
+                    "playbook_settings": home_playbook_settings
                 },
                 gm.away_team.team_id: {
                     "strategy_settings": getattr(gm.away_team, 'strategy_settings', {}),
-                    "plays": populated_plays.copy()
+                    "plays": populated_plays.copy(),
+                    "playbook_settings": away_playbook_settings
                 }
             }
             
@@ -2257,6 +2435,46 @@ def init_game(request: dict):
     if not home_team or not away_team:
         raise HTTPException(status_code=400, detail="home_team and away_team required")
     
+    # ✅ FIX: Load playbook_settings from tournament/franchise document before creating GameManager
+    # This ensures playbook_settings are stored in the initial game document
+    home_playbook_settings = {}
+    away_playbook_settings = {}
+    
+    if mode == "tournament" and tournament_id:
+        home_settings = load_team_settings_from_doc(
+            mode,
+            tournament_id,
+            None,
+            home_team
+        )
+        away_settings = load_team_settings_from_doc(
+            mode,
+            tournament_id,
+            None,
+            away_team
+        )
+        if home_settings:
+            home_playbook_settings = home_settings.get("playbook_settings", {})
+        if away_settings:
+            away_playbook_settings = away_settings.get("playbook_settings", {})
+    elif mode == "franchise" and franchise_id:
+        home_settings = load_team_settings_from_doc(
+            mode,
+            franchise_id,
+            None,
+            home_team
+        )
+        away_settings = load_team_settings_from_doc(
+            mode,
+            franchise_id,
+            None,
+            away_team
+        )
+        if home_settings:
+            home_playbook_settings = home_settings.get("playbook_settings", {})
+        if away_settings:
+            away_playbook_settings = away_settings.get("playbook_settings", {})
+    
     # Generate game_id
     game_id = generate_game_id()
     
@@ -2287,6 +2505,22 @@ def init_game(request: dict):
         summary["tournament_id"] = str(tournament_id)
     elif mode == "franchise" and franchise_id:
         summary["franchise_id"] = str(franchise_id)
+    
+    # ✅ FIX: Store playbook_settings in game document's teams object
+    # This ensures playbook_settings are available from the start and persist through saves
+    if "teams" not in summary:
+        summary["teams"] = {}
+    
+    home_team_id = gm.home_team.team_id
+    away_team_id = gm.away_team.team_id
+    
+    if home_team_id not in summary["teams"]:
+        summary["teams"][home_team_id] = {}
+    if away_team_id not in summary["teams"]:
+        summary["teams"][away_team_id] = {}
+    
+    summary["teams"][home_team_id]["playbook_settings"] = home_playbook_settings
+    summary["teams"][away_team_id]["playbook_settings"] = away_playbook_settings
     
     # Set GameManager quarter to 1 to match
     gm.quarter = 1
