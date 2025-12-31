@@ -2210,6 +2210,12 @@ inside = random.randint(1, 4)  # Never zero
 | `inside` | Uniform | 1-4 | Never zero |
 | `attack` | Uniform | 1-4 | Never zero |
 | `outside` | Uniform | 1-4 | Never zero |
+| `tempo` | Weighted | 0-4 | 50% chance of 2 (per game, not per team) |
+| `defense` | Weighted | 0-4 | 60% chance of 2 (balanced) |
+| `aggression` | Weighted | 0-4 | 60% chance of 2 (balanced) |
+| `hc_trap` | Weighted | 0-4 | 40% chance of 1, 35% chance of 2 (favors lower usage) |
+| `fc_press` | Weighted | 0-4 | 40% chance of 1, 35% chance of 2 (favors lower usage) |
+| `rebounding` | Weighted | 0-4 | 60% chance of 2 (balanced) |
 | `tempo` | Weighted | 0-4 | 60% chance of 2 (balanced) |
 | `defense` | Weighted | 0-4 | 60% chance of 2 (balanced) |
 | `aggression` | Weighted | 0-4 | 60% chance of 2 (balanced) |
