@@ -228,17 +228,14 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                 except Exception:
                     tid = None
                 if tid:
-                    logger.info(f"🔍 [APPLY-STATS] Tournament mode - Processing player {query_pid} for tournament {tournament_id}")
                     # ✅ FIX: Get existing player entry from tournament document to preserve meta.team_id
                     tournament_doc = tournaments_collection.find_one(
                         {"_id": tid},
                         {f"players.{str(query_pid)}": 1}
                     )
-                    logger.info(f"🔍 [APPLY-STATS] Tournament mode - Found tournament doc: {bool(tournament_doc)}, has players key: {bool(tournament_doc.get('players') if tournament_doc else False)}")
                     existing_player = tournament_doc.get("players", {}).get(str(query_pid), {}) if tournament_doc else {}
                     existing_meta = existing_player.get("meta", {})
                     existing_season = existing_player.get("season", {})
-                    logger.info(f"🔍 [APPLY-STATS] Tournament mode - Player {query_pid}: existing_meta.team: {existing_meta.get('team')}, existing_meta.team_id: {existing_meta.get('team_id')}, existing_season.GP: {existing_season.get('GP', 0)}")
                     
                     # ✅ FIX: For tournament mode, accumulate stats from game summary (not from players_collection)
                     # This ensures tournament stats only include tournament games, not all games
@@ -309,7 +306,6 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                     
                     # ✅ FIX: Check if game already applied (idempotency check)
                     # Check if applied_games array exists and contains this token
-                    logger.info(f"🔍 [APPLY-STATS] Tournament mode - Player {query_pid}: Checking idempotency, token: {token}")
                     check_doc = tournaments_collection.find_one(
                         {"_id": tid},
                         {f"players.{str(query_pid)}.season.applied_games": 1}
@@ -318,7 +314,6 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                         player_data = check_doc.get("players", {}).get(str(query_pid), {})
                         season_data = player_data.get("season", {})
                         applied_games = season_data.get("applied_games", [])
-                        logger.info(f"🔍 [APPLY-STATS] Tournament mode - Player {query_pid}: Existing applied_games: {applied_games}")
                         if isinstance(applied_games, list) and token in applied_games:
                             logger.warning(f"⚠️ [APPLY-STATS] Tournament mode - Player {query_pid}: Game {token} already in applied_games, skipping (idempotent)")
                             continue  # Already applied, skip
@@ -326,8 +321,6 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                     # Apply the update with idempotency check
                     # Use $nin (not in) to check if token is not in the applied_games array
                     # Also handle case where applied_games doesn't exist yet
-                    logger.info(f"🔍 [APPLY-STATS] Tournament mode - Player {query_pid}: Executing update_one with idempotency check (token not in applied_games)")
-                    logger.info(f"🔍 [APPLY-STATS] Tournament mode - Player {query_pid}: tournament_inc_doc has {len(tournament_inc_doc)} fields to increment")
                     result = tournaments_collection.update_one(
                         {
                             "_id": tid,
@@ -338,12 +331,10 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                         },
                         tournament_update,
                     )
-                    logger.info(f"🔍 [APPLY-STATS] Tournament mode - Player {query_pid}: Update result - matched_count: {result.matched_count}, modified_count: {result.modified_count}")
                     
                     # ✅ FIX: After incrementing, calculate per_game and percentages from updated stats
                     # Only do this if the update was successful
                     if result.modified_count > 0:
-                        logger.info(f"✅ [APPLY-STATS] Tournament mode - Player {query_pid}: Stats updated successfully, reloading to calculate per_game and percentages")
                         # Reload the tournament document to get updated season stats
                         updated_tournament_doc = tournaments_collection.find_one(
                             {"_id": tid},
@@ -352,12 +343,10 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                         if updated_tournament_doc:
                             updated_player = updated_tournament_doc.get("players", {}).get(str(query_pid), {})
                             updated_season = updated_player.get("season", {})
-                            logger.info(f"🔍 [APPLY-STATS] Tournament mode - Player {query_pid}: Updated season stats - GP: {updated_season.get('GP', 0)}, PTS: {updated_season.get('PTS', 0)}")
                             
                             # Calculate per_game and percentages
                             season_per_game = _per_game_block(updated_season)
                             season_percentages = _pct_block(updated_season)
-                            logger.info(f"🔍 [APPLY-STATS] Tournament mode - Player {query_pid}: Calculated per_game and percentages, updating tournament document")
                             
                             # Update with calculated fields and mark as applied
                             tournaments_collection.update_one(
@@ -372,11 +361,6 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                                     }
                                 }
                             )
-                            logger.info(f"✅ [APPLY-STATS] Tournament mode - Player {query_pid}: per_game and percentages updated successfully")
-                        else:
-                            logger.error(f"❌ [APPLY-STATS] Tournament mode - Player {query_pid}: Failed to reload updated tournament document")
-                    else:
-                        logger.warning(f"⚠️ [APPLY-STATS] Tournament mode - Player {query_pid}: Update did not modify document (matched_count: {result.matched_count}, modified_count: {result.modified_count})")
     
     # ✅ FIX: After processing all players from game summary, ensure ALL roster players from both teams are initialized
     # This ensures bench players (who didn't play) also have stats entries (with zeros)
@@ -387,11 +371,7 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
             tid = None
         if tid:
             # ✅ TASK 2: Log before calling to verify execution flow
-            logger.info(f"🔍 [APPLY-STATS] About to call _ensure_all_roster_players_initialized for tournament_id: {tid}")
-            print(f"🔍 [APPLY-STATS] About to call _ensure_all_roster_players_initialized for tournament_id: {tid}")
             _ensure_all_roster_players_initialized(summary, tid)
-            logger.info(f"✅ [APPLY-STATS] _ensure_all_roster_players_initialized completed")
-            print(f"✅ [APPLY-STATS] _ensure_all_roster_players_initialized completed")
 
 
 def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_id: ObjectId) -> None:
@@ -403,10 +383,6 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
         summary: Game summary with home_team and away_team
         tournament_id: Tournament ObjectId
     """
-    # ✅ TASK 2: Add logging to verify function is called
-    logger.info(f"🔍 [ENSURE-ROSTER] Function called for tournament_id: {tournament_id}")
-    print(f"🔍 [ENSURE-ROSTER] Function called for tournament_id: {tournament_id}")
-    
     home_team_obj = summary.get("home_team")
     away_team_obj = summary.get("away_team")
     
@@ -426,26 +402,17 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
     
     if not home_team_name or not away_team_name:
         logger.warning(f"⚠️ [ENSURE-ROSTER] Cannot get team names from summary: home={home_team_name}, away={away_team_name}")
-        print(f"⚠️ [ENSURE-ROSTER] Cannot get team names from summary: home={home_team_name}, away={away_team_name}")
         return
-    
-    logger.info(f"🔍 [ENSURE-ROSTER] Processing teams: {home_team_name} vs {away_team_name}")
-    print(f"🔍 [ENSURE-ROSTER] Processing teams: {home_team_name} vs {away_team_name}")
     
     # Get tournament document to check existing players
     tournament_doc = tournaments_collection.find_one({"_id": tournament_id}, {"players": 1})
     existing_players = tournament_doc.get("players", {}) if tournament_doc else {}
-    existing_count = len(existing_players)
-    logger.info(f"🔍 [ENSURE-ROSTER] Tournament document has {existing_count} existing players")
-    print(f"🔍 [ENSURE-ROSTER] Tournament document has {existing_count} existing players")
     
     # Load rosters for both teams
     _, home_roster = load_roster(home_team_name)
     _, away_roster = load_roster(away_team_name)
     home_roster_size = len(home_roster) if home_roster else 0
     away_roster_size = len(away_roster) if away_roster else 0
-    logger.info(f"🔍 [ENSURE-ROSTER] Roster sizes: {home_team_name}={home_roster_size}, {away_team_name}={away_roster_size}")
-    print(f"🔍 [ENSURE-ROSTER] Roster sizes: {home_team_name}={home_roster_size}, {away_team_name}={away_roster_size}")
     
     # Get team documents to resolve team_id
     home_team_doc = teams_collection.find_one({"name": home_team_name})
@@ -546,10 +513,6 @@ def _ensure_all_roster_players_initialized(summary: Dict[str, Any], tournament_i
         )
         players_initialized += 1
     
-    # ✅ TASK 2: Always log results, even if no new players initialized
-    total_players_checked = home_roster_size + away_roster_size
-    logger.info(f"✅ [ENSURE-ROSTER] Complete - Initialized: {players_initialized}, Already existed: {players_already_exist}, Team ID updated: {players_team_id_updated}, Total checked: {total_players_checked}")
-    print(f"✅ [ENSURE-ROSTER] Complete - Initialized: {players_initialized}, Already existed: {players_already_exist}, Team ID updated: {players_team_id_updated}, Total checked: {total_players_checked}")
 
 
 def recompute_tournament_leaders(tournament_id: str, limit: int = 10) -> Dict[str, Any]:
