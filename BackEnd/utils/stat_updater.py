@@ -1041,11 +1041,13 @@ def finalize_game(
         logger = logging.getLogger(__name__)
         
         logger.info(f"🔍 [FINALIZE_GAME] Tournament mode: game_id={game_id}, tournament_id={tournament_id}")
+        print(f"🔍 [FINALIZE_GAME] Tournament mode: game_id={game_id}, tournament_id={tournament_id}")
         
         try:
             tid = ObjectId(tournament_id)
         except Exception as e:
             logger.error(f"❌ [FINALIZE_GAME] Invalid tournament_id format: {tournament_id}, error: {e}")
+            print(f"❌ [FINALIZE_GAME] Invalid tournament_id format: {tournament_id}, error: {e}")
             return
 
         # Check if game is already in applied_games
@@ -1053,8 +1055,10 @@ def finalize_game(
         if tournament_doc:
             applied_games = tournament_doc.get("applied_games", [])
             logger.info(f"🔍 [FINALIZE_GAME] Tournament {tournament_id} has {len(applied_games)} games in applied_games")
+            print(f"🔍 [FINALIZE_GAME] Tournament {tournament_id} has {len(applied_games)} games in applied_games: {applied_games}")
             if game_id in applied_games or str(game_id) in [str(g) for g in applied_games]:
                 logger.warning(f"⚠️ [FINALIZE_GAME] Game {game_id} already in applied_games, skipping (idempotent)")
+                print(f"⚠️ [FINALIZE_GAME] Game {game_id} already in applied_games, skipping (idempotent)")
                 return
         else:
             logger.error(f"❌ [FINALIZE_GAME] Tournament {tournament_id} not found")
