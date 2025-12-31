@@ -1405,10 +1405,21 @@ function populateTop(data) {
     }
   }
   
-  // Update chemistry bar
+  // Update chemistry bar with proportional fill
   const chemistryBar = document.querySelector('.chemistry-bar');
   if (chemistryBar) {
-    chemistryBar.textContent = `${data.team_chemistry || 0} / 25`;
+    const chemistryValue = data.team_chemistry || 0;
+    const fillElement = chemistryBar.querySelector('.chemistry-bar-fill');
+    const textElement = chemistryBar.querySelector('.chemistry-bar-text');
+    
+    if (fillElement) {
+      const percentage = (chemistryValue / 25) * 100;
+      fillElement.style.width = `${percentage}%`;
+    }
+    
+    if (textElement) {
+      textElement.textContent = `${chemistryValue} / 25`;
+    }
   }
   
   // Update team stats (align with Franchise structure)
@@ -1441,7 +1452,17 @@ function updateTeamChemistry() {
   const chemistryBar = document.querySelector('.chemistry-bar');
   if (chemistryBar) {
     const chemistry = tournament.team_chemistry || 0;
-    chemistryBar.textContent = `${chemistry} / 25`;
+    const fillElement = chemistryBar.querySelector('.chemistry-bar-fill');
+    const textElement = chemistryBar.querySelector('.chemistry-bar-text');
+    
+    if (fillElement) {
+      const percentage = (chemistry / 25) * 100;
+      fillElement.style.width = `${percentage}%`;
+    }
+    
+    if (textElement) {
+      textElement.textContent = `${chemistry} / 25`;
+    }
   }
   
   // Update other team stats if available

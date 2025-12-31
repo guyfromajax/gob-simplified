@@ -55,7 +55,22 @@ function populateTop(data) {
     if (dukeEl) dukeEl.removeAttribute('src');
   }
 
-  document.querySelector('.chemistry-bar').textContent = `${data.team_chemistry || 0} / 25`;
+  // Update chemistry bar with proportional fill
+  const chemistryBar = document.querySelector('.chemistry-bar');
+  if (chemistryBar) {
+    const chemistryValue = data.team_chemistry || 0;
+    const fillElement = chemistryBar.querySelector('.chemistry-bar-fill');
+    const textElement = chemistryBar.querySelector('.chemistry-bar-text');
+    
+    if (fillElement) {
+      const percentage = (chemistryValue / 25) * 100;
+      fillElement.style.width = `${percentage}%`;
+    }
+    
+    if (textElement) {
+      textElement.textContent = `${chemistryValue} / 25`;
+    }
+  }
   document.getElementById('stat-offense').textContent = `Offense: ${data.offense || '--'}`;
   document.getElementById('stat-defense').textContent = `Defense: ${data.defense || '--'}`;
   document.getElementById('stat-athleticism').textContent = `Athleticism: ${data.athleticism || '--'}`;
