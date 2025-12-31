@@ -225,6 +225,11 @@ if not use_playbooks or playbook_training_mode == "all-plays-even":
 **Stats Rollup Process:**
 
 1. **After Game Completion:**
+   - **✅ FIX (February 2025):** For user games, `save_result()` now ensures final game state is saved before `finalize_game()` is called
+   - **Pattern:** Matches computer game pattern - `summarize_game_state()` → save → `finalize_game()`
+   - **Implementation:** If game is still in `ongoing_games` (memory), calls `summarize_game_state()` one final time and saves to database before finalizing
+   - **Why:** User games are saved periodically during play (timeouts, quarter breaks), but the final complete state may not be saved before `finalize_game()` reads from database
+   - **Code Location:** `BackEnd/api/franchise_routes.py` - `save_result()` (lines 342-375)
    - `finalize_game()` reads from game document's `box_score` to get all player stats
    - `finalize_game()` increments `players.{pid}.season.{stat}` and `players.{pid}.career.{stat}`
    - `rollup_game_to_franchise()` should also write to `players.{pid}.season.{stat}` (not `player_stats`)
