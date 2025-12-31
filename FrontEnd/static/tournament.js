@@ -375,20 +375,7 @@ function renderRoster() {
 let tournamentPlayerStatsDataForSorting = [];
 
 function renderStats() {
-  console.log("🔍 [RENDER-STATS] ========== FUNCTION CALLED ==========");
-  console.log("🔍 [RENDER-STATS] stats array length:", stats?.length || 0);
-  console.log("🔍 [RENDER-STATS] stats array:", stats);
-  console.trace("🔍 [RENDER-STATS] Call stack:");
-  
   tournamentPlayerStatsDataForSorting = JSON.parse(JSON.stringify(stats || [])); // Deep copy for sorting
-  console.log("🔍 [RENDER-STATS] tournamentPlayerStatsDataForSorting length:", tournamentPlayerStatsDataForSorting.length);
-  console.log("🔍 [RENDER-STATS] tournamentPlayerStatsDataForSorting:", tournamentPlayerStatsDataForSorting.map(s => ({
-    name: s.name,
-    PTS: s.PTS,
-    MIN: s.MIN,
-    FGA: s.FGA
-  })));
-  
   renderStatsTable(tournamentPlayerStatsDataForSorting);
   
   // Add click handlers to sortable headers (only once) - target only the stats table
@@ -411,23 +398,15 @@ function renderStats() {
 }
 
 function renderStatsTable(playerStats) {
-  console.log("🔍 [RENDER-STATS-TABLE] ========== FUNCTION CALLED ==========");
-  console.log("🔍 [RENDER-STATS-TABLE] playerStats array length:", playerStats?.length || 0);
-  console.trace("🔍 [RENDER-STATS-TABLE] Call stack:");
-  
   const tbody = document.getElementById("stats-body");
   if (!tbody) {
     console.error("❌ [RENDER-STATS-TABLE] stats-body tbody not found");
     return;
   }
   
-  console.log("🔍 [RENDER-STATS-TABLE] Rows in DOM before clear:", tbody.querySelectorAll('tr').length);
   tbody.innerHTML = "";
-  console.log("🔍 [RENDER-STATS-TABLE] Rows in DOM after clear:", tbody.querySelectorAll('tr').length);
   
-  let rowsAdded = 0;
-  playerStats.forEach((s, index) => {
-    console.log(`🔍 [RENDER-STATS-TABLE] Processing player ${index + 1}/${playerStats.length}: ${s.name} (PTS: ${s.PTS}, MIN: ${s.MIN})`);
+  playerStats.forEach((s) => {
     // Calculate percentages
     const fgPct = s.FGA > 0 ? ((s.FGM || 0) / s.FGA * 100).toFixed(1) : '0.0';
     const threePct = s.TPA > 0 ? ((s.TPM || 0) / s.TPA * 100).toFixed(1) : '0.0';
@@ -456,14 +435,7 @@ function renderStatsTable(playerStats) {
       <td>${s.MIN || 0}</td>
       <td>${s.TO || 0}</td>`;
     tbody.appendChild(tr);
-    rowsAdded++;
-    
-    const rowsAfterAdd = tbody.querySelectorAll('tr');
-    console.log(`🔍 [RENDER-STATS-TABLE] After adding ${s.name}: ${rowsAfterAdd.length} rows in DOM (expected ${rowsAdded})`);
   });
-  
-  console.log(`✅ [RENDER-STATS-TABLE] Added ${rowsAdded} rows to table (expected ${playerStats.length})`);
-  console.log("🔍 [RENDER-STATS-TABLE] Final DOM state:", tbody.querySelectorAll('tr').length, "rows");
 }
 
 function sortPlayerStats(statKey) {
@@ -1714,10 +1686,6 @@ async function loadTeamData() {
       const tournamentStateRes = await fetch(`/tournament/state?tournament_id=${encodeURIComponent(tournament._id)}`);
       if (tournamentStateRes.ok) {
         freshTournamentDoc = await tournamentStateRes.json();
-        console.log('✅ [TCC] Reloaded tournament document for fresh stats:', {
-          hasPlayers: !!freshTournamentDoc?.players,
-          playerCount: freshTournamentDoc?.players ? Object.keys(freshTournamentDoc.players).length : 0
-        });
       }
     } catch (error) {
       console.warn('⚠️ [TCC] Could not reload tournament document, using cached:', error);
@@ -1760,24 +1728,15 @@ async function loadTeamData() {
           // Merge stats from tournament document
           player.stats = { season: tournamentPlayer.season };
           statsFound++;
-          console.log(`✅ [TCC] Stats found for player ${player.name} (${playerId}):`, tournamentPlayer.season);
         } else {
           // No stats found, use empty object
           player.stats = { season: {} };
           statsMissing++;
-          console.log(`❌ [TCC] No stats found for player ${player.name} (${playerId}). Tournament player data:`, tournamentPlayer);
         }
         return player;
       });
-      console.log(`🔍 [TCC] Stats merge complete: ${statsFound} found, ${statsMissing} missing`);
     } else {
       playersWithStats = roster || [];
-      console.warn('⚠️ [TCC] Cannot merge stats:', {
-        hasRoster: !!roster,
-        rosterLength: roster?.length || 0,
-        hasTournamentDoc: !!tournamentDoc,
-        hasPlayers: !!tournamentDoc?.players
-      });
     }
     
     teamData = {
@@ -1787,13 +1746,6 @@ async function loadTeamData() {
       players: playersWithStats
     };
     
-    console.log('📊 [TEAM DATA] Loaded team data:', {
-      attributes: Object.keys(teamData.team_attributes).length,
-      plays: Object.keys(teamData.plays_data).length,
-      defenses: Object.keys(teamData.scouting_data?.defense || {}).length,
-      players: playersWithStats.length,
-      playersWithStats: playersWithStats.filter(p => p.stats?.season && Object.keys(p.stats.season).length > 0).length
-    });
     
     // ✅ FIX: Always render Team Report (matches FCC pattern)
     // FCC calls renderTeam() which always renders, not conditionally
@@ -1964,66 +1916,13 @@ function createPill(originalValue, attrKey) {
 
 // ✅ FIX: Add player stats rendering to Team tab (aligns with FCC)
 function renderRosterStats(players) {
-  console.log(`🔍 [RENDER-ROSTER-STATS] ========== FUNCTION CALLED ==========`);
-  console.log(`🔍 [RENDER-ROSTER-STATS] Called with ${players?.length || 0} players`);
-  console.trace(`🔍 [RENDER-ROSTER-STATS] Call stack:`);
-  
   if (!players || players.length === 0) {
     const tbody = document.getElementById('roster-stats-body');
     if (tbody) tbody.innerHTML = '';
-    console.warn('⚠️ [RENDER-ROSTER-STATS] No players provided or empty array');
     return;
   }
   
-  // ✅ DEBUG: Log player names to see what we're rendering
-  console.log(`🔍 [RENDER-ROSTER-STATS] Player names:`, players.map(p => ({
-    name: p.name,
-    hasStats: !!p.stats?.season,
-    statsKeys: p.stats?.season ? Object.keys(p.stats.season).length : 0,
-    GP: p.stats?.season?.GP || 0
-  })));
-  
-  // ✅ DEBUG: Check current DOM state before rendering
-  const tbodyBefore = document.getElementById('roster-stats-body');
-  if (tbodyBefore) {
-    const rowsBefore = tbodyBefore.querySelectorAll('tr');
-    console.log(`🔍 [RENDER-ROSTER-STATS] DOM state BEFORE: ${rowsBefore.length} rows in tbody`);
-  }
-  
-  // ✅ DEBUG: Set up observer before rendering
-  setupRosterStatsObserver();
-  
   renderRosterStatsTable(players);
-  
-  // ✅ DEBUG: Check DOM state after rendering
-  setTimeout(() => {
-    const tbodyAfter = document.getElementById('roster-stats-body');
-    if (tbodyAfter) {
-      const rowsAfter = tbodyAfter.querySelectorAll('tr');
-      console.log(`🔍 [RENDER-ROSTER-STATS] DOM state AFTER: ${rowsAfter.length} rows in tbody`);
-      
-      // Check for hidden rows
-      let visibleRows = 0;
-      let hiddenRows = 0;
-      rowsAfter.forEach((row, idx) => {
-        const style = window.getComputedStyle(row);
-        const isVisible = style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
-        if (isVisible) {
-          visibleRows++;
-        } else {
-          hiddenRows++;
-          console.warn(`⚠️ [RENDER-ROSTER-STATS] Row ${idx} is HIDDEN:`, {
-            display: style.display,
-            visibility: style.visibility,
-            opacity: style.opacity,
-            height: style.height,
-            playerName: row.querySelector('td')?.textContent
-          });
-        }
-      });
-      console.log(`🔍 [RENDER-ROSTER-STATS] Visibility check: ${visibleRows} visible, ${hiddenRows} hidden`);
-    }
-  }, 100);
   
   // Add click handlers to sortable headers
   const statsTable = document.querySelector('#team-tab .stats-table');
@@ -2046,76 +1945,17 @@ function renderRosterStats(players) {
 // Store roster stats data for sorting
 let rosterPlayersDataForSorting = [];
 
-// ✅ DEBUG: MutationObserver to detect DOM changes after rendering
-let rosterStatsObserver = null;
-function setupRosterStatsObserver() {
-  const tbody = document.getElementById('roster-stats-body');
-  if (!tbody) return;
-  
-  // Remove existing observer if any
-  if (rosterStatsObserver) {
-    rosterStatsObserver.disconnect();
-  }
-  
-  // Create new observer
-  rosterStatsObserver = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      if (mutation.type === 'childList') {
-        const addedNodes = Array.from(mutation.addedNodes);
-        const removedNodes = Array.from(mutation.removedNodes);
-        
-        if (removedNodes.length > 0) {
-          console.warn(`⚠️ [DOM-OBSERVER] Rows REMOVED from roster-stats-body:`, {
-            removedCount: removedNodes.length,
-            removedNodes: removedNodes.map(n => n.tagName === 'TR' ? n.querySelector('td')?.textContent : n.nodeName),
-            stackTrace: new Error().stack
-          });
-        }
-        
-        if (addedNodes.length > 0) {
-          console.log(`🔍 [DOM-OBSERVER] Rows ADDED to roster-stats-body:`, {
-            addedCount: addedNodes.length,
-            addedNodes: addedNodes.map(n => n.tagName === 'TR' ? n.querySelector('td')?.textContent : n.nodeName)
-          });
-        }
-      }
-    });
-  });
-  
-  // Start observing
-  rosterStatsObserver.observe(tbody, {
-    childList: true,
-    subtree: false
-  });
-  
-  console.log(`✅ [DOM-OBSERVER] MutationObserver set up for roster-stats-body`);
-}
-
 function renderRosterStatsTable(players) {
-  console.log(`🔍 [RENDER-ROSTER-STATS-TABLE] ========== FUNCTION CALLED ==========`);
-  console.log(`🔍 [RENDER-ROSTER-STATS-TABLE] Rendering ${players.length} players`);
-  console.trace(`🔍 [RENDER-ROSTER-STATS-TABLE] Call stack:`);
-  
   const tbody = document.getElementById('roster-stats-body');
   if (!tbody) {
     console.error('❌ [RENDER-ROSTER-STATS-TABLE] tbody element not found');
     return;
   }
   
-  // ✅ DEBUG: Check DOM state before clearing
-  const rowsBeforeClear = tbody.querySelectorAll('tr');
-  console.log(`🔍 [RENDER-ROSTER-STATS-TABLE] Rows in DOM before clear: ${rowsBeforeClear.length}`);
-  
   tbody.innerHTML = '';
   rosterPlayersDataForSorting = JSON.parse(JSON.stringify(players)); // Deep copy for sorting
   
-  // ✅ DEBUG: Verify tbody is empty
-  const rowsAfterClear = tbody.querySelectorAll('tr');
-  console.log(`🔍 [RENDER-ROSTER-STATS-TABLE] Rows in DOM after clear: ${rowsAfterClear.length} (should be 0)`);
-  
-  let rowsAdded = 0;
-  players.forEach((p, index) => {
-    console.log(`🔍 [RENDER-ROSTER-STATS-TABLE] Processing player ${index + 1}/${players.length}: ${p.name}`);
+  players.forEach((p) => {
     const stats = p.stats?.season || {};
     // ✅ FIX: Map 3PTM/3PTA to TPM/TPA for display (database stores as 3PTM/3PTA, frontend expects TPM/TPA)
     const tpm = stats['3PTM'] || stats.TPM || 0;
@@ -2149,53 +1989,7 @@ function renderRosterStatsTable(players) {
       <td>${stats.MIN || 0}</td>
       <td>${stats.TO || 0}</td>`;
     tbody.appendChild(tr);
-    rowsAdded++;
-    
-    // ✅ DEBUG: Verify row was added
-    const rowsAfterAdd = tbody.querySelectorAll('tr');
-    console.log(`🔍 [RENDER-ROSTER-STATS-TABLE] After adding ${p.name}: ${rowsAfterAdd.length} rows in DOM (expected ${rowsAdded})`);
-    
-    // ✅ DEBUG: Check row visibility immediately after adding
-    const rowStyle = window.getComputedStyle(tr);
-    if (rowStyle.display === 'none' || rowStyle.visibility === 'hidden') {
-      console.warn(`⚠️ [RENDER-ROSTER-STATS-TABLE] Row for ${p.name} is HIDDEN immediately after adding!`, {
-        display: rowStyle.display,
-        visibility: rowStyle.visibility,
-        opacity: rowStyle.opacity
-      });
-    }
   });
-  
-  console.log(`✅ [RENDER-ROSTER-STATS-TABLE] Added ${rowsAdded} rows to table (expected ${players.length})`);
-  
-  // ✅ DEBUG: Final DOM state check
-  const finalRows = tbody.querySelectorAll('tr');
-  console.log(`🔍 [RENDER-ROSTER-STATS-TABLE] Final DOM state: ${finalRows.length} rows in tbody`);
-  
-  // ✅ DEBUG: Check parent table visibility
-  const table = tbody.closest('table');
-  if (table) {
-    const tableStyle = window.getComputedStyle(table);
-    console.log(`🔍 [RENDER-ROSTER-STATS-TABLE] Parent table visibility:`, {
-      display: tableStyle.display,
-      visibility: tableStyle.visibility,
-      maxHeight: tableStyle.maxHeight,
-      overflow: tableStyle.overflow
-    });
-  }
-  
-  // ✅ DEBUG: Check parent container visibility
-  const container = tbody.closest('.tab-content');
-  if (container) {
-    const containerStyle = window.getComputedStyle(container);
-    console.log(`🔍 [RENDER-ROSTER-STATS-TABLE] Parent container visibility:`, {
-      display: containerStyle.display,
-      visibility: containerStyle.visibility,
-      maxHeight: containerStyle.maxHeight,
-      overflow: containerStyle.overflow,
-      hasActiveClass: container.classList.contains('active')
-    });
-  }
 }
 
 function sortRosterStats(statKey) {
