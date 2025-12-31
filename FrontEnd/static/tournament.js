@@ -1025,12 +1025,54 @@ function renderSchedule() {
     const homeSeed = seedMap[match.home_team] || '';
     const awaySeed = seedMap[match.away_team] || '';
     
-    let text = `Team ${awaySeed} ${match.away_team} @ Team ${homeSeed} ${match.home_team}`;
-    if (homeScore !== undefined && awayScore !== undefined) {
-      text = `Team ${awaySeed} ${match.away_team} (${awayScore}) @ Team ${homeSeed} ${match.home_team} (${homeScore})`;
-    }
+    // Create clickable team links
+    const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
+    const createTeamLink = (teamName, seed) => {
+      const link = document.createElement('a');
+      link.href = `/static/team-roster-view.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
+      link.textContent = seed ? `Team ${seed} ${teamName}` : teamName;
+      link.style.color = '#4a90e2';
+      link.style.textDecoration = 'none';
+      link.style.cursor = 'pointer';
+      link.addEventListener('mouseenter', () => {
+        link.style.textDecoration = 'underline';
+      });
+      link.addEventListener('mouseleave', () => {
+        link.style.textDecoration = 'none';
+      });
+      return link;
+    };
     
-    gameDiv.innerHTML = text;
+    const awayLink = createTeamLink(match.away_team, awaySeed);
+    const homeLink = createTeamLink(match.home_team, homeSeed);
+    const atText = document.createTextNode(' @ ');
+    
+    if (homeScore !== undefined && awayScore !== undefined) {
+      const awayScoreText = document.createTextNode(` (${awayScore})`);
+      const homeScoreText = document.createTextNode(` (${homeScore})`);
+      
+      const awayContainer = document.createElement('span');
+      if (awayScore > homeScore) {
+        awayContainer.style.fontWeight = 'bold';
+      }
+      awayContainer.appendChild(awayLink);
+      awayContainer.appendChild(awayScoreText);
+      
+      const homeContainer = document.createElement('span');
+      if (homeScore > awayScore) {
+        homeContainer.style.fontWeight = 'bold';
+      }
+      homeContainer.appendChild(homeLink);
+      homeContainer.appendChild(homeScoreText);
+      
+      gameDiv.appendChild(awayContainer);
+      gameDiv.appendChild(atText);
+      gameDiv.appendChild(homeContainer);
+    } else {
+      gameDiv.appendChild(awayLink);
+      gameDiv.appendChild(atText);
+      gameDiv.appendChild(homeLink);
+    }
     
     // ✅ FIX: Add box score link for completed games (aligns with FCC)
     const gameId = res?.game_id || match.game_id;
@@ -1083,11 +1125,54 @@ function renderSchedule() {
       const awayScore = res?.score?.[match.away_team] ?? match.score?.[match.away_team];
       const winner = res?.winner ?? match.winner ?? null;
 
-      let text = `${match.away_team} @ ${match.home_team}`;
+      // Create clickable team links for semifinals
+      const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
+      const createTeamLink = (teamName) => {
+        const link = document.createElement('a');
+        link.href = `/static/team-roster-view.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
+        link.textContent = teamName;
+        link.style.color = '#4a90e2';
+        link.style.textDecoration = 'none';
+        link.style.cursor = 'pointer';
+        link.addEventListener('mouseenter', () => {
+          link.style.textDecoration = 'underline';
+        });
+        link.addEventListener('mouseleave', () => {
+          link.style.textDecoration = 'none';
+        });
+        return link;
+      };
+      
+      const awayLink = createTeamLink(match.away_team);
+      const homeLink = createTeamLink(match.home_team);
+      const atText = document.createTextNode(' @ ');
+      
       if (homeScore !== undefined && awayScore !== undefined) {
-        text = `${match.away_team} (${awayScore}) @ ${match.home_team} (${homeScore})`;
+        const awayScoreText = document.createTextNode(` (${awayScore})`);
+        const homeScoreText = document.createTextNode(` (${homeScore})`);
+        
+        const awayContainer = document.createElement('span');
+        if (awayScore > homeScore) {
+          awayContainer.style.fontWeight = 'bold';
+        }
+        awayContainer.appendChild(awayLink);
+        awayContainer.appendChild(awayScoreText);
+        
+        const homeContainer = document.createElement('span');
+        if (homeScore > awayScore) {
+          homeContainer.style.fontWeight = 'bold';
+        }
+        homeContainer.appendChild(homeLink);
+        homeContainer.appendChild(homeScoreText);
+        
+        gameDiv.appendChild(awayContainer);
+        gameDiv.appendChild(atText);
+        gameDiv.appendChild(homeContainer);
+      } else {
+        gameDiv.appendChild(awayLink);
+        gameDiv.appendChild(atText);
+        gameDiv.appendChild(homeLink);
       }
-      gameDiv.innerHTML = text;
       
       // ✅ FIX: Add box score link for completed games (aligns with FCC)
       const gameId = res?.game_id || match.game_id;
@@ -1142,11 +1227,54 @@ function renderSchedule() {
     const awayScore = res?.score?.[match.away_team] ?? match.score?.[match.away_team];
     const winner = res?.winner ?? match.winner ?? null;
 
-    let text = `${match.away_team} @ ${match.home_team}`;
+    // Create clickable team links for championship
+    const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
+    const createTeamLink = (teamName) => {
+      const link = document.createElement('a');
+      link.href = `/static/team-roster-view.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
+      link.textContent = teamName;
+      link.style.color = '#4a90e2';
+      link.style.textDecoration = 'none';
+      link.style.cursor = 'pointer';
+      link.addEventListener('mouseenter', () => {
+        link.style.textDecoration = 'underline';
+      });
+      link.addEventListener('mouseleave', () => {
+        link.style.textDecoration = 'none';
+      });
+      return link;
+    };
+    
+    const awayLink = createTeamLink(match.away_team);
+    const homeLink = createTeamLink(match.home_team);
+    const atText = document.createTextNode(' @ ');
+    
     if (homeScore !== undefined && awayScore !== undefined) {
-      text = `${match.away_team} (${awayScore}) @ ${match.home_team} (${homeScore})`;
+      const awayScoreText = document.createTextNode(` (${awayScore})`);
+      const homeScoreText = document.createTextNode(` (${homeScore})`);
+      
+      const awayContainer = document.createElement('span');
+      if (awayScore > homeScore) {
+        awayContainer.style.fontWeight = 'bold';
+      }
+      awayContainer.appendChild(awayLink);
+      awayContainer.appendChild(awayScoreText);
+      
+      const homeContainer = document.createElement('span');
+      if (homeScore > awayScore) {
+        homeContainer.style.fontWeight = 'bold';
+      }
+      homeContainer.appendChild(homeLink);
+      homeContainer.appendChild(homeScoreText);
+      
+      champGameDiv.appendChild(awayContainer);
+      champGameDiv.appendChild(atText);
+      champGameDiv.appendChild(homeContainer);
+    } else {
+      champGameDiv.appendChild(awayLink);
+      champGameDiv.appendChild(atText);
+      champGameDiv.appendChild(homeLink);
     }
-    champGameDiv.innerHTML = text;
     
     // ✅ FIX: Add box score link for completed games (aligns with FCC)
     const gameId = res?.game_id || match.game_id;
