@@ -4082,16 +4082,10 @@
     };
     */
 
-    /**
-     * Update active player displays in scoreboard
-     * Shows ball handler and defender with headshots
-     * @param {string} ballHandlerId - Player ID of current ball handler
-     * @param {string} defenderId - Player ID of current defender
-     * @param {string} homeTeamId - Home team ID for determining sides
-     * @param {Object} playerSprites - Phaser player sprites (for photo URLs)
-     * @param {string} audibleText - Optional "AUDIBLE!" or "HOT READ!" text
-     */
+    // Removed: updateActivePlayersDisplay function - ball handler and defender images no longer displayed in scoreboard
     window.updateActivePlayersDisplay = function(ballHandlerId, defenderId, homeTeamId, playerSprites = {}, audibleText = null) {
+      // Function disabled - ball handler and defender images removed from scoreboard
+      return;
       const awayDisplay = document.getElementById('away-active-player');
       const homeDisplay = document.getElementById('home-active-player');
       const awayHeadshot = document.getElementById('away-active-headshot');
