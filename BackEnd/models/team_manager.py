@@ -557,6 +557,8 @@ class TeamManager:
             "POT": 0,  # Points Off Turnovers (from steal-initiated fast breaks)
             "DEF_A": 0,  # Defensive Attempts
             "DEF_S": 0,  # Defensive Stops
+            "SCR_A": 0,  # Screen Attempts
+            "SCR_S": 0,  # Screen Successes
         }
 
         # Include all players (not just current lineup) to capture bench contributions
