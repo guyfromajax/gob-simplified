@@ -114,6 +114,11 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId) {
           (playerData.playerId || playerData.player_id) === (p._id || p.playerId)
       )?.[1];
 
+      // Calculate highest RT from position_ratings
+      const posRatings = p.position_ratings || {};
+      const rtValues = Object.values(posRatings);
+      const highestRT = rtValues.length > 0 ? Math.max(...rtValues) : -Infinity;
+
       return {
         playerId: p._id || p.playerId,
         team: teamKey,
@@ -122,13 +127,25 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId) {
         pos: p.pos || p.position || null,
         stats: gamePlayer?.stats?.game || boxScorePlayer || gamePlayer?.stats || {},
         year: p.year || 'SR',
+        highestRT: highestRT,
       };
     });
 
-  // Merge roster players with game data players
+  // Merge roster players with game data players and sort by RT
+  const positionOrder = ['PG', 'SG', 'SF', 'PF', 'C'];
+  const sortByRT = (players) => players.sort((a, b) => {
+    const rtA = a.highestRT !== undefined ? a.highestRT : -Infinity;
+    const rtB = b.highestRT !== undefined ? b.highestRT : -Infinity;
+    if (rtA !== rtB) return rtB - rtA; // Descending order
+    const aPos = positionOrder.indexOf(a.pos) !== -1 ? positionOrder.indexOf(a.pos) : 999;
+    const bPos = positionOrder.indexOf(b.pos) !== -1 ? positionOrder.indexOf(b.pos) : 999;
+    if (aPos !== bPos) return aPos - bPos;
+    return (a.jersey || 0) - (b.jersey || 0);
+  });
+  
   gameData.players = [
-    ...mapPlayers(homeRoster, 'home', homeTeamName),
-    ...mapPlayers(awayRoster, 'away', awayTeamName),
+    ...sortByRT(mapPlayers(homeRoster, 'home', homeTeamName)),
+    ...sortByRT(mapPlayers(awayRoster, 'away', awayTeamName)),
   ];
   
   console.log(`Merged full rosters: ${homeRoster.length} home players, ${awayRoster.length} away players`);
@@ -164,15 +181,38 @@ async function loadPreGameData({ homeTeamName, awayTeamName, franchiseId }) {
 
   // Map players to box-score-ready format with zeroed stats
   const mapPlayers = (players, teamKey) =>
-    players.map((p) => ({
-      playerId: p._id,
-      team: teamKey,
-      name: p.name,
-      jersey: p.jersey || '',
-      pos: p.pos || p.position || null,
-      stats: {}, // zeroed in renderer
-      year: p.year || 'SR',
-    }));
+    players.map((p) => {
+      // Calculate highest RT from position_ratings
+      const posRatings = p.position_ratings || {};
+      const rtValues = Object.values(posRatings);
+      const highestRT = rtValues.length > 0 ? Math.max(...rtValues) : -Infinity;
+      
+      return {
+        playerId: p._id,
+        team: teamKey,
+        name: p.name,
+        jersey: p.jersey || '',
+        pos: p.pos || p.position || null,
+        stats: {}, // zeroed in renderer
+        year: p.year || 'SR',
+        highestRT: highestRT,
+      };
+    });
+
+  // Sort players by highest RT (descending) before storing
+  const homePlayers = mapPlayers(homeRoster, 'home');
+  const awayPlayers = mapPlayers(awayRoster, 'away');
+  const positionOrder = ['PG', 'SG', 'SF', 'PF', 'C'];
+  
+  const sortByRT = (players) => players.sort((a, b) => {
+    const rtA = a.highestRT !== undefined ? a.highestRT : -Infinity;
+    const rtB = b.highestRT !== undefined ? b.highestRT : -Infinity;
+    if (rtA !== rtB) return rtB - rtA; // Descending order
+    const aPos = positionOrder.indexOf(a.pos) !== -1 ? positionOrder.indexOf(a.pos) : 999;
+    const bPos = positionOrder.indexOf(b.pos) !== -1 ? positionOrder.indexOf(b.pos) : 999;
+    if (aPos !== bPos) return aPos - bPos;
+    return (a.jersey || 0) - (b.jersey || 0);
+  });
 
   gameData = {
     home_team: { name: homeTeamName, score: 0 },
@@ -180,8 +220,8 @@ async function loadPreGameData({ homeTeamName, awayTeamName, franchiseId }) {
     score: { [homeTeamName]: 0, [awayTeamName]: 0 },
     points_by_quarter: { [homeTeamName]: [0, 0, 0, 0], [awayTeamName]: [0, 0, 0, 0] },
     players: [
-      ...mapPlayers(homeRoster, 'home'),
-      ...mapPlayers(awayRoster, 'away'),
+      ...sortByRT(homePlayers),
+      ...sortByRT(awayPlayers),
     ],
     box_score: {},
     team_totals: { [homeTeamName]: {}, [awayTeamName]: {} },
@@ -355,12 +395,20 @@ function combinePlayersAndBoxScore(rosterPlayers, boxScore, teamName) {
     }
   });
 
-  // Sort by position (PG, SG, SF, PF, C, then bench)
+  // Sort by highest RT (descending), then by position if RT is equal
   const positionOrder = ['PG', 'SG', 'SF', 'PF', 'C'];
   return Array.from(playerMap.values()).sort((a, b) => {
+    // Primary sort: highest RT (descending)
+    const rtA = a.highestRT !== undefined ? a.highestRT : -Infinity;
+    const rtB = b.highestRT !== undefined ? b.highestRT : -Infinity;
+    if (rtA !== rtB) return rtB - rtA; // Descending order
+    
+    // Secondary sort: position if RT is equal
     const aPos = positionOrder.indexOf(a.pos) !== -1 ? positionOrder.indexOf(a.pos) : 999;
     const bPos = positionOrder.indexOf(b.pos) !== -1 ? positionOrder.indexOf(b.pos) : 999;
     if (aPos !== bPos) return aPos - bPos;
+    
+    // Tertiary sort: jersey number if position is also equal
     return (a.jersey || 0) - (b.jersey || 0);
   });
 }
@@ -523,17 +571,26 @@ function renderTeamStatsTable(team, totals) {
 
   const row = document.createElement('tr');
   
-  // Calculate TREB and DEF%
+  // Calculate TREB, DEF%, and percentages
   const treb = (totals.DREB || 0) + (totals.OREB || 0);
   const defa = totals.DEF_A || 0;
   const defs = totals.DEF_S || 0;
   const defPct = defa > 0 ? ((defs / defa) * 100).toFixed(0) : '0';
+  const fgPct = totals.FGA > 0 ? ((totals.FGM || 0) / totals.FGA * 100).toFixed(1) : '0.0';
+  const threePct = totals['3PTA'] > 0 ? ((totals['3PTM'] || 0) / totals['3PTA'] * 100).toFixed(1) : '0.0';
+  const ftPct = totals.FTA > 0 ? ((totals.FTM || 0) / totals.FTA * 100).toFixed(1) : '0.0';
+  const scrA = totals.SCR_A || 0;
+  const scrS = totals.SCR_S || 0;
+  const scrPct = scrA > 0 ? ((scrS / scrA) * 100).toFixed(1) : '0.0';
 
   row.innerHTML = `
     <td>${totals.PTS || 0}</td>
     <td>${totals.FGM || 0}/${totals.FGA || 0}</td>
+    <td>${fgPct}%</td>
     <td>${totals['3PTM'] || 0}/${totals['3PTA'] || 0}</td>
+    <td>${threePct}%</td>
     <td>${totals.FTM || 0}/${totals.FTA || 0}</td>
+    <td>${ftPct}%</td>
     <td>${totals.DREB || 0}</td>
     <td>${totals.OREB || 0}</td>
     <td>${treb}</td>
@@ -544,6 +601,8 @@ function renderTeamStatsTable(team, totals) {
     <td>${totals.TO || 0}</td>
     <td>${defa}</td>
     <td>${defPct}%</td>
+    <td>${scrA}</td>
+    <td>${scrPct}%</td>
   `;
 
   tbody.appendChild(row);
