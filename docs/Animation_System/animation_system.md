@@ -167,7 +167,7 @@ Every turn result from the backend contains data organized into **three distinct
 - `BackEnd/models/shot_manager.py` - Shot-specific fields (Bucket 2)
 - `BackEnd/engine/phase_resolution.py` - FCP/HCT/Free Throw fields (Bucket 2)
 - `BackEnd/models/animator.py` - Animation data creation (Bucket 3)
-- `docs/turn_data_structure.md` - Detailed field reference
+- `docs/GP_Core_Docs/TURN_SYSTEM.md` - Complete turn data structure and execution patterns reference
 - `docs/UNIFIED_DATA_STRUCTURE_ANALYSIS.md` - Analysis of data structure patterns
 
 ---
