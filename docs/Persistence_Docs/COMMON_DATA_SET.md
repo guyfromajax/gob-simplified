@@ -5,7 +5,7 @@
 
 This document defines the **common data set** that persists across game instances and tournament/franchise mode instances. This is the data that needs to be managed consistently across all navigation transitions.
 
-**Note:** This structure reflects the CURRENT implementation. `playcall_settings` has been removed and replaced by `strategy_settings` only.
+**Note:** This structure reflects the CURRENT implementation. Both `playcall_settings` and `strategy_settings` are used (offense and defense/general settings respectively).
 
 ---
 
@@ -27,9 +27,9 @@ The following data structure is **identical** across all three modes, stored in 
   // ✅ These are initialized when team objects are created
   "team_chemistry": number,     // e.g., 15
   "offensive_efficiency": number, // e.g., 5
-  "shot_threshold": number,     // e.g., 200
-  "turnover_modifier": number,  // e.g., -1
-  "foul_modifier": number,      // e.g., 1
+  "shot_threshold": number,     // Range: -10 to 190 (e.g., 90)
+  "discipline": number,         // e.g., -1 (formerly turnover_modifier)
+  "fight": number,              // e.g., 1 (formerly foul_modifier)
   "rebound_modifier": number,   // e.g., 1
   "defensive_efficiency": number, // e.g., -5
   "fb_efficiency": number,      // e.g., -9
@@ -162,9 +162,10 @@ The following fields from the universal `teams` collection are **NOT** copied to
 
 ## Removed Fields
 
-### ❌ No Longer Used
+### ✅ Still in Use
 
-- **`playcall_settings`** - Removed, functionality merged into `strategy_settings`
+- **`playcall_settings`** - Offense settings (Base, Freelance, Inside, Attack, Outside, Set)
+- **`strategy_settings`** - Defense and general settings (defense, aggression, tempo, etc.)
 
 ---
 
