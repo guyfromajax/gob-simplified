@@ -2218,7 +2218,7 @@ All three flows use the same core systems:
 - Pass animation system integration
 - Fallback to legacy `playTurnAnimation()`
 
-**Status:** Handler exists but `PassAnimationSystem` may not be fully implemented yet
+**Status:** ✅ Handler routes to `PassAnimationSystem.processPass()` which is fully implemented
 
 ---
 
@@ -2350,11 +2350,11 @@ Some handlers route to specialized animation systems (if available):
 
 3. **`ReboundAnimationSystem`** - Used by `handleRebound()`
    - Handles rebound animations
-   - **Status:** May not be fully implemented yet
+   - **Status:** ✅ Fully implemented and operational
 
-4. **`PassAnimationSystem`** - Used by `handleSideInbound()` and `handlePass()`
-   - Handles pass animations
-   - **Status:** May not be fully implemented yet
+4. **`PassAnimationSystem`** - Used by `handleSideInbound()`, `handleBaselineInbound()`, and `handlePass()`
+   - Handles pass animations (inbound passes, outlet passes, regular passes)
+   - **Status:** ✅ Fully implemented and operational
 
 **Fallback Pattern:**
 All specialized systems have fallbacks to legacy functions (`playTurnAnimation()`, `runFreeThrowSequence()`, etc.) if the system is not available.
@@ -2363,8 +2363,8 @@ All specialized systems have fallbacks to legacy functions (`playTurnAnimation()
 
 ## Future Improvements
 
-1. **Complete Specialized Systems:** Fully implement `ReboundAnimationSystem` and `PassAnimationSystem`
-2. **Migrate FCP/HCT to Handlers:** Currently routes directly to `playTurnAnimation()` (not through AnimationRouter)
+1. ✅ **Complete Specialized Systems:** `ReboundAnimationSystem` and `PassAnimationSystem` are fully implemented
+2. **Migrate FCP/HCT to Handlers:** Currently routes directly to `playTurnAnimation()` (not through AnimationRouter) - This is intentional for complex skeleton animations
 3. **Consolidate Text Scroll:** Move all text scroll appends to AnimationRouter for consistency
 4. **Handler Documentation:** Add JSDoc comments to all handlers
 

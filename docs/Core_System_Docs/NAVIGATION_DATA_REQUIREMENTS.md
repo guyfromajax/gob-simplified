@@ -1,9 +1,9 @@
 # Navigation Data Requirements by Experience Bucket
 
-> **Last Updated:** January 2025  
-> **Status:** Draft - Aligned with user-flow.md
+> **Last Updated:** February 2025  
+> **Status:** Current - Source of Truth for Navigation Requirements
 
-This document defines the data requirements for all page-to-page transitions across the game experience, organized by experience bucket. Aligned with the user-flow.md structure.
+This document defines the data requirements for all page-to-page transitions across the game experience, organized by experience bucket. Includes the Team ID Navigation Pattern (SS&S) as a core requirement. Aligned with the user-flow.md structure.
 
 **Instance Type Mapping:**
 - **NA (Non-Account)** = Bucket 4
@@ -279,6 +279,13 @@ This document defines the data requirements for all page-to-page transitions acr
 - **Game Completion:**
   - Must preserve: `game_id`, `mode`, `tournament_id`/`franchise_id`, `team_id`
   - Navigation: Back to command center with complete anchor set
+  - **Stat Rollup Requirements:**
+    - `game_id` must be passed to `save_result()` or `complete_week()` endpoint
+    - `finalize_game()` must be called with `game_id`, `mode`, and `franchise_id`/`tournament_id`
+    - Game document must have complete `box_score` (all 12 players per team) before `finalize_game()` is called
+    - Stats are rolled up into `franchise.players.{pid}.season` and `franchise.players.{pid}.career` (or `tournament.players` for Tournament mode)
+    - FCC endpoints (`/franchise/team-stats`, `/franchise/team-player-stats`, `/franchise/roster`) read from `franchise.players` object
+    - **Note:** Navigation parameters alone are sufficient for FCC to retrieve stats, but stat rollup must complete successfully for stats to be available
 
 ---
 
@@ -391,6 +398,232 @@ This document defines the data requirements for all page-to-page transitions acr
 
 ---
 
+## Team ID Navigation Pattern (SS&S)
+
+> **Status:** ✅ Implemented  
+> **Last Verified:** February 2025
+
+### Overview
+
+The `team_id` parameter (ObjectId string) serves as the standardized navigation anchor across the entire application. This pattern ensures seamless page-to-page transitions, consistent data persistence, and stable user experience flow.
+
+### Core Principle
+
+**`team_id` (ObjectId) = User's Team Anchor**
+
+The `team_id` parameter in URLs always represents the **user's team** (ObjectId string). This serves as the consistent anchor that allows seamless navigation between screens without losing context or data.
+
+### Navigation Anchor Set
+
+For seamless navigation, you need three parameters:
+
+1. **`mode`** (franchise/tournament/single) - Which collection/endpoints to use
+2. **`doc_id`** (franchise_id/tournament_id/game_id) - Which document within that collection
+3. **`team_id`** (ObjectId string) - Which team within that document (user's team)
+
+Together, these three parameters form the complete navigation anchor.
+
+### Implementation Pattern
+
+#### Frontend: Command Center Entry
+
+**Franchise Mode:**
+```javascript
+// 1. Check URL params first (for navigation from other pages)
+const urlParams = new URLSearchParams(window.location.search);
+const urlTeamId = urlParams.get('team_id');
+if (urlTeamId) {
+  userTeamId = urlTeamId;
+  localStorage.setItem('franchise_user_team_id', userTeamId);
+}
+
+// 2. Load command center data (includes team_id)
+const topData = await fetchJSON(`/franchise/command-center/data?franchise_id=${franchiseId}`);
+if (topData && topData.team_id && !userTeamId) {
+  userTeamId = topData.team_id;
+  localStorage.setItem('franchise_user_team_id', userTeamId);
+}
+```
+
+**Tournament Mode:**
+```javascript
+// Similar pattern - check URL params, then tournament state
+const urlTeamId = urlParams.get('team_id');
+if (urlTeamId) {
+  userTeamId = urlTeamId;
+  localStorage.setItem('userTeamId', userTeamId);
+}
+
+// Tournament state endpoint returns user_team_object_id
+if (tournament && tournament.user_team_object_id && !userTeamId) {
+  userTeamId = tournament.user_team_object_id;
+  localStorage.setItem('userTeamId', userTeamId);
+}
+```
+
+#### Frontend: Navigation URLs
+
+**All navigation URLs include `team_id` (ObjectId):**
+
+```javascript
+// Command Center → Game Plan
+const url = `/game-plan.html?mode=franchise&franchise_id=${franchiseId}&team_id=${userTeamId}&from=command_center`;
+
+// Game Plan → Command Center
+const url = `/franchise-command-center.html?franchise_id=${franchiseId}&team_id=${userTeamId}`;
+
+// Command Center → Training
+const url = `/static/training.html?franchise_id=${franchiseId}&mode=franchise&team_id=${userTeamId}`;
+
+// Training → Training Report (backend redirects with team_id)
+// Backend includes: ?team_id=${userTeamId}
+
+// Training Report → Command Center
+const url = `/franchise-command-center.html?franchise_id=${franchiseId}&team_id=${teamId}`;
+```
+
+#### Backend: Endpoint Pattern
+
+**All endpoints prefer `team_id` (ObjectId), with backward compatibility:**
+
+```python
+@router.get("/franchise/team-data")
+def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: str = None):
+    """
+    ✅ SS&S: Prefers team_id (ObjectId) for consistent navigation.
+    Falls back to team_name resolution for backward compatibility.
+    """
+    # Prefer team_id (ObjectId) if provided
+    if team_id:
+        try:
+            ObjectId(team_id)  # Validate
+            actual_team_id = team_id
+        except:
+            # If not ObjectId, resolve as team name
+            team_doc = db.teams.find_one({"name": team_id})
+            if team_doc:
+                actual_team_id = str(team_doc["_id"])
+    elif team_name:
+        # Fallback to team_name resolution
+        team_doc = db.teams.find_one({"name": team_name})
+        actual_team_id = str(team_doc["_id"])
+    
+    # Use actual_team_id directly as database key
+    team_obj = franchise_teams.get(actual_team_id, {})
+```
+
+### Roster Viewing Pattern
+
+When implementing functionality to view computer team rosters, use a separate parameter:
+
+**Pattern:**
+- **`team_id`** = User's team (ObjectId) - for navigation context
+- **`view_team_id`** = Team being viewed (ObjectId) - for display only
+
+**Example Navigation:**
+```javascript
+// Command Center → View Opponent Roster
+function viewOpponentRoster(opponentObjectId) {
+  const userTeamId = getTeamId(); // User's team ObjectId
+  const url = `/team-roster.html?franchise_id=${franchiseId}&team_id=${userTeamId}&view_team_id=${opponentObjectId}`;
+  window.location.href = url;
+}
+
+// Roster View → Back to Command Center
+function backToCommandCenter() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const userTeamId = urlParams.get('team_id'); // User's team
+  const franchiseId = urlParams.get('franchise_id');
+  window.location.href = `/franchise-command-center.html?franchise_id=${franchiseId}&team_id=${userTeamId}`;
+}
+```
+
+**Backend Endpoint Pattern:**
+```python
+@router.get("/team-data")
+def get_team_data(team_id: str, view_team_id: str = None, ...):
+    """
+    If view_team_id provided: return read-only data for viewed team
+    Otherwise: return editable data for user's team (team_id)
+    """
+    target_id = view_team_id if view_team_id else team_id
+    read_only = view_team_id is not None
+    
+    # Fetch team data using target_id
+    # Return with read_only flag if needed
+```
+
+### Game Completion Navigation
+
+When a game completes, the completion popup must preserve the complete navigation anchor set:
+
+**Pattern:**
+```javascript
+// Game Scene → Completion Popup
+showGameCompletionPopup({
+  gameId: gameId,
+  mode: mode,
+  tournamentId: this.tournamentId,  // doc_id for tournament mode
+  franchiseId: this.franchiseId,    // doc_id for franchise mode
+  teamId: this.teamId,              // team_id (ObjectId) - navigation anchor
+  finalScore: finalScore
+});
+
+// Completion Popup → Command Center URL Construction
+case 'tournament':
+  const params = new URLSearchParams();
+  if (tournamentId) params.set('tournament_id', tournamentId);
+  if (teamId) params.set('team_id', teamId);  // ✅ Preserve navigation anchor
+  lockerRoomUrl = `/static/tournament.html?${params.toString()}`;
+  break;
+```
+
+**Benefits:**
+- **Complete Context:** All three navigation parameters (mode, doc_id, team_id) preserved
+- **No Fallback Needed:** Prevents fallback to `/tournament/active?user_team_id=...` which requires ObjectId serialization
+- **Seamless Flow:** User returns to command center with full context intact
+
+**Implementation Details:**
+- `bootGame.js` reads `team_id` from URL params (or `home_id`/`away_id` fallback)
+- `gameScene.js` stores `teamId` from scene data and passes it to completion popup
+- `gameCompletionPopup.js` constructs URLs with complete navigation anchor set
+- Fallback: If `teamId` not provided, popup reads from URL params as backup
+
+### Benefits
+
+1. **Consistent Identifier:** ObjectId matches database keys exactly
+2. **No Resolution Overhead:** Backend uses ObjectId directly (no name lookup needed)
+3. **Stable Navigation:** Same format everywhere prevents resolution errors
+4. **Data Persistence:** Settings save/load using same key format
+5. **Experience Continuity:** User's team context preserved across all navigation
+6. **Future-Proof:** Pattern scales to viewing any team without breaking navigation
+
+### Implementation Files
+
+**Frontend:**
+- `FrontEnd/static/franchise-command-center.js` - Resolves and stores ObjectId, updates all navigation
+- `FrontEnd/static/tournament.js` - Resolves and stores ObjectId, updates all navigation
+- `FrontEnd/static/game-plan.js` - Uses ObjectId consistently
+- `FrontEnd/static/training.js` - Passes team_id in navigation
+- `FrontEnd/static/training-report.js` - Uses ObjectId from URL params
+- `FrontEnd/static/js/phaser/bootGame.js` - Reads `team_id` from URL params, passes to scene
+- `FrontEnd/static/js/phaser/gameScene.js` - Stores `teamId`, passes to completion popup
+- `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js` - Constructs URLs with complete navigation anchor
+
+**Backend:**
+- `BackEnd/api/franchise_routes.py` - `/franchise/command-center/data` returns `team_id`, `/franchise/team-data` accepts `team_id`
+- `BackEnd/api/tournament_routes.py` - `/tournament/state` returns `user_team_object_id`, `/tournament/team-data` accepts `team_id`
+- `BackEnd/api/gameplan_routes.py` - `get_gameplan()` and `update_gameplan()` prefer ObjectId
+- `BackEnd/api/api.py` - `/tournament/active` serializes all ObjectIds in nested structures (consistent with `/tournament/state`)
+
+### Migration Notes
+
+- **Backward Compatibility:** All endpoints still accept team names for backward compatibility
+- **Gradual Migration:** Frontend now passes ObjectId, but backend can still resolve names if needed
+- **No Breaking Changes:** Existing URLs with team names still work (backend resolves them)
+
+---
+
 ## Game Plan & Playbooks Persistence Rules
 
 ### Single Game Mode (Bucket 3 - GP)
@@ -438,12 +671,20 @@ This document defines the data requirements for all page-to-page transitions acr
 
 ## Known Bugs & Fixes Required
 
-1. **Game Plan Navigation Bug:**
-   - **Issue:** When navigating TCC/FCC → Game Plan → Playbooks → Game Plan, the `from` parameter is lost
-   - **Result:** Game Plan shows "Back to Lineup" instead of "Back to Locker Room"
-   - **Fix:** Preserve `from` parameter through Playbooks navigation
+### ✅ **All Previously Identified Bugs - FIXED**
 
-2. **Training Current Playbook:**
+1. **Game Plan Navigation Bug:** ✅ **FIXED**
+   - **Issue:** When navigating TCC/FCC → Game Plan → Playbooks → Game Plan, the `from` parameter was lost
+   - **Result:** Game Plan showed "Back to Lineup" instead of "Back to Locker Room"
+   - **Fix Implemented:** `from` parameter is now preserved through Playbooks navigation
+   - **Location:** `FrontEnd/static/playbooks.js` (lines 1834-1853), `FrontEnd/static/game-plan.js` (lines 555-564)
+   - **Status:** ✅ **RESOLVED** - Code preserves `from` parameter when navigating back from Playbooks
+
+2. **Training Current Playbook:** ✅ **IMPLEMENTED**
    - **Issue:** When user selects "Current Playbook" radio button, latest Game Plan and Playbook settings should apply
-   - **Status:** Needs verification/implementation
+   - **Fix Implemented:** Backend uses `playbook_training_mode: "current-playbooks"` to apply latest settings
+   - **Location:** 
+     - Frontend: `FrontEnd/static/training.html` (radio button), `FrontEnd/static/training.js` (line 315)
+     - Backend: `BackEnd/api/franchise_routes.py` (line 1849), `BackEnd/api/tournament_routes.py` (line 1228)
+   - **Status:** ✅ **RESOLVED** - Feature fully implemented and functional
 

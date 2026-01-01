@@ -1,5 +1,9 @@
 # Animation System Roadmap
 
+> **Status:** ⚠️ **FUTURE PLANNING** - This document describes planned future work, not the current state of the system.  
+> **Current System:** The production animation system uses `AnimationRouter`, `AnimationEngine`, and specialized animation systems (Shot, Pass, Rebound, FreeThrow, HCO). See `animation_system.md` for current implementation details.  
+> **Last Updated:** 2025-10-21
+
 ## Context
 The backend simulation already emits authoritative `turns[]` with ordered `steps[]`, rosters, and scoring updates. The Phaser front end can reliably animate half-court sets, inbound plays, free throws, rebounds, and shot attempts, but it is fragile when stitching those pieces together—especially on fast-break possessions and offensive-rebound continuations. The immediate objective is to stabilize transitions while keeping tweening smooth, timings centralized, and game modes (Single, Tournament, Franchise) intact.
 
