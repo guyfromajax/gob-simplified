@@ -26,15 +26,15 @@ The document mentions "animation/" as a generic folder but doesn't explain the n
 **What Should Be Added:**
 ```
 Frontend Animation Architecture:
-├── AnimationRouter.js          # Single entry point (322 lines)
+├── AnimationRouter.js          # Single entry point (323 lines)
 │   └── Routes to AnimationEngine
-├── AnimationEngine.js          # Central routing (446 lines)
-│   ├── ShotAnimationSystem.js  # Shot attempts (1,278 lines)
+├── AnimationEngine.js          # Central routing (949 lines)
+│   ├── ShotAnimationSystem.js  # Shot attempts (2,024 lines)
 │   ├── ReboundAnimationSystem.js
 │   ├── PassAnimationSystem.js
 │   ├── FreeThrowAnimationSystem.js
 │   └── HCOAnimationSystem.js
-├── BallController.js           # Ball state management (930 lines)
+├── BallController.js           # Ball state management (932 lines)
 ├── turnPreparation.js          # Pre/post setup functions
 └── Legacy Systems (being migrated):
     ├── turnAnimation.js        # Old system (1,940 lines)
@@ -87,15 +87,15 @@ The document doesn't mention:
 
 The document doesn't explain:
 - **Phase 2.5 Complete** - Standard HCO turns migrated to AnimationRouter
-- **Incremental Migration** - Some turns use new system, some use old
-- **Legacy Code** - `turnAnimation.js` and `ballManager.js` still in use
+- **Phase 2.6 Complete** - All turn types now route through AnimationRouter (✅ January 2025)
+- **Legacy Code** - `turnAnimation.js` and `ballManager.js` still in use (but no longer primary path)
 - **Migration Plan** - Phases 2.1-2.6 documented in `PHASE_2_INCREMENTAL_MIGRATION_PLAN.md`
 
-### 5. File Sizes (Potentially Outdated)
+### 5. File Sizes (Updated)
 
 The document mentions:
-- `gameScene.js` (82K lines) - Should verify current size
-- `court.html` (112K lines) - Should verify current size
+- `gameScene.js` (82K lines) - **Actual:** 2,210 lines (documentation likely had typo or was very outdated)
+- `court.html` (112K lines) - **Actual:** 4,202 lines (documentation likely had typo or was very outdated)
 
 ### 6. Recent Fixes (Missing)
 
@@ -149,15 +149,15 @@ The document doesn't mention:
 
 ### Low Priority (Verify/Update)
 
-1. **Verify File Sizes**
-   - Check if `gameScene.js` is still 82K lines
-   - Check if `court.html` is still 112K lines
+1. **Verify File Sizes** ✅ **UPDATED**
+   - `gameScene.js`: 2,210 lines (documentation had typo - likely meant 8.2K or was very outdated)
+   - `court.html`: 4,202 lines (documentation had typo - likely meant 11.2K or was very outdated)
 
-2. **Update Line Counts**
-   - AnimationRouter.js: 322 lines
-   - AnimationEngine.js: 446 lines
-   - ShotAnimationSystem.js: 1,278 lines
-   - BallController.js: 930 lines
+2. **Update Line Counts** ✅ **UPDATED**
+   - AnimationRouter.js: 323 lines
+   - AnimationEngine.js: 949 lines
+   - ShotAnimationSystem.js: 2,024 lines
+   - BallController.js: 932 lines
 
 ## Suggested New Section Content
 
@@ -195,7 +195,7 @@ Specialized Systems:
   - Handles pre/post animation setup via `turnPreparation.js`
   - Routes turns to `AnimationEngine`
   - Manages turn context (turnIndex, onUpdate, etc.)
-- **Status**: ✅ Active for FCP/HCT fouls and standard HCO turns
+- **Status**: ✅ **Phase 2.6 Complete** - All turn types now route through AnimationRouter
 
 #### AnimationEngine (`AnimationEngine.js`)
 - **Purpose**: Routes turns to appropriate specialized system
@@ -212,7 +212,7 @@ Specialized Systems:
   - Ball flight animation
   - Rebound handling (embedded rebounds)
   - DREB outlet pass setup
-- **Status**: ✅ Active for HCO turns routed through AnimationRouter
+- **Status**: ✅ Active for all shot turns routed through AnimationRouter (Phase 2.6 complete)
 
 #### BallController (`BallController.js`)
 - **Purpose**: Single source of truth for ball ownership and state
@@ -245,7 +245,7 @@ This pattern prevents skipped steps and state conflicts.
 - ✅ **Phase 1**: PossessionRunner removed
 - ✅ **Phase 2.1-2.4**: Foundation work (context passing, pre/post setup)
 - ✅ **Phase 2.5**: Standard HCO turns migrated
-- ⚠️ **Phase 2.6**: Remaining turn types (in progress)
+- ✅ **Phase 2.6**: Remaining turn types **COMPLETE** (all turn types now route through AnimationRouter)
 - ⚠️ **Phase 3-6**: Future phases (ballManager.js breakup, etc.)
 
 ### Legacy Systems (Still in Use)

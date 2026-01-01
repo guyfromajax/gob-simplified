@@ -409,8 +409,8 @@ Based on `transition_registry.py`, all turn types are:
 **Execution Case Coverage**: All cases documented, some issues identified (FCP/HCT skeleton skipping)
 
 **Next Steps**: 
-1. ✅ **Completed**: FCP/HCT now routes through AnimationRouter (unified with HCO)
-2. ✅ **Completed**: Unified skeleton animation system (`playTurnAnimation()`)
-3. ✅ **Completed**: Unified result handler (AnimationRouter routes to appropriate handlers)
-4. Consider: Create execution structure template (optional future enhancement)
+1. ✅ **Completed**: FCP/HCT now routes through AnimationRouter (unified with HCO) - Verified in code (old FCP/HCT handling commented out in `animateGameTurns.js`, now uses standard AnimationRouter flow)
+2. ✅ **Completed**: Unified skeleton animation system (`playTurnAnimation()`) - All turn types (HCO, FCP, HCT) use same skeleton animation system
+3. ✅ **Completed**: Unified result handler (AnimationRouter routes to appropriate handlers) - AnimationEngine.determineHandler() routes all turn types to appropriate handlers
+4. ⚠️ **Optional Future**: Create execution structure template (optional future enhancement) - Current structure works well, template would be nice-to-have for consistency
 

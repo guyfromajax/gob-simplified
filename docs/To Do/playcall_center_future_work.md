@@ -43,7 +43,7 @@ This document tracks outstanding items and future enhancements for the Playcall 
 
 **What Needs to Be Done:**
 - Execute all 5 test scenarios with 3 configurations each (15 total tests)
-- Document results in `docs/playcall_override_test_tracking.md`
+- Document results in test tracking system
 - Fix any issues discovered during testing
 
 **Test Scenarios:**
@@ -53,9 +53,7 @@ This document tracks outstanding items and future enhancements for the Playcall 
 4. HCT (user has ball) → HCO (offense) → HCO (defense)
 5. HCO → Fast Break → BIP → FCP → SIP → HCO (offense) → HCO (defense)
 
-**Related Files:**
-- `docs/playcall_override_test_tracking.md` - Test tracking document
-- `docs/playcall_override_persistence_tests.md` - Test scenario documentation
+**Note:** Test documentation files have been removed. Test scenarios can be recreated if needed.
 
 ---
 

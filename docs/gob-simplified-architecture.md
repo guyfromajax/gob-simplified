@@ -674,7 +674,7 @@ pytest test_gameplan_functionality.py
 4. **Read key documentation**
    - `docs/franchise_mode_architecture.md`
    - `docs/game_storage_architecture.md`
-   - `docs/animation_system.md`
+   - `docs/Animation_System/animation_system.md`
 
 5. **Make a small change**
    - Add a new stat to track
