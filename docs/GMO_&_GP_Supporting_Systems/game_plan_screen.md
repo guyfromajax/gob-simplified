@@ -18,23 +18,36 @@ The Game Plan screen allows users to customize their team's offensive and defens
 
 ## Sliders
 
-The Game Plan screen features **11 sliders** divided into two categories:
+The Game Plan screen features **10 sliders** divided into two categories:
 
-### Offense (6 sliders)
-Each slider controls the frequency of a specific offensive playcall:
+### Offense (5 sliders)
 
-- **Base** - Base offense plays
-- **Freelance** - Freelance motion plays
-- **Inside** - Inside scoring plays
-- **Attack** - Attacking plays
-- **Outside** - Perimeter/outside plays
-- **Set** - Set plays
+- **Offense** - Motion vs Set Plays preference
+  - 0 = "100% Motion"
+  - 2 = "50/50"
+  - 4 = "100% Set Plays"
 
-**Value Range:** 0-4  
-**Labels:**
-- 0 = "Never"
-- 2 = "Normal"
-- 4 = "Most"
+- **Inside** - Inside scoring focus preference
+  - 0 = "Never"
+  - 2 = "Normal"
+  - 4 = "Most"
+
+- **Attack** - Attacking plays focus preference
+  - 0 = "Never"
+  - 2 = "Normal"
+  - 4 = "Most"
+
+- **Outside** - Perimeter/outside plays focus preference
+  - 0 = "Never"
+  - 2 = "Normal"
+  - 4 = "Most"
+
+- **Fast Breaks** - Fast break frequency
+  - 0 = "100% Half-Court Sets"
+  - 2 = "50/50"
+  - 4 = "100% Fast Breaks"
+
+**Value Range:** 0-4 for all sliders
 
 ### Defense / General (5 sliders)
 
@@ -43,36 +56,37 @@ Each slider controls the frequency of a specific offensive playcall:
   - 2 = "50/50"
   - 4 = "100% Zone"
 
-- **Tempo** - Game pace
-  - 0 = "Slow"
-  - 2 = "Normal"
-  - 4 = "Fast"
-
 - **Aggression** - Defensive intensity
   - 0 = "Passive"
   - 2 = "Normal"
   - 4 = "Aggressive"
 
-- **Fast Breaks** - Fast break frequency
+- **Half-Court Trap** - Half court trap usage
   - 0 = "Never"
   - 2 = "Normal"
-  - 4 = "Always"
+  - 4 = "Most"
 
-- **FC Press** - Full court press usage
+- **Full-Court Press** - Full court press usage
   - 0 = "Never"
   - 2 = "Normal"
-  - 4 = "Always"
+  - 4 = "Most"
 
-- **HC Trap** - Half court trap usage
-  - 0 = "Never"
-  - 2 = "Normal"
-  - 4 = "Always"
+- **Rebounding** - Rebounding strategy
+  - 0 = "100% Crash the Boards"
+  - 2 = "50/50"
+  - 4 = "100% Get Back on D"
+
+**Value Range:** 0-4 for all sliders
+
+**Note:** All sliders are stored in `strategy_settings`. The legacy `playcall_settings` (Base, Freelance, Inside, Attack, Outside, Set) still exist in the database for backward compatibility but are not displayed as UI sliders.
 
 ## Validation Rules
 
 ### "Offense Not All Zero" Rule
 
 **Requirement:** At least one offensive slider must be above 0.
+
+**Note:** This validation currently checks `playcall_settings` (legacy), not the UI sliders. Since all UI sliders are in `strategy_settings`, this rule may need updating to validate the actual UI sliders.
 
 **Enforcement:**
 - Frontend validation blocks save attempt
@@ -106,12 +120,17 @@ Settings are stored in **mode-specific documents**, NOT in the global Teams coll
         "Set": 2
       },
       "strategy_settings": {
-        "defense": 2,
-        "tempo": 2,
-        "aggression": 2,
-        "fast_break": 2,
-        "half_court_trap": 2,
-        "full_court_press": 2
+        "offense": 2,        // Motion vs Set Plays
+        "inside": 2,         // Inside focus preference
+        "attack": 2,         // Attack focus preference
+        "outside": 2,        // Outside focus preference
+        "fast_breaks": 2,    // Fast break frequency
+        "defense": 2,        // Man vs Zone
+        "aggression": 2,     // Defensive intensity
+        "hc_trap": 2,        // Half court trap (key: hc_trap, not half_court_trap)
+        "fc_press": 2,       // Full court press (key: fc_press, not full_court_press)
+        "rebounding": 2      // Rebounding strategy
+        // Note: tempo is initialized randomly per game, not stored in game plan settings
       },
       // ... other team attributes
     }
@@ -176,12 +195,16 @@ Fetch current game plan settings for a team.
     "Set": 2
   },
   "strategy_settings": {
+    "offense": 2,
+    "inside": 3,
+    "attack": 4,
+    "outside": 1,
+    "fast_breaks": 4,
     "defense": 2,
-    "tempo": 3,
     "aggression": 2,
-    "fast_break": 4,
-    "half_court_trap": 1,
-    "full_court_press": 0
+    "hc_trap": 1,
+    "fc_press": 0,
+    "rebounding": 2
   }
 }
 ```
@@ -205,12 +228,16 @@ Update game plan settings for a team.
     "Set": 2
   },
   "strategy_settings": {
+    "offense": 2,
+    "inside": 3,
+    "attack": 4,
+    "outside": 1,
+    "fast_breaks": 4,
     "defense": 2,
-    "tempo": 3,
     "aggression": 2,
-    "fast_break": 4,
-    "half_court_trap": 1,
-    "full_court_press": 0
+    "hc_trap": 1,
+    "fc_press": 0,
+    "rebounding": 2
   }
 }
 ```
@@ -232,7 +259,7 @@ Update game plan settings for a team.
 
 ## Frontend Files
 
-- **`game-plan.html`** - Page structure with 11 sliders
+- **`game-plan.html`** - Page structure with 10 sliders
 - **`game-plan.css`** - Styling (gradient backgrounds, slider styling)
 - **`game-plan.js`** - Logic for load/save/validation
 
@@ -299,8 +326,8 @@ The Game Plan screen detects where the user came from via the `from` URL paramet
 - **Responsive Design:** Layout adapts for mobile/tablet viewing
 - **Team ID Resolution:** When coming from command center, uses `user_team_id` URL parameter; when from lineup, uses `home_id`/`away_id` based on `my_team` side
 - **Data Storage:** Game plan consists of two separate objects:
-  - `playcall_settings`: Offense settings (Base, Freelance, Inside, Attack, Outside, Set)
-  - `strategy_settings`: Defense/General settings (defense, tempo, aggression, half_court_trap, full_court_press)
+  - `playcall_settings`: Legacy offense settings (Base, Freelance, Inside, Attack, Outside, Set) - stored but not displayed as UI sliders
+  - `strategy_settings`: Current UI settings (offense, inside, attack, outside, fast_breaks, defense, aggression, hc_trap, fc_press, rebounding) - all 10 UI sliders map here
 - **Storage Locations:**
   - Franchise: `franchise_teams.{team_id}.playcall_settings` and `franchise_teams.{team_id}.strategy_settings`
   - Tournament: `teams.{team_id}.playcall_settings` and `teams.{team_id}.strategy_settings`

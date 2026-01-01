@@ -9,7 +9,7 @@
 
 ✅ **Game documents are ALREADY optimized** - no redundant fields to remove  
 ✅ **No need to delineate universal vs bespoke fields** - mode-specific fields are just metadata (<1%)  
-⚠️ **One improvement:** Add `franchise_id` to franchise game documents for clarity  
+✅ **Mode indicators implemented:** `franchise_id` and `tournament_id` are now added to game documents  
 
 ---
 
@@ -68,13 +68,13 @@
 ### **2. Tournament Mode**
 
 **Storage:** `games_collection` (same as single game)  
-**Mode indicators:** Should include `tournament_id`  
+**Mode indicators:** ✅ Includes `tournament_id` (added in init-game)  
 
 **Fields:** Same as single game +
 ```javascript
 {
   // Mode-specific metadata
-  "tournament_id": "tournament_uuid",  // For stat rollup
+  "tournament_id": "tournament_uuid",  // ✅ Added in init-game (line 2525)
   "round": "round_of_16",              // Optional
   "match_index": 3                     // Optional
 }
@@ -92,13 +92,13 @@
 ### **3. Franchise Mode**
 
 **Storage:** `games_collection` (same as single game)  
-**Mode indicators:** Should include `franchise_id`, `week`  
+**Mode indicators:** ✅ Includes `franchise_id` and `week` (implemented in multiple locations)  
 
 **Fields:** Same as single game +
 ```javascript
 {
   // Mode-specific metadata
-  "franchise_id": "franchise_uuid",    // MISSING (should be added)
+  "franchise_id": "franchise_uuid",    // ✅ Added in multiple locations (see below)
   "week": 3,                           // For scheduling
   "team1_id": ObjectId("..."),         // For results tracking
   "team2_id": ObjectId("..."),
@@ -109,9 +109,15 @@
 
 **Process:**
 1. Game saved to `games_collection`
-2. Additional fields added: `week`, `team1_id`, `team2_id`, scores
+2. Additional fields added: `franchise_id`, `week`, `team1_id`, `team2_id`, scores
 3. `stat_updater.finalize_game(game_id, mode="franchise", franchise_id=...)`
 4. Stats rolled up to `franchise.players.{player_uuid}`
+
+**Implementation locations:**
+- `franchise_routes.py` `save_result()` - Adds `franchise_id` when saving user game
+- `franchise_routes.py` `_save_game_result()` - Adds `franchise_id` for all games
+- `franchise_routes.py` `complete_week()` - Adds `franchise_id` for computer games
+- `api.py` `init-game()` - Adds `franchise_id` when initializing game
 
 **Size:** ~18KB + ~100 bytes metadata
 
@@ -178,7 +184,7 @@
 
 // Franchise
 {
-  "franchise_id": string,      // ~40 bytes (MISSING)
+  "franchise_id": string,      // ~40 bytes (✅ NOW ADDED)
   "week": number,              // ~10 bytes
   "team1_id": ObjectId,        // ~24 bytes
   "team2_id": ObjectId,        // ~24 bytes
@@ -228,39 +234,42 @@ Game Document Size: ~18KB
 
 ## Identified Issues
 
-### ⚠️ **Missing: franchise_id in Franchise Games**
+### ✅ **Fixed: franchise_id in Franchise Games**
 
-**Issue:** Franchise game documents don't include `franchise_id`
+**Status:** ✅ **IMPLEMENTED** - Franchise game documents now include `franchise_id`
 
-**Impact:**
-- Unclear which franchise a game belongs to
-- Difficult to query games by franchise
-- Relies on week + team_id matching (fragile)
+**Implementation:**
+- Added in `franchise_routes.py` `save_result()` (line 331)
+- Added in `franchise_routes.py` `_save_game_result()` (line 186)
+- Added in `franchise_routes.py` `complete_week()` (line 496)
+- Added in `api.py` `init-game()` (line 2527)
 
-**Fix:**
-```python
-# In franchise_routes.py or franchise game save logic
-game_data = summarize_game_state(gm)
-game_data["franchise_id"] = str(franchise_id)  # Add this
-game_data["week"] = week
-games_collection.update_one({"_id": game_id}, {"$set": game_data}, upsert=True)
-```
+**Result:**
+- ✅ Games can be queried by franchise
+- ✅ Clear ownership of games to franchises
+- ✅ No longer relies solely on week + team_id matching
 
 ---
 
 ## Recommendations
 
-### **1. Add Missing Mode Indicators**
+### **1. ✅ Mode Indicators Added**
 
 **Tournament games:**
 ```python
+# ✅ IMPLEMENTED in api.py init-game() (line 2525)
 game_data["tournament_id"] = str(tournament_id)
 game_data["round"] = round_key  # Optional
 ```
 
 **Franchise games:**
 ```python
-game_data["franchise_id"] = str(franchise_id)  # MISSING
+# ✅ IMPLEMENTED in multiple locations:
+# - franchise_routes.py save_result() (line 331)
+# - franchise_routes.py _save_game_result() (line 186)
+# - franchise_routes.py complete_week() (line 496)
+# - api.py init-game() (line 2527)
+game_data["franchise_id"] = str(franchise_id)
 game_data["week"] = week
 ```
 
@@ -350,8 +359,9 @@ franchise.games: {
 - Mode-specific fields are just metadata (<1%)
 - Simple, clean architecture
 
-**One improvement:**
-- ❌ Add `franchise_id` to franchise game documents
+**Status:**
+- ✅ `franchise_id` now added to franchise game documents
+- ✅ `tournament_id` now added to tournament game documents
 
 **Keep current structure:**
 - ✅ games_collection as primary storage
@@ -389,5 +399,5 @@ franchise.games: {
 - ✅ Clean structure across all modes
 - ✅ Already achieved massive size reduction
 
-**Only improvement:** Add `franchise_id` to franchise games for clarity. Otherwise, you're good to go! 🚀
+**Status:** All mode indicators are now implemented! `franchise_id` and `tournament_id` are added to game documents for clear ownership and querying. You're good to go! 🚀
 
