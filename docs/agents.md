@@ -47,7 +47,7 @@ Each team has 5 active players:
 - `scene.currentPressureType` - Tracks FCP/HCT pressure sequences
 - `scene.gameState.ballHolder` - Tracks which player has the ball
 
-**See:** `animation_system.md` for detailed state tracking patterns and examples.
+**See:** `docs/Animation_System/animation_system.md` for detailed state tracking patterns and examples.
 
 ---
 

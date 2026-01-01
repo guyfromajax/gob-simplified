@@ -1,7 +1,7 @@
 # Master Game Documentation
 
 > **Last Updated:** January 2025
-> **Previously:** `animation_system.md`
+> **Previously:** `docs/Animation_System/animation_system.md`
 
 This document provides comprehensive documentation of the **GOB** game system, including animation, transitions, game flows, and system architecture.
 

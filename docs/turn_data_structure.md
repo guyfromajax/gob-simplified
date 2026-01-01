@@ -79,7 +79,7 @@ instances.
 | `turn_count` | int | Sequential counter for micro-turns. |
 | `result_type` | string | Primary routing key (MAKE/DREB/OREB/TURNOVER/FOUL/FREE_THROW/HCO/FAST_BREAK). |
 | `time_elapsed` | int | Milliseconds deducted from the game clock. |
-| `offense_team_id` | string | **SS&S Standard:** Team on offense during this turn (authoritative). Replaces deprecated `possession_team_id`. |
+| `offense_team_id` | string | **SS&S Standard:** Team on offense during this turn (authoritative). Replaces deprecated `possession_team_id`. **Note:** `possession_team_id` may still be present in some turn types for backward compatibility, but `offense_team_id` should always be used as the authoritative source. |
 | `current_turn` | string | Explicit turn type identifier (HCO/FCP/HCT/FAST_BREAK/FREE_THROW/OREB/BASELINE_INBOUND/SIDE_INBOUND/OPENING_TIP/TIMEOUT). Used for routing and debugging. |
 | `next_turn` | string | Explicit next turn type (set by `game_manager.determine_next_turn()`). Used for transition logic. |
 | `possession_flips` | bool | If true, backend flips possession immediately after the turn. |
@@ -245,7 +245,7 @@ When an offensive rebound occurs, the backend now emits *two* turns:
   add it), treat it as informational only.
 - **No generic "MISS"** – Missed shots resolve to either `DREB` or `OREB`. Use
   `rebound_type` to differentiate defensive/offensive rebounds.
-- **SS&S Possession System** – Use `offense_team_id` (not deprecated `possession_team_id`) as the authoritative team on offense. Backend flips possession based on `possession_flips` flag.
+- **SS&S Possession System** – Use `offense_team_id` (not deprecated `possession_team_id`) as the authoritative team on offense. Backend flips possession based on `possession_flips` flag. **Note:** `possession_team_id` may still be included in some turn types for backward compatibility (e.g., inbound passes), but `offense_team_id` is always the authoritative source and should be used by all new code.
 - **Turn Type Identification** – Use `current_turn` to identify turn type and `next_turn` for transition logic (both set by backend).
 - **Free Throw Modes** – Backend supports both turn-by-turn mode (`free_throws_remaining`) and batch mode (`ftContext`). Frontend should prefer `free_throws_remaining` if available.
 - **Frontend annotations** – The frontend may append helper context (currently

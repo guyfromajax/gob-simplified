@@ -70,7 +70,7 @@ Key entries include:
   assists, rebounds, and turnovers detected mid-sequence.
 
 Each runner hook mirrors the event emitter outlined in
-`docs/animations-roadmap.md`. If you only see the events without their paired
+`docs/Animation_System/animations-roadmap.md`. If you only see the events without their paired
 `ANIM` log entries, double-check that `DEBUG_ANIM` and
 `FEATURE_POSSESSION_RUNNER` are both enabled.
 
