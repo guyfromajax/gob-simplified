@@ -271,8 +271,6 @@ The ball animation system uses a unified architecture with **BallController** as
 - ✅ Full WIP_GOB integration for player movement
 
 **See:** 
-- `Historical/BALL_ANIMATION_SYSTEM_REFACTORING_PLAN.md` - Complete refactoring details (December 2024)
-- `Historical/BALL_ANIMATION_MIGRATION_PLAN.md` - WIP_GOB migration details (earlier work)
 - `BALL_OWNERSHIP_CONSOLIDATION_PLAN.md` - Ball ownership system consolidation (December 2024)
 
 ---
@@ -508,7 +506,7 @@ this.ballController.onShotEnd(); // Too late!
 **See:**
 - `UNIVERSAL_STATE_CLEARING_PATTERN.md` - Detailed state clearing patterns
 - `FCP_HCT_STATE_TRACKING_PROPOSAL.md` - FCP/HCT state tracking implementation
-- `Historical/BALL_ANIMATION_SYSTEM_REFACTORING_PLAN.md` - BallController state management
+- BallController state management (see "State Management Patterns" section above)
 
 #### Multi-Turn Sequence State Tracking Pattern ✅ **REPLICABLE** (January 2025)
 
@@ -2367,6 +2365,309 @@ All specialized systems have fallbacks to legacy functions (`playTurnAnimation()
 2. **Migrate FCP/HCT to Handlers:** Currently routes directly to `playTurnAnimation()` (not through AnimationRouter) - This is intentional for complex skeleton animations
 3. **Consolidate Text Scroll:** Move all text scroll appends to AnimationRouter for consistency
 4. **Handler Documentation:** Add JSDoc comments to all handlers
+
+---
+
+## Configuration
+
+### Rebound Animation Defaults
+
+The front-end animation config exposes a `rebound` block in `FrontEnd/static/js/phaser/animation/animation_config.js`. It controls how missed shots and putbacks bounce and how players collapse toward the ball.
+
+**Default values:**
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `bounceArea` | `{ x: 6, y: 6 }` | Grid offset around the rim where missed shots may land. |
+| `playerMoveMs` | `300` | Milliseconds for players to move toward the rebound spot. |
+| `attachDelayMs` | `1000` | Delay before the ball attaches to the rebounder after players arrive. |
+
+**Runtime Overrides:**
+
+Overrides can be supplied at runtime via `globalThis.animation_config.rebound`.
+
+**Note:** Existing behaviours like made shots and free throws use other config values and are unchanged by these defaults.
+
+---
+
+## State Management Patterns
+
+### Universal State Clearing Pattern
+
+**Critical Pattern:** Always clear the current operation's state BEFORE transitioning to the next operation.
+
+#### The Pattern
+
+```javascript
+// 1. Complete current operation
+await completeCurrentOperation();
+
+// 2. Clear state via lifecycle method (CRITICAL - must be before next operation)
+this.ballController.onShotEnd(); // or onPassEnd(), onPutbackEnd(), etc.
+
+// 3. Validate data for next operation
+if (hasDataForNextOperation) {
+  // 4. Proceed to next operation
+  await handleNextOperation();
+}
+```
+
+#### Why This Matters
+
+**State conflicts cause skipped steps**:
+- If state isn't cleared, the next operation can't properly initialize
+- BallController's internal state (`isInFlight`, `reason`, etc.) blocks operations
+- Operations fail silently when state is incorrect
+
+**Sequencing is critical**:
+- State must be cleared AFTER current operation completes
+- State must be cleared BEFORE next operation starts
+- Validation must happen AFTER state is cleared
+
+#### Application Examples
+
+**Pattern 1: Shot → Rebound**
+
+```javascript
+// ✅ CORRECT
+async handleMissedShot() {
+  await animateBallBounce();
+  this.ballController.onShotEnd(); // Clear shot state
+  if (hasReboundData) {
+    await handleRebound(); // Can now attach ball to rebounder
+  }
+}
+
+// ❌ WRONG
+async handleMissedShot() {
+  await animateBallBounce();
+  if (hasReboundData) {
+    await handleRebound(); // State still in-flight, attachment fails
+  }
+  this.ballController.onShotEnd(); // Too late!
+}
+```
+
+**Pattern 2: Pass → Next Operation**
+
+```javascript
+// ✅ CORRECT
+async executePass() {
+  this.ballController.onPassStart({ passerId, receiverId });
+  await animatePassFlight();
+  this.ballController.onPassEnd(receiverSprite); // Clear pass state
+  // Ball is now attached to receiver, ready for next operation
+}
+```
+
+**Pattern 3: Putback → Rebound**
+
+```javascript
+// ✅ CORRECT
+async handlePutbackMiss() {
+  await animatePutback();
+  this.ballController.onPutbackEnd(); // Clear putback state
+  if (hasReboundData) {
+    await handleRebound(); // Can now attach ball to rebounder
+  }
+}
+```
+
+#### Lifecycle Methods Reference
+
+**BallController Lifecycle Methods:**
+
+| Method | When to Call | Clears State | Next Operation |
+|--------|--------------|--------------|----------------|
+| `onShotStart()` | When shot begins | Sets `isInFlight = true` | Shot animation |
+| `onShotEnd()` | After shot completes | Clears `isInFlight` | Rebound or inbound |
+| `onPassStart()` | When pass begins | Sets `isInFlight = true` | Pass animation |
+| `onPassEnd()` | After pass completes | Clears `isInFlight`, attaches to receiver | Next operation |
+| `onPutbackStart()` | When putback begins | Sets `isInFlight = true` | Putback animation |
+| `onPutbackEnd()` | After putback completes | Clears `isInFlight` | Rebound or inbound |
+
+**State Transitions:**
+
+```
+IDLE → onShotStart() → IN_FLIGHT (shot) → onShotEnd() → IDLE → attachToPlayer() → ATTACHED
+IDLE → onPassStart() → IN_FLIGHT (pass) → onPassEnd() → ATTACHED (to receiver)
+IDLE → onPutbackStart() → IN_FLIGHT (putback) → onPutbackEnd() → IDLE → attachToPlayer() → ATTACHED
+```
+
+#### Additional State Clearing Mechanisms
+
+**synchronizeBallState() Helper**
+
+In addition to lifecycle methods, there's a `synchronizeBallState()` helper function in `BallControllerAdapter.js` that provides comprehensive state clearing:
+
+```javascript
+// ✅ Comprehensive state clearing for transitions
+const { synchronizeBallState } = await import('./BallControllerAdapter.js');
+synchronizeBallState(scene, {
+  clearShotState: true,      // Clear shot-related state
+  clearPassState: true,      // Clear pass-related state
+  clearPutbackState: true,   // Clear putback-related state
+  allowAttachment: true      // Whether to allow ball attachment after clearing
+});
+```
+
+**Used in**:
+- `freeThrow.js` (line ~157): Clears lingering shot state before free throw
+- `fastBreak.js` (line ~263): Clears pass state before fast break operations
+- `animateGameTurns.js` (line ~100): Clears state before putback attempts
+
+**When to use**:
+- When transitioning between different operation types (e.g., Shot → Free Throw)
+- When you need to clear multiple state types at once
+- When handling defensive state clearing to prevent race conditions
+
+#### Common Mistakes
+
+**Mistake 1: Forgetting to Clear State**
+
+```javascript
+// ❌ WRONG
+async handleMissedShot() {
+  await animateBallBounce();
+  // Missing: this.ballController.onShotEnd();
+  await handleRebound(); // Fails because state is still in-flight
+}
+```
+
+**Mistake 2: Clearing State Too Late**
+
+```javascript
+// ❌ WRONG
+async handleMissedShot() {
+  await animateBallBounce();
+  await handleRebound(); // Tries to attach ball while still in-flight
+  this.ballController.onShotEnd(); // Too late!
+}
+```
+
+**Mistake 3: Clearing State in Wrong Order**
+
+```javascript
+// ❌ WRONG
+async handleMissedShot() {
+  this.ballController.onShotEnd(); // Too early! Shot bounce hasn't completed
+  await animateBallBounce();
+  await handleRebound();
+}
+```
+
+#### Implementation Checklist
+
+When implementing a new animation operation:
+
+- [ ] Identify the lifecycle method to call (`onShotEnd()`, `onPassEnd()`, etc.)
+- [ ] Call it AFTER the current operation completes
+- [ ] Call it BEFORE the next operation starts
+- [ ] Validate data AFTER state is cleared
+- [ ] Test that state transitions work correctly
+- [ ] Verify no skipped steps occur
+
+#### Universal Application
+
+This pattern should be applied to:
+
+1. **All shot types** → Rebound transitions
+2. **All pass types** → Next operation transitions
+3. **All putback types** → Rebound transitions
+4. **All rebound types** → Outlet pass transitions
+5. **Any operation** → Next operation transition
+6. **Cross-operation transitions** (e.g., Shot → Free Throw) using `synchronizeBallState()`
+
+**The rule**: Always clear state before transitioning to the next operation.
+
+---
+
+## Debugging
+
+### DEBUG_ANIM Flag
+
+The front-end animation stack exposes a shared `DEBUG_ANIM` flag that controls verbose logging across the Phaser animation helpers. By default the flag is disabled. Toggle it at runtime from the browser console:
+
+```js
+// Enable detailed animation tracing and the new runner in one go
+window.DEBUG_ANIM = true;
+window.FEATURE_POSSESSION_RUNNER = true;
+
+// Disable everything when you are done
+window.DEBUG_ANIM = false;
+window.FEATURE_POSSESSION_RUNNER = false;
+```
+
+Both flags are also exposed via `debugFlags.js` for module consumers:
+
+```js
+import {
+  setAnimationDebugEnabled,
+  setPossessionRunnerEnabled,
+} from 'FrontEnd/static/js/phaser/utils/debugFlags';
+
+setAnimationDebugEnabled(true);
+setPossessionRunnerEnabled(true);
+```
+
+Enabling the flag unlocks a series of structured diagnostics that are emitted with the `ANIM` prefix. These logs summarize how possessions, steps, and ball transitions are processed while a simulation plays out.
+
+### Step Ingestion Telemetry
+
+Both `animateGameTurns` and `runFastBreakSequence` emit a step record for every backend payload they consume. Each entry includes:
+
+- `turnIndex`, `turnId`, and the `possessionId`
+- `stepIndex` and the first timestamp observed for that step
+- A list of `{ playerId, action }` pairs participating in the step
+
+The step logger (shared by the legacy orchestrators and the runner) enforces a per-possession monotonicity check. If a subsequent step reports a lower `stepIndex` than the last processed value for that possession you will see a warning similar to:
+
+```
+ANIM: stepIndex regression { fromState: ..., lastStepIndex: 12, stepIndex: 10, ... }
+```
+
+Use this to quickly spot gaps or out-of-order movement data from the simulator. When `FEATURE_POSSESSION_RUNNER` is enabled the same warning will also include the offending node id and graph edge so you can track the regression back to the possession graph.
+
+### Runner-Specific Tracing
+
+`PossessionRunner` adds a layer of instrumentation that surfaces under the `ANIM` prefix when both `DEBUG_ANIM` and `FEATURE_POSSESSION_RUNNER` are true. Key entries include:
+
+- `ANIM runner:graph-loaded` – prints the possession id, node/edge counts, and whether the graph passed validation.
+- `ANIM runner:phase-enter` / `ANIM runner:phase-exit` – documents which phase is active and how long the previous phase took.
+- `ANIM runner:step-start` / `ANIM runner:step-complete` – log the node id, backend step index, and resolved tween duration. Use these to correlate runner scheduling with sprite motion.
+- `ANIM runner:ball-transfer` – highlights ball ownership changes, including assists, rebounds, and turnovers detected mid-sequence.
+
+Each runner hook mirrors the event emitter outlined in `docs/Animation_System/animations-roadmap.md`. If you only see the events without their paired `ANIM` log entries, double-check that `DEBUG_ANIM` and `FEATURE_POSSESSION_RUNNER` are both enabled.
+
+### Tween and Pass Summaries
+
+Three hotspots now produce post-action summaries:
+
+- `animateStep` logs `ANIM step summary` entries when each player tween completes, including the resolved owner, `passInFlight`/`ballDetached` state, and any scoreboard delta detected for the turn.
+- `tweenPlayerTo` produces `ANIM tween summary` records with the tween duration, easing, start/target coordinates, and the same ownership metadata.
+- `runPass` emits `ANIM pass summary` once the pass resolves (or if it aborts), indicating the involved player ids, pass duration, and ball state.
+
+All three helpers compare the actual sprite delta against the planned tween length. When the ball or sprite travels further than expected you will see a one-line warning:
+
+```
+ANIM teleport suspicion { plannedDistance: 180, actualDistance: 360, ... }
+```
+
+The warning highlights the IDs involved along with the start/target coordinates so you can trace unexpected teleports. When the runner is active it also annotates the graph node that triggered the discrepancy. Treat repeated teleport warnings as blockers before promoting the runner flag to wider audiences.
+
+### FSM Transition Tracing
+
+Every state-machine transition now flows through a shared helper that reports `{ fromState, toState, event, ...payload }` when `DEBUG_ANIM` is active. This covers both `safeTransition` calls and any direct `transition(...)` invocations on the scene state machine, giving you a chronological view of inbound/outlet state changes.
+
+### Scoreboard Deltas
+
+Whenever a turn updates the scoreboard, the debug logger records the delta in `ANIM: score update` along with the full score snapshot. The latest delta is also folded into the step, tween, and pass summaries so you can correlate ball movement with scoring plays.
+
+### Debugging Tips
+
+- The logs stream to `console.log` only when `DEBUG_ANIM` is true. Existing feature flags such as `PASS_DEBUG` and `DebugFlags.OUTLET` still gate their respective sections but now require `DEBUG_ANIM` to be enabled before they print.
+- Use `DebugFlags.ANIM` / `DebugFlags.FEATURE_POSSESSION_RUNNER` from the console to confirm flag state if you suspect conflicting overrides.
+- You can reset any accumulated step state by toggling either flag off and back on; new possessions start with a fresh monotonicity tracker.
 
 ---
 

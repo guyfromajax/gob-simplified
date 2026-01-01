@@ -3929,9 +3929,8 @@ The ball animation system uses a unified architecture with **BallController** as
 - ✅ Full WIP_GOB integration for player movement
 
 **See:** 
-- `Historical/BALL_ANIMATION_SYSTEM_REFACTORING_PLAN.md` - Complete refactoring details (December 2024)
-- `Historical/BALL_ANIMATION_MIGRATION_PLAN.md` - WIP_GOB migration details (earlier work)
 - `BALL_OWNERSHIP_CONSOLIDATION_PLAN.md` - Ball ownership system consolidation (December 2024)
+- `docs/Animation_System/animation_system.md` - Complete ball animation system documentation
 
 ---
 
@@ -4313,7 +4312,7 @@ this.ballController.onShotEnd(); // Too late!
 **See:**
 - `UNIVERSAL_STATE_CLEARING_PATTERN.md` - Detailed state clearing patterns
 - `FCP_HCT_STATE_TRACKING_PROPOSAL.md` - FCP/HCT state tracking implementation
-- `Historical/BALL_ANIMATION_SYSTEM_REFACTORING_PLAN.md` - BallController state management
+- `docs/Animation_System/animation_system.md` - BallController state management (see "State Management Patterns" section)
 
 #### Multi-Turn Sequence State Tracking Pattern ✅ **REPLICABLE** (January 2025)
 
