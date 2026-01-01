@@ -35,9 +35,9 @@
 | **Team Attributes** | | | |
 | `team_chemistry` | ✅ 7-13 (franchise range) | ✅ 7-25 (tournament range) | ✅ Same concept, different ranges |
 | `offensive_efficiency` | ✅ -3 to +3 | ✅ -10 to +10 | ✅ Same concept, different ranges |
-| `shot_threshold` | ✅ -100 to +100 | ✅ -100 to +100 | ✅ Same |
-| `turnover_modifier` | ✅ -3 to +3 | ✅ -10 to +10 | ✅ Same concept, different ranges |
-| `foul_modifier` | ✅ -3 to +3 | ✅ -10 to +10 | ✅ Same concept, different ranges |
+| `shot_threshold` | ✅ -10 to 190 | ✅ -10 to 190 | ✅ Same (center at 90 for pill display) |
+| `discipline` | ✅ -3 to +3 | ✅ -10 to +10 | ✅ Same concept, different ranges (formerly turnover_modifier) |
+| `fight` | ✅ -3 to +3 | ✅ -10 to +10 | ✅ Same concept, different ranges (formerly foul_modifier) |
 | `rebound_modifier` | ✅ 0.8-1.2 | ✅ 0.8-1.2 | ✅ Same |
 | `defensive_efficiency` | ✅ -3 to +3 | ✅ -10 to +10 | ✅ Same concept, different ranges |
 | `fb_efficiency` | ✅ -3 to +3 | ✅ -10 to +10 | ✅ Same concept, different ranges |

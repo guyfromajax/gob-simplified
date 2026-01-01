@@ -444,9 +444,9 @@ Similarly:
       // ✅ Initialized via TeamManager.init_team_attributes(mode="franchise")
       "team_chemistry": 7-13,              // Franchise mode range
       "offensive_efficiency": -3 to +3,    // Franchise mode range
-      "shot_threshold": -100 to +100,      // Randomized
-      "turnover_modifier": -3 to +3,
-      "foul_modifier": -3 to +3,
+      "shot_threshold": -10 to 190,      // Randomized (center at 90 for pill display)
+      "discipline": -3 to +3,            // Formerly turnover_modifier
+      "fight": -3 to +3,                 // Formerly foul_modifier
       "rebound_modifier": 0.8 | 0.9 | 1.0 | 1.1 | 1.2,
       "defensive_efficiency": -3 to +3,
       "fb_efficiency": -3 to +3,
@@ -706,9 +706,9 @@ See **Section 4: PLAYER EVOLUTION** above for complete structure.
       // Team attributes (mode-specific, randomized on init)
       team_chemistry: 7-13,
       offensive_efficiency: -3 to +3,
-      shot_threshold: -100 to +100,
-      turnover_modifier: -3 to +3,
-      foul_modifier: -3 to +3,
+      shot_threshold: -10 to 190,      // Center at 90 for pill display
+      discipline: -3 to +3,            // Formerly turnover_modifier
+      fight: -3 to +3,                  // Formerly foul_modifier
       rebound_modifier: 0.8-1.2,
       defensive_efficiency: -3 to +3,
       fb_efficiency: -3 to +3,
