@@ -4,14 +4,14 @@
 
 ### What We Changed
 
-In `ShotAnimationSystem.handleMissedShot()` (line 499-542), we added:
+In `ShotAnimationSystem.handleMissedShot()` (line ~1120), we added:
 
 ```javascript
 // Animate ball bounce from rim
 await this.animateBallBounce(rimCoords, turnData);
 
 // ✅ PRIORITY 1 FIX: Call onShotEnd() to clear in-flight state before rebound
-// This matches the pattern in ballManager.js (line 626)
+// This matches the pattern in ballManager.js (line ~686)
 // The ball is no longer in flight, so clear the state to allow attachment to rebounder
 this.ballController.onShotEnd();
 
@@ -231,7 +231,7 @@ When implementing a new animation operation:
 
 ## Examples from Codebase
 
-### ✅ Correct: ballManager.js (line 626)
+### ✅ Correct: ballManager.js (line ~686)
 
 ```javascript
 if (ballController) {
@@ -247,7 +247,7 @@ if (result === "MAKE") {
 }
 ```
 
-### ✅ Correct: ShotAnimationSystem.js (line 513)
+### ✅ Correct: ShotAnimationSystem.js (line ~1120)
 
 ```javascript
 async handleMissedShot() {
@@ -259,7 +259,7 @@ async handleMissedShot() {
 }
 ```
 
-### ✅ Correct: handleOrebTurn (line 240)
+### ✅ Correct: handleOrebTurn (line ~193)
 
 ```javascript
 if (ballController) {
@@ -272,6 +272,33 @@ await runDefensiveReboundSetup();
 
 ---
 
+## Additional State Clearing Mechanisms
+
+### synchronizeBallState() Helper
+
+In addition to lifecycle methods, there's a `synchronizeBallState()` helper function in `BallControllerAdapter.js` that provides comprehensive state clearing:
+
+```javascript
+// ✅ Comprehensive state clearing for transitions
+const { synchronizeBallState } = await import('./BallControllerAdapter.js');
+synchronizeBallState(scene, {
+  clearShotState: true,      // Clear shot-related state
+  clearPassState: true,      // Clear pass-related state
+  clearPutbackState: true,   // Clear putback-related state
+  allowAttachment: true      // Whether to allow ball attachment after clearing
+});
+```
+
+**Used in**:
+- `freeThrow.js` (line ~157): Clears lingering shot state before free throw
+- `fastBreak.js` (line ~263): Clears pass state before fast break operations
+- `animateGameTurns.js` (line ~100): Clears state before putback attempts
+
+**When to use**:
+- When transitioning between different operation types (e.g., Shot → Free Throw)
+- When you need to clear multiple state types at once
+- When handling defensive state clearing to prevent race conditions
+
 ## Universal Application
 
 This pattern should be applied to:
@@ -281,6 +308,7 @@ This pattern should be applied to:
 3. **All putback types** → Rebound transitions
 4. **All rebound types** → Outlet pass transitions
 5. **Any operation** → Next operation transition
+6. **Cross-operation transitions** (e.g., Shot → Free Throw) using `synchronizeBallState()`
 
 **The rule**: Always clear state before transitioning to the next operation.
 

@@ -86,9 +86,11 @@ This document maps the execution structure of each turn type to identify pattern
 
 **Bonus vs Set Number Handling**:
 - **Turn-by-Turn Mode** (Preferred):
-  - Uses `free_throws_remaining` field (number of FTs remaining after this turn)
+  - Uses `free_throws_remaining` field (number of FTs remaining after this turn, set by `BackEnd/engine/phase_resolution.py::resolve_free_throw_logic()`)
+  - Uses `one_and_one` field (boolean flag indicating if this is a 1-and-1 situation)
   - If `free_throws_remaining > 0`: More shots remain
   - If `free_throws_remaining === 0`: This was the final shot
+  - For 1-and-1: If first shot is missed → Rebound (no second shot); if made → Second shot unlocked
   - Works for all bonus types (1-and-1, 2-shot, 3-shot) and set number FTs
 - **Batch Mode** (Fallback):
   - Uses `ftContext` (ftIndex, ftTotal, bonusType) if `free_throws_remaining` is undefined
@@ -110,8 +112,8 @@ This document maps the execution structure of each turn type to identify pattern
 **Key Characteristics**:
 - Setup is always the same (FT line positions)
 - Result handling varies by bonus type and remaining shots
-- **Turn-by-turn mode**: Uses `free_throws_remaining` to determine if more shots remain (preferred)
-- **Batch mode**: Uses `ftContext` (ftIndex, ftTotal) if `free_throws_remaining` is undefined (fallback)
+- **Turn-by-turn mode**: Uses `free_throws_remaining` (set by backend) and `one_and_one` flag to determine if more shots remain (preferred)
+- **Batch mode**: Uses `ftContext` (ftIndex, ftTotal, bonusType) if `free_throws_remaining` is undefined (fallback)
 
 **Code Locations**:
 - Backend: `resolve_free_throw_logic()` → `capture_free_throw_animation()`
