@@ -18,7 +18,7 @@ The backend simulation already emits authoritative `turns[]` with ordered `steps
 1. **Ship DEBUG_ANIM instrumentation**
    - Gate existing noisy logs behind a shared flag.
    - Emit structured traces on step receipt, FSM transitions, and post-step outcomes.
-   - Add monotonicity/teleport detectors and document the workflow in `docs/Animation_System/animation-debug.md`.
+   - Add monotonicity/teleport detectors and document the workflow in `docs/Animation_System/animation_system.md` (see Debugging section).
 
 2. **Patch known blockers**
    - Provide a Phaser timeline compatibility shim so fast breaks no longer crash on `createTimeline`.

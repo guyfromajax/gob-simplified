@@ -517,7 +517,7 @@ window.DEBUG_ANIM = false;
 window.FEATURE_POSSESSION_RUNNER = false;
 ```
 
-See `docs/Animation_System/animation-debug.md` for more debugging information.
+See `docs/Animation_System/animation_system.md` (Debugging section) for more debugging information.
 
 ---
 
