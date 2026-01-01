@@ -48,30 +48,54 @@ The codebase follows a client-server architecture with clear separation between 
 ```
 BackEnd/
 ├── api/                    # API route handlers
-│   ├── api.py             # Main API endpoints (1693 lines)
+│   ├── api.py             # Main API endpoints (~2700 lines)
 │   ├── franchise_routes.py # Franchise mode endpoints
 │   ├── gameplan_routes.py  # Game plan management
 │   ├── tournament_routes.py # Tournament mode endpoints
 │   ├── training_routes.py  # Training system endpoints
-│   └── play_routes.py      # Custom play endpoints
+│   ├── play_routes.py      # Custom play endpoints
+│   └── skeleton_routes.py  # Skeleton system endpoints
 ├── models/                 # Core business logic classes
-│   ├── game_manager.py    # Orchestrates entire game (316 lines)
-│   ├── turn_manager.py    # Manages individual turns (2146 lines)
-│   ├── team_manager.py    # Team state and operations (540 lines)
-│   ├── player.py          # Player model and stats (181 lines)
-│   ├── shot_manager.py    # Shot mechanics (1070 lines)
-│   ├── animator.py        # Animation data generation (1648 lines)
-│   ├── franchise_manager.py # Franchise mode logic (584 lines)
-│   ├── play_manager.py    # Custom play execution (379 lines)
-│   ├── training_manager.py # Training system (344 lines)
-│   └── rebound_manager.py # Rebound mechanics (75 lines)
+│   ├── game_manager.py    # Orchestrates entire game (~880 lines)
+│   ├── turn_manager.py    # Manages individual turns (~3200 lines)
+│   ├── team_manager.py    # Team state and operations (~600 lines)
+│   ├── player.py          # Player model and stats (~220 lines)
+│   ├── shot_manager.py    # Shot mechanics (~1550 lines)
+│   ├── animator.py        # Animation data generation (~2000 lines)
+│   ├── franchise_manager.py # Franchise mode logic
+│   ├── play_manager.py    # Custom play execution
+│   ├── playbook_manager.py # Playbook management
+│   ├── training_manager.py # Training system (legacy)
+│   ├── training_execution_v2.py # Training system (current)
+│   └── rebound_manager.py # Rebound mechanics
 ├── engine/                 # Core simulation engine
-│   └── phase_resolution.py # Turn phase resolution (89K lines)
+│   ├── phase_resolution.py # Turn phase resolution (~89K lines)
+│   └── fast_break_trigger.py # Fast break detection
+├── season/                 # Season management
+│   ├── schedule_generator.py # Schedule generation
+│   ├── season_manager.py  # Season progression
+│   └── standings_tracker.py # Standings calculation
+├── tournament/             # Tournament management
+│   ├── bracket_logic.py   # Bracket generation
+│   ├── eos_tournament.py  # End-of-season tournaments
+│   ├── match_scheduler.py # Match scheduling
+│   └── tournament_manager.py # Tournament state management
+├── playcall_skeletons/     # Playcall skeleton definitions
+│   ├── base_skeletons.py  # Base skeleton system
+│   ├── attack_skeletons.py # Attack play skeletons
+│   ├── fcp_skeletons.py  # Full court press skeletons
+│   ├── freelance_skeletons.py # Freelance play skeletons
+│   ├── hct_skeletons.py  # Half court trap skeletons
+│   ├── inside_skeletons.py # Inside play skeletons
+│   ├── outside_skeletons.py # Outside play skeletons
+│   └── set_play_skeletons.py # Set play skeletons
+├── constants/              # Game constants and configuration (package)
+│   ├── __init__.py        # Main constants (ALL_ATTRS, BOX_SCORE_KEYS, etc.)
+│   └── fast_break_constants.py # Fast break constants
 ├── utils/                  # Utility functions
 ├── data/                   # Static data (names, etc.)
-├── constants.py           # Game constants and configuration
 ├── db.py                  # MongoDB connection setup
-├── main.py                # Core simulation functions (1045 lines)
+├── main.py                # Core simulation functions (~1250 lines)
 └── flask_app.py           # Flask wrapper (legacy)
 ```
 
@@ -82,7 +106,7 @@ FrontEnd/
 ├── static/
 │   ├── js/
 │   │   ├── phaser/        # Phaser game engine integration
-│   │   │   ├── gameScene.js      # Main game scene (82K lines)
+│   │   │   ├── gameScene.js      # Main game scene
 │   │   │   ├── bootGame.js       # Game initialization
 │   │   │   ├── finalizeGame.js   # Game completion
 │   │   │   ├── animation/        # Animation components
@@ -94,7 +118,7 @@ FrontEnd/
 │   │   └── utils/         # Frontend utilities
 │   ├── images/            # Sprites and graphics
 │   ├── sounds/            # Audio files
-│   ├── court.html         # Main game visualization (112K lines)
+│   ├── court.html         # Main game visualization
 │   ├── box-score.html     # Box score display
 │   ├── game-plan.html     # Game plan editor
 │   ├── franchise-*.html   # Franchise mode pages
@@ -128,7 +152,7 @@ The top-level orchestrator that manages the entire game state.
 - `update_team_stats()` - Aggregates team totals
 
 #### TurnManager (`BackEnd/models/turn_manager.py`)
-Manages individual possessions and turn-by-turn gameplay (2146 lines - the largest model).
+Manages individual possessions and turn-by-turn gameplay (~3200 lines - the largest model).
 
 **Key Responsibilities:**
 - Executes micro-turns (individual actions within a possession)
@@ -148,7 +172,7 @@ Manages individual possessions and turn-by-turn gameplay (2146 lines - the large
 - Zone Defense (2-3, 3-2, 1-3-1) - Zone-based defensive positioning with automatic zone shifts based on ball location
 
 #### ShotManager (`BackEnd/models/shot_manager.py`)
-Handles all shooting mechanics and outcomes (1070 lines).
+Handles all shooting mechanics and outcomes (~1550 lines).
 
 **Key Responsibilities:**
 - Calculates shot probabilities based on player attributes
@@ -158,7 +182,7 @@ Handles all shooting mechanics and outcomes (1070 lines).
 - Tracks shooting statistics
 
 #### TeamManager (`BackEnd/models/team_manager.py`)
-Manages team state, roster, and team-level operations (540 lines).
+Manages team state, roster, and team-level operations (~600 lines).
 
 **Key Responsibilities:**
 - Loads team data from database
@@ -169,7 +193,7 @@ Manages team state, roster, and team-level operations (540 lines).
 - Manages team fouls and timeouts
 
 #### Player Model (`BackEnd/models/player.py`)
-Represents individual players with attributes and statistics (181 lines).
+Represents individual players with attributes and statistics (~220 lines).
 
 **Key Attributes:**
 - Base attributes: SC (Scoring), SH (Shooting), ID (Interior Defense), etc.
@@ -304,10 +328,12 @@ The frontend consists of multiple HTML pages for different features:
 The game uses Phaser 3 for real-time basketball animations:
 
 **Key Components:**
-- **gameScene.js** (82K lines) - Main game scene with court rendering
+- **gameScene.js** - Main game scene with court rendering
 - **bootGame.js** - Initializes Phaser and loads assets
 - **finalizeGame.js** - Handles game completion
-- **animation/** - Animation state machines and sprite management
+- **animation/** - Animation system components
+  - AnimationRouter, AnimationEngine, BallController
+  - Specialized systems (Shot, Rebound, Pass, Free Throw)
 - **ui/** - Scoreboard, shot clock, and UI overlays
 
 **Animation Flow:**
@@ -466,7 +492,7 @@ Game momentum affects team performance:
      }
    }
 
-2. Backend: TrainingManager.apply_training()
+2. Backend: Training execution (via `training_execution_v2.py`)
    - Loads franchise document
    - For each allocation:
      - Calculates attribute improvements
@@ -568,7 +594,7 @@ pytest test_gameplan_functionality.py
 
 ### Adding a New Player Attribute
 
-1. Add to `BackEnd/constants.py`:
+1. Add to `BackEnd/constants/__init__.py`:
    ```python
    ALL_ATTRS = [..., "NEW_ATTR"]
    MALLEABLE_ATTRS = [..., "NEW_ATTR"]  # if malleable
@@ -578,7 +604,7 @@ pytest test_gameplan_functionality.py
 
 3. Update position rating calculations in `utils/position_ratings.py`
 
-4. Update training system in `TrainingManager` if trainable
+4. Update training system in `training_execution_v2.py` if trainable
 
 ### Adding a New API Endpoint
 
@@ -672,7 +698,7 @@ pytest test_gameplan_functionality.py
    - Understand data flow
 
 4. **Read key documentation**
-   - `docs/franchise_mode_architecture.md`
+   - `docs/Franchise_Mode/franchise_mode_architecture.md`
    - `docs/game_storage_architecture.md`
    - `docs/Animation_System/animation_system.md`
 

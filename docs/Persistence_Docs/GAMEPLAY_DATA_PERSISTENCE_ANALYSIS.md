@@ -80,9 +80,9 @@ This document analyzes what data is actually persisted to the database when the 
 - `text_log` - Game text log
 
 ### Mode-Specific Fields
-- **Franchise:** `franchise_id`, `week` (added in `franchise_routes.py:365-366`)
-- **Tournament:** None (tournament_id not added to game document)
-- **Single Game:** None
+- **Franchise:** `franchise_id`, `week` (added when game result is saved via `save_result()` or `_save_game_result()`, NOT during quarter saves)
+- **Tournament:** `tournament_id`, `mode` (added during `simulate_quarter_endpoint()` saves at lines 1911-1913)
+- **Single Game:** None (no mode-specific fields)
 
 ---
 
@@ -105,7 +105,7 @@ This document analyzes what data is actually persisted to the database when the 
 - ✅ Full team data (home_team, away_team, teams object)
 - ✅ Full players array
 - ✅ Game metadata (quarter, score, clock, etc.)
-- ✅ Mode-specific fields (franchise_id/week for Franchise mode)
+- ⚠️ Mode-specific fields (tournament_id/mode for Tournament mode added during saves; franchise_id/week for Franchise mode added later when result is saved)
 
 **Mode-Specific Behavior:**
 
@@ -116,17 +116,14 @@ This document analyzes what data is actually persisted to the database when the 
 
 #### Tournament Mode
 - **Storage:** `games_collection` with `game_id` as `_id`
-- **Fields Added:** `tournament_id` and `mode` (set during `init_game()` if called)
-- **Status:** ⚠️ **POTENTIAL DISCREPANCY** - `tournament_id` is set during `init_game()` (called from set-lineup.html), but `simulate_quarter_endpoint()` does NOT add it if missing
-- **Impact:** 
-  - If game goes through normal flow (set-lineup → init-game → simulate-quarter): `tournament_id` is preserved ✅
-  - If game is created directly via `simulate_quarter_endpoint()` (bypassing init-game): `tournament_id` is NOT set ❌
-  - MongoDB `$set` preserves existing fields, so if `tournament_id` exists, it's preserved during quarter saves
+- **Fields Added:** `tournament_id` and `mode` (added during `simulate_quarter_endpoint()` saves at lines 1911-1913)
+- **Status:** ✅ **ALIGNED** - `tournament_id` and `mode` are always set during quarter saves, regardless of game creation path
 
 #### Franchise Mode
-- **Storage:** `games_collection` with composite key `{week}-{away_id}-{home_id}` as `_id`
-- **Fields Added:** `franchise_id`, `week` (lines 365-366)
-- **Status:** ✅ **ALIGNED** - Matches documentation
+- **Storage:** `games_collection` with `game_id` as `_id` (ObjectId format, not composite key)
+- **Fields Added During Gameplay:** `mode` only (added during `simulate_quarter_endpoint()` saves)
+- **Fields Added When Result Saved:** `franchise_id`, `week` (added via `save_result()` at lines 331-336 or `_save_game_result()` at line 186)
+- **Status:** ✅ **ALIGNED** - During gameplay, only `mode` is added. `franchise_id` and `week` are added later when the game result is saved (after gameplay completes)
 
 ---
 
@@ -150,7 +147,7 @@ This document analyzes what data is actually persisted to the database when the 
 - ✅ Full team data (home_team, away_team, teams object)
 - ✅ Full players array
 - ✅ Game metadata (quarter, score, clock, etc.)
-- ✅ Mode-specific fields (franchise_id/week for Franchise mode)
+- ⚠️ Mode-specific fields (tournament_id/mode for Tournament mode added during saves; franchise_id/week for Franchise mode added later when result is saved)
 
 **Mode-Specific Behavior:**
 
@@ -161,17 +158,14 @@ This document analyzes what data is actually persisted to the database when the 
 
 #### Tournament Mode
 - **Storage:** `games_collection` with `game_id` as `_id`
-- **Fields Added:** `tournament_id` and `mode` (set during `init_game()` if called)
-- **Status:** ⚠️ **POTENTIAL DISCREPANCY** - `tournament_id` is set during `init_game()` (called from set-lineup.html), but `simulate_quarter_endpoint()` does NOT add it if missing
-- **Impact:** 
-  - If game goes through normal flow (set-lineup → init-game → simulate-quarter): `tournament_id` is preserved ✅
-  - If game is created directly via `simulate_quarter_endpoint()` (bypassing init-game): `tournament_id` is NOT set ❌
-  - MongoDB `$set` preserves existing fields, so if `tournament_id` exists, it's preserved during quarter saves
+- **Fields Added:** `tournament_id` and `mode` (added during `simulate_quarter_endpoint()` saves at lines 1911-1913)
+- **Status:** ✅ **ALIGNED** - `tournament_id` and `mode` are always set during quarter saves, regardless of game creation path
 
 #### Franchise Mode
-- **Storage:** `games_collection` with composite key `{week}-{away_id}-{home_id}` as `_id`
-- **Fields Added:** `franchise_id`, `week` (lines 365-366)
-- **Status:** ✅ **ALIGNED** - Matches documentation
+- **Storage:** `games_collection` with `game_id` as `_id` (ObjectId format, not composite key)
+- **Fields Added During Gameplay:** `mode` only (added during `simulate_quarter_endpoint()` saves)
+- **Fields Added When Result Saved:** `franchise_id`, `week` (added via `save_result()` at lines 331-336 or `_save_game_result()` at line 186)
+- **Status:** ✅ **ALIGNED** - During gameplay, only `mode` is added. `franchise_id` and `week` are added later when the game result is saved (after gameplay completes)
 
 **Note:** The `game_id` is preserved across all quarters (Q1 → Q2 → Q3), so the same game document is updated multiple times.
 
@@ -197,7 +191,7 @@ This document analyzes what data is actually persisted to the database when the 
 - ✅ Full team data (home_team, away_team, teams object)
 - ✅ Full players array
 - ✅ Game metadata (quarter, score, clock, etc.)
-- ✅ Mode-specific fields (franchise_id/week for Franchise mode)
+- ⚠️ Mode-specific fields (tournament_id/mode for Tournament mode added during saves; franchise_id/week for Franchise mode added later when result is saved)
 
 **Mode-Specific Behavior:**
 
@@ -208,17 +202,14 @@ This document analyzes what data is actually persisted to the database when the 
 
 #### Tournament Mode
 - **Storage:** `games_collection` with `game_id` as `_id`
-- **Fields Added:** `tournament_id` and `mode` (set during `init_game()` if called)
-- **Status:** ⚠️ **POTENTIAL DISCREPANCY** - `tournament_id` is set during `init_game()` (called from set-lineup.html), but `simulate_quarter_endpoint()` does NOT add it if missing
-- **Impact:** 
-  - If game goes through normal flow (set-lineup → init-game → simulate-quarter): `tournament_id` is preserved ✅
-  - If game is created directly via `simulate_quarter_endpoint()` (bypassing init-game): `tournament_id` is NOT set ❌
-  - MongoDB `$set` preserves existing fields, so if `tournament_id` exists, it's preserved during quarter saves
+- **Fields Added:** `tournament_id` and `mode` (added during `simulate_quarter_endpoint()` saves at lines 1911-1913)
+- **Status:** ✅ **ALIGNED** - `tournament_id` and `mode` are always set during quarter saves, regardless of game creation path
 
 #### Franchise Mode
-- **Storage:** `games_collection` with composite key `{week}-{away_id}-{home_id}` as `_id`
-- **Fields Added:** `franchise_id`, `week` (lines 365-366)
-- **Status:** ✅ **ALIGNED** - Matches documentation
+- **Storage:** `games_collection` with `game_id` as `_id` (ObjectId format, not composite key)
+- **Fields Added During Gameplay:** `mode` only (added during `simulate_quarter_endpoint()` saves)
+- **Fields Added When Result Saved:** `franchise_id`, `week` (added via `save_result()` at lines 331-336 or `_save_game_result()` at line 186)
+- **Status:** ✅ **ALIGNED** - During gameplay, only `mode` is added. `franchise_id` and `week` are added later when the game result is saved (after gameplay completes)
 
 **Note:** The `game_id` is preserved across all quarters (Q1 → Q2 → Q3 → Q4), so the same game document is updated multiple times. After Q4, `is_final=true` is set.
 
@@ -242,12 +233,12 @@ This document analyzes what data is actually persisted to the database when the 
 **Current Behavior (After Fix):**
 - ✅ `tournament_id` and `mode` are now ALWAYS set during `simulate_quarter_endpoint()` saves
 - ✅ Works for both normal flow and direct game creation
-- ✅ Matches Franchise mode pattern (Franchise always adds `franchise_id` during save)
+- Note: Franchise mode adds `franchise_id` and `week` when the game result is saved (not during quarter saves)
 
 **Implementation:**
 - `BackEnd/api/api.py:1636-1650` - `simulate_quarter_endpoint()` now adds `tournament_id` and `mode` to game document when saving
 - Mode is inferred from `tournament_id`/`franchise_id` if not provided in request
-- Pattern matches Franchise mode: `franchise_routes.py:365-366` always adds `franchise_id` and `week` during save
+- Note: Franchise mode adds `franchise_id` and `week` when the game result is saved (via `save_result()` or `_save_game_result()`), not during quarter saves
 
 **Status:** ✅ **RESOLVED** - Tournament mode now consistently includes `tournament_id` and `mode` in game documents, regardless of game creation path.
 
@@ -273,12 +264,12 @@ This document analyzes what data is actually persisted to the database when the 
 
 **Required Context Data:**
 - ✅ `game_id` - Persisted
-- ✅ `mode` - **NOT persisted** (must be inferred from URL or external tracking)
-- ⚠️ `tournament_id` - **NOT persisted** (discrepancy identified above)
+- ✅ `mode` - Persisted (added during `simulate_quarter_endpoint()` saves)
+- ✅ `tournament_id` - Persisted (added during `simulate_quarter_endpoint()` saves for Tournament mode)
 - ✅ `franchise_id` - Persisted (Franchise mode only)
 - ✅ `team_id` - Persisted (in `home_team_id` / `away_team_id`)
 
-**Status:** Mostly aligned, except for missing `tournament_id` in Tournament mode.
+**Status:** ✅ **ALIGNED** - All required fields are persisted correctly for all modes.
 
 ---
 
@@ -289,20 +280,19 @@ This document analyzes what data is actually persisted to the database when the 
 1. **Core Game State:** All essential game state fields are persisted correctly
 2. **Team Data:** Full team data (attributes, strategy, plays, scouting) is persisted in `teams` object
 3. **Player Data:** Full player array with stats and attributes is persisted
-4. **Franchise Mode:** Properly includes `franchise_id` and `week` in game document
+4. **Franchise Mode:** Properly includes `franchise_id` and `week` in game document when result is saved (after gameplay completes)
 5. **Timeout State:** Timeout resume state (`timeout_next_play_type`, `clock`, etc.) is persisted correctly
 
 ### ⚠️ Issues Identified
 
-1. **Tournament Mode `tournament_id` Not Always Set:** Game documents may not include `tournament_id` if the game is created directly via `simulate_quarter_endpoint()` without going through `init_game()`. Normal flow (set-lineup → init-game) works correctly, but direct game creation would not have `tournament_id`.
+1. ✅ **RESOLVED: Tournament Mode `tournament_id`** - Now always set during `simulate_quarter_endpoint()` saves (see "Discrepancies Identified" section below)
 
 ### 📋 Recommendations
 
 1. ✅ **IMPLEMENTED: Ensure `tournament_id` is Always Set in Tournament Mode Game Documents:**
    - Modified `BackEnd/api/api.py:1636` to add `tournament_id` when mode is "tournament" and `request.tournament_id` is available
-   - Pattern: Similar to how Franchise mode adds `franchise_id` and `week` in `franchise_routes.py:365-366`
    - This ensures `tournament_id` is always set, regardless of game creation path (normal flow or direct creation)
-   - This aligns Tournament mode with Franchise mode pattern (Franchise always adds `franchise_id` during save)
+   - Note: Franchise mode adds `franchise_id` and `week` when the game result is saved (not during quarter saves), so Tournament mode actually adds its mode identifier earlier in the flow
 
 2. ✅ **IMPLEMENTED: Add `mode` Field:**
    - Added `mode` field to game document when saving
@@ -338,7 +328,9 @@ This document analyzes what data is actually persisted to the database when the 
 ### Database Save Locations
 
 - **Single Game / Tournament:** `BackEnd/api/api.py:1636` - `games_collection.update_one()`
-- **Franchise Mode:** `BackEnd/api/franchise_routes.py:367` - `db.games.update_one()` (with `franchise_id` and `week`)
+- **Franchise Mode:** 
+  - During gameplay: `BackEnd/api/api.py:1928` - `games_collection.update_one()` (via `simulate_quarter_endpoint()`)
+  - When result saved: `BackEnd/api/franchise_routes.py:327-340` - `db.games.update_one()` (adds `franchise_id` and `week` via `save_result()`)
 
 ---
 
