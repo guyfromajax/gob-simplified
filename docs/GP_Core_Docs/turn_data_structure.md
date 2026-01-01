@@ -40,7 +40,19 @@ the result before it is serialised to JSON and sent to the client.
 
   // Rebound information (optional)
   "rebound_type": "DREB" | "OREB" | null,
-  "rebounder_id": "PLAYER_UUID" | null,
+  "rebounderId": "PLAYER_UUID" | null,  // Primary field (camelCase). Note: `rebounder_id` and `rebounder_player_id` may also be present for backward compatibility
+
+  // Player positioning data (for shot attempts - optional)
+  "offense_getback": ["PLAYER_UUID", ...],  // Array of offensive player IDs getting back on defense
+  "defense_release": ["PLAYER_UUID", ...],  // Array of defensive player IDs releasing for fast break
+  "offense_rebounders": ["PLAYER_UUID", ...],  // Array of offensive player IDs crashing boards
+  "defense_rebounders": ["PLAYER_UUID", ...],  // Array of defensive player IDs staying for rebound
+  "offense_getback_coords": {  // Coordinates for get-back players (for fast break logic)
+    "PLAYER_UUID": {"x": 50, "y": 30}
+  },
+  "defense_release_coords": {  // Coordinates for release players (for fast break logic)
+    "PLAYER_UUID": {"x": 50, "y": 25}
+  },
 
   // Scoreboard snapshots
   "home_lineup": { "PG": {...}, ... },
@@ -109,14 +121,15 @@ into simple strings.
 ## Free Throw Metadata
 
 - **`attempts`** – Ordered results of each free throw (`MAKE` or `MISS`).
-- **`free_throws_remaining`** – Number of free throws remaining after this turn (turn-by-turn mode). If undefined, fall back to `ftContext`.
+- **`free_throws_remaining`** – Number of free throws remaining after this turn (turn-by-turn mode). Set by `BackEnd/engine/phase_resolution.py::resolve_free_throw_logic()`. If undefined, fall back to `ftContext`.
+- **`one_and_one`** – Boolean flag indicating if this is a 1-and-1 free throw situation (front-end must make first FT to unlock second).
 - **`ftContext`** – Added by `animateGameTurns.annotateFreeThrowTurns` to expose
   attempt index/total and bonus type for UI copy (batch mode fallback).
 
 ## Rebounds
 
 - **`rebound_type`** – `DREB` or `OREB` for missed shots/free throws.
-- **`rebounder_id`** – Player securing the rebound.
+- **`rebounderId`** – Player ID securing the rebound (camelCase, primary field). **Note:** For backward compatibility, `rebounder_id` (snake_case) and `rebounder_player_id` may also be present in some contexts, but `rebounderId` is the standard field in turn results.
 
 When an offensive rebound occurs, the backend now emits *two* turns:
 
@@ -129,10 +142,23 @@ When an offensive rebound occurs, the backend now emits *two* turns:
 - **`home_lineup` / `away_lineup`** – Serialised lineup info (position → player
   metadata) used by overlays and debugging.
 - **`deltas`** – Per-player stat increments accumulated during the turn (scoring,
-  rebounds, steals, etc.).
+  rebounds, steals, etc.). Note: REB is excluded from deltas (automatically calculated from OREB + DREB).
 - **`homeFouls` / `awayFouls`** – Team foul totals this quarter.
 - **`clock`**, **`quarter`**, **`period_label`** – Human-readable game-clock
   state after the turn.
+
+## Player Positioning Data (Shot Attempts)
+
+When a shot is attempted, the backend includes player positioning data for animation:
+
+- **`offense_getback`** – Array of player IDs getting back on defense (based on offensive team's rebounding strategy setting).
+- **`defense_release`** – Array of player IDs releasing early for fast break (based on defensive team's fast_breaks strategy setting).
+- **`offense_rebounders`** – Array of player IDs crashing the offensive boards.
+- **`defense_rebounders`** – Array of player IDs staying for the rebound.
+- **`offense_getback_coords`** – Object mapping player IDs to coordinates for get-back players (backend as source of truth for fast break logic).
+- **`defense_release_coords`** – Object mapping player IDs to coordinates for release players (backend as source of truth for fast break logic).
+
+These fields are set during shot attempts (both makes and misses) to enable proper animation and fast break logic.
 
 ## Team Data
 
@@ -203,7 +229,7 @@ When an offensive rebound occurs, the backend now emits *two* turns:
     "possession_flips": true,
     "score": {"Home": 44, "Away": 40},
     "rebound_type": "DREB",
-    "rebounder_id": "player-456",
+    "rebounderId": "player-456",  // Primary field (camelCase)
     "fast_break": true,
     "next_play_type": "FAST_BREAK",
     "animations": [...],
@@ -227,10 +253,11 @@ When an offensive rebound occurs, the backend now emits *two* turns:
     "possession_flips": true,
     "score": {"Home": 45, "Away": 40},
     "attempts": ["MISS"],
-    "free_throws_remaining": 0,  # Turn-by-turn mode: 0 means this was the final FT
+    "free_throws_remaining": 0,  # Turn-by-turn mode: 0 means this was the final FT (set by phase_resolution.py)
+    "one_and_one": False,  # 1-and-1 flag (False if not 1-and-1, or after first FT made)
     "ftContext": {"ftIndex": 1, "ftTotal": 2, "bonusType": "REGULAR"},  # Batch mode fallback
     "rebound_type": "DREB",
-    "rebounder_id": "player-789",
+    "rebounderId": "player-789",  # Primary field (camelCase)
     "next_play_type": "HCO",
     "animations": [...],
     "events": [],

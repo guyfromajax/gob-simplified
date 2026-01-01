@@ -20,7 +20,10 @@ These fields are added to **every** result in `turn_manager.py` after phase reso
 ```python
 # Core identification
 - result_type: str                    # "MAKE", "MISS", "FOUL", "FREE_THROW", etc.
-- possession_team_id: str            # Team on offense during this turn
+- offense_team_id: str                # ✅ SS&S Standard: Team on offense during this turn (authoritative)
+- possession_team_id: str             # ⚠️ DEPRECATED: Backward compatibility only, use offense_team_id
+- current_turn: str                   # Explicit turn type (HCO/FCP/HCT/FAST_BREAK/FREE_THROW/OREB/BASELINE_INBOUND/SIDE_INBOUND/OPENING_TIP)
+- next_turn: str                      # Explicit next turn type (set by game_manager.determine_next_turn())
 - possession_flips: bool              # Whether possession changes after this turn
 - quarter: int                        # Current quarter
 - turn_count: int                     # Micro turn counter
@@ -71,8 +74,9 @@ These fields are added **only when relevant** to specific result types:
 - scoring_team: str (if made)
 - next_play_type: str (e.g., "BASELINE_INBOUND")
 - next_defensive_setup: str (e.g., "FCP", "HCT")
-- free_throws_remaining: int (if AND-1)
-- has_and_one: bool
+- free_throws_remaining: int (if AND-1 or free throw)
+- one_and_one: bool (if 1-and-1 bonus situation)
+- has_and_one: bool (if AND-1 on made shot)
 - intended_shooter_pos: str
 - intended_shooter_id: str
 - foul_player_id: str (if shooting foul)
@@ -87,11 +91,10 @@ These fields are added **only when relevant** to specific result types:
 - ball_handler: Player / dict
 - points: int (if made)
 - scoring_team: str (if made)
-- free_throws_remaining: int
-- one_and_one: bool
-- no_lane: bool
-- attempts: int
-- rebounderId: str (if missed)
+- free_throws_remaining: int (set by resolve_free_throw_logic())
+- one_and_one: bool (indicates 1-and-1 bonus situation)
+- attempts: list[str] (ordered results: ["MAKE", "MISS"])
+- rebounderId: str (camelCase, primary field - if missed)
 - rebound_type: str (if missed, "OREB" or "DREB")
 - next_play_type: str (if DREB)
 - next_defensive_setup: str
@@ -159,9 +162,9 @@ These fields are added **only when relevant** to specific result types:
 
 #### OREB Results
 ```python
-- rebounderId: str
-- rebound_type: str
-- animations: list (if putback)
+- rebounderId: str (camelCase, primary field)
+- rebound_type: str ("OREB")
+- animations: list (if putback attempt)
 ```
 
 ### 4. Field Categories
@@ -170,8 +173,10 @@ Fields can be categorized by **purpose**:
 
 1. **Transition Control** (determines next turn)
    - `result_type`
+   - `current_turn` (explicit turn type identifier)
+   - `next_turn` (explicit next turn type, set by game_manager.determine_next_turn())
    - `possession_flips`
-   - `next_play_type`
+   - `next_play_type` (informational hint, not authoritative)
    - `next_defensive_setup`
    - `offensive_state` (in game_state, not result)
 
@@ -230,7 +235,10 @@ Fields can be categorized by **purpose**:
 # Core Schema (always present)
 {
     "result_type": str,
-    "possession_team_id": str,
+    "offense_team_id": str,              # ✅ SS&S Standard (authoritative)
+    "possession_team_id": str,           # ⚠️ DEPRECATED (backward compatibility only)
+    "current_turn": str,                 # Explicit turn type identifier
+    "next_turn": str,                    # Explicit next turn type
     "possession_flips": bool,
     "quarter": int,
     "turn_count": int,
@@ -265,10 +273,11 @@ Fields can be categorized by **purpose**:
     "next_defensive_setup": str,
     
     # Free throw fields (if result_type == "FREE_THROW")
-    "free_throws_remaining": int,
-    "one_and_one": bool,
-    "rebounderId": str,
-    "rebound_type": str,
+    "free_throws_remaining": int,        # Set by resolve_free_throw_logic()
+    "one_and_one": bool,                 # 1-and-1 bonus flag
+    "attempts": list[str],                # Ordered results: ["MAKE", "MISS"]
+    "rebounderId": str,                  # camelCase (if missed)
+    "rebound_type": str,                 # "OREB" or "DREB" (if missed)
     
     # Foul fields (if result_type == "FOUL")
     "foul_player_id": str,

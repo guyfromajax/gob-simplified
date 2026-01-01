@@ -11,7 +11,7 @@ Player data exists in **four contexts**:
 1. **Universal Collection** - Baseline/permanent data (players_collection)
 2. **Game Instance** - Runtime snapshot (game.players array)
 3. **Franchise Instance** - Evolving data (franchise.players object)
-4. **Tournament Instance** - Evolving data (tournament.player_stats object) - **Unified with Franchise architecture**
+4. **Tournament Instance** - Evolving data (tournament.players object) - **Unified with Franchise architecture**
 
 ---
 
@@ -236,17 +236,21 @@ Player data exists in **four contexts**:
 
 **Purpose:** Track player growth/evolution throughout tournament mode (unified with Franchise architecture)
 
-**Location:** `tournament_document.player_stats`
+**Location:** `tournament_document.players`
 
 ### Structure:
 
 ```javascript
 {
-  "player_stats": {
+  "players": {
     "uuid": {  // Keyed by player _id
-      "first_name": "CJ",
-      "last_name": "Castleman",
-      "team": "Bentley-Truman",
+      // ==================== META (Reference Data) ====================
+      "meta": {
+        "first_name": "CJ",
+        "last_name": "Castleman",
+        "team": "Bentley-Truman",
+        "team_id": "BENTLEY_TRUMAN"
+      },
       
       // ==================== EVOLVED ATTRIBUTES ====================
       "attributes": {
@@ -267,11 +271,24 @@ Player data exists in **four contexts**:
         "NG": 1.0
       },
       
+      // ==================== EVOLVED POSITION RATINGS ====================
+      "position_ratings": {
+        "PG": 70,  // Improved from 65 via training
+        "SG": 85,  // Improved from 80 via training
+        "SF": 92,  // Improved from 90 via training
+        "PF": 72,  // Improved from 70 via training
+        "C": 55    // Improved from 50 via training
+      },
+      
       // ==================== SEASON STATS ====================
       "season": {
         "PTS": 450,
         "REB": 120,
-        // ... season totals (tournament-specific)
+        "AST": 85,
+        "FGM": 180,
+        "FGA": 400,
+        "GP": 5,
+        // ... season totals (tournament-specific, direct totals)
       }
     }
   }
@@ -285,10 +302,12 @@ Player data exists in **four contexts**:
 4. **Tournament ends:** Attributes don't carry over to new tournaments
 
 **Unified Architecture:**
-- Tournament mode now uses the same attribute storage pattern as Franchise mode
+- Tournament mode now uses the same storage pattern as Franchise mode (`tournament.players` instead of `tournament.player_stats`)
+- Structure matches Franchise mode: `meta`, `attributes`, `position_ratings`, `season` stats
 - All attributes are stored in the tournament document (not just EM, CH, MO)
 - This enables consistent training and attribute evolution across both modes
-- **Backward Compatibility:** Old tournaments that only have EM, CH, MO are automatically merged with core collection when accessed
+- **Note:** Tournament mode does NOT track career stats (unlike Franchise mode)
+- **Backward Compatibility:** Old tournaments using `player_stats` are automatically migrated to `players` when accessed
 
 ---
 
@@ -298,27 +317,27 @@ Player data exists in **four contexts**:
 |-------|-----------|---------------|-----------|------------|-------|
 | **_id / playerId** | ✅ _id | ✅ playerId | ✅ Key | ✅ Key | Same UUID everywhere |
 | **player_id** | ❌ Remove | ❌ | ❌ | ❌ | Redundant (same as _id) |
-| **first_name** | ✅ | Derived→name | Meta | |
-| **last_name** | ✅ | Derived→name | Meta | |
-| **team** | ✅ School | ✅ Side (home/away) | Meta | Different meaning! |
-| **team_id** | | ✅ Current team | Meta | |
-| **jersey** | ✅ | ✅ | Meta | |
-| **year** | ✅ Starting | | Evolves | Fr→So→Jr→Sr |
-| **height** | ✅ | | (Meta?) | Probably static |
-| **weight** | ✅ | | (Meta?) | Probably static |
-| **photo** | ✅ Path | ✅ Path | | Never changes |
-| **attributes** | ✅ Baseline (30+) | ✅ Runtime (4) | ✅ Evolved | |
-| **position_ratings** | ✅ Baseline | | ✅ Evolved | Improve with training |
-| **stats.game** | ✅ Empty | | | Reset each game |
-| **stats.season** | ✅ Current | | ✅ Franchise | |
-| **stats.career** | ✅ Lifetime | | ✅ Franchise | |
-| **metadata.fouls** | ✅ Reset | | | Per-game |
-| **metadata.minutes** | ✅ Reset | | | Per-game |
-| **metadata.abilities** | ✅ ? | | | TBD |
-| **pos** | | ✅ | | Which position THIS game |
-| **x, y** | | ✅ | | Court position (runtime) |
-| **primary_color** | | ✅ | | From team (runtime) |
-| **secondary_color** | | ✅ | | From team (runtime) |
+| **first_name** | ✅ | Derived→name | Meta | Meta | |
+| **last_name** | ✅ | Derived→name | Meta | Meta | |
+| **team** | ✅ School | ✅ Side (home/away) | Meta | Meta | Different meaning! |
+| **team_id** | | ✅ Current team | Meta | Meta | |
+| **jersey** | ✅ | ✅ | Meta | | |
+| **year** | ✅ Starting | | Evolves | | Fr→So→Jr→Sr (Franchise only) |
+| **height** | ✅ | | (Meta?) | | Probably static |
+| **weight** | ✅ | | (Meta?) | | Probably static |
+| **photo** | ✅ Path | ✅ Path | | | Never changes |
+| **attributes** | ✅ Baseline (30+) | ✅ Runtime (4) | ✅ Evolved | ✅ Evolved | |
+| **position_ratings** | ✅ Baseline | | ✅ Evolved | ✅ Evolved | Improve with training |
+| **stats.game** | ✅ Empty | | | | Reset each game |
+| **stats.season** | ✅ Current | | ✅ Franchise | ✅ Tournament | Season totals |
+| **stats.career** | ✅ Lifetime | | ✅ Franchise | ❌ | Tournament doesn't track career |
+| **metadata.fouls** | ✅ Reset | | | | Per-game |
+| **metadata.minutes** | ✅ Reset | | | | Per-game |
+| **metadata.abilities** | ✅ ? | | | | TBD |
+| **pos** | | ✅ | | | Which position THIS game |
+| **x, y** | | ✅ | | | Court position (runtime) |
+| **primary_color** | | ✅ | | | From team (runtime) |
+| **secondary_color** | | ✅ | | | From team (runtime) |
 
 ---
 
@@ -327,7 +346,8 @@ Player data exists in **four contexts**:
 ### ✅ **Already Working:**
 - Single games pull from universal collection ✅
 - Franchise mode tracks evolution in `franchise.players` ✅
-- Training updates franchise player attributes ✅
+- Tournament mode tracks evolution in `tournament.players` (unified with Franchise) ✅
+- Training updates player attributes in both Franchise and Tournament modes ✅
 - Game instance players array is lean (3.7KB) ✅
 
 ### 🔧 **Cleanup Needed:**

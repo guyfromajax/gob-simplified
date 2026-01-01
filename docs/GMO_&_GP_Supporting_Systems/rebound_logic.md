@@ -2,7 +2,9 @@
 
 ## Overview
 
-This document describes the rebound calculation system used when a shot is missed. The system incorporates strategy settings (offensive rebounding vs getting back on defense, defensive tempo for fast break releases), player attributes, team modifiers, and defensive scheme penalties.
+This document describes the rebound calculation system used when a shot is missed. The system incorporates strategy settings (offensive rebounding vs getting back on defense, defensive fast breaks setting for fast break releases), player attributes, team modifiers, and defensive scheme penalties.
+
+**Note:** This document describes the primary rebound system used for regular shot misses. Free throw misses and putback misses use a simplified legacy system (see Code Locations section for details).
 
 ---
 
@@ -10,17 +12,17 @@ This document describes the rebound calculation system used when a shot is misse
 
 When a shot is attempted in an HCO instance, players position themselves based on their team's strategy settings.
 
-### Defense Tempo Setting (Fast Break Release)
+### Defense Fast Breaks Setting (Fast Break Release)
 
-The defensive team's **Tempo** setting determines the probability that one defender will release early for a potential fast break opportunity:
+The defensive team's **Fast Breaks** setting (from `strategy_settings.fast_breaks`) determines the probability that one defender will release early for a potential fast break opportunity:
 
-| Tempo | All 5 Stay | 1 Releases | Released Player |
-|-------|------------|------------|-----------------|
-| 0     | 100%       | 0%         | N/A             |
-| 1     | 75%        | 25%        | PG (or SG if PG guards shooter) |
-| 2     | 50%        | 50%        | PG (or SG if PG guards shooter) |
-| 3     | 25%        | 75%        | PG (or SG if PG guards shooter) |
-| 4     | 0%         | 100%       | PG (or SG if PG guards shooter) |
+| Fast Breaks | All 5 Stay | 1 Releases | Released Player |
+|-------------|------------|------------|-----------------|
+| 0           | 100%       | 0%         | N/A             |
+| 1           | 75%        | 25%        | PG (or SG if PG guards shooter) |
+| 2           | 50%        | 50%        | PG (or SG if PG guards shooter) |
+| 3           | 25%        | 75%        | PG (or SG if PG guards shooter) |
+| 4           | 0%         | 100%       | PG (or SG if PG guards shooter) |
 
 **Animation:** Released defender animates to:
 - **Y coords:** Random 15-35
@@ -176,8 +178,8 @@ stat = "DREB" if rebound_team == defense else "OREB"
 ### Defensive Rebound (DREB)
 - Possession flips to defense
 - Determine next play type:
-  - **Fast Break:** Based on offensive team's tempo (higher tempo = higher FB chance)
-  - **Half-Court Offense (HCO):** Standard setup
+  - **Fast Break:** Triggered if a defensive player released early during the shot (based on defensive team's `fast_breaks` setting)
+  - **Half-Court Offense (HCO):** Standard setup if no fast break trigger
 
 ### Offensive Rebound (OREB)
 - Possession stays with offense
@@ -234,8 +236,13 @@ Based on 100-simulation testing with randomized parameters:
 
 ## Code Locations
 
-- **Rebound Calculation:** `BackEnd/models/shot_manager.py` (lines 259-315)
-- **Player Score Formula:** `BackEnd/utils/shared.py` - `calculate_rebound_score()`
+- **Primary Rebound Calculation:** `BackEnd/models/shot_manager.py` (lines 762-840) - Used for regular shot misses
+- **Fast Break Release Logic:** `BackEnd/engine/fast_break_trigger.py` - `FastBreakTrigger.can_trigger_from_dreb()`
+- **Player Score Formula:** `BackEnd/utils/shared.py` - `calculate_rebound_score()` (line 415-417)
+- **Legacy Rebound Logic:** 
+  - `BackEnd/utils/shared.py` - `determine_rebounder()` (lines 323-354) - Used for putback misses
+  - `BackEnd/engine/phase_resolution.py` - `resolve_free_throw_logic()` (lines 1444-1466) - Used for free throw misses
+  - **Note:** Legacy functions use simplified formulas (0.75 base probability, 0.55 minimum, no player advantage modifier, no zone penalty)
 - **Animation Logic:** `FrontEnd/static/js/phaser/animation/turnAnimation.js`
 - **Shot Animation System:** `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js`
 
