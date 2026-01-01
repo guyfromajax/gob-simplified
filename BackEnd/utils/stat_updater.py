@@ -1327,14 +1327,19 @@ def finalize_game(
         
         print(f"✅ [FINALIZE_GAME] Successfully updated franchise document: modified_count={result.modified_count}")
         logger.info(f"✅ [FINALIZE_GAME] Successfully updated franchise document: modified_count={result.modified_count}")
-
-        apply_stats_from_summary(game, game_id)
+        
+        # ✅ FIX: Remove redundant apply_stats_from_summary() call
+        # apply_stats_from_summary() only updates players_collection for franchise mode, not the franchise document
+        # The franchise document is already updated above (lines 1236-1329) from box_score (all 12 players)
+        # This matches tournament mode pattern: process all players from box_score, not from players array
         
         # Update defensive playcall season_stats from game_stats
         _update_defensive_playcall_season_stats(game)
         
         # Update offensive play season_stats from game_stats
         _update_offensive_play_season_stats(game, "franchise", fid)
+        
+        logger.info(f"✅ [FINALIZE_GAME] Franchise stats finalization complete for game_id={game_id}")
 
         return
 
