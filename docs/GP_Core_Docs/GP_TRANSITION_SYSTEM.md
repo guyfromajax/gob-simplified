@@ -18,10 +18,10 @@ This document defines the **complete data and execution requirements** for turn-
 
 | Fix | Pattern | Status | Implementation Location | Notes |
 |-----|---------|--------|------------------------|-------|
-| **Fix 1** | Pattern D (Missing offense_team_id) | ✅ **COMPLETE** | `turn_manager.py:786` | Sets `offense_team_id` in `run_micro_turn()` for ALL results |
-| **Fix 2** | Pattern A (Made shots → Inbound) | ✅ **COMPLETE** | `game_manager.py:449-455` | Backend flips possession before creating BASELINE_INBOUND for made shots |
-| **Fix 3** | Pattern B (DREB → HCO) | ✅ **COMPLETE** | `game_manager.py:288-299` | Backend flips possession for DREB → HCO transitions |
-| **Fix 4** | Pattern C (DREB → Fast Break) | ✅ **COMPLETE** | `game_manager.py:301-310` | Backend flips possession for DREB → Fast Break transitions |
+| **Fix 1** | Pattern D (Missing offense_team_id) | ✅ **COMPLETE** | `turn_manager.py:790-793` | Sets `offense_team_id` in `run_micro_turn()` for ALL results |
+| **Fix 2** | Pattern A (Made shots → Inbound) | ✅ **COMPLETE** | `game_manager.py:489-495` | Backend flips possession before creating BASELINE_INBOUND for made shots |
+| **Fix 3** | Pattern B (DREB → HCO) | ✅ **COMPLETE** | `game_manager.py:311-317` | Backend flips possession for DREB → HCO transitions |
+| **Fix 4** | Pattern C (DREB → Fast Break) | ✅ **COMPLETE** | `game_manager.py:322-328` | Backend flips possession for DREB → Fast Break transitions |
 
 ### Current SS&S Compliance Status
 
@@ -33,16 +33,20 @@ This document defines the **complete data and execution requirements** for turn-
 
 ### Known Remaining Issues
 
-1. **Free Throw Made Shots**: Frontend still has defensive flip logic (`freeThrow.js:258-289`, `FreeThrowAnimationSystem.js:403-425`), but it correctly checks for `next_play_type === "BASELINE_INBOUND"` and doesn't execute if backend handles it. This is defensive code that could be cleaned up but is not causing bugs.
-2. **Frontend Cleanup (Optional)**: Some frontend code has defensive flip logic that's no longer needed since backend handles all flips. This is low priority as it's not causing issues - the code correctly checks backend state before executing.
+1. **Free Throw Made Shots**: `freeThrow.js:258-289` - Checks `possession_flips` flag and calculates `newOffenseSide` based on shooter sprite. This is defensive code that correctly checks backend state before executing.
+2. **FreeThrowAnimationSystem**: `FreeThrowAnimationSystem.js:403-425` - Calculates `newOffenseSide` from shooter sprite (lines 405-409), but correctly checks `next_play_type === "BASELINE_INBOUND"` and returns early if backend handles it (lines 422-426). This is defensive code that's working correctly.
+
+**Note:** This is defensive cleanup - the backend is now authoritative. The frontend code correctly checks backend state (`possession_flips`, `offense_team_id`) before executing any flip logic, so it's not causing bugs. However, it could be simplified to just read `offense_team_id` directly without calculating flips.
+
+**Priority:** Low - Code is working correctly, cleanup is optional for code simplification.
 
 ### Key Implementation Details
 
 **Backend Possession Flip Locations:**
-- **Made Shots → BASELINE_INBOUND**: `game_manager.py:449-455` (Fix 2)
-- **DREB → HCO**: `game_manager.py:288-299` (Fix 3)
-- **DREB → Fast Break**: `game_manager.py:301-310` (Fix 4)
-- **Side Inbound**: `game_manager.py:385-392` (Gold standard, already existed)
+- **Made Shots → BASELINE_INBOUND**: `game_manager.py:489-495` (Fix 2)
+- **DREB → HCO**: `game_manager.py:311-317` (Fix 3)
+- **DREB → Fast Break**: `game_manager.py:322-328` (Fix 4)
+- **Side Inbound**: `game_manager.py:400-408` (Gold standard, already existed)
 
 **Frontend Transition Handler:**
 - `turnPreparation.js:144-179` - Universal transition handler reads `offense_team_id` from turn data
@@ -690,6 +694,8 @@ Note: **(PC)** indicates possession change
 ---
 
 ## SS&S Transition Evaluation
+
+> **Note:** The evaluation sections below (Batch 1-6) represent the **OLD state** before the 4 systematic fixes were implemented. They show the original 33% SS&S compliance rate and are valuable for historical reference, but the fixes described in these sections have now been **COMPLETE**. See the "Current Implementation Status" section at the top of this document for the current state (~88-94% compliant).
 
 ### Batch 1: HCO Transitions (7 Total)
 
