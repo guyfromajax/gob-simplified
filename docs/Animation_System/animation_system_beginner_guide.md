@@ -564,6 +564,151 @@ If you can answer these, you've got the basics down! 🏀
 
 ---
 
+## System Architecture Diagram
+
+The system is built like a well-organized company with clear roles:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    GAME SCENE                               │
+│  (The basketball court where everything happens)           │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 ANIMATION ROUTER                            │
+│  (The main boss - decides which system handles each turn)  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 ANIMATION ENGINE                            │
+│  (The manager - coordinates all the animation systems)     │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│              SPECIALIZED ANIMATION SYSTEMS                  │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────┐ │
+│  │    SHOT     │ │    PASS     │ │   REBOUND   │ │   HCO   │ │
+│  │   SYSTEM    │ │   SYSTEM    │ │   SYSTEM    │ │ SYSTEM  │ │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────┘ │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 BALL CONTROLLER                             │
+│  (The ball manager - keeps track of who has the ball)      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Adding New Animation Types
+
+### Step 1: Create New Animation System
+```javascript
+// NewAnimationSystem.js
+export class NewAnimationSystem {
+  constructor(scene, ballController, stateMachine, playerSprites) {
+    this.scene = scene;
+    this.ballController = ballController;
+    // ... other setup
+  }
+  
+  async processNewAnimation(turnData) {
+    // Your animation logic here
+  }
+}
+```
+
+### Step 2: Add to AnimationEngine
+```javascript
+// In AnimationEngine.js
+import NewAnimationSystem from './NewAnimationSystem.js';
+
+// In constructor:
+this.newSystem = null;
+
+// In injectDependencies:
+this.newSystem = new NewAnimationSystem(
+  this.scene,
+  this.ballController,
+  this.stateMachine,
+  this.playerSprites
+);
+
+// Add handler:
+async handleNewAnimation(turnData, context) {
+  if (this.newSystem) {
+    await this.newSystem.processNewAnimation(turnData);
+  }
+}
+```
+
+### Step 3: Add Routing Logic
+```javascript
+// In AnimationRouter.js
+if (turnData.result_type === 'NEW_ANIMATION_TYPE') {
+  await this.animationEngine.handleNewAnimation(turnData, context);
+}
+```
+
+## Best Practices
+
+### 1. Always Use BallController
+```javascript
+// ✅ Good - Use BallController
+this.ballController.attachToPlayer(playerSprite);
+
+// ❌ Bad - Direct ball manipulation
+ballSprite.x = playerSprite.x;
+```
+
+### 2. Check for Valid Data
+```javascript
+// ✅ Good - Validate data first
+if (!turnData || !turnData.shooter_id) {
+  console.error('Invalid turn data');
+  return;
+}
+
+// ❌ Bad - Assume data is always correct
+const shooter = this.playerSprites[turnData.shooter_id];
+```
+
+### 3. Use Proper Error Handling
+```javascript
+// ✅ Good - Handle errors gracefully
+try {
+  await this.processAnimation(turnData);
+} catch (error) {
+  console.error('Animation failed:', error);
+  // Fallback or recovery logic
+}
+```
+
+### 4. Log Important Events
+```javascript
+// ✅ Good - Log key events for debugging
+console.log('🎬 Starting shot animation', {
+  shooter: turnData.shooter_id,
+  result: turnData.result_type
+});
+```
+
+## Testing the System
+
+### Console Logs to Watch For
+- `AnimationRouter: Starting turn processing` - System is working
+- `BallController: Ball attached to player` - Ball ownership working
+- `ShotAnimationSystem: Processing shot` - Shot system working
+- `AnimationEngine: Completed [TYPE]` - Animation finished
+
+### Common Test Scenarios
+1. **Regular Shot** - Should see ball fly from player to rim
+2. **Pass** - Should see ball fly from passer to receiver  
+3. **Rebound** - Should see players move to rebound positions
+4. **Free Throw** - Should see proper free throw sequence
+
 ## Summary
 
 - **AnimationRouter** = Traffic director (decides who handles what)
