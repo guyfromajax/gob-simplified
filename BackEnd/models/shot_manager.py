@@ -396,24 +396,25 @@ class ShotManager:
                 # 3-pointers: 40% chance foul forces a miss
                 threshold = THREE_POINTER_FOUL_MISS_CHANCE
                 miss_chance_pct = int(THREE_POINTER_FOUL_MISS_CHANCE * 100)
-                logging.warning(f"🔍 [SHOOTING FOUL CALIBRATION] 3-pointer foul check:")
-                logging.warning(f"   Original shot result: {'MADE' if made else 'MISS'}")
-                logging.warning(f"   Calibration roll: {foul_calibration_roll:.3f}")
-                logging.warning(f"   Threshold: < {threshold} ({miss_chance_pct}% chance to force miss)")
+                # logging.warning(f"🔍 [SHOOTING FOUL CALIBRATION] 3-pointer foul check:")
+                # logging.warning(f"   Original shot result: {'MADE' if made else 'MISS'}")
+                # logging.warning(f"   Calibration roll: {foul_calibration_roll:.3f}")
+                # logging.warning(f"   Threshold: < {threshold} ({miss_chance_pct}% chance to force miss)")
                 if foul_calibration_roll < threshold:
                     made = False
-                    logging.warning(f"   ✅ Foul forces MISS (roll {foul_calibration_roll:.3f} < {threshold})")
+                    # logging.warning(f"   ✅ Foul forces MISS (roll {foul_calibration_roll:.3f} < {threshold})")
                 else:
                     # ✅ BUG FIX: Explicitly preserve original result when calibration doesn't force miss
                     # The original 'made' value is already correct, but we log it for clarity
-                    logging.warning(f"   ➡️  Standard shot result holds (roll {foul_calibration_roll:.3f} >= {threshold}) - Result: {'MADE' if made else 'MISS'}")
+                    # logging.warning(f"   ➡️  Standard shot result holds (roll {foul_calibration_roll:.3f} >= {threshold}) - Result: {'MADE' if made else 'MISS'}")
+                    pass
             else:
                 # 2-pointers: 20% chance foul forces a miss
                 threshold = TWO_POINTER_FOUL_MISS_CHANCE
                 miss_chance_pct = int(TWO_POINTER_FOUL_MISS_CHANCE * 100)
-                logging.warning(f"🔍 [SHOOTING FOUL CALIBRATION] 2-pointer foul check:")
-                logging.warning(f"   Original shot result: {'MADE' if made else 'MISS'}")
-                logging.warning(f"   Calibration roll: {foul_calibration_roll:.3f}")
+                # logging.warning(f"🔍 [SHOOTING FOUL CALIBRATION] 2-pointer foul check:")
+                # logging.warning(f"   Original shot result: {'MADE' if made else 'MISS'}")
+                # logging.warning(f"   Calibration roll: {foul_calibration_roll:.3f}")
                 logging.warning(f"   Threshold: < {threshold} ({miss_chance_pct}% chance to force miss)")
                 if foul_calibration_roll < threshold:
                     made = False
@@ -1235,15 +1236,18 @@ class ShotManager:
             # Soft foul: random chance based on SOFT_PROB
             soft_roll = random.random()
             d_foul = soft_roll < SOFT_PROB
-            logging.warning(f"   Soft foul check: defense_score {defense_score} < soft_threshold {soft_threshold}")
-            logging.warning(f"   Soft roll: {soft_roll:.3f} < SOFT_PROB {SOFT_PROB} = {d_foul}")
+            # logging.warning(f"   Soft foul check: defense_score {defense_score} < soft_threshold {soft_threshold}")
+            # logging.warning(f"   Soft roll: {soft_roll:.3f} < SOFT_PROB {SOFT_PROB} = {d_foul}")
             if d_foul:
-                logging.warning(f"   ✅ RESULT: SOFT FOUL (roll {soft_roll:.3f} < {SOFT_PROB})")
+                # logging.warning(f"   ✅ RESULT: SOFT FOUL (roll {soft_roll:.3f} < {SOFT_PROB})")
+                pass
             else:
-                logging.warning(f"   ➡️  No foul (roll {soft_roll:.3f} >= {SOFT_PROB})")
+                # logging.warning(f"   ➡️  No foul (roll {soft_roll:.3f} >= {SOFT_PROB})")
+                pass
         else:
             d_foul = False
-            logging.warning(f"   ➡️  No foul (defense_score {defense_score} >= soft_threshold {soft_threshold})")
+            # logging.warning(f"   ➡️  No foul (defense_score {defense_score} >= soft_threshold {soft_threshold})")
+            pass
         
         return d_foul, defender if d_foul else None
 

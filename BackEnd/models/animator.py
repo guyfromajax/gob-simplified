@@ -1072,7 +1072,7 @@ class Animator:
                     step_timestamp = steps[check_step_idx].get("timestamp", 0)
                     if step_action in ["pass", "receive"]:
                         player_name = getattr(player, "name", "unknown")
-                        logging.warning(f"🔍 [SKELETON MAPPING] Step {check_step_idx} (timestamp {step_timestamp}) - Position {position} → Player {player_name} (ID: {player_id[:8]}) with action: {step_action}")
+                        # logging.warning(f"🔍 [SKELETON MAPPING] Step {check_step_idx} (timestamp {step_timestamp}) - Position {position} → Player {player_name} (ID: {player_id[:8]}) with action: {step_action}")
             
             # Build movement array from steps
             movement = []
@@ -1183,7 +1183,7 @@ class Animator:
                     if check_mov_idx < len(step_mapping):
                         skeleton_idx, timestamp = step_mapping[check_mov_idx]
                         player_name = getattr(player, "name", "unknown")
-                        logging.warning(f"🔍 [MOVEMENT MAPPING] {position} ({player_name}) - movement[{check_mov_idx}] = skeleton step {skeleton_idx} (timestamp {timestamp})")
+                        # logging.warning(f"🔍 [MOVEMENT MAPPING] {position} ({player_name}) - movement[{check_mov_idx}] = skeleton step {skeleton_idx} (timestamp {timestamp})")
             
             # Calculate duration (last timestamp)
             duration = movement[-1]["timestamp"] if movement else 0
