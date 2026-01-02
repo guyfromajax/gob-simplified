@@ -1161,33 +1161,51 @@ def finalize_game(
         logger.info(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, home={home_name}, away={away_name}")
 
         players = game.get("players", [])
-        team_map = {"home": game.get("home_team"), "away": game.get("away_team")}
         
-        # Extract team names from team_map (handle both dict and string)
-        home_team_name = team_map.get("home")
-        if isinstance(home_team_name, dict):
-            home_team_name = home_team_name.get("name")
-        away_team_name = team_map.get("away")
-        if isinstance(away_team_name, dict):
-            away_team_name = away_team_name.get("name")
+        # ✅ SS&S: Extract team names from the SAME structure that builds box_score (matches tournament mode pattern)
+        # This ensures team names match the keys in box_score exactly
+        home_team_obj = game.get("home_team", {})
+        away_team_obj = game.get("away_team", {})
+        home_team_name = None
+        away_team_name = None
         
         # ✅ SS&S: Build box_score from top level OR nested structure (like apply_stats_from_summary does)
         # summarize_game_state() stores box_score nested under home_team/away_team, not at top level
         box_score = game.get("box_score", {})
         if not box_score:
             # Build box_score from nested team objects (new structure from summarize_game_state)
-            home_team_obj = game.get("home_team", {})
-            away_team_obj = game.get("away_team", {})
             if home_team_obj and isinstance(home_team_obj, dict):
-                home_team_name_from_obj = home_team_obj.get("name")
-                if home_team_name_from_obj and "box_score" in home_team_obj:
-                    box_score[home_team_name_from_obj] = home_team_obj.get("box_score", {})
+                home_team_name = home_team_obj.get("name")
+                if home_team_name and "box_score" in home_team_obj:
+                    box_score[home_team_name] = home_team_obj.get("box_score", {})
             if away_team_obj and isinstance(away_team_obj, dict):
-                away_team_name_from_obj = away_team_obj.get("name")
-                if away_team_name_from_obj and "box_score" in away_team_obj:
-                    box_score[away_team_name_from_obj] = away_team_obj.get("box_score", {})
+                away_team_name = away_team_obj.get("name")
+                if away_team_name and "box_score" in away_team_obj:
+                    box_score[away_team_name] = away_team_obj.get("box_score", {})
+        else:
+            # If box_score exists at top level, extract team names from team objects (matches tournament mode)
+            if isinstance(home_team_obj, dict):
+                home_team_name = home_team_obj.get("name")
+            elif isinstance(home_team_obj, str):
+                home_team_name = home_team_obj
+            
+            if isinstance(away_team_obj, dict):
+                away_team_name = away_team_obj.get("name")
+            elif isinstance(away_team_obj, str):
+                away_team_name = away_team_obj
         
         logger.info(f"🔍 [FINALIZE_GAME] Processing {len(players)} players, box_score keys: {list(box_score.keys())}, home_team: {home_team_name}, away_team: {away_team_name}")
+        logger.info(f"🔍 [FINALIZE_GAME] box_score structure check - has {len(box_score)} teams, keys: {list(box_score.keys())}")
+        
+        # ✅ DEBUG: Verify team name matching
+        if home_team_name and home_team_name not in box_score:
+            logger.warning(f"⚠️ [FINALIZE_GAME] home_team_name '{home_team_name}' NOT in box_score keys: {list(box_score.keys())}")
+        else:
+            logger.info(f"✅ [FINALIZE_GAME] home_team_name '{home_team_name}' found in box_score")
+        if away_team_name and away_team_name not in box_score:
+            logger.warning(f"⚠️ [FINALIZE_GAME] away_team_name '{away_team_name}' NOT in box_score keys: {list(box_score.keys())}")
+        else:
+            logger.info(f"✅ [FINALIZE_GAME] away_team_name '{away_team_name}' found in box_score")
 
         # ✅ SS&S: Build team_name -> team_id map from franchise_teams
         franchise_doc = db.franchises.find_one({"_id": fid}, {"franchise_teams": 1})
@@ -1206,6 +1224,8 @@ def finalize_game(
                 continue
         
         logger.info(f"🔍 [FINALIZE_GAME] Built team_name_to_id map: {team_name_to_id}")
+        if not team_name_to_id:
+            logger.warning(f"⚠️ [FINALIZE_GAME] team_name_to_id map is EMPTY - team_id lookups will fail")
 
         inc_doc: Dict[str, Any] = {}
         set_doc: Dict[str, Any] = {}
@@ -1218,23 +1238,30 @@ def finalize_game(
         
         for team_name in [home_team_name, away_team_name]:
             if not team_name:
+                logger.warning(f"⚠️ [FINALIZE_GAME] team_name is None/empty, skipping")
                 continue
             team_box = box_score.get(team_name, {})
             if not team_box:
-                logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team: {team_name}")
+                logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team: {team_name} (box_score keys: {list(box_score.keys())})")
                 continue
             
+            logger.info(f"🔍 [FINALIZE_GAME] Processing team '{team_name}' - found {len(team_box)} players in box_score")
+            
             # Process all players in this team's box_score
+            team_players_processed = 0
             for pos_key, player_data in team_box.items():
                 if not isinstance(player_data, dict):
+                    logger.debug(f"🔍 [FINALIZE_GAME] Skipping non-dict player_data at pos {pos_key}")
                     continue
                 pid = player_data.get("playerId")
                 if not pid:
+                    logger.debug(f"🔍 [FINALIZE_GAME] Skipping player_data with no playerId at pos {pos_key}")
                     continue
                 pid_str = str(pid)
                 
                 # Skip if already processed (avoid double-counting if same player appears multiple times)
                 if pid_str in processed_player_ids:
+                    logger.debug(f"🔍 [FINALIZE_GAME] Player {pid_str} already processed, skipping")
                     continue
                 processed_player_ids.add(pid_str)
                 
@@ -1245,6 +1272,13 @@ def finalize_game(
                     continue
                 
                 players_processed += 1
+                team_players_processed += 1
+                
+                # ✅ DEBUG: Log first player's stats to verify structure
+                if team_players_processed == 1:
+                    logger.info(f"🔍 [FINALIZE_GAME] First player from {team_name}: pid={pid_str}, stats keys: {list(stat_block.keys())[:10]}...")
+                
+                stats_added = 0
                 for stat, val in _clean_stat_block(stat_block).items():
                     # Skip non-stat fields (playerId, name, jersey, etc.)
                     if stat in ["playerId", "name", "jersey", "x", "y", "coords", "team", "pos"]:
@@ -1259,6 +1293,11 @@ def finalize_game(
                     inc_doc[f"players.{pid_str}.career.{stat}"] = inc_doc.get(
                         f"players.{pid_str}.career.{stat}", 0
                     ) + val
+                    stats_added += 1
+                
+                # ✅ DEBUG: Log if no stats were added
+                if stats_added == 0:
+                    logger.warning(f"⚠️ [FINALIZE_GAME] No stats added for player {pid_str} (team={team_name}, pos={pos_key}) - cleaned stats: {_clean_stat_block(stat_block)}")
                 
                 # ✅ SS&S: Increment GP (games played) for all players who participated
                 inc_doc[f"players.{pid_str}.season.GP"] = inc_doc.get(
@@ -1272,8 +1311,25 @@ def finalize_game(
                 if team_name in team_name_to_id:
                     set_doc[f"players.{pid_str}.meta.team_id"] = team_name_to_id[team_name]
                     logger.debug(f"🔍 [FINALIZE_GAME] Setting meta.team_id for player {pid_str}: {team_name_to_id[team_name]}")
+                else:
+                    logger.warning(f"⚠️ [FINALIZE_GAME] team_name '{team_name}' not in team_name_to_id map - cannot set meta.team_id for player {pid_str}")
+            
+            logger.info(f"🔍 [FINALIZE_GAME] Processed {team_players_processed} players from team '{team_name}'")
         
         logger.info(f"🔍 [FINALIZE_GAME] Processed {players_processed} players, {len(inc_doc)} stat increments, {len(set_doc)} meta fields to set")
+        
+        # ✅ DEBUG: Log sample of inc_doc to verify structure
+        if inc_doc:
+            sample_keys = list(inc_doc.keys())[:5]
+            logger.info(f"🔍 [FINALIZE_GAME] Sample inc_doc keys: {sample_keys}")
+            for key in sample_keys:
+                logger.info(f"🔍 [FINALIZE_GAME]   {key} = {inc_doc[key]}")
+        else:
+            logger.error(f"❌ [FINALIZE_GAME] inc_doc is EMPTY - no stats to increment!")
+        
+        # ✅ DEBUG: Check if players were processed
+        if players_processed == 0:
+            logger.error(f"❌ [FINALIZE_GAME] No players were processed! box_score structure: {box_score}")
 
         # ✅ SS&S: Ensure all players are initialized before incrementing stats
         # MongoDB's $inc will create fields if parent path exists, but won't create entire nested structure
@@ -1293,11 +1349,15 @@ def finalize_game(
             {"players": 1}
         )
         existing_players = franchise_check.get("players", {}) if franchise_check else {}
+        logger.info(f"🔍 [FINALIZE_GAME] Found {len(existing_players)} existing players in franchise document")
+        logger.info(f"🔍 [FINALIZE_GAME] Need to process {len(processed_player_ids)} players from box_score")
         
         set_on_insert_doc: Dict[str, Any] = {}
+        players_to_initialize = 0
         for pid_str in processed_player_ids:
             # Only initialize if player doesn't exist
             if pid_str not in existing_players:
+                players_to_initialize += 1
                 # Get player metadata from players_collection
                 try:
                     player_obj_id = ObjectId(pid_str)
@@ -1356,21 +1416,45 @@ def finalize_game(
         if set_on_insert_doc:
             update["$setOnInsert"] = set_on_insert_doc
             logger.info(f"🔍 [FINALIZE_GAME] Update doc has {len(set_on_insert_doc)} players to initialize if not exists")
+        else:
+            logger.info(f"🔍 [FINALIZE_GAME] No players need initialization (all {len(processed_player_ids)} players already exist)")
+        
+        # ✅ DEBUG: Log final update document structure
+        logger.info(f"🔍 [FINALIZE_GAME] Final update document structure:")
+        logger.info(f"🔍 [FINALIZE_GAME]   - $addToSet applied_games: {game_id}")
+        logger.info(f"🔍 [FINALIZE_GAME]   - $inc operations: {len(inc_doc) if inc_doc else 0}")
+        logger.info(f"🔍 [FINALIZE_GAME]   - $set operations: {len(set_doc) if set_doc else 0}")
+        logger.info(f"🔍 [FINALIZE_GAME]   - $setOnInsert operations: {len(set_on_insert_doc) if set_on_insert_doc else 0}")
 
+        # ✅ DEBUG: Check if game is already applied before attempting update
+        franchise_check_before = db.franchises.find_one({"_id": fid}, {"applied_games": 1})
+        if franchise_check_before:
+            applied_before = franchise_check_before.get("applied_games", [])
+            if game_id in applied_before or str(game_id) in [str(g) for g in applied_before]:
+                logger.warning(f"⚠️ [FINALIZE_GAME] Game {game_id} already in applied_games: {applied_before}, skipping (idempotent)")
+                return
+        
+        logger.info(f"🔍 [FINALIZE_GAME] Executing MongoDB update_one with query: {{'_id': {fid}, 'applied_games': {{'$ne': {game_id}}}}}")
         result = db.franchises.update_one(
             {"_id": fid, "applied_games": {"$ne": game_id}},
             update,
         )
+        
+        logger.info(f"🔍 [FINALIZE_GAME] MongoDB update result: matched={result.matched_count}, modified={result.modified_count}, upserted_id={result.upserted_id}")
+        
         if result.modified_count == 0:
-            logger.warning(f"⚠️ [FINALIZE_GAME] Update had no effect (modified_count=0). Game may already be in applied_games or franchise not found.")
+            logger.warning(f"⚠️ [FINALIZE_GAME] Update had no effect (modified_count=0). matched_count={result.matched_count}")
             # Check if game is already applied
             franchise_check = db.franchises.find_one({"_id": fid}, {"applied_games": 1})
             if franchise_check:
                 applied = franchise_check.get("applied_games", [])
-                if game_id in applied:
+                if game_id in applied or str(game_id) in [str(g) for g in applied]:
                     logger.info(f"ℹ️ [FINALIZE_GAME] Game {game_id} already in applied_games, skipping (idempotent)")
                 else:
-                    logger.error(f"❌ [FINALIZE_GAME] Franchise found but update failed. applied_games={applied}, game_id={game_id}")
+                    logger.error(f"❌ [FINALIZE_GAME] Franchise found but update failed. applied_games={applied}, game_id={game_id} (type: {type(game_id).__name__})")
+                    logger.error(f"❌ [FINALIZE_GAME] This suggests the query filter didn't match. Check if franchise_id or game_id format is wrong.")
+            else:
+                logger.error(f"❌ [FINALIZE_GAME] Franchise document not found: {fid}")
             return
         
         print(f"✅ [FINALIZE_GAME] Successfully updated franchise document: modified_count={result.modified_count}")
