@@ -291,7 +291,7 @@ class GameManager:
                     old_offense = self.offense_team.name
                     self.switch_possession()
                     oreb_turn["possession_flips"] = False  # ✅ Clear flag to prevent double flip
-                    logging.warning(f"🔄 [OREB] Flipped possession after putback: {old_offense} → {self.offense_team.name}")
+                    # logging.warning(f"🔄 [OREB] Flipped possession after putback: {old_offense} → {self.offense_team.name}")
                 
                 # If the OREB turn resulted in another OREB, resolve_offensive_rebound_turn
                 # will have set pending_oreb again. The while loop will process it.
