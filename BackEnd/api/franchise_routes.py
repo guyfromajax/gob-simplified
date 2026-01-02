@@ -410,33 +410,59 @@ def complete_week(req: CompleteWeekRequest):
     })
     
     # ✅ SS&S: Call finalize_game() with the actual gameplay game_id (if provided)
+    # ✅ FIX: Replicate Tournament mode pattern exactly - read from database, no memory check
+    # The database should already have complete box_score from periodic saves during gameplay
     if user_game_id:
         logger.info(f"🔍 [COMPLETE_WEEK] Calling finalize_game() for user's game with provided game_id: {user_game_id}")
         
-        # ✅ FIX: Ensure final box_score is saved before finalize_game()
-        # Computer games call summarize_game_state() right before finalize_game(), but user games
-        # rely on periodic saves. If game is still in memory, save final state now.
-        try:
-            # Import inside function to avoid circular import (api.py imports franchise_routes)
-            from BackEnd.api.api import ongoing_games
-            
-            # Convert game_id to string for dictionary lookup (ongoing_games uses string keys)
-            game_id_str = str(user_game_id)
-            gm = ongoing_games.get(game_id_str)
-            
-            if gm:
-                logger.info(f"💾 [COMPLETE_WEEK] Game still in memory, saving final state before finalize_game()")
-                db_summary = summarize_game_state(gm, exclude_animations=True)
-                db.games.update_one({"_id": ObjectId(user_game_id)}, {"$set": db_summary}, upsert=True)
-                logger.info(f"✅ [COMPLETE_WEEK] Final game state saved with box_score (game_id={user_game_id})")
-            else:
-                logger.info(f"ℹ️ [COMPLETE_WEEK] Game not in memory, using existing database state (game_id={user_game_id})")
-        except Exception as e:
-            logger.warning(f"⚠️ [COMPLETE_WEEK] Failed to save final state from memory: {e}. Proceeding with finalize_game() anyway.")
-        
-        stat_updater.finalize_game(
-            user_game_id, mode="franchise", franchise_id=req.franchise_id
+        # ✅ SS&S: Replicate Tournament mode game document lookup pattern (with multiple fallback attempts)
+        gid = (
+            ObjectId(user_game_id)
+            if ObjectId.is_valid(user_game_id)
+            else user_game_id
         )
+        logger.info(f"🔍 [COMPLETE_WEEK] User game - game_id from request: {user_game_id} (type: {type(user_game_id)}), converted gid: {gid} (type: {type(gid)})")
+        
+        # Try multiple formats to find the game document (matches Tournament mode pattern)
+        summary = None
+        # First try: Use gid as-is (ObjectId if conversion succeeded, string otherwise)
+        summary = db.games.find_one({"_id": gid}) or {}
+        if not summary or not summary.get("_id"):
+            logger.warning(f"⚠️ [COMPLETE_WEEK] Game not found with gid={gid}, trying string format")
+            # Second try: Use string format
+            try:
+                summary = db.games.find_one({"_id": user_game_id}) or {}
+            except Exception:
+                pass
+        if not summary or not summary.get("_id"):
+            logger.warning(f"⚠️ [COMPLETE_WEEK] Game not found with string format, trying ObjectId conversion")
+            # Third try: Convert string to ObjectId
+            try:
+                oid = ObjectId(user_game_id)
+                summary = db.games.find_one({"_id": oid}) or {}
+                if summary and summary.get("_id"):
+                    gid = summary.get("_id")
+                    logger.info(f"✅ [COMPLETE_WEEK] Found game document using ObjectId conversion: {gid}")
+            except Exception as e:
+                logger.error(f"❌ [COMPLETE_WEEK] Error converting game_id to ObjectId: {e}")
+        
+        logger.info(f"🔍 [COMPLETE_WEEK] User game - Final lookup result: Found={bool(summary and summary.get('_id'))}, _id={summary.get('_id') if summary else None}")
+        
+        if not summary or not summary.get("_id"):
+            logger.error(f"❌ [COMPLETE_WEEK] Game document not found in games_collection after all attempts. game_id: {user_game_id}, gid: {gid}")
+            logger.error(f"❌ [COMPLETE_WEEK] This likely means the game document was never saved to the database.")
+            logger.error(f"❌ [COMPLETE_WEEK] Check if simulate_quarter_endpoint successfully saved the game document.")
+        else:
+            # ✅ SS&S: Call finalize_game() directly (matches Tournament mode pattern)
+            # Database should already have complete box_score from periodic saves during gameplay
+            user_game_id_final = str(gid)
+            logger.info(f"🎯 [COMPLETE_WEEK] Finalizing user's game (matches Tournament pattern) - game_id: {user_game_id_final}")
+            stat_updater.finalize_game(
+                user_game_id_final,
+                mode="franchise",
+                franchise_id=req.franchise_id,
+            )
+            logger.info(f"✅ [COMPLETE_WEEK] User game - finalize_game completed for game_id: {user_game_id_final}")
     else:
         # Fallback: Try to find game by week + team IDs (legacy behavior)
         logger.warning(f"⚠️ [COMPLETE_WEEK] No game_id provided, attempting legacy lookup: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")

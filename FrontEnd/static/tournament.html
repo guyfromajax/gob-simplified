@@ -187,43 +187,42 @@
   <script src="/static/js/shared/attributeTooltips.js"></script>
   <script src="/static/tournament.js"></script>
   <script>
-    // Restore tab from URL parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    const tabParam = urlParams.get('tab');
-    
-    const tabButtons = document.querySelectorAll('.tab-buttons button');
-    const tabContents = document.querySelectorAll('.tab-content');
-    
-    // Set active tab from URL or default to bracket
-    const activeTab = tabParam || 'bracket-tab';
-    tabButtons.forEach(btn => {
-      if (btn.dataset.tab === activeTab) {
-        btn.classList.add('active');
-        const target = document.getElementById(activeTab);
-        if (target) {
-          target.classList.add('active');
+    // Wait for DOM and tournament.js functions to be available
+    document.addEventListener('DOMContentLoaded', () => {
+      // Restore tab from URL parameter
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get('tab');
+      
+      const tabButtons = document.querySelectorAll('.tab-buttons button');
+      const tabContents = document.querySelectorAll('.tab-content');
+      
+      // Set active tab from URL or default to bracket
+      const activeTab = tabParam || 'bracket-tab';
+      tabButtons.forEach(btn => {
+        if (btn.dataset.tab === activeTab) {
+          btn.classList.add('active');
+          const target = document.getElementById(activeTab);
+          if (target) {
+            target.classList.add('active');
+          }
+        } else {
+          btn.classList.remove('active');
+          const target = document.getElementById(btn.dataset.tab);
+          if (target) {
+            target.classList.remove('active');
+          }
         }
-      } else {
-        btn.classList.remove('active');
-        const target = document.getElementById(btn.dataset.tab);
-        if (target) {
-          target.classList.remove('active');
-        }
-      }
-    });
-    
-    tabButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        tabButtons.forEach(b => b.classList.remove('active'));
-        tabContents.forEach(c => c.classList.remove('active'));
-        btn.classList.add('active');
-        const target = document.getElementById(btn.dataset.tab);
-        if (target) target.classList.add('active');
-        
-        // Update URL with tab parameter (without reload)
-        const newUrl = new URL(window.location);
-        newUrl.searchParams.set('tab', btn.dataset.tab);
-        window.history.pushState({}, '', newUrl);
+      });
+      
+      // Tab switching is handled by tournament.js event listeners
+      // This script just handles initial tab state and URL updates
+      tabButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          // Update URL with tab parameter (without reload)
+          const newUrl = new URL(window.location);
+          newUrl.searchParams.set('tab', btn.dataset.tab);
+          window.history.pushState({}, '', newUrl);
+        });
       });
     });
   </script>
