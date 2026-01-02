@@ -48,27 +48,32 @@ This document details exactly what data is saved to the database after each game
   "home_team": {
     "name": "Team Name",
     "team_id": "team_object_id",
+    "mascot": "Team Mascot",
+    "colors": {
+      "primary_color": "#000000",
+      "secondary_color": "#ffffff"
+    },
     "score": 85,
-    "colors": {...},
-    "box_score": {...},  // Full box score by position
-    "totals": {...},  // Aggregated team totals
     "points_by_quarter": [20, 22, 21, 22],
     "team_fouls": 12,
     "timeouts": 2,
-    "attributes": {...},  // Team attributes
-    "strategy_calls": {...},  // Playcall overrides
-    "plays": {...},  // Play data
-    "scouting_data": {...}  // Opponent scouting
+    "attributes": {...},  // Team attributes (needed for S3 tab in Team Box Score)
+    "box_score": {...},  // Full box score by position
+    "totals": {...}  // Aggregated team totals
+    // Note: strategy_settings, plays, scouting removed from home_team/away_team
+    // (moved to teams object to reduce redundancy - was 75KB with embedded skeletons!)
   },
   "away_team": { /* same structure */ },
   
   // Teams object (by team_id) for game state persistence
   "teams": {
     "team_id_1": {
-      "strategy_calls": {...},
-      "plays": {...},
-      "attributes": {...},
-      "scouting_data": {...}
+      "strategy_settings": {...},  // Defense/general strategy settings
+      "strategy_calls": {...},  // Playcall overrides (SS&S pattern)
+      "plays": {...},  // Play data with game_stats
+      "attributes": {...},  // Team attributes
+      "scouting": {...},  // Opponent scouting data
+      "playbook_settings": {...}  // Playbook slot assignments and distribution
     },
     "team_id_2": { /* same */ }
   },
@@ -145,6 +150,8 @@ This document details exactly what data is saved to the database after each game
 - ✅ **Full text_log IS included** - needed for play-by-play display
 - ✅ **All player game stats included** - needed for rollup
 - ✅ **Team strategy/plays/scouting included** in `teams` object - needed for game state persistence
+- ⚠️ **Player coordinates (x, y) still saved** - optimization not yet implemented (see Optimization #4 below)
+- ✅ **Strategy/plays/scouting removed from `home_team`/`away_team`** - moved to `teams` object to reduce redundancy (was 75KB with embedded skeletons!)
 
 **Size Estimate:** ~50-200KB per game (depending on number of turns)
 
@@ -153,12 +160,13 @@ This document details exactly what data is saved to the database after each game
 ### 2. Computer vs Computer Games (simulated during week completion)
 
 **Location:** `games` collection  
-**Document ID:** `"{week}-{away_id}-{home_id}"` (string token)
+**Document ID:** Generated game_id (ObjectId) - same format as user games
 
 **Data Saved:** Same structure as user's game, but:
-- Generated via `summarize_game_state(gm)` after `run_simulation()`
-- Saved with `upsert=True` using token as `_id`
+- Generated via `summarize_game_state(gm, exclude_animations=True)` after `run_simulation()`
+- Saved with `upsert=True` using generated ObjectId as `_id`
 - Also calls `finalize_game()` to rollup stats
+- Also calls `_save_game_result()` to update team records and create result entry
 
 ---
 
@@ -304,10 +312,10 @@ This document details exactly what data is saved to the database after each game
 **Current:** Turns array is already empty (`turns: []`) for database saves  
 **Status:** ✅ **ALREADY OPTIMIZED** - Turns are not saved to database
 
-**Code Location:** `BackEnd/utils/shared.py:762-763`
+**Code Location:** `BackEnd/utils/shared.py:813-814`
 ```python
 if exclude_animations:
-    turns = []  # Empty array - don't save turns to database
+    turns = []  # Empty array - don't save turns to database (prevents document size issues)
 ```
 
 **Impact:**
@@ -348,7 +356,9 @@ if exclude_animations:
 
 ### 4. Remove Player Coordinates (x, y) ❓
 
-**Current:** Player `x` and `y` coordinates saved in `players` array  
+**Current:** Player `x` and `y` coordinates saved in `players` array (lines 569-570 in `shared.py`)  
+**Status:** ⚠️ **NOT YET IMPLEMENTED** - Coordinates are still being saved
+
 **Proposal:** Remove coordinates (only needed during gameplay)
 
 **Impact:**
@@ -356,6 +366,8 @@ if exclude_animations:
 - ✅ **Not needed after game completion**
 
 **Recommendation:** **REMOVE** - Only needed during active gameplay
+
+**Implementation:** Update `summarize_game_state()` to exclude `x` and `y` fields from player objects when `exclude_animations=True`
 
 ---
 
