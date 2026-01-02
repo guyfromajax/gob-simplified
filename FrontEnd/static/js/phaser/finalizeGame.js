@@ -136,20 +136,30 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
         `📡 Saving franchise game: franchiseId=${franchiseId}, week=${week}, game_id=${gameId}, quarter=${quarter}, is_final=${isFinal}, away=${awayTeamObj.name}, home=${homeTeamObj.name}`
       );
       console.log(`🔍 [FRONTEND] finalizeGame() called with simData: game_id=${gameId}, quarter=${quarter}, is_final=${isFinal}`);
+      // ✅ FIX: Pass game_document if available (from simulate-quarter when is_final=True)
+      // This eliminates race condition where complete_week() is called before Q4 save completes
+      const requestBody = {
+        franchise_id: franchiseId,
+        week: week,
+        game_id: gameId,  // ✅ SS&S: Pass actual gameplay game_id
+        result: {
+          team1_id: team1Id,
+          team2_id: team2Id,
+          team1_score: awayScore,
+          team2_score: homeScore,
+        },
+      };
+      
+      // If simData contains final_game_document (from simulate-quarter), pass it to eliminate race condition
+      if (simData && simData.final_game_document) {
+        console.log('✅ Passing final_game_document to complete_week (eliminates race condition)');
+        requestBody.game_document = simData.final_game_document;
+      }
+      
       const res = await fetch("/franchise/complete-week", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          franchise_id: franchiseId,
-          week: week,
-          game_id: gameId,  // ✅ SS&S: Pass actual gameplay game_id
-          result: {
-            team1_id: team1Id,
-            team2_id: team2Id,
-            team1_score: awayScore,
-            team2_score: homeScore,
-          },
-        }),
+        body: JSON.stringify(requestBody),
       });
       if (!res.ok) {
         console.error("❌ Failed to complete franchise week:", await res.text());

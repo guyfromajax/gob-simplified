@@ -97,6 +97,7 @@ class CompleteWeekRequest(BaseModel):
     week: int
     result: GameResult
     game_id: str | None = None  # Optional: actual gameplay game_id (ObjectId format)
+    game_document: dict | None = None  # Optional: complete game document from simulate-quarter (eliminates race condition)
 
 
 def _normalize_team_id(team_id: str):
@@ -410,97 +411,114 @@ def complete_week(req: CompleteWeekRequest):
     })
     
     # ✅ SS&S: Call finalize_game() with the actual gameplay game_id (if provided)
-    # ✅ FIX: Replicate Tournament mode pattern exactly - read from database, no memory check
-    # The database should already have complete box_score from periodic saves during gameplay
+    # ✅ FIX: Use game_document from request if provided (eliminates race condition)
+    # This matches Tournament mode pattern where game document is already available
     if user_game_id:
         logger.info(f"🔍 [COMPLETE_WEEK] Calling finalize_game() for user's game with provided game_id: {user_game_id}")
         
-        # ✅ DEBUG: Check all game documents with this game_id to see what quarters exist
-        logger.info(f"🔍 [COMPLETE_WEEK] Checking all game documents with game_id: {user_game_id}")
-        try:
-            # Try to find all documents that might match (different formats)
-            all_docs = []
-            for lookup_id in [user_game_id, ObjectId(user_game_id) if ObjectId.is_valid(user_game_id) else None]:
-                if lookup_id:
-                    doc = db.games.find_one({"_id": lookup_id})
-                    if doc:
-                        all_docs.append((lookup_id, doc))
-            if all_docs:
-                for lookup_id, doc in all_docs:
-                    quarter = doc.get("quarter", "N/A")
-                    is_final = doc.get("is_final", False)
-                    week = doc.get("week", "N/A")
-                    home = doc.get("home_team", {}).get("name") if isinstance(doc.get("home_team"), dict) else doc.get("home_team", "N/A")
-                    away = doc.get("away_team", {}).get("name") if isinstance(doc.get("away_team"), dict) else doc.get("away_team", "N/A")
-                    logger.info(f"🔍 [COMPLETE_WEEK] Found document with _id={lookup_id}: quarter={quarter}, is_final={is_final}, week={week}, home={home}, away={away}")
-            else:
-                logger.warning(f"⚠️ [COMPLETE_WEEK] No documents found with game_id: {user_game_id}")
-        except Exception as e:
-            logger.error(f"❌ [COMPLETE_WEEK] Error checking game documents: {e}")
-        
-        # ✅ SS&S: Replicate Tournament mode game document lookup pattern (with multiple fallback attempts)
-        gid = (
-            ObjectId(user_game_id)
-            if ObjectId.is_valid(user_game_id)
-            else user_game_id
-        )
-        logger.info(f"🔍 [COMPLETE_WEEK] User game - game_id from request: {user_game_id} (type: {type(user_game_id)}), converted gid: {gid} (type: {type(gid)})")
-        
-        # Try multiple formats to find the game document (matches Tournament mode pattern)
-        summary = None
-        # First try: Use gid as-is (ObjectId if conversion succeeded, string otherwise)
-        summary = db.games.find_one({"_id": gid}) or {}
-        if summary and summary.get("_id"):
+        # ✅ FIX: Use game_document from request if provided (returned from simulate-quarter when is_final=True)
+        # This eliminates race condition where complete_week() is called before Q4 save completes
+        if req.game_document:
+            logger.info(f"✅ [COMPLETE_WEEK] Using game_document from request (no database lookup needed)")
+            summary = req.game_document
             quarter = summary.get("quarter", "N/A")
             is_final = summary.get("is_final", False)
-            logger.info(f"🔍 [COMPLETE_WEEK] First try found document: quarter={quarter}, is_final={is_final}")
-        if not summary or not summary.get("_id"):
-            logger.warning(f"⚠️ [COMPLETE_WEEK] Game not found with gid={gid}, trying string format")
-            # Second try: Use string format
-            try:
-                summary = db.games.find_one({"_id": user_game_id}) or {}
-                if summary and summary.get("_id"):
-                    quarter = summary.get("quarter", "N/A")
-                    is_final = summary.get("is_final", False)
-                    logger.info(f"🔍 [COMPLETE_WEEK] Second try found document: quarter={quarter}, is_final={is_final}")
-            except Exception:
-                pass
-        if not summary or not summary.get("_id"):
-            logger.warning(f"⚠️ [COMPLETE_WEEK] Game not found with string format, trying ObjectId conversion")
-            # Third try: Convert string to ObjectId
-            try:
-                oid = ObjectId(user_game_id)
-                summary = db.games.find_one({"_id": oid}) or {}
-                if summary and summary.get("_id"):
-                    gid = summary.get("_id")
-                    quarter = summary.get("quarter", "N/A")
-                    is_final = summary.get("is_final", False)
-                    logger.info(f"✅ [COMPLETE_WEEK] Found game document using ObjectId conversion: {gid}, quarter={quarter}, is_final={is_final}")
-            except Exception as e:
-                logger.error(f"❌ [COMPLETE_WEEK] Error converting game_id to ObjectId: {e}")
-        
-        logger.info(f"🔍 [COMPLETE_WEEK] User game - Final lookup result: Found={bool(summary and summary.get('_id'))}, _id={summary.get('_id') if summary else None}")
-        if summary and summary.get("_id"):
-            quarter = summary.get("quarter", "N/A")
-            is_final = summary.get("is_final", False)
-            logger.info(f"🔍 [COMPLETE_WEEK] Final document details: quarter={quarter}, is_final={is_final}, week={summary.get('week', 'N/A')}")
-        
-        if not summary or not summary.get("_id"):
-            logger.error(f"❌ [COMPLETE_WEEK] Game document not found in games_collection after all attempts. game_id: {user_game_id}, gid: {gid}")
-            logger.error(f"❌ [COMPLETE_WEEK] This likely means the game document was never saved to the database.")
-            logger.error(f"❌ [COMPLETE_WEEK] Check if simulate_quarter_endpoint successfully saved the game document.")
+            logger.info(f"🔍 [COMPLETE_WEEK] game_document details: quarter={quarter}, is_final={is_final}, game_id={summary.get('_id') or summary.get('game_id')}")
         else:
-            # ✅ SS&S: Call finalize_game() directly (matches Tournament mode pattern)
-            # Database should already have complete box_score from periodic saves during gameplay
-            user_game_id_final = str(gid)
-            logger.info(f"🎯 [COMPLETE_WEEK] Finalizing user's game (matches Tournament pattern) - game_id: {user_game_id_final}")
-            logger.info(f"🔍 [COMPLETE_WEEK] Document being passed to finalize_game: quarter={summary.get('quarter', 'N/A')}, is_final={summary.get('is_final', False)}")
-            stat_updater.finalize_game(
-                user_game_id_final,
-                mode="franchise",
-                franchise_id=req.franchise_id,
+            # Fallback: Look up from database (for backward compatibility)
+            logger.info(f"🔍 [COMPLETE_WEEK] game_document not provided, looking up from database...")
+            
+            # ✅ DEBUG: Check all game documents with this game_id to see what quarters exist
+            logger.info(f"🔍 [COMPLETE_WEEK] Checking all game documents with game_id: {user_game_id}")
+            try:
+                # Try to find all documents that might match (different formats)
+                all_docs = []
+                for lookup_id in [user_game_id, ObjectId(user_game_id) if ObjectId.is_valid(user_game_id) else None]:
+                    if lookup_id:
+                        doc = db.games.find_one({"_id": lookup_id})
+                        if doc:
+                            all_docs.append((lookup_id, doc))
+                if all_docs:
+                    for lookup_id, doc in all_docs:
+                        quarter = doc.get("quarter", "N/A")
+                        is_final = doc.get("is_final", False)
+                        week = doc.get("week", "N/A")
+                        home = doc.get("home_team", {}).get("name") if isinstance(doc.get("home_team"), dict) else doc.get("home_team", "N/A")
+                        away = doc.get("away_team", {}).get("name") if isinstance(doc.get("away_team"), dict) else doc.get("away_team", "N/A")
+                        logger.info(f"🔍 [COMPLETE_WEEK] Found document with _id={lookup_id}: quarter={quarter}, is_final={is_final}, week={week}, home={home}, away={away}")
+                else:
+                    logger.warning(f"⚠️ [COMPLETE_WEEK] No documents found with game_id: {user_game_id}")
+            except Exception as e:
+                logger.error(f"❌ [COMPLETE_WEEK] Error checking game documents: {e}")
+            
+            # ✅ SS&S: Replicate Tournament mode game document lookup pattern (with multiple fallback attempts)
+            gid = (
+                ObjectId(user_game_id)
+                if ObjectId.is_valid(user_game_id)
+                else user_game_id
             )
-            logger.info(f"✅ [COMPLETE_WEEK] User game - finalize_game completed for game_id: {user_game_id_final}")
+            logger.info(f"🔍 [COMPLETE_WEEK] User game - game_id from request: {user_game_id} (type: {type(user_game_id)}), converted gid: {gid} (type: {type(gid)})")
+            
+            # Try multiple formats to find the game document (matches Tournament mode pattern)
+            summary = None
+            # First try: Use gid as-is (ObjectId if conversion succeeded, string otherwise)
+            summary = db.games.find_one({"_id": gid}) or {}
+            if summary and summary.get("_id"):
+                quarter = summary.get("quarter", "N/A")
+                is_final = summary.get("is_final", False)
+                logger.info(f"🔍 [COMPLETE_WEEK] First try found document: quarter={quarter}, is_final={is_final}")
+            if not summary or not summary.get("_id"):
+                logger.warning(f"⚠️ [COMPLETE_WEEK] Game not found with gid={gid}, trying string format")
+                # Second try: Use string format
+                try:
+                    summary = db.games.find_one({"_id": user_game_id}) or {}
+                    if summary and summary.get("_id"):
+                        quarter = summary.get("quarter", "N/A")
+                        is_final = summary.get("is_final", False)
+                        logger.info(f"🔍 [COMPLETE_WEEK] Second try found document: quarter={quarter}, is_final={is_final}")
+                except Exception:
+                    pass
+            if not summary or not summary.get("_id"):
+                logger.warning(f"⚠️ [COMPLETE_WEEK] Game not found with string format, trying ObjectId conversion")
+                # Third try: Convert string to ObjectId
+                try:
+                    oid = ObjectId(user_game_id)
+                    summary = db.games.find_one({"_id": oid}) or {}
+                    if summary and summary.get("_id"):
+                        gid = summary.get("_id")
+                        quarter = summary.get("quarter", "N/A")
+                        is_final = summary.get("is_final", False)
+                        logger.info(f"✅ [COMPLETE_WEEK] Found game document using ObjectId conversion: {gid}, quarter={quarter}, is_final={is_final}")
+                except Exception as e:
+                    logger.error(f"❌ [COMPLETE_WEEK] Error converting game_id to ObjectId: {e}")
+            
+            logger.info(f"🔍 [COMPLETE_WEEK] User game - Final lookup result: Found={bool(summary and summary.get('_id'))}, _id={summary.get('_id') if summary else None}")
+            if summary and summary.get("_id"):
+                quarter = summary.get("quarter", "N/A")
+                is_final = summary.get("is_final", False)
+                logger.info(f"🔍 [COMPLETE_WEEK] Final document details: quarter={quarter}, is_final={is_final}, week={summary.get('week', 'N/A')}")
+            
+            if not summary or not summary.get("_id"):
+                logger.error(f"❌ [COMPLETE_WEEK] Game document not found in games_collection after all attempts. game_id: {user_game_id}, gid: {gid}")
+                logger.error(f"❌ [COMPLETE_WEEK] This likely means the game document was never saved to the database.")
+                logger.error(f"❌ [COMPLETE_WEEK] Check if simulate_quarter_endpoint successfully saved the game document.")
+                return  # Exit early if document not found
+        
+        # ✅ SS&S: Call finalize_game() directly (matches Tournament mode pattern)
+        # Use game_id from summary or request
+        if summary and summary.get("_id"):
+            user_game_id_final = str(summary.get("_id"))
+        else:
+            user_game_id_final = user_game_id
+        
+        logger.info(f"🎯 [COMPLETE_WEEK] Finalizing user's game (matches Tournament pattern) - game_id: {user_game_id_final}")
+        logger.info(f"🔍 [COMPLETE_WEEK] Document being passed to finalize_game: quarter={summary.get('quarter', 'N/A')}, is_final={summary.get('is_final', False)}")
+        stat_updater.finalize_game(
+            user_game_id_final,
+            mode="franchise",
+            franchise_id=req.franchise_id,
+        )
+        logger.info(f"✅ [COMPLETE_WEEK] User game - finalize_game completed for game_id: {user_game_id_final}")
     else:
         # Fallback: Try to find game by week + team IDs (legacy behavior)
         logger.warning(f"⚠️ [COMPLETE_WEEK] No game_id provided, attempting legacy lookup: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")

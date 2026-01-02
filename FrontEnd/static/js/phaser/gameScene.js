@@ -2121,13 +2121,26 @@ export function createGameScene(Phaser) {
         const finalize = async () => {
           const { finalizeGame } = await import('./finalizeGame.js');
           
-          // ✅ FIX: Fetch the final game document from API to ensure we have the latest Q4 save
-          // This matches what bootGame.js does for "Sim Full Game" (line 760)
-          // Ensures the Q4 document is fully saved before calling complete_week()
+          // ✅ FIX: Use final_game_document from simulate-quarter response if available
+          // This eliminates race condition - backend returns complete document when is_final=True
+          // Works for Q4 (not tied) and any OT that ends with a winner
           let finalGameData = initialSimData;
-          if (gameId) {
+          
+          // Check if lastTurnData contains final_game_document (returned from simulate-quarter)
+          if (lastTurnData && lastTurnData.final_game_document) {
+            console.log('✅ Using final_game_document from simulate-quarter response (no fetch needed)');
+            finalGameData = lastTurnData.final_game_document;
+            console.log('✅ Final game document details:', {
+              game_id: finalGameData.game_id || finalGameData._id,
+              quarter: finalGameData.quarter,
+              is_final: finalGameData.is_final,
+              hasBoxScore: !!finalGameData.box_score,
+              boxScoreKeys: finalGameData.box_score ? Object.keys(finalGameData.box_score) : []
+            });
+          } else if (gameId) {
+            // Fallback: Fetch from API if final_game_document not in response
             try {
-              console.log('📥 Fetching final game data from API to ensure Q4 document is saved...');
+              console.log('📥 final_game_document not in response, fetching from API...');
               const gameResponse = await fetch(`/api/game/${gameId}`);
               if (gameResponse.ok) {
                 finalGameData = await gameResponse.json();
@@ -2161,6 +2174,8 @@ export function createGameScene(Phaser) {
             : finalGameData.away_team;
           
           // Update simData.score with current final scores (finalizeGame prioritizes this)
+          // ✅ FIX: Preserve final_game_document if it was in the response (from simulate-quarter)
+          // This ensures complete_week() gets the complete document without database lookup
           const updatedSimData = {
             ...finalGameData,
             home_score: finalHomeScore,
@@ -2174,6 +2189,11 @@ export function createGameScene(Phaser) {
               [awayName]: finalAwayScore
             }
           };
+          
+          // ✅ FIX: Preserve final_game_document if it was in lastTurnData (from simulate-quarter)
+          if (lastTurnData && lastTurnData.final_game_document) {
+            updatedSimData.final_game_document = lastTurnData.final_game_document;
+          }
           
           const finalScore = await finalizeGame({
             simData: updatedSimData,
