@@ -2579,12 +2579,37 @@ function createMetricBar(title, value, maxValue, color, change) {
   return metricDiv;
 }
 
-// Listen for tab changes to render Team Report when Team tab is opened
+// Listen for tab changes to load/render data when tabs are opened
 document.addEventListener('DOMContentLoaded', () => {
   const tabButtons = document.querySelectorAll('.tab-buttons button');
+  const tabContents = document.querySelectorAll('.tab-content');
+  
   tabButtons.forEach(btn => {
     btn.addEventListener('click', () => {
-      if (btn.dataset.tab === 'team-tab') {
+      const tabName = btn.dataset.tab;
+      
+      // Handle tab switching (show/hide content)
+      tabButtons.forEach(b => b.classList.remove('active'));
+      tabContents.forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      const target = document.getElementById(tabName);
+      if (target) target.classList.add('active');
+      
+      // Load/render data based on which tab was clicked
+      if (tabName === 'bracket-tab') {
+        renderBracket();
+      } else if (tabName === 'roster-tab') {
+        // Load roster data if not already loaded, then render
+        if (roster.length === 0) {
+          loadRoster().then(() => {
+            renderRoster();
+            renderStats();
+          });
+        } else {
+          renderRoster();
+          renderStats();
+        }
+      } else if (tabName === 'team-tab') {
         // Load and render team data when Team tab is opened
         if (!teamData) {
           loadTeamData();
@@ -2592,6 +2617,21 @@ document.addEventListener('DOMContentLoaded', () => {
           // ✅ FIX: Always reload to ensure fresh data (don't use stale teamData)
           loadTeamData();
         }
+      } else if (tabName === 'stats-tab') {
+        // Stats are rendered with roster, so ensure roster is loaded first
+        if (roster.length === 0) {
+          loadRoster().then(() => {
+            renderStats();
+            renderLeaderboards();
+            refreshTeamStats();
+          });
+        } else {
+          renderStats();
+          renderLeaderboards();
+          refreshTeamStats();
+        }
+      } else if (tabName === 'schedule-tab') {
+        renderSchedule();
       }
     });
   });
