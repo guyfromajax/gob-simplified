@@ -1155,6 +1155,38 @@ def finalize_game(
             logger.info(f"🔍 [FINALIZE_GAME] Attempting alternative lookup...")
             return
 
+        # ✅ DEBUG: Log initial document state before retry
+        initial_quarter = game.get("quarter", "N/A")
+        initial_is_final = game.get("is_final", False)
+        initial_week = game.get("week", "N/A")
+        logger.info(f"🔍 [FINALIZE_GAME] Initial document state: quarter={initial_quarter}, is_final={initial_is_final}, week={initial_week}")
+        logger.info(f"🔍 [FINALIZE_GAME] Initial document _id: {game.get('_id')}, game_id param: {game_id}")
+        
+        # ✅ DEBUG: Check if there are multiple documents with different quarters
+        logger.info(f"🔍 [FINALIZE_GAME] Checking for all documents with game_id: {game_id}")
+        try:
+            # Try different ID formats to see what exists
+            all_versions = []
+            for test_id in [game_id, game.get("_id"), ObjectId(game_id) if ObjectId.is_valid(game_id) else None]:
+                if test_id:
+                    try:
+                        test_doc = games_collection.find_one({"_id": test_id})
+                        if test_doc:
+                            q = test_doc.get("quarter", "N/A")
+                            final = test_doc.get("is_final", False)
+                            w = test_doc.get("week", "N/A")
+                            all_versions.append((test_id, q, final, w))
+                    except Exception:
+                        pass
+            if all_versions:
+                logger.info(f"🔍 [FINALIZE_GAME] Found {len(all_versions)} document version(s):")
+                for vid, vq, vfinal, vw in all_versions:
+                    logger.info(f"🔍 [FINALIZE_GAME]   - _id={vid}, quarter={vq}, is_final={vfinal}, week={vw}")
+            else:
+                logger.warning(f"⚠️ [FINALIZE_GAME] No documents found with any format of game_id: {game_id}")
+        except Exception as e:
+            logger.error(f"❌ [FINALIZE_GAME] Error checking document versions: {e}")
+        
         # ✅ FIX: Re-read game document with retry logic to ensure we have the final version
         # This is critical because the game document is saved multiple times during gameplay (Q1, Q2, Q3, Q4)
         # We need to wait for the final Q4 save (or OT save) before processing stats
@@ -1169,6 +1201,8 @@ def finalize_game(
             except Exception:
                 gid_for_reread = game_id
         
+        logger.info(f"🔍 [FINALIZE_GAME] Starting retry loop with gid_for_reread: {gid_for_reread}")
+        
         # Retry until we get a document with is_final=True or quarter >= 4
         game_latest = None
         for attempt in range(max_retries):
@@ -1182,11 +1216,13 @@ def finalize_game(
             if game_latest:
                 quarter = game_latest.get("quarter", 1)
                 is_final = game_latest.get("is_final", False)
+                week = game_latest.get("week", "N/A")
+                logger.info(f"🔍 [FINALIZE_GAME] Retry attempt {attempt + 1}: Found document with quarter={quarter}, is_final={is_final}, week={week}")
                 
                 # If we have the final document (is_final=True or quarter >= 4), use it
                 if is_final or quarter >= 4:
                     game = game_latest
-                    logger.info(f"✅ [FINALIZE_GAME] Re-read game document (attempt {attempt + 1}): quarter={quarter}, is_final={is_final}")
+                    logger.info(f"✅ [FINALIZE_GAME] Re-read game document (attempt {attempt + 1}): quarter={quarter}, is_final={is_final} - FINAL DOCUMENT FOUND")
                     break
                 else:
                     # Not final yet, wait and retry
@@ -1197,13 +1233,15 @@ def finalize_game(
                         # Last attempt, use what we have but log warning
                         game = game_latest
                         logger.warning(f"⚠️ [FINALIZE_GAME] Max retries reached. Using document with quarter={quarter}, is_final={is_final} (may be incomplete)")
+                        logger.warning(f"⚠️ [FINALIZE_GAME] This suggests the final Q4 document was never saved or doesn't exist for game_id: {game_id}")
             else:
                 # Document not found, wait and retry
                 if attempt < max_retries - 1:
-                    logger.info(f"🔍 [FINALIZE_GAME] Game document not found, retrying in {retry_delay}s...")
+                    logger.info(f"🔍 [FINALIZE_GAME] Game document not found (attempt {attempt + 1}), retrying in {retry_delay}s...")
                     time.sleep(retry_delay)
                 else:
                     logger.error(f"❌ [FINALIZE_GAME] Could not find game document after {max_retries} attempts")
+                    logger.error(f"❌ [FINALIZE_GAME] game_id: {game_id}, gid_for_reread: {gid_for_reread}")
                     return
 
         home_name = game.get('home_team', {}).get('name') if isinstance(game.get('home_team'), dict) else game.get('home_team')
