@@ -2121,30 +2121,55 @@ export function createGameScene(Phaser) {
         const finalize = async () => {
           const { finalizeGame } = await import('./finalizeGame.js');
           
+          // ✅ FIX: Fetch the final game document from API to ensure we have the latest Q4 save
+          // This matches what bootGame.js does for "Sim Full Game" (line 760)
+          // Ensures the Q4 document is fully saved before calling complete_week()
+          let finalGameData = initialSimData;
+          if (gameId) {
+            try {
+              console.log('📥 Fetching final game data from API to ensure Q4 document is saved...');
+              const gameResponse = await fetch(`/api/game/${gameId}`);
+              if (gameResponse.ok) {
+                finalGameData = await gameResponse.json();
+                console.log('✅ Fetched final game data:', {
+                  game_id: finalGameData.game_id || finalGameData._id,
+                  quarter: finalGameData.quarter,
+                  is_final: finalGameData.is_final,
+                  hasBoxScore: !!finalGameData.box_score,
+                  boxScoreKeys: finalGameData.box_score ? Object.keys(finalGameData.box_score) : []
+                });
+              } else {
+                console.warn('⚠️ Failed to fetch final game data, using initialSimData:', gameResponse.status);
+              }
+            } catch (err) {
+              console.error('❌ Error fetching final game data, using initialSimData:', err);
+            }
+          }
+          
           // Get team names for score map
           const { home: homeTeamName, away: awayTeamName } = gameStore.getTeams();
-          const homeName = homeTeamName || initialSimData.home_team;
-          const awayName = awayTeamName || initialSimData.away_team;
+          const homeName = homeTeamName || finalGameData.home_team?.name || finalGameData.home_team;
+          const awayName = awayTeamName || finalGameData.away_team?.name || finalGameData.away_team;
           
           // ✅ FIX: Update nested team objects with final scores to prevent stale data
           // Handle both object and string formats for home_team/away_team
-          const updatedHomeTeam = typeof initialSimData.home_team === 'object' 
-            ? { ...initialSimData.home_team, score: finalHomeScore }
-            : initialSimData.home_team;
-          const updatedAwayTeam = typeof initialSimData.away_team === 'object'
-            ? { ...initialSimData.away_team, score: finalAwayScore }
-            : initialSimData.away_team;
+          const updatedHomeTeam = typeof finalGameData.home_team === 'object' 
+            ? { ...finalGameData.home_team, score: finalHomeScore }
+            : finalGameData.home_team;
+          const updatedAwayTeam = typeof finalGameData.away_team === 'object'
+            ? { ...finalGameData.away_team, score: finalAwayScore }
+            : finalGameData.away_team;
           
           // Update simData.score with current final scores (finalizeGame prioritizes this)
           const updatedSimData = {
-            ...initialSimData,
+            ...finalGameData,
             home_score: finalHomeScore,
             away_score: finalAwayScore,
-            game_id: gameId,
+            game_id: gameId || finalGameData.game_id || finalGameData._id,
             home_team: updatedHomeTeam,
             away_team: updatedAwayTeam,
             score: {
-              ...(initialSimData.score || {}),
+              ...(finalGameData.score || {}),
               [homeName]: finalHomeScore,
               [awayName]: finalAwayScore
             }

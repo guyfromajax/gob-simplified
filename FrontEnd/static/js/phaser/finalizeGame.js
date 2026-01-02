@@ -130,9 +130,12 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
         simData.home_team;
       // ✅ SS&S: Extract game_id from simData (actual gameplay document ID)
       const gameId = simData.game_id || simData._id;
+      const quarter = simData.quarter || simData.quarters || 'N/A';
+      const isFinal = simData.is_final || false;
       console.log(
-        `📡 Saving franchise game: franchiseId=${franchiseId}, week=${week}, game_id=${gameId}, away=${awayTeamObj.name}, home=${homeTeamObj.name}`
+        `📡 Saving franchise game: franchiseId=${franchiseId}, week=${week}, game_id=${gameId}, quarter=${quarter}, is_final=${isFinal}, away=${awayTeamObj.name}, home=${homeTeamObj.name}`
       );
+      console.log(`🔍 [FRONTEND] finalizeGame() called with simData: game_id=${gameId}, quarter=${quarter}, is_final=${isFinal}`);
       const res = await fetch("/franchise/complete-week", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

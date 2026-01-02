@@ -1925,8 +1925,26 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         # Ensure _id is set in db_summary for upsert to work correctly
         db_summary["_id"] = game_id_oid
         
+        # ✅ DEBUG: Log detailed save information for Q4 to diagnose finalize_game() issue
+        quarter_saving = db_summary.get('quarter', 'N/A')
+        is_final_saving = db_summary.get('is_final', False)
+        logging.info(f"💾 [SAVE] About to save game document: game_id={game_id} (ObjectId: {game_id_oid}), quarter={quarter_saving}, is_final={is_final_saving}, mode={mode}")
+        if quarter_saving == 4 or is_final_saving:
+            logging.info(f"🎯 [SAVE] Q4/FINAL SAVE: game_id={game_id}, quarter={quarter_saving}, is_final={is_final_saving}, gm.quarter={gm.quarter}")
+        
         games_collection.update_one({"_id": game_id_oid}, {"$set": db_summary}, upsert=True)
-        logging.info(f"✅ Game state saved successfully: game_id={game_id} (ObjectId: {game_id_oid}), quarter={db_summary.get('quarter')}, mode={mode}")
+        
+        # ✅ DEBUG: Verify what was actually saved
+        saved_doc = games_collection.find_one({"_id": game_id_oid}, {"quarter": 1, "is_final": 1, "week": 1})
+        if saved_doc:
+            saved_quarter = saved_doc.get("quarter", "N/A")
+            saved_is_final = saved_doc.get("is_final", False)
+            saved_week = saved_doc.get("week", "N/A")
+            logging.info(f"✅ [SAVE] Game state saved successfully: game_id={game_id} (ObjectId: {game_id_oid}), quarter={saved_quarter}, is_final={saved_is_final}, week={saved_week}, mode={mode}")
+            if quarter_saving == 4 or is_final_saving:
+                logging.info(f"🎯 [SAVE] Q4/FINAL VERIFIED: Saved document has quarter={saved_quarter}, is_final={saved_is_final}")
+        else:
+            logging.error(f"❌ [SAVE] Failed to verify saved document: game_id={game_id} (ObjectId: {game_id_oid})")
     except Exception as e:
         print("🚨 Mongo upsert failed:", e)
         traceback.print_exc()
