@@ -4523,7 +4523,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
     # ✅ FCP NON-SHOT: Get FCP "base" variant skeleton and apply stopper system
     # For non-shot results (O_FOUL, D_FOUL, STEAL, DEAD_BALL_TURNOVER, HCO), use FCP "base" variant
     # Apply stopper system if result is not HCO (truncate and add stopper step)
-    logging.warning(f"🔍 [FCP NON-SHOT] Getting FCP base skeleton for result_type={result_type}")
+    # logging.warning(f"🔍 [FCP NON-SHOT] Getting FCP base skeleton for result_type={result_type}")
     skeleton = get_fcp_skeleton(result_type, game)  # Get FCP "base" variant (has step 0 with press break positions)
     
     # Deep copy skeleton to avoid mutating cached skeleton
@@ -4531,24 +4531,24 @@ def resolve_full_court_press_logic(game: "GameManager"):
         skeleton = copy.deepcopy(skeleton)
     
     # ✅ DEBUG: Log step 0 positions from HCO skeleton
-    if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 0:
-        step_0 = skeleton["steps"][0]
-        step_0_positions = step_0.get("pos_actions", {})
-        logging.warning(f"🔍 [FCP NON-SHOT] HCO skeleton step 0 has {len(step_0_positions)} positions: {list(step_0_positions.keys())}")
-        for pos, pos_action in step_0_positions.items():
-            location = pos_action.get("location", "N/A")
-            coords = pos_action.get("coords", "N/A")
-            logging.warning(f"🔍 [FCP NON-SHOT] Step 0 {pos}: location={location}, coords={coords}")
+    # if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 0:
+    #     step_0 = skeleton["steps"][0]
+    #     step_0_positions = step_0.get("pos_actions", {})
+    #     logging.warning(f"🔍 [FCP NON-SHOT] HCO skeleton step 0 has {len(step_0_positions)} positions: {list(step_0_positions.keys())}")
+    #     for pos, pos_action in step_0_positions.items():
+    #         location = pos_action.get("location", "N/A")
+    #         coords = pos_action.get("coords", "N/A")
+    #         logging.warning(f"🔍 [FCP NON-SHOT] Step 0 {pos}: location={location}, coords={coords}")
     
     # Apply stopper system (truncates if needed, or returns full skeleton if result == "HCO")
     skeleton = apply_stopper_system_to_skeleton(skeleton, result_type, game_state)
-    logging.warning(f"🔍 [FCP NON-SHOT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+    # logging.warning(f"🔍 [FCP NON-SHOT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
     
     # ✅ DEBUG: Log step 0 positions AFTER stopper system (should still be there)
-    if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 0:
-        step_0_after = skeleton["steps"][0]
-        step_0_positions_after = step_0_after.get("pos_actions", {})
-        logging.warning(f"🔍 [FCP NON-SHOT] After stopper, step 0 has {len(step_0_positions_after)} positions: {list(step_0_positions_after.keys())}")
+    # if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 0:
+    #     step_0_after = skeleton["steps"][0]
+    #     step_0_positions_after = step_0_after.get("pos_actions", {})
+    #     logging.warning(f"🔍 [FCP NON-SHOT] After stopper, step 0 has {len(step_0_positions_after)} positions: {list(step_0_positions_after.keys())}")
     
     # ✅ Determine ball handler from skeleton (who actually has the ball)
     ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
@@ -4639,7 +4639,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         game_state["last_rebound"] = ""
     
     if skeleton and "steps" in skeleton:
-        logging.warning(f"🔍 [FCP] Converting skeleton to animations (result_type={result_type})...")
+        # logging.warning(f"🔍 [FCP] Converting skeleton to animations (result_type={result_type})...")
         animations = animator.skeleton_to_animations(
             skeleton, 
             off_lineup, 
@@ -4647,17 +4647,17 @@ def resolve_full_court_press_logic(game: "GameManager"):
             add_defenders=True,
             is_fcp=True
         )
-        logging.warning(f"🔍 [FCP] Generated {len(animations)} animations")
+        # logging.warning(f"🔍 [FCP] Generated {len(animations)} animations")
         
         # ✅ DEBUG: Log step 0 positions from generated animations
-        for anim in animations[:5]:  # Log first 5 animations
-            player_id = anim.get("playerId", "UNKNOWN")
-            movement = anim.get("movement", [])
-            if movement and len(movement) > 0:
-                step_0_coords = movement[0].get("coords", "N/A")
-                logging.warning(f"🔍 [FCP] Animation {player_id[:8]}: step 0 coords={step_0_coords}")
-            else:
-                logging.warning(f"⚠️ [FCP] Animation {player_id[:8]}: NO MOVEMENT ARRAY or EMPTY!")
+        # for anim in animations[:5]:  # Log first 5 animations
+        #     player_id = anim.get("playerId", "UNKNOWN")
+        #     movement = anim.get("movement", [])
+        #     if movement and len(movement) > 0:
+        #         step_0_coords = movement[0].get("coords", "N/A")
+        #         logging.warning(f"🔍 [FCP] Animation {player_id[:8]}: step 0 coords={step_0_coords}")
+        #     else:
+        #         logging.warning(f"⚠️ [FCP] Animation {player_id[:8]}: NO MOVEMENT ARRAY or EMPTY!")
         
         # ✅ FIX: Extract stealer position from generated animations (SS&S approach)
         # This uses the actual calculated defensive position from the animation system
