@@ -1155,13 +1155,13 @@ def finalize_game(
             logger.info(f"🔍 [FINALIZE_GAME] Attempting alternative lookup...")
             return
 
-        # ✅ FIX: Re-read game document right before processing to ensure we have the latest version
-        # This is critical for overtime games where the game document is saved after Q4, then again after OT
-        # Without this re-read, we might process stats from the Q4 save (before OT) instead of the final OT save
+        # ✅ FIX: Re-read game document with retry logic to ensure we have the final version
+        # This is critical because the game document is saved multiple times during gameplay (Q1, Q2, Q3, Q4)
+        # We need to wait for the final Q4 save (or OT save) before processing stats
         import time
-        time.sleep(0.1)  # Small delay to ensure any pending saves complete
+        max_retries = 10
+        retry_delay = 0.2  # 200ms between retries
         
-        # Re-read with multiple fallback attempts to get the latest version
         gid_for_reread = game.get("_id") if game else None
         if not gid_for_reread:
             try:
@@ -1169,19 +1169,42 @@ def finalize_game(
             except Exception:
                 gid_for_reread = game_id
         
-        game_latest = games_collection.find_one({"_id": gid_for_reread})
-        if not game_latest and isinstance(game_id, str):
-            try:
-                game_latest = games_collection.find_one({"_id": ObjectId(game_id)})
-            except Exception:
-                pass
-        
-        if game_latest:
-            # Use the latest version (includes overtime if game went to OT)
-            game = game_latest
-            logger.info(f"✅ [FINALIZE_GAME] Re-read game document to ensure latest version (includes OT if applicable)")
-        else:
-            logger.warning(f"⚠️ [FINALIZE_GAME] Could not re-read game document, using original version")
+        # Retry until we get a document with is_final=True or quarter >= 4
+        game_latest = None
+        for attempt in range(max_retries):
+            game_latest = games_collection.find_one({"_id": gid_for_reread})
+            if not game_latest and isinstance(game_id, str):
+                try:
+                    game_latest = games_collection.find_one({"_id": ObjectId(game_id)})
+                except Exception:
+                    pass
+            
+            if game_latest:
+                quarter = game_latest.get("quarter", 1)
+                is_final = game_latest.get("is_final", False)
+                
+                # If we have the final document (is_final=True or quarter >= 4), use it
+                if is_final or quarter >= 4:
+                    game = game_latest
+                    logger.info(f"✅ [FINALIZE_GAME] Re-read game document (attempt {attempt + 1}): quarter={quarter}, is_final={is_final}")
+                    break
+                else:
+                    # Not final yet, wait and retry
+                    if attempt < max_retries - 1:
+                        logger.info(f"🔍 [FINALIZE_GAME] Game document not final yet (quarter={quarter}, is_final={is_final}), retrying in {retry_delay}s...")
+                        time.sleep(retry_delay)
+                    else:
+                        # Last attempt, use what we have but log warning
+                        game = game_latest
+                        logger.warning(f"⚠️ [FINALIZE_GAME] Max retries reached. Using document with quarter={quarter}, is_final={is_final} (may be incomplete)")
+            else:
+                # Document not found, wait and retry
+                if attempt < max_retries - 1:
+                    logger.info(f"🔍 [FINALIZE_GAME] Game document not found, retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                else:
+                    logger.error(f"❌ [FINALIZE_GAME] Could not find game document after {max_retries} attempts")
+                    return
 
         home_name = game.get('home_team', {}).get('name') if isinstance(game.get('home_team'), dict) else game.get('home_team')
         away_name = game.get('away_team', {}).get('name') if isinstance(game.get('away_team'), dict) else game.get('away_team')
