@@ -1155,10 +1155,40 @@ def finalize_game(
             logger.info(f"🔍 [FINALIZE_GAME] Attempting alternative lookup...")
             return
 
+        # ✅ FIX: Re-read game document right before processing to ensure we have the latest version
+        # This is critical for overtime games where the game document is saved after Q4, then again after OT
+        # Without this re-read, we might process stats from the Q4 save (before OT) instead of the final OT save
+        import time
+        time.sleep(0.1)  # Small delay to ensure any pending saves complete
+        
+        # Re-read with multiple fallback attempts to get the latest version
+        gid_for_reread = game.get("_id") if game else None
+        if not gid_for_reread:
+            try:
+                gid_for_reread = ObjectId(game_id) if isinstance(game_id, str) else game_id
+            except Exception:
+                gid_for_reread = game_id
+        
+        game_latest = games_collection.find_one({"_id": gid_for_reread})
+        if not game_latest and isinstance(game_id, str):
+            try:
+                game_latest = games_collection.find_one({"_id": ObjectId(game_id)})
+            except Exception:
+                pass
+        
+        if game_latest:
+            # Use the latest version (includes overtime if game went to OT)
+            game = game_latest
+            logger.info(f"✅ [FINALIZE_GAME] Re-read game document to ensure latest version (includes OT if applicable)")
+        else:
+            logger.warning(f"⚠️ [FINALIZE_GAME] Could not re-read game document, using original version")
+
         home_name = game.get('home_team', {}).get('name') if isinstance(game.get('home_team'), dict) else game.get('home_team')
         away_name = game.get('away_team', {}).get('name') if isinstance(game.get('away_team'), dict) else game.get('away_team')
-        print(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, home={home_name}, away={away_name}")
-        logger.info(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, home={home_name}, away={away_name}")
+        quarter = game.get('quarter', 1)
+        is_final = game.get('is_final', False)
+        print(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, quarter={quarter}, is_final={is_final}, home={home_name}, away={away_name}")
+        logger.info(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, quarter={quarter}, is_final={is_final}, home={home_name}, away={away_name}")
 
         players = game.get("players", [])
         
