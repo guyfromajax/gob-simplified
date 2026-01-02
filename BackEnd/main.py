@@ -613,7 +613,7 @@ def simulate_quarter(
             # Safety check: ensure time is decreasing
             if gm.game_state["time_remaining"] >= previous_time and turn_count > 10:
                 # logging.warning(f"⚠️ Time not decreasing! previous={previous_time}, current={gm.game_state['time_remaining']}, turn={turn_count}")
-                # Don't break here, might be legitimate (e.g., fouls, timeouts)
+                pass  # Don't break here, might be legitimate (e.g., fouls, timeouts)
         
         # Clear full simulation flag after loop completes
         gm.game_state.pop("_is_full_simulation", None)
