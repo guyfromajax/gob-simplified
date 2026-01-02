@@ -195,32 +195,10 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
             
             # Clean stat block and filter out non-stat fields
             cleaned_stats = _clean_stat_block(stat_block)
-            inc_fields: Dict[str, Any] = {}
-            set_fields: Dict[str, Any] = {}
-            for stat, val in cleaned_stats.items():
-                # Skip non-stat fields (playerId, name, jersey, etc.)
-                if stat in ["playerId", "name", "jersey", "x", "y", "coords", "team", "pos"]:
-                    continue
-                # ✅ MIN special handling: Convert seconds to minutes (integer division)
-                # Game MIN is tracked in seconds, but season/career MIN should be in minutes
-                if stat == "MIN":
-                    val = val // 60  # Convert seconds to minutes (integer division)
-                inc_fields[f"stats.season.{stat}"] = val
-                inc_fields[f"stats.career.{stat}"] = val
-                set_fields[f"stats.game.{stat}"] = 0
-            if not inc_fields and not set_fields:
-                continue
             
-            update_doc: Dict[str, Any] = {"$addToSet": {"stats.applied_games": token}}
-            if inc_fields:
-                update_doc["$inc"] = inc_fields
-            if set_fields:
-                update_doc["$set"] = set_fields
-            players_collection.update_one(
-                {"_id": query_pid, "stats.applied_games": {"$ne": token}},
-                update_doc,
-            )
-
+            # ✅ SS&S: Tournament mode only updates tournament document, not universal players collection
+            # The tournament document is the single source of truth for tournament stats
+            
             # Persist the latest season stats to the tournament document if applicable.
             if tournament_id:
                 try:
@@ -1297,6 +1275,71 @@ def finalize_game(
         
         logger.info(f"🔍 [FINALIZE_GAME] Processed {players_processed} players, {len(inc_doc)} stat increments, {len(set_doc)} meta fields to set")
 
+        # ✅ SS&S: Ensure all players are initialized before incrementing stats
+        # MongoDB's $inc will create fields if parent path exists, but won't create entire nested structure
+        # Use $setOnInsert to initialize player structure if it doesn't exist (similar to tournament mode)
+        # Build player-to-team mapping from box_score
+        player_to_team: Dict[str, str] = {}
+        for tname, tbox in box_score.items():
+            for pdata in tbox.values():
+                if isinstance(pdata, dict):
+                    p_id = str(pdata.get("playerId", ""))
+                    if p_id:
+                        player_to_team[p_id] = tname
+        
+        # Check which players need initialization
+        franchise_check = db.franchises.find_one(
+            {"_id": fid},
+            {"players": 1}
+        )
+        existing_players = franchise_check.get("players", {}) if franchise_check else {}
+        
+        set_on_insert_doc: Dict[str, Any] = {}
+        for pid_str in processed_player_ids:
+            # Only initialize if player doesn't exist
+            if pid_str not in existing_players:
+                # Get player metadata from players_collection
+                try:
+                    player_obj_id = ObjectId(pid_str)
+                    player_doc = players_collection.find_one(
+                        {"_id": player_obj_id},
+                        {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1}
+                    )
+                    if player_doc:
+                        zero_stats = {k: 0 for k in BOX_SCORE_KEYS}
+                        zero_stats["Outlet_Score_List"] = []
+                        meta = {
+                            "first_name": player_doc.get("first_name", ""),
+                            "last_name": player_doc.get("last_name", ""),
+                            "team": player_doc.get("team", ""),
+                        }
+                        # Use team_id from team_name_to_id map if available (more accurate for current game)
+                        if pid_str in player_to_team:
+                            team_name_for_player = player_to_team[pid_str]
+                            if team_name_for_player in team_name_to_id:
+                                meta["team_id"] = team_name_to_id[team_name_for_player]
+                            else:
+                                # Fallback to player_doc team_id
+                                tid = player_doc.get("team_id")
+                                if tid is not None:
+                                    meta["team_id"] = str(tid)
+                        else:
+                            # Fallback to player_doc team_id
+                            tid = player_doc.get("team_id")
+                            if tid is not None:
+                                meta["team_id"] = str(tid)
+                        
+                        set_on_insert_doc[f"players.{pid_str}"] = {
+                            "meta": meta,
+                            "season": zero_stats.copy(),
+                            "career": zero_stats.copy(),
+                            "attributes": player_doc.get("attributes", {}),
+                            "position_ratings": player_doc.get("position_ratings", {}),
+                        }
+                        logger.debug(f"🔍 [FINALIZE_GAME] Will initialize player {pid_str} if not exists")
+                except Exception as e:
+                    logger.warning(f"⚠️ [FINALIZE_GAME] Could not load player metadata for {pid_str}: {e}")
+
         update: Dict[str, Any] = {"$addToSet": {"applied_games": game_id}}
         if inc_doc:
             update["$inc"] = inc_doc
@@ -1308,6 +1351,11 @@ def finalize_game(
         if set_doc:
             update["$set"] = set_doc
             logger.info(f"🔍 [FINALIZE_GAME] Update doc has {len(set_doc)} meta fields to set")
+        
+        # ✅ SS&S: Initialize players if they don't exist (using $setOnInsert)
+        if set_on_insert_doc:
+            update["$setOnInsert"] = set_on_insert_doc
+            logger.info(f"🔍 [FINALIZE_GAME] Update doc has {len(set_on_insert_doc)} players to initialize if not exists")
 
         result = db.franchises.update_one(
             {"_id": fid, "applied_games": {"$ne": game_id}},
