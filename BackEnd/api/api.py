@@ -1969,6 +1969,19 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             logging.error(f"🚨 TIMEOUT RESUME: No turns returned! This should not happen - SIP turn should have been created in simulate_quarter()")
         # Turns array already contains the SIP turn created in simulate_quarter() - no need to override
     
+    # ✅ FIX: Return complete game document when game is final (Q4/OT ends with winner)
+    # This eliminates race condition where complete_week() is called before Q4 save completes
+    # Matches Tournament mode pattern where game document is already available
+    if is_final and game_id:
+        try:
+            # Include the complete db_summary (without animations) in the response
+            # This is the same document that was just saved to the database
+            frontend_summary["final_game_document"] = db_summary
+            logging.info(f"✅ [SIMULATE_QUARTER] Game is final - returning complete game document: quarter={db_summary.get('quarter')}, is_final={db_summary.get('is_final')}, game_id={game_id}")
+        except Exception as e:
+            logging.error(f"❌ [SIMULATE_QUARTER] Error adding final_game_document to response: {e}")
+            # Continue without it - frontend will fall back to fetch
+    
     logger.debug(
         "simulate_quarter_endpoint turns len=%s first=%s",
         len(turns),
