@@ -1976,10 +1976,28 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         try:
             # Include the complete db_summary (without animations) in the response
             # This is the same document that was just saved to the database
-            frontend_summary["final_game_document"] = db_summary
+            # ✅ FIX: Convert ObjectIds to strings for JSON serialization (recursively)
+            from bson import ObjectId
+            import json
+            
+            def convert_objectids(obj):
+                """Recursively convert ObjectIds to strings for JSON serialization"""
+                if isinstance(obj, ObjectId):
+                    return str(obj)
+                elif isinstance(obj, dict):
+                    return {k: convert_objectids(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_objectids(item) for item in obj]
+                else:
+                    return obj
+            
+            final_game_doc = convert_objectids(db_summary)
+            frontend_summary["final_game_document"] = final_game_doc
             logging.info(f"✅ [SIMULATE_QUARTER] Game is final - returning complete game document: quarter={db_summary.get('quarter')}, is_final={db_summary.get('is_final')}, game_id={game_id}")
         except Exception as e:
             logging.error(f"❌ [SIMULATE_QUARTER] Error adding final_game_document to response: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
             # Continue without it - frontend will fall back to fetch
     
     logger.debug(
