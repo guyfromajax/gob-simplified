@@ -5526,7 +5526,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     # ✅ HCT NON-SHOT: Get HCT "base" variant skeleton and apply stopper system
     # For non-shot results (O_FOUL, D_FOUL, STEAL, DEAD_BALL_TURNOVER, HCO), use HCT "base" variant
     # Apply stopper system if result is not HCO (truncate and add stopper step)
-    logging.warning(f"🔍 [HCT NON-SHOT] Getting HCT base skeleton for result_type={result_type}")
+    # logging.warning(f"🔍 [HCT NON-SHOT] Getting HCT base skeleton for result_type={result_type}")
     skeleton = get_hct_skeleton(result_type, game)  # Get HCT "base" variant (has step 0 with trap break positions)
     
     # Deep copy skeleton to avoid mutating cached skeleton
@@ -5535,7 +5535,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     
     # Apply stopper system (truncates if needed, or returns full skeleton if result == "HCO")
     skeleton = apply_stopper_system_to_skeleton(skeleton, result_type, game_state)
-    logging.warning(f"🔍 [HCT NON-SHOT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+    # logging.warning(f"🔍 [HCT NON-SHOT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
     
     # ✅ Determine ball handler from skeleton (who actually has the ball)
     ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
@@ -5628,7 +5628,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         game_state["last_rebound"] = ""
     
     if skeleton and "steps" in skeleton:
-        logging.warning(f"🔍 [HCT] Converting skeleton to animations (result_type={result_type})...")
+        # logging.warning(f"🔍 [HCT] Converting skeleton to animations (result_type={result_type})...")
         animations = animator.skeleton_to_animations(
             skeleton, 
             off_lineup, 
@@ -5637,7 +5637,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
             is_fcp=False,
             is_hct=True
         )
-        logging.warning(f"🔍 [HCT] Generated {len(animations)} animations")
+        # logging.warning(f"🔍 [HCT] Generated {len(animations)} animations")
         
         # ✅ FIX: Extract stealer position from generated animations (SS&S approach)
         # This uses the actual calculated defensive position from the animation system
@@ -5667,7 +5667,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         
         if animations:
             shot_result["animations"] = animations
-            logging.warning(f"✅ [HCT] Added {len(animations)} animations to shot_result")
+            # logging.warning(f"✅ [HCT] Added {len(animations)} animations to shot_result")
         else:
             logging.warning(f"⚠️ [HCT] No animations generated from skeleton!")
     else:
@@ -5746,5 +5746,5 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "defender_id": getattr(roles["defender"], "player_id", None) if roles["defender"] else None  # For steal announcements
     }
     
-    logging.warning(f"✅ [HCT] Returning result with {len(animations)} animations, result_type={result_type}")
+    # logging.warning(f"✅ [HCT] Returning result with {len(animations)} animations, result_type={result_type}")
     return result

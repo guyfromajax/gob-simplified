@@ -415,17 +415,19 @@ class ShotManager:
                 # logging.warning(f"🔍 [SHOOTING FOUL CALIBRATION] 2-pointer foul check:")
                 # logging.warning(f"   Original shot result: {'MADE' if made else 'MISS'}")
                 # logging.warning(f"   Calibration roll: {foul_calibration_roll:.3f}")
-                logging.warning(f"   Threshold: < {threshold} ({miss_chance_pct}% chance to force miss)")
+                # logging.warning(f"   Threshold: < {threshold} ({miss_chance_pct}% chance to force miss)")
                 if foul_calibration_roll < threshold:
                     made = False
-                    logging.warning(f"   ✅ Foul forces MISS (roll {foul_calibration_roll:.3f} < {threshold})")
+                    # logging.warning(f"   ✅ Foul forces MISS (roll {foul_calibration_roll:.3f} < {threshold})")
                 else:
                     # ✅ BUG FIX: Explicitly preserve original result when calibration doesn't force miss
                     # The original 'made' value is already correct, but we log it for clarity
-                    logging.warning(f"   ➡️  Standard shot result holds (roll {foul_calibration_roll:.3f} >= {threshold}) - Result: {'MADE' if made else 'MISS'}")
+                    # logging.warning(f"   ➡️  Standard shot result holds (roll {foul_calibration_roll:.3f} >= {threshold}) - Result: {'MADE' if made else 'MISS'}")
+                    pass
             
             if original_made != made:
-                logging.warning(f"   📊 Shot result changed: {('MADE' if original_made else 'MISS')} → {('MADE' if made else 'MISS')}")
+                # logging.warning(f"   📊 Shot result changed: {('MADE' if original_made else 'MISS')} → {('MADE' if made else 'MISS')}")
+                pass
             else:
                 logging.warning(f"   📊 Shot result unchanged: {'MADE' if made else 'MISS'} (calibration did not force change)")
 
@@ -1231,7 +1233,7 @@ class ShotManager:
         # Determine if foul occurs
         if defense_score < hard_threshold:
             d_foul = True
-            logging.warning(f"   ✅ RESULT: HARD FOUL (defense_score {defense_score} < hard_threshold {hard_threshold})")
+            # logging.warning(f"   ✅ RESULT: HARD FOUL (defense_score {defense_score} < hard_threshold {hard_threshold})")
         elif defense_score < soft_threshold:
             # Soft foul: random chance based on SOFT_PROB
             soft_roll = random.random()
