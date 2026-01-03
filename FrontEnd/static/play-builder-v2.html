@@ -1348,11 +1348,24 @@
       if (playState.type === 'Motion') {
         // Motion: load base_loop (or successful if that's what's stored)
         const motionSkeleton = skeletons.base_loop || skeletons.successful || {};
-        playState.variants.base_loop = {
-          steps: motionSkeleton.steps || [],
-          complete: motionSkeleton.complete || false,
-          currentStep: (motionSkeleton.steps || []).length + 1
-        };
+        // ✅ AUTO-OPPOSITE: Handle versions array format (from auto-opposite)
+        if (motionSkeleton.versions && Array.isArray(motionSkeleton.versions) && motionSkeleton.versions.length > 0) {
+          // Find v0 version (original)
+          const v0Version = motionSkeleton.versions.find(v => v.version === 'v0');
+          playState.variants.base_loop = {
+            steps: v0Version ? (v0Version.steps || []) : [],
+            complete: motionSkeleton.complete || false,
+            currentStep: v0Version ? ((v0Version.steps || []).length + 1) : 1,
+            versions: motionSkeleton.versions // Preserve versions array
+          };
+        } else {
+          // Direct steps format (legacy)
+          playState.variants.base_loop = {
+            steps: motionSkeleton.steps || [],
+            complete: motionSkeleton.complete || false,
+            currentStep: (motionSkeleton.steps || []).length + 1
+          };
+        }
         currentVariant = 'base_loop';
       } else {
         // Set Play: load all variants
@@ -1360,11 +1373,25 @@
           if (skeletons[variant]) {
             if (variant === 'successful') {
               // Successful variant: simple structure
-              playState.variants[variant] = {
-                steps: skeletons[variant].steps || [],
-                complete: skeletons[variant].complete || false,
-                currentStep: (skeletons[variant].steps || []).length + 1
-              };
+              const successfulSkeleton = skeletons[variant];
+              // ✅ AUTO-OPPOSITE: Handle versions array format (from auto-opposite)
+              if (successfulSkeleton.versions && Array.isArray(successfulSkeleton.versions) && successfulSkeleton.versions.length > 0) {
+                // Find v0 version (original)
+                const v0Version = successfulSkeleton.versions.find(v => v.version === 'v0');
+                playState.variants[variant] = {
+                  steps: v0Version ? (v0Version.steps || []) : [],
+                  complete: successfulSkeleton.complete || false,
+                  currentStep: v0Version ? ((v0Version.steps || []).length + 1) : 1,
+                  versions: successfulSkeleton.versions // Preserve versions array
+                };
+              } else {
+                // Direct steps format (legacy)
+                playState.variants[variant] = {
+                  steps: successfulSkeleton.steps || [],
+                  complete: successfulSkeleton.complete || false,
+                  currentStep: (successfulSkeleton.steps || []).length + 1
+                };
+              }
             } else {
               // Other variants: version structure
               const versions = skeletons[variant].versions || [];
@@ -1718,6 +1745,9 @@
         }
         
         variantData.complete = true;
+        
+        // ✅ AUTO-OPPOSITE: Create opposite version when skeleton is marked as complete
+        createOppositeVersionIfNeeded(variantData);
         
         // Auto-save to database
         updateVariantTabs();
@@ -2441,6 +2471,9 @@
       
       // Mark as complete
       variantData.complete = true;
+      
+      // ✅ AUTO-OPPOSITE: Create opposite version when skeleton is finished
+      createOppositeVersionIfNeeded(variantData);
       
       // Save to database
       await saveDraft();
@@ -3751,8 +3784,198 @@
     }
 
 
+    // ✅ AUTO-OPPOSITE: Helper function to flip upper/lower in location strings
+    function flipLocation(location) {
+      if (!location || typeof location !== 'string') {
+        return location;
+      }
+      
+      // Flip upper to lower (case-insensitive, preserve original case)
+      if (location.toLowerCase().includes('upper')) {
+        if (location.includes('upper')) {
+          return location.replace('upper', 'lower');
+        } else if (location.includes('Upper')) {
+          return location.replace('Upper', 'Lower');
+        } else if (location.includes('UPPER')) {
+          return location.replace('UPPER', 'LOWER');
+        }
+      }
+      
+      // Flip lower to upper
+      if (location.toLowerCase().includes('lower')) {
+        if (location.includes('lower')) {
+          return location.replace('lower', 'upper');
+        } else if (location.includes('Lower')) {
+          return location.replace('Lower', 'Upper');
+        } else if (location.includes('LOWER')) {
+          return location.replace('LOWER', 'UPPER');
+        }
+      }
+      
+      // No upper/lower found, return unchanged
+      return location;
+    }
+
+    // ✅ AUTO-OPPOSITE: Create opposite version of steps by flipping upper/lower locations
+    function createOppositeSteps(steps) {
+      return steps.map(step => {
+        const oppositeStep = JSON.parse(JSON.stringify(step)); // Deep clone
+        
+        // Flip locations in pos_actions
+        if (oppositeStep.pos_actions) {
+          for (const position in oppositeStep.pos_actions) {
+            const actionInfo = oppositeStep.pos_actions[position];
+            if (actionInfo && actionInfo.location) {
+              actionInfo.location = flipLocation(actionInfo.location);
+            }
+          }
+        }
+        
+        return oppositeStep;
+      });
+    }
+
+    // ✅ AUTO-OPPOSITE: Create opposite version when skeleton is marked as complete
+    function createOppositeVersionIfNeeded(variantData) {
+      // Check if we need to create opposite version
+      const steps = variantData.steps || [];
+      if (steps.length === 0) {
+        return; // No steps to create opposite from
+      }
+      
+      // Check if opposite already exists (don't create duplicate)
+      if (currentVariant === 'base_loop' || currentVariant === 'successful') {
+        const variant = playState.variants[currentVariant];
+        if (variant.versions && Array.isArray(variant.versions)) {
+          // Check if v1 (opposite) already exists
+          const hasV1 = variant.versions.some(v => v.version === 'v1');
+          if (hasV1) {
+            console.log(`⏭️ AUTO-OPPOSITE: Opposite version already exists for ${currentVariant}, skipping`);
+            return;
+          }
+        }
+      } else {
+        const variant = playState.variants[currentVariant];
+        if (variant.versions) {
+          // Check if opposite already exists by comparing step counts
+          // If any version beyond the current one has the same number of steps, it might be the opposite
+          const currentVersionNum = parseInt(variant.currentVersion.replace('v', ''));
+          const currentStepCount = steps.length;
+          
+          // Check ALL existing versions (not just v1-v6) to avoid overwriting
+          Object.keys(variant.versions).forEach(versionKey => {
+            const versionNum = parseInt(versionKey.replace('v', ''));
+            if (versionNum > currentVersionNum) {
+              const versionData = variant.versions[versionKey];
+              if (versionData && versionData.steps && versionData.steps.length === currentStepCount) {
+                // Same step count - likely the opposite already exists
+                console.log(`⏭️ AUTO-OPPOSITE: Version ${versionKey} already exists with ${currentStepCount} steps for ${currentVariant}, skipping to avoid overwrite`);
+                // Don't return here - continue checking, but we'll skip creation if found
+              }
+            }
+          });
+        }
+      }
+      
+      // Create opposite steps
+      const oppositeSteps = createOppositeSteps(steps);
+      
+      // Handle different variant types
+      if (currentVariant === 'base_loop' || currentVariant === 'successful') {
+        // For base_loop and successful: These use direct steps format in the UI
+        // Convert to versions array format: v0 = original, v1 = opposite
+        const variant = playState.variants[currentVariant];
+        
+        // Check if already in versions array format (from database)
+        if (variant.versions && Array.isArray(variant.versions)) {
+          // Find highest version number
+          let highestVersion = -1;
+          variant.versions.forEach(v => {
+            const match = v.version?.match(/v(\d+)/);
+            if (match) {
+              highestVersion = Math.max(highestVersion, parseInt(match[1]));
+            }
+          });
+          
+          // Create next version with opposite steps
+          const nextVersionNum = highestVersion + 1;
+          variant.versions.push({
+            version: `v${nextVersionNum}`,
+            steps: oppositeSteps
+          });
+          
+          console.log(`✅ AUTO-OPPOSITE: Created v${nextVersionNum} (opposite) for ${currentVariant}`);
+        } else {
+          // Convert from direct steps to versions array format
+          // Store original steps as v0, opposite as v1
+          variant.versions = [
+            { version: 'v0', steps: JSON.parse(JSON.stringify(steps)) },
+            { version: 'v1', steps: oppositeSteps }
+          ];
+          
+          // Keep direct steps for UI compatibility (UI reads from variantData.steps)
+          // The versions array will be used when saving to database
+          console.log(`✅ AUTO-OPPOSITE: Created versions array for ${currentVariant} (v0=original, v1=opposite)`);
+        }
+      } else {
+        // For mid_play_change, contested, broken: Create opposite in next available version
+        const variant = playState.variants[currentVariant];
+        if (!variant.versions) {
+          return; // Shouldn't happen, but safety check
+        }
+        
+        // Find highest version number (check ALL versions, not just v1-v6)
+        let highestVersion = -1;
+        Object.keys(variant.versions).forEach(versionKey => {
+          const match = versionKey.match(/v(\d+)/);
+          if (match) {
+            highestVersion = Math.max(highestVersion, parseInt(match[1]));
+          }
+        });
+        
+        // Find next available version (can go beyond v6 if needed: v7, v8, etc.)
+        let nextVersionNum = highestVersion + 1;
+        
+        // Double-check we're not overwriting an existing version
+        const nextVersionKey = `v${nextVersionNum}`;
+        if (variant.versions[nextVersionKey] && variant.versions[nextVersionKey].steps && variant.versions[nextVersionKey].steps.length > 0) {
+          // Version already exists with steps - find next empty one
+          let foundEmpty = false;
+          for (let i = nextVersionNum + 1; i <= nextVersionNum + 10; i++) { // Check up to 10 more versions
+            const checkKey = `v${i}`;
+            if (!variant.versions[checkKey] || !variant.versions[checkKey].steps || variant.versions[checkKey].steps.length === 0) {
+              nextVersionNum = i;
+              foundEmpty = true;
+              break;
+            }
+          }
+          if (!foundEmpty) {
+            // All versions are used - create new one anyway (v7, v8, etc.)
+            nextVersionNum = highestVersion + 1;
+            console.warn(`⚠️ AUTO-OPPOSITE: All checked versions have steps, creating v${nextVersionNum} anyway`);
+          }
+        }
+        
+        // Create opposite version (will create v7, v8, etc. if needed)
+        variant.versions[`v${nextVersionNum}`] = {
+          steps: oppositeSteps
+        };
+        
+        console.log(`✅ AUTO-OPPOSITE: Created v${nextVersionNum} (opposite) for ${currentVariant}`);
+      }
+      
+      // Update UI to reflect new version (if version dropdown exists)
+      if (currentVariant !== 'base_loop' && currentVariant !== 'successful') {
+        updateVersionDropdown();
+        updateVersionInfo();
+      }
+    }
+
     function submitStep() {
       const variantData = getCurrentVariantData();
+      
+      // ✅ AUTO-OPPOSITE: Check if skeleton was empty before adding this step
+      const wasEmpty = (variantData.steps || []).length === 0;
       
       // Validate step before submitting
       const validation = validateCurrentStep(false); // Not final step
@@ -4022,17 +4245,47 @@
         skeletons: playState.type === 'Motion' 
           ? {
               // Motion: only base_loop
-              base_loop: {
-                steps: playState.variants.base_loop.steps,
-                complete: playState.variants.base_loop.complete
-              }
+              base_loop: (() => {
+                const baseLoop = playState.variants.base_loop;
+                // ✅ AUTO-OPPOSITE: If versions array exists (from auto-opposite), update v0 with current steps and use versions
+                if (baseLoop.versions && Array.isArray(baseLoop.versions) && baseLoop.versions.length > 0) {
+                  // Update v0 with current steps (in case user added more steps after creating opposite)
+                  const v0Index = baseLoop.versions.findIndex(v => v.version === 'v0');
+                  if (v0Index >= 0) {
+                    baseLoop.versions[v0Index].steps = JSON.parse(JSON.stringify(baseLoop.steps));
+                  }
+                  return {
+                    versions: baseLoop.versions
+                  };
+                }
+                // Otherwise, use direct steps format
+                return {
+                  steps: baseLoop.steps,
+                  complete: baseLoop.complete
+                };
+              })()
             }
           : {
               // Set Play: all variants
-              successful: {
-                steps: playState.variants.successful.steps,
-                complete: playState.variants.successful.complete
-              },
+              successful: (() => {
+                const successful = playState.variants.successful;
+                // ✅ AUTO-OPPOSITE: If versions array exists (from auto-opposite), update v0 with current steps and use versions
+                if (successful.versions && Array.isArray(successful.versions) && successful.versions.length > 0) {
+                  // Update v0 with current steps (in case user added more steps after creating opposite)
+                  const v0Index = successful.versions.findIndex(v => v.version === 'v0');
+                  if (v0Index >= 0) {
+                    successful.versions[v0Index].steps = JSON.parse(JSON.stringify(successful.steps));
+                  }
+                  return {
+                    versions: successful.versions
+                  };
+                }
+                // Otherwise, use direct steps format
+                return {
+                  steps: successful.steps,
+                  complete: successful.complete
+                };
+              })(),
               mid_play_change: buildVariantVersions('mid_play_change'),
               contested: buildVariantVersions('contested'),
               broken: buildVariantVersions('broken')
