@@ -32,7 +32,6 @@ from BackEnd.utils.shared import (
     default_rebounder_dict,
     determine_rebounder,
 )
-from BackEnd.utils.energy_system import recharge_lineups
 
 
 def _init_game_stats_dict():
@@ -409,17 +408,10 @@ def simulate_quarter(
     gm.game_state["team_fouls"] = {gm.home_team.name: 0, gm.away_team.name: 0}
     # Note: timeouts do NOT reset per quarter - they carry over the whole game
 
-    # Recharge energy between quarters
-    # Each player gets a random amount from the appropriate list
-    # Q1->Q2, Q3->Q4, or before OT: [0.7, 0.8, 0.9, 1.0, 1.1, 1.2]
-    # Q2->Q3 (halftime): [1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
-    if q == 3:
-        # Halftime break (between Q2 and Q3)
-        recharge_amounts = [1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
-    else:
-        # Regular quarter break (Q1->Q2, Q3->Q4, or before OT)
-        recharge_amounts = [0.7, 0.8, 0.9, 1.0, 1.1, 1.2]
-    recharge_lineups(gm, recharge_amounts)
+    # ✅ QUARTER BREAK RECHARGE: Removed from here - recharge now happens when quarter ends
+    # (in simulate_turn_endpoint when quarter_complete=True, BEFORE game state is saved)
+    # This ensures updated NG values are visible on lineup screen and prevents overwriting
+    # restored NG values when returning from lineup screen
 
     # Handle quarter start possession
     if start_with_inbound and starting_possession:

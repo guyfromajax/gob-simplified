@@ -2195,6 +2195,24 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             time_elapsed = time_before_turn - time_after_turn
             logging.info(f"✅ [FINAL TURN DEBUG] Quarter complete! time_before_turn={time_before_turn}s, time_after_turn={time_after_turn}s, time_elapsed={time_elapsed}s, clock={gm.game_state.get('clock', 'N/A')}, turn_type={turn_type}, turn_text={turn_text}")
         
+        # ✅ QUARTER BREAK RECHARGE: Recharge all players when quarter completes
+        # This happens BEFORE game state is saved, so updated NG values are visible on lineup screen
+        # Matches timeout recharge pattern (recharge happens before lineup screen)
+        if quarter_complete:
+            from BackEnd.utils.energy_system import recharge_all_players
+            # Determine recharge amounts based on which quarter just completed
+            # Q2->Q3 (halftime): [1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
+            # Q1->Q2, Q3->Q4, or before OT: [0.7, 0.8, 0.9, 1.0, 1.1, 1.2]
+            current_quarter = gm.quarter  # Quarter that just completed (before increment)
+            if current_quarter == 2:
+                # Halftime break (between Q2 and Q3)
+                recharge_amounts = [1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
+            else:
+                # Regular quarter break (Q1->Q2, Q3->Q4, or before OT)
+                recharge_amounts = [0.7, 0.8, 0.9, 1.0, 1.1, 1.2]
+            recharge_all_players(gm, recharge_amounts)
+            logging.info(f"✅ QUARTER BREAK: Recharged all players (both teams, lineup + bench) for Q{current_quarter}→Q{current_quarter + 1} break")
+        
         # If quarter is complete, increment quarter number
         if quarter_complete:
             gm.quarter += 1
