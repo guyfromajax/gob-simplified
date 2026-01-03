@@ -387,6 +387,13 @@ export async function shootBall({
     
     // ==================== ANIMATE PLAYERS DURING SHOT ====================
     // Defenders releasing for fast break + Offensive players getting back on defense
+    console.log('🏀 [SHOT ANIMATION] Entering player animation block', {
+      hasTurnData: !!turnData,
+      duration,
+      shooterId,
+      isHomeTeam
+    });
+    
     if (turnData) {
       
       // Defenders releasing for fast break
@@ -452,6 +459,12 @@ export async function shootBall({
       // Animate all other players (not shooter, defender, release, get back) 
       // into rebound position during shot flight
       
+      console.log('🏀 [REBOUND POSITIONING] Starting rebounder animation setup', {
+        shooterId,
+        hasTurnData: !!turnData,
+        hasPlayerSprites: !!scene.playerSprites
+      });
+      
       // Build exclusion list
       const excludedPlayerIds = new Set();
       excludedPlayerIds.add(shooterId); // Shooter
@@ -464,20 +477,46 @@ export async function shootBall({
         turnData.offense_getback.forEach(id => excludedPlayerIds.add(id)); // Get back players
       }
       
+      console.log('🏀 [REBOUND POSITIONING] Exclusion list:', {
+        excludedCount: excludedPlayerIds.size,
+        excludedIds: Array.from(excludedPlayerIds),
+        defenderId: turnData?.defenderId,
+        defender_id: turnData?.defender_id,
+        defense_release: turnData?.defense_release,
+        offense_getback: turnData?.offense_getback
+      });
+      
       // Determine basket x coordinate (which basket is being attacked)
       const basketX = isHomeTeam ? 91 : 9; // Home attacks away basket (91), away attacks home basket (9)
+      const basketY = 25;
+      
+      console.log('🏀 [REBOUND POSITIONING] Basket coordinates:', {
+        basketX,
+        basketY,
+        isHomeTeam
+      });
       
       // Animate all other players into rebound position
       const playerSprites = scene.playerSprites || {};
       let reboundPositionCount = 0;
+      const allPlayerIds = Object.keys(playerSprites);
+      
+      console.log('🏀 [REBOUND POSITIONING] Total players available:', {
+        totalPlayers: allPlayerIds.length,
+        allPlayerIds: allPlayerIds
+      });
       
       Object.keys(playerSprites).forEach(playerId => {
         if (excludedPlayerIds.has(playerId)) {
+          console.log(`🏀 [REBOUND POSITIONING] Skipping excluded player: ${playerId}`);
           return; // Skip excluded players
         }
         
         const sprite = playerSprites[playerId];
-        if (!sprite) return;
+        if (!sprite) {
+          console.warn(`🏀 [REBOUND POSITIONING] No sprite found for player: ${playerId}`);
+          return;
+        }
         
         // Get player's current position in grid coordinates
         const currentPixelX = sprite.x;
@@ -488,6 +527,11 @@ export async function shootBall({
         const canvasHeight = scene.game.config.height;
         const currentGridX = (currentPixelX / canvasWidth) * 100;
         const currentGridY = 50 - (currentPixelY / canvasHeight) * 50;
+        
+        console.log(`🏀 [REBOUND POSITIONING] Processing rebounder: ${playerId}`, {
+          currentPixel: { x: currentPixelX, y: currentPixelY },
+          currentGrid: { x: currentGridX, y: currentGridY }
+        });
         
         // Calculate target position based on rebound positioning rules
         let targetGridX = currentGridX;
@@ -521,16 +565,38 @@ export async function shootBall({
         // Convert target grid back to pixels
         const targetPixel = gridToPixels(targetGridX, targetGridY, canvasWidth, canvasHeight);
         
-        // Animate to rebound position
-        scene.tweens.add({
-          targets: sprite,
-          x: targetPixel.x,
-          y: targetPixel.y,
-          duration: duration, // Same duration as ball flight
-          ease: 'Power1'
+        console.log(`🏀 [REBOUND POSITIONING] Creating tween for ${playerId}`, {
+          targetGrid: { x: targetGridX, y: targetGridY },
+          targetPixel: { x: targetPixel.x, y: targetPixel.y },
+          duration,
+          distanceFromBasket
         });
         
-        reboundPositionCount++;
+        // Animate to rebound position
+        try {
+          const tween = scene.tweens.add({
+            targets: sprite,
+            x: targetPixel.x,
+            y: targetPixel.y,
+            duration: duration, // Same duration as ball flight
+            ease: 'Power1'
+          });
+          
+          console.log(`🏀 [REBOUND POSITIONING] Tween created for ${playerId}`, {
+            tweenCreated: !!tween,
+            tweenId: tween?.data?.id
+          });
+          
+          reboundPositionCount++;
+        } catch (error) {
+          console.error(`🏀 [REBOUND POSITIONING] Error creating tween for ${playerId}:`, error);
+        }
+      });
+      
+      console.log('🏀 [REBOUND POSITIONING] Complete', {
+        reboundPositionCount,
+        totalPlayers: allPlayerIds.length,
+        excludedCount: excludedPlayerIds.size
       });
       
       // Rebound positioning complete
