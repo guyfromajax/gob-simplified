@@ -76,8 +76,8 @@
       - else: d_foul = False
    
    e. Apply Defense Penalty
-      - Single defender: shot_score -= defense_score * 0.4
-      - Double team: shot_score -= (defense_score * 0.25) + (second_defense_score * 0.25)
+      - Single defender: shot_score -= defense_score * 0.6
+      - Double team: shot_score -= (defense_score * 0.35) + (second_defense_score * 0.35)
    
    f. Defense Scheme Multiplier
       - if Zone defense AND three-point: shot_score *= 1.1 (makes shot more likely to be successful)
