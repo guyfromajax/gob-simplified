@@ -797,13 +797,6 @@ export class ShotAnimationSystem {
       this._getBackTweens = [];
       
       // Defenders releasing for fast break
-      console.log('🏀 [SHOT ANIMATION] Defense release players:', {
-        hasDefenseRelease: !!turnData.defense_release,
-        defenseReleaseCount: turnData.defense_release?.length || 0,
-        defenseReleaseIds: turnData.defense_release || [],
-        hasDefenseReleaseCoords: !!turnData.defense_release_coords
-      });
-      
       if (turnData.defense_release && turnData.defense_release.length > 0) {
         turnData.defense_release.forEach(playerId => {
           const sprite = this.playerSprites[playerId];
@@ -816,10 +809,6 @@ export class ShotAnimationSystem {
               const storedCoords = turnData.defense_release_coords[playerId];
               targetX = storedCoords.x;
               targetY = storedCoords.y;
-              console.log(`🏀 [DEFENSE RELEASE] Animating player ${playerId}`, {
-                from: { x: sprite.x, y: sprite.y },
-                to: { x: targetX, y: targetY }
-              });
             } else {
               // Fallback: Use safe defaults if backend coordinates missing (shouldn't happen)
               console.error('⚠️ [DEFENSE RELEASE] Missing backend coordinates, using safe defaults', {
@@ -842,20 +831,11 @@ export class ShotAnimationSystem {
               duration,
               ease: 'Linear' // Match other player movements
             });
-          } else {
-            console.warn(`🏀 [DEFENSE RELEASE] No sprite found for player ${playerId}`);
           }
         });
       }
       
       // Offensive players getting back on defense
-      console.log('🏀 [SHOT ANIMATION] Offense get-back players:', {
-        hasOffenseGetback: !!turnData.offense_getback,
-        offenseGetbackCount: turnData.offense_getback?.length || 0,
-        offenseGetbackIds: turnData.offense_getback || [],
-        hasOffenseGetbackCoords: !!turnData.offense_getback_coords
-      });
-      
       if (turnData.offense_getback && turnData.offense_getback.length > 0) {
         turnData.offense_getback.forEach(playerId => {
           const sprite = this.playerSprites[playerId];
@@ -868,10 +848,6 @@ export class ShotAnimationSystem {
               const storedCoords = turnData.offense_getback_coords[playerId];
               targetX = storedCoords.x;
               targetY = storedCoords.y;
-              console.log(`🏀 [OFFENSE GET BACK] Animating player ${playerId}`, {
-                from: { x: sprite.x, y: sprite.y },
-                to: { x: targetX, y: targetY }
-              });
             } else {
               // Fallback: Use safe defaults if backend coordinates missing (shouldn't happen)
               console.error('⚠️ [OFFENSE GET BACK] Missing backend coordinates, using safe defaults', {
@@ -897,8 +873,6 @@ export class ShotAnimationSystem {
             
             // Store tween reference for early termination
             this._getBackTweens.push(tween);
-          } else {
-            console.warn(`🏀 [OFFENSE GET BACK] No sprite found for player ${playerId}`);
           }
         });
       }
@@ -906,14 +880,6 @@ export class ShotAnimationSystem {
       // ==================== REBOUND POSITIONING ====================
       // Animate potential rebounders (not shooter, defender, get-back, or release players)
       // into rebound position during shot flight
-      
-      console.log('🏀 [REBOUND POSITIONING] Starting rebounder animation setup', {
-        shooterId: turnData.shooter_id,
-        defenderId: turnData.defenderId || turnData.defender_id,
-        hasTurnData: !!turnData,
-        hasPlayerSprites: !!this.playerSprites,
-        playerSpritesCount: this.playerSprites ? Object.keys(this.playerSprites).length : 0
-      });
       
       // Build exclusion list
       const excludedPlayerIds = new Set();
@@ -927,15 +893,6 @@ export class ShotAnimationSystem {
         turnData.offense_getback.forEach(id => excludedPlayerIds.add(id)); // Get back players
       }
       
-      console.log('🏀 [REBOUND POSITIONING] Exclusion list:', {
-        excludedCount: excludedPlayerIds.size,
-        excludedIds: Array.from(excludedPlayerIds),
-        defenderId: turnData?.defenderId,
-        defender_id: turnData?.defender_id,
-        defense_release: turnData?.defense_release,
-        offense_getback: turnData?.offense_getback
-      });
-      
       // Determine basket coordinates (which basket is being attacked)
       const shooterTeamId = shooterSprite?.team_id || turnData.possession_team_id;
       const homeTeamId = this.scene.simData?.home_team_id || this.scene.simData?.home_team?.team_id;
@@ -943,33 +900,16 @@ export class ShotAnimationSystem {
       const basketX = isHomeTeam ? 91 : 9; // Home attacks away basket (91), away attacks home basket (9)
       const basketY = 25;
       
-      console.log('🏀 [REBOUND POSITIONING] Basket coordinates:', {
-        basketX,
-        basketY,
-        isHomeTeam,
-        shooterTeamId,
-        homeTeamId
-      });
-      
       // Animate all potential rebounders into rebound position
       const playerSprites = this.playerSprites || {};
-      let reboundPositionCount = 0;
-      const allPlayerIds = Object.keys(playerSprites);
-      
-      console.log('🏀 [REBOUND POSITIONING] Total players available:', {
-        totalPlayers: allPlayerIds.length,
-        allPlayerIds: allPlayerIds
-      });
       
       Object.keys(playerSprites).forEach(playerId => {
         if (excludedPlayerIds.has(playerId)) {
-          console.log(`🏀 [REBOUND POSITIONING] Skipping excluded player: ${playerId}`);
           return; // Skip excluded players
         }
         
         const sprite = playerSprites[playerId];
         if (!sprite) {
-          console.warn(`🏀 [REBOUND POSITIONING] No sprite found for player: ${playerId}`);
           return;
         }
         
@@ -982,11 +922,6 @@ export class ShotAnimationSystem {
         const canvasHeight = this.scene.game.config.height;
         const currentGridX = (currentPixelX / canvasWidth) * 100;
         const currentGridY = 50 - (currentPixelY / canvasHeight) * 50;
-        
-        console.log(`🏀 [REBOUND POSITIONING] Processing rebounder: ${playerId}`, {
-          currentPixel: { x: currentPixelX, y: currentPixelY },
-          currentGrid: { x: currentGridX, y: currentGridY }
-        });
         
         // Calculate target position based on rebound positioning rules
         let targetGridX = currentGridX;
@@ -1020,38 +955,14 @@ export class ShotAnimationSystem {
         // Convert target grid back to pixels
         const targetPixel = gridToPixels(targetGridX, targetGridY, canvasWidth, canvasHeight);
         
-        console.log(`🏀 [REBOUND POSITIONING] Creating tween for ${playerId}`, {
-          targetGrid: { x: targetGridX, y: targetGridY },
-          targetPixel: { x: targetPixel.x, y: targetPixel.y },
-          duration: this.shotConfig.flightDuration,
-          distanceFromBasket
-        });
-        
         // Animate to rebound position (same duration as ball flight)
-        try {
-          const tween = this.scene.tweens.add({
-            targets: sprite,
-            x: targetPixel.x,
-            y: targetPixel.y,
-            duration: this.shotConfig.flightDuration,
-            ease: 'Linear' // Match get-back player ease
-          });
-          
-          console.log(`🏀 [REBOUND POSITIONING] Tween created for ${playerId}`, {
-            tweenCreated: !!tween,
-            tweenId: tween?.data?.id
-          });
-          
-          reboundPositionCount++;
-        } catch (error) {
-          console.error(`🏀 [REBOUND POSITIONING] Error creating tween for ${playerId}:`, error);
-        }
-      });
-      
-      console.log('🏀 [REBOUND POSITIONING] Complete', {
-        reboundPositionCount,
-        totalPlayers: allPlayerIds.length,
-        excludedCount: excludedPlayerIds.size
+        this.scene.tweens.add({
+          targets: sprite,
+          x: targetPixel.x,
+          y: targetPixel.y,
+          duration: this.shotConfig.flightDuration,
+          ease: 'Linear' // Match get-back player ease
+        });
       });
       
       // ==================== END REBOUND POSITIONING ====================
