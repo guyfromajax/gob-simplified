@@ -12,7 +12,6 @@ from BackEnd.constants import (
     SOFT_PROB
 )
 from BackEnd.utils.shared import (
-    apply_help_defense_if_triggered,
     apply_scoring,
     get_time_elapsed,
     resolve_offensive_rebound,
@@ -330,6 +329,7 @@ class ShotManager:
         #     print(f"🎯 SHOT DEBUG: shooter object: {shooter}")
 
         # ✅ MOTION OFFENSE: Use motion_playcall if available (from Motion shot resolution)
+        # motion_playcall is used for Motion offense, current_playcall is used for Set plays
         playcall = roles.get("motion_playcall") or self.game_state["current_playcall"]
         defense_call = self.game_state["defense_playcall"]
         
@@ -339,7 +339,56 @@ class ShotManager:
         # Determine if shot is from the paint (PIP)
         is_paint = self.is_paint_shot(shooter, roles)
         
+        # Determine shot_type (inside/attack/outside) for shot score calculation
+        # Motion offense already has shot_type in roles, Set plays use location-based logic (same as Motion)
+        shot_type = roles.get("shot_type")  # From Motion offense
+        if not shot_type:
+            # For Set plays, determine shot_type from skeleton analysis (location + drive detection)
+            # Same logic as Motion plays: check shooter location and whether there was a drive action
+            shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
+            steps = roles.get("steps", [])
+            
+            # Check if there was a drive action before the shoot action
+            has_drive = False
+            if steps and shooter_pos:
+                # Find the shoot step and check previous steps for drive action
+                for step_idx in range(len(steps) - 1, -1, -1):
+                    step = steps[step_idx]
+                    pos_actions = step.get("pos_actions", {})
+                    shooter_action = pos_actions.get(shooter_pos, {})
+                    
+                    if shooter_action.get("action") == "shoot":
+                        # Check previous steps for drive action by same player
+                        for prev_idx in range(step_idx - 1, -1, -1):
+                            prev_step = steps[prev_idx]
+                            prev_pos_actions = prev_step.get("pos_actions", {})
+                            prev_action = prev_pos_actions.get(shooter_pos, {})
+                            if prev_action.get("action") == "drive":
+                                has_drive = True
+                                break
+                        break
+            
+            # Determine shot_type based on location and drive (same logic as Motion plays)
+            if shooter_location:
+                shooter_location_lower = shooter_location.lower()
+                if shooter_location_lower in PAINT_SPOTS:
+                    # Paint spot: attack if there was a drive, otherwise inside
+                    shot_type = "attack" if has_drive else "inside"
+                else:
+                    # Not a paint spot: outside shot
+                    shot_type = "outside"
+            else:
+                # Fallback to playcall if location not found
+                if playcall == "Inside":
+                    shot_type = "inside"
+                elif playcall == "Attack" or playcall == "Set":
+                    shot_type = "attack"
+                else:
+                    shot_type = "outside"
+        
         # ✅ BALANCING SYSTEM: Check for balancing override first
+        # Balancing override is set when score difference exceeds threshold based on quarter and team attributes
+        # Trailing team gets -10 (easier shots), leading team gets 190 (harder shots)
         if "balancing_shot_threshold_override" in game_state:
             shot_threshold = game_state["balancing_shot_threshold_override"]
             # Clear override after use (one-time per turn)
@@ -347,8 +396,12 @@ class ShotManager:
         else:
             shot_threshold = off_team.team_attributes["shot_threshold"]
         
+        # Three-point threshold: 100 - (random(1-5) * momentum)
+        # Higher momentum = easier three-pointers
         if is_three:
-            shot_threshold += 100
+            momentum = off_team.team_attributes.get("momentum", 0)
+            three_point_modifier = 100 - (random.randint(1, 5) * momentum)
+            shot_threshold += three_point_modifier
         if playcall == "Set":
             playcall = "Attack"
 
@@ -373,9 +426,10 @@ class ShotManager:
         shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
         shooter_location_str = shooter_location if shooter_location else "unknown"
         
-        # ✅ New: returns shot_score, help defender, and foul info
-        shot_score, help_defender, d_foul, foul_player = self.calculate_shot_score(
-            shooter, passer, screener, defender, playcall, defense_call, is_three, is_paint, second_defender, shooter_location_str
+        # ✅ New: returns shot_score, help defender (always None), and foul info
+        # Use shot_type instead of playcall for shot score calculation
+        shot_score, _, d_foul, foul_player = self.calculate_shot_score(
+            shooter, passer, screener, defender, shot_type, defense_call, is_three, is_paint, second_defender, shooter_location_str
         )
         
         # ✅ MOTION OFFENSE: Apply attack penalty if applicable
@@ -1041,18 +1095,21 @@ class ShotManager:
         return result
 
     
-    def calculate_shot_score(self, shooter, passer, screener, defender, playcall, defense_call, is_three, is_paint=False, second_defender=None, shooter_location=None):
+    def calculate_shot_score(self, shooter, passer, screener, defender, shot_type, defense_call, is_three, is_paint=False, second_defender=None, shooter_location=None):
         """
-        Calculate shot score based on attributes, playcall, defense, gravity, etc.
+        Calculate shot score based on attributes, shot_type (inside/attack/outside), defense, gravity, etc.
         Also returns:
-            - help_defender: if one triggered
+            - help_defender: if one triggered (always None now, help defense removed)
             - d_foul: whether a defensive foul occurred
             - foul_player: who committed the foul
         """
 
         shot_score = 0
         attrs = shooter.attributes
-        weights = PLAYCALL_ATTRIBUTE_WEIGHTS.get(playcall, {})
+        # Use shot_type instead of playcall for attribute weights
+        # Map shot_type to playcall name for weights lookup
+        playcall_for_weights = shot_type.capitalize() if shot_type in ["inside", "attack", "outside"] else "Base"
+        weights = PLAYCALL_ATTRIBUTE_WEIGHTS.get(playcall_for_weights, {})
 
         # Base shot score based on shooter attributes and playcall weights
         shot_score += sum(attrs[attr] * (weight / 10) for attr, weight in weights.items()) * random.randint(1, 6)
@@ -1099,7 +1156,8 @@ class ShotManager:
         # Track defense score for statistics
         self.defense_scores.append(defense_score)
 
-        d_foul, foul_player = self.check_defensive_foul_on_shot(defender, defense_score, is_three, shooter, shooter_location)
+        # Check defensive foul with shot_type-specific thresholds
+        d_foul, foul_player = self.check_defensive_foul_on_shot(defender, defense_score, shot_type, shooter, shooter_location)
 
         # Apply primary defender's defense score
         if second_defender:
@@ -1148,18 +1206,11 @@ class ShotManager:
         if defender:
             defender.record_stat("DEF_A")
 
-        # Defense scheme multiplier
-        if (defense_call == "Zone" and is_three) or (defense_call == "Man" and not is_three):
-            shot_score *= 0.9
-        else:
+        # Defense scheme multiplier: Only Zone vs 3pt gets 1.1x (makes shot more likely to be successful)
+        if defense_call == "Zone" and is_three:
             shot_score *= 1.1
 
-        # Help defense
-        help_defender = None
-        if defender:
-            shot_score, help_defender, help_penalty = apply_help_defense_if_triggered(
-                self.game, playcall, is_three, defender, shot_score
-            )
+        # Help defense removed (will be replaced with location-based check in future)
 
         # Screener bonus
         if screener and screener != shooter:
@@ -1192,13 +1243,14 @@ class ShotManager:
         # print(f"shooter: {get_name_safe(shooter)} | passer: {get_name_safe(passer)}")
         # print(f"shot score = {round(shot_score, 2)} | (defense penalty: {round(defense_score * 0.2, 2)})")
 
-        return shot_score, help_defender, d_foul, foul_player
+        # help_defender is always None now (help defense removed)
+        return shot_score, None, d_foul, foul_player
 
     
-    def check_defensive_foul_on_shot(self, defender, defense_score, is_three=False, shooter=None, shooter_location=None):
+    def check_defensive_foul_on_shot(self, defender, defense_score, shot_type, shooter=None, shooter_location=None):
         """
         Determines if a defensive foul occurs based on defender skill and team fight.
-        Uses hard and soft thresholds with universal constants.
+        Uses hard and soft thresholds that vary by shot_type.
         Returns (bool, player) → (was_foul_committed, fouling_defender)
         """
         if not defender:
@@ -1207,9 +1259,20 @@ class ShotManager:
         defense_team = self.game.defense_team
         fight = defense_team.team_attributes.get("fight", 0)
 
+        # Base thresholds by shot_type
+        if shot_type == "inside":
+            base_hard = 50
+            base_soft = 110
+        elif shot_type == "attack":
+            base_hard = 70
+            base_soft = 130
+        else:  # outside
+            base_hard = 30
+            base_soft = 90
+
         # Calculate thresholds with fight adjustment
-        hard_threshold = HARD_SHOOTING_FOUL_THRESHOLD + fight
-        soft_threshold = SOFT_SHOOTING_FOUL_THRESHOLD + fight
+        hard_threshold = base_hard + fight
+        soft_threshold = base_soft + fight
 
         # 🔍 DEBUG: Shooting Foul Calculation
         from BackEnd.utils.shared import get_name_safe
@@ -1218,14 +1281,14 @@ class ShotManager:
         shooter_loc_str = shooter_location if shooter_location else "unknown"
         logging.debug(f"   Shooter: {shooter_name}")
         logging.debug(f"   Shooter location: {shooter_loc_str}")
+        logging.debug(f"   Shot type: {shot_type}")
         logging.debug(f"   Defender: {get_name_safe(defender)}")
         logging.debug(f"   Defense score: {defense_score}")
-        logging.debug(f"   Is 3-pointer: {is_three}")
         logging.debug(f"   Defense team fight: {fight}")
-        logging.debug(f"   Base HARD threshold: {HARD_SHOOTING_FOUL_THRESHOLD}")
-        logging.debug(f"   Base SOFT threshold: {SOFT_SHOOTING_FOUL_THRESHOLD}")
-        logging.debug(f"   Calibrated HARD threshold: {HARD_SHOOTING_FOUL_THRESHOLD} + {fight} = {hard_threshold}")
-        logging.debug(f"   Calibrated SOFT threshold: {SOFT_SHOOTING_FOUL_THRESHOLD} + {fight} = {soft_threshold}")
+        logging.debug(f"   Base HARD threshold: {base_hard}")
+        logging.debug(f"   Base SOFT threshold: {base_soft}")
+        logging.debug(f"   Calibrated HARD threshold: {base_hard} + {fight} = {hard_threshold}")
+        logging.debug(f"   Calibrated SOFT threshold: {base_soft} + {fight} = {soft_threshold}")
 
         # Determine if foul occurs
         if defense_score < hard_threshold:
