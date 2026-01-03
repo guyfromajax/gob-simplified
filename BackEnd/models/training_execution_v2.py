@@ -139,7 +139,7 @@ TEAM_ATTR_CLAMPS = {
     "shot_threshold": (-10, 190),
     "discipline": (-10, 10),
     "fight": (-10, 10),
-    "rebound_modifier": (0.8, 1.2),
+    "rebound_modifier": (0.0, 0.4),
     "momentum_score": (-10, 10),
     "offensive_efficiency": (-10, 10),
     "team_chemistry": (7, 25),
@@ -160,7 +160,7 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
     
     Pre-training conditions:
     - Player attributes (excluding EM, MO, NG): += randint(-2, 0) for each player/attribute
-    - Rebound modifier: += random choice [-0.1, 0]
+    - Rebound modifier: += random between -0.1 to 0 in 0.01 increments
     - Shot threshold: += random.randint(0, 15)
     - Team chemistry: N/A (no change)
     - All other team attributes: += random choice [-2, -1, 0]
@@ -185,10 +185,11 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
                 attrs[attr] = attrs[anchor_key]
     
     # Apply to team attributes
-    # Rebound modifier: random choice [-0.1, 0]
+    # Rebound modifier: random decrease between -0.1 to 0 in 0.01 increments
     if "rebound_modifier" in team:
-        team["rebound_modifier"] += random.choice([-0.1, 0])
-        # Clamp
+        decrease = random.randint(-10, 0) / 100.0  # -0.1 to 0 in 0.01 increments
+        team["rebound_modifier"] += decrease  # decrease is already negative or zero
+        # Clamp to [0.0, 0.4]
         team["rebound_modifier"] = max(
             TEAM_ATTR_CLAMPS["rebound_modifier"][0],
             min(TEAM_ATTR_CLAMPS["rebound_modifier"][1], team["rebound_modifier"])
@@ -387,7 +388,7 @@ def apply_training_points(
     if "technical_drills" in normalized_allocations:
         rebounding_points = normalized_allocations["technical_drills"].get("rebounding", 0)
         if rebounding_points > 0:
-            _apply_rebound_modifier_training(team, rebounding_points, archetype, sub_option)
+            _apply_rebound_modifier_training(team, rebounding_points, archetype, sub_option, source="technical_drills")
     
     # Handle scrimmages (if scrimmages category exists in allocations)
     # Scrimmages: Team Chemistry, Shot Threshold, Rebounding
@@ -400,7 +401,7 @@ def apply_training_points(
             # Apply to Shot Threshold (decreases)
             _apply_shot_threshold_training(team, scrimmage_points, archetype, sub_option)
             # Apply to Rebounding (rebound_modifier)
-            _apply_rebound_modifier_training(team, scrimmage_points, archetype, sub_option)
+            _apply_rebound_modifier_training(team, scrimmage_points, archetype, sub_option, source="scrimmages")
     
     # Momentum score (amplifier only, from coaching focus)
     # Amplifier: += random.randint(1,5)
@@ -724,38 +725,63 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
     team[team_attr] = current_val + final_increase
 
 
-def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optional[str] = None, sub_option: Optional[str] = None):
+def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optional[str] = None, sub_option: Optional[str] = None, source: str = "technical_drills"):
     """
     Apply training points to rebound_modifier.
     
-    Logic:
-    - 1 point: += random choice [0.1, 0.2]
-    - 2 points: += random choice [0.2, 0.3]
-    - 3 points: += random choice [0.2, 0.3, 0.4]
-    - 4 points: += random choice [0.2, 0.3, 0.4, 0.5]
-    - 5 points: += random choice [0.3, 0.4, 0.5]
-    - Amplifier: += incremental random choice [0.1, 0.2]
+    Args:
+        team: Team dict
+        points: Training points allocated (1-5)
+        archetype: Optional coaching focus archetype
+        sub_option: Optional coaching focus sub-option
+        source: "technical_drills" or "scrimmages" - determines which range to use
+    
+    Technical Drills ranges (in 0.01 increments):
+    - 1 point: +0.01 to +0.06
+    - 2 points: +0.03 to +0.08
+    - 3 points: +0.04 to +0.10
+    - 4 points: +0.04 to +0.12
+    - 5 points: +0.04 to +0.14
+    
+    Scrimmages ranges (in 0.01 increments):
+    - 1 point: +0.01 to +0.03
+    - 2 points: +0.02 to +0.05
+    - 3 points: +0.03 to +0.08
+    - 4 points: +0.03 to +0.09
+    - 5 points: +0.03 to +0.10
     """
     if points == 0:
         return
     
-    # Get base increase
-    if points == 1:
-        increase = random.choice([0.1, 0.2])
-    elif points == 2:
-        increase = random.choice([0.2, 0.3])
-    elif points == 3:
-        increase = random.choice([0.2, 0.3, 0.4])
-    elif points == 4:
-        increase = random.choice([0.2, 0.3, 0.4, 0.5])
-    elif points == 5:
-        increase = random.choice([0.3, 0.4, 0.5])
-    else:
-        increase = random.choice([0.3, 0.4, 0.5])
+    # Get base increase based on source and points
+    if source == "technical_drills":
+        if points == 1:
+            increase = random.randint(1, 6) / 100.0  # 0.01 to 0.06
+        elif points == 2:
+            increase = random.randint(3, 8) / 100.0  # 0.03 to 0.08
+        elif points == 3:
+            increase = random.randint(4, 10) / 100.0  # 0.04 to 0.10
+        elif points == 4:
+            increase = random.randint(4, 12) / 100.0  # 0.04 to 0.12
+        elif points == 5:
+            increase = random.randint(4, 14) / 100.0  # 0.04 to 0.14
+        else:
+            increase = random.randint(4, 14) / 100.0  # Default to 5-point range
+    else:  # scrimmages
+        if points == 1:
+            increase = random.randint(1, 3) / 100.0  # 0.01 to 0.03
+        elif points == 2:
+            increase = random.randint(2, 5) / 100.0  # 0.02 to 0.05
+        elif points == 3:
+            increase = random.randint(3, 8) / 100.0  # 0.03 to 0.08
+        elif points == 4:
+            increase = random.randint(3, 9) / 100.0  # 0.03 to 0.09
+        elif points == 5:
+            increase = random.randint(3, 10) / 100.0  # 0.03 to 0.10
+        else:
+            increase = random.randint(3, 10) / 100.0  # Default to 5-point range
     
-    # Apply amplifier (incremental add)
-    amplifier = random.choice([0.1, 0.2])
-    final_increase = increase + amplifier
+    final_increase = increase
     
     # Apply focus amplifier if rebound_modifier is amplified by the selected focus
     if _should_amplify_team_attr("rebound_modifier", archetype, sub_option):
@@ -763,8 +789,14 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
         final_increase = final_increase * focus_multiplier
     
     # Apply to team
-    current_val = team.get("rebound_modifier", 1.0)
+    current_val = team.get("rebound_modifier", 0.2)  # Default to 0.2 (center)
     team["rebound_modifier"] = current_val + final_increase
+    
+    # Clamp to valid range [0.0, 0.4]
+    team["rebound_modifier"] = max(
+        TEAM_ATTR_CLAMPS["rebound_modifier"][0],
+        min(TEAM_ATTR_CLAMPS["rebound_modifier"][1], team["rebound_modifier"])
+    )
 
 
 def _apply_shot_threshold_training(team: dict, points: int, archetype: Optional[str] = None, sub_option: Optional[str] = None):

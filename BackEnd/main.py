@@ -628,7 +628,7 @@ def initialize_team_attributes():
             "shot_threshold": random.randint(-10, 190),
             "discipline": random.randint(-250, -150),
             "fight": random.randint(40, 90),
-            "rebound_modifier": random.choice([0.8, 0.9, 1.0, 1.1, 1.2]),
+            "rebound_modifier": random.randint(0, 40) / 100.0,  # Random 0.0-0.4 in 0.01 increments
             "momentum_score": random.randint(0,20),
             "offensive_efficienty": random.randint(1,10),
             "team_chemistry": random.randint(7,25),

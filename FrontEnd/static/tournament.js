@@ -2145,7 +2145,7 @@ function createPill(originalValue, attrKey) {
     value = 90 - originalValue; // Invert: lower is better (positive/green), higher is worse (negative/red)
   } else if (attrKey === 'rebound_modifier') {
     maxValue = 0.2;
-    value = originalValue - 1.0;
+    value = originalValue - 0.2; // Center at 0.2 (new range: 0.0-0.4)
   }
   
   if (value > 0) {
