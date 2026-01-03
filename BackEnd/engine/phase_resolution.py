@@ -22,11 +22,11 @@ from BackEnd.utils.shared import (
     get_fast_break_chance,
     calculate_rebound_score,
     calculate_outlet_pass_score,
-    choose_rebounder,
-    default_rebounder_dict,
     resolve_offensive_rebound,
     apply_scoring,
-    unpack_game_context
+    unpack_game_context,
+    calculate_bounce_spot,
+    determine_rebounder,
 )
 from BackEnd.playcall_skeletons.fcp_skeletons import FCP_1, FCP_SKELETONS_DICT
 from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
@@ -1441,29 +1441,16 @@ def resolve_free_throw_logic(game):
             game_state["offensive_state"] = "HCO"
 
         if not makes_shot:
-            # Rebound logic
-            rebounder_dict = default_rebounder_dict()
-            o_pos = choose_rebounder(rebounder_dict, "offense")
-            d_pos = choose_rebounder(rebounder_dict, "defense")
-            o_rebounder = off_lineup[o_pos]
-            d_rebounder = def_lineup[d_pos]
-
-            o_score = calculate_rebound_score(o_rebounder)
-            d_score = calculate_rebound_score(d_rebounder)
-
-            off_mod = off_team.team_attributes["rebound_modifier"]
-            def_mod = def_team.team_attributes["rebound_modifier"]
-            bias = def_mod - off_mod
-            def_prob = min(0.95, max(0.55, 0.75 + bias))
-
-            total = d_score + o_score
-            d_weight = d_score / total if total > 0 else 0.5
-            d_weight += (def_prob - 0.5)
-            d_weight = min(0.95, max(0.05, d_weight))
-
-            rebound_team = def_team if random.random() < d_weight else off_team
-            rebounder = d_rebounder if rebound_team == def_team else o_rebounder
-            stat = "DREB" if rebound_team == def_team else "OREB"
+            # Unified geography-based rebound system for free throws
+            # Calculate bounce spot (free throw is at the basket being attacked)
+            is_away_offense = off_team.team_id == game.away_team.team_id
+            # Home team attacks away basket (x=91), away team attacks home basket (x=9)
+            basket_x = 9 if is_away_offense else 91
+            bounce_spot = calculate_bounce_spot(game, basket_x=basket_x, basket_y=25)
+            
+            # Use unified system to determine rebounder
+            rebounder, rebound_team, stat = determine_rebounder(game, bounce_spot)
+            
             game_state["last_rebound"] = stat
             game_state["last_rebounder"] = rebounder
             
