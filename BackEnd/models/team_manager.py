@@ -196,17 +196,20 @@ class TeamManager:
         """
         # Common attributes for all modes
         shot_threshold = random.randint(-10, 190)
-        rebound_modifier = random.choice([0.8, 0.9, 1.0, 1.1, 1.2])
         
         # Mode-specific ranges
         if mode == "franchise":
             # Franchise mode: tighter ranges for more controlled progression
             attr_range = (-3, 3)
             team_chemistry = random.randint(7, 13)
+            # Franchise: All teams start at center value (0.2)
+            rebound_modifier = 0.2
         else:
             # Single Game & Tournament mode: wider ranges
             attr_range = (-10, 10)
             team_chemistry = random.randint(7, 25)
+            # Single/Tournament: Random value 0.0-0.4 in 0.01 increments
+            rebound_modifier = random.randint(0, 40) / 100.0
         
         return {
             "shot_threshold": shot_threshold,

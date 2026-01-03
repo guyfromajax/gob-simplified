@@ -719,10 +719,10 @@ function createPill(originalValue, attrKey) {
     maxValue = 100; // Range is -10 to 190, center at 90, so max deviation is 100
     value = 90 - originalValue; // Invert: lower is better (positive/green), higher is worse (negative/red)
   } else if (attrKey === 'rebound_modifier') {
-    // Rebound modifier is 0.8-1.2, center at 1.0
-    // We'll show deviation from 1.0
-    maxValue = 0.2; // Max deviation is 0.2 (from 0.8 to 1.0 or 1.0 to 1.2)
-    value = originalValue - 1.0; // Center at 0 for fill calculation
+    // Rebound modifier is 0.0-0.4, center at 0.2
+    // We'll show deviation from 0.2
+    maxValue = 0.2; // Max deviation is 0.2 (from 0.0 to 0.2 or 0.2 to 0.4)
+    value = originalValue - 0.2; // Center at 0 for fill calculation
     displayValue = originalValue.toFixed(2); // Show original value with 2 decimals
   }
   
