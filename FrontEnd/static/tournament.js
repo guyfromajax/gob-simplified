@@ -1088,20 +1088,7 @@ function renderSchedule() {
       gameDiv.appendChild(boxScoreLink);
     }
     
-    // Add training report link if this is user's matchup and training has been run
-    // Compare with team name (bracket uses team names, not ObjectIds)
-    const isUserMatch = match.home_team === userTeamName || match.away_team === userTeamName;
-    if (isUserMatch && tournament.training_status?.training_completed && tournament.training_status?.round === 1) {
-      const link = document.createElement('a');
-      link.href = `/static/training-report.html?mode=tournament&tournament_id=${tournament._id}&team_id=${userTeamId}&round=1`;
-      link.textContent = ' [Training Report]';
-      link.className = 'training-report-link';
-      link.style.color = '#4a90e2';
-      link.style.textDecoration = 'none';
-      link.style.marginLeft = '8px';
-      link.style.fontSize = 'calc(1em - 2px)';
-      gameDiv.appendChild(link);
-    }
+    // ✅ REMOVED: Training Report links - Training is not used in Tournament mode
     
     firstRoundDiv.appendChild(gameDiv);
   });
@@ -1188,20 +1175,7 @@ function renderSchedule() {
         gameDiv.appendChild(boxScoreLink);
       }
       
-      // Add training report link if this is user's matchup and training has been run
-      // Compare with team name (bracket uses team names, not ObjectIds)
-      const isUserMatch = match.home_team === userTeamName || match.away_team === userTeamName;
-      if (isUserMatch && tournament.training_status?.training_completed && tournament.training_status?.round === 2) {
-        const link = document.createElement('a');
-        link.href = `/static/training-report.html?mode=tournament&tournament_id=${tournament._id}&team_id=${userTeamId}&round=2`;
-        link.textContent = ' [Training Report]';
-        link.className = 'training-report-link';
-        link.style.color = '#4a90e2';
-        link.style.textDecoration = 'none';
-        link.style.marginLeft = '8px';
-        link.style.fontSize = 'calc(1em - 2px)';
-        gameDiv.appendChild(link);
-      }
+      // ✅ REMOVED: Training Report links - Training is not used in Tournament mode
     } else {
       gameDiv.innerHTML = 'TBD @ TBD';
     }
@@ -1290,20 +1264,7 @@ function renderSchedule() {
       champGameDiv.appendChild(boxScoreLink);
     }
     
-    // Add training report link if this is user's matchup and training has been run
-    // Compare with team name (bracket uses team names, not ObjectIds)
-    const isUserMatch = match.home_team === userTeamName || match.away_team === userTeamName;
-    if (isUserMatch && tournament.training_status?.training_completed && tournament.training_status?.round === 3) {
-      const link = document.createElement('a');
-      link.href = `/static/training-report.html?mode=tournament&tournament_id=${tournament._id}&team_id=${userTeamId}&round=3`;
-      link.textContent = ' [Training Report]';
-      link.className = 'training-report-link';
-      link.style.color = '#4a90e2';
-      link.style.textDecoration = 'none';
-      link.style.marginLeft = '8px';
-      link.style.fontSize = 'calc(1em - 2px)';
-      champGameDiv.appendChild(link);
-    }
+    // ✅ REMOVED: Training Report links - Training is not used in Tournament mode
   } else {
     champGameDiv.innerHTML = 'TBD @ TBD';
   }
@@ -1324,9 +1285,7 @@ function updateCTA(data) {
   // If data is provided, use it (from command center endpoint)
   // Otherwise, fall back to reading from tournament object (backward compatibility)
   const completed = data ? data.completed : (tournament?.completed || false);
-  const trainingCompleted = data ? data.training_completed : (tournament?.training_status?.training_completed || false);
   const currentRound = data ? data.current_round : (tournament?.current_round || 1);
-  const sessionType = data ? data.session_type : (tournament?.training_status?.session_type || 'in-season');
   
   if (completed) {
     playBtn.style.display = 'none';
@@ -1357,20 +1316,12 @@ function updateCTA(data) {
     }
   }
 
-  // Update button based on training status (aligns with Franchise pattern)
-  if (!trainingCompleted) {
-    // Training not completed, show "Run Training" or "Run Training Camp"
-    playBtn.textContent = sessionType === 'preseason' ? 'Run Training Camp' : 'Run Training';
-    playBtn.style.display = 'inline-block';
-    simBtn.style.display = 'none';
-    simBtn.disabled = true;
-  } else {
-    // Training completed, show "Play Next Game"
-    playBtn.textContent = 'Play Next Game';
-    playBtn.style.display = 'inline-block';
-    simBtn.style.display = 'none';
-    simBtn.disabled = true;
-  }
+  // ✅ REMOVED: Training is not used in Tournament mode - users go directly to gameplay
+  // Always show "Play Next Game" button
+  playBtn.textContent = 'Play Next Game';
+  playBtn.style.display = 'inline-block';
+  simBtn.style.display = 'none';
+  simBtn.disabled = true;
 }
 
 // ✅ MIGRATION (Task 6.1): Populate top bar using structured data (aligns with Franchise pattern)
@@ -1825,18 +1776,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       playBtn.disabled = true;
       try {
-        // Check if training has been completed
-        const trainingStatus = tournament.training_status || {};
-        const trainingCompleted = trainingStatus.training_completed && trainingStatus.round === tournament.current_round;
-        
-        if (!trainingCompleted) {
-          // Navigate to training page
-          const url = `/static/training.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_id=${encodeURIComponent(userTeamId)}&round=${tournament.current_round}`;
-          window.location.href = url;
-          return;
-        }
-        
-        // Training completed, proceed to game
+        // ✅ REMOVED: Training is not used in Tournament mode - proceed directly to game
         const payload = { tournament_id: tournament._id };
         const res = await fetch('/simulate-tournament-round', {
           method: 'POST',

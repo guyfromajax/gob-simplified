@@ -1044,13 +1044,18 @@ def sim_remaining(request: SimulateRequest):
     return jsonable_encoder(final_doc, custom_encoder={ObjectId: str})
 
 
+# ✅ REMOVED: Training is not used in Tournament mode - users go directly to gameplay
 @router.post("/tournament/run-training")
 def run_tournament_training(req: TournamentTrainingRequest):
     """
-    Run training for a tournament team using tournament-specific player/team attributes.
-    Updates only the tournament document, not the core collections.
+    DISABLED: Training is not used in Tournament mode.
+    Users go directly to gameplay without training steps.
     """
-    from datetime import datetime
+    raise HTTPException(status_code=404, detail="Training is not available in Tournament mode")
+    
+    # Original implementation preserved below (unreachable) for reference
+    if False:  # This block is never executed - training removed from Tournament mode
+        from datetime import datetime
     from BackEnd.models.training_execution_v2 import execute_training
     from BackEnd.utils.position_ratings import compute_position_ratings
     
