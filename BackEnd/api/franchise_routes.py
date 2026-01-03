@@ -1215,14 +1215,17 @@ def team_stats(franchise_id: str):
     
     print(f"🔍 [TEAM_STATS] Processed {players_with_stats} players with stats, {players_without_team_id} without team_id")
     
-    # Get PF/PA from standings (teams collection)
+    # Get PF/PA and wins/losses from standings (teams collection)
     standings_data = {}
-    teams_list = list(db.teams.find({}, {"name": 1, "PF": 1, "PA": 1, "_id": 1}))
+    teams_list = list(db.teams.find({}, {"name": 1, "PF": 1, "PA": 1, "record": 1, "_id": 1}))
     for t in teams_list:
         team_id_str = str(t["_id"])
+        rec = t.get("record", {"W": 0, "L": 0})
         standings_data[team_id_str] = {
             "PF": t.get("PF", 0),
-            "PA": t.get("PA", 0)
+            "PA": t.get("PA", 0),
+            "W": rec.get("W", 0),
+            "L": rec.get("L", 0)
         }
     
     # Convert to output format with team names
@@ -1236,13 +1239,17 @@ def team_stats(franchise_id: str):
             # Fallback if team_id_str is not a valid ObjectId
             team_name = team_id_str
         
-        # Add PF/PA from standings
+        # Add PF/PA and wins/losses from standings
         if team_id_str in standings_data:
             stats["PF"] = standings_data[team_id_str]["PF"]
             stats["PA"] = standings_data[team_id_str]["PA"]
+            stats["W"] = standings_data[team_id_str]["W"]
+            stats["L"] = standings_data[team_id_str]["L"]
         else:
             stats["PF"] = 0
             stats["PA"] = 0
+            stats["W"] = 0
+            stats["L"] = 0
         
         # Calculate TREB from DREB + OREB
         stats["TREB"] = stats.get("DREB", 0) + stats.get("OREB", 0)

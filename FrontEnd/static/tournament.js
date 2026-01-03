@@ -839,6 +839,8 @@ function renderTeamStatsTable(teams) {
     
     tr.innerHTML = `
       <td>${t.team}</td>
+      <td>${s.W || 0}</td>
+      <td>${s.L || 0}</td>
       <td>${s.PF || 0}</td>
       <td>${s.PA || 0}</td>
       <td>${s.FGM || 0}</td>
@@ -881,6 +883,8 @@ function renderTeamStatsTable(teams) {
   
   totalsTr.innerHTML = `
     <td>TOTALS</td>
+    <td>${totals.W}</td>
+    <td>${totals.L}</td>
     <td>${totals.PF}</td>
     <td>${totals.PA}</td>
     <td>${totals.FGM}</td>
@@ -912,6 +916,8 @@ function sortTeamStats(statKey) {
   // Map display stat names to data stat keys
   const statMap = {
     'team': 'team',
+    'W': 'W',
+    'L': 'L',
     'PF': 'PF',
     'PA': 'PA',
     'FGM': 'FGM',
