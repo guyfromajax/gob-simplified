@@ -1161,8 +1161,8 @@ class ShotManager:
 
         # Apply primary defender's defense score
         if second_defender:
-            # Two defenders: apply both with 30% discount (0.2 * 0.7 = 0.14 each)
-            shot_score -= defense_score * 0.14
+            # Two defenders: apply both with 25% each
+            shot_score -= defense_score * 0.25
             
             # Calculate defense score for second defender
             second_defense_attrs = second_defender.attributes if second_defender else {"OD": 0, "ID": 0, "AG": 0, "ST": 0, "IQ": 0, "CH": 0}
@@ -1193,15 +1193,15 @@ class ShotManager:
             # Track second defender's defense score
             self.defense_scores.append(second_defense_score)
             
-            # Apply second defender's defense score with 30% discount
-            shot_score -= second_defense_score * 0.14
+            # Apply second defender's defense score with 25%
+            shot_score -= second_defense_score * 0.25
             
             # Record defensive attempts for both defenders
             if second_defender:
                 second_defender.record_stat("DEF_A")
         else:
-            # Single defender: apply normal 20% impact
-            shot_score -= defense_score * 0.2
+            # Single defender: apply 40% impact
+            shot_score -= defense_score * 0.4
         
         if defender:
             defender.record_stat("DEF_A")
