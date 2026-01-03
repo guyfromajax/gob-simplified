@@ -206,7 +206,21 @@ def resolve_offensive_rebound(game, rebounder):
         else:
             # Track defensive success for missed putback
             defender.record_stat("DEF_S")
-            new_rebounder, new_team, new_stat = determine_rebounder(game)
+            
+            # Unified geography-based rebound system for putback misses
+            # Putback happens at the same basket where the original shot was taken
+            is_away_offense = off_team.team_id == game.away_team.team_id
+            # Home team attacks away basket (x=91), away team attacks home basket (x=9)
+            basket_x = 9 if is_away_offense else 91
+            bounce_spot = calculate_bounce_spot(game, basket_x=basket_x, basket_y=25)
+            
+            # Penalize the rebounder who attempted the putback (20% distance penalty) but don't exclude
+            rebounder_id = getattr(rebounder, "player_id", None)
+            exclude_player_ids = set()  # Don't exclude putback player anymore
+            penalize_player_ids = {rebounder_id} if rebounder_id else set()  # Penalize putback player by 20% distance
+            
+            new_rebounder, new_team, new_stat = determine_rebounder(game, bounce_spot, exclude_player_ids, penalize_player_ids)
+            
             # Debug: Log when putback miss rebound stat is recorded
             logging.info(f"🏀 Putback Miss Rebound: {get_name_safe(new_rebounder)} credited with {new_stat} (putback miss)")
             new_rebounder.record_stat(new_stat)
@@ -214,17 +228,8 @@ def resolve_offensive_rebound(game, rebounder):
             # This ensures the shot animates to the correct basket before possession flips
             event["possession_flips"] = False
             
-            # Determine ballSpot based on where the rebound HAPPENS, not where they'll attack next
-            # For a putback, the rebound happens at the SAME basket as the putback attempt
-            # The putback happened at the basket the original offensive team was attacking
-            # Home team attacks away basket (x: 91), away team attacks home basket (x: 9)
-            if new_stat == "DREB":
-                # Defensive rebound - happens at the SAME basket where putback occurred
-                # Putback happened at the basket off_team was attacking
-                ballSpot = {"x": 91, "y": 25} if off_team == game.home_team else {"x": 9, "y": 25}
-            else:
-                # Offensive rebound - same team continues attacking same basket
-                ballSpot = {"x": 91, "y": 25} if off_team == game.home_team else {"x": 9, "y": 25}
+            # Use calculated bounce spot for frontend animation
+            ballSpot = {"x": bounce_spot["x"], "y": bounce_spot["y"]}
             
             # Add rebound information for frontend animation
             event["rebound"] = {
@@ -267,14 +272,138 @@ def calculate_screen_score(screen_attrs):
     )
     return base_score * random.randint(1, 6)
 
-def choose_rebounder(rebounders, side):
-    pool = rebounders.get(side, {})
-    if not pool:
-        logging.warning("choose_rebounder called with empty pool for %s", side)
+def calculate_bounce_spot(game, basket_x=None, basket_y=25, shooter_spot=None):
+    """
+    Calculate the bounce spot coordinates for a missed shot.
+    Uses distance-based variance: longer shots have wider bounce variance.
+    
+    Args:
+        game: GameManager instance
+        basket_x: X coordinate of the basket (if None, determines from offense team)
+        basket_y: Y coordinate of the basket (default 25)
+        shooter_spot: Optional string name of shooter's spot (e.g., "key", "upper wing")
+                     If provided, calculates distance to determine variance range
+    
+    Returns:
+        dict: {"x": float, "y": float} - bounce spot coordinates
+    """
+    import math
+    from BackEnd.constants import HCO_STRING_SPOTS
+    
+    if basket_x is None:
+        # Determine basket based on which team is on offense
+        off_team = game.offense_team
+        is_away_offense = off_team.team_id == game.away_team.team_id
+        
+        # Home team attacks away basket (x=91), away team attacks home basket (x=9)
+        # Using standard coordinates: home basket x=91, away basket x=9
+        basket_x = 9 if is_away_offense else 91
+    
+    # Determine variance ranges based on shot distance
+    if shooter_spot and shooter_spot in HCO_STRING_SPOTS:
+        # Get shooter's coordinates
+        shooter_coords = HCO_STRING_SPOTS[shooter_spot]
+        
+        # Calculate distance from shooter to basket (using actual basket coordinates)
+        distance = math.sqrt(
+            (shooter_coords["x"] - basket_x) ** 2 + 
+            (shooter_coords["y"] - basket_y) ** 2
+        )
+        
+        # Classify shot distance
+        if distance < 15:
+            # Short shot: x = 2-6 (outward only), y = ±6
+            x_variance_max = 6
+            y_variance = 6
+        elif distance <= 20:
+            # Medium shot: x = 2-8 (outward only), y = ±8
+            x_variance_max = 8
+            y_variance = 8
+        else:
+            # Long shot: x = 2-10 (outward only), y = ±10
+            x_variance_max = 10
+            y_variance = 10
+    else:
+        # Default to medium if shooter spot not provided
+        x_variance_max = 8
+        y_variance = 8
+    
+    # X variance: only outward from basket (not inward)
+    # Home team attacking away basket (x=91): bounce goes right (x > 91)
+    # Away team attacking home basket (x=9): bounce goes left (x < 9)
+    if basket_x == 91:  # Home team attacking away basket
+        x_offset = random.randint(2, x_variance_max)  # Positive offset (right)
+        bounce_x = basket_x + x_offset
+    else:  # Away team attacking home basket (x=9)
+        x_offset = random.randint(2, x_variance_max)  # Negative offset (left)
+        bounce_x = basket_x - x_offset
+    
+    # Y variance: ±variance from basket
+    bounce_y = basket_y + random.randint(-y_variance, y_variance)
+    
+    # Clamp to valid court bounds
+    bounce_x = max(0, min(100, bounce_x))
+    bounce_y = max(0, min(50, bounce_y))
+    
+    return {"x": bounce_x, "y": bounce_y}
+
+
+def choose_rebounder(lineup, bounce_spot, exclude_player_ids=None, penalize_player_ids=None):
+    """
+    Choose the player closest to the bounce spot (geography-based).
+    
+    Args:
+        lineup: Dict of position -> Player objects (e.g., {"PG": player, ...})
+        bounce_spot: Dict with "x" and "y" keys for bounce coordinates
+        exclude_player_ids: Optional set of player_ids to exclude from consideration
+        penalize_player_ids: Optional set of player_ids to penalize by 20% distance (e.g., shooter, putback player)
+    
+    Returns:
+        Player object closest to bounce spot, or None if no valid players
+    """
+    if not lineup:
+        logging.warning("choose_rebounder called with empty lineup")
         return None
-    players = list(pool.keys())
-    weights = list(pool.values())
-    return random.choices(players, weights=weights, k=1)[0]
+    
+    if exclude_player_ids is None:
+        exclude_player_ids = set()
+    
+    if penalize_player_ids is None:
+        penalize_player_ids = set()
+    
+    bounce_x = bounce_spot["x"]
+    bounce_y = bounce_spot["y"]
+    
+    closest_player = None
+    closest_distance = float("inf")
+    
+    for pos, player in lineup.items():
+        if player is None:
+            continue
+        
+        # Skip excluded players
+        player_id = getattr(player, "player_id", None)
+        if player_id and player_id in exclude_player_ids:
+            continue
+        
+        # Get player's current position
+        player_coords = getattr(player, "coords", {"x": 50, "y": 25})
+        player_x = player_coords.get("x", 50)
+        player_y = player_coords.get("y", 25)
+        
+        # Calculate Euclidean distance to bounce spot
+        distance = ((player_x - bounce_x) ** 2 + (player_y - bounce_y) ** 2) ** 0.5
+        
+        # Apply 20% penalty to distance for penalized players (shooter, putback player)
+        # This penalizes their chances without actually moving them
+        if player_id and player_id in penalize_player_ids:
+            distance = distance * 1.2
+        
+        if distance < closest_distance:
+            closest_distance = distance
+            closest_player = player
+    
+    return closest_player
 
 def generate_pass_chain(game, shooter_pos):
     
@@ -320,36 +449,88 @@ def default_rebounder_dict():
         "defense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3}
     }
 
-def determine_rebounder(game):
+def determine_rebounder(game, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None):
+    """
+    Determine rebounder using geography-based system (closest to bounce spot).
     
+    Args:
+        game: GameManager instance
+        bounce_spot: Optional dict with "x" and "y" keys. If None, calculates from basket.
+        exclude_player_ids: Optional set of player_ids to exclude (e.g., shooter)
+        penalize_player_ids: Optional set of player_ids to penalize by 20% distance (e.g., shooter, putback player)
+    
+    Returns:
+        tuple: (rebounder, team, stat) where stat is "DREB" or "OREB"
+    """
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
-    rebounder_dict = default_rebounder_dict()
-
-    o_pos = choose_rebounder(rebounder_dict, "offense")
-    d_pos = choose_rebounder(rebounder_dict, "defense")
-    o_rebounder = off_lineup[o_pos]
-    d_rebounder = def_lineup[d_pos]
-
+    
+    # Calculate bounce spot if not provided
+    if bounce_spot is None:
+        bounce_spot = calculate_bounce_spot(game)
+    
+    if exclude_player_ids is None:
+        exclude_player_ids = set()
+    
+    if penalize_player_ids is None:
+        penalize_player_ids = set()
+    
+    # Choose closest player from each team (with penalty for shooter/putback player)
+    o_rebounder = choose_rebounder(off_lineup, bounce_spot, exclude_player_ids, penalize_player_ids)
+    d_rebounder = choose_rebounder(def_lineup, bounce_spot, exclude_player_ids, penalize_player_ids)
+    
+    # Handle edge cases
+    if o_rebounder is None and d_rebounder is None:
+        # No rebounders from either team - find closest player to bounce spot from all players
+        logging.warning("determine_rebounder: No valid rebounders found, using closest player from all players")
+        all_players_lineup = {}
+        # Combine both lineups
+        for pos, player in off_lineup.items():
+            if player is not None:
+                all_players_lineup[f"O_{pos}"] = player
+        for pos, player in def_lineup.items():
+            if player is not None:
+                all_players_lineup[f"D_{pos}"] = player
+        
+        closest_player = choose_rebounder(all_players_lineup, bounce_spot, exclude_player_ids, penalize_player_ids)
+        
+        if closest_player is None:
+            raise ValueError("No players available for rebound")
+        
+        # Determine which team the closest player belongs to
+        closest_team_id = getattr(closest_player, "team_id", None)
+        if closest_team_id == off_team.team_id:
+            return closest_player, off_team, "OREB"
+        else:
+            return closest_player, def_team, "DREB"
+    
+    if o_rebounder is None:
+        # Only defensive rebounders available
+        return d_rebounder, def_team, "DREB"
+    
+    if d_rebounder is None:
+        # Only offensive rebounders available
+        return o_rebounder, off_team, "OREB"
+    
+    # Calculate rebound scores for the closest players
     o_score = calculate_rebound_score(o_rebounder)
     d_score = calculate_rebound_score(d_rebounder)
 
+    # Apply team bias
     off_mod = off_team.team_attributes["rebound_modifier"]
     def_mod = def_team.team_attributes["rebound_modifier"]
     bias = def_mod - off_mod
     def_prob = min(0.95, max(0.55, 0.75 + bias))
 
+    # Calculate final weights
     total_score = d_score + o_score
     d_weight = (d_score / total_score) if total_score else 0.5
-    o_weight = 1 - d_weight
     d_weight += (def_prob - 0.5)
     d_weight = min(0.95, max(0.05, d_weight))
-    o_weight = 1 - d_weight
 
+    # Weighted random selection
     new_team = def_team if random.random() < d_weight else off_team
     new_rebounder = d_rebounder if new_team == def_team else o_rebounder
     new_stat = "DREB" if new_team == def_team else "OREB"
-    # new_rebounder.record_stat(new_stat)
-    # print(f"+1 rebound for {get_name_safe(new_rebounder)} / utils/shared - determine_rebounder")
 
     return new_rebounder, new_team, new_stat
 
