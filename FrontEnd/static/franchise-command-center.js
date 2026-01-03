@@ -223,7 +223,7 @@ function renderTeamStatsTable(teams) {
   
   // Calculate totals for all teams
   const totals = {
-    PF: 0, PA: 0, FGM: 0, FGA: 0, TPM: 0, TPA: 0, FTM: 0, FTA: 0,
+    W: 0, L: 0, PF: 0, PA: 0, FGM: 0, FGA: 0, TPM: 0, TPA: 0, FTM: 0, FTA: 0,
     DREB: 0, OREB: 0, TREB: 0, AST: 0, STL: 0, BLK: 0, F: 0, TO: 0,
     DEF_A: 0, DEF_S: 0, SCR_A: 0, SCR_S: 0
   };
@@ -233,6 +233,8 @@ function renderTeamStatsTable(teams) {
     const s = t.stats || {};
     
     // Accumulate totals
+    totals.W += s.W || 0;
+    totals.L += s.L || 0;
     totals.PF += s.PF || 0;
     totals.PA += s.PA || 0;
     totals.FGM += s.FGM || 0;
@@ -263,6 +265,8 @@ function renderTeamStatsTable(teams) {
     
     tr.innerHTML = `
       <td>${t.team}</td>
+      <td>${s.W || 0}</td>
+      <td>${s.L || 0}</td>
       <td>${s.PF || 0}</td>
       <td>${s.PA || 0}</td>
       <td>${s.FGM || 0}</td>
@@ -305,6 +309,8 @@ function renderTeamStatsTable(teams) {
   
   totalsTr.innerHTML = `
     <td>TOTALS</td>
+    <td>${totals.W}</td>
+    <td>${totals.L}</td>
     <td>${totals.PF}</td>
     <td>${totals.PA}</td>
     <td>${totals.FGM}</td>
@@ -336,6 +342,8 @@ function sortTeamStats(statKey) {
   // Map display stat names to data stat keys
   const statMap = {
     'team': 'team',
+    'W': 'W',
+    'L': 'L',
     'PF': 'PF',
     'PA': 'PA',
     'FGM': 'FGM',

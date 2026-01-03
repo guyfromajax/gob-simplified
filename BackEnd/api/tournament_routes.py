@@ -150,14 +150,17 @@ def tournament_team_stats(tournament_id: str):
                 if output_stat in team_stats_map[team_id_str]:
                     team_stats_map[team_id_str][output_stat] += val
     
-    # Get PF/PA from standings (teams collection)
+    # Get PF/PA and wins/losses from standings (teams collection)
     standings_data = {}
-    teams_list = list(teams_collection.find({}, {"name": 1, "PF": 1, "PA": 1, "_id": 1}))
+    teams_list = list(teams_collection.find({}, {"name": 1, "PF": 1, "PA": 1, "record": 1, "_id": 1}))
     for t in teams_list:
         team_id_str = str(t["_id"])
+        rec = t.get("record", {"W": 0, "L": 0})
         standings_data[team_id_str] = {
             "PF": t.get("PF", 0),
-            "PA": t.get("PA", 0)
+            "PA": t.get("PA", 0),
+            "W": rec.get("W", 0),
+            "L": rec.get("L", 0)
         }
     
     # Convert to output format with team names
@@ -211,23 +214,32 @@ def tournament_team_stats(tournament_id: str):
         if not has_stats:
             continue
         
-        # Add PF/PA from standings
+        # Add PF/PA and wins/losses from standings
         if team_id_str in standings_data:
             stats["PF"] = standings_data[team_id_str]["PF"]
             stats["PA"] = standings_data[team_id_str]["PA"]
+            stats["W"] = standings_data[team_id_str]["W"]
+            stats["L"] = standings_data[team_id_str]["L"]
         else:
-            # ✅ FIX: Try to find PF/PA by team name if team_id_str lookup failed
+            # ✅ FIX: Try to find PF/PA and wins/losses by team name if team_id_str lookup failed
             try:
-                team_doc_for_standings = teams_collection.find_one({"name": team_name}, {"PF": 1, "PA": 1, "_id": 1})
+                team_doc_for_standings = teams_collection.find_one({"name": team_name}, {"PF": 1, "PA": 1, "record": 1, "_id": 1})
                 if team_doc_for_standings:
                     stats["PF"] = team_doc_for_standings.get("PF", 0)
                     stats["PA"] = team_doc_for_standings.get("PA", 0)
+                    rec = team_doc_for_standings.get("record", {"W": 0, "L": 0})
+                    stats["W"] = rec.get("W", 0)
+                    stats["L"] = rec.get("L", 0)
                 else:
                     stats["PF"] = 0
                     stats["PA"] = 0
+                    stats["W"] = 0
+                    stats["L"] = 0
             except Exception:
                 stats["PF"] = 0
                 stats["PA"] = 0
+                stats["W"] = 0
+                stats["L"] = 0
         
         # Calculate TREB from DREB + OREB
         stats["TREB"] = stats.get("DREB", 0) + stats.get("OREB", 0)
