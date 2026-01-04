@@ -4382,14 +4382,14 @@ def resolve_full_court_press_logic(game: "GameManager"):
 
     for pos, player in off_lineup.items():
         if pos == "PG":
-            offenseScore += 3 * (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+            offenseScore += 3 * (player.attributes["BH"] * 0.6 + player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2)
         elif pos in ["SG", "SF"]:
-            offenseScore += (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+            offenseScore += (player.attributes["BH"] * 0.6 + player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2)
     for pos, player in def_lineup.items():
         if pos == "PG":
-            defenseScore += 3 * (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+            defenseScore += 3 * (player.attributes["OD"] * 0.4 + player.attributes["AG"] * 0.4 + player.attributes["IQ"] * 0.2)
         elif pos in ["SG", "SF"]:
-            defenseScore += (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+            defenseScore += (player.attributes["OD"] * 0.4 + player.attributes["AG"] * 0.4 + player.attributes["IQ"] * 0.2)
     
     offenseScore *= random.randint(1, 6)
     defenseScore *= random.randint(1, 6)
@@ -4428,10 +4428,79 @@ def resolve_full_court_press_logic(game: "GameManager"):
     
     # Handle SHOT result - execute actual shot resolution
     if result_type == "SHOT":
-        # Build roles for shot
-        passer = off_lineup.get("PG", list(off_lineup.values())[0])
-        shooter = random.choice([off_lineup.get("PF"), off_lineup.get("C")])
-        defender = def_lineup.get("PG", list(def_lineup.values())[0])
+        # ✅ Get skeleton first (needed to determine shooter and passer dynamically)
+        skeleton = get_fcp_skeleton("SHOT", game) or {}
+        
+        # ✅ Dynamically determine shooter and passer from skeleton
+        shooter = None
+        shooter_pos = None
+        passer = None
+        passer_pos = None
+        
+        if skeleton and "steps" in skeleton and skeleton["steps"]:
+            steps = skeleton["steps"]
+            # Find shooter from final step (player with "shoot" action)
+            final_step = steps[-1]
+            pos_actions = final_step.get("pos_actions", {})
+            
+            for pos, action_info in pos_actions.items():
+                action = action_info.get("action", "").lower()
+                if action == "shoot":
+                    shooter_pos = pos
+                    shooter = off_lineup.get(pos)
+                    break
+            
+            # Fallback: use last ball handler if no shooter found
+            if not shooter:
+                ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
+                shooter = ball_handler
+                shooter_pos = getattr(ball_handler, 'position', None) or "PG"
+            
+            # Find passer using derive_passer_from_steps (same logic as HCO)
+            if shooter_pos:
+                passer_pos = game.turn_manager.derive_passer_from_steps(steps, shooter_pos)
+                if passer_pos:
+                    passer = off_lineup.get(passer_pos)
+        
+        # Fallback: use hardcoded values if skeleton doesn't have shooter/passer
+        if not shooter:
+            shooter = random.choice([off_lineup.get("PF"), off_lineup.get("C")])
+            shooter_pos = getattr(shooter, 'position', None) or "PF"
+        if not passer:
+            passer = off_lineup.get("PG", list(off_lineup.values())[0])
+            passer_pos = getattr(passer, 'position', None) or "PG"
+        
+        # ✅ Find shooter's coordinates at the time of the shot
+        shooter_coords = None
+        if skeleton and "steps" in skeleton and skeleton["steps"]:
+            final_step = skeleton["steps"][-1]
+            pos_actions = final_step.get("pos_actions", {})
+            if shooter_pos and shooter_pos in pos_actions:
+                shooter_action_info = pos_actions[shooter_pos]
+                shooter_coords = shooter_action_info.get("coords")
+                if not shooter_coords:
+                    # Fallback: use shooter's current coords
+                    shooter_coords = getattr(shooter, "coords", {"x": 50, "y": 25})
+        else:
+            # Fallback: use shooter's current coords
+            shooter_coords = getattr(shooter, "coords", {"x": 50, "y": 25})
+        
+        # ✅ Find closest defensive player to shooter's location
+        defender = None
+        closest_distance = float('inf')
+        for pos, def_player in def_lineup.items():
+            if def_player is None:
+                continue
+            def_coords = getattr(def_player, "coords", {"x": 50, "y": 25})
+            distance = ((shooter_coords["x"] - def_coords["x"]) ** 2 + 
+                       (shooter_coords["y"] - def_coords["y"]) ** 2) ** 0.5
+            if distance < closest_distance:
+                closest_distance = distance
+                defender = def_player
+        
+        # Fallback: use defensive PG if no defender found
+        if not defender:
+            defender = def_lineup.get("PG", list(def_lineup.values())[0])
         
         shot_roles = {
             "ball_handler": passer,
@@ -4444,19 +4513,28 @@ def resolve_full_court_press_logic(game: "GameManager"):
         # Use shot manager to resolve the shot
         shot_result = game.shot_manager.resolve_shot(shot_roles)
         
-        # FCP/HCT is over once shot is taken - reset to HCO
-        # (Unless it's a made shot, in which case pressure might apply on the inbound)
-        # ✅ FIX: Check for shooting foul before overwriting offensive_state
-        # If there's a shooting foul (free_throws_remaining > 0), preserve FREE_THROW state
-        if shot_result.get("result_type") == "MISS":
-            # Check if there's a shooting foul (free throws were awarded)
-            free_throws_remaining = shot_result.get("free_throws_remaining") or game_state.get("free_throws_remaining", 0)
-            if free_throws_remaining > 0:
-                # Shooting foul on miss → preserve FREE_THROW state and set next_play_type
+        # ✅ Handle AND-1 situations (MAKE with shooting foul)
+        # Check for shooting foul on both MAKE and MISS
+        free_throws_remaining = shot_result.get("free_throws_remaining") or game_state.get("free_throws_remaining", 0)
+        has_and_one = shot_result.get("has_and_one", False)
+        
+        if shot_result.get("result_type") == "MAKE":
+            if has_and_one or free_throws_remaining > 0:
+                # AND-1 situation: Made shot with shooting foul
                 game_state["offensive_state"] = "FREE_THROW"
                 shot_result["next_play_type"] = "FREE_THROW"
                 shot_result["next_turn"] = "FREE_THROW"
-                # Ensure free_throws_remaining is in result for transition system
+                shot_result["free_throws_remaining"] = free_throws_remaining
+                logging.warning(f"✅ [FCP SHOT] MAKE with shooting foul (AND-1) → FREE_THROW (free_throws_remaining: {free_throws_remaining})")
+            else:
+                # Regular make → route to BASELINE_INBOUND (pressure may apply again)
+                game_state["offensive_state"] = "HCO"  # Will be set to BASELINE_INBOUND by transition system
+        elif shot_result.get("result_type") == "MISS":
+            if free_throws_remaining > 0:
+                # Shooting foul on miss → preserve FREE_THROW state
+                game_state["offensive_state"] = "FREE_THROW"
+                shot_result["next_play_type"] = "FREE_THROW"
+                shot_result["next_turn"] = "FREE_THROW"
                 shot_result["free_throws_remaining"] = free_throws_remaining
                 logging.warning(f"✅ [FCP SHOT] MISS with shooting foul → FREE_THROW (free_throws_remaining: {free_throws_remaining})")
             else:
@@ -4478,11 +4556,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
         shot_result["text"] = "PRESS! " + shot_result.get("text", "")
         shot_result["current_turn"] = "FCP"  # ✅ SS&S: Explicit turn type for transition system
         
-        # Generate animations from skeleton for the pass, then rely on standard shot animation
-        # ✅ FCP/HCT SHOT: Use FCP shot skeleton with version selection (filters non-empty versions)
-        logging.warning(f"🔍 [FCP SHOT] Getting skeleton for SHOT variant")
-        skeleton = get_fcp_skeleton("SHOT", game) or {}
-        logging.warning(f"🔍 [FCP SHOT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+        # Generate animations from skeleton (already retrieved above)
+        logging.warning(f"🔍 [FCP SHOT] Using skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
         
         if skeleton and "steps" in skeleton:
             logging.warning(f"🔍 [FCP SHOT] Converting skeleton to animations...")
@@ -5388,14 +5463,14 @@ def resolve_half_court_trap_logic(game: "GameManager"):
 
     for pos, player in off_lineup.items():
         if pos == "PG":
-            offenseScore += 3 * (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+            offenseScore += 3 * (player.attributes["BH"] * 0.6 + player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2)
         elif pos in ["SG", "SF"]:
-            offenseScore += (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+            offenseScore += (player.attributes["BH"] * 0.6 + player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2)
     for pos, player in def_lineup.items():
         if pos == "PG":
-            defenseScore += 3 * (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+            defenseScore += 3 * (player.attributes["OD"] * 0.4 + player.attributes["AG"] * 0.4 + player.attributes["IQ"] * 0.2)
         elif pos in ["SG", "SF"]:
-            defenseScore += (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+            defenseScore += (player.attributes["OD"] * 0.4 + player.attributes["AG"] * 0.4 + player.attributes["IQ"] * 0.2)
     
     offenseScore *= random.randint(1, 6)
     defenseScore *= random.randint(1, 6)
@@ -5427,10 +5502,79 @@ def resolve_half_court_trap_logic(game: "GameManager"):
 
     # Handle SHOT result - execute actual shot resolution (same as FCP)
     if result_type == "SHOT":
-        # Build roles for shot
-        passer = off_lineup.get("PG", list(off_lineup.values())[0])
-        shooter = random.choice([off_lineup.get("PF"), off_lineup.get("C")])
-        defender = def_lineup.get("PG", list(def_lineup.values())[0])
+        # ✅ Get skeleton first (needed to determine shooter and passer dynamically)
+        skeleton = get_hct_skeleton("SHOT", game) or {}
+        
+        # ✅ Dynamically determine shooter and passer from skeleton
+        shooter = None
+        shooter_pos = None
+        passer = None
+        passer_pos = None
+        
+        if skeleton and "steps" in skeleton and skeleton["steps"]:
+            steps = skeleton["steps"]
+            # Find shooter from final step (player with "shoot" action)
+            final_step = steps[-1]
+            pos_actions = final_step.get("pos_actions", {})
+            
+            for pos, action_info in pos_actions.items():
+                action = action_info.get("action", "").lower()
+                if action == "shoot":
+                    shooter_pos = pos
+                    shooter = off_lineup.get(pos)
+                    break
+            
+            # Fallback: use last ball handler if no shooter found
+            if not shooter:
+                ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
+                shooter = ball_handler
+                shooter_pos = getattr(ball_handler, 'position', None) or "PG"
+            
+            # Find passer using derive_passer_from_steps (same logic as HCO)
+            if shooter_pos:
+                passer_pos = game.turn_manager.derive_passer_from_steps(steps, shooter_pos)
+                if passer_pos:
+                    passer = off_lineup.get(passer_pos)
+        
+        # Fallback: use hardcoded values if skeleton doesn't have shooter/passer
+        if not shooter:
+            shooter = random.choice([off_lineup.get("PF"), off_lineup.get("C")])
+            shooter_pos = getattr(shooter, 'position', None) or "PF"
+        if not passer:
+            passer = off_lineup.get("PG", list(off_lineup.values())[0])
+            passer_pos = getattr(passer, 'position', None) or "PG"
+        
+        # ✅ Find shooter's coordinates at the time of the shot
+        shooter_coords = None
+        if skeleton and "steps" in skeleton and skeleton["steps"]:
+            final_step = skeleton["steps"][-1]
+            pos_actions = final_step.get("pos_actions", {})
+            if shooter_pos and shooter_pos in pos_actions:
+                shooter_action_info = pos_actions[shooter_pos]
+                shooter_coords = shooter_action_info.get("coords")
+                if not shooter_coords:
+                    # Fallback: use shooter's current coords
+                    shooter_coords = getattr(shooter, "coords", {"x": 50, "y": 25})
+        else:
+            # Fallback: use shooter's current coords
+            shooter_coords = getattr(shooter, "coords", {"x": 50, "y": 25})
+        
+        # ✅ Find closest defensive player to shooter's location
+        defender = None
+        closest_distance = float('inf')
+        for pos, def_player in def_lineup.items():
+            if def_player is None:
+                continue
+            def_coords = getattr(def_player, "coords", {"x": 50, "y": 25})
+            distance = ((shooter_coords["x"] - def_coords["x"]) ** 2 + 
+                       (shooter_coords["y"] - def_coords["y"]) ** 2) ** 0.5
+            if distance < closest_distance:
+                closest_distance = distance
+                defender = def_player
+        
+        # Fallback: use defensive PG if no defender found
+        if not defender:
+            defender = def_lineup.get("PG", list(def_lineup.values())[0])
         
         shot_roles = {
             "ball_handler": passer,
@@ -5443,19 +5587,28 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         # Use shot manager to resolve the shot
         shot_result = game.shot_manager.resolve_shot(shot_roles)
         
-        # HCT/FCP is over once shot is taken - reset to HCO
-        # (Unless it's a made shot, in which case pressure might apply on the inbound)
-        # ✅ FIX: Check for shooting foul before overwriting offensive_state
-        # If there's a shooting foul (free_throws_remaining > 0), preserve FREE_THROW state
-        if shot_result.get("result_type") == "MISS":
-            # Check if there's a shooting foul (free throws were awarded)
-            free_throws_remaining = shot_result.get("free_throws_remaining") or game_state.get("free_throws_remaining", 0)
-            if free_throws_remaining > 0:
-                # Shooting foul on miss → preserve FREE_THROW state and set next_play_type
+        # ✅ Handle AND-1 situations (MAKE with shooting foul)
+        # Check for shooting foul on both MAKE and MISS
+        free_throws_remaining = shot_result.get("free_throws_remaining") or game_state.get("free_throws_remaining", 0)
+        has_and_one = shot_result.get("has_and_one", False)
+        
+        if shot_result.get("result_type") == "MAKE":
+            if has_and_one or free_throws_remaining > 0:
+                # AND-1 situation: Made shot with shooting foul
                 game_state["offensive_state"] = "FREE_THROW"
                 shot_result["next_play_type"] = "FREE_THROW"
                 shot_result["next_turn"] = "FREE_THROW"
-                # Ensure free_throws_remaining is in result for transition system
+                shot_result["free_throws_remaining"] = free_throws_remaining
+                logging.warning(f"✅ [HCT SHOT] MAKE with shooting foul (AND-1) → FREE_THROW (free_throws_remaining: {free_throws_remaining})")
+            else:
+                # Regular make → route to BASELINE_INBOUND (pressure may apply again)
+                game_state["offensive_state"] = "HCO"  # Will be set to BASELINE_INBOUND by transition system
+        elif shot_result.get("result_type") == "MISS":
+            if free_throws_remaining > 0:
+                # Shooting foul on miss → preserve FREE_THROW state
+                game_state["offensive_state"] = "FREE_THROW"
+                shot_result["next_play_type"] = "FREE_THROW"
+                shot_result["next_turn"] = "FREE_THROW"
                 shot_result["free_throws_remaining"] = free_throws_remaining
                 logging.warning(f"✅ [HCT SHOT] MISS with shooting foul → FREE_THROW (free_throws_remaining: {free_throws_remaining})")
             else:
@@ -5477,13 +5630,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         shot_result["text"] = "TRAP! " + shot_result.get("text", "")
         shot_result["current_turn"] = "HCT"  # ✅ SS&S: Explicit turn type for transition system
         
-        # Generate animations from skeleton
+        # Generate animations from skeleton (already retrieved above)
         from BackEnd.models.animator import Animator
         animator = Animator(game)
-        # ✅ FCP/HCT SHOT: Use HCT shot skeleton with version selection (filters non-empty versions)
-        logging.warning(f"🔍 [HCT SHOT] Getting skeleton for SHOT variant")
-        skeleton = get_hct_skeleton("SHOT", game) or {}
-        logging.warning(f"🔍 [HCT SHOT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+        logging.warning(f"🔍 [HCT SHOT] Using skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
         
         if skeleton and "steps" in skeleton:
             logging.warning(f"🔍 [HCT SHOT] Converting skeleton to animations...")
