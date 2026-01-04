@@ -18,11 +18,12 @@
 1. **Page Load** - Check localStorage for full state, if not found load from API (database)
 2. **Play Loading** - Loads plays from `teams.{team_id}.plays` filtered by `play_type` and `play_focus`
 3. **User Configuration** - User sets percentages, slot assignments, motion dropdowns, position filters
-4. **Even Distribution** - Optional toggle per section to auto-distribute percentages evenly
-5. **Navigation** - Before navigating to Play Details, save full state to localStorage
-6. **Return Navigation** - Restore full state from localStorage (skip API to preserve work)
-7. **Submit** - Save all settings to database via `POST /api/playbooks`, clear localStorage
-8. **Back Button** - Warn if unsaved changes exist, navigate back to previous page
+4. **Position Filter Changes** - When position filters change, percentages for hidden plays are reset to 0% (ensures totals remain valid)
+5. **Even Distribution** - Optional toggle per section to auto-distribute percentages evenly
+6. **Navigation** - Before navigating to Play Details, save full state to localStorage
+7. **Return Navigation** - Restore full state from localStorage (skip API to preserve work)
+8. **Submit** - Save all settings to database via `POST /api/playbooks`, clear localStorage
+9. **Back Button** - Warn if unsaved changes exist, navigate back to previous page
 
 **Long Form Documentation**
 
@@ -240,6 +241,28 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
   - Otherwise, tries to use `document.referrer` if it's a game-plan URL
   - Falls back to game-plan.html with current mode parameters
 - **Purpose:** Returns user to the page they came from (Game Plan, Tournament Command Center, or Franchise Command Center)
+
+### Position Filter Buttons ✅ **IMPLEMENTED** (January 2025, Updated February 2025)
+
+**Location:** Row of buttons above the main playbooks grid  
+**Buttons:** Standard, PG, SG, SF, PF, C  
+**Behavior:** 
+- Users can select up to 2 position filters at once (FIFO - oldest deselected when adding a third)
+- When a position filter is toggled off (deselected), percentages for plays that are ONLY in that position filter are automatically reset to 0%
+- This ensures section totals remain valid (don't exceed 100% due to hidden plays retaining percentages)
+- If Even Distribution is enabled for a section, percentages are automatically redistributed evenly among visible plays after hidden plays are reset
+- Position filter selections are saved to localStorage for session persistence
+
+**Percentage Reset Logic (February 2025):**
+- When position filters change, `resetHiddenPlayPercentages()` is called for each offense section BEFORE re-rendering
+- For each play in a section, if the play is not visible (doesn't match current position filters), its percentage is reset to 0%
+- This prevents validation errors where section totals exceed 100% due to hidden plays retaining their percentages
+- After percentages are reset, sections are re-rendered and totals are updated
+- If Even Distribution is enabled for a section, percentages are automatically redistributed evenly among visible plays after the reset
+
+**Integration with Even Distribution:**
+- If Even Distribution is enabled for a section, after hidden plays are reset, percentages are automatically redistributed evenly among visible plays
+- This maintains a 100% total for the section while only including visible plays
 
 ### Database Integration
 
