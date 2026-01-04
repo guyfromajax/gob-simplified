@@ -1762,6 +1762,42 @@ class FranchiseTrainingRequest(BaseModel):
     training_data: dict  # Contains player_drills, team_drills, general, coaching_focus
 
 
+@router.get("/franchise/training-points")
+def get_training_points(franchise_id: str):
+    """
+    Get the number of training points available for a franchise.
+    Returns 30 for first training (before first game), 24 otherwise.
+    """
+    try:
+        franchise_id_obj = ObjectId(franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise ID format")
+
+    franchise_doc = db.franchises.find_one({"_id": franchise_id_obj})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+
+    # Check if there are any completed games
+    results = franchise_doc.get("results", {})
+    has_completed_games = len(results) > 0
+    
+    # Also check games collection for any completed games
+    if not has_completed_games:
+        completed_game = db.games.find_one({
+            "franchise_id": str(franchise_id),
+            "is_final": True
+        })
+        has_completed_games = completed_game is not None
+    
+    # First training (before first game) gets 30 points, otherwise 24
+    training_points = 30 if not has_completed_games else 24
+    
+    return {
+        "training_points": training_points,
+        "is_first_training": not has_completed_games
+    }
+
+
 @router.post("/franchise/run-training")
 def run_franchise_training(req: FranchiseTrainingRequest):
     """
@@ -1781,6 +1817,42 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     # Get training status and check for duplicate submission
     training_status = franchise_doc.get("training_status", {})
     current_week = franchise_doc.get("week", 0)
+    
+    # Check if it's first training (before first game) - validate training points
+    results = franchise_doc.get("results", {})
+    has_completed_games = len(results) > 0
+    if not has_completed_games:
+        completed_game = db.games.find_one({
+            "franchise_id": str(franchise_id),
+            "is_final": True
+        })
+        has_completed_games = completed_game is not None
+    
+    expected_points = 30 if not has_completed_games else 24
+    
+    # Validate total training points allocated
+    training_data = req.training_data
+    allocations = {
+        "player_drills": training_data.get("player_drills", {}),
+        "team_drills": training_data.get("team_drills", {}),
+        "general": training_data.get("general", {})
+    }
+    
+    # Calculate total points allocated
+    total_allocated = 0
+    for category in allocations.values():
+        if isinstance(category, dict):
+            for value in category.values():
+                if isinstance(value, dict):
+                    total_allocated += sum(value.values())
+                elif isinstance(value, (int, float)):
+                    total_allocated += value
+    
+    if total_allocated != expected_points:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid training points allocation. Expected {expected_points} points, got {total_allocated}."
+        )
     if training_status.get("training_completed", False) and training_status.get("week") == current_week:
         # Training already completed for this week, redirect to report
         # ✅ SS&S: Use user_team_object_id from franchise document for redirect (authoritative)
