@@ -386,7 +386,44 @@ def initialize_playbook_settings():
         playbook_settings["position_filters"]["PG"] = pg_play_ids
         logger.info(f"✅ [INITIALIZE PLAYBOOK] PG position filter populated with {len(pg_play_ids)} play_ids")
         
-        # SG, SF, C remain empty for now (can be populated later)
+        # SG: Shooting Guard specific plays
+        sg_plays = [
+            # Set Play Inside
+            "SG Pass & Cut",
+            # Set Play Attack
+            "SG Pick & Roll",
+            # Set Play Outside
+            "SG Wheel Three"
+        ]
+        sg_play_ids = get_play_ids_by_names(sg_plays)
+        playbook_settings["position_filters"]["SG"] = sg_play_ids
+        logger.info(f"✅ [INITIALIZE PLAYBOOK] SG position filter populated with {len(sg_play_ids)} play_ids")
+        
+        # SF: Small Forward specific plays
+        sf_plays = [
+            # Set Play Inside
+            "SF Back Door",
+            # Set Play Attack
+            "SF Isolation",
+            # Set Play Outside
+            "SF Misdirection Three"
+        ]
+        sf_play_ids = get_play_ids_by_names(sf_plays)
+        playbook_settings["position_filters"]["SF"] = sf_play_ids
+        logger.info(f"✅ [INITIALIZE PLAYBOOK] SF position filter populated with {len(sf_play_ids)} play_ids")
+        
+        # C: Center specific plays
+        c_plays = [
+            # Set Play Inside
+            "C Post Iso",
+            # Set Play Attack
+            "C High Post Clear Out",
+            # Set Play Outside
+            "C Screen & Three"
+        ]
+        c_play_ids = get_play_ids_by_names(c_plays)
+        playbook_settings["position_filters"]["C"] = c_play_ids
+        logger.info(f"✅ [INITIALIZE PLAYBOOK] C position filter populated with {len(c_play_ids)} play_ids")
         
         return playbook_settings
         
