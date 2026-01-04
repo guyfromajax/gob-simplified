@@ -373,7 +373,20 @@ def initialize_playbook_settings():
         playbook_settings["position_filters"]["PF"] = pf_play_ids
         logger.info(f"✅ [INITIALIZE PLAYBOOK] PF position filter populated with {len(pf_play_ids)} play_ids")
         
-        # PG, SG, SF, C remain empty for now (can be populated later)
+        # PG: Point Guard specific plays
+        pg_plays = [
+            # Set Play Inside
+            "PG Post Up",
+            # Set Play Attack
+            "PG Wrap-Around",
+            # Set Play Outside
+            "PG Wing 3"
+        ]
+        pg_play_ids = get_play_ids_by_names(pg_plays)
+        playbook_settings["position_filters"]["PG"] = pg_play_ids
+        logger.info(f"✅ [INITIALIZE PLAYBOOK] PG position filter populated with {len(pg_play_ids)} play_ids")
+        
+        # SG, SF, C remain empty for now (can be populated later)
         
         return playbook_settings
         
