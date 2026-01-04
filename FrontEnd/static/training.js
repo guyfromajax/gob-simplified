@@ -1,5 +1,5 @@
 // Training Page JavaScript
-const TOTAL_POINTS = 24;
+let TOTAL_POINTS = 24; // Will be updated from API for franchise mode
 
 // DOM Elements
 const pointsRemainingEl = document.getElementById('points-remaining');
@@ -129,7 +129,7 @@ allSliders.forEach(slider => {
 });
 
 /**
- * Auto-Train: assign all 24 points and pick a random focus
+ * Auto-Train: assign all points and pick a random focus
  */
 function autoAssignTraining() {
   const sliders = Array.from(allSliders);
@@ -138,9 +138,12 @@ function autoAssignTraining() {
   // 1) Set every slider to 1 (guarantees min 1 across 20 sliders = 20 points)
   sliders.forEach(slider => setSliderValue(slider, 1));
 
-  // 2) Pick 4 random unique sliders to set to 2 (adds 4 points → total = 24)
+  // 2) Pick random unique sliders to set to 2 (adds remaining points)
+  // For 24 points: 20 + 4 = 24 (pick 4 sliders)
+  // For 30 points: 20 + 10 = 30 (pick 10 sliders)
+  const remainingPoints = TOTAL_POINTS - 20;
   const shuffled = [...sliders].sort(() => Math.random() - 0.5);
-  shuffled.slice(0, 4).forEach(slider => setSliderValue(slider, 2));
+  shuffled.slice(0, remainingPoints).forEach(slider => setSliderValue(slider, 2));
 
   // 3) Random coaching focus
   let focusLabel = '';
@@ -430,8 +433,39 @@ submitBtn.addEventListener('click', async function() {
   }
 });
 
-// Initialize points remaining on page load
-updatePointsRemaining();
+/**
+ * Fetch training points from API for franchise mode
+ */
+async function initializeTrainingPoints() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const mode = urlParams.get('mode');
+  const franchiseId = urlParams.get('franchise_id');
+  
+  if (mode === 'franchise' && franchiseId) {
+    try {
+      const response = await fetch(`/franchise/training-points?franchise_id=${franchiseId}`);
+      if (response.ok) {
+        const data = await response.json();
+        TOTAL_POINTS = data.training_points;
+        // Update points remaining display
+        if (pointsRemainingEl) {
+          pointsRemainingEl.textContent = TOTAL_POINTS;
+        }
+        console.log(`🎯 [TRAINING] Training points set to ${TOTAL_POINTS} (first training: ${data.is_first_training})`);
+      } else {
+        console.warn('⚠️ [TRAINING] Failed to fetch training points, using default 24');
+      }
+    } catch (error) {
+      console.error('❌ [TRAINING] Error fetching training points:', error);
+    }
+  }
+  
+  // Initialize points remaining display
+  updatePointsRemaining();
+}
+
+// Initialize training points on page load
+initializeTrainingPoints();
 
 // Debug: Verify scrimmages element exists on page load
 (function() {

@@ -75,6 +75,11 @@
      - If shooter is outlet receiver: passer = outlet passer (rebounder)
      - Else if shooter != ball_handler: passer = ball_handler
      - Else: passer = None
+   - **Special Case - Ball Handler Beats Defender**:
+     - If `ball_handler_beats_defender = True` (from Step 6 skill check):
+       - Defender still animates to stopper position (1-3 spots in front of ball handler's starting position)
+       - Ball handler animates past stopper to shot spot (shows offensive success)
+       - Use `animateFastBreakShotWithStopper()` animation path
    - Call `shot_manager.resolve_fast_break_shot()` for full shot resolution
    - Build animation packet (outlet pass + shot attempt)
    - Track Fast Break stats and team stats
