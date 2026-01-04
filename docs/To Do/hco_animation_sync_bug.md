@@ -4,6 +4,8 @@
 
 In HCO skeleton step animations, there are instances where ball pass animation and defensive player movement are not synchronized. The issue manifests as defensive players moving **before** the pass animation, when they should move **simultaneously** with the pass.
 
+**Note:** This is the **same bug** documented in `docs/master_game_doc.md` (lines 2790-2932) as "Defensive Player + Pass Animation Synchronization Fix". The `offenseTeamId` resolver fix was implemented in January 2025, but it only partially addressed the issue. The bug still exists specifically in HCO Shot Miss => DREB scenarios, where a conflict between skeleton defensive tweens and collapse animations causes the synchronization issue. The `offenseTeamId` fix may have helped in other scenarios, but did not resolve this specific case.
+
 ## Specific Flow with Bug
 
 **HCO Shot Miss, No Shooting Foul => DREB**
