@@ -1670,19 +1670,22 @@ def get_scouting_report(franchise_id: str, team_name: str):
     
     team_object_id = str(team_doc["_id"])
     
+    # Get team_id field for querying games (e.g., "XAVIEN")
+    team_id_field = team_doc.get("team_id")
+    
     # Get team attributes from franchise document
     franchise_teams = franchise_doc.get("franchise_teams", {})
     team_obj = franchise_teams.get(team_object_id, {})
     team_attributes = team_obj.get("attributes", {})
     
     # Find last completed game for this team
-    # Look for games where this team played (as team1_id or team2_id)
+    # Match against home_team_id and away_team_id (which are team_id strings like "XAVIEN")
     last_game = db.games.find_one(
         {
             "franchise_id": str(franchise_id),
             "$or": [
-                {"team1_id": team_object_id},
-                {"team2_id": team_object_id}
+                {"home_team_id": team_id_field},
+                {"away_team_id": team_id_field}
             ]
         },
         sort=[("_id", -1)]  # Most recent first
@@ -1697,9 +1700,6 @@ def get_scouting_report(franchise_id: str, team_name: str):
         # Game documents use team_id strings (like "LITTLE_YORK") as keys, not ObjectIds
         # We need to find the team key by matching team name or team_id
         team_key = None
-        
-        # Get team_id field from team document (e.g., "LITTLE_YORK")
-        team_id_field = team_doc.get("team_id")
         
         # Try multiple matching strategies
         for key in teams_obj.keys():
