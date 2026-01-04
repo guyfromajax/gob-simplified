@@ -380,7 +380,7 @@ def initialize_playbook_settings():
             # Set Play Attack
             "PG Wrap-Around",
             # Set Play Outside
-            "PG Wing 3"
+            "PG Wing Three"
         ]
         pg_play_ids = get_play_ids_by_names(pg_plays)
         playbook_settings["position_filters"]["PG"] = pg_play_ids

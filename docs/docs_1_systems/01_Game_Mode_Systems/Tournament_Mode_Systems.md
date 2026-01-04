@@ -1,0 +1,309 @@
+# Tournament Mode Systems
+
+**Status:** ✅ **PRODUCTION** - Fully operational (January 2025)
+
+## Overview
+
+Tournament Mode supports multi-game tournament brackets where team data persists across games within the tournament. Team attributes can be modified through training and persist throughout the tournament. The Tournament Command Center provides a comprehensive interface for managing tournament progression, viewing schedules, and running training sessions.
+
+**Location:** `FrontEnd/static/tournament.html`, `FrontEnd/static/tournament.js`  
+**Status:** ✅ Fully implemented with Schedule tab, training integration, and bracket management
+
+## Base Constants
+
+**Collection:** `tournaments`  
+**Document:** Tournament document (ObjectId)  
+**Path:** `tournaments.{tournament_id}.teams.{team_id}`
+
+**Team Attributes:**
+- `shot_threshold`: `random.randint(-10, 190)`
+- `discipline`: `random.randint(-10, 10)` (formerly `turnover_modifier`)
+- `fight`: `random.randint(-10, 10)` (formerly `foul_modifier`)
+- `rebound_modifier`: `random.randint(0, 40) / 100.0` (random 0.0-0.4 in 0.01 increments)
+- `offensive_efficiency`: `random.randint(-10, 10)`
+- `team_chemistry`: `random.randint(7, 25)`
+- `defensive_efficiency`: `random.randint(-10, 10)`
+- `fb_efficiency`: `random.randint(-10, 10)`
+- `pt_efficiency`: `random.randint(-10, 10)`
+- `fb_opp_modifier`: `random.randint(-10, 10)`
+- `pt_opp_modifier`: `random.randint(-10, 10)`
+
+**Initialization:**
+- **Upfront Initialization**: All 8 teams initialized when tournament is created (matches Franchise pattern)
+- **Play Randomization**: Each play gets randomized `effectiveness`, `momentum`, `cloaking` values
+- **Defense Randomization**: Each defense gets randomized `effectiveness`, `momentum`, `cloaking` values
+- **Playbook Settings**: Even distribution across all plays in each category
+
+## System Flow
+
+1. **Tournament Creation** - All 8 teams initialized upfront with mode-specific attributes
+2. **Team Object Storage** - Stored in `tournaments` collection under `teams.{team_id}`
+3. **Team Object Loading** - Loaded when creating new game instance within tournament
+4. **Training System** - Team and player attributes updated through training
+5. **Team Object Persistence** - Persists across all games in tournament, reset for new tournaments
+
+## Long Form Documentation
+
+### Tournament Command Center
+
+**Initialization:**
+- **URL Parameter Support:** Reads `tournament_id` and `team_id` from URL parameters on page load
+  - Priority 1: URL parameters (when navigating from training report, etc.)
+  - Priority 2: localStorage (for returning to page)
+  - Priority 3: Active tournament lookup by `user_team_id`
+- **Data Loading:** `loadTournament()` function prioritizes URL parameters over localStorage
+  - Uses `/tournament/state?tournament_id=...` endpoint (query parameter format)
+  - Updates `userTeamId` from tournament document if not already set
+  - Shows error message if tournament fails to load
+- **Error Handling:** Page displays error message if tournament fails to load, preventing empty data display
+
+**Tabs (in order):**
+1. **Bracket** - Visual bracket display showing tournament progression
+2. **Roster** - Team roster (player attributes) and player statistics for the current tournament
+3. **Team** - Team Report section (team attributes) and Playbook Summary section (play effectiveness)
+4. **Stats** - Tournament leaderboards for key statistics
+5. **Schedule** - Detailed schedule view with First Round, Semifinals, and Championship matchups
+
+**Tab Content Details:**
+
+**Roster Tab:**
+- Displays player roster table with attributes (SC, SH, ID, OD, PS, BH, RB, AG, ST, ND, IQ, FT, RT)
+- Displays player statistics table (PTS, FGM/FGA, 3PTM/3PTA, FTM/FTA, REB, AST, STL, BLK, F, MIN, TO)
+- Player names are clickable links to player detail pages
+
+**Team Tab:**
+- **Team Report Section**: Displays team attributes in a grid layout (same as Training Report)
+  - Shows team attributes: Shooting, Rebounding, Offense, Defense, Fast Breaks, Press/Trap, Aggression, Discipline, Momentum, Team Chemistry, Fast Break Defense, Press/Trap Breaks
+  - Uses visual indicators (pills, progress bars, +/- indicators) matching Training Report styling
+  - Styled with scoped CSS (`command-center-team-styles.css`) to maintain light theme consistency
+- **Playbook Summary Section**: Displays play and defense effectiveness
+  - Shows offensive plays (motion and set plays) with effectiveness progress bars
+  - Shows defensive schemes (man and zone defenses) with effectiveness progress bars
+  - Organized by Offense and Defense categories
+  - Data loaded from tournament document: `tournaments.{tournament_id}.teams.{team_id}.plays` and `tournaments.{tournament_id}.teams.{team_id}.scouting_data`
+  - **Data Loading**: Uses `/tournament/team-data` endpoint (matches pattern used by `/tournament/roster`)
+    - Endpoint resolves `team_name` to `team_id` server-side using multiple fallback strategies
+    - Handles both formatted ("ocean-city") and unformatted ("Ocean City") team names
+    - Falls back to `tournament.user_team_id` if provided team_name doesn't match
+    - Initializes `scouting_data.defense` structure if missing
+    - Defaults team attributes to 0 if not present
+
+**Header Controls:**
+- **Set Game Plan** - Navigate to Game Plan screen
+- **Playbooks** - Navigate to Playbooks page
+- **Run Training / Play Next Game** - Dynamic button that changes based on training status
+  - Shows "Run Training" if training has not been completed for the current round
+  - Shows "Play Next Game" if training has been completed for the current round
+  - Removes opponent name from button text (simplified display)
+
+### Schedule Tab
+
+**Location:** `FrontEnd/static/tournament.js` - `renderSchedule()` function
+
+**Display Structure:**
+- **First Round** - Shows all 4 matchups with seed numbers:
+  - Team 8 @ Team 1
+  - Team 5 @ Team 4
+  - Team 6 @ Team 3
+  - Team 7 @ Team 2
+- **Semifinals** - Shows 2 matchups:
+  - Initially displays "TBD @ TBD" for both matchups
+  - Dynamically filled based on First Round winners
+  - Shows scores when games are completed
+- **Championship** - Shows 1 matchup:
+  - Initially displays "TBD @ TBD"
+  - Dynamically filled based on Semifinals winners
+  - Shows scores when game is completed
+
+**Training Report Links:**
+- Training report link appears to the right of the user's matchup after training is run
+- Link format: `[Training Report]`
+- Styled in blue, smaller font size
+- Links to `/static/training-report.html` with tournament context
+
+### Training Flow
+
+**Mandatory Training:**
+- User must run training before each game in the tournament
+- Training is required for each round (First Round, Semifinals, Championship)
+- Training status is tracked per round in `tournament.training_status`
+
+**Training Status Tracking:**
+- `training_status.training_completed` - Boolean flag
+- `training_status.round` - Current round number (1, 2, or 3)
+- `training_status.last_training_date` - Date of last training session
+
+**Button Behavior:**
+- If `training_status.training_completed === false` or `training_status.round !== current_round`:
+  - Button shows "Run Training"
+  - Clicking navigates to `/static/training.html` with tournament context
+- If `training_status.training_completed === true` and `training_status.round === current_round`:
+  - Button shows "Play Next Game"
+  - Clicking proceeds to game simulation and lineup selection
+
+**Training Endpoint:**
+- **Location:** `BackEnd/api/tournament_routes.py` - `run_tournament_training()`
+- **Endpoint:** `POST /tournament/run-training`
+- **Process:**
+  1. Loads tournament document
+  2. Checks for duplicate training submission (same round)
+  3. Loads tournament-specific player attributes from `player_stats`
+  4. **Backward Compatibility:** If tournament only has EM, CH, MO (old format), merges with core collection attributes
+  5. **Data Initialization (Auto-Population):**
+     - If `plays_data` is empty or missing, backend automatically populates it from the universal `plays` collection using `populate_team_plays()`
+     - If `scouting_data` is empty or missing the `defense` structure, backend automatically initializes it using `TeamManager._init_scouting_data()`
+     - Initialized data is saved to the database before training execution
+     - This ensures training works even if game plan or playbooks haven't been submitted yet
+  6. Executes training using `execute_training()` from `training_execution_v2.py`
+  7. **Saves ALL player attributes** to tournament document (not just modified ones) - unified with Franchise architecture
+  8. Marks training as completed for current round
+  9. **Training Report Storage (matches Franchise pattern):**
+     - Stores training report in `teams.{team_id}.training_reports.{round}` (per-round storage)
+     - Also stores in `latest_training` field (quick access)
+  10. **Redirects to Training Report page (SS&S approach):**
+     - URL: `/static/training-report.html?mode=tournament&tournament_id=...&team_id=...`
+     - **Note:** `round` parameter is NOT included in redirect URL
+     - Backend determines round from `training_status.round` or `latest_training.round` when loading report
+     - This follows SS&S pattern: use URL params for navigation, backend state for data resolution
+
+**Training Report:**
+- **Location:** `BackEnd/api/franchise_routes.py` - `get_training_report()` (supports tournament mode)
+- **Endpoint:** `GET /franchise/training-report?mode=tournament&tournament_id=...&team_id=...&round=...` (round is optional)
+- **SS&S Approach:**
+  - **Navigation params (required):** `tournament_id`, `team_id`, `mode`
+  - **Round determination:**
+    - If `round` parameter provided: use it (for historical reports from schedule links)
+    - If not provided: backend determines from `training_status.round` or `latest_training.round`
+    - This allows direct navigation after training without needing round in URL
+- **Data Source:** 
+  - Primary: `tournaments.{tournament_id}.teams.{team_id}.training_reports.{round}` (per-round storage)
+  - Fallback: `tournament.latest_training` field (if per-round not found and round matches)
+- **Attribute Extraction:**
+  - **Unified Architecture:** Tournament mode now uses the same attribute extraction pattern as Franchise mode
+  - All attributes are stored in `tournament.player_stats.{player_id}.attributes` (not just EM, CH, MO)
+  - Extraction reads directly from tournament document (no merging with core collection needed for new tournaments)
+  - **Backward Compatibility:** For old tournaments that only have EM, CH, MO, extraction merges with core collection automatically
+- **Displays:** Player attribute changes, team attribute changes, coaching focus, upcoming opponent, play effectiveness changes, defense effectiveness changes
+- **Pattern:** Matches Franchise mode pattern - per-round storage with `latest_training` fallback, unified attribute storage
+- **SS&S Benefits:** 
+  - Reduces URL parameter complexity
+  - Backend state is source of truth
+  - Historical reports can still use `round` parameter for specific round lookup
+  - Unified architecture simplifies code maintenance and reduces bugs
+
+### Team Object Lifecycle
+
+#### 1. Team Object Creation
+
+**Primary Trigger:** When tournament is created via `TournamentManager.create_tournament()`
+
+**Location:** `BackEnd/tournament/tournament_manager.py` - `create_tournament()` (lines 36-267)
+
+**Process:**
+1. **Upfront Initialization**: All 8 teams initialized when tournament is created (matches Franchise pattern)
+2. For each team in the tournament:
+   - Resolves team name to team document and ObjectId
+   - Uses `TeamManager.init_team_attributes(mode="tournament")` to generate mode-specific team attributes
+   - Creates team object with:
+     - `playcall_settings`: Default settings (all set to 2 = Normal)
+     - `strategy_settings`: Default settings (all set to 2 = Normal)
+     - `plays`: Populated via `populate_team_plays(mode="tournament")`
+       - **Tournament Mode Randomization**: Each play gets randomized values:
+         - `effectiveness`: `random.randint(0, 80)`
+         - `momentum`: `random.randint(0, 10)`
+         - `cloaking`: `random.randint(0, 10)`
+       - Each play and each value gets its own random roll
+     - `scouting_data`: Initialized via `populate_scouting_data(mode="tournament")`
+       - **Tournament Mode Randomization**: Each defense (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone) gets randomized values:
+         - `effectiveness`: `random.randint(0, 80)`
+         - `momentum`: `random.randint(0, 10)`
+         - `cloaking`: `random.randint(0, 10)`
+       - Each defense and each value gets its own random roll
+       - **Location**: `BackEnd/api/gameplan_routes.py` - `populate_scouting_data()` function (lines 403-521)
+     - `playbook_settings`: Even distribution across all plays in each category (via `initialize_playbook_settings()`)
+     - **Team attributes**: Initialized via `TeamManager.init_team_attributes(mode="tournament")`
+
+**Fallback Trigger:** `ensure_team_objects_exist()` when accessing Game Plan or Playbooks
+
+**Location:** `BackEnd/api/gameplan_routes.py` (lines 525-651)
+
+**Process:** Same as above, but only creates missing team objects (doesn't recreate existing ones)
+
+**Initialization Pattern:**
+- **Upfront Initialization**: All 8 teams initialized when tournament is created (eliminates race conditions)
+- **Mode-Specific Attributes**: Uses Tournament mode attribute ranges
+- **Play Randomization**: Each play gets unique randomized effectiveness/momentum/cloaking values
+- **Defense Randomization**: Each defense gets unique randomized effectiveness/momentum/cloaking values
+- **Playbook Settings**: Even distribution (not first play = 100%)
+
+#### 2. Team Object Storage
+
+**Collection:** `tournaments`  
+**Document:** Tournament document (ObjectId)  
+**Path:** `tournaments.{tournament_id}.teams.{team_id}`
+
+**Structure:** Same as Single Game Mode (see Single Game Mode documentation for structure)
+
+#### 3. Team Object Loading
+
+**Location:** `BackEnd/api/api.py` - `load_team_attributes_from_doc()` (lines 196-244)
+
+**Process:**
+1. `load_team_attributes_from_doc()` is called with `mode="tournament"` and `doc_id=tournament_id`
+2. Loads team attributes from `tournaments.{tournament_id}.teams.{team_id}`
+3. If not found, falls back to the **universal `teams` collection** in MongoDB
+4. Attributes are passed to `GameManager()` constructor
+5. If no attributes are loaded, `TeamManager.init_team_attributes(mode="tournament")` generates random values
+
+**Team Data API Endpoint:**
+- **Location:** `BackEnd/api/tournament_routes.py` - `get_tournament_team_data()`
+- **Endpoint:** `GET /tournament/team-data?tournament_id=...&team_name=...`
+- **Process:**
+  1. Resolves `team_name` to `team_id` server-side using multiple fallback strategies:
+     - Strategy 1: Exact name match
+     - Strategy 2: Case-insensitive match
+     - Strategy 3: Normalized name (replace dashes with spaces, title case)
+     - Strategy 4: Fallback to `tournament.user_team_id`
+  2. Returns team object from `tournaments.{tournament_id}.teams.{team_id}`
+  3. Initializes `scouting_data.defense` structure if missing
+  4. Defaults team attributes to 0 if not present
+- **Pattern**: Matches the successful pattern used by `/tournament/roster` - server-side team name resolution with robust fallback strategies
+
+#### 4. Team Object Updates
+
+**Playbook Settings:**
+- Saved to `tournaments.{tournament_id}.teams.{team_id}.playbook_settings`
+- Updated when user submits playbook changes
+
+**Strategy Settings:**
+- Saved to `tournaments.{tournament_id}.teams.{team_id}.strategy_settings`
+- Updated when user submits game plan changes
+
+**Team Attributes:**
+- Updated through training system
+- Training changes are stored in tournament document
+- **ALL player attributes** updated in `tournament.player_stats.{player_id}.attributes` (unified with Franchise architecture)
+- Team attributes can be updated (future: stored in tournament document)
+- Training reports stored in `tournament.latest_training` and `tournament.teams.{team_id}.training_reports.{round}`
+
+#### 5. Team Object Persistence
+
+- Team objects persist for the duration of the tournament
+- Changes to team attributes persist across all games in the tournament
+- When a new tournament is started, new team objects are created (no carryover from previous tournaments)
+
+## Key Files
+
+- `BackEnd/tournament/tournament_manager.py` - `create_tournament()` (lines 36-267) - Upfront initialization
+- `BackEnd/api/gameplan_routes.py` - `ensure_team_objects_exist()` (lines 525-651) - Fallback initialization
+- `BackEnd/api/api.py` - `load_team_attributes_from_doc()` (lines 196-244)
+- `BackEnd/api/api.py` - Game creation logic (lines 1246-1253, 1337-1344)
+- `BackEnd/api/tournament_routes.py` - `get_tournament_team_data()` - Team data endpoint
+- `BackEnd/api/tournament_routes.py` - `run_tournament_training()` - Training endpoint
+
+## See Also
+
+- `Mode_Init_System.md` - Complete mode initialization system documentation
+- `Training_System.md` - Training system documentation
+- `Playbooks_Page.md` - Playbook settings management
+
