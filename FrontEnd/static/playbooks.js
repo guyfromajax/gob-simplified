@@ -427,6 +427,9 @@ class PlaybooksUI {
         };
         
         console.log('✅ Loaded plays from API:', this.playData);
+        console.log('🔍 [DEBUG OUTSIDE PLAYS] API response set_play_outside:', data.set_play_outside);
+        console.log('🔍 [DEBUG OUTSIDE PLAYS] Mapped set_play_outside:', this.playData.set_play_outside);
+        console.log('🔍 [DEBUG OUTSIDE PLAYS] Count:', this.playData.set_play_outside.length);
       } else {
         console.error('❌ Failed to load plays from API:', response.status);
         // Fallback to empty plays
@@ -1403,6 +1406,13 @@ class PlaybooksUI {
     // Save position filter selections to localStorage
     this.savePositionFilterSelections();
     
+    // Reset percentages for hidden plays FIRST (before re-rendering)
+    // This ensures percentages are cleared before UI updates
+    const offenseSections = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'];
+    offenseSections.forEach(sectionKey => {
+      this.resetHiddenPlayPercentages(sectionKey);
+    });
+    
     // Re-render all offense sections to apply filtering
     this.renderSection('motion');
     this.renderSection('set-play-inside');
@@ -1410,18 +1420,14 @@ class PlaybooksUI {
     this.renderSection('set-play-outside');
     
     // Auto-recalculate percentages if Even Distribution is enabled for any section
-    const offenseSections = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'];
     offenseSections.forEach(sectionKey => {
       if (this.evenDistributionEnabled[sectionKey]) {
         console.log(`🔄 [POSITION FILTER] Auto-recalculating ${sectionKey} (Even Distribution enabled)`);
-        // First, reset percentages for plays that are no longer visible (hidden by position filter)
-        this.resetHiddenPlayPercentages(sectionKey);
-        // Then, distribute percentages evenly among visible plays
+        // Distribute percentages evenly among visible plays (hidden plays already reset)
         this.distributePercentagesEvenly(sectionKey);
         this.updateSectionTotal(sectionKey);
       } else {
-        // Even if Even Distribution is not enabled, reset percentages for hidden plays
-        this.resetHiddenPlayPercentages(sectionKey);
+        // Update section total (hidden plays already reset)
         this.updateSectionTotal(sectionKey);
       }
     });
@@ -1448,6 +1454,8 @@ class PlaybooksUI {
       allPlays = setPlays.filter(play => play.name !== 'To Be Added');
     }
     
+    let resetCount = 0;
+    
     // Reset percentages for plays that are not visible (don't match current position filters)
     allPlays.forEach((play, index) => {
       const playDatabaseId = play.play_id;
@@ -1467,13 +1475,21 @@ class PlaybooksUI {
           }
         }
         
-        // Ensure play exists in state
+        // Ensure play exists in state and has a non-zero percentage
         if (this.state.sections[sectionKey][playId]) {
-          this.state.sections[sectionKey][playId].percentage = 0;
-          console.log(`🔄 [POSITION FILTER] Reset percentage to 0 for hidden play: ${play.name}`);
+          const oldPercentage = this.state.sections[sectionKey][playId].percentage || 0;
+          if (oldPercentage > 0) {
+            this.state.sections[sectionKey][playId].percentage = 0;
+            resetCount++;
+            console.log(`🔄 [POSITION FILTER] Reset percentage from ${oldPercentage}% to 0% for hidden play: ${play.name} (play_id: ${playDatabaseId})`);
+          }
         }
       }
     });
+    
+    if (resetCount > 0) {
+      console.log(`🔄 [POSITION FILTER] Reset ${resetCount} hidden play(s) in section "${sectionKey}"`);
+    }
   }
   
   savePositionFilterSelections() {
