@@ -707,31 +707,80 @@ class PlaybooksUI {
     if (!container) return;
     
     let plays = [];
+    const isOffenseSection = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'].includes(sectionKey);
     
     // Get plays based on section
     if (sectionKey === 'motion') {
       const motionPlays = this.playData.motion || [];
-      // Fill to 4 slots
-      for (let i = 0; i < 4; i++) {
-        plays.push(i < motionPlays.length ? motionPlays[i] : TO_BE_ADDED_PLACEHOLDER);
+      // Filter by position FIRST (for offense sections), then fill to 4 slots
+      if (isOffenseSection) {
+        const filteredPlays = motionPlays.filter(play => {
+          if (play.name === 'To Be Added') return true; // Always include placeholders
+          const playDatabaseId = play.play_id;
+          if (!playDatabaseId) return false;
+          return this.shouldShowPlay(playDatabaseId);
+        });
+        for (let i = 0; i < 4; i++) {
+          plays.push(i < filteredPlays.length ? filteredPlays[i] : TO_BE_ADDED_PLACEHOLDER);
+        }
+      } else {
+        for (let i = 0; i < 4; i++) {
+          plays.push(i < motionPlays.length ? motionPlays[i] : TO_BE_ADDED_PLACEHOLDER);
+        }
       }
     } else if (sectionKey === 'set-play-inside') {
       const setPlays = this.playData.set_play_inside || [];
-      // Fill to 3 slots
-      for (let i = 0; i < 3; i++) {
-        plays.push(i < setPlays.length ? setPlays[i] : TO_BE_ADDED_PLACEHOLDER);
+      // Filter by position FIRST (for offense sections), then fill to 3 slots
+      if (isOffenseSection) {
+        const filteredPlays = setPlays.filter(play => {
+          if (play.name === 'To Be Added') return true; // Always include placeholders
+          const playDatabaseId = play.play_id;
+          if (!playDatabaseId) return false;
+          return this.shouldShowPlay(playDatabaseId);
+        });
+        for (let i = 0; i < 3; i++) {
+          plays.push(i < filteredPlays.length ? filteredPlays[i] : TO_BE_ADDED_PLACEHOLDER);
+        }
+      } else {
+        for (let i = 0; i < 3; i++) {
+          plays.push(i < setPlays.length ? setPlays[i] : TO_BE_ADDED_PLACEHOLDER);
+        }
       }
     } else if (sectionKey === 'set-play-attack') {
       const setPlays = this.playData.set_play_attack || [];
-      // Fill to 3 slots
-      for (let i = 0; i < 3; i++) {
-        plays.push(i < setPlays.length ? setPlays[i] : TO_BE_ADDED_PLACEHOLDER);
+      // Filter by position FIRST (for offense sections), then fill to 3 slots
+      if (isOffenseSection) {
+        const filteredPlays = setPlays.filter(play => {
+          if (play.name === 'To Be Added') return true; // Always include placeholders
+          const playDatabaseId = play.play_id;
+          if (!playDatabaseId) return false;
+          return this.shouldShowPlay(playDatabaseId);
+        });
+        for (let i = 0; i < 3; i++) {
+          plays.push(i < filteredPlays.length ? filteredPlays[i] : TO_BE_ADDED_PLACEHOLDER);
+        }
+      } else {
+        for (let i = 0; i < 3; i++) {
+          plays.push(i < setPlays.length ? setPlays[i] : TO_BE_ADDED_PLACEHOLDER);
+        }
       }
     } else if (sectionKey === 'set-play-outside') {
       const setPlays = this.playData.set_play_outside || [];
-      // Fill to 3 slots
-      for (let i = 0; i < 3; i++) {
-        plays.push(i < setPlays.length ? setPlays[i] : TO_BE_ADDED_PLACEHOLDER);
+      // Filter by position FIRST (for offense sections), then fill to 3 slots
+      if (isOffenseSection) {
+        const filteredPlays = setPlays.filter(play => {
+          if (play.name === 'To Be Added') return true; // Always include placeholders
+          const playDatabaseId = play.play_id;
+          if (!playDatabaseId) return false;
+          return this.shouldShowPlay(playDatabaseId);
+        });
+        for (let i = 0; i < 3; i++) {
+          plays.push(i < filteredPlays.length ? filteredPlays[i] : TO_BE_ADDED_PLACEHOLDER);
+        }
+      } else {
+        for (let i = 0; i < 3; i++) {
+          plays.push(i < setPlays.length ? setPlays[i] : TO_BE_ADDED_PLACEHOLDER);
+        }
       }
     } else {
       // Defense plays (hardcoded) - not filtered by position
@@ -739,9 +788,6 @@ class PlaybooksUI {
     }
     
     container.innerHTML = '';
-    
-    // Filter offense plays by position (defense plays are not filtered)
-    const isOffenseSection = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'].includes(sectionKey);
     
     plays.forEach((play, index) => {
       // Generate play ID if it's a placeholder
@@ -751,20 +797,10 @@ class PlaybooksUI {
         playId = sectionKey === 'motion' ? `motion-tba-${index + 1}` : `${sectionKey}-tba-${index + 1}`;
       }
       
-      // Apply position filtering for offense sections
+      // Position filtering already done above, so just log for debugging
       if (isOffenseSection && play.name !== 'To Be Added') {
-        // Use play_id (database ObjectId) for filtering
         const playDatabaseId = play.play_id;
-        console.log(`🔍 [RENDER SECTION] Checking play "${play.name}" (play_id: ${playDatabaseId})`);
-        if (playDatabaseId && !this.shouldShowPlay(playDatabaseId)) {
-          console.log(`❌ [RENDER SECTION] Hiding play "${play.name}" - doesn't match position filter`);
-          return; // Skip this play - it doesn't match the position filter
-        }
-        if (!playDatabaseId) {
-          console.log(`❌ [RENDER SECTION] Hiding play "${play.name}" - missing play_id`);
-          return; // Skip plays without play_id
-        }
-        console.log(`✅ [RENDER SECTION] Showing play "${play.name}"`);
+        console.log(`🔍 [RENDER SECTION] Rendering play "${play.name}" (play_id: ${playDatabaseId})`);
       }
       
       const playData = this.state.sections[sectionKey][playId] || { percentage: 0, slot: null };
