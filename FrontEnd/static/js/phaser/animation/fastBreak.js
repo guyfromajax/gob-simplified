@@ -108,8 +108,15 @@ export async function runFastBreakSequence({
   const result = turnData.result_type;
   
   if (result === "MAKE" || result === "MISS") {
-    // Shot attempt scenario - move shooter toward basket now
-    await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
+    // Shot attempt scenario
+    // Check if ball handler beat the defender (skill check won)
+    if (turnData.roles?.ball_handler_beats_defender && turnData.stopper_id) {
+      // Ball handler won skill check - animate past stopper to shot spot
+      await animateFastBreakShotWithStopper(scene, turnData, playerSprites, ballSprite, width, height);
+    } else {
+      // Normal shot attempt (no stopper or stopper not in position)
+      await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
+    }
   } else {
     // Defensive stop, foul, turnover, or steal - position for defensive stop (outlet receiver hasn't moved too far)
     await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
@@ -431,6 +438,188 @@ async function animateStealEntry(scene, turnData, playerSprites, ballSprite, wid
  * - Defender follows
  * - All others move to standard positions
  */
+/**
+ * Animate Fast Break shot when ball handler beats defender (skill check won)
+ * Defender still animates to stopper position, but ball handler animates past them to shot spot
+ */
+async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, ballSprite, width, height) {
+  const shooterId = turnData.roles?.shooter?.player_id || turnData.shooter_id || turnData.roles?.ball_handler?.player_id || getCurrentOwner(scene);
+  const shooterSprite = playerSprites[shooterId];
+  
+  if (!shooterSprite) return;
+  
+  const isHomeOffense = shooterSprite.team === "home";
+  const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  
+  // Ball handler moves to shot spot near rim (past the stopper)
+  const shotSpot = {
+    x: isHomeOffense
+      ? basket.x - Phaser.Math.Between(2, 6)  // Home: basket - 2-6
+      : basket.x + Phaser.Math.Between(2, 6), // Away: basket + 2-6
+    y: basket.y + Phaser.Math.Between(-6, 6)  // ±6 from basket Y
+  };
+  
+  // Clamp to bounds
+  shotSpot.x = Phaser.Math.Clamp(shotSpot.x, 4, 97);
+  shotSpot.y = Phaser.Math.Clamp(shotSpot.y, 1, 49);
+  
+  const shotPx = gridToPixels(shotSpot.x, shotSpot.y, width, height);
+  
+  const promises = [];
+  
+  // Move shooter (ball handler) past stopper to shot spot
+  attachBallToPlayer(scene, ballSprite, shooterSprite);
+  const shooterDuration = getPlayerDuration(shooterSprite, shotPx.x, shotPx.y);
+  const shooterPromise = tweenPlayerTo(scene, shooterSprite, shotPx, {
+    duration: shooterDuration,
+    easing: "Linear"
+  });
+  promises.push(shooterPromise);
+  
+  // Move stopper to stopper position (between ball handler start and basket)
+  const stopperId = turnData.stopper_id;
+  const stopperSprite = stopperId ? playerSprites[stopperId] : null;
+  let stopperPromise = null;
+  
+  if (stopperSprite) {
+    // Get ball handler's starting position (from roles or current position)
+    const ballHandlerStartX = turnData.roles?.ball_handler_outlet_x || shooterSprite.x;
+    const ballHandlerStartY = turnData.roles?.ball_handler_outlet_y || shooterSprite.y;
+    
+    // Convert to grid if needed
+    let startGridX, startGridY;
+    if (typeof ballHandlerStartX === 'number' && ballHandlerStartX <= 100) {
+      // Already in grid coordinates
+      startGridX = ballHandlerStartX;
+      startGridY = ballHandlerStartY;
+    } else {
+      // Convert from pixels to grid
+      startGridX = (ballHandlerStartX / width) * 100;
+      startGridY = 50 - (ballHandlerStartY / height) * 50;
+    }
+    
+    // Stopper position: 1-3 spots in front of ball handler (toward basket)
+    const stopperOffset = Phaser.Math.Between(1, 3);
+    const stopperSpot = {
+      x: isHomeOffense
+        ? startGridX + stopperOffset  // Home: +X toward basket (x=90)
+        : startGridX - stopperOffset, // Away: -X toward basket (x=10)
+      y: startGridY
+    };
+    
+    stopperSpot.x = Phaser.Math.Clamp(stopperSpot.x, 4, 97);
+    stopperSpot.y = Phaser.Math.Clamp(stopperSpot.y, 1, 49);
+    
+    const stopperPx = gridToPixels(stopperSpot.x, stopperSpot.y, width, height);
+    const stopperDuration = getPlayerDuration(stopperSprite, stopperPx.x, stopperPx.y);
+    stopperPromise = tweenPlayerTo(scene, stopperSprite, stopperPx, {
+      duration: stopperDuration,
+      easing: "Linear"
+    });
+    promises.push(stopperPromise);
+  }
+  
+  // Move primary defender (if different from stopper)
+  let defenderId = turnData.defenderId || turnData.roles?.defender?.player_id;
+  if (!defenderId && turnData.roles?.defense && turnData.roles.defense[0]) {
+    const defenderData = turnData.roles.defense[0];
+    defenderId = typeof defenderData === 'string' ? defenderData : (defenderData.player_id || defenderData.playerId);
+  }
+  
+  const defenderSprite = defenderId && defenderId !== stopperId ? playerSprites[defenderId] : null;
+  
+  if (defenderSprite) {
+    // Defender follows to position behind shooter
+    const defenderSpot = {
+      x: isHomeOffense
+        ? shotSpot.x + 6  // Home: defender is +6 (behind shooter)
+        : shotSpot.x - 6, // Away: defender is -6 (behind shooter)
+      y: shotSpot.y + Phaser.Math.Between(-2, 2)
+    };
+    defenderSpot.x = Phaser.Math.Clamp(defenderSpot.x, 4, 97);
+    defenderSpot.y = Phaser.Math.Clamp(defenderSpot.y, 1, 49);
+    
+    const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
+    const defenderDuration = getPlayerDuration(defenderSprite, defenderPx.x, defenderPx.y);
+    promises.push(
+      tweenPlayerTo(scene, defenderSprite, defenderPx, {
+        duration: defenderDuration,
+        easing: "Linear"
+      })
+    );
+  }
+  
+  // Move all other players to standard positions
+  const rebounderTweens = await moveOtherPlayersToStandardPositions(
+    scene,
+    playerSprites,
+    shooterId,
+    defenderId || stopperId,
+    turnData,
+    width,
+    height,
+    promises
+  );
+  
+  // Wait for shooter to reach shot spot
+  await shooterPromise;
+  
+  // Shoot the ball
+  safeTransition(scene.stateMachine, States.ShotAttempt);
+  
+  const adjustedBasket = { ...basket };
+  if (turnData.result_type === "MAKE") {
+    adjustedBasket.x = isHomeOffense ? basket.x - 1 : basket.x + 1;
+  }
+  const rimPx = gridToPixels(adjustedBasket.x, adjustedBasket.y, width, height);
+  await animateShotToRim(scene, rimPx, {
+    duration: 400,
+    easing: "Sine.easeInOut",
+    arc: { height: 50 }
+  });
+  
+  // Stop rebounder animations when ball hits rim (made shot)
+  if (turnData.result_type === "MAKE") {
+    rebounderTweens.forEach(tween => {
+      if (tween && tween.isPlaying && scene.tweens) {
+        scene.tweens.killTweensOf(tween.targets);
+      }
+    });
+  }
+  
+  // Handle outcome (same as normal shot)
+  if (turnData.result_type === "MAKE") {
+    // Show announcement with shooter headshot
+    const shooterInfo = scene.playerInfo?.[shooterId];
+    const shooterTeamId = shooterSprite?.team_id;
+    const homeTeamName = scene.simData?.home_team?.name || "Home";
+    const awayTeamName = scene.simData?.away_team?.name || "Away";
+    const shooterTeamName = shooterTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+    
+    if (shooterInfo) {
+      const shooterPlayerData = {
+        playerId: shooterId,
+        photo: shooterSprite?.photo || null,
+        teamName: shooterTeamName
+      };
+      showAnnouncement("Fast Break Score!", shooterTeamId === scene.homeTeamId ? "home" : "away", shooterPlayerData);
+    }
+  } else if (turnData.result_type === "MISS") {
+    // Handle MISS → DREB transition
+    const rebounderId = turnData.rebounder_id || turnData.roles?.rebounder?.player_id;
+    if (rebounderId) {
+      await runInboundSetup({
+        scene,
+        ballSprite,
+        playerSprites,
+        rebounderId,
+        nextPlayType: turnData.next_play_type || "HCO",
+        turnData: turnData
+      });
+    }
+  }
+}
+
 async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height) {
   const shooterId = turnData.roles?.shooter?.player_id || turnData.shooter_id || getCurrentOwner(scene);
   const shooterSprite = playerSprites[shooterId];

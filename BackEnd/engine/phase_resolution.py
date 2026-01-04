@@ -1160,19 +1160,40 @@ def resolve_fast_break_logic(game: "GameManager"):
         event_type = "SHOT"
         logging.debug(f"  ✅ Decision: SHOT (0 defenders)")
     elif defender_ahead and closest_stopping_defender:
-        # Defender ahead AND within ±6 y-coords: defensive stop
-        event_type = "DEFENSIVE_STOP"
-        logging.debug(f"  ✅ Decision: DEFENSIVE_STOP (defender ahead AND within ±6 y-coords)")
-        logging.debug(f"  closest_stopping_defender: {get_name_safe(closest_stopping_defender)}")
-        logging.debug(f"  closest_stopping_distance: {closest_stopping_distance}")
-        # Store closest stopping defender as stopper (override previous stopper logic)
-        if closest_stopping_defender:
-            stopper_id = closest_stopping_defender.player_id
-            best_defender = closest_stopping_defender
-            hold_up = True  # Set hold_up since we're stopping the break
-            closest_defender = closest_stopping_defender  # For compatibility with existing code
+        # ✅ Geography check passed: Defender ahead AND within ±6 y-coords
+        # Now do skill check: Can ball handler beat the defender?
+        die = random.randint(1, 6)
+        break_score = ball_handler.attributes["AG"] + ball_handler.attributes["BH"] * die
+        stop_score = closest_stopping_defender.attributes["AG"] + closest_stopping_defender.attributes["OD"] * die
+        
+        logging.debug(f"  🎯 Skill Check: break_score={break_score:.1f} (AG={ball_handler.attributes['AG']}, BH={ball_handler.attributes['BH']}, die={die}) vs stop_score={stop_score:.1f} (AG={closest_stopping_defender.attributes['AG']}, OD={closest_stopping_defender.attributes['OD']}, die={die})")
+        
+        # Store closest stopping defender as stopper for animation (even if ball handler wins)
+        # This ensures defender animates to stopper position, showing the attempt
+        stopper_id = closest_stopping_defender.player_id
+        best_defender = closest_stopping_defender
+        hold_up = True  # Set hold_up so defender animates to stopper position
+        closest_defender = closest_stopping_defender  # For compatibility with existing code
+        
+        if stop_score >= break_score:
+            # Defender wins skill check: defensive stop
+            event_type = "DEFENSIVE_STOP"
+            logging.debug(f"  ✅ Decision: DEFENSIVE_STOP (defender ahead AND within y-range AND wins skill check)")
+        else:
+            # Ball handler wins skill check: shot attempt (but defender still animates to stopper position)
+            event_type = "SHOT"
+            logging.debug(f"  ✅ Decision: SHOT (defender ahead AND within y-range BUT ball handler wins skill check - beats defender)")
+            # Store stopper info in fb_roles so frontend can animate defender to stopper position
+            fb_roles["stopper_id"] = stopper_id
+            fb_roles["ball_handler_beats_defender"] = True  # Flag for frontend animation
+            # Also set shot defender (closest overall) for shot resolution
+            if closest_defender_overall:
+                fb_roles["defender"] = closest_defender_overall
+            else:
+                # Fallback: use stopper as shot defender
+                fb_roles["defender"] = closest_stopping_defender
     else:
-        # No defender ahead AND within y-range: shot attempt
+        # No defender ahead AND within y-range: shot attempt (no skill check needed)
         # Use closest defender overall as shot defender
         event_type = "SHOT"
         if closest_defender_overall:
