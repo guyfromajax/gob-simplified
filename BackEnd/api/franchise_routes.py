@@ -52,6 +52,125 @@ def get_user_team_from_franchise(franchise_doc: dict) -> tuple[str | None, str |
     
     return (None, None)
 
+
+def generate_random_training_allocations(total_points: int) -> dict:
+    """
+    Generate random training allocations similar to auto-train logic.
+    
+    Logic:
+    - Set all 20 sliders to 1 (20 points)
+    - Randomly pick (total_points - 20) sliders to set to 2
+    
+    Args:
+        total_points: Total training points (30 for first training, 24 otherwise)
+    
+    Returns:
+        Dict with player_drills, team_drills, general structure
+    """
+    # Initialize all to 1
+    allocations = {
+        "player_drills": {
+            "offense": {"inside": 1, "outside": 1},
+            "defense": {"inside": 1, "outside": 1},
+            "technical": {"passing": 1, "ball_handling": 1, "rebounding": 1},
+            "weight_room": {"strength": 1, "agility": 1}
+        },
+        "team_drills": {
+            "team_offense": {"install": 1},
+            "team_defense": {"install": 1},
+            "fast_breaks": {"offense_install": 1, "defense_install": 1},
+            "scrimmages": 1,
+            "presses_traps": {"defense_install": 1, "offense_install": 1}
+        },
+        "general": {
+            "conditioning": 1,
+            "free_throws": 1,
+            "film_study": 1,
+            "breaks": 1
+        }
+    }
+    
+    # Define all 20 sliders for random selection
+    sliders = [
+        # Player Drills (9 sliders)
+        ("player_drills", "offense", "inside"),
+        ("player_drills", "offense", "outside"),
+        ("player_drills", "defense", "inside"),
+        ("player_drills", "defense", "outside"),
+        ("player_drills", "technical", "passing"),
+        ("player_drills", "technical", "ball_handling"),
+        ("player_drills", "technical", "rebounding"),
+        ("player_drills", "weight_room", "strength"),
+        ("player_drills", "weight_room", "agility"),
+        # Team Drills (7 sliders)
+        ("team_drills", "team_offense", "install"),
+        ("team_drills", "team_defense", "install"),
+        ("team_drills", "fast_breaks", "offense_install"),
+        ("team_drills", "fast_breaks", "defense_install"),
+        ("team_drills", "scrimmages", None),
+        ("team_drills", "presses_traps", "defense_install"),
+        ("team_drills", "presses_traps", "offense_install"),
+        # General (4 sliders)
+        ("general", None, "conditioning"),
+        ("general", None, "free_throws"),
+        ("general", None, "film_study"),
+        ("general", None, "breaks"),
+    ]
+    
+    # Randomly pick (total_points - 20) sliders to set to 2
+    remaining_points = total_points - 20
+    shuffled = sliders.copy()
+    random.shuffle(shuffled)
+    
+    for i in range(min(remaining_points, len(shuffled))):
+        category, subcategory, key = shuffled[i]
+        
+        if category == "player_drills":
+            allocations[category][subcategory][key] = 2
+        elif category == "team_drills":
+            if subcategory == "scrimmages":
+                allocations[category][subcategory] = 2
+            else:
+                allocations[category][subcategory][key] = 2
+        elif category == "general":
+            allocations[category][key] = 2
+    
+    return allocations
+
+
+def generate_random_coaching_focus() -> str:
+    """
+    Randomly select a coaching focus from all available options.
+    
+    Returns:
+        String value matching the radio button value (e.g., "authoritarian-discipline")
+    """
+    coaching_focus_options = [
+        "authoritarian",
+        "authoritarian-discipline",
+        "authoritarian-rebounding",
+        "authoritarian-execution",
+        "authoritarian-teamwork",
+        "systems-coach",
+        "systems-coach-offense",
+        "systems-coach-defense",
+        "systems-coach-fast-breaks",
+        "systems-coach-press-trap",
+        "player-maximizer",
+        "player-maximizer-top-3",
+        "player-maximizer-attributes-4-6",
+        "player-maximizer-custom",
+        "player-maximizer-opportunity",
+        "culture-builder",
+        "culture-builder-inspire",
+        "culture-builder-community",
+        "culture-builder-teamwork",
+        "culture-builder-confidence",
+    ]
+    
+    return random.choice(coaching_focus_options)
+
+
 @router.get("/court.html")
 def serve_court_html():
     """Return the court page so query params work in production."""
@@ -2109,7 +2228,154 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     # Also save latest training for quick access
     franchise_update["latest_training"] = training_report_data
 
-    # Save to franchise document
+    # ✅ Run training for all computer teams (in unison with user team training)
+    # Each computer team gets random allocations and random coaching focus
+    # Each team gets separate randomizations for pre-training decay and training
+    computer_teams_update = {}
+    
+    for computer_team_id, computer_team_data in franchise_teams.items():
+        # Skip user's team (already processed above)
+        if str(computer_team_id) == str(team_id):
+            continue
+        
+        try:
+            # Get team document to get team name and player_ids
+            computer_team_doc = db.teams.find_one({"_id": ObjectId(computer_team_id)})
+            if not computer_team_doc:
+                logger.warning(f"⚠️ [COMPUTER TRAINING] Team document not found for team_id: {computer_team_id}")
+                continue
+            
+            computer_team_name = computer_team_doc.get("name", "")
+            computer_team_player_ids = computer_team_doc.get("player_ids", [])
+            
+            if not computer_team_player_ids:
+                logger.warning(f"⚠️ [COMPUTER TRAINING] No player_ids found for team_id: {computer_team_id}")
+                continue
+            
+            # Build player list with franchise-specific attributes
+            computer_players_for_training = []
+            for pid in computer_team_player_ids:
+                pid_str = str(pid)
+                computer_franchise_player_data = franchise_players.get(pid_str, {})
+                if not computer_franchise_player_data:
+                    continue
+                
+                # Build player dict for training
+                player = {
+                    "_id": pid_str,
+                    "first_name": computer_franchise_player_data.get("meta", {}).get("first_name", ""),
+                    "last_name": computer_franchise_player_data.get("meta", {}).get("last_name", ""),
+                    "team": computer_team_name or computer_team_id,
+                    "attributes": computer_franchise_player_data.get("attributes", {})
+                }
+                computer_players_for_training.append(player)
+            
+            if not computer_players_for_training:
+                logger.warning(f"⚠️ [COMPUTER TRAINING] No players found for training for team_id: {computer_team_id}")
+                continue
+            
+            # Get franchise-specific team stats
+            computer_team_stats = computer_team_data.copy()
+            
+            # Get plays, game plan settings, and playbook settings for computer team
+            computer_plays_data = computer_team_data.get("plays", {})
+            computer_playcall_settings = computer_team_data.get("playcall_settings", {})
+            computer_strategy_settings = computer_team_data.get("strategy_settings", {})
+            computer_playbook_settings = computer_team_data.get("playbook_settings", {})
+            computer_scouting_data = computer_team_data.get("scouting_data", {})
+            
+            # Initialize plays_data if empty
+            if not computer_plays_data:
+                from BackEnd.api.gameplan_routes import populate_team_plays
+                computer_plays_data = populate_team_plays(mode="franchise")
+                computer_teams_update[f"franchise_teams.{computer_team_id}.plays"] = computer_plays_data
+            
+            # Initialize scouting_data if empty or missing defense structure
+            if not computer_scouting_data or "defense" not in computer_scouting_data:
+                from BackEnd.models.team_manager import TeamManager
+                temp_team = TeamManager(name=computer_team_name or computer_team_id, mode="franchise")
+                computer_scouting_data = temp_team.scouting_data
+                computer_teams_update[f"franchise_teams.{computer_team_id}.scouting_data"] = computer_scouting_data
+            
+            # Generate random training allocations and coaching focus
+            computer_allocations = generate_random_training_allocations(expected_points)
+            computer_coaching_focus = generate_random_coaching_focus()
+            
+            # Execute training for computer team (includes pre-training conditions and effectiveness decay)
+            # Each team gets separate randomizations (handled by execute_training internally)
+            updated_computer_players, updated_computer_team, updated_computer_plays, updated_computer_scouting_data, _ = execute_training(
+                computer_players_for_training,
+                computer_team_stats,
+                computer_allocations,
+                computer_coaching_focus,
+                plays_data=computer_plays_data,
+                playcall_settings=computer_playcall_settings,
+                strategy_settings=computer_strategy_settings,
+                playbook_settings=computer_playbook_settings,
+                scouting_data=computer_scouting_data,
+                playbook_training_mode="all-plays-even"  # Use even distribution for computer teams
+            )
+            
+            # Recalculate position ratings for each computer player after training
+            for player in updated_computer_players:
+                pid = player["_id"]
+                core_player = db.players.find_one({"_id": pid}, {"height": 1})
+                if not core_player:
+                    try:
+                        core_player = db.players.find_one({"_id": ObjectId(pid)}, {"height": 1})
+                    except:
+                        pass
+                height = core_player.get("height") if core_player else None
+                
+                player_for_ratings = {
+                    "attributes": player.get("attributes", {}),
+                    "height": height,
+                    "name": f"{player.get('first_name', '')} {player.get('last_name', '')}"
+                }
+                
+                new_ratings = compute_position_ratings(player_for_ratings)
+                computer_teams_update[f"players.{pid}.position_ratings"] = new_ratings
+            
+            # Update computer team players' attributes
+            for player in updated_computer_players:
+                pid = player["_id"]
+                attrs = player.get("attributes", {})
+                
+                # Update all anchor attributes and base attributes
+                for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO"]:
+                    anchor_key = f"anchor_{attr}"
+                    if anchor_key in attrs:
+                        computer_teams_update[f"players.{pid}.attributes.{anchor_key}"] = attrs[anchor_key]
+                        computer_teams_update[f"players.{pid}.attributes.{attr}"] = attrs[attr]
+                
+                # NG doesn't have an anchor_key, save it directly if it exists
+                if "NG" in attrs:
+                    computer_teams_update[f"players.{pid}.attributes.NG"] = attrs["NG"]
+            
+            # Update computer team stats
+            for field, value in updated_computer_team.items():
+                # Skip non-numeric fields
+                if isinstance(value, dict):
+                    continue
+                computer_teams_update[f"franchise_teams.{computer_team_id}.{field}"] = value
+            
+            # Update computer team plays and scouting data
+            if updated_computer_plays:
+                computer_teams_update[f"franchise_teams.{computer_team_id}.plays"] = updated_computer_plays
+            
+            if updated_computer_scouting_data:
+                computer_teams_update[f"franchise_teams.{computer_team_id}.scouting_data"] = updated_computer_scouting_data
+            
+            logger.info(f"✅ [COMPUTER TRAINING] Completed training for computer team: {computer_team_name} ({computer_team_id})")
+        
+        except Exception as e:
+            logger.error(f"❌ [COMPUTER TRAINING] Error training computer team {computer_team_id}: {str(e)}")
+            continue
+    
+    # Merge computer teams updates with user team updates
+    franchise_update.update(computer_teams_update)
+    
+    # Save to franchise document (includes both user team and computer teams)
     db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update})
     
     return {

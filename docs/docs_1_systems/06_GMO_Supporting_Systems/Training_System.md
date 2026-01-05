@@ -17,7 +17,7 @@
 8. **Rebound Modifier Range**: 0.0-0.4 (clamped)
 9. **Pre-Training Decay**: Plays/defenses with effectiveness > 0 reduced by `random.randint(5, 15)`
 
-**Training System Flow (11 Steps)**
+**Training System Flow (13 Steps)**
 
 1. **Page Load**: Frontend fetches training points from `/franchise/training-points` endpoint (30 for first training, 24 otherwise)
 2. **User Allocates Points**: User distributes training points (30 or 24) across 20 sliders (player drills, team drills, general)
@@ -30,7 +30,8 @@
 9. **Training Point Application**: Drill allocations mapped to attributes, random increases applied based on points
 10. **Coaching Focus Amplifiers**: Selected focus amplifies specific attribute gains
 11. **Attribute Clamping**: All values clamped to valid ranges (player: min 1, team: defined ranges)
-12. **Report Generation**: Training report stored, player/team attributes updated, redirect to report page
+12. **User Team Report Generation**: Training report stored, player/team attributes updated, redirect to report page
+13. **Computer Team Training**: All computer teams run training in unison (random allocations, random focus, no reports)
 
 **Long Form Documentation**
 
@@ -456,17 +457,26 @@ Training report links appear next to scheduled games on the Franchise Command Ce
 ### Data Flow
 
 1. **Training Submission:**
-   - User allocates 24 training points and selects coaching focus on `training.html`
+   - User allocates 24 training points (or 30 for first training) and selects coaching focus on `training.html`
    - Frontend sends POST request to `/franchise/run-training` with training data
    - **Data Initialization (Auto-Population):**
      - If `plays_data` is empty or missing, backend automatically populates it from the universal `plays` collection using `populate_team_plays()`
      - If `scouting_data` is empty or missing the `defense` structure, backend automatically initializes it using `TeamManager._init_scouting_data()`
      - Initialized data is saved to the database before training execution
      - This ensures training works even if game plan or playbooks haven't been submitted yet
-   - Backend executes training (pre-conditions, point allocation, clamping)
+   - Backend executes training for user's team (pre-conditions, point allocation, clamping)
    - Backend stores training report in `franchise_teams.{team_id}.training_reports.{week}`
-   - Backend updates player attributes and team attributes in franchise document
-   - Backend returns redirect URL to training report page
+   - Backend updates player attributes and team attributes in franchise document for user's team
+   - **Computer Team Training (Franchise Mode Only):**
+     - Backend iterates through all computer teams in the franchise
+     - For each computer team:
+       - Generates random training allocations (same total points as user's team)
+       - Generates random coaching focus (archetype and sub-option)
+       - Executes training with separate randomizations (pre-training decay, training)
+       - Recalculates position ratings for all players
+       - Updates player attributes and team attributes in franchise document
+     - All updates (user team + computer teams) consolidated into single database update
+   - Backend returns redirect URL to training report page (user's team only)
 
 2. **Training Report Display:**
    - Frontend loads training report data from `/franchise/training-report` endpoint
@@ -492,6 +502,47 @@ For player loading, the system:
 - Falls back to `meta.team` name lookup if `team_id` is missing
 - Compares resolved team IDs to filter players
 
+### Computer Team Training (Franchise Mode Only)
+
+In Franchise mode, when the user submits training for their team, all computer teams in the franchise automatically run training in unison. This ensures that all teams progress together each week.
+
+**Key Features:**
+- **Automatic Execution**: Computer teams run training immediately after user's team training completes
+- **Random Allocations**: Each computer team gets randomly generated training allocations (same total points as user's team: 30 for first training, 24 otherwise)
+- **Random Coaching Focus**: Each computer team gets a randomly selected coaching focus (archetype and sub-option)
+- **Separate Randomizations**: Each computer team gets separate randomizations for:
+  - Pre-training effectiveness decay (plays/defenses)
+  - Pre-training conditions (player/team attribute decreases)
+  - Training point application (attribute increases)
+- **No Training Reports**: Computer teams do not generate training reports (only user's team gets a report)
+- **Playbook Mode**: All computer teams use "all-plays-even" mode for playbook training (even distribution across all plays)
+- **Position Ratings**: Position ratings are recalculated for all computer team players after training
+
+**Implementation Details:**
+- **Location**: `BackEnd/api/franchise_routes.py` - `run_franchise_training()` (lines 2236-2390)
+- **Helper Functions**:
+  - `generate_random_training_allocations(total_points: int)` - Generates random allocations matching frontend structure
+  - `generate_random_coaching_focus()` - Randomly selects archetype and sub-option
+- **Process**:
+  1. Iterate through all teams in `franchise_teams` (skipping user's team)
+  2. For each computer team:
+     - Fetch team document and player_ids
+     - Build player list with franchise-specific attributes from `franchise_players`
+     - Get team stats, plays, playcall settings, strategy settings, playbook settings, and scouting data
+     - Initialize `plays_data` and `scouting_data` if empty
+     - Generate random training allocations and coaching focus
+     - Call `execute_training()` (includes pre-training conditions with separate randomizations)
+     - Recalculate position ratings for all players
+     - Update franchise document with all changes
+  3. Consolidate all updates (user team + computer teams) into single `db.franchises.update_one()` call
+
+**Data Updates:**
+- Player attributes: `players.{player_id}.attributes.anchor_{attr}` and `players.{player_id}.attributes.{attr}`
+- Position ratings: `players.{player_id}.position_ratings`
+- Team attributes: `franchise_teams.{team_id}.{attribute_name}`
+- Plays data: `franchise_teams.{team_id}.plays` (if initialized)
+- Scouting data: `franchise_teams.{team_id}.scouting_data` (if initialized)
+
 ### Data Storage
 
 **Franchise Document:**
@@ -505,7 +556,11 @@ For player loading, the system:
 - `players.{player_id}.position_ratings` - Recalculated position ratings
 
 **Team Updates:**
-- `franchise_teams.{team_id}.{attribute_name}` - Updated team attribute values
+- `franchise_teams.{team_id}.{attribute_name}` - Updated team attribute values (user team and computer teams)
+
+**Computer Team Updates (Franchise Mode Only):**
+- Same structure as user team updates (player attributes, team attributes, plays, scouting data)
+- No training reports stored (only user's team gets reports)
 
 ### Key Files
 
@@ -532,5 +587,4 @@ For player loading, the system:
 - Training history tracking and archiving
 - Custom attribute selection for Player Maximizer focus
 - Play effectiveness score updates from training
-- Training simulation for computer teams
 
