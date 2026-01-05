@@ -1000,6 +1000,8 @@ class ShotManager:
                     }
                     # OREB will be handled as a separate turn
                     # Don't process putback here - let next turn handle it
+                    # ✅ FIX: Set next_play_type for OREB (will be overridden by OREB turn, but ensures it's never None)
+                    result["next_play_type"] = "OREB"
                 else:
                     # DREB - determine next play type
                     possession_flips = True
@@ -1037,6 +1039,7 @@ class ShotManager:
                         # logging.info(f"🏀 HCO determined during shot: no defense_release_list, shooter={get_name_safe(shooter)}")
                     
                     self.game_state["offensive_state"] = next_play_type
+                    # ✅ FIX: Always set next_play_type for MISS with DREB (HCO or FAST_BREAK)
                     result["next_play_type"] = next_play_type
 
         # ⏱️ Add tempo-based time to turn
