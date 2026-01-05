@@ -394,6 +394,10 @@ class PlaybooksUI {
         this.savedPlaybookPercentages = data.playbook_percentages || {};
         console.log('🔍 [PLAYBOOKS] Loaded saved percentages from API:', this.savedPlaybookPercentages);
         
+        // Store even_distribution_all flag from API
+        this.evenDistributionAllFlag = data.even_distribution_all || false;
+        console.log('🔍 [PLAYBOOKS] Loaded even_distribution_all flag from API:', this.evenDistributionAllFlag);
+        
         // Convert API response to play data format
         this.playData = {
           motion: (data.motion || []).map((play, index) => ({
@@ -457,6 +461,25 @@ class PlaybooksUI {
     // Load from API (slot assignments, motion dropdowns, and percentages)
     await this.loadSlotAssignmentsFromAPI();
     await this.loadPlaybookPercentagesFromAPI();
+    
+    // ✅ NEW: Check even_distribution_all flag and apply even distribution if enabled
+    if (this.evenDistributionAllFlag === true) {
+      console.log('🔍 [PLAYBOOKS] even_distribution_all is true, applying even distribution to all offense sections');
+      const offenseSections = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'];
+      offenseSections.forEach(sectionKey => {
+        // Enable Even Distribution for this section
+        this.evenDistributionEnabled[sectionKey] = true;
+        // Distribute percentages evenly
+        this.distributePercentagesEvenly(sectionKey);
+        // Update button visual state
+        this.updateEvenDistributionButton(sectionKey);
+      });
+      // Update "Even Distribution - All" button state
+      this.updateEvenDistributionAllButton();
+    } else {
+      // If flag is false, use saved percentages (already loaded via loadPlaybookPercentagesFromAPI)
+      console.log('🔍 [PLAYBOOKS] even_distribution_all is false, using saved percentages');
+    }
     
     // Update button visual states after loading
     Object.keys(this.evenDistributionEnabled).forEach(sectionKey => {
@@ -1021,6 +1044,8 @@ class PlaybooksUI {
       this.updateEvenDistributionButton(sectionKey);
       // Update "Even Distribution - All" button state since one section was disabled
       this.updateEvenDistributionAllButton();
+      // Set flag to false (user's last action was manual edit)
+      this.evenDistributionAllFlag = false;
     }
     
     this.updateSectionTotal(sectionKey);
@@ -1269,24 +1294,42 @@ class PlaybooksUI {
     // Apply Even Distribution to all offense sections
     const offenseSections = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'];
     
-    console.log('🔍 [EVEN DISTRIBUTION ALL] Applying to all offense sections');
+    // Check if all sections already have Even Distribution enabled
+    const allEnabled = offenseSections.every(sectionKey => this.evenDistributionEnabled[sectionKey]);
     
-    offenseSections.forEach(sectionKey => {
-      // Enable Even Distribution for this section
-      this.evenDistributionEnabled[sectionKey] = true;
+    if (allEnabled) {
+      // Disabling - turn off all offense sections
+      console.log('🔍 [EVEN DISTRIBUTION ALL] Disabling for all offense sections');
+      offenseSections.forEach(sectionKey => {
+        this.evenDistributionEnabled[sectionKey] = false;
+        this.updateEvenDistributionButton(sectionKey);
+      });
+      // Set flag to false
+      this.evenDistributionAllFlag = false;
+    } else {
+      // Enabling - apply Even Distribution to all offense sections
+      console.log('🔍 [EVEN DISTRIBUTION ALL] Applying to all offense sections');
       
-      // Distribute percentages evenly
-      this.distributePercentagesEvenly(sectionKey);
+      offenseSections.forEach(sectionKey => {
+        // Enable Even Distribution for this section
+        this.evenDistributionEnabled[sectionKey] = true;
+        
+        // Distribute percentages evenly
+        this.distributePercentagesEvenly(sectionKey);
+        
+        // Update button visual state
+        this.updateEvenDistributionButton(sectionKey);
+      });
       
-      // Update button visual state
-      this.updateEvenDistributionButton(sectionKey);
-    });
+      // Set flag to true
+      this.evenDistributionAllFlag = true;
+    }
     
     // Update the "Even Distribution - All" button visual state
     this.updateEvenDistributionAllButton();
     
     this.markUnsavedChanges();
-    console.log('✅ [EVEN DISTRIBUTION ALL] Complete for all offense sections');
+    console.log('✅ [EVEN DISTRIBUTION ALL] Complete for all offense sections, flag:', this.evenDistributionAllFlag);
   }
   
   updateEvenDistributionAllButton() {
@@ -2021,8 +2064,12 @@ class PlaybooksUI {
         }
       });
       
+      // ✅ NEW: Include even_distribution_all flag (stores user's last action)
+      playbookSettings.even_distribution_all = this.evenDistributionAllFlag || false;
+      
       console.log('🔍 [PLAYBOOKS] Saving slot assignments:', this.state.slotAssignments);
       console.log('🔍 [PLAYBOOKS] Saving motion dropdowns:', this.state.motionDropdowns);
+      console.log('🔍 [PLAYBOOKS] Saving even_distribution_all flag:', playbookSettings.even_distribution_all);
       
       // Build request body
       const requestBody = {
