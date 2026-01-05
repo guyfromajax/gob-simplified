@@ -7,8 +7,8 @@
 3. **Energy Minimum**: 0.1 (prevents zero energy during gameplay)
 4. **Energy Maximum**: 1.0 (100% energy)
 5. **Recharge Types**:
-   - **Quarter Break (Non-Halftime)**: Random from `[0.7, 0.8, 0.9, 1.0, 1.1, 1.2]`
-   - **Halftime Break**: Random from `[1.5, 1.6, 1.7, 1.8, 1.9, 2.0]`
+   - **Quarter Break (Non-Halftime)**: Random from `[0.07, 0.08, 0.09, 0.1, 0.11, 0.12]`
+   - **Halftime Break**: Random from `[0.15, 0.16, 0.17, 0.18, 0.19, 0.2]`
    - **Timeout Break**: Random from `[0.03, 0.04, 0.05, 0.06]`
    - **Bench Recharge**: 20% chance 0, 70% chance +0.01, 10% chance +0.02 (per HCO turn only)
 6. **Depletion System**: ND (Natural Durability) attribute-based via `get_fatigue_decay_amount()`
@@ -50,7 +50,7 @@ The Energy System manages player energy (NG attribute) depletion during active g
 
 **Who:** All players (active lineup + bench players) on both teams
 
-**Amount:** Random per player from `[0.7, 0.8, 0.9, 1.0, 1.1, 1.2]`
+**Amount:** Random per player from `[0.07, 0.08, 0.09, 0.1, 0.11, 0.12]`
 
 **Code Location:** `BackEnd/api/api.py` - `simulate_turn_endpoint()` (lines 2198-2214)
 
@@ -69,7 +69,7 @@ The Energy System manages player energy (NG attribute) depletion during active g
 
 **Who:** All players (active lineup + bench players) on both teams
 
-**Amount:** Random per player from `[1.5, 1.6, 1.7, 1.8, 1.9, 2.0]`
+**Amount:** Random per player from `[0.15, 0.16, 0.17, 0.18, 0.19, 0.2]`
 
 **Code Location:** `BackEnd/api/api.py` - `simulate_turn_endpoint()` (lines 2207-2209)
 
@@ -197,8 +197,8 @@ This ensures that as energy depletes, all player attributes (SC, SH, ID, OD, PS,
 
 | Situation | Who | Amount | Frequency |
 |-----------|-----|--------|-----------|
-| Quarter Break (non-halftime) | All players | Random: [0.7, 0.8, 0.9, 1.0, 1.1, 1.2] | Per quarter break (Q1→Q2, Q3→Q4, before OT) |
-| Halftime Break | All players | Random: [1.5, 1.6, 1.7, 1.8, 1.9, 2.0] | Once per game (Q2→Q3) |
+| Quarter Break (non-halftime) | All players | Random: [0.07, 0.08, 0.09, 0.1, 0.11, 0.12] | Per quarter break (Q1→Q2, Q3→Q4, before OT) |
+| Halftime Break | All players | Random: [0.15, 0.16, 0.17, 0.18, 0.19, 0.2] | Once per game (Q2→Q3) |
 | Timeout | All players | Random: [0.03, 0.04, 0.05, 0.06] | Per timeout (user/computer/foul out) |
 | Bench Recharge | Bench players only | 20%: 0, 70%: +0.01, 10%: +0.02 | Per HCO turn only |
 | Energy Depletion | Active lineup only | ND-based (0 to 0.03) | Per HCO/Fast Break/FCP/HCT turn |

@@ -227,35 +227,11 @@ class GameManager:
         import random
         timeout_recharge_amounts = [0.03, 0.04, 0.05, 0.06]
         
-        # 🔍 DEBUG: Log NG values BEFORE timeout recharge for user team
-        user_team = self.home_team if self.home_team.is_user_team else self.away_team
-        logging.warning(f"🔍 [TIMEOUT BEFORE RECHARGE] User team ({user_team.name}) NG values:")
-        logging.warning(f"   - Home team is_user_team: {self.home_team.is_user_team}, Away team is_user_team: {self.away_team.is_user_team}")
-        for player in user_team.get_all_players():
-            ng = player.attributes.get("NG", 1.0)
-            in_lineup = player.player_id in [p.player_id for p in user_team.lineup.values() if p]
-            lineup_status = "LINEUP" if in_lineup else "BENCH"
-            logging.info(f"   {lineup_status}: {player.name} (ID: {player.player_id[:8]}): NG = {ng}")
-        
         for team in [self.home_team, self.away_team]:
             for player in team.get_all_players():
                 recharge_amount = random.choice(timeout_recharge_amounts)
                 if hasattr(player, "recharge_energy"):
-                    old_ng = player.attributes.get("NG", 1.0)
                     player.recharge_energy(recharge_amount)
-                    new_ng = player.attributes.get("NG", 1.0)
-                    if team.is_user_team:
-                        in_lineup = player.player_id in [p.player_id for p in team.lineup.values() if p]
-                        lineup_status = "LINEUP" if in_lineup else "BENCH"
-                        logging.warning(f"   {lineup_status}: {player.name}: NG {old_ng:.3f} + {recharge_amount:.3f} → {new_ng:.3f}")
-        
-        # 🔍 DEBUG: Log NG values AFTER timeout recharge for user team
-        logging.warning(f"🔍 [TIMEOUT AFTER RECHARGE] User team ({user_team.name}) NG values:")
-        for player in user_team.get_all_players():
-            ng = player.attributes.get("NG", 1.0)
-            in_lineup = player.player_id in [p.player_id for p in user_team.lineup.values() if p]
-            lineup_status = "LINEUP" if in_lineup else "BENCH"
-            logging.info(f"   {lineup_status}: {player.name} (ID: {player.player_id[:8]}): NG = {ng}")
         
         # Append timeout turn to turns list
         self.turns.append(timeout_turn)
