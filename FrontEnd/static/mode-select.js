@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   const fallbackColor = '#ccc';
-  fetch('/teams')
+  fetch(API_CONFIG.buildUrl('/teams'))
     .then(resp => resp.json())
     .then(teamData => {
       const colorMap = {};

@@ -4,6 +4,7 @@
     <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico" />
   <meta charset="UTF-8" />
   <title>GOB Court</title>
+  <script src="/static/js/config/api-config.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="command-center-team-styles.css" />
   <style>
@@ -2584,6 +2585,13 @@
     // Lineups are locked at timeout navigation points, so we can safely assign images here
     // Uses the same logic as backend: extracts intended shooter from successful skeleton's final step
     async function populatePlayHeadshots() {
+      // Ensure API_CONFIG is loaded
+      if (typeof API_CONFIG === 'undefined') {
+        console.warn('⚠️ [PLAYCALL HEADSHOTS] API_CONFIG not loaded yet, retrying in 100ms...');
+        setTimeout(populatePlayHeadshots, 100);
+        return;
+      }
+      
       const playOptions = document.querySelectorAll('.play-option');
       const urlParams = new URLSearchParams(window.location.search);
       
@@ -3770,7 +3778,6 @@
     // Initialize team box score tabs
     initializeTeamBoxscoreTabs();
   </script>
-  <script src="/static/js/config/api-config.js"></script>
   <script src="/static/js/shared/timeoutNavigationHelper.js"></script>
   <script type="module" src="/static/js/phaser/bootGame.js"></script>
   <script>
