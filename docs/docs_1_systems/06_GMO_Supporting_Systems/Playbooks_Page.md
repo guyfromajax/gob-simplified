@@ -291,6 +291,7 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
   "slot_assignments": {...},
   "motion_dropdowns": {...},
   "position_filters": {...},
+  "even_distribution_all": false,
   "playbook_percentages": {
     "motion": {...},
     "set_play_inside": {...},
@@ -332,7 +333,8 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
     "man_defense": {...},
     "slot_assignments": {...},
     "motion_dropdowns": {...},
-    "position_filters": {...}
+    "position_filters": {...},
+    "even_distribution_all": false
   }
 }
 ```
@@ -341,6 +343,18 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 - Backend resolves team_id (name to ID) and ensures team objects exist
 - Saves to `teams.{team_id}.playbook_settings` in appropriate mode document
 - **Single Game Cross-Instance Persistence:** If game document has no settings, checks core `teams` collection for fallback settings
+
+**Even Distribution Toggle Persistence (February 2025):**
+- **Macro Toggle:** `even_distribution_all` boolean flag stored in `playbook_settings`
+- **Default Value:** `false` (initialized in `initialize_playbook_settings()`)
+- **Load Behavior:**
+  - If `even_distribution_all === true`: Frontend automatically applies even distribution to all offense sections (motion, set_play_inside, set_play_attack, set_play_outside) on page load, ignoring saved percentages for those sections
+  - If `even_distribution_all === false`: Frontend uses saved percentages from `playbook_percentages`
+- **Save Behavior:**
+  - When user clicks "Even Distribution - All" button: Flag is set to `true` and saved to database
+  - When user manually edits any percentage: Flag is set to `false` and saved to database (user's last action)
+  - Flag always reflects the user's last action (macro toggle or manual edit)
+- **Edge Case:** If user re-enables "Even Distribution - All" after fine-tuning, flag is set to `true` again (stores user's last action)
 
 ### Team ID Resolution (SS&S - ObjectId Standardization)
 

@@ -245,7 +245,8 @@ def initialize_playbook_settings():
                 "SF": [],        # Small Forward plays (play_id ObjectId strings)
                 "PF": [],        # Power Forward plays (play_id ObjectId strings)
                 "C": []          # Center plays (play_id ObjectId strings)
-            }
+            },
+            "even_distribution_all": False  # Macro toggle for Even Distribution - All
         }
         
         # Group plays by type and focus
@@ -446,7 +447,8 @@ def initialize_playbook_settings():
                 "SF": [],
                 "PF": [],
                 "C": []
-            }
+            },
+            "even_distribution_all": False
         }
 
 
@@ -1450,6 +1452,9 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         zone_defense_percentages = playbook_settings.get("zone_defense", {})
         man_defense_percentages = playbook_settings.get("man_defense", {})
         
+        # Get even_distribution_all flag (defaults to False if not set)
+        even_distribution_all = playbook_settings.get("even_distribution_all", False)
+        
         return {
             "motion": motion_plays,
             "set_play_inside": set_plays_inside,
@@ -1458,6 +1463,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             "slot_assignments": slot_assignments,
             "motion_dropdowns": motion_dropdowns,
             "position_filters": position_filters,
+            "even_distribution_all": even_distribution_all,
             "playbook_percentages": {
                 "motion": motion_percentages,
                 "set_play_inside": set_play_inside_percentages,
