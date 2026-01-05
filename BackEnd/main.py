@@ -262,8 +262,11 @@ def simulate_quarter(
     if not computer_team.is_user_team and not (away_lineup_ids if computer_team == gm.away_team else home_lineup_ids):
         # Only rebuild if no explicit lineup was provided and this is the computer team
         try:
+            from BackEnd.utils.db_utils import autoset_strategy_settings
             computer_team.lineup = build_lineup_from_mongo(computer_team, gm.game_state)
-            logging.info(f"✅ QUARTER BREAK: Rebuilt computer team ({computer_team.name}) lineup for Q{gm.quarter} with energy/foul filtering")
+            # Autoset strategy settings for computer team
+            autoset_strategy_settings(computer_team)
+            logging.info(f"✅ QUARTER BREAK: Rebuilt computer team ({computer_team.name}) lineup for Q{gm.quarter} with energy/foul filtering and autoset strategy settings")
         except Exception as e:
             logging.error(f"⚠️ QUARTER BREAK: Failed to rebuild computer team lineup: {e}")
             # Don't fail quarter start if lineup rebuild fails - use existing lineup

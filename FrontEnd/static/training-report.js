@@ -13,8 +13,9 @@ let currentView = 'attributes'; // 'attributes' or 'changes'
 
 // Attribute abbreviations mapping
 // NOTE: Order is critical - this is the exact order attributes should be displayed horizontally
+// MO (Momentum) is excluded from Training Report display
 const ATTRIBUTE_ORDER = [
-  'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG', 'EM', 'MO'
+  'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG', 'EM'
 ];
 
 const ATTRIBUTE_NAMES = {

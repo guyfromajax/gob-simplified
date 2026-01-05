@@ -204,20 +204,37 @@ class GameManager:
         logging.info(f"✅ TIMEOUT: Stored next_play_type '{self.game_state['timeout_next_play_type']}' and offense_team_id '{self.offense_team.team_id}' for resume")
         
         # Rebuild lineups
-        from BackEnd.utils.db_utils import build_lineup_from_mongo
+        from BackEnd.utils.db_utils import build_lineup_from_mongo, autoset_strategy_settings
         try:
             if rebuild_both_lineups:
                 # Computer timeout during simmed quarters: rebuild both teams
                 calling_team.lineup = build_lineup_from_mongo(calling_team, self.game_state)
                 other_team = self.away_team if calling_team == self.home_team else self.home_team
                 other_team.lineup = build_lineup_from_mongo(other_team, self.game_state)
+                # Autoset strategy settings for both computer teams
+                if not calling_team.is_user_team:
+                    autoset_strategy_settings(calling_team)
+                    logging.info(f"✅ TIMEOUT: Autoset strategy settings for {calling_team.name}")
+                if not other_team.is_user_team:
+                    autoset_strategy_settings(other_team)
+                    logging.info(f"✅ TIMEOUT: Autoset strategy settings for {other_team.name}")
                 logging.info(f"✅ TIMEOUT: Rebuilt both team lineups ({calling_team.name} and {other_team.name})")
             elif timeout_reason == "USER":
                 # User timeout: rebuild computer team only
                 computer_team = self.away_team if not self.away_team.is_user_team else self.home_team
                 if not computer_team.is_user_team:
                     computer_team.lineup = build_lineup_from_mongo(computer_team, self.game_state)
-                    logging.info(f"✅ TIMEOUT: Rebuilt computer team ({computer_team.name}) lineup")
+                    # Autoset strategy settings for computer team
+                    autoset_strategy_settings(computer_team)
+                    logging.info(f"✅ TIMEOUT: Rebuilt computer team ({computer_team.name}) lineup and autoset strategy settings")
+            elif timeout_reason == "FOUL_OUT":
+                # Foul out timeout: rebuild computer team lineup and autoset strategy
+                computer_team = self.away_team if not self.away_team.is_user_team else self.home_team
+                if not computer_team.is_user_team:
+                    computer_team.lineup = build_lineup_from_mongo(computer_team, self.game_state)
+                    # Autoset strategy settings for computer team
+                    autoset_strategy_settings(computer_team)
+                    logging.info(f"✅ TIMEOUT (FOUL_OUT): Rebuilt computer team ({computer_team.name}) lineup and autoset strategy settings")
         except Exception as e:
             logging.error(f"⚠️ TIMEOUT: Failed to rebuild lineups: {e}")
             # Don't fail the timeout if lineup rebuild fails

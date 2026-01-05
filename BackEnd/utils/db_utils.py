@@ -172,3 +172,29 @@ def assign_lineup_from_ids(team: TeamManager, lineup_ids: Dict[str, str]) -> Dic
 
     return team.lineup
 
+
+def autoset_strategy_settings(team: TeamManager):
+    """
+    Automatically set strategy settings for a computer team using the same
+    weighted randomization logic as initial strategy settings.
+    
+    This function regenerates strategy settings using _init_strategy_settings()
+    to allow computer teams to adjust their strategy during timeouts, quarter
+    breaks, and foul out instances.
+    
+    Args:
+        team: TeamManager instance (must be a computer team, not user team)
+    
+    Returns:
+        dict: New strategy settings
+    """
+    if team.is_user_team:
+        # Don't autoset strategy for user teams
+        return team.strategy_settings
+    
+    # Regenerate strategy settings using the same logic as initialization
+    new_strategy_settings = team._init_strategy_settings()
+    team.strategy_settings = new_strategy_settings
+    
+    return new_strategy_settings
+
