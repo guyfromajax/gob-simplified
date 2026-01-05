@@ -151,10 +151,10 @@ The training execution system applies pre-training conditions, allocates trainin
 
 1. **Pre-Training Conditions** (`apply_pre_training_conditions`)
    - Applies random decreases to player attributes (excluding EM, MO, NG)
-   - Player attributes: `+= random.randint(-2, 0)` per attribute
+   - Player attributes: `+= random.randint(-3, 0)` per attribute
    - Team attributes: Random decreases based on attribute type
-   - Rebound modifier: `+= -0.1 or 0` (pre-training)
-   - Shot threshold: `+= random.randint(0, 15)`
+   - Rebound modifier: `+= random.uniform(-0.1, 0)` (pre-training, range from -0.1 to 0)
+   - Shot threshold: `+= random.randint(5, 20)`
    - Other team attributes: `+= random.choice([-2, -1, 0])`
 
 2. **Training Point Application** (`apply_training_points`)
@@ -207,10 +207,10 @@ The training execution system applies pre-training conditions, allocates trainin
 
 **Player Attributes:**
 - 1 point: `+= random.randint(1, 3)`
-- 2 points: `+= random.randint(2, 5)`
-- 3 points: `+= random.randint(3, 7)`
-- 4 points: `+= random.randint(3, 8)`
-- 5 points: `+= random.randint(3, 9)`
+- 2 points: `+= random.randint(2, 4)`
+- 3 points: `+= random.randint(3, 6)`
+- 4 points: `+= random.randint(4, 7)`
+- 5 points: `+= random.randint(4, 9)`
 
 **Team Attributes (standard):**
 - 1 point: `+= random.randint(1, 2)`
@@ -234,18 +234,18 @@ The training execution system applies pre-training conditions, allocates trainin
 - 5 points: `+= random.randint(3, 10) / 100.0` (0.03 to 0.10)
 
 **Shot Threshold:**
-- 1 point: `-= random.randint(10, 25)`
-- 2 points: `-= random.randint(15, 35)`
-- 3 points: `-= random.randint(20, 45)`
-- 4 points: `-= random.randint(20, 55)`
-- 5 points: `-= random.randint(20, 65)`
+- 1 point: `-= random.randint(5, 15)`
+- 2 points: `-= random.randint(10, 20)`
+- 3 points: `-= random.randint(10, 30)`
+- 4 points: `-= random.randint(10, 35)`
+- 5 points: `-= random.randint(10, 40)`
 
 #### Coaching Focus Amplifiers
 
 **Authoritarian:**
 - Discipline: Amplifies BH, `fight`, `discipline` (multiplier: `random.choice([1.3, 1.4, 1.5, 1.6])`)
 - Rebounding: Amplifies RB, `rebound_modifier` (multiplier: `random.choice([1.5, 1.6, 1.7, 1.8])`)
-- Teamwork: Amplifies PS, Motion Play Effectiveness, Zone Defense Effectiveness
+- Teamwork: Amplifies PS, IQ, Motion Play Effectiveness, Zone Defense Effectiveness
 - Execution: Amplifies Set Play Effectiveness, Man Defense Effectiveness
 
 **Systems Coach:**
