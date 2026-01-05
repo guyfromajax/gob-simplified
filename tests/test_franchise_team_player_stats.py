@@ -2,7 +2,8 @@ from fastapi.testclient import TestClient
 
 from BackEnd.api.api import app
 from BackEnd.api.franchise_routes import get_team_player_stats
-from BackEnd.db import db, franchise_state_collection
+from BackEnd.db import db
+# Note: franchise_state_collection removed - using franchise document instead
 
 
 client = TestClient(app)
@@ -11,12 +12,14 @@ client = TestClient(app)
 def setup_function(_fn):
     db.franchises.delete_many({})
     db.teams.delete_many({})
-    franchise_state_collection.delete_many({})
+    # Note: franchise_state_collection cleanup removed - no longer used
 
 
 def seed_franchise():
     fid = db.franchises.insert_one(
         {
+            "user_team_id": "Team1",  # Use new approach instead of franchise_state
+            "user_team_object_id": "t1",
             "players": {
                 "p1": {
                     "meta": {"team_id": "t1", "first_name": "A", "last_name": "One"},
@@ -54,7 +57,7 @@ def test_get_team_player_stats_and_endpoints():
     assert len(data["players"]) == 1
     assert data["players"][0]["player_id"] == "p2"
 
-    franchise_state_collection.insert_one({"_id": "state", "team": "Team1"})
+    # Test with franchise_id (new approach - franchise document has user_team_id)
     resp = client.get(f"/franchise/team-player-stats?franchise_id={fid}")
     assert resp.status_code == 200
     data2 = resp.json()
