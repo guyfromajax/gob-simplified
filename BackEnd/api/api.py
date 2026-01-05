@@ -1203,7 +1203,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             # 🔍 DEBUG: Log NG values in saved database document BEFORE restoration
                             user_team = gm.home_team if gm.home_team.is_user_team else gm.away_team
                             user_team_key = "home" if user_team == gm.home_team else "away"
-                            logging.info(f"🔍 [DB LOAD BEFORE RESTORE] Q{request.quarter}, User team ({user_team.name}) NG values in saved document:")
+                            logging.warning(f"🔍 [DB LOAD BEFORE RESTORE] Q{request.quarter}, User team ({user_team.name}) NG values in saved document:")
+                            logging.warning(f"   - Home team is_user_team: {gm.home_team.is_user_team}, Away team is_user_team: {gm.away_team.is_user_team}")
                             user_team_saved_players = [p for p in saved_players_list if p.get("team") == user_team_key]
                             for saved_player in user_team_saved_players:
                                 player_id = saved_player.get("playerId", "UNKNOWN")
@@ -1214,12 +1215,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                 logging.info(f"   {lineup_status}: {player_name} (ID: {player_id[:8]}): NG = {ng}")
                             
                             # 🔍 DEBUG: Log NG values in memory BEFORE restoration (should be 1.0 from Player.__init__)
-                            logging.info(f"🔍 [DB LOAD BEFORE RESTORE] Q{request.quarter}, User team ({user_team.name}) NG values in memory (before restore):")
+                            logging.warning(f"🔍 [DB LOAD BEFORE RESTORE] Q{request.quarter}, User team ({user_team.name}) NG values in memory (before restore):")
                             for player in user_team.get_all_players():
                                 ng = player.attributes.get("NG", 1.0)
                                 in_lineup = player.player_id in [p.player_id for p in user_team.lineup.values() if p]
                                 lineup_status = "LINEUP" if in_lineup else "BENCH"
-                                logging.info(f"   {lineup_status}: {player.name} (ID: {player.player_id[:8]}): NG = {ng}")
+                                logging.warning(f"   {lineup_status}: {player.name} (ID: {player.player_id[:8]}): NG = {ng}")
                         else:
                             saved_players_list = []
                             logging.info(f"🆕 New Q1 game (requested Q1 but saved game is Q{saved_quarter}) - skipping stat restoration")
@@ -1259,12 +1260,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # 🔍 DEBUG: Log NG values in memory AFTER restoration
                         if should_restore_stats:
                             user_team = gm.home_team if gm.home_team.is_user_team else gm.away_team
-                            logging.info(f"🔍 [DB LOAD AFTER RESTORE] Q{request.quarter}, User team ({user_team.name}) NG values in memory (after restore):")
+                            logging.warning(f"🔍 [DB LOAD AFTER RESTORE] Q{request.quarter}, User team ({user_team.name}) NG values in memory (after restore):")
                             for player in user_team.get_all_players():
                                 ng = player.attributes.get("NG", 1.0)
                                 in_lineup = player.player_id in [p.player_id for p in user_team.lineup.values() if p]
                                 lineup_status = "LINEUP" if in_lineup else "BENCH"
-                                logging.info(f"   {lineup_status}: {player.name} (ID: {player.player_id[:8]}): NG = {ng}")
+                                logging.warning(f"   {lineup_status}: {player.name} (ID: {player.player_id[:8]}): NG = {ng}")
                             
                             # Restore game stats
                             if "stats" in saved_player_data:
@@ -2236,16 +2237,18 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
         # ✅ QUARTER BREAK RECHARGE: Recharge all players when quarter completes
         # This happens BEFORE game state is saved, so updated NG values are visible on lineup screen
         # Matches timeout recharge pattern (recharge happens before lineup screen)
+        logging.warning(f"🔍 [QUARTER BREAK CHECK] quarter_complete={quarter_complete}, gm.quarter={gm.quarter}")
         if quarter_complete:
             # 🔍 DEBUG: Log NG values BEFORE quarter break recharge for user team
             user_team = gm.home_team if gm.home_team.is_user_team else gm.away_team
             current_quarter = gm.quarter  # Quarter that just completed (before increment)
-            logging.info(f"🔍 [QUARTER BREAK BEFORE RECHARGE] Q{current_quarter}→Q{current_quarter + 1}, User team ({user_team.name}) NG values:")
+            logging.warning(f"🔍 [QUARTER BREAK BEFORE RECHARGE] Q{current_quarter}→Q{current_quarter + 1}, User team ({user_team.name}) NG values:")
+            logging.warning(f"   - Home team is_user_team: {gm.home_team.is_user_team}, Away team is_user_team: {gm.away_team.is_user_team}")
             for player in user_team.get_all_players():
                 ng = player.attributes.get("NG", 1.0)
                 in_lineup = player.player_id in [p.player_id for p in user_team.lineup.values() if p]
                 lineup_status = "LINEUP" if in_lineup else "BENCH"
-                logging.info(f"   {lineup_status}: {player.name} (ID: {player.player_id[:8]}): NG = {ng}")
+                logging.warning(f"   {lineup_status}: {player.name} (ID: {player.player_id[:8]}): NG = {ng}")
             
             from BackEnd.utils.energy_system import recharge_all_players
             # Determine recharge amounts based on which quarter just completed
@@ -2267,16 +2270,16 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             recharge_all_players(gm, recharge_amounts)
             
             # 🔍 DEBUG: Log NG values AFTER quarter break recharge for user team
-            logging.info(f"🔍 [QUARTER BREAK AFTER RECHARGE] Q{current_quarter}→Q{current_quarter + 1}, User team ({user_team.name}) NG values:")
+            logging.warning(f"🔍 [QUARTER BREAK AFTER RECHARGE] Q{current_quarter}→Q{current_quarter + 1}, User team ({user_team.name}) NG values:")
             for player in user_team.get_all_players():
                 new_ng = player.attributes.get("NG", 1.0)
                 old_ng = recharge_tracking.get(player.player_id, {}).get("old_ng", 1.0)
                 recharge_delta = new_ng - old_ng
                 in_lineup = player.player_id in [p.player_id for p in user_team.lineup.values() if p]
                 lineup_status = "LINEUP" if in_lineup else "BENCH"
-                logging.info(f"   {lineup_status}: {player.name} (ID: {player.player_id[:8]}): NG {old_ng:.3f} + {recharge_delta:.3f} → {new_ng:.3f}")
+                logging.warning(f"   {lineup_status}: {player.name} (ID: {player.player_id[:8]}): NG {old_ng:.3f} + {recharge_delta:.3f} → {new_ng:.3f}")
             
-            logging.info(f"✅ QUARTER BREAK: Recharged all players (both teams, lineup + bench) for Q{current_quarter}→Q{current_quarter + 1} break")
+            logging.warning(f"✅ QUARTER BREAK: Recharged all players (both teams, lineup + bench) for Q{current_quarter}→Q{current_quarter + 1} break")
         
         # If quarter is complete, increment quarter number
         if quarter_complete:
@@ -2300,12 +2303,12 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
                 # 🔍 DEBUG: Log NG values in memory BEFORE saving to database
                 if quarter_complete:
                     user_team = gm.home_team if gm.home_team.is_user_team else gm.away_team
-                    logging.info(f"🔍 [BEFORE DB SAVE] Q{gm.quarter}, User team ({user_team.name}) NG values in memory:")
+                    logging.warning(f"🔍 [BEFORE DB SAVE] Q{gm.quarter}, User team ({user_team.name}) NG values in memory:")
                     for player in user_team.get_all_players():
                         ng = player.attributes.get("NG", 1.0)
                         in_lineup = player.player_id in [p.player_id for p in user_team.lineup.values() if p]
                         lineup_status = "LINEUP" if in_lineup else "BENCH"
-                        logging.info(f"   {lineup_status}: {player.name} (ID: {player.player_id[:8]}): NG = {ng}")
+                        logging.warning(f"   {lineup_status}: {player.name} (ID: {player.player_id[:8]}): NG = {ng}")
                 
                 db_summary = summarize_game_state(gm, exclude_animations=True)
                 
@@ -2313,7 +2316,7 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
                 if quarter_complete:
                     user_team = gm.home_team if gm.home_team.is_user_team else gm.away_team
                     user_team_key = "home" if user_team == gm.home_team else "away"
-                    logging.info(f"🔍 [DB SAVE SUMMARY] Q{gm.quarter}, User team ({user_team.name}) NG values in summary (will be saved):")
+                    logging.warning(f"🔍 [DB SAVE SUMMARY] Q{gm.quarter}, User team ({user_team.name}) NG values in summary (will be saved):")
                     saved_players = db_summary.get("players", [])
                     user_team_players = [p for p in saved_players if p.get("team") == user_team_key]
                     for saved_player in user_team_players:
@@ -2510,7 +2513,8 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
     try:
         # 🔍 DEBUG: Log NG values in memory BEFORE saving to database
         user_team = gm.home_team if gm.home_team.is_user_team else gm.away_team
-        logging.info(f"🔍 [TIMEOUT BEFORE DB SAVE] User team ({user_team.name}) NG values in memory:")
+        logging.warning(f"🔍 [TIMEOUT BEFORE DB SAVE] User team ({user_team.name}) NG values in memory:")
+        logging.warning(f"   - Home team is_user_team: {gm.home_team.is_user_team}, Away team is_user_team: {gm.away_team.is_user_team}")
         for player in user_team.get_all_players():
             ng = player.attributes.get("NG", 1.0)
             in_lineup = player.player_id in [p.player_id for p in user_team.lineup.values() if p]
@@ -2521,7 +2525,7 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
         
         # 🔍 DEBUG: Log NG values in the summary that will be saved to database
         user_team_key = "home" if user_team == gm.home_team else "away"
-        logging.info(f"🔍 [TIMEOUT DB SAVE SUMMARY] User team ({user_team.name}) NG values in summary (will be saved):")
+        logging.warning(f"🔍 [TIMEOUT DB SAVE SUMMARY] User team ({user_team.name}) NG values in summary (will be saved):")
         saved_players = db_summary.get("players", [])
         user_team_players = [p for p in saved_players if p.get("team") == user_team_key]
         for saved_player in user_team_players:
