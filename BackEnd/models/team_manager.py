@@ -140,11 +140,11 @@ class TeamManager:
         - 5% chance for 4
         
         Weighted Distribution (for hc_trap, fc_press):
-        - 10% chance for 0
+        - 34% chance for 0
         - 40% chance for 1
-        - 35% chance for 2
-        - 10% chance for 3
-        - 5% chance for 4
+        - 20% chance for 2
+        - 5% chance for 3
+        - 1% chance for 4
         
         Uniform Distribution (for inside, attack, outside):
         - Random 1-4 (never zero, ensures at least some focus on each area)
@@ -161,7 +161,7 @@ class TeamManager:
         # Special weighted distribution for hc_trap and fc_press
         trap_press_choice = random.choices(
             [0, 1, 2, 3, 4],
-            weights=[10, 40, 35, 10, 5],
+            weights=[34, 40, 20, 5, 1],
             k=1
         )[0]
         

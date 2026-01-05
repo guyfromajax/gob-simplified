@@ -121,29 +121,48 @@ class Player:
             s = self.stats["game"]
             s["REB"] = s["OREB"] + s["DREB"]
 
-    def get_fatigue_decay_amount(self):
+    def get_fatigue_decay_amount(self, omit_zeros=False):
+        """
+        Calculate fatigue decay amount based on ND (Natural Durability) attribute.
+        
+        Args:
+            omit_zeros: If True, removes all zero values from the depletion list before selection.
+                        Used for defensive players on HCT/FCP turns to ensure they always lose some energy.
+        
+        Returns:
+            Random depletion amount based on ND thresholds.
+        """
         nd = self.attributes.get("ND", 50)  # Default to 50 if not set
 
         if nd >= 89:
-            return random.choice([0, 0.01])
+            decay_list = [0, 0.01]
         elif nd >= 79:
-            return random.choice([0, 0.01, 0.01])
+            decay_list = [0, 0.01, 0.01]
         elif nd >= 69:
-            return random.choice([0,0, 0.01, 0.01, 0.01])
+            decay_list = [0, 0, 0.01, 0.01, 0.01]
         elif nd >= 59:
-            return random.choice([0,0, 0.01, 0.01, 0.02])
+            decay_list = [0, 0, 0.01, 0.01, 0.02]
         elif nd >= 49:
-            return random.choice([0, 0.01, 0.01, 0.01, 0.02])
+            decay_list = [0, 0.01, 0.01, 0.01, 0.02]
         elif nd >= 39:
-            return random.choice([0, 0.01, 0.01, 0.02, 0.02])
+            decay_list = [0, 0.01, 0.01, 0.02, 0.02]
         elif nd >= 29:
-            return random.choice([0, 0.01, 0.01, 0.02, 0.03])
+            decay_list = [0, 0.01, 0.01, 0.02, 0.03]
         elif nd >= 19:
-            return random.choice([0, 0.01, 0.02, 0.02, 0.03])
+            decay_list = [0, 0.01, 0.02, 0.02, 0.03]
         elif nd >= 9:
-            return random.choice([0, 0.01, 0.02, 0.02, 0.02, 0.03])
+            decay_list = [0, 0.01, 0.02, 0.02, 0.02, 0.03]
         else:
-            return random.choice([0, 0.01, 0.02, 0.02, 0.03, 0.03])
+            decay_list = [0, 0.01, 0.02, 0.02, 0.03, 0.03]
+        
+        # ✅ FCP/HCT DEFENSIVE PLAYERS: Omit zeros for defensive players on pressure defense turns
+        if omit_zeros:
+            decay_list = [x for x in decay_list if x > 0]
+            # If list becomes empty (shouldn't happen, but safety check), use minimum depletion
+            if not decay_list:
+                decay_list = [0.01]
+        
+        return random.choice(decay_list)
     
     def decay_energy(self, amount):
         self.attributes["NG"] = max(0.1, round(self.attributes["NG"] - amount, 3))
