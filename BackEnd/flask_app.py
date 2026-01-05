@@ -11,10 +11,16 @@ app = Flask(__name__, static_folder=str(STATIC_DIR))
 
 @app.route('/franchise/start')
 def franchise_start():
-    state = franchise_state_collection.find_one({"_id": "state"}) or {}
-    if not state.get("team"):
+    # Note: franchise_state_collection is deprecated - using franchise document instead
+    # This is legacy Flask app - consider migrating to FastAPI routes
+    try:
+        state = franchise_state_collection.find_one({"_id": "state"}) or {}
+        if not state.get("team"):
+            return redirect('/franchise/select-team')
+        return redirect('/franchise/command-center')
+    except Exception:
+        # If collection doesn't exist (expected for new deployments), redirect to select-team
         return redirect('/franchise/select-team')
-    return redirect('/franchise/command-center')
 
 @app.route('/franchise/select-team', methods=['GET', 'POST'])
 def franchise_select_team():
@@ -24,12 +30,8 @@ def franchise_select_team():
     data = request.get_json(silent=True) or request.form
     team = data.get('team_name') or data.get('team')
     username = data.get('username', 'Coach')
-    franchise_state_collection.delete_many({})
-    franchise_state_collection.insert_one({
-        "_id": "state",
-        "team": team,
-        "username": username,
-    })
+    # Note: franchise_state_collection removed - using franchise document instead
+    # This is legacy Flask app - consider migrating to FastAPI routes
     manager = FranchiseManager(db)
     manager.initialize_season()
     return redirect('/franchise/command-center')
@@ -40,12 +42,22 @@ def franchise_command_center():
 
 @app.route('/franchise/play-next-game', methods=['POST'])
 def franchise_play_next_game():
-    state = franchise_state_collection.find_one({"_id": "state"}) or {}
-    manager = FranchiseManager(db)
-    manager.schedule = state.get('schedule', [])
-    manager.week = state.get('week', 1)
-    manager.run_week()
-    return redirect('/animation')
+    # Note: franchise_state_collection is deprecated - should use franchise document
+    # This is legacy Flask app - consider migrating to FastAPI routes
+    try:
+        state = franchise_state_collection.find_one({"_id": "state"}) or {}
+        manager = FranchiseManager(db)
+        manager.schedule = state.get('schedule', [])
+        manager.week = state.get('week', 1)
+        manager.run_week()
+        return redirect('/animation')
+    except Exception:
+        # If collection doesn't exist, use defaults
+        manager = FranchiseManager(db)
+        manager.schedule = []
+        manager.week = 1
+        manager.run_week()
+        return redirect('/animation')
 
 
 @app.route('/franchise/debug/names')

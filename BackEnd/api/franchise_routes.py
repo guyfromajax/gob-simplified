@@ -43,12 +43,18 @@ def get_user_team_from_franchise(franchise_doc: dict) -> tuple[str | None, str |
         return (user_team_id, user_team_object_id)
     
     # Fallback to state collection (backward compatibility for old franchises)
-    state = franchise_state_collection.find_one({"_id": "state"}) or {}
-    team_name = state.get("team")
-    if team_name:
-        team_doc = db.teams.find_one({"name": team_name})
-        if team_doc:
-            return (team_name, str(team_doc["_id"]))
+    # Note: This is deprecated - new franchises should use franchise document fields
+    try:
+        state = franchise_state_collection.find_one({"_id": "state"}) or {}
+        team_name = state.get("team")
+        if team_name:
+            logger.warning(f"⚠️ [DEPRECATED] Using franchise_state fallback for team: {team_name}. "
+                         f"Franchise should have user_team_id and user_team_object_id in document.")
+            team_doc = db.teams.find_one({"name": team_name})
+            if team_doc:
+                return (team_name, str(team_doc["_id"]))
+    except Exception as e:
+        logger.debug(f"franchise_state collection not available (expected for new franchises): {e}")
     
     return (None, None)
 
@@ -328,9 +334,8 @@ def select_team(selection: TeamSelection):
     user_team_id = selection.team_name  # Team name (human-readable)
     user_team_object_id = str(team_doc["_id"])  # ObjectId string (database identifier)
     
-    # Keep state collection for backward compatibility (will be phased out)
-    franchise_state_collection.delete_many({})
-    franchise_state_collection.insert_one({"_id": "state", "team": selection.team_name})
+    # Note: franchise_state_collection removed - using franchise document instead
+    # Old franchises may still have data in franchise_state, but new ones won't create it
     
     manager = FranchiseManager(db)
     manager.initialize_season(user_team_id=user_team_id, user_team_object_id=user_team_object_id)
@@ -841,14 +846,30 @@ def command_center_data(franchise_id: str = None):
         except Exception:
             team_doc = {}
     else:
-        # Fallback to state collection if no franchise_id (backward compatibility)
-        state = franchise_state_collection.find_one({"_id": "state"}) or {}
-        team_name = state.get("team", "")
-        team_doc = db.teams.find_one({"name": team_name}) or {}
-        team_id = str(team_doc.get("_id", "")) if team_doc.get("_id") else None
+        # Fallback to state collection if no franchise_id (backward compatibility - deprecated)
+        try:
+            state = franchise_state_collection.find_one({"_id": "state"}) or {}
+            team_name = state.get("team", "")
+            if team_name:
+                logger.warning(f"⚠️ [DEPRECATED] Using franchise_state fallback (no franchise_id provided). "
+                             f"This is legacy behavior - new code should provide franchise_id.")
+            team_doc = db.teams.find_one({"name": team_name}) or {}
+            team_id = str(team_doc.get("_id", "")) if team_doc.get("_id") else None
+        except Exception as e:
+            logger.debug(f"franchise_state collection not available: {e}")
+            team_doc = {}
+            team_id = None
     
     # Get username and seed from state (backward compatibility)
-    state = franchise_state_collection.find_one({"_id": "state"}) or {}
+    # Fallback to state collection (backward compatibility - deprecated)
+    try:
+        state = franchise_state_collection.find_one({"_id": "state"}) or {}
+        if state.get("team"):
+            logger.warning(f"⚠️ [DEPRECATED] Using franchise_state fallback in command_center(). "
+                         f"This is legacy behavior - should use franchise document.")
+    except Exception as e:
+        logger.debug(f"franchise_state collection not available: {e}")
+        state = {}
     
     # ✅ EOS TOURNAMENT: Include tournament data if active
     eos_tournament = None
