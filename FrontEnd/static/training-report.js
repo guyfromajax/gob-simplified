@@ -156,7 +156,7 @@ async function loadTrainingReport() {
     
     console.log('🔍 [TRAINING REPORT] Loading with params:', Object.fromEntries(params.entries()));
     
-    const response = await fetch(`/franchise/training-report?${params.toString()}`);
+    const response = await fetch(`${API_CONFIG.buildUrl('/franchise/training-report')}?${params.toString()}`);
     if (!response.ok) {
       throw new Error(`Failed to load training report: ${response.statusText}`);
     }

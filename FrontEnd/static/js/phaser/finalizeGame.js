@@ -59,7 +59,7 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   // POST to /tournament/save-result if needed
   if (tournamentId) {
     try {
-      const res = await fetch("/tournament/save-result", {
+      const res = await fetch(API_CONFIG.buildUrl("/tournament/save-result"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -77,7 +77,7 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
       } else {
         console.log("✅ Tournament result saved.");
         try {
-          const updated = await fetch(`/tournament/state?tournament_id=${encodeURIComponent(tournamentId)}`).then((r) =>
+          const updated = await fetch(`${API_CONFIG.buildUrl('/tournament/state')}?tournament_id=${encodeURIComponent(tournamentId)}`).then((r) =>
             r.json()
           );
           if (window.opener && window.opener.handleTournamentUpdate) {
@@ -156,7 +156,7 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
         requestBody.game_document = simData.final_game_document;
       }
       
-      const res = await fetch("/franchise/complete-week", {
+      const res = await fetch(API_CONFIG.buildUrl("/franchise/complete-week"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),

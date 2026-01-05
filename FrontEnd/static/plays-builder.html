@@ -302,6 +302,7 @@
     </div>
   </div>
 
+  <script src="/static/js/config/api-config.js"></script>
   <script>
     // Constants (reused from play-details.html)
     const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
@@ -394,7 +395,7 @@
     async function loadAllPlays() {
       try {
         console.log('🔍 Loading plays from /api/plays...');
-        const response = await fetch('/api/plays');
+        const response = await fetch(API_CONFIG.buildUrl('/api/plays'));
         if (!response.ok) {
           throw new Error(`Failed to load plays: ${response.status} ${response.statusText}`);
         }
@@ -710,7 +711,7 @@
         // Remove _id for update
         delete playUpdate._id;
 
-        const response = await fetch('/api/plays', {
+        const response = await fetch(API_CONFIG.buildUrl('/api/plays'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'

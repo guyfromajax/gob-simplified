@@ -510,7 +510,7 @@ async function handleSimToFourth() {
       payload.full_sim = true;
       
       console.log({event:'simulate-quarter:request', mode, homeTeam, awayTeam, quarter: currentQ, gameId: gId, full_sim: true});
-      const res = await fetch('/api/simulate-quarter', {
+      const res = await fetch(API_CONFIG.buildUrl('/api/simulate-quarter'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -693,7 +693,7 @@ async function handleSimFullGame() {
       payload.full_sim = true;
       
       console.log({event:'simulate-quarter:request', mode, homeTeam, awayTeam, quarter: currentQ, gameId: gId, full_sim: true});
-      const res = await fetch('/api/simulate-quarter', {
+      const res = await fetch(API_CONFIG.buildUrl('/api/simulate-quarter'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

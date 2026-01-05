@@ -750,7 +750,7 @@ let tournamentTeamsDataForSorting = [];
 async function refreshLeaders() {
   if (!tournament || !tournament._id) return;
   try {
-    const res = await fetch(`/tournament/leaders?tournament_id=${encodeURIComponent(tournament._id)}`);
+    const res = await fetch(`${API_CONFIG.buildUrl('/tournament/leaders')}?tournament_id=${encodeURIComponent(tournament._id)}`);
     leaderData = await res.json();
   } catch (err) {
     console.error("Failed to load leaders", err);
@@ -763,7 +763,7 @@ async function refreshLeaders() {
 async function refreshTeamStats() {
   if (!tournament || !tournament._id) return;
   try {
-    const res = await fetch(`/tournament/team-stats?tournament_id=${encodeURIComponent(tournament._id)}`);
+    const res = await fetch(`${API_CONFIG.buildUrl('/tournament/team-stats')}?tournament_id=${encodeURIComponent(tournament._id)}`);
     const data = await res.json();
     renderTeamStats(data);
   } catch (err) {
@@ -1480,7 +1480,7 @@ async function loadCommandCenterData() {
     const commandCenterData = await res.json();
     
     // Also load full tournament document for bracket and other detailed data
-    const tournamentRes = await fetch(`/tournament/state?tournament_id=${encodeURIComponent(tournamentId)}&_=${Date.now()}`, { cache: "no-store" });
+    const tournamentRes = await fetch(`${API_CONFIG.buildUrl('/tournament/state')}?tournament_id=${encodeURIComponent(tournamentId)}&_=${Date.now()}`, { cache: "no-store" });
     if (tournamentRes.ok) {
       tournament = await tournamentRes.json();
       localStorage.setItem("activeTournament", JSON.stringify(tournament));
@@ -1751,7 +1751,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Franchise calls it directly in init(), not just in refreshLeaders()
   if (tournament && tournament._id) {
     try {
-      const res = await fetch(`/tournament/team-stats?tournament_id=${encodeURIComponent(tournament._id)}`);
+      const res = await fetch(`${API_CONFIG.buildUrl('/tournament/team-stats')}?tournament_id=${encodeURIComponent(tournament._id)}`);
       const data = await res.json();
       renderTeamStats(data);
     } catch (err) {
@@ -1883,7 +1883,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       console.log('#sim-remaining click start');
       try {
-        const res = await fetch('/tournament/sim-remaining', {
+        const res = await fetch(API_CONFIG.buildUrl('/tournament/sim-remaining'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tournament_id: tournament._id })
@@ -1942,7 +1942,7 @@ async function loadTeamData() {
     // This ensures we have the latest stats after games complete
     let freshTournamentDoc = null;
     try {
-      const tournamentStateRes = await fetch(`/tournament/state?tournament_id=${encodeURIComponent(tournament._id)}`);
+      const tournamentStateRes = await fetch(`${API_CONFIG.buildUrl('/tournament/state')}?tournament_id=${encodeURIComponent(tournament._id)}`);
       if (tournamentStateRes.ok) {
         freshTournamentDoc = await tournamentStateRes.json();
       }
@@ -1956,13 +1956,13 @@ async function loadTeamData() {
     // First, ensure team objects exist (this will create them if missing)
     try {
       // Call ensure_team_objects_exist via get_gameplan endpoint (it calls ensure_team_objects_exist internally)
-      await fetch(`/api/gameplan?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_id=${encodeURIComponent(userTeamId)}`);
+      await fetch(`${API_CONFIG.buildUrl('/api/gameplan')}?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_id=${encodeURIComponent(userTeamId)}`);
     } catch (error) {
       console.warn('Could not ensure team objects exist:', error);
     }
     
     // ✅ SS&S: Use ObjectId directly - backend accepts team_id parameter
-    const response = await fetch(`/tournament/team-data?tournament_id=${encodeURIComponent(tournament._id)}&team_id=${encodeURIComponent(userTeamId)}`);
+    const response = await fetch(`${API_CONFIG.buildUrl('/tournament/team-data')}?tournament_id=${encodeURIComponent(tournament._id)}&team_id=${encodeURIComponent(userTeamId)}`);
     
     if (!response.ok) {
       console.error('Failed to load team data:', response.status, response.statusText);

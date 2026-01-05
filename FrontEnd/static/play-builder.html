@@ -650,6 +650,7 @@
     </div>
   </div>
 
+  <script src="/static/js/config/api-config.js"></script>
   <script>
     // Constants from backend
     const PLAY_TYPES = ["Motion", "Set Play"];
@@ -2216,7 +2217,7 @@
       };
 
       try {
-        const response = await fetch('/api/plays', {
+        const response = await fetch(API_CONFIG.buildUrl('/api/plays'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'

@@ -171,7 +171,7 @@ async function loadSettings() {
     }
     
     console.log('🔍 [GAME-PLAN] Loading settings from database:', params.toString());
-    const res = await fetch(`/api/gameplan?${params.toString()}`);
+    const res = await fetch(`${API_CONFIG.buildUrl('/api/gameplan')}?${params.toString()}`);
     if (!res.ok) {
       console.error('❌ [GAME-PLAN] Failed to load game plan settings, status:', res.status);
       // Use defaults if API fails
@@ -230,7 +230,7 @@ async function saveSettingsQuietly() {
       payload.game_id = gameId;
     }
     
-    const res = await fetch('/api/gameplan', {
+    const res = await fetch(API_CONFIG.buildUrl('/api/gameplan'), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)

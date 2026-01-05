@@ -399,7 +399,7 @@ submitBtn.addEventListener('click', async function() {
     console.log('🔍 [TRAINING] Submitting to endpoint:', endpoint);
     console.log('🔍 [TRAINING] Payload:', payload);
     
-    const response = await fetch(endpoint, {
+    const response = await fetch(API_CONFIG.buildUrl(endpoint), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -443,7 +443,7 @@ async function initializeTrainingPoints() {
   
   if (mode === 'franchise' && franchiseId) {
     try {
-      const response = await fetch(`/franchise/training-points?franchise_id=${franchiseId}`);
+      const response = await fetch(`${API_CONFIG.buildUrl('/franchise/training-points')}?franchise_id=${franchiseId}`);
       if (response.ok) {
         const data = await response.json();
         TOTAL_POINTS = data.training_points;
