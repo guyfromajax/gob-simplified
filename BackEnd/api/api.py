@@ -2413,11 +2413,11 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
             detail=f"{calling_team.name} has no timeouts remaining."
         )
     
-        # ✅ TIMEOUT: Save game state to database (reuse existing persistence pattern)
-        # This ensures scores, clock, fouls, etc. are preserved when user returns from lineup screen
-        try:
-            db_summary = summarize_game_state(gm, exclude_animations=True)
-            games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
+    # ✅ TIMEOUT: Save game state to database (reuse existing persistence pattern)
+    # This ensures scores, clock, fouls, etc. are preserved when user returns from lineup screen
+    try:
+        db_summary = summarize_game_state(gm, exclude_animations=True)
+        games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
         logging.info(
             f"💾 TIMEOUT: Saved game state before navigating to lineup screen: "
             f"game_id={game_id}, quarter={db_summary.get('quarter')}, "
