@@ -2001,7 +2001,22 @@ export function createGameScene(Phaser) {
           
         } catch (error) {
           console.error('❌ Error in turn-by-turn loop:', error);
-          break;
+          // ✅ FIX: Don't end quarter on animation errors - only end if backend signals completion
+          // Check if the current or last turn data indicates quarter completion before breaking
+          // Note: turnData is set before animateGameTurns, so it should be available even if animation fails
+          const dataToCheck = turnData || lastTurnData;
+          if (dataToCheck && (dataToCheck.quarter_complete === true || dataToCheck.time_remaining <= 0)) {
+            // Backend signaled quarter completion - exit loop normally
+            console.log('✅ Quarter complete detected after animation error, exiting loop');
+            quarterComplete = true;
+            lastTurnData = dataToCheck;
+            break;
+          }
+          // For animation errors (like missing showAnnouncement), log and continue
+          // The backend will signal quarter completion when time_remaining <= 0
+          // Continue to next iteration to check for quarter completion
+          console.warn('⚠️ Animation error occurred, continuing to next turn');
+          continue;
         }
       }
       

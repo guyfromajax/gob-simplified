@@ -443,6 +443,9 @@ async function animateStealEntry(scene, turnData, playerSprites, ballSprite, wid
  * Defender still animates to stopper position, but ball handler animates past them to shot spot
  */
 async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, ballSprite, width, height) {
+  // ✅ FIX: Import showAnnouncement at the start of the function
+  const { showAnnouncement } = await import('../utils/announcements.js');
+  
   const shooterId = turnData.roles?.shooter?.player_id || turnData.shooter_id || turnData.roles?.ball_handler?.player_id || getCurrentOwner(scene);
   const shooterSprite = playerSprites[shooterId];
   
