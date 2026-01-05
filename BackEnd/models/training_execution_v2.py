@@ -159,9 +159,9 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
     Apply pre-training conditions to players and team.
     
     Pre-training conditions:
-    - Player attributes (excluding EM, MO, NG): += randint(-2, 0) for each player/attribute
+    - Player attributes (excluding EM, MO, NG): += randint(-3, 0) for each player/attribute
     - Rebound modifier: += random between -0.1 to 0 in 0.01 increments
-    - Shot threshold: += random.randint(0, 15)
+    - Shot threshold: += random.randint(5, 20)
     - Team chemistry: N/A (no change)
     - All other team attributes: += random choice [-2, -1, 0]
     
@@ -178,8 +178,8 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
         for attr in TRAINABLE_PLAYER_ATTRS:
             anchor_key = f"anchor_{attr}"
             if anchor_key in attrs:
-                # Apply random decrease: randint(-2, 0) inclusive
-                decrease = random.randint(-2, 0)
+                # Apply random decrease: randint(-3, 0) inclusive
+                decrease = random.randint(-3, 0)
                 attrs[anchor_key] = max(PLAYER_ATTR_CLAMP[0], attrs[anchor_key] + decrease)
                 # Also update base attribute
                 attrs[attr] = attrs[anchor_key]
@@ -195,9 +195,9 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
             min(TEAM_ATTR_CLAMPS["rebound_modifier"][1], team["rebound_modifier"])
         )
     
-    # Shot threshold: += random.randint(0, 15)
+    # Shot threshold: += random.randint(5, 20)
     if "shot_threshold" in team:
-        team["shot_threshold"] += random.randint(0, 15)
+        team["shot_threshold"] += random.randint(5, 20)
         # Clamp
         team["shot_threshold"] = max(
             TEAM_ATTR_CLAMPS["shot_threshold"][0],
@@ -524,10 +524,10 @@ def _apply_player_training_points(
     
     Logic:
     - 1 point: += random.randint(1, 3)
-    - 2 points: += random.randint(2, 5)
-    - 3 points: += random.randint(3, 7)
-    - 4 points: += random.randint(3, 8)
-    - 5 points: += random.randint(3, 9)
+    - 2 points: += random.randint(2, 4)
+    - 3 points: += random.randint(3, 6)
+    - 4 points: += random.randint(4, 7)
+    - 5 points: += random.randint(4, 9)
     
     Focus amplifier: Applied based on sub_option selection
     Multiplier: For attributes like CH that get 0.5 multiplier
@@ -542,13 +542,13 @@ def _apply_player_training_points(
     if points == 1:
         increase = random.randint(1, 3)
     elif points == 2:
-        increase = random.randint(2, 5)
+        increase = random.randint(2, 4)
     elif points == 3:
-        increase = random.randint(3, 7)
+        increase = random.randint(3, 6)
     elif points == 4:
-        increase = random.randint(3, 8)
+        increase = random.randint(4, 7)
     elif points == 5:
-        increase = random.randint(3, 9)
+        increase = random.randint(4, 9)
     else:
         # For points > 5, use same logic as 5 points
         increase = random.randint(3, 9)
@@ -804,11 +804,11 @@ def _apply_shot_threshold_training(team: dict, points: int, archetype: Optional[
     Apply training points to shot_threshold (decreases threshold, lower is better).
     
     Logic:
-    - 1 point: -= random.randint(10, 25)
-    - 2 points: -= random.randint(15, 35)
-    - 3 points: -= random.randint(20, 45)
-    - 4 points: -= random.randint(20, 55)
-    - 5 points: -= random.randint(20, 65)
+    - 1 point: -= random.randint(5, 15)
+    - 2 points: -= random.randint(10, 20)
+    - 3 points: -= random.randint(10, 30)
+    - 4 points: -= random.randint(10, 35)
+    - 5 points: -= random.randint(10, 40)
     - Amplifier: *= random.choice([1.3, 1.4, 1.5, 1.6]) (only if "authoritarian-discipline" or "culture-builder-confidence" focus is selected)
     """
     if points == 0:
@@ -816,17 +816,17 @@ def _apply_shot_threshold_training(team: dict, points: int, archetype: Optional[
     
     # Get base decrease
     if points == 1:
-        decrease = random.randint(10, 25)
+        decrease = random.randint(5, 15)
     elif points == 2:
-        decrease = random.randint(15, 35)
+        decrease = random.randint(10, 20)
     elif points == 3:
-        decrease = random.randint(20, 45)
+        decrease = random.randint(10, 30)
     elif points == 4:
-        decrease = random.randint(20, 55)
+        decrease = random.randint(10, 35)
     elif points == 5:
-        decrease = random.randint(20, 65)
+        decrease = random.randint(10, 40)
     else:
-        decrease = random.randint(20, 65)
+        decrease = random.randint(10, 40)
     
     # Apply amplifier (multiply) - only if specific coaching focus is selected
     final_decrease = decrease
@@ -854,7 +854,7 @@ def _should_amplify_player_attr(attr: str, archetype: Optional[str], sub_option:
     elif sub_option == "authoritarian-rebounding":
         return attr == "RB"  # Amplifies RB, rebound_modifier
     elif sub_option == "authoritarian-teamwork":
-        return attr == "PS"  # Amplifies PS, Motion Play Effectiveness Scores, Zone Defense Effectiveness Scores
+        return attr in ["PS", "IQ"]  # Amplifies PS, IQ, Motion Play Effectiveness Scores, Zone Defense Effectiveness Scores
     elif sub_option == "authoritarian-execution":
         return False  # Amplifies Set Play Effectiveness Scores, Man Defense Effectiveness Scores (handled separately)
     
@@ -941,10 +941,10 @@ def _apply_breaks_effect(
     Logic:
     - 0: random.choice([0.85, 0.9, 0.95]) - applied to all positive increments
     - 1: random.choice([0.9, 0.95, 1, 1, 1])
-    - 2: random.choice([0.95, 1, 1, 1, 1])
-    - 3: random.choice([0.9, 0.95, 1])
-    - 4: random.choice([0.9, 0.95, 1]), and team chemistry += random.randint(-1,1)
-    - 5: random.choice([0.9, 0.95, 1]), and team chemistry += random.randint(-3,3)
+    - 2: random.choice([1, 1, 1.05, 1.1])
+    - 3: random.choice([1, 1.05, 1.1])
+    - 4: random.choice([1, 1.05, 1.1, 1.1]), and team chemistry += random.randint(-1,1), discipline += random.randint(-2,0), fight += random.randint(-2,0)
+    - 5: random.choice([1, 1.05, 1.1, 1.15]), and team chemistry += random.randint(-3,3), discipline += random.randint(-3,-1), fight += random.randint(-3,-1)
     
     Note: Only applies to positive increments (gains), not losses.
     Calculates change from original baseline, if positive, multiplies the increment by multiplier.
@@ -954,33 +954,69 @@ def _apply_breaks_effect(
     elif breaks_points == 1:
         multiplier = random.choice([0.9, 0.95, 1, 1, 1])
     elif breaks_points == 2:
-        multiplier = random.choice([0.95, 1, 1, 1, 1])
+        multiplier = random.choice([1, 1, 1.05, 1.1])
     elif breaks_points == 3:
-        multiplier = random.choice([0.9, 0.95, 1])
+        multiplier = random.choice([1, 1.05, 1.1])
     elif breaks_points == 4:
-        multiplier = random.choice([0.9, 0.95, 1])
-        # Also adjust team chemistry
+        multiplier = random.choice([1, 1.05, 1.1, 1.1])
+        # Also adjust team chemistry, discipline, and fight
         team["team_chemistry"] += random.randint(-1, 1)
         team["team_chemistry"] = max(
             TEAM_ATTR_CLAMPS["team_chemistry"][0],
             min(TEAM_ATTR_CLAMPS["team_chemistry"][1], team["team_chemistry"])
         )
+        if "discipline" in team:
+            team["discipline"] += random.randint(-2, 0)
+            team["discipline"] = max(
+                TEAM_ATTR_CLAMPS["discipline"][0],
+                min(TEAM_ATTR_CLAMPS["discipline"][1], team["discipline"])
+            )
+        if "fight" in team:
+            team["fight"] += random.randint(-2, 0)
+            team["fight"] = max(
+                TEAM_ATTR_CLAMPS["fight"][0],
+                min(TEAM_ATTR_CLAMPS["fight"][1], team["fight"])
+            )
     elif breaks_points == 5:
-        multiplier = random.choice([0.9, 0.95, 1])
-        # Also adjust team chemistry
+        multiplier = random.choice([1, 1.05, 1.1, 1.15])
+        # Also adjust team chemistry, discipline, and fight
         team["team_chemistry"] += random.randint(-3, 3)
         team["team_chemistry"] = max(
             TEAM_ATTR_CLAMPS["team_chemistry"][0],
             min(TEAM_ATTR_CLAMPS["team_chemistry"][1], team["team_chemistry"])
         )
+        if "discipline" in team:
+            team["discipline"] += random.randint(-3, -1)
+            team["discipline"] = max(
+                TEAM_ATTR_CLAMPS["discipline"][0],
+                min(TEAM_ATTR_CLAMPS["discipline"][1], team["discipline"])
+            )
+        if "fight" in team:
+            team["fight"] += random.randint(-3, -1)
+            team["fight"] = max(
+                TEAM_ATTR_CLAMPS["fight"][0],
+                min(TEAM_ATTR_CLAMPS["fight"][1], team["fight"])
+            )
     else:
         # For breaks > 5, use same as 5
-        multiplier = random.choice([0.9, 0.95, 1])
+        multiplier = random.choice([1, 1.05, 1.1, 1.15])
         team["team_chemistry"] += random.randint(-3, 3)
         team["team_chemistry"] = max(
             TEAM_ATTR_CLAMPS["team_chemistry"][0],
             min(TEAM_ATTR_CLAMPS["team_chemistry"][1], team["team_chemistry"])
         )
+        if "discipline" in team:
+            team["discipline"] += random.randint(-3, -1)
+            team["discipline"] = max(
+                TEAM_ATTR_CLAMPS["discipline"][0],
+                min(TEAM_ATTR_CLAMPS["discipline"][1], team["discipline"])
+            )
+        if "fight" in team:
+            team["fight"] += random.randint(-3, -1)
+            team["fight"] = max(
+                TEAM_ATTR_CLAMPS["fight"][0],
+                min(TEAM_ATTR_CLAMPS["fight"][1], team["fight"])
+            )
     
     # Apply multiplier to positive player attribute increments
     for player in players:
@@ -1008,8 +1044,15 @@ def _apply_breaks_effect(
             current_val = team[attr_name]
             increment = current_val - original_val
             
-            # Only apply to positive increments
-            if increment > 0:
+            # For shot_threshold, a decrease (negative increment) is a positive gain
+            if attr_name == "shot_threshold" and increment < 0:
+                # Decrease is a positive gain - apply multiplier to make it more negative
+                decrease_amount = abs(increment)
+                new_decrease = int(decrease_amount * multiplier)
+                new_val = original_val - new_decrease
+                team[attr_name] = new_val
+            elif increment > 0:
+                # Only apply to positive increments (for all other attributes)
                 # Calculate new value: original + (increment * multiplier)
                 new_val = original_val + int(increment * multiplier)
                 team[attr_name] = new_val
