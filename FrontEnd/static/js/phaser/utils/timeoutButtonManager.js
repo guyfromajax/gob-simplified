@@ -220,7 +220,7 @@ async function handleTimeoutButtonClick() {
     
     try {
         // Call timeout API
-        const response = await fetch('/api/call-timeout', {
+        const response = await fetch(API_CONFIG.buildUrl('/api/call-timeout'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

@@ -374,7 +374,7 @@ class PlaybooksUI {
         params.set('franchise_id', franchiseId);
       }
       
-        const response = await fetch(`/api/playbooks?${params.toString()}`);
+        const response = await fetch(`${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
         
@@ -625,7 +625,7 @@ class PlaybooksUI {
       }
       
       console.log('🔍 [PLAYBOOKS] Loading slot assignments from API:', params.toString());
-      const response = await fetch(`/api/playbooks?${params.toString()}`);
+      const response = await fetch(`${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
         console.log('🔍 [PLAYBOOKS] API response for slot assignments:', data);
@@ -2087,7 +2087,7 @@ class PlaybooksUI {
       }
       
       // Save to API
-      const response = await fetch('/api/playbooks', {
+      const response = await fetch(API_CONFIG.buildUrl('/api/playbooks'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)

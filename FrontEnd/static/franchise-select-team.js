@@ -22,13 +22,8 @@ function createButtons() {
 
 async function selectTeam(team) {
   try {
-    // Use absolute URL so the request always goes to the FastAPI backend
-    const backendURL =
-      window.location.hostname === "localhost"
-        ? "http://localhost:8000"
-        : window.location.origin;
-
-    const res = await fetch(`${backendURL}/franchise/select-team`, {
+    // Use centralized API config for consistent backend URL
+    const res = await fetch(API_CONFIG.buildUrl('/franchise/select-team'), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ team_name: team })

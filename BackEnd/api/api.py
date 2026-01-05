@@ -35,6 +35,7 @@ import traceback
 from unidecode import unidecode
 from typing import Optional
 import logging
+import os
 from BackEnd.models.player import Player
 
 logger = logging.getLogger(__name__)
@@ -51,18 +52,49 @@ templates = Jinja2Templates(directory="FrontEnd/static")
 
 # app.mount("/", StaticFiles(directory="FrontEnd", html=True), name="static")
 # app.mount("/static", StaticFiles(directory="FrontEnd", html=True), name="static")
-app.mount("/static", StaticFiles(directory="FrontEnd/static"), name="static")
+# Conditionally mount static files (only in development)
+# In production, Netlify serves static files
+environment = os.getenv("ENVIRONMENT", "development")
+if environment == "development":
+    app.mount("/static", StaticFiles(directory="FrontEnd/static"), name="static")
+    print("✅ Static files mounted (development mode)")
 
 print("🚀 Loaded FastAPI app from api.py")
 
+# CORS Configuration - Must match actual testing domains, not just final ideal
+# CRITICAL: Include default Railway/Netlify domains initially, tighten later
+def get_cors_origins():
+    """
+    Get CORS allowed origins based on environment.
+    Includes default Railway/Netlify domains for initial deployment,
+    custom domains when configured, and localhost for development.
+    """
+    origins = [
+        "http://localhost:8000",  # Local development
+        "http://localhost:3000",  # Alternative local port
+    ]
+    
+    # Get custom origins from environment variable (comma-separated)
+    custom_origins = os.getenv("CORS_ORIGINS", "")
+    if custom_origins:
+        origins.extend([origin.strip() for origin in custom_origins.split(",") if origin.strip()])
+    
+    return origins
+
+# Get CORS origins
+cors_origins = get_cors_origins()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=".*",  # allows all origins including null
+    allow_origins=cors_origins,
+    allow_origin_regex=r"https://.*\.railway\.app|https://.*\.netlify\.app",  # Allow default Railway/Netlify domains
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]  # ← add this line
+    expose_headers=["*"]
 )
+
+logger.info(f"🔒 CORS configured with origins: {cors_origins}")
 
 class SimulationRequest(BaseModel):
     home_team: str

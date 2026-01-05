@@ -183,6 +183,12 @@
     // Cache buster: Add timestamp to force browser to reload game-plan.js
     const cacheBuster = Date.now();
     const script = document.createElement('script');
+    // Load API config first
+    const apiConfigScript = document.createElement('script');
+    apiConfigScript.src = '/static/js/config/api-config.js';
+    document.head.appendChild(apiConfigScript);
+    
+    // Then load game-plan.js
     script.src = `/static/game-plan.js?v=${cacheBuster}`;
     script.onload = () => {
       console.log('✅ game-plan.js loaded with cache buster:', cacheBuster);

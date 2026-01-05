@@ -137,7 +137,7 @@ async function loadRoster() {
         initPayload.franchise_id = franchiseId;
       }
       
-      const initRes = await fetch('/api/init-game', {
+      const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(initPayload)
@@ -173,7 +173,7 @@ async function loadRoster() {
   if (gameId) {
     console.log("Loading current player energy from game:", gameId);
     try {
-        const gameRes = await fetch(`/api/game/${gameId}?quarter=1`);
+        const gameRes = await fetch(`${API_CONFIG.buildUrl(`/api/game/${gameId}`)}?quarter=1`);
         if (gameRes.ok) {
           const gameData = await gameRes.json();
           const gamePlayers = gameData.players || [];

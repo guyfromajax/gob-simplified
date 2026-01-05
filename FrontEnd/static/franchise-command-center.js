@@ -897,7 +897,7 @@ async function init() {
   // This ensures 100% consistency between header and Team tab
   if (franchiseId && userTeamId) {
     try {
-      const teamDataResponse = await fetch(`/franchise/team-data?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`);
+      const teamDataResponse = await fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`);
       if (teamDataResponse.ok) {
         const teamData = await teamDataResponse.json();
         // Override team_chemistry with value from team-data endpoint (same as Team tab uses)
@@ -1050,7 +1050,7 @@ playNowBtn.addEventListener('click', async () => {
     playNowBtn.textContent = 'Simulating...';
     
     try {
-      const res = await fetch('/franchise/sim-rest-of-tournament', {
+      const res = await fetch(API_CONFIG.buildUrl('/franchise/sim-rest-of-tournament'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ franchise_id: franchiseId })
@@ -1079,7 +1079,7 @@ playNowBtn.addEventListener('click', async () => {
         
         document.getElementById('sim-championship-btn').addEventListener('click', async () => {
           try {
-            const champRes = await fetch('/franchise/sim-championship', {
+            const champRes = await fetch(API_CONFIG.buildUrl('/franchise/sim-championship'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ franchise_id: franchiseId })
@@ -1118,7 +1118,7 @@ playNowBtn.addEventListener('click', async () => {
     playNowBtn.textContent = 'Finishing Season...';
     
     try {
-      const res = await fetch('/franchise/finish-season', {
+      const res = await fetch(API_CONFIG.buildUrl('/franchise/finish-season'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ franchise_id: franchiseId })
@@ -1147,7 +1147,7 @@ playNowBtn.addEventListener('click', async () => {
     return;
   }
   try {
-    const res = await fetch('/franchise/play-next-game', {
+    const res = await fetch(API_CONFIG.buildUrl('/franchise/play-next-game'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ franchise_id: franchiseId })
@@ -1261,13 +1261,13 @@ async function loadTeamData() {
     // First, ensure team objects exist (this will create them if missing)
     try {
       // ✅ SS&S: Use ObjectId directly - backend accepts it
-      await fetch(`/api/gameplan?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`);
+      await fetch(`${API_CONFIG.buildUrl('/api/gameplan')}?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`);
     } catch (error) {
       console.warn('Could not ensure team objects exist:', error);
     }
     
     // ✅ SS&S: Use ObjectId directly - backend accepts team_id parameter
-    const response = await fetch(`/franchise/team-data?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`);
+    const response = await fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`);
     
     if (!response.ok) {
       console.error('Failed to load team data:', response.status, response.statusText);
@@ -1279,7 +1279,7 @@ async function loadTeamData() {
     // Also load players for top scorer lookup
     let players = [];
     try {
-      const rosterResponse = await fetch(`/franchise/roster?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(data.team_name || '')}`);
+      const rosterResponse = await fetch(`${API_CONFIG.buildUrl('/franchise/roster')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(data.team_name || '')}`);
       if (rosterResponse.ok) {
         const rosterData = await rosterResponse.json();
         players = rosterData.players || [];
@@ -1958,7 +1958,7 @@ function updateScoutingButton(data) {
   const week = data?.week || data?.training_status?.current_week || 0;
   if (data && week >= 0 && week <= 14) {
     // Get upcoming opponent from play-next-game endpoint
-    fetch('/franchise/play-next-game', {
+    fetch(API_CONFIG.buildUrl('/franchise/play-next-game'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ franchise_id: franchiseId })
@@ -2012,8 +2012,8 @@ async function loadScoutingReport() {
   try {
     // Load opponent team data and last game play usage
     const [teamDataRes, playUsageRes] = await Promise.all([
-      fetch(`/franchise/team-data?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(upcomingOpponent)}`),
-      fetch(`/franchise/scouting-report?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(upcomingOpponent)}`)
+      fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(upcomingOpponent)}`),
+      fetch(`${API_CONFIG.buildUrl('/franchise/scouting-report')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(upcomingOpponent)}`)
     ]);
     
     if (!teamDataRes.ok) throw new Error('Failed to load team data');

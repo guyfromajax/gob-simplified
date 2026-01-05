@@ -1012,6 +1012,7 @@
     </div>
   </div>
 
+  <script src="/static/js/config/api-config.js"></script>
   <script>
     // Constants from backend
     const PLAY_TYPES = ["Motion", "Set Play"];
@@ -1263,7 +1264,7 @@
       console.log('📂 loadAvailableSkeletons called');
       try {
         console.log('📂 Fetching /api/hct-skeletons...');
-        const response = await fetch('/api/hct-skeletons');
+        const response = await fetch(API_CONFIG.buildUrl('/api/hct-skeletons'));
         console.log('📂 Response status:', response.status);
         
         if (!response.ok) {
@@ -4045,7 +4046,7 @@
       // This ensures all variants with the same name stay in the same document
       if (!playState.skeletonId && skeletonData.name) {
         try {
-          const checkResponse = await fetch('/api/hct-skeletons');
+          const checkResponse = await fetch(API_CONFIG.buildUrl('/api/hct-skeletons'));
           if (checkResponse.ok) {
             const existingSkeletons = await checkResponse.json();
             const existingSkeleton = existingSkeletons.find(s => 
@@ -4068,7 +4069,7 @@
       }
 
       try {
-        const response = await fetch('/api/hct-skeletons', {
+        const response = await fetch(API_CONFIG.buildUrl('/api/hct-skeletons'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'

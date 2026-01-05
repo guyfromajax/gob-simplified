@@ -2619,7 +2619,7 @@
         try {
           // Fetch play document from backend
           const encodedPlayName = encodeURIComponent(playName);
-          const response = await fetch(`/api/play/${encodedPlayName}`);
+          const response = await fetch(API_CONFIG.buildUrl(`/api/play/${encodedPlayName}`));
           
           if (!response.ok) {
             console.warn(`⚠️ [PLAYCALL HEADSHOTS] Failed to fetch play '${playName}': ${response.status}`);
@@ -3237,7 +3237,7 @@
             payload.aggression_override = value;
           }
           
-          const response = await fetch('/api/set-playcall-override', {
+          const response = await fetch(API_CONFIG.buildUrl('/api/set-playcall-override'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -3312,7 +3312,7 @@
             };
             
             try {
-              const response = await fetch('/api/set-playcall-override', {
+              const response = await fetch(API_CONFIG.buildUrl('/api/set-playcall-override'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -3770,6 +3770,7 @@
     // Initialize team box score tabs
     initializeTeamBoxscoreTabs();
   </script>
+  <script src="/static/js/config/api-config.js"></script>
   <script src="/static/js/shared/timeoutNavigationHelper.js"></script>
   <script type="module" src="/static/js/phaser/bootGame.js"></script>
   <script>

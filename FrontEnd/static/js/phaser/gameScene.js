@@ -1693,7 +1693,7 @@ export function createGameScene(Phaser) {
             window.clearPlaycallOverrides();
           }
           
-          const response = await fetch('/api/simulate-turn', {
+          const response = await fetch(API_CONFIG.buildUrl('/api/simulate-turn'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
