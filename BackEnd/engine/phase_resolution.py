@@ -57,7 +57,7 @@ def get_in_play_defenders(ball_handler, defense_lineup, target_is_away):
     return in_play
 
 
-def apply_energy_decay(off_lineup, def_lineup):
+def apply_energy_decay(off_lineup, def_lineup, omit_zeros_for_defense=False):
     """
     Apply energy decay to all players in both lineups.
     
@@ -68,13 +68,17 @@ def apply_energy_decay(off_lineup, def_lineup):
     Args:
         off_lineup: Dictionary of offensive players by position
         def_lineup: Dictionary of defensive players by position
+        omit_zeros_for_defense: If True, defensive players will have zero values
+                                omitted from their depletion lists (used for HCT/FCP turns).
+                                Offensive players always use normal depletion (with zeros).
     """
     for player in off_lineup.values():
         if player and hasattr(player, "decay_energy") and hasattr(player, "get_fatigue_decay_amount"):
             player.decay_energy(player.get_fatigue_decay_amount())
     for player in def_lineup.values():
         if player and hasattr(player, "decay_energy") and hasattr(player, "get_fatigue_decay_amount"):
-            player.decay_energy(player.get_fatigue_decay_amount())
+            # ✅ FCP/HCT DEFENSIVE PLAYERS: Omit zeros from depletion list for defensive players on pressure defense turns
+            player.decay_energy(player.get_fatigue_decay_amount(omit_zeros=omit_zeros_for_defense))
 
 
 def apply_bench_energy_recharge(game):
@@ -4391,7 +4395,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     
     # ✅ Apply energy decay for active players during FCP
-    apply_energy_decay(off_lineup, def_lineup)
+    # ✅ FCP DEFENSIVE PLAYERS: Omit zeros from depletion list for defensive players (they always lose some energy)
+    apply_energy_decay(off_lineup, def_lineup, omit_zeros_for_defense=True)
     
     # Track FCP attempt (defensive team)
     def_scouting = def_team.scouting_data
@@ -5466,7 +5471,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     
     # ✅ Apply energy decay for active players during HCT
-    apply_energy_decay(off_lineup, def_lineup)
+    # ✅ HCT DEFENSIVE PLAYERS: Omit zeros from depletion list for defensive players (they always lose some energy)
+    apply_energy_decay(off_lineup, def_lineup, omit_zeros_for_defense=True)
     
     # Track HCT attempt (defensive team)
     def_scouting = def_team.scouting_data
