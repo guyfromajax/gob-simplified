@@ -407,3 +407,44 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 **Backend:**
 - `BackEnd/api/gameplan_routes.py` - `GET /api/playbooks` and `POST /api/playbooks` endpoints
 
+### Persistence Issues (February 2025)
+
+**Status:** Under investigation - approach being reconsidered
+
+**Identified Issues:**
+
+1. **Order of Operations Bug - Even Distribution Runs Before Position Filters Load:**
+   - **Symptom:** When `even_distribution_all === true`, Even Distribution logic runs in `loadState()` before `loadPositionFilterSelections()` is called
+   - **Result:** Even Distribution finds no visible plays (because `selectedPositions` is empty) and logs "No plays found" warnings for all offense sections
+   - **Impact:** Even Distribution fails to apply on page load when position filters are active
+   - **Root Cause:** `loadState()` calls Even Distribution logic before `loadPositionFilterSelections()` runs (which happens later in `init()`)
+
+2. **Position Filter Persistence Mismatch:**
+   - **Symptom:** User saves playbooks with Standard + SG position filters selected, but on reload, Standard + SF filters are loaded from localStorage
+   - **User Action:** Clicked "Submit Playbooks" with Standard + SG selected
+   - **Observed Behavior:** localStorage contains Standard + SF instead of Standard + SG
+   - **Possible Causes:**
+     - localStorage key mismatch (mode/team_id inconsistency between save and load)
+     - Position filter selections saved at wrong time (before user's final selection)
+     - localStorage cleared/changed between sessions
+     - Wrong data being saved when "Submit Playbooks" is clicked
+   - **Investigation Needed:** Verify localStorage key generation matches between `savePositionFilterSelections()` and `loadPositionFilterSelections()`
+
+3. **Percentage Calculation Bug - Hidden Plays Included in Totals:**
+   - **Symptom:** Set Play Outside section shows "You're over by 50%" when visible plays total only 50% (Standard Play: 50%, SF Play: 0%)
+   - **Root Cause:** Section total calculation includes percentages from hidden plays that weren't reset to 0%
+   - **Expected Behavior:** When position filters change, `resetHiddenPlayPercentages()` should reset hidden play percentages to 0% BEFORE totals are calculated
+   - **Impact:** Validation errors prevent submission even when visible plays total correctly
+
+**Current State:**
+- Even Distribution toggle persistence (`even_distribution_all` flag) is implemented and working
+- Position filter persistence (localStorage) is implemented but showing incorrect data
+- Percentage reset logic exists but may not be executing at the correct time in the load sequence
+- Order of operations in `init()` and `loadState()` needs to be re-evaluated
+
+**Next Steps:**
+- Reconsider overall approach to playbook building and persistence
+- Determine correct order of operations for loading state, position filters, and applying Even Distribution
+- Verify localStorage key consistency and timing of position filter saves
+- Ensure hidden play percentages are reset before any total calculations
+

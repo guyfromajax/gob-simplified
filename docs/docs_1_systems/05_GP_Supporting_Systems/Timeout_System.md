@@ -547,22 +547,29 @@ Current game plan settings are fetched and passed to the game plan screen:
 - Passes populated lineup (minus foul out player) to `TimeoutNavigationHelper`
 - **Key Point:** Only removes the fouled-out player if they're on the user's team; other team's lineup is preserved
 
-### Computer Team Lineup Management (January 2025)
+### Computer Team Lineup and Strategy Management (January 2025, Updated February 2025)
 
-The computer team automatically adjusts its lineup during timeouts and at quarter breaks based on player energy levels and foul counts.
+The computer team automatically adjusts its lineup and strategy settings during timeouts, at quarter breaks, and during foul out instances based on player energy levels, foul counts, and game situation.
 
 **When Lineups Are Rebuilt:**
 
 1. **During Timeouts:**
    - When the user calls a timeout, the computer team's lineup is automatically rebuilt
-   - Location: `BackEnd/api/api.py` `call_timeout_endpoint()` (lines 195-210)
+   - Location: `BackEnd/models/game_manager.py` `call_timeout()` (lines 206-223)
    - Only the computer team's lineup is adjusted (user team lineup remains unchanged)
    - Uses current game state to apply energy and foul filtering rules
+   - **Strategy Settings:** Computer team's strategy settings are automatically regenerated using weighted randomization (same logic as initial strategy settings)
 
 2. **At Quarter Breaks:**
    - At the start of each new quarter (Q2, Q3, Q4, OT), the computer team's lineup is automatically rebuilt
-   - Location: `BackEnd/main.py` `simulate_quarter()` (lines 402-443, 444-468, 469-493)
+   - Location: `BackEnd/main.py` `simulate_quarter()` (lines 259-269)
    - Ensures the computer team starts each quarter with an optimal lineup based on current player conditions
+   - **Strategy Settings:** Computer team's strategy settings are automatically regenerated using weighted randomization (same logic as initial strategy settings)
+
+3. **During Foul Out Instances:**
+   - When a player fouls out, the computer team's lineup is automatically rebuilt (if computer team player fouled out)
+   - Location: `BackEnd/models/game_manager.py` `call_timeout()` with `timeout_reason="FOUL_OUT"` (lines 230-237)
+   - **Strategy Settings:** Computer team's strategy settings are automatically regenerated using weighted randomization (same logic as initial strategy settings)
 
 **Player Eligibility Filtering:**
 
@@ -583,9 +590,13 @@ The system uses `is_player_eligible_for_lineup()` (`BackEnd/utils/db_utils.py`) 
    - Players with 5 or more fouls are always excluded (not considered active)
 
 **Implementation Details:**
-- **Function:** `build_lineup_from_mongo(team, game_state=None)` (`BackEnd/utils/db_utils.py`)
+- **Lineup Function:** `build_lineup_from_mongo(team, game_state=None)` (`BackEnd/utils/db_utils.py`)
+- **Strategy Function:** `autoset_strategy_settings(team)` (`BackEnd/utils/db_utils.py`)
+  - Regenerates strategy settings using `TeamManager._init_strategy_settings()` method
+  - Uses same weighted randomization logic as initial strategy settings
+  - Only applies to computer teams (user team strategy settings are never auto-adjusted)
 - **Lineup Completion:** `ensure_complete_lineup(team, game_state)` (`BackEnd/utils/db_utils.py`)
-- Only affects computer team (user team lineups are never auto-adjusted)
+- Only affects computer team (user team lineups and strategy settings are never auto-adjusted)
 - Works consistently across all game modes (single, tournament, franchise)
 
 ### Comparison: Timeout vs Quarter Break vs Foul Out
