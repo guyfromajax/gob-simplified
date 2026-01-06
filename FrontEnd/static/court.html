@@ -2954,7 +2954,7 @@
           params.set('franchise_id', franchiseId);
         }
         
-        const apiUrl = `/api/playbooks?${params.toString()}`;
+        const apiUrl = API_CONFIG.buildUrl(`/api/playbooks?${params.toString()}`);
         console.log('🔍 [PLAYCALL CENTER] Fetching from:', apiUrl);
         
         const response = await fetch(apiUrl);
