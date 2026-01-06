@@ -87,7 +87,7 @@ cors_origins = get_cors_origins()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_origin_regex=r"https://.*\.railway\.app|https://.*\.netlify\.app",  # Allow default Railway/Netlify domains
+    allow_origin_regex=r"https://.*\.(railway|netlify)\.app",  # Allow default Railway/Netlify domains (fixed regex)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
