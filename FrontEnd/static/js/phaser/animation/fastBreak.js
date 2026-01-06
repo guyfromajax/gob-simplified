@@ -868,7 +868,9 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       console.error('⚠️ [FAST BREAK MISS] Missing rebounderId in turnData, cannot animate rebound', {
         turnDataKeys: Object.keys(turnData),
         hasRebounderId: !!turnData.rebounderId,
+        hasRebounderIdUnderscore: !!turnData.rebounder_id,
         hasRebounderPlayerId: !!turnData.rebounder_player_id,
+        hasRolesRebounder: !!turnData.roles?.rebounder?.player_id,
         fullTurnData: turnData
       });
       // Return early - rebound will be handled by next turn
