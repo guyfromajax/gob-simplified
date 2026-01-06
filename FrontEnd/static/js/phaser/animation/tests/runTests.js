@@ -1,6 +1,6 @@
 /**
  * Node.js test runner for FCP/HCT routing tests
- * Run with: node FrontEnd/static/js/phaser/animation/tests/runTests.js
+ * Run with: node FrontEnd/js/phaser/animation/tests/runTests.js
  */
 
 // Mock turn data for each FCP/HCT outcome

@@ -119,7 +119,7 @@ function setHeader() {
   
   const logo = document.getElementById('team-logo');
   if (logo && teamName) {
-    logo.src = `/static/images/homepage-logos/${teamName}.png`;
+    logo.src = `/images/homepage-logos/${teamName}.png`;
     logo.alt = `${teamName} logo`;
     logo.hidden = false;
     logo.onerror = () => { logo.hidden = true; };
@@ -413,7 +413,7 @@ async function navigateBack() {
   
   console.log('[navigateBack] Passing lineup params:', { pgId, sgId, sfId, pfId, cId, myTeamSide });
   
-  window.location.href = `/static/set-lineup.html?${params.toString()}`;
+  window.location.href = `/set-lineup.html?${params.toString()}`;
 }
 
 async function navigateToCommandCenter() {
@@ -426,13 +426,13 @@ async function navigateToCommandCenter() {
   if (mode === 'tournament' && tournamentId) {
     // Include team_id in URL for tournament command center
     const teamIdParam = teamId || userTeamIdParam || teamName;
-    const url = `/static/tournament.html?tournament_id=${encodeURIComponent(tournamentId)}`;
+    const url = `/tournament.html?tournament_id=${encodeURIComponent(tournamentId)}`;
     const finalUrl = teamIdParam ? `${url}&team_id=${encodeURIComponent(teamIdParam)}` : url;
     window.location.href = finalUrl;
   } else if (mode === 'franchise' && franchiseId) {
     // Include team_id in URL for franchise command center
     const teamIdParam = teamId || userTeamIdParam || teamName;
-    const url = `/static/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}`;
+    const url = `/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}`;
     const finalUrl = teamIdParam ? `${url}&team_id=${encodeURIComponent(teamIdParam)}` : url;
     window.location.href = finalUrl;
   } else {
@@ -568,7 +568,7 @@ async function init() {
       }
       
       console.log('🔍 [GAME-PLAN] Navigating to playbooks with params:', params.toString());
-      window.location.href = `/static/playbooks.html?${params.toString()}`;
+      window.location.href = `/playbooks.html?${params.toString()}`;
     });
   }
   

@@ -389,7 +389,7 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
       hasComputerTimeout: params.has('computer_timeout'),
       computerTimeoutValue: params.get('computer_timeout'),
       computerTeamNameValue: params.get('computer_team_name'),
-      fullUrl: `/static/set-lineup.html?${params.toString()}`
+      fullUrl: `/set-lineup.html?${params.toString()}`
     });
     
     try {
@@ -414,7 +414,7 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
     }
     
     // Navigate to lineup screen
-    window.location.href = `/static/set-lineup.html?${params.toString()}`;
+    window.location.href = `/set-lineup.html?${params.toString()}`;
 }
 
 /**

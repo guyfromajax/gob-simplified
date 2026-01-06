@@ -47,12 +47,12 @@ function setupBackButton() {
       // Build return URL
       let returnPath = '';
       if (mode === 'franchise' && franchiseId) {
-        returnPath = `/static/franchise-command-center.html?franchise_id=${franchiseId}`;
+        returnPath = `/franchise-command-center.html?franchise_id=${franchiseId}`;
         if (returnTab) {
           returnPath += `&tab=${returnTab}`;
         }
       } else if (mode === 'tournament' && tournamentId) {
-        returnPath = `/static/tournament.html?tournament_id=${tournamentId}`;
+        returnPath = `/tournament.html?tournament_id=${tournamentId}`;
         if (returnTab) {
           returnPath += `&tab=${returnTab}`;
         }
@@ -277,7 +277,7 @@ function renderRoster() {
     // Name with link
     const nameTd = document.createElement('td');
     const nameLink = document.createElement('a');
-    nameLink.href = `/static/player-detail.html?id=${p._id}`;
+    nameLink.href = `/player-detail.html?id=${p._id}`;
     nameLink.textContent = p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
@@ -345,7 +345,7 @@ function renderStats() {
     // Name
     const nameTd = document.createElement('td');
     const nameLink = document.createElement('a');
-    nameLink.href = `/static/player-detail.html?id=${p._id}`;
+    nameLink.href = `/player-detail.html?id=${p._id}`;
     nameLink.textContent = p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';

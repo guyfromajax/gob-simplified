@@ -572,7 +572,7 @@ async function handleSimToFourth() {
     console.log(`🏀 Q4 will use standard possession logic (opening tip winner gets ball)`);
     
     console.log('🎮 Redirecting to set-lineup for Q4 after simming Q1-Q3');
-    window.location.href = `/static/set-lineup.html?${params.toString()}`;
+    window.location.href = `/set-lineup.html?${params.toString()}`;
   } catch (err) {
     console.error('Error simming to 4th quarter:', err);
     // ✅ FIX: Show actual error message instead of generic message

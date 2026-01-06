@@ -124,10 +124,10 @@ function setupLockerRoomButton() {
   
   btn.addEventListener('click', () => {
     if (mode === 'franchise') {
-      window.location.href = `/static/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}`;
+      window.location.href = `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}`;
     } else if (mode === 'tournament') {
       // Use same pattern as franchise mode - tournament.html is the command center
-      window.location.href = `/static/tournament.html?tournament_id=${tournamentId}&team_id=${teamId}`;
+      window.location.href = `/tournament.html?tournament_id=${tournamentId}&team_id=${teamId}`;
     }
   });
 }

@@ -79,7 +79,7 @@ console.log("✅ tournament.js loaded");
 
 function getLogo(teamName) {
   const formatted = formatTeamName(teamName);
-  return `/static/images/homepage-logos/${formatted}.png`;
+  return `/images/homepage-logos/${formatted}.png`;
 }
 
 
@@ -344,7 +344,7 @@ function renderRoster() {
     // Create player name as clickable link
     const nameTd = document.createElement("td");
     const nameLink = document.createElement("a");
-    nameLink.href = `/static/player-detail.html?id=${p._id}`;
+    nameLink.href = `/player-detail.html?id=${p._id}`;
     nameLink.textContent = p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
@@ -491,7 +491,7 @@ function sortTournamentRoster(columnName, direction) {
     
     const nameTd = document.createElement("td");
     const nameLink = document.createElement("a");
-    nameLink.href = `/static/player-detail.html?id=${p._id}`;
+    nameLink.href = `/player-detail.html?id=${p._id}`;
     nameLink.textContent = p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
@@ -1035,7 +1035,7 @@ function renderSchedule() {
     const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
     const createTeamLink = (teamName, seed) => {
       const link = document.createElement('a');
-      link.href = `/static/team-roster-view.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
+      link.href = `/team-roster-view.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
       link.textContent = seed ? `Team ${seed} ${teamName}` : teamName;
       link.style.color = '#4a90e2';
       link.style.textDecoration = 'none';
@@ -1084,7 +1084,7 @@ function renderSchedule() {
     const gameId = res?.game_id || match.game_id;
     if (gameId && homeScore !== undefined && awayScore !== undefined) {
       const boxScoreLink = document.createElement('a');
-      boxScoreLink.href = `/static/box-score.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&game_id=${encodeURIComponent(gameId)}`;
+      boxScoreLink.href = `/box-score.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&game_id=${encodeURIComponent(gameId)}`;
       boxScoreLink.textContent = ' [Box Score]';
       boxScoreLink.className = 'box-score-link';
       boxScoreLink.style.color = '#4a90e2';
@@ -1122,7 +1122,7 @@ function renderSchedule() {
       const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
       const createTeamLink = (teamName) => {
         const link = document.createElement('a');
-        link.href = `/static/team-roster-view.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
+        link.href = `/team-roster-view.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
         link.textContent = teamName;
         link.style.color = '#4a90e2';
         link.style.textDecoration = 'none';
@@ -1171,7 +1171,7 @@ function renderSchedule() {
       const gameId = res?.game_id || match.game_id;
       if (gameId && homeScore !== undefined && awayScore !== undefined) {
         const boxScoreLink = document.createElement('a');
-        boxScoreLink.href = `/static/box-score.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&game_id=${encodeURIComponent(gameId)}`;
+        boxScoreLink.href = `/box-score.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&game_id=${encodeURIComponent(gameId)}`;
         boxScoreLink.textContent = ' [Box Score]';
         boxScoreLink.className = 'box-score-link';
         boxScoreLink.style.color = '#4a90e2';
@@ -1211,7 +1211,7 @@ function renderSchedule() {
     const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
     const createTeamLink = (teamName) => {
       const link = document.createElement('a');
-      link.href = `/static/team-roster-view.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
+      link.href = `/team-roster-view.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
       link.textContent = teamName;
       link.style.color = '#4a90e2';
       link.style.textDecoration = 'none';
@@ -1260,7 +1260,7 @@ function renderSchedule() {
     const gameId = res?.game_id || match.game_id;
     if (gameId && homeScore !== undefined && awayScore !== undefined) {
       const boxScoreLink = document.createElement('a');
-      boxScoreLink.href = `/static/box-score.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&game_id=${encodeURIComponent(gameId)}`;
+      boxScoreLink.href = `/box-score.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&game_id=${encodeURIComponent(gameId)}`;
       boxScoreLink.textContent = ' [Box Score]';
       boxScoreLink.className = 'box-score-link';
       boxScoreLink.style.color = '#4a90e2';
@@ -1343,7 +1343,7 @@ function populateTop(data) {
   // Update team logo
   if (data.team) {
     const formattedTeam = formatTeamName(data.team);
-    const logoSrc = `/static/images/homepage-logos/${formattedTeam}.png`;
+    const logoSrc = `/images/homepage-logos/${formattedTeam}.png`;
     const logoEl = document.getElementById('user-team-logo');
     if (logoEl) {
       logoEl.src = logoSrc;
@@ -1354,8 +1354,8 @@ function populateTop(data) {
     const sammyEl = document.getElementById('coach-sammy');
     const dukeEl = document.getElementById('coach-duke');
     if (abbr) {
-      if (sammyEl) sammyEl.src = `/static/images/coaches/${abbr}/Sammy-${abbr}.png`;
-      if (dukeEl) dukeEl.src = `/static/images/coaches/${abbr}/Duke-${abbr}.png`;
+      if (sammyEl) sammyEl.src = `/images/coaches/${abbr}/Sammy-${abbr}.png`;
+      if (dukeEl) dukeEl.src = `/images/coaches/${abbr}/Duke-${abbr}.png`;
     } else {
       if (sammyEl) sammyEl.removeAttribute('src');
       if (dukeEl) dukeEl.removeAttribute('src');
@@ -1442,14 +1442,14 @@ function initTopAssets(teamName) {
   const formattedName = formatTeamName(teamName || userTeamId || "");
   const logoEl = document.getElementById("user-team-logo");
   if (logoEl) {
-    logoEl.src = `/static/images/homepage-logos/${formattedName}.png`;
+    logoEl.src = `/images/homepage-logos/${formattedName}.png`;
   }
   const abbr = teamMap[formattedName] || "";
   const sammyEl = document.getElementById("coach-sammy");
   const dukeEl = document.getElementById("coach-duke");
   if (abbr) {
-    if (sammyEl) sammyEl.src = `/static/images/coaches/${abbr}/Sammy-${abbr}.png`;
-    if (dukeEl) dukeEl.src = `/static/images/coaches/${abbr}/Duke-${abbr}.png`;
+    if (sammyEl) sammyEl.src = `/images/coaches/${abbr}/Sammy-${abbr}.png`;
+    if (dukeEl) dukeEl.src = `/images/coaches/${abbr}/Duke-${abbr}.png`;
   } else {
     if (sammyEl) sammyEl.removeAttribute('src');
     if (dukeEl) dukeEl.removeAttribute('src');
@@ -1811,7 +1811,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const mySide = home === userTeamName ? 'home' : (away === userTeamName ? 'away' : '');
         // ✅ FIX: Add mode=tournament parameter (matches Franchise pattern)
         // This ensures mode is preserved through navigation chain: TCC → Lineup → Game Plan → Court
-        let url = `/static/set-lineup.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`;
+        let url = `/set-lineup.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`;
         // Add team IDs for gameplan API compatibility
         url += `&home_id=${encodeURIComponent(home)}&away_id=${encodeURIComponent(away)}`;
         if (userTeamId) url += `&user_team_id=${encodeURIComponent(userTeamId)}`;
@@ -1862,7 +1862,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       params.set('team_id', userTeamId);
       params.set('from', 'tournament-command-center'); // Track navigation source
       
-      window.location.href = `/static/playbooks.html?${params.toString()}`;
+      window.location.href = `/playbooks.html?${params.toString()}`;
     });
   }
 
@@ -1911,7 +1911,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const exitBtn = document.getElementById('exit-tournament');
   if (exitBtn) {
     exitBtn.addEventListener('click', () => {
-      window.location.href = '/static/mode-select.html';
+      window.location.href = '/mode-select.html';
     });
   }
 });
