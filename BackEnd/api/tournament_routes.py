@@ -1090,7 +1090,7 @@ def run_tournament_training(req: TournamentTrainingRequest):
         return {
             "status": "already_completed",
             "round": current_round,
-            "redirect": f"/static/training-report.html?mode=tournament&tournament_id={req.tournament_id}&team_id={req.team_id}"
+            "redirect": f"/training-report.html?mode=tournament&tournament_id={req.tournament_id}&team_id={req.team_id}"
         }
 
     # ✅ MIGRATION: Use tournament document's user_team_object_id as source of truth
@@ -1349,5 +1349,5 @@ def run_tournament_training(req: TournamentTrainingRequest):
         "team_changes": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
         # SS&S: Only pass navigation params (tournament_id, mode, team_id) - backend will determine round from state
-        "redirect": f"/static/training-report.html?mode=tournament&tournament_id={req.tournament_id}&team_id={team_name}"
+        "redirect": f"/training-report.html?mode=tournament&tournament_id={req.tournament_id}&team_id={team_name}"
     }
