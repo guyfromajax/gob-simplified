@@ -159,7 +159,7 @@ async function loadStats() {
       } else if (teamName) {
         // Resolve team_id from team_name by fetching team document
         try {
-          const teamsResponse = await fetch('/teams');
+          const teamsResponse = await fetch(API_CONFIG.buildUrl('/teams'));
           const teams = await teamsResponse.json();
           const teamDoc = teams.find(t => t.name === teamName);
           if (teamDoc && teamDoc._id) {
