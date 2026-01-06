@@ -183,13 +183,17 @@
     // Cache buster: Add timestamp to force browser to reload game-plan.js
     const cacheBuster = Date.now();
     const script = document.createElement('script');
-    // Load API config first
+    // Load API config first (detect environment for path)
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const staticPrefix = isLocalhost ? '/static' : '';
     const apiConfigScript = document.createElement('script');
-    apiConfigScript.src = '/static/js/config/api-config.js';
+    apiConfigScript.src = `${staticPrefix}/js/config/api-config.js`;
+    apiConfigScript.onload = () => {
+      // After API config loads, load game-plan.js using the helper
+      script.src = `${API_CONFIG.getStaticPath()}/game-plan.js?v=${cacheBuster}`;
+      document.head.appendChild(script);
+    };
     document.head.appendChild(apiConfigScript);
-    
-    // Then load game-plan.js
-    script.src = `${API_CONFIG.getStaticPath()}/game-plan.js?v=${cacheBuster}`;
     script.onload = () => {
       console.log('✅ game-plan.js loaded with cache buster:', cacheBuster);
       // If DOM is already loaded, manually trigger init() since DOMContentLoaded already fired
