@@ -852,12 +852,15 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const missTurnForGetback = previousTurn?.result_type === "MISS" ? previousTurn : null;
     
     // ✅ Get rebounderId - must be present for rebound animation
-    const rebounderId = turnData.rebounderId || turnData.rebounder_player_id;
+    // Check all possible field names: rebounderId (camelCase), rebounder_id (underscore), rebounder_player_id
+    const rebounderId = turnData.rebounderId || turnData.rebounder_id || turnData.rebounder_player_id || turnData.roles?.rebounder?.player_id;
     
-    if (false) console.log('🏀 [FAST BREAK MISS] Checking rebounderId', {
+    console.log('🏀 [FAST BREAK MISS] Checking rebounderId', {
       rebounderId,
       fromRebounderId: turnData.rebounderId,
+      fromRebounderIdUnderscore: turnData.rebounder_id,
       fromRebounderPlayerId: turnData.rebounder_player_id,
+      fromRolesRebounder: turnData.roles?.rebounder?.player_id,
       exists: !!rebounderId
     });
     
