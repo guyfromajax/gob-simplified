@@ -240,21 +240,21 @@ backBtn.addEventListener('click', function() {
   if (mode === 'franchise') {
     const franchiseId = urlParams.get('franchise_id');
     const teamId = urlParams.get('team_id');
-    const url = `/static/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}`;
+    const url = `/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}`;
     const finalUrl = teamId ? `${url}&team_id=${encodeURIComponent(teamId)}` : url;
     window.location.href = finalUrl;
   } else if (mode === 'tournament') {
     // Use same pattern as franchise mode - tournament.html is the command center
     const tournamentId = urlParams.get('tournament_id');
     const teamId = urlParams.get('team_id');
-    const url = `/static/tournament.html?tournament_id=${encodeURIComponent(tournamentId)}`;
+    const url = `/tournament.html?tournament_id=${encodeURIComponent(tournamentId)}`;
     const finalUrl = teamId ? `${url}&team_id=${encodeURIComponent(teamId)}` : url;
     window.location.href = finalUrl;
   } else if (from === 'game-plan') {
-    window.location.href = '/static/game-plan.html?' + urlParams.toString();
+    window.location.href = '/game-plan.html?' + urlParams.toString();
   } else {
     // Default fallback
-    window.location.href = '/static/game-plan.html';
+    window.location.href = '/game-plan.html';
   }
 });
 
@@ -417,12 +417,12 @@ submitBtn.addEventListener('click', async function() {
     if (result.redirect) {
       window.location.href = result.redirect;
     } else if (mode === 'franchise' && franchiseId) {
-      window.location.href = `/static/franchise-command-center.html?franchise_id=${franchiseId}`;
+      window.location.href = `/franchise-command-center.html?franchise_id=${franchiseId}`;
     } else if (mode === 'tournament' && tournamentId) {
       // Use same pattern as franchise mode - tournament.html is the command center
-      window.location.href = `/static/tournament.html?tournament_id=${tournamentId}`;
+      window.location.href = `/tournament.html?tournament_id=${tournamentId}`;
     } else {
-      window.location.href = '/static/game-plan.html';
+      window.location.href = '/game-plan.html';
     }
     
   } catch (error) {

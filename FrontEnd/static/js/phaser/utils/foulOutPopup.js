@@ -111,7 +111,7 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
     params.set(key, value);
   });
   
-  const lineupUrl = `/static/set-lineup.html?${params.toString()}`;
+  const lineupUrl = `/set-lineup.html?${params.toString()}`;
 
   // Create popup
   const popup = document.createElement('div');
@@ -121,7 +121,7 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
       <div class="foul-out-header">
         <div class="foul-out-player-image-container">
           ${player.photo ? 
-            `<img src="${player.photo}" alt="${player.name}" class="foul-out-player-image" onerror="this.src='/static/images/default-player.png'">` :
+            `<img src="${player.photo}" alt="${player.name}" class="foul-out-player-image" onerror="this.src='/images/default-player.png'">` :
             `<div class="foul-out-player-placeholder">${player.name?.charAt(0) || 'P'}</div>`
           }
         </div>

@@ -2,7 +2,7 @@
  * BASELINE_INBOUND Fix Validation Script
  * 
  * Validates that the code fixes are in place to prevent double inbound animations.
- * Run with: node FrontEnd/static/js/phaser/animation/tests/validateBaselineInboundFix.js
+ * Run with: node FrontEnd/js/phaser/animation/tests/validateBaselineInboundFix.js
  */
 
 import fs from 'fs';
@@ -52,7 +52,7 @@ console.log('━━━━━━━━━━━━━━━━━━━━━━�
 const testResults = [];
 
 // Test 1: ShotAnimationSystem.handleMadeShot should skip runInboundSetup when next_play_type is BASELINE_INBOUND
-const shotSystemPath = path.join(projectRoot, 'FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js');
+const shotSystemPath = path.join(projectRoot, 'FrontEnd/js/phaser/animation/ShotAnimationSystem.js');
 testResults.push(checkFile(shotSystemPath, [
   {
     name: 'HCO MAKE skips runInboundSetup when next_play_type is BASELINE_INBOUND',
@@ -65,7 +65,7 @@ testResults.push(checkFile(shotSystemPath, [
 ]));
 
 // Test 2: handleOrebTurn should skip runInboundSetup when next_play_type is BASELINE_INBOUND
-const animateGameTurnsPath = path.join(projectRoot, 'FrontEnd/static/js/phaser/animation/animateGameTurns.js');
+const animateGameTurnsPath = path.join(projectRoot, 'FrontEnd/js/phaser/animation/animateGameTurns.js');
 testResults.push(checkFile(animateGameTurnsPath, [
   {
     name: 'PUTBACK_MAKE skips runInboundSetup when next_play_type is BASELINE_INBOUND',
@@ -74,7 +74,7 @@ testResults.push(checkFile(animateGameTurnsPath, [
 ]));
 
 // Test 3: fastBreak.js should skip runInboundSetup when next_play_type is BASELINE_INBOUND
-const fastBreakPath = path.join(projectRoot, 'FrontEnd/static/js/phaser/animation/fastBreak.js');
+const fastBreakPath = path.join(projectRoot, 'FrontEnd/js/phaser/animation/fastBreak.js');
 testResults.push(checkFile(fastBreakPath, [
   {
     name: 'Fast Break MAKE skips runInboundSetup when next_play_type is BASELINE_INBOUND',
@@ -83,7 +83,7 @@ testResults.push(checkFile(fastBreakPath, [
 ]));
 
 // Test 4: freeThrow.js should skip runInboundSetup when next_play_type is BASELINE_INBOUND
-const freeThrowPath = path.join(projectRoot, 'FrontEnd/static/js/phaser/animation/freeThrow.js');
+const freeThrowPath = path.join(projectRoot, 'FrontEnd/js/phaser/animation/freeThrow.js');
 testResults.push(checkFile(freeThrowPath, [
   {
     name: 'Free Throw MAKE skips runInboundSetup when next_play_type is BASELINE_INBOUND',
@@ -92,7 +92,7 @@ testResults.push(checkFile(freeThrowPath, [
 ]));
 
 // Test 5: FreeThrowAnimationSystem should skip runInboundSetup when next_play_type is BASELINE_INBOUND
-const freeThrowSystemPath = path.join(projectRoot, 'FrontEnd/static/js/phaser/animation/FreeThrowAnimationSystem.js');
+const freeThrowSystemPath = path.join(projectRoot, 'FrontEnd/js/phaser/animation/FreeThrowAnimationSystem.js');
 testResults.push(checkFile(freeThrowSystemPath, [
   {
     name: 'FreeThrowAnimationSystem skips runInboundSetup when next_play_type is BASELINE_INBOUND',
@@ -101,7 +101,7 @@ testResults.push(checkFile(freeThrowSystemPath, [
 ]));
 
 // Test 6: playTurnAnimation should skip runInboundSetup when next_play_type is BASELINE_INBOUND
-const turnAnimationPath = path.join(projectRoot, 'FrontEnd/static/js/phaser/animation/turnAnimation.js');
+const turnAnimationPath = path.join(projectRoot, 'FrontEnd/js/phaser/animation/turnAnimation.js');
 testResults.push(checkFile(turnAnimationPath, [
   {
     name: 'playTurnAnimation skips runInboundSetup when next_play_type is BASELINE_INBOUND',
@@ -110,7 +110,7 @@ testResults.push(checkFile(turnAnimationPath, [
 ]));
 
 // Test 7: AnimationEngine.handleBaselineInbound should call runInboundSetup
-const animationEnginePath = path.join(projectRoot, 'FrontEnd/static/js/phaser/animation/AnimationEngine.js');
+const animationEnginePath = path.join(projectRoot, 'FrontEnd/js/phaser/animation/AnimationEngine.js');
 testResults.push(checkFile(animationEnginePath, [
   {
     name: 'AnimationEngine.handleBaselineInbound exists',

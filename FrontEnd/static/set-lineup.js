@@ -389,7 +389,7 @@ function renderRoster() {
       // Make player name a clickable link
       if (idx === 0) {  // First cell is player name
         const link = document.createElement('a');
-        link.href = `/static/player-detail.html?id=${p._id}`;
+        link.href = `/player-detail.html?id=${p._id}`;
         link.textContent = val ?? '--';
         link.style.color = ng <= 0.89 ? '#fff' : 'inherit';
         link.style.textDecoration = 'none';
@@ -678,8 +678,8 @@ function updateSlotDisplay(slot) {
     // Build slot content HTML
     slotContent.innerHTML = `
       <div class="player-image-container">
-        <img class="player-image" src="/static/images/players/${playerId}.png" 
-             onerror="this.src='/static/images/players/default.png'" alt="${player.name}">
+        <img class="player-image" src="/images/players/${playerId}.png" 
+             onerror="this.src='/images/players/default.png'" alt="${player.name}">
       </div>
       <div class="player-name">${player.name}</div>
       <div class="player-rating">${rating}</div>
@@ -934,7 +934,7 @@ async function setHeader() {
   
   const logo = document.getElementById('team-logo');
   if (logo) {
-    logo.src = `/static/images/homepage-logos/${teamName}.png`;
+    logo.src = `/images/homepage-logos/${teamName}.png`;
     logo.alt = `${teamName} logo`;
     logo.hidden = false;
     logo.onerror = () => { logo.hidden = true; };
@@ -1147,7 +1147,7 @@ async function init() {
       // Mark that navigation originated from lineup so Box Score can "Back" here
       params.set('from', 'lineup');
 
-      window.location.href = `/static/box-score.html?${params.toString()}`;
+      window.location.href = `/box-score.html?${params.toString()}`;
     });
   }
 }
@@ -1331,7 +1331,7 @@ function createCardFront(player) {
   
   // Headshot container (clickable link to player detail)
   const headshotLink = document.createElement('a');
-  headshotLink.href = `/static/player-detail.html?id=${player._id}`;
+  headshotLink.href = `/player-detail.html?id=${player._id}`;
   headshotLink.style.display = 'block';
   headshotLink.style.textDecoration = 'none';
   
@@ -1340,7 +1340,7 @@ function createCardFront(player) {
   
   // Set team background image
   const teamNameNormalized = teamName.toLowerCase().replace(/\s+/g, '-');
-  headshotContainer.style.backgroundImage = `url(/static/images/team-backgrounds/${teamNameNormalized}-background.png)`;
+  headshotContainer.style.backgroundImage = `url(/images/team-backgrounds/${teamNameNormalized}-background.png)`;
   headshotContainer.style.backgroundSize = 'cover';
   headshotContainer.style.backgroundPosition = 'center';
   
@@ -1367,7 +1367,7 @@ function createCardFront(player) {
   // Player image
   const img = document.createElement('img');
   img.className = 'player-headshot';
-  img.src = player.photo || `/static/images/players/${player._id}.png`;
+  img.src = player.photo || `/images/players/${player._id}.png`;
   img.alt = player.name;
   img.onerror = () => {
     // Fallback to white background if image fails

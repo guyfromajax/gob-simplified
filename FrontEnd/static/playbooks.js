@@ -1101,7 +1101,7 @@ class PlaybooksUI {
       params.set('from', from);
     }
     
-    window.location.href = `/static/play-details.html?${params.toString()}`;
+    window.location.href = `/play-details.html?${params.toString()}`;
   }
   
   // ✅ SS&S: Removed saveStateToLocalStorage() - database is single source of truth
@@ -1863,7 +1863,7 @@ class PlaybooksUI {
       if (tournamentId) params.set('tournament_id', tournamentId);
       if (userTeamId) params.set('user_team_id', userTeamId);
       
-      window.location.href = `/static/tournament.html?${params.toString()}`;
+      window.location.href = `/tournament.html?${params.toString()}`;
       return;
     }
     
@@ -1877,7 +1877,7 @@ class PlaybooksUI {
       if (tournamentId) params.set('tournament_id', tournamentId);
       if (userTeamId) params.set('user_team_id', userTeamId);
       
-      window.location.href = `/static/tournament.html?${params.toString()}`;
+      window.location.href = `/tournament.html?${params.toString()}`;
       return;
     }
     
@@ -1894,7 +1894,7 @@ class PlaybooksUI {
       if (franchiseId) params.set('franchise_id', franchiseId);
       if (teamId) params.set('team_id', teamId); // Use team_id (ObjectId), not user_team_name
       
-      window.location.href = `/static/franchise-command-center.html?${params.toString()}`;
+      window.location.href = `/franchise-command-center.html?${params.toString()}`;
       return;
     }
     
@@ -1909,7 +1909,7 @@ class PlaybooksUI {
       if (franchiseId) params.set('franchise_id', franchiseId);
       if (teamId) params.set('team_id', teamId); // Use team_id (ObjectId), not user_team_name
       
-      window.location.href = `/static/franchise-command-center.html?${params.toString()}`;
+      window.location.href = `/franchise-command-center.html?${params.toString()}`;
       return;
     }
     
@@ -1947,7 +1947,7 @@ class PlaybooksUI {
       params.set('from', 'playbooks');
     }
     
-    window.location.href = `/static/game-plan.html?${params.toString()}`;
+    window.location.href = `/game-plan.html?${params.toString()}`;
   }
   
   async handleSubmit() {

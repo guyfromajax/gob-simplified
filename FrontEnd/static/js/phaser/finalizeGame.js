@@ -98,7 +98,7 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
             window.refreshLeaders?.();
           } else {
             localStorage.setItem("activeTournament", JSON.stringify(updated));
-            window.location.href = "/static/tournament.html";
+            window.location.href = "/tournament.html";
           }
         } catch (e) {
           console.error("Failed to update tournament state", e);

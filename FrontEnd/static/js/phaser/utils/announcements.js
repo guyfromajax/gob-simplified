@@ -141,13 +141,13 @@ function createHeadshotElement(playerData, scale = 1.0) {
   
   if (playerData.teamName) {
     const teamNameNormalized = playerData.teamName.toLowerCase().replace(/\s+/g, '-');
-    container.style.backgroundImage = `url(/static/images/team-backgrounds/${teamNameNormalized}-background.png)`;
+    container.style.backgroundImage = `url(/images/team-backgrounds/${teamNameNormalized}-background.png)`;
     container.style.backgroundSize = 'cover';
     container.style.backgroundPosition = 'center';
   }
   
   const img = document.createElement('img');
-  img.src = playerData.photo || `/static/images/players/${playerData.playerId}.png`;
+  img.src = playerData.photo || `/images/players/${playerData.playerId}.png`;
   img.alt = 'Player';
   img.style.width = '100%';
   img.style.height = '100%';
@@ -240,13 +240,13 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
     // Set team background
     if (playerData.teamName) {
       const teamNameNormalized = playerData.teamName.toLowerCase().replace(/\s+/g, '-');
-      headshotContainer.style.backgroundImage = `url(/static/images/team-backgrounds/${teamNameNormalized}-background.png)`;
+      headshotContainer.style.backgroundImage = `url(/images/team-backgrounds/${teamNameNormalized}-background.png)`;
       headshotContainer.style.backgroundSize = 'cover';
       headshotContainer.style.backgroundPosition = 'center';
     }
     
     const img = document.createElement('img');
-    img.src = playerData.photo || `/static/images/players/${playerData.playerId}.png`;
+    img.src = playerData.photo || `/images/players/${playerData.playerId}.png`;
     img.alt = 'Player';
     img.style.width = '100%';
     img.style.height = '100%';

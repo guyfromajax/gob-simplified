@@ -34,7 +34,7 @@ function populateTop(data) {
   if (!data) return;
   document.querySelector('.username').textContent = data.username || 'User';
   const formattedTeam = formatTeamName(data.team);
-  const logoSrc = `/static/images/homepage-logos/${formattedTeam}.png`;
+  const logoSrc = `/images/homepage-logos/${formattedTeam}.png`;
   document.getElementById('team-logo').src = logoSrc;
   console.log('Team logo URL:', logoSrc);
 
@@ -43,11 +43,11 @@ function populateTop(data) {
   const dukeEl = document.getElementById('coach-duke');
   if (abbr) {
     if (sammyEl) {
-      sammyEl.src = `/static/images/coaches/${abbr}/Sammy-${abbr}.png`;
+      sammyEl.src = `/images/coaches/${abbr}/Sammy-${abbr}.png`;
       console.log('Coach Sammy URL:', sammyEl.src);
     }
     if (dukeEl) {
-      dukeEl.src = `/static/images/coaches/${abbr}/Duke-${abbr}.png`;
+      dukeEl.src = `/images/coaches/${abbr}/Duke-${abbr}.png`;
       console.log('Coach Duke URL:', dukeEl.src);
     }
   } else {
@@ -91,7 +91,7 @@ function renderStandings(data) {
     const teamNameTd = document.createElement('td');
     const teamLink = document.createElement('a');
     const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
-    teamLink.href = `/static/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(t.team_id)}&team_name=${encodeURIComponent(t.name)}&return_tab=standings-tab&return_url=${returnUrl}`;
+    teamLink.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(t.team_id)}&team_name=${encodeURIComponent(t.name)}&return_tab=standings-tab&return_url=${returnUrl}`;
     teamLink.textContent = t.name;
     teamLink.style.color = '#4a90e2';
     teamLink.style.textDecoration = 'none';
@@ -558,7 +558,7 @@ function renderTeam(data) {
     // Create player name as clickable link
     const nameTd = document.createElement("td");
     const nameLink = document.createElement("a");
-    nameLink.href = `/static/player-detail.html?id=${p._id}`;
+    nameLink.href = `/player-detail.html?id=${p._id}`;
     nameLink.textContent = p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
@@ -714,7 +714,7 @@ function sortRosterTable(columnName, direction) {
     
     const nameTd = document.createElement("td");
     const nameLink = document.createElement("a");
-    nameLink.href = `/static/player-detail.html?id=${p._id}`;
+    nameLink.href = `/player-detail.html?id=${p._id}`;
     nameLink.textContent = p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
@@ -791,7 +791,7 @@ function renderSchedule(data) {
       const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
       const createTeamLink = (teamName, teamId) => {
         const link = document.createElement('a');
-        link.href = `/static/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(teamId || teamName)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
+        link.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(teamId || teamName)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
         link.textContent = teamName;
         link.style.color = '#4a90e2';
         link.style.textDecoration = 'none';
@@ -842,7 +842,7 @@ function renderSchedule(data) {
       // ✅ SS&S: Add box score link for all completed games
       if (g.status === 'complete' && g.game_id) {
         const boxScoreLink = document.createElement('a');
-        boxScoreLink.href = `/static/box-score.html?mode=franchise&franchise_id=${franchiseId}&game_id=${g.game_id}`;
+        boxScoreLink.href = `/box-score.html?mode=franchise&franchise_id=${franchiseId}&game_id=${g.game_id}`;
         boxScoreLink.textContent = ' [Box Score]';
         boxScoreLink.className = 'box-score-link';
         boxScoreLink.style.color = '#4a90e2';
@@ -857,7 +857,7 @@ function renderSchedule(data) {
         const link = document.createElement('a');
         // ✅ SS&S: Use ObjectId for consistent navigation
         const teamIdParam = userTeamId || teamId;
-        link.href = `/static/training-report.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamIdParam}&week=${g.week}`;
+        link.href = `/training-report.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamIdParam}&week=${g.week}`;
         link.textContent = ' [Training Report]';
         link.className = 'training-report-link';
         link.style.color = '#4a90e2';
@@ -1039,7 +1039,7 @@ playNowBtn.addEventListener('click', async () => {
     const sessionType = topData?.session_type || 'in-season';
     // ✅ SS&S: Include team_id (ObjectId) for consistent navigation
     const teamIdParam = userTeamId ? `&team_id=${encodeURIComponent(userTeamId)}` : '';
-    window.location.href = `/static/training.html?franchise_id=${franchiseId}&mode=franchise&session_type=${sessionType}${teamIdParam}`;
+    window.location.href = `/training.html?franchise_id=${franchiseId}&mode=franchise&session_type=${sessionType}${teamIdParam}`;
     return;
   }
   
@@ -1159,7 +1159,7 @@ playNowBtn.addEventListener('click', async () => {
       localStorage.setItem('franchise_week', week);
     } catch {}
     const mySide = userTeamName === home ? 'home' : (userTeamName === away ? 'away' : '');
-    let url = `/static/set-lineup.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&home_id=${encodeURIComponent(home_id)}&away_id=${encodeURIComponent(away_id)}`;
+    let url = `/set-lineup.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&home_id=${encodeURIComponent(home_id)}&away_id=${encodeURIComponent(away_id)}`;
     // ✅ SS&S: Use ObjectId for consistent navigation
     if (userTeamId) url += `&team_id=${encodeURIComponent(userTeamId)}`;
     if (mySide) url += `&my_team=${mySide}`;
@@ -1204,7 +1204,7 @@ if (playbooksBtn) {
       params.set('team_id', userTeamId);
       params.set('from', 'franchise-command-center'); // Track navigation source
       
-      window.location.href = `/static/playbooks.html?${params.toString()}`;
+      window.location.href = `/playbooks.html?${params.toString()}`;
   });
 }
 

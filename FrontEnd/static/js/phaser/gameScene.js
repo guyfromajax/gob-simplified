@@ -150,11 +150,11 @@ export function createGameScene(Phaser) {
     async preload() {
       if (DEBUG_FLOW) console.log("✅ GameScene preloaded");
       if (this.animate) {
-        this.load.image("ball", "/static/images/ball.png");
+        this.load.image("ball", "/images/ball.png");
         const { home } = gameStore.getTeams();
         const normalizeTeamName = (name) => name.toLowerCase().replace(/[\s\-]/g, '_');
         const teamId = normalizeTeamName(home);
-        this.load.image("court-bg", `/static/images/courts/${teamId}.jpg`);
+        this.load.image("court-bg", `/images/courts/${teamId}.jpg`);
       }
 
     }
@@ -388,8 +388,8 @@ export function createGameScene(Phaser) {
 
       const homeLogoEl = document.getElementById('home-logo');
       const awayLogoEl = document.getElementById('away-logo');
-      if (homeLogoEl) homeLogoEl.src = `/static/images/homepage-logos/${encodeURIComponent(homeTeam)}.png`;
-      if (awayLogoEl) awayLogoEl.src = `/static/images/homepage-logos/${encodeURIComponent(awayTeam)}.png`;
+      if (homeLogoEl) homeLogoEl.src = `/images/homepage-logos/${encodeURIComponent(homeTeam)}.png`;
+      if (awayLogoEl) awayLogoEl.src = `/images/homepage-logos/${encodeURIComponent(awayTeam)}.png`;
 
       const homeScoreEl = document.getElementById('home-score');
       const awayScoreEl = document.getElementById('away-score');
@@ -504,10 +504,10 @@ export function createGameScene(Phaser) {
         if (!tooltip) return;
         
         // Set player image
-        const playerPhoto = player.photo || `/static/images/players/${playerId}.png`;
+        const playerPhoto = player.photo || `/images/players/${playerId}.png`;
         image.src = playerPhoto;
         image.onerror = () => {
-          image.src = '/static/images/players/default.png'; // Fallback image
+          image.src = '/images/players/default.png'; // Fallback image
         };
         
         // Get current player stats (including current energy)
@@ -1515,7 +1515,7 @@ export function createGameScene(Phaser) {
             // Wire up button
             const button = popup.querySelector('.locker-room-button');
             button.addEventListener('click', () => {
-              window.location.href = `/static/set-lineup.html?${params.toString()}`;
+              window.location.href = `/set-lineup.html?${params.toString()}`;
             });
             
             return;
@@ -1598,7 +1598,7 @@ export function createGameScene(Phaser) {
           }
           DEBUG_FLOW && console.log('➡️ Advancing to lineup', { nextQ, gameId: this.gameId });
           DEBUG_FLOW && console.log('skipToEnd at navigation:', this.skipToEnd);
-          window.location.href = `/static/set-lineup.html?${params.toString()}`;
+          window.location.href = `/set-lineup.html?${params.toString()}`;
         }
       }
     }
@@ -2091,7 +2091,7 @@ export function createGameScene(Phaser) {
         // Wire up button
         const button = popup.querySelector('.locker-room-button');
         button.addEventListener('click', () => {
-          window.location.href = `/static/set-lineup.html?${params.toString()}`;
+          window.location.href = `/set-lineup.html?${params.toString()}`;
         });
         return;
       } else if (quarterThatJustFinished > 4 && finalIsTied) {
@@ -2123,7 +2123,7 @@ export function createGameScene(Phaser) {
         // Wire up button
         const button = popup.querySelector('.locker-room-button');
         button.addEventListener('click', () => {
-          window.location.href = `/static/set-lineup.html?${params.toString()}`;
+          window.location.href = `/set-lineup.html?${params.toString()}`;
         });
         return;
       } else if (isFinalFromBackend || (quarterThatJustFinished >= 4 && !finalIsTied)) {
@@ -2261,7 +2261,7 @@ export function createGameScene(Phaser) {
         // Wire up button
         const button = popup.querySelector('.locker-room-button');
         button.addEventListener('click', () => {
-          window.location.href = `/static/set-lineup.html?${params.toString()}`;
+          window.location.href = `/set-lineup.html?${params.toString()}`;
         });
         return;
       }

@@ -25,7 +25,7 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
   let lockerRoomUrl;
   switch (mode) {
     case 'tournament':
-      lockerRoomUrl = '/static/tournament.html';
+      lockerRoomUrl = '/tournament.html';
       const tournamentParams = new URLSearchParams();
       if (tournamentId) {
         tournamentParams.set('tournament_id', tournamentId);
@@ -39,7 +39,7 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
       }
       break;
     case 'franchise':
-      lockerRoomUrl = '/static/franchise-command-center.html';
+      lockerRoomUrl = '/franchise-command-center.html';
       const franchiseParams = new URLSearchParams();
       if (franchiseId) {
         franchiseParams.set('franchise_id', franchiseId);
@@ -53,7 +53,7 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
       }
       break;
     default:
-      lockerRoomUrl = '/static/mode-select.html';
+      lockerRoomUrl = '/mode-select.html';
   }
 
   // Box Score URL - include mode, IDs, and team names for proper navigation
@@ -66,7 +66,7 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
   if (tournamentId) boxScoreParams.set('tournament_id', tournamentId);
   if (franchiseId) boxScoreParams.set('franchise_id', franchiseId);
   if (teamId) boxScoreParams.set('team_id', teamId);
-  const boxScoreUrl = `/static/box-score.html?${boxScoreParams.toString()}`;
+  const boxScoreUrl = `/box-score.html?${boxScoreParams.toString()}`;
   
   console.log('📊 Box Score URL constructed:', {
     gameId,
