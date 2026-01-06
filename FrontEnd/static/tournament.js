@@ -1472,7 +1472,7 @@ async function loadCommandCenterData() {
     }
     
     // ✅ MIGRATION: Use command-center/data endpoint (aligns with Franchise pattern)
-    const url = `/tournament/command-center/data?tournament_id=${encodeURIComponent(tournamentId)}&_=${Date.now()}`;
+    const url = `${API_CONFIG.buildUrl('/tournament/command-center/data')}?tournament_id=${encodeURIComponent(tournamentId)}&_=${Date.now()}`;
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) {
       throw new Error(`Failed to load command center data: ${res.status} ${res.statusText}`);
@@ -1518,15 +1518,15 @@ async function loadTournament() {
     
     if (urlTournamentId) {
       params = new URLSearchParams({ tournament_id: urlTournamentId });
-      url = `/tournament/state?${params.toString()}`;
+      url = `${API_CONFIG.buildUrl('/tournament/state')}?${params.toString()}`;
     } else if (tournament && tournament._id) {
       // Priority 2: tournament from localStorage
       params = new URLSearchParams({ tournament_id: tournament._id });
-      url = `/tournament/state?${params.toString()}`;
+      url = `${API_CONFIG.buildUrl('/tournament/state')}?${params.toString()}`;
     } else {
       // Priority 3: fallback to active tournament by user_team_id
       params = new URLSearchParams({ user_team_id: userTeamId });
-      url = `/tournament/active?${params.toString()}`;
+      url = `${API_CONFIG.buildUrl('/tournament/active')}?${params.toString()}`;
     }
     
     // Add cache buster using & (not ?) since URL already has query params
@@ -1581,7 +1581,7 @@ async function loadRoster() {
     }
     // Use tournament roster endpoint (similar to franchise/roster)
     // Use userTeamId directly (not formatted) - backend handles name resolution
-    const url = `/tournament/roster?tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(userTeamId)}`;
+    const url = `${API_CONFIG.buildUrl('/tournament/roster')}?tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(userTeamId)}`;
     const res = await fetch(url);
     const data = await res.json();
     console.log("Tournament team player data:", data);
