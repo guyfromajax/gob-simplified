@@ -842,7 +842,14 @@ function renderSchedule(data) {
       // ✅ SS&S: Add box score link for all completed games
       if (g.status === 'complete' && g.game_id) {
         const boxScoreLink = document.createElement('a');
-        boxScoreLink.href = `/box-score.html?mode=franchise&franchise_id=${franchiseId}&game_id=${g.game_id}`;
+        const boxScoreParams = new URLSearchParams();
+        boxScoreParams.set('mode', 'franchise');
+        boxScoreParams.set('franchise_id', franchiseId);
+        boxScoreParams.set('game_id', g.game_id);
+        // ✅ Add team names for roster loading
+        if (home) boxScoreParams.set('home', home);
+        if (away) boxScoreParams.set('away', away);
+        boxScoreLink.href = `/box-score.html?${boxScoreParams.toString()}`;
         boxScoreLink.textContent = ' [Box Score]';
         boxScoreLink.className = 'box-score-link';
         boxScoreLink.style.color = '#4a90e2';
