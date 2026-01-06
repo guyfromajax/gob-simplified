@@ -69,7 +69,7 @@ async function loadRoster() {
   try {
     let url = '';
     if (mode === 'franchise' && franchiseId) {
-      url = `/franchise/roster?franchise_id=${franchiseId}`;
+      url = `${API_CONFIG.buildUrl('/franchise/roster')}?franchise_id=${franchiseId}`;
       // Use teamName (team display name) for the API call, not teamId (ObjectId)
       if (teamName) {
         url += `&team_name=${encodeURIComponent(teamName)}`;
@@ -78,7 +78,7 @@ async function loadRoster() {
         url += `&team_name=${encodeURIComponent(teamId)}`;
       }
     } else if (mode === 'tournament' && tournamentId) {
-      url = `/tournament/roster?tournament_id=${tournamentId}`;
+      url = `${API_CONFIG.buildUrl('/tournament/roster')}?tournament_id=${tournamentId}`;
       // Use teamName (team display name) for the API call, not teamId (ObjectId)
       if (teamName) {
         url += `&team_name=${encodeURIComponent(teamName)}`;
@@ -155,7 +155,7 @@ async function loadStats() {
       // First, try to get team document to resolve ObjectId
       if (teamId && teamId.match(/^[0-9a-fA-F]{24}$/)) {
         // teamId is already an ObjectId string, use it
-        url = `/franchise/team-player-stats/${encodeURIComponent(teamId)}?franchise_id=${franchiseId}&scope=season`;
+        url = `${API_CONFIG.buildUrl('/franchise/team-player-stats')}/${encodeURIComponent(teamId)}?franchise_id=${franchiseId}&scope=season`;
       } else if (teamName) {
         // Resolve team_id from team_name by fetching team document
         try {
@@ -163,25 +163,25 @@ async function loadStats() {
           const teams = await teamsResponse.json();
           const teamDoc = teams.find(t => t.name === teamName);
           if (teamDoc && teamDoc._id) {
-            url = `/franchise/team-player-stats/${encodeURIComponent(teamDoc._id)}?franchise_id=${franchiseId}&scope=season`;
+            url = `${API_CONFIG.buildUrl('/franchise/team-player-stats')}/${encodeURIComponent(teamDoc._id)}?franchise_id=${franchiseId}&scope=season`;
           } else {
             // Fallback: use leaders endpoint and filter by team
-            url = `/franchise/leaders?franchise_id=${franchiseId}&scope=season`;
+            url = `${API_CONFIG.buildUrl('/franchise/leaders')}?franchise_id=${franchiseId}&scope=season`;
           }
         } catch (e) {
           // Fallback: use leaders endpoint
-          url = `/franchise/leaders?franchise_id=${franchiseId}&scope=season`;
+          url = `${API_CONFIG.buildUrl('/franchise/leaders')}?franchise_id=${franchiseId}&scope=season`;
         }
       } else {
         // Fallback: use user team endpoint
-        url = `/franchise/team-player-stats?franchise_id=${franchiseId}&scope=season`;
+        url = `${API_CONFIG.buildUrl('/franchise/team-player-stats')}?franchise_id=${franchiseId}&scope=season`;
       }
     } else if (mode === 'tournament' && tournamentId) {
       // Tournament mode - stats are stored in tournament.players[pid].season
       // We'll extract from the roster data we already have, or fetch roster again
       // The tournament roster endpoint doesn't return stats, so we need to get them from tournament document
       // For now, we'll use the leaders endpoint and filter
-      url = `/tournament/leaders?tournament_id=${tournamentId}`;
+      url = `${API_CONFIG.buildUrl('/tournament/leaders')}?tournament_id=${tournamentId}`;
     } else {
       document.getElementById('stats-body').innerHTML = '<tr><td colspan="23">Invalid mode or missing IDs</td></tr>';
       return;
