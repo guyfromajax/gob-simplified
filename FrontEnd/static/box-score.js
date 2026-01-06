@@ -36,21 +36,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       await loadPreGameData({ homeTeamName, awayTeamName, franchiseId, tournamentId, mode });
       renderBoxScore();
       setupTabs();
-      setupLockerRoomButton();
-      return;
     } catch (e) {
       console.error('❌ Error loading pregame box score:', e);
-      return;
+    } finally {
+      // ✅ Always setup locker room button, even if data loading fails
+      setupLockerRoomButton();
     }
+    return;
   }
 
   try {
     await loadGameData(gameId);
     renderBoxScore();
     setupTabs();
-    setupLockerRoomButton();
   } catch (error) {
     console.error('❌ Error loading box score:', error);
+  } finally {
+    // ✅ Always setup locker room button, even if data loading fails
+    setupLockerRoomButton();
   }
 });
 
@@ -1104,7 +1107,15 @@ function setupTabs() {
 // Setup Locker Room button navigation
 function setupLockerRoomButton() {
   const button = document.getElementById('locker-room-button');
-  if (!button) return;
+  if (!button) {
+    console.warn('⚠️ [BOX-SCORE] Locker room button not found in DOM');
+    return;
+  }
+  
+  // ✅ Remove any existing event listeners by cloning the button
+  const newButton = button.cloneNode(true);
+  button.parentNode.replaceChild(newButton, button);
+  const cleanButton = newButton;
 
   // Determine mode from URL params or localStorage
   const urlParams = new URLSearchParams(window.location.search);
@@ -1128,11 +1139,11 @@ function setupLockerRoomButton() {
   // ✅ SS&S: Handle back navigation from lineup or game-plan screens
   // Both use TimeoutNavigationHelper to preserve timeout state
   if (from === 'lineup' || from === 'game-plan') {
-    button.textContent = 'Back';
+    cleanButton.textContent = 'Back';
     
     // Remove any existing event listeners by cloning the button
-    const newButton = button.cloneNode(true);
-    button.parentNode.replaceChild(newButton, button);
+    const newButton = cleanButton.cloneNode(true);
+    cleanButton.parentNode.replaceChild(newButton, cleanButton);
     const backButton = newButton;
     
     // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
@@ -1251,7 +1262,10 @@ function setupLockerRoomButton() {
     }
   }
 
-  button.addEventListener('click', () => {
+  cleanButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('🚪 [BOX-SCORE] Navigating to locker room:', lockerRoomUrl);
     window.location.href = lockerRoomUrl;
   });
 }
