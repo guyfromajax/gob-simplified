@@ -1084,7 +1084,14 @@ function renderSchedule() {
     const gameId = res?.game_id || match.game_id;
     if (gameId && homeScore !== undefined && awayScore !== undefined) {
       const boxScoreLink = document.createElement('a');
-      boxScoreLink.href = `/box-score.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&game_id=${encodeURIComponent(gameId)}`;
+      const boxScoreParams = new URLSearchParams();
+      boxScoreParams.set('mode', 'tournament');
+      boxScoreParams.set('tournament_id', tournament._id);
+      boxScoreParams.set('game_id', gameId);
+      // ✅ Add team names for roster loading
+      if (match.home_team) boxScoreParams.set('home', match.home_team);
+      if (match.away_team) boxScoreParams.set('away', match.away_team);
+      boxScoreLink.href = `/box-score.html?${boxScoreParams.toString()}`;
       boxScoreLink.textContent = ' [Box Score]';
       boxScoreLink.className = 'box-score-link';
       boxScoreLink.style.color = '#4a90e2';
@@ -1260,7 +1267,14 @@ function renderSchedule() {
     const gameId = res?.game_id || match.game_id;
     if (gameId && homeScore !== undefined && awayScore !== undefined) {
       const boxScoreLink = document.createElement('a');
-      boxScoreLink.href = `/box-score.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&game_id=${encodeURIComponent(gameId)}`;
+      const boxScoreParams = new URLSearchParams();
+      boxScoreParams.set('mode', 'tournament');
+      boxScoreParams.set('tournament_id', tournament._id);
+      boxScoreParams.set('game_id', gameId);
+      // ✅ Add team names for roster loading
+      if (match.home_team) boxScoreParams.set('home', match.home_team);
+      if (match.away_team) boxScoreParams.set('away', match.away_team);
+      boxScoreLink.href = `/box-score.html?${boxScoreParams.toString()}`;
       boxScoreLink.textContent = ' [Box Score]';
       boxScoreLink.className = 'box-score-link';
       boxScoreLink.style.color = '#4a90e2';

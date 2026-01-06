@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const homeTeamName = urlParams.get('home');
   const awayTeamName = urlParams.get('away');
   const franchiseId = urlParams.get('franchise_id');
+  const tournamentId = urlParams.get('tournament_id');
+  const mode = urlParams.get('mode');
   
   console.log('📋 Box Score page loaded:', {
     gameId,
@@ -18,6 +20,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     homeTeamName,
     awayTeamName,
     franchiseId,
+    tournamentId,
+    mode,
     fullUrl: window.location.href,
     allParams: Object.fromEntries(urlParams.entries())
   });
@@ -29,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     try {
-      await loadPreGameData({ homeTeamName, awayTeamName, franchiseId });
+      await loadPreGameData({ homeTeamName, awayTeamName, franchiseId, tournamentId, mode });
       renderBoxScore();
       setupTabs();
       setupLockerRoomButton();
@@ -71,21 +75,33 @@ async function loadGameData(gameId) {
   
   // Fetch full rosters to ensure all 12 players are shown
   const urlParams = new URLSearchParams(window.location.search);
-  const homeTeamName = urlParams.get('home') || gameData.home_team?.name;
-  const awayTeamName = urlParams.get('away') || gameData.away_team?.name;
+  // Extract team names from URL params, game data, or team objects
+  const homeTeamName = urlParams.get('home') || 
+                       (typeof gameData.home_team === 'object' ? gameData.home_team?.name : gameData.home_team) ||
+                       gameData.home_team?.name;
+  const awayTeamName = urlParams.get('away') || 
+                       (typeof gameData.away_team === 'object' ? gameData.away_team?.name : gameData.away_team) ||
+                       gameData.away_team?.name;
   const franchiseId = urlParams.get('franchise_id');
+  const tournamentId = urlParams.get('tournament_id');
+  const mode = urlParams.get('mode');
   
   if (homeTeamName && awayTeamName) {
-    await mergeFullRosters(homeTeamName, awayTeamName, franchiseId);
+    await mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournamentId, mode);
   }
 }
 
 // Fetch and merge full rosters with game data to ensure all 12 players are shown
-async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId) {
+async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournamentId, mode) {
   const fetchRoster = async (team) => {
-    const path = franchiseId
-      ? `${API_CONFIG.buildUrl('/franchise/roster')}?franchise_id=${franchiseId}&team_name=${encodeURIComponent(team)}`
-      : API_CONFIG.buildUrl(`/roster/${encodeURIComponent(team)}`);
+    let path;
+    if (mode === 'franchise' && franchiseId) {
+      path = `${API_CONFIG.buildUrl('/franchise/roster')}?franchise_id=${franchiseId}&team_name=${encodeURIComponent(team)}`;
+    } else if (mode === 'tournament' && tournamentId) {
+      path = `${API_CONFIG.buildUrl('/tournament/roster')}?tournament_id=${tournamentId}&team_name=${encodeURIComponent(team)}`;
+    } else {
+      path = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(team)}`);
+    }
     const res = await fetch(path);
     if (!res.ok) throw new Error(`Failed to load roster for ${team}`);
     const data = await res.json();
@@ -163,11 +179,16 @@ function renderBoxScore() {
 }
 
 // Build zeroed box score data from rosters when viewing pre-game
-async function loadPreGameData({ homeTeamName, awayTeamName, franchiseId }) {
+async function loadPreGameData({ homeTeamName, awayTeamName, franchiseId, tournamentId, mode }) {
   const fetchRoster = async (team) => {
-    const path = franchiseId
-      ? `${API_CONFIG.buildUrl('/franchise/roster')}?franchise_id=${franchiseId}&team_name=${encodeURIComponent(team)}`
-      : API_CONFIG.buildUrl(`/roster/${encodeURIComponent(team)}`);
+    let path;
+    if (mode === 'franchise' && franchiseId) {
+      path = `${API_CONFIG.buildUrl('/franchise/roster')}?franchise_id=${franchiseId}&team_name=${encodeURIComponent(team)}`;
+    } else if (mode === 'tournament' && tournamentId) {
+      path = `${API_CONFIG.buildUrl('/tournament/roster')}?tournament_id=${tournamentId}&team_name=${encodeURIComponent(team)}`;
+    } else {
+      path = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(team)}`);
+    }
     const res = await fetch(path);
     if (!res.ok) throw new Error(`Failed to load roster for ${team}`);
     const data = await res.json();
