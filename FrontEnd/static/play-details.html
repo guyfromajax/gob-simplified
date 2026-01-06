@@ -400,6 +400,9 @@
 
     // Back navigation
     function goBack() {
+      // ✅ SS&S: Stop animation before navigation to prevent conflicts
+      stopAnimation();
+      
       // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
       const helper = window.TimeoutNavigationHelper;
       if (!helper) {
@@ -438,24 +441,17 @@
         computerTeamName: null
       });
       
-      // ✅ SS&S: Determine navigation target based on 'from' parameter
-      // If from=game-plan, go back to game-plan.html; otherwise go to playbooks.html
+      // ✅ SS&S: Always navigate back to playbooks.html (where user came from)
+      // Preserve 'from' parameter so playbooks knows where to navigate back to
       const from = urlParams.get('from');
-      let targetPage = 'playbooks.html'; // Default
-      
-      if (from === 'game-plan') {
-        targetPage = 'game-plan.html';
-        // Preserve 'from' parameter for game-plan's back navigation
-        params.set('from', from);
-      } else if (from) {
-        // Preserve other 'from' values (e.g., command_center)
+      if (from) {
         params.set('from', from);
       }
       
       // Use environment-aware path
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       const staticPrefix = isLocalhost ? '/static' : '';
-      window.location.href = `${staticPrefix}/${targetPage}?${params.toString()}`;
+      window.location.href = `${staticPrefix}/playbooks.html?${params.toString()}`;
     }
 
     // Helper function to adjust color brightness
