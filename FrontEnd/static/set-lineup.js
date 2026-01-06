@@ -106,10 +106,10 @@ async function loadRoster() {
   // Use franchise-specific roster endpoint if in franchise mode
   let url;
   if (franchiseId) {
-    url = `/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(teamName)}`;
+    url = API_CONFIG.buildUrl(`/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(teamName)}`);
     console.log("Loading franchise-specific roster for lineup");
   } else {
-    url = `/roster/${encodeURIComponent(teamName)}`;
+    url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(teamName)}`);
     console.log("Loading standard roster for lineup");
   }
   
@@ -865,7 +865,7 @@ async function setHeader() {
   
   if (gameId) {
     try {
-      const gameRes = await fetch(`/api/game/${gameId}?quarter=1`);
+      const gameRes = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}?quarter=1`));
       if (gameRes.ok) {
         const gameData = await gameRes.json();
         const score = gameData.score || {};
