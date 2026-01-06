@@ -436,7 +436,10 @@
         params.set('from', from);
       }
       
-      window.location.href = `/static/playbooks.html?${params.toString()}`;
+      // Use environment-aware path
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const staticPrefix = isLocalhost ? '/static' : '';
+      window.location.href = `${staticPrefix}/playbooks.html?${params.toString()}`;
     }
 
     // Helper function to adjust color brightness
@@ -493,7 +496,7 @@
 
       try {
         const encodedPlayName = encodeURIComponent(playName);
-        const response = await fetch(`/api/play/${encodedPlayName}`);
+        const response = await fetch(API_CONFIG.buildUrl(`/api/play/${encodedPlayName}`));
         
         if (!response.ok) {
           throw new Error(`Failed to load play: ${response.status}`);
@@ -948,6 +951,7 @@
       stopAnimation();
     });
   </script>
+  <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/timeoutNavigationHelper.js"></script>
 </body>
 </html>
