@@ -520,19 +520,34 @@
         
         // Get skeleton based on play type
         if (playState.type === 'Motion') {
-          // Motion plays: base_loop might be the skeleton object directly or have steps
+          // Motion plays: base_loop can have versions array (new format) or direct steps (old format)
           const baseLoop = playData.skeletons?.base_loop;
           if (baseLoop) {
-            // If base_loop has steps directly, use it
-            if (baseLoop.steps && Array.isArray(baseLoop.steps)) {
+            // Check for new format: versions array
+            if (baseLoop.versions && Array.isArray(baseLoop.versions) && baseLoop.versions.length > 0) {
+              // Use first version with steps (or v0 if available)
+              const v0Version = baseLoop.versions.find(v => v.version === 'v0' && v.steps && v.steps.length > 0);
+              const firstVersion = baseLoop.versions.find(v => v.steps && v.steps.length > 0);
+              const selectedVersion = v0Version || firstVersion;
+              if (selectedVersion && selectedVersion.steps) {
+                playState.skeleton = { steps: selectedVersion.steps };
+              } else {
+                console.error('Motion play base_loop has versions but none have steps');
+              }
+            } 
+            // Check for old format: direct steps array
+            else if (baseLoop.steps && Array.isArray(baseLoop.steps)) {
               playState.skeleton = baseLoop;
-            } else if (Array.isArray(baseLoop)) {
-              // If base_loop is an array of steps directly
+            } 
+            // Check if base_loop is an array of steps directly (unlikely but possible)
+            else if (Array.isArray(baseLoop)) {
               playState.skeleton = { steps: baseLoop };
-            } else {
-              // Try to find steps in the structure
-              playState.skeleton = baseLoop;
+            } 
+            else {
+              console.error('Motion play base_loop structure not recognized:', baseLoop);
             }
+          } else {
+            console.error('Motion play has no base_loop skeleton');
           }
         } else {
           // Set Play: Access successful skeleton v0 from versions array
@@ -559,33 +574,40 @@
         }
 
         if (!playState.skeleton || !playState.skeleton.steps || playState.skeleton.steps.length === 0) {
-          console.error('No skeleton data found for play');
+          console.error('No skeleton data found for play. playState.skeleton:', playState.skeleton);
+          console.error('playData.skeletons:', playData.skeletons);
+          document.getElementById('play-name').textContent = 'Error: No animation data available';
           return;
         }
+        
+        console.log('✅ Loaded skeleton with', playState.skeleton.steps.length, 'steps');
 
         // Load and display copy if it exists (works for both motion and set plays)
+        console.log('🔍 Checking for copy data:', playData.copy);
         if (playData.copy) {
           const copyContainers = document.querySelectorAll('.info-container p');
           if (copyContainers.length >= 3) {
             // Handle both object format (copy_1, copy_2, copy_3) and array format
             if (typeof playData.copy === 'object' && !Array.isArray(playData.copy)) {
-              copyContainers[0].textContent = playData.copy.copy_1 || playData.copy[0] || 'Copy Goes Here';
-              copyContainers[1].textContent = playData.copy.copy_2 || playData.copy[1] || 'Copy Goes Here';
-              copyContainers[2].textContent = playData.copy.copy_3 || playData.copy[2] || 'Copy Goes Here';
+              const copy1 = playData.copy.copy_1 || playData.copy[0] || '';
+              const copy2 = playData.copy.copy_2 || playData.copy[1] || '';
+              const copy3 = playData.copy.copy_3 || playData.copy[2] || '';
+              
+              if (copy1) copyContainers[0].textContent = copy1;
+              if (copy2) copyContainers[1].textContent = copy2;
+              if (copy3) copyContainers[2].textContent = copy3;
+              
+              console.log('✅ Loaded copy:', { copy1, copy2, copy3 });
             } else if (Array.isArray(playData.copy)) {
-              copyContainers[0].textContent = playData.copy[0] || 'Copy Goes Here';
-              copyContainers[1].textContent = playData.copy[1] || 'Copy Goes Here';
-              copyContainers[2].textContent = playData.copy[2] || 'Copy Goes Here';
+              if (playData.copy[0]) copyContainers[0].textContent = playData.copy[0];
+              if (playData.copy[1]) copyContainers[1].textContent = playData.copy[1];
+              if (playData.copy[2]) copyContainers[2].textContent = playData.copy[2];
+              
+              console.log('✅ Loaded copy from array:', playData.copy);
             }
           }
         } else {
-          // If no copy, show placeholder
-          const copyContainers = document.querySelectorAll('.info-container p');
-          copyContainers.forEach(container => {
-            if (container.textContent === 'Copy Goes Here') {
-              // Keep placeholder if no copy available
-            }
-          });
+          console.warn('⚠️ No copy data found for play:', playData.name);
         }
 
         // Start animation
