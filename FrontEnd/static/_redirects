@@ -1,0 +1,6 @@
+# Netlify redirects file
+# This file must be in the publish directory (FrontEnd/static)
+
+# Redirect root to mode-select.html
+/  /mode-select.html  200
+
