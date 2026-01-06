@@ -84,7 +84,7 @@ async function loadGameData(gameId) {
 async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId) {
   const fetchRoster = async (team) => {
     const path = franchiseId
-      ? `/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(team)}`
+      ? `${API_CONFIG.buildUrl('/franchise/roster')}?franchise_id=${franchiseId}&team_name=${encodeURIComponent(team)}`
       : `/roster/${encodeURIComponent(team)}`;
     const res = await fetch(path);
     if (!res.ok) throw new Error(`Failed to load roster for ${team}`);
@@ -166,7 +166,7 @@ function renderBoxScore() {
 async function loadPreGameData({ homeTeamName, awayTeamName, franchiseId }) {
   const fetchRoster = async (team) => {
     const path = franchiseId
-      ? `/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(team)}`
+      ? `${API_CONFIG.buildUrl('/franchise/roster')}?franchise_id=${franchiseId}&team_name=${encodeURIComponent(team)}`
       : `/roster/${encodeURIComponent(team)}`;
     const res = await fetch(path);
     if (!res.ok) throw new Error(`Failed to load roster for ${team}`);
