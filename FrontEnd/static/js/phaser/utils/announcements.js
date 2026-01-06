@@ -141,7 +141,10 @@ function createHeadshotElement(playerData, scale = 1.0) {
   
   if (playerData.teamName) {
     const teamNameNormalized = playerData.teamName.toLowerCase().replace(/\s+/g, '-');
-    container.style.backgroundImage = `url(/images/team-backgrounds/${teamNameNormalized}-background.png)`;
+    // Use environment-aware path
+    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const staticPrefix = isLocalhost ? '/static' : '';
+    container.style.backgroundImage = `url(${staticPrefix}/images/team-backgrounds/${teamNameNormalized}-background.png)`;
     container.style.backgroundSize = 'cover';
     container.style.backgroundPosition = 'center';
   }
@@ -240,7 +243,10 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
     // Set team background
     if (playerData.teamName) {
       const teamNameNormalized = playerData.teamName.toLowerCase().replace(/\s+/g, '-');
-      headshotContainer.style.backgroundImage = `url(/images/team-backgrounds/${teamNameNormalized}-background.png)`;
+      // Use environment-aware path
+      const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const staticPrefix = isLocalhost ? '/static' : '';
+      headshotContainer.style.backgroundImage = `url(${staticPrefix}/images/team-backgrounds/${teamNameNormalized}-background.png)`;
       headshotContainer.style.backgroundSize = 'cover';
       headshotContainer.style.backgroundPosition = 'center';
     }

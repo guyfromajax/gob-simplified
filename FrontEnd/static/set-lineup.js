@@ -1340,7 +1340,10 @@ function createCardFront(player) {
   
   // Set team background image
   const teamNameNormalized = teamName.toLowerCase().replace(/\s+/g, '-');
-  headshotContainer.style.backgroundImage = `url(/images/team-backgrounds/${teamNameNormalized}-background.png)`;
+  // Use environment-aware path
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const staticPrefix = isLocalhost ? '/static' : '';
+  headshotContainer.style.backgroundImage = `url(${staticPrefix}/images/team-backgrounds/${teamNameNormalized}-background.png)`;
   headshotContainer.style.backgroundSize = 'cover';
   headshotContainer.style.backgroundPosition = 'center';
   
