@@ -441,8 +441,17 @@
         computerTeamName: null
       });
       
-      // ✅ SS&S: Always navigate back to playbooks.html (where user came from)
-      // Preserve 'from' parameter so playbooks knows where to navigate back to
+      // ✅ SS&S: Dynamic back navigation - check backTo parameter to determine where to go
+      // This makes the back button truly dynamic and future-proof for any entry point
+      const backTo = urlParams.get('backTo');
+      let targetPage = 'playbooks.html'; // Default fallback for backward compatibility
+      
+      if (backTo) {
+        // Use the explicitly set backTo parameter (e.g., 'playbooks.html', 'game-plan.html', etc.)
+        targetPage = backTo;
+      }
+      
+      // Preserve 'from' parameter so the target page knows where to navigate back to
       const from = urlParams.get('from');
       if (from) {
         params.set('from', from);
@@ -451,7 +460,7 @@
       // Use environment-aware path
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       const staticPrefix = isLocalhost ? '/static' : '';
-      window.location.href = `${staticPrefix}/playbooks.html?${params.toString()}`;
+      window.location.href = `${staticPrefix}/${targetPage}?${params.toString()}`;
     }
 
     // Helper function to adjust color brightness

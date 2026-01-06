@@ -1095,7 +1095,11 @@ class PlaybooksUI {
     // Add play-specific parameter
     params.set('play_name', playName);
     
-    // Preserve 'from' parameter if it exists
+    // ✅ SS&S: Explicitly set backTo parameter so play-details knows where to navigate back to
+    // This makes the back button truly dynamic and future-proof
+    params.set('backTo', 'playbooks.html');
+    
+    // Preserve 'from' parameter if it exists (for playbooks' own back navigation)
     const from = urlParams.get('from');
     if (from) {
       params.set('from', from);
