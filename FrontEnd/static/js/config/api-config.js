@@ -69,6 +69,35 @@ const API_CONFIG = {
     // Ensure endpoint starts with /
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     return `${this.getBaseUrl()}${normalizedEndpoint}`;
+  },
+  
+  /**
+   * Get the static asset path prefix based on environment
+   * - Local dev: "/static" (backend serves from /static/)
+   * - Netlify/Production: "" (files are at root)
+   * @returns {string} Path prefix for static assets
+   */
+  getStaticPath() {
+    const hostname = window.location.hostname;
+    
+    // Local development - backend serves from /static/
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return '/static';
+    }
+    
+    // Production/Staging (Netlify, Railway, custom domains) - files at root
+    return '';
+  },
+  
+  /**
+   * Build a static asset path (images, JS, CSS)
+   * @param {string} path - Asset path (e.g., "/images/players/123.png" or "js/utils.js")
+   * @returns {string} Full static asset path
+   */
+  buildStaticPath(path) {
+    // Ensure path starts with /
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    return `${this.getStaticPath()}${normalizedPath}`;
   }
 };
 

@@ -2844,12 +2844,12 @@
           if (shooterId) {
             const headshotImg = playOption.querySelector('.play-headshot');
             if (headshotImg) {
-              const imgPath = `/images/players/${shooterId}.png`;
+              const imgPath = API_CONFIG.buildStaticPath(`/images/players/${shooterId}.png`);
               headshotImg.src = imgPath;
               headshotImg.setAttribute('data-player-id', shooterId);
               headshotImg.onerror = () => {
                 console.warn(`⚠️ [PLAYCALL HEADSHOTS] Headshot failed to load: ${imgPath}, using default`);
-                headshotImg.src = '/images/players/default.png';
+                headshotImg.src = API_CONFIG.buildStaticPath('/images/players/default.png');
               };
               
               // Add tooltip event listeners (if tooltip functions exist)
@@ -3747,8 +3747,11 @@
   </script>
   <script type="module">
     // Apply vibrant colors based on teams in URL
-    import { applyVibrantColors } from '/js/phaser/utils/vibrantColors.js';
-    import { initializeGameStats } from '/js/phaser/utils/loadGameStats.js';
+    const staticPath = API_CONFIG.getStaticPath();
+    const vibrantColorsModule = await import(`${staticPath}/js/phaser/utils/vibrantColors.js`);
+    const loadGameStatsModule = await import(`${staticPath}/js/phaser/utils/loadGameStats.js`);
+    const { applyVibrantColors } = vibrantColorsModule;
+    const { initializeGameStats } = loadGameStatsModule;
     
     const urlParams = new URLSearchParams(window.location.search);
     const homeTeam = urlParams.get('home');
@@ -3923,8 +3926,8 @@
       }
       
       // Set player image
-      image.src = `/images/players/${playerId}.png`;
-      image.onerror = () => { image.src = '/images/players/default.png'; };
+      image.src = API_CONFIG.buildStaticPath(`/images/players/${playerId}.png`);
+      image.onerror = () => { image.src = API_CONFIG.buildStaticPath('/images/players/default.png'); };
       
       // Energy (NG)
       const ng = stats.NG ?? stats.ng ?? 1.0;
@@ -4000,7 +4003,7 @@
         
         // Fallback to default if image fails to load
         headshotEl.onerror = () => {
-          headshotEl.src = '/images/players/default.png';
+          headshotEl.src = API_CONFIG.buildStaticPath('/images/players/default.png');
         };
       } else {
         headshotEl.style.display = 'none';
@@ -4072,7 +4075,7 @@
       headshotEl.style.display = 'block';
       
       headshotEl.onerror = () => {
-        headshotEl.src = '/images/players/default.png';
+        headshotEl.src = API_CONFIG.buildStaticPath('/images/players/default.png');
       };
 
       const mo = data.shooterMO || 5;
@@ -4132,7 +4135,7 @@
       // Set ball handler display
       if (isBallHandlerHome) {
         // Home team has ball - show on home side (right)
-        homeHeadshot.src = ballHandlerSprite.photo || `/images/players/${ballHandlerId}.png`;
+        homeHeadshot.src = ballHandlerSprite.photo || API_CONFIG.buildStaticPath(`/images/players/${ballHandlerId}.png`);
         homeHeadshot.className = 'active-player-headshot has-ball';
         homeRole.textContent = '🏀';
         homeRole.className = 'player-role-icon ball';
@@ -4141,7 +4144,7 @@
         
         // Show defender on away side (left) if available
         if (defenderSprite) {
-          awayHeadshot.src = defenderSprite.photo || `/images/players/${defenderId}.png`;
+          awayHeadshot.src = defenderSprite.photo || API_CONFIG.buildStaticPath(`/images/players/${defenderId}.png`);
           awayHeadshot.className = 'active-player-headshot defender';
           awayRole.textContent = 'D';
           awayRole.className = 'player-role-icon defense';
@@ -4174,10 +4177,10 @@
 
       // Image error handling
       awayHeadshot.onerror = () => {
-        awayHeadshot.src = '/images/players/default.png';
+        awayHeadshot.src = API_CONFIG.buildStaticPath('/images/players/default.png');
       };
       homeHeadshot.onerror = () => {
-        homeHeadshot.src = '/images/players/default.png';
+        homeHeadshot.src = API_CONFIG.buildStaticPath('/images/players/default.png');
       };
 
       // Display audible text in scoreboard if provided
