@@ -147,6 +147,8 @@
     // 9. COMPUTER TIMEOUT PARAMS
     // ============================================
     // ✅ COMPUTER TIMEOUT: Add params to indicate computer timeout for lineup screen display
+    // ✅ SS&S: Only log warning if computerTimeout is explicitly true but computerTeamName is missing
+    // (Don't warn if both are false/null - that's normal for non-timeout navigation)
     if (computerTimeout && computerTeamName) {
       params.set('computer_timeout', 'true');
       params.set('computer_team_name', computerTeamName);
@@ -154,12 +156,14 @@
         computer_timeout: 'true',
         computer_team_name: computerTeamName
       });
-    } else {
-      console.warn('⚠️ COMPUTER TIMEOUT: Missing params', {
+    } else if (computerTimeout && !computerTeamName) {
+      // Only warn if computerTimeout is true but computerTeamName is missing (actual error)
+      console.warn('⚠️ COMPUTER TIMEOUT: Missing computerTeamName when computerTimeout is true', {
         computerTimeout: computerTimeout,
         computerTeamName: computerTeamName
       });
     }
+    // ✅ SS&S: No warning if both are false/null - that's expected for normal navigation
     
     // ============================================
     // 10. DEBUG PARAMS
