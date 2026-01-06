@@ -222,14 +222,14 @@ async function fetchTeamRoster(teamName) {
   // Use franchise-specific roster endpoint if in franchise mode
   let url;
   if (mode === 'franchise' && franchiseId) {
-    url = `/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(teamName)}`;
+    url = API_CONFIG.buildUrl(`/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(teamName)}`);
     console.log(`Loading franchise-specific roster for ${teamName}`);
   } else {
     const query = buildQuery({
       tournament_id: mode === 'tournament' ? tournamentId : null,
       franchise_id: mode === 'franchise' ? franchiseId : null,
     });
-    url = `/roster/${encodeURIComponent(teamName)}${query}`;
+    url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(teamName)}${query}`);
   }
   
   const res = await fetch(url);
