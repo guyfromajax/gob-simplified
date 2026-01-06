@@ -288,7 +288,7 @@ export function createGameScene(Phaser) {
       
       // Note: Q4 possession is handled by backend using opening_tip_winner from Q1
       // No need to pass start_with_inbound for standard Q4 logic
-      const url = this.gameId || this.quarter > 1 ? '/api/simulate-quarter' : '/api/simulate-quarter';
+      const url = API_CONFIG.buildUrl('/api/simulate-quarter');
       const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
