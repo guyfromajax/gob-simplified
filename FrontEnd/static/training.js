@@ -415,7 +415,9 @@ submitBtn.addEventListener('click', async function() {
     
     // Handle success - use redirect URL from backend if provided, otherwise navigate to command center
     if (result.redirect) {
-      window.location.href = result.redirect;
+      // ✅ FIX: Strip /static/ prefix from backend redirect URLs for Netlify compatibility
+      const redirectUrl = result.redirect.replace(/^\/static\//, '/');
+      window.location.href = redirectUrl;
     } else if (mode === 'franchise' && franchiseId) {
       window.location.href = `/franchise-command-center.html?franchise_id=${franchiseId}`;
     } else if (mode === 'tournament' && tournamentId) {

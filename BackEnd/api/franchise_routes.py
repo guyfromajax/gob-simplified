@@ -2001,7 +2001,7 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         return {
             "status": "already_completed",
             "week": current_week,
-            "redirect": f"/static/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={redirect_team_id}&week={current_week}"
+            "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={redirect_team_id}&week={current_week}"
         }
 
     # ✅ SS&S: Always use user_team_object_id from franchise document as source of truth
@@ -2406,7 +2406,7 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         "team_changes": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
         "session_type": session_type,
-        "redirect": f"/static/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={team_id}&week={current_week}"
+        "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={team_id}&week={current_week}"
     }
 
 
