@@ -111,12 +111,14 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      min-height: 500px; /* Ensure container has minimum height */
     }
 
     .court-visualization {
       position: relative;
       max-width: 100%;
       width: 100%;
+      min-height: 400px; /* Ensure visualization has minimum height */
     }
 
     .court-image {
@@ -357,11 +359,14 @@
       const courtImage = document.getElementById('court-image');
       if (courtImage && teamName) {
         const normalizedName = normalizeTeamName(teamName);
-        courtImage.src = `/static/images/courts/${normalizedName}.jpg`;
+        // Use environment-aware path
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const staticPrefix = isLocalhost ? '/static' : '';
+        courtImage.src = `${staticPrefix}/images/courts/${normalizedName}.jpg`;
         courtImage.alt = `${teamName} Basketball Court`;
         // Fallback to default if image doesn't exist
         courtImage.onerror = function() {
-          this.src = '/static/images/courts/bentley_truman.jpg';
+          this.src = `${staticPrefix}/images/courts/bentley_truman.jpg`;
           this.onerror = null; // Prevent infinite loop
         };
       }
@@ -515,7 +520,20 @@
         
         // Get skeleton based on play type
         if (playState.type === 'Motion') {
-          playState.skeleton = playData.skeletons?.base_loop;
+          // Motion plays: base_loop might be the skeleton object directly or have steps
+          const baseLoop = playData.skeletons?.base_loop;
+          if (baseLoop) {
+            // If base_loop has steps directly, use it
+            if (baseLoop.steps && Array.isArray(baseLoop.steps)) {
+              playState.skeleton = baseLoop;
+            } else if (Array.isArray(baseLoop)) {
+              // If base_loop is an array of steps directly
+              playState.skeleton = { steps: baseLoop };
+            } else {
+              // Try to find steps in the structure
+              playState.skeleton = baseLoop;
+            }
+          }
         } else {
           // Set Play: Access successful skeleton v0 from versions array
           const successfulVariant = playData.skeletons?.successful;
@@ -545,14 +563,29 @@
           return;
         }
 
-        // Load and display copy if it exists
+        // Load and display copy if it exists (works for both motion and set plays)
         if (playData.copy) {
           const copyContainers = document.querySelectorAll('.info-container p');
           if (copyContainers.length >= 3) {
-            copyContainers[0].textContent = playData.copy.copy_1 || 'Copy Goes Here';
-            copyContainers[1].textContent = playData.copy.copy_2 || 'Copy Goes Here';
-            copyContainers[2].textContent = playData.copy.copy_3 || 'Copy Goes Here';
+            // Handle both object format (copy_1, copy_2, copy_3) and array format
+            if (typeof playData.copy === 'object' && !Array.isArray(playData.copy)) {
+              copyContainers[0].textContent = playData.copy.copy_1 || playData.copy[0] || 'Copy Goes Here';
+              copyContainers[1].textContent = playData.copy.copy_2 || playData.copy[1] || 'Copy Goes Here';
+              copyContainers[2].textContent = playData.copy.copy_3 || playData.copy[2] || 'Copy Goes Here';
+            } else if (Array.isArray(playData.copy)) {
+              copyContainers[0].textContent = playData.copy[0] || 'Copy Goes Here';
+              copyContainers[1].textContent = playData.copy[1] || 'Copy Goes Here';
+              copyContainers[2].textContent = playData.copy[2] || 'Copy Goes Here';
+            }
           }
+        } else {
+          // If no copy, show placeholder
+          const copyContainers = document.querySelectorAll('.info-container p');
+          copyContainers.forEach(container => {
+            if (container.textContent === 'Copy Goes Here') {
+              // Keep placeholder if no copy available
+            }
+          });
         }
 
         // Start animation
