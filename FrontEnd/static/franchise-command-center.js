@@ -885,7 +885,7 @@ async function init() {
     userTeamId = localStorage.getItem('franchise_user_team_id');
   }
   
-  const topData = await fetchJSON(`/franchise/command-center/data?franchise_id=${franchiseId}`);
+  const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}`);
   
   // ✅ SS&S: Resolve team_id from command center data if not already set
   if (topData && topData.team_id && !userTeamId) {
@@ -933,10 +933,10 @@ async function init() {
       return;
     }
     try {
-      const rosterData = await fetchJSON(`/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(topData.team)}`);
+      const rosterData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/roster')}?franchise_id=${franchiseId}&team_name=${encodeURIComponent(topData.team)}`);
       
       // Load player stats separately from franchise document
-      const franchiseDoc = await fetchJSON(`/franchise/state?franchise_id=${franchiseId}`);
+      const franchiseDoc = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/state')}?franchise_id=${franchiseId}`);
       
       if (franchiseDoc && franchiseDoc.players && rosterData.players) {
         // Merge stats into player data
@@ -956,13 +956,13 @@ async function init() {
       console.error('Failed to load franchise roster:', error);
     }
   }
-  const standingsData = await fetchJSON(`/franchise/standings?franchise_id=${franchiseId}`);
+  const standingsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}`);
   renderStandings(standingsData);
-    const scheduleData = await fetchJSON(`/franchise/schedule?franchise_id=${franchiseId}`);
+    const scheduleData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/schedule')}?franchise_id=${franchiseId}`);
     renderSchedule(scheduleData);
-    renderLeaders(await fetchJSON(`/franchise/leaders?franchise_id=${franchiseId}`));
-    renderTeamStats(await fetchJSON(`/franchise/team-stats?franchise_id=${franchiseId}`));
-    renderRecruits(await fetchJSON(`/franchise/recruits?franchise_id=${franchiseId}`));
+    renderLeaders(await fetchJSON(`${API_CONFIG.buildUrl('/franchise/leaders')}?franchise_id=${franchiseId}`));
+    renderTeamStats(await fetchJSON(`${API_CONFIG.buildUrl('/franchise/team-stats')}?franchise_id=${franchiseId}`));
+    renderRecruits(await fetchJSON(`${API_CONFIG.buildUrl('/franchise/recruits')}?franchise_id=${franchiseId}`));
     // ✅ Removed: renderTrainingResults - Training Reports are now linked directly on Schedule page
     
     // Initialize tooltips for table headers
@@ -1035,7 +1035,7 @@ playNowBtn.addEventListener('click', async () => {
   
   if (mode === 'training') {
     // Navigate to training page
-    const topData = await fetchJSON(`/franchise/command-center/data?franchise_id=${franchiseId}`);
+    const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}`);
     const sessionType = topData?.session_type || 'in-season';
     // ✅ SS&S: Include team_id (ObjectId) for consistent navigation
     const teamIdParam = userTeamId ? `&team_id=${encodeURIComponent(userTeamId)}` : '';
@@ -1059,7 +1059,7 @@ playNowBtn.addEventListener('click', async () => {
       const result = await res.json();
       
       // Check if championship needs to be simmed
-      const topData = await fetchJSON(`/franchise/command-center/data?franchise_id=${franchiseId}`);
+      const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}`);
       const eosTournament = topData?.eos_tournament;
       const currentRound = eosTournament?.current_round;
       
@@ -1859,7 +1859,7 @@ async function renderTournamentBracket() {
   const container = document.getElementById('tournament-bracket-container');
   if (!container) return;
   
-  const topData = await fetchJSON(`/franchise/command-center/data?franchise_id=${franchiseId}`);
+  const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}`);
   const eosTournament = topData?.eos_tournament;
   
   if (!eosTournament) {
