@@ -124,7 +124,10 @@ async function loadGamePlanSettings() {
     return;
   }
   
-  const teamId = userTeamSide === 'home' ? urlParams.get('home_id') : urlParams.get('away_id');
+  // Try multiple parameter names (different pages use different names)
+  const teamId = urlParams.get('team_id') || 
+                 urlParams.get('user_team_id') ||
+                 (userTeamSide === 'home' ? urlParams.get('home_id') : urlParams.get('away_id'));
   
   // ✅ SS&S: Always load from database (single source of truth for all modes)
   try {
