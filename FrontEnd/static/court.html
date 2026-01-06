@@ -3781,8 +3781,23 @@
     // Initialize team box score tabs
     initializeTeamBoxscoreTabs();
   </script>
-  <script src="/js/shared/timeoutNavigationHelper.js"></script>
-  <script type="module" src="/js/phaser/bootGame.js"></script>
+  <script>
+    // Load timeoutNavigationHelper with environment-aware path
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const staticPrefix = isLocalhost ? '/static' : '';
+    const timeoutHelperScript = document.createElement('script');
+    timeoutHelperScript.src = `${staticPrefix}/js/shared/timeoutNavigationHelper.js`;
+    document.head.appendChild(timeoutHelperScript);
+  </script>
+  <script type="module">
+    // Load bootGame.js with environment-aware path
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const staticPrefix = isLocalhost ? '/static' : '';
+    const bootGameScript = document.createElement('script');
+    bootGameScript.type = 'module';
+    bootGameScript.src = `${staticPrefix}/js/phaser/bootGame.js`;
+    document.head.appendChild(bootGameScript);
+  </script>
   <script>
     // console.log('🚨 HTML: bootGame.js should be loaded now');
   </script>
