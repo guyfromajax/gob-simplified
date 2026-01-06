@@ -498,6 +498,15 @@ class PlaybooksUI {
       const percentages = this.savedPlaybookPercentages;
       console.log('🔍 [PLAYBOOKS] Loading percentages from API:', percentages);
       
+      // ✅ SS&S FIX: Reset all percentages to 0 first to ensure database is single source of truth
+      // This prevents leftover default percentages (100% for first play) from causing totals > 100%
+      Object.keys(this.state.sections).forEach(sectionKey => {
+        Object.keys(this.state.sections[sectionKey] || {}).forEach(playId => {
+          this.state.sections[sectionKey][playId].percentage = 0;
+        });
+      });
+      console.log('✅ [PLAYBOOKS] Reset all percentages to 0 before applying saved values');
+      
       let appliedCount = 0;
       
       // Apply motion percentages
@@ -511,7 +520,8 @@ class PlaybooksUI {
               appliedCount++;
               console.log(`✅ [PLAYBOOKS] Applied motion percentage: ${play.name} = ${percentages.motion[play.name]}%`);
             } else {
-              console.log(`⚠️ [PLAYBOOKS] Motion play "${play.name}" (id: ${playId}) not found in saved percentages`);
+              // Play exists in state but not in saved percentages - already reset to 0 above
+              console.log(`✅ [PLAYBOOKS] Motion play "${play.name}" (id: ${playId}) not in saved percentages, keeping at 0%`);
             }
           } else {
             console.log(`⚠️ [PLAYBOOKS] Motion play with id "${playId}" not found in playData`);
@@ -537,7 +547,8 @@ class PlaybooksUI {
                 appliedCount++;
                 console.log(`✅ [PLAYBOOKS] Applied ${settingsKey} percentage: ${play.name} = ${sectionPercentages[play.name]}%`);
               } else {
-                console.log(`⚠️ [PLAYBOOKS] ${settingsKey} play "${play.name}" (id: ${playId}) not found in saved percentages`);
+                // Play exists in state but not in saved percentages - already reset to 0 above
+                console.log(`✅ [PLAYBOOKS] ${settingsKey} play "${play.name}" (id: ${playId}) not in saved percentages, keeping at 0%`);
               }
             } else {
               console.log(`⚠️ [PLAYBOOKS] ${settingsKey} play with id "${playId}" not found in playData`);
@@ -559,7 +570,8 @@ class PlaybooksUI {
               appliedCount++;
               console.log(`✅ [PLAYBOOKS] Applied zone_defense percentage: ${play.name} = ${percentages.zone_defense[play.name]}%`);
             } else {
-              console.log(`⚠️ [PLAYBOOKS] Zone defense play "${play.name}" (id: ${playId}) not found in saved percentages`);
+              // Play exists in state but not in saved percentages - already reset to 0 above
+              console.log(`✅ [PLAYBOOKS] Zone defense play "${play.name}" (id: ${playId}) not in saved percentages, keeping at 0%`);
             }
           }
         });
@@ -578,7 +590,8 @@ class PlaybooksUI {
               appliedCount++;
               console.log(`✅ [PLAYBOOKS] Applied man_defense percentage: ${play.name} = ${percentages.man_defense[play.name]}%`);
             } else {
-              console.log(`⚠️ [PLAYBOOKS] Man defense play "${play.name}" (id: ${playId}) not found in saved percentages`);
+              // Play exists in state but not in saved percentages - already reset to 0 above
+              console.log(`✅ [PLAYBOOKS] Man defense play "${play.name}" (id: ${playId}) not in saved percentages, keeping at 0%`);
             }
           }
         });

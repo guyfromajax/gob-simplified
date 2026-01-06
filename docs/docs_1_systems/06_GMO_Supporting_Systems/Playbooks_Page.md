@@ -407,6 +407,26 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 **Backend:**
 - `BackEnd/api/gameplan_routes.py` - `GET /api/playbooks` and `POST /api/playbooks` endpoints
 
+### Percentage Loading Fix (January 2025)
+
+**Issue:** After submitting playbooks and navigating to play details, returning to playbooks showed incorrect percentages (some plays reset to 0%, totals > 100%).
+
+**Root Cause:**
+- `loadPlaybookPercentagesFromAPI()` only set percentages for plays that existed in saved data
+- Plays not in saved data retained their default values (first play = 100%, others = 0%)
+- This caused totals to exceed 100% when default 100% values weren't overwritten
+
+**Fix:**
+- `loadPlaybookPercentagesFromAPI()` now resets ALL percentages to 0% before applying saved values
+- Ensures database is the single source of truth - no leftover default percentages
+- Plays not in saved data are explicitly set to 0% (not left at defaults)
+
+**Implementation:**
+- Added percentage reset loop at start of `loadPlaybookPercentagesFromAPI()`
+- Resets all sections (motion, set-play-inside, set-play-attack, set-play-outside, zone-defense, man-defense)
+- Then applies saved percentages from database
+- Prevents validation errors from totals > 100%
+
 ### Persistence Issues (February 2025)
 
 **Status:** Under investigation - approach being reconsidered
@@ -437,6 +457,7 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
    - **Impact:** Validation errors prevent submission even when visible plays total correctly
 
 **Current State:**
+- ✅ **FIXED:** Percentage loading now resets all percentages to 0% before applying saved values (January 2025)
 - Even Distribution toggle persistence (`even_distribution_all` flag) is implemented and working
 - Position filter persistence (localStorage) is implemented but showing incorrect data
 - Percentage reset logic exists but may not be executing at the correct time in the load sequence
