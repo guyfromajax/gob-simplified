@@ -191,6 +191,17 @@
     apiConfigScript.onload = () => {
       // After API config loads, load game-plan.js using the helper
       script.src = `${API_CONFIG.getStaticPath()}/game-plan.js?v=${cacheBuster}`;
+      script.onload = () => {
+        console.log('✅ game-plan.js loaded with cache buster:', cacheBuster);
+        // If DOM is already loaded, manually trigger init() since DOMContentLoaded already fired
+        if (document.readyState !== 'loading') {
+          if (typeof init === 'function') {
+            console.log('🚀 Manually calling init() - DOM already loaded');
+            init();
+          }
+        }
+        // The script's DOMContentLoaded listener will handle it if DOM is still loading
+      };
       document.head.appendChild(script);
     };
     document.head.appendChild(apiConfigScript);
