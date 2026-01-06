@@ -142,7 +142,7 @@ playBtn.addEventListener('click', () => {
     params.set('user_team_id', userTeam);
   }
 
-  window.location.href = `/static/set-lineup.html?${params.toString()}`;
+  window.location.href = `/set-lineup.html?${params.toString()}`;
 });
 
 createLogoButtons();

@@ -46,11 +46,10 @@ const API_CONFIG = {
     if (hostname.includes('.railway.app') || hostname.includes('.netlify.app')) {
       // For default domains, we need to detect if this is staging or production
       // This is a fallback - ideally we'll use custom domains
-      // For now, assume staging if hostname contains 'staging', otherwise production
-      if (hostname.includes('staging')) {
-        // Staging default domain - you'll need to update this with actual Railway staging URL
-        // Or use environment variable if Netlify supports it
-        return 'https://gob-backend-staging.railway.app';
+      // For now, assume staging if hostname contains 'staging' or 'test', otherwise production
+      if (hostname.includes('staging') || hostname.includes('test')) {
+        // Staging default domain - Railway staging backend
+        return 'https://gob-simplified-staging.up.railway.app';
       } else {
         // Production default domain - you'll need to update this with actual Railway production URL
         return 'https://gob-backend-prod.railway.app';
