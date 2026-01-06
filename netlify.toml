@@ -1,7 +1,7 @@
 # Netlify Configuration for GOB Simplified
 
 [build]
-  # Publish directory is set in Netlify UI (FrontEnd/static)
+  publish = "FrontEnd/static"
   # No build command needed (static site)
 
 # Redirect root to mode-select.html for easier tournament/franchise mode testing
@@ -9,5 +9,5 @@
   from = "/"
   to = "/mode-select.html"
   status = 200
-  force = false
+  force = true
 
