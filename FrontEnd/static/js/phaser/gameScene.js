@@ -1705,8 +1705,18 @@ export function createGameScene(Phaser) {
           });
           
           if (!response.ok) {
-            const errorData = await response.json();
+            let errorData;
+            try {
+              errorData = await response.json();
+            } catch {
+              errorData = { detail: `HTTP ${response.status}: ${response.statusText}` };
+            }
             console.error('❌ /api/simulate-turn failed:', errorData);
+            // If game not found, the backend likely cleared it from memory
+            // This can happen if the backend restarts or the game times out
+            if (response.status === 404 && errorData.detail && errorData.detail.includes('not found')) {
+              console.error('⚠️ Game was cleared from backend memory. This may indicate a backend restart or timeout.');
+            }
             break;
           }
           
