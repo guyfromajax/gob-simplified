@@ -1,0 +1,24 @@
+# Netlify Configuration for GOB Simplified
+
+[build]
+  # Publish directory is set in Netlify UI (FrontEnd/static)
+  # No build command needed (static site)
+
+# Redirect root to mode-select.html
+[[redirects]]
+  from = "/"
+  to = "/mode-select.html"
+  status = 200
+  force = false
+
+# Handle client-side routing for single-page app behavior
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
+  conditions = {Role = ["admin"]}
+
+# Note: The second redirect is a fallback for SPA routing if needed
+# The first redirect ensures root (/) goes to mode-select.html
+
