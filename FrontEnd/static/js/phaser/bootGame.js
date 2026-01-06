@@ -140,7 +140,7 @@ async function loadGamePlanSettings() {
       params.set('game_id', gameId);
     }
     
-    const res = await fetch(`/api/gameplan?${params.toString()}`);
+    const res = await fetch(API_CONFIG.buildUrl(`/api/gameplan?${params.toString()}`));
     if (res.ok) {
       gamePlanSettings = await res.json();
       console.log(`📋 Loaded game plan settings from database (${mode} mode):`, gamePlanSettings);
@@ -436,8 +436,8 @@ async function handleSimToFourth() {
   // Fetch rosters for auto-set lineup generation
   let homeRoster, awayRoster;
   try {
-    const homeRes = await fetch(`/roster/${homeTeam}`);
-    const awayRes = await fetch(`/roster/${awayTeam}`);
+    const homeRes = await fetch(API_CONFIG.buildUrl(`/roster/${homeTeam}`));
+    const awayRes = await fetch(API_CONFIG.buildUrl(`/roster/${awayTeam}`));
     if (homeRes.ok) homeRoster = await homeRes.json();
     if (awayRes.ok) awayRoster = await awayRes.json();
   } catch (err) {
@@ -619,8 +619,8 @@ async function handleSimFullGame() {
   // Fetch rosters for auto-set lineup generation
   let homeRoster, awayRoster;
   try {
-    const homeRes = await fetch(`/roster/${homeTeam}`);
-    const awayRes = await fetch(`/roster/${awayTeam}`);
+    const homeRes = await fetch(API_CONFIG.buildUrl(`/roster/${homeTeam}`));
+    const awayRes = await fetch(API_CONFIG.buildUrl(`/roster/${awayTeam}`));
     if (homeRes.ok) homeRoster = await homeRes.json();
     if (awayRes.ok) awayRoster = await awayRes.json();
   } catch (err) {
@@ -758,7 +758,7 @@ async function handleSimFullGame() {
     if (gameId) {
       try {
         console.log('📥 Fetching final game data from API to ensure box_score is complete...');
-        const gameResponse = await fetch(`/api/game/${gameId}`);
+        const gameResponse = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`));
         if (gameResponse.ok) {
           finalGameData = await gameResponse.json();
           console.log('✅ Fetched final game data:', {
@@ -844,7 +844,7 @@ async function initGame() {
     // Lightweight check: If URL param missing but we have gameId in Q1, check DB for timeout state
     // This is a fallback - URL param is still primary source for navigation
     try {
-      const response = await fetch(`/api/game/${gameId}?quarter=${quarter}`);
+      const response = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}?quarter=${quarter}`));
       if (response.ok) {
         const gameData = await response.json();
         if (gameData.timeout_next_play_type) {

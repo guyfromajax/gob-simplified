@@ -2156,7 +2156,7 @@ export function createGameScene(Phaser) {
             // Fallback: Fetch from API if final_game_document not in response
             try {
               console.log('📥 final_game_document not in response, fetching from API...');
-              const gameResponse = await fetch(`/api/game/${gameId}`);
+              const gameResponse = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`));
               if (gameResponse.ok) {
                 finalGameData = await gameResponse.json();
                 console.log('✅ Fetched final game data:', {

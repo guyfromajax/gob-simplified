@@ -665,7 +665,7 @@ async function initializeTeamColorCache() {
   if (teamColorCache) return; // Already initialized
   
   try {
-    const res = await fetch('/teams');
+    const res = await fetch(API_CONFIG.buildUrl('/teams'));
     const teamData = await res.json();
     teamColorCache = {};
     teamData.forEach(t => {
@@ -1784,7 +1784,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       try {
         // ✅ REMOVED: Training is not used in Tournament mode - proceed directly to game
         const payload = { tournament_id: tournament._id };
-        const res = await fetch('/simulate-tournament-round', {
+        const res = await fetch(API_CONFIG.buildUrl('/simulate-tournament-round'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)

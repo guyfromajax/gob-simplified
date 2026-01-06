@@ -115,7 +115,7 @@ async function initializeTeamColorCache() {
   if (teamColorCache) return; // Already initialized
   
   try {
-    const res = await fetch('/teams');
+    const res = await fetch(API_CONFIG.buildUrl('/teams'));
     const teamData = await res.json();
     teamColorCache = {};
     teamData.forEach(t => {
