@@ -57,8 +57,17 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   }
 
   // POST to /tournament/save-result if needed
+  console.log('🔍 [FINALIZE_GAME] Checking tournamentId:', {
+    tournamentId: tournamentId,
+    franchiseId: franchiseId,
+    hasTournamentId: !!tournamentId,
+    willCallSaveResult: !!tournamentId
+  });
+  
   if (tournamentId) {
     try {
+      console.log('✅ [FINALIZE_GAME] tournamentId present, calling /tournament/save-result');
+      
       // ✅ SS&S: Build request body (matches Franchise mode pattern)
       const requestBody = {
         tournament_id: tournamentId,
@@ -78,15 +87,26 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
         requestBody.game_document = simData.final_game_document;
       }
       
-      const res = await fetch(API_CONFIG.buildUrl("/tournament/save-result"), {
+      const saveResultUrl = API_CONFIG.buildUrl("/tournament/save-result");
+      console.log('📤 [FINALIZE_GAME] POSTing to:', saveResultUrl, 'with body:', requestBody);
+      
+      const res = await fetch(saveResultUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
       });
+      console.log('📥 [FINALIZE_GAME] /tournament/save-result response:', {
+        status: res.status,
+        statusText: res.statusText,
+        ok: res.ok
+      });
+      
       if (!res.ok) {
-        console.error("❌ Failed to save tournament result:", await res.text());
+        const errorText = await res.text();
+        console.error("❌ Failed to save tournament result:", errorText);
       } else {
-        console.log("✅ Tournament result saved.");
+        const responseData = await res.json().catch(() => null);
+        console.log("✅ Tournament result saved.", responseData);
         try {
           const updated = await fetch(`${API_CONFIG.buildUrl('/tournament/state')}?tournament_id=${encodeURIComponent(tournamentId)}`).then((r) =>
             r.json()
@@ -117,7 +137,15 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
       }
     } catch (err) {
       console.error("🚨 Error during tournament result save:", err);
+      console.error("🚨 Error details:", {
+        message: err.message,
+        stack: err.stack,
+        tournamentId: tournamentId,
+        game_id: simData.game_id || simData._id
+      });
     }
+  } else {
+    console.log('⚠️ [FINALIZE_GAME] tournamentId is missing, skipping /tournament/save-result call');
   }
 
   // POST to /franchise/complete-week if needed (only if NOT in tournament mode)
