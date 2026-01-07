@@ -44,8 +44,6 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     if (allSelectedButtons.length > 0) {
       // Un-highlight the selected button (there should only be one selected at a time)
       const selectedButton = allSelectedButtons[0];
-      const playName = selectedButton.dataset.play;
-      console.log(`🎮 [PLAYCALL CENTER CLEAR] Offense playcall cleared after use: "${playName}" (backend flag: offense_override_cleared=true)`);
       selectedButton.classList.remove('selected');
     }
   }
