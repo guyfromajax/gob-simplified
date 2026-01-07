@@ -33,3 +33,14 @@
   - Removed old `renderStats()` and `renderStatsTable()` functions that used separate stats array
   - Updated HTML: Changed `stats-body` to `roster-stats-body` to match Franchise
   - **Result**: Tournament and Franchise modes now use the exact same execution pattern with only variable names different (`tournament_id` vs `franchise_id`, `tournament.players` vs `franchise.players`)
+
+✅ **Tournament Player Stats Not Saving - SS&S Refactoring** (Fixed: January 2025)
+  - **Issue**: Player stats remained at zero after Tournament games, even though games were played
+  - **Root Cause**: Tournament mode used per-player update pattern with complex nested path queries, while Franchise mode used single atomic update
+  - **Fix**: Refactored Tournament mode's `finalize_game()` to match Franchise mode's pattern exactly:
+    - Single atomic MongoDB update for all players (instead of per-player updates)
+    - Document-level `applied_games` check (removed complex nested path queries)
+    - Uses `$setOnInsert` for automatic player initialization
+    - Processes all players from `box_score` in one operation
+  - **Result**: Tournament and Franchise modes now use identical execution patterns, ensuring consistent behavior and eliminating zero stats issues
+  - **Documentation**: See `docs/To Do/Tournament_vs_Franchise_Player_Stats_Comparison.md` for detailed comparison
