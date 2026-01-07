@@ -88,25 +88,33 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
       }
       
       const saveResultUrl = API_CONFIG.buildUrl("/tournament/save-result");
-      console.log('📤 [FINALIZE_GAME] POSTing to:', saveResultUrl, 'with body:', requestBody);
+      console.log('📤 [FINALIZE_GAME] POSTing to:', saveResultUrl);
+      console.log('📤 [FINALIZE_GAME] Request body (stringified):', JSON.stringify(requestBody, null, 2));
+      console.log('📤 [FINALIZE_GAME] Has game_document?', !!requestBody.game_document);
+      if (requestBody.game_document) {
+        console.log('📤 [FINALIZE_GAME] game_document keys:', Object.keys(requestBody.game_document));
+        console.log('📤 [FINALIZE_GAME] game_document has box_score?', !!requestBody.game_document.box_score);
+      }
       
       const res = await fetch(saveResultUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
       });
-      console.log('📥 [FINALIZE_GAME] /tournament/save-result response:', {
-        status: res.status,
-        statusText: res.statusText,
-        ok: res.ok
-      });
+      console.log('📥 [FINALIZE_GAME] Response status:', res.status, res.statusText);
+      console.log('📥 [FINALIZE_GAME] Response ok?', res.ok);
       
       if (!res.ok) {
         const errorText = await res.text();
-        console.error("❌ Failed to save tournament result:", errorText);
+        console.error("❌ Failed to save tournament result. Status:", res.status);
+        console.error("❌ Error response text:", errorText);
       } else {
-        const responseData = await res.json().catch(() => null);
-        console.log("✅ Tournament result saved.", responseData);
+        const responseData = await res.json().catch((e) => {
+          console.warn("⚠️ Could not parse JSON response:", e);
+          return null;
+        });
+        console.log("✅ Tournament result saved successfully!");
+        console.log("✅ Response data:", JSON.stringify(responseData, null, 2));
         try {
           const updated = await fetch(`${API_CONFIG.buildUrl('/tournament/state')}?tournament_id=${encodeURIComponent(tournamentId)}`).then((r) =>
             r.json()
@@ -136,13 +144,11 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
         }
       }
     } catch (err) {
-      console.error("🚨 Error during tournament result save:", err);
-      console.error("🚨 Error details:", {
-        message: err.message,
-        stack: err.stack,
-        tournamentId: tournamentId,
-        game_id: simData.game_id || simData._id
-      });
+      console.error("🚨 Error during tournament result save!");
+      console.error("🚨 Error message:", err.message);
+      console.error("🚨 Error stack:", err.stack);
+      console.error("🚨 Tournament ID:", tournamentId);
+      console.error("🚨 Game ID:", simData.game_id || simData._id);
     }
   } else {
     console.log('⚠️ [FINALIZE_GAME] tournamentId is missing, skipping /tournament/save-result call');
