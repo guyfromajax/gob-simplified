@@ -61,7 +61,7 @@ Tournament Mode supports multi-game tournament brackets where team data persists
 1. **Bracket** - Visual bracket display showing tournament progression
 2. **Roster** - Team roster (player attributes) and player statistics for the current tournament
 3. **Team** - Team Report section (team attributes) and Playbook Summary section (play effectiveness)
-4. **Stats** - Tournament leaderboards for key statistics
+4. **Stats** - Team stats table (W/L, PF/PA, shooting stats, rebounding, assists, etc.) and tournament leaderboards for key statistics
 5. **Schedule** - Detailed schedule view with First Round, Semifinals, and Championship matchups
 
 **Tab Content Details:**
@@ -87,6 +87,16 @@ Tournament Mode supports multi-game tournament brackets where team data persists
     - Falls back to `tournament.user_team_id` if provided team_name doesn't match
     - Initializes `scouting_data.defense` structure if missing
     - Defaults team attributes to 0 if not present
+
+**Stats Tab:**
+- **Team Stats Table**: Displays aggregated team statistics for all teams in the tournament
+  - Columns: Team, W (Wins), L (Losses), PF (Points For), PA (Points Against), FGM/FGA, FG%, 3PTM/3PTA, 3PT%, FTM/FTA, FT%, DREB, OREB, TREB, AST, STL, BLK, F, TO, DEF_A, DEF%, SCR_A, SCR%
+  - Includes a TOTALS row that sums all team stats (W/L, shooting stats, rebounding, assists, etc.)
+  - Stats are sortable by clicking column headers
+  - Data loaded from `/tournament/team-stats` endpoint which aggregates player stats from `tournaments.{tournament_id}.players`
+  - **Data Refresh**: Automatically refreshes when returning to TCC after game completion via `handleTournamentUpdate()`
+  - **Player Stats**: Roster tab player stats are refreshed when team stats are refreshed to ensure consistency
+- **Leaderboards**: Displays tournament leaders for key statistics (PTS, REB, AST, etc.)
 
 **Header Controls:**
 - **Set Game Plan** - Navigate to Game Plan screen
