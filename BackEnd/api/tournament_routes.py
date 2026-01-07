@@ -303,6 +303,38 @@ def save_result(request: TournamentResultRequest):
                 is_final = summary.get("is_final", False)
                 logger.info(f"🔍 [SAVE-RESULT] game_document details: quarter={quarter}, is_final={is_final}, game_id={summary.get('_id') or summary.get('game_id')}")
                 print(f"🔍 [SAVE-RESULT] game_document details: quarter={quarter}, is_final={is_final}")
+                
+                # ✅ FIX: Save game_document to database to ensure finalize_game() gets complete data
+                # This ensures the database has the most up-to-date game document with complete box_score
+                try:
+                    game_doc_id = summary.get("_id") or summary.get("game_id")
+                    if game_doc_id:
+                        # Convert to ObjectId if needed
+                        try:
+                            game_doc_oid = ObjectId(game_doc_id) if not isinstance(game_doc_id, ObjectId) else game_doc_id
+                        except:
+                            game_doc_oid = game_doc_id
+                        
+                        # Ensure _id is set correctly
+                        if "_id" not in summary:
+                            summary["_id"] = game_doc_oid
+                        elif summary.get("_id") != game_doc_oid:
+                            summary["_id"] = game_doc_oid
+                        
+                        # Save/update the game document in database
+                        games_collection.replace_one(
+                            {"_id": game_doc_oid},
+                            summary,
+                            upsert=True
+                        )
+                        logger.info(f"✅ [SAVE-RESULT] Saved game_document to database: {game_doc_oid}")
+                        print(f"✅ [SAVE-RESULT] Saved game_document to database: {game_doc_oid}")
+                        gid = game_doc_oid
+                    else:
+                        logger.warning(f"⚠️ [SAVE-RESULT] game_document missing _id or game_id, cannot save to database")
+                except Exception as e:
+                    logger.error(f"❌ [SAVE-RESULT] Error saving game_document to database: {e}", exc_info=True)
+                    print(f"❌ [SAVE-RESULT] Error saving game_document to database: {e}")
             else:
                 # Fallback: Look up from database (for backward compatibility)
                 logger.info(f"🔍 [SAVE-RESULT] game_document not provided, looking up from database...")
