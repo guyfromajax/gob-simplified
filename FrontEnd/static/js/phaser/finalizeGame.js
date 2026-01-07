@@ -59,18 +59,29 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   // POST to /tournament/save-result if needed
   if (tournamentId) {
     try {
+      // ✅ SS&S: Build request body (matches Franchise mode pattern)
+      const requestBody = {
+        tournament_id: tournamentId,
+        game_id: simData.game_id || simData._id,
+        winner: winner,
+        score: {
+          [homeKey]: homeScore,
+          [awayKey]: awayScore,
+        },
+      };
+      
+      // ✅ FIX: Pass game_document if available (from simulate-quarter when is_final=True)
+      // This eliminates race condition where save-result is called before Q4 save completes
+      // Matches Franchise mode pattern exactly
+      if (simData && simData.final_game_document) {
+        console.log('✅ Passing final_game_document to tournament/save-result (eliminates race condition)');
+        requestBody.game_document = simData.final_game_document;
+      }
+      
       const res = await fetch(API_CONFIG.buildUrl("/tournament/save-result"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tournament_id: tournamentId,
-          game_id: simData.game_id || simData._id,
-          winner: winner,
-          score: {
-            [homeKey]: homeScore,
-            [awayKey]: awayScore,
-          },
-        }),
+        body: JSON.stringify(requestBody),
       });
       if (!res.ok) {
         console.error("❌ Failed to save tournament result:", await res.text());

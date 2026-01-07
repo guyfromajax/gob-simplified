@@ -76,7 +76,10 @@ players[playerId] = {
 **Location:** `BackEnd/utils/stat_updater.py:1165-1595`
 
 **Process:**
-1. **Loads game document** from `games_collection`
+1. **Receives game document** from `/franchise/complete-week` endpoint:
+   - Frontend passes `final_game_document` from `simulate-quarter` response (when `is_final=True`)
+   - Backend uses `req.game_document` directly (no database lookup needed)
+   - This eliminates race condition where `complete-week` is called before Q4 save completes
 2. **Extracts `box_score`** from game document (nested under `home_team.box_score` and `away_team.box_score`)
 3. **Processes ALL players from `box_score`**:
    - Iterates through `box_score[team_name][position]` for each team
@@ -106,12 +109,16 @@ players[playerId] = {
 - ✅ Simple query filter (just checks `applied_games`)
 - ✅ Processes ALL players from `box_score` (lineup + bench)
 
-### Tournament Mode (`finalize_game()` → `apply_stats_from_summary()`)
-**Location:** `BackEnd/utils/stat_updater.py:1083-1163` (finalize_game) and `115-352` (apply_stats_from_summary)
+### Tournament Mode (`finalize_game()`)
+**Location:** `BackEnd/utils/stat_updater.py:1083-1163`
 
 **Process:**
-1. **Loads game document** from `games_collection`
-2. **Calls `apply_stats_from_summary(game, game_id, tournament_id)`**
+1. **Receives game document** from `/tournament/save-result` endpoint:
+   - ✅ **FIXED**: Frontend now passes `final_game_document` from `simulate-quarter` response (when `is_final=True`)
+   - ✅ **FIXED**: Backend uses `request.game_document` directly if provided (no database lookup needed)
+   - ✅ **FIXED**: This eliminates race condition where `save-result` is called before Q4 save completes
+   - **Fallback**: If `game_document` not provided, looks up from database (backward compatibility)
+2. **Extracts `box_score`** from game document (same structure as Franchise)
 3. **Inside `apply_stats_from_summary()`:**
    - Extracts `box_score` from game document
    - Processes players from `box_score` one at a time
