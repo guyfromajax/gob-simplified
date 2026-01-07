@@ -83,20 +83,23 @@ def tournament_team_stats(tournament_id: str):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid tournament_id")
     
-    tournament_doc = tournaments_collection.find_one({"_id": tid}, {"players": 1, "teams": 1})
+    tournament_doc = tournaments_collection.find_one({"_id": tid}, {"players": 1, "teams": 1, "bracket": 1})
     if not tournament_doc:
         raise HTTPException(status_code=404, detail="Tournament not found")
     
     players = tournament_doc.get("players", {})
     tournament_teams = tournament_doc.get("teams", {})
+    bracket = tournament_doc.get("bracket", {})
     
     # ✅ SS&S: Use shared aggregator utility
+    # ✅ FIX: Pass bracket to calculate W/L and PF/PA from tournament results (not global teams collection)
     output = aggregate_team_stats_from_players(
         players=players,
         team_ids=tournament_teams,
         teams_collection=teams_collection,
         collection_type='tournament',
-        logger=logger
+        logger=logger,
+        tournament_bracket=bracket  # ✅ FIX: Pass bracket to calculate tournament-specific W/L and PF/PA
     )
     
     return {"teams": output}
