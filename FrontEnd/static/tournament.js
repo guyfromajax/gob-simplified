@@ -2518,18 +2518,9 @@ document.addEventListener('DOMContentLoaded', () => {
           loadTeamData();
         }
       } else if (tabName === 'stats-tab') {
-        // Stats are rendered with roster, so ensure roster is loaded first
-        if (roster.length === 0) {
-          loadRoster().then(() => {
-            renderRoster(); // ✅ SS&S: renderRoster() now calls renderRosterStats() internally (matches Franchise)
-            renderLeaderboards();
-            refreshTeamStats();
-          });
-        } else {
-          renderRoster(); // ✅ SS&S: renderRoster() now calls renderRosterStats() internally (matches Franchise)
-          renderLeaderboards();
-          refreshTeamStats();
-        }
+        // Stats tab only shows Team Stats and Leaderboards (player stats are in Roster tab)
+        renderLeaderboards();
+        refreshTeamStats();
       } else if (tabName === 'schedule-tab') {
         renderSchedule();
       }
