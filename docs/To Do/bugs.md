@@ -70,14 +70,19 @@
 - **Result**: Game documents now have correct `mode: "tournament"` field, ensuring `finalize_game()` processes player stats correctly for Tournament mode
 - **Status**: ✅ Fixed and committed
 
-### ✅ Fixed: Player Stats Not Saving for User Games (Race Condition)
-- **Root Cause**: Tournament mode was looking up game document from database in `/tournament/save-result`, which could be stale or incomplete due to race condition (save-result called before Q4 save completes). Franchise mode avoided this by accepting `game_document` directly from the request.
+### ✅ Fixed: Player Stats Not Saving for User Games (Race Condition + Missing game_document)
+- **Root Cause**: Two issues prevented player stats from saving:
+  1. **Race Condition**: Tournament mode was looking up game document from database in `/tournament/save-result`, which could be stale or incomplete (save-result called before Q4 save completes). Franchise mode avoided this by accepting `game_document` directly from the request.
+  2. **Missing game_document in Sim Full Game**: When using "Sim Full Game" in `bootGame.js`, the fetched game document wasn't being passed as `game_document` to `finalizeGame()`, so `finalizeGame()` couldn't detect it and pass it to the backend.
 - **Fix**: 
-  - Added `game_document` field to `TournamentResultRequest` (matches Franchise `CompleteWeekRequest`)
-  - Updated `/tournament/save-result` to use `request.game_document` if provided (matches Franchise pattern)
-  - Updated `finalizeGame.js` to pass `final_game_document` from `simulate-quarter` response to `/tournament/save-result` (matches Franchise pattern)
-- **Result**: Tournament mode now uses the exact same pattern as Franchise mode - receives fresh, complete game document directly from `simulate-quarter` when `is_final=True`, eliminating race conditions and ensuring `finalize_game()` processes complete `box_score` data
-- **Status**: ✅ Fixed and committed
+  - **Frontend (`finalizeGame.js`)**: Added logic to detect if `simData` itself is a complete game document (has `box_score` and `game_id`) and use it directly as `game_document` when calling `/tournament/save-result`. This handles the "Sim Full Game" flow from `bootGame.js`.
+  - **Backend (`tournament_routes.py`)**: 
+    - Added `game_document` field to `TournamentResultRequest` (matches Franchise `CompleteWeekRequest`)
+    - Updated `/tournament/save-result` to use `request.game_document` if provided (matches Franchise pattern)
+    - Added logic to save `game_document` to database before calling `finalize_game()` to ensure complete data is available
+  - **Frontend (`finalizeGame.js`)**: Updated to pass `final_game_document` from `simulate-quarter` response to `/tournament/save-result` (matches Franchise pattern)
+- **Result**: Tournament mode now uses the exact same pattern as Franchise mode - receives fresh, complete game document directly from frontend, saves it to database, and `finalize_game()` processes complete `box_score` data. Player stats now save correctly for both regular gameplay and "Sim Full Game" flows.
+- **Status**: ✅ Fixed and committed (January 2025)
 
 ### 🔍 Investigating: Formatting Bug (Team Stats Table)
 - **Current State**: 

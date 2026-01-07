@@ -15,7 +15,8 @@ def aggregate_team_stats_from_players(
     team_ids: Dict[str, Any],
     teams_collection: Collection,
     collection_type: str = 'tournament',
-    logger=None
+    logger=None,
+    tournament_bracket: Dict[str, Any] | None = None  # ✅ FIX: Optional bracket for tournament-specific W/L and PF/PA
 ) -> List[Dict[str, Any]]:
     """
     Aggregates player stats into team stats.
@@ -144,18 +145,76 @@ def aggregate_team_stats_from_players(
                 f"{players_without_team_id} without team_id, {players_without_stats} without stats, "
                 f"{players_with_empty_stats} with empty stats")
     
-    # Get PF/PA and wins/losses from standings (teams collection)
+    # ✅ FIX: Calculate W/L and PF/PA from tournament bracket (tournament-specific) instead of global teams collection
+    # This prevents stats from accumulating across multiple tournaments
     standings_data = {}
-    teams_list = list(teams_collection.find({}, {"name": 1, "PF": 1, "PA": 1, "record": 1, "_id": 1}))
-    for t in teams_list:
-        team_id_str = str(t["_id"])
-        rec = t.get("record", {"W": 0, "L": 0})
-        standings_data[team_id_str] = {
-            "PF": t.get("PF", 0),
-            "PA": t.get("PA", 0),
-            "W": rec.get("W", 0),
-            "L": rec.get("L", 0)
-        }
+    if collection_type == 'tournament' and tournament_bracket:
+        # Calculate W/L and PF/PA from tournament bracket results
+        # Build team name -> team_id map for lookup
+        team_name_to_id = {}
+        for team_id_str, team_data in team_ids.items():
+            try:
+                team_obj_id = ObjectId(team_id_str)
+                team_doc = teams_collection.find_one({"_id": team_obj_id}, {"name": 1})
+                if team_doc:
+                    team_name = team_doc.get("name")
+                    if team_name:
+                        team_name_to_id[team_name] = team_id_str
+            except Exception:
+                pass
+        
+        # Initialize all teams with zeros
+        for team_id_str in team_ids.keys():
+            standings_data[team_id_str] = {"PF": 0, "PA": 0, "W": 0, "L": 0}
+        
+        # Process all rounds in bracket
+        for round_name, matchups in tournament_bracket.items():
+            if not isinstance(matchups, list):
+                continue
+            for matchup in matchups:
+                if not isinstance(matchup, dict):
+                    continue
+                home_team_name = matchup.get("home_team")
+                away_team_name = matchup.get("away_team")
+                winner_name = matchup.get("winner")
+                score = matchup.get("score", {})
+                
+                if not home_team_name or not away_team_name or not winner_name:
+                    continue
+                
+                # Get team IDs from names
+                home_team_id = team_name_to_id.get(home_team_name)
+                away_team_id = team_name_to_id.get(away_team_name)
+                
+                if home_team_id and away_team_id:
+                    home_score = score.get(home_team_name, 0)
+                    away_score = score.get(away_team_name, 0)
+                    
+                    # Update winner
+                    if winner_name == home_team_name:
+                        standings_data[home_team_id]["W"] += 1
+                        standings_data[away_team_id]["L"] += 1
+                    else:
+                        standings_data[away_team_id]["W"] += 1
+                        standings_data[home_team_id]["L"] += 1
+                    
+                    # Update PF/PA
+                    standings_data[home_team_id]["PF"] += home_score
+                    standings_data[home_team_id]["PA"] += away_score
+                    standings_data[away_team_id]["PF"] += away_score
+                    standings_data[away_team_id]["PA"] += home_score
+    else:
+        # Fallback: Read from teams collection (for Franchise mode or when bracket not provided)
+        teams_list = list(teams_collection.find({}, {"name": 1, "PF": 1, "PA": 1, "record": 1, "_id": 1}))
+        for t in teams_list:
+            team_id_str = str(t["_id"])
+            rec = t.get("record", {"W": 0, "L": 0})
+            standings_data[team_id_str] = {
+                "PF": t.get("PF", 0),
+                "PA": t.get("PA", 0),
+                "W": rec.get("W", 0),
+                "L": rec.get("L", 0)
+            }
     
     # Convert to output format with team names
     output = []
