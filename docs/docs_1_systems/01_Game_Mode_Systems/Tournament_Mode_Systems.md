@@ -96,7 +96,16 @@ Tournament Mode supports multi-game tournament brackets where team data persists
   - Stats are sortable by clicking column headers
   - Data loaded from `/tournament/team-stats` endpoint which uses shared `team_stats_aggregator.py` utility
   - **Data Refresh**: Automatically refreshes when returning to TCC after game completion via `handleTournamentUpdate()`
+  - **Container Formatting**: Uses `overflow-x: auto` on container div (matches Franchise pattern)
 - **Leaderboards**: Displays tournament leaders for key statistics (PTS, REB, AST, etc.)
+
+**Roster Tab:**
+- ✅ **SS&S**: Uses identical execution pattern as Franchise mode
+  - `loadRoster()`: Loads roster from `/tournament/roster`, loads tournament doc from `/tournament/state`, merges stats into roster data
+  - `renderRoster()`: Renders roster table and calls `renderRosterStats()` internally (matches Franchise `renderTeam()` pattern)
+  - Player stats are merged from `tournament.players[playerId].season` into `rosterData.players[].stats.season`
+  - Stats table uses `roster-stats-body` tbody ID (matches Franchise)
+  - **Result**: Tournament and Franchise modes execute the exact same code with only variable names different
 
 **Header Controls:**
 - **Set Game Plan** - Navigate to Game Plan screen
