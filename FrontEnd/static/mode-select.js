@@ -4,7 +4,7 @@ const franchiseBtn = document.getElementById('franchise-btn');
 
 if (scrimmageBtn) {
   scrimmageBtn.addEventListener('click', () => {
-    window.location.href = './index.html';
+    window.location.href = './scrimmage-select.html';
   });
 }
 
