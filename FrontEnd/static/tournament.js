@@ -2122,6 +2122,9 @@ function renderRosterStats(players) {
       name: players[0].name || `${players[0].first_name} ${players[0].last_name}`,
       hasStats: !!players[0].stats,
       hasSeason: !!(players[0].stats?.season),
+      hasPlayed: (players[0].stats?.season?.MIN || 0) > 0, // ✅ FIX: Check MIN > 0
+      MIN: players[0].stats?.season?.MIN || 0,
+      GP: players[0].stats?.season?.GP || 0,
       seasonKeys: players[0].stats?.season ? Object.keys(players[0].stats.season) : []
     } : null
   });
@@ -2186,7 +2189,8 @@ function renderRosterStatsTable(players) {
   
   players.forEach((p, index) => {
     const stats = p.stats?.season || {};
-    const hasNonZeroStats = Object.keys(stats).some(key => stats[key] !== 0);
+    // ✅ FIX: hasStats should only be true if player has played (MIN > 0)
+    const hasNonZeroStats = (stats.MIN || 0) > 0;
     
     if (hasNonZeroStats) {
       playersWithStats++;
