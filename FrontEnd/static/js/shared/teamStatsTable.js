@@ -15,8 +15,13 @@
    * @param {string} tbodyId - ID of tbody element to render into (default: 'teamstats-body')
    */
   function renderTeamStatsTable(teams, tbodyId = 'teamstats-body') {
+  console.log('🔍 [DEBUG TeamStatsTable.renderTeamStatsTable] Starting with', teams.length, 'teams, tbodyId:', tbodyId);
   const tbody = document.getElementById(tbodyId);
-  if (!tbody) return;
+  if (!tbody) {
+    console.error('❌ [DEBUG TeamStatsTable.renderTeamStatsTable] tbody element not found:', tbodyId);
+    return;
+  }
+  console.log('🔍 [DEBUG TeamStatsTable.renderTeamStatsTable] Found tbody element');
   tbody.innerHTML = '';
   
   // Calculate totals for all teams
@@ -134,6 +139,7 @@
     <td>${totalScrPct}%</td>
   `;
   tbody.appendChild(totalsTr);
+  console.log('✅ [DEBUG TeamStatsTable.renderTeamStatsTable] Rendered', teams.length, 'teams + totals row');
 }
 
   /**

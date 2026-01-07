@@ -315,18 +315,25 @@ let tournamentRosterSortDirection = 'desc';
 
 // ✅ SS&S: Refactored to match Franchise renderTeam() pattern exactly
 function renderRoster() {
+  console.log('🔍 [DEBUG renderRoster] Starting renderRoster()');
   // Use tournamentRosterData if available (has merged stats), otherwise fall back to roster
   const data = tournamentRosterData || { players: roster || [] };
+  console.log('🔍 [DEBUG renderRoster] Data source:', {
+    usingTournamentRosterData: !!tournamentRosterData,
+    hasData: !!data,
+    playersCount: data.players?.length || 0,
+    rosterLength: roster?.length || 0
+  });
   
   const tbody = document.getElementById("roster-body");
   if (!tbody) {
-    console.log("roster-body element not found");
+    console.error("❌ [DEBUG renderRoster] roster-body element not found");
     return;
   }
   tbody.innerHTML = "";
   
   if (!data.players || data.players.length === 0) {
-    console.log("No roster data to render");
+    console.warn("⚠️ [DEBUG renderRoster] No roster data to render");
     return;
   }
   
@@ -435,7 +442,16 @@ function renderRoster() {
   });
   
   // ✅ SS&S: Also render player stats (matches Franchise renderTeam() pattern)
+  console.log('🔍 [DEBUG renderRoster] Calling renderRosterStats() with', (data.players || []).length, 'players');
+  console.log('🔍 [DEBUG renderRoster] Sample player data:', data.players?.[0] ? {
+    _id: data.players[0]._id,
+    name: data.players[0].name || `${data.players[0].first_name} ${data.players[0].last_name}`,
+    hasStats: !!data.players[0].stats,
+    hasSeason: !!(data.players[0].stats?.season),
+    seasonKeys: data.players[0].stats?.season ? Object.keys(data.players[0].stats.season) : []
+  } : null);
   renderRosterStats(data.players || []);
+  console.log('✅ [DEBUG renderRoster] renderRosterStats() called');
 }
 
 function sortTournamentRoster(columnName, direction) {
@@ -719,21 +735,44 @@ async function refreshLeaders() {
 }
 
 async function refreshTeamStats() {
-  if (!tournament || !tournament._id) return;
+  console.log('🔍 [DEBUG refreshTeamStats] Starting refreshTeamStats()');
+  if (!tournament || !tournament._id) {
+    console.warn('⚠️ [DEBUG refreshTeamStats] Tournament not loaded');
+    return;
+  }
   try {
-    const res = await fetch(`${API_CONFIG.buildUrl('/tournament/team-stats')}?tournament_id=${encodeURIComponent(tournament._id)}`);
+    const url = `${API_CONFIG.buildUrl('/tournament/team-stats')}?tournament_id=${encodeURIComponent(tournament._id)}`;
+    console.log('🔍 [DEBUG refreshTeamStats] Fetching team stats from:', url);
+    const res = await fetch(url);
     const data = await res.json();
+    console.log('🔍 [DEBUG refreshTeamStats] Team stats API response:', {
+      hasData: !!data,
+      teamsCount: data?.teams?.length || 0,
+      teams: data?.teams?.map(t => t.team) || []
+    });
     renderTeamStats(data);
     // ✅ SS&S: Removed redundant roster refresh - already handled by handleTournamentUpdate()
   } catch (err) {
-    console.error("Failed to load team stats", err);
+    console.error("❌ [DEBUG refreshTeamStats] Failed to load team stats", err);
   }
 }
 
 function renderTeamStats(data) {
-  if (!data) return;
+  console.log('🔍 [DEBUG renderTeamStats] Starting renderTeamStats()');
+  console.log('🔍 [DEBUG renderTeamStats] Data received:', {
+    hasData: !!data,
+    teamsCount: data?.teams?.length || 0,
+    teams: data?.teams?.map(t => ({ team: t.team, hasStats: !!t.stats })) || []
+  });
+  
+  if (!data) {
+    console.warn('⚠️ [DEBUG renderTeamStats] No data provided');
+    return;
+  }
   tournamentTeamsDataForSorting = JSON.parse(JSON.stringify(data.teams || [])); // Deep copy for sorting
+  console.log('🔍 [DEBUG renderTeamStats] Calling TeamStatsTable.renderTeamStatsTable() with', tournamentTeamsDataForSorting.length, 'teams');
   TeamStatsTable.renderTeamStatsTable(tournamentTeamsDataForSorting);
+  console.log('✅ [DEBUG renderTeamStats] TeamStatsTable.renderTeamStatsTable() called');
   
   // Add click handlers to sortable headers (only once)
   const sortableHeaders = document.querySelectorAll('#stats-tab .sortable');
@@ -1354,49 +1393,95 @@ async function loadTournament() {
 
 async function loadRoster() {
   try {
-    console.log('Loading tournament roster for userTeamId:', userTeamId);
+    console.log('🔍 [DEBUG loadRoster] Starting loadRoster()');
+    console.log('🔍 [DEBUG loadRoster] userTeamId:', userTeamId);
+    console.log('🔍 [DEBUG loadRoster] tournament:', tournament?._id);
+    
     if (!userTeamId) {
-      console.error('No userTeamId found - cannot load roster');
+      console.error('❌ [DEBUG loadRoster] No userTeamId found - cannot load roster');
       return;
     }
     // Ensure tournament is loaded
     if (!tournament || !tournament._id) {
-      console.error('Tournament not loaded - cannot load roster');
+      console.error('❌ [DEBUG loadRoster] Tournament not loaded - cannot load roster');
       return;
     }
     // Use tournament roster endpoint (similar to franchise/roster)
     // Use userTeamId directly (not formatted) - backend handles name resolution
     const url = `${API_CONFIG.buildUrl('/tournament/roster')}?tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(userTeamId)}`;
+    console.log('🔍 [DEBUG loadRoster] Fetching roster from:', url);
     const res = await fetch(url);
     const data = await res.json();
-    console.log("Tournament team player data:", data);
+    console.log('🔍 [DEBUG loadRoster] Roster API response:', {
+      playersCount: data.players?.length || 0,
+      hasPlayers: !!data.players,
+      firstPlayer: data.players?.[0] ? { _id: data.players[0]._id, name: data.players[0].name || `${data.players[0].first_name} ${data.players[0].last_name}` } : null
+    });
+    
     // ✅ SS&S: Load tournament document and merge stats (match Franchise pattern exactly)
     let tournamentDoc = tournament;
     try {
-      const tournamentStateRes = await fetch(`${API_CONFIG.buildUrl('/tournament/state')}?tournament_id=${encodeURIComponent(tournament._id)}`);
+      const tournamentStateUrl = `${API_CONFIG.buildUrl('/tournament/state')}?tournament_id=${encodeURIComponent(tournament._id)}`;
+      console.log('🔍 [DEBUG loadRoster] Fetching tournament state from:', tournamentStateUrl);
+      const tournamentStateRes = await fetch(tournamentStateUrl);
       if (tournamentStateRes.ok) {
         tournamentDoc = await tournamentStateRes.json();
+        console.log('🔍 [DEBUG loadRoster] Tournament state loaded:', {
+          hasPlayers: !!tournamentDoc.players,
+          playersCount: tournamentDoc.players ? Object.keys(tournamentDoc.players).length : 0,
+          samplePlayerId: tournamentDoc.players ? Object.keys(tournamentDoc.players)[0] : null,
+          samplePlayerStats: tournamentDoc.players ? (() => {
+            const firstId = Object.keys(tournamentDoc.players)[0];
+            return firstId ? tournamentDoc.players[firstId] : null;
+          })() : null
+        });
+      } else {
+        console.warn('⚠️ [DEBUG loadRoster] Tournament state response not OK:', tournamentStateRes.status);
       }
     } catch (error) {
-      console.warn('⚠️ [TCC] Could not reload tournament document, using cached:', error);
+      console.warn('⚠️ [DEBUG loadRoster] Could not reload tournament document, using cached:', error);
     }
     
     // ✅ SS&S: Merge stats into roster data (exactly like Franchise)
+    let statsMergedCount = 0;
+    let statsEmptyCount = 0;
     if (tournamentDoc && tournamentDoc.players && data.players) {
+      console.log('🔍 [DEBUG loadRoster] Merging stats into roster data...');
       data.players = data.players.map(player => {
         const playerId = player._id;
         const tournamentPlayer = tournamentDoc.players[playerId];
         if (tournamentPlayer && tournamentPlayer.season) {
           player.stats = { season: tournamentPlayer.season };
+          statsMergedCount++;
+          if (statsMergedCount === 1) {
+            console.log('🔍 [DEBUG loadRoster] Sample merged stats for player', playerId, ':', tournamentPlayer.season);
+          }
         } else {
           player.stats = { season: {} };
+          statsEmptyCount++;
         }
         return player;
+      });
+      console.log('🔍 [DEBUG loadRoster] Stats merge complete:', {
+        statsMergedCount,
+        statsEmptyCount,
+        totalPlayers: data.players.length
+      });
+    } else {
+      console.warn('⚠️ [DEBUG loadRoster] Cannot merge stats - missing data:', {
+        hasTournamentDoc: !!tournamentDoc,
+        hasTournamentPlayers: !!(tournamentDoc && tournamentDoc.players),
+        hasDataPlayers: !!data.players
       });
     }
     
     // ✅ SS&S: Store roster data with merged stats (matches Franchise pattern)
     tournamentRosterData = data;
+    console.log('🔍 [DEBUG loadRoster] tournamentRosterData stored:', {
+      hasData: !!tournamentRosterData,
+      playersCount: tournamentRosterData?.players?.length || 0,
+      firstPlayerHasStats: !!(tournamentRosterData?.players?.[0]?.stats?.season)
+    });
     
     // Update roster array with merged stats
     roster = (data.players || []).map(p => {
@@ -1415,9 +1500,18 @@ async function loadRoster() {
       };
     });
     
-    console.log('Tournament roster loaded:', roster.length, 'players with stats merged');
+    console.log('✅ [DEBUG loadRoster] Tournament roster loaded:', {
+      rosterLength: roster.length,
+      firstPlayer: roster[0] ? {
+        _id: roster[0]._id,
+        name: roster[0].name,
+        hasStats: !!roster[0].stats,
+        hasSeason: !!(roster[0].stats?.season),
+        sampleStats: roster[0].stats?.season ? Object.keys(roster[0].stats.season).slice(0, 5) : []
+      } : null
+    });
   } catch (err) {
-    console.error("Failed to load roster", err);
+    console.error("❌ [DEBUG loadRoster] Failed to load roster", err);
   }
 }
 
@@ -1959,13 +2053,40 @@ let rosterPlayersDataForSorting = [];
 
 // ✅ SS&S: Wrapper function to match Franchise renderRosterStats() pattern
 function renderRosterStats(players) {
+  console.log('🔍 [DEBUG renderRosterStats] Starting renderRosterStats()');
+  console.log('🔍 [DEBUG renderRosterStats] Players received:', {
+    playersCount: players?.length || 0,
+    hasPlayers: !!players,
+    firstPlayer: players?.[0] ? {
+      _id: players[0]._id,
+      name: players[0].name || `${players[0].first_name} ${players[0].last_name}`,
+      hasStats: !!players[0].stats,
+      hasSeason: !!(players[0].stats?.season),
+      seasonKeys: players[0].stats?.season ? Object.keys(players[0].stats.season) : []
+    } : null
+  });
+  
   if (!players || players.length === 0) {
+    console.warn('⚠️ [DEBUG renderRosterStats] No players provided');
     const tbody = document.getElementById('roster-stats-body');
-    if (tbody) tbody.innerHTML = '';
+    if (tbody) {
+      tbody.innerHTML = '';
+      console.log('🔍 [DEBUG renderRosterStats] Cleared empty tbody');
+    } else {
+      console.error('❌ [DEBUG renderRosterStats] roster-stats-body element not found');
+    }
     return;
   }
   
+  const tbody = document.getElementById('roster-stats-body');
+  if (!tbody) {
+    console.error('❌ [DEBUG renderRosterStats] roster-stats-body element not found in DOM');
+    return;
+  }
+  console.log('🔍 [DEBUG renderRosterStats] Found roster-stats-body element');
+  
   rosterPlayersDataForSorting = JSON.parse(JSON.stringify(players)); // Deep copy for sorting
+  console.log('🔍 [DEBUG renderRosterStats] Calling renderRosterStatsTable() with', rosterPlayersDataForSorting.length, 'players');
   renderRosterStatsTable(rosterPlayersDataForSorting);
   
   // Add click handlers to sortable headers (only once) - target only the stats table
@@ -1988,17 +2109,34 @@ function renderRosterStats(players) {
 }
 
 function renderRosterStatsTable(players) {
+  console.log('🔍 [DEBUG renderRosterStatsTable] Starting renderRosterStatsTable()');
   const tbody = document.getElementById('roster-stats-body');
   if (!tbody) {
-    console.error('❌ [RENDER-ROSTER-STATS-TABLE] tbody element not found');
+    console.error('❌ [DEBUG renderRosterStatsTable] roster-stats-body tbody element not found');
     return;
   }
+  console.log('🔍 [DEBUG renderRosterStatsTable] Found tbody, rendering', players.length, 'players');
   
   tbody.innerHTML = '';
   rosterPlayersDataForSorting = JSON.parse(JSON.stringify(players)); // Deep copy for sorting
   
-  players.forEach((p) => {
+  let renderedCount = 0;
+  players.forEach((p, index) => {
     const stats = p.stats?.season || {};
+    if (index === 0) {
+      console.log('🔍 [DEBUG renderRosterStatsTable] Sample player stats:', {
+        playerId: p._id,
+        playerName: p.name || `${p.first_name} ${p.last_name}`,
+        hasStats: !!p.stats,
+        hasSeason: !!p.stats?.season,
+        statsKeys: Object.keys(stats),
+        sampleValues: {
+          PTS: stats.PTS,
+          FGM: stats.FGM,
+          FGA: stats.FGA
+        }
+      });
+    }
     // ✅ FIX: Map 3PTM/3PTA to TPM/TPA for display (database stores as 3PTM/3PTA, frontend expects TPM/TPA)
     const tpm = stats['3PTM'] || stats.TPM || 0;
     const tpa = stats['3PTA'] || stats.TPA || 0;
@@ -2031,7 +2169,9 @@ function renderRosterStatsTable(players) {
       <td>${stats.MIN || 0}</td>
       <td>${stats.TO || 0}</td>`;
     tbody.appendChild(tr);
+    renderedCount++;
   });
+  console.log('✅ [DEBUG renderRosterStatsTable] Rendered', renderedCount, 'player stat rows');
 }
 
 function sortRosterStats(statKey) {
