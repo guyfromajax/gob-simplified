@@ -415,6 +415,9 @@ h1, h2, h3, h4, h5, h6 {
 #stats-tab > div:first-child {
   width: 100%;
   overflow-x: auto;
+  /* ✅ DEBUG: Ensure container can expand */
+  min-width: 0;
+  max-width: 100%;
 }
 
 table.roster-table,
