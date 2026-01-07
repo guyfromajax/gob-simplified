@@ -15,6 +15,7 @@ from BackEnd.tournament.bracket_logic import update_bracket_from_results
 from BackEnd.main import run_simulation
 from BackEnd.utils.shared import summarize_game_state
 from BackEnd.utils import stat_updater
+from BackEnd.utils.team_stats_aggregator import aggregate_team_stats_from_players
 from bson import ObjectId
 
 router = APIRouter()
@@ -88,170 +89,14 @@ def tournament_team_stats(tournament_id: str):
     players = tournament_doc.get("players", {})
     tournament_teams = tournament_doc.get("teams", {})
     
-    # Get all team IDs from tournament_teams
-    team_stats_map: dict[str, dict[str, int]] = {}
-    
-    # Initialize team stats for all teams in tournament
-    for team_id in tournament_teams.keys():
-        team_id_str = str(team_id)
-        team_stats_map[team_id_str] = {
-            "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
-            "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
-            "DREB": 0, "OREB": 0, "TREB": 0,
-            "TO": 0, "F": 0,
-            "DEF_A": 0, "DEF_S": 0, "SCR_A": 0, "SCR_S": 0
-        }
-    
-    # Aggregate stats from players object
-    players_with_stats = 0
-    players_without_team_id = 0
-    players_without_stats = 0
-    players_with_empty_stats = 0
-    for pid, pdata in players.items():
-        meta = pdata.get("meta", {})
-        team_id = meta.get("team_id")
-        if not team_id:
-            players_without_team_id += 1
-            logger.warning(f"⚠️ [TOURNAMENT_TEAM_STATS] Player {pid} missing team_id in meta: {meta}")
-            continue
-        
-        team_id_str = str(team_id)
-        season_stats = pdata.get("season", {})
-        if not season_stats:
-            players_without_stats += 1
-            continue
-        
-        # ✅ FIX: Include players with empty stats (zeros) - they still count for team aggregation
-        # Empty stats object means player hasn't played yet, but they're still on the roster
-        if len(season_stats) == 0:
-            players_with_empty_stats += 1
-            # Continue to next player - empty stats don't contribute to team totals
-            continue
-        
-        if team_id_str not in team_stats_map:
-            team_stats_map[team_id_str] = {
-                "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
-                "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
-                "DREB": 0, "OREB": 0, "TREB": 0,
-                "TO": 0, "F": 0,
-                "DEF_A": 0, "DEF_S": 0, "SCR_A": 0, "SCR_S": 0
-            }
-        
-        players_with_stats += 1
-        # Sum all stats for this team (map 3PTM to TPM for output)
-        for stat, val in season_stats.items():
-            if isinstance(val, (int, float)):
-                output_stat = stat
-                if stat == "3PTM":
-                    output_stat = "TPM"
-                elif stat == "3PTA":
-                    output_stat = "TPA"
-                
-                if output_stat in team_stats_map[team_id_str]:
-                    team_stats_map[team_id_str][output_stat] += val
-    
-    # Get PF/PA and wins/losses from standings (teams collection)
-    standings_data = {}
-    teams_list = list(teams_collection.find({}, {"name": 1, "PF": 1, "PA": 1, "record": 1, "_id": 1}))
-    for t in teams_list:
-        team_id_str = str(t["_id"])
-        rec = t.get("record", {"W": 0, "L": 0})
-        standings_data[team_id_str] = {
-            "PF": t.get("PF", 0),
-            "PA": t.get("PA", 0),
-            "W": rec.get("W", 0),
-            "L": rec.get("L", 0)
-        }
-    
-    # Convert to output format with team names
-    # ✅ FIX: Deduplicate by team name to avoid duplicate entries
-    # Some teams might be keyed by ObjectId, others by team name string
-    output = []
-    seen_team_names = set()
-    
-    for team_id_str, stats in team_stats_map.items():
-        # ✅ FIX: Try multiple lookup strategies to get team name
-        team_name = None
-        try:
-            # Strategy 1: Try as ObjectId
-            team_doc = teams_collection.find_one({"_id": ObjectId(team_id_str)}, {"name": 1})
-            if team_doc:
-                team_name = team_doc.get("name")
-        except Exception:
-            pass
-        
-        if not team_name:
-            # Strategy 2: Try as team name (if team_id_str is already a team name)
-            team_doc = teams_collection.find_one({"name": team_id_str}, {"name": 1})
-            if team_doc:
-                team_name = team_doc.get("name")
-        
-        if not team_name:
-            # Strategy 3: Fallback to team_id_str (but normalize if it's an underscore format)
-            # Convert "OCEAN_CITY" to "Ocean City" if possible
-            if "_" in team_id_str:
-                # Try to find team by converting underscore format to proper name
-                normalized = team_id_str.replace("_", " ").title()
-                team_doc = teams_collection.find_one({"name": normalized}, {"name": 1})
-                if team_doc:
-                    team_name = team_doc.get("name")
-                else:
-                    team_name = team_id_str
-            else:
-                team_name = team_id_str
-        
-        # ✅ FIX: Skip if we've already seen this team name (deduplicate)
-        if team_name in seen_team_names:
-            continue
-        seen_team_names.add(team_name)
-        
-        # ✅ FIX: Only include teams with actual stats (non-zero totals)
-        # Check if team has any meaningful stats (not all zeros)
-        has_stats = any(
-            stats.get(stat, 0) > 0 
-            for stat in ["PTS", "FGM", "FGA", "REB", "AST", "STL", "BLK", "TO", "F"]
-        )
-        if not has_stats:
-            continue
-        
-        # Add PF/PA and wins/losses from standings
-        if team_id_str in standings_data:
-            stats["PF"] = standings_data[team_id_str]["PF"]
-            stats["PA"] = standings_data[team_id_str]["PA"]
-            stats["W"] = standings_data[team_id_str]["W"]
-            stats["L"] = standings_data[team_id_str]["L"]
-        else:
-            # ✅ FIX: Try to find PF/PA and wins/losses by team name if team_id_str lookup failed
-            try:
-                team_doc_for_standings = teams_collection.find_one({"name": team_name}, {"PF": 1, "PA": 1, "record": 1, "_id": 1})
-                if team_doc_for_standings:
-                    stats["PF"] = team_doc_for_standings.get("PF", 0)
-                    stats["PA"] = team_doc_for_standings.get("PA", 0)
-                    rec = team_doc_for_standings.get("record", {"W": 0, "L": 0})
-                    stats["W"] = rec.get("W", 0)
-                    stats["L"] = rec.get("L", 0)
-                else:
-                    stats["PF"] = 0
-                    stats["PA"] = 0
-                    stats["W"] = 0
-                    stats["L"] = 0
-            except Exception:
-                stats["PF"] = 0
-                stats["PA"] = 0
-                stats["W"] = 0
-                stats["L"] = 0
-        
-        # Calculate TREB from DREB + OREB
-        stats["TREB"] = stats.get("DREB", 0) + stats.get("OREB", 0)
-        
-        output.append({"team": team_name, "stats": stats})
-    
-    # Log for debugging
-    logger.info(f"🔍 [TOURNAMENT_TEAM_STATS] Processed {players_with_stats} players with stats, {players_without_team_id} without team_id, {players_without_stats} without season key, {players_with_empty_stats} with empty stats")
-    logger.info(f"🔍 [TOURNAMENT_TEAM_STATS] Returning {len(output)} teams")
-    for team_data in output:
-        stats = team_data.get('stats', {})
-        logger.info(f"🔍 [TOURNAMENT_TEAM_STATS] Team: {team_data.get('team')}, PTS: {stats.get('PTS', 0)}, FGM: {stats.get('FGM', 0)}, FGA: {stats.get('FGA', 0)}, REB: {stats.get('REB', 0)}")
+    # ✅ SS&S: Use shared aggregator utility
+    output = aggregate_team_stats_from_players(
+        players=players,
+        team_ids=tournament_teams,
+        teams_collection=teams_collection,
+        collection_type='tournament',
+        logger=logger
+    )
     
     return {"teams": output}
 

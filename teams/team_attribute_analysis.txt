@@ -25,3 +25,14 @@ SC: 510 (5), SH: 397 (7), ID: 478 (6), OD: 492 (5), PS: 573 (5), BH: 437 (4), RB
 
 Xavien (4,785):
 SC: 353 (8), SH: 330 (8), ID: 382 (8), OD: 399 (8), PS: 402 (8), BH: 310 (8), RB: 453 (7), AG: 417 (8), ST: 367 (8), ND: 441 (8), IQ: 390 (8), FT: 541 (8), CH: 0 (8)
+
+
+Adjustment Targets:
+1. Bentley-Truman: 7221 (1: SC, PS, BH, CH)
+2. Lancaster: 6787 (1: ID, OD, RB, ST)
+3. Four Corners 6650 (1: AG, ND)
+4. Morristown: 6427 (Balance)
+5. Ocean City: 6222 (1: SH)
+6. Little York: 6204 (1: IQ, FT)
+7. South Lancaster: 6068
+8. Xavien: 4785 (improve FR, SO, JR, SR training scaling)
