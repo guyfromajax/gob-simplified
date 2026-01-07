@@ -383,38 +383,9 @@ def save_result(request: TournamentResultRequest):
                 round_key, i, request.game_id, request.winner, score_map
             )
             
-            # ✅ SS&S: Update teams collection with W/L and PF/PA (matches Franchise mode pattern)
-            # This ensures team_stats_aggregator can find W/L and PF/PA in the teams collection
-            # Note: home_team and away_team from bracket are team names (strings), not ObjectIds
-            try:
-                # Direct lookup by team name (bracket stores team names, not ObjectIds)
-                home_doc = teams_collection.find_one({"name": home_team}, {"_id": 1})
-                away_doc = teams_collection.find_one({"name": away_team}, {"_id": 1})
-                
-                if home_doc and away_doc and score_map:
-                    home_team_id = home_doc["_id"]
-                    away_team_id = away_doc["_id"]
-                    home_score = score_map.get(home_team, 0)
-                    away_score = score_map.get(away_team, 0)
-                    winner_id = home_team_id if request.winner == home_team else away_team_id
-                    loser_id = away_team_id if request.winner == home_team else home_team_id
-                    winner_score = home_score if request.winner == home_team else away_score
-                    loser_score = away_score if request.winner == home_team else home_score
-                    
-                    teams_collection.update_one(
-                        {"_id": winner_id}, {"$inc": {"record.W": 1, "PF": winner_score, "PA": loser_score}}
-                    )
-                    teams_collection.update_one(
-                        {"_id": loser_id}, {"$inc": {"record.L": 1, "PF": loser_score, "PA": winner_score}}
-                    )
-                    logger.info(f"✅ [SAVE-RESULT] Updated teams collection: {request.winner} (id: {winner_id}) W+1, PF+{winner_score}, PA+{loser_score}")
-                    print(f"✅ [SAVE-RESULT] Updated teams collection: {request.winner} (id: {winner_id}) W+1, PF+{winner_score}, PA+{loser_score}")
-                else:
-                    logger.warning(f"⚠️ [SAVE-RESULT] Could not find team documents: home={home_team} (found={bool(home_doc)}), away={away_team} (found={bool(away_doc)})")
-                    print(f"⚠️ [SAVE-RESULT] Could not find team documents: home={home_team} (found={bool(home_doc)}), away={away_team} (found={bool(away_doc)})")
-            except Exception as e:
-                logger.error(f"❌ [SAVE-RESULT] Error updating teams collection: {e}", exc_info=True)
-                print(f"❌ [SAVE-RESULT] Error updating teams collection: {e}")
+            # ✅ SS&S: W/L and PF/PA are now calculated from tournament bracket (not teams collection)
+            # This ensures tournament-specific stats don't accumulate across multiple tournaments
+            # See team_stats_aggregator.py for bracket-based calculation logic
             
             # ✅ FINALIZE USER'S GAME FIRST (matches Franchise mode pattern)
             if summary and summary.get("_id"):
@@ -524,38 +495,9 @@ def save_result(request: TournamentResultRequest):
         winner = home if score_map[home] > score_map[away] else away
         manager.save_game_result(round_key, i, str(game_id), winner, score_map)
         
-        # ✅ SS&S: Update teams collection with W/L and PF/PA (matches Franchise mode pattern)
-        # This ensures team_stats_aggregator can find W/L and PF/PA in the teams collection
-        # Note: home and away from bracket are team names (strings), not ObjectIds
-        try:
-            # Direct lookup by team name (bracket stores team names, not ObjectIds)
-            home_doc = teams_collection.find_one({"name": home}, {"_id": 1})
-            away_doc = teams_collection.find_one({"name": away}, {"_id": 1})
-            
-            if home_doc and away_doc and score_map:
-                home_team_id = home_doc["_id"]
-                away_team_id = away_doc["_id"]
-                home_score = score_map.get(home, 0)
-                away_score = score_map.get(away, 0)
-                winner_id = home_team_id if winner == home else away_team_id
-                loser_id = away_team_id if winner == home else home_team_id
-                winner_score = home_score if winner == home else away_score
-                loser_score = away_score if winner == home else home_score
-                
-                teams_collection.update_one(
-                    {"_id": winner_id}, {"$inc": {"record.W": 1, "PF": winner_score, "PA": loser_score}}
-                )
-                teams_collection.update_one(
-                    {"_id": loser_id}, {"$inc": {"record.L": 1, "PF": loser_score, "PA": winner_score}}
-                )
-                logger.info(f"✅ [SAVE-RESULT] Updated teams collection (computer game): {winner} (id: {winner_id}) W+1, PF+{winner_score}, PA+{loser_score}")
-                print(f"✅ [SAVE-RESULT] Updated teams collection (computer game): {winner} (id: {winner_id}) W+1, PF+{winner_score}, PA+{loser_score}")
-            else:
-                logger.warning(f"⚠️ [SAVE-RESULT] Could not find team documents (computer game): home={home} (found={bool(home_doc)}), away={away} (found={bool(away_doc)})")
-                print(f"⚠️ [SAVE-RESULT] Could not find team documents (computer game): home={home} (found={bool(home_doc)}), away={away} (found={bool(away_doc)})")
-        except Exception as e:
-            logger.error(f"❌ [SAVE-RESULT] Error updating teams collection (computer game): {e}", exc_info=True)
-            print(f"❌ [SAVE-RESULT] Error updating teams collection (computer game): {e}")
+        # ✅ SS&S: W/L and PF/PA are now calculated from tournament bracket (not teams collection)
+        # This ensures tournament-specific stats don't accumulate across multiple tournaments
+        # See team_stats_aggregator.py for bracket-based calculation logic
 
         result_doc = {
             "home_team": home,
