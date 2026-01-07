@@ -348,6 +348,60 @@ def save_result(request: TournamentResultRequest):
                 round_key, i, request.game_id, request.winner, score_map
             )
             
+            # ✅ SS&S: Update teams collection with W/L and PF/PA (matches Franchise mode pattern)
+            # This ensures team_stats_aggregator can find W/L and PF/PA in the teams collection
+            try:
+                # Get team IDs from tournament document
+                tournament_doc = tournaments_collection.find_one({"_id": ObjectId(request.tournament_id)}, {"teams": 1})
+                if tournament_doc:
+                    teams_map = tournament_doc.get("teams", {})
+                    # Find team IDs by name
+                    home_team_id = None
+                    away_team_id = None
+                    for team_id_str, team_data in teams_map.items():
+                        if isinstance(team_data, dict):
+                            team_name = team_data.get("name", "")
+                        else:
+                            # Fallback: try to get team name from teams collection
+                            team_doc = teams_collection.find_one({"_id": ObjectId(team_id_str)}, {"name": 1})
+                            team_name = team_doc.get("name", "") if team_doc else ""
+                        
+                        if team_name == home_team:
+                            home_team_id = ObjectId(team_id_str)
+                        elif team_name == away_team:
+                            away_team_id = ObjectId(team_id_str)
+                    
+                    # If not found in tournament.teams, try direct lookup by name
+                    if not home_team_id:
+                        home_doc = teams_collection.find_one({"name": home_team}, {"_id": 1})
+                        if home_doc:
+                            home_team_id = home_doc["_id"]
+                    if not away_team_id:
+                        away_doc = teams_collection.find_one({"name": away_team}, {"_id": 1})
+                        if away_doc:
+                            away_team_id = away_doc["_id"]
+                    
+                    # Update teams collection with W/L and PF/PA (matches Franchise pattern)
+                    if home_team_id and away_team_id and score_map:
+                        home_score = score_map.get(home_team, 0)
+                        away_score = score_map.get(away_team, 0)
+                        winner_id = home_team_id if request.winner == home_team else away_team_id
+                        loser_id = away_team_id if request.winner == home_team else home_team_id
+                        winner_score = home_score if request.winner == home_team else away_score
+                        loser_score = away_score if request.winner == home_team else home_score
+                        
+                        teams_collection.update_one(
+                            {"_id": winner_id}, {"$inc": {"record.W": 1, "PF": winner_score, "PA": loser_score}}
+                        )
+                        teams_collection.update_one(
+                            {"_id": loser_id}, {"$inc": {"record.L": 1, "PF": loser_score, "PA": winner_score}}
+                        )
+                        logger.info(f"✅ [SAVE-RESULT] Updated teams collection: {request.winner} W+1, PF+{winner_score}, PA+{loser_score}")
+                        print(f"✅ [SAVE-RESULT] Updated teams collection: {request.winner} W+1, PF+{winner_score}, PA+{loser_score}")
+            except Exception as e:
+                logger.error(f"❌ [SAVE-RESULT] Error updating teams collection: {e}")
+                print(f"❌ [SAVE-RESULT] Error updating teams collection: {e}")
+            
             # ✅ FINALIZE USER'S GAME FIRST (matches Franchise mode pattern)
             if summary and summary.get("_id"):
                 user_game_id = str(gid)
@@ -455,6 +509,60 @@ def save_result(request: TournamentResultRequest):
         score_map = summary.get("score") or summary.get("final_score")
         winner = home if score_map[home] > score_map[away] else away
         manager.save_game_result(round_key, i, str(game_id), winner, score_map)
+        
+        # ✅ SS&S: Update teams collection with W/L and PF/PA (matches Franchise mode pattern)
+        # This ensures team_stats_aggregator can find W/L and PF/PA in the teams collection
+        try:
+            # Get team IDs from tournament document
+            tournament_doc = tournaments_collection.find_one({"_id": ObjectId(request.tournament_id)}, {"teams": 1})
+            if tournament_doc:
+                teams_map = tournament_doc.get("teams", {})
+                # Find team IDs by name
+                home_team_id = None
+                away_team_id = None
+                for team_id_str, team_data in teams_map.items():
+                    if isinstance(team_data, dict):
+                        team_name = team_data.get("name", "")
+                    else:
+                        # Fallback: try to get team name from teams collection
+                        team_doc = teams_collection.find_one({"_id": ObjectId(team_id_str)}, {"name": 1})
+                        team_name = team_doc.get("name", "") if team_doc else ""
+                    
+                    if team_name == home:
+                        home_team_id = ObjectId(team_id_str)
+                    elif team_name == away:
+                        away_team_id = ObjectId(team_id_str)
+                
+                # If not found in tournament.teams, try direct lookup by name
+                if not home_team_id:
+                    home_doc = teams_collection.find_one({"name": home}, {"_id": 1})
+                    if home_doc:
+                        home_team_id = home_doc["_id"]
+                if not away_team_id:
+                    away_doc = teams_collection.find_one({"name": away}, {"_id": 1})
+                    if away_doc:
+                        away_team_id = away_doc["_id"]
+                
+                # Update teams collection with W/L and PF/PA (matches Franchise pattern)
+                if home_team_id and away_team_id and score_map:
+                    home_score = score_map.get(home, 0)
+                    away_score = score_map.get(away, 0)
+                    winner_id = home_team_id if winner == home else away_team_id
+                    loser_id = away_team_id if winner == home else home_team_id
+                    winner_score = home_score if winner == home else away_score
+                    loser_score = away_score if winner == home else home_score
+                    
+                    teams_collection.update_one(
+                        {"_id": winner_id}, {"$inc": {"record.W": 1, "PF": winner_score, "PA": loser_score}}
+                    )
+                    teams_collection.update_one(
+                        {"_id": loser_id}, {"$inc": {"record.L": 1, "PF": loser_score, "PA": winner_score}}
+                    )
+                    logger.info(f"✅ [SAVE-RESULT] Updated teams collection (computer game): {winner} W+1, PF+{winner_score}, PA+{loser_score}")
+                    print(f"✅ [SAVE-RESULT] Updated teams collection (computer game): {winner} W+1, PF+{winner_score}, PA+{loser_score}")
+        except Exception as e:
+            logger.error(f"❌ [SAVE-RESULT] Error updating teams collection (computer game): {e}")
+            print(f"❌ [SAVE-RESULT] Error updating teams collection (computer game): {e}")
 
         result_doc = {
             "home_team": home,
