@@ -240,6 +240,18 @@ export function createGameScene(Phaser) {
         payload.game_id = this.gameId;
       }
       
+      // ✅ SS&S: Add mode and mode-specific IDs to payload (matches bootGame.js pattern)
+      // This ensures backend sets correct mode on game document for finalize_game() processing
+      if (this.mode) {
+        payload.mode = this.mode;
+      }
+      if (this.tournamentId) {
+        payload.tournament_id = this.tournamentId;
+      }
+      if (this.franchiseId) {
+        payload.franchise_id = this.franchiseId;
+      }
+      
       // ✅ TIMEOUT: Add resume_from_timeout flag if present in URL
       if (resumeFromTimeout) {
         payload.resume_from_timeout = true;
