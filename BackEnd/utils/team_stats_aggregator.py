@@ -36,13 +36,46 @@ def aggregate_team_stats_from_players(
     else:
         log_func = logger.info if hasattr(logger, 'info') else logger
     
-    # Initialize team stats map
-    team_stats_map: Dict[str, Dict[str, int]] = {}
+    # ✅ FIX: Normalize team_ids to ObjectId strings to prevent duplicates
+    # Tournament.teams might have mixed formats (ObjectId strings, team names, etc.)
+    normalized_team_ids: Dict[str, Any] = {}
+    team_id_to_normalized: Dict[str, str] = {}  # Map original team_id to normalized ObjectId string
     
-    # Initialize team stats for all teams
     for team_id in team_ids.keys():
         team_id_str = str(team_id)
-        team_stats_map[team_id_str] = {
+        normalized_id = None
+        
+        # Try to normalize to ObjectId string
+        try:
+            # If it's already an ObjectId string, use it
+            obj_id = ObjectId(team_id_str)
+            normalized_id = str(obj_id)
+        except Exception:
+            # If it's a team name, try to resolve to ObjectId
+            try:
+                team_doc = teams_collection.find_one({"name": team_id_str}, {"_id": 1})
+                if team_doc:
+                    normalized_id = str(team_doc["_id"])
+                else:
+                    # Try case-insensitive search
+                    team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_id_str}$", "$options": "i"}}, {"_id": 1})
+                    if team_doc:
+                        normalized_id = str(team_doc["_id"])
+                    else:
+                        # Last resort: use as-is (shouldn't happen)
+                        normalized_id = team_id_str
+            except Exception:
+                normalized_id = team_id_str
+        
+        if normalized_id:
+            normalized_team_ids[normalized_id] = team_ids[team_id]
+            team_id_to_normalized[team_id_str] = normalized_id
+    
+    # Initialize team stats map with normalized IDs
+    team_stats_map: Dict[str, Dict[str, int]] = {}
+    
+    for normalized_id in normalized_team_ids.keys():
+        team_stats_map[normalized_id] = {
             "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
             "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
             "DREB": 0, "OREB": 0, "TREB": 0,
@@ -78,8 +111,21 @@ def aggregate_team_stats_from_players(
             # Continue to next player - empty stats don't contribute to team totals
             continue
         
-        if team_id_str not in team_stats_map:
-            team_stats_map[team_id_str] = {
+        # ✅ FIX: Normalize team_id to match normalized_team_ids map
+        normalized_team_id = team_id_to_normalized.get(team_id_str, team_id_str)
+        # Try to resolve if not in map
+        if normalized_team_id == team_id_str and normalized_team_id not in team_stats_map:
+            try:
+                obj_id = ObjectId(team_id_str)
+                normalized_team_id = str(obj_id)
+            except Exception:
+                # Try to find by team name
+                team_doc = teams_collection.find_one({"name": team_id_str}, {"_id": 1})
+                if team_doc:
+                    normalized_team_id = str(team_doc["_id"])
+        
+        if normalized_team_id not in team_stats_map:
+            team_stats_map[normalized_team_id] = {
                 "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
                 "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
                 "DREB": 0, "OREB": 0, "TREB": 0,
@@ -97,8 +143,8 @@ def aggregate_team_stats_from_players(
                 elif stat == "3PTA":
                     output_stat = "TPA"
                 
-                if output_stat in team_stats_map[team_id_str]:
-                    team_stats_map[team_id_str][output_stat] += val
+                if output_stat in team_stats_map[normalized_team_id]:
+                    team_stats_map[normalized_team_id][output_stat] += val
     
     if logger:
         log_func(f"🔍 [{collection_type.upper()}_TEAM_STATS] Processed {players_with_stats} players with stats, "
@@ -156,6 +202,7 @@ def aggregate_team_stats_from_players(
             # Teams with zero stats will still show W/L, PF/PA from standings
         
         # Add PF/PA and wins/losses from standings
+        # ✅ FIX: Use normalized team_id_str (ObjectId string) for standings lookup
         if team_id_str in standings_data:
             stats["PF"] = standings_data[team_id_str]["PF"]
             stats["PA"] = standings_data[team_id_str]["PA"]
