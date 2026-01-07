@@ -36,46 +36,14 @@ def aggregate_team_stats_from_players(
     else:
         log_func = logger.info if hasattr(logger, 'info') else logger
     
-    # ✅ FIX: Normalize team_ids to ObjectId strings to prevent duplicates
-    # Tournament.teams might have mixed formats (ObjectId strings, team names, etc.)
-    normalized_team_ids: Dict[str, Any] = {}
-    team_id_to_normalized: Dict[str, str] = {}  # Map original team_id to normalized ObjectId string
-    
-    for team_id in team_ids.keys():
-        team_id_str = str(team_id)
-        normalized_id = None
-        
-        # Try to normalize to ObjectId string
-        try:
-            # If it's already an ObjectId string, use it
-            obj_id = ObjectId(team_id_str)
-            normalized_id = str(obj_id)
-        except Exception:
-            # If it's a team name, try to resolve to ObjectId
-            try:
-                team_doc = teams_collection.find_one({"name": team_id_str}, {"_id": 1})
-                if team_doc:
-                    normalized_id = str(team_doc["_id"])
-                else:
-                    # Try case-insensitive search
-                    team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_id_str}$", "$options": "i"}}, {"_id": 1})
-                    if team_doc:
-                        normalized_id = str(team_doc["_id"])
-                    else:
-                        # Last resort: use as-is (shouldn't happen)
-                        normalized_id = team_id_str
-            except Exception:
-                normalized_id = team_id_str
-        
-        if normalized_id:
-            normalized_team_ids[normalized_id] = team_ids[team_id]
-            team_id_to_normalized[team_id_str] = normalized_id
-    
-    # Initialize team stats map with normalized IDs
+    # Initialize team stats map
+    # ✅ SS&S: Both tournament.teams and franchise_teams use ObjectId strings as keys
     team_stats_map: Dict[str, Dict[str, int]] = {}
     
-    for normalized_id in normalized_team_ids.keys():
-        team_stats_map[normalized_id] = {
+    # Initialize team stats for all teams
+    for team_id in team_ids.keys():
+        team_id_str = str(team_id)
+        team_stats_map[team_id_str] = {
             "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
             "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
             "DREB": 0, "OREB": 0, "TREB": 0,
@@ -111,21 +79,46 @@ def aggregate_team_stats_from_players(
             # Continue to next player - empty stats don't contribute to team totals
             continue
         
-        # ✅ FIX: Normalize team_id to match normalized_team_ids map
-        normalized_team_id = team_id_to_normalized.get(team_id_str, team_id_str)
-        # Try to resolve if not in map
-        if normalized_team_id == team_id_str and normalized_team_id not in team_stats_map:
+        # ✅ SS&S: player meta.team_id should be ObjectId string (matches tournament.teams/franchise_teams keys)
+        # If it's not in the map, try to resolve it (might be team name or different format)
+        if team_id_str not in team_stats_map:
+            # Try to resolve team_id_str to ObjectId string
+            resolved_team_id = None
             try:
+                # Try as ObjectId first
                 obj_id = ObjectId(team_id_str)
-                normalized_team_id = str(obj_id)
+                resolved_team_id = str(obj_id)
             except Exception:
-                # Try to find by team name
+                # Try as team name
                 team_doc = teams_collection.find_one({"name": team_id_str}, {"_id": 1})
                 if team_doc:
-                    normalized_team_id = str(team_doc["_id"])
+                    resolved_team_id = str(team_doc["_id"])
+                else:
+                    # Try case-insensitive
+                    team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_id_str}$", "$options": "i"}}, {"_id": 1})
+                    if team_doc:
+                        resolved_team_id = str(team_doc["_id"])
+            
+            if resolved_team_id and resolved_team_id in team_stats_map:
+                team_id_str = resolved_team_id
+            elif resolved_team_id:
+                # Team not in tournament/franchise, but player has stats - initialize it
+                team_stats_map[resolved_team_id] = {
+                    "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
+                    "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
+                    "DREB": 0, "OREB": 0, "TREB": 0,
+                    "TO": 0, "F": 0,
+                    "DEF_A": 0, "DEF_S": 0, "SCR_A": 0, "SCR_S": 0
+                }
+                team_id_str = resolved_team_id
+            else:
+                # Can't resolve, skip this player
+                if logger:
+                    log_func(f"⚠️ [{collection_type.upper()}_TEAM_STATS] Cannot resolve team_id '{team_id_str}' for player {pid}, skipping")
+                continue
         
-        if normalized_team_id not in team_stats_map:
-            team_stats_map[normalized_team_id] = {
+        if team_id_str not in team_stats_map:
+            team_stats_map[team_id_str] = {
                 "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
                 "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
                 "DREB": 0, "OREB": 0, "TREB": 0,
@@ -143,8 +136,8 @@ def aggregate_team_stats_from_players(
                 elif stat == "3PTA":
                     output_stat = "TPA"
                 
-                if output_stat in team_stats_map[normalized_team_id]:
-                    team_stats_map[normalized_team_id][output_stat] += val
+                if output_stat in team_stats_map[team_id_str]:
+                    team_stats_map[team_id_str][output_stat] += val
     
     if logger:
         log_func(f"🔍 [{collection_type.upper()}_TEAM_STATS] Processed {players_with_stats} players with stats, "
@@ -166,36 +159,26 @@ def aggregate_team_stats_from_players(
     
     # Convert to output format with team names
     output = []
-    seen_team_names = set()  # For tournament deduplication (case-insensitive)
-    seen_team_ids = set()  # Track by ObjectId to prevent duplicates
+    seen_team_ids = set()  # Track by ObjectId to prevent duplicates (SS&S: same for both modes)
     
     for team_id_str, stats in team_stats_map.items():
         # Resolve team name (mode-specific logic)
         team_name = resolve_team_name(team_id_str, teams_collection, collection_type)
         
-        # ✅ FIX: Normalize team name for case-insensitive deduplication
-        team_name_normalized = team_name.upper() if team_name else ""
-        
-        # Tournament mode: Deduplicate by team name (case-insensitive)
-        if collection_type == 'tournament':
-            # Check if we've seen this team name (case-insensitive) or this team_id
-            if team_name_normalized in seen_team_names:
+        # ✅ SS&S: Deduplicate by ObjectId (same for both modes)
+        # This prevents duplicates even if team name resolution differs
+        try:
+            team_obj_id = ObjectId(team_id_str)
+            if team_obj_id in seen_team_ids:
                 if logger:
-                    log_func(f"⚠️ [{collection_type.upper()}_TEAM_STATS] Skipping duplicate team: {team_name} (normalized: {team_name_normalized})")
+                    log_func(f"⚠️ [{collection_type.upper()}_TEAM_STATS] Skipping duplicate team_id: {team_id_str} (name: {team_name})")
                 continue
-            
-            # Also check by ObjectId to catch duplicates even if name resolution differs
-            try:
-                team_obj_id = ObjectId(team_id_str)
-                if team_obj_id in seen_team_ids:
-                    if logger:
-                        log_func(f"⚠️ [{collection_type.upper()}_TEAM_STATS] Skipping duplicate team_id: {team_id_str} (name: {team_name})")
-                    continue
-                seen_team_ids.add(team_obj_id)
-            except Exception:
-                pass  # team_id_str is not an ObjectId, skip ObjectId check
-            
-            seen_team_names.add(team_name_normalized)
+            seen_team_ids.add(team_obj_id)
+        except Exception:
+            # team_id_str is not an ObjectId - this shouldn't happen but handle gracefully
+            if logger:
+                log_func(f"⚠️ [{collection_type.upper()}_TEAM_STATS] team_id_str '{team_id_str}' is not a valid ObjectId")
+            # Still add to output but log warning
             
             # ✅ SS&S: Include ALL teams in tournament bracket, even if stats are zero
             # This matches Franchise mode behavior and ensures all teams appear in the table
