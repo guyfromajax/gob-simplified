@@ -1210,14 +1210,16 @@ def finalize_game(
                     # MIN special handling: Convert seconds to minutes
                     if stat == "MIN":
                         val = val // 60
+                    # ✅ SS&S: Accumulate stats (in case same stat appears multiple times)
                     inc_doc[f"players.{pid_str}.season.{stat}"] = inc_doc.get(
                         f"players.{pid_str}.season.{stat}", 0
                     ) + val
                 
-                # Increment GP
-                inc_doc[f"players.{pid_str}.season.GP"] = inc_doc.get(
-                    f"players.{pid_str}.season.GP", 0
-                ) + 1
+                # Increment GP (only once per player)
+                if f"players.{pid_str}.season.GP" not in inc_doc:
+                    inc_doc[f"players.{pid_str}.season.GP"] = 1
+                else:
+                    inc_doc[f"players.{pid_str}.season.GP"] += 1
                 
                 # Set meta.team_id if team_name is in our map
                 if team_name in team_name_to_id:
