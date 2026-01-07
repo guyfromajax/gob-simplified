@@ -198,10 +198,10 @@ players[playerId] = {
 
 ---
 
-## 5. RECOMMENDED FIXES
+## 5. REFACTORING COMPLETED ✅
 
-### Fix #1: Match Franchise Pattern for Update Query
-**Current (Tournament):**
+### ✅ Fix #1: Match Franchise Pattern for Update Query
+**Before (Tournament):**
 ```python
 result = tournaments_collection.update_one(
     {
@@ -215,27 +215,28 @@ result = tournaments_collection.update_one(
 )
 ```
 
-**Recommended (Match Franchise):**
+**After (Refactored to Match Franchise):**
 ```python
-# Use document-level applied_games check (like Franchise)
+# ✅ SS&S: Use document-level applied_games check (like Franchise)
 result = tournaments_collection.update_one(
     {"_id": tid, "applied_games": {"$ne": game_id}},
-    tournament_update,
+    update,
 )
 ```
 
-### Fix #2: Use Single Atomic Update (Like Franchise)
-**Current (Tournament):** Per-player updates in a loop
+### ✅ Fix #2: Use Single Atomic Update (Like Franchise)
+**Before (Tournament):** Per-player updates in a loop (multiple MongoDB operations)
 
-**Recommended:** Build all increments in one `inc_doc`, then single update:
+**After (Refactored):** Build all increments in one `inc_doc`, then single atomic update:
 ```python
-# Build inc_doc for ALL players (like Franchise does)
+# ✅ SS&S: Build inc_doc for ALL players (like Franchise does)
 inc_doc = {}
-for player in all_players:
-    for stat, val in player_stats.items():
-        inc_doc[f"players.{playerId}.season.{stat}"] = val
+for team_name in [home_team_name, away_team_name]:
+    for pos_key, player_data in box_score[team_name].items():
+        for stat, val in cleaned_stats.items():
+            inc_doc[f"players.{playerId}.season.{stat}"] = val
 
-# Single atomic update
+# ✅ SS&S: Single atomic update
 result = tournaments_collection.update_one(
     {"_id": tid, "applied_games": {"$ne": game_id}},
     {
@@ -247,10 +248,10 @@ result = tournaments_collection.update_one(
 )
 ```
 
-### Fix #3: Use `$setOnInsert` for Player Initialization
-**Current (Tournament):** Initialize players before updating (two-step)
+### ✅ Fix #3: Use `$setOnInsert` for Player Initialization
+**Before (Tournament):** Initialize players before updating (two-step process)
 
-**Recommended:** Use `$setOnInsert` in the same update (like Franchise):
+**After (Refactored):** Use `$setOnInsert` in the same update (like Franchise):
 ```python
 update = {
     "$inc": inc_doc,
@@ -259,26 +260,76 @@ update = {
         f"players.{playerId}": {
             "meta": {...},
             "season": zero_stats.copy(),
-            ...
+            "attributes": {...},
+            "position_ratings": {...}
         }
     },
     "$addToSet": {"applied_games": game_id}
 }
 ```
 
+### ✅ Fix #4: Process All Players from box_score (Like Franchise)
+**Before (Tournament):** Called `apply_stats_from_summary()` which processed players one at a time
+
+**After (Refactored):** Process all players from `box_score` directly in `finalize_game()` (like Franchise):
+- Extract `box_score` from game document
+- Process all players in one loop
+- Build single `inc_doc` for all players
+- Single atomic update
+
+**Status:** ✅ **ALL FIXES IMPLEMENTED** - Tournament mode now matches Franchise mode pattern exactly.
+
 ---
 
 ## 6. SUMMARY
 
-**Root Cause:** Tournament mode uses a more complex, per-player update pattern that:
-1. Requires nested paths to exist for query filters
-2. Uses multiple MongoDB operations (not atomic)
-3. Has complex idempotency checks per player
+**Root Cause (IDENTIFIED):** Tournament mode used a more complex, per-player update pattern that:
+1. Required nested paths to exist for query filters
+2. Used multiple MongoDB operations (not atomic)
+3. Had complex idempotency checks per player
 
 **Franchise mode works because:**
 1. Simple document-level query filter
 2. Single atomic update operation
 3. Uses `$setOnInsert` for automatic player initialization
 
-**Recommended Action:** Refactor Tournament mode's `apply_stats_from_summary()` to match Franchise mode's pattern in `finalize_game()` - use single atomic update with `$setOnInsert` and document-level `applied_games` check.
+**✅ ACTION TAKEN:** Refactored Tournament mode's `finalize_game()` to match Franchise mode's pattern:
+- ✅ Single atomic update for all players
+- ✅ Document-level `applied_games` check
+- ✅ Uses `$setOnInsert` for automatic player initialization
+- ✅ Processes all players from `box_score` in one operation
+- ✅ Removed per-player update loop and complex query filters
+
+**Result:** Tournament mode now uses the exact same execution pattern as Franchise mode, ensuring consistent behavior and eliminating the root cause of zero stats issues.
+
+---
+
+## 7. REFACTORING DETAILS
+
+### Changes Made to `BackEnd/utils/stat_updater.py`
+
+1. **Removed `apply_stats_from_summary()` call for Tournament mode**
+   - Tournament mode now processes stats directly in `finalize_game()` (like Franchise)
+   - `apply_stats_from_summary()` is still used for other purposes but not for Tournament stat saving
+
+2. **Refactored Tournament `finalize_game()` section (lines 1083-1162)**
+   - Extracts `box_score` from game document (same structure as Franchise)
+   - Processes ALL players from `box_score` in one loop
+   - Builds single `inc_doc` for all stat increments
+   - Builds `set_doc` for meta updates
+   - Builds `set_on_insert_doc` for missing players
+   - Single atomic MongoDB update with all operations
+
+3. **Key Improvements:**
+   - **Atomicity:** All players updated in one operation (no partial failures)
+   - **Simplicity:** Simple document-level query filter (no nested path checks)
+   - **Reliability:** `$setOnInsert` handles missing players automatically
+   - **Consistency:** Exact same pattern as Franchise mode
+
+### Testing Recommendations
+
+1. **Verify player stats save correctly** after Tournament games
+2. **Check that all players appear** in Tournament Command Center stats
+3. **Verify idempotency** (running `finalize_game()` twice doesn't double-count stats)
+4. **Compare behavior** with Franchise mode to ensure identical patterns
 

@@ -1108,28 +1108,8 @@ def finalize_game(
             logger.error(f"❌ [FINALIZE_GAME] Tournament {tournament_id} not found")
             return
 
-        logger.info(f"🔍 [FINALIZE_GAME] Attempting to add game_id to applied_games (format: {type(game_id).__name__})")
-        result = tournaments_collection.update_one(
-            {"_id": tid, "applied_games": {"$ne": game_id}},
-            {"$addToSet": {"applied_games": game_id}},
-        )
-
-        logger.info(f"🔍 [FINALIZE_GAME] Update result: matched={result.matched_count}, modified={result.modified_count}")
-        
-        if result.modified_count == 0:
-            # Check why it failed
-            check_doc = tournaments_collection.find_one({"_id": tid}, {"applied_games": 1})
-            if check_doc:
-                applied = check_doc.get("applied_games", [])
-                logger.warning(f"⚠️ [FINALIZE_GAME] Update had no effect. Tournament applied_games: {applied}, game_id={game_id} (type: {type(game_id).__name__})")
-                # Try string comparison
-                game_id_str = str(game_id)
-                if game_id_str in [str(g) for g in applied]:
-                    logger.warning(f"⚠️ [FINALIZE_GAME] Game_id found in applied_games as string match, skipping")
-                else:
-                    logger.error(f"❌ [FINALIZE_GAME] Game_id NOT in applied_games but update failed - possible format mismatch")
-            return
-
+        # ✅ SS&S REFACTOR: Match Franchise mode pattern - process all players in single atomic update
+        # Load game document
         try:
             gid = ObjectId(game_id)
         except Exception:
@@ -1142,12 +1122,204 @@ def finalize_game(
             logger.error(f"❌ [FINALIZE_GAME] Game document not found: game_id={game_id}, gid={gid}")
             return
         
-        logger.info(f"✅ [FINALIZE_GAME] Game document found, calling apply_stats_from_summary")
-        logger.info(f"🔍 [FINALIZE_GAME] Game has {len(game.get('players', []))} players in summary")
-        logger.info(f"🔍 [FINALIZE_GAME] Tournament ID: {tournament_id}, will call _ensure_all_roster_players_initialized")
+        logger.info(f"✅ [FINALIZE_GAME] Game document found, processing stats (SS&S pattern)")
         
-        apply_stats_from_summary(game, game_id, tournament_id)
-        logger.info(f"✅ [FINALIZE_GAME] apply_stats_from_summary completed")
+        # ✅ SS&S: Extract box_score from game document (same structure as Franchise mode)
+        home_team_obj = game.get("home_team", {})
+        away_team_obj = game.get("away_team", {})
+        home_team_name = None
+        away_team_name = None
+        
+        box_score = game.get("box_score", {})
+        if not box_score:
+            # Build box_score from nested team objects (new structure from summarize_game_state)
+            if home_team_obj and isinstance(home_team_obj, dict):
+                home_team_name = home_team_obj.get("name")
+                if home_team_name and "box_score" in home_team_obj:
+                    box_score[home_team_name] = home_team_obj.get("box_score", {})
+            if away_team_obj and isinstance(away_team_obj, dict):
+                away_team_name = away_team_obj.get("name")
+                if away_team_name and "box_score" in away_team_obj:
+                    box_score[away_team_name] = away_team_obj.get("box_score", {})
+        else:
+            # If box_score exists at top level, extract team names from team objects
+            if isinstance(home_team_obj, dict):
+                home_team_name = home_team_obj.get("name")
+            elif isinstance(home_team_obj, str):
+                home_team_name = home_team_obj
+            
+            if isinstance(away_team_obj, dict):
+                away_team_name = away_team_obj.get("name")
+            elif isinstance(away_team_obj, str):
+                away_team_name = away_team_obj
+        
+        logger.info(f"🔍 [FINALIZE_GAME] Processing box_score with {len(box_score)} teams: {list(box_score.keys())}")
+        
+        # ✅ SS&S: Build team_name -> team_id map from tournament.teams
+        tournament_doc = tournaments_collection.find_one({"_id": tid}, {"teams": 1})
+        tournament_teams = tournament_doc.get("teams", {}) if tournament_doc else {}
+        team_name_to_id: Dict[str, str] = {}
+        for team_id_str, team_data in tournament_teams.items():
+            # Look up team name from teams collection
+            try:
+                team_obj_id = ObjectId(team_id_str)
+                team_doc = teams_collection.find_one({"_id": team_obj_id}, {"name": 1})
+                if team_doc:
+                    team_name = team_doc.get("name")
+                    if team_name:
+                        team_name_to_id[team_name] = team_id_str
+            except Exception:
+                continue
+        
+        # ✅ SS&S: Process ALL players from box_score and build single inc_doc (like Franchise)
+        inc_doc: Dict[str, Any] = {}
+        set_doc: Dict[str, Any] = {}
+        processed_player_ids = set()
+        players_processed = 0
+        
+        for team_name in [home_team_name, away_team_name]:
+            if not team_name:
+                continue
+            team_box = box_score.get(team_name, {})
+            if not team_box:
+                logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team: {team_name}")
+                continue
+            
+            for pos_key, player_data in team_box.items():
+                if not isinstance(player_data, dict):
+                    continue
+                pid = player_data.get("playerId")
+                if not pid:
+                    continue
+                pid_str = str(pid)
+                
+                if pid_str in processed_player_ids:
+                    continue
+                processed_player_ids.add(pid_str)
+                
+                stat_block = player_data
+                if not stat_block:
+                    continue
+                
+                players_processed += 1
+                
+                # Clean stats and build increments
+                for stat, val in _clean_stat_block(stat_block).items():
+                    if stat in ["playerId", "name", "jersey", "x", "y", "coords", "team", "pos"]:
+                        continue
+                    # MIN special handling: Convert seconds to minutes
+                    if stat == "MIN":
+                        val = val // 60
+                    inc_doc[f"players.{pid_str}.season.{stat}"] = inc_doc.get(
+                        f"players.{pid_str}.season.{stat}", 0
+                    ) + val
+                
+                # Increment GP
+                inc_doc[f"players.{pid_str}.season.GP"] = inc_doc.get(
+                    f"players.{pid_str}.season.GP", 0
+                ) + 1
+                
+                # Set meta.team_id if team_name is in our map
+                if team_name in team_name_to_id:
+                    set_doc[f"players.{pid_str}.meta.team_id"] = team_name_to_id[team_name]
+        
+        logger.info(f"🔍 [FINALIZE_GAME] Processed {players_processed} players, {len(inc_doc)} stat increments")
+        
+        # ✅ SS&S: Check existing players and build set_on_insert_doc for missing players
+        tournament_check = tournaments_collection.find_one({"_id": tid}, {"players": 1})
+        existing_players = tournament_check.get("players", {}) if tournament_check else {}
+        
+        set_on_insert_doc: Dict[str, Any] = {}
+        for pid_str in processed_player_ids:
+            if pid_str not in existing_players:
+                # Get player metadata from players_collection
+                try:
+                    player_obj_id = ObjectId(pid_str)
+                    player_doc = players_collection.find_one(
+                        {"_id": player_obj_id},
+                        {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1}
+                    )
+                    if player_doc:
+                        zero_stats = {k: 0 for k in BOX_SCORE_KEYS}
+                        zero_stats["Outlet_Score_List"] = []
+                        meta = {
+                            "first_name": player_doc.get("first_name", ""),
+                            "last_name": player_doc.get("last_name", ""),
+                            "team": player_doc.get("team", ""),
+                        }
+                        # Use team_id from team_name_to_id map if available
+                        # Find which team this player belongs to by checking box_score
+                        team_name_for_player = None
+                        for tname in [home_team_name, away_team_name]:
+                            if tname and tname in box_score:
+                                team_box = box_score[tname]
+                                for pos_data in team_box.values():
+                                    if isinstance(pos_data, dict) and str(pos_data.get("playerId")) == pid_str:
+                                        team_name_for_player = tname
+                                        break
+                                if team_name_for_player:
+                                    break
+                        if team_name_for_player and team_name_for_player in team_name_to_id:
+                            meta["team_id"] = team_name_to_id[team_name_for_player]
+                        else:
+                            tid_val = player_doc.get("team_id")
+                            if tid_val is not None:
+                                meta["team_id"] = str(tid_val)
+                        
+                        set_on_insert_doc[f"players.{pid_str}"] = {
+                            "meta": meta,
+                            "season": zero_stats.copy(),
+                            "attributes": player_doc.get("attributes", {}),
+                            "position_ratings": player_doc.get("position_ratings", {}),
+                        }
+                except Exception as e:
+                    logger.warning(f"⚠️ [FINALIZE_GAME] Could not load player metadata for {pid_str}: {e}")
+        
+        # ✅ SS&S: Build single atomic update (like Franchise mode)
+        update: Dict[str, Any] = {"$addToSet": {"applied_games": game_id}}
+        if inc_doc:
+            update["$inc"] = inc_doc
+        if set_doc:
+            update["$set"] = set_doc
+        if set_on_insert_doc:
+            update["$setOnInsert"] = set_on_insert_doc
+        
+        # ✅ SS&S: Single atomic update with document-level applied_games check (like Franchise)
+        logger.info(f"🔍 [FINALIZE_GAME] Executing single atomic update (SS&S pattern)")
+        result = tournaments_collection.update_one(
+            {"_id": tid, "applied_games": {"$ne": game_id}},
+            update,
+        )
+        
+        logger.info(f"🔍 [FINALIZE_GAME] Update result: matched={result.matched_count}, modified={result.modified_count}")
+        
+        if result.modified_count == 0:
+            check_doc = tournaments_collection.find_one({"_id": tid}, {"applied_games": 1})
+            if check_doc:
+                applied = check_doc.get("applied_games", [])
+                if game_id in applied or str(game_id) in [str(g) for g in applied]:
+                    logger.info(f"ℹ️ [FINALIZE_GAME] Game {game_id} already in applied_games, skipping (idempotent)")
+                else:
+                    logger.warning(f"⚠️ [FINALIZE_GAME] Update had no effect. Tournament applied_games: {applied}, game_id={game_id}")
+            return
+        
+        # ✅ SS&S: Calculate per_game and percentages for all updated players (like Franchise)
+        if result.modified_count > 0 and inc_doc:
+            # Reload tournament document to get updated stats
+            updated_tournament_doc = tournaments_collection.find_one({"_id": tid}, {"players": 1})
+            if updated_tournament_doc:
+                stats_doc: Dict[str, Any] = {}
+                for pid_str in processed_player_ids:
+                    pdata = updated_tournament_doc.get("players", {}).get(pid_str, {})
+                    season_totals = pdata.get("season", {})
+                    if season_totals:
+                        stats_doc[f"players.{pid_str}.season.per_game"] = _per_game_block(season_totals)
+                        stats_doc[f"players.{pid_str}.season.percentages"] = _pct_block(season_totals)
+                
+                if stats_doc:
+                    tournaments_collection.update_one({"_id": tid}, {"$set": stats_doc})
+        
+        logger.info(f"✅ [FINALIZE_GAME] Tournament stats finalization complete (SS&S pattern)")
         
         recompute_tournament_leaders(tournament_id)
         logger.info(f"✅ [FINALIZE_GAME] recompute_tournament_leaders completed")
