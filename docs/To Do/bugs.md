@@ -44,3 +44,35 @@
     - Processes all players from `box_score` in one operation
   - **Result**: Tournament and Franchise modes now use identical execution patterns, ensuring consistent behavior and eliminating zero stats issues
   - **Documentation**: See `docs/To Do/Tournament_vs_Franchise_Player_Stats_Comparison.md` for detailed comparison
+
+## Current Investigation (January 2025)
+
+### ✅ Fixed: Duplicate Teams Bug
+- **Root Cause**: When `team_id_str` was not a valid ObjectId (e.g., "BENTLEY_TRUMAN"), the code still added it to output, creating duplicates
+- **Fix**: Updated `BackEnd/utils/team_stats_aggregator.py` to resolve non-ObjectId team IDs to ObjectIds before adding to output, or skip them if they can't be resolved
+- **Status**: ✅ Fixed and committed
+
+### 🔍 Investigating: Player Stats Not Populating on Roster Tab
+- **Pattern Match**: Tournament mode now uses identical pattern to Franchise mode:
+  - `loadRoster()` fetches roster and tournament document, merges stats
+  - `renderRoster()` calls `renderRosterStats()` internally
+  - Both use `roster-stats-body` tbody element
+- **Possible Causes**:
+  1. Player IDs don't match between roster API response and tournament document
+  2. Tournament document not being loaded correctly
+  3. Stats not being saved (but we already fixed `finalize_game()`)
+- **Next Steps**: Need to verify with console logs that:
+  - `tournamentDoc.players[playerId]` exists for each player
+  - Stats are being merged correctly in `loadRoster()`
+  - `renderRosterStats()` is receiving players with stats
+
+### 🔍 Investigating: Formatting Bug (Team Stats Table)
+- **Current State**: 
+  - HTML has `overflow-x: auto` on wrapper div (line 143 in tournament.html)
+  - CSS has `min-width: 800px` on `.stats-table` (line 425 in tournament.css)
+  - Structure matches Franchise mode
+- **Possible Causes**:
+  1. CSS not being applied correctly
+  2. Container width constraint
+  3. Browser caching
+- **Next Steps**: Verify CSS is loading and container width is correct

@@ -1445,33 +1445,72 @@ async function loadRoster() {
     // ✅ SS&S: Merge stats into roster data (exactly like Franchise)
     let statsMergedCount = 0;
     let statsEmptyCount = 0;
+    let playerIdMismatchCount = 0;
     if (tournamentDoc && tournamentDoc.players && data.players) {
       console.log('🔍 [DEBUG loadRoster] Merging stats into roster data...');
+      console.log('🔍 [DEBUG loadRoster] Tournament players keys:', Object.keys(tournamentDoc.players).slice(0, 5));
+      console.log('🔍 [DEBUG loadRoster] Roster player IDs:', data.players.slice(0, 5).map(p => p._id));
+      
       data.players = data.players.map(player => {
         const playerId = player._id;
         const tournamentPlayer = tournamentDoc.players[playerId];
+        
+        // ✅ DEBUG: Check if player ID exists in tournament document
+        if (!tournamentPlayer) {
+          playerIdMismatchCount++;
+          if (playerIdMismatchCount <= 3) {
+            console.warn(`⚠️ [DEBUG loadRoster] Player ID ${playerId} (${player.name || `${player.first_name} ${player.last_name}`}) not found in tournament.players`);
+            console.warn(`   Available player IDs in tournament:`, Object.keys(tournamentDoc.players).slice(0, 10));
+          }
+          player.stats = { season: {} };
+          statsEmptyCount++;
+          return player;
+        }
+        
         if (tournamentPlayer && tournamentPlayer.season) {
+          const seasonKeys = Object.keys(tournamentPlayer.season);
+          const hasNonZeroStats = seasonKeys.some(key => tournamentPlayer.season[key] !== 0);
+          
           player.stats = { season: tournamentPlayer.season };
           statsMergedCount++;
           if (statsMergedCount === 1) {
-            console.log('🔍 [DEBUG loadRoster] Sample merged stats for player', playerId, ':', tournamentPlayer.season);
+            console.log('🔍 [DEBUG loadRoster] Sample merged stats for player', playerId, ':', {
+              seasonKeys: seasonKeys.slice(0, 10),
+              hasNonZeroStats,
+              sampleStats: {
+                PTS: tournamentPlayer.season.PTS,
+                FGM: tournamentPlayer.season.FGM,
+                FGA: tournamentPlayer.season.FGA,
+                GP: tournamentPlayer.season.GP
+              }
+            });
           }
         } else {
           player.stats = { season: {} };
           statsEmptyCount++;
+          if (statsEmptyCount <= 3) {
+            console.warn(`⚠️ [DEBUG loadRoster] Player ${playerId} found in tournament but no season stats:`, {
+              hasTournamentPlayer: !!tournamentPlayer,
+              hasSeason: !!(tournamentPlayer && tournamentPlayer.season),
+              tournamentPlayerKeys: tournamentPlayer ? Object.keys(tournamentPlayer) : []
+            });
+          }
         }
         return player;
       });
       console.log('🔍 [DEBUG loadRoster] Stats merge complete:', {
         statsMergedCount,
         statsEmptyCount,
+        playerIdMismatchCount,
         totalPlayers: data.players.length
       });
     } else {
       console.warn('⚠️ [DEBUG loadRoster] Cannot merge stats - missing data:', {
         hasTournamentDoc: !!tournamentDoc,
         hasTournamentPlayers: !!(tournamentDoc && tournamentDoc.players),
-        hasDataPlayers: !!data.players
+        tournamentPlayersCount: tournamentDoc && tournamentDoc.players ? Object.keys(tournamentDoc.players).length : 0,
+        hasDataPlayers: !!data.players,
+        dataPlayersCount: data.players ? data.players.length : 0
       });
     }
     
