@@ -120,17 +120,36 @@ def aggregate_team_stats_from_players(
     
     # Convert to output format with team names
     output = []
-    seen_team_names = set()  # For tournament deduplication
+    seen_team_names = set()  # For tournament deduplication (case-insensitive)
+    seen_team_ids = set()  # Track by ObjectId to prevent duplicates
     
     for team_id_str, stats in team_stats_map.items():
         # Resolve team name (mode-specific logic)
         team_name = resolve_team_name(team_id_str, teams_collection, collection_type)
         
-        # Tournament mode: Deduplicate by team name
+        # ✅ FIX: Normalize team name for case-insensitive deduplication
+        team_name_normalized = team_name.upper() if team_name else ""
+        
+        # Tournament mode: Deduplicate by team name (case-insensitive)
         if collection_type == 'tournament':
-            if team_name in seen_team_names:
+            # Check if we've seen this team name (case-insensitive) or this team_id
+            if team_name_normalized in seen_team_names:
+                if logger:
+                    log_func(f"⚠️ [{collection_type.upper()}_TEAM_STATS] Skipping duplicate team: {team_name} (normalized: {team_name_normalized})")
                 continue
-            seen_team_names.add(team_name)
+            
+            # Also check by ObjectId to catch duplicates even if name resolution differs
+            try:
+                team_obj_id = ObjectId(team_id_str)
+                if team_obj_id in seen_team_ids:
+                    if logger:
+                        log_func(f"⚠️ [{collection_type.upper()}_TEAM_STATS] Skipping duplicate team_id: {team_id_str} (name: {team_name})")
+                    continue
+                seen_team_ids.add(team_obj_id)
+            except Exception:
+                pass  # team_id_str is not an ObjectId, skip ObjectId check
+            
+            seen_team_names.add(team_name_normalized)
             
             # ✅ SS&S: Include ALL teams in tournament bracket, even if stats are zero
             # This matches Franchise mode behavior and ensures all teams appear in the table
@@ -206,17 +225,30 @@ def resolve_team_name(team_id_str: str, teams_collection: Collection, collection
                 team_name = team_doc.get("name")
         
         if not team_name:
-            # Strategy 3: Fallback to team_id_str (but normalize if it's an underscore format)
-            # Convert "OCEAN_CITY" to "Ocean City" if possible
-            if "_" in team_id_str:
-                # Try to find team by converting underscore format to proper name
+            # Strategy 3: Try case-insensitive search and normalize formats
+            # Try uppercase version (e.g., "MORRISTOWN" -> "Morristown")
+            team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_id_str}$", "$options": "i"}}, {"name": 1})
+            if team_doc:
+                team_name = team_doc.get("name")  # Use canonical name from database
+            
+            # Strategy 4: Try underscore format normalization (e.g., "OCEAN_CITY" -> "Ocean City")
+            if not team_name and "_" in team_id_str:
                 normalized = team_id_str.replace("_", " ").title()
                 team_doc = teams_collection.find_one({"name": normalized}, {"name": 1})
                 if team_doc:
                     team_name = team_doc.get("name")
-                else:
-                    team_name = team_id_str
-            else:
+            
+            # Strategy 5: Last resort - try to find by any case variation
+            if not team_name:
+                # Search all teams and find case-insensitive match
+                all_teams = teams_collection.find({}, {"name": 1})
+                for t in all_teams:
+                    if t.get("name", "").upper() == team_id_str.upper():
+                        team_name = t.get("name")
+                        break
+            
+            # Final fallback: use team_id_str as-is (should rarely happen)
+            if not team_name:
                 team_name = team_id_str
     else:
         # Franchise mode: Simple ObjectId lookup with fallback
