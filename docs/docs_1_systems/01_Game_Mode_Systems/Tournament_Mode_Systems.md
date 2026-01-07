@@ -90,12 +90,12 @@ Tournament Mode supports multi-game tournament brackets where team data persists
 
 **Stats Tab:**
 - **Team Stats Table**: Displays aggregated team statistics for all teams in the tournament
+  - ✅ **SS&S**: Uses shared `TeamStatsTable` module (`FrontEnd/static/js/shared/teamStatsTable.js`) - same code as Franchise mode
   - Columns: Team, W (Wins), L (Losses), PF (Points For), PA (Points Against), FGM/FGA, FG%, 3PTM/3PTA, 3PT%, FTM/FTA, FT%, DREB, OREB, TREB, AST, STL, BLK, F, TO, DEF_A, DEF%, SCR_A, SCR%
   - Includes a TOTALS row that sums all team stats (W/L, shooting stats, rebounding, assists, etc.)
   - Stats are sortable by clicking column headers
-  - Data loaded from `/tournament/team-stats` endpoint which aggregates player stats from `tournaments.{tournament_id}.players`
+  - Data loaded from `/tournament/team-stats` endpoint which uses shared `team_stats_aggregator.py` utility
   - **Data Refresh**: Automatically refreshes when returning to TCC after game completion via `handleTournamentUpdate()`
-  - **Player Stats**: Roster tab player stats are refreshed when team stats are refreshed to ensure consistency
 - **Leaderboards**: Displays tournament leaders for key statistics (PTS, REB, AST, etc.)
 
 **Header Controls:**

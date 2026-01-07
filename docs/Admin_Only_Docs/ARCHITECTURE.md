@@ -97,7 +97,6 @@ This is a modern, production-grade architecture.
 - Frontend and backend share the same origin (`localhost:8000`)
 - Frontend makes relative API calls:
 
-NEW Content Here
 
 ### Target Deployment Behavior
 - Frontend and backend live on **different domains**

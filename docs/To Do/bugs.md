@@ -10,3 +10,13 @@
 - **Player stats not populating on Roster tab**: Fixed by ensuring `loadRoster()` is called after tournament updates
 - **Team stats container scroll issue**: Fixed by removing `scroll-x` wrapper and using inline overflow styling
 - **Note**: Computer teams showing 2 games is a backend issue (likely double finalization) - needs backend investigation
+
+✅ **Team Stats SS&S Refactoring** (Completed: January 2025)
+- **Frontend**: Extracted shared `teamStatsTable.js` module (~160 lines of duplicate code removed)
+  - Both Tournament and Franchise modes now use `TeamStatsTable.renderTeamStatsTable()` and `TeamStatsTable.sortTeamStats()`
+  - Removed unnecessary roster refresh logic from Tournament `refreshTeamStats()`
+- **Backend**: Extracted shared `team_stats_aggregator.py` utility (~130 lines of duplicate code removed)
+  - Both Tournament and Franchise endpoints now use `aggregate_team_stats_from_players()`
+  - Single source of truth for team stats aggregation logic
+- **Total Reduction**: ~290 lines of duplicate code eliminated
+- **Benefits**: One fix applies to both modes, prevents future bugs, ensures consistent behavior

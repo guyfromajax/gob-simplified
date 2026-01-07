@@ -13,6 +13,7 @@ from BackEnd.main import run_simulation
 from BackEnd.db import db, franchise_state_collection
 from BackEnd.utils.shared import summarize_game_state
 from BackEnd.utils import stat_updater
+from BackEnd.utils.team_stats_aggregator import aggregate_team_stats_from_players
 from BackEnd.models.franchise_manager import FranchiseManager
 from BackEnd.tournament.eos_tournament import (
     initialize_eos_tournament,
@@ -1298,104 +1299,14 @@ def team_stats(franchise_id: str):
     
     print(f"🔍 [TEAM_STATS] Found {len(players)} players, {len(franchise_teams)} teams")
     
-    # Get all team IDs from franchise_teams
-    team_stats_map: Dict[str, Dict[str, int]] = {}
-    
-    # Initialize team stats for all teams in franchise
-    # ✅ SS&S: Normalize team_id keys to strings for consistent comparison
-    for team_id in franchise_teams.keys():
-        team_id_str = str(team_id)
-        team_stats_map[team_id_str] = {
-            "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
-            "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
-            "DREB": 0, "OREB": 0, "TREB": 0,
-            "TO": 0, "F": 0,
-            "DEF_A": 0, "DEF_S": 0, "SCR_A": 0, "SCR_S": 0
-        }
-    
-    # Aggregate stats from players object
-    players_with_stats = 0
-    players_without_team_id = 0
-    for pid, pdata in players.items():
-        meta = pdata.get("meta", {})
-        team_id = meta.get("team_id")
-        if not team_id:
-            players_without_team_id += 1
-            continue
-        
-        # ✅ SS&S: Normalize team_id to string for consistent comparison
-        team_id_str = str(team_id)
-        
-        season_stats = pdata.get("season", {})
-        if not season_stats:
-            continue
-        
-        if team_id_str not in team_stats_map:
-            team_stats_map[team_id_str] = {
-                "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
-                "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
-                "DREB": 0, "OREB": 0, "TREB": 0,
-                "TO": 0, "F": 0,
-                "DEF_A": 0, "DEF_S": 0, "SCR_A": 0, "SCR_S": 0
-            }
-        
-        players_with_stats += 1
-        # Sum all stats for this team (map 3PTM to TPM for output)
-        for stat, val in season_stats.items():
-            if isinstance(val, (int, float)):
-                # Map 3PTM/3PTA to TPM/TPA for output consistency
-                output_stat = stat
-                if stat == "3PTM":
-                    output_stat = "TPM"
-                elif stat == "3PTA":
-                    output_stat = "TPA"
-                
-                if output_stat in team_stats_map[team_id_str]:
-                    team_stats_map[team_id_str][output_stat] += val
-    
-    print(f"🔍 [TEAM_STATS] Processed {players_with_stats} players with stats, {players_without_team_id} without team_id")
-    
-    # Get PF/PA and wins/losses from standings (teams collection)
-    standings_data = {}
-    teams_list = list(db.teams.find({}, {"name": 1, "PF": 1, "PA": 1, "record": 1, "_id": 1}))
-    for t in teams_list:
-        team_id_str = str(t["_id"])
-        rec = t.get("record", {"W": 0, "L": 0})
-        standings_data[team_id_str] = {
-            "PF": t.get("PF", 0),
-            "PA": t.get("PA", 0),
-            "W": rec.get("W", 0),
-            "L": rec.get("L", 0)
-        }
-    
-    # Convert to output format with team names
-    output = []
-    for team_id_str, stats in team_stats_map.items():
-        # Get team name from teams collection
-        try:
-            team_doc = db.teams.find_one({"_id": ObjectId(team_id_str)}, {"name": 1})
-            team_name = team_doc.get("name", team_id_str) if team_doc else team_id_str
-        except Exception:
-            # Fallback if team_id_str is not a valid ObjectId
-            team_name = team_id_str
-        
-        # Add PF/PA and wins/losses from standings
-        if team_id_str in standings_data:
-            stats["PF"] = standings_data[team_id_str]["PF"]
-            stats["PA"] = standings_data[team_id_str]["PA"]
-            stats["W"] = standings_data[team_id_str]["W"]
-            stats["L"] = standings_data[team_id_str]["L"]
-        else:
-            stats["PF"] = 0
-            stats["PA"] = 0
-            stats["W"] = 0
-            stats["L"] = 0
-        
-        # Calculate TREB from DREB + OREB
-        stats["TREB"] = stats.get("DREB", 0) + stats.get("OREB", 0)
-        
-        print(f"🔍 [TEAM_STATS] Team {team_name}: PTS={stats.get('PTS')}, REB={stats.get('REB')}, AST={stats.get('AST')}")
-        output.append({"team": team_name, "stats": stats})
+    # ✅ SS&S: Use shared aggregator utility
+    output = aggregate_team_stats_from_players(
+        players=players,
+        team_ids=franchise_teams,
+        teams_collection=db.teams,
+        collection_type='franchise',
+        logger=logger
+    )
     
     return {"teams": output}
 
