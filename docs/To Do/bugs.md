@@ -52,19 +52,14 @@
 - **Fix**: Updated `BackEnd/utils/team_stats_aggregator.py` to resolve non-ObjectId team IDs to ObjectIds before adding to output, or skip them if they can't be resolved
 - **Status**: ✅ Fixed and committed
 
-### 🔍 Investigating: Player Stats Not Populating on Roster Tab
-- **Pattern Match**: Tournament mode now uses identical pattern to Franchise mode:
-  - `loadRoster()` fetches roster and tournament document, merges stats
-  - `renderRoster()` calls `renderRosterStats()` internally
-  - Both use `roster-stats-body` tbody element
-- **Possible Causes**:
-  1. Player IDs don't match between roster API response and tournament document
-  2. Tournament document not being loaded correctly
-  3. Stats not being saved (but we already fixed `finalize_game()`)
-- **Next Steps**: Need to verify with console logs that:
-  - `tournamentDoc.players[playerId]` exists for each player
-  - Stats are being merged correctly in `loadRoster()`
-  - `renderRosterStats()` is receiving players with stats
+### ✅ Fixed: Player Stats Not Saving for User Games (Race Condition)
+- **Root Cause**: Tournament mode was looking up game document from database in `/tournament/save-result`, which could be stale or incomplete due to race condition (save-result called before Q4 save completes). Franchise mode avoided this by accepting `game_document` directly from the request.
+- **Fix**: 
+  - Added `game_document` field to `TournamentResultRequest` (matches Franchise `CompleteWeekRequest`)
+  - Updated `/tournament/save-result` to use `request.game_document` if provided (matches Franchise pattern)
+  - Updated `finalizeGame.js` to pass `final_game_document` from `simulate-quarter` response to `/tournament/save-result` (matches Franchise pattern)
+- **Result**: Tournament mode now uses the exact same pattern as Franchise mode - receives fresh, complete game document directly from `simulate-quarter` when `is_final=True`, eliminating race conditions and ensuring `finalize_game()` processes complete `box_score` data
+- **Status**: ✅ Fixed and committed
 
 ### 🔍 Investigating: Formatting Bug (Team Stats Table)
 - **Current State**: 
