@@ -1215,11 +1215,13 @@ def finalize_game(
                         f"players.{pid_str}.season.{stat}", 0
                     ) + val
                 
-                # Increment GP (only once per player)
+                # ✅ FIX: Increment GP exactly once per player per game
+                # processed_player_ids ensures each player is only processed once per game
+                # So GP should only be incremented once, not accumulated
                 if f"players.{pid_str}.season.GP" not in inc_doc:
                     inc_doc[f"players.{pid_str}.season.GP"] = 1
-                else:
-                    inc_doc[f"players.{pid_str}.season.GP"] += 1
+                # If GP is already in inc_doc, it means this player was processed twice (shouldn't happen)
+                # Don't increment again - this is a bug if it happens
                 
                 # Set meta.team_id if team_name is in our map
                 if team_name in team_name_to_id:
@@ -1305,9 +1307,19 @@ def finalize_game(
             update["$setOnInsert"] = set_on_insert_doc
         
         # ✅ SS&S: Single atomic update with document-level applied_games check (like Franchise)
-        logger.info(f"🔍 [FINALIZE_GAME] Executing single atomic update (SS&S pattern)")
+        # ✅ FIX: Normalize game_id to string for consistent comparison
+        game_id_str = str(game_id)
+        logger.info(f"🔍 [FINALIZE_GAME] Executing single atomic update (SS&S pattern), game_id={game_id_str}")
+        # Check both string and ObjectId formats in applied_games
         result = tournaments_collection.update_one(
-            {"_id": tid, "applied_games": {"$ne": game_id}},
+            {
+                "_id": tid,
+                "$and": [
+                    {"applied_games": {"$ne": game_id_str}},
+                    {"applied_games": {"$ne": game_id}},
+                    {"applied_games": {"$ne": gid}},
+                ]
+            },
             update,
         )
         
