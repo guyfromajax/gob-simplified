@@ -2232,6 +2232,13 @@ export function createGameScene(Phaser) {
             updatedSimData.final_game_document = lastTurnData.final_game_document;
           }
           
+          console.log('🔍 [GAMESCENE] Calling finalizeGame with:', {
+            tournamentId: this.tournamentId,
+            franchiseId: this.franchiseId,
+            game_id: updatedSimData.game_id || updatedSimData._id,
+            hasFinalGameDocument: !!updatedSimData.final_game_document
+          });
+          
           const finalScore = await finalizeGame({
             simData: updatedSimData,
             tournamentId: this.tournamentId,
