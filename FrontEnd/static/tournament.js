@@ -1515,16 +1515,8 @@ async function loadRoster() {
   }
 }
 
-async function refreshTeamStats() {
-  await loadTournament();
-  await loadRoster();
-  renderRoster(); // ✅ SS&S: renderRoster() now calls renderRosterStats() internally (matches Franchise)
-  renderBracket();
-  renderSchedule();
-  updateCTA();
-}
-
-window.refreshTeamStats = refreshTeamStats;
+// ✅ SS&S: Removed duplicate refreshTeamStats() - using the one at line 737 that calls renderTeamStats()
+// This function was overriding the correct one
 
 function handleTournamentUpdate(doc) {
   if (DEBUG_BRACKET)
@@ -1629,14 +1621,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   // ✅ FIX: Call renderTeamStats directly in DOMContentLoaded (matches Franchise pattern)
   // Franchise calls it directly in init(), not just in refreshLeaders()
+  console.log('🔍 [DEBUG DOMContentLoaded] Loading team stats on initial page load');
   if (tournament && tournament._id) {
     try {
-      const res = await fetch(`${API_CONFIG.buildUrl('/tournament/team-stats')}?tournament_id=${encodeURIComponent(tournament._id)}`);
+      const url = `${API_CONFIG.buildUrl('/tournament/team-stats')}?tournament_id=${encodeURIComponent(tournament._id)}`;
+      console.log('🔍 [DEBUG DOMContentLoaded] Fetching team stats from:', url);
+      const res = await fetch(url);
       const data = await res.json();
+      console.log('🔍 [DEBUG DOMContentLoaded] Team stats response:', {
+        hasData: !!data,
+        teamsCount: data?.teams?.length || 0
+      });
       renderTeamStats(data);
     } catch (err) {
-      console.error("Failed to load team stats", err);
+      console.error("❌ [DEBUG DOMContentLoaded] Failed to load team stats", err);
     }
+  } else {
+    console.warn('⚠️ [DEBUG DOMContentLoaded] Tournament not loaded, cannot fetch team stats');
   }
   
   // ✅ MIGRATION: Update CTA using command center data (aligns with Franchise)
