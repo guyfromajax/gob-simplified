@@ -175,10 +175,40 @@ def aggregate_team_stats_from_players(
                 continue
             seen_team_ids.add(team_obj_id)
         except Exception:
-            # team_id_str is not an ObjectId - this shouldn't happen but handle gracefully
+            # team_id_str is not an ObjectId - try to resolve it to ObjectId before adding
+            # This prevents duplicates like "BENTLEY_TRUMAN" vs ObjectId
             if logger:
-                log_func(f"⚠️ [{collection_type.upper()}_TEAM_STATS] team_id_str '{team_id_str}' is not a valid ObjectId")
-            # Still add to output but log warning
+                log_func(f"⚠️ [{collection_type.upper()}_TEAM_STATS] team_id_str '{team_id_str}' is not a valid ObjectId, attempting resolution")
+            
+            # Try to resolve to ObjectId by looking up team name
+            resolved_obj_id = None
+            try:
+                # Try as team name
+                team_doc = teams_collection.find_one({"name": team_id_str}, {"_id": 1})
+                if team_doc:
+                    resolved_obj_id = team_doc["_id"]
+                else:
+                    # Try case-insensitive
+                    team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_id_str}$", "$options": "i"}}, {"_id": 1})
+                    if team_doc:
+                        resolved_obj_id = team_doc["_id"]
+            except Exception:
+                pass
+            
+            if resolved_obj_id:
+                # Check if we've already seen this ObjectId
+                if resolved_obj_id in seen_team_ids:
+                    if logger:
+                        log_func(f"⚠️ [{collection_type.upper()}_TEAM_STATS] Skipping duplicate (resolved): team_id_str '{team_id_str}' -> ObjectId '{resolved_obj_id}' (name: {team_name})")
+                    continue
+                seen_team_ids.add(resolved_obj_id)
+                # Update team_id_str to the resolved ObjectId for consistency
+                team_id_str = str(resolved_obj_id)
+            else:
+                # Can't resolve - skip this entry to prevent duplicates
+                if logger:
+                    log_func(f"⚠️ [{collection_type.upper()}_TEAM_STATS] Cannot resolve team_id_str '{team_id_str}' to ObjectId, skipping to prevent duplicates")
+                continue
             
             # ✅ SS&S: Include ALL teams in tournament bracket, even if stats are zero
             # This matches Franchise mode behavior and ensures all teams appear in the table
