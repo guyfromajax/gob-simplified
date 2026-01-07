@@ -95,6 +95,18 @@ app.add_middleware(
     max_age=3600  # Cache preflight requests for 1 hour
 )
 
+# ✅ DEBUG: Add CORS logging middleware to trace CORS issues
+@app.middleware("http")
+async def cors_debug_middleware(request, call_next):
+    origin = request.headers.get("origin")
+    if origin:
+        logger.info(f"🔍 [CORS] Request from origin: {origin}")
+    response = await call_next(request)
+    if origin:
+        cors_header = response.headers.get("access-control-allow-origin")
+        logger.info(f"🔍 [CORS] Response CORS header: {cors_header}")
+    return response
+
 logger.info(f"🔒 CORS configured with origins: {cors_origins}")
 
 class SimulationRequest(BaseModel):
