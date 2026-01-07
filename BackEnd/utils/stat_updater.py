@@ -1227,6 +1227,24 @@ def finalize_game(
         
         logger.info(f"🔍 [FINALIZE_GAME] Processed {players_processed} players, {len(inc_doc)} stat increments")
         
+        # ✅ DEBUG: Log sample of what's being saved
+        if inc_doc:
+            sample_keys = list(inc_doc.keys())[:5]
+            logger.info(f"🔍 [FINALIZE_GAME] Sample inc_doc keys: {sample_keys}")
+            for key in sample_keys:
+                logger.info(f"🔍 [FINALIZE_GAME]   {key} = {inc_doc[key]}")
+        else:
+            logger.warning(f"⚠️ [FINALIZE_GAME] inc_doc is EMPTY - no stats to increment!")
+            logger.warning(f"⚠️ [FINALIZE_GAME] This means box_score had no player stats or all stats were zero")
+            logger.warning(f"⚠️ [FINALIZE_GAME] box_score structure: {list(box_score.keys())}")
+            for team_name, team_box in box_score.items():
+                logger.warning(f"⚠️ [FINALIZE_GAME]   {team_name}: {len(team_box)} players in box_score")
+                if team_box:
+                    sample_player = list(team_box.values())[0] if isinstance(team_box, dict) else None
+                    if sample_player and isinstance(sample_player, dict):
+                        logger.warning(f"⚠️ [FINALIZE_GAME]     Sample player keys: {list(sample_player.keys())[:10]}")
+                        logger.warning(f"⚠️ [FINALIZE_GAME]     Sample player stats: PTS={sample_player.get('PTS', 'N/A')}, FGM={sample_player.get('FGM', 'N/A')}, MIN={sample_player.get('MIN', 'N/A')}")
+        
         # ✅ SS&S: Check existing players and build set_on_insert_doc for missing players
         tournament_check = tournaments_collection.find_one({"_id": tid}, {"players": 1})
         existing_players = tournament_check.get("players", {}) if tournament_check else {}
