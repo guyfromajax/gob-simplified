@@ -766,6 +766,10 @@ async function refreshTeamStats() {
     const res = await fetch(`${API_CONFIG.buildUrl('/tournament/team-stats')}?tournament_id=${encodeURIComponent(tournament._id)}`);
     const data = await res.json();
     renderTeamStats(data);
+    // ✅ FIX: Also refresh roster stats when team stats are refreshed
+    await loadRoster();
+    renderRoster();
+    renderStats();
   } catch (err) {
     console.error("Failed to load team stats", err);
   }
@@ -799,7 +803,7 @@ function renderTeamStatsTable(teams) {
   
   // Calculate totals for all teams
   const totals = {
-    PF: 0, PA: 0, FGM: 0, FGA: 0, TPM: 0, TPA: 0, FTM: 0, FTA: 0,
+    W: 0, L: 0, PF: 0, PA: 0, FGM: 0, FGA: 0, TPM: 0, TPA: 0, FTM: 0, FTA: 0,
     DREB: 0, OREB: 0, TREB: 0, AST: 0, STL: 0, BLK: 0, F: 0, TO: 0,
     DEF_A: 0, DEF_S: 0, SCR_A: 0, SCR_S: 0
   };
@@ -809,6 +813,8 @@ function renderTeamStatsTable(teams) {
     const s = t.stats || {};
     
     // Accumulate totals
+    totals.W += s.W || 0;
+    totals.L += s.L || 0;
     totals.PF += s.PF || 0;
     totals.PA += s.PA || 0;
     totals.FGM += s.FGM || 0;
@@ -1672,8 +1678,11 @@ function handleTournamentUpdate(doc) {
   updateTeamChemistry();
   renderBracket();
   renderSchedule();
-  renderRoster();
-  renderStats();
+  // ✅ FIX: Reload roster and stats to ensure player stats populate after game completion
+  loadRoster().then(() => {
+    renderRoster();
+    renderStats();
+  });
   // ✅ FIX: Reload team data to refresh player stats on Team tab
   loadTeamData();
   updateCTA();

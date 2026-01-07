@@ -411,6 +411,12 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
 }
 
+/* Team Stats table should be full width, not constrained */
+#stats-tab > div:first-child {
+  width: 100%;
+  overflow-x: auto;
+}
+
 table.roster-table,
 table.stats-table {
   width: 100%;
