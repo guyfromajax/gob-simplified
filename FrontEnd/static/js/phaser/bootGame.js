@@ -460,9 +460,15 @@ async function handleSimToFourth() {
         game_id: gameId, // Always pass gameId for tournament games
       };
       
-      // ✅ SS&S: Add mode-specific parameters for franchise mode
-      if (mode === 'franchise' && franchiseId) {
-        payload.mode = 'franchise';
+      // ✅ SS&S: Add mode and mode-specific IDs to payload (matches gameScene.js pattern)
+      // This ensures backend sets correct mode on game document for finalize_game() processing
+      if (mode) {
+        payload.mode = mode;
+      }
+      if (tournamentId) {
+        payload.tournament_id = tournamentId;
+      }
+      if (franchiseId) {
         payload.franchise_id = franchiseId;
         if (weekParam && !Number.isNaN(weekParam)) {
           payload.week = weekParam;
@@ -643,9 +649,15 @@ async function handleSimFullGame() {
       };
       if (gId) payload.game_id = gId;
       
-      // ✅ SS&S: Add mode-specific parameters for franchise mode
-      if (mode === 'franchise' && franchiseId) {
-        payload.mode = 'franchise';
+      // ✅ SS&S: Add mode and mode-specific IDs to payload (matches gameScene.js pattern)
+      // This ensures backend sets correct mode on game document for finalize_game() processing
+      if (mode) {
+        payload.mode = mode;
+      }
+      if (tournamentId) {
+        payload.tournament_id = tournamentId;
+      }
+      if (franchiseId) {
         payload.franchise_id = franchiseId;
         if (weekParam && !Number.isNaN(weekParam)) {
           payload.week = weekParam;
