@@ -215,6 +215,12 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                     existing_meta = existing_player.get("meta", {})
                     existing_season = existing_player.get("season", {})
                     
+                    # ✅ DEBUG: Log if player doesn't exist (this shouldn't happen if create_tournament worked)
+                    if not existing_player:
+                        logger.warning(f"⚠️ [APPLY-STATS] Tournament mode - Player {query_pid} NOT FOUND in tournament document. This suggests players weren't initialized during tournament creation. Initializing now...")
+                    else:
+                        logger.debug(f"✅ [APPLY-STATS] Tournament mode - Player {query_pid} found in tournament document. Season stats keys: {list(existing_season.keys())[:5]}...")
+                    
                     # ✅ FIX: For tournament mode, accumulate stats from game summary (not from players_collection)
                     # This ensures tournament stats only include tournament games, not all games
                     # Get stats from the game summary's box_score (already processed above)
