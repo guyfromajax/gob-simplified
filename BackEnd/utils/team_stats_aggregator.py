@@ -132,13 +132,9 @@ def aggregate_team_stats_from_players(
                 continue
             seen_team_names.add(team_name)
             
-            # Tournament mode: Only include teams with actual stats (non-zero totals)
-            has_stats = any(
-                stats.get(stat, 0) > 0 
-                for stat in ["PTS", "FGM", "FGA", "REB", "AST", "STL", "BLK", "TO", "F"]
-            )
-            if not has_stats:
-                continue
+            # ✅ SS&S: Include ALL teams in tournament bracket, even if stats are zero
+            # This matches Franchise mode behavior and ensures all teams appear in the table
+            # Teams with zero stats will still show W/L, PF/PA from standings
         
         # Add PF/PA and wins/losses from standings
         if team_id_str in standings_data:
