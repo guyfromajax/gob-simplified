@@ -61,6 +61,15 @@
 - **Result**: Game documents now have correct `mode: "tournament"` field, ensuring `finalize_game()` processes player stats correctly for Tournament mode
 - **Status**: ✅ Fixed and committed
 
+### ✅ Fixed: Player Stats Not Saving for User Games (Mode Field Missing)
+- **Root Cause**: Frontend was not passing `tournament_id` and `mode` in `/api/simulate-quarter` request payload, causing backend to default to `mode: "single"` instead of `mode: "tournament"`. When `finalize_game()` was called with `mode="tournament"`, the game document had `mode: "single"`, causing a mismatch and potentially skipping Tournament processing.
+- **Fix**: 
+  - Added `tournament_id` and `mode` to payload in `gameScene.js` (main gameplay flow)
+  - Added `tournament_id` and `mode` to payload in `bootGame.js` (sim-to-4th and sim-full-game flows)
+  - This ensures backend correctly sets `mode: "tournament"` on game document, allowing `finalize_game()` to process Tournament stats correctly
+- **Result**: Game documents now have correct `mode: "tournament"` field, ensuring `finalize_game()` processes player stats correctly for Tournament mode
+- **Status**: ✅ Fixed and committed
+
 ### ✅ Fixed: Player Stats Not Saving for User Games (Race Condition)
 - **Root Cause**: Tournament mode was looking up game document from database in `/tournament/save-result`, which could be stale or incomplete due to race condition (save-result called before Q4 save completes). Franchise mode avoided this by accepting `game_document` directly from the request.
 - **Fix**: 
