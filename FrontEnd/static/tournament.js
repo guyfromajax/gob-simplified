@@ -2161,8 +2161,19 @@ function renderRosterStatsTable(players) {
   rosterPlayersDataForSorting = JSON.parse(JSON.stringify(players)); // Deep copy for sorting
   
   let renderedCount = 0;
+  let playersWithZeroStats = 0;
+  let playersWithStats = 0;
+  
   players.forEach((p, index) => {
     const stats = p.stats?.season || {};
+    const hasNonZeroStats = Object.keys(stats).some(key => stats[key] !== 0);
+    
+    if (hasNonZeroStats) {
+      playersWithStats++;
+    } else {
+      playersWithZeroStats++;
+    }
+    
     if (index === 0) {
       console.log('🔍 [DEBUG renderRosterStatsTable] Sample player stats:', {
         playerId: p._id,
@@ -2170,10 +2181,12 @@ function renderRosterStatsTable(players) {
         hasStats: !!p.stats,
         hasSeason: !!p.stats?.season,
         statsKeys: Object.keys(stats),
+        hasNonZeroStats,
         sampleValues: {
-          PTS: stats.PTS,
-          FGM: stats.FGM,
-          FGA: stats.FGA
+          PTS: stats.PTS || 0,
+          FGM: stats.FGM || 0,
+          FGA: stats.FGA || 0,
+          GP: stats.GP || 0
         }
       });
     }
@@ -2211,7 +2224,12 @@ function renderRosterStatsTable(players) {
     tbody.appendChild(tr);
     renderedCount++;
   });
-  console.log('✅ [DEBUG renderRosterStatsTable] Rendered', renderedCount, 'player stat rows');
+  
+  console.log('✅ [DEBUG renderRosterStatsTable] Rendered', renderedCount, 'player stat rows:', {
+    totalPlayers: players.length,
+    playersWithStats,
+    playersWithZeroStats
+  });
 }
 
 function sortRosterStats(statKey) {
