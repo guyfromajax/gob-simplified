@@ -82,9 +82,15 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
       // ✅ FIX: Pass game_document if available (from simulate-quarter when is_final=True)
       // This eliminates race condition where save-result is called before Q4 save completes
       // Matches Franchise mode pattern exactly
+      // Also handle case where simData itself IS the game document (from bootGame.js "Sim Full Game")
       if (simData && simData.final_game_document) {
         console.log('✅ Passing final_game_document to tournament/save-result (eliminates race condition)');
         requestBody.game_document = simData.final_game_document;
+      } else if (simData && simData.box_score && (simData.game_id || simData._id)) {
+        // ✅ FIX: If simData itself is a complete game document (has box_score and game_id),
+        // use it directly as game_document (handles "Sim Full Game" flow from bootGame.js)
+        console.log('✅ Using simData as game_document (Sim Full Game flow)');
+        requestBody.game_document = simData;
       }
       
       const saveResultUrl = API_CONFIG.buildUrl("/tournament/save-result");
