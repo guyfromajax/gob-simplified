@@ -296,6 +296,29 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                             logger.warning(f"⚠️ [APPLY-STATS] Tournament mode - Player {query_pid}: Game {token} already in applied_games, skipping (idempotent)")
                             continue  # Already applied, skip
                     
+                    # ✅ FIX: Ensure player exists before updating stats
+                    # If player doesn't exist, initialize with empty season stats first
+                    if not existing_player:
+                        # Initialize player with empty season stats and metadata
+                        tournaments_collection.update_one(
+                            {"_id": tid},
+                            {
+                                "$setOnInsert": {
+                                    f"players.{str(query_pid)}.meta": meta,
+                                    f"players.{str(query_pid)}.season": {},
+                                    f"players.{str(query_pid)}.attributes": player_doc.get("attributes", {}),
+                                    f"players.{str(query_pid)}.position_ratings": player_doc.get("position_ratings", {}),
+                                }
+                            },
+                            upsert=True
+                        )
+                        # Reload to get the initialized player
+                        tournament_doc = tournaments_collection.find_one(
+                            {"_id": tid},
+                            {f"players.{str(query_pid)}": 1}
+                        )
+                        existing_player = tournament_doc.get("players", {}).get(str(query_pid), {}) if tournament_doc else {}
+                    
                     # Apply the update with idempotency check
                     # Use $nin (not in) to check if token is not in the applied_games array
                     # Also handle case where applied_games doesn't exist yet
@@ -309,6 +332,12 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                         },
                         tournament_update,
                     )
+                    
+                    # Log if update failed (for debugging)
+                    if result.matched_count == 0:
+                        logger.warning(f"⚠️ [APPLY-STATS] Tournament mode - Player {query_pid}: Update query didn't match. Player may not exist or query filter issue.")
+                    elif result.modified_count == 0:
+                        logger.warning(f"⚠️ [APPLY-STATS] Tournament mode - Player {query_pid}: Update matched but didn't modify (may already be applied or no stats to increment).")
                     
                     # ✅ FIX: After incrementing, calculate per_game and percentages from updated stats
                     # Only do this if the update was successful
