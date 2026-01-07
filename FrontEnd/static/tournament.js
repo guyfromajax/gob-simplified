@@ -1504,6 +1504,26 @@ async function loadRoster() {
         playerIdMismatchCount,
         totalPlayers: data.players.length
       });
+      
+      // ✅ DEBUG: Log first player's actual stats to verify they're not all zeros
+      if (data.players && data.players.length > 0) {
+        const firstPlayer = data.players[0];
+        const firstPlayerStats = firstPlayer.stats?.season || {};
+        const hasNonZeroStats = Object.keys(firstPlayerStats).some(key => firstPlayerStats[key] !== 0);
+        console.log('🔍 [DEBUG loadRoster] First player stats check:', {
+          playerId: firstPlayer._id,
+          playerName: firstPlayer.name || `${firstPlayer.first_name} ${firstPlayer.last_name}`,
+          hasNonZeroStats,
+          sampleStats: {
+            PTS: firstPlayerStats.PTS || 0,
+            FGM: firstPlayerStats.FGM || 0,
+            FGA: firstPlayerStats.FGA || 0,
+            GP: firstPlayerStats.GP || 0,
+            REB: firstPlayerStats.REB || 0
+          },
+          allStatsKeys: Object.keys(firstPlayerStats).slice(0, 10)
+        });
+      }
     } else {
       console.warn('⚠️ [DEBUG loadRoster] Cannot merge stats - missing data:', {
         hasTournamentDoc: !!tournamentDoc,
@@ -2230,6 +2250,26 @@ function renderRosterStatsTable(players) {
     playersWithStats,
     playersWithZeroStats
   });
+  
+  // ✅ DEBUG: If all stats are zero, log a sample to verify
+  if (playersWithStats === 0 && players.length > 0) {
+    const samplePlayer = players[0];
+    const sampleStats = samplePlayer.stats?.season || {};
+    console.warn('⚠️ [DEBUG renderRosterStatsTable] ALL PLAYERS HAVE ZERO STATS:', {
+      samplePlayerId: samplePlayer._id,
+      samplePlayerName: samplePlayer.name || `${samplePlayer.first_name} ${samplePlayer.last_name}`,
+      sampleStats: {
+        PTS: sampleStats.PTS || 0,
+        FGM: sampleStats.FGM || 0,
+        FGA: sampleStats.FGA || 0,
+        GP: sampleStats.GP || 0,
+        REB: sampleStats.REB || 0
+      },
+      hasStatsObject: !!samplePlayer.stats,
+      hasSeasonObject: !!samplePlayer.stats?.season,
+      seasonKeys: Object.keys(sampleStats)
+    });
+  }
 }
 
 function sortRosterStats(statKey) {
@@ -2576,8 +2616,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       } else if (tabName === 'stats-tab') {
         // Stats tab only shows Team Stats and Leaderboards (player stats are in Roster tab)
-        renderLeaderboards();
-        refreshTeamStats();
+            renderLeaderboards();
+            refreshTeamStats();
       } else if (tabName === 'schedule-tab') {
         renderSchedule();
       }
