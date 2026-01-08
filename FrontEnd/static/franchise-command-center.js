@@ -702,7 +702,13 @@ async function init() {
     userTeamId = localStorage.getItem('franchise_user_team_id');
   }
   
+  const initStartTime = performance.now();
+  console.log('⏱️ [PERF] FCC init() START');
+  
+  const topDataStartTime = performance.now();
   const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}`);
+  const topDataEndTime = performance.now();
+  console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
   
   // ✅ SS&S: Resolve team_id from command center data if not already set
   if (topData && topData.team_id && !userTeamId) {
@@ -714,7 +720,10 @@ async function init() {
   // This ensures 100% consistency between header and Team tab
   if (franchiseId && userTeamId) {
     try {
+      const teamDataStartTime = performance.now();
       const teamDataResponse = await fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`);
+      const teamDataEndTime = performance.now();
+      console.log(`⏱️ [PERF] /franchise/team-data: ${(teamDataEndTime - teamDataStartTime).toFixed(2)}ms`);
       if (teamDataResponse.ok) {
         const teamData = await teamDataResponse.json();
         // Override team_chemistry with value from team-data endpoint (same as Team tab uses)
@@ -750,10 +759,16 @@ async function init() {
       return;
     }
     try {
+      const rosterStartTime = performance.now();
       const rosterData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/roster')}?franchise_id=${franchiseId}&team_name=${encodeURIComponent(topData.team)}`);
+      const rosterEndTime = performance.now();
+      console.log(`⏱️ [PERF] /franchise/roster: ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
       
       // Load player stats separately from franchise document
+      const stateStartTime = performance.now();
       const franchiseDoc = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/state')}?franchise_id=${franchiseId}`);
+      const stateEndTime = performance.now();
+      console.log(`⏱️ [PERF] /franchise/state: ${(stateEndTime - stateStartTime).toFixed(2)}ms`);
       
       if (franchiseDoc && franchiseDoc.players && rosterData.players) {
         // Merge stats into player data
@@ -773,11 +788,23 @@ async function init() {
       console.error('Failed to load franchise roster:', error);
     }
   }
+  const standingsStartTime = performance.now();
   const standingsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}`);
+  const standingsEndTime = performance.now();
+  console.log(`⏱️ [PERF] /franchise/standings: ${(standingsEndTime - standingsStartTime).toFixed(2)}ms`);
   renderStandings(standingsData);
+  
+    const scheduleStartTime = performance.now();
     const scheduleData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/schedule')}?franchise_id=${franchiseId}`);
+    const scheduleEndTime = performance.now();
+    console.log(`⏱️ [PERF] /franchise/schedule: ${(scheduleEndTime - scheduleStartTime).toFixed(2)}ms`);
     renderSchedule(scheduleData);
-    renderLeaders(await fetchJSON(`${API_CONFIG.buildUrl('/franchise/leaders')}?franchise_id=${franchiseId}`));
+    
+    const leadersStartTime = performance.now();
+    const leadersData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/leaders')}?franchise_id=${franchiseId}`);
+    const leadersEndTime = performance.now();
+    console.log(`⏱️ [PERF] /franchise/leaders: ${(leadersEndTime - leadersStartTime).toFixed(2)}ms`);
+    renderLeaders(leadersData);
     
     // ============================================================================
     // 🛠️ DEV MODE: Simulate Entire Regular Season Popup (Temporary Development Feature)
@@ -786,13 +813,26 @@ async function init() {
     // ⚠️  To disable: Comment out the code block below (lines ~785-850)
     // ⚠️  To re-enable: Uncomment the code block
     // ============================================================================
+    const popupStartTime = performance.now();
+    console.log('⏱️ [PERF] showDevSimPopup START', { week: topData?.week, hasResults: !!topData?.results, resultsKeys: topData?.results ? Object.keys(topData.results).length : 0 });
     showDevSimPopup(topData);
+    const popupEndTime = performance.now();
+    console.log(`⏱️ [PERF] showDevSimPopup COMPLETE: ${(popupEndTime - popupStartTime).toFixed(2)}ms`);
     // ============================================================================
     // 🛠️ END DEV MODE FEATURE
     // ============================================================================
     
-    renderTeamStats(await fetchJSON(`${API_CONFIG.buildUrl('/franchise/team-stats')}?franchise_id=${franchiseId}`));
-    renderRecruits(await fetchJSON(`${API_CONFIG.buildUrl('/franchise/recruits')}?franchise_id=${franchiseId}`));
+    const teamStatsStartTime = performance.now();
+    const teamStatsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/team-stats')}?franchise_id=${franchiseId}`);
+    const teamStatsEndTime = performance.now();
+    console.log(`⏱️ [PERF] /franchise/team-stats: ${(teamStatsEndTime - teamStatsStartTime).toFixed(2)}ms`);
+    renderTeamStats(teamStatsData);
+    
+    const recruitsStartTime = performance.now();
+    const recruitsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/recruits')}?franchise_id=${franchiseId}`);
+    const recruitsEndTime = performance.now();
+    console.log(`⏱️ [PERF] /franchise/recruits: ${(recruitsEndTime - recruitsStartTime).toFixed(2)}ms`);
+    renderRecruits(recruitsData);
     // ✅ Removed: renderTrainingResults - Training Reports are now linked directly on Schedule page
     
     // Initialize tooltips for table headers
@@ -804,7 +844,14 @@ async function init() {
     }
     
     // Load team data for Team tab
+    const loadTeamDataStartTime = performance.now();
+    console.log('⏱️ [PERF] loadTeamData() START');
     await loadTeamData();
+    const loadTeamDataEndTime = performance.now();
+    console.log(`⏱️ [PERF] loadTeamData() COMPLETE: ${(loadTeamDataEndTime - loadTeamDataStartTime).toFixed(2)}ms`);
+    
+    const initEndTime = performance.now();
+    console.log(`⏱️ [PERF] FCC init() COMPLETE: ${(initEndTime - initStartTime).toFixed(2)}ms`);
   }
 
 function updatePlayButton(data) {
@@ -1087,17 +1134,28 @@ let teamData = null;
 async function loadTeamData() {
   if (!franchiseId || !userTeamId) return;
   
+  const loadTeamDataStartTime = performance.now();
+  console.log('⏱️ [PERF] loadTeamData() function START');
+  
   try {
     // First, ensure team objects exist (this will create them if missing)
     try {
       // ✅ SS&S: Use ObjectId directly - backend accepts it
+      const gameplanStartTime = performance.now();
+      console.log('⏱️ [PERF] loadTeamData() calling /api/gameplan START');
       await fetch(`${API_CONFIG.buildUrl('/api/gameplan')}?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`);
+      const gameplanEndTime = performance.now();
+      console.log(`⏱️ [PERF] loadTeamData() /api/gameplan: ${(gameplanEndTime - gameplanStartTime).toFixed(2)}ms`);
     } catch (error) {
       console.warn('Could not ensure team objects exist:', error);
     }
     
     // ✅ SS&S: Use ObjectId directly - backend accepts team_id parameter
+    const teamDataStartTime = performance.now();
+    console.log('⏱️ [PERF] loadTeamData() calling /franchise/team-data START');
     const response = await fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`);
+    const teamDataEndTime = performance.now();
+    console.log(`⏱️ [PERF] loadTeamData() /franchise/team-data: ${(teamDataEndTime - teamDataStartTime).toFixed(2)}ms`);
     
     if (!response.ok) {
       console.error('Failed to load team data:', response.status, response.statusText);
@@ -1109,7 +1167,10 @@ async function loadTeamData() {
     // Also load players for top scorer lookup
     let players = [];
     try {
+      const rosterStartTime = performance.now();
       const rosterResponse = await fetch(`${API_CONFIG.buildUrl('/franchise/roster')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(data.team_name || '')}`);
+      const rosterEndTime = performance.now();
+      console.log(`⏱️ [PERF] loadTeamData() /franchise/roster (2nd call): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
       if (rosterResponse.ok) {
         const rosterData = await rosterResponse.json();
         players = rosterData.players || [];
@@ -1134,6 +1195,9 @@ async function loadTeamData() {
       renderTeamReport();
       renderPlaybookSummary();
     }
+    
+    const loadTeamDataEndTime = performance.now();
+    console.log(`⏱️ [PERF] loadTeamData() function COMPLETE: ${(loadTeamDataEndTime - loadTeamDataStartTime).toFixed(2)}ms`);
   } catch (error) {
     console.error('Failed to load team data:', error);
   }
@@ -1987,13 +2051,27 @@ if (document.readyState === 'loading') {
 // ============================================================================
 
 function showDevSimPopup(topData) {
+  const funcStartTime = performance.now();
+  console.log('⏱️ [PERF] showDevSimPopup function START', { 
+    hasTopData: !!topData,
+    week: topData?.week,
+    trainingWeek: topData?.training_status?.current_week,
+    hasResults: !!topData?.results,
+    resultsType: typeof topData?.results,
+    resultsKeys: topData?.results ? Object.keys(topData.results).length : 'N/A'
+  });
+  
   // Only show if week is 1 and no games have been played
   const week = topData?.week || topData?.training_status?.current_week || 1;
   const results = topData?.results || {};
   const hasPlayedGames = Object.keys(results).length > 0;
   
+  console.log('⏱️ [PERF] showDevSimPopup check', { week, hasPlayedGames, resultsKeys: Object.keys(results).length });
+  
   // Check if games exist in database
   if (week === 1 && !hasPlayedGames) {
+    console.log('⏱️ [PERF] showDevSimPopup - Creating popup DOM elements');
+    const domStartTime = performance.now();
     // Create popup overlay
     const overlay = document.createElement('div');
     overlay.id = 'dev-sim-popup-overlay';
@@ -2129,7 +2207,15 @@ function showDevSimPopup(topData) {
         document.body.removeChild(overlay);
       }
     });
+    
+    const domEndTime = performance.now();
+    console.log(`⏱️ [PERF] showDevSimPopup - DOM creation: ${(domEndTime - domStartTime).toFixed(2)}ms`);
+  } else {
+    console.log('⏱️ [PERF] showDevSimPopup - Popup NOT shown (week !== 1 or hasPlayedGames)');
   }
+  
+  const funcEndTime = performance.now();
+  console.log(`⏱️ [PERF] showDevSimPopup function COMPLETE: ${(funcEndTime - funcStartTime).toFixed(2)}ms`);
 }
 
 // ============================================================================
