@@ -98,6 +98,92 @@ Franchise Mode supports multi-season career mode where team and player data pers
 **Standings Tab:**
 - Displays conference standings table only (schedule moved to Schedule tab)
 - Shows team name, wins, losses, win percentage, points for, points against, and next opponent
+- **EOS Tournament Support**: Next opponent column populates from tournament bracket during weeks 15-17 (reuses Tournament mode's bracket lookup pattern)
+
+### End-of-Season (EOS) Tournament System
+
+**Overview:**
+After completing the regular season (week 14), the top 8 teams advance to a single-elimination tournament spanning weeks 15-17. The tournament consists of three rounds: Round 1 (Quarterfinals), Round 2 (Semifinals), and Final (Championship).
+
+**Initialization:**
+- **Trigger**: Automatically initialized when week 14 is completed via `/franchise/complete-week`
+- **Location**: `BackEnd/tournament/eos_tournament.py` - `initialize_eos_tournament()`
+- **Process**:
+  1. Calculates regular season standings (sorted by wins, PF-PA differential, random tiebreaker)
+  2. Generates seeds 1-8 from top 8 teams
+  3. Creates bracket structure with Round 1 matchups: 1v8, 4v5, 2v7, 3v6
+  4. Sets `eos_tournament_active = True` and `week = 15` on franchise document
+  5. Stores tournament state in `franchise_doc.eos_tournament`:
+     - `bracket`: `{round1: [...], round2: [], final: []}`
+     - `current_round`: 1, 2, or 3
+     - `completed`: Boolean flag
+     - `champion`: Winning team ObjectId (string)
+     - `seeds`: Dictionary mapping team_id to seed number
+     - `results`: Array of completed game results
+
+**Bracket Structure:**
+- Each matchup contains:
+  - `home_team`: ObjectId string
+  - `away_team`: ObjectId string
+  - `game_id`: Game document ID (set after game completion)
+  - `winner`: Winning team ObjectId string (set after game completion)
+  - `score`: Dictionary with team_id keys and score values
+
+**Gameplay Flow:**
+- **Week 15**: Round 1 (Quarterfinals) - 4 games
+- **Week 16**: Round 2 (Semifinals) - 2 games (winners from Round 1)
+- **Week 17**: Final (Championship) - 1 game (winners from Round 2)
+
+**API Endpoints:**
+- **`POST /franchise/play-next-game`**: Returns user's matchup for current week
+  - ✅ **EOS Tournament Support**: Checks `eos_tournament_active` and `week >= 15`
+  - Reuses Tournament mode's bracket lookup pattern:
+    1. Gets current round from `eos_tournament.current_round`
+    2. Determines round name (`round1`, `round2`, or `final`) via `get_round_name()`
+    3. Finds user's matchup in bracket by matching `user_team_id`
+    4. Returns matchup with team names and IDs (same format as regular season)
+  - **Location**: `BackEnd/api/franchise_routes.py` (lines 355-395)
+
+- **`GET /franchise/standings`**: Returns standings with next opponent column
+  - ✅ **EOS Tournament Support**: Populates "Next Opponent" from tournament bracket during weeks 15-17
+  - Reuses same bracket lookup pattern as `play-next-game`
+  - **Location**: `BackEnd/api/franchise_routes.py` (lines 957-1003)
+
+**Frontend Integration:**
+- **Scouting Report Button**: 
+  - ✅ **EOS Tournament Support**: Shows during weeks 15-17 if user team is not eliminated
+  - Extended week check from `week <= 14` to `week <= 17` (with elimination check)
+  - Reuses `play-next-game` endpoint to get opponent (now handles EOS Tournament)
+  - **Location**: `FrontEnd/static/franchise-command-center.js` - `updateScoutingButton()` (lines 1769-1829)
+
+- **Next Opponent Column**:
+  - ✅ **EOS Tournament Support**: Populates from tournament bracket during weeks 15-17
+  - Backend endpoint (`/franchise/standings`) handles bracket lookup automatically
+  - **Location**: `FrontEnd/static/franchise-command-center.js` - `renderStandings()` (line 108)
+
+- **Play Now Button**:
+  - Changes to "Sim Rest of Tournament" if user team is eliminated
+  - Changes to "Finish Current Season" when tournament is complete
+  - **Location**: `FrontEnd/static/franchise-command-center.js` - `updatePlayButton()` (lines 800-846)
+
+**Tournament Progression:**
+- **Round Advancement**: Automatically advances to next round when all games in current round are complete
+- **Location**: `BackEnd/tournament/eos_tournament.py` - `advance_tournament_round()`
+- **Process**:
+  - Round 1 → Round 2: When all 4 Round 1 games have winners
+  - Round 2 → Final: When both Round 2 games have winners
+  - Final → Complete: When Final game has winner (sets `completed = True` and `champion`)
+
+**Key Files:**
+- `BackEnd/tournament/eos_tournament.py` - Tournament initialization, bracket generation, round advancement
+- `BackEnd/api/franchise_routes.py` - `play_next_game()`, `standings()`, `complete_week()` (EOS Tournament initialization)
+- `FrontEnd/static/franchise-command-center.js` - `updateScoutingButton()`, `updatePlayButton()`, `renderStandings()`
+
+**SS&S Principles:**
+- ✅ **Code Reuse**: EOS Tournament gameplay flow reuses Tournament mode's bracket lookup pattern
+- ✅ **Consistent API**: Same endpoint (`/franchise/play-next-game`) handles both regular season and EOS Tournament
+- ✅ **Single Source of Truth**: Tournament bracket stored in `franchise_doc.eos_tournament.bracket`
+- ✅ **Idempotent Operations**: Round advancement checks for completion before advancing
 
 ### Team Object Lifecycle
 

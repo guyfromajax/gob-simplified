@@ -374,21 +374,58 @@ def play_next_game(req: PlayGameRequest):
     manager.week = franchise_doc.get("week", 1)
     manager.franchise_id = franchise_doc.get("_id")
 
+    # ✅ EOS TOURNAMENT: Check if tournament is active (weeks 15-17)
+    eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
+    eos_tournament = franchise_doc.get("eos_tournament", {})
+    
     matchup = None
-    if manager.week - 1 < len(manager.schedule):
-        for away_id, home_id in manager.schedule[manager.week - 1]:
-            # Compare ObjectIds (schedule uses ObjectIds, user_team_id is now ObjectId)
-            if away_id == user_team_id or home_id == user_team_id:
-                away_doc = db.teams.find_one({"_id": away_id}, {"name": 1})
-                home_doc = db.teams.find_one({"_id": home_id}, {"name": 1})
-                matchup = {
-                    "home": home_doc.get("name", ""),
-                    "away": away_doc.get("name", ""),
-                    "home_id": str(home_id),
-                    "away_id": str(away_id),
-                    "week": manager.week,
-                }
+    
+    if eos_tournament_active and eos_tournament and manager.week >= 15:
+        # ✅ SS&S: Reuse Tournament mode's bracket lookup pattern
+        # Get current round and round name
+        current_round = eos_tournament.get("current_round", 1)
+        round_name = get_round_name(current_round)
+        bracket = eos_tournament.get("bracket", {})
+        matchups = bracket.get(round_name, [])
+        
+        # Find user's matchup in bracket (reusing Tournament mode pattern)
+        user_matchup = None
+        for matchup_data in matchups:
+            # Matchups use ObjectId strings, compare with user_team_id as string
+            if str(user_team_id) in [matchup_data.get("home_team"), matchup_data.get("away_team")]:
+                user_matchup = matchup_data
                 break
+        
+        if user_matchup:
+            # Get team names from ObjectIds
+            home_id = ObjectId(user_matchup["home_team"])
+            away_id = ObjectId(user_matchup["away_team"])
+            home_doc = db.teams.find_one({"_id": home_id}, {"name": 1})
+            away_doc = db.teams.find_one({"_id": away_id}, {"name": 1})
+            
+            matchup = {
+                "home": home_doc.get("name", "") if home_doc else "",
+                "away": away_doc.get("name", "") if away_doc else "",
+                "home_id": str(home_id),
+                "away_id": str(away_id),
+                "week": manager.week,
+            }
+    else:
+        # Regular season (weeks 1-14)
+        if manager.week - 1 < len(manager.schedule):
+            for away_id, home_id in manager.schedule[manager.week - 1]:
+                # Compare ObjectIds (schedule uses ObjectIds, user_team_id is now ObjectId)
+                if away_id == user_team_id or home_id == user_team_id:
+                    away_doc = db.teams.find_one({"_id": away_id}, {"name": 1})
+                    home_doc = db.teams.find_one({"_id": home_id}, {"name": 1})
+                    matchup = {
+                        "home": home_doc.get("name", ""),
+                        "away": away_doc.get("name", ""),
+                        "home_id": str(home_id),
+                        "away_id": str(away_id),
+                        "week": manager.week,
+                    }
+                    break
 
     if not matchup:
         raise HTTPException(status_code=404, detail="User matchup not found")
@@ -927,15 +964,46 @@ def standings(franchise_id: str):
 
     schedule = franchise_doc.get("schedule", [])
     week = franchise_doc.get("week", 1)
-    next_games = schedule[week - 1] if week - 1 < len(schedule) else []
     id_to_name = {t["_id"]: t["name"] for t in db.teams.find({}, {"name": 1})}
 
     matchup_map = {}
-    for away_id, home_id in next_games:
-        home_name = id_to_name.get(home_id, "")
-        away_name = id_to_name.get(away_id, "")
-        matchup_map[away_id] = f"at {home_name}"
-        matchup_map[home_id] = f"vs {away_name}"
+    
+    # ✅ EOS TOURNAMENT: Check if tournament is active (weeks 15-17)
+    eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
+    eos_tournament = franchise_doc.get("eos_tournament", {})
+    
+    if eos_tournament_active and eos_tournament and week >= 15:
+        # ✅ SS&S: Reuse Tournament mode's bracket lookup pattern
+        current_round = eos_tournament.get("current_round", 1)
+        round_name = get_round_name(current_round)
+        bracket = eos_tournament.get("bracket", {})
+        matchups = bracket.get(round_name, [])
+        
+        # Build matchup_map from tournament bracket
+        for matchup_data in matchups:
+            home_id_str = matchup_data.get("home_team")
+            away_id_str = matchup_data.get("away_team")
+            
+            if home_id_str and away_id_str:
+                try:
+                    home_id = ObjectId(home_id_str)
+                    away_id = ObjectId(away_id_str)
+                    home_name = id_to_name.get(home_id, "")
+                    away_name = id_to_name.get(away_id, "")
+                    
+                    matchup_map[str(away_id)] = f"at {home_name}"
+                    matchup_map[str(home_id)] = f"vs {away_name}"
+                except Exception:
+                    # Skip invalid ObjectIds
+                    continue
+    else:
+        # Regular season (weeks 1-14)
+        next_games = schedule[week - 1] if week - 1 < len(schedule) else []
+        for away_id, home_id in next_games:
+            home_name = id_to_name.get(home_id, "")
+            away_name = id_to_name.get(away_id, "")
+            matchup_map[away_id] = f"at {home_name}"
+            matchup_map[home_id] = f"vs {away_name}"
 
     teams = list(db.teams.find({}, {"name": 1, "record": 1, "PF": 1, "PA": 1}))
 
@@ -958,7 +1026,7 @@ def standings(franchise_id: str):
             "PF": pf,
             "PA": pa,
             "differential": differential,
-            "next": matchup_map.get(t["_id"], "")
+            "next": matchup_map.get(str(t["_id"]), "")
         })
 
     output.sort(key=lambda x: (x["W"], x["differential"]), reverse=True)
