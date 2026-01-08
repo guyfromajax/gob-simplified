@@ -309,16 +309,21 @@ class TurnManager:
         self.set_strategy_calls()
         
         # ✅ LOG: Check for Playcall Center overrides at start of turn
+        # ✅ PERFORMANCE: Skip Playcall Center checks during full simulation (full_sim=True)
+        # Playcall Center is user-specific UI feature, not needed when simming games
+        is_full_simulation = self.game.game_state.get("_is_full_simulation", False)
+        
         # ✅ SS&S: Use game_state["user_team_side"] instead of is_user_team flag (more reliable, persists to DB)
         user_team_side = self.game.game_state.get("user_team_side")
-        logging.debug(f"🔍 [TURN START DEBUG] user_team_side from game_state: {user_team_side}")
+        logging.debug(f"🔍 [TURN START DEBUG] user_team_side from game_state: {user_team_side}, is_full_simulation: {is_full_simulation}")
         user_team = None
         if user_team_side == "home":
             user_team = self.game.home_team
         elif user_team_side == "away":
             user_team = self.game.away_team
         
-        if user_team:
+        # Only check Playcall Center overrides if not in full simulation mode
+        if user_team and not is_full_simulation:
             offense_override = user_team.strategy_calls.get("offense_call")
             defense_override = user_team.strategy_calls.get("defense_call")
             aggression_override = user_team.strategy_calls.get("aggression_override")

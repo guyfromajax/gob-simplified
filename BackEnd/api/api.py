@@ -2275,9 +2275,10 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             and gm.score.get(gm.home_team.name, 0) != gm.score.get(gm.away_team.name, 0)
         )
         
-        # Save game state to database every 10 turns (for crash recovery)
-        # ✅ FIX: Always save when quarter completes to ensure quarter number is persisted
-        if len(gm.turns) % 10 == 0 or quarter_complete:
+        # ✅ PERFORMANCE: Save game state every 25 turns (reduced from 10 for better performance)
+        # Still save on quarter complete to ensure quarter number is persisted
+        # 25 turns is still sufficient for crash recovery (saves ~13 times per game vs 32)
+        if len(gm.turns) % 25 == 0 or quarter_complete:
             try:
                 db_summary = summarize_game_state(gm, exclude_animations=True)
                 games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
