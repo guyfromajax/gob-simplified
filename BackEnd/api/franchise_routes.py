@@ -1324,7 +1324,10 @@ def get_leaders(
     players_count = len(players)
     logger.info(f"⏱️ [PERF] get_leaders('{stat}') Loaded {players_count} players")
 
-    if len(players) <= 500:
+    # ✅ PERFORMANCE: Always use aggregation pipeline for franchise mode
+    # Aggregation is faster because MongoDB sorts internally and only projects needed fields
+    # Even with 96 players, aggregation (~0.1s) is faster than loading full objects and Python sorting (~1.5s)
+    if len(players) <= 50:  # Lowered from 500 - only use in-memory for very small datasets (like single game mode)
         sort_start = time.time()
         rows: list[dict[str, Any]] = []
         for pid, pdata in players.items():
@@ -1699,6 +1702,10 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
     
     ✅ PERFORMANCE: Only fetches franchise_teams field (reduces from 402KB to ~15KB, 96% reduction).
     """
+    import time
+    start_time = time.time()
+    logger.info(f"⏱️ [PERF] /franchise/team-data START - franchise_id={franchise_id}, team_id={team_id}, team_name={team_name}")
+    
     try:
         fid = ObjectId(franchise_id)
     except Exception:
