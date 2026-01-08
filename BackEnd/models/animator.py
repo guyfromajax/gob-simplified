@@ -58,6 +58,10 @@ class Animator:
         Returns:
             list[dict]: Animation payload for the frontend.
         """
+        # ✅ PERFORMANCE: Skip animation generation for full simulations
+        if self.game.game_state.get("_is_full_simulation", False):
+            self.latest_packet = []
+            return []
 
         offense_team = self.game.offense_team
         defense_team = self.game.defense_team
@@ -408,6 +412,10 @@ class Animator:
         Returns:
             list[dict]: Animation payload for the frontend.
         """
+        # ✅ PERFORMANCE: Skip animation generation for full simulations
+        if game.game_state.get("_is_full_simulation", False):
+            self.latest_packet = []
+            return []
 
         offense_team = game.offense_team
         defense_team = game.defense_team
@@ -611,6 +619,11 @@ class Animator:
         return animations
 
     def capture_halfcourt_animation(self, roles, event_step=None):
+        # ✅ PERFORMANCE: Skip animation generation for full simulations
+        if self.game.game_state.get("_is_full_simulation", False):
+            self.latest_packet = []
+            return []
+        
         offense_team = self.game.offense_team
         defense_team = self.game.defense_team
         off_lineup = offense_team.lineup
@@ -1036,6 +1049,10 @@ class Animator:
         Returns:
             List of animation dicts for each player
         """
+        # ✅ PERFORMANCE: Skip animation generation for full simulations
+        if self.game.game_state.get("_is_full_simulation", False):
+            return []
+        
         if not skeleton or "steps" not in skeleton:
             return []
         
