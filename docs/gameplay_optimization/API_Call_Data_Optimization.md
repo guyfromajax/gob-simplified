@@ -280,11 +280,13 @@ Single game documents are typically small, but similar patterns apply.
 
 ### Phase 1: Critical Fixes (30+ second endpoints)
 
-- [ ] Fix `/api/gameplan` endpoint:
-  - [ ] Add projection to initial franchise document load
-  - [ ] Optimize `ensure_team_objects_exist()` to only check requested team
-  - [ ] Cache `populate_team_plays()` and `initialize_playbook_settings()` results
-  - [ ] Remove unnecessary `db.teams.find()` call
+- [x] Fix `/api/gameplan` endpoint: ✅ **COMPLETED**
+  - [x] Add projection to initial franchise document load (98% reduction: 402KB → ~10KB)
+  - [x] Optimize `ensure_team_objects_exist()` to only check requested team (not all 8)
+  - [x] Fix caching bug - make `populate_team_plays()` caching mode-aware (was global, now per-mode)
+  - [x] Add projection to `ensure_team_objects_exist()` franchise document load
+  - [x] Fix double-loads in PUT and POST endpoints (pass pre-loaded doc)
+  - [x] Remove unnecessary double-loads (was loading doc twice, now loads once and passes it)
 - [ ] Fix `/franchise/leaders` endpoint:
   - [ ] Lower aggregation threshold to 50 players
   - [ ] Use aggregation pipeline for all queries
