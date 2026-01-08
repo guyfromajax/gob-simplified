@@ -987,7 +987,7 @@ def standings(franchise_id: str):
     db_query_start = time.time()
     franchise_doc = db.franchises.find_one(
         {"_id": ObjectId(franchise_id)},
-        {"schedule": 1, "week": 1, "eos_tournament": 1, "eos_tournament_active": 1, "_id": 1}
+        {"schedule": 1, "week": 1, "eos_tournament": 1, "eos_tournament_active": 1, "results": 1, "_id": 1}
     )
     db_query_time = time.time() - db_query_start
     logger.info(f"⏱️ [PERF] /franchise/standings DB query: {db_query_time:.3f}s")
@@ -1315,50 +1315,11 @@ def get_leaders(
     except Exception:
         fid = franchise_id
 
-    db_query_start = time.time()
-    doc = db.franchises.find_one({"_id": fid}, {"players": 1}) or {}
-    db_query_time = time.time() - db_query_start
-    logger.info(f"⏱️ [PERF] get_leaders('{stat}') DB query: {db_query_time:.3f}s")
+    # ✅ PERFORMANCE: Skip initial find_one for franchise mode - go straight to aggregation
+    # Franchise mode always has 96 players (12 per team × 8 teams), so we don't need to count first
+    # Aggregation pipeline is faster because MongoDB sorts internally and only projects needed fields
+    # This eliminates the wasteful ~1.5s load of the entire players object (300KB+) just to count
     
-    players = doc.get("players", {}) or {}
-    players_count = len(players)
-    logger.info(f"⏱️ [PERF] get_leaders('{stat}') Loaded {players_count} players")
-
-    # ✅ PERFORMANCE: Always use aggregation pipeline for franchise mode
-    # Aggregation is faster because MongoDB sorts internally and only projects needed fields
-    # Even with 96 players, aggregation (~0.1s) is faster than loading full objects and Python sorting (~1.5s)
-    if len(players) <= 50:  # Lowered from 500 - only use in-memory for very small datasets (like single game mode)
-        sort_start = time.time()
-        rows: list[dict[str, Any]] = []
-        for pid, pdata in players.items():
-            meta = pdata.get("meta", {})
-            # ✅ SS&S: Read stats directly from players.{pid}.season.{stat} (no totals wrapper)
-            block = pdata.get(scope, {}) or {}
-            # ✅ FIX: Map TPM to 3PTM (box score uses 3PTM, but leaders endpoint uses TPM)
-            if stat == "TPM":
-                value = block.get("3PTM", 0)
-            elif stat == "TPA":
-                value = block.get("3PTA", 0)
-            else:
-                value = block.get(stat, 0)
-            rows.append(
-                {
-                    "player_id": pid,
-                    "first_name": meta.get("first_name", ""),
-                    "last_name": meta.get("last_name", ""),
-                    "team": meta.get("team", meta.get("team_id", "")),
-                    "value": value,
-                }
-            )
-
-        sort_time = time.time() - sort_start
-        rows.sort(key=lambda r: r["value"], reverse=True)
-        sort_time_total = time.time() - sort_start
-        logger.info(f"⏱️ [PERF] get_leaders('{stat}') In-memory sort ({players_count} players): {sort_time_total:.3f}s")
-        total_time = time.time() - start_time
-        logger.info(f"⏱️ [PERF] get_leaders('{stat}') COMPLETE (in-memory): {total_time:.3f}s")
-        return rows[:limit]
-
     # ✅ SS&S: Read stats directly from players.{pid}.season.{stat} (no totals wrapper)
     # ✅ FIX: Map TPM to 3PTM for aggregation pipeline
     stat_field = stat
@@ -1386,7 +1347,7 @@ def get_leaders(
 
     agg = list(db.franchises.aggregate(pipeline))
     aggregation_time = time.time() - aggregation_start
-    logger.info(f"⏱️ [PERF] get_leaders('{stat}') Aggregation pipeline ({players_count} players): {aggregation_time:.3f}s")
+    logger.info(f"⏱️ [PERF] get_leaders('{stat}') Aggregation pipeline: {aggregation_time:.3f}s")
     results: list[dict[str, Any]] = []
     for p in agg:
         meta = p.get("meta", {})
