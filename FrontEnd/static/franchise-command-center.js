@@ -809,15 +809,15 @@ async function init() {
     // ============================================================================
     // 🛠️ DEV MODE: Simulate Entire Regular Season Popup (Temporary Development Feature)
     // ============================================================================
-    // ⚠️  THIS IS A TEMPORARY DEVELOPMENT FEATURE
+    // ⚠️  DISABLED: Commented out for testing
     // ⚠️  To disable: Comment out the code block below (lines ~785-850)
     // ⚠️  To re-enable: Uncomment the code block
     // ============================================================================
-    const popupStartTime = performance.now();
-    console.log('⏱️ [PERF] showDevSimPopup START', { week: topData?.week, hasResults: !!topData?.results, resultsKeys: topData?.results ? Object.keys(topData.results).length : 0 });
-    showDevSimPopup(topData);
-    const popupEndTime = performance.now();
-    console.log(`⏱️ [PERF] showDevSimPopup COMPLETE: ${(popupEndTime - popupStartTime).toFixed(2)}ms`);
+    // const popupStartTime = performance.now();
+    // console.log('⏱️ [PERF] showDevSimPopup START', { week: topData?.week, hasResults: !!topData?.results, resultsKeys: topData?.results ? Object.keys(topData.results).length : 0 });
+    // showDevSimPopup(topData);
+    // const popupEndTime = performance.now();
+    // console.log(`⏱️ [PERF] showDevSimPopup COMPLETE: ${(popupEndTime - popupStartTime).toFixed(2)}ms`);
     // ============================================================================
     // 🛠️ END DEV MODE FEATURE
     // ============================================================================
