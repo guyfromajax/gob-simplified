@@ -778,6 +778,19 @@ async function init() {
     const scheduleData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/schedule')}?franchise_id=${franchiseId}`);
     renderSchedule(scheduleData);
     renderLeaders(await fetchJSON(`${API_CONFIG.buildUrl('/franchise/leaders')}?franchise_id=${franchiseId}`));
+    
+    // ============================================================================
+    // 🛠️ DEV MODE: Simulate Entire Regular Season Popup (Temporary Development Feature)
+    // ============================================================================
+    // ⚠️  THIS IS A TEMPORARY DEVELOPMENT FEATURE
+    // ⚠️  To disable: Comment out the code block below (lines ~785-850)
+    // ⚠️  To re-enable: Uncomment the code block
+    // ============================================================================
+    showDevSimPopup(topData);
+    // ============================================================================
+    // 🛠️ END DEV MODE FEATURE
+    // ============================================================================
+    
     renderTeamStats(await fetchJSON(`${API_CONFIG.buildUrl('/franchise/team-stats')}?franchise_id=${franchiseId}`));
     renderRecruits(await fetchJSON(`${API_CONFIG.buildUrl('/franchise/recruits')}?franchise_id=${franchiseId}`));
     // ✅ Removed: renderTrainingResults - Training Reports are now linked directly on Schedule page
@@ -1964,4 +1977,162 @@ if (document.readyState === 'loading') {
 } else {
   setupScoutingReport();
 }
+
+// ============================================================================
+// 🛠️ DEV MODE: Simulate Entire Regular Season Popup (Temporary Development Feature)
+// ============================================================================
+// ⚠️  THIS IS A TEMPORARY DEVELOPMENT FEATURE
+// ⚠️  To disable: Comment out the function below (lines ~1985-2090)
+// ⚠️  To re-enable: Uncomment the function
+// ============================================================================
+
+function showDevSimPopup(topData) {
+  // Only show if week is 1 and no games have been played
+  const week = topData?.week || topData?.training_status?.current_week || 1;
+  const results = topData?.results || {};
+  const hasPlayedGames = Object.keys(results).length > 0;
+  
+  // Check if games exist in database
+  if (week === 1 && !hasPlayedGames) {
+    // Create popup overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'dev-sim-popup-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 10000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    `;
+    
+    // Create popup content
+    const popup = document.createElement('div');
+    popup.style.cssText = `
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      max-width: 500px;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    `;
+    
+    popup.innerHTML = `
+      <h2 style="margin-top: 0; color: #333;">🛠️ Dev Mode: Simulate Regular Season</h2>
+      <p style="color: #666; margin-bottom: 20px;">
+        This will simulate weeks 1-14 with auto-training and auto-lineups for all teams.
+        <br><strong>This will skip directly to the tournament!</strong>
+      </p>
+      <div style="display: flex; gap: 10px; justify-content: center;">
+        <button id="dev-sim-confirm-btn" style="
+          padding: 12px 24px;
+          background: #4a90e2;
+          color: white;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+          font-size: 16px;
+          font-weight: bold;
+        ">Simulate Regular Season</button>
+        <button id="dev-sim-cancel-btn" style="
+          padding: 12px 24px;
+          background: #ccc;
+          color: #333;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+          font-size: 16px;
+        ">Cancel</button>
+      </div>
+      <p style="color: #999; font-size: 12px; margin-top: 20px;">
+        ⚠️ Development feature - can be disabled in code
+      </p>
+    `;
+    
+    overlay.appendChild(popup);
+    document.body.appendChild(overlay);
+    
+    // Handle confirm button
+    document.getElementById('dev-sim-confirm-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('dev-sim-confirm-btn');
+      btn.disabled = true;
+      btn.textContent = 'Simulating...';
+      
+      try {
+        const response = await fetch(API_CONFIG.buildUrl('/franchise/dev-sim-regular-season'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ franchise_id: franchiseId })
+        });
+        
+        if (!response.ok) {
+          throw new Error('Simulation failed');
+        }
+        
+        const result = await response.json();
+        popup.innerHTML = `
+          <h2 style="margin-top: 0; color: #4a90e2;">✅ Simulation Complete!</h2>
+          <p style="color: #666; margin-bottom: 20px;">
+            ${result.message || 'Regular season simulated successfully.'}
+          </p>
+          <button id="dev-sim-close-btn" style="
+            padding: 12px 24px;
+            background: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+          ">Close & Reload</button>
+        `;
+        
+        document.getElementById('dev-sim-close-btn').addEventListener('click', () => {
+          document.body.removeChild(overlay);
+          location.reload();
+        });
+      } catch (error) {
+        console.error('Dev sim error:', error);
+        popup.innerHTML = `
+          <h2 style="margin-top: 0; color: #e74c3c;">❌ Simulation Failed</h2>
+          <p style="color: #666; margin-bottom: 20px;">
+            ${error.message || 'An error occurred during simulation.'}
+          </p>
+          <button id="dev-sim-close-btn" style="
+            padding: 12px 24px;
+            background: #ccc;
+            color: #333;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+          ">Close</button>
+        `;
+        
+        document.getElementById('dev-sim-close-btn').addEventListener('click', () => {
+          document.body.removeChild(overlay);
+        });
+      }
+    });
+    
+    // Handle cancel button
+    document.getElementById('dev-sim-cancel-btn').addEventListener('click', () => {
+      document.body.removeChild(overlay);
+    });
+    
+    // Close on overlay click (outside popup)
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        document.body.removeChild(overlay);
+      }
+    });
+  }
+}
+
+// ============================================================================
+// 🛠️ END DEV MODE FEATURE
+// ============================================================================
 
