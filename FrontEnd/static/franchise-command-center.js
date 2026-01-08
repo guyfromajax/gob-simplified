@@ -2138,7 +2138,51 @@ function showDevSimPopup(topData) {
     document.getElementById('dev-sim-confirm-btn').addEventListener('click', async () => {
       const btn = document.getElementById('dev-sim-confirm-btn');
       btn.disabled = true;
-      btn.textContent = 'Simulating...';
+      btn.style.display = 'none';
+      
+      // Create progress container
+      const progressContainer = document.createElement('div');
+      progressContainer.id = 'dev-sim-progress';
+      progressContainer.style.cssText = `
+        max-height: 400px;
+        overflow-y: auto;
+        margin: 20px 0;
+        padding: 15px;
+        background: #f5f5f5;
+        border-radius: 5px;
+        font-family: monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        text-align: left;
+      `;
+      
+      const progressList = document.createElement('div');
+      progressList.id = 'dev-sim-progress-list';
+      progressContainer.appendChild(progressList);
+      
+      // Insert progress container before buttons
+      const buttonsContainer = popup.querySelector('div[style*="display: flex"]');
+      if (buttonsContainer) {
+        popup.insertBefore(progressContainer, buttonsContainer);
+      } else {
+        // Fallback: append to popup
+        popup.appendChild(progressContainer);
+      }
+      
+      function addProgressMessage(message, type = 'info') {
+        const messageDiv = document.createElement('div');
+        const timestamp = new Date().toLocaleTimeString();
+        const colors = {
+          info: '#666',
+          success: '#4a90e2',
+          error: '#e74c3c',
+          warning: '#f39c12'
+        };
+        messageDiv.style.cssText = `color: ${colors[type] || colors.info}; margin: 4px 0;`;
+        messageDiv.textContent = `[${timestamp}] ${message}`;
+        progressList.appendChild(messageDiv);
+        progressContainer.scrollTop = progressContainer.scrollHeight;
+      }
       
       try {
         const response = await fetch(API_CONFIG.buildUrl('/franchise/dev-sim-regular-season'), {
@@ -2148,51 +2192,171 @@ function showDevSimPopup(topData) {
         });
         
         if (!response.ok) {
-          throw new Error('Simulation failed');
+          throw new Error(`Simulation failed: ${response.status} ${response.statusText}`);
         }
         
-        const result = await response.json();
-        popup.innerHTML = `
-          <h2 style="margin-top: 0; color: #4a90e2;">✅ Simulation Complete!</h2>
-          <p style="color: #666; margin-bottom: 20px;">
-            ${result.message || 'Regular season simulated successfully.'}
-          </p>
-          <button id="dev-sim-close-btn" style="
-            padding: 12px 24px;
-            background: #4a90e2;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-          ">Close & Reload</button>
-        `;
+        // Check if response is streaming (text/event-stream)
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('text/event-stream')) {
+          // Fallback to JSON response (backward compatibility)
+          const result = await response.json();
+          addProgressMessage(result.message || 'Simulation complete!', 'success');
+          setTimeout(() => {
+            popup.innerHTML = `
+              <h2 style="margin-top: 0; color: #4a90e2;">✅ Simulation Complete!</h2>
+              <p style="color: #666; margin-bottom: 20px;">
+                ${result.message || 'Regular season simulated successfully.'}
+              </p>
+              <button id="dev-sim-close-btn" style="
+                padding: 12px 24px;
+                background: #4a90e2;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 16px;
+              ">Close & Reload</button>
+            `;
+            document.getElementById('dev-sim-close-btn').addEventListener('click', () => {
+              document.body.removeChild(overlay);
+              location.reload();
+            });
+          }, 1000);
+          return;
+        }
         
-        document.getElementById('dev-sim-close-btn').addEventListener('click', () => {
-          document.body.removeChild(overlay);
-          location.reload();
-        });
+        // Stream SSE events
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        
+        addProgressMessage('Starting simulation...', 'info');
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            break;
+          }
+          
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
+                
+                // Handle different event types
+                switch (data.type) {
+                  case 'start':
+                    addProgressMessage(data.message, 'info');
+                    break;
+                  case 'week_start':
+                    addProgressMessage(`📅 ${data.message}`, 'info');
+                    break;
+                  case 'training_start':
+                    addProgressMessage(`🏋️ ${data.message}`, 'info');
+                    break;
+                  case 'training_progress':
+                    addProgressMessage(`  ✓ ${data.message}`, 'success');
+                    break;
+                  case 'training_complete':
+                    addProgressMessage(`✅ ${data.message}`, 'success');
+                    break;
+                  case 'training_skip':
+                    addProgressMessage(`⏭️ ${data.message}`, 'warning');
+                    break;
+                  case 'training_error':
+                    addProgressMessage(`⚠️ ${data.message}`, 'error');
+                    break;
+                  case 'game_start':
+                    addProgressMessage(`🏀 ${data.message}`, 'info');
+                    break;
+                  case 'game_simulating':
+                    addProgressMessage(`  ⏳ ${data.message}`, 'info');
+                    break;
+                  case 'game_result':
+                    addProgressMessage(`  📊 ${data.message}`, 'success');
+                    break;
+                  case 'game_finalizing':
+                    addProgressMessage(`  💾 ${data.message}`, 'info');
+                    break;
+                  case 'week_completing':
+                    addProgressMessage(`  🔄 ${data.message}`, 'info');
+                    break;
+                  case 'week_complete':
+                    addProgressMessage(`✅ ${data.message}`, 'success');
+                    break;
+                  case 'week_skip':
+                    addProgressMessage(`⏭️ ${data.message}`, 'warning');
+                    break;
+                  case 'week_error':
+                    addProgressMessage(`⚠️ ${data.message}`, 'error');
+                    break;
+                  case 'complete':
+                    addProgressMessage(`🎉 ${data.message}`, 'success');
+                    // Show completion UI
+                    setTimeout(() => {
+                      popup.innerHTML = `
+                        <h2 style="margin-top: 0; color: #4a90e2;">✅ Simulation Complete!</h2>
+                        <p style="color: #666; margin-bottom: 20px;">
+                          ${data.message || 'Regular season simulated successfully.'}
+                        </p>
+                        <button id="dev-sim-close-btn" style="
+                          padding: 12px 24px;
+                          background: #4a90e2;
+                          color: white;
+                          border: none;
+                          border-radius: 5px;
+                          cursor: pointer;
+                          font-size: 16px;
+                        ">Close & Reload</button>
+                      `;
+                      document.getElementById('dev-sim-close-btn').addEventListener('click', () => {
+                        document.body.removeChild(overlay);
+                        location.reload();
+                      });
+                    }, 1000);
+                    break;
+                  case 'error':
+                    addProgressMessage(`❌ ${data.message}`, 'error');
+                    throw new Error(data.message);
+                  default:
+                    if (data.message) {
+                      addProgressMessage(data.message, 'info');
+                    }
+                }
+              } catch (parseError) {
+                console.error('Error parsing SSE data:', parseError, line);
+              }
+            }
+          }
+        }
       } catch (error) {
         console.error('Dev sim error:', error);
-        popup.innerHTML = `
-          <h2 style="margin-top: 0; color: #e74c3c;">❌ Simulation Failed</h2>
-          <p style="color: #666; margin-bottom: 20px;">
-            ${error.message || 'An error occurred during simulation.'}
-          </p>
-          <button id="dev-sim-close-btn" style="
-            padding: 12px 24px;
-            background: #ccc;
-            color: #333;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-          ">Close</button>
-        `;
-        
-        document.getElementById('dev-sim-close-btn').addEventListener('click', () => {
-          document.body.removeChild(overlay);
-        });
+        addProgressMessage(`❌ Error: ${error.message}`, 'error');
+        setTimeout(() => {
+          popup.innerHTML = `
+            <h2 style="margin-top: 0; color: #e74c3c;">❌ Simulation Failed</h2>
+            <p style="color: #666; margin-bottom: 20px;">
+              ${error.message || 'An error occurred during simulation.'}
+            </p>
+            <button id="dev-sim-close-btn" style="
+              padding: 12px 24px;
+              background: #ccc;
+              color: #333;
+              border: none;
+              border-radius: 5px;
+              cursor: pointer;
+              font-size: 16px;
+            ">Close</button>
+          `;
+          document.getElementById('dev-sim-close-btn').addEventListener('click', () => {
+            document.body.removeChild(overlay);
+          });
+        }, 2000);
       }
     });
     
