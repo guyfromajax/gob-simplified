@@ -842,6 +842,10 @@ def complete_week(req: CompleteWeekRequest):
 
 @router.get("/franchise/command-center/data")
 def command_center_data(franchise_id: str = None):
+    import time
+    start_time = time.time()
+    logger.info(f"⏱️ [PERF] /franchise/command-center/data START - franchise_id={franchise_id}")
+    
     # Get user team info from franchise document (with backward compatibility)
     team_name = None
     team_id = None
@@ -851,6 +855,7 @@ def command_center_data(franchise_id: str = None):
     if franchise_id:
         try:
             fid = ObjectId(franchise_id)
+            db_query_start = time.time()
             # ✅ PERFORMANCE: Load once with projection (only needed fields) - reduces from 402KB to ~10KB (98% reduction)
             # Projection includes: franchise_teams, training_status, week, eos_tournament, user_team fields
             franchise_doc = db.franchises.find_one(
@@ -866,6 +871,8 @@ def command_center_data(franchise_id: str = None):
                     "_id": 1
                 }
             )
+            db_query_time = time.time() - db_query_start
+            logger.info(f"⏱️ [PERF] /franchise/command-center/data DB query: {db_query_time:.3f}s")
             if franchise_doc:
                 # Get user team identifiers from franchise document
                 team_name, team_id = get_user_team_from_franchise(franchise_doc)
@@ -965,16 +972,26 @@ def command_center_data(franchise_id: str = None):
         response["eos_tournament"] = eos_tournament
         response["eos_tournament_active"] = True
     
+    total_time = time.time() - start_time
+    logger.info(f"⏱️ [PERF] /franchise/command-center/data COMPLETE: {total_time:.3f}s")
     return response
 
 
 @router.get("/franchise/standings")
 def standings(franchise_id: str):
+    import time
+    start_time = time.time()
+    logger.info(f"⏱️ [PERF] /franchise/standings START - franchise_id={franchise_id}")
+    
     # ✅ PERFORMANCE: Only fetch needed fields (reduces from 402KB to ~20KB, 95% reduction)
+    db_query_start = time.time()
     franchise_doc = db.franchises.find_one(
         {"_id": ObjectId(franchise_id)},
         {"schedule": 1, "week": 1, "eos_tournament": 1, "eos_tournament_active": 1, "_id": 1}
     )
+    db_query_time = time.time() - db_query_start
+    logger.info(f"⏱️ [PERF] /franchise/standings DB query: {db_query_time:.3f}s")
+    
     found = franchise_doc is not None
     logger.info("standings franchise_id=%s found=%s", franchise_id, found)
     if not franchise_doc:
@@ -1049,12 +1066,20 @@ def standings(franchise_id: str):
 
     output.sort(key=lambda x: (x["W"], x["differential"]), reverse=True)
     logger.info("standings returning franchise_id=%s found=%s", franchise_id, found)
+    
+    total_time = time.time() - start_time
+    logger.info(f"⏱️ [PERF] /franchise/standings COMPLETE: {total_time:.3f}s")
     return {"standings": output}
 
 
 @router.get("/franchise/schedule")
 def season_schedule(franchise_id: str):
+    import time
+    start_time = time.time()
+    logger.info(f"⏱️ [PERF] /franchise/schedule START - franchise_id={franchise_id}")
+    
     # ✅ PERFORMANCE: Only fetch needed fields (reduces from 402KB to ~30KB, 92% reduction)
+    db_query_start = time.time()
     franchise_doc = db.franchises.find_one(
         {"_id": ObjectId(franchise_id)},
         {
@@ -1068,6 +1093,9 @@ def season_schedule(franchise_id: str):
             "_id": 1
         }
     )
+    db_query_time = time.time() - db_query_start
+    logger.info(f"⏱️ [PERF] /franchise/schedule DB query: {db_query_time:.3f}s")
+    
     found = franchise_doc is not None
     logger.info("season_schedule franchise_id=%s found=%s", franchise_id, found)
     if not franchise_doc:
@@ -1279,16 +1307,25 @@ def get_leaders(
     number of players grows large an aggregation pipeline is used so MongoDB
     can leverage indexes on the ``players`` subdocument.
     """
+    import time
+    start_time = time.time()
 
     try:
         fid = ObjectId(franchise_id)
     except Exception:
         fid = franchise_id
 
+    db_query_start = time.time()
     doc = db.franchises.find_one({"_id": fid}, {"players": 1}) or {}
+    db_query_time = time.time() - db_query_start
+    logger.info(f"⏱️ [PERF] get_leaders('{stat}') DB query: {db_query_time:.3f}s")
+    
     players = doc.get("players", {}) or {}
+    players_count = len(players)
+    logger.info(f"⏱️ [PERF] get_leaders('{stat}') Loaded {players_count} players")
 
     if len(players) <= 500:
+        sort_start = time.time()
         rows: list[dict[str, Any]] = []
         for pid, pdata in players.items():
             meta = pdata.get("meta", {})
@@ -1311,7 +1348,12 @@ def get_leaders(
                 }
             )
 
+        sort_time = time.time() - sort_start
         rows.sort(key=lambda r: r["value"], reverse=True)
+        sort_time_total = time.time() - sort_start
+        logger.info(f"⏱️ [PERF] get_leaders('{stat}') In-memory sort ({players_count} players): {sort_time_total:.3f}s")
+        total_time = time.time() - start_time
+        logger.info(f"⏱️ [PERF] get_leaders('{stat}') COMPLETE (in-memory): {total_time:.3f}s")
         return rows[:limit]
 
     # ✅ SS&S: Read stats directly from players.{pid}.season.{stat} (no totals wrapper)
@@ -1322,6 +1364,8 @@ def get_leaders(
     elif stat == "TPA":
         stat_field = "3PTA"
     
+    # ✅ PERFORMANCE: Use MongoDB aggregation pipeline for large datasets
+    aggregation_start = time.time()
     pipeline = [
         {"$match": {"_id": fid}},
         {"$project": {"players": {"$objectToArray": "$players"}}},
@@ -1338,6 +1382,8 @@ def get_leaders(
     ]
 
     agg = list(db.franchises.aggregate(pipeline))
+    aggregation_time = time.time() - aggregation_start
+    logger.info(f"⏱️ [PERF] get_leaders('{stat}') Aggregation pipeline ({players_count} players): {aggregation_time:.3f}s")
     results: list[dict[str, Any]] = []
     for p in agg:
         meta = p.get("meta", {})
@@ -1350,7 +1396,8 @@ def get_leaders(
                 "value": p.get("value", 0),
             }
         )
-
+    total_time = time.time() - start_time
+    logger.info(f"⏱️ [PERF] get_leaders('{stat}') COMPLETE (aggregation): {total_time:.3f}s")
     return results
 
 
@@ -1360,10 +1407,17 @@ def leaders(
     scope: str = "season",
     limit: int = 10,
 ):
+    import time
+    start_time = time.time()
+    logger.info(f"⏱️ [PERF] /franchise/leaders START - franchise_id={franchise_id}, scope={scope}")
+    
     categories = ["PTS", "AST", "TPM", "REB", "BLK", "STL"]
     result: dict[str, list[dict[str, Any]]] = {}
     for cat in categories:
+        cat_start = time.time()
         top = get_leaders(franchise_id, scope=scope, stat=cat, limit=limit)
+        cat_time = time.time() - cat_start
+        logger.info(f"⏱️ [PERF] /franchise/leaders get_leaders('{cat}'): {cat_time:.3f}s")
         result[cat] = [
             {
                 "player_id": p.get("player_id"),
@@ -1373,6 +1427,9 @@ def leaders(
             }
             for p in top
         ]
+    
+    total_time = time.time() - start_time
+    logger.info(f"⏱️ [PERF] /franchise/leaders COMPLETE: {total_time:.3f}s")
     return result
 
 
@@ -1383,22 +1440,30 @@ def team_stats(franchise_id: str):
     ✅ SS&S: Aggregates from franchise.players object (franchise-specific stats),
     not from universal players_collection.
     """
-    print(f"🔍 [TEAM_STATS] Called with franchise_id={franchise_id}")
+    import time
+    start_time = time.time()
+    logger.info(f"⏱️ [PERF] /franchise/team-stats START - franchise_id={franchise_id}")
+    
     try:
         fid = ObjectId(franchise_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid franchise_id")
     
+    db_query_start = time.time()
     franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 1, "franchise_teams": 1})
+    db_query_time = time.time() - db_query_start
+    logger.info(f"⏱️ [PERF] /franchise/team-stats DB query: {db_query_time:.3f}s")
+    
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
     
     players = franchise_doc.get("players", {})
     franchise_teams = franchise_doc.get("franchise_teams", {})
     
-    print(f"🔍 [TEAM_STATS] Found {len(players)} players, {len(franchise_teams)} teams")
+    logger.info(f"⏱️ [PERF] /franchise/team-stats Found {len(players)} players, {len(franchise_teams)} teams")
     
     # ✅ SS&S: Use shared aggregator utility
+    aggregation_start = time.time()
     output = aggregate_team_stats_from_players(
         players=players,
         team_ids=franchise_teams,
@@ -1406,7 +1471,11 @@ def team_stats(franchise_id: str):
         collection_type='franchise',
         logger=logger
     )
+    aggregation_time = time.time() - aggregation_start
+    logger.info(f"⏱️ [PERF] /franchise/team-stats Aggregation: {aggregation_time:.3f}s")
     
+    total_time = time.time() - start_time
+    logger.info(f"⏱️ [PERF] /franchise/team-stats COMPLETE: {total_time:.3f}s")
     return {"teams": output}
 
 
@@ -1520,18 +1589,29 @@ def user_team_player_stats_endpoint(
 @router.get("/franchise/recruits")
 def recruits(franchise_id: str = Query(...)):
     """Get recruits for a specific franchise."""
+    import time
     from bson import ObjectId
     
-    # Get recruits from franchise document
+    start_time = time.time()
+    logger.info(f"⏱️ [PERF] /franchise/recruits START - franchise_id={franchise_id}")
+    
+    # ✅ PERFORMANCE: Get recruits from franchise document with projection (only recruits field)
+    db_query_start = time.time()
     franchise = db.franchises.find_one(
         {"_id": ObjectId(franchise_id)}, 
-        {"recruits": 1}
+        {"recruits": 1, "_id": 1}
     )
+    db_query_time = time.time() - db_query_start
+    logger.info(f"⏱️ [PERF] /franchise/recruits DB query: {db_query_time:.3f}s")
     
     if not franchise:
+        total_time = time.time() - start_time
+        logger.info(f"⏱️ [PERF] /franchise/recruits COMPLETE: {total_time:.3f}s (no franchise)")
         return {"recruits": []}
     
     recs = franchise.get("recruits", [])
+    total_time = time.time() - start_time
+    logger.info(f"⏱️ [PERF] /franchise/recruits COMPLETE: {total_time:.3f}s ({len(recs)} recruits)")
     return {"recruits": recs}
 
 
@@ -1580,19 +1660,32 @@ def get_franchise_state(franchise_id: str):
     ✅ PERFORMANCE: Only returns players object (used for merging stats into roster).
     This reduces data transfer from ~402KB to ~300KB (25% reduction).
     """
+    import time
+    start_time = time.time()
+    logger.info(f"⏱️ [PERF] /franchise/state START - franchise_id={franchise_id}")
+    
     try:
         fid = ObjectId(franchise_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid franchise ID")
     
     # ✅ PERFORMANCE: Only fetch players object (frontend only uses franchiseDoc.players)
+    db_query_start = time.time()
     franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 1, "_id": 1})
+    db_query_time = time.time() - db_query_start
+    logger.info(f"⏱️ [PERF] /franchise/state DB query: {db_query_time:.3f}s")
+    
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
+    
+    players_count = len(franchise_doc.get("players", {}))
+    logger.info(f"⏱️ [PERF] /franchise/state Loaded {players_count} players")
     
     # Convert ObjectId to string for JSON serialization
     franchise_doc["_id"] = str(franchise_doc["_id"])
     
+    total_time = time.time() - start_time
+    logger.info(f"⏱️ [PERF] /franchise/state COMPLETE: {total_time:.3f}s")
     return jsonable_encoder(franchise_doc, custom_encoder={ObjectId: str})
 
 
@@ -1717,6 +1810,8 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
             elif "effectiveness" not in scouting_data["defense"][def_name]:
                 scouting_data["defense"][def_name]["effectiveness"] = 0
     
+    total_time = time.time() - start_time
+    logger.info(f"⏱️ [PERF] /franchise/team-data COMPLETE: {total_time:.3f}s")
     return {
         "team_attributes": team_attributes,
         "plays_data": plays_data,
@@ -1729,14 +1824,24 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
     """
     Get roster with franchise-specific player attributes.
     """
+    import time
+    start_time = time.time()
+    logger.info(f"⏱️ [PERF] /franchise/roster START - franchise_id={franchise_id}, team_name={team_name}")
+    
     try:
         fid = ObjectId(franchise_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid franchise ID")
     
-    # Get team name from franchise document if not provided (with backward compatibility)
+    # ✅ PERFORMANCE: Get team name from franchise document with projection (only user_team fields)
     if not team_name:
-        franchise_doc = db.franchises.find_one({"_id": fid})
+        db_query_start = time.time()
+        franchise_doc = db.franchises.find_one(
+            {"_id": fid},
+            {"user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+        )
+        db_query_time = time.time() - db_query_start
+        logger.info(f"⏱️ [PERF] /franchise/roster DB query 1 (get team name): {db_query_time:.3f}s")
         if franchise_doc:
             user_team_id, _ = get_user_team_from_franchise(franchise_doc)
             team_name = user_team_id
@@ -1745,12 +1850,18 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
         raise HTTPException(status_code=404, detail="Team not found")
     
     # Get team document
+    team_query_start = time.time()
     team_doc = db.teams.find_one({"name": team_name})
+    team_query_time = time.time() - team_query_start
+    logger.info(f"⏱️ [PERF] /franchise/roster DB query (team doc): {team_query_time:.3f}s")
     if not team_doc:
         raise HTTPException(status_code=404, detail="Team not found")
     
-    # Get franchise document
-    franchise_doc = db.franchises.find_one({"_id": fid})
+    # ✅ PERFORMANCE: Get franchise document with projection (only players field)
+    franchise_query_start = time.time()
+    franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 1, "_id": 1})
+    franchise_query_time = time.time() - franchise_query_start
+    logger.info(f"⏱️ [PERF] /franchise/roster DB query 2 (franchise players): {franchise_query_time:.3f}s")
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
     
@@ -1758,6 +1869,7 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
     team_player_ids = team_doc.get("player_ids", [])
     
     # Build player list with franchise-specific attributes
+    processing_start = time.time()
     players = []
     for pid in team_player_ids:
         pid_str = str(pid)
@@ -1807,6 +1919,11 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
         }
         players.append(player)
     
+    processing_time = time.time() - processing_start
+    logger.info(f"⏱️ [PERF] /franchise/roster Processing ({len(players)} players): {processing_time:.3f}s")
+    
+    total_time = time.time() - start_time
+    logger.info(f"⏱️ [PERF] /franchise/roster COMPLETE: {total_time:.3f}s")
     return {"players": players}
 
 
