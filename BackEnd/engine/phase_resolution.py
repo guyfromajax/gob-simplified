@@ -4884,6 +4884,11 @@ def get_fcp_skeleton(result_type, game_context=None):
     Returns:
         dict: Skeleton with steps, or fallback to old hardcoded system
     """
+    # ✅ PERFORMANCE: Skip skeleton loading for full simulations
+    if game_context and hasattr(game_context, 'game_state'):
+        if game_context.game_state.get("_is_full_simulation", False):
+            return None
+    
     import random
     from BackEnd.db import fcp_skeletons_collection
     
@@ -4976,6 +4981,11 @@ def get_hct_skeleton(result_type, game_context=None):
     Returns:
         dict: Skeleton with steps, or fallback to old hardcoded system
     """
+    # ✅ PERFORMANCE: Skip skeleton loading for full simulations
+    if game_context and hasattr(game_context, 'game_state'):
+        if game_context.game_state.get("_is_full_simulation", False):
+            return None
+    
     import random
     from BackEnd.db import hct_skeletons_collection
     
