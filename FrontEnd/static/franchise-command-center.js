@@ -1770,11 +1770,29 @@ function updateScoutingButton(data) {
   const scoutingBtn = document.getElementById('scouting-report-btn');
   if (!scoutingBtn) return;
   
-  // Show button only if there's an upcoming game (weeks 1-14, regular season)
+  // ✅ EOS TOURNAMENT: Show button for regular season (weeks 1-14) and EOS Tournament (weeks 15-17)
   // Also show during preseason (week 0 or undefined) if there's a schedule
   const week = data?.week || data?.training_status?.current_week || 0;
-  if (data && week >= 0 && week <= 14) {
-    // Get upcoming opponent from play-next-game endpoint
+  const eosTournamentActive = data?.eos_tournament_active || false;
+  const eosTournament = data?.eos_tournament;
+  
+  // Check if user team is eliminated from tournament
+  let userTeamEliminated = false;
+  if (eosTournamentActive && eosTournament && userTeamId && week >= 15) {
+    const bracket = eosTournament.bracket || {};
+    const round1 = bracket.round1 || [];
+    const round2 = bracket.round2 || [];
+    const final = bracket.final || [];
+    const allMatchups = [...round1, ...round2, ...final];
+    const userInMatchup = allMatchups.some(m => 
+      m.home_team === userTeamId || m.away_team === userTeamId
+    );
+    userTeamEliminated = !userInMatchup;
+  }
+  
+  // Show button if: (regular season weeks 0-14) OR (EOS Tournament weeks 15-17 and user not eliminated)
+  if (data && ((week >= 0 && week <= 14) || (week >= 15 && week <= 17 && !userTeamEliminated))) {
+    // Get upcoming opponent from play-next-game endpoint (now handles both regular season and EOS Tournament)
     fetch(API_CONFIG.buildUrl('/franchise/play-next-game'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
