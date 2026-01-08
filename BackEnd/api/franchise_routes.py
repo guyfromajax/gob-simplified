@@ -3187,30 +3187,77 @@ def dev_sim_regular_season(req: DevSimRegularSeasonRequest):
         logger.info(f"🛠️ [DEV SIM] User team: {user_team_name} ({user_team_object_id})")
         logger.info(f"🛠️ [DEV SIM] Total teams: {len(all_team_ids)}")
         
-        # Default training allocations (even distribution for simplicity)
-        default_training_data = {
-            "player_drills": {
-                "shooting": {"SC": 3, "SH": 3},
-                "ball_handling": {"BH": 3},
-                "defense": {"ID": 3, "OD": 3},
-                "rebounding": {"RB": 3},
-                "athleticism": {"AG": 3, "ST": 3},
-                "intelligence": {"IQ": 3, "ND": 3}
-            },
-            "team_drills": {
-                "offense": {"offensive_efficiency": 4},
-                "defense": {"defensive_efficiency": 4},
-                "fast_break": {"fb_efficiency": 4},
-                "press_trap": {"pt_efficiency": 4}
-            },
-            "general": {
-                "team_chemistry": 3,
-                "discipline": 3,
-                "fight": 3
-            },
-            "coaching_focus": "balanced",
-            "playbook_training_mode": "current-playbooks"
-        }
+        # Helper function to generate training data with correct point allocation
+        def get_training_data_for_week(week_num, franchise_doc):
+            """Generate training data with 30 points for first training, 24 for subsequent"""
+            # Check if this is the first training (week 1, no completed games)
+            results = franchise_doc.get("results", {})
+            has_completed_games = len(results) > 0
+            if not has_completed_games:
+                completed_game = db.games.find_one({
+                    "franchise_id": str(franchise_id),
+                    "is_final": True
+                })
+                has_completed_games = completed_game is not None
+            
+            is_first_training = (week_num == 1 and not has_completed_games)
+            total_points = 30 if is_first_training else 24
+            
+            # Balanced allocation: 30 points = 18 player + 8 team + 4 general
+            # Balanced allocation: 24 points = 14 player + 7 team + 3 general
+            if is_first_training:
+                # 30 points: 18 player + 8 team + 4 general
+                return {
+                    "player_drills": {
+                        "shooting": {"SC": 3, "SH": 3},  # 6 points
+                        "ball_handling": {"BH": 3},  # 3 points
+                        "defense": {"ID": 3, "OD": 3},  # 6 points
+                        "rebounding": {"RB": 3},  # 3 points
+                        # Total player: 18 points
+                    },
+                    "team_drills": {
+                        "offense": {"offensive_efficiency": 2},  # 2 points
+                        "defense": {"defensive_efficiency": 2},  # 2 points
+                        "fast_break": {"fb_efficiency": 2},  # 2 points
+                        "press_trap": {"pt_efficiency": 2},  # 2 points
+                        # Total team: 8 points
+                    },
+                    "general": {
+                        "team_chemistry": 2,  # 2 points
+                        "discipline": 1,  # 1 point
+                        "fight": 1  # 1 point
+                        # Total general: 4 points
+                    },
+                    "coaching_focus": "balanced",
+                    "playbook_training_mode": "current-playbooks"
+                }
+            else:
+                # 24 points: 14 player + 7 team + 3 general
+                return {
+                    "player_drills": {
+                        "shooting": {"SC": 2, "SH": 2},  # 4 points
+                        "ball_handling": {"BH": 2},  # 2 points
+                        "defense": {"ID": 2, "OD": 2},  # 4 points
+                        "rebounding": {"RB": 2},  # 2 points
+                        "athleticism": {"AG": 1, "ST": 1},  # 2 points
+                        # Total player: 14 points
+                    },
+                    "team_drills": {
+                        "offense": {"offensive_efficiency": 2},  # 2 points
+                        "defense": {"defensive_efficiency": 2},  # 2 points
+                        "fast_break": {"fb_efficiency": 2},  # 2 points
+                        "press_trap": {"pt_efficiency": 1},  # 1 point
+                        # Total team: 7 points
+                    },
+                    "general": {
+                        "team_chemistry": 1,  # 1 point
+                        "discipline": 1,  # 1 point
+                        "fight": 1  # 1 point
+                        # Total general: 3 points
+                    },
+                    "coaching_focus": "balanced",
+                    "playbook_training_mode": "current-playbooks"
+                }
         
         # Simulate weeks 1-14
         for week in range(1, 15):
@@ -3241,11 +3288,14 @@ def dev_sim_regular_season(req: DevSimRegularSeasonRequest):
                         continue
                     
                     try:
+                        # Get training data with correct point allocation for this week
+                        training_data = get_training_data_for_week(week, franchise_doc)
+                        
                         # Create training request
                         training_req = FranchiseTrainingRequest(
                             franchise_id=req.franchise_id,
                             team_id=team_id_str,
-                            training_data=default_training_data
+                            training_data=training_data
                         )
                         
                         # Run training (reuse existing endpoint logic)
