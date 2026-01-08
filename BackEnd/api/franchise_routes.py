@@ -3286,7 +3286,8 @@ def dev_sim_regular_season(req: DevSimRegularSeasonRequest):
                 continue
             
             # Step 3: Simulate user's game (with auto-lineup)
-            yield f"data: {json.dumps({'type': 'game_start', 'week': week, 'home': user_matchup['home'], 'away': user_matchup['away'], 'message': f'Week {week}: Simulating {user_matchup[\"away\"]} @ {user_matchup[\"home\"]}...'})}\n\n"
+            game_msg = f"Week {week}: Simulating {user_matchup['away']} @ {user_matchup['home']}..."
+            yield f"data: {json.dumps({'type': 'game_start', 'week': week, 'home': user_matchup['home'], 'away': user_matchup['away'], 'message': game_msg})}\n\n"
             logger.info(f"🛠️ [DEV SIM] Week {week}: Simulating user game ({user_matchup['away']} @ {user_matchup['home']})...")
             try:
                 # Build auto-lineups for both teams
@@ -3315,7 +3316,8 @@ def dev_sim_regular_season(req: DevSimRegularSeasonRequest):
                 home_score = gm.score.get(user_matchup["home"], 0)
                 away_score = gm.score.get(user_matchup["away"], 0)
                 
-                yield f"data: {json.dumps({'type': 'game_result', 'week': week, 'home': user_matchup['home'], 'away': user_matchup['away'], 'home_score': home_score, 'away_score': away_score, 'message': f'Final: {user_matchup[\"away\"]} {away_score}, {user_matchup[\"home\"]} {home_score}'})}\n\n"
+                result_msg = f"Final: {user_matchup['away']} {away_score}, {user_matchup['home']} {home_score}"
+                yield f"data: {json.dumps({'type': 'game_result', 'week': week, 'home': user_matchup['home'], 'away': user_matchup['away'], 'home_score': home_score, 'away_score': away_score, 'message': result_msg})}\n\n"
                 
                 # Save game to database
                 summary = summarize_game_state(gm)
