@@ -3129,305 +3129,306 @@ def finish_season(req: FinishSeasonRequest):
 # ⚠️  To re-enable: Uncomment the endpoint
 # ============================================================================
 
-class DevSimRegularSeasonRequest(BaseModel):
-    franchise_id: str
+# ⚠️ DISABLED: Dev sim functionality commented out for testing
+# class DevSimRegularSeasonRequest(BaseModel):
+#     franchise_id: str
 
 
-@router.post("/franchise/dev-sim-regular-season")
-def dev_sim_regular_season(req: DevSimRegularSeasonRequest):
-    """
-    🛠️ DEV MODE ONLY: Simulate entire regular season (weeks 1-14) with auto-training and auto-lineups.
+# @router.post("/franchise/dev-sim-regular-season")
+# def dev_sim_regular_season(req: DevSimRegularSeasonRequest):
+#     """
+#     🛠️ DEV MODE ONLY: Simulate entire regular season (weeks 1-14) with auto-training and auto-lineups.
     
-    This endpoint streams progress updates via Server-Sent Events (SSE):
-    1. Loops through weeks 1-14
-    2. For each week:
-       - Auto-trains all teams (including user team) with default training allocations
-       - Auto-sets lineups for all teams from roster
-       - Simulates all games (user game + computer games)
-    3. Stops before week 15 (tournament)
-    
-    ⚠️  TEMPORARY DEVELOPMENT FEATURE - Comment out to disable
-    """
-    import json
-    
-    def generate_progress():
-        """Generator that yields SSE events with progress updates"""
-        try:
-            franchise_id = ObjectId(req.franchise_id)
-        except Exception:
-            yield f"data: {json.dumps({'type': 'error', 'message': 'Invalid franchise_id format'})}\n\n"
-            return
-        
-        franchise_doc = db.franchises.find_one({"_id": franchise_id})
-        if not franchise_doc:
-            yield f"data: {json.dumps({'type': 'error', 'message': 'Franchise not found'})}\n\n"
-            return
-        
-        # Get user team info
-        user_team_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
-        if not user_team_name or not user_team_object_id:
-            yield f"data: {json.dumps({'type': 'error', 'message': 'User team not found in franchise'})}\n\n"
-            return
-        
-        try:
-            user_team_id = ObjectId(user_team_object_id)
-        except Exception:
-            yield f"data: {json.dumps({'type': 'error', 'message': 'Invalid user team ObjectId'})}\n\n"
-            return
-        
-        schedule = franchise_doc.get("schedule", [])
-        franchise_teams = franchise_doc.get("franchise_teams", {})
-        
-        # Get all team IDs in franchise
-        all_team_ids = [ObjectId(tid) for tid in franchise_teams.keys() if ObjectId.is_valid(tid)]
-        all_team_docs = {str(t["_id"]): t for t in db.teams.find({"_id": {"$in": all_team_ids}}, {"name": 1, "_id": 1})}
-        
-        yield f"data: {json.dumps({'type': 'start', 'message': f'Starting regular season simulation for {user_team_name}', 'total_weeks': 14})}\n\n"
-        logger.info(f"🛠️ [DEV SIM] Starting regular season simulation for franchise {req.franchise_id}")
-        logger.info(f"🛠️ [DEV SIM] User team: {user_team_name} ({user_team_object_id})")
-        logger.info(f"🛠️ [DEV SIM] Total teams: {len(all_team_ids)}")
-        
-        # Helper function to generate training data with correct point allocation
-        def get_training_data_for_week(week_num, franchise_doc):
-            """Generate training data with 30 points for first training, 24 for subsequent"""
-            # Check if this is the first training (week 1, no completed games)
-            results = franchise_doc.get("results", {})
-            has_completed_games = len(results) > 0
-            if not has_completed_games:
-                completed_game = db.games.find_one({
-                    "franchise_id": str(franchise_id),
-                    "is_final": True
-                })
-                has_completed_games = completed_game is not None
-            
-            is_first_training = (week_num == 1 and not has_completed_games)
-            total_points = 30 if is_first_training else 24
-            
-            # Balanced allocation: 30 points = 18 player + 8 team + 4 general
-            # Balanced allocation: 24 points = 14 player + 7 team + 3 general
-            if is_first_training:
-                # 30 points: 18 player + 8 team + 4 general
-                return {
-                    "player_drills": {
-                        "shooting": {"SC": 3, "SH": 3},  # 6 points
-                        "ball_handling": {"BH": 3},  # 3 points
-                        "defense": {"ID": 3, "OD": 3},  # 6 points
-                        "rebounding": {"RB": 3},  # 3 points
-                        # Total player: 18 points
-                    },
-                    "team_drills": {
-                        "offense": {"offensive_efficiency": 2},  # 2 points
-                        "defense": {"defensive_efficiency": 2},  # 2 points
-                        "fast_break": {"fb_efficiency": 2},  # 2 points
-                        "press_trap": {"pt_efficiency": 2},  # 2 points
-                        # Total team: 8 points
-                    },
-                    "general": {
-                        "team_chemistry": 2,  # 2 points
-                        "discipline": 1,  # 1 point
-                        "fight": 1  # 1 point
-                        # Total general: 4 points
-                    },
-                    "coaching_focus": "balanced",
-                    "playbook_training_mode": "current-playbooks"
-                }
-            else:
-                # 24 points: 14 player + 7 team + 3 general
-                return {
-                    "player_drills": {
-                        "shooting": {"SC": 2, "SH": 2},  # 4 points
-                        "ball_handling": {"BH": 2},  # 2 points
-                        "defense": {"ID": 2, "OD": 2},  # 4 points
-                        "rebounding": {"RB": 2},  # 2 points
-                        "athleticism": {"AG": 1, "ST": 1},  # 2 points
-                        # Total player: 14 points
-                    },
-                    "team_drills": {
-                        "offense": {"offensive_efficiency": 2},  # 2 points
-                        "defense": {"defensive_efficiency": 2},  # 2 points
-                        "fast_break": {"fb_efficiency": 2},  # 2 points
-                        "press_trap": {"pt_efficiency": 1},  # 1 point
-                        # Total team: 7 points
-                    },
-                    "general": {
-                        "team_chemistry": 1,  # 1 point
-                        "discipline": 1,  # 1 point
-                        "fight": 1  # 1 point
-                        # Total general: 3 points
-                    },
-                    "coaching_focus": "balanced",
-                    "playbook_training_mode": "current-playbooks"
-                }
-        
-        # Simulate weeks 1-14
-        for week in range(1, 15):
-            yield f"data: {json.dumps({'type': 'week_start', 'week': week, 'message': f'Processing Week {week}...'})}\n\n"
-            logger.info(f"🛠️ [DEV SIM] Processing Week {week}...")
-            
-            # Reload franchise doc to get latest state
-            franchise_doc = db.franchises.find_one({"_id": franchise_id})
-            current_week = franchise_doc.get("week", 1)
-            
-            # Skip if already past this week
-            if current_week > week:
-                yield f"data: {json.dumps({'type': 'week_skip', 'week': week, 'message': f'Week {week} already completed, skipping'})}\n\n"
-                logger.info(f"🛠️ [DEV SIM] Week {week} already completed (current_week={current_week}), skipping")
-                continue
-            
-            # Step 1: Auto-train all teams (including user team)
-            # Check if training already completed for this week (training_status is global)
-            franchise_doc = db.franchises.find_one({"_id": franchise_id})
-            training_status = franchise_doc.get("training_status", {})
-            if not (training_status.get("training_completed") and training_status.get("current_week") == week):
-                yield f"data: {json.dumps({'type': 'training_start', 'week': week, 'message': f'Week {week}: Training all teams...'})}\n\n"
-                logger.info(f"🛠️ [DEV SIM] Week {week}: Auto-training all teams...")
-                trained_count = 0
-                for team_id_str, team_doc in all_team_docs.items():
-                    team_name = team_doc.get("name", "")
-                    if not team_name:
-                        continue
-                    
-                    try:
-                        # Get training data with correct point allocation for this week
-                        training_data = get_training_data_for_week(week, franchise_doc)
-                        
-                        # Create training request
-                        training_req = FranchiseTrainingRequest(
-                            franchise_id=req.franchise_id,
-                            team_id=team_id_str,
-                            training_data=training_data
-                        )
-                        
-                        # Run training (reuse existing endpoint logic)
-                        training_result = run_franchise_training(training_req)
-                        trained_count += 1
-                        yield f"data: {json.dumps({'type': 'training_progress', 'week': week, 'team': team_name, 'message': f'Trained {team_name}'})}\n\n"
-                        logger.info(f"🛠️ [DEV SIM] Week {week}: Trained {team_name} - {training_result.get('status', 'unknown')}")
-                        
-                    except Exception as e:
-                        logger.error(f"🛠️ [DEV SIM] Week {week}: Error training {team_name}: {e}")
-                        import traceback
-                        logger.error(f"🛠️ [DEV SIM] Traceback: {traceback.format_exc()}")
-                        yield f"data: {json.dumps({'type': 'training_error', 'week': week, 'team': team_name, 'message': f'Error training {team_name}: {str(e)}'})}\n\n"
-                        # Continue with other teams even if one fails
-                yield f"data: {json.dumps({'type': 'training_complete', 'week': week, 'message': f'Week {week}: Training complete ({trained_count} teams)'})}\n\n"
-            else:
-                yield f"data: {json.dumps({'type': 'training_skip', 'week': week, 'message': f'Week {week}: Training already completed, skipping'})}\n\n"
-                logger.info(f"🛠️ [DEV SIM] Week {week}: Training already completed, skipping")
-            
-            # Step 2: Get user's matchup for this week
-            week_games = schedule[week - 1] if week - 1 < len(schedule) else []
-            user_matchup = None
-            for away_id, home_id in week_games:
-                if away_id == user_team_id or home_id == user_team_id:
-                    away_doc = db.teams.find_one({"_id": away_id}, {"name": 1})
-                    home_doc = db.teams.find_one({"_id": home_id}, {"name": 1})
-                    user_matchup = {
-                        "home": home_doc.get("name", ""),
-                        "away": away_doc.get("name", ""),
-                        "home_id": str(home_id),
-                        "away_id": str(away_id),
-                    }
-                    break
-            
-            if not user_matchup:
-                yield f"data: {json.dumps({'type': 'week_error', 'week': week, 'message': f'Week {week}: User matchup not found, skipping'})}\n\n"
-                logger.warning(f"🛠️ [DEV SIM] Week {week}: User matchup not found, skipping user game")
-                continue
-            
-            # Step 3: Simulate user's game (with auto-lineup)
-            game_msg = f"Week {week}: Simulating {user_matchup['away']} @ {user_matchup['home']}..."
-            yield f"data: {json.dumps({'type': 'game_start', 'week': week, 'home': user_matchup['home'], 'away': user_matchup['away'], 'message': game_msg})}\n\n"
-            logger.info(f"🛠️ [DEV SIM] Week {week}: Simulating user game ({user_matchup['away']} @ {user_matchup['home']})...")
-            try:
-                # Build auto-lineups for both teams
-                from BackEnd.models.team_manager import TeamManager
-                home_team_manager = TeamManager(user_matchup["home"])
-                away_team_manager = TeamManager(user_matchup["away"])
-                
-                home_lineup = build_lineup_from_mongo(home_team_manager)
-                away_lineup = build_lineup_from_mongo(away_team_manager)
-                
-                # Convert lineups to player ID format
-                home_lineup_ids = {pos: player.player_id for pos, player in home_lineup.items()}
-                away_lineup_ids = {pos: player.player_id for pos, player in away_lineup.items()}
-                
-                yield f"data: {json.dumps({'type': 'game_simulating', 'week': week, 'message': 'Running game simulation...'})}\n\n"
-                
-                # Run full game simulation
-                gm = run_simulation(
-                    user_matchup["home"],
-                    user_matchup["away"],
-                    home_lineup_ids,
-                    away_lineup_ids
-                )
-                
-                # Get final scores
-                home_score = gm.score.get(user_matchup["home"], 0)
-                away_score = gm.score.get(user_matchup["away"], 0)
-                
-                result_msg = f"Final: {user_matchup['away']} {away_score}, {user_matchup['home']} {home_score}"
-                yield f"data: {json.dumps({'type': 'game_result', 'week': week, 'home': user_matchup['home'], 'away': user_matchup['away'], 'home_score': home_score, 'away_score': away_score, 'message': result_msg})}\n\n"
-                
-                # Save game to database
-                summary = summarize_game_state(gm)
-                game_id = generate_game_id()
-                summary["_id"] = game_id
-                summary["franchise_id"] = str(franchise_id)
-                summary["week"] = week
-                summary["is_final"] = True
-                db.games.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
-                
-                # Finalize game stats
-                yield f"data: {json.dumps({'type': 'game_finalizing', 'week': week, 'message': 'Finalizing game stats...'})}\n\n"
-                stat_updater.finalize_game(game_id, mode="franchise", franchise_id=str(franchise_id))
-                
-                # Determine winner
-                winner_id = user_matchup["home_id"] if home_score > away_score else user_matchup["away_id"]
-                
-                # Complete week (this will simulate computer games and advance week)
-                yield f"data: {json.dumps({'type': 'week_completing', 'week': week, 'message': 'Completing week (simulating computer games)...'})}\n\n"
-                complete_week_req = CompleteWeekRequest(
-                    franchise_id=req.franchise_id,
-                    week=week,
-                    result=GameResult(
-                        team1_id=user_matchup["away_id"],
-                        team2_id=user_matchup["home_id"],
-                        team1_score=away_score,
-                        team2_score=home_score
-                    ),
-                    game_id=str(game_id),
-                    game_document=summary
-                )
-                
-                complete_week(complete_week_req)
-                yield f"data: {json.dumps({'type': 'week_complete', 'week': week, 'message': f'Week {week} complete!'})}\n\n"
-                logger.info(f"🛠️ [DEV SIM] Week {week}: Completed user game and all computer games")
-                
-            except Exception as e:
-                error_msg = f"Week {week}: Error simulating user game: {str(e)}"
-                yield f"data: {json.dumps({'type': 'week_error', 'week': week, 'message': error_msg})}\n\n"
-                logger.error(f"🛠️ [DEV SIM] Week {week}: Error simulating user game: {e}")
-                import traceback
-                logger.error(f"🛠️ [DEV SIM] Traceback: {traceback.format_exc()}")
-                # Continue to next week even if this one fails
-        
-        # Reload franchise doc to get final state
-        franchise_doc = db.franchises.find_one({"_id": franchise_id})
-        final_week = franchise_doc.get("week", 1)
-        
-        logger.info(f"🛠️ [DEV SIM] Regular season simulation complete! Final week: {final_week}")
-        yield f"data: {json.dumps({'type': 'complete', 'status': 'success', 'final_week': final_week, 'message': f'Simulation complete! Current week: {final_week}'})}\n\n"
-    
-    return StreamingResponse(
-        generate_progress(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"  # Disable nginx buffering
-        }
-    )
+#     This endpoint streams progress updates via Server-Sent Events (SSE):
+#     1. Loops through weeks 1-14
+#     2. For each week:
+#        - Auto-trains all teams (including user team) with default training allocations
+#        - Auto-sets lineups for all teams from roster
+#        - Simulates all games (user game + computer games)
+#     3. Stops before week 15 (tournament)
+#     
+#     ⚠️  TEMPORARY DEVELOPMENT FEATURE - Comment out to disable
+#     """
+# #     import json
+    # 
+# #     def generate_progress():
+# #         """Generator that yields SSE events with progress updates"""
+# #         try:
+            # franchise_id = ObjectId(req.franchise_id)
+        # except Exception:
+            # yield f"data: {json.dumps({'type': 'error', 'message': 'Invalid franchise_id format'})}\n\n"
+            # return
+        # 
+        # franchise_doc = db.franchises.find_one({"_id": franchise_id})
+        # if not franchise_doc:
+            # yield f"data: {json.dumps({'type': 'error', 'message': 'Franchise not found'})}\n\n"
+            # return
+        # 
+        # # Get user team info
+        # user_team_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+        # if not user_team_name or not user_team_object_id:
+            # yield f"data: {json.dumps({'type': 'error', 'message': 'User team not found in franchise'})}\n\n"
+            # return
+        # 
+        # try:
+            # user_team_id = ObjectId(user_team_object_id)
+        # except Exception:
+            # yield f"data: {json.dumps({'type': 'error', 'message': 'Invalid user team ObjectId'})}\n\n"
+            # return
+        # 
+        # schedule = franchise_doc.get("schedule", [])
+        # franchise_teams = franchise_doc.get("franchise_teams", {})
+        # 
+        # # Get all team IDs in franchise
+        # all_team_ids = [ObjectId(tid) for tid in franchise_teams.keys() if ObjectId.is_valid(tid)]
+        # all_team_docs = {str(t["_id"]): t for t in db.teams.find({"_id": {"$in": all_team_ids}}, {"name": 1, "_id": 1})}
+        # 
+        # yield f"data: {json.dumps({'type': 'start', 'message': f'Starting regular season simulation for {user_team_name}', 'total_weeks': 14})}\n\n"
+        # logger.info(f"🛠️ [DEV SIM] Starting regular season simulation for franchise {req.franchise_id}")
+        # logger.info(f"🛠️ [DEV SIM] User team: {user_team_name} ({user_team_object_id})")
+        # logger.info(f"🛠️ [DEV SIM] Total teams: {len(all_team_ids)}")
+        # 
+        # # Helper function to generate training data with correct point allocation
+        # def get_training_data_for_week(week_num, franchise_doc):
+            # """Generate training data with 30 points for first training, 24 for subsequent"""
+            # # Check if this is the first training (week 1, no completed games)
+            # results = franchise_doc.get("results", {})
+            # has_completed_games = len(results) > 0
+            # if not has_completed_games:
+                # completed_game = db.games.find_one({
+                    # "franchise_id": str(franchise_id),
+                    # "is_final": True
+                # })
+                # has_completed_games = completed_game is not None
+            # 
+            # is_first_training = (week_num == 1 and not has_completed_games)
+            # total_points = 30 if is_first_training else 24
+            # 
+            # # Balanced allocation: 30 points = 18 player + 8 team + 4 general
+            # # Balanced allocation: 24 points = 14 player + 7 team + 3 general
+            # if is_first_training:
+                # # 30 points: 18 player + 8 team + 4 general
+                # return {
+                    # "player_drills": {
+                        # "shooting": {"SC": 3, "SH": 3},  # 6 points
+                        # "ball_handling": {"BH": 3},  # 3 points
+                        # "defense": {"ID": 3, "OD": 3},  # 6 points
+                        # "rebounding": {"RB": 3},  # 3 points
+                        # # Total player: 18 points
+                    # },
+                    # "team_drills": {
+                        # "offense": {"offensive_efficiency": 2},  # 2 points
+                        # "defense": {"defensive_efficiency": 2},  # 2 points
+                        # "fast_break": {"fb_efficiency": 2},  # 2 points
+                        # "press_trap": {"pt_efficiency": 2},  # 2 points
+                        # # Total team: 8 points
+                    # },
+                    # "general": {
+                        # "team_chemistry": 2,  # 2 points
+                        # "discipline": 1,  # 1 point
+                        # "fight": 1  # 1 point
+                        # # Total general: 4 points
+                    # },
+                    # "coaching_focus": "balanced",
+                    # "playbook_training_mode": "current-playbooks"
+                # }
+            # else:
+                # # 24 points: 14 player + 7 team + 3 general
+                # return {
+                    # "player_drills": {
+                        # "shooting": {"SC": 2, "SH": 2},  # 4 points
+                        # "ball_handling": {"BH": 2},  # 2 points
+                        # "defense": {"ID": 2, "OD": 2},  # 4 points
+                        # "rebounding": {"RB": 2},  # 2 points
+                        # "athleticism": {"AG": 1, "ST": 1},  # 2 points
+                        # # Total player: 14 points
+                    # },
+                    # "team_drills": {
+                        # "offense": {"offensive_efficiency": 2},  # 2 points
+                        # "defense": {"defensive_efficiency": 2},  # 2 points
+                        # "fast_break": {"fb_efficiency": 2},  # 2 points
+                        # "press_trap": {"pt_efficiency": 1},  # 1 point
+                        # # Total team: 7 points
+                    # },
+                    # "general": {
+                        # "team_chemistry": 1,  # 1 point
+                        # "discipline": 1,  # 1 point
+                        # "fight": 1  # 1 point
+                        # # Total general: 3 points
+                    # },
+                    # "coaching_focus": "balanced",
+                    # "playbook_training_mode": "current-playbooks"
+                # }
+        # 
+        # # Simulate weeks 1-14
+        # for week in range(1, 15):
+            # yield f"data: {json.dumps({'type': 'week_start', 'week': week, 'message': f'Processing Week {week}...'})}\n\n"
+            # logger.info(f"🛠️ [DEV SIM] Processing Week {week}...")
+            # 
+            # # Reload franchise doc to get latest state
+            # franchise_doc = db.franchises.find_one({"_id": franchise_id})
+            # current_week = franchise_doc.get("week", 1)
+            # 
+            # # Skip if already past this week
+            # if current_week > week:
+                # yield f"data: {json.dumps({'type': 'week_skip', 'week': week, 'message': f'Week {week} already completed, skipping'})}\n\n"
+                # logger.info(f"🛠️ [DEV SIM] Week {week} already completed (current_week={current_week}), skipping")
+                # continue
+            # 
+            # # Step 1: Auto-train all teams (including user team)
+            # # Check if training already completed for this week (training_status is global)
+            # franchise_doc = db.franchises.find_one({"_id": franchise_id})
+            # training_status = franchise_doc.get("training_status", {})
+            # if not (training_status.get("training_completed") and training_status.get("current_week") == week):
+                # yield f"data: {json.dumps({'type': 'training_start', 'week': week, 'message': f'Week {week}: Training all teams...'})}\n\n"
+                # logger.info(f"🛠️ [DEV SIM] Week {week}: Auto-training all teams...")
+                # trained_count = 0
+                # for team_id_str, team_doc in all_team_docs.items():
+                    # team_name = team_doc.get("name", "")
+                    # if not team_name:
+                        # continue
+                    # 
+                    # try:
+                        # # Get training data with correct point allocation for this week
+                        # training_data = get_training_data_for_week(week, franchise_doc)
+                        # 
+                        # # Create training request
+                        # training_req = FranchiseTrainingRequest(
+                            # franchise_id=req.franchise_id,
+                            # team_id=team_id_str,
+                            # training_data=training_data
+                        # )
+                        # 
+                        # # Run training (reuse existing endpoint logic)
+                        # training_result = run_franchise_training(training_req)
+                        # trained_count += 1
+                        # yield f"data: {json.dumps({'type': 'training_progress', 'week': week, 'team': team_name, 'message': f'Trained {team_name}'})}\n\n"
+                        # logger.info(f"🛠️ [DEV SIM] Week {week}: Trained {team_name} - {training_result.get('status', 'unknown')}")
+                        # 
+                    # except Exception as e:
+                        # logger.error(f"🛠️ [DEV SIM] Week {week}: Error training {team_name}: {e}")
+                        # import traceback
+                        # logger.error(f"🛠️ [DEV SIM] Traceback: {traceback.format_exc()}")
+                        # yield f"data: {json.dumps({'type': 'training_error', 'week': week, 'team': team_name, 'message': f'Error training {team_name}: {str(e)}'})}\n\n"
+                        # # Continue with other teams even if one fails
+                # yield f"data: {json.dumps({'type': 'training_complete', 'week': week, 'message': f'Week {week}: Training complete ({trained_count} teams)'})}\n\n"
+            # else:
+                # yield f"data: {json.dumps({'type': 'training_skip', 'week': week, 'message': f'Week {week}: Training already completed, skipping'})}\n\n"
+                # logger.info(f"🛠️ [DEV SIM] Week {week}: Training already completed, skipping")
+            # 
+            # # Step 2: Get user's matchup for this week
+            # week_games = schedule[week - 1] if week - 1 < len(schedule) else []
+            # user_matchup = None
+            # for away_id, home_id in week_games:
+                # if away_id == user_team_id or home_id == user_team_id:
+                    # away_doc = db.teams.find_one({"_id": away_id}, {"name": 1})
+                    # home_doc = db.teams.find_one({"_id": home_id}, {"name": 1})
+                    # user_matchup = {
+                        # "home": home_doc.get("name", ""),
+                        # "away": away_doc.get("name", ""),
+                        # "home_id": str(home_id),
+                        # "away_id": str(away_id),
+                    # }
+                    # break
+            # 
+            # if not user_matchup:
+                # yield f"data: {json.dumps({'type': 'week_error', 'week': week, 'message': f'Week {week}: User matchup not found, skipping'})}\n\n"
+                # logger.warning(f"🛠️ [DEV SIM] Week {week}: User matchup not found, skipping user game")
+                # continue
+            # 
+            # # Step 3: Simulate user's game (with auto-lineup)
+            # game_msg = f"Week {week}: Simulating {user_matchup['away']} @ {user_matchup['home']}..."
+            # yield f"data: {json.dumps({'type': 'game_start', 'week': week, 'home': user_matchup['home'], 'away': user_matchup['away'], 'message': game_msg})}\n\n"
+            # logger.info(f"🛠️ [DEV SIM] Week {week}: Simulating user game ({user_matchup['away']} @ {user_matchup['home']})...")
+            # try:
+                # # Build auto-lineups for both teams
+                # from BackEnd.models.team_manager import TeamManager
+                # home_team_manager = TeamManager(user_matchup["home"])
+                # away_team_manager = TeamManager(user_matchup["away"])
+                # 
+                # home_lineup = build_lineup_from_mongo(home_team_manager)
+                # away_lineup = build_lineup_from_mongo(away_team_manager)
+                # 
+                # # Convert lineups to player ID format
+                # home_lineup_ids = {pos: player.player_id for pos, player in home_lineup.items()}
+                # away_lineup_ids = {pos: player.player_id for pos, player in away_lineup.items()}
+                # 
+                # yield f"data: {json.dumps({'type': 'game_simulating', 'week': week, 'message': 'Running game simulation...'})}\n\n"
+                # 
+                # # Run full game simulation
+                # gm = run_simulation(
+                    # user_matchup["home"],
+                    # user_matchup["away"],
+                    # home_lineup_ids,
+                    # away_lineup_ids
+                # )
+                # 
+                # # Get final scores
+                # home_score = gm.score.get(user_matchup["home"], 0)
+                # away_score = gm.score.get(user_matchup["away"], 0)
+                # 
+                # result_msg = f"Final: {user_matchup['away']} {away_score}, {user_matchup['home']} {home_score}"
+                # yield f"data: {json.dumps({'type': 'game_result', 'week': week, 'home': user_matchup['home'], 'away': user_matchup['away'], 'home_score': home_score, 'away_score': away_score, 'message': result_msg})}\n\n"
+                # 
+                # # Save game to database
+                # summary = summarize_game_state(gm)
+                # game_id = generate_game_id()
+                # summary["_id"] = game_id
+                # summary["franchise_id"] = str(franchise_id)
+                # summary["week"] = week
+                # summary["is_final"] = True
+                # db.games.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
+                # 
+                # # Finalize game stats
+                # yield f"data: {json.dumps({'type': 'game_finalizing', 'week': week, 'message': 'Finalizing game stats...'})}\n\n"
+                # stat_updater.finalize_game(game_id, mode="franchise", franchise_id=str(franchise_id))
+                # 
+                # # Determine winner
+                # winner_id = user_matchup["home_id"] if home_score > away_score else user_matchup["away_id"]
+                # 
+                # # Complete week (this will simulate computer games and advance week)
+                # yield f"data: {json.dumps({'type': 'week_completing', 'week': week, 'message': 'Completing week (simulating computer games)...'})}\n\n"
+                # complete_week_req = CompleteWeekRequest(
+                    # franchise_id=req.franchise_id,
+                    # week=week,
+                    # result=GameResult(
+                        # team1_id=user_matchup["away_id"],
+                        # team2_id=user_matchup["home_id"],
+                        # team1_score=away_score,
+                        # team2_score=home_score
+                    # ),
+                    # game_id=str(game_id),
+                    # game_document=summary
+                # )
+                # 
+                # complete_week(complete_week_req)
+                # yield f"data: {json.dumps({'type': 'week_complete', 'week': week, 'message': f'Week {week} complete!'})}\n\n"
+                # logger.info(f"🛠️ [DEV SIM] Week {week}: Completed user game and all computer games")
+                # 
+            # except Exception as e:
+                # error_msg = f"Week {week}: Error simulating user game: {str(e)}"
+                # yield f"data: {json.dumps({'type': 'week_error', 'week': week, 'message': error_msg})}\n\n"
+                # logger.error(f"🛠️ [DEV SIM] Week {week}: Error simulating user game: {e}")
+                # import traceback
+                # logger.error(f"🛠️ [DEV SIM] Traceback: {traceback.format_exc()}")
+                # # Continue to next week even if this one fails
+        # 
+        # # Reload franchise doc to get final state
+        # franchise_doc = db.franchises.find_one({"_id": franchise_id})
+        # final_week = franchise_doc.get("week", 1)
+        # 
+        # logger.info(f"🛠️ [DEV SIM] Regular season simulation complete! Final week: {final_week}")
+        # yield f"data: {json.dumps({'type': 'complete', 'status': 'success', 'final_week': final_week, 'message': f'Simulation complete! Current week: {final_week}'})}\n\n"
+    # 
+    # return StreamingResponse(
+        # generate_progress(),
+        # media_type="text/event-stream",
+        # headers={
+            # "Cache-Control": "no-cache",
+            # "Connection": "keep-alive",
+            # "X-Accel-Buffering": "no"  # Disable nginx buffering
+        # }
+    # )
 
 # ============================================================================
 # 🛠️ END DEV MODE FEATURE
