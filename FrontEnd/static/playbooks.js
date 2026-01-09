@@ -472,22 +472,25 @@ class PlaybooksUI {
     await this.loadSlotAssignmentsFromAPI();
     await this.loadPlaybookPercentagesFromAPI();
     
-    // ✅ FIX: The even_distribution_all flag is for UI state (button active), not for forcing redistribution on load
-    // If flag is true, it means "keep the Even Distribution All button active" - use saved percentages
-    // Redistribution only happens when the user clicks the button, not on every load
-    // Position filters are now loaded BEFORE loadState() so percentages are applied correctly
+    // ✅ FIX: even_distribution_all: true means "redistribute on every load based on current visible plays"
+    // This makes the flag a behavior instruction, not a data state
+    // Position filters are now loaded BEFORE loadState() so shouldShowPlay() works correctly
     if (this.evenDistributionAllFlag === true) {
-      console.log('🔍 [PLAYBOOKS] even_distribution_all is true - syncing button states but using saved percentages');
+      console.log('🔍 [PLAYBOOKS] even_distribution_all is true - redistributing on load based on current visible plays');
       // Sync button states (even distribution is enabled for UI)
       const offenseSections = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'];
       offenseSections.forEach(sectionKey => {
         this.evenDistributionEnabled[sectionKey] = true;
+        // Reset hidden plays first (those that don't match current position filters)
+        this.resetHiddenPlayPercentages(sectionKey);
+        // Then redistribute among visible plays (ignoring saved percentages for offense sections)
+        this.distributePercentagesEvenly(sectionKey);
         this.updateEvenDistributionButton(sectionKey);
+        this.updateSectionTotal(sectionKey);
       });
       // Update "Even Distribution - All" button state
       this.updateEvenDistributionAllButton();
-      // ✅ DO NOT redistribute - use saved percentages (already loaded via loadPlaybookPercentagesFromAPI)
-      // Redistribution only happens when user clicks the "Even Distribution - All" button
+      // ✅ Defense percentages are still loaded from saved values (they don't use even distribution)
     } else {
       // If flag is false, use saved percentages (already loaded via loadPlaybookPercentagesFromAPI)
       console.log('🔍 [PLAYBOOKS] even_distribution_all is false, using saved percentages');
@@ -1399,6 +1402,14 @@ class PlaybooksUI {
   }
   
   distributePercentagesEvenly(sectionKey) {
+    // ✅ SS&S: First, reset ALL plays in this section to 0 to ensure clean redistribution
+    // This ensures no leftover percentages from previous distributions or loaded data
+    if (this.state.sections[sectionKey]) {
+      Object.keys(this.state.sections[sectionKey]).forEach(playId => {
+        this.state.sections[sectionKey][playId].percentage = 0;
+      });
+    }
+    
     // Get all plays in this section (excluding "To Be Added" placeholders)
     let plays = [];
     
@@ -1439,7 +1450,7 @@ class PlaybooksUI {
     
     console.log(`📊 [EVEN DISTRIBUTION] ${plays.length} plays, base: ${basePercentage}%, remainder: ${remainder}%`);
     
-    // Assign percentages
+    // Assign percentages only to visible plays
     plays.forEach((play, index) => {
       // Generate play ID if needed
       let playId = play.id;
@@ -1547,18 +1558,26 @@ class PlaybooksUI {
     this.renderSection('set-play-attack');
     this.renderSection('set-play-outside');
     
-    // Auto-recalculate percentages if Even Distribution is enabled for any section
-    offenseSections.forEach(sectionKey => {
-      if (this.evenDistributionEnabled[sectionKey]) {
-        console.log(`🔄 [POSITION FILTER] Auto-recalculating ${sectionKey} (Even Distribution enabled)`);
+    // Auto-recalculate percentages if Even Distribution All is enabled
+    // If even_distribution_all: true, redistribute among new visible plays when position filters change
+    if (this.evenDistributionAllFlag === true) {
+      console.log('🔄 [POSITION FILTER] even_distribution_all is true - auto-redistributing among new visible plays');
+      offenseSections.forEach(sectionKey => {
+        // Ensure even distribution is enabled for this section (it should be if flag is true)
+        this.evenDistributionEnabled[sectionKey] = true;
         // Distribute percentages evenly among visible plays (hidden plays already reset)
         this.distributePercentagesEvenly(sectionKey);
+        this.updateEvenDistributionButton(sectionKey);
         this.updateSectionTotal(sectionKey);
-      } else {
-        // Update section total (hidden plays already reset)
+      });
+      // Ensure "Even Distribution - All" button state is correct
+      this.updateEvenDistributionAllButton();
+    } else {
+      // If flag is false, just update section totals (hidden plays already reset)
+      offenseSections.forEach(sectionKey => {
         this.updateSectionTotal(sectionKey);
-      }
-    });
+      });
+    }
     
     this.updateSubmitButton();
     this.markUnsavedChanges();
