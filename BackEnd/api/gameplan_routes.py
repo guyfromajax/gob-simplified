@@ -1564,6 +1564,10 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         if motion_percentages:
             sample_motion = dict(list(motion_percentages.items())[:3])
             logger.warning(f"🔍 [PLAYBOOKS GET] Sample motion percentages: {sample_motion}")
+            # ✅ CRITICAL: Log ALL motion percentages to verify they match what was saved
+            logger.warning(f"🔍 [PLAYBOOKS GET] ALL motion percentages being returned: {motion_percentages}")
+        else:
+            logger.error(f"❌ [PLAYBOOKS GET] motion_percentages is EMPTY or MISSING!")
         
         # Get even_distribution_all flag (defaults to False if not set)
         even_distribution_all = playbook_settings.get("even_distribution_all", False)
@@ -1813,11 +1817,24 @@ def save_playbooks(request: PlaybookSettingsRequest):
             except Exception as e:
                 logger.warning(f"⚠️ Error saving to core teams collection (non-critical): {e}")
         else:
+            # ✅ CRITICAL: Log the exact data being saved before the update
+            logger.warning(f"🔍 [PLAYBOOKS SAVE] About to save playbook_settings with {len(request.playbook_settings.get('motion', {}))} motion plays")
+            if request.playbook_settings.get('motion'):
+                sample_motion = dict(list(request.playbook_settings.get('motion', {}).items())[:3])
+                logger.warning(f"🔍 [PLAYBOOKS SAVE] Sample motion percentages being saved: {sample_motion}")
+            
             result = collection.update_one(
                 {"_id": ObjectId(doc_id)},
                 {"$set": {update_path: request.playbook_settings}}
             )
             logger.warning(f"🔍 [PLAYBOOKS SAVE] MongoDB update result: matched={result.matched_count}, modified={result.modified_count}")
+            
+            if result.matched_count == 0:
+                logger.error(f"❌ [PLAYBOOKS SAVE] Document not found: mode={request.mode}, doc_id={doc_id}")
+                raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
+            
+            if result.modified_count == 0:
+                logger.warning(f"⚠️ [PLAYBOOKS SAVE] Update matched but did not modify - document may already have identical data")
         
         if request.mode != "single" and result.matched_count == 0:
             logger.error(f"❌ [PLAYBOOKS SAVE] Document not found: mode={request.mode}, doc_id={doc_id}")
@@ -1836,7 +1853,14 @@ def save_playbooks(request: PlaybookSettingsRequest):
                     logger.warning(f"✅ [PLAYBOOKS SAVE] Verified save - set_play_inside keys: {list(saved_settings.get('set_play_inside', {}).keys())}")
                     if saved_settings.get('motion'):
                         sample = dict(list(saved_settings.get('motion', {}).items())[:3])
-                        logger.warning(f"✅ [PLAYBOOKS SAVE] Verified save - sample motion: {sample}")
+                        logger.warning(f"✅ [PLAYBOOKS SAVE] Verified save - sample motion percentages: {sample}")
+                        # ✅ CRITICAL: Log ALL motion percentages to verify they match what was sent
+                        all_motion = saved_settings.get('motion', {})
+                        logger.warning(f"✅ [PLAYBOOKS SAVE] Verified save - ALL motion percentages: {all_motion}")
+                    else:
+                        logger.error(f"❌ [PLAYBOOKS SAVE] Verified save - motion is EMPTY or MISSING!")
+                else:
+                    logger.error(f"❌ [PLAYBOOKS SAVE] Verification failed - document not found")
             elif request.mode == "tournament":
                 verify_doc = collection.find_one(
                     {"_id": ObjectId(doc_id)},
