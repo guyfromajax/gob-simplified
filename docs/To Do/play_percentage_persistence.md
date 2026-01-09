@@ -366,38 +366,67 @@ async loadState() {
 
 ---
 
-### ⚠️ Issue 2: Percentage Matching Relies on Play Names
+### ✅ Issue 2: Percentage Matching - State Sections Only Contain First N Plays - **FIXED**
 
-**Location:** `FrontEnd/static/playbooks.js:528-615`
+**Location:** `FrontEnd/static/playbooks.js:505-622`
 
-**Problem:**
-- Saved percentages use **play names** as keys (e.g., `"3-2 Motion"`)
-- Loading matches by `play.name` to find saved percentage
-- If play names don't match exactly (whitespace, casing, typos), percentages won't apply
+**Problem (Before Fix):**
+- Saved percentages use **play names** as keys (e.g., `"Base Post Play"`, `"SG Pass & Cut"`)
+- Loading iterated through `this.state.sections[sectionKey]` which only contains first N plays (first 3 for set plays, first 4 for motion)
+- State sections are initialized with first N plays from API, regardless of position filters
+- When position filters are active, visible plays might not be in state sections
+- Result: Percentages for plays not in state sections (e.g., plays at index 4, 5, 6) never get loaded
 
-**Current Code:**
+**Root Cause:**
+- `initDefaults()` creates state entries for first N plays only (based on array index)
+- `loadPlaybookPercentagesFromAPI()` iterated through state sections, not all plays
+- If a play wasn't in the first N plays, it wasn't in state sections, so its percentage couldn't be loaded
+
+**Fix Implemented:**
+- Changed `loadPlaybookPercentagesFromAPI()` to iterate through **ALL plays** in `this.playData[settingsKey]`
+- For each play, find or create the corresponding state entry (by playId)
+- Apply saved percentage using `play.name` as key
+- This ensures ALL plays from database are matched, not just the first N that were initialized in state
+
+**Fixed Code:**
 ```javascript
-// Saving (line 2115)
-playbookSettings.motion[play.name] = percentage;  // Play NAME as key
+// ✅ FIX: Iterate through ALL plays in playData, not just state sections
+// State sections only contain first N plays, but saved percentages include ALL plays
+const plays = this.playData[settingsKey] || [];
 
-// Loading (line 533)
-if (percentages.motion[play.name] !== undefined) {
-  this.state.sections.motion[playId].percentage = percentages.motion[play.name];
-}
+plays.forEach((play, index) => {
+  if (!play || play.name === 'To Be Added') return;
+  
+  const playId = play.id || `${sectionKey}-${index + 1}`;
+  
+  // Ensure this play exists in state sections (create if needed)
+  if (!this.state.sections[sectionKey][playId]) {
+    this.state.sections[sectionKey][playId] = {
+      percentage: 0,
+      slot: null,
+    };
+  }
+  
+  // Apply saved percentage if it exists in database
+  if (sectionPercentages[play.name] !== undefined) {
+    this.state.sections[sectionKey][playId].percentage = sectionPercentages[play.name];
+  }
+});
 ```
 
-**Potential Issues:**
-- Database has `"3-2 Motion"` but frontend has `"3-2 Motion "` (trailing space)
-- Play name changed in database but percentages still use old name
-- Case sensitivity issues (though JavaScript keys are case-sensitive)
+**Matching Strategy:**
+- **Database/API Storage:** Uses **play names** as keys (`{"Base Post Play": 50, "SG Pass & Cut": 50}`)
+- **Frontend State:** Uses **generated IDs** like `set-inside-1`, `set-inside-2` based on array index
+- **Matching Process:**
+  1. Iterate through ALL plays in `playData` (not just state sections)
+  2. For each play, find or create state entry by `playId`
+  3. Look up saved percentage using `play.name` as key
+  4. Apply percentage to state entry
 
-**Impact:**
-- Percentages may not apply if play names don't match exactly
-- Silent failures (no error, just 0% displayed)
-
-**Mitigation:**
-- Currently working because play names are consistent
-- Could break if play names are updated in database
+**Remaining Considerations:**
+- Play names must match exactly (whitespace, casing, etc.)
+- If play names change in database, old percentages won't apply
+- Future enhancement: Use `play_id` (database ID) instead of play names for more robustness
 
 ---
 
