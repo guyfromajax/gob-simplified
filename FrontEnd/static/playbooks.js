@@ -1729,7 +1729,7 @@ class PlaybooksUI {
     
     // Message
     const message = document.createElement('p');
-    message.textContent = "You haven't submitted playbook changes.";
+    message.textContent = "You haven't saved playbook changes.";
     message.style.cssText = `
       font-size: 1.125rem;
       margin-bottom: 20px;
@@ -1761,9 +1761,9 @@ class PlaybooksUI {
       justify-content: flex-end;
     `;
     
-    // Submit Playbooks button
+    // Save Playbooks button
     const submitBtn = document.createElement('button');
-    submitBtn.textContent = 'Submit Playbooks';
+    submitBtn.textContent = 'Save Playbooks';
     submitBtn.style.cssText = `
       padding: 10px 20px;
       background: #ff7a00;
