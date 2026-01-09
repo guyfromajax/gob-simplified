@@ -526,21 +526,36 @@ class PlaybooksUI {
       let appliedCount = 0;
       
       // Apply motion percentages
+      // ✅ FIX: Iterate through ALL plays in playData, not just state sections
+      // State sections only contain first 4 plays, but saved percentages include ALL plays
       if (percentages.motion && Object.keys(percentages.motion).length > 0) {
         console.log('🔍 [PLAYBOOKS] Applying motion percentages:', percentages.motion);
-        Object.keys(this.state.sections.motion || {}).forEach(playId => {
-          const play = this.playData.motion?.find(p => p.id === playId);
-          if (play) {
-            if (percentages.motion[play.name] !== undefined) {
-              this.state.sections.motion[playId].percentage = percentages.motion[play.name];
-              appliedCount++;
-              console.log(`✅ [PLAYBOOKS] Applied motion percentage: ${play.name} = ${percentages.motion[play.name]}%`);
-            } else {
-              // Play exists in state but not in saved percentages - already reset to 0 above
-              console.log(`✅ [PLAYBOOKS] Motion play "${play.name}" (id: ${playId}) not in saved percentages, keeping at 0%`);
-            }
+        const motionPlays = this.playData.motion || [];
+        
+        // ✅ FIX: Iterate through ALL motion plays in playData, not just plays in state sections
+        motionPlays.forEach((play, index) => {
+          if (!play || play.name === 'To Be Added') return;
+          
+          // Find or create the playId for this play
+          const playId = play.id || `motion-${index + 1}`;
+          
+          // Ensure this play exists in state sections (create if needed)
+          if (!this.state.sections.motion[playId]) {
+            this.state.sections.motion[playId] = {
+              percentage: 0,
+              slot: null,
+            };
+            console.log(`🔧 [PLAYBOOKS] Created state entry for motion play "${play.name}" (id: ${playId})`);
+          }
+          
+          // Apply saved percentage if it exists in database
+          if (percentages.motion[play.name] !== undefined) {
+            this.state.sections.motion[playId].percentage = percentages.motion[play.name];
+            appliedCount++;
+            console.log(`✅ [PLAYBOOKS] Applied motion percentage: ${play.name} = ${percentages.motion[play.name]}%`);
           } else {
-            console.log(`⚠️ [PLAYBOOKS] Motion play with id "${playId}" not found in playData`);
+            // Play exists in database but not in saved percentages - keep at 0
+            console.log(`✅ [PLAYBOOKS] Motion play "${play.name}" (id: ${playId}) not in saved percentages, keeping at 0%`);
           }
         });
       } else {
@@ -548,6 +563,8 @@ class PlaybooksUI {
       }
       
       // Apply set play percentages
+      // ✅ FIX: Iterate through ALL plays in playData, not just state sections
+      // State sections only contain first N plays, but saved percentages include ALL plays
       ['set-play-inside', 'set-play-attack', 'set-play-outside'].forEach(sectionKey => {
         const settingsKey = sectionKey.replace('set-play-', 'set_play_');
         const sectionPercentages = percentages[settingsKey];
@@ -555,19 +572,32 @@ class PlaybooksUI {
         if (sectionPercentages && Object.keys(sectionPercentages).length > 0) {
           console.log(`🔍 [PLAYBOOKS] Applying ${settingsKey} percentages:`, sectionPercentages);
           const plays = this.playData[settingsKey] || [];
-          Object.keys(this.state.sections[sectionKey] || {}).forEach(playId => {
-            const play = plays.find(p => p.id === playId);
-            if (play) {
-              if (sectionPercentages[play.name] !== undefined) {
-                this.state.sections[sectionKey][playId].percentage = sectionPercentages[play.name];
-                appliedCount++;
-                console.log(`✅ [PLAYBOOKS] Applied ${settingsKey} percentage: ${play.name} = ${sectionPercentages[play.name]}%`);
-              } else {
-                // Play exists in state but not in saved percentages - already reset to 0 above
-                console.log(`✅ [PLAYBOOKS] ${settingsKey} play "${play.name}" (id: ${playId}) not in saved percentages, keeping at 0%`);
-              }
+          
+          // ✅ FIX: Iterate through ALL plays in playData, not just plays in state sections
+          // This ensures we match all plays from database, not just the first N that were initialized in state
+          plays.forEach((play, index) => {
+            if (!play || play.name === 'To Be Added') return;
+            
+            // Find or create the playId for this play
+            const playId = play.id || `${sectionKey}-${index + 1}`;
+            
+            // Ensure this play exists in state sections (create if needed)
+            if (!this.state.sections[sectionKey][playId]) {
+              this.state.sections[sectionKey][playId] = {
+                percentage: 0,
+                slot: null,
+              };
+              console.log(`🔧 [PLAYBOOKS] Created state entry for ${settingsKey} play "${play.name}" (id: ${playId})`);
+            }
+            
+            // Apply saved percentage if it exists in database
+            if (sectionPercentages[play.name] !== undefined) {
+              this.state.sections[sectionKey][playId].percentage = sectionPercentages[play.name];
+              appliedCount++;
+              console.log(`✅ [PLAYBOOKS] Applied ${settingsKey} percentage: ${play.name} = ${sectionPercentages[play.name]}%`);
             } else {
-              console.log(`⚠️ [PLAYBOOKS] ${settingsKey} play with id "${playId}" not found in playData`);
+              // Play exists in database but not in saved percentages - keep at 0
+              console.log(`✅ [PLAYBOOKS] ${settingsKey} play "${play.name}" (id: ${playId}) not in saved percentages, keeping at 0%`);
             }
           });
         } else {
