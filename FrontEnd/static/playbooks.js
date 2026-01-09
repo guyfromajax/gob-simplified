@@ -1273,6 +1273,26 @@ class PlaybooksUI {
     
     const backBtn = document.getElementById('back-btn');
     if (backBtn) {
+      // ✅ Update back button text based on where user came from
+      const urlParams = new URLSearchParams(window.location.search);
+      const from = urlParams.get('from');
+      const mode = urlParams.get('mode') || 'single';
+      
+      // Check if from command center (FCC/TCC)
+      const isFromCommandCenter = from === 'command_center' || 
+                                   from === 'tournament-command-center' || 
+                                   from === 'franchise-command-center' ||
+                                   (!from && (mode === 'tournament' || mode === 'franchise'));
+      
+      if (isFromCommandCenter) {
+        backBtn.textContent = 'Back To Locker Room';
+      } else if (from === 'lineup') {
+        backBtn.textContent = 'Back To Lineup';
+      } else {
+        // Default fallback
+        backBtn.textContent = 'Back';
+      }
+      
       backBtn.addEventListener('click', () => {
         this.handleBack();
       });
@@ -1927,6 +1947,24 @@ class PlaybooksUI {
       if (teamId) params.set('team_id', teamId); // Use team_id (ObjectId), not user_team_name
       
       window.location.href = `/franchise-command-center.html?${params.toString()}`;
+      return;
+    }
+    
+    // ✅ FIX: Check if from lineup - go back to Lineup Selection screen
+    if (from === 'lineup') {
+      console.log('✅ [PLAYBOOKS BACK] Navigating to Lineup Selection screen');
+      
+      // ✅ SS&S: Use TimeoutNavigationHelper to preserve all game context
+      const params = helper.buildGameNavigationParams({
+        sourceParams: urlParams,
+        targetQuarter: currentQuarter,
+        gameId: currentGameId,
+        resumeFromTimeout: resumeFromTimeout,
+        lineup: lineup,
+        myTeamSide: myTeamSide
+      });
+      
+      window.location.href = `/set-lineup.html?${params.toString()}`;
       return;
     }
     
