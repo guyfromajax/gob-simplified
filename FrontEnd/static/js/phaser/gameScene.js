@@ -283,7 +283,6 @@ export function createGameScene(Phaser) {
       // If DB has None/missing strategy_settings, backend can use request.strategy_settings as fallback
       if (this.gamePlanSettings && this.userTeamSide) {
         payload.user_team_side = this.userTeamSide;
-        payload.playcall_settings = this.gamePlanSettings.playcall_settings;
         payload.strategy_settings = this.gamePlanSettings.strategy_settings;
         console.log('🎮 [gameScene] Sending game plan settings to backend:', {
           user_team_side: this.userTeamSide,

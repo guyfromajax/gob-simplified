@@ -126,7 +126,6 @@ class QuarterSimulationRequest(BaseModel):
     away_lineup: dict[str, str] | None = None
     # Game plan settings (for user's team in single game mode)
     user_team_side: str | None = None  # "home" or "away"
-    playcall_settings: dict[str, int] | None = None
     strategy_settings: dict[str, int] | None = None
     # Starting possession control for quarters after Q1
     start_with_inbound: bool | None = None

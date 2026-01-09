@@ -1104,7 +1104,6 @@ def run_tournament_training(req: TournamentTrainingRequest):
     # These are the LATEST settings saved from Game Plan and Playbooks screens
     # When playbook_training_mode == "current-playbooks", these settings will be used
     plays_data = team_data.get("plays", {})
-    playcall_settings = team_data.get("playcall_settings", {})
     strategy_settings = team_data.get("strategy_settings", {})
     playbook_settings = team_data.get("playbook_settings", {})
     scouting_data = team_data.get("scouting_data", {})
@@ -1146,7 +1145,6 @@ def run_tournament_training(req: TournamentTrainingRequest):
         allocations,
         coaching_focus,
         plays_data=plays_data,
-        playcall_settings=playcall_settings,
         strategy_settings=strategy_settings,
         playbook_settings=playbook_settings,
         scouting_data=scouting_data,

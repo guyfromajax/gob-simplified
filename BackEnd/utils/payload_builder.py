@@ -15,7 +15,6 @@ def build_quarter_simulation_payload(
     home_lineup: Optional[Dict[str, str]] = None,
     away_lineup: Optional[Dict[str, str]] = None,
     user_team_side: Optional[str] = None,
-    playcall_settings: Optional[Dict[str, int]] = None,
     strategy_settings: Optional[Dict[str, int]] = None,
     franchise_id: Optional[str] = None,
     tournament_id: Optional[str] = None
@@ -32,8 +31,7 @@ def build_quarter_simulation_payload(
         home_lineup: Home team lineup (position -> player_id mapping)
         away_lineup: Away team lineup (position -> player_id mapping)
         user_team_side: Which side the user controls ("home" or "away")
-        playcall_settings: User's playcall preferences
-        strategy_settings: User's strategy preferences
+        strategy_settings: User's strategy preferences (offense, defense, inside, outside, attack, etc.)
         franchise_id: Franchise ID (for franchise mode)
         tournament_id: Tournament ID (for tournament mode)
         
@@ -59,27 +57,24 @@ def build_quarter_simulation_payload(
     # Add mode-specific fields
     if mode == "single":
         # Single game mode - user controls one team
-        if user_team_side and playcall_settings and strategy_settings:
+        if user_team_side and strategy_settings:
             payload["user_team_side"] = user_team_side
-            payload["playcall_settings"] = playcall_settings
             payload["strategy_settings"] = strategy_settings
     
     elif mode == "franchise":
         # Franchise mode - user controls their franchise team
         if franchise_id:
             payload["franchise_id"] = franchise_id
-        if user_team_side and playcall_settings and strategy_settings:
+        if user_team_side and strategy_settings:
             payload["user_team_side"] = user_team_side
-            payload["playcall_settings"] = playcall_settings
             payload["strategy_settings"] = strategy_settings
     
     elif mode == "tournament":
         # Tournament mode - user controls their team in tournament context
         if tournament_id:
             payload["tournament_id"] = tournament_id
-        if user_team_side and playcall_settings and strategy_settings:
+        if user_team_side and strategy_settings:
             payload["user_team_side"] = user_team_side
-            payload["playcall_settings"] = playcall_settings
             payload["strategy_settings"] = strategy_settings
     
     return payload
@@ -142,7 +137,6 @@ def build_auto_lineup_payload(
     mode: str = "single",
     game_id: Optional[str] = None,
     user_team_side: Optional[str] = None,
-    playcall_settings: Optional[Dict[str, int]] = None,
     strategy_settings: Optional[Dict[str, int]] = None,
     franchise_id: Optional[str] = None,
     tournament_id: Optional[str] = None
@@ -158,8 +152,7 @@ def build_auto_lineup_payload(
         mode: Game mode ("single", "franchise", "tournament")
         game_id: Existing game ID
         user_team_side: Which side the user controls
-        playcall_settings: User's playcall preferences
-        strategy_settings: User's strategy preferences
+        strategy_settings: User's strategy preferences (offense, defense, inside, outside, attack, etc.)
         franchise_id: Franchise ID (for franchise mode)
         tournament_id: Tournament ID (for tournament mode)
         
@@ -175,7 +168,6 @@ def build_auto_lineup_payload(
         home_lineup=None,  # Will be auto-generated
         away_lineup=None,  # Will be auto-generated
         user_team_side=user_team_side,
-        playcall_settings=playcall_settings,
         strategy_settings=strategy_settings,
         franchise_id=franchise_id,
         tournament_id=tournament_id

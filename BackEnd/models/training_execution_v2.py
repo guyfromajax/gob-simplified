@@ -22,7 +22,6 @@ def execute_training(
     allocations: Dict,
     coaching_focus: Optional[str] = None,
     plays_data: Optional[Dict] = None,
-    playcall_settings: Optional[Dict] = None,
     strategy_settings: Optional[Dict] = None,
     playbook_settings: Optional[Dict] = None,
     scouting_data: Optional[Dict] = None,
@@ -103,7 +102,6 @@ def execute_training(
         scouting_data,
         allocations,
         playbook_training_mode,
-        playcall_settings,
         strategy_settings,
         playbook_settings,
         coaching_focus
@@ -1280,7 +1278,6 @@ def apply_play_defense_training(
     scouting_data: Dict,
     allocations: Dict,
     playbook_training_mode: str,
-    playcall_settings: Dict,
     strategy_settings: Dict,
     playbook_settings: Dict,
     coaching_focus: Optional[str] = None
@@ -1293,9 +1290,9 @@ def apply_play_defense_training(
         scouting_data: Dict of scouting data with defense effectiveness/momentum
         allocations: Training point allocations
         playbook_training_mode: "current-playbooks", "all-plays-even", or "custom"
-        playcall_settings: Game plan playcall settings (Inside, Outside, Attack, etc.)
-        strategy_settings: Game plan strategy settings (offense, defense, etc.)
+        strategy_settings: Game plan strategy settings (offense, defense, inside, outside, attack, etc.)
         playbook_settings: Playbook percentage settings
+        coaching_focus: Optional coaching focus for targeted training
     
     Returns:
         Tuple of (updated_plays, updated_scouting_data)
@@ -1361,7 +1358,6 @@ def apply_play_defense_training(
             updated_plays,
             offense_play_points,
             playbook_training_mode,
-            playcall_settings,
             strategy_settings,
             playbook_settings
         )
@@ -1384,12 +1380,18 @@ def _apply_offense_play_training(
     plays_data: Dict,
     total_points: int,
     playbook_training_mode: str,
-    playcall_settings: Dict,
     strategy_settings: Dict,
     playbook_settings: Dict
 ) -> Dict:
     """
     Apply training points to offensive plays.
+    
+    Args:
+        plays_data: Dict of plays with effectiveness/momentum
+        total_points: Total training points to distribute
+        playbook_training_mode: "current-playbooks", "all-plays-even", or "custom"
+        strategy_settings: Game plan strategy settings (used for inside/outside/attack split)
+        playbook_settings: Playbook percentage settings
     
     Returns:
         Updated plays_data dict
@@ -1497,14 +1499,14 @@ def _apply_offense_play_training(
         
         # Distribute set play points
         if set_points > 0:
-            # Filter 2: playcall_settings determine Inside/Outside/Attack split
-            inside_setting = playcall_settings.get("Inside", 2)
-            outside_setting = playcall_settings.get("Outside", 2)
-            attack_setting = playcall_settings.get("Attack", 2)
+            # Filter 2: strategy_settings determine Inside/Outside/Attack split
+            inside_setting = strategy_settings.get("inside", 2)
+            outside_setting = strategy_settings.get("outside", 2)
+            attack_setting = strategy_settings.get("attack", 2)
             
             # 🔍 DEBUG: Log set play distribution
             logger.warning(f"🔍 [SET PLAY TRAINING DEBUG] set_points: {set_points}")
-            logger.warning(f"🔍 [SET PLAY TRAINING DEBUG] playcall_settings: Inside={inside_setting}, Outside={outside_setting}, Attack={attack_setting}")
+            logger.warning(f"🔍 [SET PLAY TRAINING DEBUG] strategy_settings: inside={inside_setting}, outside={outside_setting}, attack={attack_setting}")
             
             total_focus = inside_setting + outside_setting + attack_setting
             if total_focus == 0:

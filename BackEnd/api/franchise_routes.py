@@ -2183,14 +2183,12 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     # These are the LATEST settings saved from Game Plan and Playbooks screens
     # When playbook_training_mode == "current-playbooks", these settings will be used
     plays_data = team_data.get("plays", {})
-    playcall_settings = team_data.get("playcall_settings", {})
     strategy_settings = team_data.get("strategy_settings", {})
     playbook_settings = team_data.get("playbook_settings", {})
     scouting_data = team_data.get("scouting_data", {})
     
     # 🔍 DEBUG: Log settings loaded for training
     logger.warning(f"🔍 [TRAINING DEBUG] team_id used: {team_id}")
-    logger.warning(f"🔍 [TRAINING DEBUG] playcall_settings keys: {list(playcall_settings.keys()) if playcall_settings else 'EMPTY/NONE'}")
     logger.warning(f"🔍 [TRAINING DEBUG] strategy_settings keys: {list(strategy_settings.keys()) if strategy_settings else 'EMPTY/NONE'}")
     logger.warning(f"🔍 [TRAINING DEBUG] strategy_settings['offense']: {strategy_settings.get('offense') if strategy_settings else 'N/A'}")
     logger.warning(f"🔍 [TRAINING DEBUG] playbook_settings keys: {list(playbook_settings.keys()) if playbook_settings else 'EMPTY/NONE'}")
@@ -2258,7 +2256,6 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         allocations,
         coaching_focus,
         plays_data=plays_data,
-        playcall_settings=playcall_settings,
         strategy_settings=strategy_settings,
         playbook_settings=playbook_settings,
         scouting_data=scouting_data,
@@ -2422,7 +2419,6 @@ def run_franchise_training(req: FranchiseTrainingRequest):
             
             # Get plays, game plan settings, and playbook settings for computer team
             computer_plays_data = computer_team_data.get("plays", {})
-            computer_playcall_settings = computer_team_data.get("playcall_settings", {})
             computer_strategy_settings = computer_team_data.get("strategy_settings", {})
             computer_playbook_settings = computer_team_data.get("playbook_settings", {})
             computer_scouting_data = computer_team_data.get("scouting_data", {})
@@ -2452,7 +2448,6 @@ def run_franchise_training(req: FranchiseTrainingRequest):
                 computer_allocations,
                 computer_coaching_focus,
                 plays_data=computer_plays_data,
-                playcall_settings=computer_playcall_settings,
                 strategy_settings=computer_strategy_settings,
                 playbook_settings=computer_playbook_settings,
                 scouting_data=computer_scouting_data,
