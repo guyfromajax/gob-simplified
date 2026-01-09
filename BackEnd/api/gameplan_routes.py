@@ -1487,6 +1487,11 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         
         # Get playbook settings (percentages, slot assignments, motion dropdowns, and position filters)
         playbook_settings = team_obj.get("playbook_settings", {})
+        logger.info(f"🔍 [PLAYBOOKS GET] team_obj type: {type(team_obj)}, has playbook_settings: {'playbook_settings' in team_obj if isinstance(team_obj, dict) else False}")
+        logger.info(f"🔍 [PLAYBOOKS GET] actual_team_id: {actual_team_id}")
+        if not playbook_settings:
+            logger.warning(f"⚠️ [PLAYBOOKS GET] playbook_settings is empty or missing for team {actual_team_id}")
+            logger.warning(f"⚠️ [PLAYBOOKS GET] team_obj keys: {list(team_obj.keys()) if isinstance(team_obj, dict) else 'N/A'}")
         
         # ✅ SINGLE GAME CROSS-INSTANCE PERSISTENCE: Check core teams collection if game document has no settings
         if mode == "single" and (not playbook_settings or len(playbook_settings) == 0 or not any(playbook_settings.get(k) for k in ["motion", "set_play_inside", "set_play_attack", "set_play_outside", "zone_defense", "man_defense", "slot_assignments"])):
@@ -1545,12 +1550,20 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             logger.info(f"🔍 [GET PLAYBOOKS] Position '{key}' has {count} play_ids")
         
         # Get saved playbook percentages (motion, set_play, zone_defense)
+        logger.info(f"🔍 [PLAYBOOKS GET] playbook_settings keys: {list(playbook_settings.keys()) if playbook_settings else 'EMPTY'}")
         motion_percentages = playbook_settings.get("motion", {})
         set_play_inside_percentages = playbook_settings.get("set_play_inside", {})
         set_play_attack_percentages = playbook_settings.get("set_play_attack", {})
         set_play_outside_percentages = playbook_settings.get("set_play_outside", {})
         zone_defense_percentages = playbook_settings.get("zone_defense", {})
         man_defense_percentages = playbook_settings.get("man_defense", {})
+        logger.info(f"🔍 [PLAYBOOKS GET] motion_percentages keys: {list(motion_percentages.keys())}")
+        logger.info(f"🔍 [PLAYBOOKS GET] set_play_inside_percentages keys: {list(set_play_inside_percentages.keys())}")
+        logger.info(f"🔍 [PLAYBOOKS GET] set_play_attack_percentages keys: {list(set_play_attack_percentages.keys())}")
+        logger.info(f"🔍 [PLAYBOOKS GET] set_play_outside_percentages keys: {list(set_play_outside_percentages.keys())}")
+        if motion_percentages:
+            sample_motion = dict(list(motion_percentages.items())[:3])
+            logger.info(f"🔍 [PLAYBOOKS GET] Sample motion percentages: {sample_motion}")
         
         # Get even_distribution_all flag (defaults to False if not set)
         even_distribution_all = playbook_settings.get("even_distribution_all", False)
@@ -1597,6 +1610,19 @@ def save_playbooks(request: PlaybookSettingsRequest):
     Stores in teams.{team_id}.playbook_settings in the appropriate mode document.
     """
     try:
+        logger.info(f"🔍 [PLAYBOOKS SAVE] Received save request: mode={request.mode}, team_id={request.team_id}")
+        logger.info(f"🔍 [PLAYBOOKS SAVE] playbook_settings keys: {list(request.playbook_settings.keys()) if request.playbook_settings else 'EMPTY'}")
+        if request.playbook_settings:
+            logger.info(f"🔍 [PLAYBOOKS SAVE] motion keys: {list(request.playbook_settings.get('motion', {}).keys())}")
+            logger.info(f"🔍 [PLAYBOOKS SAVE] set_play_inside keys: {list(request.playbook_settings.get('set_play_inside', {}).keys())}")
+            logger.info(f"🔍 [PLAYBOOKS SAVE] set_play_attack keys: {list(request.playbook_settings.get('set_play_attack', {}).keys())}")
+            logger.info(f"🔍 [PLAYBOOKS SAVE] set_play_outside keys: {list(request.playbook_settings.get('set_play_outside', {}).keys())}")
+            logger.info(f"🔍 [PLAYBOOKS SAVE] zone_defense keys: {list(request.playbook_settings.get('zone_defense', {}).keys())}")
+            logger.info(f"🔍 [PLAYBOOKS SAVE] man_defense keys: {list(request.playbook_settings.get('man_defense', {}).keys())}")
+            # Log sample percentages
+            if request.playbook_settings.get('motion'):
+                sample_motion = dict(list(request.playbook_settings.get('motion', {}).items())[:3])
+                logger.info(f"🔍 [PLAYBOOKS SAVE] Sample motion percentages: {sample_motion}")
         # Determine which collection to use
         if request.mode == "franchise":
             if not request.franchise_id:
@@ -1643,17 +1669,9 @@ def save_playbooks(request: PlaybookSettingsRequest):
         if not doc:
             raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
         
-        # ✅ Resolve team_id (might be a name, need actual team_id for update path)
+        # ✅ FIX: Resolve team_id FIRST (before ensure_team_objects_exist) to use correct team_id
+        # This ensures we're using the authoritative team_id from the document
         actual_team_id = request.team_id
-        
-        # ✅ PERFORMANCE: Ensure team objects exist, passing pre-loaded doc to avoid double-load
-        ensure_team_objects_exist(
-            request.mode, doc_id, actual_team_id,
-            franchise_doc=doc if request.mode == "franchise" else None,
-            tournament_doc=doc if request.mode == "tournament" else None
-        )
-        if not doc:
-            raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
         
         if request.mode == "franchise":
             # ✅ SS&S: Always use franchise document's user_team_object_id as source of truth
@@ -1682,7 +1700,7 @@ def save_playbooks(request: PlaybookSettingsRequest):
             if request.team_id and request.team_id != actual_team_id:
                 logger.warning(f"⚠️ [PLAYBOOKS SAVE] URL team_id ({request.team_id}) doesn't match tournament document user_team_object_id ({actual_team_id}). Using tournament document value.")
         else:
-            # For tournament/single mode, try to resolve team name to team_id
+            # For single mode, try to resolve team name to team_id
             teams = doc.get("teams", {})
             # First try direct lookup
             if request.team_id not in teams:
@@ -1710,11 +1728,41 @@ def save_playbooks(request: PlaybookSettingsRequest):
             else:
                 actual_team_id = request.team_id
         
+        logger.info(f"🔍 [PLAYBOOKS SAVE] Resolved actual_team_id: {actual_team_id} (from request.team_id: {request.team_id})")
+        
+        # ✅ FIX: Ensure team objects exist AFTER resolving actual_team_id
+        # This ensures we're using the correct team_id when creating/updating team objects
+        ensure_team_objects_exist(
+            request.mode, doc_id, actual_team_id,
+            franchise_doc=doc if request.mode == "franchise" else None,
+            tournament_doc=doc if request.mode == "tournament" else None
+        )
+        
+        # ✅ FIX: Reload document after ensure_team_objects_exist to get latest data
+        # ensure_team_objects_exist might have modified the document
+        if request.mode == "franchise":
+            doc = collection.find_one(
+                {"_id": ObjectId(doc_id)},
+                {"franchise_teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+            )
+        elif request.mode == "tournament":
+            doc = collection.find_one(
+                {"_id": ObjectId(doc_id)},
+                {"teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+            )
+        
+        if not doc:
+            raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
+        
         # Update playbook_settings in the appropriate document
         if request.mode == "franchise":
             update_path = f"franchise_teams.{actual_team_id}.playbook_settings"
         else:
             update_path = f"teams.{actual_team_id}.playbook_settings"
+        
+        logger.info(f"🔍 [PLAYBOOKS SAVE] Update path: {update_path}")
+        logger.info(f"🔍 [PLAYBOOKS SAVE] actual_team_id: {actual_team_id}")
+        logger.info(f"🔍 [PLAYBOOKS SAVE] doc_id: {doc_id}")
         
         # For single game mode, try both UUID string and ObjectId formats
         if request.mode == "single":
@@ -1769,9 +1817,46 @@ def save_playbooks(request: PlaybookSettingsRequest):
                 {"_id": ObjectId(doc_id)},
                 {"$set": {update_path: request.playbook_settings}}
             )
+            logger.info(f"🔍 [PLAYBOOKS SAVE] MongoDB update result: matched={result.matched_count}, modified={result.modified_count}")
         
         if request.mode != "single" and result.matched_count == 0:
+            logger.error(f"❌ [PLAYBOOKS SAVE] Document not found: mode={request.mode}, doc_id={doc_id}")
             raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
+        
+        # Verify the save by reading it back
+        try:
+            if request.mode == "franchise":
+                verify_doc = collection.find_one(
+                    {"_id": ObjectId(doc_id)},
+                    {"franchise_teams": 1, "_id": 1}
+                )
+                if verify_doc:
+                    saved_settings = verify_doc.get("franchise_teams", {}).get(actual_team_id, {}).get("playbook_settings", {})
+                    logger.info(f"✅ [PLAYBOOKS SAVE] Verified save - motion keys: {list(saved_settings.get('motion', {}).keys())}")
+                    logger.info(f"✅ [PLAYBOOKS SAVE] Verified save - set_play_inside keys: {list(saved_settings.get('set_play_inside', {}).keys())}")
+                    if saved_settings.get('motion'):
+                        sample = dict(list(saved_settings.get('motion', {}).items())[:3])
+                        logger.info(f"✅ [PLAYBOOKS SAVE] Verified save - sample motion: {sample}")
+            elif request.mode == "tournament":
+                verify_doc = collection.find_one(
+                    {"_id": ObjectId(doc_id)},
+                    {"teams": 1, "_id": 1}
+                )
+                if verify_doc:
+                    saved_settings = verify_doc.get("teams", {}).get(actual_team_id, {}).get("playbook_settings", {})
+                    logger.info(f"✅ [PLAYBOOKS SAVE] Verified save - motion keys: {list(saved_settings.get('motion', {}).keys())}")
+                    logger.info(f"✅ [PLAYBOOKS SAVE] Verified save - set_play_inside keys: {list(saved_settings.get('set_play_inside', {}).keys())}")
+            else:
+                verify_doc = collection.find_one({"_id": doc_id}, {"teams": 1, "_id": 1})
+                if verify_doc:
+                    saved_settings = verify_doc.get("teams", {}).get(actual_team_id, {}).get("playbook_settings", {})
+                    logger.info(f"✅ [PLAYBOOKS SAVE] Verified save - motion keys: {list(saved_settings.get('motion', {}).keys())}")
+                    logger.info(f"✅ [PLAYBOOKS SAVE] Verified save - set_play_inside keys: {list(saved_settings.get('set_play_inside', {}).keys())}")
+            
+            if not verify_doc:
+                logger.warning(f"⚠️ [PLAYBOOKS SAVE] Could not verify save - document not found")
+        except Exception as e:
+            logger.warning(f"⚠️ [PLAYBOOKS SAVE] Error during verification (non-critical): {e}")
         
         logger.info(f"✅ Saved playbook settings for team {actual_team_id} in {request.mode} mode")
         return {"success": True, "message": "Playbook settings saved successfully"}

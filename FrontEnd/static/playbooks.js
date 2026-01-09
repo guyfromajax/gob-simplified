@@ -392,7 +392,15 @@ class PlaybooksUI {
         
         // Store saved playbook percentages for later use
         this.savedPlaybookPercentages = data.playbook_percentages || {};
-        console.log('🔍 [PLAYBOOKS] Loaded saved percentages from API:', this.savedPlaybookPercentages);
+        console.log('🔍 [PLAYBOOKS LOAD] Loaded saved percentages from API:', this.savedPlaybookPercentages);
+        console.log('🔍 [PLAYBOOKS LOAD] motion keys:', Object.keys(this.savedPlaybookPercentages.motion || {}));
+        console.log('🔍 [PLAYBOOKS LOAD] set_play_inside keys:', Object.keys(this.savedPlaybookPercentages.set_play_inside || {}));
+        console.log('🔍 [PLAYBOOKS LOAD] set_play_attack keys:', Object.keys(this.savedPlaybookPercentages.set_play_attack || {}));
+        console.log('🔍 [PLAYBOOKS LOAD] set_play_outside keys:', Object.keys(this.savedPlaybookPercentages.set_play_outside || {}));
+        if (this.savedPlaybookPercentages.motion) {
+          const sample = Object.entries(this.savedPlaybookPercentages.motion).slice(0, 3);
+          console.log('🔍 [PLAYBOOKS LOAD] Sample motion percentages:', sample);
+        }
         
         // Store even_distribution_all flag from API
         this.evenDistributionAllFlag = data.even_distribution_all || false;
@@ -2072,13 +2080,17 @@ class PlaybooksUI {
       
       // ✅ FIX: Save ALL percentages including 0% (database is single source of truth)
       // Extract motion play percentages (exclude "To Be Added")
+      console.log('🔍 [PLAYBOOKS SAVE] Building playbookSettings from state...');
+      console.log('🔍 [PLAYBOOKS SAVE] Motion plays in state:', Object.keys(this.state.sections.motion || {}));
       Object.keys(this.state.sections.motion || {}).forEach(playId => {
         const playData = this.state.sections.motion[playId];
         // Find play name from playData
         const play = this.playData.motion?.find(p => p.id === playId);
         if (play && play.name !== 'To Be Added') {
           // Save percentage even if 0 (ensures database is complete source of truth)
-          playbookSettings.motion[play.name] = playData.percentage || 0;
+          const percentage = playData.percentage || 0;
+          playbookSettings.motion[play.name] = percentage;
+          console.log(`🔍 [PLAYBOOKS SAVE] Motion: ${play.name} = ${percentage}%`);
         }
       });
       
@@ -2086,6 +2098,7 @@ class PlaybooksUI {
       ['set-play-inside', 'set-play-attack', 'set-play-outside'].forEach(sectionKey => {
         const settingsKey = sectionKey.replace('set-play-', 'set_play_');
         const plays = this.playData[settingsKey] || [];
+        console.log(`🔍 [PLAYBOOKS SAVE] ${settingsKey} plays in state:`, Object.keys(this.state.sections[sectionKey] || {}));
         
         Object.keys(this.state.sections[sectionKey] || {}).forEach(playId => {
           const playData = this.state.sections[sectionKey][playId];
@@ -2093,7 +2106,9 @@ class PlaybooksUI {
           const play = plays.find(p => p.id === playId);
           if (play && play.name !== 'To Be Added') {
             // Save percentage even if 0 (ensures database is complete source of truth)
-            playbookSettings[settingsKey][play.name] = playData.percentage || 0;
+            const percentage = playData.percentage || 0;
+            playbookSettings[settingsKey][play.name] = percentage;
+            console.log(`🔍 [PLAYBOOKS SAVE] ${settingsKey}: ${play.name} = ${percentage}%`);
           }
         });
       });
@@ -2127,6 +2142,7 @@ class PlaybooksUI {
       // ✅ NEW: Include even_distribution_all flag (stores user's last action)
       playbookSettings.even_distribution_all = this.evenDistributionAllFlag || false;
       
+      console.log('🔍 [PLAYBOOKS SAVE] Final playbookSettings structure:', JSON.stringify(playbookSettings, null, 2));
       console.log('🔍 [PLAYBOOKS] Saving slot assignments:', this.state.slotAssignments);
       console.log('🔍 [PLAYBOOKS] Saving motion dropdowns:', this.state.motionDropdowns);
       console.log('🔍 [PLAYBOOKS] Saving even_distribution_all flag:', playbookSettings.even_distribution_all);
@@ -2137,6 +2153,13 @@ class PlaybooksUI {
         team_id: teamId,
         playbook_settings: playbookSettings
       };
+      console.log('🔍 [PLAYBOOKS SAVE] Request body (mode, team_id, franchise_id, tournament_id, game_id):', {
+        mode: mode,
+        team_id: teamId,
+        franchise_id: franchiseId,
+        tournament_id: tournamentId,
+        game_id: gameId
+      });
       
       if (mode === 'single' && gameId) {
         requestBody.game_id = gameId;
@@ -2155,12 +2178,20 @@ class PlaybooksUI {
       
       if (response.ok) {
         const result = await response.json();
-        console.log('✅ Playbook settings saved successfully:', result);
+        console.log('✅ [PLAYBOOKS SAVE] Playbook settings saved successfully:', result);
+        console.log('✅ [PLAYBOOKS SAVE] Response status:', response.status);
         return true;
       } else {
-        const error = await response.json().catch(() => ({ detail: `HTTP ${response.status}: ${response.statusText}` }));
-        console.error('❌ Failed to save playbook settings:', error);
-        console.error('❌ Request body was:', requestBody);
+        const errorText = await response.text();
+        console.error('❌ [PLAYBOOKS SAVE] Failed to save playbook settings. Status:', response.status);
+        console.error('❌ [PLAYBOOKS SAVE] Error response:', errorText);
+        console.error('❌ [PLAYBOOKS SAVE] Request body was:', JSON.stringify(requestBody, null, 2));
+        try {
+          const error = JSON.parse(errorText);
+          console.error('❌ [PLAYBOOKS SAVE] Parsed error:', error);
+        } catch (e) {
+          console.error('❌ [PLAYBOOKS SAVE] Could not parse error as JSON');
+        }
         return false;
       }
     } catch (error) {
