@@ -299,11 +299,13 @@ class PlaybooksUI {
     // Initialize state with loaded plays
     this.state = new PlaybooksState(this.playData);
     
+    // ✅ FIX: Load position filter selections BEFORE loadState() so that
+    // redistributePercentagesEvenly() (if even_distribution_all is true) can
+    // correctly filter plays based on selected positions
+    this.loadPositionFilterSelections();
+    
     // Load saved state (if any)
     await this.loadState();
-    
-    // Load position filter button selections from localStorage
-    this.loadPositionFilterSelections();
     
     // Re-render assigned plays to ensure slot assignments are displayed
     this.renderAssignedPlays();
@@ -470,39 +472,22 @@ class PlaybooksUI {
     await this.loadSlotAssignmentsFromAPI();
     await this.loadPlaybookPercentagesFromAPI();
     
-    // ✅ FIX: Only redistribute if even_distribution_all is true AND percentages are missing/empty
-    // If percentages are already loaded, respect them (they are the source of truth)
+    // ✅ FIX: The even_distribution_all flag is for UI state (button active), not for forcing redistribution on load
+    // If flag is true, it means "keep the Even Distribution All button active" - use saved percentages
+    // Redistribution only happens when the user clicks the button, not on every load
+    // Position filters are now loaded BEFORE loadState() so percentages are applied correctly
     if (this.evenDistributionAllFlag === true) {
-      // Check if percentages are actually set in any section
-      const hasLoadedPercentages = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'].some(sectionKey => {
-        const section = this.state.sections[sectionKey] || {};
-        return Object.keys(section).some(playId => {
-          const percentage = section[playId]?.percentage || 0;
-          return percentage > 0;
-        });
+      console.log('🔍 [PLAYBOOKS] even_distribution_all is true - syncing button states but using saved percentages');
+      // Sync button states (even distribution is enabled for UI)
+      const offenseSections = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'];
+      offenseSections.forEach(sectionKey => {
+        this.evenDistributionEnabled[sectionKey] = true;
+        this.updateEvenDistributionButton(sectionKey);
       });
-      
-      if (hasLoadedPercentages) {
-        // Percentages are already loaded - use them as-is, but sync button states
-        console.log('🔍 [PLAYBOOKS] even_distribution_all is true but percentages are already loaded - using saved percentages');
-        const offenseSections = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'];
-        offenseSections.forEach(sectionKey => {
-          // Enable Even Distribution button state (visual only, don't redistribute)
-          this.evenDistributionEnabled[sectionKey] = true;
-          this.updateEvenDistributionButton(sectionKey);
-        });
-        this.updateEvenDistributionAllButton();
-      } else {
-        // No percentages loaded - apply even distribution
-        console.log('🔍 [PLAYBOOKS] even_distribution_all is true and no percentages loaded - applying even distribution');
-        const offenseSections = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'];
-        offenseSections.forEach(sectionKey => {
-          this.evenDistributionEnabled[sectionKey] = true;
-          this.distributePercentagesEvenly(sectionKey);
-          this.updateEvenDistributionButton(sectionKey);
-        });
-        this.updateEvenDistributionAllButton();
-      }
+      // Update "Even Distribution - All" button state
+      this.updateEvenDistributionAllButton();
+      // ✅ DO NOT redistribute - use saved percentages (already loaded via loadPlaybookPercentagesFromAPI)
+      // Redistribution only happens when user clicks the "Even Distribution - All" button
     } else {
       // If flag is false, use saved percentages (already loaded via loadPlaybookPercentagesFromAPI)
       console.log('🔍 [PLAYBOOKS] even_distribution_all is false, using saved percentages');
