@@ -2201,16 +2201,20 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         logger.warning(f"🔍 [TRAINING DEBUG] playbook_settings['set_play_attack'] keys: {list(playbook_settings.get('set_play_attack', {}).keys())}")
     logger.warning(f"🔍 [TRAINING DEBUG] playbook_training_mode: {training_data.get('playbook_training_mode', 'not provided')}")
     
-    # Initialize plays_data if empty (first time training for this team)
+    # ✅ FIX: Initialize plays_data if empty (first time training for this team)
+    # This ensures plays structure exists before training, preventing plays from being lost
     if not plays_data:
         logger.warning(f"📚 [API] plays_data is empty, populating from universal plays collection")
         from BackEnd.api.gameplan_routes import populate_team_plays
         plays_data = populate_team_plays(mode="franchise")
-        # Save to database
+        # Save to database immediately to ensure structure exists
         db.franchises.update_one(
             {"_id": franchise_id},
             {"$set": {f"franchise_teams.{team_id}.plays": plays_data}}
         )
+        logger.info(f"✅ [API] Initialized {len(plays_data)} plays for team {team_id}")
+    else:
+        logger.info(f"✅ [API] Found {len(plays_data)} existing plays for team {team_id}")
     
     # Initialize scouting_data if empty or missing defense structure
     if not scouting_data or "defense" not in scouting_data:
@@ -2325,13 +2329,20 @@ def run_franchise_training(req: FranchiseTrainingRequest):
             continue
         franchise_update[f"franchise_teams.{team_id}.{field}"] = value
     
-    # Update plays data
-    if updated_plays:
+    # ✅ FIX: Always save plays data (even if empty) to preserve structure after training
+    # This ensures plays are not lost when playbooks page reloads
+    if updated_plays is not None:
         franchise_update[f"franchise_teams.{team_id}.plays"] = updated_plays
+        logger.info(f"✅ [TRAINING] Saving {len(updated_plays)} plays to database")
+    else:
+        logger.warning(f"⚠️ [TRAINING] updated_plays is None, preserving existing plays data")
     
-    # Update scouting_data (defenses)
-    if updated_scouting_data:
+    # ✅ FIX: Always save scouting_data (even if empty) to preserve structure after training
+    if updated_scouting_data is not None:
         franchise_update[f"franchise_teams.{team_id}.scouting_data"] = updated_scouting_data
+        logger.info(f"✅ [TRAINING] Saving scouting_data to database")
+    else:
+        logger.warning(f"⚠️ [TRAINING] updated_scouting_data is None, preserving existing scouting_data")
 
     # Mark training as completed and update status
     session_type = training_status.get("session_type", "in-season")

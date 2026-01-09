@@ -2,6 +2,7 @@
 
 1. Playcall Override During Opening Tip Sequence -- When a user selects a playcall override during the opening tip sequence (before the game is initialized), the play is highlighted in the playcall center UI but the override never reaches the backend. The frontend `setPlaycallOverride()` function blocks the API call because `game_id` is `null` at that point (the game hasn't been created yet via `/api/simulate-quarter`). The override only works after the first turn is simulated and `game_id` becomes available. **Solution:** Either queue the override and send it after game initialization, or defer the `game_id` check until the first turn is simulated.
 2. Defensive Foul on missed shot attempt not announcing via our Announcement System
+3. Scouting Report button does not appear in the TCC
 
 ## Fixed Bugs (January 2025)
 
@@ -94,3 +95,27 @@
   2. Container width constraint
   3. Browser caching
 - **Next Steps**: Verify CSS is loading and container width is correct
+
+### 🔍 Investigating: Continuous 404 Requests for Player Tooltip Images (court.html)
+- **Issue**: Continuous stream of 404 requests for player headshot images (`/images/players/${playerId}.png` and `/images/players/default.png`) even when game is paused
+- **Location**: `FrontEnd/static/js/phaser/gameScene.js` lines 519-523 (player tooltip image loading)
+- **Root Cause**:
+  1. Tooltip tries to load player image: `/images/players/${playerId}.png` (UUID-based filenames)
+  2. When that fails (404), `onerror` handler tries fallback: `/images/players/default.png`
+  3. Fallback also doesn't exist (404), creating a retry loop
+  4. `mousemove` event listener (lines 673-683) is active even when paused, continuously triggering tooltip updates and image load attempts
+- **Impact**:
+  - Unnecessary network requests (continuous 404s)
+  - Console noise
+  - Potential performance impact from repeated failed requests
+  - May contribute to slow initial game download
+- **Expected Behavior**:
+  - Image should load once when tooltip is first shown
+  - Should fail gracefully if missing (hide image or show placeholder)
+  - Should not retry continuously after failure
+  - Tooltips should be disabled when game is paused
+- **Fix Required**:
+  1. Add flag to prevent retries after first failure
+  2. Hide image element on error instead of trying non-existent fallback
+  3. Optionally disable tooltips when game is paused
+  4. Ensure tooltip image only loads once per tooltip show, not on every mousemove

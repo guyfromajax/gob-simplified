@@ -2070,13 +2070,15 @@ class PlaybooksUI {
         zone_defense: {}
       };
       
+      // ✅ FIX: Save ALL percentages including 0% (database is single source of truth)
       // Extract motion play percentages (exclude "To Be Added")
       Object.keys(this.state.sections.motion || {}).forEach(playId => {
         const playData = this.state.sections.motion[playId];
         // Find play name from playData
         const play = this.playData.motion?.find(p => p.id === playId);
-        if (play && play.name !== 'To Be Added' && playData.percentage > 0) {
-          playbookSettings.motion[play.name] = playData.percentage;
+        if (play && play.name !== 'To Be Added') {
+          // Save percentage even if 0 (ensures database is complete source of truth)
+          playbookSettings.motion[play.name] = playData.percentage || 0;
         }
       });
       
@@ -2089,8 +2091,9 @@ class PlaybooksUI {
           const playData = this.state.sections[sectionKey][playId];
           // Find play name from playData
           const play = plays.find(p => p.id === playId);
-          if (play && play.name !== 'To Be Added' && playData.percentage > 0) {
-            playbookSettings[settingsKey][play.name] = playData.percentage;
+          if (play && play.name !== 'To Be Added') {
+            // Save percentage even if 0 (ensures database is complete source of truth)
+            playbookSettings[settingsKey][play.name] = playData.percentage || 0;
           }
         });
       });
@@ -2100,8 +2103,9 @@ class PlaybooksUI {
         const playData = this.state.sections['zone-defense'][playId];
         // Find play name from DEFENSE_PLAY_DATA
         const play = DEFENSE_PLAY_DATA['zone-defense']?.find(p => p.id === playId);
-        if (play && play.name !== 'To Be Added' && playData.percentage > 0) {
-          playbookSettings.zone_defense[play.name] = playData.percentage;
+        if (play && play.name !== 'To Be Added') {
+          // Save percentage even if 0 (ensures database is complete source of truth)
+          playbookSettings.zone_defense[play.name] = playData.percentage || 0;
         }
       });
       
@@ -2114,8 +2118,9 @@ class PlaybooksUI {
       Object.keys(this.state.sections['man-defense'] || {}).forEach(playId => {
         const playData = this.state.sections['man-defense'][playId];
         const play = DEFENSE_PLAY_DATA['man-defense']?.find(p => p.id === playId);
-        if (play && play.name !== 'To Be Added' && playData.percentage > 0) {
-          playbookSettings.man_defense[play.name] = playData.percentage;
+        if (play && play.name !== 'To Be Added') {
+          // Save percentage even if 0 (ensures database is complete source of truth)
+          playbookSettings.man_defense[play.name] = playData.percentage || 0;
         }
       });
       

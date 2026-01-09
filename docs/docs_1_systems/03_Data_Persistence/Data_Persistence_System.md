@@ -352,3 +352,80 @@ This system documents data persistence across all three game modes when users ar
 - `docs/franchise_mode_architecture.md` - Complete franchise mode architecture
 - `docs/COMMON_DATA_SET.md` - Common data structure across all modes
 
+---
+
+## Known Issues & Fixes (January 2025)
+
+### ✅ Fixed: Playbook Percentage Persistence
+
+**Issue:** Playbook percentages were not persisting correctly, especially 0% values. When users set percentages and saved, then reloaded the playbooks page, percentages would reset to 0 or default values.
+
+**Root Cause:**
+- Frontend `savePlaybookSettings()` only saved percentages > 0 (filtered out 0% values)
+- When loading, all percentages were reset to 0 first, then saved values applied
+- If a play wasn't in the saved percentages object (because it was 0%), it stayed at 0
+- This created a mismatch where the database didn't have complete percentage data
+
+**Fix (January 2025):**
+- Modified `FrontEnd/static/playbooks.js` `savePlaybookSettings()` to save ALL percentages including 0%
+- Changed condition from `playData.percentage > 0` to save all percentages (using `playData.percentage || 0`)
+- This ensures the database is the complete source of truth for all play percentages
+
+**Files Changed:**
+- `FrontEnd/static/playbooks.js` (lines 2073-2120)
+
+---
+
+### ✅ Fixed: Plays Not Populating After Training
+
+**Issue:** After running training in Franchise/Tournament mode, when revisiting the Playbooks page, offense play containers were empty (no plays listed). Defense plays still appeared because they come from hardcoded data.
+
+**Root Cause:**
+- Training execution (`execute_training()`) modifies plays data and returns `updated_plays`
+- Backend only saved `updated_plays` if it was truthy: `if updated_plays:`
+- If `updated_plays` was an empty dict `{}` or `None`, plays weren't saved
+- When playbooks page reloaded, `/api/playbooks` endpoint read `team_obj.get("plays", {})` which was empty
+- Frontend had no plays to display in containers
+
+**Fix (January 2025):**
+- Modified `BackEnd/api/franchise_routes.py` and `BackEnd/api/tournament_routes.py` to always save plays data after training
+- Changed condition from `if updated_plays:` to `if updated_plays is not None:`
+- This ensures plays structure is preserved even if training doesn't modify plays
+- Added logging to track when plays are saved vs. preserved
+- Enhanced plays initialization logging to track when plays are populated from universal collection
+
+**Files Changed:**
+- `BackEnd/api/franchise_routes.py` (lines 2204-2213, 2328-2334)
+- `BackEnd/api/tournament_routes.py` (lines 1104-1122, 1184-1190)
+
+**Prevention:**
+- Plays are now initialized before training if empty (prevents empty plays_data from being passed to training)
+- Training always returns plays data (even if unchanged)
+- Backend always saves plays data after training (preserves structure)
+
+---
+
+### Playbook Settings Structure
+
+**Complete Playbook Settings Object:**
+```javascript
+{
+  "motion": { "Play Name": percentage (0-100), ... },
+  "set_play_inside": { "Play Name": percentage (0-100), ... },
+  "set_play_attack": { "Play Name": percentage (0-100), ... },
+  "set_play_outside": { "Play Name": percentage (0-100), ... },
+  "zone_defense": { "Defense Name": percentage (0-100), ... },
+  "man_defense": { "Defense Name": percentage (0-100), ... },
+  "slot_assignments": { "playId": slotNumber, ... },
+  "motion_dropdowns": { "playId": dropdownValue, ... },
+  "position_filters": { "standard": [...], "PG": [...], ... },
+  "even_distribution_all": boolean
+}
+```
+
+**Key Points:**
+- All percentages are saved (including 0%) to ensure database is complete source of truth
+- Plays data structure must be preserved through training to prevent empty containers
+- Defense plays come from hardcoded `DEFENSE_PLAY_DATA` (not from database), so they always appear
+- Offense plays come from database `plays` object, so structure must be maintained
+
