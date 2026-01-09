@@ -99,6 +99,69 @@ function showToast(msg) {
   setTimeout(() => { toast.hidden = true; }, 2000);
 }
 
+function showSuccessPopup(message) {
+  // Create modal overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'gameplan-success-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+  `;
+  
+  // Create modal
+  const modal = document.createElement('div');
+  modal.className = 'gameplan-success-modal';
+  modal.style.cssText = `
+    background: #1a1a1a;
+    border: 2px solid #00ff00;
+    border-radius: 8px;
+    padding: 24px;
+    max-width: 400px;
+    width: 90%;
+    color: #fff;
+    text-align: center;
+  `;
+  
+  // Message
+  const messageEl = document.createElement('p');
+  messageEl.textContent = message;
+  messageEl.style.cssText = `
+    font-size: 1.125rem;
+    margin-bottom: 20px;
+    font-weight: 600;
+    color: #00ff00;
+  `;
+  
+  // OK button
+  const okBtn = document.createElement('button');
+  okBtn.textContent = 'OK';
+  okBtn.style.cssText = `
+    padding: 10px 30px;
+    background: #00ff00;
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+  `;
+  okBtn.addEventListener('click', () => {
+    overlay.remove();
+  });
+  
+  modal.appendChild(messageEl);
+  modal.appendChild(okBtn);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
 function showModal(message) {
   const modal = document.getElementById('validation-modal');
   const modalMessage = document.getElementById('modal-message');
@@ -282,7 +345,7 @@ async function saveGamePlan() {
       return;
     }
     
-    showToast('Game plan saved!');
+    showSuccessPopup('Game Plan Successfully Saved');
   } catch (err) {
     console.error('Error saving settings:', err);
     showModal('An error occurred while saving. Please try again.');
@@ -431,9 +494,20 @@ function executeNavigateBack() {
   window.location.href = `/set-lineup.html?${params.toString()}`;
 }
 
-async function navigateToCommandCenter() {
-  // Save settings quietly before navigating back to command center
-  await saveSettingsQuietly();
+function navigateToCommandCenter() {
+  // Check for unsaved changes before navigating
+  if (hasUnsavedChanges) {
+    showUnsavedChangesWarning(() => {
+      executeNavigateToCommandCenter();
+    });
+    return;
+  }
+  executeNavigateToCommandCenter();
+}
+
+function executeNavigateToCommandCenter() {
+  // ✅ TASK 0: Commented out save logic - nav-only button
+  // await saveSettingsQuietly();
   
   // Return to command center (tournament or franchise)
   const mode = modeParam || 'single';
@@ -598,10 +672,9 @@ async function init() {
   // Button event listeners
   // ✅ TASK 0: Updated button IDs
   const btnSaveGamePlan = document.getElementById('btn-save-game-plan');
-  const btnPlayGame = document.getElementById('btn-play-game');
+  const btnNavPrimary = document.getElementById('btn-nav-primary'); // "Play Game" or "Back To Locker Room"
   const btnCancel = document.getElementById('btn-cancel');
   const btnBackToLineup = document.getElementById('btn-back-to-lineup');
-  const btnBackToLockerRoom = document.getElementById('btn-back-to-locker-room');
   const modalClose = document.getElementById('modal-close');
   
   // Check if lineup is valid (all 5 positions filled)
@@ -614,30 +687,49 @@ async function init() {
                                from === 'franchise-command-center';
   
   if (isFromCommandCenter) {
-    // From command center: show Back To Locker Room, hide Back To Lineup and Cancel
-    if (btnBackToLockerRoom) btnBackToLockerRoom.style.display = 'inline-block';
+    // From command center (FCC/TCC): show "Back To Locker Room" button, hide "Back To Lineup" and "Cancel"
+    if (btnNavPrimary) {
+      btnNavPrimary.textContent = 'Back To Locker Room';
+      btnNavPrimary.style.display = 'inline-block';
+      btnNavPrimary.addEventListener('click', () => {
+        console.log('🚀 [GAME-PLAN] btnNavPrimary (Back To Locker Room) CLICKED!');
+        navigateToCommandCenter();
+      });
+    }
     if (btnBackToLineup) btnBackToLineup.style.display = 'none';
     if (btnCancel) btnCancel.style.display = 'none';
   } else {
-    // From lineup: show Back To Lineup, hide Back To Locker Room and Cancel
-    if (btnBackToLineup) btnBackToLineup.style.display = 'inline-block';
-    if (btnBackToLockerRoom) btnBackToLockerRoom.style.display = 'none';
-    if (btnCancel) btnCancel.style.display = 'none';
-    
-    // Disable "Play Game" if lineup is invalid
-    if (btnPlayGame) {
+    // From lineup: show "Play Game" button and "Back To Lineup" button, hide "Cancel"
+    if (btnNavPrimary) {
+      btnNavPrimary.textContent = 'Play Game';
+      btnNavPrimary.style.display = 'inline-block';
+      
+      // Disable "Play Game" if lineup is invalid
       if (!lineupValid) {
-        btnPlayGame.disabled = true;
-        btnPlayGame.style.opacity = '0.5';
-        btnPlayGame.style.cursor = 'not-allowed';
-        btnPlayGame.title = 'Please complete your lineup first (Back To Lineup)';
+        btnNavPrimary.disabled = true;
+        btnNavPrimary.style.opacity = '0.5';
+        btnNavPrimary.style.cursor = 'not-allowed';
+        btnNavPrimary.title = 'Please complete your lineup first (Back To Lineup)';
       } else {
-        btnPlayGame.disabled = false;
-        btnPlayGame.style.opacity = '1';
-        btnPlayGame.style.cursor = 'pointer';
-        btnPlayGame.title = '';
+        btnNavPrimary.disabled = false;
+        btnNavPrimary.style.opacity = '1';
+        btnNavPrimary.style.cursor = 'pointer';
+        btnNavPrimary.title = '';
       }
+      
+      btnNavPrimary.addEventListener('click', () => {
+        console.log('🚀 [GAME-PLAN] btnNavPrimary (Play Game) CLICKED! About to call navigateToCourt()');
+        navigateToCourt();
+      });
     }
+    if (btnBackToLineup) {
+      btnBackToLineup.style.display = 'inline-block';
+      btnBackToLineup.addEventListener('click', () => {
+        console.log('🚀 [GAME-PLAN] btnBackToLineup CLICKED! About to call navigateBack()');
+        navigateBack();
+      });
+    }
+    if (btnCancel) btnCancel.style.display = 'none';
   }
   
   // ✅ TASK 0: Save Game Plan button (only button that saves to DB)
@@ -651,87 +743,8 @@ async function init() {
     console.error('❌ [GAME-PLAN] init() - btnSaveGamePlan NOT FOUND!');
   }
   
-  // ✅ TASK 0: Play Game button (nav-only, no save)
-  if (btnPlayGame) {
-    console.log('🔍 [GAME-PLAN] init() - btnPlayGame found, adding click listener');
-    btnPlayGame.addEventListener('click', () => {
-      console.log('🚀 [GAME-PLAN] btnPlayGame CLICKED! About to call navigateToCourt()');
-      navigateToCourt();
-    });
-  } else {
-    console.error('❌ [GAME-PLAN] init() - btnPlayGame NOT FOUND!');
-  }
-  
-  // ✅ TASK 0: Removed Playbooks button handler (button removed from HTML)
-      // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
-      const helper = window.TimeoutNavigationHelper;
-      if (!helper) {
-        console.error('❌ [GAME-PLAN] TimeoutNavigationHelper not loaded!');
-        return;
-      }
-      
-      const currentUrlParams = new URLSearchParams(window.location.search);
-      const currentGameId = helper.getGameId(currentUrlParams);
-      const resumeFromTimeout = helper.getResumeFromTimeout(currentUrlParams);
-      const currentQuarter = parseInt(currentUrlParams.get('quarter'), 10) || 1;
-      const currentMyTeamSide = currentUrlParams.get('my_team');
-      
-      // Build lineup object from URL params
-      const lineup = {};
-      if (currentMyTeamSide) {
-        const currentPgId = currentUrlParams.get(`${currentMyTeamSide}_pg`);
-        const currentSgId = currentUrlParams.get(`${currentMyTeamSide}_sg`);
-        const currentSfId = currentUrlParams.get(`${currentMyTeamSide}_sf`);
-        const currentPfId = currentUrlParams.get(`${currentMyTeamSide}_pf`);
-        const currentCId = currentUrlParams.get(`${currentMyTeamSide}_c`);
-        
-        if (currentPgId) lineup['PG'] = currentPgId;
-        if (currentSgId) lineup['SG'] = currentSgId;
-        if (currentSfId) lineup['SF'] = currentSfId;
-        if (currentPfId) lineup['PF'] = currentPfId;
-        if (currentCId) lineup['C'] = currentCId;
-      }
-      
-      // ✅ SS&S: Use TimeoutNavigationHelper to preserve all game context (including resume_from_timeout and clock)
-      const params = helper.buildGameNavigationParams({
-        sourceParams: currentUrlParams,
-        targetQuarter: currentQuarter,
-        gameId: currentGameId,
-        resumeFromTimeout: resumeFromTimeout,
-        lineup: lineup,
-        myTeamSide: currentMyTeamSide
-      });
-      
-      // ✅ FIX: Preserve original 'from' parameter if it indicates command center navigation
-      // This ensures that when navigating back from Playbooks, Game Plan knows the original source
-      const originalFrom = currentUrlParams.get('from');
-      if (originalFrom === 'command_center' || originalFrom === 'tournament-command-center' || originalFrom === 'franchise-command-center') {
-        // Preserve original command center source
-        params.set('from', originalFrom);
-      } else {
-        // Otherwise, set to 'game-plan' to indicate we came from Game Plan
-        params.set('from', 'game-plan');
-      }
-      
-      if (DEBUG) {
-        params.set('debug', '1');
-      }
-      
-      console.log('🔍 [GAME-PLAN] Navigating to playbooks with params:', params.toString());
-      window.location.href = `/playbooks.html?${params.toString()}`;
-    });
-  }
-  
   if (btnCancel) {
     btnCancel.addEventListener('click', navigateToCommandCenter);
-  }
-  
-  if (btnBackToLineup) {
-    btnBackToLineup.addEventListener('click', navigateBack);
-  }
-  
-  if (btnBackToLockerRoom) {
-    btnBackToLockerRoom.addEventListener('click', navigateToCommandCenter);
   }
   
   if (modalClose) {
