@@ -1112,6 +1112,45 @@ async function init() {
     });
   }
 
+  // ✅ TASK 0: PLAYBOOKS button: navigate to playbooks page
+  const playbooksBtn = document.getElementById('playbooks-button');
+  if (playbooksBtn) {
+    playbooksBtn.addEventListener('click', () => {
+      console.log('📚 PLAYBOOKS BUTTON CLICKED! Redirecting to playbooks.html');
+      
+      // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
+      const helper = window.TimeoutNavigationHelper;
+      if (!helper) {
+        console.error('❌ [SET-LINEUP] TimeoutNavigationHelper not loaded!');
+        return;
+      }
+      
+      const currentGameId = helper.getGameId(urlParams);
+      const resumeFromTimeout = helper.getResumeFromTimeout(urlParams);
+      
+      const params = helper.buildGameNavigationParams({
+        sourceParams: urlParams,
+        targetQuarter: quarter,
+        gameId: currentGameId,
+        resumeFromTimeout: resumeFromTimeout, // ✅ SS&S: Supports any quarter (backend supports this)
+        lineup: lineup,
+        myTeamSide: myTeamSide
+      });
+
+      if (DEBUG) {
+        params.set('debug', '1');
+      }
+      
+      // Add "from=lineup" so Playbooks screen knows where user came from
+      params.set('from', 'lineup');
+      
+      if (DEBUG) {
+        console.debug('🔀 Redirecting to playbooks.html', { home: homeTeam, away: awayTeam, gameId: currentGameId });
+      }
+      window.location.href = `/playbooks.html?${params.toString()}`;
+    });
+  }
+
   // BOX SCORE button: go to current game's box score if available
   const boxBtn = document.getElementById('box-score-button');
   if (boxBtn) {

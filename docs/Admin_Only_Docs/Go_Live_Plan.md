@@ -15,7 +15,88 @@ This plan prioritizes getting the application live and functional. Frontend desi
 - ✅ MongoDB Atlas account (already connected locally)
 - ✅ Domain ownership (geekedoutbasketball.com)
 - ✅ Codebase ready for deployment
-- ⚠️ Code updates needed for multi-domain deployment
+- ✅ Phase 3 (Code Updates) - COMPLETE
+- ⏳ Task 0 (Button Updates) - IN PROGRESS
+- ⏳ Task 1 (Persistence Foundation) - PENDING
+- ⏳ Task 2 (Database Optimization) - PENDING
+
+---
+
+## Revised Work Plan Structure
+
+### Task 0: Button Updates (IN PROGRESS)
+**Priority:** 🔴 HIGH - Streamlines UI for persistence system  
+**Estimated Time:** 1-2 hours  
+**Status:** ⏳ IN PROGRESS
+
+**Scope:**
+- Playbooks page: Change "Submit Playbooks" → "Save Playbooks"
+- Game Plan page: 
+  - Remove "Playbooks" button
+  - Add "Save Game Plan" button (only button that saves to DB)
+  - Make "Back To Lineup" and "Play Game" nav-only (comment out save logic)
+  - Add unsaved changes warning popup (reuse Playbooks pattern)
+- Lineup Selection page: Add "Playbooks" button (vertically stacked between "Game Plan" and "Box Score")
+
+**Dependencies:** None
+
+---
+
+### Task 1: Persistence Foundation + Go-Live Functionality (MUST-HAVE)
+**Priority:** 🔴 CRITICAL - Blocks go-live  
+**Estimated Time:** 4-6 hours  
+**Status:** ⏳ PENDING (Waiting on Task 0)
+
+**Goal:** The application exists reliably on the internet (staging + production), and persistence behaves correctly enough that two weeks of testing and polish produce trustworthy results.
+
+**Scope:**
+1. **Go-live foundations:**
+   - Staging and production environments exist and are independently functional
+   - Frontend and backend are correctly wired in each environment
+   - Database connectivity is verified and stable
+   - Environment separation is clean (no accidental cross-talk)
+
+2. **Frontend ↔ backend contract:**
+   - Single, centralized mechanism for frontend to determine which backend to communicate with
+   - All frontend→backend communication flows through that mechanism
+   - Backend access controls (CORS) configured to match actual domains
+
+3. **Persistence correctness:**
+   - Save Playbooks commits changes durably (survives refresh, logout, re-login)
+   - Save Game Plan commits changes durably (survives refresh, logout, re-login)
+   - Lineup persistence: **NO CHANGES NEEDED** (current flow works perfectly - URL params → gameplay → periodic saves)
+
+**Definition of Done:**
+- Staging supports end-to-end usage with reliable persistence (save → refresh → data intact)
+- Production can be cloned from staging via configuration, not rework
+- No silent persistence failures (clear success/error signaling)
+- Can run two weeks of testing without uncertainty about deployment or data correctness
+
+**Dependencies:** Task 0 must be complete
+
+---
+
+### Task 2: Database Calls + Macro Persistence System (PERFORMANCE & SCALE)
+**Priority:** 🟡 MEDIUM - Performance optimization  
+**Estimated Time:** 8-12 hours  
+**Status:** ⏳ PENDING (Waiting on Task 1)
+
+**Goal:** Reduce query explosion and establish sustainable data access patterns so the app performs well and costs remain controlled under concurrent usage.
+
+**Scope:**
+- Identify and prioritize worst query offenders (pages/endpoints triggering dozens of DB calls)
+- Reduce database calls per request through: batching, aggregation, projections, composite read patterns
+- Introduce macro-level persistence patterns only where justified (settings snapshots, pre-computed summaries, materialized read models)
+- Add measurement and visibility (query counts, response times)
+
+**Definition of Done:**
+- Highest-impact page/endpoint drops from ~35-40 DB calls to single digits
+- Response times materially improve and remain stable under expected concurrency
+- Data access patterns are efficient, predictable, and cost-aware
+
+**Dependencies:** Task 1 must be complete
+
+**Note:** Advanced patterns (CQRS, background workers, caching layers) should be treated as tools, not defaults, and introduced incrementally where they clearly move the needle.
 
 ---
 
@@ -501,10 +582,10 @@ This plan prioritizes getting the application live and functional. Frontend desi
 
 ## Status Tracking
 
-**Last Updated:** [Current Date]  
-**Current Phase:** ✅ Phase 3 Complete - Ready for Phase 1 (Staging Backend)  
+**Last Updated:** January 2025  
+**Current Phase:** ⏳ Task 0 (Button Updates) - IN PROGRESS  
 **Blockers:** None  
-**Next Action:** Set up Railway account and deploy staging backend
+**Next Action:** Complete Task 0 button updates, then proceed to Task 1 (Persistence Foundation)
 
 ---
 

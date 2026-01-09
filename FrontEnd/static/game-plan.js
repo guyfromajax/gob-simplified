@@ -73,6 +73,10 @@ let currentSettings = {
   strategy_settings: {}
 };
 
+// Track unsaved changes
+let hasUnsavedChanges = false;
+let lastSavedSettings = null;
+
 // Slider mappings (note: all go to strategy_settings now for unified backend handling)
 const strategySliders = {
   'offense': 'slider-offense',
@@ -137,9 +141,14 @@ function setupSliders() {
         const value = parseInt(e.target.value, 10);
         valueDisplay.textContent = value;
         currentSettings.strategy_settings[key] = value;
+        markUnsavedChanges();
       });
     }
   }
+}
+
+function markUnsavedChanges() {
+  hasUnsavedChanges = true;
 }
 
 function validateOffenseSettings() {
@@ -203,6 +212,10 @@ async function loadSettings() {
       if (valueDisplay) valueDisplay.textContent = value;
     }
     
+    // Store last saved settings for comparison
+    lastSavedSettings = JSON.parse(JSON.stringify(currentSettings));
+    hasUnsavedChanges = false;
+    
     console.log('✅ Loaded game plan settings:', currentSettings);
   } catch (err) {
     console.error('Error loading settings:', err);
@@ -249,17 +262,17 @@ async function saveSettingsQuietly() {
   }
 }
 
-async function saveSettings() {
-  console.log('🚀 [GAME-PLAN] saveSettings() CALLED');
-  console.log('🚀 [GAME-PLAN] saveSettings() - Current URL:', window.location.href);
+async function saveGamePlan() {
+  console.log('🚀 [GAME-PLAN] saveGamePlan() CALLED');
+  console.log('🚀 [GAME-PLAN] saveGamePlan() - Current URL:', window.location.href);
   try {
     // Validate offense settings
     if (!validateOffenseSettings()) {
-      console.warn('⚠️ [GAME-PLAN] saveSettings() - Validation failed');
+      console.warn('⚠️ [GAME-PLAN] saveGamePlan() - Validation failed');
       showModal("At least one Offense setting must be above 'Never'. Please increase any Offense slider.");
       return;
     }
-    console.log('✅ [GAME-PLAN] saveSettings() - Validation passed, saving...');
+    console.log('✅ [GAME-PLAN] saveGamePlan() - Validation passed, saving...');
     
     // Save the settings
     const saved = await saveSettingsQuietly();
@@ -270,29 +283,6 @@ async function saveSettings() {
     }
     
     showToast('Game plan saved!');
-    
-    // Redirect based on where user came from
-    setTimeout(() => {
-      console.log('🚀 [GAME-PLAN] saveSettings() - About to navigate (after 500ms delay)');
-      const urlParams = new URLSearchParams(window.location.search);
-      const from = urlParams.get('from') || 'lineup';
-      console.log('🚀 [GAME-PLAN] saveSettings() - from param:', from);
-      
-      // ✅ FIX: Check for all command center variations
-      const isFromCommandCenter = from === 'command_center' || 
-                                   from === 'tournament-command-center' || 
-                                   from === 'franchise-command-center';
-      
-      if (isFromCommandCenter) {
-        // Return to command center
-        console.log('🚀 [GAME-PLAN] saveSettings() - Navigating to command center');
-        navigateToCommandCenter();
-      } else {
-        // Go to court.html (start game)
-        console.log('🚀 [GAME-PLAN] saveSettings() - About to call navigateToCourt()');
-        navigateToCourt();
-      }
-    }, 500);
   } catch (err) {
     console.error('Error saving settings:', err);
     showModal('An error occurred while saving. Please try again.');
@@ -300,15 +290,29 @@ async function saveSettings() {
 }
 
 function navigateToCourt() {
-  console.log('🚀 [GAME-PLAN] navigateToCourt() CALLED');
+  // Check for unsaved changes before navigating
+  if (hasUnsavedChanges) {
+    showUnsavedChangesWarning(() => {
+      executeNavigateToCourt();
+    });
+    return;
+  }
+  executeNavigateToCourt();
+}
+
+function executeNavigateToCourt() {
+  console.log('🚀 [GAME-PLAN] executeNavigateToCourt() CALLED');
   console.log('🚀 [GAME-PLAN] Current URL:', window.location.href);
+  
+  // ✅ TASK 0: Commented out save logic - nav-only button
+  // await saveSettingsQuietly();
   
   // ✅ CRITICAL FIX: Read URL params directly from window.location.search
   // Don't rely on module-level urlParams which might be stale
   const currentUrlParams = new URLSearchParams(window.location.search);
   const currentParamsObj = Object.fromEntries(currentUrlParams.entries());
   console.log('🚀 [GAME-PLAN] Current URL params:', currentParamsObj);
-  console.error('🚀🚀🚀 [GAME-PLAN] navigateToCourt() - game_id:', currentUrlParams.get('game_id'), 'resume_from_timeout:', currentUrlParams.get('resume_from_timeout'));
+  console.error('🚀🚀🚀 [GAME-PLAN] executeNavigateToCourt() - game_id:', currentUrlParams.get('game_id'), 'resume_from_timeout:', currentUrlParams.get('resume_from_timeout'));
   
   // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
   const helper = window.TimeoutNavigationHelper;
@@ -337,7 +341,7 @@ function navigateToCourt() {
   if (currentCId) lineup['C'] = currentCId;
   
   // ✅ DEBUG: Log timeout resume state
-  console.log('🔍 [GAME-PLAN] navigateToCourt() timeout state:', {
+  console.log('🔍 [GAME-PLAN] executeNavigateToCourt() timeout state:', {
     currentGameId,
     currentQuarter,
     resumeFromTimeout,
@@ -362,8 +366,8 @@ function navigateToCourt() {
   
   // ✅ DEBUG: Log final URL before navigation
   const finalUrl = `/court.html?${params.toString()}`;
-  console.log('🔍 [GAME-PLAN] navigateToCourt() FINAL URL:', finalUrl);
-  console.log('🔍 [GAME-PLAN] navigateToCourt() URL params:', {
+  console.log('🔍 [GAME-PLAN] executeNavigateToCourt() FINAL URL:', finalUrl);
+  console.log('🔍 [GAME-PLAN] executeNavigateToCourt() URL params:', {
     game_id: params.get('game_id'),
     resume_from_timeout: params.get('resume_from_timeout'),
     quarter: params.get('quarter'),
@@ -376,9 +380,20 @@ function navigateToCourt() {
   window.location.href = finalUrl;
 }
 
-async function navigateBack() {
-  // Save settings quietly before navigating back to lineup
-  await saveSettingsQuietly();
+function navigateBack() {
+  // Check for unsaved changes before navigating
+  if (hasUnsavedChanges) {
+    showUnsavedChangesWarning(() => {
+      executeNavigateBack();
+    });
+    return;
+  }
+  executeNavigateBack();
+}
+
+function executeNavigateBack() {
+  // ✅ TASK 0: Commented out save logic - nav-only button
+  // await saveSettingsQuietly();
   
   // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
   const helper = window.TimeoutNavigationHelper;
@@ -411,7 +426,7 @@ async function navigateBack() {
     myTeamSide: myTeamSide
   });
   
-  console.log('[navigateBack] Passing lineup params:', { pgId, sgId, sfId, pfId, cId, myTeamSide });
+  console.log('[executeNavigateBack] Passing lineup params:', { pgId, sgId, sfId, pfId, cId, myTeamSide });
   
   window.location.href = `/set-lineup.html?${params.toString()}`;
 }
@@ -446,6 +461,131 @@ async function resetSettings() {
   showToast('Settings reset');
 }
 
+function showUnsavedChangesWarning(onContinue) {
+  // Check if user has suppressed this warning
+  if (sessionStorage.getItem('gameplan_suppress_warning') === 'true') {
+    onContinue();
+    return;
+  }
+  
+  // Create modal overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'gameplan-warning-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+  `;
+  
+  // Create modal
+  const modal = document.createElement('div');
+  modal.className = 'gameplan-warning-modal';
+  modal.style.cssText = `
+    background: #1a1a1a;
+    border: 2px solid #ff7a00;
+    border-radius: 8px;
+    padding: 24px;
+    max-width: 500px;
+    width: 90%;
+    color: #fff;
+  `;
+  
+  // Message
+  const message = document.createElement('p');
+  message.textContent = "You haven't saved game plan changes.";
+  message.style.cssText = `
+    font-size: 1.125rem;
+    margin-bottom: 20px;
+    font-weight: 600;
+  `;
+  
+  // Checkbox
+  const checkboxContainer = document.createElement('div');
+  checkboxContainer.style.cssText = 'margin-bottom: 20px;';
+  
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.id = 'gameplan-suppress-warning';
+  checkbox.style.cssText = 'margin-right: 8px;';
+  
+  const checkboxLabel = document.createElement('label');
+  checkboxLabel.htmlFor = 'gameplan-suppress-warning';
+  checkboxLabel.textContent = "Don't show this message again";
+  checkboxLabel.style.cssText = 'color: #fff; cursor: pointer;';
+  
+  checkboxContainer.appendChild(checkbox);
+  checkboxContainer.appendChild(checkboxLabel);
+  
+  // Buttons container
+  const buttonsContainer = document.createElement('div');
+  buttonsContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  `;
+  
+  // Save Game Plan button
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Save Game Plan';
+  saveBtn.style.cssText = `
+    padding: 10px 20px;
+    background: #ff7a00;
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+  `;
+  saveBtn.addEventListener('click', async () => {
+    if (checkbox.checked) {
+      sessionStorage.setItem('gameplan_suppress_warning', 'true');
+    }
+    overlay.remove();
+    await saveGamePlan();
+    // After successful save, continue with navigation
+    if (!hasUnsavedChanges) {
+      onContinue();
+    }
+  });
+  
+  // Leave Without Saving button
+  const leaveBtn = document.createElement('button');
+  leaveBtn.textContent = 'Leave Without Saving';
+  leaveBtn.style.cssText = `
+    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+  `;
+  leaveBtn.addEventListener('click', () => {
+    if (checkbox.checked) {
+      sessionStorage.setItem('gameplan_suppress_warning', 'true');
+    }
+    overlay.remove();
+    hasUnsavedChanges = false;
+    onContinue();
+  });
+  
+  buttonsContainer.appendChild(saveBtn);
+  buttonsContainer.appendChild(leaveBtn);
+  
+  modal.appendChild(message);
+  modal.appendChild(checkboxContainer);
+  modal.appendChild(buttonsContainer);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
 async function init() {
   setHeader();
   setupSliders();
@@ -456,8 +596,9 @@ async function init() {
   const from = urlParams.get('from') || 'lineup';  // Default to lineup for backwards compatibility
   
   // Button event listeners
-  const btnSave = document.getElementById('btn-save');
-  const btnPlaybooks = document.getElementById('btn-playbooks');
+  // ✅ TASK 0: Updated button IDs
+  const btnSaveGamePlan = document.getElementById('btn-save-game-plan');
+  const btnPlayGame = document.getElementById('btn-play-game');
   const btnCancel = document.getElementById('btn-cancel');
   const btnBackToLineup = document.getElementById('btn-back-to-lineup');
   const btnBackToLockerRoom = document.getElementById('btn-back-to-locker-room');
@@ -477,42 +618,51 @@ async function init() {
     if (btnBackToLockerRoom) btnBackToLockerRoom.style.display = 'inline-block';
     if (btnBackToLineup) btnBackToLineup.style.display = 'none';
     if (btnCancel) btnCancel.style.display = 'none';
-    if (btnSave) btnSave.textContent = 'Save Game Plan';  // Save and return to command center
   } else {
     // From lineup: show Back To Lineup, hide Back To Locker Room and Cancel
     if (btnBackToLineup) btnBackToLineup.style.display = 'inline-block';
     if (btnBackToLockerRoom) btnBackToLockerRoom.style.display = 'none';
     if (btnCancel) btnCancel.style.display = 'none';
-    if (btnSave) {
-      btnSave.textContent = 'Play Game';  // Save and go to court
-      
-      // Disable "Play Game" if lineup is invalid
+    
+    // Disable "Play Game" if lineup is invalid
+    if (btnPlayGame) {
       if (!lineupValid) {
-        btnSave.disabled = true;
-        btnSave.style.opacity = '0.5';
-        btnSave.style.cursor = 'not-allowed';
-        btnSave.title = 'Please complete your lineup first (Back To Lineup)';
+        btnPlayGame.disabled = true;
+        btnPlayGame.style.opacity = '0.5';
+        btnPlayGame.style.cursor = 'not-allowed';
+        btnPlayGame.title = 'Please complete your lineup first (Back To Lineup)';
       } else {
-        btnSave.disabled = false;
-        btnSave.style.opacity = '1';
-        btnSave.style.cursor = 'pointer';
-        btnSave.title = '';
+        btnPlayGame.disabled = false;
+        btnPlayGame.style.opacity = '1';
+        btnPlayGame.style.cursor = 'pointer';
+        btnPlayGame.title = '';
       }
     }
   }
   
-  if (btnSave) {
-    console.log('🔍 [GAME-PLAN] init() - btnSave found, adding click listener');
-    btnSave.addEventListener('click', () => {
-      console.log('🚀 [GAME-PLAN] btnSave CLICKED! About to call saveSettings()');
-      saveSettings();
+  // ✅ TASK 0: Save Game Plan button (only button that saves to DB)
+  if (btnSaveGamePlan) {
+    console.log('🔍 [GAME-PLAN] init() - btnSaveGamePlan found, adding click listener');
+    btnSaveGamePlan.addEventListener('click', () => {
+      console.log('🚀 [GAME-PLAN] btnSaveGamePlan CLICKED! About to call saveGamePlan()');
+      saveGamePlan();
     });
   } else {
-    console.error('❌ [GAME-PLAN] init() - btnSave NOT FOUND!');
+    console.error('❌ [GAME-PLAN] init() - btnSaveGamePlan NOT FOUND!');
   }
   
-  if (btnPlaybooks) {
-    btnPlaybooks.addEventListener('click', () => {
+  // ✅ TASK 0: Play Game button (nav-only, no save)
+  if (btnPlayGame) {
+    console.log('🔍 [GAME-PLAN] init() - btnPlayGame found, adding click listener');
+    btnPlayGame.addEventListener('click', () => {
+      console.log('🚀 [GAME-PLAN] btnPlayGame CLICKED! About to call navigateToCourt()');
+      navigateToCourt();
+    });
+  } else {
+    console.error('❌ [GAME-PLAN] init() - btnPlayGame NOT FOUND!');
+  }
+  
+  // ✅ TASK 0: Removed Playbooks button handler (button removed from HTML)
       // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
       const helper = window.TimeoutNavigationHelper;
       if (!helper) {
@@ -590,4 +740,5 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
 
