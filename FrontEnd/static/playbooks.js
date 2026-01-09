@@ -470,20 +470,39 @@ class PlaybooksUI {
     await this.loadSlotAssignmentsFromAPI();
     await this.loadPlaybookPercentagesFromAPI();
     
-    // ✅ NEW: Check even_distribution_all flag and apply even distribution if enabled
+    // ✅ FIX: Only redistribute if even_distribution_all is true AND percentages are missing/empty
+    // If percentages are already loaded, respect them (they are the source of truth)
     if (this.evenDistributionAllFlag === true) {
-      console.log('🔍 [PLAYBOOKS] even_distribution_all is true, applying even distribution to all offense sections');
-      const offenseSections = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'];
-      offenseSections.forEach(sectionKey => {
-        // Enable Even Distribution for this section
-        this.evenDistributionEnabled[sectionKey] = true;
-        // Distribute percentages evenly
-        this.distributePercentagesEvenly(sectionKey);
-        // Update button visual state
-        this.updateEvenDistributionButton(sectionKey);
+      // Check if percentages are actually set in any section
+      const hasLoadedPercentages = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'].some(sectionKey => {
+        const section = this.state.sections[sectionKey] || {};
+        return Object.keys(section).some(playId => {
+          const percentage = section[playId]?.percentage || 0;
+          return percentage > 0;
+        });
       });
-      // Update "Even Distribution - All" button state
-      this.updateEvenDistributionAllButton();
+      
+      if (hasLoadedPercentages) {
+        // Percentages are already loaded - use them as-is, but sync button states
+        console.log('🔍 [PLAYBOOKS] even_distribution_all is true but percentages are already loaded - using saved percentages');
+        const offenseSections = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'];
+        offenseSections.forEach(sectionKey => {
+          // Enable Even Distribution button state (visual only, don't redistribute)
+          this.evenDistributionEnabled[sectionKey] = true;
+          this.updateEvenDistributionButton(sectionKey);
+        });
+        this.updateEvenDistributionAllButton();
+      } else {
+        // No percentages loaded - apply even distribution
+        console.log('🔍 [PLAYBOOKS] even_distribution_all is true and no percentages loaded - applying even distribution');
+        const offenseSections = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'];
+        offenseSections.forEach(sectionKey => {
+          this.evenDistributionEnabled[sectionKey] = true;
+          this.distributePercentagesEvenly(sectionKey);
+          this.updateEvenDistributionButton(sectionKey);
+        });
+        this.updateEvenDistributionAllButton();
+      }
     } else {
       // If flag is false, use saved percentages (already loaded via loadPlaybookPercentagesFromAPI)
       console.log('🔍 [PLAYBOOKS] even_distribution_all is false, using saved percentages');
