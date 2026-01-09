@@ -345,6 +345,10 @@ async function saveGamePlan() {
       return;
     }
     
+    // ✅ FIX: Reset unsaved changes flag after successful save
+    lastSavedSettings = JSON.parse(JSON.stringify(currentSettings));
+    hasUnsavedChanges = false;
+    
     showSuccessPopup('Game Plan Successfully Saved');
   } catch (err) {
     console.error('Error saving settings:', err);
