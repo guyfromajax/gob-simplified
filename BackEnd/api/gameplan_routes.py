@@ -26,7 +26,6 @@ def serve_playbooks_html():
     return FileResponse(STATIC_DIR / "playbooks.html")
 
 class GamePlanSettings(BaseModel):
-    playcall_settings: dict[str, int]
     strategy_settings: dict[str, int]
 
 class GamePlanRequest(BaseModel):
@@ -39,23 +38,14 @@ class GamePlanRequest(BaseModel):
 class GamePlanUpdateRequest(BaseModel):
     mode: str
     team_id: str
-    playcall_settings: dict[str, int]
     strategy_settings: dict[str, int]
     franchise_id: Optional[str] = None
     tournament_id: Optional[str] = None
     game_id: Optional[str] = None
 
 
-def validate_settings(playcall_settings: dict, strategy_settings: dict):
+def validate_settings(strategy_settings: dict):
     """Validate that settings are integers 0-4 and offense not all zero."""
-    # Validate playcall_settings (offense)
-    for key, value in playcall_settings.items():
-        if not isinstance(value, int) or value < 0 or value > 4:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Playcall setting '{key}' must be an integer between 0 and 4"
-            )
-    
     # Validate strategy_settings (defense/general)
     for key, value in strategy_settings.items():
         if not isinstance(value, int) or value < 0 or value > 4:
@@ -64,8 +54,10 @@ def validate_settings(playcall_settings: dict, strategy_settings: dict):
                 detail=f"Strategy setting '{key}' must be an integer between 0 and 4"
             )
     
-    # Ensure at least one offense setting is above 0
-    if all(v == 0 for v in playcall_settings.values()):
+    # Ensure at least one offense setting is above 0 (offense, inside, outside, attack)
+    offense_keys = ["offense", "inside", "outside", "attack"]
+    offense_values = [strategy_settings.get(key, 0) for key in offense_keys]
+    if all(v == 0 for v in offense_values):
         raise HTTPException(
             status_code=400,
             detail="At least one Offense setting must be above 'Never'. Please increase any Offense slider."
@@ -75,14 +67,6 @@ def validate_settings(playcall_settings: dict, strategy_settings: dict):
 def get_default_settings():
     """Return default settings (all set to 2 = Normal)."""
     return {
-        "playcall_settings": {
-            "Base": 2,
-            "Freelance": 2,
-            "Inside": 2,
-            "Attack": 2,
-            "Outside": 2,
-            "Set": 2
-        },
         "strategy_settings": {
             "offense": 2,  # Motion vs Set Play split (0=motion only, 4=set plays only)
             "inside": 2,   # Inside focus preference
@@ -675,7 +659,6 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
                 "pt_efficiency": team_attrs["pt_efficiency"],
                 "fb_opp_modifier": team_attrs["fb_opp_modifier"],
                 "pt_opp_modifier": team_attrs["pt_opp_modifier"],
-                "playcall_settings": defaults["playcall_settings"].copy(),
                 "strategy_settings": defaults["strategy_settings"].copy(),
                 "plays": populated_plays.copy(),
                 "playbook_settings": playbook_settings.copy()
@@ -691,8 +674,6 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
             updates = {}
             defaults = _get_cached_default_settings()
             
-            if "playcall_settings" not in team_obj:
-                updates[f"franchise_teams.{team_id}.playcall_settings"] = defaults["playcall_settings"].copy()
             if "strategy_settings" not in team_obj:
                 updates[f"franchise_teams.{team_id}.strategy_settings"] = defaults["strategy_settings"].copy()
             if not team_obj.get("plays"):
@@ -707,7 +688,7 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
                 )
                 # Update local copy for return value
                 for key, value in updates.items():
-                    # Extract field name from key (e.g., "franchise_teams.{team_id}.playcall_settings" -> "playcall_settings")
+                    # Extract field name from key (e.g., "franchise_teams.{team_id}.strategy_settings" -> "strategy_settings")
                     field_name = key.split(".")[-1]
                     franchise_teams[team_id][field_name] = value
         
@@ -758,7 +739,6 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
                 "pt_efficiency": team_attrs["pt_efficiency"],
                 "fb_opp_modifier": team_attrs["fb_opp_modifier"],
                 "pt_opp_modifier": team_attrs["pt_opp_modifier"],
-                "playcall_settings": defaults["playcall_settings"].copy(),
                 "strategy_settings": defaults["strategy_settings"].copy(),
                 "plays": populated_plays.copy(),
                 "scouting_data": scouting_data,
@@ -775,7 +755,7 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
                     {"_id": ObjectId(doc_id)},
                     {"$set": {f"{team_key}": team_obj}}
                 )
-        elif "playcall_settings" not in team_obj or "strategy_settings" not in team_obj or not team_obj.get("plays") or "shot_threshold" not in team_obj or "playbook_settings" not in team_obj:
+        elif "strategy_settings" not in team_obj or not team_obj.get("plays") or "shot_threshold" not in team_obj or "playbook_settings" not in team_obj:
             # Add missing settings
             defaults = get_default_settings()
             # Pass mode to populate_team_plays for tournament randomization
@@ -806,8 +786,6 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
                 else:
                     playbook_settings = existing_playbook_settings
             updates = {}
-            if "playcall_settings" not in team_obj:
-                updates[f"{team_key}.playcall_settings"] = defaults["playcall_settings"].copy()
             if "strategy_settings" not in team_obj:
                 updates[f"{team_key}.strategy_settings"] = defaults["strategy_settings"].copy()
             if not team_obj.get("plays"):
@@ -1019,7 +997,6 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
         
         # Get settings or return defaults
         defaults = get_default_settings()
-        playcall_settings = team_obj.get("playcall_settings", defaults["playcall_settings"])
         strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
         
         # ✅ FIX: Normalize legacy keys and ensure all required fields exist
@@ -1034,7 +1011,6 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
         normalized_strategy_settings.update(strategy_settings)
         
         return {
-            "playcall_settings": playcall_settings,
             "strategy_settings": normalized_strategy_settings
         }
     
@@ -1053,7 +1029,7 @@ def update_gameplan(request: GamePlanUpdateRequest):
     """Update game plan settings for a team in the specified mode."""
     try:
         # Validate settings
-        validate_settings(request.playcall_settings, request.strategy_settings)
+        validate_settings(request.strategy_settings)
         
         # Determine which collection to use
         if request.mode == "franchise":
@@ -1152,12 +1128,10 @@ def update_gameplan(request: GamePlanUpdateRequest):
         # Update settings in the appropriate document
         if request.mode == "franchise":
             update_fields = {
-                f"franchise_teams.{actual_team_id}.playcall_settings": request.playcall_settings,
                 f"franchise_teams.{actual_team_id}.strategy_settings": request.strategy_settings
             }
         else:
             update_fields = {
-                f"teams.{actual_team_id}.playcall_settings": request.playcall_settings,
                 f"teams.{actual_team_id}.strategy_settings": request.strategy_settings
             }
         

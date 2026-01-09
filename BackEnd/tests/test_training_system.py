@@ -165,15 +165,12 @@ def test_training_system():
     }
     
     # Sample settings
-    playcall_settings = {
-        "Inside": 4,
-        "Outside": 2,
-        "Attack": 0
-    }
-    
     strategy_settings = {
         "offense": 1,  # 75% motion, 25% set plays
-        "defense": 2   # 50/50 man/zone
+        "defense": 2,  # 50/50 man/zone
+        "inside": 4,   # Inside focus preference
+        "outside": 2,  # Outside focus preference
+        "attack": 0    # Attack focus preference
     }
     
     playbook_settings = {
@@ -213,7 +210,6 @@ def test_training_system():
             allocations,
             coaching_focus,
             plays_data=plays_data,
-            playcall_settings=playcall_settings,
             strategy_settings=strategy_settings,
             playbook_settings=playbook_settings,
             scouting_data=scouting_data,

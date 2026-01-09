@@ -484,9 +484,8 @@ async function handleSimToFourth() {
         console.log('🔍 Game plan check:', { currentQ, quarter, hasSettings: !!gamePlanSettings, userTeamSide, mode });
         if (currentQ === 1 && gamePlanSettings && userTeamSide) {
           payload.user_team_side = userTeamSide;
-          payload.playcall_settings = gamePlanSettings.playcall_settings;
           payload.strategy_settings = gamePlanSettings.strategy_settings;
-          console.log(`🎮 Sending game plan settings to backend (${mode} mode):`, { userTeamSide, playcall: gamePlanSettings.playcall_settings });
+          console.log(`🎮 Sending game plan settings to backend (${mode} mode):`, { userTeamSide, strategy: gamePlanSettings.strategy_settings });
         } else if (currentQ === 1) {
           console.warn('⚠️ Not sending game plan settings:', { hasSettings: !!gamePlanSettings, userTeamSide });
         }
@@ -501,7 +500,6 @@ async function handleSimToFourth() {
         // Reuse game plan settings from Q1
         if (gamePlanSettings && userTeamSide) {
           payload.user_team_side = userTeamSide;
-          payload.playcall_settings = gamePlanSettings.playcall_settings;
           payload.strategy_settings = gamePlanSettings.strategy_settings;
         }
         // Randomize possession and start with inbound for Q2-Q3
@@ -673,9 +671,8 @@ async function handleSimFullGame() {
         console.log('🔍 Game plan check (sim full):', { currentQ, quarter, hasSettings: !!gamePlanSettings, userTeamSide, mode });
         if (currentQ === 1 && gamePlanSettings && userTeamSide) {
           payload.user_team_side = userTeamSide;
-          payload.playcall_settings = gamePlanSettings.playcall_settings;
           payload.strategy_settings = gamePlanSettings.strategy_settings;
-          console.log(`🎮 Sending game plan settings to backend (${mode} mode, sim full):`, { userTeamSide, playcall: gamePlanSettings.playcall_settings });
+          console.log(`🎮 Sending game plan settings to backend (${mode} mode, sim full):`, { userTeamSide, strategy: gamePlanSettings.strategy_settings });
         } else if (currentQ === 1) {
           console.warn('⚠️ Not sending game plan settings (sim full):', { hasSettings: !!gamePlanSettings, userTeamSide });
         }
@@ -690,7 +687,6 @@ async function handleSimFullGame() {
         // Reuse game plan settings from Q1
         if (gamePlanSettings && userTeamSide) {
           payload.user_team_side = userTeamSide;
-          payload.playcall_settings = gamePlanSettings.playcall_settings;
           payload.strategy_settings = gamePlanSettings.strategy_settings;
         }
         // Randomize possession and start with inbound for Q2-Q4

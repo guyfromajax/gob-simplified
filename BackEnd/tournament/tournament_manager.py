@@ -117,14 +117,6 @@ class TournamentManager:
                 "fb_opp_modifier": team_attrs["fb_opp_modifier"],
                 "pt_opp_modifier": team_attrs["pt_opp_modifier"],
                 # Game plan settings (all start at 2 = Normal)
-                "playcall_settings": {
-                    "Base": 2,
-                    "Freelance": 2,
-                    "Inside": 2,
-                    "Attack": 2,
-                    "Outside": 2,
-                    "Set": 2
-                },
                 "strategy_settings": {
                     "offense": 2,  # Motion vs Set Play split (0=motion only, 4=set plays only)
                     "inside": 2,   # Inside focus preference

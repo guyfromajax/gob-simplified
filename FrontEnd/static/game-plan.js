@@ -69,7 +69,6 @@ if (modeParam === 'single') {
 
 // State
 let currentSettings = {
-  playcall_settings: {},
   strategy_settings: {}
 };
 
@@ -248,7 +247,6 @@ async function loadSettings() {
       console.error('❌ [GAME-PLAN] Failed to load game plan settings, status:', res.status);
       // Use defaults if API fails
       currentSettings = {
-        playcall_settings: {},
         strategy_settings: {
           'offense': 2, 'inside': 2, 'attack': 2, 'outside': 2, 'fast_breaks': 2,
           'defense': 2, 'aggression': 2, 'hc_trap': 2, 'fc_press': 2, 'rebounding': 2
@@ -294,7 +292,6 @@ async function saveSettingsQuietly() {
     const payload = {
       mode,
       team_id: teamId,
-      playcall_settings: currentSettings.playcall_settings,
       strategy_settings: currentSettings.strategy_settings
     };
     

@@ -167,3 +167,46 @@ This document tracks page load and API call speeds over time to measure performa
 
 ---
 
+**Date:** January 9, 2026 (Fourth measurement)
+
+| Endpoint/Resource | Status | Type | Size | Time |
+|-------------------|--------|------|------|------|
+| play-next-game | 200 | fetch | 0.2 kB | 3.72 s |
+| team-stats?franchise_id=696149297cd33b86528bd1ed | 200 | fetch | 1.9 kB | 3.06 s |
+| schedule?franchise_id=696149297cd33b86528bd1ed | 200 | fetch | 12.3 kB | 2.57 s |
+| roster?franchise_id=696149297cd33b86528bd1ed&team_name= | 200 | fetch | 7.6 kB | 1.94 s |
+| roster?franchise_id=696149297cd33b86528bd1ed&team_name=Morristown | 200 | fetch | 7.6 kB | 1.92 s |
+| state?franchise_id=696149297cd33b86528bd1ed | 200 | fetch | 142 kB | 1.84 s |
+| team-data?franchise_id=696149297cd33b86528bd1ed&team_id=68c98b09674d3f9b04546b33 | 200 | fetch | 14.1 kB | 1.56 s |
+| data?franchise_id=696149297cd33b86528bd1ed | 200 | fetch | 0.4 kB | 1.48 s |
+| gameplan?mode=franchise&franchise_id=696149297cd33b86528bd1ed&team_id=68c98b09674d3f9b04546b33 | 200 | fetch | 0.3 kB | 1.47 s |
+| team-data?franchise_id=696149297cd33b86528bd1ed&team_id=68c98b09674d3f9b04546b33 | 200 | fetch | 14.0 kB | 1.45 s |
+| franchise-command-center.js | 200 | script | 18.6 kB | 239 ms |
+| leaders?franchise_id=696149297cd33b86528bd1ed | 200 | fetch | 6.7 kB | 229 ms |
+| recruits?franchise_id=696149297cd33b86528bd1ed | 200 | fetch | 16.0 kB | 218 ms |
+| scouting-report.css | 200 | stylesheet | 0.7 kB | 205 ms |
+| attributeTooltips.js | 200 | script | 2.0 kB | 205 ms |
+| common.js | 200 | script | 0.6 kB | 205 ms |
+| command-center-team-styles.css | 200 | stylesheet | 1.4 kB | 204 ms |
+| teamStatsTable.js | 200 | script | 2.1 kB | 204 ms |
+| franchise-command-center.html | 200 | document | 2.4 kB | 197 ms |
+| tournament.css | 200 | stylesheet | 2.4 kB | 184 ms |
+| franchise-command-center.css | 200 | stylesheet | 0.6 kB | 169 ms |
+| ImageMorristown.png | 200 | png | 43.0 kB | 121 ms |
+| standings?franchise_id=696149297cd33b86528bd1ed | 200 | fetch | 1.1 kB | 111 ms |
+| teams | 200 | fetch | 0.7 kB | 63 ms |
+| api-config.js | 200 | script | 1.4 kB | 45 ms |
+| css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap | 200 | stylesheet | 0.8 kB | 43 ms |
+| play-next-game | 200 | preflight | 0.0 kB | 42 ms |
+| UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2 | 200 | font | 48.5 kB | 39 ms |
+| JTUSjIg69CK48gW7PXoo9WlhyyTh89Y.woff2 | 200 | font | 8.6 kB | 33 ms |
+| hive_keychain.js | 200 | script | 5.6 kB | 1 ms |
+
+### Notes
+- Slowest calls: `play-next-game` (3.72s), `team-stats` (3.06s), `schedule` (2.57s)
+- Largest payload: `state` endpoint (142 kB)
+- Fastest calls: `hive_keychain.js` (1ms), fonts (33-39ms), `teams` endpoint (63ms), `standings` (111ms)
+- **Consistency:** Speeds very similar to previous measurements, showing stable performance across multiple loads
+
+---
+

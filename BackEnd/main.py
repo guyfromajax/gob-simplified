@@ -877,12 +877,10 @@ def run_simulation(home_team_name, away_team_name, home_lineup_ids=None, away_li
         # Create team objects with plays for skeleton lookup
         teams_obj = {
             gm.home_team.team_id: {
-                "playcall_settings": getattr(gm.home_team, 'playcall_settings', {}),
                 "strategy_settings": getattr(gm.home_team, 'strategy_settings', {}),
                 "plays": populated_plays.copy()
             },
             gm.away_team.team_id: {
-                "playcall_settings": getattr(gm.away_team, 'playcall_settings', {}),
                 "strategy_settings": getattr(gm.away_team, 'strategy_settings', {}),
                 "plays": populated_plays.copy()
             }
