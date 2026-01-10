@@ -2,17 +2,38 @@ const DEBUG_BRACKET = window.DEBUG_BRACKET || false;
 const DEBUG_GAME_ID = window.DEBUG_GAME_ID || false;
 
 export async function finalizeGame({ simData, tournamentId, franchiseId, game }) {
-  // Extract score and winner - handle both new nested and old flat structure
-  // New structure: simData.home_team is an object with {name, score, etc.}
-  // Old structure: simData.home_team is a string, simData.homeTeam is an object
-  const homeTeamField = simData.home_team;
-  const awayTeamField = simData.away_team;
+  // ✅ UNIFIED STRUCTURE: Extract team names with priority: unified structure > backward compatibility
+  // Unified structure: simData.teams[home_team_id].name (preferred)
+  // Backward compatibility: simData.home_team (object with name) or simData.home_team (string) or simData.homeTeam (object)
   
-  const homeTeamObj = typeof homeTeamField === 'object' ? homeTeamField : (simData.homeTeam || { name: homeTeamField });
-  const awayTeamObj = typeof awayTeamField === 'object' ? awayTeamField : (simData.awayTeam || { name: awayTeamField });
+  // Try unified structure first
+  const homeTeamId = simData.home_team_id;
+  const awayTeamId = simData.away_team_id;
+  const teamsObj = simData.teams || {};
   
-  const homeKey = homeTeamObj.name || homeTeamField;
-  const awayKey = awayTeamObj.name || awayTeamField;
+  let homeTeamObj = null;
+  let awayTeamObj = null;
+  
+  // Priority 1: Unified structure (preferred)
+  if (homeTeamId && teamsObj[homeTeamId]) {
+    homeTeamObj = teamsObj[homeTeamId];
+  }
+  if (awayTeamId && teamsObj[awayTeamId]) {
+    awayTeamObj = teamsObj[awayTeamId];
+  }
+  
+  // Priority 2: Backward compatibility - old structure
+  if (!homeTeamObj) {
+    const homeTeamField = simData.home_team;
+    homeTeamObj = typeof homeTeamField === 'object' ? homeTeamField : (simData.homeTeam || { name: homeTeamField });
+  }
+  if (!awayTeamObj) {
+    const awayTeamField = simData.away_team;
+    awayTeamObj = typeof awayTeamField === 'object' ? awayTeamField : (simData.awayTeam || { name: awayTeamField });
+  }
+  
+  const homeKey = homeTeamObj?.name || homeTeamId || simData.home_team;
+  const awayKey = awayTeamObj?.name || awayTeamId || simData.away_team;
   
   const scoreMap = simData.final_score || simData.score || {};
   // ✅ FIX: Prioritize scoreMap (updated scores) over nested object scores (may be stale from initialSimData)
