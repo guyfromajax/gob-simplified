@@ -5,12 +5,14 @@ from pymongo.errors import PyMongoError
 
 # ✅ LOCAL DEV: Load .env.local if it exists (dev), otherwise use .env (Railway)
 # This allows local dev to use different MongoDB (local or Atlas) without affecting Railway
+import sys
+print("🔵 [DEBUG] db.py: Starting module", file=sys.stderr, flush=True)
 if os.path.exists(".env.local"):
     load_dotenv(".env.local")
-    print("🔧 [LOCAL DEV] Loaded .env.local")
+    print("🔧 [LOCAL DEV] Loaded .env.local", file=sys.stderr, flush=True)
 else:
     load_dotenv()  # Load .env or use Railway env vars
-    print("☁️ [RAILWAY/PROD] Loaded .env or system environment")
+    print("☁️ [RAILWAY/PROD] Loaded .env or system environment", file=sys.stderr, flush=True)
 
 MONGO_URI = os.environ.get("MONGO_URI")
 
@@ -56,12 +58,16 @@ def _init_client(uri: str | None):
         return None
 
 # Get database name (configurable for staging/production separation)
+print("🔵 [DEBUG] db.py: About to get database name", file=sys.stderr, flush=True)
 DB_NAME = _get_database_name(MONGO_URI)
-print(f"📊 [DB CONFIG] Using database: {DB_NAME}")
+print(f"📊 [DB CONFIG] Using database: {DB_NAME}", file=sys.stderr, flush=True)
 
+print("🔵 [DEBUG] db.py: About to initialize MongoDB client", file=sys.stderr, flush=True)
 client = _init_client(MONGO_URI)
+print(f"🔵 [DEBUG] db.py: MongoDB client initialized: {client is not None}", file=sys.stderr, flush=True)
 
 if client:
+    print(f"🔵 [DEBUG] db.py: Using real MongoDB client, database: {DB_NAME}", file=sys.stderr, flush=True)
     db = client[DB_NAME]
     players_collection = db["players"]
     teams_collection = db["teams"]
@@ -74,7 +80,9 @@ if client:
     defenses_collection = db["defenses"]
     fcp_skeletons_collection = db["fcp_skeletons"]
     hct_skeletons_collection = db["hct_skeletons"]
+    print("🔵 [DEBUG] db.py: Collections initialized", file=sys.stderr, flush=True)
 else:
+    print("🔵 [DEBUG] db.py: Using mongomock (no MongoDB connection)", file=sys.stderr, flush=True)
     import mongomock
     client = mongomock.MongoClient()
     db = client[DB_NAME]  # DB_NAME is defined at module level above
@@ -89,5 +97,8 @@ else:
     defenses_collection = db["defenses"]
     fcp_skeletons_collection = db["fcp_skeletons"]
     hct_skeletons_collection = db["hct_skeletons"]
+    print("🔵 [DEBUG] db.py: Mongomock collections initialized", file=sys.stderr, flush=True)
+
+print("🔵 [DEBUG] db.py: Module initialization complete", file=sys.stderr, flush=True)
 
 
