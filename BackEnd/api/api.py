@@ -138,11 +138,43 @@ async def cors_debug_middleware(request, call_next):
 print("🔵 [DEBUG] api.py: CORS debug middleware registered", file=sys.stderr, flush=True)
 print("🔵 [DEBUG] api.py: Module initialization complete", file=sys.stderr, flush=True)
 
+# ✅ Add global exception handler to catch all unhandled exceptions
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    print(f"🔴 [ERROR] Global exception handler: {type(exc).__name__}: {str(exc)}", file=sys.stderr, flush=True)
+    import traceback
+    traceback.print_exc(file=sys.stderr)
+    return JSONResponse(
+        status_code=500,
+        content={"error": "Internal server error", "type": type(exc).__name__, "message": str(exc)}
+    )
+
 # ✅ Add startup event to verify app is ready
 @app.on_event("startup")
 async def startup_event():
     print("🔵 [DEBUG] startup_event: FastAPI app is ready!", file=sys.stderr, flush=True)
     print(f"🔵 [DEBUG] startup_event: PORT env var: {os.getenv('PORT', 'NOT SET')}", file=sys.stderr, flush=True)
+    print(f"🔵 [DEBUG] startup_event: App instance: {app}", file=sys.stderr, flush=True)
+    print(f"🔵 [DEBUG] startup_event: Number of routes: {len(app.routes)}", file=sys.stderr, flush=True)
+    
+    # Log all route paths to verify routes are registered
+    route_paths = []
+    for route in app.routes[:20]:  # First 20 routes
+        if hasattr(route, 'methods'):
+            methods = list(route.methods) if route.methods else ['ANY']
+            route_paths.append(f"{methods[0] if methods else 'ANY'} {route.path}")
+        else:
+            route_paths.append(f"ANY {route.path}")
+    print(f"🔵 [DEBUG] startup_event: Registered routes (first 20): {route_paths}", file=sys.stderr, flush=True)
+    
+    # Test if we can actually access a collection
+    try:
+        teams_count = teams_collection.count_documents({})
+        print(f"🔵 [DEBUG] startup_event: MongoDB test - teams collection has {teams_count} documents", file=sys.stderr, flush=True)
+    except Exception as e:
+        print(f"🔴 [ERROR] startup_event: MongoDB test failed: {e}", file=sys.stderr, flush=True)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
 
 class SimulationRequest(BaseModel):
     home_team: str
@@ -601,21 +633,23 @@ def root():
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint for Railway"""
-    print("🔵 [DEBUG] health_check: GET /health called", file=sys.stderr, flush=True)
-    return {"status": "healthy", "port": os.getenv("PORT", "NOT SET")}
+    """Simplest possible health check - no dependencies"""
+    try:
+        print("🔵 [DEBUG] health_check: GET /health called", file=sys.stderr, flush=True)
+        port = os.getenv("PORT", "NOT SET")
+        print(f"🔵 [DEBUG] health_check: Returning response with port={port}", file=sys.stderr, flush=True)
+        return {"status": "healthy", "port": port}
+    except Exception as e:
+        print(f"🔴 [ERROR] health_check: Exception: {e}", file=sys.stderr, flush=True)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        return JSONResponse(
+            status_code=500,
+            content={"status": "unhealthy", "error": str(e)}
+        )
 
-@app.options("/{full_path:path}")
-async def catch_all_options(full_path: str):
-    """Explicit OPTIONS handler for all routes - ensures preflight requests are handled"""
-    print(f"🔵 [DEBUG] catch_all_options: OPTIONS /{full_path} called", file=sys.stderr, flush=True)
-    return Response()
-
-@app.options("/{full_path:path}")
-async def options_handler(full_path: str):
-    """Explicit OPTIONS handler for all routes to debug CORS preflight"""
-    print(f"🔵 [DEBUG] OPTIONS handler: OPTIONS /{full_path} called", file=sys.stderr, flush=True)
-    return Response()
+# Note: FastAPI's CORSMiddleware automatically handles OPTIONS preflight requests
+# We don't need an explicit OPTIONS handler - the middleware does this
 
 @app.get("/teams")
 def get_team_names():
