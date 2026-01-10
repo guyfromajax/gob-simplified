@@ -17,7 +17,9 @@ This plan prioritizes getting the application live and functional. Frontend desi
 - ✅ Codebase ready for deployment
 - ✅ Phase 3 (Code Updates) - COMPLETE
 - ✅ Task 0 (Button Updates) - COMPLETE
-- ⏳ Task 1 (Persistence Foundation) - IN PROGRESS
+- ✅ Task 1.3 (Persistence Correctness) - COMPLETE (Verified on staging)
+- ⏳ Task 1.1 (Go-live Foundations - Staging/Production Environments) - IN PROGRESS
+- ⏳ Task 1.2 (Frontend ↔ Backend Contract) - VERIFIED (API config working)
 - ⏳ Task 2 (Database Optimization) - PENDING
 
 ---
@@ -45,7 +47,7 @@ This plan prioritizes getting the application live and functional. Frontend desi
 ### Task 1: Persistence Foundation + Go-Live Functionality (MUST-HAVE)
 **Priority:** 🔴 CRITICAL - Blocks go-live  
 **Estimated Time:** 4-6 hours  
-**Status:** ⏳ IN PROGRESS
+**Status:** ⏳ IN PROGRESS (Persistence Correctness ✅ COMPLETE)
 
 **Goal:** The application exists reliably on the internet (staging + production), and persistence behaves correctly enough that two weeks of testing and polish produce trustworthy results.
 
@@ -61,18 +63,39 @@ This plan prioritizes getting the application live and functional. Frontend desi
    - All frontend→backend communication flows through that mechanism
    - Backend access controls (CORS) configured to match actual domains
 
-3. **Persistence correctness:**
-   - Save Playbooks commits changes durably (survives refresh, logout, re-login)
-   - Save Game Plan commits changes durably (survives refresh, logout, re-login)
-   - Lineup persistence: **NO CHANGES NEEDED** (current flow works perfectly - URL params → gameplay → periodic saves)
+3. **Persistence correctness:** ✅ **COMPLETE** (Verified on staging - January 2026)
+   - ✅ Save Playbooks commits changes durably (survives refresh, logout, re-login) - **VERIFIED ON STAGING**
+   - ✅ Save Game Plan commits changes durably (survives refresh, logout, re-login) - **VERIFIED ON STAGING**
+   - ✅ Lineup persistence: **NO CHANGES NEEDED** (current flow works perfectly - URL params → gameplay → periodic saves)
 
 **Definition of Done:**
-- Staging supports end-to-end usage with reliable persistence (save → refresh → data intact)
-- Production can be cloned from staging via configuration, not rework
-- No silent persistence failures (clear success/error signaling)
-- Can run two weeks of testing without uncertainty about deployment or data correctness
+- ✅ **Persistence Correctness:** Staging supports end-to-end usage with reliable persistence (save → refresh → data intact) - **COMPLETE (January 2026)**
+- ⏳ **Go-live Foundations:** Staging and production environments exist and are independently functional
+- ✅ **Frontend ↔ Backend Contract:** Verified (API config working, CORS configured)
+- ✅ **Persistence Verification:** Save Playbooks and Save Game Plan verified working on staging
+- ⏳ **Production Readiness:** Production can be cloned from staging via configuration, not rework
+- ✅ **Error Signaling:** No silent persistence failures (clear success/error signaling)
+- ✅ **Testing Confidence:** Can run two weeks of testing without uncertainty about deployment or data correctness
 
-**Dependencies:** Task 0 must be complete
+**Dependencies:** Task 0 must be complete ✅
+
+**Completion Status:**
+- [x] **3. Persistence Correctness** - COMPLETE (Verified on staging)
+  - [x] Save Playbooks persistence verified on staging
+  - [x] Save Game Plan persistence verified on staging
+  - [x] Lineup persistence confirmed working (no changes needed)
+- [ ] **1. Go-live Foundations** - IN PROGRESS
+  - [ ] Staging backend deployed and verified
+  - [ ] Staging frontend deployed and verified
+  - [ ] Production backend ready (can clone from staging)
+  - [ ] Production frontend ready (can clone from staging)
+  - [ ] Database connectivity verified and stable
+  - [ ] Environment separation verified (no cross-talk)
+  - **📋 Detailed Checklist:** See `docs/To Do/Task_1_1_Go_Live_Foundations_Verification.md`
+- [x] **2. Frontend ↔ Backend Contract** - COMPLETE
+  - [x] Centralized API config mechanism in place
+  - [x] All API calls use centralized config
+  - [x] CORS configured for staging/production domains
 
 ---
 
@@ -582,10 +605,15 @@ This plan prioritizes getting the application live and functional. Frontend desi
 
 ## Status Tracking
 
-**Last Updated:** January 2025  
+**Last Updated:** January 2026  
 **Current Phase:** ⏳ Task 1 (Persistence Foundation) - IN PROGRESS  
+**Progress:**
+- ✅ Task 1.3 (Persistence Correctness) - COMPLETE - Verified on staging (Game Plan & Playbooks)
+- ⏳ Task 1.1 (Go-live Foundations) - Need to verify staging/production environments fully deployed
+- ✅ Task 1.2 (Frontend ↔ Backend Contract) - COMPLETE (API config working, CORS configured)
+
 **Blockers:** None  
-**Next Action:** Verify persistence correctness (Save Playbooks, Save Game Plan), then set up staging/production environments
+**Next Action:** Verify staging/production environments are fully set up and functional, then proceed to Task 2 (Database Optimization) or production launch preparation
 
 ---
 
