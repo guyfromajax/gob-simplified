@@ -351,12 +351,39 @@ def select_team(selection: TeamSelection):
     import sys
     print(f"🔵 [DEBUG] select_team: POST /franchise/select-team called with team: {selection.team_name}", file=sys.stderr, flush=True)
     try:
-        # Resolve team name to ObjectId
+        # Resolve team name to ObjectId - try multiple strategies for matching
         print(f"🔵 [DEBUG] select_team: Looking up team in database: {selection.team_name}", file=sys.stderr, flush=True)
+        
+        # Strategy 1: Exact match
         team_doc = db.teams.find_one({"name": selection.team_name})
+        
+        # Strategy 2: Case-insensitive regex match
         if not team_doc:
+            print(f"🔵 [DEBUG] select_team: Exact match failed, trying case-insensitive search...", file=sys.stderr, flush=True)
+            team_doc = db.teams.find_one({"name": {"$regex": f"^{selection.team_name}$", "$options": "i"}})
+        
+        # Strategy 3: Try with hyphen/underscore normalization (e.g., "Bentley-Truman" -> "Bentley Truman")
+        if not team_doc and ("-" in selection.team_name or "_" in selection.team_name):
+            print(f"🔵 [DEBUG] select_team: Case-insensitive failed, trying normalized format...", file=sys.stderr, flush=True)
+            normalized = selection.team_name.replace("_", " ").replace("-", " ")
+            team_doc = db.teams.find_one({"name": {"$regex": f"^{normalized}$", "$options": "i"}})
+        
+        # Strategy 4: Search all teams and find case-insensitive match
+        if not team_doc:
+            print(f"🔵 [DEBUG] select_team: Normalized format failed, trying full collection search...", file=sys.stderr, flush=True)
+            all_teams = db.teams.find({}, {"name": 1})
+            for t in all_teams:
+                if t.get("name", "").upper().strip() == selection.team_name.upper().strip():
+                    team_doc = t
+                    print(f"✅ [DEBUG] select_team: Found match via full search: '{t.get('name')}' matches '{selection.team_name}'", file=sys.stderr, flush=True)
+                    break
+        
+        if not team_doc:
+            # Log all available team names for debugging
+            available_teams = [t.get("name") for t in db.teams.find({}, {"name": 1})]
             print(f"❌ [ERROR] select_team: Team not found in database: {selection.team_name}", file=sys.stderr, flush=True)
-            raise HTTPException(status_code=404, detail="Team not found")
+            print(f"🔍 [DEBUG] select_team: Available teams in database: {available_teams}", file=sys.stderr, flush=True)
+            raise HTTPException(status_code=404, detail=f"Team '{selection.team_name}' not found. Available teams: {', '.join(available_teams[:10])}")
         
         print(f"✅ [DEBUG] select_team: Team found, _id: {team_doc['_id']}", file=sys.stderr, flush=True)
         user_team_id = selection.team_name  # Team name (human-readable)
