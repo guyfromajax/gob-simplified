@@ -1254,6 +1254,12 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             tournament_doc=doc if mode == "tournament" else None
         )
         
+        # ✅ DEBUG: Log if plays were populated by ensure_team_objects_exist
+        if mode == "franchise" and isinstance(teams_dict, dict):
+            team_obj_check = teams_dict.get(authoritative_team_id, {})
+            plays_count = len(team_obj_check.get("plays", {})) if team_obj_check else 0
+            logger.warning(f"🔍 [GET PLAYBOOKS] After ensure_team_objects_exist: {plays_count} plays in returned teams_dict for team {authoritative_team_id}")
+        
         # ✅ PERFORMANCE: Update in-memory doc with returned teams dict if needed
         # This ensures we have the latest data without reloading from database
         if mode == "franchise" and isinstance(teams_dict, dict):
@@ -1410,8 +1416,49 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 else:
                     team_obj = doc.get("teams", {}).get(actual_team_id, {})
         
+        # ✅ CRITICAL FIX: Ensure plays exist before reading them
+        # This ensures plays are always available, even if ensure_team_objects_exist didn't populate them
+        # or if they were lost during document reloads
+        if actual_team_id and (not team_obj or not team_obj.get("plays") or len(team_obj.get("plays", {})) == 0):
+            logger.warning(f"⚠️ [GET PLAYBOOKS] plays missing or empty for team {actual_team_id}, populating now...")
+            populated_plays = _get_cached_populated_plays(mode=mode)
+            
+            # Update the database
+            if mode == "franchise":
+                team_key = f"franchise_teams.{actual_team_id}"
+            else:
+                team_key = f"teams.{actual_team_id}"
+            
+            if mode == "single":
+                collection.update_one(
+                    {"_id": doc_id},
+                    {"$set": {f"{team_key}.plays": populated_plays}}
+                )
+                # Reload document
+                doc = collection.find_one({"_id": doc_id})
+            else:
+                collection.update_one(
+                    {"_id": ObjectId(doc_id)},
+                    {"$set": {f"{team_key}.plays": populated_plays}}
+                )
+                # Reload document
+                doc = collection.find_one({"_id": ObjectId(doc_id)})
+            
+            # Reload team_obj with populated plays
+            if mode == "franchise":
+                franchise_teams = doc.get("franchise_teams", {})
+                team_obj = franchise_teams.get(actual_team_id, {}) if actual_team_id else {}
+            elif mode == "tournament":
+                teams = doc.get("teams", {})
+                team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
+            else:
+                teams = doc.get("teams", {})
+                team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
+            
+            logger.warning(f"✅ [GET PLAYBOOKS] plays populated, reloaded team_obj has {len(team_obj.get('plays', {}))} plays")
+        
         plays = team_obj.get("plays", {})
-        logger.warning(f"🔍 [PLAYBOOKS] Found {len(plays)} plays for team")
+        logger.warning(f"🔍 [PLAYBOOKS] Found {len(plays)} plays for team {actual_team_id}")
         
         # Organize plays by type and focus
         motion_plays = []
