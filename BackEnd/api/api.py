@@ -41,28 +41,9 @@ from BackEnd.models.player import Player
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-app.include_router(tournament_router)
-app.include_router(training_router)
-app.include_router(franchise_router)
-app.include_router(gameplan_router)
-app.include_router(play_router)
-app.include_router(skeleton_router)
-
-templates = Jinja2Templates(directory="FrontEnd/static")
-
-# app.mount("/", StaticFiles(directory="FrontEnd", html=True), name="static")
-# app.mount("/static", StaticFiles(directory="FrontEnd", html=True), name="static")
-# Conditionally mount static files (only in development)
-# In production, Netlify serves static files
-environment = os.getenv("ENVIRONMENT", "development")
-if environment == "development":
-    app.mount("/static", StaticFiles(directory="FrontEnd/static"), name="static")
-    print("✅ Static files mounted (development mode)")
-
-print("🚀 Loaded FastAPI app from api.py")
 
 # CORS Configuration - Must match actual testing domains, not just final ideal
-# CRITICAL: Include default Railway/Netlify domains initially, tighten later
+# CRITICAL: Add CORS middleware BEFORE including routers to ensure it applies to all routes
 def get_cors_origins():
     """
     Get CORS allowed origins based on environment.
@@ -82,7 +63,7 @@ def get_cors_origins():
     
     return origins
 
-# Get CORS origins
+# Get CORS origins and configure middleware BEFORE including routers
 cors_origins = get_cors_origins()
 
 app.add_middleware(
@@ -95,6 +76,25 @@ app.add_middleware(
     expose_headers=["*"],
     max_age=3600  # Cache preflight requests for 1 hour
 )
+
+# Include routers AFTER CORS middleware is configured
+app.include_router(tournament_router)
+app.include_router(training_router)
+app.include_router(franchise_router)
+app.include_router(gameplan_router)
+app.include_router(play_router)
+app.include_router(skeleton_router)
+
+templates = Jinja2Templates(directory="FrontEnd/static")
+
+# Conditionally mount static files (only in development)
+# In production, Netlify serves static files
+environment = os.getenv("ENVIRONMENT", "development")
+if environment == "development":
+    app.mount("/static", StaticFiles(directory="FrontEnd/static"), name="static")
+    print("✅ Static files mounted (development mode)")
+
+print("🚀 Loaded FastAPI app from api.py")
 
 # ✅ DEBUG: Add CORS logging middleware to trace CORS issues
 @app.middleware("http")
