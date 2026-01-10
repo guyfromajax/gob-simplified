@@ -350,20 +350,36 @@ async def select_team_options():
 def select_team(selection: TeamSelection):
     import sys
     print(f"🔵 [DEBUG] select_team: POST /franchise/select-team called with team: {selection.team_name}", file=sys.stderr, flush=True)
-    # Resolve team name to ObjectId
-    team_doc = db.teams.find_one({"name": selection.team_name})
-    if not team_doc:
-        raise HTTPException(status_code=404, detail="Team not found")
-    
-    user_team_id = selection.team_name  # Team name (human-readable)
-    user_team_object_id = str(team_doc["_id"])  # ObjectId string (database identifier)
-    
-    # Note: franchise_state_collection removed - using franchise document instead
-    # Old franchises may still have data in franchise_state, but new ones won't create it
-    
-    manager = FranchiseManager(db)
-    manager.initialize_season(user_team_id=user_team_id, user_team_object_id=user_team_object_id)
-    return {"status": "ok", "franchise_id": str(manager.franchise_id)}
+    try:
+        # Resolve team name to ObjectId
+        print(f"🔵 [DEBUG] select_team: Looking up team in database: {selection.team_name}", file=sys.stderr, flush=True)
+        team_doc = db.teams.find_one({"name": selection.team_name})
+        if not team_doc:
+            print(f"❌ [ERROR] select_team: Team not found in database: {selection.team_name}", file=sys.stderr, flush=True)
+            raise HTTPException(status_code=404, detail="Team not found")
+        
+        print(f"✅ [DEBUG] select_team: Team found, _id: {team_doc['_id']}", file=sys.stderr, flush=True)
+        user_team_id = selection.team_name  # Team name (human-readable)
+        user_team_object_id = str(team_doc["_id"])  # ObjectId string (database identifier)
+        
+        # Note: franchise_state_collection removed - using franchise document instead
+        # Old franchises may still have data in franchise_state, but new ones won't create it
+        
+        print(f"🔵 [DEBUG] select_team: Initializing FranchiseManager...", file=sys.stderr, flush=True)
+        manager = FranchiseManager(db)
+        manager.initialize_season(user_team_id=user_team_id, user_team_object_id=user_team_object_id)
+        print(f"✅ [DEBUG] select_team: Franchise initialized successfully, franchise_id: {manager.franchise_id}", file=sys.stderr, flush=True)
+        result = {"status": "ok", "franchise_id": str(manager.franchise_id)}
+        print(f"🔵 [DEBUG] select_team: Returning response: {result}", file=sys.stderr, flush=True)
+        return result
+    except HTTPException as e:
+        print(f"❌ [ERROR] select_team: HTTPException raised: {e.status_code} - {e.detail}", file=sys.stderr, flush=True)
+        raise
+    except Exception as e:
+        print(f"❌ [ERROR] select_team: Unexpected exception: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.get("/franchise/command-center")
 def command_center():
