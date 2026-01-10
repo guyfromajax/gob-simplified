@@ -1,15 +1,15 @@
 # Setting Up Staging Database (gob-staging)
 
 **Date:** January 2026  
-**Status:** ✅ APPROACH SELECTED - Ready for Railway Setup  
+**Status:** ✅ COMPLETE - Staging database setup and initialization successful  
 **Priority:** 🔴 CRITICAL - Required for environment separation  
-**Approach:** ✅ Option A (Start Fresh) - Database auto-created on first write
+**Approach:** ✅ Option B (Clone Reference Data) - Reference data cloned from production
 
 ## Overview
 
 We need to create a separate `gob-staging` database for staging environment to ensure clean environment separation. The current `gob` database will be used for production.
 
-**✅ CHOSEN APPROACH: Option A (Start Fresh)** - Database will be created automatically on first write. Reference data will be populated by app code.
+**✅ APPROACH USED: Option B (Clone Reference Data)** - Database was created with reference data cloned from production. This ensures staging has the same core data (teams, players, plays, skeletons) as production for accurate testing.
 
 ## Database Roles
 
@@ -57,11 +57,19 @@ We need to create a separate `gob-staging` database for staging environment to e
 - Need to keep reference data in sync manually if production reference data changes
 
 **Steps:**
-1. Run clone script: `python scripts/clone_reference_data_to_staging.py`
-2. Script clones reference collections: players, teams, plays, defenses, fcp_skeletons, hct_skeletons
-3. Script skips game-specific collections: games, tournaments, franchises (start fresh)
-4. Update Railway staging `MONGO_URI` to point to `gob-staging` database
-5. Deploy staging backend - will use cloned reference data
+1. ✅ Update Railway staging `MONGO_DB_NAME` environment variable to `gob-staging`
+2. ✅ Run clone script: `python scripts/clone_reference_data_to_staging.py` (from project root with venv activated)
+   - Script clones reference collections: players, teams, plays, defenses, fcp_skeletons, hct_skeletons
+   - Script skips game-specific collections: games, tournaments, franchises (start fresh)
+   - ✅ Successfully cloned 133 documents across 6 collections (January 2026)
+3. ✅ Deploy staging backend - uses cloned reference data
+4. ✅ Verify teams are accessible (test franchise team selection)
+
+**Actual Execution (January 2026):**
+- ✅ Database cloning completed successfully
+- ✅ Cloned collections: players (96 docs), teams (8 docs), plays (23 docs), defenses (4 docs), fcp_skeletons (1 doc), hct_skeletons (1 doc)
+- ✅ Total: 133 documents cloned
+- ✅ Team selection now works correctly in staging
 
 ## Code Changes Made
 
@@ -82,9 +90,35 @@ We need to create a separate `gob-staging` database for staging environment to e
 
 ## Setting Up gob-staging Database
 
+## Issues Encountered and Resolved
+
+### Issue 1: Railway Port Configuration (502 Errors)
+**Problem:** All requests returned 502 "Application failed to respond" even though app was running.  
+**Root Cause:** Railway's "Target port" was set to 8000, but the app was running on port 8080 (from Railway's `$PORT` env var).  
+**Solution:** Updated Railway Settings → Public Networking → Target port from 8000 to 8080.  
+**Lesson:** Always verify Railway's target port matches the actual port your app is listening on (check via startup logs: `PORT env var: 8080`).
+
+### Issue 2: Empty Staging Database (404 Team Not Found)
+**Problem:** Team selection failed with 404 "Team not found in database" - `Available teams in database: []`  
+**Root Cause:** `gob-staging` database was empty (no teams, players, or reference data).  
+**Solution:** Ran `scripts/clone_reference_data_to_staging.py` to clone reference collections from production.  
+**Result:** ✅ Successfully cloned 133 documents (teams, players, plays, defenses, skeletons).  
+**Lesson:** Staging database needs reference data populated before it can be used. Cloning from production ensures consistency.
+
+### Issue 3: Team Name Case Sensitivity
+**Problem:** Team lookup was case-sensitive, potentially failing if team names didn't match exactly.  
+**Solution:** Enhanced team lookup in `BackEnd/api/franchise_routes.py` to use case-insensitive matching with multiple fallback strategies:
+  - Strategy 1: Exact match
+  - Strategy 2: Case-insensitive regex
+  - Strategy 3: Hyphen/underscore normalization (e.g., "Bentley-Truman" → "Bentley Truman")
+  - Strategy 4: Full collection search with case-insensitive comparison
+**Result:** More robust team matching (though cloning fixed the immediate issue).
+
+## Setting Up gob-staging Database
+
 ### Step 1: Update Railway Staging Environment Variables
 
-**✅ APPROACH CHOSEN: Option A (Start Fresh)** - No cloning needed. Database will be created automatically.
+**✅ COMPLETED: Option B (Clone Reference Data)** - Reference data cloned from production.
 
 **Option 2a: Set Database Name in Connection String**
 ```
@@ -104,21 +138,31 @@ MONGO_DB_NAME=gob-staging
 
 **Recommendation:** Use Option 2b (explicit `MONGO_DB_NAME`) - clearer intent, easier to verify
 
-### Step 2: Verify Staging Database Connection
+### Step 2: Clone Reference Data to Staging
 
-**Note:** With Option A (Start Fresh), the `gob-staging` database will be created automatically when the app first writes to it. No manual creation or cloning needed.
+**✅ COMPLETED (January 2026):**
 
-After updating Railway environment variables:
+1. ✅ Activated virtual environment: `source venv/bin/activate`
+2. ✅ Ran clone script: `echo "yes" | python scripts/clone_reference_data_to_staging.py`
+3. ✅ Script output confirmed:
+   - Cloned 96 players
+   - Cloned 8 teams  
+   - Cloned 23 plays
+   - Cloned 4 defenses
+   - Cloned 1 fcp_skeletons document
+   - Cloned 1 hct_skeletons document
+   - **Total: 133 documents cloned**
 
-1. **Redeploy staging backend** (or restart if already deployed)
-2. **Check Railway logs** for database connection message:
-   ```
-   📊 [DB CONFIG] Using database: gob-staging
-   ```
-3. **Test database connection** by creating a test game/tournament/franchise
-4. **Verify database** in MongoDB Atlas - should see `gob-staging` database created (if starting fresh) or populated (if cloned)
+### Step 3: Verify Staging Database Connection
 
-### Step 3: Verify Environment Separation
+**✅ COMPLETED:**
+
+1. ✅ Railway logs show: `📊 [DB CONFIG] Using database: gob-staging`
+2. ✅ Tested team selection in staging - works correctly
+3. ✅ Verified database in MongoDB Atlas - `gob-staging` database exists with cloned collections
+4. ✅ Verified environment separation - staging uses `gob-staging`, production uses `gob`
+
+### Step 4: Verify Environment Separation
 
 **Check Production Database:**
 - Production `MONGO_URI` should still point to `gob` database
@@ -132,13 +176,16 @@ After updating Railway environment variables:
 
 ## Testing Checklist
 
-- [ ] Staging backend logs show: `📊 [DB CONFIG] Using database: gob-staging`
-- [ ] Production backend logs show: `📊 [DB CONFIG] Using database: gob`
-- [ ] Create test franchise in staging - appears in `gob-staging` database (not `gob`)
-- [ ] Create test tournament in staging - appears in `gob-staging` database (not `gob`)
+- [x] ✅ Staging backend logs show: `📊 [DB CONFIG] Using database: gob-staging`
+- [x] ✅ Production backend logs show: `📊 [DB CONFIG] Using database: gob`
+- [x] ✅ Create test franchise in staging - appears in `gob-staging` database (not `gob`)
+- [x] ✅ Verify reference collections exist in `gob-staging` (cloned successfully: 133 documents)
+- [x] ✅ Test team selection in staging works (uses cloned teams from `gob-staging`)
+- [ ] Create test tournament in staging - should appear in `gob-staging` database (not `gob`)
 - [ ] Verify `gob` database unchanged (production data intact)
-- [ ] Verify reference collections exist in `gob-staging` (if cloned) or can be populated
 - [ ] Test game creation in staging works (uses `gob-staging` database)
+
+**Note:** Railway port configuration must match app's actual port. Check startup logs for `PORT env var: XXXX` and update Railway target port accordingly.
 
 ## MongoDB Atlas Setup
 
@@ -176,7 +223,22 @@ After updating Railway environment variables:
 ## Related Files
 
 - `BackEnd/db.py` - Database connection and configuration
-- `scripts/clone_reference_data_to_staging.py` - Reference data cloning script
+- `BackEnd/api/franchise_routes.py` - Team lookup logic (case-insensitive matching)
+- `scripts/clone_reference_data_to_staging.py` - Reference data cloning script (✅ Used successfully)
 - `docs/Admin_Only_Docs/Go_Live_Plan.md` - Main go-live plan
 - `docs/To Do/Task_1_1_Go_Live_Foundations_Verification.md` - Verification checklist
+- `railway.json` - Railway deployment configuration
+- `Procfile` - Railway startup command
+
+## Command Reference
+
+**Clone reference data to staging:**
+```bash
+source venv/bin/activate
+echo "yes" | python scripts/clone_reference_data_to_staging.py
+```
+
+**Check Railway port configuration:**
+- Railway Dashboard → Service → Settings → Networking → Target port
+- Should match app's PORT env var (check logs: `PORT env var: 8080`)
 
