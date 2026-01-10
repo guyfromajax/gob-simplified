@@ -154,9 +154,18 @@ export function displayTeamBoxScore(gameData, homeTeam, awayTeam) {
   const homeTotals = gameData.team_totals?.[homeTeam] || {};
   const awayTotals = gameData.team_totals?.[awayTeam] || {};
   
-  // Get team attributes from home_team/away_team objects
-  const homeAttrs = gameData.home_team?.attributes || {};
-  const awayAttrs = gameData.away_team?.attributes || {};
+  // ✅ UNIFIED STRUCTURE: Get team attributes from unified teams object
+  const homeTeamId = gameData.home_team_id;
+  const awayTeamId = gameData.away_team_id;
+  const teamsObj = gameData.teams || {};
+  
+  // Get team data from unified structure first
+  const homeTeamObj = homeTeamId && teamsObj[homeTeamId] ? teamsObj[homeTeamId] : null;
+  const awayTeamObj = awayTeamId && teamsObj[awayTeamId] ? teamsObj[awayTeamId] : null;
+  
+  // ✅ BACKWARD COMPATIBILITY: Fallback to old structure if unified structure not available
+  const homeAttrs = homeTeamObj?.attributes || gameData.home_team?.attributes || {};
+  const awayAttrs = awayTeamObj?.attributes || gameData.away_team?.attributes || {};
   
   // Get playcall stats (S2 tab) - these come from team_stats if available
   const homeOffense = gameData.team_stats?.[homeTeam]?.offense || {};

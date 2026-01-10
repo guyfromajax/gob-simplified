@@ -78,11 +78,20 @@ async function loadGameData(gameId) {
   
   // Fetch full rosters to ensure all 12 players are shown
   const urlParams = new URLSearchParams(window.location.search);
-  // Extract team names from URL params, game data, or team objects
+  // ✅ UNIFIED STRUCTURE: Extract team names from unified teams object, fallback to old structure
+  const homeTeamId = gameData.home_team_id;
+  const awayTeamId = gameData.away_team_id;
+  const teamsObj = gameData.teams || {};
+  
+  const homeTeamObj = homeTeamId && teamsObj[homeTeamId] ? teamsObj[homeTeamId] : null;
+  const awayTeamObj = awayTeamId && teamsObj[awayTeamId] ? teamsObj[awayTeamId] : null;
+  
   const homeTeamName = urlParams.get('home') || 
+                       homeTeamObj?.name ||
                        (typeof gameData.home_team === 'object' ? gameData.home_team?.name : gameData.home_team) ||
                        gameData.home_team?.name;
   const awayTeamName = urlParams.get('away') || 
+                       awayTeamObj?.name ||
                        (typeof gameData.away_team === 'object' ? gameData.away_team?.name : gameData.away_team) ||
                        gameData.away_team?.name;
   const franchiseId = urlParams.get('franchise_id');
@@ -255,14 +264,20 @@ async function loadPreGameData({ homeTeamName, awayTeamName, franchiseId, tourna
 
 // Render header with team names and scores
 function renderHeader() {
-  const homeTeam = gameData.home_team || {};
-  const awayTeam = gameData.away_team || {};
+  // ✅ UNIFIED STRUCTURE: Get team data from unified teams object, fallback to old structure
+  const homeTeamId = gameData.home_team_id;
+  const awayTeamId = gameData.away_team_id;
+  const teamsObj = gameData.teams || {};
+  
+  const homeTeamObj = homeTeamId && teamsObj[homeTeamId] ? teamsObj[homeTeamId] : (gameData.home_team || {});
+  const awayTeamObj = awayTeamId && teamsObj[awayTeamId] ? teamsObj[awayTeamId] : (gameData.away_team || {});
+  
   const score = gameData.score || {};
 
-  const homeName = homeTeam.name || 'Home Team';
-  const awayName = awayTeam.name || 'Away Team';
-  const homeScore = score[homeName] || homeTeam.score || 0;
-  const awayScore = score[awayName] || awayTeam.score || 0;
+  const homeName = homeTeamObj.name || 'Home Team';
+  const awayName = awayTeamObj.name || 'Away Team';
+  const homeScore = score[homeName] || homeTeamObj.score || 0;
+  const awayScore = score[awayName] || awayTeamObj.score || 0;
 
   document.getElementById('home-team-name').textContent = homeName;
   document.getElementById('away-team-name').textContent = awayName;
@@ -278,8 +293,13 @@ function renderHeader() {
 
 // Render quarter scoring table
 function renderQuarterScoring() {
-  const homeTeam = gameData.home_team || {};
-  const awayTeam = gameData.away_team || {};
+  // ✅ UNIFIED STRUCTURE: Get team data from unified teams object, fallback to old structure
+  const homeTeamId = gameData.home_team_id;
+  const awayTeamId = gameData.away_team_id;
+  const teamsObj = gameData.teams || {};
+  
+  const homeTeam = homeTeamId && teamsObj[homeTeamId] ? teamsObj[homeTeamId] : (gameData.home_team || {});
+  const awayTeam = awayTeamId && teamsObj[awayTeamId] ? teamsObj[awayTeamId] : (gameData.away_team || {});
   const pointsByQuarter = gameData.points_by_quarter || {};
   const score = gameData.score || {};
 
@@ -330,9 +350,15 @@ function renderPlayerStats() {
   const homePlayers = players.filter(p => p.team === 'home');
   const awayPlayers = players.filter(p => p.team === 'away');
 
-  // Get all players including bench (from box_score if available)
-  const homeTeamName = gameData.home_team?.name || 'Home Team';
-  const awayTeamName = gameData.away_team?.name || 'Away Team';
+  // ✅ UNIFIED STRUCTURE: Get team names from unified teams object, fallback to old structure
+  const homeTeamId = gameData.home_team_id;
+  const awayTeamId = gameData.away_team_id;
+  const teamsObj = gameData.teams || {};
+  const homeTeamObj = homeTeamId && teamsObj[homeTeamId] ? teamsObj[homeTeamId] : null;
+  const awayTeamObj = awayTeamId && teamsObj[awayTeamId] ? teamsObj[awayTeamId] : null;
+  
+  const homeTeamName = homeTeamObj?.name || gameData.home_team?.name || 'Home Team';
+  const awayTeamName = awayTeamObj?.name || gameData.away_team?.name || 'Away Team';
   
   // box_score structure: { teamName: { pos: { name, FGM, FGA, ... } } }
   const homeBoxScore = boxScore[homeTeamName] || {};
@@ -573,9 +599,16 @@ function createTableCell(text) {
 
 // Render team stats
 function renderTeamStats() {
+  // ✅ UNIFIED STRUCTURE: Get team names from unified teams object, fallback to old structure
+  const homeTeamId = gameData.home_team_id;
+  const awayTeamId = gameData.away_team_id;
+  const teamsObj = gameData.teams || {};
+  const homeTeamObj = homeTeamId && teamsObj[homeTeamId] ? teamsObj[homeTeamId] : null;
+  const awayTeamObj = awayTeamId && teamsObj[awayTeamId] ? teamsObj[awayTeamId] : null;
+  
   const teamTotals = gameData.team_totals || {};
-  const homeTeamName = gameData.home_team?.name || 'Home Team';
-  const awayTeamName = gameData.away_team?.name || 'Away Team';
+  const homeTeamName = homeTeamObj?.name || gameData.home_team?.name || 'Home Team';
+  const awayTeamName = awayTeamObj?.name || gameData.away_team?.name || 'Away Team';
 
   const homeTotals = teamTotals[homeTeamName] || {};
   const awayTotals = teamTotals[awayTeamName] || {};
@@ -643,9 +676,16 @@ function renderSpecialStats(team, totals, teamName) {
 
 // Render scouting notes
 function renderScoutingNotes() {
+  // ✅ UNIFIED STRUCTURE: Get team names from unified teams object, fallback to old structure
+  const homeTeamId = gameData.home_team_id;
+  const awayTeamId = gameData.away_team_id;
+  const teamsObj = gameData.teams || {};
+  const homeTeamObj = homeTeamId && teamsObj[homeTeamId] ? teamsObj[homeTeamId] : null;
+  const awayTeamObj = awayTeamId && teamsObj[awayTeamId] ? teamsObj[awayTeamId] : null;
+  
   const teamStats = gameData.team_stats || {};
-  const homeTeamName = gameData.home_team?.name || 'Home Team';
-  const awayTeamName = gameData.away_team?.name || 'Away Team';
+  const homeTeamName = homeTeamObj?.name || gameData.home_team?.name || 'Home Team';
+  const awayTeamName = awayTeamObj?.name || gameData.away_team?.name || 'Away Team';
 
   renderScoutingContent('home', teamStats[homeTeamName] || {});
   renderScoutingContent('away', teamStats[awayTeamName] || {});

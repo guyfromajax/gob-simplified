@@ -342,23 +342,36 @@ export function createGameScene(Phaser) {
       }
       DEBUG_FLOW && console.log('[gameScene] quarters', { requested: this.quarter, sim: simData.quarter });
       
-      // Handle both new (nested) and old (flat) structure
-      const homeTeamObj = typeof simData.home_team === 'object' ? simData.home_team : null;
-      const awayTeamObj = typeof simData.away_team === 'object' ? simData.away_team : null;
+      // ✅ UNIFIED STRUCTURE: Prefer unified teams object, fallback to backward-compatible fields
+      const homeTeamId = simData.home_team_id;
+      const awayTeamId = simData.away_team_id;
+      const teamsObj = simData.teams || {};
       
-      // Extract team names (new nested structure or old flat structure)
+      // Get team data from unified structure first
+      let homeTeamObj = homeTeamId && teamsObj[homeTeamId] ? teamsObj[homeTeamId] : null;
+      let awayTeamObj = awayTeamId && teamsObj[awayTeamId] ? teamsObj[awayTeamId] : null;
+      
+      // ✅ BACKWARD COMPATIBILITY: Fallback to old structure if unified structure not available
+      if (!homeTeamObj) {
+        homeTeamObj = typeof simData.home_team === 'object' ? simData.home_team : null;
+      }
+      if (!awayTeamObj) {
+        awayTeamObj = typeof simData.away_team === 'object' ? simData.away_team : null;
+      }
+      
+      // Extract team names (unified structure preferred, fallback to old structure)
       const logHome = homeTeamObj?.name || simData.home_team || simData.homeTeam?.name;
       const logAway = awayTeamObj?.name || simData.away_team || simData.awayTeam?.name;
       
       // Extract team IDs
-      const homeId = homeTeamObj?.team_id || simData.home_team_id || simData.homeTeam?.team_id;
-      const awayId = awayTeamObj?.team_id || simData.away_team_id || simData.awayTeam?.team_id;
+      const homeId = homeTeamId || homeTeamObj?.team_id || simData.home_team_id || simData.homeTeam?.team_id;
+      const awayId = awayTeamId || awayTeamObj?.team_id || simData.away_team_id || simData.awayTeam?.team_id;
       
       // ✅ TIMEOUT: Store team names in scene for timeout button manager
       this.homeTeam = logHome;
       this.awayTeam = logAway;
       
-      // Extract team colors
+      // Extract team colors (unified structure preferred)
       const homeColors = homeTeamObj?.colors || simData.home_team_colors;
       const awayColors = awayTeamObj?.colors || simData.away_team_colors;
       
@@ -1026,11 +1039,24 @@ export function createGameScene(Phaser) {
         const homeDefense = turn.team_stats?.[homeTeam]?.defense || {};
         const awayDefense = turn.team_stats?.[awayTeam]?.defense || {};
         
-        // Get team attributes from nested structure or old flat structure
-        const homeTeamObj = typeof simData.home_team === 'object' ? simData.home_team : null;
-        const awayTeamObj = typeof simData.away_team === 'object' ? simData.away_team : null;
-        const homeAttrs = homeTeamObj?.attributes || simData.team_attributes?.[homeTeam] || {};
-        const awayAttrs = awayTeamObj?.attributes || simData.team_attributes?.[awayTeam] || {};
+        // ✅ UNIFIED STRUCTURE: Get team attributes from unified teams object
+        // Reuse team objects from outer scope if available, otherwise get from simData
+        let localHomeTeamObj = homeTeamObj;
+        let localAwayTeamObj = awayTeamObj;
+        if (!localHomeTeamObj && simData.home_team_id && simData.teams) {
+          localHomeTeamObj = simData.teams[simData.home_team_id];
+        }
+        if (!localHomeTeamObj) {
+          localHomeTeamObj = typeof simData.home_team === 'object' ? simData.home_team : null;
+        }
+        if (!localAwayTeamObj && simData.away_team_id && simData.teams) {
+          localAwayTeamObj = simData.teams[simData.away_team_id];
+        }
+        if (!localAwayTeamObj) {
+          localAwayTeamObj = typeof simData.away_team === 'object' ? simData.away_team : null;
+        }
+        const homeAttrs = localHomeTeamObj?.attributes || simData.team_attributes?.[homeTeam] || {};
+        const awayAttrs = localAwayTeamObj?.attributes || simData.team_attributes?.[awayTeam] || {};
         
         // Get cumulative team stats for S1 tab
         const homeTotals = turn.team_totals?.[homeTeam] || {};
@@ -2195,19 +2221,36 @@ export function createGameScene(Phaser) {
             }
           }
           
-          // Get team names for score map
+          // ✅ UNIFIED STRUCTURE: Get team names from unified teams object, fallback to old structure
           const { home: homeTeamName, away: awayTeamName } = gameStore.getTeams();
-          const homeName = homeTeamName || finalGameData.home_team?.name || finalGameData.home_team;
-          const awayName = awayTeamName || finalGameData.away_team?.name || finalGameData.away_team;
+          const finalHomeTeamId = finalGameData.home_team_id;
+          const finalAwayTeamId = finalGameData.away_team_id;
+          const finalTeamsObj = finalGameData.teams || {};
+          const finalHomeTeamObj = finalHomeTeamId && finalTeamsObj[finalHomeTeamId] ? finalTeamsObj[finalHomeTeamId] : null;
+          const finalAwayTeamObj = finalAwayTeamId && finalTeamsObj[finalAwayTeamId] ? finalTeamsObj[finalAwayTeamId] : null;
           
-          // ✅ FIX: Update nested team objects with final scores to prevent stale data
-          // Handle both object and string formats for home_team/away_team
-          const updatedHomeTeam = typeof finalGameData.home_team === 'object' 
-            ? { ...finalGameData.home_team, score: finalHomeScore }
-            : finalGameData.home_team;
-          const updatedAwayTeam = typeof finalGameData.away_team === 'object'
-            ? { ...finalGameData.away_team, score: finalAwayScore }
-            : finalGameData.away_team;
+          const homeName = homeTeamName || finalHomeTeamObj?.name || finalGameData.home_team?.name || finalGameData.home_team;
+          const awayName = awayTeamName || finalAwayTeamObj?.name || finalGameData.away_team?.name || finalGameData.away_team;
+          
+          // ✅ UNIFIED STRUCTURE: Update team objects with final scores (if unified structure exists)
+          // For unified structure, scores are updated in teams object
+          // For backward compatibility, maintain old structure if it exists
+          let updatedHomeTeam = null;
+          let updatedAwayTeam = null;
+          if (finalHomeTeamObj) {
+            updatedHomeTeam = { ...finalHomeTeamObj, score: finalHomeScore };
+          } else if (typeof finalGameData.home_team === 'object') {
+            updatedHomeTeam = { ...finalGameData.home_team, score: finalHomeScore };
+          } else {
+            updatedHomeTeam = finalGameData.home_team;
+          }
+          if (finalAwayTeamObj) {
+            updatedAwayTeam = { ...finalAwayTeamObj, score: finalAwayScore };
+          } else if (typeof finalGameData.away_team === 'object') {
+            updatedAwayTeam = { ...finalGameData.away_team, score: finalAwayScore };
+          } else {
+            updatedAwayTeam = finalGameData.away_team;
+          }
           
           // Update simData.score with current final scores (finalizeGame prioritizes this)
           // ✅ FIX: Preserve final_game_document if it was in the response (from simulate-quarter)

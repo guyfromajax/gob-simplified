@@ -1483,34 +1483,51 @@ def finalize_game(
                     logger.error(f"❌ [FINALIZE_GAME] game_id: {game_id}, gid_for_reread: {gid_for_reread}")
                     return
 
-        home_name = game.get('home_team', {}).get('name') if isinstance(game.get('home_team'), dict) else game.get('home_team')
-        away_name = game.get('away_team', {}).get('name') if isinstance(game.get('away_team'), dict) else game.get('away_team')
+        # ✅ UNIFIED STRUCTURE: Extract team data from unified teams object
+        home_team_id = game.get('home_team_id')
+        away_team_id = game.get('away_team_id')
+        teams_obj = game.get("teams", {})
+        
+        home_team_obj = teams_obj.get(home_team_id, {}) if home_team_id and teams_obj else {}
+        away_team_obj = teams_obj.get(away_team_id, {}) if away_team_id and teams_obj else {}
+        
+        # ✅ BACKWARD COMPATIBILITY: Fallback to old structure if unified structure not found
+        if not home_team_obj:
+            home_team_field = game.get("home_team")
+            if isinstance(home_team_field, dict):
+                home_team_obj = home_team_field
+            elif isinstance(home_team_field, str):
+                # Old structure: home_team is a string name
+                pass
+        
+        if not away_team_obj:
+            away_team_field = game.get("away_team")
+            if isinstance(away_team_field, dict):
+                away_team_obj = away_team_field
+            elif isinstance(away_team_field, str):
+                # Old structure: away_team is a string name
+                pass
+        
+        home_team_name = home_team_obj.get("name") if isinstance(home_team_obj, dict) else (game.get('home_team') if isinstance(game.get('home_team'), str) else None)
+        away_team_name = away_team_obj.get("name") if isinstance(away_team_obj, dict) else (game.get('away_team') if isinstance(game.get('away_team'), str) else None)
+        
         quarter = game.get('quarter', 1)
         is_final = game.get('is_final', False)
-        print(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, quarter={quarter}, is_final={is_final}, home={home_name}, away={away_name}")
-        logger.info(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, quarter={quarter}, is_final={is_final}, home={home_name}, away={away_name}")
+        print(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, quarter={quarter}, is_final={is_final}, home={home_team_name}, away={away_team_name}")
+        logger.info(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, quarter={quarter}, is_final={is_final}, home={home_team_name}, away={away_team_name}")
 
         players = game.get("players", [])
         
-        # ✅ SS&S: Extract team names from the SAME structure that builds box_score (matches tournament mode pattern)
-        # This ensures team names match the keys in box_score exactly
-        home_team_obj = game.get("home_team", {})
-        away_team_obj = game.get("away_team", {})
-        home_team_name = None
-        away_team_name = None
-        
-        # ✅ SS&S: Build box_score from top level OR nested structure (like apply_stats_from_summary does)
-        # summarize_game_state() stores box_score nested under home_team/away_team, not at top level
+        # ✅ UNIFIED STRUCTURE: Build box_score from unified teams object
+        # summarize_game_state() stores box_score in teams[team_id].box_score
         box_score = game.get("box_score", {})
         if not box_score:
-            # Build box_score from nested team objects (new structure from summarize_game_state)
-            if home_team_obj and isinstance(home_team_obj, dict):
-                home_team_name = home_team_obj.get("name")
-                if home_team_name and "box_score" in home_team_obj:
+            # Build box_score from unified teams structure
+            if home_team_obj and isinstance(home_team_obj, dict) and home_team_name:
+                if "box_score" in home_team_obj:
                     box_score[home_team_name] = home_team_obj.get("box_score", {})
-            if away_team_obj and isinstance(away_team_obj, dict):
-                away_team_name = away_team_obj.get("name")
-                if away_team_name and "box_score" in away_team_obj:
+            if away_team_obj and isinstance(away_team_obj, dict) and away_team_name:
+                if "box_score" in away_team_obj:
                     box_score[away_team_name] = away_team_obj.get("box_score", {})
         else:
             # If box_score exists at top level, extract team names from team objects (matches tournament mode)

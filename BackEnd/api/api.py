@@ -814,21 +814,26 @@ def get_game_state(game_id: str, quarter: int | None = None):
                     }
                     players_with_energy.append(player_data)
                 
-                # Extract team data
-                home_team_data = saved.get("home_team", {})
-                away_team_data = saved.get("away_team", {})
-                
-                # Extract scouting data from teams object (contains playcall stats for S2 tab)
+                # ✅ UNIFIED STRUCTURE: Extract team data from teams object using home_team_id/away_team_id
                 teams_obj = saved.get("teams", {})
                 home_team_id = saved.get("home_team_id")
                 away_team_id = saved.get("away_team_id")
                 
-                home_scouting = {}
-                away_scouting = {}
-                if home_team_id and home_team_id in teams_obj:
-                    home_scouting = teams_obj[home_team_id].get("scouting", {})
-                if away_team_id and away_team_id in teams_obj:
-                    away_scouting = teams_obj[away_team_id].get("scouting", {})
+                # Get team data from unified teams object
+                home_team_data = teams_obj.get(home_team_id, {}) if home_team_id else {}
+                away_team_data = teams_obj.get(away_team_id, {}) if away_team_id else {}
+                
+                # Fallback: if teams object is empty or structure is old, try old structure (backward compatibility)
+                if not home_team_data and saved.get("home_team"):
+                    home_team_data = saved.get("home_team", {})
+                    logging.warning(f"⚠️ Using legacy home_team structure (teams object not found)")
+                if not away_team_data and saved.get("away_team"):
+                    away_team_data = saved.get("away_team", {})
+                    logging.warning(f"⚠️ Using legacy away_team structure (teams object not found)")
+                
+                # Extract scouting data from teams object (contains playcall stats for S2 tab)
+                home_scouting = home_team_data.get("scouting", {})
+                away_scouting = away_team_data.get("scouting", {})
                 
                 # Build team_stats structure (for S2 tab - playcall stats)
                 team_stats = {
@@ -842,10 +847,10 @@ def get_game_state(game_id: str, quarter: int | None = None):
                     }
                 }
                 
-                # Build box_score from nested structure (summarize_game_state stores it under home_team/away_team)
+                # Build box_score from nested structure (unified structure stores it in teams[team_id].box_score)
                 box_score = saved.get("box_score", {})
                 if not box_score:
-                    # Build from nested structure
+                    # Build from unified teams structure
                     home_team_name = home_team_data.get("name")
                     away_team_name = away_team_data.get("name")
                     if home_team_name and "box_score" in home_team_data:
@@ -853,6 +858,9 @@ def get_game_state(game_id: str, quarter: int | None = None):
                     if away_team_name and "box_score" in away_team_data:
                         box_score[away_team_name] = away_team_data.get("box_score", {})
                 
+                # ✅ UNIFIED STRUCTURE: Return unified teams object structure
+                # Frontend should read from teams[home_team_id]/teams[away_team_id]
+                # Keeping backward compatibility home_team/away_team for now (built from teams object)
                 return {
                     "game_id": game_id,
                     "score": saved.get("score", {}),
@@ -860,6 +868,11 @@ def get_game_state(game_id: str, quarter: int | None = None):
                     "quarter": saved.get("quarter", 1),
                     "clock": saved.get("clock", "8:00"),
                     "players": players_with_energy,
+                    # Team IDs for unified structure access
+                    "home_team_id": home_team_id,
+                    "away_team_id": away_team_id,
+                    # Unified teams object (single source of truth)
+                    "teams": teams_obj,
                     # Team-level stats (for S1/S2/S3 tabs and scoreboard)
                     "team_totals": {
                         home_team_data.get("name"): home_team_data.get("totals", {}),
@@ -870,15 +883,29 @@ def get_game_state(game_id: str, quarter: int | None = None):
                         home_team_data.get("name"): home_team_data.get("points_by_quarter", [0, 0, 0, 0]),
                         away_team_data.get("name"): away_team_data.get("points_by_quarter", [0, 0, 0, 0])
                     },
+                    # ✅ BACKWARD COMPATIBILITY: Keep home_team/away_team in response (built from teams object)
+                    # TODO: Remove these after frontend is updated to use teams[home_team_id]/teams[away_team_id]
                     "home_team": {
                         "name": home_team_data.get("name"),
                         "team_fouls": home_team_data.get("team_fouls", 0),
-                        "attributes": home_team_data.get("attributes", {})  # Team attributes for S3 tab
+                        "attributes": home_team_data.get("attributes", {}),  # Team attributes for S3 tab
+                        "colors": home_team_data.get("colors", {}),
+                        "score": home_team_data.get("score", 0),
+                        "timeouts": home_team_data.get("timeouts", 4),
+                        "points_by_quarter": home_team_data.get("points_by_quarter", [0, 0, 0, 0]),
+                        "box_score": home_team_data.get("box_score", {}),
+                        "totals": home_team_data.get("totals", {})
                     },
                     "away_team": {
                         "name": away_team_data.get("name"),
                         "team_fouls": away_team_data.get("team_fouls", 0),
-                        "attributes": away_team_data.get("attributes", {})  # Team attributes for S3 tab
+                        "attributes": away_team_data.get("attributes", {}),  # Team attributes for S3 tab
+                        "colors": away_team_data.get("colors", {}),
+                        "score": away_team_data.get("score", 0),
+                        "timeouts": away_team_data.get("timeouts", 4),
+                        "points_by_quarter": away_team_data.get("points_by_quarter", [0, 0, 0, 0]),
+                        "box_score": away_team_data.get("box_score", {}),
+                        "totals": away_team_data.get("totals", {})
                     }
                 }
         
@@ -1047,30 +1074,44 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             )
             if saved:
                 try:
-                    # Handle both old (flat) and new (teams object) structure
-                    home_team_field = saved.get("home_team")
-                    away_team_field = saved.get("away_team")
+                    # ✅ UNIFIED STRUCTURE: Get team IDs from top level (unified structure)
+                    home_team_id = saved.get("home_team_id")
+                    away_team_id = saved.get("away_team_id")
+                    teams_obj = saved.get("teams", {})
                     
-                    # New structure: home_team is a dict with name and team_id
-                    if isinstance(home_team_field, dict):
-                        home = home_team_field.get("name")
-                        away = away_team_field.get("name") if isinstance(away_team_field, dict) else None
-                        home_team_id = home_team_field.get("team_id")
-                        away_team_id = away_team_field.get("team_id") if isinstance(away_team_field, dict) else None
-                    # Old structure: home_team is a string
-                    else:
-                        home = home_team_field or saved.get("homeTeam", {}).get("name")
-                        away = away_team_field or saved.get("awayTeam", {}).get("name")
-                        home_team_id = None
-                        away_team_id = None
+                    # Get team data from unified teams object
+                    home_team_data = teams_obj.get(home_team_id, {}) if home_team_id and teams_obj else {}
+                    away_team_data = teams_obj.get(away_team_id, {}) if away_team_id and teams_obj else {}
+                    
+                    # Extract team names from teams object
+                    home = home_team_data.get("name") if home_team_data else None
+                    away = away_team_data.get("name") if away_team_data else None
+                    
+                    # ✅ BACKWARD COMPATIBILITY: Fallback to old structure if unified structure not found
+                    if not home_team_data:
+                        home_team_field = saved.get("home_team")
+                        if isinstance(home_team_field, dict):
+                            home = home_team_field.get("name") or home
+                            if not home_team_id:
+                                home_team_id = home_team_field.get("team_id")
+                            # Use old structure data as fallback
+                            home_team_data = home_team_field
+                        elif isinstance(home_team_field, str):
+                            home = home_team_field or home
+                    
+                    if not away_team_data:
+                        away_team_field = saved.get("away_team")
+                        if isinstance(away_team_field, dict):
+                            away = away_team_field.get("name") or away
+                            if not away_team_id:
+                                away_team_id = away_team_field.get("team_id")
+                            # Use old structure data as fallback
+                            away_team_data = away_team_field
+                        elif isinstance(away_team_field, str):
+                            away = away_team_field or away
                     
                     if home and away:
-                        # Try to load from new 'teams' object structure (by team_id)
-                        teams_obj = saved.get("teams", {})
-                        home_team_data = teams_obj.get(home_team_id, {}) if home_team_id else {}
-                        away_team_data = teams_obj.get(away_team_id, {}) if away_team_id else {}
-                        
-                        # Extract team data from teams object
+                        # ✅ Extract team data from teams object (or fallback old structure)
                         home_plays = home_team_data.get("plays")
                         away_plays = away_team_data.get("plays")
                         home_attrs = home_team_data.get("attributes")

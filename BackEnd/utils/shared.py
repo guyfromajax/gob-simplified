@@ -957,35 +957,12 @@ def summarize_game_state(game, exclude_animations=True):
             # If we can't load playbook_settings, continue without them (non-critical)
             logging.warning(f"⚠️ Could not preserve playbook_settings from database: {e}", exc_info=True)
     
-    # Create team objects with all necessary data for game state persistence
+    # ✅ UNIFIED TEAM STRUCTURE: Create single teams object with ALL team data
     # ✅ Use resolved team_id keys if we found them, otherwise use game.home_team.team_id
     # This ensures we use the same key format that was used when saving playbook_settings
     home_key = home_actual_team_id if home_actual_team_id else game.home_team.team_id
     away_key = away_actual_team_id if away_actual_team_id else game.away_team.team_id
     
-    teams_obj = {
-        home_key: {
-            "strategy_settings": getattr(game.home_team, 'strategy_settings', {}),
-            "strategy_calls": getattr(game.home_team, 'strategy_calls', {}),  # ✅ SS&S: Persist playcall overrides
-            "plays": home_plays,  # ✅ FIX: Use in-memory plays with updated game_stats
-            "attributes": getattr(game.home_team, 'team_attributes', {}),
-            "scouting": getattr(game.home_team, 'scouting_data', {}),
-            "playbook_settings": home_playbook_settings  # ✅ Preserve from database
-        },
-        away_key: {
-            "strategy_settings": getattr(game.away_team, 'strategy_settings', {}),
-            "strategy_calls": getattr(game.away_team, 'strategy_calls', {}),  # ✅ SS&S: Persist playcall overrides
-            "plays": away_plays,  # ✅ FIX: Use in-memory plays with updated game_stats
-            "attributes": getattr(game.away_team, 'team_attributes', {}),
-            "scouting": getattr(game.away_team, 'scouting_data', {}),
-            "playbook_settings": away_playbook_settings  # ✅ Preserve from database
-        }
-    }
-    
-    # print(f"🔍 DEBUG: Created teams object with keys: {list(teams_obj.keys())}")
-    # print(f"🔍 DEBUG: Home team plays: {len(teams_obj[game.home_team.team_id]['plays'])}")
-    # print(f"🔍 DEBUG: Away team plays: {len(teams_obj[game.away_team.team_id]['plays'])}")
-
     # Process turns: exclude animations for database persistence, keep for real-time frontend
     from copy import deepcopy
     
@@ -998,67 +975,63 @@ def summarize_game_state(game, exclude_animations=True):
     
     # Get cumulative box scores
     cumulative_box = game.get_box_score()
-
-    # Build nested team objects with all team-related data
-    home_team_data = {
-        "name": game.home_team.name,
-        "team_id": game.home_team.team_id,
-        "mascot": game.home_team.mascot,
-        "colors": {
-            "primary_color": game.home_team.primary_color,
-            "secondary_color": game.home_team.secondary_color,
-        },
-        "score": game.score.get(game.home_team.name, 0),
-        "points_by_quarter": game.game_state["points_by_quarter"].get(game.home_team.name, [0, 0, 0, 0]),
-        "team_fouls": game.home_team.team_fouls,
-        "timeouts": getattr(game.home_team, 'timeouts', 4),  # Default to 4 if not set (backward compatibility)
-        
-        # Team attributes (needed for S3 tab in Team Box Score)
-        "attributes": getattr(game.home_team, 'team_attributes', {}),
-        
-        # ✅ Removed redundant fields (already in teams object):
-        # - plays (was 75KB with embedded skeletons!)
-        # - strategy_settings
-        # - scouting
-        # Frontend should read from teams object instead
-        
-        # Player stats (for frontend display)
-        "box_score": cumulative_box.get(game.home_team.name, {}),
-        
-        # Team totals (aggregated from players)
-        "totals": game.team_totals.get(game.home_team.name, {})
-    }
     
-    away_team_data = {
-        "name": game.away_team.name,
-        "team_id": game.away_team.team_id,
-        "mascot": game.away_team.mascot,
-        "colors": {
-            "primary_color": game.away_team.primary_color,
-            "secondary_color": game.away_team.secondary_color,
+    # ✅ UNIFIED STRUCTURE: All team data in one place (eliminates home_team/away_team duplication)
+    teams_obj = {
+        home_key: {
+            # Display fields
+            "name": game.home_team.name,
+            "team_id": game.home_team.team_id,
+            "mascot": game.home_team.mascot,
+            "colors": {
+                "primary_color": game.home_team.primary_color,
+                "secondary_color": game.home_team.secondary_color,
+            },
+            # Game state fields
+            "score": game.score.get(game.home_team.name, 0),
+            "points_by_quarter": game.game_state["points_by_quarter"].get(game.home_team.name, [0, 0, 0, 0]),
+            "team_fouls": game.home_team.team_fouls,
+            "timeouts": getattr(game.home_team, 'timeouts', 4),  # Default to 4 if not set (backward compatibility)
+            # Data fields (single source of truth)
+            "attributes": getattr(game.home_team, 'team_attributes', {}),
+            "box_score": cumulative_box.get(game.home_team.name, {}),
+            "totals": game.team_totals.get(game.home_team.name, {}),
+            # Persistence fields
+            "strategy_settings": getattr(game.home_team, 'strategy_settings', {}),
+            "strategy_calls": getattr(game.home_team, 'strategy_calls', {}),  # ✅ SS&S: Persist playcall overrides
+            "plays": home_plays,  # ✅ FIX: Use in-memory plays with updated game_stats
+            "scouting": getattr(game.home_team, 'scouting_data', {}),
+            "playbook_settings": home_playbook_settings  # ✅ Preserve from database
         },
-        "score": game.score.get(game.away_team.name, 0),
-        "points_by_quarter": game.game_state["points_by_quarter"].get(game.away_team.name, [0, 0, 0, 0]),
-        "team_fouls": game.away_team.team_fouls,
-        "timeouts": getattr(game.away_team, 'timeouts', 4),  # Default to 4 if not set (backward compatibility)
-        
-        # Team attributes (needed for S3 tab in Team Box Score)
-        "attributes": getattr(game.away_team, 'team_attributes', {}),
-        
-        # ✅ Removed redundant fields (already in teams object):
-        # - plays (was 75KB with embedded skeletons!)
-        # - strategy_settings
-        # - scouting
-        # Frontend should read from teams object instead
-        
-        # Player stats (for frontend display)
-        "box_score": cumulative_box.get(game.away_team.name, {}),
-        
-        # Team totals (aggregated from players)
-        "totals": game.team_totals.get(game.away_team.name, {})
+        away_key: {
+            # Display fields
+            "name": game.away_team.name,
+            "team_id": game.away_team.team_id,
+            "mascot": game.away_team.mascot,
+            "colors": {
+                "primary_color": game.away_team.primary_color,
+                "secondary_color": game.away_team.secondary_color,
+            },
+            # Game state fields
+            "score": game.score.get(game.away_team.name, 0),
+            "points_by_quarter": game.game_state["points_by_quarter"].get(game.away_team.name, [0, 0, 0, 0]),
+            "team_fouls": game.away_team.team_fouls,
+            "timeouts": getattr(game.away_team, 'timeouts', 4),  # Default to 4 if not set (backward compatibility)
+            # Data fields (single source of truth)
+            "attributes": getattr(game.away_team, 'team_attributes', {}),
+            "box_score": cumulative_box.get(game.away_team.name, {}),
+            "totals": game.team_totals.get(game.away_team.name, {}),
+            # Persistence fields
+            "strategy_settings": getattr(game.away_team, 'strategy_settings', {}),
+            "strategy_calls": getattr(game.away_team, 'strategy_calls', {}),  # ✅ SS&S: Persist playcall overrides
+            "plays": away_plays,  # ✅ FIX: Use in-memory plays with updated game_stats
+            "scouting": getattr(game.away_team, 'scouting_data', {}),
+            "playbook_settings": away_playbook_settings  # ✅ Preserve from database
+        }
     }
 
-    # Streamlined structure with nested teams
+    # ✅ UNIFIED STRUCTURE: All team data in teams object, referenced by home_team_id/away_team_id
+    # ✅ Eliminated home_team/away_team duplication - single source of truth in teams object
     return {
         # Game metadata
         "game_id": str(game.game_id) if hasattr(game, 'game_id') else None,
@@ -1072,21 +1045,21 @@ def summarize_game_state(game, exclude_animations=True):
         "clock": game.game_state.get("clock", "8:00"),  # ✅ TIMEOUT: Save clock for resume (same as quarter breaks)
         "time_remaining": game.game_state.get("time_remaining", 480),  # ✅ TIMEOUT: Save time_remaining for resume (same as quarter breaks)
         
+        # Top-level team IDs for team lookup (required for accessing teams object)
+        "home_team_id": home_key,
+        "away_team_id": away_key,
+        
         # Top-level score map for backward compatibility (some code expects summary["score"])
+        # Build from teams object to ensure consistency
         "score": {
-            game.home_team.name: home_team_data["score"],
-            game.away_team.name: away_team_data["score"]
+            teams_obj[home_key]["name"]: teams_obj[home_key]["score"],
+            teams_obj[away_key]["name"]: teams_obj[away_key]["score"]
         },
         
-        # Top-level team IDs for frontend compatibility (used by animation system)
-        "home_team_id": game.home_team.team_id,
-        "away_team_id": game.away_team.team_id,
-        
-        # Nested team data (all team info in one place)
-        "home_team": home_team_data,
-        "away_team": away_team_data,
-        
-        # Teams object (by team_id) for game state persistence with strategy, plays, attributes, scouting
+        # ✅ UNIFIED TEAMS OBJECT: Single source of truth for all team data
+        # Access via: teams[home_team_id] or teams[away_team_id]
+        # Contains: name, team_id, mascot, colors, score, points_by_quarter, team_fouls, timeouts,
+        #           attributes, box_score, totals, strategy_settings, strategy_calls, plays, scouting, playbook_settings
         "teams": teams_obj,
         
         # Game data
