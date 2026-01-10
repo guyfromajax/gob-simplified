@@ -1,6 +1,10 @@
 # 1. Imports
+import sys
+print("🔵 [DEBUG] api.py: Starting imports...", file=sys.stderr, flush=True)
+
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
+print("🔵 [DEBUG] api.py: FastAPI imports complete", file=sys.stderr, flush=True)
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi import Request
@@ -8,12 +12,14 @@ from BackEnd.constants import POSITION_LIST
 import uuid
 from BackEnd.main import run_simulation, simulate_quarter
 from BackEnd.models.game_manager import GameManager
+print("🔵 [DEBUG] api.py: About to import from BackEnd.db", file=sys.stderr, flush=True)
 from BackEnd.db import (
     players_collection,
     teams_collection,
     games_collection,
     tournaments_collection,
 )
+print("🔵 [DEBUG] api.py: BackEnd.db import complete", file=sys.stderr, flush=True)
 from BackEnd.utils.roster_loader import load_roster
 from BackEnd.utils.game_summary_builder import build_game_summary
 from BackEnd.utils.shared import clean_mongo_ids, summarize_game_state, format_height
@@ -25,12 +31,14 @@ from bson.json_util import dumps
 from bson import ObjectId
 from fastapi.staticfiles import StaticFiles
 from BackEnd.models.animator import Animator   
+print("🔵 [DEBUG] api.py: About to import routers", file=sys.stderr, flush=True)
 from .tournament_routes import router as tournament_router
 from .training_routes import router as training_router
 from .franchise_routes import router as franchise_router
 from .gameplan_routes import router as gameplan_router
 from .play_routes import router as play_router
 from .skeleton_routes import router as skeleton_router
+print("🔵 [DEBUG] api.py: All routers imported", file=sys.stderr, flush=True)
 import traceback
 from unidecode import unidecode
 from typing import Optional
@@ -40,7 +48,9 @@ from BackEnd.models.player import Player
 
 logger = logging.getLogger(__name__)
 
+print("🔵 [DEBUG] api.py: Creating FastAPI app instance", file=sys.stderr, flush=True)
 app = FastAPI()
+print("🔵 [DEBUG] api.py: FastAPI app created", file=sys.stderr, flush=True)
 
 # CORS Configuration - Must match actual testing domains, not just final ideal
 # CRITICAL: Add CORS middleware BEFORE including routers to ensure it applies to all routes
@@ -64,8 +74,11 @@ def get_cors_origins():
     return origins
 
 # Get CORS origins and configure middleware BEFORE including routers
+print("🔵 [DEBUG] api.py: About to get CORS origins", file=sys.stderr, flush=True)
 cors_origins = get_cors_origins()
+print(f"🔵 [DEBUG] api.py: CORS origins: {cors_origins}", file=sys.stderr, flush=True)
 
+print("🔵 [DEBUG] api.py: About to add CORS middleware", file=sys.stderr, flush=True)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -76,14 +89,17 @@ app.add_middleware(
     expose_headers=["*"],
     max_age=3600  # Cache preflight requests for 1 hour
 )
+print("🔵 [DEBUG] api.py: CORS middleware added", file=sys.stderr, flush=True)
 
 # Include routers AFTER CORS middleware is configured
+print("🔵 [DEBUG] api.py: About to include routers", file=sys.stderr, flush=True)
 app.include_router(tournament_router)
 app.include_router(training_router)
 app.include_router(franchise_router)
 app.include_router(gameplan_router)
 app.include_router(play_router)
 app.include_router(skeleton_router)
+print("🔵 [DEBUG] api.py: All routers included", file=sys.stderr, flush=True)
 
 templates = Jinja2Templates(directory="FrontEnd/static")
 
@@ -94,21 +110,33 @@ if environment == "development":
     app.mount("/static", StaticFiles(directory="FrontEnd/static"), name="static")
     print("✅ Static files mounted (development mode)")
 
-print("🚀 Loaded FastAPI app from api.py")
+print("🚀 Loaded FastAPI app from api.py", file=sys.stderr, flush=True)
+print(f"🔵 [DEBUG] api.py: CORS origins configured: {cors_origins}", file=sys.stderr, flush=True)
 
 # ✅ DEBUG: Add CORS logging middleware to trace CORS issues
+print("🔵 [DEBUG] api.py: About to register CORS debug middleware", file=sys.stderr, flush=True)
 @app.middleware("http")
 async def cors_debug_middleware(request, call_next):
+    print(f"🔵 [DEBUG] cors_debug_middleware: Request {request.method} {request.url.path}", file=sys.stderr, flush=True)
     origin = request.headers.get("origin")
     if origin:
+        print(f"🔵 [DEBUG] cors_debug_middleware: Origin: {origin}", file=sys.stderr, flush=True)
         logger.info(f"🔍 [CORS] Request from origin: {origin}")
-    response = await call_next(request)
-    if origin:
-        cors_header = response.headers.get("access-control-allow-origin")
-        logger.info(f"🔍 [CORS] Response CORS header: {cors_header}")
-    return response
+    try:
+        response = await call_next(request)
+        if origin:
+            cors_header = response.headers.get("access-control-allow-origin")
+            print(f"🔵 [DEBUG] cors_debug_middleware: Response CORS header: {cors_header}", file=sys.stderr, flush=True)
+            logger.info(f"🔍 [CORS] Response CORS header: {cors_header}")
+        return response
+    except Exception as e:
+        print(f"🔵 [DEBUG] cors_debug_middleware: EXCEPTION: {e}", file=sys.stderr, flush=True)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        raise
 
-logger.info(f"🔒 CORS configured with origins: {cors_origins}")
+print("🔵 [DEBUG] api.py: CORS debug middleware registered", file=sys.stderr, flush=True)
+print("🔵 [DEBUG] api.py: Module initialization complete", file=sys.stderr, flush=True)
 
 class SimulationRequest(BaseModel):
     home_team: str
