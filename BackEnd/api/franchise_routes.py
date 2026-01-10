@@ -241,20 +241,14 @@ def _normalize_team_id(team_id: str):
         return doc["_id"]
 
 
-def _apply_team_result(team1_id, team2_id, team1_score, team2_score, sign=1):
-    db.teams.update_one({"_id": team1_id}, {"$inc": {"PF": sign * team1_score, "PA": sign * team2_score, "record.W": 0, "record.L": 0}})
-    db.teams.update_one({"_id": team2_id}, {"$inc": {"PF": sign * team2_score, "PA": sign * team1_score, "record.W": 0, "record.L": 0}})
-    if team1_score > team2_score:
-        db.teams.update_one({"_id": team1_id}, {"$inc": {"record.W": sign}})
-        db.teams.update_one({"_id": team2_id}, {"$inc": {"record.L": sign}})
-    elif team2_score > team1_score:
-        db.teams.update_one({"_id": team2_id}, {"$inc": {"record.W": sign}})
-        db.teams.update_one({"_id": team1_id}, {"$inc": {"record.L": sign}})
-
-
 def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franchise_id=None, game_id=None):
     """
     Save or update game result in games collection.
+    
+    ✅ FIX: This function no longer updates the universal teams collection.
+    Franchise mode stores W/L and PF/PA in franchise.results, which is calculated
+    when displaying team stats. This ensures franchise stats are isolated from
+    other game modes and franchise instances.
     
     Args:
         team1_id: Team 1 ObjectId
@@ -276,8 +270,6 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
             game_oid = ObjectId(game_id) if isinstance(game_id, str) else game_id
             existing = db.games.find_one({"_id": game_oid})
             if existing:
-                # Update existing game document with result fields
-                _apply_team_result(existing.get("team1_id"), existing.get("team2_id"), existing.get("team1_score", 0), existing.get("team2_score", 0), sign=-1)
                 filter_doc = {"_id": game_oid}
             else:
                 # Game document doesn't exist yet, create it
@@ -297,12 +289,9 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
         })
 
         if existing:
-            _apply_team_result(existing["team1_id"], existing["team2_id"], existing["team1_score"], existing["team2_score"], sign=-1)
             filter_doc = {"_id": existing["_id"]}
         else:
             filter_doc = {"week": week, "team1_id": team1_id, "team2_id": team2_id}
-
-    _apply_team_result(team1_id, team2_id, team1_score, team2_score, sign=1)
 
     update_fields = {
         "team1_id": team1_id,
@@ -531,12 +520,10 @@ def save_result(req: FranchiseResultRequest):
         winner_id, loser_id = away_id, home_id
         winner_score, loser_score = away_score, home_score
 
-    db.teams.update_one(
-        {"_id": winner_id}, {"$inc": {"record.W": 1, "PF": winner_score, "PA": loser_score}}
-    )
-    db.teams.update_one(
-        {"_id": loser_id}, {"$inc": {"record.L": 1, "PF": loser_score, "PA": winner_score}}
-    )
+    # ✅ FIX: Removed updates to universal teams collection.
+    # Franchise mode stores W/L and PF/PA in franchise.results (set in complete-week endpoint),
+    # and team stats are calculated from franchise.results when displayed.
+    # This ensures franchise stats are isolated from other game modes and franchise instances.
 
     week = franchise_doc.get("week", 1) - 1
     if week < 1:
@@ -1478,7 +1465,7 @@ def team_stats(franchise_id: str):
         raise HTTPException(status_code=400, detail="Invalid franchise_id")
     
     db_query_start = time.time()
-    franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 1, "franchise_teams": 1})
+    franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 1, "franchise_teams": 1, "results": 1})
     db_query_time = time.time() - db_query_start
     logger.info(f"⏱️ [PERF] /franchise/team-stats DB query: {db_query_time:.3f}s")
     
@@ -1487,17 +1474,20 @@ def team_stats(franchise_id: str):
     
     players = franchise_doc.get("players", {})
     franchise_teams = franchise_doc.get("franchise_teams", {})
+    franchise_results = franchise_doc.get("results", {})  # ✅ FIX: Get franchise.results for W/L and PF/PA calculation
     
-    logger.info(f"⏱️ [PERF] /franchise/team-stats Found {len(players)} players, {len(franchise_teams)} teams")
+    logger.info(f"⏱️ [PERF] /franchise/team-stats Found {len(players)} players, {len(franchise_teams)} teams, {len(franchise_results)} weeks of results")
     
     # ✅ SS&S: Use shared aggregator utility
+    # ✅ FIX: Pass franchise_results to calculate W/L and PF/PA from franchise-specific results, not universal teams collection
     aggregation_start = time.time()
     output = aggregate_team_stats_from_players(
         players=players,
         team_ids=franchise_teams,
         teams_collection=db.teams,
         collection_type='franchise',
-        logger=logger
+        logger=logger,
+        franchise_results=franchise_results
     )
     aggregation_time = time.time() - aggregation_start
     logger.info(f"⏱️ [PERF] /franchise/team-stats Aggregation: {aggregation_time:.3f}s")
