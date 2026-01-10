@@ -84,14 +84,18 @@ This plan prioritizes getting the application live and functional. Frontend desi
   - [x] Save Playbooks persistence verified on staging
   - [x] Save Game Plan persistence verified on staging
   - [x] Lineup persistence confirmed working (no changes needed)
-- [ ] **1. Go-live Foundations** - IN PROGRESS
-  - [ ] Staging backend deployed and verified
-  - [ ] Staging frontend deployed and verified
+- [x] **1. Go-live Foundations** - ✅ COMPLETE (January 2026)
+  - [x] ✅ Staging backend deployed and verified (Railway: `gob-simplified-staging.up.railway.app`)
+  - [x] ✅ Staging frontend deployed and verified (Netlify: `gob-test.netlify.app`)
+  - [x] ✅ Database connectivity verified and stable (`gob-staging` database created and populated)
+  - [x] ✅ Environment separation verified (staging uses `gob-staging`, production uses `gob`)
+  - [x] ✅ Railway port configuration fixed (target port updated from 8000 to 8080)
+  - [x] ✅ Reference data cloned to staging (133 documents: teams, players, plays, defenses, skeletons)
+  - [x] ✅ Team selection working in staging (CORS and routing verified)
   - [ ] Production backend ready (can clone from staging)
   - [ ] Production frontend ready (can clone from staging)
-  - [ ] Database connectivity verified and stable
-  - [ ] Environment separation verified (no cross-talk)
   - **📋 Detailed Checklist:** See `docs/To Do/Task_1_1_Go_Live_Foundations_Verification.md`
+  - **📋 Setup Notes:** See `docs/To Do/setup_staging_database.md` for Railway port fix and database cloning process
 - [x] **2. Frontend ↔ Backend Contract** - COMPLETE
   - [x] Centralized API config mechanism in place
   - [x] All API calls use centralized config
