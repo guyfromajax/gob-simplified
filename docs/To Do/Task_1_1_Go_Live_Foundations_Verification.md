@@ -81,8 +81,9 @@ This checklist verifies that staging and production environments are fully set u
 ### 1.3 Environment Variables
 - [ ] **MONGO_URI is configured:**
   - Format: `mongodb+srv://...`
-  - Database name: `_________________` (should be staging-specific, e.g., `gob-staging`)
+  - Database name: `gob-staging` (configured via `MONGO_DB_NAME` env var or URI path)
   - Status: [ ] ✅ Configured | [ ] ❌ Missing | [ ] ⚠️ Wrong Format
+  - Note: Database will be auto-created on first write (Option A: Start Fresh approach)
 
 - [ ] **ENVIRONMENT is set:**
   - Value: `staging` (should be exactly "staging")

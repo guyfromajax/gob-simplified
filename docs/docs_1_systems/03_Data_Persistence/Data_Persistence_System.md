@@ -354,9 +354,9 @@ This system documents data persistence across all three game modes when users ar
 
 ---
 
-## Known Issues & Fixes (January 2025)
+## Known Issues & Fixes (January 2025-2026)
 
-### ✅ Fixed: Playbook Percentage Persistence
+### ✅ Fixed: Playbook Percentage Persistence (0% Values)
 
 **Issue:** Playbook percentages were not persisting correctly, especially 0% values. When users set percentages and saved, then reloaded the playbooks page, percentages would reset to 0 or default values.
 
@@ -428,4 +428,72 @@ This system documents data persistence across all three game modes when users ar
 - Plays data structure must be preserved through training to prevent empty containers
 - Defense plays come from hardcoded `DEFENSE_PLAY_DATA` (not from database), so they always appear
 - Offense plays come from database `plays` object, so structure must be maintained
+
+---
+
+### ✅ Fixed: `even_distribution_all` Flag Auto-Redistribution Bug (January 2026)
+
+**Issue:** When `even_distribution_all: true`, percentages were being redistributed on every page load, overwriting saved percentages that users had manually set. Users could not persist custom percentages when the flag was `true`.
+
+**Root Cause:**
+- `loadState()` method checked `even_distribution_all` flag and automatically redistributed percentages on every page load
+- This overwrote saved percentages that were already correctly stored in the database
+- The flag was being used as a "behavior instruction" (redistribute on load) instead of a "preference indicator" (user wants even distribution)
+
+**Fix (January 2026):**
+- Modified `FrontEnd/static/playbooks.js` `loadState()` to never redistribute on page load
+- Flag now only controls UI state (button appearance), not redistribution behavior
+- Saved percentages are always respected regardless of flag value
+- Redistribution only happens when user explicitly clicks "Even Distribution - All" button
+- When user saves after redistribution, the evenly-distributed percentages are saved to database
+- On next load, saved evenly-distributed percentages are loaded (no redistribution occurs)
+
+**Behavior After Fix:**
+- `even_distribution_all: true` means "user last used even distribution" (percentages were already evenly distributed when saved)
+- On page load, saved percentages are always loaded and displayed (no redistribution)
+- When position filters change and flag is `true`, percentages redistribute among new visible plays (intentional behavior)
+- Flag controls UI state (button appearance) only - does not auto-redistribute on load
+
+**Files Changed:**
+- `FrontEnd/static/playbooks.js` (lines 469-503)
+
+**Related Documentation:**
+- `docs/To Do/play_percentage_persistence.md` - Complete analysis and fix documentation
+
+---
+
+### ✅ Fixed: Playbook Percentage Loading - State Sections Only Contained First N Plays (January 2026)
+
+**Issue:** Some plays showed 0% even though they had saved percentages in the database. Specifically, plays that weren't in the first N plays (first 3 for set plays, first 4 for motion) didn't get their percentages loaded.
+
+**Root Cause:**
+- `initDefaults()` created state entries only for first N plays from API response (based on array index)
+- `loadPlaybookPercentagesFromAPI()` iterated through `this.state.sections[sectionKey]` which only contained first N plays
+- If a play wasn't in the first N plays (e.g., "SG Pass & Cut" at index 5), it wasn't in state sections, so its percentage couldn't be loaded
+- Position filters could also cause visible plays to not be in state sections
+
+**Fix (January 2026):**
+- Modified `FrontEnd/static/playbooks.js` `loadPlaybookPercentagesFromAPI()` to iterate through **ALL plays** in `this.playData[settingsKey]`
+- For each play, find or create the corresponding state entry (by playId)
+- Apply saved percentage using `play.name` as key
+- This ensures ALL plays from database are matched, not just the first N that were initialized in state
+
+**Matching Strategy:**
+- **Database/API Storage:** Uses **play names** as keys (`{"Base Post Play": 50, "SG Pass & Cut": 50}`)
+- **Frontend State:** Uses **generated IDs** like `set-inside-1`, `set-inside-2` based on array index
+- **Matching Process:**
+  1. Iterate through ALL plays in `playData` (not just state sections)
+  2. For each play, find or create state entry by `playId`
+  3. Look up saved percentage using `play.name` as key
+  4. Apply percentage to state entry
+
+**Files Changed:**
+- `FrontEnd/static/playbooks.js` (lines 505-622)
+
+**Related Documentation:**
+- `docs/To Do/play_percentage_persistence.md` - Complete analysis and fix documentation
+
+**Future Enhancement:**
+- Consider using `play_id` (database ID) instead of play names for more robust matching
+- This would prevent issues if play names change in database
 
