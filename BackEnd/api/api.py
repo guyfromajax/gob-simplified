@@ -116,21 +116,30 @@ print(f"🔵 [DEBUG] api.py: CORS origins configured: {cors_origins}", file=sys.
 # ✅ DEBUG: Add CORS logging middleware to trace CORS issues
 print("🔵 [DEBUG] api.py: About to register CORS debug middleware", file=sys.stderr, flush=True)
 @app.middleware("http")
-async def cors_debug_middleware(request, call_next):
-    print(f"🔵 [DEBUG] cors_debug_middleware: Request {request.method} {request.url.path}", file=sys.stderr, flush=True)
+async def cors_debug_middleware(request: Request, call_next):
+    """Debug middleware to log all requests and catch exceptions early"""
+    method = request.method
+    path = request.url.path
+    print(f"🔵 [DEBUG] cors_debug_middleware: {method} {path}", file=sys.stderr, flush=True)
+    
     origin = request.headers.get("origin")
     if origin:
         print(f"🔵 [DEBUG] cors_debug_middleware: Origin: {origin}", file=sys.stderr, flush=True)
         logger.info(f"🔍 [CORS] Request from origin: {origin}")
+    
+    # Log all headers for debugging
+    print(f"🔵 [DEBUG] cors_debug_middleware: Headers: {dict(request.headers)}", file=sys.stderr, flush=True)
+    
     try:
         response = await call_next(request)
         if origin:
             cors_header = response.headers.get("access-control-allow-origin")
-            print(f"🔵 [DEBUG] cors_debug_middleware: Response CORS header: {cors_header}", file=sys.stderr, flush=True)
+            print(f"🔵 [DEBUG] cors_debug_middleware: Response status: {response.status_code}, CORS header: {cors_header}", file=sys.stderr, flush=True)
             logger.info(f"🔍 [CORS] Response CORS header: {cors_header}")
+        print(f"🔵 [DEBUG] cors_debug_middleware: {method} {path} - Status: {response.status_code}", file=sys.stderr, flush=True)
         return response
     except Exception as e:
-        print(f"🔵 [DEBUG] cors_debug_middleware: EXCEPTION: {e}", file=sys.stderr, flush=True)
+        print(f"🔴 [ERROR] cors_debug_middleware: EXCEPTION on {method} {path}: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
         import traceback
         traceback.print_exc(file=sys.stderr)
         raise
