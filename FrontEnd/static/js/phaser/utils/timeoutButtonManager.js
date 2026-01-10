@@ -268,15 +268,35 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
         return;
     }
     
-    // Get team info from scene - try multiple sources
-    const homeTeam = scene.simData?.home_team?.name || 
-                     scene.simData?.home_team_id || 
+    // ✅ UNIFIED STRUCTURE: Get team names from unified teams object
+    // Priority: 1) teams[home_team_id].name (unified structure), 2) home_team.name (backward compatibility), 3) scene fallbacks
+    const homeTeamId = scene.simData?.home_team_id;
+    const awayTeamId = scene.simData?.away_team_id;
+    const teamsObj = scene.simData?.teams || {};
+    
+    const homeTeam = (homeTeamId && teamsObj[homeTeamId]?.name) ||  // ✅ Unified structure (preferred)
+                     scene.simData?.home_team?.name ||                // Backward compatibility
                      (typeof scene.homeTeam === 'string' ? scene.homeTeam : scene.homeTeam?.name) ||
-                     scene.simData?.homeTeam?.name;
-    const awayTeam = scene.simData?.away_team?.name || 
-                     scene.simData?.away_team_id || 
+                     scene.simData?.homeTeam?.name ||
+                     homeTeamId;  // Last resort: use ID (should log warning if we get here)
+    
+    const awayTeam = (awayTeamId && teamsObj[awayTeamId]?.name) ||  // ✅ Unified structure (preferred)
+                     scene.simData?.away_team?.name ||                // Backward compatibility
                      (typeof scene.awayTeam === 'string' ? scene.awayTeam : scene.awayTeam?.name) ||
-                     scene.simData?.awayTeam?.name;
+                     scene.simData?.awayTeam?.name ||
+                     awayTeamId;  // Last resort: use ID (should log warning if we get here)
+    
+    // Log warning if we had to use team ID as fallback (indicates missing team name)
+    if (homeTeam === homeTeamId || awayTeam === awayTeamId) {
+        console.warn('⚠️ [TIMEOUT] Using team ID as team name fallback (team name not found in unified structure)', {
+            homeTeamId,
+            awayTeamId,
+            homeTeam,
+            awayTeam,
+            hasTeamsObj: !!teamsObj,
+            teamsObjKeys: teamsObj ? Object.keys(teamsObj) : []
+        });
+    }
     const myTeamSide = scene.userTeamSide || 
                        scene.myTeamSide || 
                        (scene.simData?.user_team_side === 'home' ? 'home' : 'away');

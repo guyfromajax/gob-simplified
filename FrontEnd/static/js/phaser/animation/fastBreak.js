@@ -595,8 +595,16 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
     // Show announcement with shooter headshot
     const shooterInfo = scene.playerInfo?.[shooterId];
     const shooterTeamId = shooterSprite?.team_id;
-    const homeTeamName = scene.simData?.home_team?.name || "Home";
-    const awayTeamName = scene.simData?.away_team?.name || "Away";
+    // ✅ UNIFIED STRUCTURE: Get team names from unified structure (with backward compatibility)
+    const homeTeamId = scene.simData?.home_team_id;
+    const awayTeamId = scene.simData?.away_team_id;
+    const teamsObj = scene.simData?.teams || {};
+    const homeTeamName = (homeTeamId && teamsObj[homeTeamId]?.name) || 
+                         scene.simData?.home_team?.name || 
+                         "Home";
+    const awayTeamName = (awayTeamId && teamsObj[awayTeamId]?.name) || 
+                         scene.simData?.away_team?.name || 
+                         "Away";
     const shooterTeamName = shooterTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
     
     if (shooterInfo) {
