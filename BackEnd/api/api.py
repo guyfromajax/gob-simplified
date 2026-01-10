@@ -167,14 +167,21 @@ async def startup_event():
             route_paths.append(f"ANY {route.path}")
     print(f"🔵 [DEBUG] startup_event: Registered routes (first 20): {route_paths}", file=sys.stderr, flush=True)
     
-    # Test if we can actually access a collection
+    # Check MongoDB connection status (non-blocking, don't crash if it fails)
+    # MongoDB connections are lazy - this just verifies the client exists
     try:
-        teams_count = teams_collection.count_documents({})
-        print(f"🔵 [DEBUG] startup_event: MongoDB test - teams collection has {teams_count} documents", file=sys.stderr, flush=True)
+        from BackEnd.db import client, DB_NAME
+        print(f"🔵 [DEBUG] startup_event: MongoDB client exists: {client is not None}", file=sys.stderr, flush=True)
+        print(f"🔵 [DEBUG] startup_event: Target database name: {DB_NAME}", file=sys.stderr, flush=True)
+        print(f"🔵 [DEBUG] startup_event: MONGO_URI set: {bool(os.getenv('MONGO_URI'))}", file=sys.stderr, flush=True)
+        print(f"🔵 [DEBUG] startup_event: MONGO_DB_NAME env var: {os.getenv('MONGO_DB_NAME', 'NOT SET')}", file=sys.stderr, flush=True)
+        
+        # NOTE: We don't test actual DB connection here to avoid blocking startup
+        # MongoDB will connect on first real operation. If connection fails, 
+        # the global exception handler will catch it.
     except Exception as e:
-        print(f"🔴 [ERROR] startup_event: MongoDB test failed: {e}", file=sys.stderr, flush=True)
-        import traceback
-        traceback.print_exc(file=sys.stderr)
+        print(f"⚠️ [WARNING] startup_event: Could not check MongoDB config: {e}", file=sys.stderr, flush=True)
+        # Don't crash startup - MongoDB might connect later
 
 class SimulationRequest(BaseModel):
     home_team: str

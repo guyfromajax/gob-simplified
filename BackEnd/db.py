@@ -49,12 +49,20 @@ def _get_database_name(uri: str | None) -> str:
     return "gob"
 
 def _init_client(uri: str | None):
+    """Initialize MongoDB client. Returns None on any error to allow graceful fallback to mongomock."""
     if not uri:
+        print("⚠️ [DB] MONGO_URI not set - will use mongomock", file=sys.stderr, flush=True)
         return None
     try:
-        return MongoClient(uri, serverSelectionTimeoutMS=5000)
-    except PyMongoError as e:
-        print(f"⚠️ Failed to connect to MongoDB at {uri}: {e}")
+        print(f"🔵 [DB] Attempting to connect to MongoDB...", file=sys.stderr, flush=True)
+        client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+        print(f"✅ [DB] MongoDB client created successfully", file=sys.stderr, flush=True)
+        return client
+    except Exception as e:  # Catch ALL exceptions, not just PyMongoError
+        print(f"⚠️ [DB] Failed to initialize MongoDB client: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+        print(f"⚠️ [DB] Will fallback to mongomock for development", file=sys.stderr, flush=True)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return None
 
 # Get database name (configurable for staging/production separation)
