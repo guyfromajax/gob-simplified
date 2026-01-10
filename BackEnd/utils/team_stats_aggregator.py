@@ -16,7 +16,8 @@ def aggregate_team_stats_from_players(
     teams_collection: Collection,
     collection_type: str = 'tournament',
     logger=None,
-    tournament_bracket: Dict[str, Any] | None = None  # ✅ FIX: Optional bracket for tournament-specific W/L and PF/PA
+    tournament_bracket: Dict[str, Any] | None = None,  # ✅ FIX: Optional bracket for tournament-specific W/L and PF/PA
+    franchise_results: Dict[str, Any] | None = None  # ✅ FIX: Optional franchise results for franchise-specific W/L and PF/PA
 ) -> List[Dict[str, Any]]:
     """
     Aggregates player stats into team stats.
@@ -203,8 +204,57 @@ def aggregate_team_stats_from_players(
                     standings_data[home_team_id]["PA"] += away_score
                     standings_data[away_team_id]["PF"] += away_score
                     standings_data[away_team_id]["PA"] += home_score
+    elif collection_type == 'franchise' and franchise_results:
+        # ✅ FIX: Calculate W/L and PF/PA from franchise.results (franchise-specific) instead of global teams collection
+        # This prevents stats from accumulating across multiple franchises or from Single Game mode
+        # Initialize all teams with zeros
+        for team_id_str in team_ids.keys():
+            standings_data[str(team_id_str)] = {"PF": 0, "PA": 0, "W": 0, "L": 0}
+        
+        # Process all weeks in results
+        # franchise_results structure: {"1": [{"away_id": "...", "home_id": "...", "away_score": X, "home_score": Y}, ...], "2": [...], ...}
+        for week_str, week_results in franchise_results.items():
+            if not isinstance(week_results, list):
+                continue
+            for game_result in week_results:
+                if not isinstance(game_result, dict):
+                    continue
+                
+                away_id = game_result.get("away_id")
+                home_id = game_result.get("home_id")
+                away_score = game_result.get("away_score", 0)
+                home_score = game_result.get("home_score", 0)
+                
+                if not away_id or not home_id:
+                    continue
+                
+                # Normalize team IDs to strings
+                away_id_str = str(away_id)
+                home_id_str = str(home_id)
+                
+                # Initialize if not present (in case team not in team_ids)
+                if away_id_str not in standings_data:
+                    standings_data[away_id_str] = {"PF": 0, "PA": 0, "W": 0, "L": 0}
+                if home_id_str not in standings_data:
+                    standings_data[home_id_str] = {"PF": 0, "PA": 0, "W": 0, "L": 0}
+                
+                # Determine winner
+                if away_score > home_score:
+                    standings_data[away_id_str]["W"] += 1
+                    standings_data[home_id_str]["L"] += 1
+                elif home_score > away_score:
+                    standings_data[home_id_str]["W"] += 1
+                    standings_data[away_id_str]["L"] += 1
+                # Tie: no win/loss (or handle ties if needed)
+                
+                # Update PF/PA
+                standings_data[away_id_str]["PF"] += away_score
+                standings_data[away_id_str]["PA"] += home_score
+                standings_data[home_id_str]["PF"] += home_score
+                standings_data[home_id_str]["PA"] += away_score
     else:
-        # Fallback: Read from teams collection (for Franchise mode or when bracket not provided)
+        # Fallback: Read from teams collection (for backward compatibility or when results not provided)
+        # ⚠️ WARNING: This should NOT be used for franchise mode - use franchise_results instead
         teams_list = list(teams_collection.find({}, {"name": 1, "PF": 1, "PA": 1, "record": 1, "_id": 1}))
         for t in teams_list:
             team_id_str = str(t["_id"])
