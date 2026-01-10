@@ -329,6 +329,8 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
 
 @router.post("/franchise/select-team")
 def select_team(selection: TeamSelection):
+    import sys
+    print(f"🔵 [DEBUG] select_team: POST /franchise/select-team called with team: {selection.team_name}", file=sys.stderr, flush=True)
     # Resolve team name to ObjectId
     team_doc = db.teams.find_one({"name": selection.team_name})
     if not team_doc:

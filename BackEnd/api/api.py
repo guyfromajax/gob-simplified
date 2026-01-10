@@ -138,6 +138,12 @@ async def cors_debug_middleware(request, call_next):
 print("🔵 [DEBUG] api.py: CORS debug middleware registered", file=sys.stderr, flush=True)
 print("🔵 [DEBUG] api.py: Module initialization complete", file=sys.stderr, flush=True)
 
+# ✅ Add startup event to verify app is ready
+@app.on_event("startup")
+async def startup_event():
+    print("🔵 [DEBUG] startup_event: FastAPI app is ready!", file=sys.stderr, flush=True)
+    print(f"🔵 [DEBUG] startup_event: PORT env var: {os.getenv('PORT', 'NOT SET')}", file=sys.stderr, flush=True)
+
 class SimulationRequest(BaseModel):
     home_team: str
     away_team: str
@@ -590,7 +596,26 @@ def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
 # 4. Routes
 @app.get("/")
 def root():
+    print("🔵 [DEBUG] root endpoint: GET / called", file=sys.stderr, flush=True)
     return {"message": "GOB Simulation API is live"}
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for Railway"""
+    print("🔵 [DEBUG] health_check: GET /health called", file=sys.stderr, flush=True)
+    return {"status": "healthy", "port": os.getenv("PORT", "NOT SET")}
+
+@app.options("/{full_path:path}")
+async def catch_all_options(full_path: str):
+    """Explicit OPTIONS handler for all routes - ensures preflight requests are handled"""
+    print(f"🔵 [DEBUG] catch_all_options: OPTIONS /{full_path} called", file=sys.stderr, flush=True)
+    return Response()
+
+@app.options("/{full_path:path}")
+async def options_handler(full_path: str):
+    """Explicit OPTIONS handler for all routes to debug CORS preflight"""
+    print(f"🔵 [DEBUG] OPTIONS handler: OPTIONS /{full_path} called", file=sys.stderr, flush=True)
+    return Response()
 
 @app.get("/teams")
 def get_team_names():
