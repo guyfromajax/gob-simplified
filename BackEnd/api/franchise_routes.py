@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
@@ -326,6 +326,24 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
         "team1_score": team1_score,
         "team2_score": team2_score,
     }
+
+@router.options("/franchise/select-team")
+async def select_team_options():
+    """
+    Explicit OPTIONS handler for CORS preflight debugging.
+    This bypasses CORSMiddleware to see if requests reach FastAPI at all.
+    """
+    import sys
+    print(f"🔵 [DEBUG] select_team_options: OPTIONS /franchise/select-team called", file=sys.stderr, flush=True)
+    return Response(
+        status_code=204,
+        headers={
+            "Access-Control-Allow-Origin": "https://gob-test.netlify.app",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
 
 @router.post("/franchise/select-team")
 def select_team(selection: TeamSelection):
