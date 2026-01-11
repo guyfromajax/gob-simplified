@@ -773,19 +773,14 @@ def get_tournament_roster(tournament_id: str, team_name: str = None):
     tournament_players = tournament_doc.get("players", {}) or tournament_doc.get("player_stats", {})  # Backward compatibility
     team_player_ids = team_doc.get("player_ids", [])
     
-    # Build player list with tournament-specific attributes
+    # ✅ FIX: Build player list with tournament-specific attributes (matches Franchise mode pattern)
+    # Return ALL players from team roster, even if not yet in tournament.players (for teams that haven't played yet)
     players = []
     for pid in team_player_ids:
         pid_str = str(pid)
         tournament_player_data = tournament_players.get(pid_str, {})
-        if not tournament_player_data:
-            continue
         
-        # Get tournament-specific attributes (currently EM, CH, MO only)
-        # Future: will include all evolved attributes when training is added
-        tournament_attributes = tournament_player_data.get("attributes", {})
-        
-        # Get additional data from core collection
+        # Get additional data from core collection (always load, even if player not in tournament yet)
         core_player = players_collection.find_one({"_id": pid}, {
             "position_ratings": 1, "height": 1, "weight": 1, "jersey": 1, "year": 1, "attributes": 1,
             "first_name": 1, "last_name": 1
@@ -794,8 +789,12 @@ def get_tournament_roster(tournament_id: str, team_name: str = None):
         if not core_player:
             continue
         
+        # Get tournament-specific attributes (currently EM, CH, MO only)
+        # Future: will include all evolved attributes when training is added
+        tournament_attributes = tournament_player_data.get("attributes", {}) if tournament_player_data else {}
+        
         # Get position ratings from tournament (with backward compatibility to core)
-        position_ratings = tournament_player_data.get("position_ratings")
+        position_ratings = tournament_player_data.get("position_ratings") if tournament_player_data else None
         if not position_ratings:
             position_ratings = core_player.get("position_ratings", {})
         
@@ -805,14 +804,14 @@ def get_tournament_roster(tournament_id: str, team_name: str = None):
         
         # Create anchor_ prefixed attributes (like Player class does)
         for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
-            if attr_key in merged_attributes:
+            if merged_attributes.get(attr_key) is not None:
                 merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
         
         # Use tournament player data for name (with meta wrapper), fallback to core
         # Backward compatibility: check meta wrapper first, then root level, then core
-        meta = tournament_player_data.get("meta", {})
-        first = meta.get("first_name") or tournament_player_data.get("first_name") or core_player.get("first_name", "")
-        last = meta.get("last_name") or tournament_player_data.get("last_name") or core_player.get("last_name", "")
+        meta = tournament_player_data.get("meta", {}) if tournament_player_data else {}
+        first = meta.get("first_name") or (tournament_player_data.get("first_name") if tournament_player_data else None) or core_player.get("first_name", "")
+        last = meta.get("last_name") or (tournament_player_data.get("last_name") if tournament_player_data else None) or core_player.get("last_name", "")
         
         player = {
             "_id": pid_str,
