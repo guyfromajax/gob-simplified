@@ -51,8 +51,8 @@ const API_CONFIG = {
         // Staging default domain - Railway staging backend
         return 'https://gob-simplified-staging.up.railway.app';
       } else {
-        // Production default domain - you'll need to update this with actual Railway production URL
-        return 'https://gob-backend-prod.railway.app';
+        // Production default domain - Railway production backend
+        return 'https://gob-simplified-gob-backend-prod.up.railway.app';
       }
     }
     
