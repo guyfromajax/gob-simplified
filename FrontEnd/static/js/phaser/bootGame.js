@@ -475,7 +475,9 @@ async function handleSimQuarter() {
   }
 
   try {
-    showStatus(`Simulating Q${nextQuarter}...`);
+    // ✅ FIX: Display quarter being simulated (nextQuarter - 1) to match what's actually being simmed
+    const displayQuarter = nextQuarter - 1;
+    showStatus(`Simulating Q${displayQuarter}...`);
     const payload = {
       home_team: homeTeam,
       away_team: awayTeam,
