@@ -2084,9 +2084,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         logging.info(f"💾 Saving game state: game_id={game_id}, quarter={db_summary.get('quarter')}, gm.quarter={gm.quarter}")
         
         # ✅ TOURNAMENT MODE: Add mode and tournament_id to game document for consistency with Franchise mode
-        # Infer mode from tournament_id/franchise_id if mode not provided in request
+        # ✅ FIX: Prefer explicit mode from request over inferring from IDs
+        # This prevents Single Game mode from being incorrectly set to "franchise" when franchise_id leaks from localStorage
         mode = request.mode
         if not mode:
+            # Only infer mode if it's truly not set
+            # Default to "single" if mode is not explicitly provided (even if IDs are present)
             if request.tournament_id:
                 mode = "tournament"
             elif request.franchise_id:

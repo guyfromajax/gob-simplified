@@ -88,7 +88,10 @@ const storedFranchiseId =
   typeof localStorage !== 'undefined'
     ? localStorage.getItem('franchise_id') || localStorage.getItem('franchiseId')
     : null;
-const franchiseId = queryFranchiseId || storedFranchiseId;
+// ✅ FIX: Only use storedFranchiseId if mode is explicitly 'franchise' or queryFranchiseId exists
+// This prevents Single Game mode from accidentally using franchise_id from localStorage
+const urlMode = urlParams.get('mode');
+const franchiseId = queryFranchiseId || (urlMode === 'franchise' ? storedFranchiseId : null);
 if (queryFranchiseId && typeof localStorage !== 'undefined') {
   localStorage.setItem('franchise_id', queryFranchiseId);
 }
@@ -96,7 +99,7 @@ const weekParam = parseInt(urlParams.get('week'), 10);
 if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined') {
   localStorage.setItem('franchise_week', weekParam);
 }
-const mode = urlParams.get('mode') || getMode({ tournamentId, franchiseId });
+const mode = urlMode || getMode({ tournamentId, franchiseId });
 const userTeamSide = urlParams.get('my_team');  // "home" or "away"
 // ✅ SS&S: Read team_id (ObjectId) from URL params for navigation anchor preservation
 const teamId = urlParams.get('team_id') || (userTeamSide === 'home' ? urlParams.get('home_id') : urlParams.get('away_id'));
@@ -655,7 +658,9 @@ async function handleSimFullGame() {
       if (tournamentId) {
         payload.tournament_id = tournamentId;
       }
-      if (franchiseId) {
+      // ✅ FIX: Only pass franchise_id if mode is explicitly 'franchise'
+      // This prevents Single Game mode from accidentally passing franchise_id from localStorage
+      if (mode === 'franchise' && franchiseId) {
         payload.franchise_id = franchiseId;
         if (weekParam && !Number.isNaN(weekParam)) {
           payload.week = weekParam;
