@@ -580,11 +580,13 @@ async function handleSimQuarter() {
       throw new Error('Game is complete - simulation should not be possible');
     }
     
-    // Calculate next quarter after simulation (backend increments quarter)
-    const quarterAfterSim = lastSummary.quarter || (nextQuarter + 1);
+    // ✅ FIX: Calculate next quarter after simulation
+    // Backend returns the completed quarter (gm.quarter - 1), so we need to add 1 to get the next quarter
+    // Example: Backend simulates Q1, increments to 2, returns 1 (completed), so next quarter = 1 + 1 = 2
+    const quarterAfterSim = lastSummary.quarter ? lastSummary.quarter + 1 : (nextQuarter + 1);
     const periodLabel = quarterAfterSim <= 4 ? `Q${quarterAfterSim}` : `OT${quarterAfterSim - 4}`;
     
-    console.log(`✅ Q${nextQuarter} fully simulated, backend reports next quarter=${quarterAfterSim}`);
+    console.log(`✅ Q${nextQuarter} fully simulated, backend reports completed quarter=${lastSummary.quarter}, next quarter=${quarterAfterSim}`);
     
     // Build URL parameters for set-lineup screen using TimeoutNavigationHelper for consistency
     const helper = window.TimeoutNavigationHelper;
