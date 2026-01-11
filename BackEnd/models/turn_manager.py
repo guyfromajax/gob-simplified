@@ -346,24 +346,29 @@ class TurnManager:
         
         # Get previous turn's offensive_state (stored in game_state for tracking)
         previous_state = self.game.game_state.get("_previous_offensive_state", "N/A (first turn)")
-        logging.info(f"🔄 [OFFENSIVE_STATE TRANSITION] Turn #{turn_num} - BEFORE ROUTING", {
-            "turn_number": turn_num,
-            "previous_offensive_state": previous_state,
-            "current_offensive_state": state,
-            "time_remaining": time_remaining,
-            "offense_team": self.game.offense_team.name,
-            "defense_team": self.game.defense_team.name,
-            "transition": f"{previous_state} → {state}",
-            "note": "This is the offensive_state that determines routing for this turn"
-        })
+        
+        # ✅ PERFORMANCE: Skip verbose logging during full simulations (hundreds of turns per quarter)
+        # Keep logging for turn-by-turn mode where users need debug info
+        if not is_full_simulation:
+            logging.info(f"🔄 [OFFENSIVE_STATE TRANSITION] Turn #{turn_num} - BEFORE ROUTING", {
+                "turn_number": turn_num,
+                "previous_offensive_state": previous_state,
+                "current_offensive_state": state,
+                "time_remaining": time_remaining,
+                "offense_team": self.game.offense_team.name,
+                "defense_team": self.game.defense_team.name,
+                "transition": f"{previous_state} → {state}",
+                "note": "This is the offensive_state that determines routing for this turn"
+            })
         
         # Store current state as previous for next turn
         self.game.game_state["_previous_offensive_state"] = state
         
         # Create debug string for frontend display
         debug_turn_start = f"***** RUN TURN, turn number: {turn_num}, time remaining: {time_remaining}, offensive state: {state} *****"
-        # ✅ KEEP: Turn header log (user requested to keep these)
-        logging.info(debug_turn_start)
+        # ✅ PERFORMANCE: Skip turn header log during full simulations
+        if not is_full_simulation:
+            logging.info(debug_turn_start)
         # if state in ["HCO", "HALF_COURT"]:
         #     print(f"{self.game.offense_team.name}: {self.game.game_state['current_playcall']}")
         #     print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
@@ -441,9 +446,11 @@ class TurnManager:
             # This ensures Motion play overrides (like "3-2 Motion") are reflected in the result
             result["offensive_playcall"] = self.game.game_state.get("current_playcall", calls["offense"])
             result["defensive_playcall"] = calls["defense"]
-            offense_name = calls["offense"]
-            defense_name = calls["defense"]
-            logging.info(f"🎮 [PLAYCALL RESULT] Added to result: offensive_playcall='{offense_name}', defensive_playcall='{defense_name}'")
+            # ✅ PERFORMANCE: Skip playcall logging during full simulations
+            if not is_full_simulation:
+                offense_name = calls["offense"]
+                defense_name = calls["defense"]
+                logging.info(f"🎮 [PLAYCALL RESULT] Added to result: offensive_playcall='{offense_name}', defensive_playcall='{defense_name}'")
             # ✅ SS&S: Set offense_override_cleared flag from calls (overrides default False)
             result["offense_override_cleared"] = calls.get("offense_override_cleared", False)
             
@@ -488,18 +495,21 @@ class TurnManager:
             final_state = self.game.game_state.get("offensive_state", "HCO")
             next_play_type = result.get("next_play_type", "None")
             result_type = result.get("result_type", "N/A")
-            logging.info(f"🔄 [OFFENSIVE_STATE TRANSITION] Turn #{turn_num} - AFTER HANDLER", {
-                "turn_number": turn_num,
-                "result_type": result_type,
-                "current_offensive_state": state,  # State used for routing this turn
-                "next_offensive_state": final_state,  # State that will be used for next turn
-                "next_play_type": next_play_type,  # Informational only (not used for routing)
-                "transition": f"{state} → {final_state}",
-                "state_changed": state != final_state,
-                "offense_team": self.game.offense_team.name,
-                "defense_team": self.game.defense_team.name,
-                "note": "Handler may have changed offensive_state for next turn"
-            })
+            
+            # ✅ PERFORMANCE: Skip verbose logging during full simulations
+            if not is_full_simulation:
+                logging.info(f"🔄 [OFFENSIVE_STATE TRANSITION] Turn #{turn_num} - AFTER HANDLER", {
+                    "turn_number": turn_num,
+                    "result_type": result_type,
+                    "current_offensive_state": state,  # State used for routing this turn
+                    "next_offensive_state": final_state,  # State that will be used for next turn
+                    "next_play_type": next_play_type,  # Informational only (not used for routing)
+                    "transition": f"{state} → {final_state}",
+                    "state_changed": state != final_state,
+                    "offense_team": self.game.offense_team.name,
+                    "defense_team": self.game.defense_team.name,
+                    "note": "Handler may have changed offensive_state for next turn"
+                })
             # ✅ DEBUG: Log fast break data if present (to verify it's being preserved)
             if result.get("fast_break") or result.get("result_type") == "DEFENSIVE_STOP":
                 import json
@@ -517,19 +527,21 @@ class TurnManager:
                 }
                 # Debug log removed to declutter output
             
-            # Note: Keeping this log for backward compatibility, but the detailed log above is more useful
-            logging.info(f"🔄 [OFFENSIVE_STATE TRANSITION] Turn #{turn_num} Complete", {
-                "turn_number": turn_num,
-                "result_type": result_type,
-                "previous_offensive_state": state,  # State at start of this turn
-                "next_offensive_state": final_state,  # State for next turn (set by handler)
-                "next_play_type": next_play_type,  # Informational only (not used for routing)
-                "transition": f"{state} → {final_state}",
-                "state_changed": state != final_state,
-                "offense_team": self.game.offense_team.name,
-                "defense_team": self.game.defense_team.name,
-                "note": "next_offensive_state is what will be used to route the NEXT turn"
-            })
+            # ✅ PERFORMANCE: Skip verbose logging during full simulations
+            # Note: Keeping this log for backward compatibility in turn-by-turn mode, but the detailed log above is more useful
+            if not is_full_simulation:
+                logging.info(f"🔄 [OFFENSIVE_STATE TRANSITION] Turn #{turn_num} Complete", {
+                    "turn_number": turn_num,
+                    "result_type": result_type,
+                    "previous_offensive_state": state,  # State at start of this turn
+                    "next_offensive_state": final_state,  # State for next turn (set by handler)
+                    "next_play_type": next_play_type,  # Informational only (not used for routing)
+                    "transition": f"{state} → {final_state}",
+                    "state_changed": state != final_state,
+                    "offense_team": self.game.offense_team.name,
+                    "defense_team": self.game.defense_team.name,
+                    "note": "next_offensive_state is what will be used to route the NEXT turn"
+                })
             
             # ✅ REMOVED: Overwrite logic that was causing transition bugs
             # 
