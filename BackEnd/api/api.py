@@ -2058,6 +2058,10 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             resume_from_timeout=request.resume_from_timeout,
         )
         
+        # 🔍 DEBUG: Log time_remaining after simulate_quarter() returns
+        time_after_sim = gm.game_state.get("time_remaining", "NOT_SET")
+        logging.warning(f"🔍 [Q4 DEBUG] AFTER simulate_quarter() returns: quarter={gm.quarter}, time_remaining={time_after_sim}, resume_from_timeout={request.resume_from_timeout}")
+        
     except ValueError as e:
         logging.error(
             "simulate_quarter lineup error for game_id=%s, home_team=%s, away_team=%s, quarter=%s: %s",
