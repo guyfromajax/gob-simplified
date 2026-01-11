@@ -177,11 +177,9 @@ async function loadStats() {
         url = `${API_CONFIG.buildUrl('/franchise/team-player-stats')}?franchise_id=${franchiseId}&scope=season`;
       }
     } else if (mode === 'tournament' && tournamentId) {
-      // Tournament mode - stats are stored in tournament.players[pid].season
-      // We'll extract from the roster data we already have, or fetch roster again
-      // The tournament roster endpoint doesn't return stats, so we need to get them from tournament document
-      // For now, we'll use the leaders endpoint and filter
-      url = `${API_CONFIG.buildUrl('/tournament/leaders')}?tournament_id=${tournamentId}`;
+      // ✅ FIX: Tournament mode - use tournament state endpoint to get tournament document and merge stats
+      // Matches Franchise mode pattern (fetch roster + tournament document, merge stats)
+      url = `${API_CONFIG.buildUrl('/tournament/state')}?tournament_id=${tournamentId}`;
     } else {
       document.getElementById('stats-body').innerHTML = '<tr><td colspan="23">Invalid mode or missing IDs</td></tr>';
       return;
@@ -222,23 +220,31 @@ async function loadStats() {
         statsData = Array.from(allPlayers.values());
       }
     } else if (mode === 'tournament') {
-      // Tournament mode - leaders endpoint returns stats by category
-      const allPlayers = new Map();
-      Object.values(data).forEach(category => {
-        if (Array.isArray(category)) {
-          category.forEach(player => {
-            if (teamPlayerIds.includes(player._id)) {
-              if (!allPlayers.has(player._id)) {
-                allPlayers.set(player._id, { _id: player._id, name: player.name, stats: {} });
-              }
-              const playerData = allPlayers.get(player._id);
-              // Merge stats from this category
-              Object.assign(playerData.stats, player.stats || {});
-            }
-          });
+      // ✅ FIX: Tournament mode - merge stats from tournament document (matches Franchise mode pattern)
+      // Tournament state endpoint returns full tournament document with players object
+      const tournamentPlayers = data.players || {};
+      
+      // Map roster players to stats from tournament document
+      statsData = teamPlayerIds.map(pid => {
+        const tournamentPlayer = tournamentPlayers[pid];
+        const rosterPlayer = rosterData.find(p => p._id === pid);
+        
+        if (tournamentPlayer && tournamentPlayer.season) {
+          // Player has stats in tournament document
+          return {
+            _id: pid,
+            name: rosterPlayer ? rosterPlayer.name : `${tournamentPlayer.meta?.first_name || ''} ${tournamentPlayer.meta?.last_name || ''}`.trim(),
+            stats: tournamentPlayer.season || {}
+          };
+        } else {
+          // Player doesn't have stats yet (team hasn't played)
+          return {
+            _id: pid,
+            name: rosterPlayer ? rosterPlayer.name : '',
+            stats: {}
+          };
         }
       });
-      statsData = Array.from(allPlayers.values());
     }
     
     renderStats();
