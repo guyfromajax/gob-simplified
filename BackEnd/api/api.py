@@ -1533,6 +1533,10 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             # Clear any old turns from previous game - opening tip will be added in simulate_quarter
                             gm.turns = []
                         
+                        # 🔍 DEBUG: Log time_remaining before calling simulate_quarter()
+                        time_before_sim = gm.game_state.get("time_remaining", "NOT_SET")
+                        logging.warning(f"🔍 [Q4 DEBUG] BEFORE simulate_quarter() call: quarter={request.quarter}, resume_from_timeout={request.resume_from_timeout}, time_remaining={time_before_sim}, saved_time_remaining={saved.get('time_remaining', 'NOT_SET') if saved else 'NO_SAVED_DOC'}")
+                        
                         ongoing_games[game_id] = gm
                         if debug:
                             logging.debug(
@@ -1939,8 +1943,16 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             # print(f"🔍 DEBUG: Home team plays: {len(teams_obj[gm.home_team.team_id]['plays'])}")
             # print(f"🔍 DEBUG: Away team plays: {len(teams_obj[gm.away_team.team_id]['plays'])}")
             
+            # 🔍 DEBUG: Log time_remaining before summarizing
+            time_before_summarize = gm.game_state.get("time_remaining", "NOT_SET")
+            logging.warning(f"🔍 [Q4 DEBUG] BEFORE summarize_game_state(): time_remaining={time_before_summarize}, quarter={gm.quarter}")
+            
             # Create a summary with new nested team structure
             summary = summarize_game_state(gm)
+            
+            # 🔍 DEBUG: Log time_remaining in summary
+            time_in_summary = summary.get("time_remaining", "NOT_SET")
+            logging.warning(f"🔍 [Q4 DEBUG] AFTER summarize_game_state(): time_remaining in summary={time_in_summary}, quarter={summary.get('quarter', 'NOT_SET')}")
             
             # ✅ FIX: Merge playbook_settings from teams_obj into summary before saving
             # This ensures playbook_settings loaded from tournament/franchise document are preserved
@@ -1952,8 +1964,13 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         if "playbook_settings" in team_data and team_data["playbook_settings"]:
                             summary["teams"][team_id]["playbook_settings"] = team_data["playbook_settings"]
             
+            # 🔍 DEBUG: Log time_remaining before saving
+            time_being_saved = summary.get("time_remaining", "NOT_SET")
+            logging.warning(f"🔍 [Q4 DEBUG] BEFORE saving to DB: time_remaining={time_being_saved}, quarter={summary.get('quarter', 'NOT_SET')}, game_id={game_id}")
+            
             # Save to database
             games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
+            logging.warning(f"🔍 [Q4 DEBUG] SAVED to DB: time_remaining={time_being_saved}, quarter={summary.get('quarter', 'NOT_SET')}, game_id={game_id}")
             # print(f"🔍 DEBUG: Saved teams object to database with game_id: {game_id}")
             
         except Exception as e:
