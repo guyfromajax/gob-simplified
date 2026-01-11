@@ -298,6 +298,15 @@ def simulate_quarter(
     q = gm.quarter
     gm.game_state["quarter"] = q
 
+    # ✅ FIX: Reset time_remaining for new quarters (not timeout resumes)
+    # This ensures time_remaining is always 480 (Q1-Q4) or 240 (OT) when starting a new quarter
+    # Critical for "Play Quarter" after "Sim Quarter" - prevents 0:00 time from previous quarter
+    if not resume_from_timeout:
+        # Not a timeout resume - this is a new quarter start, so reset time_remaining
+        gm.game_state["time_remaining"] = 480 if q <= 4 else 240
+        gm.game_state["clock"] = "8:00" if q <= 4 else "4:00"
+        logging.info(f"✅ NEW QUARTER: Reset time_remaining to {gm.game_state['time_remaining']}s for Q{q}")
+
     # ✅ TIMEOUT: If resuming from timeout, skip all quarter initialization
     # Reuse the same pattern as quarter breaks - preserve all game state
     # Create the appropriate initial turn based on timeout_next_play_type
@@ -403,9 +412,9 @@ def simulate_quarter(
         gm.away_team.name: gm.away_team.points_by_quarter,
     }
 
-    # Reset clock and fouls for the upcoming quarter
-    gm.game_state["time_remaining"] = 480 if q <= 4 else 240
-    gm.game_state["clock"] = "8:00" if q <= 4 else "4:00"
+    # Reset fouls for the upcoming quarter (time_remaining and clock already reset earlier)
+    # Note: time_remaining and clock are reset before timeout resume check to ensure
+    # they're always correct for new quarters, even if this code path is skipped
     gm.home_team.team_fouls = 0
     gm.away_team.team_fouls = 0
     gm.game_state["team_fouls"] = {gm.home_team.name: 0, gm.away_team.name: 0}
