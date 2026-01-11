@@ -299,23 +299,13 @@ def simulate_quarter(
     gm.game_state["quarter"] = q
 
     # ✅ FIX: ALWAYS reset time_remaining for new quarters (not timeout resumes)
-    # For turn_by_turn_mode (Play Quarter), this ensures time_remaining starts at 480 (Q1-Q4) or 240 (OT)
+    # This ensures time_remaining starts at 480 (Q1-Q4) or 240 (OT) when starting a new quarter
     # Critical for "Play Quarter" after "Sim Quarter" - prevents 0:00 time from previous quarter
-    # Do this unconditionally for turn_by_turn_mode - don't let anything override it
+    # Simple fix: Always reset if not resuming from timeout (regardless of turn_by_turn_mode)
     if not resume_from_timeout:
-        # Not a timeout resume - this is a new quarter start, so FORCE reset time_remaining
-        # Use turn_by_turn_mode check to ensure we're starting a new quarter (not resuming)
-        # If turn_by_turn_mode is True, we're definitely starting a new quarter, so always reset
-        if turn_by_turn_mode:
-            # Turn-by-turn mode = starting new quarter, force reset
-            gm.game_state["time_remaining"] = 480 if q <= 4 else 240
-            gm.game_state["clock"] = "8:00" if q <= 4 else "4:00"
-            logging.info(f"✅ NEW QUARTER (turn-by-turn): Force reset time_remaining to {gm.game_state['time_remaining']}s for Q{q}")
-        else:
-            # Full sim mode - also reset for new quarters
-            gm.game_state["time_remaining"] = 480 if q <= 4 else 240
-            gm.game_state["clock"] = "8:00" if q <= 4 else "4:00"
-            logging.info(f"✅ NEW QUARTER (full sim): Reset time_remaining to {gm.game_state['time_remaining']}s for Q{q}")
+        gm.game_state["time_remaining"] = 480 if q <= 4 else 240
+        gm.game_state["clock"] = "8:00" if q <= 4 else "4:00"
+        logging.info(f"✅ NEW QUARTER: Reset time_remaining to {gm.game_state['time_remaining']}s for Q{q}")
 
     # ✅ TIMEOUT: If resuming from timeout, skip all quarter initialization
     # Reuse the same pattern as quarter breaks - preserve all game state
