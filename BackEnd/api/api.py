@@ -2670,11 +2670,31 @@ def get_team_roster(team_name: str, tournament_id: str | None = None, response: 
     if tournament_id:
         print(f"🔍 Tournament ID provided but ignored: {tournament_id}")
 
-    # Normalize team name to match DB
+    # ✅ PERFORMANCE: Use MongoDB query for case-insensitive team lookup instead of loading all teams
+    # This reduces data transfer from loading 8-16 teams to just 1 query
     normalized_name = unidecode(team_name.strip().replace("-", " ")).lower()
-
-    all_teams = [t["name"] for t in teams_collection.find({}, {"name": 1})]
-    match = next((t for t in all_teams if unidecode(t.lower().replace("-", " ")) == normalized_name), None)
+    
+    # Use MongoDB aggregation for case-insensitive matching
+    pipeline = [
+        {
+            "$addFields": {
+                "normalized_name": {
+                    "$toLower": {"$replaceAll": {"input": "$name", "find": "-", "replacement": " "}}
+                }
+            }
+        },
+        {
+            "$match": {
+                "normalized_name": normalized_name
+            }
+        },
+        {
+            "$limit": 1
+        }
+    ]
+    
+    team_result = list(teams_collection.aggregate(pipeline))
+    match = team_result[0]["name"] if team_result else None
 
     if not match:
         print(f"❌ No team found matching: {normalized_name}")

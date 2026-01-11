@@ -773,6 +773,15 @@ def get_tournament_roster(tournament_id: str, team_name: str = None):
     tournament_players = tournament_doc.get("players", {}) or tournament_doc.get("player_stats", {})  # Backward compatibility
     team_player_ids = team_doc.get("player_ids", [])
     
+    # ✅ PERFORMANCE: Batch player lookups to fix N+1 query pattern
+    # Instead of 12 individual queries, do 1 batch query with $in operator
+    player_ids_obj = [ObjectId(pid) for pid in team_player_ids]
+    core_players_dict = {str(p["_id"]): p for p in players_collection.find(
+        {"_id": {"$in": player_ids_obj}},
+        {"position_ratings": 1, "height": 1, "weight": 1, "jersey": 1, "year": 1, "attributes": 1,
+         "first_name": 1, "last_name": 1}
+    )}
+    
     # ✅ FIX: Build player list with tournament-specific attributes (matches Franchise mode pattern)
     # Return ALL players from team roster, even if not yet in tournament.players (for teams that haven't played yet)
     players = []
@@ -780,11 +789,8 @@ def get_tournament_roster(tournament_id: str, team_name: str = None):
         pid_str = str(pid)
         tournament_player_data = tournament_players.get(pid_str, {})
         
-        # Get additional data from core collection (always load, even if player not in tournament yet)
-        core_player = players_collection.find_one({"_id": pid}, {
-            "position_ratings": 1, "height": 1, "weight": 1, "jersey": 1, "year": 1, "attributes": 1,
-            "first_name": 1, "last_name": 1
-        })
+        # ✅ PERFORMANCE: Use cached result from batch query instead of individual query
+        core_player = core_players_dict.get(pid_str)
         
         if not core_player:
             continue
