@@ -432,6 +432,9 @@ async function handleSimQuarter() {
   // On Q1 break (quarter = 1), nextQuarter = 1 + 1 = 2 (correct)
   const nextQuarter = quarter + 1;
   
+  // ✅ DEBUG: Log quarter calculation for debugging
+  console.log(`🔍 [SIM QUARTER] Current quarter=${quarter}, nextQuarter=${nextQuarter}, URL quarter param=${urlParams.get('quarter')}`);
+  
   // Validate: Don't simulate if already simulating
   if (isSimulating) return;
   
