@@ -108,7 +108,10 @@ if (!mode) {
 const userTeamSide = urlParams.get('my_team');  // "home" or "away"
 // ✅ SS&S: Read team_id (ObjectId) from URL params for navigation anchor preservation
 const teamId = urlParams.get('team_id') || (userTeamSide === 'home' ? urlParams.get('home_id') : urlParams.get('away_id'));
-let quarter = parseInt(urlParams.get('quarter'), 10) || 1;
+// ✅ FIX: Default to 0 for pre-game screen (before Q1 starts)
+// On pre-game screen, quarter param is missing, so default to 0
+// This ensures "Sim Quarter" button simulates Q1 (0 + 1 = 1), not Q2 (1 + 1 = 2)
+let quarter = urlParams.has('quarter') ? parseInt(urlParams.get('quarter'), 10) : 0;
 let gameId =
   urlParams.get('game_id') ||
   (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
@@ -116,7 +119,8 @@ let gameId =
 // Initialize scoreboard scores
 // Only reset to 0-0 for fresh Q1 games; for resumed games, loadGameStats.js sets accumulated scores
 // ✅ REFACTOR: Direct DOM update (same pattern as other scoreboard items)
-if (quarter === 1 && !gameId) {
+// ✅ FIX: Use quarter === 0 (pre-game) OR (quarter === 1 && !gameId) for fresh Q1 games
+if ((quarter === 0 || quarter === 1) && !gameId) {
   const homeScoreEl = document.getElementById('home-score');
   const awayScoreEl = document.getElementById('away-score');
   if (homeScoreEl) homeScoreEl.textContent = 0;
@@ -423,7 +427,9 @@ async function handleButtonClick(animate) {
 }
 
 async function handleSimQuarter() {
-  // Calculate next quarter
+  // ✅ FIX: Calculate next quarter (handle pre-game screen where quarter = 0)
+  // On pre-game screen (quarter = 0), nextQuarter = 0 + 1 = 1 (correct)
+  // On Q1 break (quarter = 1), nextQuarter = 1 + 1 = 2 (correct)
   const nextQuarter = quarter + 1;
   
   // Validate: Don't simulate if already simulating
@@ -881,12 +887,14 @@ async function initGame() {
   // ✅ TIMEOUT + QUARTER BREAKS: Hide pre-game buttons if resuming (timeout) or continuing (quarter > 1)
   // This matches the quarter break flow where buttons are hidden and game auto-starts
   let resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
-  const isQuarterBreak = quarter > 1 && gameId; // Quarter breaks: Q2, Q3, Q4 with existing game
+  // ✅ FIX: Quarter breaks are Q2, Q3, Q4 with existing game (quarter >= 2, not > 1, and not 0)
+  const isQuarterBreak = quarter >= 2 && quarter <= 4 && gameId; // Quarter breaks: Q2, Q3, Q4 with existing game
   
   // ✅ RESILIENCE: Check database for timeout state as fallback (if URL param missing but gameId exists)
   // This makes the system robust - even if URL param is lost, we can still detect timeout resume
-  // Only checks DB if URL param is missing (fast path: URL param works → no DB call)
-  if (!resumeFromTimeout && gameId && quarter === 1) {
+    // Only checks DB if URL param is missing (fast path: URL param works → no DB call)
+    // ✅ FIX: Check for Q1 (quarter === 1) OR pre-game (quarter === 0) with gameId
+    if (!resumeFromTimeout && gameId && (quarter === 0 || quarter === 1)) {
     // Lightweight check: If URL param missing but we have gameId in Q1, check DB for timeout state
     // This is a fallback - URL param is still primary source for navigation
     try {
@@ -943,12 +951,14 @@ async function initGame() {
     // ✅ SIM QUARTER: Button works for Q1-Q4 (before game completes)
     // Disabled when quarter >= 4 (game already in Q4+ or complete)
     // Note: Button is only shown on pre-game screen, so if quarter >= 4, game is complete
-    if (quarter >= 4) {
+    // ✅ FIX: Use Math.max(0, quarter) to handle pre-game screen (quarter = 0)
+    const currentQuarter = Math.max(0, quarter);
+    if (currentQuarter >= 4) {
       sim4Btn.disabled = true;
       sim4Btn.title = 'Game complete';
     } else {
       sim4Btn.disabled = false;
-      sim4Btn.title = `Sim Quarter ${quarter + 1}`;
+      sim4Btn.title = `Sim Quarter ${currentQuarter + 1}`;
       sim4Btn.addEventListener('click', handleSimQuarter);
     }
   }
