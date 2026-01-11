@@ -6,6 +6,8 @@
 
 Single Game Mode is designed for one-off games with no persistent state between games. Each game is independent and does not affect future games.
 
+**Mode Value:** `mode="single"` (explicitly declared, never inferred)
+
 ## Base Constants
 
 **Collection:** `games`  
@@ -142,6 +144,8 @@ Single Game Mode is designed for one-off games with no persistent state between 
 **Playbook Settings:**
 - Saved to `games.{game_id}.teams.{team_id}.playbook_settings`
 - Updated when user submits playbook changes
+- **Team Resolution:** Frontend sends team name (e.g., "Bentley-Truman"), backend resolves to `team_id` (e.g., "BENTLEY_TRUMAN") by matching team name in game document's `teams` object
+- **Mode Handling:** Backend `/api/playbooks` endpoint explicitly handles `mode="single"` to save to game document using `game_id`
 
 **Strategy Settings:**
 - Saved to `games.{game_id}.teams.{team_id}.strategy_settings`
