@@ -1252,9 +1252,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             # Use franchise document's user_team_object_id as authoritative team_id
             authoritative_team_id = user_team_object_id
             
-            # Log if URL team_id doesn't match (for debugging)
-            if team_id and team_id != authoritative_team_id:
-                # ✅ PERFORMANCE: Removed debug logging - only log actual errors
+            # ✅ PERFORMANCE: Removed debug logging - only log actual errors
         elif mode == "tournament":
             # ✅ MIGRATION: Use tournament document's user_team_object_id as source of truth
             user_team_id_name, user_team_object_id = get_user_team_from_tournament(doc)
@@ -1264,9 +1262,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             # Use tournament document's user_team_object_id as authoritative team_id
             authoritative_team_id = user_team_object_id
             
-            # Log if URL team_id doesn't match (for debugging)
-            if team_id and team_id != authoritative_team_id:
-                # ✅ PERFORMANCE: Removed debug logging - only log actual errors
+            # ✅ PERFORMANCE: Removed debug logging - only log actual errors
         else:
             # For single mode, use the provided team_id
             authoritative_team_id = team_id
