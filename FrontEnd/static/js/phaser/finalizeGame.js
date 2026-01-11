@@ -37,7 +37,7 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   
   const scoreMap = simData.final_score || simData.score || {};
   // ✅ FIX: Prioritize scoreMap (updated scores) over nested object scores (may be stale from initialSimData)
-  // This ensures that when "Sim to 4th Quarter" is used, we use Q4 final scores, not Q3 scores from initialSimData
+  // This ensures that when "Sim Quarter" is used, we use correct final scores, not stale scores from initialSimData
   const homeScore = (scoreMap[homeKey] !== undefined && scoreMap[homeKey] !== null) 
     ? scoreMap[homeKey] 
     : (homeTeamObj.score ?? 0);
