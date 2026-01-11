@@ -38,7 +38,7 @@ if (typeof window !== 'undefined') {
 function getMode({ tournamentId, franchiseId }) {
   if (tournamentId) return 'tournament';
   if (franchiseId) return 'franchise';
-  return 'standalone';
+  return 'single'; // ✅ SS&S: Explicitly return 'single' for Single Game mode
 }
 
 // Utility function to generate MongoDB ObjectId format game IDs
@@ -99,7 +99,12 @@ const weekParam = parseInt(urlParams.get('week'), 10);
 if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined') {
   localStorage.setItem('franchise_week', weekParam);
 }
+// ✅ SS&S: Explicitly set mode to 'single' if not provided and not tournament/franchise
 const mode = urlMode || getMode({ tournamentId, franchiseId });
+// Ensure mode is always explicit (never undefined)
+if (!mode) {
+  console.warn('⚠️ [BOOTGAME] Mode was undefined, defaulting to "single"');
+}
 const userTeamSide = urlParams.get('my_team');  // "home" or "away"
 // ✅ SS&S: Read team_id (ObjectId) from URL params for navigation anchor preservation
 const teamId = urlParams.get('team_id') || (userTeamSide === 'home' ? urlParams.get('home_id') : urlParams.get('away_id'));

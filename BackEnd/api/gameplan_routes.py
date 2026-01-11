@@ -1725,23 +1725,28 @@ def save_playbooks(request: PlaybookSettingsRequest):
             if request.team_id and request.team_id != actual_team_id:
                 logger.warning(f"⚠️ [PLAYBOOKS SAVE] URL team_id ({request.team_id}) doesn't match tournament document user_team_object_id ({actual_team_id}). Using tournament document value.")
         else:
-            # For single mode, try to resolve team name to team_id
+            # ✅ FIX: For Single Game mode, resolve team name to team_id using game document structure
+            # Game document stores teams using team_id as keys (e.g., "MORRISTOWN", "FOUR_CORNERS")
+            # Frontend sends team name (e.g., "Bentley-Truman"), so we need to match by name
             teams = doc.get("teams", {})
-            # First try direct lookup
-            if request.team_id not in teams:
+            home_team_id = doc.get("home_team_id")
+            away_team_id = doc.get("away_team_id")
+            
+            # First try direct lookup (in case team_id was sent instead of name)
+            if request.team_id in teams:
+                actual_team_id = request.team_id
+            else:
                 # Try to find by team name - iterate through teams to find match
+                actual_team_id = None
                 for tid in teams.keys():
-                    # Find the team that matches our input team_id (could be name or ObjectId)
-                    try:
-                        team_doc = db.teams.find_one({"_id": ObjectId(tid)})
-                    except:
-                        # If tid is not a valid ObjectId, try as team_id string
-                        team_doc = db.teams.find_one({"team_id": tid})
-                    if team_doc and (team_doc.get("name") == request.team_id or str(team_doc.get("_id")) == request.team_id or team_doc.get("team_id") == request.team_id):
+                    team_obj = teams.get(tid, {})
+                    # Check if team name matches (teams object contains name field)
+                    if team_obj.get("name") == request.team_id:
                         actual_team_id = tid
                         break
+                
                 # If still not found, try teams collection lookup by name
-                if actual_team_id == request.team_id:
+                if not actual_team_id:
                     team_doc = db.teams.find_one({"name": request.team_id})
                     if team_doc:
                         team_id_from_doc = team_doc.get("team_id")
@@ -1750,8 +1755,24 @@ def save_playbooks(request: PlaybookSettingsRequest):
                             if tid == team_id_from_doc or str(tid) == str(team_doc.get("_id")):
                                 actual_team_id = tid
                                 break
-            else:
-                actual_team_id = request.team_id
+                
+                # If still not found, try using home_team_id/away_team_id as fallback
+                # (This handles edge cases where team name doesn't match exactly)
+                if not actual_team_id:
+                    # Try to match by checking if request.team_id matches home or away team name
+                    if home_team_id and home_team_id in teams:
+                        home_team_obj = teams.get(home_team_id, {})
+                        if home_team_obj.get("name") == request.team_id:
+                            actual_team_id = home_team_id
+                    if not actual_team_id and away_team_id and away_team_id in teams:
+                        away_team_obj = teams.get(away_team_id, {})
+                        if away_team_obj.get("name") == request.team_id:
+                            actual_team_id = away_team_id
+                
+                # Final fallback: use request.team_id as-is (might be team_id already)
+                if not actual_team_id:
+                    actual_team_id = request.team_id
+                    logger.warning(f"⚠️ [PLAYBOOKS SAVE] Could not resolve team name '{request.team_id}' to team_id, using as-is")
         
         logger.warning(f"🔍 [PLAYBOOKS SAVE] Resolved actual_team_id: {actual_team_id} (from request.team_id: {request.team_id})")
         
@@ -1775,6 +1796,21 @@ def save_playbooks(request: PlaybookSettingsRequest):
                 {"_id": ObjectId(doc_id)},
                 {"teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
             )
+        elif request.mode == "single":
+            # ✅ FIX: Reload game document with teams and home_team_id/away_team_id for Single Game mode
+            doc = collection.find_one(
+                {"_id": doc_id},
+                {"teams": 1, "home_team_id": 1, "away_team_id": 1, "_id": 1}
+            )
+            if not doc:
+                # Try as ObjectId if UUID string lookup failed
+                try:
+                    doc = collection.find_one(
+                        {"_id": ObjectId(doc_id)},
+                        {"teams": 1, "home_team_id": 1, "away_team_id": 1, "_id": 1}
+                    )
+                except:
+                    pass
         
         if not doc:
             raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
