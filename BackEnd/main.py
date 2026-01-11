@@ -630,6 +630,14 @@ def simulate_quarter(
         # Clear full simulation flag after loop completes
         gm.game_state.pop("_is_full_simulation", None)
         
+        # ✅ FIX: Clear stale timeout state after quarter completes (when simmed)
+        # timeout_next_play_type should only exist during active timeout pauses, not after quarters finish
+        # This prevents stale timeout state from causing resume_from_timeout=True on next "Play Quarter"
+        if "timeout_next_play_type" in gm.game_state:
+            logging.warning(f"🧹 QUARTER COMPLETE: Clearing stale timeout state (quarter {gm.quarter} finished)")
+            gm.game_state.pop("timeout_next_play_type", None)
+            gm.game_state.pop("timeout_offense_team_id", None)
+        
         logging.info(f"✅ Full simulation complete: Q{gm.quarter} finished after {turn_count} turns, final time_remaining={gm.game_state['time_remaining']}")
         gm.quarter += 1
     else:
