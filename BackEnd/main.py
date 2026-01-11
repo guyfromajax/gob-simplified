@@ -298,14 +298,22 @@ def simulate_quarter(
     q = gm.quarter
     gm.game_state["quarter"] = q
 
+    # 🔍 DEBUG: Log time_remaining BEFORE reset logic
+    time_before = gm.game_state.get("time_remaining", "NOT_SET")
+    logging.warning(f"🔍 [Q4 DEBUG] simulate_quarter() START: quarter={q}, resume_from_timeout={resume_from_timeout}, time_remaining BEFORE reset={time_before}, turn_by_turn_mode={turn_by_turn_mode}")
+
     # ✅ FIX: ALWAYS reset time_remaining for new quarters (not timeout resumes)
     # This ensures time_remaining starts at 480 (Q1-Q4) or 240 (OT) when starting a new quarter
     # Critical for "Play Quarter" after "Sim Quarter" - prevents 0:00 time from previous quarter
     # Simple fix: Always reset if not resuming from timeout (regardless of turn_by_turn_mode)
     if not resume_from_timeout:
-        gm.game_state["time_remaining"] = 480 if q <= 4 else 240
-        gm.game_state["clock"] = "8:00" if q <= 4 else "4:00"
-        logging.info(f"✅ NEW QUARTER: Reset time_remaining to {gm.game_state['time_remaining']}s for Q{q}")
+        new_time = 480 if q <= 4 else 240
+        new_clock = "8:00" if q <= 4 else "4:00"
+        gm.game_state["time_remaining"] = new_time
+        gm.game_state["clock"] = new_clock
+        logging.warning(f"✅ [Q4 DEBUG] NEW QUARTER RESET: Set time_remaining={new_time}s, clock={new_clock} for Q{q} (was {time_before})")
+    else:
+        logging.warning(f"🔍 [Q4 DEBUG] TIMEOUT RESUME: NOT resetting time_remaining (resume_from_timeout=True), keeping {time_before}")
 
     # ✅ TIMEOUT: If resuming from timeout, skip all quarter initialization
     # Reuse the same pattern as quarter breaks - preserve all game state
