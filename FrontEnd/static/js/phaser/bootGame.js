@@ -471,7 +471,9 @@ async function handleSimToFourth() {
       if (tournamentId) {
         payload.tournament_id = tournamentId;
       }
-      if (franchiseId) {
+      // ✅ FIX: Only pass franchise_id if mode is explicitly 'franchise'
+      // This prevents Single Game mode from accidentally passing franchise_id from localStorage
+      if (mode === 'franchise' && franchiseId) {
         payload.franchise_id = franchiseId;
         if (weekParam && !Number.isNaN(weekParam)) {
           payload.week = weekParam;
