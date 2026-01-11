@@ -708,7 +708,7 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
             teams = doc.get("teams", {})
             team_obj = teams.get(actual_team_id)
             
-            logger.warning(f"🔍 [ENSURE TEAM OBJECTS] Single Game mode: Using team_id={actual_team_id} from game document, team_obj exists={team_obj is not None}")
+            # ✅ PERFORMANCE: Removed debug logging
         else:
             # Tournament mode: Normalize team_id to ObjectId - try name first, then ObjectId
             team = db.teams.find_one({"name": team_id})
@@ -788,7 +788,7 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
             # Initialize playbook_settings if missing
             if "playbook_settings" not in team_obj:
                 playbook_settings = initialize_playbook_settings()
-                logger.warning(f"⚠️ [ENSURE TEAM OBJECTS] playbook_settings missing for team {actual_team_id}, initializing...")
+                # ✅ PERFORMANCE: Removed debug logging
             else:
                 # Check if position_filters is missing or empty, and populate if needed
                 existing_playbook_settings = team_obj.get("playbook_settings", {})
@@ -1192,7 +1192,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
     Returns plays organized by type (motion, set_play) and focus (inside, attack, outside).
     """
     try:
-        logger.warning(f"🔍 [GET PLAYBOOKS] Called with mode={mode}, team_id={team_id}, franchise_id={franchise_id}, tournament_id={tournament_id}, game_id={game_id}")
+        # ✅ PERFORMANCE: Removed debug logging - only log errors and critical events
         # Determine which collection to use
         if mode == "franchise":
             if not franchise_id:
@@ -1254,7 +1254,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             
             # Log if URL team_id doesn't match (for debugging)
             if team_id and team_id != authoritative_team_id:
-                logger.warning(f"⚠️ [GET PLAYBOOKS] URL team_id ({team_id}) doesn't match franchise document user_team_object_id ({authoritative_team_id}). Using franchise document value.")
+                # ✅ PERFORMANCE: Removed debug logging - only log actual errors
         elif mode == "tournament":
             # ✅ MIGRATION: Use tournament document's user_team_object_id as source of truth
             user_team_id_name, user_team_object_id = get_user_team_from_tournament(doc)
@@ -1266,7 +1266,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             
             # Log if URL team_id doesn't match (for debugging)
             if team_id and team_id != authoritative_team_id:
-                logger.warning(f"⚠️ [GET PLAYBOOKS] URL team_id ({team_id}) doesn't match tournament document user_team_object_id ({authoritative_team_id}). Using tournament document value.")
+                # ✅ PERFORMANCE: Removed debug logging - only log actual errors
         else:
             # For single mode, use the provided team_id
             authoritative_team_id = team_id
@@ -1283,7 +1283,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         if mode == "franchise" and isinstance(teams_dict, dict):
             team_obj_check = teams_dict.get(authoritative_team_id, {})
             plays_count = len(team_obj_check.get("plays", {})) if team_obj_check else 0
-            logger.warning(f"🔍 [GET PLAYBOOKS] After ensure_team_objects_exist: {plays_count} plays in returned teams_dict for team {authoritative_team_id}")
+            # ✅ PERFORMANCE: Removed debug logging
         
         # ✅ PERFORMANCE: Update in-memory doc with returned teams dict if needed
         # This ensures we have the latest data without reloading from database
@@ -1305,15 +1305,12 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             actual_team_id = authoritative_team_id
         else:
             teams = doc.get("teams", {})
-            logger.warning(f"🔍 [PLAYBOOKS] Looking for team_id='{team_id}' in document with {len(teams)} teams")
-            logger.warning(f"🔍 [PLAYBOOKS] Available team keys: {list(teams.keys())[:5]}...")  # Log first 5 keys
-            
+            # ✅ PERFORMANCE: Removed debug logging - only log errors
             # For tournament/single mode, try to resolve team name to team_id
             actual_team_id = None
             # First try direct lookup
             if team_id in teams:
                 actual_team_id = team_id
-                logger.warning(f"✅ [PLAYBOOKS] Found team_id directly: {actual_team_id}")
             else:
                 # Try to find by team name - iterate through teams to find match
                 for tid in teams.keys():
@@ -1325,35 +1322,28 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                         team_doc = db.teams.find_one({"team_id": tid})
                     if team_doc and (team_doc.get("name") == team_id or str(team_doc.get("_id")) == team_id or team_doc.get("team_id") == team_id):
                         actual_team_id = tid
-                        logger.warning(f"✅ [PLAYBOOKS] Found team by name lookup: {actual_team_id} (team name: {team_doc.get('name')})")
                         break
                 # If still not found, try teams collection lookup by name
                 if not actual_team_id:
                     team_doc = db.teams.find_one({"name": team_id})
                     if team_doc:
                         team_id_from_doc = team_doc.get("team_id")
-                        logger.warning(f"🔍 [PLAYBOOKS] Found team in teams collection: {team_doc.get('name')}, team_id={team_id_from_doc}, _id={team_doc.get('_id')}")
                         # Try to find this team_id in the document's teams
                         for tid in teams.keys():
                             if tid == team_id_from_doc or str(tid) == str(team_doc.get("_id")):
                                 actual_team_id = tid
-                                logger.warning(f"✅ [PLAYBOOKS] Matched team in document: {actual_team_id}")
                                 break
             
             if not actual_team_id:
-                logger.warning(f"⚠️ [PLAYBOOKS] Could not resolve team_id '{team_id}' to a team in the document")
-                logger.warning(f"⚠️ [PLAYBOOKS] Available teams in document: {list(teams.keys())}")
+                logger.error(f"⚠️ [PLAYBOOKS] Could not resolve team_id '{team_id}' to a team in the document")
             
             team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
-        # DEBUG: Log actual_team_id and team_obj state before check
-        logger.warning(f"🔍 [DEBUG] Before playbook_settings check: actual_team_id={actual_team_id}, team_obj type={type(team_obj)}, team_obj keys={list(team_obj.keys()) if isinstance(team_obj, dict) else 'N/A'}, has playbook_settings={'playbook_settings' in team_obj if isinstance(team_obj, dict) else False}")
-        
+        # ✅ PERFORMANCE: Removed debug logging
         # Ensure playbook_settings exists (even if ensure_team_objects_exist missed it)
         # Check if team_obj exists and playbook_settings is missing or falsy (None, empty dict, etc.)
         # Note: Key might exist but value could be None or empty dict
         if actual_team_id and (not team_obj or not team_obj.get("playbook_settings")):
-            logger.warning(f"⚠️ [GET PLAYBOOKS] playbook_settings missing for team {actual_team_id}, adding now...")
             playbook_settings = initialize_playbook_settings()
             # ✅ FIX: Use correct path based on mode (franchise_teams for franchise, teams for tournament/single)
             if mode == "franchise":
@@ -1386,10 +1376,9 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             else:
                 teams = doc.get("teams", {})
                 team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
-            logger.warning(f"⚠️ [GET PLAYBOOKS] playbook_settings added, reloaded team_obj has playbook_settings: {bool(team_obj.get('playbook_settings'))}")
         
+        # ✅ PERFORMANCE: Removed debug logging
         # Check if position filters need to be populated (after ensure_team_objects_exist and document reload)
-        logger.warning(f"⚠️ [GET PLAYBOOKS] Checking position filters for team {actual_team_id}, team_obj has playbook_settings: {bool(team_obj and team_obj.get('playbook_settings'))}")
         if team_obj and team_obj.get("playbook_settings"):
             existing_playbook_settings = team_obj.get("playbook_settings", {})
             position_filters = existing_playbook_settings.get("position_filters", {})
@@ -1405,7 +1394,6 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             
             if not position_filters or all_empty:
                 # Position filters are missing or empty, populate them
-                logger.warning(f"⚠️ [GET PLAYBOOKS] Position filters empty, populating now for team {actual_team_id}...")
                 new_playbook_settings = initialize_playbook_settings()
                 existing_playbook_settings["position_filters"] = new_playbook_settings["position_filters"]
                 
@@ -1425,7 +1413,6 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                         {"_id": ObjectId(doc_id)},
                         {"$set": {f"{team_key}.playbook_settings": existing_playbook_settings}}
                     )
-                logger.warning(f"⚠️ [GET PLAYBOOKS] Position filters populated, update result: matched={result.matched_count}, modified={result.modified_count}")
                 
                 # Reload document again to get the updated position filters
                 if mode == "single":
@@ -1445,7 +1432,6 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         # This ensures plays are always available, even if ensure_team_objects_exist didn't populate them
         # or if they were lost during document reloads
         if actual_team_id and (not team_obj or not team_obj.get("plays") or len(team_obj.get("plays", {})) == 0):
-            logger.warning(f"⚠️ [GET PLAYBOOKS] plays missing or empty for team {actual_team_id}, populating now...")
             populated_plays = _get_cached_populated_plays(mode=mode)
             
             # Update the database
@@ -1483,7 +1469,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             logger.warning(f"✅ [GET PLAYBOOKS] plays populated, reloaded team_obj has {len(team_obj.get('plays', {}))} plays")
         
         plays = team_obj.get("plays", {})
-        logger.warning(f"🔍 [PLAYBOOKS] Found {len(plays)} plays for team {actual_team_id}")
+        # ✅ PERFORMANCE: Removed debug logging
         
         # Organize plays by type and focus
         motion_plays = []
@@ -1533,11 +1519,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         
         # Get playbook settings (percentages, slot assignments, motion dropdowns, and position filters)
         playbook_settings = team_obj.get("playbook_settings", {})
-        logger.warning(f"🔍 [PLAYBOOKS GET] team_obj type: {type(team_obj)}, has playbook_settings: {'playbook_settings' in team_obj if isinstance(team_obj, dict) else False}")
-        logger.warning(f"🔍 [PLAYBOOKS GET] actual_team_id: {actual_team_id}")
-        if not playbook_settings:
-            logger.warning(f"⚠️ [PLAYBOOKS GET] playbook_settings is empty or missing for team {actual_team_id}")
-            logger.warning(f"⚠️ [PLAYBOOKS GET] team_obj keys: {list(team_obj.keys()) if isinstance(team_obj, dict) else 'N/A'}")
+        # ✅ PERFORMANCE: Removed debug logging - only log actual errors
         
         # ✅ SINGLE GAME CROSS-INSTANCE PERSISTENCE: Check core teams collection if game document has no settings
         if mode == "single" and (not playbook_settings or len(playbook_settings) == 0 or not any(playbook_settings.get(k) for k in ["motion", "set_play_inside", "set_play_attack", "set_play_outside", "zone_defense", "man_defense", "slot_assignments"])):
@@ -1556,7 +1538,6 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                     core_playbook_settings = team_doc.get("playbook_settings", {})
                     if core_playbook_settings and any(core_playbook_settings.get(k) for k in ["motion", "set_play_inside", "set_play_attack", "set_play_outside", "zone_defense", "man_defense", "slot_assignments"]):
                         playbook_settings = core_playbook_settings
-                        logger.warning(f"✅ Loaded playbook settings from core teams collection for team {team_id} (cross-instance persistence)")
                         # Also update the game document with these settings for consistency
                         try:
                             if mode == "single":
@@ -1583,37 +1564,20 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             "C": []
         }
         position_filters = playbook_settings.get("position_filters", default_position_filters)
-        logger.warning(f"🔍 [GET PLAYBOOKS] Loaded position_filters from playbook_settings: {position_filters}")
         
         # Ensure all position keys exist (backward compatibility)
         for key in default_position_filters:
             if key not in position_filters:
                 position_filters[key] = []
         
-        # Log the counts for each position
-        for key in ["standard", "PG", "SG", "SF", "PF", "C"]:
-            count = len(position_filters.get(key, []))
-            logger.warning(f"🔍 [GET PLAYBOOKS] Position '{key}' has {count} play_ids")
-        
+        # ✅ PERFORMANCE: Removed debug logging
         # Get saved playbook percentages (motion, set_play, zone_defense)
-        logger.warning(f"🔍 [PLAYBOOKS GET] playbook_settings keys: {list(playbook_settings.keys()) if playbook_settings else 'EMPTY'}")
         motion_percentages = playbook_settings.get("motion", {})
         set_play_inside_percentages = playbook_settings.get("set_play_inside", {})
         set_play_attack_percentages = playbook_settings.get("set_play_attack", {})
         set_play_outside_percentages = playbook_settings.get("set_play_outside", {})
         zone_defense_percentages = playbook_settings.get("zone_defense", {})
         man_defense_percentages = playbook_settings.get("man_defense", {})
-        logger.warning(f"🔍 [PLAYBOOKS GET] motion_percentages keys: {list(motion_percentages.keys())}")
-        logger.warning(f"🔍 [PLAYBOOKS GET] set_play_inside_percentages keys: {list(set_play_inside_percentages.keys())}")
-        logger.warning(f"🔍 [PLAYBOOKS GET] set_play_attack_percentages keys: {list(set_play_attack_percentages.keys())}")
-        logger.warning(f"🔍 [PLAYBOOKS GET] set_play_outside_percentages keys: {list(set_play_outside_percentages.keys())}")
-        if motion_percentages:
-            sample_motion = dict(list(motion_percentages.items())[:3])
-            logger.warning(f"🔍 [PLAYBOOKS GET] Sample motion percentages: {sample_motion}")
-            # ✅ CRITICAL: Log ALL motion percentages to verify they match what was saved
-            logger.warning(f"🔍 [PLAYBOOKS GET] ALL motion percentages being returned: {motion_percentages}")
-        else:
-            logger.error(f"❌ [PLAYBOOKS GET] motion_percentages is EMPTY or MISSING!")
         
         # Get even_distribution_all flag (defaults to False if not set)
         even_distribution_all = playbook_settings.get("even_distribution_all", False)
@@ -1733,9 +1697,7 @@ def save_playbooks(request: PlaybookSettingsRequest):
             # Use franchise document's user_team_object_id as authoritative team_id
             actual_team_id = user_team_object_id
             
-            # Log if URL team_id doesn't match (for debugging)
-            if request.team_id and request.team_id != actual_team_id:
-                logger.warning(f"⚠️ [PLAYBOOKS SAVE] URL team_id ({request.team_id}) doesn't match franchise document user_team_object_id ({actual_team_id}). Using franchise document value.")
+            # ✅ PERFORMANCE: Removed debug logging - only log actual errors
         elif request.mode == "tournament":
             # ✅ MIGRATION: Use tournament document's user_team_object_id as source of truth
             # This ensures we're always using the correct team, even if URL params are wrong
@@ -1746,9 +1708,7 @@ def save_playbooks(request: PlaybookSettingsRequest):
             # Use tournament document's user_team_object_id as authoritative team_id
             actual_team_id = user_team_object_id
             
-            # Log if URL team_id doesn't match (for debugging)
-            if request.team_id and request.team_id != actual_team_id:
-                logger.warning(f"⚠️ [PLAYBOOKS SAVE] URL team_id ({request.team_id}) doesn't match tournament document user_team_object_id ({actual_team_id}). Using tournament document value.")
+            # ✅ PERFORMANCE: Removed debug logging - only log actual errors
         else:
             # ✅ FIX: For Single Game mode, resolve team name to team_id using game document structure
             # Game document stores teams using team_id as keys (e.g., "MORRISTOWN", "FOUR_CORNERS")

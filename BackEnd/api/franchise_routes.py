@@ -1907,6 +1907,17 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
     franchise_players = franchise_doc.get("players", {})
     team_player_ids = team_doc.get("player_ids", [])
     
+    # ✅ PERFORMANCE: Batch player lookups to fix N+1 query pattern
+    # Instead of 12 individual queries, do 1 batch query with $in operator
+    batch_query_start = time.time()
+    player_ids_obj = [ObjectId(pid) for pid in team_player_ids]
+    core_players_dict = {str(p["_id"]): p for p in db.players.find(
+        {"_id": {"$in": player_ids_obj}},
+        {"position_ratings": 1, "height": 1, "weight": 1, "jersey": 1, "year": 1, "attributes": 1}
+    )}
+    batch_query_time = time.time() - batch_query_start
+    logger.info(f"⏱️ [PERF] /franchise/roster Batch player query ({len(team_player_ids)} players): {batch_query_time:.3f}s")
+    
     # Build player list with franchise-specific attributes
     processing_start = time.time()
     players = []
@@ -1922,10 +1933,8 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
         # Get franchise-specific position ratings (if available), otherwise use core ratings
         position_ratings = franchise_player_data.get("position_ratings", {})
         
-        # Get additional data from core collection
-        core_player = db.players.find_one({"_id": pid}, {
-            "position_ratings": 1, "height": 1, "weight": 1, "jersey": 1, "year": 1, "attributes": 1
-        })
+        # ✅ PERFORMANCE: Use cached result from batch query instead of individual query
+        core_player = core_players_dict.get(pid_str)
         
         # Use franchise position ratings if available, otherwise fall back to core
         if not position_ratings and core_player:
