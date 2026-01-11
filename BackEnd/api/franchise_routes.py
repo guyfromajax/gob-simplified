@@ -1035,10 +1035,11 @@ def standings(franchise_id: str):
     logger.info(f"⏱️ [PERF] /franchise/standings START - franchise_id={franchise_id}")
     
     # ✅ PERFORMANCE: Only fetch needed fields (reduces from 402KB to ~20KB, 95% reduction)
+    # ✅ FIX: Also fetch franchise_teams to get list of teams for standings calculation
     db_query_start = time.time()
     franchise_doc = db.franchises.find_one(
         {"_id": ObjectId(franchise_id)},
-        {"schedule": 1, "week": 1, "eos_tournament": 1, "eos_tournament_active": 1, "results": 1, "_id": 1}
+        {"schedule": 1, "week": 1, "eos_tournament": 1, "eos_tournament_active": 1, "results": 1, "franchise_teams": 1, "_id": 1}
     )
     db_query_time = time.time() - db_query_start
     logger.info(f"⏱️ [PERF] /franchise/standings DB query: {db_query_time:.3f}s")
@@ -1091,20 +1092,36 @@ def standings(franchise_id: str):
             matchup_map[away_id] = f"at {home_name}"
             matchup_map[home_id] = f"vs {away_name}"
 
-    teams = list(db.teams.find({}, {"name": 1, "record": 1, "PF": 1, "PA": 1}))
+    # ✅ SS&S: Calculate W/L and PF/PA from franchise.results (franchise-specific) instead of global teams collection
+    # This ensures standings match team-stats endpoint and are isolated from other game modes
+    from BackEnd.utils.franchise_standings import calculate_franchise_standings
+    
+    franchise_results = franchise_doc.get("results", {})
+    franchise_teams = franchise_doc.get("franchise_teams", {})
+    
+    # Calculate standings from franchise.results
+    standings_data = calculate_franchise_standings(franchise_results, franchise_teams)
+    
+    # Get team names and build output
+    # ✅ FIX: Only query teams that are in franchise_teams (not all teams)
+    team_ids_list = [ObjectId(tid) for tid in franchise_teams.keys()]
+    teams = list(db.teams.find({"_id": {"$in": team_ids_list}}, {"name": 1, "_id": 1}))
 
     output = []
     for t in teams:
-        rec = t.get("record", {"W": 0, "L": 0})
-        wins = rec.get("W", 0)
-        losses = rec.get("L", 0)
+        team_id_str = str(t["_id"])
+        team_standings = standings_data.get(team_id_str, {"W": 0, "L": 0, "PF": 0, "PA": 0})
+        
+        wins = team_standings.get("W", 0)
+        losses = team_standings.get("L", 0)
         games_played = wins + losses
         pct = round(wins / games_played, 3) if games_played else 0.0
-        pf = t.get("PF", 0)
-        pa = t.get("PA", 0)
+        pf = team_standings.get("PF", 0)
+        pa = team_standings.get("PA", 0)
         differential = pf - pa
+        
         output.append({
-            "team_id": str(t["_id"]),
+            "team_id": team_id_str,
             "name": t.get("name", ""),
             "W": wins,
             "L": losses,
@@ -1112,7 +1129,7 @@ def standings(franchise_id: str):
             "PF": pf,
             "PA": pa,
             "differential": differential,
-            "next": matchup_map.get(str(t["_id"]), "")
+            "next": matchup_map.get(team_id_str, "")
         })
 
     output.sort(key=lambda x: (x["W"], x["differential"]), reverse=True)
