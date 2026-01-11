@@ -417,8 +417,18 @@ async function handleButtonClick(animate) {
   }
 }
 
-async function handleSimToFourth() {
-  if (isSimulating || quarter >= 4) return;
+async function handleSimQuarter() {
+  // Calculate next quarter
+  const nextQuarter = quarter + 1;
+  
+  // Validate: Don't simulate if already simulating
+  if (isSimulating) return;
+  
+  // Validate: Don't simulate if game is complete (Q4+ and scores differ, or game is final)
+  // Note: We can't easily check if game is final here without fetching game state
+  // So we'll rely on button state logic to disable button after game completes
+  // This is a safety check - button should already be disabled
+  
   if (!gameId && typeof localStorage !== 'undefined') {
     gameId = localStorage.getItem('game_id');
   }
@@ -433,13 +443,13 @@ async function handleSimToFourth() {
   isSimulating = true;
   const playBtn = document.querySelector('.play-button');
   const simFullBtn = document.querySelector('.sim-full-game-button');
-  const sim4Btn = document.querySelector('.sim-to-fourth-button');
-  [playBtn, simFullBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = true; });
+  const simQuarterBtn = document.querySelector('.sim-to-fourth-button');
+  [playBtn, simFullBtn, simQuarterBtn].forEach(btn => { if (btn) btn.disabled = true; });
 
   // Load game plan settings before simulating
   await loadGamePlanSettings();
 
-  // Fetch rosters for auto-set lineup generation
+  // Fetch rosters for auto-set lineup generation (needed for Q2-Q4)
   let homeRoster, awayRoster;
   try {
     const homeRes = await fetch(API_CONFIG.buildUrl(`/roster/${homeTeam}`));
@@ -451,142 +461,155 @@ async function handleSimToFourth() {
   }
 
   try {
-    let currentQ = quarter;
-    let gId = gameId;
-    let lastSummary;
-      while (currentQ <= 3) {
-        showStatus(`Simulating Q${currentQ}...`);
-      const payload = {
-        home_team: homeTeam,
-        away_team: awayTeam,
-        quarter: currentQ,
-        game_id: gameId, // Always pass gameId for tournament games
-      };
-      
-      // ✅ SS&S: Add mode and mode-specific IDs to payload (matches gameScene.js pattern)
-      // This ensures backend sets correct mode on game document for finalize_game() processing
-      if (mode) {
-        payload.mode = mode;
-      }
-      if (tournamentId) {
-        payload.tournament_id = tournamentId;
-      }
-      // ✅ FIX: Only pass franchise_id if mode is explicitly 'franchise'
-      // This prevents Single Game mode from accidentally passing franchise_id from localStorage
-      if (mode === 'franchise' && franchiseId) {
-        payload.franchise_id = franchiseId;
-        if (weekParam && !Number.isNaN(weekParam)) {
-          payload.week = weekParam;
-        }
-      }
-      
-      // Q1: Use user's set lineup
-      // Q2-Q3: Auto-set lineups for both teams
-      if (currentQ === quarter) {
-        if (Object.keys(homeLineup).length) payload.home_lineup = homeLineup;
-        if (Object.keys(awayLineup).length) payload.away_lineup = awayLineup;
-        // Add game plan settings (Q1 only, will be reused for Q2-Q3)
-        console.log('🔍 Game plan check:', { currentQ, quarter, hasSettings: !!gamePlanSettings, userTeamSide, mode });
-        if (currentQ === 1 && gamePlanSettings && userTeamSide) {
-          payload.user_team_side = userTeamSide;
-          payload.strategy_settings = gamePlanSettings.strategy_settings;
-          console.log(`🎮 Sending game plan settings to backend (${mode} mode):`, { userTeamSide, strategy: gamePlanSettings.strategy_settings });
-        } else if (currentQ === 1) {
-          console.warn('⚠️ Not sending game plan settings:', { hasSettings: !!gamePlanSettings, userTeamSide });
-        }
-      } else {
-        // Q2-Q3: Auto-set lineups
-        if (homeRoster && awayRoster) {
-          const autoLineups = generateBothLineups(homeRoster, awayRoster);
-          payload.home_lineup = autoLineups.home_lineup;
-          payload.away_lineup = autoLineups.away_lineup;
-          console.log(`🤖 Q${currentQ}: Auto-set lineups generated for both teams`);
-        }
-        // Reuse game plan settings from Q1
-        if (gamePlanSettings && userTeamSide) {
-          payload.user_team_side = userTeamSide;
-          payload.strategy_settings = gamePlanSettings.strategy_settings;
-        }
-        // Randomize possession and start with inbound for Q2-Q3
-        payload.start_with_inbound = true;
-        payload.starting_possession = Math.random() < 0.5 ? 'home' : 'away';
-        console.log(`🎲 Q${currentQ}: Random possession assigned to ${payload.starting_possession}`);
-      }
-      if (DEBUG_TEAMS) {
-        console.log('/api/simulate-quarter payload teams:', {
-          home: payload.home_team,
-          away: payload.away_team,
-        });
-      }
-      // ✅ FIX: Add full_sim=true for "simming" operations (fully simulate without animation)
-      payload.full_sim = true;
-      
-      console.log({event:'simulate-quarter:request', mode, homeTeam, awayTeam, quarter: currentQ, gameId: gId, full_sim: true});
-      const res = await fetch(API_CONFIG.buildUrl('/api/simulate-quarter'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        // ✅ FIX: Extract actual error message from backend for better debugging
-        let errorDetail = `HTTP ${res.status}: ${res.statusText}`;
-        try {
-          const errorData = await res.json();
-          errorDetail = errorData.detail || errorData.message || errorDetail;
-        } catch (e) {
-          try {
-            errorDetail = await res.text();
-          } catch (e2) {
-            // Keep default errorDetail
-          }
-        }
-        console.error(`❌ Q${currentQ} simulation failed:`, errorDetail);
-        throw new Error(`Q${currentQ} simulation failed: ${errorDetail}`);
-      }
-      lastSummary = await res.json();
-      gId = lastSummary.game_id;
-      // ✅ FIX: After fully simulating a quarter, increment to the next quarter
-      // This ensures the loop progresses: Q1 → Q2 → Q3 → exit (4 > 3)
-      const simulatedQuarter = currentQ;
-      currentQ += 1;
-      console.log(`✅ Q${simulatedQuarter} fully simulated, backend reports next quarter=${lastSummary.quarter}, moving to Q${currentQ}`);
-      // Safety check: if currentQ didn't increment, break to prevent infinite loop
-      if (currentQ === simulatedQuarter) {
-        console.error('🚨 Infinite loop detected: currentQ did not increment! Breaking loop.');
-        break;
+    showStatus(`Simulating Q${nextQuarter}...`);
+    const payload = {
+      home_team: homeTeam,
+      away_team: awayTeam,
+      quarter: nextQuarter,
+      game_id: gameId, // Always pass gameId for tournament games
+    };
+    
+    // ✅ SS&S: Add mode and mode-specific IDs to payload (matches gameScene.js pattern)
+    // This ensures backend sets correct mode on game document for finalize_game() processing
+    if (mode) {
+      payload.mode = mode;
+    }
+    if (tournamentId) {
+      payload.tournament_id = tournamentId;
+    }
+    // ✅ FIX: Only pass franchise_id if mode is explicitly 'franchise'
+    // This prevents Single Game mode from accidentally passing franchise_id from localStorage
+    if (mode === 'franchise' && franchiseId) {
+      payload.franchise_id = franchiseId;
+      if (weekParam && !Number.isNaN(weekParam)) {
+        payload.week = weekParam;
       }
     }
-
-    // After Q1-Q3 simulated, redirect to set-lineup for Q4
+    
+    // Q1: Use user's set lineup (if we're simulating Q1 from pre-game screen)
+    // Q2-Q4: Auto-set lineups for both teams
+    if (nextQuarter === 1) {
+      if (Object.keys(homeLineup).length) payload.home_lineup = homeLineup;
+      if (Object.keys(awayLineup).length) payload.away_lineup = awayLineup;
+      // Add game plan settings (Q1 only)
+      if (gamePlanSettings && userTeamSide) {
+        payload.user_team_side = userTeamSide;
+        payload.strategy_settings = gamePlanSettings.strategy_settings;
+        console.log(`🎮 Sending game plan settings to backend (${mode} mode):`, { userTeamSide, strategy: gamePlanSettings.strategy_settings });
+      }
+    } else {
+      // Q2-Q4: Auto-set lineups
+      if (homeRoster && awayRoster) {
+        const autoLineups = generateBothLineups(homeRoster, awayRoster);
+        payload.home_lineup = autoLineups.home_lineup;
+        payload.away_lineup = autoLineups.away_lineup;
+        console.log(`🤖 Q${nextQuarter}: Auto-set lineups generated for both teams`);
+      }
+      // Reuse game plan settings from Q1
+      if (gamePlanSettings && userTeamSide) {
+        payload.user_team_side = userTeamSide;
+        payload.strategy_settings = gamePlanSettings.strategy_settings;
+      }
+      // Q2-Q3: Randomize possession and start with inbound
+      // Q4: Use standard possession logic (opening tip winner) - handled by backend
+      if (nextQuarter < 4) {
+        payload.start_with_inbound = true;
+        payload.starting_possession = Math.random() < 0.5 ? 'home' : 'away';
+        console.log(`🎲 Q${nextQuarter}: Random possession assigned to ${payload.starting_possession}`);
+      }
+    }
+    if (DEBUG_TEAMS) {
+      console.log('/api/simulate-quarter payload teams:', {
+        home: payload.home_team,
+        away: payload.away_team,
+      });
+    }
+    // ✅ FIX: Add full_sim=true for "simming" operations (fully simulate without animation)
+    payload.full_sim = true;
+    
+    console.log({event:'simulate-quarter:request', mode, homeTeam, awayTeam, quarter: nextQuarter, gameId, full_sim: true});
+    const res = await fetch(API_CONFIG.buildUrl('/api/simulate-quarter'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      // ✅ FIX: Extract actual error message from backend for better debugging
+      let errorDetail = `HTTP ${res.status}: ${res.statusText}`;
+      try {
+        const errorData = await res.json();
+        errorDetail = errorData.detail || errorData.message || errorDetail;
+      } catch (e) {
+        try {
+          errorDetail = await res.text();
+        } catch (e2) {
+          // Keep default errorDetail
+        }
+      }
+      console.error(`❌ Q${nextQuarter} simulation failed:`, errorDetail);
+      throw new Error(`Q${nextQuarter} simulation failed: ${errorDetail}`);
+    }
+    const lastSummary = await res.json();
+    const gId = lastSummary.game_id;
+    
+    // Update gameId from response
     gameId = gId;
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('game_id', gameId);
     }
     
-    // Build URL parameters for set-lineup screen
-    const params = new URLSearchParams();
-    params.set('home', homeTeam);
-    params.set('away', awayTeam);
-    params.set('home_id', urlParams.get('home_id') || homeTeam);
-    params.set('away_id', urlParams.get('away_id') || awayTeam);
-    params.set('mode', mode);
-    // ✅ SS&S: Preserve franchise mode navigation anchor set
-    if (franchiseId) params.set('franchise_id', franchiseId);
-    if (weekParam && !Number.isNaN(weekParam)) params.set('week', weekParam);
-    if (teamId) params.set('team_id', teamId);
-    params.set('my_team', userTeamSide || 'home');
-    params.set('quarter', 4);
-    params.set('period', 'Q4');
-    params.set('game_id', gameId);
+    // Check if game is complete (Q4+ and not tied)
+    const isGameComplete = lastSummary.is_final === true;
+    if (isGameComplete) {
+      // Game is complete - redirect to finalization (should not happen from pre-game screen, but handle it)
+      console.log('✅ Game complete after simulation - redirecting to finalization');
+      // This should be handled by gameScene.js, but for safety, redirect to box score or completion
+      // Actually, if game is complete, we shouldn't be showing this button
+      // So this is a safety check
+      throw new Error('Game is complete - simulation should not be possible');
+    }
     
-    // Q4 should NOT use start_with_inbound - let backend handle standard Q4 logic (opening tip winner)
-    // The backend will automatically give possession to the opening tip winner for Q4
-    console.log(`🏀 Q4 will use standard possession logic (opening tip winner gets ball)`);
+    // Calculate next quarter after simulation (backend increments quarter)
+    const quarterAfterSim = lastSummary.quarter || (nextQuarter + 1);
+    const periodLabel = quarterAfterSim <= 4 ? `Q${quarterAfterSim}` : `OT${quarterAfterSim - 4}`;
     
-    console.log('🎮 Redirecting to set-lineup for Q4 after simming Q1-Q3');
-    window.location.href = `/set-lineup.html?${params.toString()}`;
+    console.log(`✅ Q${nextQuarter} fully simulated, backend reports next quarter=${quarterAfterSim}`);
+    
+    // Build URL parameters for set-lineup screen using TimeoutNavigationHelper for consistency
+    const helper = window.TimeoutNavigationHelper;
+    if (helper) {
+      const params = helper.buildGameNavigationParams({
+        sourceParams: urlParams,
+        targetQuarter: quarterAfterSim,
+        gameId: gameId,
+        resumeFromTimeout: false, // Not a timeout resume
+        lineup: {}, // Lineup will be set on lineup screen
+        myTeamSide: userTeamSide || 'home'
+      });
+      
+      console.log(`🎮 Redirecting to set-lineup for ${periodLabel} after simming Q${nextQuarter}`);
+      window.location.href = `/set-lineup.html?${params.toString()}`;
+    } else {
+      // Fallback: Build params manually if helper not available
+      const params = new URLSearchParams();
+      params.set('home', homeTeam);
+      params.set('away', awayTeam);
+      params.set('home_id', urlParams.get('home_id') || homeTeam);
+      params.set('away_id', urlParams.get('away_id') || awayTeam);
+      params.set('mode', mode);
+      if (franchiseId) params.set('franchise_id', franchiseId);
+      if (weekParam && !Number.isNaN(weekParam)) params.set('week', weekParam);
+      if (teamId) params.set('team_id', teamId);
+      params.set('my_team', userTeamSide || 'home');
+      params.set('quarter', quarterAfterSim);
+      params.set('period', periodLabel);
+      params.set('game_id', gameId);
+      
+      console.log(`🎮 Redirecting to set-lineup for ${periodLabel} after simming Q${nextQuarter}`);
+      window.location.href = `/set-lineup.html?${params.toString()}`;
+    }
   } catch (err) {
-    console.error('Error simming to 4th quarter:', err);
+    console.error('Error simming quarter:', err);
     // ✅ FIX: Show actual error message instead of generic message
     const errorMessage = err.message || 'Simulation failed. Please try again.';
     showStatus(errorMessage);
@@ -596,7 +619,7 @@ async function handleSimToFourth() {
     isSimulating = false;
     if (playBtn) playBtn.disabled = false;
     if (simFullBtn) simFullBtn.disabled = false;
-    if (sim4Btn) sim4Btn.disabled = true;
+    if (simQuarterBtn) simQuarterBtn.disabled = false;
   }
 }
 
@@ -912,11 +935,16 @@ async function initGame() {
     simFullBtn.addEventListener('click', handleSimFullGame);
   }
   if (sim4Btn) {
+    // ✅ SIM QUARTER: Button works for Q1-Q4 (before game completes)
+    // Disabled when quarter >= 4 (game already in Q4+ or complete)
+    // Note: Button is only shown on pre-game screen, so if quarter >= 4, game is complete
     if (quarter >= 4) {
       sim4Btn.disabled = true;
-      sim4Btn.title = 'Already in 4th quarter';
+      sim4Btn.title = 'Game complete';
     } else {
-      sim4Btn.addEventListener('click', handleSimToFourth);
+      sim4Btn.disabled = false;
+      sim4Btn.title = `Sim Quarter ${quarter + 1}`;
+      sim4Btn.addEventListener('click', handleSimQuarter);
     }
   }
 }
