@@ -3,6 +3,11 @@
 1. Playcall Override During Opening Tip Sequence -- When a user selects a playcall override during the opening tip sequence (before the game is initialized), the play is highlighted in the playcall center UI but the override never reaches the backend. The frontend `setPlaycallOverride()` function blocks the API call because `game_id` is `null` at that point (the game hasn't been created yet via `/api/simulate-quarter`). The override only works after the first turn is simulated and `game_id` becomes available. **Solution:** Either queue the override and send it after game initialization, or defer the `game_id` check until the first turn is simulated.
 2. Defensive Foul on missed shot attempt not announcing via our Announcement System
 3. Scouting Report button does not appear in the TCC
+4. Next column on Standings tab not populating on the Standings tab on FCC
+5. Since going to production, Playcall Center overrides are not working
+6. Since going to production, the computer is calling timeouts for the user team
+7. Elminate "Simulating Q5..."
+8. Tournament Mode -- Non user game team and player stats are not populating on the Stats tab, and no team's player stats are populating on the team roster pages.
 
 ## Fixed Bugs (January 2025)
 
@@ -119,3 +124,28 @@
   2. Hide image element on error instead of trying non-existent fallback
   3. Optionally disable tooltips when game is paused
   4. Ensure tooltip image only loads once per tooltip show, not on every mousemove
+
+### 🔍 Investigating: Slow Lineup Screen Load in Single Game Mode
+- **Issue**: Lineup screen takes 5-10 seconds to load player data when starting a Single Game, despite network request completing in only 294ms (49.4 kB response). The delay occurs after the network response is received, indicating a frontend processing bottleneck.
+- **Location**: `FrontEnd/static/set-lineup.js` - Likely contains the bottleneck
+- **Environment**: Staging
+- **Mode**: Single Game Mode
+- **Symptoms**:
+  - Network request completes quickly (294ms)
+  - Response size: 49.4 kB (reasonable)
+  - UI takes 5-10 seconds to appear after network completion
+  - Users see loading state for extended period
+- **Root Cause Analysis (Initial)**:
+  - **Network is NOT the bottleneck** - Request completes in 294ms
+  - **Frontend processing is the bottleneck** - 4.7-9.7 seconds of blocking JavaScript execution
+  - Likely causes:
+    1. Heavy synchronous data processing (player stats/attributes/energy calculations)
+    2. Inefficient DOM rendering (creating many player elements in loop, no batching)
+    3. Sequential blocking operations (for loops, synchronous await calls)
+    4. Missing optimization patterns (no debouncing, no requestAnimationFrame, no lazy loading)
+- **Investigation Needed**:
+  1. Check browser performance profiler to identify where time is spent (scripting vs rendering)
+  2. Review `set-lineup.js` for synchronous loops processing player data
+  3. Check for DOM thrashing (too many DOM updates causing reflows)
+  4. Identify any hidden sequential operations happening after network request
+- **Expected Behavior**: Lineup screen should load and display player data within 1-2 seconds after network request completes.

@@ -696,21 +696,38 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
     
     # ✅ PERFORMANCE: For tournament and single game modes, only check/update the requested team
     else:
-        # Normalize team_id to ObjectId - try name first, then ObjectId
-        team = db.teams.find_one({"name": team_id})
-        if not team:
-            try:
-                team = db.teams.find_one({"_id": ObjectId(team_id)})
-            except:
-                pass
-        if not team:
-            raise HTTPException(status_code=404, detail="Team not found")
+        # ✅ FIX: For Single Game mode, use team_id directly from game document (no teams collection lookup)
+        # For Tournament mode, still need to resolve team_id from teams collection
+        if mode == "single":
+            # Single Game mode: team_id is already resolved from game document (e.g., "FOUR_CORNERS")
+            # Use it directly - no need to look up in universal teams collection
+            # The team_id has already been resolved from the game document's teams object
+            actual_team_id = team_id
+            
+            # Check if team object exists in game document
+            teams = doc.get("teams", {})
+            team_obj = teams.get(actual_team_id)
+            
+            logger.warning(f"🔍 [ENSURE TEAM OBJECTS] Single Game mode: Using team_id={actual_team_id} from game document, team_obj exists={team_obj is not None}")
+        else:
+            # Tournament mode: Normalize team_id to ObjectId - try name first, then ObjectId
+            team = db.teams.find_one({"name": team_id})
+            if not team:
+                try:
+                    team = db.teams.find_one({"_id": ObjectId(team_id)})
+                except:
+                    pass
+            if not team:
+                raise HTTPException(status_code=404, detail="Team not found")
+            
+            actual_team_id = str(team["_id"])
+            
+            # Check if team object exists in tournament document
+            teams = doc.get("teams", {})
+            team_obj = teams.get(actual_team_id)
         
-        actual_team_id = str(team["_id"])
-        
-        # Check if team object exists
+        # Check if team object exists (for both single and tournament modes)
         team_key = f"teams.{actual_team_id}"
-        team_obj = doc.get("teams", {}).get(actual_team_id)
         
         if not team_obj:
             # Create team object with defaults
@@ -750,11 +767,19 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
                     {"_id": doc_id},
                     {"$set": {f"{team_key}": team_obj}}
                 )
+                # ✅ FIX: Reload document to get the newly created team object
+                doc = collection.find_one({"_id": doc_id})
+                teams = doc.get("teams", {}) if doc else {}
+                team_obj = teams.get(actual_team_id)
             else:
                 collection.update_one(
                     {"_id": ObjectId(doc_id)},
                     {"$set": {f"{team_key}": team_obj}}
                 )
+                # ✅ FIX: Reload document to get the newly created team object
+                doc = collection.find_one({"_id": ObjectId(doc_id)})
+                teams = doc.get("teams", {}) if doc else {}
+                team_obj = teams.get(actual_team_id)
         elif "strategy_settings" not in team_obj or not team_obj.get("plays") or "shot_threshold" not in team_obj or "playbook_settings" not in team_obj:
             # Add missing settings
             defaults = get_default_settings()
