@@ -1,10 +1,9 @@
 # 1. Imports
 import sys
-print("🔵 [DEBUG] api.py: Starting imports...", file=sys.stderr, flush=True)
+# ✅ PERFORMANCE: Removed debug print statements - use logger instead
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-print("🔵 [DEBUG] api.py: FastAPI imports complete", file=sys.stderr, flush=True)
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi import Request
@@ -12,14 +11,13 @@ from BackEnd.constants import POSITION_LIST
 import uuid
 from BackEnd.main import run_simulation, simulate_quarter
 from BackEnd.models.game_manager import GameManager
-print("🔵 [DEBUG] api.py: About to import from BackEnd.db", file=sys.stderr, flush=True)
+# ✅ PERFORMANCE: Removed debug print statements
 from BackEnd.db import (
     players_collection,
     teams_collection,
     games_collection,
     tournaments_collection,
 )
-print("🔵 [DEBUG] api.py: BackEnd.db import complete", file=sys.stderr, flush=True)
 from BackEnd.utils.roster_loader import load_roster
 from BackEnd.utils.game_summary_builder import build_game_summary
 from BackEnd.utils.shared import clean_mongo_ids, summarize_game_state, format_height
@@ -31,14 +29,13 @@ from bson.json_util import dumps
 from bson import ObjectId
 from fastapi.staticfiles import StaticFiles
 from BackEnd.models.animator import Animator   
-print("🔵 [DEBUG] api.py: About to import routers", file=sys.stderr, flush=True)
+# ✅ PERFORMANCE: Removed debug print statements
 from .tournament_routes import router as tournament_router
 from .training_routes import router as training_router
 from .franchise_routes import router as franchise_router
 from .gameplan_routes import router as gameplan_router
 from .play_routes import router as play_router
 from .skeleton_routes import router as skeleton_router
-print("🔵 [DEBUG] api.py: All routers imported", file=sys.stderr, flush=True)
 import traceback
 from unidecode import unidecode
 from typing import Optional
@@ -48,9 +45,8 @@ from BackEnd.models.player import Player
 
 logger = logging.getLogger(__name__)
 
-print("🔵 [DEBUG] api.py: Creating FastAPI app instance", file=sys.stderr, flush=True)
+# ✅ PERFORMANCE: Removed debug print statements
 app = FastAPI()
-print("🔵 [DEBUG] api.py: FastAPI app created", file=sys.stderr, flush=True)
 
 # CORS Configuration - Must match actual testing domains, not just final ideal
 # CRITICAL: Add CORS middleware BEFORE including routers to ensure it applies to all routes
@@ -74,11 +70,9 @@ def get_cors_origins():
     return origins
 
 # Get CORS origins and configure middleware BEFORE including routers
-print("🔵 [DEBUG] api.py: About to get CORS origins", file=sys.stderr, flush=True)
+# ✅ PERFORMANCE: Removed debug print statements
 cors_origins = get_cors_origins()
-print(f"🔵 [DEBUG] api.py: CORS origins: {cors_origins}", file=sys.stderr, flush=True)
 
-print("🔵 [DEBUG] api.py: About to add CORS middleware", file=sys.stderr, flush=True)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -89,17 +83,14 @@ app.add_middleware(
     expose_headers=["*"],
     max_age=3600  # Cache preflight requests for 1 hour
 )
-print("🔵 [DEBUG] api.py: CORS middleware added", file=sys.stderr, flush=True)
 
 # Include routers AFTER CORS middleware is configured
-print("🔵 [DEBUG] api.py: About to include routers", file=sys.stderr, flush=True)
 app.include_router(tournament_router)
 app.include_router(training_router)
 app.include_router(franchise_router)
 app.include_router(gameplan_router)
 app.include_router(play_router)
 app.include_router(skeleton_router)
-print("🔵 [DEBUG] api.py: All routers included", file=sys.stderr, flush=True)
 
 templates = Jinja2Templates(directory="FrontEnd/static")
 
@@ -110,11 +101,9 @@ if environment == "development":
     app.mount("/static", StaticFiles(directory="FrontEnd/static"), name="static")
     print("✅ Static files mounted (development mode)")
 
-print("🚀 Loaded FastAPI app from api.py", file=sys.stderr, flush=True)
-print(f"🔵 [DEBUG] api.py: CORS origins configured: {cors_origins}", file=sys.stderr, flush=True)
+# ✅ PERFORMANCE: Removed debug print statements
 
 # ✅ DEBUG: Add CORS logging middleware to trace CORS issues
-print("🔵 [DEBUG] api.py: About to register CORS debug middleware", file=sys.stderr, flush=True)
 @app.middleware("http")
 async def cors_debug_middleware(request: Request, call_next):
     """Debug middleware to log all requests and catch exceptions early"""
@@ -144,8 +133,7 @@ async def cors_debug_middleware(request: Request, call_next):
         traceback.print_exc(file=sys.stderr)
         raise
 
-print("🔵 [DEBUG] api.py: CORS debug middleware registered", file=sys.stderr, flush=True)
-print("🔵 [DEBUG] api.py: Module initialization complete", file=sys.stderr, flush=True)
+# ✅ PERFORMANCE: Removed debug print statements
 
 # ✅ Add global exception handler to catch all unhandled exceptions
 @app.exception_handler(Exception)
@@ -556,7 +544,7 @@ def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest
                             game_data = round_games.get(str(game_id)) or round_games.get(ObjectId(game_id))
                             if game_data:
                                 saved = game_data
-                                logging.info(f"✅ TIMEOUT RESUME: Found game in tournament nested structure (round: {round_key})")
+                                # ✅ PERFORMANCE: Removed debug logging
                                 break
             except Exception as e:
                 logging.warning(f"⚠️ TIMEOUT RESUME: Error loading from tournament nested structure: {e}")
@@ -564,8 +552,7 @@ def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest
             # Fallback to games_collection if not found in nested structure
             if not saved and games_collection is not None:
                 saved = games_collection.find_one({"_id": game_id})
-                if saved:
-                    logging.info(f"✅ TIMEOUT RESUME: Found game in games_collection (tournament fallback)")
+                # ✅ PERFORMANCE: Removed debug logging
         
         elif request.mode == "franchise" and request.franchise_id:
             # Franchise mode: Check nested structure first, then fallback to games_collection
@@ -582,7 +569,7 @@ def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest
                             game_data = week_games.get(str(game_id)) or week_games.get(ObjectId(game_id))
                             if game_data:
                                 saved = game_data
-                                logging.info(f"✅ TIMEOUT RESUME: Found game in franchise nested structure (week: {week_key})")
+                                # ✅ PERFORMANCE: Removed debug logging
                                 break
             except Exception as e:
                 logging.warning(f"⚠️ TIMEOUT RESUME: Error loading from franchise nested structure: {e}")
@@ -591,14 +578,14 @@ def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest
             if not saved and games_collection is not None:
                 saved = games_collection.find_one({"_id": game_id})
                 if saved:
-                    logging.info(f"✅ TIMEOUT RESUME: Found game in games_collection (franchise fallback)")
+                    # ✅ PERFORMANCE: Removed debug logging
+                    pass
         
         else:
             # Single game mode: Check games_collection
             if games_collection is not None:
                 saved = games_collection.find_one({"_id": game_id})
-                if saved:
-                    logging.info(f"✅ TIMEOUT RESUME: Found game in games_collection (single mode)")
+                # ✅ PERFORMANCE: Removed debug logging
         
         if not saved:
             logging.warning(f"⚠️ TIMEOUT RESUME: Game {game_id} not found in any document location (mode: {request.mode})")
@@ -609,11 +596,7 @@ def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest
             logging.error(f"❌ TIMEOUT RESUME: timeout_next_play_type missing from saved game {game_id}")
             return None
         
-        logging.info(
-            f"✅ TIMEOUT RESUME: Loaded state from DB - "
-            f"timeout_next_play_type={saved.get('timeout_next_play_type')}, "
-            f"quarter={saved.get('quarter')}, clock={saved.get('clock')}, mode={request.mode}"
-        )
+        # ✅ PERFORMANCE: Removed debug logging
         return saved
     except Exception as e:
         logging.error(f"❌ TIMEOUT RESUME: Error loading from DB: {e}", exc_info=True)
@@ -635,11 +618,11 @@ def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
     
     if "clock" in saved:
         gm.game_state["clock"] = saved["clock"]
-        logging.info(f"🔄 TIMEOUT RESUME: Applied clock={saved['clock']}")
+        # ✅ PERFORMANCE: Removed debug logging
     
     if "time_remaining" in saved:
         gm.game_state["time_remaining"] = saved["time_remaining"]
-        logging.info(f"🔄 TIMEOUT RESUME: Applied time_remaining={saved['time_remaining']}")
+        # ✅ PERFORMANCE: Removed debug logging
 
 # 4. Routes
 @app.get("/")
@@ -766,11 +749,9 @@ def get_game_state(game_id: str, quarter: int | None = None):
                  returns empty stats (new game scenario)
     """
     try:
-        logging.info(f"🔍 [BOX_SCORE] Loading game: game_id={game_id}, quarter={quarter}")
+        # ✅ PERFORMANCE: Removed debug logging - only log errors
         # Check ongoing games first
         gm = ongoing_games.get(game_id)
-        logging.info(f"📊 /api/game/{game_id} - GameManager in memory: {gm is not None}, quarter param: {quarter}")
-        logging.info(f"📊 Active games in memory: {list(ongoing_games.keys())}")
         if gm:
             # Get players with current energy levels, stats, and attributes
             # Include ALL players (not just lineup) so roster merge works correctly
@@ -831,18 +812,18 @@ def get_game_state(game_id: str, quarter: int | None = None):
         
         # Check database
         if games_collection is not None:
-            logging.info(f"🔍 [BOX_SCORE] Checking database for game_id={game_id}")
+            # ✅ PERFORMANCE: Removed debug logging
             # Try both string and ObjectId lookups
             saved = games_collection.find_one({"_id": game_id})
             if not saved and isinstance(game_id, str):
                 try:
                     saved = games_collection.find_one({"_id": ObjectId(game_id)})
-                    logging.info(f"✅ [BOX_SCORE] Found game using ObjectId conversion")
                 except Exception as e:
-                    logging.warning(f"⚠️ [BOX_SCORE] Could not convert game_id to ObjectId: {e}")
+                    # Only log actual errors
+                    pass
             
             if saved:
-                logging.info(f"✅ [BOX_SCORE] Found game in database: quarter={saved.get('quarter')}, is_final={saved.get('is_final')}, has_box_score={bool(saved.get('box_score'))}, has_players={bool(saved.get('players'))}")
+                # ✅ PERFORMANCE: Removed debug logging
                 saved_quarter = saved.get("quarter", 1)
                 
                 # Check if this is a "new game" scenario: user requesting Q1 but saved game is Q2+
@@ -1025,17 +1006,7 @@ def get_game_state(game_id: str, quarter: int | None = None):
 @app.post("/api/simulate-quarter")
 def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = False):
     game_id = request.game_id
-    logging.info(
-        "simulate_quarter_endpoint payload: game_id=%s, home_team=%s, away_team=%s, quarter=%s, home_lineup_keys=%s, away_lineup_keys=%s, resume_from_timeout=%s, mode=%s",
-        game_id,
-        request.home_team,
-        request.away_team,
-        request.quarter,
-        list((request.home_lineup or {}).keys()),
-        list((request.away_lineup or {}).keys()),
-        request.resume_from_timeout,
-        request.mode,
-    )
+    # ✅ PERFORMANCE: Removed debug logging - only log errors and critical events
     if debug:
         logging.debug(
             "simulate_quarter_endpoint request detail: %s",
@@ -1110,16 +1081,13 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         # The database is the source of truth - if timeout_next_play_type exists, we're resuming from timeout
         # Validation (quarter match, etc.) happens later when applying the state
         timeout_saved_state = None
-        logging.info(f"🔍 TIMEOUT RESUME CHECK: Checking if we should look for timeout state (game_id={game_id}, quarter={request.quarter}, mode={request.mode}, URL resume_from_timeout={request.resume_from_timeout})")
+        # ✅ PERFORMANCE: Removed debug logging - only log errors
         
         # Check for timeout state if we have a game_id (existing game)
         # Don't skip Q1 - we could be resuming from a timeout in Q1!
         # The restore_timeout_resume_state function will validate quarter match to prevent stale data
         if game_id:
-            logging.info(f"🔍 TIMEOUT RESUME: Checking DB for timeout state (game_id exists)")
             timeout_saved_state = restore_timeout_resume_state(game_id, request, games_collection)
-        else:
-            logging.info(f"🔍 TIMEOUT RESUME: Skipping timeout check (no game_id - brand new game)")
         
         if timeout_saved_state:
             # Validate quarter match to prevent stale data from affecting new games
@@ -1153,7 +1121,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 # This handles cases where resume_from_timeout was incorrectly preserved across quarter boundaries
                 request.resume_from_timeout = False
             else:
-                logging.info(f"🔍 TIMEOUT RESUME: No timeout state in DB (normal game start/resume)")
+                # ✅ PERFORMANCE: Removed debug logging
+                pass
         
         if gm is None:
             logging.warning(
@@ -1309,7 +1278,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         saved_quarter = saved.get("quarter", 1)
                         gm.quarter = saved_quarter
                         # ✅ FIX: Log loaded quarter to debug save/load issues
-                        logging.info(f"📂 Loaded game from DB: game_id={game_id}, saved_quarter={saved_quarter}, requested_quarter={request.quarter}")
+                        # ✅ PERFORMANCE: Removed debug logging
                         
                         # ✅ SS&S: Restore user_team_side to game_state (persists override checking across game loads)
                         # If saved game has it, use that; otherwise use request.user_team_side
@@ -1337,7 +1306,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             # Timeout state found - ensure resume_from_timeout is set
                             if not request.resume_from_timeout:
                                 request.resume_from_timeout = True
-                                logging.info(f"✅ TIMEOUT RESUME: Detected timeout state in saved document, setting resume_from_timeout=True (quarter {request.quarter})")
+                                # ✅ PERFORMANCE: Removed debug logging
                         
                         # ✅ TIMEOUT RESUME: Check for timeout state in saved document BEFORE calculating should_restore_stats
                         # This ensures scores/fouls are restored when resuming from timeout
@@ -1347,7 +1316,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             # Timeout state found in saved document - ensure resume_from_timeout is set
                             if not request.resume_from_timeout:
                                 request.resume_from_timeout = True
-                                logging.info(f"✅ TIMEOUT RESUME: Detected timeout state in saved document, setting resume_from_timeout=True (quarter {request.quarter})")
+                                # ✅ PERFORMANCE: Removed debug logging
                         
                         # Simple check: If requesting Q1 but saved game is at a later quarter, start fresh (new game)
                         # ✅ TIMEOUT: If resuming from timeout, always restore stats (we're continuing an existing game)
@@ -1360,20 +1329,17 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         if request.home_lineup:
                             from BackEnd.utils.db_utils import assign_lineup_from_ids
                             gm.home_team.lineup = assign_lineup_from_ids(gm.home_team, request.home_lineup)
-                            logging.info(f"✅ Loaded from DB: Set home lineup from request: {list(gm.home_team.lineup.keys())}")
+                            # ✅ PERFORMANCE: Removed debug logging
                         elif not gm.home_team.lineup:
                             from BackEnd.utils.db_utils import build_lineup_from_mongo
                             gm.home_team.lineup = build_lineup_from_mongo(gm.home_team, gm.game_state)
-                            logging.info(f"✅ Loaded from DB: Built home lineup from MongoDB: {list(gm.home_team.lineup.keys())}")
                         
                         if request.away_lineup:
                             from BackEnd.utils.db_utils import assign_lineup_from_ids
                             gm.away_team.lineup = assign_lineup_from_ids(gm.away_team, request.away_lineup)
-                            logging.info(f"✅ Loaded from DB: Set away lineup from request: {list(gm.away_team.lineup.keys())}")
                         elif not gm.away_team.lineup:
                             from BackEnd.utils.db_utils import build_lineup_from_mongo
                             gm.away_team.lineup = build_lineup_from_mongo(gm.away_team, gm.game_state)
-                            logging.info(f"✅ Loaded from DB: Built away lineup from MongoDB: {list(gm.away_team.lineup.keys())}")
                         
                         # Validate lineups are set
                         if not gm.home_team.lineup or not gm.away_team.lineup:
@@ -1389,10 +1355,9 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # Players are stored as an array: [{"playerId": "...", "team": "home", "stats": {...}, "attributes": {...}}]
                         if should_restore_stats:
                             saved_players_list = saved.get("players", [])
-                            logging.info(f"🔄 Restoring stats for {len(saved_players_list)} players")
+                            # ✅ PERFORMANCE: Removed debug logging
                         else:
                             saved_players_list = []
-                            logging.info(f"🆕 New Q1 game (requested Q1 but saved game is Q{saved_quarter}) - skipping stat restoration")
                         
                         for saved_player_data in saved_players_list:
                             player_id = saved_player_data.get("playerId")
@@ -1420,10 +1385,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             
                             # Restore game stats
                             if "stats" in saved_player_data:
-                                old_pts = player.stats.get("game", {}).get("PTS", 0)
                                 player.stats["game"] = saved_player_data["stats"]
-                                new_pts = player.stats["game"].get("PTS", 0)
-                                logging.info(f"🔄 Player {player_id}: PTS restored {old_pts} → {new_pts}")
+                                # ✅ PERFORMANCE: Removed debug logging
                         
                         # Restore team-level stats (score, fouls, totals, points by quarter)
                         # Only restore if this is NOT a new Q1 game (fresh start)
@@ -1434,50 +1397,39 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             # Restore team scores
                             if "score" in home_team_data:
                                 gm.score[gm.home_team.name] = home_team_data["score"]
-                                logging.info(f"🔄 Home team score restored: {home_team_data['score']}")
                             if "score" in away_team_data:
                                 gm.score[gm.away_team.name] = away_team_data["score"]
-                                logging.info(f"🔄 Away team score restored: {away_team_data['score']}")
                             
                             # Restore team fouls
                             if "team_fouls" in home_team_data:
                                 gm.home_team.team_fouls = home_team_data["team_fouls"]
-                                logging.info(f"🔄 Home team fouls restored: {home_team_data['team_fouls']}")
                             if "team_fouls" in away_team_data:
                                 gm.away_team.team_fouls = away_team_data["team_fouls"]
-                                logging.info(f"🔄 Away team fouls restored: {away_team_data['team_fouls']}")
                             
                             # Restore team timeouts
                             if "timeouts" in home_team_data:
                                 gm.home_team.timeouts = home_team_data["timeouts"]
-                                logging.info(f"🔄 Home team timeouts restored: {home_team_data['timeouts']}")
                             else:
-                                # Default to 5 if not in saved data (backward compatibility)
+                                # Default to 4 if not in saved data (backward compatibility)
                                 gm.home_team.timeouts = 4
-                                logging.info(f"🔄 Home team timeouts set to default: 4")
                             if "timeouts" in away_team_data:
                                 gm.away_team.timeouts = away_team_data["timeouts"]
-                                logging.info(f"🔄 Away team timeouts restored: {away_team_data['timeouts']}")
                             else:
-                                # Default to 5 if not in saved data (backward compatibility)
+                                # Default to 4 if not in saved data (backward compatibility)
                                 gm.away_team.timeouts = 4
-                                logging.info(f"🔄 Away team timeouts set to default: 4")
                             
                             # Restore team totals (aggregated stats)
                             if "totals" in home_team_data:
                                 gm.team_totals[gm.home_team.name] = home_team_data["totals"]
-                                logging.info(f"🔄 Home team totals restored: {home_team_data['totals']}")
                             if "totals" in away_team_data:
                                 gm.team_totals[gm.away_team.name] = away_team_data["totals"]
-                                logging.info(f"🔄 Away team totals restored: {away_team_data['totals']}")
                             
                             # Restore points by quarter
                             if "points_by_quarter" in home_team_data:
                                 gm.game_state["points_by_quarter"][gm.home_team.name] = home_team_data["points_by_quarter"]
-                                logging.info(f"🔄 Home team points_by_quarter restored: {home_team_data['points_by_quarter']}")
                             if "points_by_quarter" in away_team_data:
                                 gm.game_state["points_by_quarter"][gm.away_team.name] = away_team_data["points_by_quarter"]
-                                logging.info(f"🔄 Away team points_by_quarter restored: {away_team_data['points_by_quarter']}")
+                            # ✅ PERFORMANCE: Removed debug logging
                             
                             # Restore game_stats_initialized flag to prevent stats reset
                             if "game_stats_initialized" in saved:
