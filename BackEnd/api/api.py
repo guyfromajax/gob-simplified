@@ -1507,13 +1507,15 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                 logging.warning(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={request.quarter})")
                                 timeout_saved_state = None  # Clear invalid timeout state
                         else:
-                            # Not resuming from timeout - restore clock/time_remaining normally
-                            if "clock" in saved:
-                                gm.game_state["clock"] = saved["clock"]
-                                logging.info(f"🔄 Clock restored: {saved['clock']}")
-                            if "time_remaining" in saved:
-                                gm.game_state["time_remaining"] = saved["time_remaining"]
-                                logging.info(f"🔄 Time remaining restored: {saved['time_remaining']} seconds")
+                            # ✅ FIX: Don't restore time_remaining when starting a new quarter
+                            # simulate_quarter() will reset it to 480 (for Q1-Q4) or 240 (for OT)
+                            # Only restore clock/time_remaining when resuming mid-quarter (timeout resume)
+                            # For new quarter starts, let simulate_quarter() reset them
+                            saved_quarter = saved.get("quarter", 0)
+                            if saved_quarter != request.quarter:
+                                # Quarter mismatch - this shouldn't happen, but if it does, don't restore time
+                                logging.warning(f"⚠️ Quarter mismatch: saved={saved_quarter}, requested={request.quarter} - not restoring time_remaining")
+                            # Don't restore time_remaining here - simulate_quarter() will reset it for the new quarter
                         
                         # Restore opening_tip_winner for Q2-Q4 possession logic
                         # Only restore if this is NOT a new Q1 game (opening tip hasn't happened yet for new games)

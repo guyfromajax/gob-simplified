@@ -884,11 +884,9 @@ async function initGame() {
   
   console.log('Initializing game buttons:', { playBtn, simFullBtn, sim4Btn });
   
-  // ✅ TIMEOUT + QUARTER BREAKS: Hide pre-game buttons if resuming (timeout) or continuing (quarter > 1)
-  // This matches the quarter break flow where buttons are hidden and game auto-starts
+  // ✅ FIX: Show pre-game buttons at start of each quarter (not just Q1)
+  // Only hide buttons when resuming from timeout (not quarter breaks)
   let resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
-  // ✅ FIX: Quarter breaks are Q2, Q3, Q4 with existing game (quarter >= 2, not > 1, and not 0)
-  const isQuarterBreak = quarter >= 2 && quarter <= 4 && gameId; // Quarter breaks: Q2, Q3, Q4 with existing game
   
   // ✅ RESILIENCE: Check database for timeout state as fallback (if URL param missing but gameId exists)
   // This makes the system robust - even if URL param is lost, we can still detect timeout resume
@@ -912,10 +910,12 @@ async function initGame() {
     }
   }
   
-  if (resumeFromTimeout || isQuarterBreak) {
+  // ✅ FIX: Only hide pre-game buttons when resuming from timeout
+  // Show pre-game buttons at start of each quarter (Q1-Q4, OT)
+  if (resumeFromTimeout) {
     const preGameContainer = document.querySelector('.pre-game-container');
     if (preGameContainer) {
-      console.log(`🎮 Hiding pre-game container (${resumeFromTimeout ? 'timeout resume' : 'quarter break'})`);
+      console.log(`🎮 Hiding pre-game container (timeout resume)`);
       preGameContainer.classList.add('hidden');
     }
   }
@@ -936,16 +936,31 @@ async function initGame() {
     console.error('Play Quarter button not found!');
   }
   
-  // ✅ TIMEOUT + QUARTER BREAKS: Auto-start if resuming from timeout OR continuing quarter break
-  // This matches the quarter break flow where game auto-starts immediately
-  if ((resumeFromTimeout || isQuarterBreak) && gameId && homeTeam && awayTeam) {
-    console.log(`⏸️ AUTO-START: ${resumeFromTimeout ? 'Timeout resume' : 'Quarter break'} - auto-starting game`);
+  // ✅ FIX: Only auto-start when resuming from timeout (not quarter breaks)
+  // Quarter breaks now show pre-game buttons for user to choose Play/Sim Quarter/Sim Full Game
+  if (resumeFromTimeout && gameId && homeTeam && awayTeam) {
+    console.log(`⏸️ AUTO-START: Timeout resume - auto-starting game`);
     // Auto-start the game (same as clicking "Play Quarter" button)
     handleButtonClick(true);
   }
   
   if (simFullBtn) {
-    simFullBtn.addEventListener('click', handleSimFullGame);
+    // ✅ FIX: Update button text based on quarter
+    // Q2-Q3: "Sim Rest Of Game"
+    // Q4+: Hide button (only show Play Quarter and Sim Quarter)
+    const currentQuarter = Math.max(0, quarter);
+    if (currentQuarter >= 4) {
+      // Q4+: Hide "Sim Full Game"/"Sim Rest Of Game" button
+      simFullBtn.style.display = 'none';
+    } else if (currentQuarter >= 2) {
+      // Q2-Q3: Change text to "Sim Rest Of Game"
+      simFullBtn.textContent = 'Sim Rest Of Game';
+      simFullBtn.addEventListener('click', handleSimFullGame);
+    } else {
+      // Q1: Show "Sim Full Game"
+      simFullBtn.textContent = 'Sim Full Game';
+      simFullBtn.addEventListener('click', handleSimFullGame);
+    }
   }
   if (sim4Btn) {
     // ✅ SIM QUARTER: Button works for Q1-Q4 (before game completes)
