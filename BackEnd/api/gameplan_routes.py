@@ -1198,7 +1198,12 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
     """
     Get plays for a team from the appropriate mode document.
     Returns plays organized by type (motion, set_play) and focus (inside, attack, outside).
+    
+    PERFORMANCE DIAGNOSTIC: This endpoint is instrumented with timing logs.
     """
+    import time
+    endpoint_start = time.time()
+    
     try:
         # ✅ PERFORMANCE: Removed debug logging - only log errors and critical events
         # Determine which collection to use
