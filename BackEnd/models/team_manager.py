@@ -28,22 +28,32 @@ def _get_cached_play_names():
 
 class TeamManager:
     def __init__(self, name: str, is_home_team=False, strategy_settings=None, team_attributes=None, scouting_data=None, plays_data=None, strategy_calls=None, mode="single", is_user_team=False):
+        import time
+        import logging
         self.name = name
         self.is_home_team = is_home_team
         self.is_user_team = is_user_team  # ✅ SS&S: Track if this is the user's team for override logic
         self.mode = mode  # Store mode for use in _init_scouting_data() and other methods
+        
+        roster_start = time.time()
         self.players = self._load_roster()
+        roster_time = (time.time() - roster_start) * 1000
+        logging.warning(f"⏱️ [PERF] TeamManager({name}) - _load_roster: {roster_time:.2f}ms")
+        
         self.lineup = self._load_lineup()
         
         # Load BASE team data from universal teams collection (name, team_id, colors, mascot)
+        team_doc_start = time.time()
         team_doc = teams_collection.find_one({"name": name})
+        team_doc_time = (time.time() - team_doc_start) * 1000
+        logging.warning(f"⏱️ [PERF] TeamManager({name}) - teams_collection.find_one: {team_doc_time:.2f}ms")
         if not team_doc:
             print(f"⚠️ No team document found for team: {name}")
         self.team_id = team_doc.get("team_id") if team_doc else None
         self.primary_color = team_doc.get("primary_color", "#000000") if team_doc else "#000000"
         self.secondary_color = team_doc.get("secondary_color", "#ffffff") if team_doc else "#ffffff"
         self.mascot = team_doc.get("mascot", "") if team_doc else ""
-
+        
         self.points = 0
         self.points_by_quarter = [0, 0, 0, 0]
         self.team_fouls = 0
@@ -52,10 +62,13 @@ class TeamManager:
         self.team_stats = {}  # Team-level stats (release/get back tracking, fast break defender counts)
         
         # Use provided scouting_data or initialize fresh
+        scouting_start = time.time()
         if scouting_data:
             self.scouting_data = scouting_data
         else:
             self.scouting_data = self._init_scouting_data()
+        scouting_time = (time.time() - scouting_start) * 1000
+        logging.warning(f"⏱️ [PERF] TeamManager({name}) - scouting_data: {scouting_time:.2f}ms")
 
         # Use provided strategy_settings or fall back to random initialization
         # MALLEABLE: Generated per game instance (not loaded from universal teams collection)
@@ -97,6 +110,7 @@ class TeamManager:
         
         # Use provided plays_data (from saved game) or initialize fresh from universal collection
         # MALLEABLE: Each game instance has its own copy with tracking stats
+        plays_start = time.time()
         if plays_data:
             # Handle both dict (saved games) and list (new games) formats
             if isinstance(plays_data, dict):
@@ -110,6 +124,8 @@ class TeamManager:
                 self.plays = self._init_plays_from_universal(mode)
         else:
             self.plays = self._init_plays_from_universal(mode)
+        plays_time = (time.time() - plays_start) * 1000
+        logging.warning(f"⏱️ [PERF] TeamManager({name}) - plays initialization: {plays_time:.2f}ms")
         
         # Use provided team_attributes or generate random values
         # MALLEABLE: Generated per game instance (not loaded from universal teams collection)
