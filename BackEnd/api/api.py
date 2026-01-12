@@ -41,6 +41,8 @@ from unidecode import unidecode
 from typing import Optional
 import logging
 import os
+import json
+import time
 from BackEnd.models.player import Player
 
 logger = logging.getLogger(__name__)
@@ -794,7 +796,7 @@ def get_game_state(game_id: str, quarter: int | None = None):
             process_time = (time.time() - process_start) * 1000  # Convert to ms
             logging.warning(f"⏱️ [PERF] /api/game/{game_id} - In-memory processing: {process_time:.2f}ms")
             
-            return {
+            response_data = {
                 "game_id": game_id,
                 "score": gm.score,
                 "box_score": gm.get_box_score(),
@@ -818,6 +820,10 @@ def get_game_state(game_id: str, quarter: int | None = None):
                     "attributes": gm.away_team.team_attributes  # Team attributes for S3 tab
                 }
             }
+            response_size = len(json.dumps(response_data))
+            total_time = (time.time() - endpoint_start) * 1000
+            logging.warning(f"⏱️ [PERF] /api/game/{game_id} - In-memory path: processing: {process_time:.2f}ms, response_size: {response_size} bytes, total: {total_time:.2f}ms")
+            return response_data
         
         # Check database
         if games_collection is not None:
@@ -887,7 +893,7 @@ def get_game_state(game_id: str, quarter: int | None = None):
                         players_with_energy.append(player_data)
                     
                     # Return empty stats structure
-                    return {
+                    response_data = {
                         "game_id": game_id,
                         "score": {home_team_data.get("name", ""): 0, away_team_data.get("name", ""): 0},
                         "box_score": {},
@@ -917,6 +923,10 @@ def get_game_state(game_id: str, quarter: int | None = None):
                             "attributes": away_team_data.get("attributes", {})
                         }
                     }
+                    response_size = len(json.dumps(response_data))
+                    total_time = (time.time() - endpoint_start) * 1000
+                    logging.warning(f"⏱️ [PERF] /api/game/{game_id} - New game path: response_size: {response_size} bytes, total: {total_time:.2f}ms")
+                    return response_data
                 
                 # Extract player energy, stats, and attributes from saved game doc
                 players = saved.get("players", [])
@@ -980,7 +990,7 @@ def get_game_state(game_id: str, quarter: int | None = None):
                 # ✅ UNIFIED STRUCTURE: Return unified teams object structure
                 # Frontend should read from teams[home_team_id]/teams[away_team_id]
                 # Keeping backward compatibility home_team/away_team for now (built from teams object)
-                return {
+                response_data = {
                     "game_id": game_id,
                     "score": saved.get("score", {}),
                     "box_score": box_score,
@@ -1027,6 +1037,10 @@ def get_game_state(game_id: str, quarter: int | None = None):
                         "totals": away_team_data.get("totals", {})
                     }
                 }
+                response_size = len(json.dumps(response_data))
+                total_time = (time.time() - endpoint_start) * 1000
+                logging.warning(f"⏱️ [PERF] /api/game/{game_id} - DB path: query: {query_time:.2f}ms, response_size: {response_size} bytes, total: {total_time:.2f}ms")
+                return response_data
         
             logging.error(f"❌ [BOX_SCORE] Game not found in database: game_id={game_id}")
             # Try to find any games with similar IDs for debugging
@@ -1038,8 +1052,8 @@ def get_game_state(game_id: str, quarter: int | None = None):
         logging.exception(f"Error fetching game state for {game_id}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        # ✅ PERFORMANCE DIAGNOSTIC: Log total endpoint time
-        if 'endpoint_start' in locals():
+        # ✅ PERFORMANCE DIAGNOSTIC: Log total endpoint time (if not already logged)
+        if 'endpoint_start' in locals() and 'response_size' not in locals():
             total_time = (time.time() - endpoint_start) * 1000  # Convert to ms
             logging.warning(f"⏱️ [PERF] /api/game/{game_id} - Total endpoint time: {total_time:.2f}ms")
 
@@ -2642,6 +2656,7 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
 
 @app.get("/roster/{team_name}")
 def get_team_roster(team_name: str, tournament_id: str | None = None, response: Response = None):
+    endpoint_start = time.time()
     # ✅ FIX: Add cache-busting headers to ensure browser fetches fresh player data
     # This ensures updated player attributes (year, jersey, height, etc.) show up immediately
     if response:
@@ -2676,16 +2691,18 @@ def get_team_roster(team_name: str, tournament_id: str | None = None, response: 
         }
     ]
     
+    query_start = time.time()
     team_result = list(teams_collection.aggregate(pipeline))
+    query_time = (time.time() - query_start) * 1000
     match = team_result[0]["name"] if team_result else None
 
     if not match:
         print(f"❌ No team found matching: {normalized_name}")
         raise HTTPException(status_code=404, detail=f"No players found for team '{team_name}'")
 
+    load_start = time.time()
     team_doc, player_objects = load_roster(match)
-    ...
-
+    load_time = (time.time() - load_start) * 1000
 
     if not player_objects:
         print(f"❌ No players found for {team_name}")
@@ -2696,6 +2713,7 @@ def get_team_roster(team_name: str, tournament_id: str | None = None, response: 
 
     display_attributes = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "NG"]
 
+    process_start = time.time()
     players = []
     for p in player_objects:
         attributes = p.get("attributes", {})  # safely get nested attributes dict
@@ -2717,16 +2735,25 @@ def get_team_roster(team_name: str, tournament_id: str | None = None, response: 
             "position_ratings": p.get("position_ratings", {}),
             "attributes": attributes,  # Return full attributes object (not filtered)
         })
+    process_time = (time.time() - process_start) * 1000
 
-    return {
+    response_data = {
         "team": team.get("name", team_name),
         "team_name": team.get("name", team_name),
         "players": players
     }
+    
+    # Measure response size
+    response_size = len(json.dumps(response_data))
+    total_time = (time.time() - endpoint_start) * 1000
+    logging.warning(f"⏱️ [PERF] /roster/{team_name} - DB query: {query_time:.2f}ms, load_roster: {load_time:.2f}ms, processing: {process_time:.2f}ms, response_size: {response_size} bytes, total: {total_time:.2f}ms")
+    
+    return response_data
 
 
 @app.post("/api/init-game")
 def init_game(request: dict):
+    endpoint_start = time.time()
     # Initialize a game document with players (Emotion, Momentum) before first quarter starts
     from BackEnd.models.game_manager import GameManager
     from BackEnd.utils.game_id_utils import generate_game_id
@@ -2744,6 +2771,7 @@ def init_game(request: dict):
     
     # ✅ FIX: Load playbook_settings from tournament/franchise document before creating GameManager
     # This ensures playbook_settings are stored in the initial game document
+    settings_start = time.time()
     home_playbook_settings = {}
     away_playbook_settings = {}
     
@@ -2781,18 +2809,22 @@ def init_game(request: dict):
             home_playbook_settings = home_settings.get("playbook_settings", {})
         if away_settings:
             away_playbook_settings = away_settings.get("playbook_settings", {})
+    settings_time = (time.time() - settings_start) * 1000
     
     # Generate game_id
     game_id = generate_game_id()
     
     # Create GameManager (this initializes teams and players)
+    gm_start = time.time()
     gm = GameManager(home_team, away_team, mode=mode)
     
     # Initialize game stats (this randomizes EM, CH, MO for all players)
     _initialize_game_stats(gm, game_id=None)  # None = new game, will randomize
+    gm_time = (time.time() - gm_start) * 1000
     
     # Create minimal game document with players
     # CRITICAL: Ensure scores are zeroed before summarizing
+    summary_start = time.time()
     gm.score = {home_team: 0, away_team: 0}
     summary = summarize_game_state(gm, exclude_animations=True)
     summary["_id"] = game_id
@@ -2828,17 +2860,25 @@ def init_game(request: dict):
     
     summary["teams"][home_team_id]["playbook_settings"] = home_playbook_settings
     summary["teams"][away_team_id]["playbook_settings"] = away_playbook_settings
+    summary_time = (time.time() - summary_start) * 1000
     
     # Set GameManager quarter to 1 to match
     gm.quarter = 1
     
     # Save to database
+    db_start = time.time()
     games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
+    db_time = (time.time() - db_start) * 1000
     
     # Store in ongoing_games so /api/game/{game_id} can access it
     ongoing_games[game_id] = gm
     
-    return {"game_id": game_id}
+    response_data = {"game_id": game_id}
+    response_size = len(json.dumps(response_data))
+    total_time = (time.time() - endpoint_start) * 1000
+    logging.warning(f"⏱️ [PERF] /api/init-game - settings: {settings_time:.2f}ms, GameManager: {gm_time:.2f}ms, summary: {summary_time:.2f}ms, DB save: {db_time:.2f}ms, response_size: {response_size} bytes, total: {total_time:.2f}ms")
+    
+    return response_data
 
 
 @app.get("/games")
