@@ -157,7 +157,7 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
     Apply pre-training conditions to players and team.
     
     Pre-training conditions:
-    - Player attributes (excluding EM, MO, NG): += randint(-3, 0) for each player/attribute
+    - Player attributes (excluding EM, MO, NG): += randint(-5, -1) for each player/attribute
     - Rebound modifier: += random between -0.1 to 0 in 0.01 increments
     - Shot threshold: += random.randint(5, 20)
     - Team chemistry: N/A (no change)
@@ -176,8 +176,8 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
         for attr in TRAINABLE_PLAYER_ATTRS:
             anchor_key = f"anchor_{attr}"
             if anchor_key in attrs:
-                # Apply random decrease: randint(-3, 0) inclusive
-                decrease = random.randint(-3, 0)
+                # Apply random decrease: randint(-5, -1) inclusive
+                decrease = random.randint(-5, -1)
                 attrs[anchor_key] = max(PLAYER_ATTR_CLAMP[0], attrs[anchor_key] + decrease)
                 # Also update base attribute
                 attrs[attr] = attrs[anchor_key]
