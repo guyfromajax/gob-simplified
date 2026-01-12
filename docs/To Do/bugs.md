@@ -8,6 +8,7 @@
 6. Since going to production, the computer is calling timeouts for the user team
 7. Elminate "Simulating Q5..."
 8. Tournament Mode -- Non user game team and player stats are not populating on the Stats tab, and no team's player stats are populating on the team roster pages.
+9. Pre-game buttons missing after "Play Quarter" - After playing a quarter with "Play Quarter" button, the next quarter break does not show the pre-game buttons ("Play Quarter", "Sim Quarter", "Sim Rest of Game"). The game auto-starts instead. This only happens after using "Play Quarter" - if you use "Sim Quarter", the pre-game buttons appear correctly at the next quarter break. **Root Cause**: The `resume_from_timeout` URL parameter is being set to `true` when it should be `false` for quarter breaks. Multiple attempts to fix this have been made (ensuring `gameScene.js` sets it to `false`, updating `set-lineup.js` to force `false` for quarter breaks, updating `bootGame.js` DB fallback logic), but the parameter still shows as `true` when `court.html` loads. **Investigation Needed**: Need to trace the full navigation chain to identify where `resume_from_timeout` is being set to `true` - check URL when `set-lineup.html` loads, check debug logs from `set-lineup.js` when building params, check if any code is reading from localStorage or database and overriding the URL param.
 
 ## Fixed Bugs (January 2025)
 

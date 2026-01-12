@@ -1060,6 +1060,8 @@ def get_game_state(game_id: str, quarter: int | None = None):
 
 @app.post("/api/simulate-quarter")
 def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = False):
+    import time
+    start_time = time.time()
     game_id = request.game_id
     # ✅ PERFORMANCE: Removed debug logging - only log errors and critical events
     if debug:
@@ -2054,6 +2056,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         turn_by_turn_mode = not request.full_sim
         logging.info(f"🎮 simulate_quarter_endpoint: full_sim={request.full_sim}, turn_by_turn_mode={turn_by_turn_mode}, quarter={request.quarter}, resume_from_timeout={request.resume_from_timeout}")
         
+        # ⏱️ PERFORMANCE: Time the quarter simulation
+        sim_start = time.time()
         simulate_quarter(
             gm,
             request.home_lineup,
@@ -2064,6 +2068,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             turn_by_turn_mode=turn_by_turn_mode,
             resume_from_timeout=request.resume_from_timeout,
         )
+        sim_time = (time.time() - sim_start) * 1000
         
         # 🔍 DEBUG: Log time_remaining after simulate_quarter() returns
         time_after_sim = gm.game_state.get("time_remaining", "NOT_SET")
@@ -2099,6 +2104,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
     # Create TWO summaries:
     # 1. WITH animations for frontend (exclude_animations=False)
     # 2. WITHOUT animations for database save (exclude_animations=True)
+    summary_start = time.time()
     frontend_summary = summarize_game_state(gm, exclude_animations=False)
     
     # Add start_box_score (only needed for Q2-Q4 frontend, not critical for saves)
@@ -2106,8 +2112,10 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
     
     # Get is_final status
     is_final = frontend_summary.get("is_final", False)
+    summary_time = (time.time() - summary_start) * 1000
 
     # Save to database (WITHOUT animations to reduce document size)
+    db_save_start = time.time()
     try:
         db_summary = summarize_game_state(gm, exclude_animations=True)
         # ✅ FIX: Log quarter before save to debug save/load issues
@@ -2168,9 +2176,11 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 logging.info(f"🎯 [SAVE] Q4/FINAL VERIFIED: Saved document has quarter={saved_quarter}, is_final={saved_is_final}")
         else:
             logging.error(f"❌ [SAVE] Failed to verify saved document: game_id={game_id} (ObjectId: {game_id_oid})")
+        db_save_time = (time.time() - db_save_start) * 1000
     except Exception as e:
         print("🚨 Mongo upsert failed:", e)
         traceback.print_exc()
+        db_save_time = (time.time() - db_save_start) * 1000
 
     if is_final and game_id:
         # Scrimmage simulations should not generate aggregate stats.
@@ -2228,11 +2238,24 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         len(turns),
         turns[0] if turns else None,
     )
+    
+    # ⏱️ PERFORMANCE: Log total endpoint time
+    total_time = (time.time() - start_time) * 1000
+    response_size = len(str(frontend_summary).encode('utf-8'))
+    logging.warning(
+        f"⏱️ [PERF] /api/simulate-quarter - quarter={request.quarter}, "
+        f"simulation: {sim_time:.2f}ms, summary: {summary_time:.2f}ms, "
+        f"db_save: {db_save_time:.2f}ms, response_size: {response_size} bytes, "
+        f"total: {total_time:.2f}ms, full_sim={request.full_sim}"
+    )
+    
     return frontend_summary
 
 
 @app.post("/api/simulate-turn")
 def simulate_turn_endpoint(request: TurnSimulationRequest):
+    import time
+    start_time = time.time()
     # Simulate a single turn for turn-by-turn gameplay.
     # This endpoint:
     # 1. Retrieves the GameManager from ongoing_games
@@ -2264,7 +2287,7 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
     
     # Check if quarter is already over
     if gm.game_state["time_remaining"] <= 0:
-        return {
+        early_return = {
             "quarter_complete": True,
             "game_id": game_id,
             "quarter": gm.quarter,
@@ -2273,6 +2296,13 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             "away_score": gm.score.get(gm.away_team.name, 0),
             "turn": None
         }
+        # ⏱️ PERFORMANCE: Log early return path
+        total_time = (time.time() - start_time) * 1000
+        logging.warning(
+            f"⏱️ [PERF] /api/simulate-turn - EARLY RETURN (quarter complete), "
+            f"quarter={gm.quarter}, total: {total_time:.2f}ms"
+        )
+        return early_return
     
     # ✅ TIMEOUT: Check if last turn is a TIMEOUT turn (user-initiated or foul out)
     # If so, return it immediately without simulating a new turn
@@ -2346,7 +2376,7 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
                 
                 # Remove the TIMEOUT turn from turns so next API call can simulate the actual next turn
                 timeout_turn = gm.turns.pop()
-                return {
+                timeout_response = {
                     "turn": timeout_turn,
                     "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
                     "time_remaining": gm.game_state["time_remaining"],
@@ -2370,13 +2400,24 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
                         gm.away_team.name: gm.away_team.get_team_game_stats()
                     }
                 }
+                # ⏱️ PERFORMANCE: Log timeout return path
+                total_time = (time.time() - start_time) * 1000
+                response_size = len(str(timeout_response).encode('utf-8'))
+                logging.warning(
+                    f"⏱️ [PERF] /api/simulate-turn - TIMEOUT PATH, quarter={gm.quarter}, "
+                    f"response_size: {response_size} bytes, total: {total_time:.2f}ms"
+                )
+                return timeout_response
         
         # Track how many turns existed before this call (after deferred timeout check)
         turns_before = len(gm.turns)
         time_before_turn = gm.game_state["time_remaining"]
         
+        # ⏱️ PERFORMANCE: Time the turn simulation
+        turn_sim_start = time.time()
         # Simulate the next turn (unless we already returned a timeout above)
         gm.simulate_macro_turn()
+        turn_sim_time = (time.time() - turn_sim_start) * 1000
         
         time_after_turn = gm.game_state["time_remaining"]
         
@@ -2451,13 +2492,17 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
         # ✅ PERFORMANCE: Save game state every 25 turns (reduced from 10 for better performance)
         # Still save on quarter complete to ensure quarter number is persisted
         # 25 turns is still sufficient for crash recovery (saves ~13 times per game vs 32)
+        db_save_time = 0
         if len(gm.turns) % 25 == 0 or quarter_complete:
+            db_save_start = time.time()
             try:
                 db_summary = summarize_game_state(gm, exclude_animations=True)
                 games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
                 logging.info(f"💾 Saved game state at turn {len(gm.turns)}, quarter={gm.quarter}")
             except Exception as e:
                 logging.error(f"Failed to save game state: {e}")
+            finally:
+                db_save_time = (time.time() - db_save_start) * 1000
         
         # Return turn data + metadata
         response_data = {
@@ -2489,6 +2534,17 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
         # Debug log for unexpected quarter complete
         if quarter_complete and gm.game_state["time_remaining"] != 0:
             logging.warning(f"⚠️ Quarter complete but time_remaining != 0: {gm.game_state['time_remaining']}")
+        
+        # ⏱️ PERFORMANCE: Log total endpoint time
+        total_time = (time.time() - start_time) * 1000
+        response_size = len(str(response_data).encode('utf-8'))
+        turn_number = len(gm.turns)
+        logging.warning(
+            f"⏱️ [PERF] /api/simulate-turn - turn={turn_number}, quarter={gm.quarter}, "
+            f"simulation: {turn_sim_time:.2f}ms, db_save: {db_save_time:.2f}ms, "
+            f"response_size: {response_size} bytes, total: {total_time:.2f}ms, "
+            f"quarter_complete={quarter_complete}"
+        )
         
         return response_data
         
