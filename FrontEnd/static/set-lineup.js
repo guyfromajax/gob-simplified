@@ -217,6 +217,19 @@ async function loadRoster() {
           })));
         
         // Merge game data into roster (same approach as box-score.js)
+        // ✅ PERFORMANCE FIX: Build lookup maps once (O(n)) instead of nested find() loops (O(n²))
+        const rosterById = new Map();
+        const rosterByName = new Map();
+        roster.forEach(p => {
+          const playerId = p._id || p.playerId || p.player_id;
+          if (playerId) {
+            rosterById.set(String(playerId), p);
+          }
+          if (p.name) {
+            rosterByName.set(p.name, p);
+          }
+        });
+        
         let updatedCount = 0;
         gamePlayers.forEach(gp => {
           const playerId = gp._id || gp.playerId || gp.player_id;
@@ -225,15 +238,12 @@ async function loadRoster() {
             return;
           }
           
-          // Try to find by ID first, then by name (same as box-score.js)
-          let rosterPlayer = roster.find(p => {
-            const rosterId = p._id || p.playerId || p.player_id;
-            return String(rosterId) === String(playerId);
-          });
+          // ✅ PERFORMANCE FIX: O(1) lookup instead of O(n) find()
+          let rosterPlayer = rosterById.get(String(playerId));
           
           // Fallback to name matching if ID doesn't match
           if (!rosterPlayer && gp.name) {
-            rosterPlayer = roster.find(p => p.name === gp.name);
+            rosterPlayer = rosterByName.get(gp.name);
             if (rosterPlayer) {
               console.log(`[Lineup] Matched ${gp.name} by name (ID mismatch: game=${playerId}, roster=${rosterPlayer._id || rosterPlayer.playerId || rosterPlayer.player_id})`);
             }
@@ -272,14 +282,6 @@ async function loadRoster() {
         
         console.log(`Successfully updated ${updatedCount} players with game data`);
         
-        // Update playerMap (same objects, just ensure references are current)
-        roster.forEach(p => {
-          const playerId = p._id || p.playerId || p.player_id;
-          if (playerId) {
-            playerMap[playerId] = p;
-          }
-        });
-        
         // Refresh slot displays to show updated stats
         updateAllSlotDisplays();
       } else {
@@ -292,15 +294,22 @@ async function loadRoster() {
     console.log("No gameId found, skipping energy load (players will show default 100%)");
   }
   
+  // ✅ PERFORMANCE FIX: Sort first, then build playerMap once (removed duplicate building)
   roster.sort((a, b) => {
     const diff = getRT(b) - getRT(a);
     return diff !== 0 ? diff : a._idx - b._idx;
   });
   console.log("Sorted lineup by RT descending");
+  
+  // ✅ PERFORMANCE FIX: Build playerMap once after sorting (removed duplicate forEach)
   roster.forEach(p => {
     delete p._idx;
-    playerMap[p._id] = p;
+    const playerId = p._id || p.playerId || p.player_id;
+    if (playerId) {
+      playerMap[playerId] = p;
+    }
   });
+  
   renderRoster();
 }
 
@@ -326,6 +335,9 @@ function renderRoster() {
   if (currentSortColumn === 'RT' && currentSortDirection === 'desc') {
     rosterDataForSorting.sort((a, b) => (b.highestRT ?? -Infinity) - (a.highestRT ?? -Infinity));
   }
+  
+  // ✅ PERFORMANCE FIX: Use DocumentFragment to batch DOM updates (single reflow)
+  const fragment = document.createDocumentFragment();
   
   rosterDataForSorting.forEach(p => {
     const tr = document.createElement('tr');
@@ -422,8 +434,12 @@ function renderRoster() {
       
       tr.appendChild(td);
     });
-    tbody.appendChild(tr);
+    // ✅ PERFORMANCE FIX: Append to fragment instead of tbody (batched update)
+    fragment.appendChild(tr);
   });
+  
+  // ✅ PERFORMANCE FIX: Single DOM update (triggers one reflow instead of N)
+  tbody.appendChild(fragment);
   
   // Add click handlers to sortable headers
   const sortableHeaders = document.querySelectorAll('.roster-table thead th');
