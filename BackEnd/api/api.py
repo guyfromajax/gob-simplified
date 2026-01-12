@@ -2885,7 +2885,7 @@ def get_player(player_id: str):
 
 @app.get("/teams/{team_id}/players")
 def get_team_players(team_id: str):
-    """Return roster data for a given team."""
+    # Return roster data for a given team.
     team_doc, players = load_roster(team_id)
     if not players:
         raise HTTPException(status_code=404, detail=f"No players found for team '{team_id}'")
