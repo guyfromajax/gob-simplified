@@ -923,7 +923,16 @@ async function initGame() {
   
   // ✅ FIX: Show pre-game buttons at start of each quarter (not just Q1)
   // Only hide buttons when resuming from timeout (not quarter breaks)
-  let resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+  const urlResumeFromTimeoutParam = urlParams.get('resume_from_timeout');
+  let resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
+  
+  console.log('🔍 [DEBUG QTR BREAK] bootGame.js initGame() - Reading resume_from_timeout:', {
+    urlParam: urlResumeFromTimeoutParam,
+    parsedValue: resumeFromTimeout,
+    quarter: quarter,
+    gameId: gameId,
+    allUrlParams: Object.fromEntries(urlParams.entries())
+  });
   
   // ✅ RESILIENCE: Check database for timeout state as fallback (if URL param missing but gameId exists)
   // This makes the system robust - even if URL param is lost, we can still detect timeout resume
@@ -932,13 +941,16 @@ async function initGame() {
     if (!resumeFromTimeout && gameId && (quarter === 0 || quarter === 1)) {
     // Lightweight check: If URL param missing but we have gameId in Q1, check DB for timeout state
     // This is a fallback - URL param is still primary source for navigation
+    console.log('🔍 [DEBUG QTR BREAK] bootGame.js - Checking DB fallback (Q1/pre-game only)');
     try {
       const response = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}?quarter=${quarter}`));
       if (response.ok) {
         const gameData = await response.json();
         if (gameData.timeout_next_play_type) {
-          // ✅ REMOVED: Timeout resume logging (cluttering console)
+          console.log('🔍 [DEBUG QTR BREAK] bootGame.js - DB check found timeout state, setting resumeFromTimeout=true');
           resumeFromTimeout = true;
+        } else {
+          console.log('🔍 [DEBUG QTR BREAK] bootGame.js - DB check found no timeout state');
         }
       }
     } catch (error) {
@@ -947,6 +959,12 @@ async function initGame() {
     }
   }
   
+  console.log('🔍 [DEBUG QTR BREAK] bootGame.js initGame() - Final decision:', {
+    resumeFromTimeout: resumeFromTimeout,
+    willHideButtons: resumeFromTimeout,
+    quarter: quarter
+  });
+  
   // ✅ FIX: Only hide pre-game buttons when resuming from timeout
   // Show pre-game buttons at start of each quarter (Q1-Q4, OT)
   if (resumeFromTimeout) {
@@ -954,6 +972,16 @@ async function initGame() {
     if (preGameContainer) {
       console.log(`🎮 Hiding pre-game container (timeout resume)`);
       preGameContainer.classList.add('hidden');
+    } else {
+      console.log('🔍 [DEBUG QTR BREAK] bootGame.js - resumeFromTimeout=true but pre-game container not found');
+    }
+  } else {
+    console.log('🔍 [DEBUG QTR BREAK] bootGame.js - resumeFromTimeout=false, pre-game buttons should be visible');
+    const preGameContainer = document.querySelector('.pre-game-container');
+    if (preGameContainer) {
+      console.log('🔍 [DEBUG QTR BREAK] bootGame.js - Pre-game container found, should be visible');
+    } else {
+      console.log('🔍 [DEBUG QTR BREAK] bootGame.js - Pre-game container NOT found in DOM!');
     }
   }
   
