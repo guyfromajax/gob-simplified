@@ -17,6 +17,7 @@ from BackEnd.db import (
     teams_collection,
     games_collection,
     tournaments_collection,
+    franchises_collection,
 )
 from BackEnd.utils.roster_loader import load_roster
 from BackEnd.utils.game_summary_builder import build_game_summary
@@ -2655,7 +2656,7 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
 
 
 @app.get("/roster/{team_name}")
-def get_team_roster(team_name: str, tournament_id: str | None = None, response: Response = None):
+def get_team_roster(team_name: str, tournament_id: str | None = None, franchise_id: str | None = None, response: Response = None):
     endpoint_start = time.time()
     # ✅ FIX: Add cache-busting headers to ensure browser fetches fresh player data
     # This ensures updated player attributes (year, jersey, height, etc.) show up immediately
@@ -2664,9 +2665,8 @@ def get_team_roster(team_name: str, tournament_id: str | None = None, response: 
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
     
-    # print(f"🔍 Endpoint hit: GET /roster/{team_name}")
-    if tournament_id:
-        print(f"🔍 Tournament ID provided but ignored: {tournament_id}")
+    # ✅ UNIFIED: Support both tournament_id and franchise_id for mode-specific attributes
+    # Tournament ID is currently ignored (future enhancement), franchise_id merges attributes
 
     # ✅ PERFORMANCE: Use MongoDB query for case-insensitive team lookup instead of loading all teams
     # This reduces data transfer from loading 8-16 teams to just 1 query
@@ -2710,21 +2710,48 @@ def get_team_roster(team_name: str, tournament_id: str | None = None, response: 
 
     team = team_doc or {"name": team_name}
 
+    # ✅ UNIFIED: Load franchise-specific attributes if franchise_id is provided
+    franchise_players = {}
+    if franchise_id:
+        try:
+            fid = ObjectId(franchise_id)
+            franchise_doc = franchises_collection.find_one({"_id": fid}, {"players": 1, "_id": 1})
+            if franchise_doc:
+                franchise_players = franchise_doc.get("players", {})
+        except Exception as e:
+            logging.warning(f"⚠️ Error loading franchise document {franchise_id}: {e}")
 
     display_attributes = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "NG"]
 
     process_start = time.time()
     players = []
     for p in player_objects:
-        attributes = p.get("attributes", {})  # safely get nested attributes dict
+        player_id_str = str(p.get("_id"))
+        core_attributes = p.get("attributes", {})  # safely get nested attributes dict
+        
+        # ✅ UNIFIED: Merge franchise-specific attributes if available
+        merged_attributes = core_attributes.copy()
+        if franchise_id and player_id_str in franchise_players:
+            franchise_player_data = franchise_players[player_id_str]
+            franchise_attrs = franchise_player_data.get("attributes", {})
+            # Franchise attributes override core attributes
+            merged_attributes.update(franchise_attrs)
         
         # Create anchor_ prefixed attributes (like Player class does)
         for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
-            if attr_key in attributes:
-                attributes[f"anchor_{attr_key}"] = attributes[attr_key]
+            if attr_key in merged_attributes:
+                merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
+        
+        # ✅ UNIFIED: Use franchise position_ratings if available, otherwise use core
+        position_ratings = p.get("position_ratings", {})
+        if franchise_id and player_id_str in franchise_players:
+            franchise_player_data = franchise_players[player_id_str]
+            franchise_position_ratings = franchise_player_data.get("position_ratings", {})
+            if franchise_position_ratings:
+                position_ratings = franchise_position_ratings
         
         players.append({
-            "_id": str(p.get("_id")),
+            "_id": player_id_str,
             "first_name": p.get("first_name", ""),
             "last_name": p.get("last_name", ""),
             "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
@@ -2732,8 +2759,8 @@ def get_team_roster(team_name: str, tournament_id: str | None = None, response: 
             "height": p.get("height"),
             "weight": p.get("weight"),
             "jersey": p.get("jersey", 0),
-            "position_ratings": p.get("position_ratings", {}),
-            "attributes": attributes,  # Return full attributes object (not filtered)
+            "position_ratings": position_ratings,
+            "attributes": merged_attributes,  # Return merged attributes (franchise overrides core)
         })
     process_time = (time.time() - process_start) * 1000
 

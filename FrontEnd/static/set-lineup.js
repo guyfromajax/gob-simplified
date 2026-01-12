@@ -103,15 +103,20 @@ function showToast(msg) {
 async function loadRoster() {
   if (!teamName) return;
   
-  // Use franchise-specific roster endpoint if in franchise mode
-  let url;
-  if (franchiseId) {
-    url = API_CONFIG.buildUrl(`/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(teamName)}`);
-    console.log("Loading franchise-specific roster for lineup");
-  } else {
-    url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(teamName)}`);
-    console.log("Loading standard roster for lineup");
+  // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint for all modes
+  // Supports tournament_id and franchise_id query parameters
+  let url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(teamName)}`);
+  const params = new URLSearchParams();
+  if (tournamentId) {
+    params.append('tournament_id', tournamentId);
   }
+  if (franchiseId) {
+    params.append('franchise_id', franchiseId);
+  }
+  if (params.toString()) {
+    url += `?${params.toString()}`;
+  }
+  console.log("Loading roster for lineup", franchiseId ? "(franchise mode)" : tournamentId ? "(tournament mode)" : "(single game mode)");
   
   const res = await fetch(url);
   if (!res.ok) return;

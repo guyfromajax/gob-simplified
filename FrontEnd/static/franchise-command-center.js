@@ -760,9 +760,10 @@ async function init() {
     }
     try {
       const rosterStartTime = performance.now();
-      const rosterData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/roster')}?franchise_id=${franchiseId}&team_name=${encodeURIComponent(topData.team)}`);
+      // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint
+      const rosterData = await fetchJSON(`${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(topData.team)}`)}?franchise_id=${franchiseId}`);
       const rosterEndTime = performance.now();
-      console.log(`⏱️ [PERF] /franchise/roster: ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
+      console.log(`⏱️ [PERF] /roster/${topData.team} (franchise): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
       
       // Load player stats separately from franchise document
       const stateStartTime = performance.now();
@@ -1168,9 +1169,10 @@ async function loadTeamData() {
     let players = [];
     try {
       const rosterStartTime = performance.now();
-      const rosterResponse = await fetch(`${API_CONFIG.buildUrl('/franchise/roster')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(data.team_name || '')}`);
+      // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint
+      const rosterResponse = await fetch(`${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(data.team_name || '')}`)}?franchise_id=${encodeURIComponent(franchiseId)}`);
       const rosterEndTime = performance.now();
-      console.log(`⏱️ [PERF] loadTeamData() /franchise/roster (2nd call): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
+      console.log(`⏱️ [PERF] loadTeamData() /roster/${data.team_name || ''} (franchise): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
       if (rosterResponse.ok) {
         const rosterData = await rosterResponse.json();
         players = rosterData.players || [];
