@@ -755,6 +755,8 @@ def get_game_state(game_id: str, quarter: int | None = None):
         # Check ongoing games first
         gm = ongoing_games.get(game_id)
         if gm:
+            # ✅ PERFORMANCE DIAGNOSTIC: Log in-memory path
+            logging.warning(f"⏱️ [PERF] /api/game/{game_id} - Using in-memory game (no DB query)")
             # Get players with current energy levels, stats, and attributes
             # Include ALL players (not just lineup) so roster merge works correctly
             players = []
