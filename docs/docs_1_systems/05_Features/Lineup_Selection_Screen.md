@@ -34,7 +34,7 @@ The Lineup Selection Screen allows users to set their starting lineup before eac
 ### Data Sources
 
 **Backend:**
-- **Roster API**: Mode-specific endpoints (`/roster/{team_name}`, `/franchise/roster`, `/tournament/roster`)
+- **Roster API**: ✅ UNIFIED endpoint `/roster/{team_name}` with query parameters (`?franchise_id={id}` or `?tournament_id={id}`) for all modes
 - **Game API** (`/api/game/{gameId}`): Returns player stats, attributes (EM, MO, CH, NG), ineligible players
 
 **Frontend:**

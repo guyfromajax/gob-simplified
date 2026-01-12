@@ -302,7 +302,7 @@ if not use_playbooks or playbook_training_mode == "all-plays-even":
 **API Endpoints for Stats:**
 
 - `GET /franchise/state` - Returns full franchise document including `players` object
-- `GET /franchise/roster` - Returns roster with player attributes (stats loaded separately from `players`)
+- `GET /roster/{team_name}?franchise_id={id}` - ✅ UNIFIED: Returns roster with player attributes (franchise-specific attributes merged, stats loaded separately from `players`)
 - `GET /franchise/leaders` - Reads from `players.{pid}.{scope}` to get category leaders
 - `GET /franchise/team-stats` - Aggregates from `players` object, filters by `meta.team_id`
 - `GET /api/game/{game_id}` - Returns game state including `box_score`
@@ -1297,7 +1297,7 @@ These variables provide additional context for navigation but aren't required fo
 **API Endpoints for Stats:**
 
 - `GET /api/tournament/state` - Returns full tournament document including `players` object
-- `GET /api/tournament/roster` - Returns roster with player attributes (stats loaded separately from `players`)
+- `GET /roster/{team_name}?tournament_id={id}` - ✅ UNIFIED: Returns roster with player attributes (tournament-specific attributes merged, stats loaded separately from `players`)
 - `GET /api/tournament/team-stats` - Aggregates from `players` object, filters by `meta.team_id`
 - `GET /api/game/{game_id}` - Returns game state including `box_score`
   - **Box Score Handling:** Builds `box_score` from nested `home_team["box_score"]` and `away_team["box_score"]` if not found at top level

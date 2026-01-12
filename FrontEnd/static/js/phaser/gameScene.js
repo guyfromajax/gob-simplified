@@ -2314,6 +2314,9 @@ export function createGameScene(Phaser) {
         params.set('game_id', this.gameId);
         params.set('quarter', nextQ);
         params.set('period', `Q${nextQ}`);
+        // ✅ FIX: Explicitly set resume_from_timeout=false for quarter breaks
+        // This ensures pre-game buttons (Play Quarter, Sim Quarter, Sim Rest of Game) appear on court.html
+        params.set('resume_from_timeout', 'false');
         if (this.gameId && typeof localStorage !== 'undefined') {
           localStorage.setItem('game_id', this.gameId);
         }
