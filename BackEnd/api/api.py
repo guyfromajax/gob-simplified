@@ -2915,7 +2915,7 @@ def get_team_players(team_id: str):
 
 @app.get("/team-roster/{team}", response_class=HTMLResponse)
 def team_roster_page(request: Request, team: str):
-    """Render an HTML roster page for a given team."""
+    # Render an HTML roster page for a given team.
     players_cursor = players_collection.find({"team": team})
     players = []
     order = ["PG", "SG", "SF", "PF", "C"]
