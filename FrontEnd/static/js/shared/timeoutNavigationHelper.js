@@ -93,13 +93,14 @@
     // ============================================
     // 4. RESUME FROM TIMEOUT/FOUL OUT (SS&S Rules)
     // ============================================
-    // Rule: Set resume_from_timeout if:
-    //   - resumeFromTimeout is true (any quarter - backend supports this)
-    //   - AND gameId exists (not a new game)
-    //   - NOT for quarter breaks (Q2-Q4 without timeout)
-    //   - NOT for new game start
-    if (resumeFromTimeout && gameId) {
-      params.set('resume_from_timeout', 'true');
+    // Rule: Set resume_from_timeout explicitly:
+    //   - If resumeFromTimeout is true AND gameId exists → set 'true' (timeout/foul out resume)
+    //   - If resumeFromTimeout is false AND gameId exists → set 'false' (quarter break, not timeout)
+    //   - If gameId doesn't exist → don't set (new game start)
+    // ✅ FIX: Explicitly set 'false' for quarter breaks to ensure param is present in URL
+    // This ensures bootGame.js initGame() can correctly detect quarter breaks vs timeout resumes
+    if (gameId) {
+      params.set('resume_from_timeout', resumeFromTimeout ? 'true' : 'false');
     }
     
     // ============================================
