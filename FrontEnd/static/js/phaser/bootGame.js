@@ -425,6 +425,53 @@ async function handleButtonClick(animate) {
   }
 }
 
+/**
+ * ✅ SS&S: Shared function to handle game completion (finalize and show popup)
+ * Used by both handleSimQuarter and handleSimFullGame to avoid code duplication
+ */
+async function handleGameCompletion({ gameId, lastSummary, tournamentId, franchiseId, teamId, homeTeam, awayTeam }) {
+  console.log('✅ Game complete - finalizing game');
+  
+  // Fetch final game data to ensure box_score is complete
+  let finalGameData = lastSummary;
+  if (gameId) {
+    try {
+      console.log('📥 Fetching final game data from API to ensure box_score is complete...');
+      const gameResponse = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`));
+      if (gameResponse.ok) {
+        finalGameData = await gameResponse.json();
+        console.log('✅ Fetched final game data:', {
+          hasBoxScore: !!finalGameData.box_score,
+          boxScoreKeys: finalGameData.box_score ? Object.keys(finalGameData.box_score) : [],
+          hasPlayers: !!finalGameData.players,
+          playerCount: finalGameData.players ? finalGameData.players.length : 0
+        });
+      } else {
+        console.warn('⚠️ Failed to fetch final game data, using lastSummary:', gameResponse.status);
+      }
+    } catch (err) {
+      console.error('❌ Error fetching final game data, using lastSummary:', err);
+    }
+  }
+
+  // Finalize the game and show completion popup
+  const finalScore = await finalizeGame({ simData: finalGameData, tournamentId, franchiseId });
+  console.log('🏆 Final score object:', finalScore);
+  
+  const { showGameCompletionPopup } = await import('./utils/gameCompletionPopup.js');
+  const popupMode = tournamentId ? 'tournament' : (franchiseId ? 'franchise' : 'single');
+  showGameCompletionPopup({
+    gameId: gameId,
+    mode: popupMode,
+    tournamentId: tournamentId,
+    franchiseId: franchiseId,
+    teamId: teamId, // ✅ SS&S: Include team_id (ObjectId) for navigation anchor preservation
+    finalScore: finalScore,
+    homeTeam: homeTeam,
+    awayTeam: awayTeam
+  });
+}
+
 async function handleSimQuarter() {
   // ✅ FIX: Calculate next quarter (handle pre-game screen where quarter = 0)
   // On pre-game screen (quarter = 0), nextQuarter = 0 + 1 = 1 (correct)
@@ -576,12 +623,24 @@ async function handleSimQuarter() {
     // Check if game is complete (Q4+ and not tied)
     const isGameComplete = lastSummary.is_final === true;
     if (isGameComplete) {
-      // Game is complete - redirect to finalization (should not happen from pre-game screen, but handle it)
-      console.log('✅ Game complete after simulation - redirecting to finalization');
-      // This should be handled by gameScene.js, but for safety, redirect to box score or completion
-      // Actually, if game is complete, we shouldn't be showing this button
-      // So this is a safety check
-      throw new Error('Game is complete - simulation should not be possible');
+      // ✅ FIX: Game is complete - use shared completion handler
+      // When Q4 completes via Sim Quarter, finalize the game and show completion popup
+      await handleGameCompletion({
+        gameId,
+        lastSummary,
+        tournamentId,
+        franchiseId,
+        teamId,
+        homeTeam,
+        awayTeam
+      });
+      
+      // Reset simulation flag and return (don't navigate to lineup screen)
+      isSimulating = false;
+      if (playBtn) playBtn.disabled = false;
+      if (simFullBtn) simFullBtn.disabled = false;
+      if (simQuarterBtn) simQuarterBtn.disabled = false;
+      return; // Exit - game is complete, popup handles navigation
     }
     
     // ✅ FIX: Calculate next quarter after simulation
@@ -812,45 +871,15 @@ async function handleSimFullGame() {
       isFinal: lastSummary.is_final
     });
 
-    // ✅ FIX: Fetch the complete game data from API to ensure box_score is fully populated
-    // This matches what happens when "Sim To 4th Quarter" → play Q4 normally
-    let finalGameData = lastSummary;
-    if (gameId) {
-      try {
-        console.log('📥 Fetching final game data from API to ensure box_score is complete...');
-        const gameResponse = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`));
-        if (gameResponse.ok) {
-          finalGameData = await gameResponse.json();
-          console.log('✅ Fetched final game data:', {
-            hasBoxScore: !!finalGameData.box_score,
-            boxScoreKeys: finalGameData.box_score ? Object.keys(finalGameData.box_score) : [],
-            hasPlayers: !!finalGameData.players,
-            playerCount: finalGameData.players ? finalGameData.players.length : 0
-          });
-        } else {
-          console.warn('⚠️ Failed to fetch final game data, using lastSummary:', gameResponse.status);
-        }
-      } catch (err) {
-        console.error('❌ Error fetching final game data, using lastSummary:', err);
-      }
-    }
-
-    const finalScore = await finalizeGame({ simData: finalGameData, tournamentId, franchiseId });
-    console.log('🏆 Final score object:', finalScore);
-    
-    // ✅ REPLICATE gameScene.js approach: Pass gameId directly to showGameCompletionPopup
-    // This matches exactly what gameScene.js does (line 1916: gameId: gameId)
-    const { showGameCompletionPopup } = await import('./utils/gameCompletionPopup.js');
-    const popupMode = tournamentId ? 'tournament' : (franchiseId ? 'franchise' : 'single');
-    showGameCompletionPopup({
-      gameId: gameId, // Use module-level gameId directly, just like gameScene.js
-      mode: popupMode,
-      tournamentId: tournamentId,
-      franchiseId: franchiseId,
-      teamId: teamId, // ✅ SS&S: Include team_id (ObjectId) for navigation anchor preservation
-      finalScore: finalScore,
-      homeTeam: homeTeam,
-      awayTeam: awayTeam
+    // ✅ SS&S: Use shared game completion handler (same as handleSimQuarter)
+    await handleGameCompletion({
+      gameId,
+      lastSummary,
+      tournamentId,
+      franchiseId,
+      teamId,
+      homeTeam,
+      awayTeam
     });
     
     // ❌ COMMENTED OUT: No longer needed since we call showGameCompletionPopup directly
