@@ -1072,12 +1072,13 @@ async function init() {
       const currentGameId = helper.getGameId(urlParams);
       let resumeFromTimeout = helper.getResumeFromTimeout(urlParams);
       
-      // ✅ CRITICAL FIX: For quarter breaks (quarter > 1), explicitly ensure resumeFromTimeout is false
-      // This prevents quarter breaks from being treated as timeout resumes
-      // Rule: If quarter > 1 and URL param is missing or false, it's a quarter break (not timeout)
-      if (quarter > 1 && urlParams.get('resume_from_timeout') !== 'true') {
+      // ✅ CRITICAL FIX: For quarter breaks (quarter > 1), ALWAYS force resumeFromTimeout to false
+      // This matches the Sim Quarter pattern - quarter breaks are never timeout resumes
+      // Rule: Quarter breaks (quarter > 1) are always new quarter starts, not timeout resumes
+      // Fix: Always override URL param for quarter breaks, regardless of what it says
+      if (quarter > 1) {
         resumeFromTimeout = false;
-        console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Quarter break detected (Q' + quarter + '), forcing resumeFromTimeout=false');
+        console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Quarter break detected (Q' + quarter + '), forcing resumeFromTimeout=false (ignoring URL param)');
       }
       
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Before building params:', {
