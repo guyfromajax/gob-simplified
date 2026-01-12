@@ -1220,6 +1220,9 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
         
+        # ✅ PERFORMANCE DIAGNOSTIC: Measure database query time
+        query_start = time.time()
+        
         # ✅ PERFORMANCE: Load document with projection (only needed fields) to reduce data transfer
         # For single game mode, try both UUID string and ObjectId formats
         if mode == "single":
@@ -1238,6 +1241,24 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                     )
                 except:
                     pass
+        else:
+            # ✅ PERFORMANCE: Use projection for franchise/tournament modes
+            if mode == "franchise":
+                doc = collection.find_one(
+                    {"_id": ObjectId(doc_id)},
+                    {"franchise_teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+                )
+            elif mode == "tournament":
+                doc = collection.find_one(
+                    {"_id": ObjectId(doc_id)},
+                    {"teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+                )
+            else:
+                doc = collection.find_one({"_id": ObjectId(doc_id)})
+        
+        query_time = (time.time() - query_start) * 1000  # Convert to ms
+        doc_size = len(str(doc)) if doc else 0
+        logger.warning(f"⏱️ [PERF] /api/playbooks - DB query: {query_time:.2f}ms, doc_size: {doc_size} bytes, mode: {mode}")
         else:
             # ✅ PERFORMANCE: Use projection for franchise/tournament modes
             if mode == "franchise":
