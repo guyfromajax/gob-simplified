@@ -2310,20 +2310,53 @@ export function createGameScene(Phaser) {
         // Regular quarter complete (Q1-Q3) - show locker room popup
         console.log('✅ Quarter complete - showing locker room popup');
         const nextQ = this.quarter + 1;
-        const params = new URLSearchParams(window.location.search);
-        params.set('game_id', this.gameId);
-        params.set('quarter', nextQ);
-        params.set('period', `Q${nextQ}`);
-        // ✅ FIX: Explicitly set resume_from_timeout=false for quarter breaks
-        // This ensures pre-game buttons (Play Quarter, Sim Quarter, Sim Rest of Game) appear on court.html
-        params.set('resume_from_timeout', 'false');
-        console.log('🔍 [DEBUG QTR BREAK] gameScene.js - Setting params for quarter break:', {
+        
+        // ✅ FIX: Use TimeoutNavigationHelper (same as Sim Quarter) to ensure resume_from_timeout=false
+        // This matches the working Sim Quarter pattern exactly
+        const helper = window.TimeoutNavigationHelper;
+        if (!helper) {
+          console.error('❌ [GAMESCENE] TimeoutNavigationHelper not loaded!');
+          // Fallback to manual params if helper not available
+          const params = new URLSearchParams(window.location.search);
+          params.set('game_id', this.gameId);
+          params.set('quarter', nextQ);
+          params.set('period', `Q${nextQ}`);
+          params.set('resume_from_timeout', 'false');
+          const finalUrl = `/set-lineup.html?${params.toString()}`;
+          window.location.href = finalUrl;
+          return;
+        }
+        
+        // Get teams from gameStore (same as Sim Quarter pattern)
+        const teams = gameStore.getTeams();
+        const sourceParams = new URLSearchParams(window.location.search);
+        
+        // Build params using helper (exactly like Sim Quarter does)
+        const params = helper.buildGameNavigationParams({
+          sourceParams: sourceParams,
+          targetQuarter: nextQ,
+          gameId: this.gameId,
+          resumeFromTimeout: false, // ✅ CRITICAL: Not a timeout resume (quarter break)
+          lineup: {}, // Lineup will be set on lineup screen
+          myTeamSide: this.userTeamSide || 'home',
+          overrides: {
+            home: teams.home,
+            away: teams.away,
+            mode: this.mode,
+            tournament_id: this.tournamentId,
+            franchise_id: this.franchiseId,
+            team_id: this.teamId
+          }
+        });
+        
+        console.log('🔍 [DEBUG QTR BREAK] gameScene.js - Using TimeoutNavigationHelper (Sim Quarter pattern):', {
           quarter: this.quarter,
           nextQ: nextQ,
           gameId: this.gameId,
           resume_from_timeout: params.get('resume_from_timeout'),
           fullParams: Object.fromEntries(params.entries())
         });
+        
         if (this.gameId && typeof localStorage !== 'undefined') {
           localStorage.setItem('game_id', this.gameId);
         }
