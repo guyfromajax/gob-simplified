@@ -2317,6 +2317,13 @@ export function createGameScene(Phaser) {
         // ✅ FIX: Explicitly set resume_from_timeout=false for quarter breaks
         // This ensures pre-game buttons (Play Quarter, Sim Quarter, Sim Rest of Game) appear on court.html
         params.set('resume_from_timeout', 'false');
+        console.log('🔍 [DEBUG QTR BREAK] gameScene.js - Setting params for quarter break:', {
+          quarter: this.quarter,
+          nextQ: nextQ,
+          gameId: this.gameId,
+          resume_from_timeout: params.get('resume_from_timeout'),
+          fullParams: Object.fromEntries(params.entries())
+        });
         if (this.gameId && typeof localStorage !== 'undefined') {
           localStorage.setItem('game_id', this.gameId);
         }
@@ -2335,7 +2342,9 @@ export function createGameScene(Phaser) {
         // Wire up button
         const button = popup.querySelector('.locker-room-button');
         button.addEventListener('click', () => {
-          window.location.href = `/set-lineup.html?${params.toString()}`;
+          const finalUrl = `/set-lineup.html?${params.toString()}`;
+          console.log('🔍 [DEBUG QTR BREAK] gameScene.js - Navigating to set-lineup:', finalUrl);
+          window.location.href = finalUrl;
         });
         return;
       }

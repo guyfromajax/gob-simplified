@@ -1072,6 +1072,14 @@ async function init() {
       const currentGameId = helper.getGameId(urlParams);
       const resumeFromTimeout = helper.getResumeFromTimeout(urlParams);
       
+      console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Before building params:', {
+        quarter: quarter,
+        gameId: currentGameId,
+        resumeFromTimeout: resumeFromTimeout,
+        urlResumeFromTimeout: urlParams.get('resume_from_timeout'),
+        allUrlParams: Object.fromEntries(urlParams.entries())
+      });
+      
       const params = helper.buildGameNavigationParams({
         sourceParams: urlParams,
         targetQuarter: quarter,
@@ -1082,6 +1090,13 @@ async function init() {
         clock: urlParams.get('clock')
       });
       
+      console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - After building params:', {
+        resume_from_timeout: params.get('resume_from_timeout'),
+        game_id: params.get('game_id'),
+        quarter: params.get('quarter'),
+        fullParams: Object.fromEntries(params.entries())
+      });
+      
       if (DEBUG) {
         params.set('debug', '1');
       }
@@ -1089,7 +1104,9 @@ async function init() {
         console.debug('🔀 Redirecting to court.html (bypassing game plan)', { home: homeTeam, away: awayTeam, gameId: currentGameId });
       }
       DEBUG && console.log('[lineup] launching quarter', quarter);
-      window.location.href = `/court.html?${params.toString()}`;
+      const finalUrl = `/court.html?${params.toString()}`;
+      console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Navigating to court.html:', finalUrl);
+      window.location.href = finalUrl;
     });
   }
   
