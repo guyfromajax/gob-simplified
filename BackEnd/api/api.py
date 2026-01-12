@@ -755,7 +755,8 @@ def get_game_state(game_id: str, quarter: int | None = None):
         # Check ongoing games first
         gm = ongoing_games.get(game_id)
         if gm:
-            # ✅ PERFORMANCE DIAGNOSTIC: Log in-memory path
+            # ✅ PERFORMANCE DIAGNOSTIC: Log in-memory path and measure processing time
+            process_start = time.time()
             logging.warning(f"⏱️ [PERF] /api/game/{game_id} - Using in-memory game (no DB query)")
             # Get players with current energy levels, stats, and attributes
             # Include ALL players (not just lineup) so roster merge works correctly
@@ -788,6 +789,10 @@ def get_game_state(game_id: str, quarter: int | None = None):
                     "defense": gm.away_team.scouting_data.get("defense", {})
                 }
             }
+            
+            # ✅ PERFORMANCE DIAGNOSTIC: Log processing time for in-memory path
+            process_time = (time.time() - process_start) * 1000  # Convert to ms
+            logging.warning(f"⏱️ [PERF] /api/game/{game_id} - In-memory processing: {process_time:.2f}ms")
             
             return {
                 "game_id": game_id,
