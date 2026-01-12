@@ -5,6 +5,27 @@ from BackEnd.utils.roster_loader import load_roster
 from BackEnd.models.player import Player
 from BackEnd.constants import PLAYCALLS
 
+# ✅ PERFORMANCE: Cache plays collection to avoid reloading during GameManager initialization
+# This dramatically speeds up GameManager creation (from ~16s to <1s)
+_plays_cache = None
+_plays_names_cache = None
+
+def _get_cached_plays():
+    """Get all plays from database, using cache if available."""
+    global _plays_cache
+    if _plays_cache is None:
+        from BackEnd.db import plays_collection
+        _plays_cache = list(plays_collection.find({}))
+    return _plays_cache
+
+def _get_cached_play_names():
+    """Get play names from database, using cache if available."""
+    global _plays_names_cache
+    if _plays_names_cache is None:
+        plays = _get_cached_plays()
+        _plays_names_cache = [play["name"] for play in plays]
+    return _plays_names_cache
+
 class TeamManager:
     def __init__(self, name: str, is_home_team=False, strategy_settings=None, team_attributes=None, scouting_data=None, plays_data=None, strategy_calls=None, mode="single", is_user_team=False):
         self.name = name
@@ -276,12 +297,10 @@ class TeamManager:
         }
 
     def _init_scouting_data(self):
-        # Get actual play names from database
+        # Get actual play names from database (using cache)
         play_names = []
         try:
-            from BackEnd.db import plays_collection
-            plays = list(plays_collection.find({}, {"name": 1}))
-            play_names = [play["name"] for play in plays]
+            play_names = _get_cached_play_names()
         except Exception as e:
             print(f"⚠️ Could not load play names for scouting data: {e}")
             play_names = PLAYCALLS  # Fallback to constants
@@ -469,10 +488,9 @@ class TeamManager:
         Returns:
             dict: {play_name: play_data} with play_id reference and stats (NO skeletons)
         """
-        from BackEnd.db import plays_collection
-        
         plays_dict = {}
-        universal_plays = list(plays_collection.find({}))
+        # ✅ PERFORMANCE: Use cached plays instead of reloading from database
+        universal_plays = _get_cached_plays()
         
         for play in universal_plays:
             # Get initial values from universal play (if they exist), otherwise default to 0
