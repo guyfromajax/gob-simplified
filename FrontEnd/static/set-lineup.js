@@ -1070,7 +1070,15 @@ async function init() {
       }
       
       const currentGameId = helper.getGameId(urlParams);
-      const resumeFromTimeout = helper.getResumeFromTimeout(urlParams);
+      let resumeFromTimeout = helper.getResumeFromTimeout(urlParams);
+      
+      // ✅ CRITICAL FIX: For quarter breaks (quarter > 1), explicitly ensure resumeFromTimeout is false
+      // This prevents quarter breaks from being treated as timeout resumes
+      // Rule: If quarter > 1 and URL param is missing or false, it's a quarter break (not timeout)
+      if (quarter > 1 && urlParams.get('resume_from_timeout') !== 'true') {
+        resumeFromTimeout = false;
+        console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Quarter break detected (Q' + quarter + '), forcing resumeFromTimeout=false');
+      }
       
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Before building params:', {
         quarter: quarter,
