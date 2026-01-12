@@ -266,11 +266,14 @@ class TeamManager:
         """Instance method wrapper for static init_team_attributes."""
         return TeamManager.init_team_attributes(mode)
 
-    def _create_defense_structure_template(self):
+    @staticmethod
+    def _create_defense_structure_template():
         """Create the standard defense structure template used by all defense types.
         
         Returns a dictionary with the standard structure for Man, 2-3 Zone, 3-2 Zone, and 1-3-1 Zone.
         This eliminates code duplication and makes it easier to add new defense types.
+        
+        ✅ PERFORMANCE: Made static and creates fresh structure each time (avoids deepcopy overhead).
         """
         return {
             "used": 0,
@@ -321,15 +324,18 @@ class TeamManager:
             print(f"⚠️ Could not load play names for scouting data: {e}")
             play_names = PLAYCALLS  # Fallback to constants
         
-        # Create defense structure template (used by all defense types)
+        # ✅ PERFORMANCE: Create defense structure template once (static method creates fresh structure)
         # For tournament mode, randomize effectiveness, momentum, and cloaking for each defense
-        defense_template = self._create_defense_structure_template()
+        # For non-tournament mode, create fresh structures (avoids slow deepcopy)
         
-        # For tournament mode, randomize defense values
-        if self.mode == "tournament":
-            defense_template["effectiveness"] = random.randint(0, 80)
-            defense_template["momentum"] = random.randint(0, 10)
-            defense_template["cloaking"] = random.randint(0, 10)
+        # Helper function to create a fresh defense structure (avoids deepcopy overhead)
+        def create_fresh_defense():
+            template = TeamManager._create_defense_structure_template()
+            if self.mode == "tournament":
+                template["effectiveness"] = random.randint(0, 80)
+                template["momentum"] = random.randint(0, 10)
+                template["cloaking"] = random.randint(0, 10)
+            return template
         
         # New playcall tracking structure
         return {
@@ -447,46 +453,12 @@ class TeamManager:
                 }
             },
             "defense": {
-                # Use template for all standard defense types (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone)
-                # This eliminates ~280 lines of duplicate code
-                # Use deepcopy to ensure each defense type gets its own independent dictionary
-                # For tournament mode, each defense gets its own random values
-                "Man": deepcopy(defense_template) if self.mode != "tournament" else {
-                    "used": 0,
-                    "success": 0,
-                    "effectiveness": random.randint(0, 80),
-                    "momentum": random.randint(0, 10),
-                    "cloaking": random.randint(0, 10),
-                    "game_stats": defense_template["game_stats"].copy(),
-                    "season_stats": defense_template["season_stats"].copy()
-                },
-                "2-3 Zone": deepcopy(defense_template) if self.mode != "tournament" else {
-                    "used": 0,
-                    "success": 0,
-                    "effectiveness": random.randint(0, 80),
-                    "momentum": random.randint(0, 10),
-                    "cloaking": random.randint(0, 10),
-                    "game_stats": defense_template["game_stats"].copy(),
-                    "season_stats": defense_template["season_stats"].copy()
-                },
-                "3-2 Zone": deepcopy(defense_template) if self.mode != "tournament" else {
-                    "used": 0,
-                    "success": 0,
-                    "effectiveness": random.randint(0, 80),
-                    "momentum": random.randint(0, 10),
-                    "cloaking": random.randint(0, 10),
-                    "game_stats": defense_template["game_stats"].copy(),
-                    "season_stats": defense_template["season_stats"].copy()
-                },
-                "1-3-1 Zone": deepcopy(defense_template) if self.mode != "tournament" else {
-                    "used": 0,
-                    "success": 0,
-                    "effectiveness": random.randint(0, 80),
-                    "momentum": random.randint(0, 10),
-                    "cloaking": random.randint(0, 10),
-                    "game_stats": defense_template["game_stats"].copy(),
-                    "season_stats": defense_template["season_stats"].copy()
-                },
+                # ✅ PERFORMANCE: Create fresh defense structures instead of deepcopy (much faster)
+                # Each defense type gets its own independent dictionary
+                "Man": create_fresh_defense(),
+                "2-3 Zone": create_fresh_defense(),
+                "3-2 Zone": create_fresh_defense(),
+                "1-3-1 Zone": create_fresh_defense(),
                 "vs_Fast_Break": {"used": 0, "success": 0},
                 "FCP": {"used": 0, "success": 0},
                 "HCT": {"used": 0, "success": 0}
