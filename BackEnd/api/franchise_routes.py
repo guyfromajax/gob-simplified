@@ -1089,8 +1089,8 @@ def standings(franchise_id: str):
         for away_id, home_id in next_games:
             home_name = id_to_name.get(home_id, "")
             away_name = id_to_name.get(away_id, "")
-            matchup_map[away_id] = f"at {home_name}"
-            matchup_map[home_id] = f"vs {away_name}"
+            matchup_map[str(away_id)] = f"at {home_name}"
+            matchup_map[str(home_id)] = f"vs {away_name}"
 
     # ✅ SS&S: Calculate W/L and PF/PA from franchise.results (franchise-specific) instead of global teams collection
     # This ensures standings match team-stats endpoint and are isolated from other game modes
