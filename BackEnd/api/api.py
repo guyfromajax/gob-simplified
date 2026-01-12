@@ -743,15 +743,13 @@ def simulate_game(request: SimulationRequest):
 def get_game_state(game_id: str, quarter: int | None = None):
     # Fetch current game state for displaying accumulated stats and player energy
     # PERFORMANCE DIAGNOSTIC: This endpoint is instrumented with timing logs.
-    import time
-    endpoint_start = time.time()
-    
-    try:
-    
     # Args:
     #     game_id: Game ID
     #     quarter: Optional quarter query parameter. If quarter=1 and saved game is Q2+,
     #              returns empty stats (new game scenario)
+    import time
+    endpoint_start = time.time()
+    
     try:
         # ✅ PERFORMANCE: Removed debug logging - only log errors
         # Check ongoing games first
