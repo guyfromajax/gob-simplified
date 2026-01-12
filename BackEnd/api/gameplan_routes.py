@@ -1639,6 +1639,12 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
     except Exception as e:
         logger.error(f"Error loading playbooks: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # ✅ PERFORMANCE DIAGNOSTIC: Log total endpoint time
+        if 'endpoint_start' in locals():
+            total_time = (time.time() - endpoint_start) * 1000  # Convert to ms
+            process_time = (time.time() - process_start) * 1000 if 'process_start' in locals() else 0
+            logger.warning(f"⏱️ [PERF] /api/playbooks - Processing: {process_time:.2f}ms, Total: {total_time:.2f}ms, mode: {mode}")
 
 
 class PlaybookSettingsRequest(BaseModel):
