@@ -1037,6 +1037,11 @@ def get_game_state(game_id: str, quarter: int | None = None):
     except Exception as e:
         logging.exception(f"Error fetching game state for {game_id}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # ✅ PERFORMANCE DIAGNOSTIC: Log total endpoint time
+        if 'endpoint_start' in locals():
+            total_time = (time.time() - endpoint_start) * 1000  # Convert to ms
+            logging.warning(f"⏱️ [PERF] /api/game/{game_id} - Total endpoint time: {total_time:.2f}ms")
 
 @app.post("/api/simulate-quarter")
 def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = False):
