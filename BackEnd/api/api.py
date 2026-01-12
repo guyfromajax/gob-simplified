@@ -2182,7 +2182,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             import json
             
             def convert_objectids(obj):
-                """Recursively convert ObjectIds to strings for JSON serialization"""
+                # Recursively convert ObjectIds to strings for JSON serialization
                 if isinstance(obj, ObjectId):
                     return str(obj)
                 elif isinstance(obj, dict):
