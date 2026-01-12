@@ -2483,15 +2483,11 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
 
 @app.post("/api/set-playcall-override")
 async def set_playcall_override_endpoint(raw_request: Request):
-    """
-    SS&S: Set persistent playcall overrides for user team.
-    
-    Overrides are stored in team.strategy_calls and persist until used.
-    This replaces the old single-turn override system.
-    
-    Only processes fields that are explicitly provided in the request body.
-    This prevents accidentally clearing other overrides when setting one.
-    """
+    # SS&S: Set persistent playcall overrides for user team.
+    # Overrides are stored in team.strategy_calls and persist until used.
+    # This replaces the old single-turn override system.
+    # Only processes fields that are explicitly provided in the request body.
+    # This prevents accidentally clearing other overrides when setting one.
     # Parse request body to see which fields were explicitly provided
     body = await raw_request.json()
     provided_fields = set(body.keys())
