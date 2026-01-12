@@ -741,10 +741,8 @@ def simulate_game(request: SimulationRequest):
 
 @app.get("/api/game/{game_id}")
 def get_game_state(game_id: str, quarter: int | None = None):
-    """Fetch current game state for displaying accumulated stats and player energy
-    
-    ✅ PERFORMANCE DIAGNOSTIC: This endpoint is instrumented with timing logs.
-    """
+    # Fetch current game state for displaying accumulated stats and player energy
+    # PERFORMANCE DIAGNOSTIC: This endpoint is instrumented with timing logs.
     import time
     endpoint_start = time.time()
     
