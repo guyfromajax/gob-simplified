@@ -2729,7 +2729,7 @@ def get_team_roster(team_name: str, tournament_id: str | None = None, response: 
 
 @app.post("/api/init-game")
 def init_game(request: dict):
-    """Initialize a game document with players (Emotion, Momentum) before first quarter starts"""
+    # Initialize a game document with players (Emotion, Momentum) before first quarter starts
     from BackEnd.models.game_manager import GameManager
     from BackEnd.utils.game_id_utils import generate_game_id
     from BackEnd.utils.shared import summarize_game_state
