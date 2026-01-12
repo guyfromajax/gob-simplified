@@ -58,7 +58,7 @@ Franchise Mode supports multi-season career mode where team and player data pers
 - Displays player roster table with attributes (SC, SH, ID, OD, PS, BH, RB, AG, ST, ND, IQ, FT, RT)
 - Displays player statistics table for the current season (PTS, FGM/FGA, 3PTM/3PTA, FTM/FTA, REB, AST, STL, BLK, F, MIN, TO)
 - Player names are clickable links to player detail pages
-- **Data Loading**: Roster loaded from `/franchise/roster` endpoint, stats merged from franchise document's `players` collection
+- **Data Loading**: ✅ UNIFIED: Roster loaded from `/roster/{team_name}?franchise_id={id}` endpoint, stats merged from franchise document's `players` collection
 
 **Team Tab:**
 - **Team Report Section**: Displays team attributes in a grid layout (same as Training Report)

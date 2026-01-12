@@ -972,14 +972,16 @@ async function initGame() {
   }
   if (sim4Btn) {
     // ✅ SIM QUARTER: Button works for Q1-Q4 (before game completes)
-    // Disabled when quarter >= 4 (game already in Q4+ or complete)
-    // Note: Button is only shown on pre-game screen, so if quarter >= 4, game is complete
+    // Disabled when quarter > 4 (game already complete, in OT or finished)
+    // Note: Button should be enabled at Q4 start (quarter = 4), only disabled after Q4 completes
     // ✅ FIX: Use Math.max(0, quarter) to handle pre-game screen (quarter = 0)
     const currentQuarter = Math.max(0, quarter);
-    if (currentQuarter >= 4) {
+    if (currentQuarter > 4) {
+      // Game is complete (in OT or finished) - disable button
       sim4Btn.disabled = true;
       sim4Btn.title = 'Game complete';
     } else {
+      // Q1-Q4: Button enabled (can sim current quarter if at start, or next quarter if at break)
       sim4Btn.disabled = false;
       sim4Btn.title = `Sim Quarter ${currentQuarter + 1}`;
       sim4Btn.addEventListener('click', handleSimQuarter);

@@ -101,7 +101,7 @@ Tournament Mode supports multi-game tournament brackets where team data persists
 
 **Roster Tab:**
 - ✅ **SS&S**: Uses identical execution pattern as Franchise mode
-  - `loadRoster()`: Loads roster from `/tournament/roster`, loads tournament doc from `/tournament/state`, merges stats into roster data
+  - `loadRoster()`: ✅ UNIFIED: Loads roster from `/roster/{team_name}?tournament_id={id}`, loads tournament doc from `/tournament/state`, merges stats into roster data
   - `renderRoster()`: Renders roster table and calls `renderRosterStats()` internally (matches Franchise `renderTeam()` pattern)
   - Player stats are merged from `tournament.players[playerId].season` into `rosterData.players[].stats.season`
   - Stats table uses `roster-stats-body` tbody ID (matches Franchise)
