@@ -1264,20 +1264,6 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         query_time = (time.time() - query_start) * 1000  # Convert to ms
         doc_size = len(str(doc)) if doc else 0
         logger.warning(f"⏱️ [PERF] /api/playbooks - DB query: {query_time:.2f}ms, doc_size: {doc_size} bytes, mode: {mode}")
-        else:
-            # ✅ PERFORMANCE: Use projection for franchise/tournament modes
-            if mode == "franchise":
-                doc = collection.find_one(
-                    {"_id": ObjectId(doc_id)},
-                    {"franchise_teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
-                )
-            elif mode == "tournament":
-                doc = collection.find_one(
-                    {"_id": ObjectId(doc_id)},
-                    {"teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
-                )
-            else:
-                doc = collection.find_one({"_id": ObjectId(doc_id)})
         
         if not doc:
             raise HTTPException(status_code=404, detail=f"{mode.capitalize()} document not found")
