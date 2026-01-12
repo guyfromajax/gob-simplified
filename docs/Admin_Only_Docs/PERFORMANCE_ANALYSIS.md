@@ -32,13 +32,18 @@ Overall performance is **excellent** for the endpoints that are instrumented. Al
 - **Analysis:** Very fast roster loading. Database queries are efficient.
 
 #### `/api/playbooks`
-- **Status:** ✅ Good
-- **Metrics:**
-  - Total: **18.27ms**
-  - DB query: 11.25ms
-  - Document size: 137 KB
-  - Processing: < 0.01ms
-- **Analysis:** Good performance. Document size is reasonable.
+- **Status:** ⚠️ **Needs Investigation**
+- **Metrics (Single Game Mode):**
+  - Total: **244.41ms** (slower than expected)
+  - DB query: 8.61ms
+  - Processing: 0.00ms
+  - Document size: 53 KB
+  - **Gap:** 235ms unaccounted for between DB query and total time
+- **Analysis:** There's a significant time gap (235ms) that's not being measured. This could be:
+  - Blocking on parallel `/api/play/{play_name}` requests
+  - Network latency
+  - Other operations not instrumented
+  - **Action Required:** Investigate what's happening during this gap
 
 ### ⚠️ Missing Performance Instrumentation
 
@@ -81,9 +86,21 @@ The following endpoints are called frequently but have **no performance logging*
 
 ## GameManager Creation Performance
 
-- **Away TeamManager:** 9.73ms ✅
-- **Home TeamManager:** Not logged in this sample
-- **Analysis:** TeamManager creation is fast, indicating the caching optimizations are working.
+- **Home TeamManager (first):** 61.62ms
+  - `scouting_data`: 48.39ms (first team - cache miss, builds template)
+  - `_load_roster`: 7.73ms
+  - `teams_collection.find_one`: 2.63ms
+  - `plays initialization`: 2.13ms
+- **Away TeamManager (second):** 11.61ms ✅
+  - `scouting_data`: 0.73ms (cached! ✅)
+  - `_load_roster`: 7.51ms
+  - `teams_collection.find_one`: 2.75ms
+  - `plays initialization`: 0.09ms (cached! ✅)
+- **Total GameManager creation:** 96.76ms
+- **Analysis:** 
+  - ✅ Caching is working perfectly - second team is 5x faster
+  - ✅ First team's scouting_data build (48ms) is acceptable for a one-time cost
+  - ✅ Overall GameManager creation (119ms total) is good for initialization
 
 ## Performance Thresholds
 
@@ -93,7 +110,7 @@ Based on user experience expectations:
 |----------|--------|----------------|
 | `/api/game/{game_id}` | < 100ms | ✅ 1-2ms (excellent) |
 | `/roster/{team_name}` | < 50ms | ✅ 10-12ms (excellent) |
-| `/api/playbooks` | < 100ms | ✅ 18ms (excellent) |
+| `/api/playbooks` | < 100ms | ⚠️ 244ms (needs investigation) |
 | `/api/simulate-quarter` | < 2000ms | ⚠️ Unknown |
 | `/api/simulate-turn` | < 100ms | ⚠️ Unknown |
 | `/api/gameplan` | < 200ms | ⚠️ Unknown |
@@ -137,11 +154,39 @@ Based on the current data, no immediate optimizations are needed. However, once 
 - Slow `/api/play/{play_name}` calls (could improve caching)
 - Large response sizes (could use projections)
 
+## Latest Analysis (Single Game Mode - Jan 12, 2026)
+
+### New Findings
+
+1. **`/api/playbooks` Performance Issue:**
+   - Total time: 244.41ms (exceeds 100ms target)
+   - DB query: 8.61ms
+   - Processing: 0.00ms
+   - **235ms gap unaccounted for**
+   - **Hypothesis:** Multiple parallel `/api/play/{play_name}` requests may be blocking or causing contention
+   - **Action:** Add timing around the entire `/api/playbooks` endpoint, including any async operations
+
+2. **GameManager Creation:**
+   - First team (cache miss): 61.62ms - acceptable
+   - Second team (cache hit): 11.61ms - excellent
+   - **Caching is working as designed**
+
+3. **Other Endpoints:**
+   - `/roster/{team_name}`: 12.72ms ✅
+   - `/api/game/{game_id}`: 2.05ms ✅
+   - `/api/init-game`: 119.36ms ✅
+
+### Missing Logs
+
+- `/api/simulate-quarter` - Not called yet (user still in setup)
+- `/api/simulate-turn` - Not called yet (user still in setup)
+- These will appear once gameplay begins
+
 ## Next Steps
 
-1. **Add performance logging** to missing endpoints
-2. **Run another game** with full instrumentation
-3. **Analyze new metrics** to identify bottlenecks
+1. **Investigate `/api/playbooks` 235ms gap** - add more granular timing
+2. **Wait for gameplay logs** to see `/api/simulate-quarter` and `/api/simulate-turn` performance
+3. **Add performance logging** to `/api/play/{play_name}` to see if parallel requests are the issue
 4. **Document findings** in this file
 
 ## Notes

@@ -1268,6 +1268,9 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         if not doc:
             raise HTTPException(status_code=404, detail=f"{mode.capitalize()} document not found")
         
+        # ⏱️ PERFORMANCE: Start timing processing phase
+        process_start = time.time()
+        
         # ✅ FIX: Get authoritative team_id FIRST, then ensure team objects exist
         # Get team plays
         # ✅ SS&S: Use document's user_team_object_id as authoritative source (aligns with Franchise pattern)
