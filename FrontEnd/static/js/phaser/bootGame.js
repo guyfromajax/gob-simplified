@@ -924,6 +924,8 @@ async function initGame() {
   // ✅ FIX: Show pre-game buttons at start of each quarter (not just Q1)
   // Only hide buttons when resuming from timeout (not quarter breaks)
   const urlResumeFromTimeoutParam = urlParams.get('resume_from_timeout');
+  // ✅ CRITICAL FIX: Explicitly check for 'true' string - if param is 'false' or missing, treat as false
+  // This ensures quarter breaks (resume_from_timeout=false) are never treated as timeout resumes
   let resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
   
   console.log('🔍 [DEBUG QTR BREAK] bootGame.js initGame() - Reading resume_from_timeout:', {
@@ -934,14 +936,14 @@ async function initGame() {
     allUrlParams: Object.fromEntries(urlParams.entries())
   });
   
-  // ✅ RESILIENCE: Check database for timeout state as fallback (if URL param missing but gameId exists)
+  // ✅ RESILIENCE: Check database for timeout state as fallback (ONLY if URL param is missing/null)
   // This makes the system robust - even if URL param is lost, we can still detect timeout resume
-    // Only checks DB if URL param is missing (fast path: URL param works → no DB call)
-    // ✅ FIX: Check for Q1 (quarter === 1) OR pre-game (quarter === 0) with gameId
-    if (!resumeFromTimeout && gameId && (quarter === 0 || quarter === 1)) {
+  // ✅ CRITICAL: Only check DB if URL param is missing (null) - if it's explicitly 'false', trust it!
+  // ✅ CRITICAL: Only check for Q1/pre-game (quarter === 0 || quarter === 1) - quarter breaks (Q2+) should never use DB fallback
+  if (urlResumeFromTimeoutParam === null && gameId && (quarter === 0 || quarter === 1)) {
     // Lightweight check: If URL param missing but we have gameId in Q1, check DB for timeout state
     // This is a fallback - URL param is still primary source for navigation
-    console.log('🔍 [DEBUG QTR BREAK] bootGame.js - Checking DB fallback (Q1/pre-game only)');
+    console.log('🔍 [DEBUG QTR BREAK] bootGame.js - Checking DB fallback (Q1/pre-game only, URL param missing)');
     try {
       const response = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}?quarter=${quarter}`));
       if (response.ok) {
@@ -957,6 +959,9 @@ async function initGame() {
       console.warn('⚠️ Could not check DB for timeout state (non-critical):', error);
       // Non-critical - user can still click "Play Quarter" button
     }
+  } else if (urlResumeFromTimeoutParam === 'false') {
+    // ✅ CRITICAL: If URL explicitly says 'false', trust it - don't check DB
+    console.log('🔍 [DEBUG QTR BREAK] bootGame.js - URL param explicitly set to false (quarter break), skipping DB check');
   }
   
   console.log('🔍 [DEBUG QTR BREAK] bootGame.js initGame() - Final decision:', {
