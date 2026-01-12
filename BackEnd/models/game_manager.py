@@ -15,12 +15,22 @@ import logging
 
 class GameManager:
     def __init__(self, home_team_name, away_team_name, home_strategy_settings=None, away_strategy_settings=None, home_team_attributes=None, away_team_attributes=None, home_scouting_data=None, away_scouting_data=None, home_plays_data=None, away_plays_data=None, home_strategy_calls=None, away_strategy_calls=None, mode="single", user_team_side=None):
+        import time
         # ✅ SS&S: Set is_user_team flag based on user_team_side
         is_home_user = user_team_side == "home"
         is_away_user = user_team_side == "away"
         
+        home_start = time.time()
+        logging.warning(f"⏱️ [PERF] GameManager - Creating home TeamManager: {home_team_name}")
         self.home_team = TeamManager(home_team_name, is_home_team=True, strategy_settings=home_strategy_settings, team_attributes=home_team_attributes, scouting_data=home_scouting_data, plays_data=home_plays_data, strategy_calls=home_strategy_calls, mode=mode, is_user_team=is_home_user)
+        home_time = (time.time() - home_start) * 1000
+        logging.warning(f"⏱️ [PERF] GameManager - Home TeamManager created: {home_time:.2f}ms")
+        
+        away_start = time.time()
+        logging.warning(f"⏱️ [PERF] GameManager - Creating away TeamManager: {away_team_name}")
         self.away_team = TeamManager(away_team_name, is_home_team=False, strategy_settings=away_strategy_settings, team_attributes=away_team_attributes, scouting_data=away_scouting_data, plays_data=away_plays_data, strategy_calls=away_strategy_calls, mode=mode, is_user_team=is_away_user)
+        away_time = (time.time() - away_start) * 1000
+        logging.warning(f"⏱️ [PERF] GameManager - Away TeamManager created: {away_time:.2f}ms")
 
         # ✅ Initialize tempo randomly per game (not per team)
         # Tempo is used for time_elapsed calculations, not fast break logic

@@ -2816,10 +2816,16 @@ def init_game(request: dict):
     
     # Create GameManager (this initializes teams and players)
     gm_start = time.time()
+    logging.warning(f"⏱️ [PERF] /api/init-game - Starting GameManager creation")
     gm = GameManager(home_team, away_team, mode=mode)
+    gm_create_time = (time.time() - gm_start) * 1000
+    logging.warning(f"⏱️ [PERF] /api/init-game - GameManager created: {gm_create_time:.2f}ms")
     
     # Initialize game stats (this randomizes EM, CH, MO for all players)
+    stats_start = time.time()
     _initialize_game_stats(gm, game_id=None)  # None = new game, will randomize
+    stats_time = (time.time() - stats_start) * 1000
+    logging.warning(f"⏱️ [PERF] /api/init-game - Game stats initialized: {stats_time:.2f}ms")
     gm_time = (time.time() - gm_start) * 1000
     
     # Create minimal game document with players
