@@ -743,6 +743,13 @@ def simulate_game(request: SimulationRequest):
 def get_game_state(game_id: str, quarter: int | None = None):
     """Fetch current game state for displaying accumulated stats and player energy
     
+    ✅ PERFORMANCE DIAGNOSTIC: This endpoint is instrumented with timing logs.
+    """
+    import time
+    endpoint_start = time.time()
+    
+    try:
+    
     Args:
         game_id: Game ID
         quarter: Optional quarter query parameter. If quarter=1 and saved game is Q2+,
@@ -831,6 +838,10 @@ def get_game_state(game_id: str, quarter: int | None = None):
                 "_id": 1
             }
             
+            # ✅ PERFORMANCE DIAGNOSTIC: Measure database query time
+            import time
+            query_start = time.time()
+            
             # Try both string and ObjectId lookups with projection
             saved = games_collection.find_one({"_id": game_id}, projection)
             if not saved and isinstance(game_id, str):
@@ -839,6 +850,10 @@ def get_game_state(game_id: str, quarter: int | None = None):
                 except Exception as e:
                     # Only log actual errors
                     pass
+            
+            query_time = (time.time() - query_start) * 1000  # Convert to ms
+            doc_size = len(str(saved)) if saved else 0
+            logging.warning(f"⏱️ [PERF] /api/game/{game_id} - DB query: {query_time:.2f}ms, doc_size: {doc_size} bytes")
             
             if saved:
                 # ✅ PERFORMANCE: Removed debug logging
