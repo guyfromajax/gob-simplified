@@ -2211,16 +2211,13 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
 
 @app.post("/api/simulate-turn")
 def simulate_turn_endpoint(request: TurnSimulationRequest):
-    """
-    Simulate a single turn for turn-by-turn gameplay.
-    
-    This endpoint:
-    1. Retrieves the GameManager from ongoing_games
-    2. Applies user overrides (if any) for this turn
-    3. Simulates ONE turn (one call to gm.simulate_macro_turn())
-    4. Returns the turn data + game state metadata
-    5. Saves game state periodically
-    """
+    # Simulate a single turn for turn-by-turn gameplay.
+    # This endpoint:
+    # 1. Retrieves the GameManager from ongoing_games
+    # 2. Applies user overrides (if any) for this turn
+    # 3. Simulates ONE turn (one call to gm.simulate_macro_turn())
+    # 4. Returns the turn data + game state metadata
+    # 5. Saves game state periodically
     game_id = request.game_id
     
     # Get the GameManager from memory
