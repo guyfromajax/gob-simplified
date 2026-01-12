@@ -2589,10 +2589,8 @@ async def set_playcall_override_endpoint(raw_request: Request):
 
 @app.post("/api/call-timeout")
 async def call_timeout_endpoint(request: CallTimeoutRequest):
-    """
-    User-initiated timeout endpoint.
-    Creates a TIMEOUT turn and saves game state before navigating to lineup screen.
-    """
+    # User-initiated timeout endpoint.
+    # Creates a TIMEOUT turn and saves game state before navigating to lineup screen.
     game_id = request.game_id
     calling_team_side = request.calling_team  # 'home' or 'away'
     
