@@ -234,18 +234,17 @@ function resetGameContext() {
 
 
 async function fetchTeamRoster(teamName) {
-  // Use franchise-specific roster endpoint if in franchise mode
-  let url;
-  if (mode === 'franchise' && franchiseId) {
-    url = API_CONFIG.buildUrl(`/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(teamName)}`);
-    console.log(`Loading franchise-specific roster for ${teamName}`);
-  } else {
-    const query = buildQuery({
-      tournament_id: mode === 'tournament' ? tournamentId : null,
-      franchise_id: mode === 'franchise' ? franchiseId : null,
-    });
-    url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(teamName)}${query}`);
+  // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint for all modes
+  // Supports tournament_id and franchise_id query parameters
+  const params = new URLSearchParams();
+  if (mode === 'tournament' && tournamentId) {
+    params.append('tournament_id', tournamentId);
   }
+  if (mode === 'franchise' && franchiseId) {
+    params.append('franchise_id', franchiseId);
+  }
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(teamName)}${query}`);
   
   const res = await fetch(url);
   if (!res.ok) {

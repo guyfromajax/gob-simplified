@@ -1406,9 +1406,9 @@ async function loadRoster() {
       console.error('❌ [DEBUG loadRoster] Tournament not loaded - cannot load roster');
       return;
     }
-    // Use tournament roster endpoint (similar to franchise/roster)
+    // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint
     // Use userTeamId directly (not formatted) - backend handles name resolution
-    const url = `${API_CONFIG.buildUrl('/tournament/roster')}?tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(userTeamId)}`;
+    const url = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?tournament_id=${encodeURIComponent(tournament._id)}`;
     console.log('🔍 [DEBUG loadRoster] Fetching roster from:', url);
     const res = await fetch(url);
     const data = await res.json();

@@ -106,13 +106,16 @@ async function loadGameData(gameId) {
 // Fetch and merge full rosters with game data to ensure all 12 players are shown
 async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournamentId, mode) {
   const fetchRoster = async (team) => {
-    let path;
+    // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint for all modes
+    let path = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(team)}`);
+    const params = new URLSearchParams();
     if (mode === 'franchise' && franchiseId) {
-      path = `${API_CONFIG.buildUrl('/franchise/roster')}?franchise_id=${franchiseId}&team_name=${encodeURIComponent(team)}`;
+      params.append('franchise_id', franchiseId);
     } else if (mode === 'tournament' && tournamentId) {
-      path = `${API_CONFIG.buildUrl('/tournament/roster')}?tournament_id=${tournamentId}&team_name=${encodeURIComponent(team)}`;
-    } else {
-      path = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(team)}`);
+      params.append('tournament_id', tournamentId);
+    }
+    if (params.toString()) {
+      path += `?${params.toString()}`;
     }
     const res = await fetch(path);
     if (!res.ok) throw new Error(`Failed to load roster for ${team}`);
@@ -193,13 +196,16 @@ function renderBoxScore() {
 // Build zeroed box score data from rosters when viewing pre-game
 async function loadPreGameData({ homeTeamName, awayTeamName, franchiseId, tournamentId, mode }) {
   const fetchRoster = async (team) => {
-    let path;
+    // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint for all modes
+    let path = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(team)}`);
+    const params = new URLSearchParams();
     if (mode === 'franchise' && franchiseId) {
-      path = `${API_CONFIG.buildUrl('/franchise/roster')}?franchise_id=${franchiseId}&team_name=${encodeURIComponent(team)}`;
+      params.append('franchise_id', franchiseId);
     } else if (mode === 'tournament' && tournamentId) {
-      path = `${API_CONFIG.buildUrl('/tournament/roster')}?tournament_id=${tournamentId}&team_name=${encodeURIComponent(team)}`;
-    } else {
-      path = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(team)}`);
+      params.append('tournament_id', tournamentId);
+    }
+    if (params.toString()) {
+      path += `?${params.toString()}`;
     }
     const res = await fetch(path);
     if (!res.ok) throw new Error(`Failed to load roster for ${team}`);

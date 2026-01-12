@@ -67,28 +67,27 @@ function setupBackButton() {
 
 async function loadRoster() {
   try {
-    let url = '';
+    // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint for all modes
+    if (!teamName && !teamId) {
+      document.getElementById('roster-body').innerHTML = '<tr><td colspan="18">Team name required</td></tr>';
+      return;
+    }
+    
+    const displayTeamName = teamName || teamId;
+    let url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(displayTeamName)}`);
+    const params = new URLSearchParams();
+    
     if (mode === 'franchise' && franchiseId) {
-      url = `${API_CONFIG.buildUrl('/franchise/roster')}?franchise_id=${franchiseId}`;
-      // Use teamName (team display name) for the API call, not teamId (ObjectId)
-      if (teamName) {
-        url += `&team_name=${encodeURIComponent(teamName)}`;
-      } else if (teamId) {
-        // Fallback to teamId if teamName not provided (shouldn't happen, but just in case)
-        url += `&team_name=${encodeURIComponent(teamId)}`;
-      }
+      params.append('franchise_id', franchiseId);
     } else if (mode === 'tournament' && tournamentId) {
-      url = `${API_CONFIG.buildUrl('/tournament/roster')}?tournament_id=${tournamentId}`;
-      // Use teamName (team display name) for the API call, not teamId (ObjectId)
-      if (teamName) {
-        url += `&team_name=${encodeURIComponent(teamName)}`;
-      } else if (teamId) {
-        // Fallback to teamId if teamName not provided
-        url += `&team_name=${encodeURIComponent(teamId)}`;
-      }
+      params.append('tournament_id', tournamentId);
     } else {
       document.getElementById('roster-body').innerHTML = '<tr><td colspan="18">Invalid mode or missing IDs</td></tr>';
       return;
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
     }
     
     const response = await fetch(url);
