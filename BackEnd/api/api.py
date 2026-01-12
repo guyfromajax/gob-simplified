@@ -2996,7 +2996,7 @@ def team_roster_page(request: Request, team: str):
 
 @app.get("/tournament/active")
 def get_active_tournament(user_team_id: Optional[str] = "BENTLEY-TRUMAN"):
-    """Fetch the most recently created active tournament or create one."""
+    # Fetch the most recently created active tournament or create one.
     doc = tournaments_collection.find_one({"completed": False}, sort=[("created_at", -1)])
     if not doc:
         manager = TournamentManager(user_team_id=user_team_id, tournaments_collection=tournaments_collection)
