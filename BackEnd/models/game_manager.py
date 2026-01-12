@@ -58,12 +58,10 @@ class GameManager:
         # This is more reliable than is_user_team flag which isn't persisted to DB
         if user_team_side:
             self.game_state["user_team_side"] = user_team_side
-            import logging
             logging.warning(f"✅ [GAME MANAGER] Set user_team_side in game_state: {user_team_side}")
             logging.warning(f"   - Home team: {self.home_team.name} (team_id: {self.home_team.team_id}, is_home_team: {self.home_team.is_home_team})")
             logging.warning(f"   - Away team: {self.away_team.name} (team_id: {self.away_team.team_id}, is_home_team: {self.away_team.is_home_team})")
         else:
-            import logging
             logging.warning(f"⚠️ [GAME MANAGER] No user_team_side provided - override checking will not work!")
 
         self.turn_manager = TurnManager(self)
