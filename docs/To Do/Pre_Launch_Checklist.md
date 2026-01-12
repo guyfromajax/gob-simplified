@@ -310,18 +310,41 @@
 ---
 
 ### 11. Backup & Disaster Recovery
-**Status:** ⚠️ PARTIAL (MongoDB Atlas has backups)  
-**Priority:** 🟢 MEDIUM - Good practice
+**Status:** ⚠️ NEEDS VERIFICATION  
+**Priority:** 🟢 MEDIUM - Good practice for alpha
 
-- [ ] Review MongoDB Atlas backup settings
-  - [ ] Verify automated backups are enabled
-  - [ ] Verify backup retention period (7 days minimum)
-  - [ ] Test backup restoration process
+**Important Context:**
+- **MongoDB Atlas Backups:** Depends on your Atlas tier
+  - **Free Tier (M0):** Manual backups only (via `mongodump` or MongoDB Compass export)
+  - **Paid Tiers (M10+):** Automated continuous backups included (point-in-time restore, retention periods)
+- **For Alpha:** Manual backups are probably sufficient if you're on free tier
+- **Additional Tooling:** Not required for alpha - MongoDB Atlas backups (if on paid tier) are sufficient
+
+**Action Items:**
+- [ ] Check your MongoDB Atlas tier (free M0 or paid M10+)
+- [ ] If on **paid tier (M10+):**
+  - [ ] Verify automated backups are enabled (usually enabled by default)
+  - [ ] Verify backup retention period (7 days minimum recommended)
+  - [ ] Test backup restoration process (restore a test database)
+  - [ ] Document how to restore from backup
+
+- [ ] If on **free tier (M0):**
+  - [ ] Set up manual backup process (weekly/monthly exports)
+  - [ ] Document how to export database (`mongodump` command or MongoDB Compass)
+  - [ ] Store exports in safe location (S3, local storage, etc.)
+  - [ ] Test restoration process (restore from export)
 
 - [ ] Document disaster recovery procedures
-  - [ ] Document how to restore from backup
-  - [ ] Document how to redeploy if Railway fails
+  - [ ] Document how to restore database from backup
+  - [ ] Document how to redeploy if Railway fails (redeploy from GitHub)
+  - [ ] Document how to switch to backup instance if needed
   - [ ] Document database migration procedures
+
+**Recommendation for Alpha:**
+- **If on free tier:** Manual weekly backups are sufficient (export database, store safely)
+- **If on paid tier:** Automated backups are sufficient - just verify they're enabled
+- **No additional tooling needed** - MongoDB Atlas provides the backup infrastructure
+- **Documentation is key** - Make sure you know how to restore if needed
 
 ---
 
