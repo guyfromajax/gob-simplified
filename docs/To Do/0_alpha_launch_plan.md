@@ -170,21 +170,21 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 
 ## Step 4 — Error Tracking (Visibility Before You Ship)
 
-### 2.1 Choose a Tool
+### 4.1 Choose a Tool
 - [ ] Pick error tracking service (Sentry recommended)
 
-### 2.2 Backend Error Tracking
+### 4.2 Backend Error Tracking
 - [ ] Install SDK
 - [ ] Capture unhandled exceptions
 - [ ] Capture API errors (4xx/5xx where helpful)
 - [ ] Attach user context (`user_id`) to events
 
-### 2.3 Frontend Error Tracking
+### 4.3 Frontend Error Tracking
 - [ ] Capture JS runtime errors
 - [ ] Capture unhandled promise rejections
 - [ ] Attach user context if available
 
-### 2.4 Verification
+### 4.4 Verification
 - [ ] Trigger intentional test errors (backend + frontend)
 - [ ] Confirm events appear with useful context
 
