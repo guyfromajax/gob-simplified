@@ -502,10 +502,35 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     } else if (resultType === 'STEAL') {
       // Steals
       const stealerId = turn.stealer_id || turn.ball_handler;
-      const stealerData = playerMap[stealerId] || { name: turn.stealer_name || 'Unknown', jersey: '', team: 'home' };
+      // ✅ FIX: Try multiple ID formats and fallback to stealer_name
+      // playerMap uses player.playerId as key, but stealer_id might be in different format
+      let stealerData = playerMap[stealerId];
+      if (!stealerData && stealerId) {
+        // Try string conversion (in case of type mismatch)
+        stealerData = playerMap[String(stealerId)];
+      }
+      // If still not found, try to find player by searching players array
+      if (!stealerData && stealerId) {
+        const foundPlayer = players.find(p => p.playerId === stealerId || p.playerId === String(stealerId) || p.player_id === stealerId);
+        if (foundPlayer) {
+          stealerData = {
+            name: foundPlayer.name || 'Unknown',
+            jersey: foundPlayer.jersey || foundPlayer.jerseyNumber || foundPlayer.jersey_number || '',
+            team_id: foundPlayer.team_id
+          };
+        }
+      }
+      // Final fallback: use turn.stealer_name if available
+      if (!stealerData) {
+        stealerData = { 
+          name: turn.stealer_name || 'Unknown', 
+          jersey: '', 
+          team_id: null 
+        };
+      }
       
       // ✅ FIX: Use turn.offense_team_id to determine team (stealer is on defense, opposite of offense)
-      const playerTeam = getPlayerTeam(stealerId, stealerData.team);
+      const playerTeam = getPlayerTeam(stealerId, stealerData.team_id ? null : 'home');
       
       eventResults.push({
         timeRemaining,
@@ -696,41 +721,14 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   // ✅ FIX: Update scoreboard with final scores from lastSummary (authoritative source)
   // This ensures the scoreboard shows correct final scores before navigation
   // Use lastSummary.score (dict with team names as keys) as single source of truth
-  // 🔍 DEBUG: Log score state to diagnose Q4 score regression
-  console.log('🔍 [Q4 SCORE DEBUG] Before final score update:', {
-    quarter,
-    lastSummaryScore: lastSummary.score,
-    homeTeamName,
-    awayTeamName,
-    homeTeam,
-    awayTeam,
-    displayHomeScore,
-    displayAwayScore,
-    startBoxScore: lastSummary.start_box_score
-  });
-  
   if (lastSummary.score) {
     const finalHomeScore = typeof lastSummary.score[homeTeamName] === 'number' ? lastSummary.score[homeTeamName] : 
                            (typeof lastSummary.score[homeTeam] === 'number' ? lastSummary.score[homeTeam] : displayHomeScore);
     const finalAwayScore = typeof lastSummary.score[awayTeamName] === 'number' ? lastSummary.score[awayTeamName] : 
                            (typeof lastSummary.score[awayTeam] === 'number' ? lastSummary.score[awayTeam] : displayAwayScore);
     
-    console.log('🔍 [Q4 SCORE DEBUG] Final scores resolved:', {
-      finalHomeScore,
-      finalAwayScore,
-      scoreKeys: Object.keys(lastSummary.score),
-      homeTeamNameInScore: homeTeamName in lastSummary.score,
-      awayTeamNameInScore: awayTeamName in lastSummary.score,
-      homeTeamInScore: homeTeam in lastSummary.score,
-      awayTeamInScore: awayTeam in lastSummary.score
-    });
-    
     if (homeScoreEl) homeScoreEl.textContent = finalHomeScore;
     if (awayScoreEl) awayScoreEl.textContent = finalAwayScore;
-    
-    console.log('✅ [SIM QUARTER] Scoreboard updated with final scores:', { finalHomeScore, finalAwayScore });
-  } else {
-    console.warn('⚠️ [Q4 SCORE DEBUG] lastSummary.score is missing!', { lastSummaryKeys: Object.keys(lastSummary) });
   }
   
   // Hide popup before navigation
