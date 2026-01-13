@@ -240,8 +240,21 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   
   // Get team colors from team objects (SS&S: same pattern as gameScene.js)
   // Works across all modes (Single, Tournament, Franchise) - always present in summarize_game_state()
+  // Debug: Log the structure to verify colors are present
+  console.log('🔍 [SIM QUARTER] Team color debug:', {
+    home_team: lastSummary.home_team,
+    away_team: lastSummary.away_team,
+    home_team_colors: lastSummary.home_team?.colors,
+    away_team_colors: lastSummary.away_team?.colors,
+    home_primary: lastSummary.home_team?.colors?.primary_color,
+    away_primary: lastSummary.away_team?.colors?.primary_color
+  });
+  
   const homeColor = lastSummary.home_team?.colors?.primary_color || '#ff6200';
   const awayColor = lastSummary.away_team?.colors?.primary_color || '#ff6200';
+  
+  console.log('🔍 [SIM QUARTER] Resolved colors:', { homeColor, awayColor });
+  
   const players = lastSummary.players || [];
   
   // Create player lookup map (playerId -> {name, jersey, team})
