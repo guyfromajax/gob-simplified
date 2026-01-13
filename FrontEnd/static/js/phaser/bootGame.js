@@ -238,10 +238,10 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     quarterEl.textContent = periodLabel;
   }
   
-  // Get team colors and player data
-  const teamInfo = lastSummary.team_info || {};
-  const homeColor = teamInfo.home?.primary_color || '#ff6200';
-  const awayColor = teamInfo.away?.primary_color || '#ff6200';
+  // Get team colors from team objects (SS&S: same pattern as gameScene.js)
+  // Works across all modes (Single, Tournament, Franchise) - always present in summarize_game_state()
+  const homeColor = lastSummary.home_team?.colors?.primary_color || '#ff6200';
+  const awayColor = lastSummary.away_team?.colors?.primary_color || '#ff6200';
   const players = lastSummary.players || [];
   
   // Create player lookup map (playerId -> {name, jersey, team})
@@ -260,18 +260,8 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   const homeTeamName = lastSummary.home_team?.name || homeTeam;
   const awayTeamName = lastSummary.away_team?.name || awayTeam;
   
-  // Get initial scores from summary (before this quarter)
-  const scoreObj = lastSummary.score || {};
-  let currentHomeScore = scoreObj[homeTeamName] || scoreObj[homeTeam] || 0;
-  let currentAwayScore = scoreObj[awayTeamName] || scoreObj[awayTeam] || 0;
-  
-  // If start_box_score exists, use it (scores at start of this quarter)
-  if (lastSummary.start_box_score) {
-    currentHomeScore = lastSummary.start_box_score.home_score || currentHomeScore;
-    currentAwayScore = lastSummary.start_box_score.away_score || currentAwayScore;
-  }
-  
   // Extract shot results from turns
+  // SS&S: Use turn.score (authoritative) just like updateScoreboard in gameScene.js
   const turns = lastSummary.turns || [];
   const shotResults = [];
   
@@ -288,19 +278,13 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       // Get time remaining
       const timeRemaining = turn.time_remaining || turn.clock || turn.game_clock || '0:00';
       
-      // Calculate scores: if MAKE, add points to current score
-      let homeScore = currentHomeScore;
-      let awayScore = currentAwayScore;
-      
-      if (turn.result_type === 'MAKE') {
-        if (shooterData.team === 'home') {
-          homeScore = currentHomeScore + points;
-          currentHomeScore = homeScore;
-        } else {
-          awayScore = currentAwayScore + points;
-          currentAwayScore = awayScore;
-        }
-      }
+      // SS&S: Use turn.score (authoritative) - same pattern as updateScoreboard in gameScene.js
+      // turn.score is a dict with team names as keys: {homeTeamName: score, awayTeamName: score}
+      const turnScore = turn.score || {};
+      const homeScore = typeof turnScore[homeTeamName] === 'number' ? turnScore[homeTeamName] : 
+                       (typeof turnScore[homeTeam] === 'number' ? turnScore[homeTeam] : 0);
+      const awayScore = typeof turnScore[awayTeamName] === 'number' ? turnScore[awayTeamName] : 
+                       (typeof turnScore[awayTeam] === 'number' ? turnScore[awayTeam] : 0);
       
       shotResults.push({
         timeRemaining,
@@ -321,23 +305,28 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   // Clear content
   contentEl.innerHTML = '';
   
-  // Reset scores for display (start of quarter)
-  let displayHomeScore = scoreObj[homeTeamName] || scoreObj[homeTeam] || 0;
-  let displayAwayScore = scoreObj[awayTeamName] || scoreObj[awayTeam] || 0;
+  // Get initial scores (start of quarter) - use start_box_score if available, otherwise use score from first turn
+  let displayHomeScore = 0;
+  let displayAwayScore = 0;
   
   if (lastSummary.start_box_score) {
-    displayHomeScore = lastSummary.start_box_score.home_score || displayHomeScore;
-    displayAwayScore = lastSummary.start_box_score.away_score || displayAwayScore;
+    displayHomeScore = lastSummary.start_box_score.home_score || 0;
+    displayAwayScore = lastSummary.start_box_score.away_score || 0;
+  } else if (turns.length > 0 && turns[0].score) {
+    // Fallback: use first turn's score as starting point
+    const firstTurnScore = turns[0].score;
+    displayHomeScore = typeof firstTurnScore[homeTeamName] === 'number' ? firstTurnScore[homeTeamName] : 
+                      (typeof firstTurnScore[homeTeam] === 'number' ? firstTurnScore[homeTeam] : 0);
+    displayAwayScore = typeof firstTurnScore[awayTeamName] === 'number' ? firstTurnScore[awayTeamName] : 
+                       (typeof firstTurnScore[awayTeam] === 'number' ? firstTurnScore[awayTeam] : 0);
   }
   
   for (let i = 0; i < shotResults.length; i++) {
     const shot = shotResults[i];
     
-    // Update display score after shot
-    if (shot.resultType === 'MAKE') {
-      displayHomeScore = shot.homeScore;
-      displayAwayScore = shot.awayScore;
-    }
+    // SS&S: Use authoritative score from turn (same as updateScoreboard)
+    displayHomeScore = shot.homeScore;
+    displayAwayScore = shot.awayScore;
     
     // Create shot entry
     const entry = document.createElement('div');
