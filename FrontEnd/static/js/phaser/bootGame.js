@@ -412,60 +412,88 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
                        (typeof firstTurnScore[awayTeam] === 'number' ? firstTurnScore[awayTeam] : 0);
   }
   
+  // ✅ NEW: Get clock element for real-time updates
+  const clockEl = document.getElementById('game-clock');
+  
   // ✅ NEW: Initialize scoreboard with starting scores
   if (homeScoreEl) homeScoreEl.textContent = displayHomeScore;
   if (awayScoreEl) awayScoreEl.textContent = displayAwayScore;
   
-  for (let i = 0; i < shotResults.length; i++) {
-    const shot = shotResults[i];
+  // Process all turns to update clock in real-time, but only create entries for shots
+  for (let i = 0; i < turns.length; i++) {
+    const turn = turns[i];
     
-    // SS&S: Use authoritative score from turn (same as updateScoreboard)
-    displayHomeScore = shot.homeScore;
-    displayAwayScore = shot.awayScore;
-    
-    // ✅ NEW: Update scoreboard in real-time (SS&S: same pattern as gameScene.js updateScoreboard)
-    if (homeScoreEl) homeScoreEl.textContent = displayHomeScore;
-    if (awayScoreEl) awayScoreEl.textContent = displayAwayScore;
-    
-    // Create shot entry
-    const entry = document.createElement('div');
-    entry.className = 'sim-quarter-shot-entry';
-    
-    // Determine team color
-    const teamColor = shot.shooterTeam === 'home' ? homeColor : awayColor;
-    
-    // Format time (convert seconds to MM:SS if needed)
-    let timeDisplay = shot.timeRemaining;
-    if (typeof shot.timeRemaining === 'number') {
-      const minutes = Math.floor(shot.timeRemaining / 60);
-      const seconds = Math.floor(shot.timeRemaining % 60);
-      timeDisplay = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    // ✅ NEW: Update clock with each turn's time_remaining (not just shots)
+    if (clockEl && (turn.time_remaining !== undefined || turn.clock || turn.game_clock)) {
+      let timeValue = turn.time_remaining || turn.clock || turn.game_clock;
+      // Convert seconds to MM:SS format if needed
+      if (typeof timeValue === 'number') {
+        const minutes = Math.floor(timeValue / 60);
+        const seconds = Math.floor(timeValue % 60);
+        timeValue = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      }
+      clockEl.textContent = timeValue;
     }
     
-    // Format jersey number
-    const jerseyDisplay = shot.shooterJersey ? ` (#${shot.shooterJersey})` : '';
-    
-    // Build text with colored player name and jersey
-    const resultText = shot.resultType === 'MAKE' ? 'makes' : 'misses';
-    // Colors: Clock value #9a9a9a, Normal copy #e6e6e6, Team colors for player name
-    entry.innerHTML = `
-      <span style="color: #9a9a9a;">[${timeDisplay}]: </span>
-      <span style="color: ${teamColor}; font-weight: bold;">${shot.shooterName}${jerseyDisplay}</span>
-      <span style="color: #e6e6e6;"> ${resultText} the ${shot.shotType} shot.</span>
-    `;
-    
-    contentEl.appendChild(entry);
-    
-    // ✅ REMOVED: Score line from text scroll (scores now update in real-time on scoreboard)
-    
-    // Scroll to bottom
-    const scrollContainer = popup.querySelector('.sim-quarter-scroll-container');
-    if (scrollContainer) {
-      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    // Only create shot entry for shot results
+    if (turn.result_type === 'MAKE' || turn.result_type === 'MISS') {
+      // Find corresponding shot in shotResults array
+      const shot = shotResults.find(s => 
+        s.timeRemaining === (turn.time_remaining || turn.clock || turn.game_clock) &&
+        s.resultType === turn.result_type
+      );
+      
+      if (shot) {
+        // SS&S: Use authoritative score from turn (same as updateScoreboard)
+        displayHomeScore = shot.homeScore;
+        displayAwayScore = shot.awayScore;
+        
+        // ✅ NEW: Update scoreboard in real-time (SS&S: same pattern as gameScene.js updateScoreboard)
+        if (homeScoreEl) homeScoreEl.textContent = displayHomeScore;
+        if (awayScoreEl) awayScoreEl.textContent = displayAwayScore;
+        
+        // Create shot entry
+        const entry = document.createElement('div');
+        entry.className = 'sim-quarter-shot-entry';
+        
+        // Determine team color
+        const teamColor = shot.shooterTeam === 'home' ? homeColor : awayColor;
+        
+        // Format time (convert seconds to MM:SS if needed)
+        let timeDisplay = shot.timeRemaining;
+        if (typeof shot.timeRemaining === 'number') {
+          const minutes = Math.floor(shot.timeRemaining / 60);
+          const seconds = Math.floor(shot.timeRemaining % 60);
+          timeDisplay = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        // Format jersey number
+        const jerseyDisplay = shot.shooterJersey ? ` (#${shot.shooterJersey})` : '';
+        
+        // Build text with colored player name and jersey (removed score line - now in scoreboard)
+        const resultText = shot.resultType === 'MAKE' ? 'makes' : 'misses';
+        // Colors: Clock value #9a9a9a, Normal copy #e6e6e6, Team colors for player name
+        entry.innerHTML = `
+          <span style="color: #9a9a9a;">[${timeDisplay}]: </span>
+          <span style="color: ${teamColor}; font-weight: bold;">${shot.shooterName}${jerseyDisplay}</span>
+          <span style="color: #e6e6e6;"> ${resultText} the ${shot.shotType} shot.</span>
+        `;
+        
+        contentEl.appendChild(entry);
+        
+        // Scroll to bottom
+        const scrollContainer = popup.querySelector('.sim-quarter-scroll-container');
+        if (scrollContainer) {
+          scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }
+        
+        // 2 second delay for real-time feel (users experience each shot)
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    } else {
+      // Not a shot turn, just update clock with small delay
+      await new Promise(resolve => setTimeout(resolve, 200)); // Small delay for clock updates
     }
-    
-    // 2 second delay for real-time feel (users experience each shot)
-    await new Promise(resolve => setTimeout(resolve, 2000));
   }
   
   // If no shots, show message
@@ -1039,7 +1067,7 @@ async function handleSimFullGame() {
     let gId = gameId;
     let lastSummary;
     while (true) {
-      showStatus(`Simulating Q${currentQ}...`);
+      // ✅ REMOVED: showStatus call - redundant with popup header
       const payload = {
         home_team: homeTeam,
         away_team: awayTeam,
