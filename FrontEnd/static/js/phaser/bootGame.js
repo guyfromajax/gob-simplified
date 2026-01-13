@@ -316,11 +316,30 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   // Extract shot results from turns - ONLY from the quarter we just simulated
   // SS&S: Use turn.score (authoritative) just like updateScoreboard in gameScene.js
   // Filter turns to only include the quarter we just simulated (each turn has a quarter field)
+  // ⚠️ BUG FIX: Backend sets turn.quarter = gm.quarter BEFORE simulating, so if we're simulating Q2
+  // but gm.quarter=1, all turns will have quarter=1. We need to filter by the quarter BEFORE the one
+  // that was just completed. If we just simulated Q2, turns have quarter=1 (the quarter before Q2).
+  // Actually wait - let me check: if we're at Q1 break (gm.quarter=1) and simulate Q2, turns get quarter=1.
+  // But if we're at Q2 break (gm.quarter=2) and simulate Q3, turns get quarter=2.
+  // So the turns have the quarter that was ACTIVE when they were created, which is the quarter we just simulated.
+  // But the backend increments gm.quarter AFTER simulation, so if we simulate Q2, turns should have quarter=2.
+  // Let me check the actual behavior: we're simulating Q2, so turns should have quarter=2.
+  // But the log shows 0 turns with quarter=2, which means turns have quarter=1.
+  // This suggests gm.quarter=1 when we start simulating Q2.
+  // FIX: Filter by quarter-1 (the quarter that was active during simulation)
   const allTurns = lastSummary.turns || [];
   console.log('🔍 [SIM QUARTER] Total turns in summary:', allTurns.length);
+  console.log('🔍 [SIM QUARTER] Sample turn quarters:', allTurns.slice(0, 5).map(t => t.quarter));
   
-  const turns = allTurns.filter(turn => turn.quarter === quarter);
+  // Try filtering by the quarter we just simulated (quarter parameter)
+  let turns = allTurns.filter(turn => turn.quarter === quarter);
   console.log('🔍 [SIM QUARTER] Turns for quarter', quarter + ':', turns.length);
+  
+  // If no turns found, try quarter-1 (backend might set quarter before incrementing)
+  if (turns.length === 0 && quarter > 1) {
+    turns = allTurns.filter(turn => turn.quarter === quarter - 1);
+    console.log('🔍 [SIM QUARTER] Trying quarter-1 filter:', turns.length, 'turns found');
+  }
   
   const shotResults = [];
   
