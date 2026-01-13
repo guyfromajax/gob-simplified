@@ -45,19 +45,48 @@ The Sim Quarter System provides a real-time text scroll experience during quarte
 
 ### Events Printed in Scroll
 
-**Shot Events Only:**
-- **Shot Makes**: `[Time]: Player Name (#jersey) makes the 2-pt shot.` or `makes the 3-pt shot.`
-- **Shot Misses**: `[Time]: Player Name (#jersey) misses the 2-pt shot.` or `misses the 3-pt shot.`
+**All Event Types Displayed:**
+
+1. **Regular Shots** (`result_type: 'MAKE'` or `'MISS'`):
+   - Format: `[Time]: Player Name (#jersey) makes/misses the 2-pt shot.` or `makes/misses the 3-pt shot.`
+   - Example: `[7:45]: John Smith (#23) makes the 3-pt shot.`
+
+2. **Fast Break Shots** (`result_type: 'MAKE'` or `'MISS'` with `fast_break: true` or `offensive_state: 'FAST_BREAK'`):
+   - Format: `[Time]: [Fast Break] Player Name (#jersey) makes/misses the 2-pt shot.` or `makes/misses the 3-pt shot.`
+   - Example: `[6:23]: [Fast Break] Mike Johnson (#5) makes the 2-pt shot.`
+   - Special prefix: `[Fast Break]` appears after time, before player name
+
+3. **OREB Putback Attempts** (`result_type: 'PUTBACK_MAKE'` or `'PUTBACK_MISS'`):
+   - Format: `[Time]: [Off Rebound] Player Name (#jersey) makes/misses the 2-pt shot.` or `makes/misses the 3-pt shot.`
+   - Example: `[5:12]: [Off Rebound] Chris Davis (#42) misses the 2-pt shot.`
+   - Special prefix: `[Off Rebound]` appears after time, before player name
+
+4. **Free Throws** (`result_type: 'FREE_THROW'`):
+   - Format: `[Time]: Player Name (#jersey) makes/misses the free throw.`
+   - Example: `[4:30]: Sarah Williams (#10) makes the free throw.`
+   - Note: Made/missed determined by `points > 0` in turn data
+
+5. **Fouls** (`result_type: 'FOUL'`):
+   - Format: `[Time]: Player Name (#jersey) commits a foul.`
+   - Example: `[3:15]: Tom Brown (#7) commits a foul.`
+
+6. **Dead Ball Turnovers** (`result_type: 'DEAD BALL'` or `'TURNOVER'`):
+   - Format: `[Time]: Player Name (#jersey) turnover (dead ball).`
+   - Example: `[2:45]: Alex Green (#15) turnover (dead ball).`
+
+7. **Steals** (`result_type: 'STEAL'`):
+   - Format: `[Time]: Player Name (#jersey) steals the ball.`
+   - Example: `[1:30]: Jordan White (#3) steals the ball.`
 
 **Event Filtering:**
-- Only turns with `result_type === 'MAKE'` or `result_type === 'MISS'` are displayed
-- All other turn types (passes, rebounds, steals, etc.) update the clock but do not create scroll entries
-- If no shots occur in the quarter, displays: "No shots in this quarter."
+- Only turns matching the above event types are displayed in the scroll
+- All other turn types (passes, defensive rebounds, etc.) update the clock but do not create scroll entries
+- If no events occur in the quarter, displays: "No shots in this quarter."
 
 **Turn Processing:**
 - All turns are processed to update the scoreboard clock in real-time
-- Shot turns create scroll entries with 2-second delays
-- Non-shot turns update clock with 200ms delays (faster progression)
+- Event turns create scroll entries with 2-second delays
+- Non-event turns update clock with 200ms delays (faster progression)
 
 ### Design Components and Colors
 
