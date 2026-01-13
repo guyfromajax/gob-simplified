@@ -212,10 +212,15 @@ function showStatus(msg) {
  * @param {string} awayTeam - Away team name
  */
 async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
+  console.log('🔍 [SIM QUARTER] showSimQuarterResults called', { quarter, homeTeam, awayTeam });
+  
   // Hide pre-game container
   const preGameContainer = document.querySelector('.pre-game-container');
   if (preGameContainer) {
     preGameContainer.classList.add('hidden');
+    console.log('🔍 [SIM QUARTER] Pre-game container hidden');
+  } else {
+    console.log('🔍 [SIM QUARTER] Pre-game container not found (may already be hidden)');
   }
   
   // Show sim quarter popup
@@ -223,10 +228,18 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   const titleEl = document.getElementById('sim-quarter-title');
   const contentEl = document.getElementById('sim-quarter-scroll-content');
   
+  console.log('🔍 [SIM QUARTER] Popup elements check:', {
+    popup: !!popup,
+    titleEl: !!titleEl,
+    contentEl: !!contentEl
+  });
+  
   if (!popup || !titleEl || !contentEl) {
-    console.error('Sim quarter popup elements not found');
+    console.error('❌ [SIM QUARTER] Sim quarter popup elements not found - returning early');
     return;
   }
+  
+  console.log('🔍 [SIM QUARTER] All popup elements found, proceeding...');
   
   // Update title
   const periodLabel = quarter <= 4 ? `Q${quarter}` : `OT${quarter - 4}`;
@@ -335,6 +348,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   
   // Show popup before processing shots
   popup.classList.remove('hidden');
+  console.log('🔍 [SIM QUARTER] Popup shown, processing', shotResults.length, 'shots');
   
   // Clear content
   contentEl.innerHTML = '';
@@ -844,7 +858,14 @@ async function handleSimQuarter() {
     }
     
     // ✅ NEW: Show scrolling text popup with shot results
-    await showSimQuarterResults(lastSummary, nextQuarter, homeTeam, awayTeam);
+    console.log('🔍 [SIM QUARTER] About to call showSimQuarterResults');
+    try {
+      await showSimQuarterResults(lastSummary, nextQuarter, homeTeam, awayTeam);
+      console.log('🔍 [SIM QUARTER] showSimQuarterResults completed');
+    } catch (error) {
+      console.error('❌ [SIM QUARTER] Error in showSimQuarterResults:', error);
+      throw error; // Re-throw to prevent continuing if there's an error
+    }
     
     // Check if game is complete (Q4+ and not tied)
     const isGameComplete = lastSummary.is_final === true;
