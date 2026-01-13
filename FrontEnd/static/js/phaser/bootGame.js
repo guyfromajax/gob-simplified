@@ -229,9 +229,9 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   const contentEl = document.getElementById('sim-quarter-scroll-content');
   
   // ✅ NEW: Hide game control buttons when Sim Quarter popup is visible
-  const gameControls = document.querySelector('.game-controls');
-  if (gameControls) {
-    gameControls.style.display = 'none';
+  const gameControlsEl = document.querySelector('.game-controls');
+  if (gameControlsEl) {
+    gameControlsEl.style.display = 'none';
   }
   
   console.log('🔍 [SIM QUARTER] Popup elements check:', {
@@ -485,9 +485,8 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   popup.classList.add('hidden');
   
   // ✅ NEW: Show game control buttons when Sim Quarter popup is hidden
-  const gameControls = document.querySelector('.game-controls');
-  if (gameControls) {
-    gameControls.style.display = '';
+  if (gameControlsEl) {
+    gameControlsEl.style.display = '';
   }
 }
 
