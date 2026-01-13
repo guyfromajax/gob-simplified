@@ -25,3 +25,73 @@
     height: 150px;
   }
 }
+
+/* Top-right button hierarchy redesign */
+#franchise-container #top-right.right-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Secondary buttons on left, hero button on right */
+  gap: 20px; /* Spacing between secondary buttons group and hero button */
+}
+
+/* Secondary buttons group (Set Game Plan, Playbooks, Scouting Report) */
+#franchise-container .secondary-buttons-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+/* Secondary buttons - dark/neutral fills with strong contrast */
+#franchise-container .secondary-btn {
+  background: #2c3e50; /* Dark blue-gray - neutral, professional */
+  color: #fff;
+  border: 1px solid #34495e; /* Slightly lighter border for definition */
+  padding: 10px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: 140px; /* Consistent width */
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+#franchise-container .secondary-btn:hover {
+  background: #34495e;
+  border-color: #4a5f7f;
+  transform: translateY(-1px);
+}
+
+/* Hero button (Run Training) - visually dominant */
+#franchise-container .hero-btn {
+  background: #ff7a00; /* Orange hero color */
+  color: #fff;
+  border: none;
+  padding: 12px 24px; /* Larger padding than secondary buttons */
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'Bebas Neue', cursive;
+  font-size: 24px; /* Larger font size */
+  font-weight: 400;
+  white-space: nowrap;
+  text-align: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(255, 122, 0, 0.3); /* Subtle shadow for depth */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#franchise-container .hero-btn:hover {
+  background: #ff8a1a; /* Slightly lighter orange on hover */
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 122, 0, 0.4);
+}
+
+#franchise-container .hero-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(255, 122, 0, 0.3);
+}
