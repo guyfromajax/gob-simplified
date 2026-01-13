@@ -293,10 +293,18 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   const playerMap = {};
   players.forEach(player => {
     if (player.playerId) {
+      // Determine team side: check if player's team_id matches home team
+      let playerTeam = player.team;
+      if (!playerTeam) {
+        // Fallback: check if player's team_id matches home team's team_id
+        const homeTeamIdFromObj = homeTeamObj?.team_id || homeTeamId;
+        playerTeam = (player.team_id === homeTeamIdFromObj) ? 'home' : 'away';
+      }
+      
       playerMap[player.playerId] = {
         name: player.name || 'Unknown',
         jersey: player.jersey || player.jerseyNumber || player.jersey_number || '',
-        team: player.team || (player.team_id === teamInfo.home?.team_id ? 'home' : 'away')
+        team: playerTeam
       };
     }
   });
