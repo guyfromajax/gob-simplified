@@ -238,22 +238,41 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     quarterEl.textContent = periodLabel;
   }
   
-  // Get team colors from team objects (SS&S: same pattern as gameScene.js)
-  // Works across all modes (Single, Tournament, Franchise) - always present in summarize_game_state()
-  // Debug: Log the structure to verify colors are present
-  console.log('🔍 [SIM QUARTER] Team color debug:', {
-    home_team: lastSummary.home_team,
-    away_team: lastSummary.away_team,
-    home_team_colors: lastSummary.home_team?.colors,
-    away_team_colors: lastSummary.away_team?.colors,
-    home_primary: lastSummary.home_team?.colors?.primary_color,
-    away_primary: lastSummary.away_team?.colors?.primary_color
+  // Get team colors (SS&S: same pattern as gameScene.js - check unified structure first, then fallback)
+  // Works across all modes (Single, Tournament, Franchise)
+  const homeTeamId = lastSummary.home_team_id;
+  const awayTeamId = lastSummary.away_team_id;
+  const teamsObj = lastSummary.teams || {};
+  
+  // Try unified structure first (teams[team_id])
+  let homeTeamObj = homeTeamId && teamsObj[homeTeamId] ? teamsObj[homeTeamId] : null;
+  let awayTeamObj = awayTeamId && teamsObj[awayTeamId] ? teamsObj[awayTeamId] : null;
+  
+  // Fallback to direct home_team/away_team objects (backward compatibility)
+  if (!homeTeamObj) {
+    homeTeamObj = typeof lastSummary.home_team === 'object' ? lastSummary.home_team : null;
+  }
+  if (!awayTeamObj) {
+    awayTeamObj = typeof lastSummary.away_team === 'object' ? lastSummary.away_team : null;
+  }
+  
+  // Extract colors (same pattern as gameScene.js line 375-376)
+  const homeColors = homeTeamObj?.colors || lastSummary.home_team_colors;
+  const awayColors = awayTeamObj?.colors || lastSummary.away_team_colors;
+  
+  const homeColor = homeColors?.primary_color || '#ff6200';
+  const awayColor = awayColors?.primary_color || '#ff6200';
+  
+  console.log('🔍 [SIM QUARTER] Team colors resolved:', {
+    homeTeamId,
+    awayTeamId,
+    homeTeamObj: !!homeTeamObj,
+    awayTeamObj: !!awayTeamObj,
+    homeColors,
+    awayColors,
+    homeColor,
+    awayColor
   });
-  
-  const homeColor = lastSummary.home_team?.colors?.primary_color || '#ff6200';
-  const awayColor = lastSummary.away_team?.colors?.primary_color || '#ff6200';
-  
-  console.log('🔍 [SIM QUARTER] Resolved colors:', { homeColor, awayColor });
   
   const players = lastSummary.players || [];
   
