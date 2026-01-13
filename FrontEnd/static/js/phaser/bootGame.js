@@ -501,7 +501,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     const noShotsMsg = document.createElement('div');
     noShotsMsg.className = 'sim-quarter-shot-entry';
     noShotsMsg.style.textAlign = 'center';
-    noShotsMsg.style.color = '#fff';
+    noShotsMsg.style.color = '#111827';
     noShotsMsg.textContent = 'No shots in this quarter.';
     contentEl.appendChild(noShotsMsg);
   }
