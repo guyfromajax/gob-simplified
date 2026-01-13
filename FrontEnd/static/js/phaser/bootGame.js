@@ -241,7 +241,10 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   
   console.log('🔍 [SIM QUARTER] All popup elements found, proceeding...');
   
-  // Update title - quarter parameter is the quarter we're about to simulate (correct)
+  // ✅ FIX: Quarter display - show the quarter we're simulating, but for display purposes
+  // when we're at Q1 break (quarter=1) and simulating Q2, the title should show Q2 (correct)
+  // But the user wants the quarter value to be accurate, so we use quarter parameter directly
+  // The quarter parameter passed in is the quarter we're about to simulate (nextQuarter)
   const periodLabel = quarter <= 4 ? `Q${quarter}` : `OT${quarter - 4}`;
   titleEl.textContent = `Simulating ${periodLabel}...`;
   
