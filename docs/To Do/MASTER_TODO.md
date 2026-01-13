@@ -229,7 +229,7 @@ The following items have been completed and moved to `docs/To Do/Archive/`:
 - `0_alpha_launch_plan.md` - Alpha launch planning
 
 ### Reference / Analysis Documents
-These documents provide analysis, comparisons, or strategic guidance but are not active tasks:
+These documents provide analysis, comparisons, or strategic guidance but are not active tasks. They are located in `docs/Reference/`:
 
 - `timeout_v_quarterbreak.md` - Comparison of timeout vs quarter break data persistence
 - `Tournament_vs_Franchise_Player_Stats_Comparison.md` - Comparison of player stats flow
