@@ -364,6 +364,40 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   
   const eventResults = [];
   
+  // ✅ FIX: Helper function to determine player team from turn data (SS&S: use turn.offense_team_id)
+  const getPlayerTeam = (playerId, defaultTeam = 'home') => {
+    const playerData = playerMap[playerId];
+    if (!playerData) return defaultTeam;
+    
+    // ✅ FIX: Use turn.offense_team_id as authoritative source for team determination
+    if (turn.offense_team_id) {
+      const isHomeOffense = turn.offense_team_id === homeTeamIdForComparison;
+      
+      // For shots, putbacks, free throws, turnovers: player is on offense_team_id
+      if (resultType === 'MAKE' || resultType === 'MISS' || resultType === 'PUTBACK_MAKE' || 
+          resultType === 'PUTBACK_MISS' || resultType === 'FREE_THROW' || 
+          resultType === 'DEAD BALL' || resultType === 'TURNOVER') {
+        return isHomeOffense ? 'home' : 'away';
+      }
+      // For steals: stealer is on defense team (opposite of offense_team_id)
+      else if (resultType === 'STEAL') {
+        return isHomeOffense ? 'away' : 'home'; // Stealer is on defense team
+      }
+      // For fouls: if fouler is ball_handler, they're on offense; otherwise use playerData.team
+      else if (resultType === 'FOUL') {
+        // If fouler is ball_handler, they're on offense
+        if (turn.ball_handler === playerId) {
+          return isHomeOffense ? 'home' : 'away';
+        }
+        // Otherwise, fouler is on defense (opposite of offense)
+        return isHomeOffense ? 'away' : 'home';
+      }
+    }
+    
+    // Fallback to playerData.team (from playerMap)
+    return playerData.team || defaultTeam;
+  };
+  
   turns.forEach((turn, index) => {
     const timeRemaining = turn.time_remaining || turn.clock || turn.game_clock || '0:00';
     const turnScore = turn.score || {};
@@ -380,6 +414,9 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       const shooterId = turn.shooter_id || turn.shooter?.player_id || turn.shooter;
       const shooterData = playerMap[shooterId] || { name: turn.shooter || 'Unknown', jersey: '', team: 'home' };
       
+      // ✅ FIX: Use turn.offense_team_id to determine team (shooter is on offense)
+      const playerTeam = getPlayerTeam(shooterId, shooterData.team);
+      
       // Determine shot type (2-pt or 3-pt)
       const points = turn.points || 0;
       const shotType = points === 3 ? '3-pt' : '2-pt';
@@ -392,7 +429,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         timeRemaining,
         playerName: shooterData.name,
         playerJersey: shooterData.jersey,
-        playerTeam: shooterData.team,
+        playerTeam: playerTeam,
         resultType: resultType,
         eventType: 'SHOT',
         shotType,
@@ -405,6 +442,9 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       const shooterId = turn.shooter_id || turn.shooter?.player_id || turn.shooter || turn.rebounderId;
       const shooterData = playerMap[shooterId] || { name: turn.shooter || 'Unknown', jersey: '', team: 'home' };
       
+      // ✅ FIX: Use turn.offense_team_id to determine team (shooter is on offense)
+      const playerTeam = getPlayerTeam(shooterId, shooterData.team);
+      
       const points = turn.points || 0;
       const shotType = points === 3 ? '3-pt' : '2-pt';
       
@@ -412,7 +452,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         timeRemaining,
         playerName: shooterData.name,
         playerJersey: shooterData.jersey,
-        playerTeam: shooterData.team,
+        playerTeam: playerTeam,
         resultType: resultType === 'PUTBACK_MAKE' ? 'MAKE' : 'MISS',
         eventType: 'OREB_PUTBACK',
         shotType,
@@ -425,13 +465,16 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       const shooterId = turn.shooter_id || turn.shooter?.player_id || turn.shooter;
       const shooterData = playerMap[shooterId] || { name: turn.shooter || 'Unknown', jersey: '', team: 'home' };
       
+      // ✅ FIX: Use turn.offense_team_id to determine team (shooter is on offense)
+      const playerTeam = getPlayerTeam(shooterId, shooterData.team);
+      
       const made = (turn.points || 0) > 0;
       
       eventResults.push({
         timeRemaining,
         playerName: shooterData.name,
         playerJersey: shooterData.jersey,
-        playerTeam: shooterData.team,
+        playerTeam: playerTeam,
         resultType: made ? 'MAKE' : 'MISS',
         eventType: 'FREE_THROW',
         shotType: 'free throw',
@@ -444,11 +487,14 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       const foulerId = turn.fouler_id || turn.ball_handler || turn.shooter_id;
       const foulerData = playerMap[foulerId] || { name: turn.fouler || turn.ball_handler || 'Unknown', jersey: '', team: 'home' };
       
+      // ✅ FIX: Use turn.offense_team_id if fouler is ball_handler, otherwise use playerData.team
+      const playerTeam = getPlayerTeam(foulerId, foulerData.team);
+      
       eventResults.push({
         timeRemaining,
         playerName: foulerData.name,
         playerJersey: foulerData.jersey,
-        playerTeam: foulerData.team,
+        playerTeam: playerTeam,
         resultType: 'FOUL',
         eventType: 'FOUL',
         shotType: null,
@@ -461,11 +507,14 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       const victimId = turn.victim_id || turn.ball_handler || turn.shooter_id;
       const victimData = playerMap[victimId] || { name: turn.victim_name || turn.ball_handler || 'Unknown', jersey: '', team: 'home' };
       
+      // ✅ FIX: Use turn.offense_team_id to determine team (victim is on offense)
+      const playerTeam = getPlayerTeam(victimId, victimData.team);
+      
       eventResults.push({
         timeRemaining,
         playerName: victimData.name,
         playerJersey: victimData.jersey,
-        playerTeam: victimData.team,
+        playerTeam: playerTeam,
         resultType: 'TURNOVER',
         eventType: 'DEAD_BALL',
         shotType: null,
@@ -478,11 +527,14 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       const stealerId = turn.stealer_id || turn.ball_handler;
       const stealerData = playerMap[stealerId] || { name: turn.stealer_name || 'Unknown', jersey: '', team: 'home' };
       
+      // ✅ FIX: Use turn.offense_team_id to determine team (stealer is on defense, opposite of offense)
+      const playerTeam = getPlayerTeam(stealerId, stealerData.team);
+      
       eventResults.push({
         timeRemaining,
         playerName: stealerData.name,
         playerJersey: stealerData.jersey,
-        playerTeam: stealerData.team,
+        playerTeam: playerTeam,
         resultType: 'STEAL',
         eventType: 'STEAL',
         shotType: null,
