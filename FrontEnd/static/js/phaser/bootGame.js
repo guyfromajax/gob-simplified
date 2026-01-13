@@ -214,6 +214,16 @@ function showStatus(msg) {
 async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   console.log('🔍 [SIM QUARTER] showSimQuarterResults called', { quarter, homeTeam, awayTeam });
   
+  // Set scoreboard logos (GameScene doesn't start during Sim Quarter, so set them here)
+  const homeLogoEl = document.getElementById('home-logo');
+  const awayLogoEl = document.getElementById('away-logo');
+  if (homeLogoEl && homeTeam) {
+    homeLogoEl.src = `/images/homepage-logos/${encodeURIComponent(homeTeam)}.png`;
+  }
+  if (awayLogoEl && awayTeam) {
+    awayLogoEl.src = `/images/homepage-logos/${encodeURIComponent(awayTeam)}.png`;
+  }
+  
   // Hide pre-game container
   const preGameContainer = document.querySelector('.pre-game-container');
   if (preGameContainer) {
