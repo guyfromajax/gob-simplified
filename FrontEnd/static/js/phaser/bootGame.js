@@ -383,8 +383,8 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       scrollContainer.scrollTop = scrollContainer.scrollHeight;
     }
     
-    // Small delay for scrolling effect (50ms per shot)
-    await new Promise(resolve => setTimeout(resolve, 50));
+    // 2 second delay for real-time feel (users experience each shot)
+    await new Promise(resolve => setTimeout(resolve, 2000));
   }
   
   // If no shots, show message
