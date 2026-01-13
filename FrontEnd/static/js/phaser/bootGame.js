@@ -472,11 +472,11 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         
         // Build text with colored player name and jersey (removed score line - now in scoreboard)
         const resultText = shot.resultType === 'MAKE' ? 'makes' : 'misses';
-        // Colors: Clock value #9a9a9a, Normal copy #e6e6e6, Team colors for player name
+        // Colors: Clock value #374151, Normal copy #111827, Team colors for player name
         entry.innerHTML = `
-          <span style="color: #9a9a9a;">[${timeDisplay}]: </span>
+          <span style="color: #374151;">[${timeDisplay}]: </span>
           <span style="color: ${teamColor}; font-weight: bold;">${shot.shooterName}${jerseyDisplay}</span>
-          <span style="color: #e6e6e6;"> ${resultText} the ${shot.shotType} shot.</span>
+          <span style="color: #111827;"> ${resultText} the ${shot.shotType} shot.</span>
         `;
         
         contentEl.appendChild(entry);
