@@ -759,16 +759,18 @@
     /* Sim Quarter Scrolling Text Popup */
     .sim-quarter-popup {
       position: absolute;
-      top: 30%;
+      top: var(--scoreboard-height);
       left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0, 0, 0, 0.95);
-      border: 4px solid #ff6200;
+      transform: translateX(-50%);
+      background: #111111;
+      border: 2px solid #2a2a2d;
       border-radius: 12px;
-      padding: 30px 50px;
+      padding: 20px 50px;
       width: 600px;
       max-width: 90%;
-      max-height: 500px;
+      height: calc(100vh - var(--scoreboard-height) - 40px);
+      margin-top: 20px;
+      margin-bottom: 20px;
       z-index: 200;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
       display: flex;
@@ -800,8 +802,8 @@
       flex: 1;
       overflow-y: auto;
       overflow-x: hidden;
-      max-height: 400px;
       padding-right: 10px;
+      min-height: 0; /* Allows flex child to shrink */
     }
 
     .sim-quarter-scroll-container::-webkit-scrollbar {
@@ -822,7 +824,7 @@
       font-family: 'Bebas Neue', sans-serif;
       font-size: 18px;
       line-height: 1.8;
-      color: #fff;
+      color: #e6e6e6;
     }
 
     .sim-quarter-shot-entry {
