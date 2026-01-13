@@ -30,8 +30,8 @@
 #franchise-container #top-right.right-controls {
   display: flex;
   align-items: center;
-  justify-content: flex-end; /* Align everything to the right */
-  gap: 12px; /* Reduced spacing between secondary buttons group and hero button */
+  justify-content: space-between; /* Secondary buttons on left, hero button on right - equal spacing */
+  gap: 12px; /* Gap between secondary buttons group and hero button */
 }
 
 /* Secondary buttons group (Set Game Plan, Playbooks, Scouting Report) */
