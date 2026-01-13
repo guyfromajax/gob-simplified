@@ -37,8 +37,9 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 
 ### 0.1 Alpha Environment Flag
 - [ ] Add `IS_ALPHA=true` to **production** environment variables
-- [ ] Add an “ALPHA” badge in the UI (persistent and visible)
+- [ ] Add an "ALPHA" badge in the UI (persistent and visible)
 - [ ] Add alpha disclaimer copy on signup/login/home (at minimum)
+- [ ] **Note:** `IS_ALPHA` flag controls whether one-time passwords (OTPs) are required for signup
 
 ### 0.2 Alpha Data Disclaimer
 - [ ] Add copy: **“This is an alpha. Data may be wiped without notice.”**
@@ -52,8 +53,17 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 - [ ] Create a safe script/process to wipe alpha data (users + all dependent game data)
 - [ ] Script should wipe: `games`, `tournaments`, `franchises`, `users` collections
 - [ ] Script should preserve: `teams`, `players`, `plays` (universal reference data)
+- [ ] **OTP Collection:** Decide whether to wipe `alpha_otps` collection or preserve for tracking
 - [ ] Test wipe process in staging
 - [ ] Document exactly how to run it
+
+### 0.5 One-Time Password (OTP) System Setup
+- [ ] Create `alpha_otps` collection in MongoDB
+- [ ] OTP schema: `otp_code` (unique string), `used` (boolean), `used_by_email` (string, nullable), `used_at` (timestamp, nullable), `created_at` (timestamp)
+- [ ] Create script to generate ~200 OTP codes (8-12 character alphanumeric codes)
+- [ ] Insert OTPs into database (all marked as `used: false`)
+- [ ] Store OTP list securely (for distribution to alpha testers)
+- [ ] **Note:** OTPs are only validated when `IS_ALPHA=true`
 
 ---
 
@@ -63,14 +73,28 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 - [ ] Use email + password + JWT for alpha (keep it simple)
 - [ ] Define user schema: `user_id`, `email`, `password_hash`, `created_at`, `role`, `version`
 - [ ] **Standardize on `role` field** (values: `"user"`, `"admin"`) - not `is_admin` boolean
+- [ ] **Alpha OTP Requirement:** When `IS_ALPHA=true`, signup requires valid, unused OTP code
+- [ ] **OTP Validation:** Check `IS_ALPHA` env var to determine if OTP validation is required
 
 ### 1.2 Signup Flow
 - [ ] Create signup page (`/signup.html`)
+  - [ ] Add OTP input field (only visible when `IS_ALPHA=true`)
+  - [ ] Add helper text: "Alpha access code required" when in alpha mode
 - [ ] Create API endpoint (`POST /api/auth/signup`)
-- [ ] Validate inputs (email format, password rules)
+  - [ ] Validate inputs (email format, password rules)
+  - [ ] **If `IS_ALPHA=true`:**
+    - [ ] Require `otp_code` in request body
+    - [ ] Validate OTP exists in `alpha_otps` collection
+    - [ ] Verify OTP is unused (`used: false`)
+    - [ ] Verify OTP hasn't been used by another email (check `used_by_email` is null)
+    - [ ] Mark OTP as used: set `used: true`, `used_by_email: email`, `used_at: timestamp`
+    - [ ] Return error if OTP is invalid, already used, or used by different email
+  - [ ] **If `IS_ALPHA=false`:**
+    - [ ] Skip OTP validation (normal signup flow)
 - [ ] Hash passwords securely (bcrypt or argon2)
 - [ ] Create user doc in MongoDB
 - [ ] Handle duplicate email errors gracefully
+- [ ] Handle invalid/used OTP errors gracefully
 
 ### 1.3 Login Flow
 - [ ] Create login page (`/login.html`)
@@ -95,6 +119,12 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 - [ ] Refresh page → session persists
 - [ ] Logout works
 - [ ] Invalid login error messaging works
+- [ ] **OTP Testing (when `IS_ALPHA=true`):**
+  - [ ] Valid OTP allows signup
+  - [ ] Invalid OTP rejects signup
+  - [ ] Used OTP rejects signup (cannot reuse)
+  - [ ] Same OTP cannot be used by different email
+  - [ ] OTP field hidden when `IS_ALPHA=false`
 
 ---
 
@@ -407,6 +437,10 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 4. **Email Service:** Password reset only for alpha (full service post-launch)
 5. **Security:** Essential items only (Steps 1, 5, 6). Advanced security post-launch.
 6. **Data Wipe:** Will wipe `games`, `tournaments`, `franchises`, `users` at launch. Preserve universal reference data (`teams`, `players`, `plays`).
+7. **Alpha Access Control:** One-time passwords (OTPs) required for signup when `IS_ALPHA=true`. ~200 OTPs generated, each usable once by one email. OTP validation disabled when `IS_ALPHA=false`.
 
 ### Testing Reference
 - See `Final_Testing_Checklist.md` for detailed test scenarios (Step 11 references this)
+
+### OTP Implementation Reference
+- See `OTP_Implementation_Guide.md` for detailed implementation guide for one-time passwords
