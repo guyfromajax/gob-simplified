@@ -375,7 +375,8 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     
     // Process different event types
     if (resultType === 'MAKE' || resultType === 'MISS') {
-      // Regular shots or Fast Break shots
+      // Regular shots, Fast Break shots, FCP shots, or HCT shots
+      // Note: FCP/HCT shots have result_type 'MAKE'/'MISS' with fcp_shot/hct_shot flags, so they're captured here
       const shooterId = turn.shooter_id || turn.shooter?.player_id || turn.shooter;
       const shooterData = playerMap[shooterId] || { name: turn.shooter || 'Unknown', jersey: '', team: 'home' };
       
@@ -386,7 +387,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       const points = turn.points || 0;
       const shotType = points === 3 ? '3-pt' : '2-pt';
       
-      // Check if this is a Fast Break shot
+      // Check if this is a Fast Break shot (for prefix display)
       const isFastBreak = turn.fast_break === true || turn.offensive_state === 'FAST_BREAK' || 
                          turn.current_turn === 'FAST_BREAK';
       
@@ -619,7 +620,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       let prefix = '';
       
       if (event.eventType === 'SHOT') {
-        // Regular shot or Fast Break shot
+        // Regular shot or Fast Break shot (FCP/HCT shots also included but no prefix)
         if (event.isFastBreak) {
           prefix = '[Fast Break] ';
         }
