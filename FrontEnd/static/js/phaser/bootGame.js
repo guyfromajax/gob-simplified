@@ -349,11 +349,21 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     console.log('🔍 [SIM QUARTER] Trying quarter-1 filter:', turns.length, 'turns found');
   }
   
-  const shotResults = [];
+  const eventResults = [];
   
   turns.forEach((turn, index) => {
-    // Only process shot results (MAKE or MISS)
-    if (turn.result_type === 'MAKE' || turn.result_type === 'MISS') {
+    const timeRemaining = turn.time_remaining || turn.clock || turn.game_clock || '0:00';
+    const turnScore = turn.score || {};
+    const homeScore = typeof turnScore[homeTeamName] === 'number' ? turnScore[homeTeamName] : 
+                     (typeof turnScore[homeTeam] === 'number' ? turnScore[homeTeam] : 0);
+    const awayScore = typeof turnScore[awayTeamName] === 'number' ? turnScore[awayTeamName] : 
+                     (typeof turnScore[awayTeam] === 'number' ? turnScore[awayTeam] : 0);
+    
+    const resultType = turn.result_type;
+    
+    // Process different event types
+    if (resultType === 'MAKE' || resultType === 'MISS') {
+      // Regular shots or Fast Break shots
       const shooterId = turn.shooter_id || turn.shooter?.player_id || turn.shooter;
       const shooterData = playerMap[shooterId] || { name: turn.shooter || 'Unknown', jersey: '', team: 'home' };
       
@@ -361,33 +371,118 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       const points = turn.points || 0;
       const shotType = points === 3 ? '3-pt' : '2-pt';
       
-      // Get time remaining
-      const timeRemaining = turn.time_remaining || turn.clock || turn.game_clock || '0:00';
+      // Check if this is a Fast Break shot
+      const isFastBreak = turn.fast_break === true || turn.offensive_state === 'FAST_BREAK' || 
+                         turn.current_turn === 'FAST_BREAK';
       
-      // SS&S: Use turn.score (authoritative) - same pattern as updateScoreboard in gameScene.js
-      // turn.score is a dict with team names as keys: {homeTeamName: score, awayTeamName: score}
-      const turnScore = turn.score || {};
-      const homeScore = typeof turnScore[homeTeamName] === 'number' ? turnScore[homeTeamName] : 
-                       (typeof turnScore[homeTeam] === 'number' ? turnScore[homeTeam] : 0);
-      const awayScore = typeof turnScore[awayTeamName] === 'number' ? turnScore[awayTeamName] : 
-                       (typeof turnScore[awayTeam] === 'number' ? turnScore[awayTeam] : 0);
-      
-      shotResults.push({
+      eventResults.push({
         timeRemaining,
-        shooterName: shooterData.name,
-        shooterJersey: shooterData.jersey,
-        shooterTeam: shooterData.team,
-        resultType: turn.result_type,
+        playerName: shooterData.name,
+        playerJersey: shooterData.jersey,
+        playerTeam: shooterData.team,
+        resultType: resultType,
+        eventType: 'SHOT',
         shotType,
+        isFastBreak,
+        homeScore,
+        awayScore
+      });
+    } else if (resultType === 'PUTBACK_MAKE' || resultType === 'PUTBACK_MISS') {
+      // OREB putback attempts
+      const shooterId = turn.shooter_id || turn.shooter?.player_id || turn.shooter || turn.rebounderId;
+      const shooterData = playerMap[shooterId] || { name: turn.shooter || 'Unknown', jersey: '', team: 'home' };
+      
+      const points = turn.points || 0;
+      const shotType = points === 3 ? '3-pt' : '2-pt';
+      
+      eventResults.push({
+        timeRemaining,
+        playerName: shooterData.name,
+        playerJersey: shooterData.jersey,
+        playerTeam: shooterData.team,
+        resultType: resultType === 'PUTBACK_MAKE' ? 'MAKE' : 'MISS',
+        eventType: 'OREB_PUTBACK',
+        shotType,
+        isFastBreak: false,
+        homeScore,
+        awayScore
+      });
+    } else if (resultType === 'FREE_THROW') {
+      // Free throws (made or missed based on points)
+      const shooterId = turn.shooter_id || turn.shooter?.player_id || turn.shooter;
+      const shooterData = playerMap[shooterId] || { name: turn.shooter || 'Unknown', jersey: '', team: 'home' };
+      
+      const made = (turn.points || 0) > 0;
+      
+      eventResults.push({
+        timeRemaining,
+        playerName: shooterData.name,
+        playerJersey: shooterData.jersey,
+        playerTeam: shooterData.team,
+        resultType: made ? 'MAKE' : 'MISS',
+        eventType: 'FREE_THROW',
+        shotType: 'free throw',
+        isFastBreak: false,
+        homeScore,
+        awayScore
+      });
+    } else if (resultType === 'FOUL') {
+      // Fouls
+      const foulerId = turn.fouler_id || turn.ball_handler || turn.shooter_id;
+      const foulerData = playerMap[foulerId] || { name: turn.fouler || turn.ball_handler || 'Unknown', jersey: '', team: 'home' };
+      
+      eventResults.push({
+        timeRemaining,
+        playerName: foulerData.name,
+        playerJersey: foulerData.jersey,
+        playerTeam: foulerData.team,
+        resultType: 'FOUL',
+        eventType: 'FOUL',
+        shotType: null,
+        isFastBreak: false,
+        homeScore,
+        awayScore
+      });
+    } else if (resultType === 'DEAD BALL' || resultType === 'TURNOVER') {
+      // Dead ball turnovers
+      const victimId = turn.victim_id || turn.ball_handler || turn.shooter_id;
+      const victimData = playerMap[victimId] || { name: turn.victim_name || turn.ball_handler || 'Unknown', jersey: '', team: 'home' };
+      
+      eventResults.push({
+        timeRemaining,
+        playerName: victimData.name,
+        playerJersey: victimData.jersey,
+        playerTeam: victimData.team,
+        resultType: 'TURNOVER',
+        eventType: 'DEAD_BALL',
+        shotType: null,
+        isFastBreak: false,
+        homeScore,
+        awayScore
+      });
+    } else if (resultType === 'STEAL') {
+      // Steals
+      const stealerId = turn.stealer_id || turn.ball_handler;
+      const stealerData = playerMap[stealerId] || { name: turn.stealer_name || 'Unknown', jersey: '', team: 'home' };
+      
+      eventResults.push({
+        timeRemaining,
+        playerName: stealerData.name,
+        playerJersey: stealerData.jersey,
+        playerTeam: stealerData.team,
+        resultType: 'STEAL',
+        eventType: 'STEAL',
+        shotType: null,
+        isFastBreak: false,
         homeScore,
         awayScore
       });
     }
   });
   
-  // Show popup before processing shots
+  // Show popup before processing events
   popup.classList.remove('hidden');
-  console.log('🔍 [SIM QUARTER] Popup shown, processing', shotResults.length, 'shots');
+  console.log('🔍 [SIM QUARTER] Popup shown, processing', eventResults.length, 'events');
   
   // Clear content
   contentEl.innerHTML = '';
@@ -412,18 +507,24 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
                        (typeof firstTurnScore[awayTeam] === 'number' ? firstTurnScore[awayTeam] : 0);
   }
   
-  // ✅ NEW: Get clock element for real-time updates
+  // ✅ NEW: Get clock and quarter elements for real-time updates
   const clockEl = document.getElementById('game-clock');
+  const quarterEl = document.getElementById('quarter');
+  
+  // ✅ NEW: Update scoreboard quarter to show the quarter being simulated
+  if (quarterEl) {
+    quarterEl.textContent = periodLabel;
+  }
   
   // ✅ NEW: Initialize scoreboard with starting scores
   if (homeScoreEl) homeScoreEl.textContent = displayHomeScore;
   if (awayScoreEl) awayScoreEl.textContent = displayAwayScore;
   
-  // Process all turns to update clock in real-time, but only create entries for shots
+  // Process all turns to update clock in real-time, create entries for all event types
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
     
-    // ✅ NEW: Update clock with each turn's time_remaining (not just shots)
+    // ✅ NEW: Update clock with each turn's time_remaining (all turns)
     if (clockEl && (turn.time_remaining !== undefined || turn.clock || turn.game_clock)) {
       let timeValue = turn.time_remaining || turn.clock || turn.game_clock;
       // Convert seconds to MM:SS format if needed
@@ -435,69 +536,98 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       clockEl.textContent = timeValue;
     }
     
-    // Only create shot entry for shot results
-    if (turn.result_type === 'MAKE' || turn.result_type === 'MISS') {
-      // Find corresponding shot in shotResults array
-      const shot = shotResults.find(s => 
-        s.timeRemaining === (turn.time_remaining || turn.clock || turn.game_clock) &&
-        s.resultType === turn.result_type
-      );
-      
-      if (shot) {
-        // SS&S: Use authoritative score from turn (same as updateScoreboard)
-        displayHomeScore = shot.homeScore;
-        displayAwayScore = shot.awayScore;
+    // Find corresponding event in eventResults array
+    const event = eventResults.find(e => 
+      e.timeRemaining === (turn.time_remaining || turn.clock || turn.game_clock) &&
+      e.resultType === turn.result_type
+    );
+    
+    if (event) {
+      // Update scores if they changed
+      if (event.homeScore !== displayHomeScore || event.awayScore !== displayAwayScore) {
+        displayHomeScore = event.homeScore;
+        displayAwayScore = event.awayScore;
         
         // ✅ NEW: Update scoreboard in real-time (SS&S: same pattern as gameScene.js updateScoreboard)
         if (homeScoreEl) homeScoreEl.textContent = displayHomeScore;
         if (awayScoreEl) awayScoreEl.textContent = displayAwayScore;
-        
-        // Create shot entry
-        const entry = document.createElement('div');
-        entry.className = 'sim-quarter-shot-entry';
-        
-        // Determine team color
-        const teamColor = shot.shooterTeam === 'home' ? homeColor : awayColor;
-        
-        // Format time (convert seconds to MM:SS if needed)
-        let timeDisplay = shot.timeRemaining;
-        if (typeof shot.timeRemaining === 'number') {
-          const minutes = Math.floor(shot.timeRemaining / 60);
-          const seconds = Math.floor(shot.timeRemaining % 60);
-          timeDisplay = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        }
-        
-        // Format jersey number
-        const jerseyDisplay = shot.shooterJersey ? ` (#${shot.shooterJersey})` : '';
-        
-        // Build text with colored player name and jersey (removed score line - now in scoreboard)
-        const resultText = shot.resultType === 'MAKE' ? 'makes' : 'misses';
-        // Colors: Clock value #374151, Normal copy #111827, Team colors for player name
-        entry.innerHTML = `
-          <span style="color: #374151;">[${timeDisplay}]: </span>
-          <span style="color: ${teamColor}; font-weight: bold;">${shot.shooterName}${jerseyDisplay}</span>
-          <span style="color: #111827;"> ${resultText} the ${shot.shotType} shot.</span>
-        `;
-        
-        contentEl.appendChild(entry);
-        
-        // Scroll to bottom
-        const scrollContainer = popup.querySelector('.sim-quarter-scroll-container');
-        if (scrollContainer) {
-          scrollContainer.scrollTop = scrollContainer.scrollHeight;
-        }
-        
-        // 2 second delay for real-time feel (users experience each shot)
-        await new Promise(resolve => setTimeout(resolve, 2000));
       }
+      
+      // Create event entry
+      const entry = document.createElement('div');
+      entry.className = 'sim-quarter-shot-entry';
+      
+      // Determine team color
+      const teamColor = event.playerTeam === 'home' ? homeColor : awayColor;
+      
+      // Format time (convert seconds to MM:SS if needed)
+      let timeDisplay = event.timeRemaining;
+      if (typeof event.timeRemaining === 'number') {
+        const minutes = Math.floor(event.timeRemaining / 60);
+        const seconds = Math.floor(event.timeRemaining % 60);
+        timeDisplay = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      }
+      
+      // Format jersey number
+      const jerseyDisplay = event.playerJersey ? ` (#${event.playerJersey})` : '';
+      
+      // Build event text based on event type
+      let eventText = '';
+      let prefix = '';
+      
+      if (event.eventType === 'SHOT') {
+        // Regular shot or Fast Break shot
+        if (event.isFastBreak) {
+          prefix = '[Fast Break] ';
+        }
+        const resultText = event.resultType === 'MAKE' ? 'makes' : 'misses';
+        eventText = `${resultText} the ${event.shotType} shot.`;
+      } else if (event.eventType === 'OREB_PUTBACK') {
+        // OREB putback
+        prefix = '[Off Rebound] ';
+        const resultText = event.resultType === 'MAKE' ? 'makes' : 'misses';
+        eventText = `${resultText} the ${event.shotType} shot.`;
+      } else if (event.eventType === 'FREE_THROW') {
+        // Free throw
+        const resultText = event.resultType === 'MAKE' ? 'makes' : 'misses';
+        eventText = `${resultText} the ${event.shotType}.`;
+      } else if (event.eventType === 'FOUL') {
+        // Foul
+        eventText = 'commits a foul.';
+      } else if (event.eventType === 'DEAD_BALL') {
+        // Dead ball turnover
+        eventText = 'turnover (dead ball).';
+      } else if (event.eventType === 'STEAL') {
+        // Steal
+        eventText = 'steals the ball.';
+      }
+      
+      // Colors: Clock value #374151, Normal copy #111827, Team colors for player name
+      entry.innerHTML = `
+        <span style="color: #374151;">[${timeDisplay}]: </span>
+        ${prefix ? `<span style="color: #374151;">${prefix}</span>` : ''}
+        <span style="color: ${teamColor}; font-weight: bold;">${event.playerName}${jerseyDisplay}</span>
+        <span style="color: #111827;"> ${eventText}</span>
+      `;
+      
+      contentEl.appendChild(entry);
+      
+      // Scroll to bottom
+      const scrollContainer = popup.querySelector('.sim-quarter-scroll-container');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+      
+      // 2 second delay for real-time feel (users experience each event)
+      await new Promise(resolve => setTimeout(resolve, 2000));
     } else {
-      // Not a shot turn, just update clock with small delay
+      // Not an event we display, just update clock with small delay
       await new Promise(resolve => setTimeout(resolve, 200)); // Small delay for clock updates
     }
   }
   
-  // If no shots, show message
-  if (shotResults.length === 0) {
+  // If no events, show message
+  if (eventResults.length === 0) {
     const noShotsMsg = document.createElement('div');
     noShotsMsg.className = 'sim-quarter-shot-entry';
     noShotsMsg.style.textAlign = 'center';
