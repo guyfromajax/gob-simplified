@@ -298,15 +298,28 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   const players = lastSummary.players || [];
   
   // Create player lookup map (playerId -> {name, jersey, team})
+  // ✅ FIX: Use team_id comparison to reliably determine home/away (SS&S: single source of truth)
   const playerMap = {};
+  const homeTeamIdForComparison = homeTeamObj?.team_id || homeTeamId;
+  const awayTeamIdForComparison = awayTeamObj?.team_id || awayTeamId;
+  
   players.forEach(player => {
     if (player.playerId) {
-      // Determine team side: check if player's team_id matches home team
-      let playerTeam = player.team;
-      if (!playerTeam) {
-        // Fallback: check if player's team_id matches home team's team_id
-        const homeTeamIdFromObj = homeTeamObj?.team_id || homeTeamId;
-        playerTeam = (player.team_id === homeTeamIdFromObj) ? 'home' : 'away';
+      // ✅ FIX: Always determine team by comparing team_id (most reliable method)
+      // This ensures player colors are always correct regardless of player.team field
+      let playerTeam = 'home'; // Default fallback
+      if (player.team_id) {
+        if (player.team_id === homeTeamIdForComparison) {
+          playerTeam = 'home';
+        } else if (player.team_id === awayTeamIdForComparison) {
+          playerTeam = 'away';
+        } else {
+          // Fallback: use player.team if team_id doesn't match (shouldn't happen, but safe)
+          playerTeam = player.team || 'home';
+        }
+      } else {
+        // Fallback: use player.team if team_id not available
+        playerTeam = player.team || 'home';
       }
       
       playerMap[player.playerId] = {
