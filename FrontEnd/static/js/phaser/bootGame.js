@@ -364,7 +364,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   
   const eventResults = [];
   
-  // ✅ FIX: Helper function to determine player team from turn data (SS&S: use turn.offense_team_id)
+  // ✅ FIX: Helper function to determine player team from turn data (SS&S: use turn.offense_team_id and turn.foul_team)
   const getPlayerTeam = (playerId, defaultTeam = 'home') => {
     const playerData = playerMap[playerId];
     if (!playerData) return defaultTeam;
@@ -383,13 +383,22 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       else if (resultType === 'STEAL') {
         return isHomeOffense ? 'away' : 'home'; // Stealer is on defense team
       }
-      // For fouls: if fouler is ball_handler, they're on offense; otherwise use playerData.team
+      // For fouls: use turn.foul_team if available (most reliable)
       else if (resultType === 'FOUL') {
-        // If fouler is ball_handler, they're on offense
+        // ✅ FIX: Use turn.foul_team ("OFFENSE" or "DEFENSE") to determine fouler's team
+        if (turn.foul_team === 'OFFENSE') {
+          // Offensive foul: fouler is on offense team
+          return isHomeOffense ? 'home' : 'away';
+        } else if (turn.foul_team === 'DEFENSE') {
+          // Defensive foul: fouler is on defense team (opposite of offense)
+          return isHomeOffense ? 'away' : 'home';
+        }
+        // Fallback: if foul_team not available, check if fouler is ball_handler
         if (turn.ball_handler === playerId) {
+          // If fouler is ball_handler, they're on offense
           return isHomeOffense ? 'home' : 'away';
         }
-        // Otherwise, fouler is on defense (opposite of offense)
+        // Otherwise, assume defensive foul (fouler is on defense)
         return isHomeOffense ? 'away' : 'home';
       }
     }
