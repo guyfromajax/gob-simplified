@@ -297,35 +297,18 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   
   const players = lastSummary.players || [];
   
-  // Create player lookup map (playerId -> {name, jersey, team})
-  // ✅ FIX: Use team_id comparison to reliably determine home/away (SS&S: single source of truth)
+  // Create player lookup map (playerId -> {name, jersey, team_id})
+  // ✅ SIMPLIFIED: Store team_id directly, compare to home/away team IDs when needed
   const playerMap = {};
   const homeTeamIdForComparison = homeTeamObj?.team_id || homeTeamId;
   const awayTeamIdForComparison = awayTeamObj?.team_id || awayTeamId;
   
   players.forEach(player => {
     if (player.playerId) {
-      // ✅ FIX: Always determine team by comparing team_id (most reliable method)
-      // This ensures player colors are always correct regardless of player.team field
-      let playerTeam = 'home'; // Default fallback
-      if (player.team_id) {
-        if (player.team_id === homeTeamIdForComparison) {
-          playerTeam = 'home';
-        } else if (player.team_id === awayTeamIdForComparison) {
-          playerTeam = 'away';
-        } else {
-          // Fallback: use player.team if team_id doesn't match (shouldn't happen, but safe)
-          playerTeam = player.team || 'home';
-        }
-      } else {
-        // Fallback: use player.team if team_id not available
-        playerTeam = player.team || 'home';
-      }
-      
       playerMap[player.playerId] = {
         name: player.name || 'Unknown',
         jersey: player.jersey || player.jerseyNumber || player.jersey_number || '',
-        team: playerTeam
+        team_id: player.team_id // Store team_id directly
       };
     }
   });
@@ -364,47 +347,20 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   
   const eventResults = [];
   
-  // ✅ FIX: Helper function to determine player team from turn data (SS&S: use turn.offense_team_id and turn.foul_team)
+  // ✅ SIMPLIFIED: Helper function to get player team ('home' or 'away') by comparing team_id
   const getPlayerTeam = (playerId, defaultTeam = 'home') => {
     const playerData = playerMap[playerId];
-    if (!playerData) return defaultTeam;
+    if (!playerData || !playerData.team_id) return defaultTeam;
     
-    // ✅ FIX: Use turn.offense_team_id as authoritative source for team determination
-    if (turn.offense_team_id) {
-      const isHomeOffense = turn.offense_team_id === homeTeamIdForComparison;
-      
-      // For shots, putbacks, free throws, turnovers: player is on offense_team_id
-      if (resultType === 'MAKE' || resultType === 'MISS' || resultType === 'PUTBACK_MAKE' || 
-          resultType === 'PUTBACK_MISS' || resultType === 'FREE_THROW' || 
-          resultType === 'DEAD BALL' || resultType === 'TURNOVER') {
-        return isHomeOffense ? 'home' : 'away';
-      }
-      // For steals: stealer is on defense team (opposite of offense_team_id)
-      else if (resultType === 'STEAL') {
-        return isHomeOffense ? 'away' : 'home'; // Stealer is on defense team
-      }
-      // For fouls: use turn.foul_team if available (most reliable)
-      else if (resultType === 'FOUL') {
-        // ✅ FIX: Use turn.foul_team ("OFFENSE" or "DEFENSE") to determine fouler's team
-        if (turn.foul_team === 'OFFENSE') {
-          // Offensive foul: fouler is on offense team
-          return isHomeOffense ? 'home' : 'away';
-        } else if (turn.foul_team === 'DEFENSE') {
-          // Defensive foul: fouler is on defense team (opposite of offense)
-          return isHomeOffense ? 'away' : 'home';
-        }
-        // Fallback: if foul_team not available, check if fouler is ball_handler
-        if (turn.ball_handler === playerId) {
-          // If fouler is ball_handler, they're on offense
-          return isHomeOffense ? 'home' : 'away';
-        }
-        // Otherwise, assume defensive foul (fouler is on defense)
-        return isHomeOffense ? 'away' : 'home';
-      }
+    // Simply compare player's team_id to home/away team IDs
+    if (playerData.team_id === homeTeamIdForComparison) {
+      return 'home';
+    } else if (playerData.team_id === awayTeamIdForComparison) {
+      return 'away';
     }
     
-    // Fallback to playerData.team (from playerMap)
-    return playerData.team || defaultTeam;
+    // Fallback if team_id doesn't match (shouldn't happen, but safe)
+    return defaultTeam;
   };
   
   turns.forEach((turn, index) => {
