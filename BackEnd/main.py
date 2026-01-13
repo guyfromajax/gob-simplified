@@ -284,7 +284,22 @@ def simulate_quarter(
     if not gm.game_state.get("game_stats_initialized", False):
         _initialize_game_stats(gm, game_id)
         gm.game_state["game_stats_initialized"] = True
-    gm.game_state["start_box_score"] = gm.get_box_score()
+    
+    # 🔍 DEBUG: Log score state before setting start_box_score
+    logging.warning(f"🔍 [START_BOX_SCORE DEBUG] Setting start_box_score: gm.quarter={gm.quarter}, gm.score={gm.score}, home_team.name={gm.home_team.name}, away_team.name={gm.away_team.name}")
+    box_score_result = gm.get_box_score()
+    logging.warning(f"🔍 [START_BOX_SCORE DEBUG] get_box_score() returned keys: {list(box_score_result.keys()) if isinstance(box_score_result, dict) else 'NOT_A_DICT'}")
+    gm.game_state["start_box_score"] = box_score_result
+    # 🔍 DEBUG: Log what was actually stored
+    stored_start_box = gm.game_state.get("start_box_score")
+    if isinstance(stored_start_box, dict):
+        logging.warning(f"🔍 [START_BOX_SCORE DEBUG] Stored start_box_score structure: keys={list(stored_start_box.keys())}, has home_score={'home_score' in stored_start_box}, has away_score={'away_score' in stored_start_box}")
+        # Check if it has team names as keys (box score structure)
+        for team_name in [gm.home_team.name, gm.away_team.name]:
+            if team_name in stored_start_box:
+                logging.warning(f"🔍 [START_BOX_SCORE DEBUG] start_box_score[{team_name}] exists (box score structure)")
+    else:
+        logging.warning(f"🔍 [START_BOX_SCORE DEBUG] start_box_score is not a dict: {type(stored_start_box)}")
 
     # Ensure the turn manager is aware of any lineup changes
     gm.turn_manager = TurnManager(gm)

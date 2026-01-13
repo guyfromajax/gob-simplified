@@ -1334,8 +1334,10 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # Only update quarter - game_state is already initialized by GameManager.__init__
                         saved_quarter = saved.get("quarter", 1)
                         gm.quarter = saved_quarter
-                        # ✅ FIX: Log loaded quarter to debug save/load issues
-                        # ✅ PERFORMANCE: Removed debug logging
+                        # 🔍 DEBUG: Log quarter mismatch
+                        logging.warning(f"🔍 [QUARTER_DEBUG] Loaded from DB: saved_quarter={saved_quarter}, request.quarter={request.quarter}, gm.quarter set to={gm.quarter}")
+                        if saved_quarter != request.quarter:
+                            logging.warning(f"🔍 [QUARTER_DEBUG] ⚠️ QUARTER MISMATCH: saved_quarter ({saved_quarter}) != request.quarter ({request.quarter})")
                         
                         # ✅ SS&S: Restore user_team_side to game_state (persists override checking across game loads)
                         # If saved game has it, use that; otherwise use request.user_team_side
@@ -1452,10 +1454,15 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             away_team_data = saved.get("away_team", {})
                             
                             # Restore team scores
+                            # 🔍 DEBUG: Log score restoration
+                            logging.warning(f"🔍 [SCORE_RESTORE DEBUG] Before restore: gm.score={gm.score}, gm.quarter={gm.quarter}")
                             if "score" in home_team_data:
                                 gm.score[gm.home_team.name] = home_team_data["score"]
+                                logging.warning(f"🔍 [SCORE_RESTORE DEBUG] Restored home score: {gm.home_team.name}={home_team_data['score']}")
                             if "score" in away_team_data:
                                 gm.score[gm.away_team.name] = away_team_data["score"]
+                                logging.warning(f"🔍 [SCORE_RESTORE DEBUG] Restored away score: {gm.away_team.name}={away_team_data['score']}")
+                            logging.warning(f"🔍 [SCORE_RESTORE DEBUG] After restore: gm.score={gm.score}, gm.quarter={gm.quarter}")
                             
                             # Restore team fouls
                             if "team_fouls" in home_team_data:
@@ -1545,6 +1552,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # 🔍 DEBUG: Log time_remaining before calling simulate_quarter()
                         time_before_sim = gm.game_state.get("time_remaining", "NOT_SET")
                         logging.warning(f"🔍 [Q4 DEBUG] BEFORE simulate_quarter() call: quarter={request.quarter}, resume_from_timeout={request.resume_from_timeout}, time_remaining={time_before_sim}, saved_time_remaining={saved.get('time_remaining', 'NOT_SET') if saved else 'NO_SAVED_DOC'}")
+                        # 🔍 DEBUG: Log quarter and score state before simulate_quarter()
+                        logging.warning(f"🔍 [BEFORE_SIM_DEBUG] gm.quarter={gm.quarter}, request.quarter={request.quarter}, gm.score={gm.score}")
                         
                         ongoing_games[game_id] = gm
                         if debug:
