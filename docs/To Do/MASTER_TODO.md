@@ -62,7 +62,63 @@
 
 ---
 
-### 2. Final Testing Checklist
+### 2. Team Structure Unification Performance Issues
+**Status:** 🔍 IDENTIFIED - Needs Fix  
+**Priority:** 🔴 HIGH - Affecting gameplay transitions  
+**Document:** `team_structure_unification_performance_issues.md`
+
+**Problem:** After unifying team structure, slow transitions during gameplay. Legacy code patterns causing performance issues.
+
+**Priorities:**
+1. Cache Team Objects in `gameScene.js`
+2. Audit and Fix Animation Files
+3. Add Performance Logging
+4. Remove Redundant Fallbacks
+
+**Progress:** 0% (0/4 priorities completed)
+
+---
+
+### 3. TBTT System SS&S Migration
+**Status:** ⚠️ PARTIALLY IMPLEMENTED (~88-94% SS&S)  
+**Priority:** 🟡 MEDIUM  
+**Document:** `TBTT_SYSTEM_SSS_MIGRATION_PLAN.md`
+
+**Problem:** Fragmented possession flip logic across backend and frontend, causing bugs and maintenance issues.
+
+**Current State:** ~88-94% SS&S with 4 systematic fixes implemented. Target: ~90% SS&S with unified function approach.
+
+**Action:** Complete remaining SS&S improvements.
+
+---
+
+### 4. Timeout System SS&S Improvements
+**Status:** ⚠️ PARTIALLY IMPLEMENTED  
+**Priority:** 🟡 MEDIUM  
+**Document:** `timeout_system_sss_improvements.md`
+
+**Problem:** Scattered inference logic to determine game state (new game vs. resuming vs. timeout resume).
+
+**Current State:** Some improvements implemented, but patchy inference logic still exists.
+
+**Action:** Complete unified game state detection and navigation parameter building.
+
+---
+
+### 5. Team ID Resolution System
+**Status:** ⚠️ PARTIALLY IMPLEMENTED - Bug Fixed, Unified Helper Not Implemented  
+**Priority:** 🟡 MEDIUM  
+**Document:** `team_id_resolution_system.md`
+
+**Problem:** Bug is fixed, but code duplication remains. Unified helper not implemented.
+
+**Current Solution:** Uses `get_user_team_from_franchise()` and `get_user_team_from_tournament()` (SS&S pattern), but unified helper would reduce duplication.
+
+**Action:** Implement unified helper to reduce code duplication.
+
+---
+
+### 6. Final Testing Checklist
 **Status:** ⏳ PENDING  
 **Document:** `Final_Testing_Checklist.md`
 
@@ -74,7 +130,36 @@
 
 ## 📋 Future Improvements & Enhancements
 
-### 1. Database Query Architecture Overhaul
+### 1. Tournament & Franchise Unification
+**Status:** 📋 PLANNING  
+**Priority:** 🟡 MEDIUM  
+**Document:** `Tournament_Franchise_Unification_Plan.md`
+
+**Goal:** Unify Tournament and Franchise modes to use identical code patterns, with only mode variable differences and intentional feature differences.
+
+**Key Areas:**
+- Field name standardization (`franchise_teams` → `teams`)
+- Frontend roster/stats rendering (extract shared functions)
+- API pattern consistency
+
+**Note:** Some unification already completed (team stats refactoring). Continue incrementally.
+
+---
+
+### 2. Team Objects Data Architecture
+**Status:** 📋 PLANNING / DISCUSSION  
+**Priority:** 🟡 MEDIUM  
+**Document:** `team_objects_data.md`
+
+**Problem:** Playbooks page from lineup screen during gameplay - offensive plays not displaying in Franchise Mode.
+
+**Architectural Decision:** Hybrid approach - copy `plays` and `playbook_settings` from franchise document to game document at game start, then use game document as source of truth during gameplay.
+
+**Action:** Review and implement if needed.
+
+---
+
+### 3. Database Query Architecture Overhaul
 **Status:** 🔍 STRATEGIC PLANNING  
 **Priority:** 🟡 MEDIUM - Scalability improvement  
 **Document:** `Database_Query_Architecture_Overhaul.md` (archived)
@@ -90,7 +175,7 @@
 
 ---
 
-### 2. Data Persistence Caching Strategy
+### 4. Data Persistence Caching Strategy
 **Status:** 📋 PROPOSED ENHANCEMENT  
 **Priority:** 🟡 MEDIUM  
 **Document:** `data_persistence_caching_strategy.md` (archived)
@@ -125,12 +210,14 @@
 The following items have been completed and moved to `docs/To Do/Archive/`:
 
 1. ✅ **Phase 5: Production Deployment** - Production environment fully deployed
-2. ✅ **Playbook Percentage Persistence** - Bug fixes implemented
-3. ✅ **Staging Setup** - Staging environment operational
-4. ✅ **Railway 502 Solution** - 502 errors resolved
-5. ✅ **Tournament Stats Display** - Bug fixes implemented
-6. ✅ **Sim Quarter Feature** - Feature implemented and working
-7. ✅ **Performance Analysis Docs** - Performance issues resolved (archived analysis docs)
+2. ✅ **Task 1.1: Go-Live Foundations Verification** - Staging and production environments verified (96% complete)
+3. ✅ **Team Stats SS&S Refactoring** - Shared code extracted, ~290 lines of duplication removed
+4. ✅ **Playbook Percentage Persistence** - Bug fixes implemented
+5. ✅ **Staging Setup** - Staging environment operational
+6. ✅ **Railway 502 Solution** - 502 errors resolved
+7. ✅ **Tournament Stats Display** - Bug fixes implemented
+8. ✅ **Sim Quarter Feature** - Feature implemented and working
+9. ✅ **Performance Analysis Docs** - Performance issues resolved (archived analysis docs)
 
 ---
 
@@ -140,6 +227,16 @@ The following items have been completed and moved to `docs/To Do/Archive/`:
 - `bugs.md` - Current active bugs and fixed bugs
 - `Pre_Launch_Checklist.md` - Pre-launch requirements
 - `0_alpha_launch_plan.md` - Alpha launch planning
+
+### Reference / Analysis Documents
+These documents provide analysis, comparisons, or strategic guidance but are not active tasks:
+
+- `timeout_v_quarterbreak.md` - Comparison of timeout vs quarter break data persistence
+- `Tournament_vs_Franchise_Player_Stats_Comparison.md` - Comparison of player stats flow
+- `why_performance_issues_surface_in_production.md` - Analysis of production performance issues
+- `World_Class_Architecture_Patterns.md` - Strategic reference for architecture decisions
+
+**Note:** These are kept for reference but not tracked as active tasks.
 
 ### Archived Documentation
 - See `docs/To Do/Archive/` for completed task documentation
