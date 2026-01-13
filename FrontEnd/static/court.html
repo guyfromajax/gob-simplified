@@ -756,6 +756,95 @@
       pointer-events: none !important;
     }
 
+    /* Sim Quarter Scrolling Text Popup */
+    .sim-quarter-popup {
+      position: absolute;
+      top: 30%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.95);
+      border: 4px solid #ff6200;
+      border-radius: 12px;
+      padding: 30px 50px;
+      width: 600px;
+      max-width: 90%;
+      max-height: 500px;
+      z-index: 200;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sim-quarter-popup.hidden {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    .sim-quarter-header {
+      text-align: center;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #ff6200;
+      padding-bottom: 15px;
+    }
+
+    .sim-quarter-header h2 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      color: #fff;
+      margin: 0;
+    }
+
+    .sim-quarter-scroll-container {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      max-height: 400px;
+      padding-right: 10px;
+    }
+
+    .sim-quarter-scroll-container::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .sim-quarter-scroll-container::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+
+    .sim-quarter-scroll-container::-webkit-scrollbar-thumb {
+      background: #ff6200;
+      border-radius: 4px;
+    }
+
+    .sim-quarter-scroll-content {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px;
+      line-height: 1.8;
+      color: #fff;
+    }
+
+    .sim-quarter-shot-entry {
+      margin-bottom: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .sim-quarter-shot-entry:last-child {
+      border-bottom: none;
+    }
+
+    .sim-quarter-score-line {
+      text-align: center;
+      margin: 15px 0;
+      padding: 10px 0;
+      border-top: 2px solid rgba(255, 255, 255, 0.2);
+      border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+      font-size: 20px;
+      font-weight: bold;
+    }
+
     /* Game control buttons */
     .play-button,
     .sim-full-game-button,
@@ -2224,6 +2313,18 @@
         <button class="play-button">Play Quarter</button>
         <button class="sim-full-game-button">Sim Full Game</button>
         <button class="sim-to-fourth-button">Sim Quarter</button>
+      </div>
+      
+      <!-- Sim Quarter Scrolling Text Popup -->
+      <div id="sim-quarter-popup" class="sim-quarter-popup hidden">
+        <div class="sim-quarter-header">
+          <h2 id="sim-quarter-title">Simulating Q1...</h2>
+        </div>
+        <div class="sim-quarter-scroll-container">
+          <div id="sim-quarter-scroll-content" class="sim-quarter-scroll-content">
+            <!-- Shot results will be inserted here -->
+          </div>
+        </div>
       </div>
       
       <!-- Game controls (pause/skip) at bottom of court -->

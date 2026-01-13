@@ -204,6 +204,206 @@ function showStatus(msg) {
   el.textContent = msg;
 }
 
+/**
+ * Show scrolling text popup with shot results during Sim Quarter
+ * @param {Object} lastSummary - Game summary from backend with turns array
+ * @param {number} quarter - Quarter being simulated
+ * @param {string} homeTeam - Home team name
+ * @param {string} awayTeam - Away team name
+ */
+async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
+  // Hide pre-game container
+  const preGameContainer = document.querySelector('.pre-game-container');
+  if (preGameContainer) {
+    preGameContainer.classList.add('hidden');
+  }
+  
+  // Show sim quarter popup
+  const popup = document.getElementById('sim-quarter-popup');
+  const titleEl = document.getElementById('sim-quarter-title');
+  const contentEl = document.getElementById('sim-quarter-scroll-content');
+  
+  if (!popup || !titleEl || !contentEl) {
+    console.error('Sim quarter popup elements not found');
+    return;
+  }
+  
+  // Update title
+  const periodLabel = quarter <= 4 ? `Q${quarter}` : `OT${quarter - 4}`;
+  titleEl.textContent = `Simulating ${periodLabel}...`;
+  
+  // Update quarter display in scoreboard
+  const quarterEl = document.getElementById('quarter');
+  if (quarterEl) {
+    quarterEl.textContent = periodLabel;
+  }
+  
+  // Get team colors and player data
+  const teamInfo = lastSummary.team_info || {};
+  const homeColor = teamInfo.home?.primary_color || '#ff6200';
+  const awayColor = teamInfo.away?.primary_color || '#ff6200';
+  const players = lastSummary.players || [];
+  
+  // Create player lookup map (playerId -> {name, jersey, team})
+  const playerMap = {};
+  players.forEach(player => {
+    if (player.playerId) {
+      playerMap[player.playerId] = {
+        name: player.name || 'Unknown',
+        jersey: player.jersey || player.jerseyNumber || player.jersey_number || '',
+        team: player.team || (player.team_id === teamInfo.home?.team_id ? 'home' : 'away')
+      };
+    }
+  });
+  
+  // Get team names
+  const homeTeamName = lastSummary.home_team?.name || homeTeam;
+  const awayTeamName = lastSummary.away_team?.name || awayTeam;
+  
+  // Get initial scores from summary (before this quarter)
+  const scoreObj = lastSummary.score || {};
+  let currentHomeScore = scoreObj[homeTeamName] || scoreObj[homeTeam] || 0;
+  let currentAwayScore = scoreObj[awayTeamName] || scoreObj[awayTeam] || 0;
+  
+  // If start_box_score exists, use it (scores at start of this quarter)
+  if (lastSummary.start_box_score) {
+    currentHomeScore = lastSummary.start_box_score.home_score || currentHomeScore;
+    currentAwayScore = lastSummary.start_box_score.away_score || currentAwayScore;
+  }
+  
+  // Extract shot results from turns
+  const turns = lastSummary.turns || [];
+  const shotResults = [];
+  
+  turns.forEach((turn, index) => {
+    // Only process shot results (MAKE or MISS)
+    if (turn.result_type === 'MAKE' || turn.result_type === 'MISS') {
+      const shooterId = turn.shooter_id || turn.shooter?.player_id || turn.shooter;
+      const shooterData = playerMap[shooterId] || { name: turn.shooter || 'Unknown', jersey: '', team: 'home' };
+      
+      // Determine shot type (2-pt or 3-pt)
+      const points = turn.points || 0;
+      const shotType = points === 3 ? '3-pt' : '2-pt';
+      
+      // Get time remaining
+      const timeRemaining = turn.time_remaining || turn.clock || turn.game_clock || '0:00';
+      
+      // Calculate scores: if MAKE, add points to current score
+      let homeScore = currentHomeScore;
+      let awayScore = currentAwayScore;
+      
+      if (turn.result_type === 'MAKE') {
+        if (shooterData.team === 'home') {
+          homeScore = currentHomeScore + points;
+          currentHomeScore = homeScore;
+        } else {
+          awayScore = currentAwayScore + points;
+          currentAwayScore = awayScore;
+        }
+      }
+      
+      shotResults.push({
+        timeRemaining,
+        shooterName: shooterData.name,
+        shooterJersey: shooterData.jersey,
+        shooterTeam: shooterData.team,
+        resultType: turn.result_type,
+        shotType,
+        homeScore,
+        awayScore
+      });
+    }
+  });
+  
+  // Show popup before processing shots
+  popup.classList.remove('hidden');
+  
+  // Clear content
+  contentEl.innerHTML = '';
+  
+  // Reset scores for display (start of quarter)
+  let displayHomeScore = scoreObj[homeTeamName] || scoreObj[homeTeam] || 0;
+  let displayAwayScore = scoreObj[awayTeamName] || scoreObj[awayTeam] || 0;
+  
+  if (lastSummary.start_box_score) {
+    displayHomeScore = lastSummary.start_box_score.home_score || displayHomeScore;
+    displayAwayScore = lastSummary.start_box_score.away_score || displayAwayScore;
+  }
+  
+  for (let i = 0; i < shotResults.length; i++) {
+    const shot = shotResults[i];
+    
+    // Update display score after shot
+    if (shot.resultType === 'MAKE') {
+      displayHomeScore = shot.homeScore;
+      displayAwayScore = shot.awayScore;
+    }
+    
+    // Create shot entry
+    const entry = document.createElement('div');
+    entry.className = 'sim-quarter-shot-entry';
+    
+    // Determine team color
+    const teamColor = shot.shooterTeam === 'home' ? homeColor : awayColor;
+    
+    // Format time (convert seconds to MM:SS if needed)
+    let timeDisplay = shot.timeRemaining;
+    if (typeof shot.timeRemaining === 'number') {
+      const minutes = Math.floor(shot.timeRemaining / 60);
+      const seconds = Math.floor(shot.timeRemaining % 60);
+      timeDisplay = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    // Format jersey number
+    const jerseyDisplay = shot.shooterJersey ? ` (#${shot.shooterJersey})` : '';
+    
+    // Build text with colored player name and jersey
+    const resultText = shot.resultType === 'MAKE' ? 'makes' : 'misses';
+    entry.innerHTML = `
+      <span style="color: #fff;">[${timeDisplay}]: </span>
+      <span style="color: ${teamColor}; font-weight: bold;">${shot.shooterName}${jerseyDisplay}</span>
+      <span style="color: #fff;"> ${resultText} the ${shot.shotType} shot.</span>
+    `;
+    
+    contentEl.appendChild(entry);
+    
+    // Add score line after each shot
+    const scoreLine = document.createElement('div');
+    scoreLine.className = 'sim-quarter-score-line';
+    scoreLine.innerHTML = `
+      <span style="color: ${homeColor}; font-weight: bold;">***${homeTeamName}: ${displayHomeScore}</span>
+      <span style="color: #fff;">  //  </span>
+      <span style="color: ${awayColor}; font-weight: bold;">${awayTeamName}: ${displayAwayScore}***</span>
+    `;
+    contentEl.appendChild(scoreLine);
+    
+    // Scroll to bottom
+    const scrollContainer = popup.querySelector('.sim-quarter-scroll-container');
+    if (scrollContainer) {
+      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    }
+    
+    // Small delay for scrolling effect (50ms per shot)
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  
+  // If no shots, show message
+  if (shotResults.length === 0) {
+    const noShotsMsg = document.createElement('div');
+    noShotsMsg.className = 'sim-quarter-shot-entry';
+    noShotsMsg.style.textAlign = 'center';
+    noShotsMsg.style.color = '#fff';
+    noShotsMsg.textContent = 'No shots in this quarter.';
+    contentEl.appendChild(noShotsMsg);
+  }
+  
+  // Wait a bit before navigating (2 seconds after last shot or message)
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  // Hide popup before navigation
+  popup.classList.add('hidden');
+}
+
 function updateOffsets() {
   if (typeof document === 'undefined') return;
   const container = document.getElementById('phaser-container');
@@ -619,6 +819,9 @@ async function handleSimQuarter() {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('game_id', gameId);
     }
+    
+    // ✅ NEW: Show scrolling text popup with shot results
+    await showSimQuarterResults(lastSummary, nextQuarter, homeTeam, awayTeam);
     
     // Check if game is complete (Q4+ and not tied)
     const isGameComplete = lastSummary.is_final === true;
