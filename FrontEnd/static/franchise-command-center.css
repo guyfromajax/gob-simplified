@@ -30,8 +30,8 @@
 #franchise-container #top-right.right-controls {
   display: flex;
   align-items: center;
-  justify-content: space-between; /* Secondary buttons on left, hero button on right */
-  gap: 20px; /* Spacing between secondary buttons group and hero button */
+  justify-content: flex-end; /* Align everything to the right */
+  gap: 12px; /* Reduced spacing between secondary buttons group and hero button */
 }
 
 /* Secondary buttons group (Set Game Plan, Playbooks, Scouting Report) */
@@ -42,26 +42,59 @@
   align-items: flex-start;
 }
 
-/* Secondary buttons - dark/neutral fills with strong contrast */
+/* Secondary buttons - exact same size for all three */
 #franchise-container .secondary-btn {
-  background: #2c3e50; /* Dark blue-gray - neutral, professional */
-  color: #fff;
-  border: 1px solid #34495e; /* Slightly lighter border for definition */
-  padding: 10px 16px;
+  width: 140px; /* Fixed width - exact same for all */
+  height: 40px; /* Fixed height - exact same for all */
+  padding: 0; /* Remove padding to use fixed dimensions */
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
   font-family: 'Inter', sans-serif;
   font-weight: 600;
   white-space: nowrap;
-  min-width: 140px; /* Consistent width */
   text-align: center;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
-#franchise-container .secondary-btn:hover {
-  background: #34495e;
-  border-color: #4a5f7f;
+/* Set Game Plan - Blue fill */
+#franchise-container #set-gameplan-franchise.secondary-btn {
+  background: #4065af;
+  color: #fff;
+  border: none;
+}
+
+#franchise-container #set-gameplan-franchise.secondary-btn:hover {
+  background: #345a94;
+  transform: translateY(-1px);
+}
+
+/* Playbooks - White fill, blue text and border */
+#franchise-container #playbooks-franchise.secondary-btn {
+  background: #ffffff;
+  color: #4065af;
+  border: 1px solid #4065af;
+}
+
+#franchise-container #playbooks-franchise.secondary-btn:hover {
+  background: #f0f7ff;
+  border-color: #345a94;
+  transform: translateY(-1px);
+}
+
+/* Scouting Report - Gray fill */
+#franchise-container #scouting-report-btn.secondary-btn {
+  background: #9e9d9d;
+  color: #fff;
+  border: none;
+}
+
+#franchise-container #scouting-report-btn.secondary-btn:hover {
+  background: #8a8989;
   transform: translateY(-1px);
 }
 
