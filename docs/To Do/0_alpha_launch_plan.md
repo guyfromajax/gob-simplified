@@ -245,17 +245,17 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 - [ ] Document backup restoration process (if needed)
 - [ ] **Note:** Free tier backups may be sufficient for alpha
 
-### 5.1 Provider Alerts
+### 7.1 Provider Alerts
 - [ ] Configure MongoDB Atlas usage alerts
 - [ ] Configure Railway spending alerts/caps
 - [ ] Review Netlify bandwidth constraints
 
-### 5.2 In-App Caps (Hard Stops)
+### 7.2 In-App Caps (Hard Stops)
 - [ ] Max games per user per day
 - [ ] Max tournaments per user
 - [ ] Max sim requests per minute
 
-### 5.3 Verification
+### 7.3 Verification
 - [ ] Confirm caps actually block usage
 - [ ] Confirm messaging is clear when a cap is hit
 
@@ -354,16 +354,6 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 - [ ] Verify reset token expires after 1 hour (or chosen duration)
 - [ ] Verify reset token is invalidated after use
 - [ ] Test error handling (invalid token, expired token)
-
-### 10.1 Provider Setup
-- [ ] Choose provider (SendGrid/Mailgun/Postmark/etc.)
-- [ ] Add API key to env vars
-- [ ] Send a test email successfully
-
-### 10.2 Password Reset
-- [ ] Implement password reset request
-- [ ] Implement reset token handling
-- [ ] Verify reset end-to-end
 
 ---
 
