@@ -414,6 +414,10 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     displayHomeScore = shot.homeScore;
     displayAwayScore = shot.awayScore;
     
+    // ✅ NEW: Update scoreboard in real-time (SS&S: same pattern as gameScene.js updateScoreboard)
+    if (homeScoreEl) homeScoreEl.textContent = displayHomeScore;
+    if (awayScoreEl) awayScoreEl.textContent = displayAwayScore;
+    
     // Create shot entry
     const entry = document.createElement('div');
     entry.className = 'sim-quarter-shot-entry';
@@ -442,15 +446,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     
     contentEl.appendChild(entry);
     
-    // Add score line after each shot
-    const scoreLine = document.createElement('div');
-    scoreLine.className = 'sim-quarter-score-line';
-    scoreLine.innerHTML = `
-      <span style="color: ${homeColor}; font-weight: bold;">***${homeTeamName}: ${displayHomeScore}</span>
-      <span style="color: #fff;">  //  </span>
-      <span style="color: ${awayColor}; font-weight: bold;">${awayTeamName}: ${displayAwayScore}***</span>
-    `;
-    contentEl.appendChild(scoreLine);
+    // ✅ REMOVED: Score line from text scroll (scores now update in real-time on scoreboard)
     
     // Scroll to bottom
     const scrollContainer = popup.querySelector('.sim-quarter-scroll-container');
