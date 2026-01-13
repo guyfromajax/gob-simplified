@@ -247,11 +247,11 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   
   console.log('🔍 [SIM QUARTER] All popup elements found, proceeding...');
   
-  // ✅ FIX: Quarter display - show the quarter we're simulating, but for display purposes
-  // when we're at Q1 break (quarter=1) and simulating Q2, the title should show Q2 (correct)
-  // But the user wants the quarter value to be accurate, so we use quarter parameter directly
+  // ✅ FIX: Quarter display - show the quarter that just completed (quarter - 1)
+  // When we're at Q1 break (quarter=1) and simulating Q2, the title should show Q1 (the quarter that just completed)
   // The quarter parameter passed in is the quarter we're about to simulate (nextQuarter)
-  const periodLabel = quarter <= 4 ? `Q${quarter}` : `OT${quarter - 4}`;
+  const displayQuarter = quarter - 1;
+  const periodLabel = displayQuarter <= 4 ? `Q${displayQuarter}` : `OT${displayQuarter - 4}`;
   titleEl.textContent = `Simulating ${periodLabel}...`;
   
   // ✅ FIX: Don't update scoreboard quarter during Sim Quarter
@@ -807,9 +807,7 @@ async function handleSimQuarter() {
   }
 
   try {
-    // ✅ FIX: Display quarter being simulated (nextQuarter - 1) to match what's actually being simmed
-    const displayQuarter = nextQuarter - 1;
-    showStatus(`Simulating Q${displayQuarter}...`);
+    // ✅ REMOVED: showStatus call - redundant with popup header
     const payload = {
       home_team: homeTeam,
       away_team: awayTeam,
