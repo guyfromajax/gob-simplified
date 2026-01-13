@@ -537,10 +537,22 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     }
     
     // Find corresponding event in eventResults array
-    const event = eventResults.find(e => 
-      e.timeRemaining === (turn.time_remaining || turn.clock || turn.game_clock) &&
-      e.resultType === turn.result_type
-    );
+    // Match by time and result type, but handle special cases (FREE_THROW, PUTBACK_MAKE/MISS)
+    const event = eventResults.find(e => {
+      const timeMatch = e.timeRemaining === (turn.time_remaining || turn.clock || turn.game_clock);
+      if (!timeMatch) return false;
+      
+      // Handle special result type mappings
+      if (turn.result_type === 'FREE_THROW') {
+        return e.eventType === 'FREE_THROW';
+      } else if (turn.result_type === 'PUTBACK_MAKE' || turn.result_type === 'PUTBACK_MISS') {
+        return e.eventType === 'OREB_PUTBACK' && 
+               ((turn.result_type === 'PUTBACK_MAKE' && e.resultType === 'MAKE') ||
+                (turn.result_type === 'PUTBACK_MISS' && e.resultType === 'MISS'));
+      } else {
+        return e.resultType === turn.result_type || e.eventType === turn.result_type;
+      }
+    });
     
     if (event) {
       // Update scores if they changed
