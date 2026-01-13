@@ -260,9 +260,11 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   const homeTeamName = lastSummary.home_team?.name || homeTeam;
   const awayTeamName = lastSummary.away_team?.name || awayTeam;
   
-  // Extract shot results from turns
+  // Extract shot results from turns - ONLY from the quarter we just simulated
   // SS&S: Use turn.score (authoritative) just like updateScoreboard in gameScene.js
-  const turns = lastSummary.turns || [];
+  // Filter turns to only include the quarter we just simulated (each turn has a quarter field)
+  const allTurns = lastSummary.turns || [];
+  const turns = allTurns.filter(turn => turn.quarter === quarter);
   const shotResults = [];
   
   turns.forEach((turn, index) => {
