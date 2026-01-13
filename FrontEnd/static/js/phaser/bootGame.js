@@ -241,15 +241,14 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   
   console.log('🔍 [SIM QUARTER] All popup elements found, proceeding...');
   
-  // Update title
+  // Update title - quarter parameter is the quarter we're about to simulate (correct)
   const periodLabel = quarter <= 4 ? `Q${quarter}` : `OT${quarter - 4}`;
   titleEl.textContent = `Simulating ${periodLabel}...`;
   
-  // Update quarter display in scoreboard
-  const quarterEl = document.getElementById('quarter');
-  if (quarterEl) {
-    quarterEl.textContent = periodLabel;
-  }
+  // ✅ FIX: Don't update scoreboard quarter during Sim Quarter
+  // Scoreboard should show the quarter that just completed (quarter - 1), not the quarter we're simulating
+  // The scoreboard quarter will be updated after simulation completes via normal game flow
+  // This prevents showing Q2 when we're still in Q1
   
   // Get team colors (SS&S: same pattern as gameScene.js - check unified structure first, then fallback)
   // Works across all modes (Single, Tournament, Franchise)
@@ -384,6 +383,10 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   // Clear content
   contentEl.innerHTML = '';
   
+  // ✅ NEW: Get scoreboard elements for real-time updates (SS&S: same pattern as gameScene.js)
+  const homeScoreEl = document.getElementById('home-score');
+  const awayScoreEl = document.getElementById('away-score');
+  
   // Get initial scores (start of quarter) - use start_box_score if available, otherwise use score from first turn
   let displayHomeScore = 0;
   let displayAwayScore = 0;
@@ -399,6 +402,10 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     displayAwayScore = typeof firstTurnScore[awayTeamName] === 'number' ? firstTurnScore[awayTeamName] : 
                        (typeof firstTurnScore[awayTeam] === 'number' ? firstTurnScore[awayTeam] : 0);
   }
+  
+  // ✅ NEW: Initialize scoreboard with starting scores
+  if (homeScoreEl) homeScoreEl.textContent = displayHomeScore;
+  if (awayScoreEl) awayScoreEl.textContent = displayAwayScore;
   
   for (let i = 0; i < shotResults.length; i++) {
     const shot = shotResults[i];
