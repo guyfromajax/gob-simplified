@@ -449,7 +449,8 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       });
     } else if (resultType === 'FOUL') {
       // Fouls
-      const foulerId = turn.fouler_id || turn.ball_handler || turn.shooter_id;
+      // ✅ FIX: Backend sends foul_player_id, not fouler_id
+      const foulerId = turn.foul_player_id || turn.fouler_id || turn.ball_handler || turn.shooter_id;
       const foulerData = playerMap[foulerId] || { name: turn.fouler || turn.ball_handler || 'Unknown', jersey: '', team: 'home' };
       
       // ✅ FIX: Use turn.offense_team_id if fouler is ball_handler, otherwise use playerData.team
@@ -918,26 +919,42 @@ async function handleButtonClick(animate) {
 async function handleGameCompletion({ gameId, lastSummary, tournamentId, franchiseId, teamId, homeTeam, awayTeam }) {
   console.log('✅ Game complete - finalizing game');
   
-  // Fetch final game data to ensure box_score is complete
+  // ✅ SS&S FIX: Use lastSummary directly as single source of truth (has correct final scores)
+  // Only fetch from API if lastSummary is missing critical fields (box_score, players, etc.)
   let finalGameData = lastSummary;
-  if (gameId) {
+  
+  // Check if lastSummary has all required fields
+  const hasBoxScore = !!lastSummary.box_score;
+  const hasPlayers = !!lastSummary.players && lastSummary.players.length > 0;
+  const hasScore = !!lastSummary.score && Object.keys(lastSummary.score).length > 0;
+  
+  // Only fetch if missing critical data (shouldn't happen, but safe fallback)
+  if (gameId && (!hasBoxScore || !hasPlayers || !hasScore)) {
     try {
-      console.log('📥 Fetching final game data from API to ensure box_score is complete...');
+      console.log('📥 Fetching final game data from API (lastSummary missing some fields)...', {
+        hasBoxScore,
+        hasPlayers,
+        hasScore
+      });
       const gameResponse = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`));
       if (gameResponse.ok) {
-        finalGameData = await gameResponse.json();
-        console.log('✅ Fetched final game data:', {
-          hasBoxScore: !!finalGameData.box_score,
-          boxScoreKeys: finalGameData.box_score ? Object.keys(finalGameData.box_score) : [],
-          hasPlayers: !!finalGameData.players,
-          playerCount: finalGameData.players ? finalGameData.players.length : 0
-        });
+        const fetchedData = await gameResponse.json();
+        // Merge fetched data with lastSummary (prefer lastSummary scores - they're authoritative)
+        finalGameData = {
+          ...fetchedData,
+          ...lastSummary, // lastSummary takes precedence (has correct final scores)
+          score: lastSummary.score || fetchedData.score, // Use lastSummary.score (correct final scores)
+          box_score: lastSummary.box_score || fetchedData.box_score // Prefer lastSummary.box_score
+        };
+        console.log('✅ Merged fetched data with lastSummary (lastSummary scores take precedence)');
       } else {
         console.warn('⚠️ Failed to fetch final game data, using lastSummary:', gameResponse.status);
       }
     } catch (err) {
       console.error('❌ Error fetching final game data, using lastSummary:', err);
     }
+  } else {
+    console.log('✅ Using lastSummary directly (has all required fields, correct final scores)');
   }
 
   // Finalize the game and show completion popup
