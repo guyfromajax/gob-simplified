@@ -9,8 +9,24 @@
 7. Elminate "Simulating Q5..."
 8. Tournament Mode -- Non user game team and player stats are not populating on the Stats tab, and no team's player stats are populating on the team roster pages.
 9. ~~Pre-game buttons missing after "Play Quarter"~~ - ✅ **FIXED** (January 2025) - After playing a quarter with "Play Quarter" button, the next quarter break did not show the pre-game buttons ("Play Quarter", "Sim Quarter", "Sim Rest of Game"). The game auto-started instead. **Root Cause**: The `resume_from_timeout` URL parameter was being set to `true` when it should be `false` for quarter breaks. The condition in `set-lineup.js` only forced `false` when the URL param was NOT `'true'`, but if the URL still had `'true'` from previous navigation, it wasn't being overridden. **Fix**: Updated `set-lineup.js` to ALWAYS force `resumeFromTimeout = false` for quarter breaks (quarter > 1), regardless of URL param value. This matches the Sim Quarter pattern where `resumeFromTimeout: false` is always explicitly set. Also updated `gameScene.js` to use `TimeoutNavigationHelper.buildGameNavigationParams()` with explicit `resumeFromTimeout: false` (matching Sim Quarter pattern) instead of manually building URL params. **Result**: Quarter breaks now correctly show pre-game buttons and do not auto-start.
+10. User is still able to put fouled out players into the lineup on the Lineup Selection screen
+11. Need to add quarter to the right of Time Remaining on the Lineup Screen
+12. Computer is calling timeout for the user team in Play Quarter situations
+13. We've lost the 1 second hold of the basketball on the basket on a Fast Break make in Play Quarter situations
+15. Play Quarter situation, when I return from a timeout, I'm being cued with the Play Quarter / Sim Quarter pop up. That should only appear after quarter breaks. Not Timeout Breaks (or Player Foul Out Breaks if its wired to do so there as well)
+16. EOG Progression in Franchise Mode is broken -- I Sim Quarter for the first three quarters and Play Quarter for the fourth in this instance. When the game ended, it took me back to the Lineup Screen, had me press Play Game, then had me press either Sim Quarter or Play Quarter (I pressed Sim Quarter just to test what would happen) then it temproarly showed the text scroll pop, then it went to the proper EOG sequence with the EOG pop up wiht the buttons to the Box Score or FCC.
 
 ## Fixed Bugs (January 2025)
+
+✅ **Playcall Center Overrides Not Working After Sim Quarter → Play Quarter** (Fixed: January 2025)
+- **Issue**: Playcall overrides were not being applied during Play Quarter after simulating previous quarters (e.g., Sim Quarter for Q1-Q3, then Play Quarter for Q4).
+- **Root Cause**: `user_team_side` was `None` in the game state, causing the override check in `turn_manager.py` to skip processing with "no user_team (user_team_side=None)". This happened because `user_team_side` wasn't being preserved when games were loaded from the database or when transitioning between Sim Quarter and Play Quarter modes.
+- **Fix**: Added safeguards to preserve and restore `user_team_side`:
+  - Preserve `user_team_side` from in-memory game before any DB operations
+  - When loading from DB, use priority: saved document → preserved in-memory value → request value
+  - Set `user_team_side` in in-memory game if missing (from request or preserved value)
+- **Result**: Playcall overrides now work correctly after Sim Quarter → Play Quarter transitions
+- **Status**: ✅ Fixed and committed (January 2025)
 
 ✅ **Tournament Command Center Stats Bugs** (Fixed: January 2025)
 - **Totals showing "undefined"**: Fixed missing W/L initialization in totals object
