@@ -933,13 +933,32 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         mismatchCount: mismatches.length
       };
       
-      await fetch(API_CONFIG.buildUrl('/api/diagnostics/sim-quarter'), {
+      const response = await fetch(API_CONFIG.buildUrl('/api/diagnostics/sim-quarter'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(diagnosticData)
       });
+      
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Download markdown file to user's computer
+        if (result.markdownContent) {
+          const blob = new Blob([result.markdownContent], { type: 'text/markdown' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = result.filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          
+          console.log(`✅ [DIAGNOSTIC] Diagnostic file downloaded: ${result.filename} (${result.mismatchCount} mismatches found)`);
+        }
+      }
     } catch (error) {
       console.error('❌ [DIAGNOSTIC] Failed to send diagnostic data:', error);
     }

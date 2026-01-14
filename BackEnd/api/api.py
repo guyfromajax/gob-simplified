@@ -3268,17 +3268,20 @@ def save_sim_quarter_diagnostics(request: SimQuarterDiagnosticRequest):
 
 """
         
-        # Write file
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(md_content)
+        # Try to write file (for local development)
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(md_content)
+            logger.info(f"✅ [DIAGNOSTIC] Saved Sim Quarter diagnostic file: {filepath}")
+        except Exception as e:
+            logger.warning(f"⚠️ [DIAGNOSTIC] Could not write file to filesystem (Railway ephemeral): {e}")
         
-        logger.info(f"✅ [DIAGNOSTIC] Saved Sim Quarter diagnostic file: {filepath}")
-        
+        # Return markdown content in response so frontend can download it
         return {
             "status": "success",
-            "filepath": str(filepath),
             "filename": filename,
-            "mismatchCount": request.mismatchCount
+            "mismatchCount": request.mismatchCount,
+            "markdownContent": md_content  # Include content for frontend download
         }
     
     except Exception as e:
