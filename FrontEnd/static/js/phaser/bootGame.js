@@ -746,15 +746,36 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       
       // Build player image for made shots (SS&S: Use DOM element creation like announcement system)
       if (event.resultType === 'MAKE' && (event.eventType === 'SHOT' || event.eventType === 'OREB_PUTBACK' || event.eventType === 'FREE_THROW')) {
-        const playerPhoto = event.playerPhoto || (event.playerId ? `/images/players/${event.playerId}.png` : '');
+        // SS&S: Use same environment-aware path logic as announcement system
+        const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        
+        // Normalize playerPhoto path based on environment
+        let playerPhoto = event.playerPhoto;
+        if (playerPhoto) {
+          // If we have a photo path, normalize it for the current environment
+          if (!isLocalhost && playerPhoto.startsWith('/static/')) {
+            // Production: remove /static/ prefix
+            playerPhoto = playerPhoto.replace('/static', '');
+          } else if (isLocalhost && !playerPhoto.startsWith('/static/') && playerPhoto.startsWith('/images/')) {
+            // Localhost: add /static/ prefix if missing
+            playerPhoto = '/static' + playerPhoto;
+          }
+        } else if (event.playerId) {
+          // Construct path based on environment (fallback if no photo provided)
+          const staticPrefix = isLocalhost ? '/static' : '';
+          playerPhoto = `${staticPrefix}/images/players/${event.playerId}.png`;
+        }
+        
         console.log('🖼️ [SIM QUARTER IMAGE] Made shot detected:', {
           resultType: event.resultType,
           eventType: event.eventType,
           playerId: event.playerId,
-          playerPhoto: event.playerPhoto,
-          constructedPhoto: playerPhoto,
+          originalPlayerPhoto: event.playerPhoto,
+          isLocalhost,
+          finalPlayerPhoto: playerPhoto,
           playerName: event.playerName
         });
+        
         if (playerPhoto) {
           const img = document.createElement('img');
           img.src = playerPhoto;
