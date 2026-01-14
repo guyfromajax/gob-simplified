@@ -636,15 +636,18 @@ def root():
     return {"message": "GOB Simulation API is live"}
 
 @app.get("/health")
-async def health_check():
-    """Simplest possible health check - no dependencies, async for better performance"""
+def health_check():
+    """Simplest possible health check - no dependencies, no async, no logger"""
+    # Use print instead of logger in case logger isn't configured yet
+    print("🔵 [HEALTH] GET /health called", file=sys.stderr, flush=True)
     try:
-        logger.info("🔵 [HEALTH] GET /health called")
         port = os.getenv("PORT", "NOT SET")
-        logger.info(f"🔵 [HEALTH] Returning response with port={port}")
+        print(f"🔵 [HEALTH] Returning response with port={port}", file=sys.stderr, flush=True)
         return {"status": "healthy", "port": port}
     except Exception as e:
-        logger.error(f"🔴 [HEALTH ERROR] Exception: {e}", exc_info=True)
+        print(f"🔴 [HEALTH ERROR] Exception: {e}", file=sys.stderr, flush=True)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return JSONResponse(
             status_code=500,
             content={"status": "unhealthy", "error": str(e)}
@@ -2141,15 +2144,15 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
     is_final = frontend_summary.get("is_final", False)
     summary_time = (time.time() - summary_start) * 1000
 
-        # ✅ DEBUG: Check ongoing_games state after simulate_quarter completes
-        gm_after_sim = ongoing_games.get(game_id)
-        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] After simulate_quarter() completes: game_id={game_id}, in_ongoing_games={gm_after_sim is not None}")
-        if gm_after_sim:
-            logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game still in ongoing_games - object_id={id(gm_after_sim)}, quarter={gm_after_sim.quarter}, full_sim={request.full_sim}")
-        else:
-            logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ⚠️ Game NOT in ongoing_games after simulate_quarter! Available games: {list(ongoing_games.keys())}")
-        
-        # Save to database (WITHOUT animations to reduce document size)
+    # ✅ DEBUG: Check ongoing_games state after simulate_quarter completes
+    gm_after_sim = ongoing_games.get(game_id)
+    logging.warning(f"🔍 [ONGOING_GAMES DEBUG] After simulate_quarter() completes: game_id={game_id}, in_ongoing_games={gm_after_sim is not None}")
+    if gm_after_sim:
+        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game still in ongoing_games - object_id={id(gm_after_sim)}, quarter={gm_after_sim.quarter}, full_sim={request.full_sim}")
+    else:
+        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ⚠️ Game NOT in ongoing_games after simulate_quarter! Available games: {list(ongoing_games.keys())}")
+    
+    # Save to database (WITHOUT animations to reduce document size)
         db_save_start = time.time()
         try:
             db_summary = summarize_game_state(gm, exclude_animations=True)
