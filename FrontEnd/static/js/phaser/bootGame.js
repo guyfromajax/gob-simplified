@@ -318,7 +318,8 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       playerMap[player.playerId] = {
         name: player.name || 'Unknown',
         jersey: player.jersey || player.jerseyNumber || player.jersey_number || '',
-        team_id: player.team_id // Store team_id directly
+        team_id: player.team_id, // Store team_id directly
+        photo: player.photo || null // Store player photo for made shots
       };
     }
   });
@@ -411,7 +412,9 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         shotType,
         isFastBreak,
         homeScore,
-        awayScore
+        awayScore,
+        playerId: shooterId, // Store playerId for made shot images
+        playerPhoto: shooterData.photo // Store player photo for made shot images
       });
     } else if (resultType === 'PUTBACK_MAKE' || resultType === 'PUTBACK_MISS') {
       // OREB putback attempts
@@ -434,7 +437,9 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         shotType,
         isFastBreak: false,
         homeScore,
-        awayScore
+        awayScore,
+        playerId: shooterId, // Store playerId for made shot images
+        playerPhoto: shooterData.photo // Store player photo for made shot images
       });
     } else if (resultType === 'FREE_THROW') {
       // Free throws (made or missed based on points)
@@ -456,7 +461,9 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         shotType: 'free throw',
         isFastBreak: false,
         homeScore,
-        awayScore
+        awayScore,
+        playerId: shooterId, // Store playerId for made shot images
+        playerPhoto: shooterData.photo // Store player photo for made shot images
       });
     } else if (resultType === 'FOUL') {
       // Fouls
@@ -634,7 +641,6 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       
       // Create event entry
       const entry = document.createElement('div');
-      entry.className = 'sim-quarter-shot-entry';
       
       // Determine team color
       const teamColor = event.playerTeam === 'home' ? homeColor : awayColor;
@@ -649,6 +655,22 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       
       // Format jersey number
       const jerseyDisplay = event.playerJersey ? ` (#${event.playerJersey})` : '';
+      
+      // Determine CSS class based on event type
+      let eventClass = 'sim-quarter-shot-entry';
+      if (event.resultType === 'MAKE' && (event.eventType === 'SHOT' || event.eventType === 'OREB_PUTBACK' || event.eventType === 'FREE_THROW')) {
+        eventClass += ' event-make';
+      } else if (event.resultType === 'MISS' && (event.eventType === 'SHOT' || event.eventType === 'OREB_PUTBACK' || event.eventType === 'FREE_THROW')) {
+        eventClass += ' event-miss';
+      } else if (event.eventType === 'FOUL') {
+        eventClass += ' event-foul';
+      } else if (event.eventType === 'STEAL') {
+        eventClass += ' event-steal';
+      } else if (event.eventType === 'DEAD_BALL') {
+        eventClass += ' event-turnover';
+      }
+      
+      entry.className = eventClass;
       
       // Build event text based on event type
       let eventText = '';
@@ -681,12 +703,24 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         eventText = 'steals the ball.';
       }
       
+      // Build player image HTML for made shots
+      let playerImageHTML = '';
+      if (event.resultType === 'MAKE' && (event.eventType === 'SHOT' || event.eventType === 'OREB_PUTBACK' || event.eventType === 'FREE_THROW')) {
+        const playerPhoto = event.playerPhoto || (event.playerId ? `/images/players/${event.playerId}.png` : '');
+        if (playerPhoto) {
+          playerImageHTML = `<img src="${playerPhoto}" alt="${event.playerName}" class="sim-quarter-player-image" onerror="this.style.display='none'">`;
+        }
+      }
+      
       // Colors: Clock value #374151, Normal copy #111827, Team colors for player name
       entry.innerHTML = `
-        <span style="color: #374151;">[${timeDisplay}]: </span>
-        ${prefix ? `<span style="color: #374151;">${prefix}</span>` : ''}
-        <span style="color: ${teamColor}; font-weight: bold;">${event.playerName}${jerseyDisplay}</span>
-        <span style="color: #111827;"> ${eventText}</span>
+        <div class="sim-quarter-entry-content">
+          <span style="color: #374151;">[${timeDisplay}]: </span>
+          ${prefix ? `<span style="color: #374151;">${prefix}</span>` : ''}
+          <span style="color: ${teamColor}; font-weight: bold;">${event.playerName}${jerseyDisplay}</span>
+          <span style="color: #111827;"> ${eventText}</span>
+        </div>
+        ${playerImageHTML}
       `;
       
       contentEl.appendChild(entry);

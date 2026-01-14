@@ -828,13 +828,57 @@
     }
 
     .sim-quarter-shot-entry {
-      margin-bottom: 12px;
-      padding: 8px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-radius: 4px;
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     }
 
     .sim-quarter-shot-entry:last-child {
       border-bottom: none;
+    }
+
+    .sim-quarter-entry-content {
+      flex: 1;
+    }
+
+    /* Made Shots - No background tint, player image on right */
+    .sim-quarter-shot-entry.event-make {
+      background: transparent;
+    }
+
+    .sim-quarter-player-image {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+      margin-left: 12px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+    }
+
+    /* Missed Shots - Subtle dimming */
+    .sim-quarter-shot-entry.event-miss {
+      background: transparent;
+      opacity: 0.85;
+    }
+
+    /* Fouls - Light amber tint */
+    .sim-quarter-shot-entry.event-foul {
+      background: rgba(245, 158, 11, 0.12);
+    }
+
+    /* Steals - Light cyan/ice-blue tint */
+    .sim-quarter-shot-entry.event-steal {
+      background: rgba(56, 189, 248, 0.12);
+    }
+
+    /* Dead Ball Turnovers - Light muted lavender tint */
+    .sim-quarter-shot-entry.event-turnover {
+      background: rgba(168, 162, 255, 0.12);
     }
 
     .sim-quarter-score-line {
