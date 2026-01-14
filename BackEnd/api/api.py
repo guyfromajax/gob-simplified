@@ -3362,12 +3362,17 @@ class FTFGDiagnosticRequest(BaseModel):
     madeFGEvents: list
     printedFTEvents: list
     printedMadeFGEvents: list
+    allPrintedEvents: list = []  # ✅ NEW: All printed events (not just FT/FG)
+    playerLookupFailures: list = []  # ✅ NEW: Track when playerMap lookups fail
+    playerMapStats: dict = {}  # ✅ NEW: PlayerMap statistics
     ftMismatches: list
     fgMismatches: list
     totalFreeThrows: int
     totalMadeFGs: int
     totalPrintedFTs: int
     totalPrintedMadeFGs: int
+    totalAllPrintedEvents: int = 0  # ✅ NEW: Total printed events
+    totalLookupFailures: int = 0  # ✅ NEW: Total lookup failures
     ftMismatchCount: int
     fgMismatchCount: int
 
@@ -3404,6 +3409,9 @@ def save_ft_fg_diagnostics(request: FTFGDiagnosticRequest):
 - **Total Made Field Goals (from turns):** {request.totalMadeFGs}
 - **Total Printed Made FGs:** {request.totalPrintedMadeFGs}
 - **Made FG Mismatches:** {request.fgMismatchCount}
+- **Total All Printed Events:** {request.totalAllPrintedEvents}
+- **Total Player Lookup Failures:** {request.totalLookupFailures}
+- **PlayerMap Stats:** {request.playerMapStats.get('totalPlayers', 0) if request.playerMapStats else 0} players, {request.playerMapStats.get('playerMapSize', 0) if request.playerMapStats else 0} in map
 
 ---
 
