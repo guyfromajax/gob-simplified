@@ -1079,6 +1079,13 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
     source = "resume"
     if game_id:
         gm = ongoing_games.get(game_id)
+        # ✅ DEBUG: Track ongoing_games state at start of simulate_quarter_endpoint
+        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] simulate_quarter_endpoint START: game_id={game_id}, full_sim={request.full_sim}, quarter={request.quarter}")
+        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game in ongoing_games: {gm is not None}")
+        if gm:
+            logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game object found - object_id={id(gm)}, current_quarter={gm.quarter}")
+        else:
+            logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game NOT in ongoing_games - will load from DB. Available games: {list(ongoing_games.keys())}")
         if gm is not None and (
             request.home_team != gm.home_team.name
             or request.away_team != gm.away_team.name
@@ -1102,6 +1109,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             logging.info(
                 f"🆕 New game: game_id={game_id} in memory at Q{gm.quarter}, but user requested Q1. Removing from memory to reload from DB."
             )
+            logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ⚠️ Removing game from ongoing_games (new game scenario): game_id={game_id}")
             del ongoing_games[game_id]
             gm = None  # Force reload from DB where new game detection will run
         
@@ -1558,6 +1566,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         logging.warning(f"🔍 [BEFORE_SIM_DEBUG] gm.quarter={gm.quarter}, request.quarter={request.quarter}, gm.score={gm.score}")
                         
                         ongoing_games[game_id] = gm
+                        # ✅ DEBUG: Track when game is added to ongoing_games
+                        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ✅ Added game to ongoing_games: game_id={game_id}, object_id={id(gm)}, quarter={gm.quarter}, full_sim={request.full_sim}")
                         if debug:
                             logging.debug(
                                 "simulate_quarter_endpoint loaded from DB: %s vs %s",
@@ -1677,6 +1687,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         game_id = str(uuid.uuid4())
                     gm.game_id = game_id  # Store game_id on the GameManager object
                     ongoing_games[game_id] = gm
+                    logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ✅ Added game to ongoing_games (timeout resume path): game_id={game_id}, object_id={id(gm)}, quarter={gm.quarter}")
                     source = "new"
                     
                     # Save teams object to database for skeleton lookup during simulation
@@ -1893,6 +1904,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             game_id = generate_game_id()
         gm.game_id = game_id  # Store game_id on the GameManager object
         ongoing_games[game_id] = gm
+        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ✅ Added game to ongoing_games (new game path): game_id={game_id}, object_id={id(gm)}, quarter={gm.quarter}")
         source = "new"
         
         # Save teams object to database for skeleton lookup during simulation
@@ -2131,12 +2143,20 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
     is_final = frontend_summary.get("is_final", False)
     summary_time = (time.time() - summary_start) * 1000
 
-    # Save to database (WITHOUT animations to reduce document size)
-    db_save_start = time.time()
-    try:
-        db_summary = summarize_game_state(gm, exclude_animations=True)
-        # ✅ FIX: Log quarter before save to debug save/load issues
-        logging.info(f"💾 Saving game state: game_id={game_id}, quarter={db_summary.get('quarter')}, gm.quarter={gm.quarter}")
+        # ✅ DEBUG: Check ongoing_games state after simulate_quarter completes
+        gm_after_sim = ongoing_games.get(game_id)
+        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] After simulate_quarter() completes: game_id={game_id}, in_ongoing_games={gm_after_sim is not None}")
+        if gm_after_sim:
+            logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game still in ongoing_games - object_id={id(gm_after_sim)}, quarter={gm_after_sim.quarter}, full_sim={request.full_sim}")
+        else:
+            logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ⚠️ Game NOT in ongoing_games after simulate_quarter! Available games: {list(ongoing_games.keys())}")
+        
+        # Save to database (WITHOUT animations to reduce document size)
+        db_save_start = time.time()
+        try:
+            db_summary = summarize_game_state(gm, exclude_animations=True)
+            # ✅ FIX: Log quarter before save to debug save/load issues
+            logging.info(f"💾 Saving game state: game_id={game_id}, quarter={db_summary.get('quarter')}, gm.quarter={gm.quarter}")
         
         # ✅ TOURNAMENT MODE: Add mode and tournament_id to game document for consistency with Franchise mode
         # ✅ FIX: Prefer explicit mode from request over inferring from IDs
@@ -2590,6 +2610,14 @@ async def set_playcall_override_endpoint(raw_request: Request):
     game_id = request.game_id
     gm = ongoing_games.get(game_id)
     
+    # ✅ DEBUG: Track ongoing_games state for playcall override issue
+    logging.warning(f"🔍 [ONGOING_GAMES DEBUG] set_playcall_override called: game_id={game_id}")
+    logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game in ongoing_games: {gm is not None}")
+    if gm:
+        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game object found - object_id={id(gm)}, quarter={gm.quarter}")
+    else:
+        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ❌ Game NOT in ongoing_games! Available games: {list(ongoing_games.keys())}")
+    
     if gm is None:
         raise HTTPException(
             status_code=404,
@@ -2978,6 +3006,7 @@ def init_game(request: dict):
     
     # Store in ongoing_games so /api/game/{game_id} can access it
     ongoing_games[game_id] = gm
+    logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ✅ Added game to ongoing_games (init-game path): game_id={game_id}, object_id={id(gm)}, quarter={gm.quarter}")
     
     response_data = {"game_id": game_id}
     response_size = len(json.dumps(response_data))
