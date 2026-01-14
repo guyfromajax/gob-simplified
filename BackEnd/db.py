@@ -55,8 +55,11 @@ def _init_client(uri: str | None):
         return None
     try:
         print(f"🔵 [DB] Attempting to connect to MongoDB...", file=sys.stderr, flush=True)
-        client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-        print(f"✅ [DB] MongoDB client created successfully", file=sys.stderr, flush=True)
+        # ✅ CRITICAL: Use connect=False to avoid blocking during import
+        # This creates the client without actually connecting, allowing the app to start
+        # The connection will be established lazily on first use
+        client = MongoClient(uri, serverSelectionTimeoutMS=5000, connect=False)
+        print(f"✅ [DB] MongoDB client created successfully (lazy connection)", file=sys.stderr, flush=True)
         return client
     except Exception as e:  # Catch ALL exceptions, not just PyMongoError
         print(f"⚠️ [DB] Failed to initialize MongoDB client: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
