@@ -112,6 +112,12 @@ const teamId = urlParams.get('team_id') || (userTeamSide === 'home' ? urlParams.
 // On pre-game screen, quarter param is missing, so default to 0
 // This ensures "Sim Quarter" button simulates Q1 (0 + 1 = 1), not Q2 (1 + 1 = 2)
 let quarter = urlParams.has('quarter') ? parseInt(urlParams.get('quarter'), 10) : 0;
+console.log('🔍 [Q1 SKIP DEBUG] Quarter initialized:', { 
+  urlHasQuarter: urlParams.has('quarter'), 
+  urlQuarter: urlParams.get('quarter'), 
+  parsedQuarter: quarter,
+  url: window.location.href 
+});
 let gameId =
   urlParams.get('game_id') ||
   (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
@@ -1064,8 +1070,14 @@ async function handleSimQuarter() {
   // On Q1 break (quarter = 1), nextQuarter = 1 + 1 = 2 (correct)
   const nextQuarter = quarter + 1;
   
-  // ✅ DEBUG: Log quarter calculation for debugging
-  console.log(`🔍 [SIM QUARTER] Current quarter=${quarter}, nextQuarter=${nextQuarter}, URL quarter param=${urlParams.get('quarter')}`);
+  // ✅ DEBUG: Log quarter calculation for debugging (including Q1 skip investigation)
+  console.log(`🔍 [Q1 SKIP DEBUG] handleSimQuarter called:`, {
+    currentQuarter: quarter,
+    nextQuarter: nextQuarter,
+    urlQuarter: urlParams.get('quarter'),
+    gameId: gameId,
+    url: window.location.href
+  });
   
   // Validate: Don't simulate if already simulating
   if (isSimulating) return;
