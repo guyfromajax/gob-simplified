@@ -3287,3 +3287,246 @@ def save_sim_quarter_diagnostics(request: SimQuarterDiagnosticRequest):
     except Exception as e:
         logger.error(f"❌ [DIAGNOSTIC] Failed to save diagnostic file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to save diagnostic file: {str(e)}")
+
+
+class FTFGDiagnosticRequest(BaseModel):
+    gameId: str
+    quarter: int
+    homeTeam: str
+    awayTeam: str
+    timestamp: str
+    freeThrowEvents: list
+    madeFGEvents: list
+    printedFTEvents: list
+    printedMadeFGEvents: list
+    ftMismatches: list
+    fgMismatches: list
+    totalFreeThrows: int
+    totalMadeFGs: int
+    totalPrintedFTs: int
+    totalPrintedMadeFGs: int
+    ftMismatchCount: int
+    fgMismatchCount: int
+
+
+@app.post("/api/diagnostics/ft-fg-analysis")
+def save_ft_fg_diagnostics(request: FTFGDiagnosticRequest):
+    """
+    Save Free Throw and Made Field Goal diagnostic data to a markdown file.
+    Tracks free throws and made FGs to identify edge cases where result types don't match.
+    """
+    try:
+        # Create diagnostics directory if it doesn't exist
+        diagnostics_dir = Path("docs/0_Text_Scroll_Debug")
+        diagnostics_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate filename with timestamp
+        timestamp = datetime.fromisoformat(request.timestamp.replace('Z', '+00:00'))
+        filename = f"ft_fg_analysis_{timestamp.strftime('%Y-%m-%d_%H-%M-%S')}.md"
+        filepath = diagnostics_dir / filename
+        
+        # Build markdown content
+        md_content = f"""# Free Throw & Made Field Goal Analysis
+
+**Generated:** {request.timestamp}  
+**Game ID:** {request.gameId}  
+**Quarter:** {request.quarter}  
+**Teams:** {request.homeTeam} vs {request.awayTeam}
+
+## Summary
+
+- **Total Free Throws (from turns):** {request.totalFreeThrows}
+- **Total Printed Free Throws:** {request.totalPrintedFTs}
+- **Free Throw Mismatches:** {request.ftMismatchCount}
+- **Total Made Field Goals (from turns):** {request.totalMadeFGs}
+- **Total Printed Made FGs:** {request.totalPrintedMadeFGs}
+- **Made FG Mismatches:** {request.fgMismatchCount}
+
+---
+
+## Free Throw Events
+
+"""
+        
+        # Add free throw events
+        for i, ft in enumerate(request.freeThrowEvents, 1):
+            time_display = ft.get('timeRemaining', 'N/A')
+            if isinstance(time_display, (int, float)):
+                minutes = int(time_display // 60)
+                seconds = int(time_display % 60)
+                time_display = f"{minutes}:{seconds:02d}"
+            elif time_display == 'N/A' or time_display is None:
+                time_display = 'N/A'
+            
+            score = ft.get('score', {})
+            home_score = score.get(request.homeTeam, score.get('home', 0))
+            away_score = score.get(request.awayTeam, score.get('away', 0))
+            
+            md_content += f"""### Free Throw #{i}
+
+- **Time:** {time_display}
+- **Turn Index:** {ft.get('turnIndex', 'N/A')}
+- **Shooter ID:** {ft.get('shooterId', 'N/A')}
+- **Shooter Name (from turn):** {ft.get('shooterName', 'N/A')}
+- **Turn Points:** {ft.get('turnPoints', 0)}
+- **Expected Result:** {ft.get('expectedResultType', 'N/A')} (based on turn.points > 0)
+- **Scores:** {home_score} - {away_score}
+
+"""
+        
+        md_content += "\n---\n\n## Made Field Goal Events\n\n"
+        
+        # Add made FG events
+        for i, fg in enumerate(request.madeFGEvents, 1):
+            time_display = fg.get('timeRemaining', 'N/A')
+            if isinstance(time_display, (int, float)):
+                minutes = int(time_display // 60)
+                seconds = int(time_display % 60)
+                time_display = f"{minutes}:{seconds:02d}"
+            elif time_display == 'N/A' or time_display is None:
+                time_display = 'N/A'
+            
+            score = fg.get('score', {})
+            home_score = score.get(request.homeTeam, score.get('home', 0))
+            away_score = score.get(request.awayTeam, score.get('away', 0))
+            
+            md_content += f"""### Made Field Goal #{i}
+
+- **Time:** {time_display}
+- **Turn Index:** {fg.get('turnIndex', 'N/A')}
+- **Shooter ID:** {fg.get('shooterId', 'N/A')}
+- **Shooter Name (from turn):** {fg.get('shooterName', 'N/A')}
+- **Turn Points:** {fg.get('turnPoints', 0)}
+- **Scores:** {home_score} - {away_score}
+
+"""
+        
+        md_content += "\n---\n\n## Printed Free Throw Events\n\n"
+        
+        # Add printed free throw events
+        for i, pft in enumerate(request.printedFTEvents, 1):
+            time_display = pft.get('timeRemaining', 'N/A')
+            if isinstance(time_display, (int, float)):
+                minutes = int(time_display // 60)
+                seconds = int(time_display % 60)
+                time_display = f"{minutes}:{seconds:02d}"
+            elif time_display == 'N/A' or time_display is None:
+                time_display = 'N/A'
+            
+            md_content += f"""### Printed Free Throw #{i}
+
+- **Time:** {time_display}
+- **Turn Index:** {pft.get('turnIndex', 'N/A')}
+- **Player:** {pft.get('playerName', 'N/A')} {pft.get('playerJersey', '')}
+- **Result Type (printed):** {pft.get('resultType', 'N/A')}
+- **Scores:** {pft.get('homeScore', 0)} - {pft.get('awayScore', 0)}
+
+"""
+        
+        md_content += "\n---\n\n## Printed Made Field Goal Events\n\n"
+        
+        # Add printed made FG events
+        for i, pfg in enumerate(request.printedMadeFGEvents, 1):
+            time_display = pfg.get('timeRemaining', 'N/A')
+            if isinstance(time_display, (int, float)):
+                minutes = int(time_display // 60)
+                seconds = int(time_display % 60)
+                time_display = f"{minutes}:{seconds:02d}"
+            elif time_display == 'N/A' or time_display is None:
+                time_display = 'N/A'
+            
+            md_content += f"""### Printed Made FG #{i}
+
+- **Time:** {time_display}
+- **Turn Index:** {pfg.get('turnIndex', 'N/A')}
+- **Player:** {pfg.get('playerName', 'N/A')} {pfg.get('playerJersey', '')}
+- **Shot Type:** {pfg.get('shotType', 'N/A')}
+- **Points Scored:** {pfg.get('pointsScored', 0)}
+- **Scores:** {pfg.get('homeScore', 0)} - {pfg.get('awayScore', 0)}
+
+"""
+        
+        # Add mismatches section
+        if request.ftMismatches:
+            md_content += "\n---\n\n## ⚠️ Free Throw Mismatches\n\n"
+            
+            for i, mismatch in enumerate(request.ftMismatches, 1):
+                time_display = mismatch.get('timeRemaining', 'N/A')
+                if isinstance(time_display, (int, float)):
+                    minutes = int(time_display // 60)
+                    seconds = int(time_display % 60)
+                    time_display = f"{minutes}:{seconds:02d}"
+                elif time_display == 'N/A' or time_display is None:
+                    time_display = 'N/A'
+                
+                mismatch_type = mismatch.get('type', 'UNKNOWN')
+                if mismatch_type == 'RESULT_TYPE_MISMATCH':
+                    md_content += f"""### Free Throw Mismatch #{i} - Result Type Mismatch
+
+- **Time:** {time_display}
+- **Turn Index:** {mismatch.get('turnIndex', 'N/A')}
+- **Shooter:** {mismatch.get('shooterName', 'N/A')}
+- **Expected Result (from turn.points):** {mismatch.get('expectedResultType', 'N/A')}
+- **Printed Result:** {mismatch.get('printedResultType', 'N/A')}
+- **Turn Points:** {mismatch.get('turnPoints', 0)}
+- **Made (turn.points > 0):** {mismatch.get('made', False)}
+
+**⚠️ WARNING:** Free throw result type mismatch! Expected {mismatch.get('expectedResultType', 'N/A')} but printed {mismatch.get('printedResultType', 'N/A')}
+
+"""
+                elif mismatch_type == 'NOT_PRINTED':
+                    md_content += f"""### Free Throw Mismatch #{i} - Not Printed
+
+- **Time:** {time_display}
+- **Turn Index:** {mismatch.get('turnIndex', 'N/A')}
+- **Shooter:** {mismatch.get('shooterName', 'N/A')}
+- **Expected Result:** {mismatch.get('expectedResultType', 'N/A')}
+- **Turn Points:** {mismatch.get('turnPoints', 0)}
+
+**⚠️ WARNING:** Free throw was NOT printed in the text scroll!
+
+"""
+        
+        if request.fgMismatches:
+            md_content += "\n---\n\n## ⚠️ Made Field Goal Mismatches\n\n"
+            
+            for i, mismatch in enumerate(request.fgMismatches, 1):
+                time_display = mismatch.get('timeRemaining', 'N/A')
+                if isinstance(time_display, (int, float)):
+                    minutes = int(time_display // 60)
+                    seconds = int(time_display % 60)
+                    time_display = f"{minutes}:{seconds:02d}"
+                elif time_display == 'N/A' or time_display is None:
+                    time_display = 'N/A'
+                
+                md_content += f"""### Made FG Mismatch #{i} - Not Printed
+
+- **Time:** {time_display}
+- **Turn Index:** {mismatch.get('turnIndex', 'N/A')}
+- **Shooter:** {mismatch.get('shooterName', 'N/A')}
+- **Turn Points:** {mismatch.get('turnPoints', 0)}
+
+**⚠️ WARNING:** Made field goal was NOT printed in the text scroll!
+
+"""
+        
+        # Try to write file (for local development)
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(md_content)
+            logger.info(f"✅ [FT/FG DIAGNOSTIC] Saved analysis file: {filepath}")
+        except Exception as e:
+            logger.warning(f"⚠️ [FT/FG DIAGNOSTIC] Could not write file to filesystem (Railway ephemeral): {e}")
+        
+        # Return markdown content in response so frontend can download it
+        return {
+            "status": "success",
+            "filename": filename,
+            "markdownContent": md_content,
+            "ftMismatchCount": request.ftMismatchCount,
+            "fgMismatchCount": request.fgMismatchCount
+        }
+    
+    except Exception as e:
+        logger.error(f"❌ [FT/FG DIAGNOSTIC] Failed to save diagnostic file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to save diagnostic file: {str(e)}")

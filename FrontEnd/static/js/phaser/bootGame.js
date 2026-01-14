@@ -428,7 +428,41 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     } else if (resultType === 'PUTBACK_MAKE' || resultType === 'PUTBACK_MISS') {
       // OREB putback attempts
       const shooterId = turn.shooter_id || turn.shooter?.player_id || turn.shooter || turn.rebounderId;
-      const shooterData = playerMap[shooterId] || { name: turn.shooter || 'Unknown', jersey: '', team: 'home' };
+      let shooterData = playerMap[shooterId];
+      
+      // ✅ FIX: If not found in playerMap, try to find player in players array or use fallback name
+      if (!shooterData && shooterId) {
+        // Try to find player in players array (try multiple ID formats)
+        const foundPlayer = players.find(p => 
+          p.playerId === shooterId || 
+          p.player_id === shooterId || 
+          String(p.playerId) === String(shooterId) ||
+          String(p.player_id) === String(shooterId)
+        );
+        if (foundPlayer) {
+          shooterData = {
+            name: foundPlayer.name || 'Unknown',
+            jersey: foundPlayer.jersey || foundPlayer.jerseyNumber || foundPlayer.jersey_number || '',
+            team_id: foundPlayer.team_id,
+            photo: foundPlayer.photo || null
+          };
+        }
+      }
+      
+      // ✅ FIX: Final fallback - use turn.shooter_name if available, check if turn.shooter is an ID
+      if (!shooterData) {
+        const fallbackName = turn.shooter_name || turn.shooter || 'Unknown';
+        // If turn.shooter looks like an ID (UUID format with dashes and long length), don't use it as name
+        const isLikelyId = fallbackName && typeof fallbackName === 'string' && 
+                          (fallbackName.includes('-') && fallbackName.length > 20) ||
+                          (fallbackName.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i));
+        shooterData = {
+          name: isLikelyId ? (turn.shooter_name || 'Unknown') : fallbackName,
+          jersey: '',
+          team_id: null,
+          photo: null
+        };
+      }
       
       // ✅ FIX: Use turn.offense_team_id to determine team (shooter is on offense)
       const playerTeam = getPlayerTeam(shooterId, shooterData.team);
@@ -932,6 +966,164 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   // ✅ NEW: Show game control buttons when Sim Quarter popup is hidden
   if (gameControlsEl) {
     gameControlsEl.style.display = '';
+  }
+  
+  // ✅ DIAGNOSTIC: Track free throws and made FGs for edge case analysis
+  const ENABLE_FT_FG_DIAGNOSTICS = true; // Set to false to disable
+  const freeThrowEvents = [];
+  const madeFGEvents = [];
+  const printedFTEvents = [];
+  const printedMadeFGEvents = [];
+  
+  if (ENABLE_FT_FG_DIAGNOSTICS) {
+    // Collect all free throw and made FG events from turns for analysis
+    turns.forEach((turn, index) => {
+      if (turn.result_type === 'FREE_THROW') {
+        const turnPoints = turn.points || 0;
+        const made = turnPoints > 0;
+        freeThrowEvents.push({
+          turnIndex: index,
+          timeRemaining: turn.time_remaining || turn.clock || turn.game_clock,
+          shooterId: turn.shooter_id || turn.shooter?.player_id || turn.shooter,
+          shooterName: turn.shooter_name || turn.shooter || 'Unknown',
+          turnPoints,
+          made,
+          expectedResultType: made ? 'MAKE' : 'MISS',
+          score: turn.score || {},
+          turn: turn
+        });
+      } else if (turn.result_type === 'MAKE' && turn.points && turn.points > 0) {
+        // Only track actual made field goals (not free throws)
+        const turnPoints = turn.points || 0;
+        madeFGEvents.push({
+          turnIndex: index,
+          timeRemaining: turn.time_remaining || turn.clock || turn.game_clock,
+          shooterId: turn.shooter_id || turn.shooter?.player_id || turn.shooter,
+          shooterName: turn.shooter_name || turn.shooter || 'Unknown',
+          turnPoints,
+          score: turn.score || {},
+          turn: turn
+        });
+      }
+    });
+    
+    // After processing all events, collect printed free throws and made FGs
+    // This happens in the event processing loop below
+  }
+  
+  // ✅ DIAGNOSTIC: Match free throws and made FGs with printed events and send to backend
+  if (ENABLE_FT_FG_DIAGNOSTICS) {
+    const ftMismatches = [];
+    const fgMismatches = [];
+    
+    // Match free throws
+    for (const ft of freeThrowEvents) {
+      const printedFT = printedFTEvents.find(pft => 
+        pft.turnIndex === ft.turnIndex ||
+        (pft.timeRemaining === ft.timeRemaining && pft.playerName === ft.shooterName)
+      );
+      
+      if (printedFT) {
+        // Check if result types match
+        if (printedFT.resultType !== ft.expectedResultType) {
+          ftMismatches.push({
+            type: 'RESULT_TYPE_MISMATCH',
+            turnIndex: ft.turnIndex,
+            timeRemaining: ft.timeRemaining,
+            shooterName: ft.shooterName,
+            expectedResultType: ft.expectedResultType,
+            printedResultType: printedFT.resultType,
+            turnPoints: ft.turnPoints,
+            made: ft.made
+          });
+        }
+      } else {
+        // Free throw not printed at all
+        ftMismatches.push({
+          type: 'NOT_PRINTED',
+          turnIndex: ft.turnIndex,
+          timeRemaining: ft.timeRemaining,
+          shooterName: ft.shooterName,
+          expectedResultType: ft.expectedResultType,
+          turnPoints: ft.turnPoints,
+          made: ft.made
+        });
+      }
+    }
+    
+    // Match made FGs (simpler - just check if they were printed)
+    for (const fg of madeFGEvents) {
+      const printedFG = printedMadeFGEvents.find(pfg => 
+        pfg.turnIndex === fg.turnIndex ||
+        (pfg.timeRemaining === fg.timeRemaining && pfg.playerName === fg.shooterName)
+      );
+      
+      if (!printedFG) {
+        fgMismatches.push({
+          type: 'NOT_PRINTED',
+          turnIndex: fg.turnIndex,
+          timeRemaining: fg.timeRemaining,
+          shooterName: fg.shooterName,
+          turnPoints: fg.turnPoints
+        });
+      }
+    }
+    
+    // Get game ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const gameId = urlParams.get('game_id');
+    
+    // Send diagnostic data to backend
+    try {
+      const diagnosticData = {
+        gameId: gameId || 'unknown',
+        quarter,
+        homeTeam,
+        awayTeam,
+        timestamp: new Date().toISOString(),
+        freeThrowEvents,
+        madeFGEvents,
+        printedFTEvents,
+        printedMadeFGEvents,
+        ftMismatches,
+        fgMismatches,
+        totalFreeThrows: freeThrowEvents.length,
+        totalMadeFGs: madeFGEvents.length,
+        totalPrintedFTs: printedFTEvents.length,
+        totalPrintedMadeFGs: printedMadeFGEvents.length,
+        ftMismatchCount: ftMismatches.length,
+        fgMismatchCount: fgMismatches.length
+      };
+      
+      const response = await fetch(API_CONFIG.buildUrl('/api/diagnostics/ft-fg-analysis'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(diagnosticData)
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Download markdown file to user's computer
+        if (result.markdownContent) {
+          const blob = new Blob([result.markdownContent], { type: 'text/markdown' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = result.filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          
+          console.log(`✅ [FT/FG DIAGNOSTIC] Analysis file downloaded: ${result.filename} (${result.ftMismatchCount || 0} FT mismatches, ${result.fgMismatchCount || 0} FG mismatches)`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ [FT/FG DIAGNOSTIC] Failed to send diagnostic data:', error);
+    }
   }
   
   // ✅ DIAGNOSTIC: Match score increments with printed events and send to backend
