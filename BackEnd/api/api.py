@@ -636,17 +636,15 @@ def root():
     return {"message": "GOB Simulation API is live"}
 
 @app.get("/health")
-def health_check():
-    """Simplest possible health check - no dependencies"""
+async def health_check():
+    """Simplest possible health check - no dependencies, async for better performance"""
     try:
-        print("🔵 [DEBUG] health_check: GET /health called", file=sys.stderr, flush=True)
+        logger.info("🔵 [HEALTH] GET /health called")
         port = os.getenv("PORT", "NOT SET")
-        print(f"🔵 [DEBUG] health_check: Returning response with port={port}", file=sys.stderr, flush=True)
+        logger.info(f"🔵 [HEALTH] Returning response with port={port}")
         return {"status": "healthy", "port": port}
     except Exception as e:
-        print(f"🔴 [ERROR] health_check: Exception: {e}", file=sys.stderr, flush=True)
-        import traceback
-        traceback.print_exc(file=sys.stderr)
+        logger.error(f"🔴 [HEALTH ERROR] Exception: {e}", exc_info=True)
         return JSONResponse(
             status_code=500,
             content={"status": "unhealthy", "error": str(e)}
