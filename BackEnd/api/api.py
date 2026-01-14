@@ -2153,11 +2153,11 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ⚠️ Game NOT in ongoing_games after simulate_quarter! Available games: {list(ongoing_games.keys())}")
     
     # Save to database (WITHOUT animations to reduce document size)
-        db_save_start = time.time()
-        try:
-            db_summary = summarize_game_state(gm, exclude_animations=True)
-            # ✅ FIX: Log quarter before save to debug save/load issues
-            logging.info(f"💾 Saving game state: game_id={game_id}, quarter={db_summary.get('quarter')}, gm.quarter={gm.quarter}")
+    db_save_start = time.time()
+    try:
+        db_summary = summarize_game_state(gm, exclude_animations=True)
+        # ✅ FIX: Log quarter before save to debug save/load issues
+        logging.info(f"💾 Saving game state: game_id={game_id}, quarter={db_summary.get('quarter')}, gm.quarter={gm.quarter}")
         
         # ✅ TOURNAMENT MODE: Add mode and tournament_id to game document for consistency with Franchise mode
         # ✅ FIX: Prefer explicit mode from request over inferring from IDs
