@@ -747,15 +747,34 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       // Build player image for made shots (SS&S: Use DOM element creation like announcement system)
       if (event.resultType === 'MAKE' && (event.eventType === 'SHOT' || event.eventType === 'OREB_PUTBACK' || event.eventType === 'FREE_THROW')) {
         const playerPhoto = event.playerPhoto || (event.playerId ? `/images/players/${event.playerId}.png` : '');
+        console.log('🖼️ [SIM QUARTER IMAGE] Made shot detected:', {
+          resultType: event.resultType,
+          eventType: event.eventType,
+          playerId: event.playerId,
+          playerPhoto: event.playerPhoto,
+          constructedPhoto: playerPhoto,
+          playerName: event.playerName
+        });
         if (playerPhoto) {
           const img = document.createElement('img');
           img.src = playerPhoto;
           img.alt = event.playerName;
           img.className = 'sim-quarter-player-image';
           img.onerror = () => {
+            console.log('❌ [SIM QUARTER IMAGE] Image failed to load:', playerPhoto);
             img.style.display = 'none';
           };
+          img.onload = () => {
+            console.log('✅ [SIM QUARTER IMAGE] Image loaded successfully:', playerPhoto);
+          };
           entry.appendChild(img);
+          console.log('🖼️ [SIM QUARTER IMAGE] Image element appended to entry:', {
+            hasParent: !!img.parentElement,
+            entryChildren: entry.children.length,
+            imgSrc: img.src
+          });
+        } else {
+          console.log('⚠️ [SIM QUARTER IMAGE] No playerPhoto found for made shot');
         }
       }
       
