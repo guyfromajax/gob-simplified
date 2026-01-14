@@ -104,6 +104,3 @@ const API_CONFIG = {
 // Make it globally available
 window.API_CONFIG = API_CONFIG;
 
-// Export for ES6 modules
-export { API_CONFIG };
-

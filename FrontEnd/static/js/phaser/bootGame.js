@@ -6,7 +6,9 @@ import { finalizeGame } from './finalizeGame.js';
 import { DEBUG } from './utils/debug.js';
 import gameStore from '../state/gameStore.js';
 import { generateBothLineups } from './utils/autosetLineup.js';
-import { API_CONFIG } from '../config/api-config.js';
+
+// API_CONFIG is loaded as a global script, access via window
+const API_CONFIG = window.API_CONFIG;
 
 const DEBUG_GAME_ID =
   (typeof window !== 'undefined' && window.DEBUG_GAME_ID) ||
