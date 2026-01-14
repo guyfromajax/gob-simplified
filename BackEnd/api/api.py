@@ -44,6 +44,8 @@ import logging
 import os
 import json
 import time
+from datetime import datetime
+from pathlib import Path
 from BackEnd.models.player import Player
 
 logger = logging.getLogger(__name__)
@@ -3143,3 +3145,142 @@ def get_active_tournament(user_team_id: Optional[str] = "BENTLEY-TRUMAN"):
     from bson import ObjectId
     from fastapi.encoders import jsonable_encoder
     return jsonable_encoder(doc, custom_encoder={ObjectId: str})
+
+
+class SimQuarterDiagnosticRequest(BaseModel):
+    gameId: str
+    quarter: int
+    homeTeam: str
+    awayTeam: str
+    timestamp: str
+    scoreIncrements: list
+    printedEvents: list
+    mismatches: list
+    totalScoreIncrements: int
+    totalPrintedEvents: int
+    mismatchCount: int
+
+
+@app.post("/api/diagnostics/sim-quarter")
+def save_sim_quarter_diagnostics(request: SimQuarterDiagnosticRequest):
+    """
+    Save Sim Quarter diagnostic data to a markdown file.
+    Tracks score increments and printed events to identify missing prints.
+    """
+    try:
+        # Create diagnostics directory if it doesn't exist
+        diagnostics_dir = Path("docs/0_Text_Scroll_Debug")
+        diagnostics_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate filename with timestamp
+        timestamp = datetime.fromisoformat(request.timestamp.replace('Z', '+00:00'))
+        filename = f"sim_quarter_diagnostics_{timestamp.strftime('%Y-%m-%d_%H-%M-%S')}.md"
+        filepath = diagnostics_dir / filename
+        
+        # Build markdown content
+        md_content = f"""# Sim Quarter Text Scroll Diagnostics
+
+**Generated:** {request.timestamp}  
+**Game ID:** {request.gameId}  
+**Quarter:** {request.quarter}  
+**Teams:** {request.homeTeam} vs {request.awayTeam}
+
+## Summary
+
+- **Total Score Increments:** {request.totalScoreIncrements}
+- **Total Printed Events:** {request.totalPrintedEvents}
+- **Mismatches (Missing Prints):** {request.mismatchCount}
+
+---
+
+## Score Increments
+
+"""
+        
+        # Add score increments
+        for i, inc in enumerate(request.scoreIncrements, 1):
+            time_display = inc.get('timeRemaining', 'N/A')
+            if isinstance(time_display, (int, float)):
+                minutes = int(time_display // 60)
+                seconds = int(time_display % 60)
+                time_display = f"{minutes}:{seconds:02d}"
+            
+            md_content += f"""### Score Increment #{i}
+
+- **Time:** {time_display}
+- **Home Score Change:** +{inc.get('homeScoreChange', 0)}
+- **Away Score Change:** +{inc.get('awayScoreChange', 0)}
+- **Total Points:** {inc.get('homeScoreChange', 0) + inc.get('awayScoreChange', 0)}
+- **Result Type:** {inc.get('resultType', 'N/A')}
+- **Points (from turn):** {inc.get('points', 0)}
+- **Shooter ID:** {inc.get('shooterId', 'N/A')}
+- **New Scores:** {inc.get('newHomeScore', 0)} - {inc.get('newAwayScore', 0)}
+
+"""
+        
+        md_content += "\n---\n\n## Printed Events\n\n"
+        
+        # Add printed events
+        for i, event in enumerate(request.printedEvents, 1):
+            time_display = event.get('timeRemaining', 'N/A')
+            if isinstance(time_display, (int, float)):
+                minutes = int(time_display // 60)
+                seconds = int(time_display % 60)
+                time_display = f"{minutes}:{seconds:02d}"
+            
+            md_content += f"""### Printed Event #{i}
+
+- **Time:** {time_display}
+- **Event Type:** {event.get('eventType', 'N/A')}
+- **Result Type:** {event.get('resultType', 'N/A')}
+- **Points Scored:** {event.get('pointsScored', 0)}
+- **Player:** {event.get('playerName', 'N/A')} {event.get('playerJersey', '')}
+- **Shot Type:** {event.get('shotType', 'N/A')}
+- **Fast Break:** {event.get('isFastBreak', False)}
+- **Scores:** {event.get('homeScore', 0)} - {event.get('awayScore', 0)}
+
+"""
+        
+        # Add mismatches section
+        if request.mismatches:
+            md_content += "\n---\n\n## ⚠️ Mismatches (Score Increments Without Prints)\n\n"
+            
+            for i, mismatch in enumerate(request.mismatches, 1):
+                if mismatch.get('type') == 'MISSING_PRINT':
+                    score_inc = mismatch.get('scoreIncrement', {})
+                    time_display = score_inc.get('timeRemaining', 'N/A')
+                    if isinstance(time_display, (int, float)):
+                        minutes = int(time_display // 60)
+                        seconds = int(time_display % 60)
+                        time_display = f"{minutes}:{seconds:02d}"
+                    
+                    md_content += f"""### Missing Print #{i}
+
+- **Time:** {time_display}
+- **Turn Index:** {score_inc.get('turnIndex', 'N/A')}
+- **Score Change:** +{score_inc.get('homeScoreChange', 0)} (home), +{score_inc.get('awayScoreChange', 0)} (away)
+- **Total Points:** {score_inc.get('totalPoints', 0)}
+- **Result Type:** {score_inc.get('resultType', 'N/A')}
+- **Points (from turn):** {score_inc.get('points', 0)}
+- **Shooter ID:** {score_inc.get('shooterId', 'N/A')}
+
+**⚠️ WARNING:** This score increment was NOT printed in the text scroll!
+
+"""
+        
+        # Write file
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(md_content)
+        
+        logger.info(f"✅ [DIAGNOSTIC] Saved Sim Quarter diagnostic file: {filepath}")
+        
+        return {
+            "status": "success",
+            "filepath": str(filepath),
+            "filename": filename,
+            "mismatchCount": request.mismatchCount
+        }
+    
+    except Exception as e:
+        logger.error(f"❌ [DIAGNOSTIC] Failed to save diagnostic file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to save diagnostic file: {str(e)}")
