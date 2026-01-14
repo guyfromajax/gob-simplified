@@ -333,6 +333,19 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     }
   });
   
+  // ✅ DIAGNOSTIC: Initialize tracking arrays (before event processing)
+  const ENABLE_FT_FG_DIAGNOSTICS = true; // Set to false to disable
+  const playerLookupFailures = []; // Track when playerMap lookups fail
+  const allPrintedEvents = []; // Track ALL printed events (not just FT/FG)
+  
+  // ✅ DIAGNOSTIC: Build playerMap statistics for analysis
+  const playerMapStats = {
+    totalPlayers: players.length,
+    playerMapSize: Object.keys(playerMap).length,
+    playerIds: Object.keys(playerMap),
+    playerNames: Object.values(playerMap).map(p => p.name)
+  };
+  
   // Get team names
   const homeTeamName = lastSummary.home_team?.name || homeTeam;
   const awayTeamName = lastSummary.away_team?.name || awayTeam;
@@ -398,10 +411,25 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       // Regular shots, Fast Break shots, FCP shots, or HCT shots
       // Note: FCP/HCT shots have result_type 'MAKE'/'MISS' with fcp_shot/hct_shot flags, so they're captured here
       const shooterId = turn.shooter_id || turn.shooter?.player_id || turn.shooter;
-      const shooterData = playerMap[shooterId] || { name: turn.shooter || 'Unknown', jersey: '', team: 'home' };
+      const shooterData = playerMap[shooterId];
+      const lookupSucceeded = !!shooterData;
+      
+      // ✅ DIAGNOSTIC: Track lookup failures
+      if (ENABLE_FT_FG_DIAGNOSTICS && !lookupSucceeded && shooterId) {
+        playerLookupFailures.push({
+          eventType: resultType === 'MAKE' ? 'MADE_FG' : 'MISSED_FG',
+          turnIndex: index,
+          shooterId: shooterId,
+          fallbackUsed: turn.shooter || 'Unknown',
+          inPlayerMap: false,
+          playerMapKeys: Object.keys(playerMap).slice(0, 10) // First 10 for reference
+        });
+      }
+      
+      const finalShooterData = shooterData || { name: turn.shooter || 'Unknown', jersey: '', team: 'home' };
       
       // ✅ FIX: Use turn.offense_team_id to determine team (shooter is on offense)
-      const playerTeam = getPlayerTeam(shooterId, shooterData.team);
+      const playerTeam = getPlayerTeam(shooterId, finalShooterData.team);
       
       // Determine shot type (2-pt or 3-pt)
       const points = turn.points || 0;
@@ -413,8 +441,8 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       
       eventResults.push({
         timeRemaining,
-        playerName: shooterData.name,
-        playerJersey: shooterData.jersey,
+        playerName: finalShooterData.name,
+        playerJersey: finalShooterData.jersey,
         playerTeam: playerTeam,
         resultType: resultType,
         eventType: 'SHOT',
@@ -920,6 +948,36 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         });
       }
       
+      // ✅ DIAGNOSTIC: Track ALL printed events for FT/FG analysis (with player ID lookup info)
+      if (ENABLE_FT_FG_DIAGNOSTICS) {
+        const printedEvent = {
+          turnIndex: i,
+          timeRemaining: event.timeRemaining,
+          eventType: event.eventType,
+          resultType: event.resultType,
+          playerId: event.playerId, // The shooter_id from the turn
+          playerName: event.playerName, // The name actually printed
+          playerJersey: event.playerJersey,
+          shotType: event.shotType,
+          homeScore: event.homeScore,
+          awayScore: event.awayScore,
+          isFastBreak: event.isFastBreak,
+          // Track lookup details
+          lookupSucceeded: !!playerMap[event.playerId],
+          playerMapHasId: event.playerId ? (event.playerId in playerMap) : false,
+          fallbackUsed: !playerMap[event.playerId] ? 'Yes (playerMap lookup failed)' : 'No'
+        };
+        
+        allPrintedEvents.push(printedEvent);
+        
+        // Also track in specific arrays for matching
+        if (event.eventType === 'FREE_THROW') {
+          printedFTEvents.push(printedEvent);
+        } else if (event.eventType === 'SHOT' && event.resultType === 'MAKE') {
+          printedMadeFGEvents.push(printedEvent);
+        }
+      }
+      
       // Scroll to bottom
       const scrollContainer = popup.querySelector('.sim-quarter-scroll-container');
       if (scrollContainer) {
@@ -968,8 +1026,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     gameControlsEl.style.display = '';
   }
   
-  // ✅ DIAGNOSTIC: Track free throws and made FGs for edge case analysis
-  const ENABLE_FT_FG_DIAGNOSTICS = true; // Set to false to disable
+  // ✅ DIAGNOSTIC: Initialize FT/FG tracking arrays (for matching with printed events)
   const freeThrowEvents = [];
   const madeFGEvents = [];
   const printedFTEvents = [];
@@ -981,27 +1038,65 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       if (turn.result_type === 'FREE_THROW') {
         const turnPoints = turn.points || 0;
         const made = turnPoints > 0;
+        const shooterId = turn.shooter_id || turn.shooter?.player_id || turn.shooter;
+        const shooterData = playerMap[shooterId];
+        const lookupSucceeded = !!shooterData;
+        const fallbackName = turn.shooter || 'Unknown';
+        
+        // Track lookup failures
+        if (!lookupSucceeded) {
+          playerLookupFailures.push({
+            eventType: 'FREE_THROW',
+            turnIndex: index,
+            shooterId: shooterId,
+            fallbackUsed: fallbackName,
+            inPlayerMap: false,
+            playerMapKeys: Object.keys(playerMap).slice(0, 10) // First 10 for reference
+          });
+        }
+        
         freeThrowEvents.push({
           turnIndex: index,
           timeRemaining: turn.time_remaining || turn.clock || turn.game_clock,
-          shooterId: turn.shooter_id || turn.shooter?.player_id || turn.shooter,
-          shooterName: turn.shooter_name || turn.shooter || 'Unknown',
+          shooterId: shooterId,
+          shooterName: shooterData?.name || turn.shooter_name || turn.shooter || 'Unknown',
           turnPoints,
           made,
           expectedResultType: made ? 'MAKE' : 'MISS',
           score: turn.score || {},
+          lookupSucceeded: lookupSucceeded,
+          fallbackUsed: !lookupSucceeded ? fallbackName : null,
           turn: turn
         });
       } else if (turn.result_type === 'MAKE' && turn.points && turn.points > 0) {
         // Only track actual made field goals (not free throws)
         const turnPoints = turn.points || 0;
+        const shooterId = turn.shooter_id || turn.shooter?.player_id || turn.shooter;
+        const shooterData = playerMap[shooterId];
+        const lookupSucceeded = !!shooterData;
+        const fallbackName = turn.shooter || 'Unknown';
+        
+        // Track lookup failures
+        if (!lookupSucceeded) {
+          playerLookupFailures.push({
+            eventType: 'MADE_FG',
+            turnIndex: index,
+            shooterId: shooterId,
+            fallbackUsed: fallbackName,
+            inPlayerMap: false,
+            playerMapKeys: Object.keys(playerMap).slice(0, 10) // First 10 for reference
+          });
+        }
+        
         madeFGEvents.push({
           turnIndex: index,
           timeRemaining: turn.time_remaining || turn.clock || turn.game_clock,
-          shooterId: turn.shooter_id || turn.shooter?.player_id || turn.shooter,
-          shooterName: turn.shooter_name || turn.shooter || 'Unknown',
+          shooterId: shooterId,
+          shooterName: shooterData?.name || turn.shooter_name || turn.shooter || 'Unknown',
           turnPoints,
           score: turn.score || {},
+          lookupSucceeded: lookupSucceeded,
+          fallbackUsed: !lookupSucceeded ? fallbackName : null,
           turn: turn
         });
       }
@@ -1085,12 +1180,17 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         madeFGEvents,
         printedFTEvents,
         printedMadeFGEvents,
+        allPrintedEvents, // ✅ NEW: All printed events (not just FT/FG)
         ftMismatches,
         fgMismatches,
+        playerLookupFailures, // ✅ NEW: Track when playerMap lookups fail
+        playerMapStats, // ✅ NEW: PlayerMap statistics
         totalFreeThrows: freeThrowEvents.length,
         totalMadeFGs: madeFGEvents.length,
         totalPrintedFTs: printedFTEvents.length,
         totalPrintedMadeFGs: printedMadeFGEvents.length,
+        totalAllPrintedEvents: allPrintedEvents.length,
+        totalLookupFailures: playerLookupFailures.length,
         ftMismatchCount: ftMismatches.length,
         fgMismatchCount: fgMismatches.length
       };
