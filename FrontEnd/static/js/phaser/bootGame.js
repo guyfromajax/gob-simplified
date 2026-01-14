@@ -458,7 +458,22 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       // ✅ FIX: Use turn.offense_team_id to determine team (shooter is on offense)
       const playerTeam = getPlayerTeam(shooterId, shooterData.team);
       
-      const made = (turn.points || 0) > 0;
+      const turnPoints = turn.points || 0;
+      const made = turnPoints > 0;
+      
+      // ✅ DEBUG: Log free throw processing
+      console.log('🏀 [FREE THROW DEBUG] Processing free throw:', {
+        turnIndex: index,
+        timeRemaining,
+        shooterId,
+        shooterName: shooterData.name,
+        turnPoints,
+        made,
+        resultType: made ? 'MAKE' : 'MISS',
+        homeScore,
+        awayScore,
+        turn: turn
+      });
       
       eventResults.push({
         timeRemaining,
@@ -683,7 +698,25 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       
       // Handle special result type mappings
       if (turn.result_type === 'FREE_THROW') {
-        return e.eventType === 'FREE_THROW';
+        const isMatch = e.eventType === 'FREE_THROW';
+        
+        // ✅ DEBUG: Log free throw matching
+        if (isMatch) {
+          const turnPoints = turn.points || 0;
+          const expectedMade = turnPoints > 0;
+          console.log('🏀 [FREE THROW DEBUG] Matching free throw:', {
+            turnIndex: i,
+            timeRemaining: turn.time_remaining || turn.clock || turn.game_clock,
+            turnPoints,
+            expectedResultType: expectedMade ? 'MAKE' : 'MISS',
+            matchedEventResultType: e.resultType,
+            matchedEventPlayerName: e.playerName,
+            matchedEventTimeRemaining: e.timeRemaining,
+            match: e.resultType === (expectedMade ? 'MAKE' : 'MISS') ? '✅ CORRECT' : '❌ MISMATCH'
+          });
+        }
+        
+        return isMatch;
       } else {
         return e.resultType === turn.result_type || e.eventType === turn.result_type;
       }
