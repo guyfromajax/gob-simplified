@@ -426,7 +426,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         });
       }
       
-      const finalShooterData = shooterData || { name: turn.shooter || 'Unknown', jersey: '', team: 'home' };
+      const finalShooterData = shooterData || { name: turn.shooter || 'Unknown', jersey: '', team: 'home', photo: null };
       
       // ✅ FIX: Use turn.offense_team_id to determine team (shooter is on offense)
       const playerTeam = getPlayerTeam(shooterId, finalShooterData.team);
@@ -451,7 +451,8 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         homeScore,
         awayScore,
         playerId: shooterId, // Store playerId for made shot images
-        playerPhoto: shooterData.photo // Store player photo for made shot images
+        playerPhoto: finalShooterData.photo || null, // Store player photo for made shot images
+        lookupSucceeded: lookupSucceeded // ✅ DIAGNOSTIC: Track lookup success
       });
     } else if (resultType === 'PUTBACK_MAKE' || resultType === 'PUTBACK_MISS') {
       // OREB putback attempts
@@ -510,12 +511,12 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         homeScore,
         awayScore,
         playerId: shooterId, // Store playerId for made shot images
-        playerPhoto: shooterData.photo // Store player photo for made shot images
+        playerPhoto: shooterData.photo || null // Store player photo for made shot images (safe access)
       });
     } else if (resultType === 'FREE_THROW') {
       // Free throws (made or missed based on points)
       const shooterId = turn.shooter_id || turn.shooter?.player_id || turn.shooter;
-      const shooterData = playerMap[shooterId] || { name: turn.shooter || 'Unknown', jersey: '', team: 'home' };
+      const shooterData = playerMap[shooterId] || { name: turn.shooter || 'Unknown', jersey: '', team: 'home', photo: null };
       
       // ✅ FIX: Use turn.offense_team_id to determine team (shooter is on offense)
       const playerTeam = getPlayerTeam(shooterId, shooterData.team);
@@ -549,7 +550,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         homeScore,
         awayScore,
         playerId: shooterId, // Store playerId for made shot images
-        playerPhoto: shooterData.photo // Store player photo for made shot images
+        playerPhoto: shooterData.photo || null // Store player photo for made shot images (safe access)
       });
     } else if (resultType === 'FOUL') {
       // Fouls
