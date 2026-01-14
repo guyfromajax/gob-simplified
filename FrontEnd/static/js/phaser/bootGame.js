@@ -6,6 +6,7 @@ import { finalizeGame } from './finalizeGame.js';
 import { DEBUG } from './utils/debug.js';
 import gameStore from '../state/gameStore.js';
 import { generateBothLineups } from './utils/autosetLineup.js';
+import { API_CONFIG } from '../config/api-config.js';
 
 const DEBUG_GAME_ID =
   (typeof window !== 'undefined' && window.DEBUG_GAME_ID) ||
@@ -600,6 +601,13 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   if (homeScoreEl) homeScoreEl.textContent = displayHomeScore;
   if (awayScoreEl) awayScoreEl.textContent = displayAwayScore;
   
+  // ✅ DIAGNOSTIC: Track score increments and printed events for debugging
+  const ENABLE_TEXT_SCROLL_DIAGNOSTICS = true; // Set to false to disable
+  const scoreIncrements = [];
+  const printedEvents = [];
+  let previousHomeScore = displayHomeScore;
+  let previousAwayScore = displayAwayScore;
+  
   // Process all turns to update clock in real-time, create entries for all event types
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
@@ -614,6 +622,35 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         timeValue = `${minutes}:${seconds.toString().padStart(2, '0')}`;
       }
       clockEl.textContent = timeValue;
+    }
+    
+    // ✅ DIAGNOSTIC: Track score increments
+    if (ENABLE_TEXT_SCROLL_DIAGNOSTICS) {
+      const turnScore = turn.score || {};
+      const currentHomeScore = typeof turnScore[homeTeamName] === 'number' ? turnScore[homeTeamName] : 
+                              (typeof turnScore[homeTeam] === 'number' ? turnScore[homeTeam] : previousHomeScore);
+      const currentAwayScore = typeof turnScore[awayTeamName] === 'number' ? turnScore[awayTeamName] : 
+                              (typeof turnScore[awayTeam] === 'number' ? turnScore[awayTeam] : previousAwayScore);
+      
+      const homeScoreChange = currentHomeScore - previousHomeScore;
+      const awayScoreChange = currentAwayScore - previousAwayScore;
+      
+      if (homeScoreChange > 0 || awayScoreChange > 0) {
+        scoreIncrements.push({
+          turnIndex: i,
+          timeRemaining: turn.time_remaining || turn.clock || turn.game_clock,
+          homeScoreChange,
+          awayScoreChange,
+          newHomeScore: currentHomeScore,
+          newAwayScore: currentAwayScore,
+          resultType: turn.result_type,
+          points: turn.points || 0,
+          shooterId: turn.shooter_id || turn.shooter?.player_id || turn.shooter,
+          turn: turn
+        });
+        previousHomeScore = currentHomeScore;
+        previousAwayScore = currentAwayScore;
+      }
     }
     
     // Find corresponding event in eventResults array
@@ -766,40 +803,37 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
           playerPhoto = `${staticPrefix}/images/players/${event.playerId}.png`;
         }
         
-        console.log('🖼️ [SIM QUARTER IMAGE] Made shot detected:', {
-          resultType: event.resultType,
-          eventType: event.eventType,
-          playerId: event.playerId,
-          originalPlayerPhoto: event.playerPhoto,
-          isLocalhost,
-          finalPlayerPhoto: playerPhoto,
-          playerName: event.playerName
-        });
-        
         if (playerPhoto) {
           const img = document.createElement('img');
           img.src = playerPhoto;
           img.alt = event.playerName;
           img.className = 'sim-quarter-player-image';
           img.onerror = () => {
-            console.log('❌ [SIM QUARTER IMAGE] Image failed to load:', playerPhoto);
             img.style.display = 'none';
           };
-          img.onload = () => {
-            console.log('✅ [SIM QUARTER IMAGE] Image loaded successfully:', playerPhoto);
-          };
           entry.appendChild(img);
-          console.log('🖼️ [SIM QUARTER IMAGE] Image element appended to entry:', {
-            hasParent: !!img.parentElement,
-            entryChildren: entry.children.length,
-            imgSrc: img.src
-          });
-        } else {
-          console.log('⚠️ [SIM QUARTER IMAGE] No playerPhoto found for made shot');
         }
       }
       
       contentEl.appendChild(entry);
+      
+      // ✅ DIAGNOSTIC: Track printed events
+      if (ENABLE_TEXT_SCROLL_DIAGNOSTICS) {
+        const pointsScored = event.resultType === 'MAKE' ? (event.shotType === '3-pt' ? 3 : event.shotType === 'free throw' ? 1 : 2) : 0;
+        printedEvents.push({
+          turnIndex: i,
+          timeRemaining: event.timeRemaining,
+          eventType: event.eventType,
+          resultType: event.resultType,
+          pointsScored,
+          playerName: event.playerName,
+          playerJersey: event.playerJersey,
+          shotType: event.shotType,
+          homeScore: event.homeScore,
+          awayScore: event.awayScore,
+          isFastBreak: event.isFastBreak
+        });
+      }
       
       // Scroll to bottom
       const scrollContainer = popup.querySelector('.sim-quarter-scroll-container');
@@ -847,6 +881,68 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   // ✅ NEW: Show game control buttons when Sim Quarter popup is hidden
   if (gameControlsEl) {
     gameControlsEl.style.display = '';
+  }
+  
+  // ✅ DIAGNOSTIC: Match score increments with printed events and send to backend
+  if (ENABLE_TEXT_SCROLL_DIAGNOSTICS) {
+    const mismatches = [];
+    
+    // Match each score increment with a printed event
+    for (const scoreInc of scoreIncrements) {
+      // Find matching printed event by turn index and points
+      const matchingEvent = printedEvents.find(pe => 
+        pe.turnIndex === scoreInc.turnIndex && 
+        pe.pointsScored === (scoreInc.homeScoreChange + scoreInc.awayScoreChange)
+      );
+      
+      if (!matchingEvent) {
+        // No matching printed event found
+        mismatches.push({
+          type: 'MISSING_PRINT',
+          scoreIncrement: {
+            turnIndex: scoreInc.turnIndex,
+            timeRemaining: scoreInc.timeRemaining,
+            homeScoreChange: scoreInc.homeScoreChange,
+            awayScoreChange: scoreInc.awayScoreChange,
+            totalPoints: scoreInc.homeScoreChange + scoreInc.awayScoreChange,
+            resultType: scoreInc.resultType,
+            points: scoreInc.points,
+            shooterId: scoreInc.shooterId
+          }
+        });
+      }
+    }
+    
+    // Get game ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const gameId = urlParams.get('game_id');
+    
+    // Send diagnostic data to backend
+    try {
+      const diagnosticData = {
+        gameId: gameId || 'unknown',
+        quarter,
+        homeTeam,
+        awayTeam,
+        timestamp: new Date().toISOString(),
+        scoreIncrements,
+        printedEvents,
+        mismatches,
+        totalScoreIncrements: scoreIncrements.length,
+        totalPrintedEvents: printedEvents.length,
+        mismatchCount: mismatches.length
+      };
+      
+      await fetch(API_CONFIG.buildUrl('/api/diagnostics/sim-quarter'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(diagnosticData)
+      });
+    } catch (error) {
+      console.error('❌ [DIAGNOSTIC] Failed to send diagnostic data:', error);
+    }
   }
 }
 
