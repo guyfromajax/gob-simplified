@@ -2065,6 +2065,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         # When full_sim=True (simming), fully simulate the quarter instantly (no animation)
         # When full_sim=False (playing), use turn-by-turn mode (for animation)
         turn_by_turn_mode = not request.full_sim
+        logging.warning(f"🔍 [FULL_SIM DEBUG] simulate_quarter_endpoint START: full_sim={request.full_sim}, turn_by_turn_mode={turn_by_turn_mode}, quarter={request.quarter}, game_id={game_id}")
+        if gm:
+            current_flag = gm.game_state.get("_is_full_simulation", False)
+            logging.warning(f"🔍 [FULL_SIM DEBUG] Game in memory - current _is_full_simulation={current_flag}")
+        else:
+            logging.warning(f"🔍 [FULL_SIM DEBUG] Game NOT in memory - will load from DB")
         logging.info(f"🎮 simulate_quarter_endpoint: full_sim={request.full_sim}, turn_by_turn_mode={turn_by_turn_mode}, quarter={request.quarter}, resume_from_timeout={request.resume_from_timeout}")
         
         # ⏱️ PERFORMANCE: Time the quarter simulation
