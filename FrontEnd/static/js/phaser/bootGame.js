@@ -662,19 +662,20 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       // Format jersey number
       const jerseyDisplay = event.playerJersey ? ` (#${event.playerJersey})` : '';
       
-      // Determine CSS class based on event type
+      // Determine CSS class based on event type (only made shots get background colors)
       let eventClass = 'sim-quarter-shot-entry';
-      if (event.resultType === 'MAKE' && (event.eventType === 'SHOT' || event.eventType === 'OREB_PUTBACK' || event.eventType === 'FREE_THROW')) {
-        eventClass += ' event-make';
-      } else if (event.resultType === 'MISS' && (event.eventType === 'SHOT' || event.eventType === 'OREB_PUTBACK' || event.eventType === 'FREE_THROW')) {
-        eventClass += ' event-miss';
-      } else if (event.eventType === 'FOUL') {
-        eventClass += ' event-foul';
-      } else if (event.eventType === 'STEAL') {
-        eventClass += ' event-steal';
-      } else if (event.eventType === 'DEAD_BALL') {
-        eventClass += ' event-turnover';
+      if (event.resultType === 'MAKE') {
+        if (event.eventType === 'FREE_THROW') {
+          eventClass += ' event-made-ft'; // Made free throw - yellow
+        } else if (event.eventType === 'SHOT' || event.eventType === 'OREB_PUTBACK') {
+          if (event.shotType === '3-pt') {
+            eventClass += ' event-made-3pt'; // Made 3-point shot - blue
+          } else {
+            eventClass += ' event-made-2pt'; // Made 2-point shot - green
+          }
+        }
       }
+      // All other events (missed shots, fouls, steals, turnovers) get default grey (no background)
       
       entry.className = eventClass;
       
