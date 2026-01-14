@@ -710,25 +710,54 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         eventText = 'steals the ball.';
       }
       
-      // Build player image HTML for made shots
-      let playerImageHTML = '';
+      // Create content div (SS&S: Use DOM element creation like announcement system)
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'sim-quarter-entry-content';
+      
+      // Create time span
+      const timeSpan = document.createElement('span');
+      timeSpan.style.color = '#374151';
+      timeSpan.textContent = `[${timeDisplay}]: `;
+      contentDiv.appendChild(timeSpan);
+      
+      // Create prefix span if needed
+      if (prefix) {
+        const prefixSpan = document.createElement('span');
+        prefixSpan.style.color = '#374151';
+        prefixSpan.textContent = prefix;
+        contentDiv.appendChild(prefixSpan);
+      }
+      
+      // Create player name span
+      const playerNameSpan = document.createElement('span');
+      playerNameSpan.style.color = teamColor;
+      playerNameSpan.style.fontWeight = 'bold';
+      playerNameSpan.textContent = `${event.playerName}${jerseyDisplay}`;
+      contentDiv.appendChild(playerNameSpan);
+      
+      // Create event text span
+      const eventTextSpan = document.createElement('span');
+      eventTextSpan.style.color = '#111827';
+      eventTextSpan.textContent = ` ${eventText}`;
+      contentDiv.appendChild(eventTextSpan);
+      
+      // Append content div to entry
+      entry.appendChild(contentDiv);
+      
+      // Build player image for made shots (SS&S: Use DOM element creation like announcement system)
       if (event.resultType === 'MAKE' && (event.eventType === 'SHOT' || event.eventType === 'OREB_PUTBACK' || event.eventType === 'FREE_THROW')) {
         const playerPhoto = event.playerPhoto || (event.playerId ? `/images/players/${event.playerId}.png` : '');
         if (playerPhoto) {
-          playerImageHTML = `<img src="${playerPhoto}" alt="${event.playerName}" class="sim-quarter-player-image" onerror="this.style.display='none'">`;
+          const img = document.createElement('img');
+          img.src = playerPhoto;
+          img.alt = event.playerName;
+          img.className = 'sim-quarter-player-image';
+          img.onerror = () => {
+            img.style.display = 'none';
+          };
+          entry.appendChild(img);
         }
       }
-      
-      // Colors: Clock value #374151, Normal copy #111827, Team colors for player name
-      entry.innerHTML = `
-        <div class="sim-quarter-entry-content">
-          <span style="color: #374151;">[${timeDisplay}]: </span>
-          ${prefix ? `<span style="color: #374151;">${prefix}</span>` : ''}
-          <span style="color: ${teamColor}; font-weight: bold;">${event.playerName}${jerseyDisplay}</span>
-          <span style="color: #111827;"> ${eventText}</span>
-        </div>
-        ${playerImageHTML}
-      `;
       
       contentEl.appendChild(entry);
       
