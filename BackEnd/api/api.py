@@ -53,6 +53,26 @@ logger = logging.getLogger(__name__)
 # ✅ PERFORMANCE: Removed debug print statements
 app = FastAPI()
 
+# ✅ CRITICAL: Register health endpoint FIRST (before any other routes or middleware)
+# This ensures health checks work even if other parts of the app fail to initialize
+@app.get("/health")
+def health_check():
+    """Simplest possible health check - no dependencies, no async, no logger"""
+    # Use print instead of logger in case logger isn't configured yet
+    print("🔵 [HEALTH] GET /health called", file=sys.stderr, flush=True)
+    try:
+        port = os.getenv("PORT", "NOT SET")
+        print(f"🔵 [HEALTH] Returning response with port={port}", file=sys.stderr, flush=True)
+        return {"status": "healthy", "port": port}
+    except Exception as e:
+        print(f"🔴 [HEALTH ERROR] Exception: {e}", file=sys.stderr, flush=True)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        return JSONResponse(
+            status_code=500,
+            content={"status": "unhealthy", "error": str(e)}
+        )
+
 # CORS Configuration - Must match actual testing domains, not just final ideal
 # CRITICAL: Add CORS middleware BEFORE including routers to ensure it applies to all routes
 def get_cors_origins():
@@ -635,23 +655,8 @@ def root():
     print("🔵 [DEBUG] root endpoint: GET / called", file=sys.stderr, flush=True)
     return {"message": "GOB Simulation API is live"}
 
-@app.get("/health")
-def health_check():
-    """Simplest possible health check - no dependencies, no async, no logger"""
-    # Use print instead of logger in case logger isn't configured yet
-    print("🔵 [HEALTH] GET /health called", file=sys.stderr, flush=True)
-    try:
-        port = os.getenv("PORT", "NOT SET")
-        print(f"🔵 [HEALTH] Returning response with port={port}", file=sys.stderr, flush=True)
-        return {"status": "healthy", "port": port}
-    except Exception as e:
-        print(f"🔴 [HEALTH ERROR] Exception: {e}", file=sys.stderr, flush=True)
-        import traceback
-        traceback.print_exc(file=sys.stderr)
-        return JSONResponse(
-            status_code=500,
-            content={"status": "unhealthy", "error": str(e)}
-        )
+# Note: Health endpoint is registered at the top of the file (line 58) before CORS middleware
+# This ensures it's available even if other initialization fails
 
 # Note: FastAPI's CORSMiddleware automatically handles OPTIONS preflight requests
 # We don't need an explicit OPTIONS handler - the middleware does this
