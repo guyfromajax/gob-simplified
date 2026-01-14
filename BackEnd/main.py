@@ -606,13 +606,6 @@ def simulate_quarter(
         # Set flag to indicate we're in full simulation mode (for immediate timeout handling)
         gm.game_state["_is_full_simulation"] = True
         logging.warning(f"🔍 [FULL_SIM DEBUG] SET _is_full_simulation=True (turn_by_turn_mode=False, quarter={gm.quarter})")
-    else:
-        # ✅ DEBUG: Explicitly clear flag for turn-by-turn mode (Play Quarter)
-        # This ensures flag is cleared even if game was previously in full sim mode
-        if "_is_full_simulation" in gm.game_state:
-            logging.warning(f"🔍 [FULL_SIM DEBUG] Found stale _is_full_simulation flag in turn-by-turn mode! Clearing it. (quarter={gm.quarter})")
-        gm.game_state.pop("_is_full_simulation", None)
-        logging.warning(f"🔍 [FULL_SIM DEBUG] Ensured _is_full_simulation is cleared for turn-by-turn mode (quarter={gm.quarter})")
         
         # Safety guard: prevent infinite loops
         max_turns = 200  # Reasonable limit for a quarter (480 seconds / ~2-3 seconds per turn)
@@ -666,6 +659,12 @@ def simulate_quarter(
         logging.info(f"✅ Full simulation complete: Q{gm.quarter} finished after {turn_count} turns, final time_remaining={gm.game_state['time_remaining']}")
         gm.quarter += 1
     else:
+        # ✅ DEBUG: Explicitly clear flag for turn-by-turn mode (Play Quarter)
+        # This ensures flag is cleared even if game was previously in full sim mode
+        if "_is_full_simulation" in gm.game_state:
+            logging.warning(f"🔍 [FULL_SIM DEBUG] Found stale _is_full_simulation flag in turn-by-turn mode! Clearing it. (quarter={gm.quarter})")
+        gm.game_state.pop("_is_full_simulation", None)
+        logging.warning(f"🔍 [FULL_SIM DEBUG] Ensured _is_full_simulation is cleared for turn-by-turn mode (quarter={gm.quarter})")
         # Turn-by-turn mode: Quarter is initialized, ready for turn-by-turn sim
         pass
 
