@@ -604,7 +604,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   if (awayScoreEl) awayScoreEl.textContent = displayAwayScore;
   
   // ✅ DIAGNOSTIC: Track score increments and printed events for debugging
-  const ENABLE_TEXT_SCROLL_DIAGNOSTICS = true; // Set to false to disable
+  const ENABLE_TEXT_SCROLL_DIAGNOSTICS = false; // Set to true to enable
   const scoreIncrements = [];
   const printedEvents = [];
   let previousHomeScore = displayHomeScore;
