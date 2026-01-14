@@ -1083,6 +1083,9 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             },
         )
     source = "resume"
+    # ✅ SS&S: Preserve user_team_side from in-memory game BEFORE any DB operations
+    # This ensures user_team_side persists even if it's not in the saved document or request
+    preserved_user_team_side = None
     if game_id:
         gm = ongoing_games.get(game_id)
         # ✅ DEBUG: Track ongoing_games state at start of simulate_quarter_endpoint
@@ -1090,6 +1093,10 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game in ongoing_games: {gm is not None}")
         if gm:
             logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game object found - object_id={id(gm)}, current_quarter={gm.quarter}")
+            # Preserve user_team_side from in-memory game
+            if gm.game_state.get("user_team_side"):
+                preserved_user_team_side = gm.game_state.get("user_team_side")
+                logging.warning(f"✅ [USER_TEAM_SIDE] Preserved from in-memory game: {preserved_user_team_side}")
         else:
             logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game NOT in ongoing_games - will load from DB. Available games: {list(ongoing_games.keys())}")
         if gm is not None and (
@@ -1118,6 +1125,18 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ⚠️ Removing game from ongoing_games (new game scenario): game_id={game_id}")
             del ongoing_games[game_id]
             gm = None  # Force reload from DB where new game detection will run
+        
+        # ✅ SS&S: Ensure user_team_side is set in in-memory game if missing
+        # This fixes the case where user_team_side was never set or was lost
+        if gm is not None and not gm.game_state.get("user_team_side"):
+            if request.user_team_side:
+                gm.game_state["user_team_side"] = request.user_team_side
+                logging.warning(f"✅ [USER_TEAM_SIDE] Set in in-memory game from request: {request.user_team_side}")
+            elif preserved_user_team_side:
+                gm.game_state["user_team_side"] = preserved_user_team_side
+                logging.warning(f"✅ [USER_TEAM_SIDE] Set in in-memory game from preserved value: {preserved_user_team_side}")
+            else:
+                logging.warning(f"⚠️ [USER_TEAM_SIDE] In-memory game missing user_team_side and no request/preserved value - override checking will not work!")
         
         # ✅ CRITICAL FIX: If game is already in memory, update strategy_settings if request has them
         # This ensures user's updated Game Plan settings are applied even if game is already loaded
@@ -1356,15 +1375,18 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             logging.warning(f"🔍 [QUARTER_DEBUG] ⚠️ QUARTER MISMATCH: saved_quarter ({saved_quarter}) != request.quarter ({request.quarter})")
                         
                         # ✅ SS&S: Restore user_team_side to game_state (persists override checking across game loads)
-                        # If saved game has it, use that; otherwise use request.user_team_side
+                        # Priority: 1) Saved document, 2) Preserved from in-memory, 3) Request, 4) Warn
                         if "user_team_side" in saved:
                             gm.game_state["user_team_side"] = saved["user_team_side"]
                             logging.warning(f"✅ Restored user_team_side from DB: {saved['user_team_side']}")
+                        elif preserved_user_team_side:
+                            gm.game_state["user_team_side"] = preserved_user_team_side
+                            logging.warning(f"✅ Restored user_team_side from preserved in-memory value: {preserved_user_team_side}")
                         elif request.user_team_side:
                             gm.game_state["user_team_side"] = request.user_team_side
                             logging.warning(f"✅ Set user_team_side from request: {request.user_team_side}")
                         else:
-                            logging.warning(f"⚠️ No user_team_side found in DB or request - override checking will not work!")
+                            logging.warning(f"⚠️ No user_team_side found in DB, preserved memory, or request - override checking will not work!")
                         
                         # 🔍 DEBUG: Log offense_play_type in saved state (if present)
                         if "offense_play_type" in saved:
