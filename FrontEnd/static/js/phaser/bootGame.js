@@ -333,10 +333,14 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     }
   });
   
-  // ✅ DIAGNOSTIC: Initialize tracking arrays (before event processing)
+  // ✅ DIAGNOSTIC: Initialize ALL tracking arrays (before event processing)
   const ENABLE_FT_FG_DIAGNOSTICS = true; // Set to false to disable
   const playerLookupFailures = []; // Track when playerMap lookups fail
   const allPrintedEvents = []; // Track ALL printed events (not just FT/FG)
+  const freeThrowEvents = []; // Track free throw events from turns
+  const madeFGEvents = []; // Track made FG events from turns
+  const printedFTEvents = []; // Track printed free throw events
+  const printedMadeFGEvents = []; // Track printed made FG events
   
   // ✅ DIAGNOSTIC: Build playerMap statistics for analysis
   const playerMapStats = {
@@ -1027,12 +1031,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     gameControlsEl.style.display = '';
   }
   
-  // ✅ DIAGNOSTIC: Initialize FT/FG tracking arrays (for matching with printed events)
-  const freeThrowEvents = [];
-  const madeFGEvents = [];
-  const printedFTEvents = [];
-  const printedMadeFGEvents = [];
-  
+  // ✅ DIAGNOSTIC: Collect FT/FG events from turns for analysis (arrays already initialized above)
   if (ENABLE_FT_FG_DIAGNOSTICS) {
     // Collect all free throw and made FG events from turns for analysis
     turns.forEach((turn, index) => {
