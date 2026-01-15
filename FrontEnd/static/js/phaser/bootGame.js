@@ -692,6 +692,9 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   let previousHomeScore = displayHomeScore;
   let previousAwayScore = displayAwayScore;
   
+  // ✅ FIX: Track matched events to prevent duplicate matches (especially for FTs with same time)
+  const matchedEventIndices = new Set();
+  
   // Process all turns to update clock in real-time, create entries for all event types
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
@@ -765,21 +768,30 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       
       // Handle special result type mappings
       if (turn.result_type === 'FREE_THROW') {
-        const isMatch = e.eventType === 'FREE_THROW';
+        // ✅ FIX: Match free throws more specifically by result type (MAKE/MISS) to handle multiple FTs at same time
+        const turnPoints = turn.points || 0;
+        const expectedMade = turnPoints > 0;
+        const expectedResultType = expectedMade ? 'MAKE' : 'MISS';
+        
+        // Match by event type AND result type AND time, and ensure not already matched
+        const eventIndex = eventResults.indexOf(e);
+        const isMatch = e.eventType === 'FREE_THROW' && 
+                       e.resultType === expectedResultType && 
+                       !matchedEventIndices.has(eventIndex);
         
         // ✅ DEBUG: Log free throw matching
-        if (isMatch) {
-          const turnPoints = turn.points || 0;
-          const expectedMade = turnPoints > 0;
+        if (e.eventType === 'FREE_THROW') {
           console.log('🏀 [FREE THROW DEBUG] Matching free throw:', {
             turnIndex: i,
             timeRemaining: turn.time_remaining || turn.clock || turn.game_clock,
             turnPoints,
-            expectedResultType: expectedMade ? 'MAKE' : 'MISS',
+            expectedResultType: expectedResultType,
             matchedEventResultType: e.resultType,
             matchedEventPlayerName: e.playerName,
             matchedEventTimeRemaining: e.timeRemaining,
-            match: e.resultType === (expectedMade ? 'MAKE' : 'MISS') ? '✅ CORRECT' : '❌ MISMATCH'
+            eventIndex: eventIndex,
+            alreadyMatched: matchedEventIndices.has(eventIndex),
+            match: isMatch ? '✅ CORRECT' : '❌ NO MATCH'
           });
         }
         
@@ -790,6 +802,12 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     });
     
     if (event) {
+      // ✅ FIX: Mark this event as matched to prevent duplicate matches (especially for FTs with same time)
+      const eventIndex = eventResults.indexOf(event);
+      if (eventIndex !== -1) {
+        matchedEventIndices.add(eventIndex);
+      }
+      
       // Update scores if they changed
       if (event.homeScore !== displayHomeScore || event.awayScore !== displayAwayScore) {
         displayHomeScore = event.homeScore;
@@ -955,6 +973,10 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       
       // ✅ DIAGNOSTIC: Track ALL printed events for FT/FG analysis (with player ID lookup info)
       if (ENABLE_FT_FG_DIAGNOSTICS) {
+        // Calculate points scored based on result type and shot type
+        const pointsScored = event.resultType === 'MAKE' ? 
+          (event.shotType === '3-pt' ? 3 : event.shotType === 'free throw' ? 1 : 2) : 0;
+        
         const printedEvent = {
           turnIndex: i,
           timeRemaining: event.timeRemaining,
@@ -964,6 +986,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
           playerName: event.playerName, // The name actually printed
           playerJersey: event.playerJersey,
           shotType: event.shotType,
+          pointsScored: pointsScored, // ✅ FIX: Add points scored calculation
           homeScore: event.homeScore,
           awayScore: event.awayScore,
           isFastBreak: event.isFastBreak,
