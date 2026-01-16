@@ -43,8 +43,14 @@ export function createPhaserPlayer({ scene, player, teamInfo, position, Phaser }
   label.setDepth(2);
 
   // ✅ Jersey number — above if home, below if away
+  // ✅ FIX: Handle jersey number 0 - use explicit check to preserve 0
   const jerseyOffset = isHome ? -32 : 32;
-  const jersey = scene.add.text(0, jerseyOffset, player.jersey || "", {
+  const jerseyValue = (typeof player.jersey === 'number') 
+    ? String(player.jersey) 
+    : (player.jersey !== undefined && player.jersey !== null && player.jersey !== '') 
+      ? String(player.jersey) 
+      : '';
+  const jersey = scene.add.text(0, jerseyOffset, jerseyValue, {
     font: "bold 15px Arial",
     color: textColor,
     align: "center"
