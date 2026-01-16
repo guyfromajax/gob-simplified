@@ -3365,6 +3365,7 @@ class FTFGDiagnosticRequest(BaseModel):
     allPrintedEvents: list = []  # ✅ NEW: All printed events (not just FT/FG)
     playerLookupFailures: list = []  # ✅ NEW: Track when playerMap lookups fail
     playerMapStats: dict = {}  # ✅ NEW: PlayerMap statistics
+    scoreboardUpdates: list = []  # ✅ NEW: Track every scoreboard update
     ftMismatches: list
     fgMismatches: list
     totalFreeThrows: int
@@ -3373,6 +3374,7 @@ class FTFGDiagnosticRequest(BaseModel):
     totalPrintedMadeFGs: int
     totalAllPrintedEvents: int = 0  # ✅ NEW: Total printed events
     totalLookupFailures: int = 0  # ✅ NEW: Total lookup failures
+    totalScoreboardUpdates: int = 0  # ✅ NEW: Total scoreboard updates
     ftMismatchCount: int
     fgMismatchCount: int
 
@@ -3411,6 +3413,7 @@ def save_ft_fg_diagnostics(request: FTFGDiagnosticRequest):
 - **Made FG Mismatches:** {request.fgMismatchCount}
 - **Total All Printed Events:** {request.totalAllPrintedEvents}
 - **Total Player Lookup Failures:** {request.totalLookupFailures}
+- **Total Scoreboard Updates:** {request.totalScoreboardUpdates}
 - **PlayerMap Stats:** {request.playerMapStats.get('totalPlayers', 0) if request.playerMapStats else 0} players, {request.playerMapStats.get('playerMapSize', 0) if request.playerMapStats else 0} in map
 
 ---
@@ -3516,6 +3519,50 @@ def save_ft_fg_diagnostics(request: FTFGDiagnosticRequest):
 - **Scores:** {pfg.get('homeScore', 0)} - {pfg.get('awayScore', 0)}
 
 """
+        
+        # Add scoreboard updates section
+        if request.scoreboardUpdates:
+            md_content += "\n---\n\n## Scoreboard Updates\n\n"
+            
+            for i, update in enumerate(request.scoreboardUpdates, 1):
+                time_display = update.get('timeRemaining', 'N/A')
+                if isinstance(time_display, (int, float)):
+                    minutes = int(time_display // 60)
+                    seconds = int(time_display % 60)
+                    time_display = f"{minutes}:{seconds:02d}"
+                elif time_display == 'N/A' or time_display is None:
+                    time_display = 'N/A'
+                
+                update_type = update.get('type', 'UNKNOWN')
+                source = update.get('source', 'unknown')
+                event_type = update.get('eventType', 'N/A')
+                event_result = update.get('eventResultType', 'N/A')
+                player_name = update.get('playerName', 'N/A')
+                points_scored = update.get('pointsScored', 0)
+                
+                md_content += f"""### Scoreboard Update #{i}
+
+- **Type:** {update_type}
+- **Time:** {time_display}
+- **Turn Index:** {update.get('turnIndex', 'N/A')}
+- **Home Score:** {update.get('homeScore', 0)} (Change: {update.get('homeScoreChange', 0):+d})
+- **Away Score:** {update.get('awayScore', 0)} (Change: {update.get('awayScoreChange', 0):+d})
+- **Source:** {source}
+"""
+                
+                if update_type == 'UPDATE':
+                    md_content += f"- **Event Type:** {event_type}
+- **Event Result:** {event_result}
+- **Player:** {player_name}
+- **Points Scored:** {points_scored}
+"
+                
+                if update_type == 'FINAL' and 'previousHomeScore' in update:
+                    md_content += f"- **Previous Home Score:** {update.get('previousHomeScore', 0)}
+- **Previous Away Score:** {update.get('previousAwayScore', 0)}
+"
+                
+                md_content += "\n"
         
         # Add mismatches section
         if request.ftMismatches:
