@@ -357,6 +357,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   const madeFGEvents = []; // Track made FG events from turns
   const printedFTEvents = []; // Track printed free throw events
   const printedMadeFGEvents = []; // Track printed made FG events
+  const scoreboardUpdates = []; // ✅ NEW: Track every scoreboard update
   
   // ✅ DIAGNOSTIC: Build playerMap statistics for analysis
   const playerMapStats = {
@@ -733,6 +734,22 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   if (homeScoreEl) homeScoreEl.textContent = displayHomeScore;
   if (awayScoreEl) awayScoreEl.textContent = displayAwayScore;
   
+  // ✅ DIAGNOSTIC: Track initial scoreboard setup
+  if (ENABLE_FT_FG_DIAGNOSTICS) {
+    scoreboardUpdates.push({
+      type: 'INITIAL',
+      turnIndex: null,
+      timeRemaining: null,
+      homeScore: displayHomeScore,
+      awayScore: displayAwayScore,
+      homeScoreChange: 0,
+      awayScoreChange: 0,
+      source: 'initial_setup',
+      eventType: null,
+      eventResultType: null
+    });
+  }
+  
   // ✅ DIAGNOSTIC: Track score increments and printed events for debugging
   const ENABLE_TEXT_SCROLL_DIAGNOSTICS = false; // Set to true to enable
   const scoreIncrements = [];
@@ -858,12 +875,35 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       
       // Update scores if they changed
       if (event.homeScore !== displayHomeScore || event.awayScore !== displayAwayScore) {
+        const homeScoreChange = event.homeScore - displayHomeScore;
+        const awayScoreChange = event.awayScore - displayAwayScore;
+        
         displayHomeScore = event.homeScore;
         displayAwayScore = event.awayScore;
         
         // ✅ NEW: Update scoreboard in real-time (SS&S: same pattern as gameScene.js updateScoreboard)
         if (homeScoreEl) homeScoreEl.textContent = displayHomeScore;
         if (awayScoreEl) awayScoreEl.textContent = displayAwayScore;
+        
+        // ✅ DIAGNOSTIC: Track scoreboard update
+        if (ENABLE_FT_FG_DIAGNOSTICS) {
+          scoreboardUpdates.push({
+            type: 'UPDATE',
+            turnIndex: i,
+            timeRemaining: event.timeRemaining,
+            homeScore: displayHomeScore,
+            awayScore: displayAwayScore,
+            homeScoreChange: homeScoreChange,
+            awayScoreChange: awayScoreChange,
+            source: 'event_processing',
+            eventType: event.eventType,
+            eventResultType: event.resultType,
+            playerName: event.playerName,
+            playerJersey: event.playerJersey,
+            shotType: event.shotType,
+            pointsScored: event.resultType === 'MAKE' ? (event.shotType === '3-pt' ? 3 : event.shotType === 'free throw' ? 1 : 2) : 0
+          });
+        }
       }
       
       // Create event entry
@@ -1093,8 +1133,29 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     const finalAwayScore = typeof lastSummary.score[awayTeamName] === 'number' ? lastSummary.score[awayTeamName] : 
                            (typeof lastSummary.score[awayTeam] === 'number' ? lastSummary.score[awayTeam] : displayAwayScore);
     
+    const finalHomeScoreChange = finalHomeScore - displayHomeScore;
+    const finalAwayScoreChange = finalAwayScore - displayAwayScore;
+    
     if (homeScoreEl) homeScoreEl.textContent = finalHomeScore;
     if (awayScoreEl) awayScoreEl.textContent = finalAwayScore;
+    
+    // ✅ DIAGNOSTIC: Track final scoreboard update
+    if (ENABLE_FT_FG_DIAGNOSTICS && (finalHomeScoreChange !== 0 || finalAwayScoreChange !== 0)) {
+      scoreboardUpdates.push({
+        type: 'FINAL',
+        turnIndex: null,
+        timeRemaining: null,
+        homeScore: finalHomeScore,
+        awayScore: finalAwayScore,
+        homeScoreChange: finalHomeScoreChange,
+        awayScoreChange: finalAwayScoreChange,
+        source: 'final_update',
+        eventType: null,
+        eventResultType: null,
+        previousHomeScore: displayHomeScore,
+        previousAwayScore: displayAwayScore
+      });
+    }
   }
   
   // Hide popup before navigation
@@ -1259,12 +1320,14 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         fgMismatches,
         playerLookupFailures, // ✅ NEW: Track when playerMap lookups fail
         playerMapStats, // ✅ NEW: PlayerMap statistics
+        scoreboardUpdates, // ✅ NEW: Track every scoreboard update
         totalFreeThrows: freeThrowEvents.length,
         totalMadeFGs: madeFGEvents.length,
         totalPrintedFTs: printedFTEvents.length,
         totalPrintedMadeFGs: printedMadeFGEvents.length,
         totalAllPrintedEvents: allPrintedEvents.length,
         totalLookupFailures: playerLookupFailures.length,
+        totalScoreboardUpdates: scoreboardUpdates.length, // ✅ NEW: Total scoreboard updates
         ftMismatchCount: ftMismatches.length,
         fgMismatchCount: fgMismatches.length
       };
