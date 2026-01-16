@@ -4224,9 +4224,12 @@
       // Helper to format player name display
       const formatPlayerName = (sprite) => {
         if (!sprite) return '';
-        const jersey = sprite.jersey || '';
+        // ✅ FIX: Handle jersey number 0 - use explicit check to preserve 0
+        const jersey = (typeof sprite.jersey === 'number') ? sprite.jersey : (sprite.jersey !== undefined && sprite.jersey !== null && sprite.jersey !== '' ? sprite.jersey : '');
         const lastName = sprite.name ? sprite.name.split(' ').pop() : '';
-        return jersey && lastName ? `#${jersey} ${lastName}` : (lastName || `#${jersey}` || '');
+        // Check for jersey existence (including 0) and lastName
+        const hasJersey = jersey !== undefined && jersey !== null && jersey !== '';
+        return hasJersey && lastName ? `#${jersey} ${lastName}` : (lastName || (hasJersey ? `#${jersey}` : ''));
       };
 
       // Set ball handler display

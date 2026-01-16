@@ -393,7 +393,8 @@
       const team = player.team || 'Free Agent';
       const height = formatHeight(player.height || player.HT || 75);
       const weight = `${player.weight || player.WT || 200} lbs`;
-      const jersey = player.jersey || '';
+      // ✅ FIX: Handle jersey number 0 - use explicit check to preserve 0
+      const jersey = (typeof player.jersey === 'number') ? player.jersey : (player.jersey !== undefined && player.jersey !== null && player.jersey !== '' ? player.jersey : '');
       const photo = player.photo || '';
       const attributes = player.attributes || {};
       const year = formatYear(player.year);
@@ -413,7 +414,7 @@
             <div class="team-info-header">
               ${teamLogo ? `<img src="${teamLogo}" alt="${team}" class="team-logo-header">` : ''}
               <span>${team}</span>
-              ${jersey ? `<span>#${jersey}</span>` : ''}
+              ${(jersey !== undefined && jersey !== null && jersey !== '') ? `<span>#${jersey}</span>` : ''}
             </div>
           </div>
           <div style="width: 100px;"></div>

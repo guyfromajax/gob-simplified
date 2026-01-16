@@ -154,7 +154,7 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournam
         playerId: p._id || p.playerId,
         team: teamKey,
         name: p.name,
-        jersey: boxScorePlayer?.jersey !== undefined ? boxScorePlayer.jersey : (p.jersey || ''),
+        jersey: boxScorePlayer?.jersey !== undefined ? boxScorePlayer.jersey : (typeof p.jersey === 'number' ? p.jersey : (p.jersey !== undefined && p.jersey !== null && p.jersey !== '' ? p.jersey : '')),
         pos: p.pos || p.position || null,
         stats: gamePlayer?.stats?.game || boxScorePlayer || gamePlayer?.stats || {},
         year: p.year || 'SR',
@@ -230,7 +230,7 @@ async function loadPreGameData({ homeTeamName, awayTeamName, franchiseId, tourna
         playerId: p._id,
         team: teamKey,
         name: p.name,
-        jersey: p.jersey || '',
+        jersey: (typeof p.jersey === 'number') ? p.jersey : (p.jersey !== undefined && p.jersey !== null && p.jersey !== '' ? p.jersey : ''),
         pos: p.pos || p.position || null,
         stats: {}, // zeroed in renderer
         year: p.year || 'SR',
@@ -390,7 +390,7 @@ function combinePlayersAndBoxScore(rosterPlayers, boxScore, teamName) {
       ...p,
       stats: p.stats?.game || p.stats || {},
       year: p.year || 'SR', // Use year from player data or default
-      jersey: p.jersey !== undefined ? p.jersey : (p.jerseyNumber || p.jersey_number || '') // Preserve jersey from multiple possible sources
+      jersey: p.jersey !== undefined ? p.jersey : (typeof p.jerseyNumber === 'number' ? p.jerseyNumber : (p.jerseyNumber !== undefined && p.jerseyNumber !== null && p.jerseyNumber !== '' ? p.jerseyNumber : (typeof p.jersey_number === 'number' ? p.jersey_number : (p.jersey_number !== undefined && p.jersey_number !== null && p.jersey_number !== '' ? p.jersey_number : '')))) // Preserve jersey from multiple possible sources, handle 0
     });
   });
 
@@ -442,7 +442,7 @@ function combinePlayersAndBoxScore(rosterPlayers, boxScore, teamName) {
         playerMap.set(`bench_${pos}`, {
           playerId: playerData.playerId || `bench_${pos}`,
           name: playerData.name || `Player ${pos}`,
-          jersey: playerData.jersey !== undefined ? playerData.jersey : (playerData.jerseyNumber || playerData.jersey_number || ''),
+          jersey: playerData.jersey !== undefined ? playerData.jersey : (typeof playerData.jerseyNumber === 'number' ? playerData.jerseyNumber : (playerData.jerseyNumber !== undefined && playerData.jerseyNumber !== null && playerData.jerseyNumber !== '' ? playerData.jerseyNumber : (typeof playerData.jersey_number === 'number' ? playerData.jersey_number : (playerData.jersey_number !== undefined && playerData.jersey_number !== null && playerData.jersey_number !== '' ? playerData.jersey_number : '')))),
           pos: pos,
           stats: boxStats,
           year: playerData.year || 'SR'
@@ -484,7 +484,8 @@ function renderPlayerStatsTable(team, players) {
     if (player) {
       const stats = player.stats || {};
       const name = player.name || 'Unknown';
-      const jersey = player.jersey || '';
+      // ✅ FIX: Handle jersey number 0 - this is just an intermediate variable, proper handling happens at line 502+
+      const jersey = (typeof player.jersey === 'number') ? player.jersey : (player.jersey !== undefined && player.jersey !== null && player.jersey !== '' ? player.jersey : '');
       
       // Calculate TREB, DEF%, and SCR%
       const treb = (stats.DREB || 0) + (stats.OREB || 0);
