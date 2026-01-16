@@ -3366,6 +3366,8 @@ class FTFGDiagnosticRequest(BaseModel):
     playerLookupFailures: list = []  # ✅ NEW: Track when playerMap lookups fail
     playerMapStats: dict = {}  # ✅ NEW: PlayerMap statistics
     scoreboardUpdates: list = []  # ✅ NEW: Track every scoreboard update
+    madeShotVerifications: list = []  # ✅ NEW: Track every made shot with print + scoreboard verification
+    unmatchedPrints: list = []  # ✅ NEW: Track prints that don't link to made shots
     ftMismatches: list
     fgMismatches: list
     totalFreeThrows: int
@@ -3375,6 +3377,8 @@ class FTFGDiagnosticRequest(BaseModel):
     totalAllPrintedEvents: int = 0  # ✅ NEW: Total printed events
     totalLookupFailures: int = 0  # ✅ NEW: Total lookup failures
     totalScoreboardUpdates: int = 0  # ✅ NEW: Total scoreboard updates
+    totalMadeShotVerifications: int = 0  # ✅ NEW: Total made shot verifications
+    totalUnmatchedPrints: int = 0  # ✅ NEW: Total unmatched prints
     ftMismatchCount: int
     fgMismatchCount: int
 
@@ -3563,6 +3567,86 @@ def save_ft_fg_diagnostics(request: FTFGDiagnosticRequest):
 "
                 
                 md_content += "\n"
+        
+        # Add made shot verifications section
+        if request.madeShotVerifications:
+            md_content += "\n---\n\n## Made Shot Verifications (Print + Scoreboard)\n\n"
+            
+            for i, verification in enumerate(request.madeShotVerifications, 1):
+                time_display = verification.get('timeRemaining', 'N/A')
+                if isinstance(time_display, (int, float)):
+                    minutes = int(time_display // 60)
+                    seconds = int(time_display % 60)
+                    time_display = f"{minutes}:{seconds:02d}"
+                elif time_display == 'N/A' or time_display is None:
+                    time_display = 'N/A'
+                
+                shot_type = verification.get('type', 'UNKNOWN')
+                has_print = verification.get('hasPrint', False)
+                has_scoreboard = verification.get('hasScoreboardUpdate', False)
+                scoreboard_matches = verification.get('scoreboardMatches', False)
+                
+                status_icon = '✅' if (has_print and has_scoreboard and scoreboard_matches) else '⚠️'
+                
+                md_content += f"""### {status_icon} Made Shot Verification #{i}
+
+- **Type:** {shot_type}
+- **Time:** {time_display}
+- **Turn Index:** {verification.get('turnIndex', 'N/A')}
+- **Shooter:** {verification.get('shooterName', 'N/A')} (ID: {verification.get('shooterId', 'N/A')})
+- **Turn Points:** {verification.get('turnPoints', 0)}
+- **Has Print:** {'✅ Yes' if has_print else '❌ No'}
+"""
+                
+                if has_print:
+                    md_content += f"- **Print Result Type:** {verification.get('printResultType', 'N/A')}
+"
+                    if shot_type == 'MADE_FG':
+                        md_content += f"- **Print Points Scored:** {verification.get('printPointsScored', 0)}
+"
+                
+                md_content += f"- **Has Scoreboard Update:** {'✅ Yes' if has_scoreboard else '❌ No'}
+- **Expected Score Change:** {verification.get('expectedScoreChange', 0)}
+- **Actual Score Change:** {verification.get('actualScoreChange', 0)}
+- **Scoreboard Matches:** {'✅ Yes' if scoreboard_matches else '❌ No'}
+"
+                
+                if not has_print:
+                    md_content += "\n**⚠️ WARNING:** Made shot was NOT printed in text scroll!\n"
+                if not has_scoreboard:
+                    md_content += "\n**⚠️ WARNING:** Made shot did NOT update scoreboard!\n"
+                if has_scoreboard and not scoreboard_matches:
+                    md_content += f"\n**⚠️ WARNING:** Scoreboard update ({verification.get('actualScoreChange', 0)}) doesn't match expected ({verification.get('expectedScoreChange', 0)})!\n"
+                
+                md_content += "\n"
+        
+        # Add unmatched prints section
+        if request.unmatchedPrints:
+            md_content += "\n---\n\n## ⚠️ Unmatched Prints (Prints Without Made Shots)\n\n"
+            
+            for i, print_event in enumerate(request.unmatchedPrints, 1):
+                time_display = print_event.get('timeRemaining', 'N/A')
+                if isinstance(time_display, (int, float)):
+                    minutes = int(time_display // 60)
+                    seconds = int(time_display % 60)
+                    time_display = f"{minutes}:{seconds:02d}"
+                elif time_display == 'N/A' or time_display is None:
+                    time_display = 'N/A'
+                
+                md_content += f"""### Unmatched Print #{i}
+
+- **Type:** {print_event.get('type', 'UNKNOWN')}
+- **Time:** {time_display}
+- **Turn Index:** {print_event.get('turnIndex', 'N/A')}
+- **Player:** {print_event.get('playerName', 'N/A')} (ID: {print_event.get('playerId', 'N/A')})
+- **Result Type:** {print_event.get('resultType', 'N/A')}
+- **Points Scored:** {print_event.get('pointsScored', 0)}
+- **Shot Type:** {print_event.get('shotType', 'N/A')}
+- **Scores:** {print_event.get('homeScore', 0)} - {print_event.get('awayScore', 0)}
+
+**⚠️ WARNING:** This print does NOT have a corresponding made shot in the turn data!
+
+"""
         
         # Add mismatches section
         if request.ftMismatches:

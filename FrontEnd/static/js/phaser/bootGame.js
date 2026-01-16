@@ -1241,16 +1241,28 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     // This happens in the event processing loop below
   }
   
-  // ✅ DIAGNOSTIC: Match free throws and made FGs with printed events and send to backend
+  // ✅ DIAGNOSTIC: Comprehensive made shot tracking - link made shots → prints → scoreboard updates
   if (ENABLE_FT_FG_DIAGNOSTICS) {
     const ftMismatches = [];
     const fgMismatches = [];
+    const madeShotVerifications = []; // ✅ NEW: Track every made shot with print + scoreboard verification
+    const unmatchedPrints = []; // ✅ NEW: Track prints that don't link to made shots
     
-    // Match free throws
+    // ✅ IMPROVED: Match free throws using turnIndex as primary (more explicit than timing)
     for (const ft of freeThrowEvents) {
-      const printedFT = printedFTEvents.find(pft => 
-        pft.turnIndex === ft.turnIndex ||
-        (pft.timeRemaining === ft.timeRemaining && pft.playerName === ft.shooterName)
+      // Primary match: turnIndex (most reliable)
+      let printedFT = printedFTEvents.find(pft => pft.turnIndex === ft.turnIndex);
+      
+      // Fallback: time + player name (only if turnIndex didn't match)
+      if (!printedFT) {
+        printedFT = printedFTEvents.find(pft => 
+          pft.timeRemaining === ft.timeRemaining && pft.playerName === ft.shooterName
+        );
+      }
+      
+      // Find corresponding scoreboard update
+      const scoreboardUpdate = scoreboardUpdates.find(su => 
+        su.turnIndex === ft.turnIndex && su.type === 'UPDATE'
       );
       
       if (printedFT) {
@@ -1267,6 +1279,30 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
             made: ft.made
           });
         }
+        
+        // ✅ NEW: Verify made free throw has scoreboard update
+        if (ft.made && ft.turnPoints > 0) {
+          const hasScoreboardUpdate = !!scoreboardUpdate;
+          const expectedScoreChange = 1;
+          const actualScoreChange = scoreboardUpdate ? 
+            (scoreboardUpdate.homeScoreChange + scoreboardUpdate.awayScoreChange) : 0;
+          
+          madeShotVerifications.push({
+            type: 'FREE_THROW_MAKE',
+            turnIndex: ft.turnIndex,
+            timeRemaining: ft.timeRemaining,
+            shooterName: ft.shooterName,
+            shooterId: ft.shooterId,
+            turnPoints: ft.turnPoints,
+            hasPrint: true,
+            printResultType: printedFT.resultType,
+            hasScoreboardUpdate: hasScoreboardUpdate,
+            expectedScoreChange: expectedScoreChange,
+            actualScoreChange: actualScoreChange,
+            scoreboardMatches: hasScoreboardUpdate && actualScoreChange === expectedScoreChange,
+            scoreboardUpdate: scoreboardUpdate || null
+          });
+        }
       } else {
         // Free throw not printed at all
         ftMismatches.push({
@@ -1278,17 +1314,69 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
           turnPoints: ft.turnPoints,
           made: ft.made
         });
+        
+        // ✅ NEW: Track made FT without print
+        if (ft.made && ft.turnPoints > 0) {
+          madeShotVerifications.push({
+            type: 'FREE_THROW_MAKE',
+            turnIndex: ft.turnIndex,
+            timeRemaining: ft.timeRemaining,
+            shooterName: ft.shooterName,
+            shooterId: ft.shooterId,
+            turnPoints: ft.turnPoints,
+            hasPrint: false,
+            hasScoreboardUpdate: !!scoreboardUpdate,
+            expectedScoreChange: 1,
+            actualScoreChange: scoreboardUpdate ? 
+              (scoreboardUpdate.homeScoreChange + scoreboardUpdate.awayScoreChange) : 0,
+            scoreboardMatches: false,
+            scoreboardUpdate: scoreboardUpdate || null
+          });
+        }
       }
     }
     
-    // Match made FGs (simpler - just check if they were printed)
+    // ✅ IMPROVED: Match made FGs and verify print + scoreboard update
     for (const fg of madeFGEvents) {
-      const printedFG = printedMadeFGEvents.find(pfg => 
-        pfg.turnIndex === fg.turnIndex ||
-        (pfg.timeRemaining === fg.timeRemaining && pfg.playerName === fg.shooterName)
+      // Primary match: turnIndex (most reliable)
+      let printedFG = printedMadeFGEvents.find(pfg => pfg.turnIndex === fg.turnIndex);
+      
+      // Fallback: time + player name (only if turnIndex didn't match)
+      if (!printedFG) {
+        printedFG = printedMadeFGEvents.find(pfg => 
+          pfg.timeRemaining === fg.timeRemaining && pfg.playerName === fg.shooterName
+        );
+      }
+      
+      // Find corresponding scoreboard update
+      const scoreboardUpdate = scoreboardUpdates.find(su => 
+        su.turnIndex === fg.turnIndex && su.type === 'UPDATE'
       );
       
-      if (!printedFG) {
+      const expectedScoreChange = fg.turnPoints; // 2 or 3 points
+      const actualScoreChange = scoreboardUpdate ? 
+        (scoreboardUpdate.homeScoreChange + scoreboardUpdate.awayScoreChange) : 0;
+      
+      if (printedFG) {
+        // ✅ NEW: Verify made FG has scoreboard update
+        madeShotVerifications.push({
+          type: 'MADE_FG',
+          turnIndex: fg.turnIndex,
+          timeRemaining: fg.timeRemaining,
+          shooterName: fg.shooterName,
+          shooterId: fg.shooterId,
+          turnPoints: fg.turnPoints,
+          hasPrint: true,
+          printResultType: printedFG.resultType,
+          printPointsScored: printedFG.pointsScored,
+          hasScoreboardUpdate: !!scoreboardUpdate,
+          expectedScoreChange: expectedScoreChange,
+          actualScoreChange: actualScoreChange,
+          scoreboardMatches: !!scoreboardUpdate && actualScoreChange === expectedScoreChange,
+          scoreboardUpdate: scoreboardUpdate || null
+        });
+      } else {
+        // Made FG not printed
         fgMismatches.push({
           type: 'NOT_PRINTED',
           turnIndex: fg.turnIndex,
@@ -1296,6 +1384,71 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
           shooterName: fg.shooterName,
           turnPoints: fg.turnPoints
         });
+        
+        // ✅ NEW: Track made FG without print
+        madeShotVerifications.push({
+          type: 'MADE_FG',
+          turnIndex: fg.turnIndex,
+          timeRemaining: fg.timeRemaining,
+          shooterName: fg.shooterName,
+          shooterId: fg.shooterId,
+          turnPoints: fg.turnPoints,
+          hasPrint: false,
+          hasScoreboardUpdate: !!scoreboardUpdate,
+          expectedScoreChange: expectedScoreChange,
+          actualScoreChange: actualScoreChange,
+          scoreboardMatches: false,
+          scoreboardUpdate: scoreboardUpdate || null
+        });
+      }
+    }
+    
+    // ✅ NEW: Find prints that don't link to made shots (unmatched prints)
+    // Check all printed made FGs
+    for (const printedFG of printedMadeFGEvents) {
+      const matchingMadeFG = madeFGEvents.find(fg => 
+        fg.turnIndex === printedFG.turnIndex ||
+        (fg.timeRemaining === printedFG.timeRemaining && fg.shooterName === printedFG.playerName)
+      );
+      
+      if (!matchingMadeFG) {
+        unmatchedPrints.push({
+          type: 'MADE_FG_PRINT',
+          turnIndex: printedFG.turnIndex,
+          timeRemaining: printedFG.timeRemaining,
+          playerName: printedFG.playerName,
+          playerId: printedFG.playerId,
+          resultType: printedFG.resultType,
+          pointsScored: printedFG.pointsScored,
+          shotType: printedFG.shotType,
+          homeScore: printedFG.homeScore,
+          awayScore: printedFG.awayScore
+        });
+      }
+    }
+    
+    // Check all printed made free throws
+    for (const printedFT of printedFTEvents) {
+      if (printedFT.resultType === 'MAKE') {
+        const matchingFT = freeThrowEvents.find(ft => 
+          ft.turnIndex === printedFT.turnIndex ||
+          (ft.timeRemaining === printedFT.timeRemaining && ft.shooterName === printedFT.playerName)
+        );
+        
+        if (!matchingFT || !matchingFT.made) {
+          unmatchedPrints.push({
+            type: 'FREE_THROW_MAKE_PRINT',
+            turnIndex: printedFT.turnIndex,
+            timeRemaining: printedFT.timeRemaining,
+            playerName: printedFT.playerName,
+            playerId: printedFT.playerId,
+            resultType: printedFT.resultType,
+            pointsScored: printedFT.pointsScored,
+            shotType: printedFT.shotType,
+            homeScore: printedFT.homeScore,
+            awayScore: printedFT.awayScore
+          });
+        }
       }
     }
     
@@ -1318,6 +1471,8 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         allPrintedEvents, // ✅ NEW: All printed events (not just FT/FG)
         ftMismatches,
         fgMismatches,
+        madeShotVerifications, // ✅ NEW: Track every made shot with print + scoreboard verification
+        unmatchedPrints, // ✅ NEW: Track prints that don't link to made shots
         playerLookupFailures, // ✅ NEW: Track when playerMap lookups fail
         playerMapStats, // ✅ NEW: PlayerMap statistics
         scoreboardUpdates, // ✅ NEW: Track every scoreboard update
@@ -1328,6 +1483,8 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         totalAllPrintedEvents: allPrintedEvents.length,
         totalLookupFailures: playerLookupFailures.length,
         totalScoreboardUpdates: scoreboardUpdates.length, // ✅ NEW: Total scoreboard updates
+        totalMadeShotVerifications: madeShotVerifications.length, // ✅ NEW: Total made shot verifications
+        totalUnmatchedPrints: unmatchedPrints.length, // ✅ NEW: Total unmatched prints
         ftMismatchCount: ftMismatches.length,
         fgMismatchCount: fgMismatches.length
       };
