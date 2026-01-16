@@ -324,9 +324,25 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   
   players.forEach(player => {
     if (player.playerId) {
+      // ✅ FIX: Handle jersey number 0 - use nullish coalescing to preserve 0
+      let jersey = '';
+      if (typeof player.jersey === 'number') {
+        jersey = player.jersey; // Preserve 0
+      } else if (player.jersey !== undefined && player.jersey !== null && player.jersey !== '') {
+        jersey = player.jersey;
+      } else if (typeof player.jerseyNumber === 'number') {
+        jersey = player.jerseyNumber; // Preserve 0
+      } else if (player.jerseyNumber !== undefined && player.jerseyNumber !== null && player.jerseyNumber !== '') {
+        jersey = player.jerseyNumber;
+      } else if (typeof player.jersey_number === 'number') {
+        jersey = player.jersey_number; // Preserve 0
+      } else if (player.jersey_number !== undefined && player.jersey_number !== null && player.jersey_number !== '') {
+        jersey = player.jersey_number;
+      }
+      
       playerMap[player.playerId] = {
         name: player.name || 'Unknown',
-        jersey: player.jersey || player.jerseyNumber || player.jersey_number || '',
+        jersey: jersey,
         team_id: player.team_id, // Store team_id directly
         photo: player.photo || null // Store player photo for made shots
       };
@@ -473,9 +489,25 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
           String(p.player_id) === String(shooterId)
         );
         if (foundPlayer) {
+          // ✅ FIX: Handle jersey number 0 - use explicit checks to preserve 0
+          let jersey = '';
+          if (typeof foundPlayer.jersey === 'number') {
+            jersey = foundPlayer.jersey; // Preserve 0
+          } else if (foundPlayer.jersey !== undefined && foundPlayer.jersey !== null && foundPlayer.jersey !== '') {
+            jersey = foundPlayer.jersey;
+          } else if (typeof foundPlayer.jerseyNumber === 'number') {
+            jersey = foundPlayer.jerseyNumber; // Preserve 0
+          } else if (foundPlayer.jerseyNumber !== undefined && foundPlayer.jerseyNumber !== null && foundPlayer.jerseyNumber !== '') {
+            jersey = foundPlayer.jerseyNumber;
+          } else if (typeof foundPlayer.jersey_number === 'number') {
+            jersey = foundPlayer.jersey_number; // Preserve 0
+          } else if (foundPlayer.jersey_number !== undefined && foundPlayer.jersey_number !== null && foundPlayer.jersey_number !== '') {
+            jersey = foundPlayer.jersey_number;
+          }
+          
           shooterData = {
             name: foundPlayer.name || 'Unknown',
-            jersey: foundPlayer.jersey || foundPlayer.jerseyNumber || foundPlayer.jersey_number || '',
+            jersey: jersey,
             team_id: foundPlayer.team_id,
             photo: foundPlayer.photo || null
           };
@@ -611,9 +643,25 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       if (!stealerData && stealerId) {
         const foundPlayer = players.find(p => p.playerId === stealerId || p.playerId === String(stealerId) || p.player_id === stealerId);
         if (foundPlayer) {
+          // ✅ FIX: Handle jersey number 0 - use explicit checks to preserve 0
+          let jersey = '';
+          if (typeof foundPlayer.jersey === 'number') {
+            jersey = foundPlayer.jersey; // Preserve 0
+          } else if (foundPlayer.jersey !== undefined && foundPlayer.jersey !== null && foundPlayer.jersey !== '') {
+            jersey = foundPlayer.jersey;
+          } else if (typeof foundPlayer.jerseyNumber === 'number') {
+            jersey = foundPlayer.jerseyNumber; // Preserve 0
+          } else if (foundPlayer.jerseyNumber !== undefined && foundPlayer.jerseyNumber !== null && foundPlayer.jerseyNumber !== '') {
+            jersey = foundPlayer.jerseyNumber;
+          } else if (typeof foundPlayer.jersey_number === 'number') {
+            jersey = foundPlayer.jersey_number; // Preserve 0
+          } else if (foundPlayer.jersey_number !== undefined && foundPlayer.jersey_number !== null && foundPlayer.jersey_number !== '') {
+            jersey = foundPlayer.jersey_number;
+          }
+          
           stealerData = {
             name: foundPlayer.name || 'Unknown',
-            jersey: foundPlayer.jersey || foundPlayer.jerseyNumber || foundPlayer.jersey_number || '',
+            jersey: jersey,
             team_id: foundPlayer.team_id
           };
         }
@@ -832,8 +880,11 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         timeDisplay = `${minutes}:${seconds.toString().padStart(2, '0')}`;
       }
       
-      // Format jersey number
-      const jerseyDisplay = event.playerJersey ? ` (#${event.playerJersey})` : '';
+      // ✅ FIX: Format jersey number - handle 0 as valid jersey number
+      // Check for null/undefined/empty string, but allow 0
+      const jerseyDisplay = (event.playerJersey !== undefined && event.playerJersey !== null && event.playerJersey !== '') 
+        ? ` (#${event.playerJersey})` 
+        : '';
       
       // Determine CSS class based on event type (only made shots get background colors)
       let eventClass = 'sim-quarter-shot-entry';
