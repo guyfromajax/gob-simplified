@@ -3,14 +3,14 @@
 **Base Constants**
 
 1. **Total Training Points**: 
-   - **First Training (Franchise Mode)**: 30 points (before first game)
-   - **All Other Trainings**: 24 points per training session
+   - **Training Camp (Week 1, before first games)**: 30 points
+   - **All Other Trainings (Week 1+ after games)**: 24 points per training session
 2. **Slider Range**: 0-5 points per slider (discrete steps)
 3. **Training Page Files**: `FrontEnd/static/training.html`, `FrontEnd/static/training.js`, `FrontEnd/static/training.css`
 4. **Training Report Page**: `FrontEnd/static/training-report.html`
 5. **Backend Execution**: `BackEnd/models/training_execution_v2.py`
 6. **API Endpoints**:
-   - `GET /franchise/training-points` - Get available training points (30 for first training, 24 otherwise)
+   - `GET /franchise/training-points` - Get available training points (30 for training camp, 24 for regular training)
    - `POST /franchise/run-training` - Submit training
    - `GET /franchise/training-report` - Get training report data
 7. **Coaching Focus Archetypes**: Authoritarian, Systems Coach, Player Maximizer, Culture Builder
@@ -19,14 +19,14 @@
 
 **Training System Flow (13 Steps)**
 
-1. **Page Load**: Frontend fetches training points from `/franchise/training-points` endpoint (30 for first training, 24 otherwise)
+1. **Page Load**: Frontend fetches training points from `/franchise/training-points` endpoint (30 for training camp, 24 for regular training)
 2. **User Allocates Points**: User distributes training points (30 or 24) across 20 sliders (player drills, team drills, general)
 3. **User Selects Focus**: User selects one coaching focus archetype and sub-option
 4. **Submit Training**: Frontend sends POST request to `/franchise/run-training` with training data
-5. **Backend Validation**: Backend validates total points match expected (30 for first training, 24 otherwise)
+5. **Backend Validation**: Backend validates total points match expected (30 for training camp, 24 for regular training)
 6. **Data Auto-Population**: Backend initializes `plays_data` and `scouting_data` if missing
-7. **Pre-Training Decay**: All plays/defenses with effectiveness > 0 reduced by 5-15 points (skipped for first training/training camp)
-8. **Pre-Training Conditions**: Random decreases applied to player/team attributes (excluding EM, MO, NG) (skipped for first training/training camp)
+7. **Pre-Training Decay**: All plays/defenses with effectiveness > 0 reduced by 5-15 points (skipped for training camp: week 1 before first games)
+8. **Pre-Training Conditions**: Random decreases applied to player/team attributes (excluding EM, MO, NG) (skipped for training camp: week 1 before first games)
 9. **Training Point Application**: Drill allocations mapped to attributes, random increases applied based on points
 10. **Coaching Focus Amplifiers**: Selected focus amplifies specific attribute gains
 11. **Attribute Clamping**: All values clamped to valid ranges (player: min 1, team: defined ranges)
@@ -149,7 +149,7 @@ The training execution system applies pre-training conditions, allocates trainin
    - Minimum effectiveness is clamped to 0 (cannot be negative)
    - This represents natural skill degradation between training sessions
    - Original effectiveness values are tracked for change calculation
-   - **Skipped for first training (training camp) in franchise mode** - no games have been played yet, so no depreciation occurs
+   - **Skipped for training camp in franchise mode** - determined by `week == 1 and not results.get("1")`, no depreciation occurs before first games
 
 1. **Pre-Training Conditions** (`apply_pre_training_conditions`)
    - Applies random decreases to player attributes (excluding EM, MO, NG)
@@ -158,7 +158,7 @@ The training execution system applies pre-training conditions, allocates trainin
    - Rebound modifier: `+= random.uniform(-0.1, 0)` (pre-training, range from -0.1 to 0)
    - Shot threshold: `+= random.randint(5, 20)`
    - Other team attributes: `+= random.choice([-2, -1, 0])`
-   - **Skipped for first training (training camp) in franchise mode** - no games have been played yet, so no depreciation occurs
+   - **Skipped for training camp in franchise mode** - determined by `week == 1 and not results.get("1")`, no depreciation occurs before first games
 
 2. **Training Point Application** (`apply_training_points`)
    - Maps drill allocations to player/team attributes
@@ -413,7 +413,7 @@ After training is submitted, users are automatically redirected to the training 
   - Minimum effectiveness value is 0 (cannot be negative)
   - This decay represents natural skill degradation between training sessions
   - The change indicator shows the net change from the original effectiveness (before decay) to the final effectiveness (after decay + training)
-  - **Note:** Pre-training depreciation is skipped for the first training (training camp) in franchise mode - no games have been played yet, so no skill degradation occurs
+  - **Note:** Pre-training depreciation is skipped for training camp in franchise mode - determined by `week == 1 and not results.get("1")`, so no skill degradation occurs before first games
 
 **Training Notes Section:**
 - Header: "Training Notes"
@@ -513,11 +513,11 @@ In Franchise mode, when the user submits training for their team, all computer t
 
 **Key Features:**
 - **Automatic Execution**: Computer teams run training immediately after user's team training completes
-- **Random Allocations**: Each computer team gets randomly generated training allocations (same total points as user's team: 30 for first training, 24 otherwise)
+- **Random Allocations**: Each computer team gets randomly generated training allocations (same total points as user's team: 30 for training camp, 24 for regular training)
 - **Random Coaching Focus**: Each computer team gets a randomly selected coaching focus (archetype and sub-option)
 - **Separate Randomizations**: Each computer team gets separate randomizations for:
-  - Pre-training effectiveness decay (plays/defenses) - skipped for first training (training camp)
-  - Pre-training conditions (player/team attribute decreases) - skipped for first training (training camp)
+  - Pre-training effectiveness decay (plays/defenses) - skipped for training camp (`week == 1 and not results.get("1")`)
+  - Pre-training conditions (player/team attribute decreases) - skipped for training camp (`week == 1 and not results.get("1")`)
   - Training point application (attribute increases)
 - **No Training Reports**: Computer teams do not generate training reports (only user's team gets a report)
 - **Playbook Mode**: All computer teams use "all-plays-even" mode for playbook training (even distribution across all plays)
@@ -536,7 +536,7 @@ In Franchise mode, when the user submits training for their team, all computer t
      - Get team stats, plays, playcall settings, strategy settings, playbook settings, and scouting data
      - Initialize `plays_data` and `scouting_data` if empty
      - Generate random training allocations and coaching focus
-     - Call `execute_training()` (includes pre-training conditions with separate randomizations)
+     - Call `execute_training()` with `skip_pre_training_depreciation=is_first_training` (based on `week == 1 and not results.get("1")`) - includes pre-training conditions with separate randomizations when not skipped
      - Recalculate position ratings for all players
      - Update franchise document with all changes
   3. Consolidate all updates (user team + computer teams) into single `db.franchises.update_one()` call
