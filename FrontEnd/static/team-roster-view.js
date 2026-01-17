@@ -349,6 +349,11 @@ function renderRoster() {
   if (typeof initAttributeTooltips !== 'undefined') {
     initAttributeTooltips(tbody, ['td']);
   }
+  
+  // If player view is active, re-render it when roster changes
+  if (currentView === 'player') {
+    renderPlayerView();
+  }
 }
 
 function renderStats() {
