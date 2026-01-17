@@ -819,7 +819,6 @@ def complete_week(req: CompleteWeekRequest):
     update_fields = {
         "results": existing_results,
         "week": next_week,
-        "training_status.current_week": next_week,
         "training_status.training_completed": False,
         "training_status.session_type": "in-season"
     }
@@ -1012,7 +1011,6 @@ def command_center_data(franchise_id: str = None):
         "session_type": session_type,
         "week": week if week is not None else 1,  # ✅ Always include week (defaults to 1)
         "training_status": {
-            "current_week": franchise_doc.get("training_status", {}).get("current_week", week if week is not None else 1),
             "training_completed": training_completed,
             "session_type": session_type
         } if franchise_id and franchise_doc else {}
@@ -2108,24 +2106,17 @@ def get_training_points(franchise_id: str):
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
 
-    # Check if there are any completed games
+    # Check if it's first training (training camp) - week 1 and no results yet
+    week = franchise_doc.get("week", 1)
     results = franchise_doc.get("results", {})
-    has_completed_games = len(results) > 0
+    is_first_training = (week == 1 and not results.get("1"))
     
-    # Also check games collection for any completed games
-    if not has_completed_games:
-        completed_game = db.games.find_one({
-            "franchise_id": str(franchise_id),
-            "is_final": True
-        })
-        has_completed_games = completed_game is not None
-    
-    # First training (before first game) gets 30 points, otherwise 24
-    training_points = 30 if not has_completed_games else 24
+    # First training (training camp) gets 30 points, otherwise 24
+    training_points = 30 if is_first_training else 24
     
     return {
         "training_points": training_points,
-        "is_first_training": not has_completed_games
+        "is_first_training": is_first_training
     }
 
 
@@ -2147,19 +2138,12 @@ def run_franchise_training(req: FranchiseTrainingRequest):
 
     # Get training status and check for duplicate submission
     training_status = franchise_doc.get("training_status", {})
-    current_week = franchise_doc.get("week", 0)
-    
-    # Check if it's first training (before first game) - validate training points
+    week = franchise_doc.get("week", 1)
     results = franchise_doc.get("results", {})
-    has_completed_games = len(results) > 0
-    if not has_completed_games:
-        completed_game = db.games.find_one({
-            "franchise_id": str(franchise_id),
-            "is_final": True
-        })
-        has_completed_games = completed_game is not None
     
-    expected_points = 30 if not has_completed_games else 24
+    # Check if it's first training (training camp) - week 1 and no results yet
+    is_first_training = (week == 1 and not results.get("1"))
+    expected_points = 30 if is_first_training else 24
     
     # Validate total training points allocated
     training_data = req.training_data
@@ -2184,15 +2168,15 @@ def run_franchise_training(req: FranchiseTrainingRequest):
             status_code=400,
             detail=f"Invalid training points allocation. Expected {expected_points} points, got {total_allocated}."
         )
-    if training_status.get("training_completed", False) and training_status.get("week") == current_week:
+    if training_status.get("training_completed", False) and training_status.get("week") == week:
         # Training already completed for this week, redirect to report
         # ✅ SS&S: Use user_team_object_id from franchise document for redirect (authoritative)
         user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
         redirect_team_id = user_team_object_id if user_team_object_id else req.team_id
         return {
             "status": "already_completed",
-            "week": current_week,
-            "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={redirect_team_id}&week={current_week}"
+            "week": week,
+            "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={redirect_team_id}&week={week}"
         }
 
     # ✅ SS&S: Always use user_team_object_id from franchise document as source of truth
@@ -2330,8 +2314,7 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     from BackEnd.models.training_execution_v2 import execute_training
     
     # Execute training (applies pre-training conditions, then training points)
-    # Skip pre-training depreciation for first training (training camp) - before any games are played
-    is_first_training = not has_completed_games
+    # Skip pre-training depreciation for first training (training camp) - week 1 before games
     updated_players, updated_team, updated_plays, updated_scouting_data, training_report = execute_training(
         players_for_training,
         team_stats,
@@ -2427,12 +2410,12 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     # Mark training as completed and update status
     session_type = training_status.get("session_type", "in-season")
     franchise_update["training_status.training_completed"] = True
-    franchise_update["training_status.week"] = current_week
+    franchise_update["training_status.week"] = week
     franchise_update["training_status.last_training_date"] = datetime.now().strftime("%Y-%m-%d")
     
     # Store training report data
     training_report_data = {
-        "week": current_week,
+        "week": week,
         "player_logs": player_logs,  # Standardized name (was player_changes)
         "team_log": team_log,  # Standardized name (was team_changes)
         "coaching_focus": training_report.get("coaching_focus", {}),
@@ -2446,7 +2429,7 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     }
     
     # Store training report in franchise_teams.{team_id}.training_reports
-    franchise_update[f"franchise_teams.{team_id}.training_reports.{current_week}"] = training_report_data
+    franchise_update[f"franchise_teams.{team_id}.training_reports.{week}"] = training_report_data
     
     # Also save latest training for quick access
     franchise_update["latest_training"] = training_report_data
@@ -2603,12 +2586,12 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     
     return {
         "status": "success",
-        "week": current_week,
+        "week": week,
         "player_changes": player_logs,
         "team_changes": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
         "session_type": session_type,
-        "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={team_id}&week={current_week}"
+        "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={team_id}&week={week}"
     }
 
 
@@ -3201,7 +3184,6 @@ def finish_season(req: FinishSeasonRequest):
             "current_season": next_season,
             "week": 1,
             "eos_tournament_active": False,
-            "training_status.current_week": 1,
             "training_status.training_completed": False,
             "training_status.session_type": "preseason"
         }}

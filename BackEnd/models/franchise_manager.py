@@ -207,9 +207,8 @@ class FranchiseManager:
                 "playbook_settings": playbook_settings.copy()
             }
 
-        # Initialize training status - needs training before week 1 (training camp)
+        # Initialize training status - training camp happens at week 1 before games are played
         training_status = {
-            "current_week": 0,
             "training_completed": False,
             "session_type": "preseason",  # First training is always training camp
             "last_training_date": None  # No training completed yet

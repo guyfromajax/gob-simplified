@@ -31,6 +31,7 @@ Franchise Mode supports multi-season career mode where team and player data pers
 **Initialization:**
 - **Upfront Initialization**: All 8 teams initialized when franchise season is created
 - **Playbook Settings**: Even distribution across all plays in each category
+- **Week Initialization**: Franchise starts at `week = 1` (training camp happens before first games are played)
 
 ## System Flow
 
@@ -194,9 +195,10 @@ After completing the regular season (week 14), the top 8 teams advance to a sing
 **Location:** `BackEnd/models/franchise_manager.py` - `initialize_season()` (lines 109-235)
 
 **Process:**
-1. **Upfront Initialization**: All 8 teams initialized when franchise season is created
-2. Creates `franchise_teams` objects for all 8 teams in the franchise
-3. Each team object includes:
+1. **Week Initialization**: Franchise `week` field set to `1` (training camp occurs at week 1 before first games)
+2. **Upfront Initialization**: All 8 teams initialized when franchise season is created
+3. Creates `franchise_teams` objects for all 8 teams in the franchise
+4. Each team object includes:
    - `playcall_settings`: Default settings (all set to 2 = Normal)
    - `strategy_settings`: Default settings (all set to 2 = Normal)
    - `plays`: Populated via `populate_team_plays(mode="franchise")`
