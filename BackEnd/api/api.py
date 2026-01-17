@@ -3555,16 +3555,10 @@ def save_ft_fg_diagnostics(request: FTFGDiagnosticRequest):
 """
                 
                 if update_type == 'UPDATE':
-                    md_content += f"- **Event Type:** {event_type}
-- **Event Result:** {event_result}
-- **Player:** {player_name}
-- **Points Scored:** {points_scored}
-"
+                    md_content += f"- **Event Type:** {event_type}\n- **Event Result:** {event_result}\n- **Player:** {player_name}\n- **Points Scored:** {points_scored}\n"
                 
                 if update_type == 'FINAL' and 'previousHomeScore' in update:
-                    md_content += f"- **Previous Home Score:** {update.get('previousHomeScore', 0)}
-- **Previous Away Score:** {update.get('previousAwayScore', 0)}
-"
+                    md_content += f"- **Previous Home Score:** {update.get('previousHomeScore', 0)}\n- **Previous Away Score:** {update.get('previousAwayScore', 0)}\n"
                 
                 md_content += "\n"
         
@@ -3599,17 +3593,11 @@ def save_ft_fg_diagnostics(request: FTFGDiagnosticRequest):
 """
                 
                 if has_print:
-                    md_content += f"- **Print Result Type:** {verification.get('printResultType', 'N/A')}
-"
+                    md_content += f"- **Print Result Type:** {verification.get('printResultType', 'N/A')}\n"
                     if shot_type == 'MADE_FG':
-                        md_content += f"- **Print Points Scored:** {verification.get('printPointsScored', 0)}
-"
+                        md_content += f"- **Print Points Scored:** {verification.get('printPointsScored', 0)}\n"
                 
-                md_content += f"- **Has Scoreboard Update:** {'✅ Yes' if has_scoreboard else '❌ No'}
-- **Expected Score Change:** {verification.get('expectedScoreChange', 0)}
-- **Actual Score Change:** {verification.get('actualScoreChange', 0)}
-- **Scoreboard Matches:** {'✅ Yes' if scoreboard_matches else '❌ No'}
-"
+                md_content += f"- **Has Scoreboard Update:** {'✅ Yes' if has_scoreboard else '❌ No'}\n- **Expected Score Change:** {verification.get('expectedScoreChange', 0)}\n- **Actual Score Change:** {verification.get('actualScoreChange', 0)}\n- **Scoreboard Matches:** {'✅ Yes' if scoreboard_matches else '❌ No'}\n"
                 
                 if not has_print:
                     md_content += "\n**⚠️ WARNING:** Made shot was NOT printed in text scroll!\n"
