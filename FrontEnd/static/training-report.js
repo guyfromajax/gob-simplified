@@ -247,7 +247,8 @@ function renderHeader() {
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
     
-    focusText = `${archetypeDisplay} (${formatSubOption})`;
+    // Format: focus (archetype) - focus outside, archetype inside parentheses
+    focusText = `${formatSubOption} (${archetypeDisplay})`;
   }
   
   document.getElementById('training-focus').textContent = focusText;
