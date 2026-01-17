@@ -948,6 +948,12 @@ async function setHeader() {
     
     // Add time remaining to the right of header content
     headerText += ` <span style="margin-left: 20px; font-weight: bold;">Time: ${formattedClock}</span>`;
+    
+    // Add quarter display to the right of time remaining
+    // During quarter breaks, show the upcoming quarter (which is currentQuarter)
+    // During regular play, show the current quarter
+    const displayQuarter = currentQuarter;
+    headerText += ` <span style="margin-left: 10px; font-weight: bold;">Q${displayQuarter}</span>`;
   }
   
   title.innerHTML = headerText; // Use innerHTML to support the span element
