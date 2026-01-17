@@ -145,16 +145,26 @@ function autoAssignTraining() {
   const shuffled = [...sliders].sort(() => Math.random() - 0.5);
   shuffled.slice(0, remainingPoints).forEach(slider => setSliderValue(slider, 2));
 
-  // 3) Random coaching focus
+  // 3) Random coaching focus (only select from focus options, not archetype headers)
   let focusLabel = '';
   let archetypeLabel = '';
   if (coachingRadios.length > 0) {
-    const radios = Array.from(coachingRadios);
-    const randomRadio = radios[Math.floor(Math.random() * radios.length)];
-    randomRadio.checked = true;
-    randomRadio.dispatchEvent(new Event('change', { bubbles: true }));
-    focusLabel = getFocusLabelText(randomRadio);
-    archetypeLabel = getArchetypeLabelText(randomRadio);
+    // Filter out archetype-level radio buttons - only allow focus options
+    // Focus options have hyphens (e.g., "authoritarian-discipline"), archetype headers don't
+    const archetypeValues = ['authoritarian', 'systems-coach', 'player-maximizer', 'culture-builder', 'culture'];
+    const validFocusRadios = Array.from(coachingRadios).filter(radio => {
+      const value = radio.value || '';
+      // Only include radios with hyphens (focus options) and exclude archetype-only values
+      return value.includes('-') && !archetypeValues.includes(value);
+    });
+    
+    if (validFocusRadios.length > 0) {
+      const randomRadio = validFocusRadios[Math.floor(Math.random() * validFocusRadios.length)];
+      randomRadio.checked = true;
+      randomRadio.dispatchEvent(new Event('change', { bubbles: true }));
+      focusLabel = getFocusLabelText(randomRadio);
+      archetypeLabel = getArchetypeLabelText(randomRadio);
+    }
   }
 
   // 4) Update UI state (points + submit enabled)
