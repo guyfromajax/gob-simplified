@@ -162,9 +162,52 @@ function autoAssignTraining() {
 
   // 5) Show confirmation popup
   if (autoTrainModal && autoTrainModalMessage) {
-    const focusText = focusLabel || 'Focus';
-    const archetypeText = archetypeLabel ? ` (${archetypeLabel})` : '';
-    autoTrainModalMessage.innerHTML = `Training Points Assigned<br>${focusText}${archetypeText} Focus Chosen`;
+    // Normalize archetype names to exact format required
+    const archetypeMap = {
+      'authoritarian': 'Authoritarian',
+      'systems-coach': 'Systems Coach',
+      'systems coach': 'Systems Coach',
+      'player-maximizer': 'Player Maximizer',
+      'player maximizer': 'Player Maximizer',
+      'culture-builder': 'Culture Builder',
+      'culture': 'Culture Builder',
+      'culture builder': 'Culture Builder'
+    };
+    
+    // Ensure archetype is in exact format (handle variations)
+    let normalizedArchetype = '';
+    if (archetypeLabel) {
+      const archetypeLower = archetypeLabel.toLowerCase().trim();
+      // Try direct match first
+      if (archetypeMap[archetypeLower]) {
+        normalizedArchetype = archetypeMap[archetypeLower];
+      } else {
+        // Try partial match
+        for (const [key, value] of Object.entries(archetypeMap)) {
+          if (archetypeLower.includes(key) || key.includes(archetypeLower)) {
+            normalizedArchetype = value;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Clean focus label - remove any archetype prefix that might be included
+    let cleanFocus = focusLabel || 'Focus';
+    // Remove archetype names from focus if they appear at the start
+    const archetypeNames = ['Authoritarian', 'Systems Coach', 'Player Maximizer', 'Culture Builder'];
+    archetypeNames.forEach(arch => {
+      const regex = new RegExp(`^${arch}\\s*-\\s*`, 'i');
+      cleanFocus = cleanFocus.replace(regex, '').trim();
+      // Also handle "Systems - Offense" pattern
+      const regex2 = new RegExp(`^Systems\\s+-\\s+`, 'i');
+      cleanFocus = cleanFocus.replace(regex2, '').trim();
+    });
+    
+    // Format: focus (archetype) - focus outside, archetype inside parentheses
+    // Archetype must be exactly: "Authoritarian", "Systems Coach", "Player Maximizer", or "Culture Builder"
+    const focusText = normalizedArchetype ? `${cleanFocus} (${normalizedArchetype})` : cleanFocus;
+    autoTrainModalMessage.innerHTML = `Training Points Assigned<br>${focusText} Focus Chosen`;
     autoTrainModal.style.display = 'flex';
   }
 }

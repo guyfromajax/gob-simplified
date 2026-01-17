@@ -326,7 +326,7 @@ After training is submitted, users are automatically redirected to the training 
 - Page title: "TRAINING REPORT"
 - Week number
 - Upcoming Opponent (from schedule)
-- Training Focus (formatted as "Archetype (Sub-Option)", e.g., "Culture Builder (Inspire)")
+- Training Focus (formatted as "Focus (Archetype)", e.g., "Inspire (Culture Builder)")
 - Orange "Go To Locker Room" button (top-right) - navigates to Franchise/Tournament Command Center
 
 **Player Report Section:**
@@ -428,27 +428,29 @@ After training is submitted, users are automatically redirected to the training 
 
 #### Training Focus Display Format
 
-The training focus is formatted as "Archetype (Sub-Option)" with proper capitalization:
+The training focus is formatted as "Focus (Archetype)" with the focus outside parentheses and archetype inside:
 - **Authoritarian** archetype options:
-  - "Authoritarian (Discipline)"
-  - "Authoritarian (Rebounding)"
-  - "Authoritarian (Teamwork)"
-  - "Authoritarian (Execution)"
+  - "Discipline (Authoritarian)"
+  - "Rebounding (Authoritarian)"
+  - "Teamwork (Authoritarian)"
+  - "Execution (Authoritarian)"
 - **Systems Coach** archetype options:
-  - "Systems Coach (Offense)"
-  - "Systems Coach (Defense)"
-  - "Systems Coach (Fast Breaks)"
-  - "Systems Coach (Presses/Traps)"
+  - "Offense (Systems Coach)"
+  - "Defense (Systems Coach)"
+  - "Fast Breaks (Systems Coach)"
+  - "Press / Trap (Systems Coach)"
 - **Player Maximizer** archetype options:
-  - "Player Maximizer (Top 3 Attributes)"
-  - "Player Maximizer (Attributes 4-6)"
-  - "Player Maximizer (Custom)"
-  - "Player Maximizer (Be Opportunistic)"
+  - "Top 3 Attributes (Player Maximizer)"
+  - "Attributes 4-6 (Player Maximizer)"
+  - "Custom (Player Maximizer)"
+  - "Be Opportunistic (Player Maximizer)"
 - **Culture Builder** archetype options:
-  - "Culture Builder (Inspire)"
-  - "Culture Builder (Community Engagement)"
-  - "Culture Builder (Teamwork)"
-  - "Culture Builder (Build Confidence)"
+  - "Inspire (Culture Builder)"
+  - "Community Engagement (Culture Builder)"
+  - "Teamwork (Culture Builder)"
+  - "Build Confidence (Culture Builder)"
+
+**Note:** Archetype names inside parentheses must be exactly: "Authoritarian", "Systems Coach", "Player Maximizer", or "Culture Builder"
 
 #### Schedule Integration
 
