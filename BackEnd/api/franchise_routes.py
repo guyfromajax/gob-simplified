@@ -2145,13 +2145,6 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     is_first_training = (week == 1 and not results.get("1"))
     expected_points = 30 if is_first_training else 24
     
-    # Debug logs for training camp detection
-    logger.warning(f"🔍 [TRAINING CAMP DEBUG] week={week}, results.get('1')={results.get('1')}, is_first_training={is_first_training}")
-    if is_first_training:
-        logger.warning(f"✅ [TRAINING CAMP DEBUG] Training camp detected - skip_pre_training_depreciation will be True")
-    else:
-        logger.warning(f"ℹ️ [TRAINING CAMP DEBUG] Regular training - skip_pre_training_depreciation will be False")
-    
     # Validate total training points allocated
     training_data = req.training_data
     allocations = {
@@ -2322,7 +2315,6 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     
     # Execute training (applies pre-training conditions, then training points)
     # Skip pre-training depreciation for first training (training camp) - week 1 before games
-    logger.warning(f"🔍 [TRAINING CAMP DEBUG] Calling execute_training with skip_pre_training_depreciation={is_first_training}")
     updated_players, updated_team, updated_plays, updated_scouting_data, training_report = execute_training(
         players_for_training,
         team_stats,
