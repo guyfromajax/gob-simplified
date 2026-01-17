@@ -33,10 +33,10 @@ The computer timeout system enables AI-controlled teams to call timeouts during 
 
 **Timeout Timing:**
 - Computer can only call timeouts during BIP (Baseline Inbound) and SIP (Side Inbound) turns
-- Computer timeout is evaluated when the BIP/SIP turn would be created (backend)
-- **Deferred Creation:** If computer calls timeout, a pending timeout is stored in `game_state["pending_computer_timeout"]` instead of creating the timeout turn immediately
-- This allows the current turn (e.g., shot) to be returned and animated before the timeout is created
-- On the next API call (`/api/simulate-turn`), the pending timeout is created and returned immediately
+- **Only during full simulation mode:** Computer timeout checks ONLY run during "Sim Quarter" or "Sim Full Game" modes (when `_is_full_simulation` flag is `True`)
+- **NOT during Play Quarter:** Computer timeout checks do NOT run during "Play Quarter" mode (turn-by-turn mode), even if the user team is playing against a computer opponent
+- Computer timeout is evaluated when the BIP/SIP turn would be created (backend), but only if in full simulation mode
+- **Immediate Creation:** In full simulation mode, computer timeouts are created immediately when conditions are met (no deferred creation needed since animations are skipped)
 - User timeout button is only active during the 2-second pause window (after turn is received by frontend)
 - **Precedence:** If computer timeout is called, it takes precedence over user timeout (computer timeout is checked before the BIP/SIP turn is created)
 
@@ -107,28 +107,36 @@ Computer evaluates timeout conditions in order. Each condition only checks once 
 - The pending timeout is cleared when the timeout turn is created on the next API call
 
 **Integration Points:**
-- Computer timeout check occurs in `game_manager.simulate_macro_turn()` when creating SIP turns
-- Computer timeout check occurs in `game_manager.simulate_macro_turn()` when creating BIP turns
-- **Deferred Timeout Creation:** If computer calls timeout, `game_state["pending_computer_timeout"]` is set with the calling team and turn type. The BIP/SIP turn is NOT appended, and the function returns normally, allowing the current turn (e.g., shot) to be returned and animated.
-- **Turn-by-turn mode:** The `/api/simulate-turn` endpoint checks for `pending_computer_timeout` at the START of the call (before calling `simulate_macro_turn()`). If a pending timeout exists, it creates the timeout turn immediately and returns it to the frontend. This ensures the previous turn has been animated before the timeout is created.
-- **Game state persistence:** When a computer timeout is returned from `/api/simulate-turn`, the game state is immediately saved to the database (same as user timeouts). This ensures clock, scores, fouls, and timeout state are preserved when the user returns from the lineup screen.
+- Computer timeout check occurs in `game_manager.simulate_macro_turn()` when creating SIP turns, but ONLY if `_is_full_simulation` is `True`
+- Computer timeout check occurs in `game_manager.simulate_macro_turn()` when creating BIP turns, but ONLY if `_is_full_simulation` is `True`
+- **Gated by simulation mode:** Computer timeout checks are wrapped in `if is_full_simulation:` condition to ensure they only run during "Sim Quarter" or "Sim Full Game", not during "Play Quarter"
+- **Immediate Creation:** In full simulation mode, computer timeouts are created immediately when conditions are met (no deferred creation since animations are skipped)
+- **Game state persistence:** When a computer timeout is created during full simulation, the game state is saved to the database (same as user timeouts). This ensures clock, scores, fouls, and timeout state are preserved.
 - **Game state restoration:** When resuming from a computer timeout, the backend checks for timeout state in the saved document before calculating `should_restore_stats`. This ensures that scores, fouls, timeouts, and other team-level data are properly restored (same as user timeouts). The timeout state check happens early in the game loading process to ensure all state is restored correctly.
 - **Frontend navigation:** Computer timeout turns trigger the exact same navigation flow as user timeouts (no popup, direct navigation). The `AnimationEngine.handleTimeout()` method detects computer timeouts and automatically calls `showTimeoutPopup()` to navigate directly to the lineup screen with proper `resume_from_timeout` and `clock` parameters. The `showTimeoutPopup()` function accepts optional `computerTimeout` and `computerTeamName` parameters, which are passed as URL parameters (`computer_timeout=true` and `computer_team_name={Team Name}`) to the lineup screen.
 - **Lineup screen display:** When the lineup screen loads with `computer_timeout=true` in the URL, bold red text is displayed in the header (to the right of the team scores) that reads "{Computer Team Name} Called Timeout". This text only appears when `computer_timeout=true` is present in the URL, ensuring it does not persist to the next TNS instance unless it's another computer timeout. The text is implemented using a `<span>` element with inline styles (`color: red; font-weight: bold; margin-left: 20px;`) appended to the header text in `set-lineup.js`.
-- **Works during simmed quarters:** Computer timeout logic runs during "Sim To 4th Quarter" and "Sim Full Game" operations
+- **Only during full simulation:** Computer timeout logic ONLY runs during "Sim Quarter" or "Sim Full Game" operations (when `_is_full_simulation` is `True`)
+- **NOT during Play Quarter:** Computer timeout checks do NOT run during "Play Quarter" mode, even if playing against a computer opponent
 - **Two computer teams:** Both teams are checked for timeout conditions; first team to meet conditions calls timeout
-- **Lineup adjustments:** When computer calls timeout during simmed quarters, both team lineups are rebuilt using `build_lineup_from_mongo()` (same autoset logic as regular timeouts)
+- **Lineup adjustments:** When computer calls timeout during full simulation, both team lineups are rebuilt using `build_lineup_from_mongo()` (same autoset logic as regular timeouts)
 
 ### Simmed Quarter Behavior
 
-**Sim To 4th Quarter and Sim Full Game:**
-- Computer timeout logic runs during all simmed quarters (Q1-Q3 for "Sim To 4th Quarter", Q1-Q4 for "Sim Full Game")
+**Sim Quarter and Sim Full Game (Full Simulation Mode):**
+- Computer timeout logic ONLY runs during full simulation mode ("Sim Quarter" or "Sim Full Game")
+- Computer timeout checks are gated by the `_is_full_simulation` flag in `game_manager.simulate_macro_turn()`
 - Computer teams can call timeouts during simmed quarters using the same conditions and logic as regular gameplay
 - **User team lineup handling:** When a computer timeout occurs during simmed quarters, the user team's lineup is also automatically rebuilt using the same autoset lineup process (`build_lineup_from_mongo()`). This ensures both teams have optimal lineups based on current energy levels and foul status, even though the user is not actively managing the lineup during simmed quarters.
 - **Two computer teams:** In games where both teams are computer-controlled, both teams are evaluated for timeout conditions. The first team to meet timeout conditions calls the timeout, and both team lineups are rebuilt using autoset lineup logic.
 
+**Play Quarter Mode (Turn-by-Turn Mode):**
+- Computer timeout checks do NOT run during "Play Quarter" mode (`_is_full_simulation` is `False`)
+- This ensures that when the user is actively playing a quarter, computer opponents cannot call timeouts
+- Computer timeout logic only applies when the user has chosen to simulate quarters ("Sim Quarter" or "Sim Full Game")
+
 **Key Implementation:**
-- Computer timeout checking happens in `game_manager.simulate_macro_turn()` which is called during the simulation loop in `simulate_quarter()`
-- When computer timeout is called during simmed quarters, both `calling_team.lineup` and `other_team.lineup` are rebuilt via `build_lineup_from_mongo()`
-- This ensures consistent lineup management across all gameplay modes (regular gameplay, simmed quarters, user timeouts, computer timeouts)
+- Computer timeout checking happens in `game_manager.simulate_macro_turn()` but is gated by `if is_full_simulation:` condition
+- The check occurs when creating SIP (Side Inbound) and BIP (Baseline Inbound) turns, but only if `_is_full_simulation` is `True`
+- When computer timeout is called during full simulation, both `calling_team.lineup` and `other_team.lineup` are rebuilt via `build_lineup_from_mongo()`
+- This ensures consistent lineup management across all gameplay modes while respecting the user's choice between "Play Quarter" and "Sim Quarter"
 
