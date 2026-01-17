@@ -2330,6 +2330,8 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     from BackEnd.models.training_execution_v2 import execute_training
     
     # Execute training (applies pre-training conditions, then training points)
+    # Skip pre-training depreciation for first training (training camp) - before any games are played
+    is_first_training = not has_completed_games
     updated_players, updated_team, updated_plays, updated_scouting_data, training_report = execute_training(
         players_for_training,
         team_stats,
@@ -2339,7 +2341,8 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         strategy_settings=strategy_settings,
         playbook_settings=playbook_settings,
         scouting_data=scouting_data,
-        playbook_training_mode=training_data.get("playbook_training_mode", "current-playbooks")
+        playbook_training_mode=training_data.get("playbook_training_mode", "current-playbooks"),
+        skip_pre_training_depreciation=is_first_training
     )
     
     # Update players_for_training and team_stats with results
@@ -2522,6 +2525,7 @@ def run_franchise_training(req: FranchiseTrainingRequest):
             
             # Execute training for computer team (includes pre-training conditions and effectiveness decay)
             # Each team gets separate randomizations (handled by execute_training internally)
+            # Skip pre-training depreciation for first training (training camp) - before any games are played
             updated_computer_players, updated_computer_team, updated_computer_plays, updated_computer_scouting_data, _ = execute_training(
                 computer_players_for_training,
                 computer_team_stats,
@@ -2531,7 +2535,8 @@ def run_franchise_training(req: FranchiseTrainingRequest):
                 strategy_settings=computer_strategy_settings,
                 playbook_settings=computer_playbook_settings,
                 scouting_data=computer_scouting_data,
-                playbook_training_mode="all-plays-even"  # Use even distribution for computer teams
+                playbook_training_mode="all-plays-even",  # Use even distribution for computer teams
+                skip_pre_training_depreciation=is_first_training  # Skip depreciation for first training (training camp)
             )
             
             # Recalculate position ratings for each computer player after training

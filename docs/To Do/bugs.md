@@ -7,8 +7,6 @@
 5. Since going to production, Playcall Center overrides are not working
 6. Since going to production, the computer is calling timeouts for the user team
 7. Elminate "Simulating Q5..."
-8. Tournament Mode -- Non user game team and player stats are not populating on the Stats tab, and no team's player stats are populating on the team roster pages.
-9. ~~Pre-game buttons missing after "Play Quarter"~~ - ✅ **FIXED** (January 2025) - After playing a quarter with "Play Quarter" button, the next quarter break did not show the pre-game buttons ("Play Quarter", "Sim Quarter", "Sim Rest of Game"). The game auto-started instead. **Root Cause**: The `resume_from_timeout` URL parameter was being set to `true` when it should be `false` for quarter breaks. The condition in `set-lineup.js` only forced `false` when the URL param was NOT `'true'`, but if the URL still had `'true'` from previous navigation, it wasn't being overridden. **Fix**: Updated `set-lineup.js` to ALWAYS force `resumeFromTimeout = false` for quarter breaks (quarter > 1), regardless of URL param value. This matches the Sim Quarter pattern where `resumeFromTimeout: false` is always explicitly set. Also updated `gameScene.js` to use `TimeoutNavigationHelper.buildGameNavigationParams()` with explicit `resumeFromTimeout: false` (matching Sim Quarter pattern) instead of manually building URL params. **Result**: Quarter breaks now correctly show pre-game buttons and do not auto-start.
 10. User is still able to put fouled out players into the lineup on the Lineup Selection screen
 11. Need to add quarter to the right of Time Remaining on the Lineup Screen
 12. Computer is calling timeout for the user team in Play Quarter situations

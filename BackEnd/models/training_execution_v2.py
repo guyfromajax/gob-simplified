@@ -25,7 +25,8 @@ def execute_training(
     strategy_settings: Optional[Dict] = None,
     playbook_settings: Optional[Dict] = None,
     scouting_data: Optional[Dict] = None,
-    playbook_training_mode: str = "current-playbooks"
+    playbook_training_mode: str = "current-playbooks",
+    skip_pre_training_depreciation: bool = False
 ) -> Tuple[List[dict], dict, Dict, Dict, Dict]:
     """
     Main training execution function.
@@ -83,11 +84,19 @@ def execute_training(
     logger.warning(f"📚 [TRAINING] Total defenses tracked: {len(original_defenses_effectiveness)}")
     
     # Step 0: Reduce play/defense effectiveness by 5-15 (pre-training decay)
-    plays_data = _apply_pre_training_effectiveness_decay(plays_data)
-    scouting_data = _apply_pre_training_defense_decay(scouting_data)
+    # Skip for first training (training camp) in franchise mode
+    if not skip_pre_training_depreciation:
+        plays_data = _apply_pre_training_effectiveness_decay(plays_data)
+        scouting_data = _apply_pre_training_defense_decay(scouting_data)
+    else:
+        logger.warning("⏭️ [TRAINING] Skipping pre-training depreciation (first training/training camp)")
     
     # Step 1: Apply pre-training conditions
-    players, team = apply_pre_training_conditions(players, team)
+    # Skip for first training (training camp) in franchise mode
+    if not skip_pre_training_depreciation:
+        players, team = apply_pre_training_conditions(players, team)
+    else:
+        logger.warning("⏭️ [TRAINING] Skipping pre-training conditions (first training/training camp)")
     
     # Step 2: Apply training points (pass original baselines for report calculation)
     players, team, training_report = apply_training_points(

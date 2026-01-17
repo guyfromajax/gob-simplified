@@ -25,8 +25,8 @@
 4. **Submit Training**: Frontend sends POST request to `/franchise/run-training` with training data
 5. **Backend Validation**: Backend validates total points match expected (30 for first training, 24 otherwise)
 6. **Data Auto-Population**: Backend initializes `plays_data` and `scouting_data` if missing
-7. **Pre-Training Decay**: All plays/defenses with effectiveness > 0 reduced by 5-15 points
-8. **Pre-Training Conditions**: Random decreases applied to player/team attributes (excluding EM, MO, NG)
+7. **Pre-Training Decay**: All plays/defenses with effectiveness > 0 reduced by 5-15 points (skipped for first training/training camp)
+8. **Pre-Training Conditions**: Random decreases applied to player/team attributes (excluding EM, MO, NG) (skipped for first training/training camp)
 9. **Training Point Application**: Drill allocations mapped to attributes, random increases applied based on points
 10. **Coaching Focus Amplifiers**: Selected focus amplifies specific attribute gains
 11. **Attribute Clamping**: All values clamped to valid ranges (player: min 1, team: defined ranges)
@@ -149,14 +149,16 @@ The training execution system applies pre-training conditions, allocates trainin
    - Minimum effectiveness is clamped to 0 (cannot be negative)
    - This represents natural skill degradation between training sessions
    - Original effectiveness values are tracked for change calculation
+   - **Skipped for first training (training camp) in franchise mode** - no games have been played yet, so no depreciation occurs
 
 1. **Pre-Training Conditions** (`apply_pre_training_conditions`)
    - Applies random decreases to player attributes (excluding EM, MO, NG)
-   - Player attributes: `+= random.randint(-3, 0)` per attribute
+   - Player attributes: `+= random.randint(-4, -1)` per attribute
    - Team attributes: Random decreases based on attribute type
    - Rebound modifier: `+= random.uniform(-0.1, 0)` (pre-training, range from -0.1 to 0)
    - Shot threshold: `+= random.randint(5, 20)`
    - Other team attributes: `+= random.choice([-2, -1, 0])`
+   - **Skipped for first training (training camp) in franchise mode** - no games have been played yet, so no depreciation occurs
 
 2. **Training Point Application** (`apply_training_points`)
    - Maps drill allocations to player/team attributes
@@ -411,6 +413,7 @@ After training is submitted, users are automatically redirected to the training 
   - Minimum effectiveness value is 0 (cannot be negative)
   - This decay represents natural skill degradation between training sessions
   - The change indicator shows the net change from the original effectiveness (before decay) to the final effectiveness (after decay + training)
+  - **Note:** Pre-training depreciation is skipped for the first training (training camp) in franchise mode - no games have been played yet, so no skill degradation occurs
 
 **Training Notes Section:**
 - Header: "Training Notes"
@@ -513,8 +516,8 @@ In Franchise mode, when the user submits training for their team, all computer t
 - **Random Allocations**: Each computer team gets randomly generated training allocations (same total points as user's team: 30 for first training, 24 otherwise)
 - **Random Coaching Focus**: Each computer team gets a randomly selected coaching focus (archetype and sub-option)
 - **Separate Randomizations**: Each computer team gets separate randomizations for:
-  - Pre-training effectiveness decay (plays/defenses)
-  - Pre-training conditions (player/team attribute decreases)
+  - Pre-training effectiveness decay (plays/defenses) - skipped for first training (training camp)
+  - Pre-training conditions (player/team attribute decreases) - skipped for first training (training camp)
   - Training point application (attribute increases)
 - **No Training Reports**: Computer teams do not generate training reports (only user's team gets a report)
 - **Playbook Mode**: All computer teams use "all-plays-even" mode for playbook training (even distribution across all plays)
