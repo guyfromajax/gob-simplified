@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/tournament.css">
   <link rel="stylesheet" href="/franchise-command-center.css">
   <link rel="stylesheet" href="/command-center-team-styles.css">
+  <link rel="stylesheet" href="/set-lineup.css">
   <style>
     body {
       font-family: 'Inter', sans-serif;
@@ -32,8 +33,11 @@
       background: #357abd;
     }
     #team-header {
-      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       margin: 60px 0 30px 0;
+      position: relative;
     }
     #team-header h1 {
       font-family: 'Bebas Neue', cursive;
@@ -90,11 +94,19 @@
   
   <div id="team-header">
     <h1 id="team-name">Loading...</h1>
+    
+    <!-- View Toggle -->
+    <div class="view-toggle">
+      <button class="view-toggle-btn active" data-view="grid">Grid View</button>
+      <button class="view-toggle-btn" data-view="player">Player View</button>
+    </div>
   </div>
 
-  <div class="section-title">Player Attributes</div>
-  <div class="scroll-x">
-    <table class="roster-table" id="roster-table">
+  <!-- Grid View -->
+  <div id="roster-table-container" class="view-content active">
+    <div class="section-title">Player Attributes</div>
+    <div class="scroll-x">
+      <table class="roster-table" id="roster-table">
       <thead>
         <tr>
           <th data-sort="name">Name</th>
@@ -121,8 +133,15 @@
         <tr><td colspan="18" class="loading">Loading roster...</td></tr>
       </tbody>
     </table>
+    </div>
   </div>
 
+  <!-- Player View -->
+  <div id="player-view-container" class="view-content">
+    <div class="players-grid"></div>
+  </div>
+
+  <!-- Season Statistics (shown in both views) -->
   <div class="section-title">Season Statistics</div>
   <div class="scroll-x">
     <table class="stats-table" id="stats-table">
