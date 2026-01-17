@@ -17,6 +17,21 @@ let rosterSortDirection = 'desc';
 let statsSortColumn = 'PTS';
 let statsSortDirection = 'desc';
 
+// View toggle state
+let currentView = 'grid'; // 'grid' or 'player'
+const cardFlipState = {}; // Track flip state per player ID
+const dropdownState = {}; // Track dropdown open state per player ID
+
+// Attribute groupings for card back
+const ATTR_GROUPS = {
+  'OFFENSE': ['SC', 'SH'],
+  'DEFENSE': ['ID', 'OD'],
+  'SKILLS': ['PS', 'BH'],
+  'DIRTY WORK': ['RB', 'ST'],
+  'PHYSICAL': ['AG', 'ND'],
+  'MIND': ['IQ', 'FT']
+};
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
   setupBackButton();
@@ -28,6 +43,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else {
     teamNameEl.textContent = 'Team Roster';
   }
+  
+  // Initialize view toggle
+  initViewToggle();
   
   // Load roster and stats
   await loadRoster();
@@ -100,9 +118,11 @@ async function loadRoster() {
       
       // Calculate highest RT
       let highestRT = -Infinity;
-      Object.values(posRatings).forEach(rating => {
+      let highestPos = null;
+      Object.entries(posRatings).forEach(([pos, rating]) => {
         if (typeof rating === 'number' && rating > highestRT) {
           highestRT = rating;
+          highestPos = pos;
         }
       });
       
@@ -121,7 +141,10 @@ async function loadRoster() {
         heightRaw: heightInches,
         weight: p.weight || '--',
         attributes: attrs,
-        highestRT: highestRT !== -Infinity ? highestRT : null
+        position_ratings: posRatings, // Store full position ratings for player view
+        highestRT: highestRT !== -Infinity ? highestRT : null,
+        highestPos: highestPos || (p.position || '--'),
+        photo: p.photo || null
       };
     });
     
@@ -542,5 +565,406 @@ function sortStats() {
   // Re-render both tables
   renderRoster();
   renderStats();
+  
+  // If player view is active, re-render it when stats are sorted
+  if (currentView === 'player') {
+    renderPlayerView();
+  }
+}
+
+// ========== VIEW TOGGLE FUNCTIONS ==========
+
+function initViewToggle() {
+  // Restore saved view from sessionStorage
+  const savedView = sessionStorage.getItem('rosterView');
+  if (savedView === 'player') {
+    currentView = 'player';
+  }
+  
+  const toggleBtns = document.querySelectorAll('.view-toggle-btn');
+  toggleBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const view = btn.dataset.view;
+      switchView(view);
+    });
+    
+    // Set active state based on current view
+    if (btn.dataset.view === currentView) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+  
+  // Initialize view
+  switchView(currentView);
+}
+
+function switchView(view) {
+  currentView = view;
+  sessionStorage.setItem('rosterView', view);
+  
+  // Update toggle buttons
+  document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+    if (btn.dataset.view === view) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+  
+  // Show/hide view containers
+  const gridContainer = document.getElementById('roster-table-container');
+  const playerContainer = document.getElementById('player-view-container');
+  
+  if (view === 'grid') {
+    gridContainer?.classList.add('active');
+    playerContainer?.classList.remove('active');
+  } else {
+    gridContainer?.classList.remove('active');
+    playerContainer?.classList.add('active');
+    renderPlayerView();
+  }
+}
+
+function renderPlayerView() {
+  const container = document.querySelector('.players-grid');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  // Sort players by their HIGHEST position rating
+  const sortedPlayers = rosterData
+    .map(p => {
+      const posRatings = p.position_ratings || {};
+      const entries = Object.entries(posRatings);
+      
+      let highestPos = p.highestPos || p.pos || '--';
+      let highestRating = p.highestRT ?? -1;
+      
+      if (entries.length > 0) {
+        const sorted = entries.sort((a, b) => b[1] - a[1]);
+        highestPos = sorted[0][0];
+        highestRating = sorted[0][1];
+      }
+      
+      return { 
+        ...p, 
+        highestPos,
+        highestRating 
+      };
+    })
+    .sort((a, b) => {
+      // Sort by highest rating desc
+      if (b.highestRating !== a.highestRating) return b.highestRating - a.highestRating;
+      // Then by name asc
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  
+  sortedPlayers.forEach(player => {
+    const card = createPlayerCard(player);
+    container.appendChild(card);
+  });
+  
+  // Initialize tooltips for player cards
+  if (typeof initAttributeTooltips !== 'undefined') {
+    initAttributeTooltips(container, ['.attr-label']);
+  }
+}
+
+function createPlayerCard(player) {
+  const card = document.createElement('div');
+  card.className = 'player-card';
+  card.dataset.playerId = player._id;
+  
+  const inner = document.createElement('div');
+  inner.className = 'player-card-inner';
+  
+  // Front side
+  const front = createCardFront(player);
+  inner.appendChild(front);
+  
+  // Back side
+  const back = createCardBack(player);
+  inner.appendChild(back);
+  
+  card.appendChild(inner);
+  
+  return card;
+}
+
+function createCardFront(player) {
+  const front = document.createElement('div');
+  front.className = 'player-card-front';
+  
+  // Headshot container (clickable link to player detail)
+  const headshotLink = document.createElement('a');
+  headshotLink.href = `/player-detail.html?id=${player._id}`;
+  headshotLink.style.display = 'block';
+  headshotLink.style.textDecoration = 'none';
+  
+  const headshotContainer = document.createElement('div');
+  headshotContainer.className = 'player-headshot-container';
+  
+  // Set team background image
+  const teamNameNormalized = (teamName || '').toLowerCase().replace(/\s+/g, '-');
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const staticPrefix = isLocalhost ? '/static' : '';
+  headshotContainer.style.backgroundImage = `url(${staticPrefix}/images/team-backgrounds/${teamNameNormalized}-background.png)`;
+  headshotContainer.style.backgroundSize = 'cover';
+  headshotContainer.style.backgroundPosition = 'center';
+  
+  // Add energy-based border (NG from attributes)
+  const attrs = player.attributes || {};
+  const ng = attrs.NG ?? 1.0;
+  let borderColor;
+  if (ng > 0.89) borderColor = '#00aa00';      // Green
+  else if (ng >= 0.8) borderColor = '#cccc00'; // Yellow
+  else if (ng >= 0.7) borderColor = '#ff8800'; // Orange
+  else borderColor = '#cc0000';                // Red
+  
+  headshotContainer.style.border = `4px solid ${borderColor}`;
+  headshotContainer.style.cursor = 'pointer';
+  headshotContainer.style.transition = 'transform 0.2s ease';
+  
+  // Add hover effect
+  headshotContainer.addEventListener('mouseenter', () => {
+    headshotContainer.style.transform = 'scale(1.05)';
+  });
+  headshotContainer.addEventListener('mouseleave', () => {
+    headshotContainer.style.transform = 'scale(1)';
+  });
+  
+  // Player image
+  const img = document.createElement('img');
+  img.className = 'player-headshot';
+  img.src = player.photo || `/images/players/${player._id}.png`;
+  img.alt = player.name;
+  img.onerror = () => {
+    img.style.display = 'none';
+  };
+  headshotContainer.appendChild(img);
+  
+  headshotLink.appendChild(headshotContainer);
+  front.appendChild(headshotLink);
+  
+  // Flip button (outside the link so it doesn't navigate)
+  const flipBtn = document.createElement('button');
+  flipBtn.className = 'flip-btn';
+  flipBtn.innerHTML = '🔁';
+  flipBtn.setAttribute('aria-label', 'Flip card');
+  flipBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleCardFlip(player._id);
+  });
+  front.appendChild(flipBtn);
+  
+  // Ratings dropdown (outside the link)
+  const dropdown = createRatingsDropdown(player);
+  front.appendChild(dropdown);
+  
+  // Info bar
+  const infoBar = document.createElement('div');
+  infoBar.className = 'player-info-bar';
+  
+  // Left side: name and physical stats
+  const leftInfo = document.createElement('div');
+  leftInfo.className = 'player-info-left';
+  
+  const name = document.createElement('div');
+  name.className = 'player-name';
+  name.textContent = player.name;
+  leftInfo.appendChild(name);
+  
+  const physical = document.createElement('div');
+  physical.className = 'player-physical';
+  // Format height from raw inches or display string
+  let heightDisplay = player.height;
+  if (typeof player.heightRaw === 'number') {
+    const feet = Math.floor(player.heightRaw / 12);
+    const inches = player.heightRaw % 12;
+    heightDisplay = `${feet}'${inches}"`;
+  }
+  physical.textContent = `${heightDisplay} ${player.weight || '--'} lbs`;
+  leftInfo.appendChild(physical);
+  
+  infoBar.appendChild(leftInfo);
+  
+  // Right side: energy percentage
+  const energyDisplay = document.createElement('div');
+  energyDisplay.className = 'player-energy-display';
+  const ngPercent = Math.round(ng * 100);
+  energyDisplay.textContent = `${ngPercent}%`;
+  energyDisplay.style.color = borderColor;  // Match border color
+  energyDisplay.style.fontWeight = 'bold';
+  energyDisplay.style.fontSize = '18px';
+  infoBar.appendChild(energyDisplay);
+  
+  front.appendChild(infoBar);
+  
+  return front;
+}
+
+function createRatingsDropdown(player) {
+  const dropdown = document.createElement('div');
+  dropdown.className = 'ratings-dropdown';
+  
+  // Get position ratings from player data
+  const posRatings = player.position_ratings || {};
+  const entries = Object.entries(posRatings)
+    .sort((a, b) => b[1] - a[1]); // Sort by rating desc
+  
+  if (entries.length === 0) return dropdown;
+  
+  // Use player's highest position
+  const topPos = player.highestPos || entries[0][0];
+  const topRating = player.highestRT || entries[0][1];
+  
+  // Toggle button - shows highest rated position
+  const toggle = document.createElement('button');
+  toggle.className = 'ratings-dropdown-toggle';
+  toggle.innerHTML = `${topPos}: ${topRating} <span style="font-size: 10px;">▼</span>`;
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle('open');
+    dropdownState[player._id] = dropdown.classList.contains('open');
+  });
+  dropdown.appendChild(toggle);
+  
+  // List - all positions sorted by rating
+  const list = document.createElement('div');
+  list.className = 'ratings-dropdown-list';
+  
+  entries.forEach(([pos, rating]) => {
+    const item = document.createElement('div');
+    item.className = 'ratings-dropdown-item';
+    item.innerHTML = `<span>${pos}</span><span>${rating}</span>`;
+    list.appendChild(item);
+  });
+  
+  dropdown.appendChild(list);
+  
+  return dropdown;
+}
+
+function createCardBack(player) {
+  const back = document.createElement('div');
+  back.className = 'player-card-back';
+  
+  // Flip button (on back)
+  const flipBtn = document.createElement('button');
+  flipBtn.className = 'flip-btn';
+  flipBtn.innerHTML = '🔁';
+  flipBtn.style.position = 'absolute';
+  flipBtn.style.top = '8px';
+  flipBtn.style.right = '8px';
+  flipBtn.setAttribute('aria-label', 'Flip card back');
+  flipBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleCardFlip(player._id);
+  });
+  back.appendChild(flipBtn);
+  
+  // Attribute sections - use anchor attributes (not energy-scaled)
+  const attrs = player.attributes || {};
+  
+  Object.entries(ATTR_GROUPS).forEach(([sectionName, attrKeys]) => {
+    const section = document.createElement('div');
+    section.className = 'attr-section';
+    
+    const title = document.createElement('div');
+    title.className = 'attr-section-title';
+    title.textContent = sectionName;
+    section.appendChild(title);
+    
+    attrKeys.forEach(key => {
+      const row = document.createElement('div');
+      row.className = 'attr-row';
+      
+      const label = document.createElement('span');
+      label.className = 'attr-label';
+      label.textContent = key;
+      // Add tooltip for attribute abbreviation
+      if (typeof addTooltip !== 'undefined') {
+        addTooltip(label, key);
+      }
+      row.appendChild(label);
+      
+      const value = document.createElement('span');
+      value.className = 'attr-value';
+      // Use anchor attribute (base value, not energy-scaled)
+      const rawVal = attrs[`anchor_${key}`] ?? attrs[key];
+      const displayVal = rawVal != null ? Math.floor(rawVal / 10) : '--';
+      value.textContent = displayVal;
+      
+      // Set gold bar fill percentage (0-10 scale, max at 100%)
+      if (displayVal !== '--') {
+        const fillPercentage = Math.min(displayVal * 10, 100);
+        row.style.setProperty('--attr-fill', `${fillPercentage}%`);
+      }
+      
+      row.appendChild(value);
+      
+      section.appendChild(row);
+    });
+    
+    back.appendChild(section);
+  });
+  
+  // Add NG (Energy) section at the end
+  const ngSection = document.createElement('div');
+  ngSection.className = 'attr-section';
+  
+  const ngTitle = document.createElement('div');
+  ngTitle.className = 'attr-section-title';
+  ngTitle.textContent = 'ENERGY';
+  ngSection.appendChild(ngTitle);
+  
+  const ngRow = document.createElement('div');
+  ngRow.className = 'attr-row';
+  
+  const ngLabel = document.createElement('span');
+  ngLabel.className = 'attr-label';
+  ngLabel.textContent = 'NG';
+  // Add tooltip for NG abbreviation
+  if (typeof addTooltip !== 'undefined') {
+    addTooltip(ngLabel, 'NG');
+  }
+  ngRow.appendChild(ngLabel);
+  
+  const ngValue = document.createElement('span');
+  ngValue.className = 'attr-value';
+  const ng = attrs.NG ?? 1.0;
+  const ngPercent = Math.round(ng * 100);
+  ngValue.textContent = `${ngPercent}%`;
+  
+  // Set energy-based background color
+  let bgColor;
+  if (ng > 0.89) bgColor = '#00aa00';      // Green
+  else if (ng >= 0.8) bgColor = '#cccc00'; // Yellow
+  else if (ng >= 0.7) bgColor = '#ff8800'; // Orange
+  else bgColor = '#cc0000';                // Red
+  
+  ngRow.style.backgroundColor = bgColor;
+  ngValue.style.color = '#fff';  // White text on colored background
+  ngLabel.style.color = '#fff';  // White label too
+  ngValue.style.fontWeight = 'bold';
+  
+  // No gold bar for NG row - it has full colored background
+  ngRow.style.setProperty('--attr-fill', '0%');
+  
+  ngRow.appendChild(ngValue);
+  ngSection.appendChild(ngRow);
+  back.appendChild(ngSection);
+  
+  return back;
+}
+
+function toggleCardFlip(playerId) {
+  const card = document.querySelector(`.player-card[data-player-id="${playerId}"]`);
+  if (!card) return;
+  
+  card.classList.toggle('flipped');
+  cardFlipState[playerId] = card.classList.contains('flipped');
 }
 
