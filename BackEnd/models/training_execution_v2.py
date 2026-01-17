@@ -85,21 +85,18 @@ def execute_training(
     
     # Step 0: Reduce play/defense effectiveness by 5-15 (pre-training decay)
     # Skip for first training (training camp) in franchise mode
-    logger.warning(f"🔍 [PRE-TRAINING DEBUG] skip_pre_training_depreciation={skip_pre_training_depreciation}")
     if not skip_pre_training_depreciation:
-        logger.warning("▶️ [PRE-TRAINING DEBUG] Applying pre-training effectiveness decay (plays/defenses)")
         plays_data = _apply_pre_training_effectiveness_decay(plays_data)
         scouting_data = _apply_pre_training_defense_decay(scouting_data)
     else:
-        logger.warning("⏭️ [PRE-TRAINING DEBUG] SKIPPING pre-training effectiveness decay (training camp)")
+        logger.warning("⏭️ [TRAINING] Skipping pre-training depreciation (first training/training camp)")
     
     # Step 1: Apply pre-training conditions
     # Skip for first training (training camp) in franchise mode
     if not skip_pre_training_depreciation:
-        logger.warning("▶️ [PRE-TRAINING DEBUG] Applying pre-training conditions (player/team attribute decreases)")
         players, team = apply_pre_training_conditions(players, team)
     else:
-        logger.warning("⏭️ [PRE-TRAINING DEBUG] SKIPPING pre-training conditions (training camp)")
+        logger.warning("⏭️ [TRAINING] Skipping pre-training conditions (first training/training camp)")
     
     # Step 2: Apply training points (pass original baselines for report calculation)
     players, team, training_report = apply_training_points(
