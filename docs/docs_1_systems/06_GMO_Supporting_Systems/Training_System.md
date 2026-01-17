@@ -105,13 +105,11 @@
 
 - All radios in the Coaching Focus section are part of ONE global radio group
 - Only one selection can be active at a time
-- Selecting any archetype header or sub-option clears all others
+- **Users must select a specific focus option** - archetype headers are display-only and cannot be selected
+- Selecting any focus option clears all others
 
 **Visual Behavior:**
-- **Archetype header radio selected:**
-  - Entire archetype block gets a highlight outline in the archetype's color
-  - Header and all four sub-options appear "active" with neutral grey fill
-- **Sub-option radio selected:**
+- **Focus option radio selected:**
   - Only that radio fills with the archetype's header color
   - Archetype block shows a subtle outline in the same color (more subtle than header selection)
 
@@ -131,7 +129,7 @@
     - Randomly selects additional sliders to set to `2`:
       - **24 points**: 4 sliders set to `2` (20 + 4 = 24)
       - **30 points**: 10 sliders set to `2` (20 + 10 = 30)
-  - Randomly selects a Coaching Focus (one of the existing focus radio options)
+  - Randomly selects a Coaching Focus (one of the existing focus options, not archetype headers)
   - Shows confirmation popup: `Training Points Assigned - {Focus Name} Focus Chosen`
     - Popup has a "Close" button; closing keeps the user on the Training page
   - After auto-assign, Points Remaining = 0 and Submit becomes eligible (provided focus set by auto-train)
