@@ -75,7 +75,8 @@ function setupBackButton() {
           returnPath += `&tab=${returnTab}`;
         }
       } else {
-        window.history.back();
+        // Base mode (from mode-select) - return to mode-select
+        window.location.href = '/mode-select.html';
         return;
       }
       window.location.href = returnPath;
@@ -95,14 +96,13 @@ async function loadRoster() {
     let url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(displayTeamName)}`);
     const params = new URLSearchParams();
     
+    // Support franchise, tournament, or base mode (no mode parameter)
     if (mode === 'franchise' && franchiseId) {
       params.append('franchise_id', franchiseId);
     } else if (mode === 'tournament' && tournamentId) {
       params.append('tournament_id', tournamentId);
-    } else {
-      document.getElementById('roster-body').innerHTML = '<tr><td colspan="18">Invalid mode or missing IDs</td></tr>';
-      return;
     }
+    // If no mode, just load base roster (no params needed)
     
     if (params.toString()) {
       url += `?${params.toString()}`;
@@ -160,6 +160,16 @@ async function loadRoster() {
 
 async function loadStats() {
   try {
+    // Skip stats loading if in base mode (no franchise/tournament)
+    if (!mode) {
+      // Hide stats section for base roster view
+      const statsSection = document.getElementById('stats-section');
+      if (statsSection) {
+        statsSection.style.display = 'none';
+      }
+      return;
+    }
+    
     // Wait for roster to load first so we have player IDs
     if (rosterData.length === 0) {
       await new Promise(resolve => setTimeout(resolve, 100));
