@@ -4,7 +4,7 @@
 
 1. **Player Attribute Initialization**:
    - **Copied from Universal**: SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT (exact values)
-   - **Randomized**: NG=1.0, CH=random(1-100), MO=weighted(0:50%, ±1:15%, ±2:7.5%, ±3:2.5%), EM=random(1-100)
+   - **Randomized**: NG=1.0, CH (Character)=random(1-100), MO (Momentum)=0, EM (Emotion)=random(1-100)
 
 2. **Team Attribute Ranges**:
    - **Single Game & Tournament**: `random.randint(-10, 10)` for most attributes, `team_chemistry=random(7-25)`, `rebound_modifier=random(0.0-0.4)`
@@ -58,12 +58,8 @@ The Mode Initialization System diversifies attribute values when users create a 
 
 **Randomized Values:**
 - **NG** (Energy): Always `1.0` (full energy at start)
-- **CH** (Chemistry): `random.randint(1, 100)`
-- **MO** (Momentum): Weighted random distribution:
-  - `0`: 50% chance
-  - `-1` or `1`: 15% chance each (30% total)
-  - `-2` or `2`: 7.5% chance each (15% total)
-  - `-3` or `3`: 2.5% chance each (5% total)
+- **CH** (Character): `random.randint(1, 100)`
+- **MO** (Momentum): Always `0` (always starts at 0 for all game modes)
 - **EM** (Emotion): `random.randint(1, 100)`
 
 **Implementation:**
