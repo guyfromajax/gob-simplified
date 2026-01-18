@@ -766,14 +766,30 @@ function createCardFront(player) {
     yearDisplay.className = 'player-year-display';
     // Format: capitalize first letter, rest lowercase
     const yearText = player.year.toLowerCase();
-    yearDisplay.textContent = yearText.charAt(0).toUpperCase() + yearText.slice(1);
+    const yearFormatted = yearText.charAt(0).toUpperCase() + yearText.slice(1);
+    yearDisplay.textContent = yearFormatted;
+    
+    // Custom colors by year
+    let yearColor;
+    if (yearText === 'senior') {
+      yearColor = '#FFD700'; // Bright gold
+    } else if (yearText === 'junior') {
+      yearColor = '#C0C0C0'; // Bright silver
+    } else if (yearText === 'sophomore') {
+      yearColor = '#D3D3D3'; // Light grey
+    } else if (yearText === 'freshman') {
+      yearColor = '#FF69B4'; // Bright pink
+    } else {
+      yearColor = '#C0C0C0'; // Default to silver
+    }
+    
     yearDisplay.style.cssText = `
       position: absolute;
       top: 8px;
       left: 50%;
       transform: translateX(-50%);
-      color: silver;
-      opacity: 0.5;
+      color: ${yearColor};
+      opacity: 0.75;
       font-weight: 600;
       font-size: 14px;
       text-transform: capitalize;
