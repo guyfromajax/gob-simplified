@@ -1672,97 +1672,83 @@ function createCardBack(player) {
   });
   back.appendChild(flipBtn);
   
+  // Two-column container
+  const columnsContainer = document.createElement('div');
+  columnsContainer.className = 'attr-columns-container';
+  
+  // Column 1
+  const column1 = document.createElement('div');
+  column1.className = 'attr-column';
+  
+  // Column 2
+  const column2 = document.createElement('div');
+  column2.className = 'attr-column';
+  
   // Attribute sections - use anchor attributes (not energy-scaled)
   const attrs = player.attributes || {};
   
-  Object.entries(ATTR_GROUPS).forEach(([sectionName, attrKeys]) => {
+  // Helper function to create an attribute pill
+  function createAttrPill(key, attrs) {
+    const pill = document.createElement('div');
+    pill.className = 'attr-pill';
+    
+    const label = document.createElement('span');
+    label.className = 'attr-label';
+    label.textContent = key;
+    // Add tooltip for attribute abbreviation
+    if (typeof addTooltip !== 'undefined') {
+      addTooltip(label, key);
+    }
+    pill.appendChild(label);
+    
+    const value = document.createElement('span');
+    value.className = 'attr-value';
+    // Use anchor attribute (base value, not energy-scaled)
+    const rawVal = attrs[`anchor_${key}`] ?? attrs[key];
+    const displayVal = rawVal != null ? Math.floor(rawVal / 10) : '--';
+    value.textContent = displayVal;
+    
+    // Set gold bar fill percentage (0-10 scale, max at 100%)
+    if (displayVal !== '--') {
+      const fillPercentage = Math.min(displayVal * 10, 100);
+      pill.style.setProperty('--attr-fill', `${fillPercentage}%`);
+    }
+    
+    pill.appendChild(value);
+    return pill;
+  }
+  
+  // Helper function to create a section with header and pills
+  function createSection(headerText, attrKeys) {
     const section = document.createElement('div');
     section.className = 'attr-section';
     
     const title = document.createElement('div');
     title.className = 'attr-section-title';
-    title.textContent = sectionName;
+    title.textContent = headerText;
     section.appendChild(title);
     
     attrKeys.forEach(key => {
-      const row = document.createElement('div');
-      row.className = 'attr-row';
-      
-      const label = document.createElement('span');
-      label.className = 'attr-label';
-      label.textContent = key;
-      // Add tooltip for attribute abbreviation
-      if (typeof addTooltip !== 'undefined') {
-        addTooltip(label, key);
-      }
-      row.appendChild(label);
-      
-      const value = document.createElement('span');
-      value.className = 'attr-value';
-      // Use anchor attribute (base value, not energy-scaled)
-      const rawVal = attrs[`anchor_${key}`] ?? attrs[key];
-      const displayVal = rawVal != null ? Math.floor(rawVal / 10) : '--';
-      value.textContent = displayVal;
-      
-      // Set gold bar fill percentage (0-10 scale, max at 100%)
-      if (displayVal !== '--') {
-        const fillPercentage = Math.min(displayVal * 10, 100);
-        row.style.setProperty('--attr-fill', `${fillPercentage}%`);
-      }
-      
-      row.appendChild(value);
-      
-      section.appendChild(row);
+      const pill = createAttrPill(key, attrs);
+      section.appendChild(pill);
     });
     
-    back.appendChild(section);
-  });
-  
-  // Add NG (Energy) section at the end
-  const ngSection = document.createElement('div');
-  ngSection.className = 'attr-section';
-  
-  const ngTitle = document.createElement('div');
-  ngTitle.className = 'attr-section-title';
-  ngTitle.textContent = 'ENERGY';
-  ngSection.appendChild(ngTitle);
-  
-  const ngRow = document.createElement('div');
-  ngRow.className = 'attr-row';
-  
-  const ngLabel = document.createElement('span');
-  ngLabel.className = 'attr-label';
-  ngLabel.textContent = 'NG';
-  // Add tooltip for NG abbreviation
-  if (typeof addTooltip !== 'undefined') {
-    addTooltip(ngLabel, 'NG');
+    return section;
   }
-  ngRow.appendChild(ngLabel);
   
-  const ngValue = document.createElement('span');
-  ngValue.className = 'attr-value';
-  const ng = attrs.NG ?? 1.0;
-  const ngPercent = Math.round(ng * 100);
-  ngValue.textContent = `${ngPercent}%`;
+  // Column 1: Offense, Skills, Physical
+  column1.appendChild(createSection('Offense', ['SC', 'SH']));
+  column1.appendChild(createSection('Skills', ['PS', 'BH']));
+  column1.appendChild(createSection('Physical', ['AG', 'ND']));
   
-  // Set energy-based background color
-  let bgColor;
-  if (ng > 0.89) bgColor = '#00aa00';      // Green
-  else if (ng >= 0.8) bgColor = '#cccc00'; // Yellow
-  else if (ng >= 0.7) bgColor = '#ff8800'; // Orange
-  else bgColor = '#cc0000';                // Red
+  // Column 2: Defense, Dirty Work, Mind
+  column2.appendChild(createSection('Defense', ['ID', 'OD']));
+  column2.appendChild(createSection('Dirty Work', ['RB', 'ST']));
+  column2.appendChild(createSection('Mind', ['IQ', 'FT']));
   
-  ngRow.style.backgroundColor = bgColor;
-  ngValue.style.color = '#fff';  // White text on colored background
-  ngLabel.style.color = '#fff';  // White label too
-  ngValue.style.fontWeight = 'bold';
-  
-  // No gold bar for NG row - it has full colored background
-  ngRow.style.setProperty('--attr-fill', '0%');
-  
-  ngRow.appendChild(ngValue);
-  ngSection.appendChild(ngRow);
-  back.appendChild(ngSection);
+  columnsContainer.appendChild(column1);
+  columnsContainer.appendChild(column2);
+  back.appendChild(columnsContainer);
   
   return back;
 }
