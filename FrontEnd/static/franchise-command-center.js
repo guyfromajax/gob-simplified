@@ -690,6 +690,152 @@ function renderSchedule(data) {
   });
 }
 
+// Store team traits data for sorting
+let teamTraitsDataForSorting = [];
+let teamTraitsSortColumn = 'FT';
+let teamTraitsSortDirection = 'desc';
+
+function renderTeamTraits(data) {
+  if (!data || !data.teams) return;
+  
+  teamTraitsDataForSorting = data.teams;
+  
+  // Render main table
+  const tbody = document.getElementById('team-traits-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  
+  // Sort by default (FT descending)
+  sortTeamTraitsTable(teamTraitsSortColumn, teamTraitsSortDirection);
+  
+  // Setup sortable headers
+  const headers = document.querySelectorAll('#team-traits-table thead th.sortable');
+  headers.forEach(header => {
+    header.style.cursor = 'pointer';
+    header.style.userSelect = 'none';
+    
+    header.addEventListener('click', () => {
+      const attr = header.dataset.attr;
+      
+      // Toggle sort direction if clicking the same column
+      if (teamTraitsSortColumn === attr) {
+        teamTraitsSortDirection = teamTraitsSortDirection === 'desc' ? 'asc' : 'desc';
+      } else {
+        teamTraitsSortColumn = attr;
+        teamTraitsSortDirection = 'desc';
+      }
+      
+      sortTeamTraitsTable(attr, teamTraitsSortDirection);
+    });
+  });
+  
+  // Render Top 10 list (excluding FT)
+  renderTeamTraitsTop10(data.teams);
+}
+
+function sortTeamTraitsTable(columnName, direction) {
+  const tbody = document.getElementById('team-traits-body');
+  if (!tbody || !teamTraitsDataForSorting.length) return;
+  
+  teamTraitsDataForSorting.sort((a, b) => {
+    let val1, val2;
+    
+    if (columnName === 'team') {
+      val1 = a.team_name || '';
+      val2 = b.team_name || '';
+      return direction === 'desc' ? val2.localeCompare(val1) : val1.localeCompare(val2);
+    } else {
+      // Attribute columns
+      const attrsA = a.attributes || {};
+      const attrsB = b.attributes || {};
+      val1 = attrsA[columnName] || 0;
+      val2 = attrsB[columnName] || 0;
+    }
+    
+    if (direction === 'desc') {
+      return val2 - val1;
+    } else {
+      return val1 - val2;
+    }
+  });
+  
+  // Render sorted table
+  tbody.innerHTML = '';
+  teamTraitsDataForSorting.forEach(team => {
+    const tr = document.createElement('tr');
+    const attrs = team.attributes || {};
+    
+    tr.innerHTML = `
+      <td>${team.team_name || ''}</td>
+      <td>${attrs.SC || 0}</td>
+      <td>${attrs.SH || 0}</td>
+      <td>${attrs.ID || 0}</td>
+      <td>${attrs.OD || 0}</td>
+      <td>${attrs.PS || 0}</td>
+      <td>${attrs.BH || 0}</td>
+      <td>${attrs.RB || 0}</td>
+      <td>${attrs.AG || 0}</td>
+      <td>${attrs.ST || 0}</td>
+      <td>${attrs.ND || 0}</td>
+      <td>${attrs.IQ || 0}</td>
+      <td>${attrs.FT || 0}</td>
+    `;
+    
+    tbody.appendChild(tr);
+  });
+}
+
+function renderTeamTraitsTop10(teams) {
+  const container = document.getElementById('team-traits-top10');
+  if (!container) return;
+  container.innerHTML = '';
+  
+  // Create list of all (team_name, attribute, value) tuples, excluding FT
+  const allValues = [];
+  const attributes = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ'];
+  
+  teams.forEach(team => {
+    const attrs = team.attributes || {};
+    attributes.forEach(attr => {
+      allValues.push({
+        team_name: team.team_name,
+        team_id: team.team_id,
+        primary_color: team.primary_color || '#000000',
+        attribute: attr,
+        value: attrs[attr] || 0
+      });
+    });
+  });
+  
+  // Sort by value descending
+  allValues.sort((a, b) => b.value - a.value);
+  
+  // Get Top 10
+  const top10 = allValues.slice(0, 10);
+  
+  // Create list element
+  const list = document.createElement('ul');
+  list.style.listStyle = 'none';
+  list.style.padding = '0';
+  list.style.margin = '0';
+  
+  top10.forEach((item, index) => {
+    const li = document.createElement('li');
+    li.style.padding = '8px 0';
+    li.style.borderBottom = '1px solid #eee';
+    
+    const span = document.createElement('span');
+    span.style.fontWeight = 'bold';
+    span.style.color = item.primary_color;
+    span.textContent = `${index + 1}. ${item.team_name} ${item.attribute}: ${item.value}`;
+    
+    li.appendChild(span);
+    list.appendChild(li);
+  });
+  
+  container.appendChild(list);
+}
+
 async function init() {
   // ✅ SS&S: Check URL params first for team_id (ObjectId) - allows seamless navigation
   const urlParams = new URLSearchParams(window.location.search);
@@ -834,6 +980,12 @@ async function init() {
     const recruitsEndTime = performance.now();
     console.log(`⏱️ [PERF] /franchise/recruits: ${(recruitsEndTime - recruitsStartTime).toFixed(2)}ms`);
     renderRecruits(recruitsData);
+    
+    const teamTraitsStartTime = performance.now();
+    const teamTraitsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/team-traits')}?franchise_id=${franchiseId}`);
+    const teamTraitsEndTime = performance.now();
+    console.log(`⏱️ [PERF] /franchise/team-traits: ${(teamTraitsEndTime - teamTraitsStartTime).toFixed(2)}ms`);
+    renderTeamTraits(teamTraitsData);
     // ✅ Removed: renderTrainingResults - Training Reports are now linked directly on Schedule page
     
     // Initialize tooltips for table headers

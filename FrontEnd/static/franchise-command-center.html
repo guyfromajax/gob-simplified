@@ -51,6 +51,7 @@
         <button data-tab="team-tab">Team</button>
         <button data-tab="stats-tab">Stats</button>
         <button data-tab="schedule-tab">Schedule</button>
+        <button data-tab="team-traits-tab">Team Traits</button>
         <button data-tab="recruits-tab">Recruits</button>
         <button data-tab="tournament-tab">Tournament</button>
       </div>
@@ -192,6 +193,45 @@
       <div id="schedule-tab" class="tab-content">
         <h3>Season Schedule</h3>
         <div id="schedule-container" class="schedule-container"></div>
+      </div>
+      <div id="team-traits-tab" class="tab-content">
+        <h3>Team Attribute Totals</h3>
+        <div class="scroll-x">
+          <table class="roster-table" id="team-traits-table">
+            <thead>
+              <tr>
+                <th class="sortable" data-attr="team">Team</th>
+                <th class="sortable" data-attr="SC">SC</th>
+                <th class="sortable" data-attr="SH">SH</th>
+                <th class="sortable" data-attr="ID">ID</th>
+                <th class="sortable" data-attr="OD">OD</th>
+                <th class="sortable" data-attr="PS">PS</th>
+                <th class="sortable" data-attr="BH">BH</th>
+                <th class="sortable" data-attr="RB">RB</th>
+                <th class="sortable" data-attr="AG">AG</th>
+                <th class="sortable" data-attr="ST">ST</th>
+                <th class="sortable" data-attr="ND">ND</th>
+                <th class="sortable" data-attr="IQ">IQ</th>
+                <th class="sortable" data-attr="FT">FT</th>
+              </tr>
+            </thead>
+            <tbody id="team-traits-body"></tbody>
+          </table>
+        </div>
+        <div style="margin-top: 40px;">
+          <h3>Top 10 (excluding FT)</h3>
+          <div id="team-traits-top10"></div>
+        </div>
+      </div>
+      <div id="recruits-tab" class="tab-content">
+        <div class="scroll-x">
+          <table class="roster-table">
+            <thead>
+              <tr><th>Name</th><th>Archetype</th><th>HT</th><th>WT</th><th>POS</th><th>SC</th><th>SH</th><th>ID</th><th>OD</th><th>PS</th><th>BH</th><th>RB</th><th>AG</th><th>ST</th><th>ND</th><th>IQ</th><th>FT</th><th>RT</th></tr>
+            </thead>
+            <tbody id="recruits-body"></tbody>
+          </table>
+        </div>
       </div>
       <div id="tournament-tab" class="tab-content">
         <h3>End-of-Season Tournament</h3>

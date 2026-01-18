@@ -1512,6 +1512,91 @@ def team_stats(franchise_id: str):
     return {"teams": output}
 
 
+@router.get("/franchise/team-traits")
+def team_traits(franchise_id: str):
+    """Get team attribute totals for all teams in franchise.
+    
+    ✅ SS&S: Aggregates from franchise.players object (franchise-specific attributes),
+    not from universal players_collection.
+    """
+    import time
+    start_time = time.time()
+    logger.info(f"⏱️ [PERF] /franchise/team-traits START - franchise_id={franchise_id}")
+    
+    try:
+        fid = ObjectId(franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise_id")
+    
+    db_query_start = time.time()
+    franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 1, "franchise_teams": 1})
+    db_query_time = time.time() - db_query_start
+    logger.info(f"⏱️ [PERF] /franchise/team-traits DB query: {db_query_time:.3f}s")
+    
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    
+    players = franchise_doc.get("players", {})
+    franchise_teams = franchise_doc.get("franchise_teams", {})
+    
+    logger.info(f"⏱️ [PERF] /franchise/team-traits Found {len(players)} players, {len(franchise_teams)} teams")
+    
+    # Attribute list to analyze
+    attributes = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]
+    
+    # Initialize team totals map
+    team_totals = {}
+    team_names = {}  # Map team_id to team name
+    
+    # Get team names from teams collection
+    for team_id_str in franchise_teams.keys():
+        try:
+            team_doc = db.teams.find_one({"_id": ObjectId(team_id_str)}, {"name": 1, "primary_color": 1})
+            if team_doc:
+                team_name = team_doc.get("name", team_id_str)
+                team_names[team_id_str] = team_name
+                team_totals[team_id_str] = {
+                    "team_name": team_name,
+                    "primary_color": team_doc.get("primary_color", "#000000"),
+                    "attributes": {attr: 0 for attr in attributes}
+                }
+        except Exception:
+            # Skip invalid ObjectIds
+            continue
+    
+    # Aggregate attributes from players
+    for pid, player_data in players.items():
+        meta = player_data.get("meta", {})
+        player_team_id = str(meta.get("team_id", ""))
+        
+        if not player_team_id or player_team_id not in team_totals:
+            continue
+        
+        # Get franchise-specific attributes (anchor_ prefixed if available, otherwise regular)
+        player_attrs = player_data.get("attributes", {})
+        
+        # Sum all attributes for this team
+        for attr in attributes:
+            # Try anchor_ prefixed first (franchise-specific), then regular
+            attr_value = player_attrs.get(f"anchor_{attr}", player_attrs.get(attr, 0))
+            if isinstance(attr_value, (int, float)):
+                team_totals[player_team_id]["attributes"][attr] += attr_value
+    
+    # Convert to list format for response
+    result = []
+    for team_id, data in team_totals.items():
+        result.append({
+            "team_id": team_id,
+            "team_name": data["team_name"],
+            "primary_color": data["primary_color"],
+            "attributes": data["attributes"]
+        })
+    
+    total_time = time.time() - start_time
+    logger.info(f"⏱️ [PERF] /franchise/team-traits COMPLETE: {total_time:.3f}s")
+    return {"teams": result}
+
+
 def get_team_player_stats(
     franchise_id: str,
     team_id: str,
