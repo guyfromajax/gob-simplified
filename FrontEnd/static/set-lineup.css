@@ -191,7 +191,6 @@ body {
   width: 100%;
   perspective: 1000px;
   cursor: pointer;
-  overflow: hidden; /* Prevent card back from extending beyond container */
 }
 
 .player-card.selected {
@@ -202,7 +201,6 @@ body {
 .player-card-inner {
   position: relative;
   width: 100%;
-  height: 100%;
   transition: transform 0.6s;
   transform-style: preserve-3d;
 }
@@ -214,7 +212,6 @@ body {
 .player-card-front,
 .player-card-back {
   width: 100%;
-  height: 100%;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   border-radius: 8px;
@@ -228,13 +225,13 @@ body {
   top: 0;
   left: 0;
   transform: rotateY(180deg);
+  height: 100%;
 }
 
 /* ========== CARD FRONT ========== */
 .player-card-front {
   display: flex;
   flex-direction: column;
-  height: 100%;
 }
 
 .player-headshot-container {
@@ -266,8 +263,7 @@ body {
   cursor: pointer;
   font-size: 19px; /* Increased from 16px (20% larger) */
   transition: all 0.2s ease;
-  z-index: 100; /* Ensure flip button is clickable on both front and back */
-  pointer-events: auto; /* Ensure click events work */
+  z-index: 10;
 }
 
 .flip-btn:hover {
@@ -343,10 +339,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0;
-  overflow-y: auto; /* Allow scrolling within card back if content exceeds */
+  overflow: hidden;
   height: 100%;
-  box-sizing: border-box;
-  position: relative; /* Ensure flip button positioning works correctly */
+  max-height: 400px;
 }
 
 .attr-columns-container {
