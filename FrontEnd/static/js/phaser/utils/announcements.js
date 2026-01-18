@@ -343,9 +343,12 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     // for precise timing when ball reaches rim/rebounder
     
     if (turnData.result_type === 'FOUL') {
-      // Skip shooting fouls - they're already announced in ballManager.js with "And 1!" or "Shooting Foul!"
-      const isShootingFoul = turnData?.text?.includes('AND-1') || 
-                            (turnData?.text?.includes('fouls') && turnData?.text?.includes('on the shot'));
+      // ✅ FIX: Skip shooting fouls - they're already announced in ballManager.js
+      // Shooting fouls result in free throws, so check for FREE_THROW next_play_type or free_throws_remaining
+      // This is more reliable than text parsing which can fail
+      const hasFreeThrowsRemaining = (turnData.free_throws_remaining ?? 0) > 0;
+      const nextPlayTypeIsFreeThrow = turnData.next_play_type === 'FREE_THROW';
+      const isShootingFoul = hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow;
       
       if (!isShootingFoul) {
         // Non-shooting fouls: announce as "OFFENSIVE FOUL!" or "DEFENSIVE FOUL!"
