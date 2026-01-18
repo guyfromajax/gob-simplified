@@ -776,7 +776,7 @@ function createCardFront(player) {
     } else if (yearText === 'junior') {
       yearColor = '#C0C0C0'; // Bright silver
     } else if (yearText === 'sophomore') {
-      yearColor = '#D3D3D3'; // Light grey
+      yearColor = '#32CD32'; // Bright lime green
     } else if (yearText === 'freshman') {
       yearColor = '#FF69B4'; // Bright pink
     } else {
