@@ -278,7 +278,7 @@ body {
   left: 8px;
   width: 38px;  /* Same size as flip button */
   height: 38px;
-  background: rgba(255,255,255,0.9);
+  background: #f2f4f7;  /* Circle fill */
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -286,10 +286,10 @@ body {
   cursor: pointer;
   font-weight: 700;
   font-size: 16px;
-  color: #333;
+  color: #0f172a;  /* Rating number text color */
   transition: all 0.2s ease;
   z-index: 10;
-  border: 2px solid #333;
+  border: 2px solid #c7ccd3;  /* Circle border */
 }
 
 .position-rating-circle:hover {
