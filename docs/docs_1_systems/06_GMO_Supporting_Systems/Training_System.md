@@ -206,12 +206,18 @@ The training execution system applies pre-training conditions, allocates trainin
 
 #### Training Point Ranges
 
-**Player Attributes:**
+**Player Attributes (Base Ranges):**
 - 1 point: `+= random.randint(1, 3)`
 - 2 points: `+= random.randint(2, 4)`
 - 3 points: `+= random.randint(3, 6)`
 - 4 points: `+= random.randint(4, 7)`
 - 5 points: `+= random.randint(4, 9)`
+
+**Year-Based Adjustments (Max Range Only):**
+- **Freshman**: +4 to max (e.g., 1 point: `random.randint(1, 7)`)
+- **Sophomore**: +2 to max (e.g., 1 point: `random.randint(1, 5)`)
+- **Junior**: No change (uses base ranges)
+- **Senior**: -1 to max (e.g., 1 point: `random.randint(1, 2)`)
 
 **Team Attributes (standard):**
 - 1 point: `+= random.randint(1, 2)`
