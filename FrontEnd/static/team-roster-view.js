@@ -760,6 +760,30 @@ function createCardFront(player) {
   };
   headshotContainer.appendChild(img);
   
+  // Year display (top center)
+  if (player.year) {
+    const yearDisplay = document.createElement('div');
+    yearDisplay.className = 'player-year-display';
+    // Format: capitalize first letter, rest lowercase
+    const yearText = player.year.toLowerCase();
+    yearDisplay.textContent = yearText.charAt(0).toUpperCase() + yearText.slice(1);
+    yearDisplay.style.cssText = `
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: silver;
+      opacity: 0.5;
+      font-weight: 600;
+      font-size: 14px;
+      text-transform: capitalize;
+      z-index: 10;
+      pointer-events: none;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    `;
+    headshotContainer.appendChild(yearDisplay);
+  }
+  
   headshotLink.appendChild(headshotContainer);
   front.appendChild(headshotLink);
   
