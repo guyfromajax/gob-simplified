@@ -529,12 +529,18 @@ def _apply_player_training_points(
     """
     Apply training points to a single player attribute.
     
-    Logic:
+    Base ranges:
     - 1 point: += random.randint(1, 3)
     - 2 points: += random.randint(2, 4)
     - 3 points: += random.randint(3, 6)
     - 4 points: += random.randint(4, 7)
     - 5 points: += random.randint(4, 9)
+    
+    Year-based adjustments (max range only):
+    - Freshman: +4 to max
+    - Sophomore: +2 to max
+    - Junior: no change (base ranges)
+    - Senior: -1 to max
     
     Focus amplifier: Applied based on sub_option selection
     Multiplier: For attributes like CH that get 0.5 multiplier
@@ -545,20 +551,35 @@ def _apply_player_training_points(
     attrs = player.get("attributes", {})
     anchor_key = f"anchor_{attr}"
     
-    # Get base increase based on points
+    # Get player year and calculate year adjustment
+    year = player.get("year", "").lower() if player.get("year") else ""
+    year_adjustment = 0
+    if year == "freshman":
+        year_adjustment = 4
+    elif year == "sophomore":
+        year_adjustment = 2
+    elif year == "junior":
+        year_adjustment = 0
+    elif year == "senior":
+        year_adjustment = -1
+    
+    # Get base increase based on points, with year adjustment to max
     if points == 1:
-        increase = random.randint(1, 3)
+        base_min, base_max = 1, 3
     elif points == 2:
-        increase = random.randint(2, 4)
+        base_min, base_max = 2, 4
     elif points == 3:
-        increase = random.randint(3, 6)
+        base_min, base_max = 3, 6
     elif points == 4:
-        increase = random.randint(4, 7)
+        base_min, base_max = 4, 7
     elif points == 5:
-        increase = random.randint(4, 9)
+        base_min, base_max = 4, 9
     else:
         # For points > 5, use same logic as 5 points
-        increase = random.randint(3, 9)
+        base_min, base_max = 3, 9
+    
+    adjusted_max = max(base_min, base_max + year_adjustment)  # Ensure max >= min
+    increase = random.randint(base_min, adjusted_max)
     
     # Apply multiplier (for CH in conditioning/film_study)
     increase = int(increase * multiplier)

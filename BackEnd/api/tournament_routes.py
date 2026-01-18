@@ -1069,6 +1069,11 @@ def run_tournament_training(req: TournamentTrainingRequest):
         if not position_ratings and core_player:
             position_ratings = core_player.get("position_ratings", {})
         
+        # Get year from core player data
+        player_year = None
+        if core_player:
+            player_year = core_player.get("year")
+        
         # Build player dict for training
         player = {
             "_id": pid_str,
@@ -1076,7 +1081,8 @@ def run_tournament_training(req: TournamentTrainingRequest):
             "last_name": last_name,
             "team": team_name,
             "attributes": tournament_attributes,
-            "position_ratings": position_ratings or {}
+            "position_ratings": position_ratings or {},
+            "year": player_year
         }
         players_for_training.append(player)
 

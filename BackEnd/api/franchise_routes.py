@@ -2222,13 +2222,22 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         if not franchise_player_data:
             continue
         
+        # Get year from core player data
+        core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
+        if not core_player:
+            try:
+                core_player = db.players.find_one({"_id": ObjectId(pid_str)}, {"year": 1})
+            except:
+                pass
+        
         # Build player dict for training
         player = {
             "_id": pid_str,
             "first_name": franchise_player_data.get("meta", {}).get("first_name", ""),
             "last_name": franchise_player_data.get("meta", {}).get("last_name", ""),
             "team": team_name or team_id,  # Use team_name if available, otherwise use team_id
-            "attributes": franchise_player_data.get("attributes", {})
+            "attributes": franchise_player_data.get("attributes", {}),
+            "year": core_player.get("year") if core_player else None
         }
         players_for_training.append(player)
 
