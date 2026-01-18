@@ -51,7 +51,8 @@ Franchise Mode supports multi-season career mode where team and player data pers
 3. **Team** - Team Report section (team attributes) and Playbook Summary section (play effectiveness)
 4. **Stats** - Franchise leaderboards for key statistics across all teams, plus team-level statistics
 5. **Schedule** - Season schedule view with weekly matchups and training report links
-6. **Recruits** - Recruiting pool with player attributes and position ratings
+6. **Team Traits** - Team attribute totals for all teams in the franchise with sortable grid and Top 10 list
+7. **Recruits** - Recruiting pool with player attributes and position ratings
 
 **Tab Content Details:**
 
@@ -95,6 +96,17 @@ Franchise Mode supports multi-season career mode where team and player data pers
 - Shows upcoming games without scores
 - Training report links appear next to user's team's games when training has been completed for that week
 - Also displays latest training session results below the schedule
+
+**Team Traits Tab:**
+- **Team Attribute Totals Grid**: Displays a sortable table with team attribute totals for all teams in the franchise
+  - Shows totals for SC, SH, ID, OD, PS, BH, RB, AG, ST, ND, IQ, FT
+  - Headers are clickable and sortable (same as player attribute sorting on roster pages)
+  - Default sort is by FT descending
+- **Top 10 List**: Displays the top 10 team attribute values excluding FT
+  - Each team's row content is displayed in their primary color with bold font
+  - Shows format: `Rank. Team Name Attribute: Value`
+- **Data Loading**: ✅ Aggregates from franchise.players object (franchise-specific attributes), not from universal players_collection
+- Loaded via `/franchise/team-traits` endpoint
 
 **Standings Tab:**
 - Displays conference standings table only (schedule moved to Schedule tab)
