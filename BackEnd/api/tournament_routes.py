@@ -1035,12 +1035,12 @@ def run_tournament_training(req: TournamentTrainingRequest):
         
         # Get core player data for additional fields and attributes
         core_player = players_collection.find_one({"_id": pid}, {
-            "first_name": 1, "last_name": 1, "height": 1, "attributes": 1
+            "first_name": 1, "last_name": 1, "height": 1, "year": 1, "attributes": 1
         })
         if not core_player:
             try:
                 core_player = players_collection.find_one({"_id": ObjectId(pid)}, {
-                    "first_name": 1, "last_name": 1, "height": 1, "attributes": 1
+                    "first_name": 1, "last_name": 1, "height": 1, "year": 1, "attributes": 1
                 })
             except:
                 pass
