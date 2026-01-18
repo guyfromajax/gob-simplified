@@ -536,11 +536,11 @@ def _apply_player_training_points(
     - 4 points: += random.randint(4, 7)
     - 5 points: += random.randint(4, 9)
     
-    Year-based adjustments (max range only):
-    - Freshman: +4 to max
-    - Sophomore: +2 to max
+    Year-based adjustments:
+    - Freshman: +1 to min, +4 to max
+    - Sophomore: +1 to min, +2 to max
     - Junior: no change (base ranges)
-    - Senior: -1 to max
+    - Senior: -1 to max only
     
     Focus amplifier: Applied based on sub_option selection
     Multiplier: For attributes like CH that get 0.5 multiplier
