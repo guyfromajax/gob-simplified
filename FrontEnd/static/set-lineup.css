@@ -226,6 +226,7 @@ body {
   left: 0;
   transform: rotateY(180deg);
   height: 100%;
+  pointer-events: auto; /* Ensure the back card can receive pointer events */
 }
 
 /* ========== CARD FRONT ========== */

@@ -1658,16 +1658,18 @@ function createCardBack(player) {
   const back = document.createElement('div');
   back.className = 'player-card-back';
   
-  // Flip button (on back)
+  // Flip button (on back) - append first so it's on top
   const flipBtn = document.createElement('button');
   flipBtn.className = 'flip-btn';
   flipBtn.innerHTML = '🔁';
   flipBtn.style.position = 'absolute';
   flipBtn.style.top = '8px';
   flipBtn.style.right = '8px';
+  flipBtn.style.zIndex = '1000'; // Very high z-index to ensure it's clickable
   flipBtn.setAttribute('aria-label', 'Flip card back');
   flipBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    e.preventDefault();
     toggleCardFlip(player._id);
   });
   back.appendChild(flipBtn);
