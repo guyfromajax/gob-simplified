@@ -1248,7 +1248,6 @@ async function init() {
 
 let currentView = 'grid'; // 'grid' or 'player'
 const cardFlipState = {}; // Track flip state per player ID
-const dropdownState = {}; // Track dropdown open state per player ID
 
 // Attribute groupings for card back
 const ATTR_GROUPS = {
@@ -1389,9 +1388,9 @@ function createPlayerCard(player) {
   // Click to fill next slot (only if not ineligible)
   if (!player.ineligible && !player.fouled_out) {
     card.addEventListener('click', (e) => {
-      // Don't trigger on flip button, dropdown, or headshot clicks
+      // Don't trigger on flip button, position rating circle, or headshot clicks
       if (e.target.closest('.flip-btn') || 
-          e.target.closest('.ratings-dropdown') || 
+          e.target.closest('.position-rating-circle') || 
           e.target.closest('.player-headshot-container')) {
         return;
       }
