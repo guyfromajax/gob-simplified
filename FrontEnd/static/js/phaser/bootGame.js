@@ -460,6 +460,14 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       const isFastBreak = turn.fast_break === true || turn.offensive_state === 'FAST_BREAK' || 
                          turn.current_turn === 'FAST_BREAK';
       
+      // ✅ FIX: Check for defensive foul on missed shot (for shooting foul announcement)
+      // Store foul information if there's a defensive foul on this shot
+      const hasFoulPlayer = !!(turn.foul_player_id || turn.foul_player?.player_id);
+      const hasDefensiveFoul = hasFoulPlayer && turn.foul_team === 'DEFENSE';
+      const hasFreeThrowsRemaining = (turn.free_throws_remaining ?? 0) > 0;
+      const nextPlayTypeIsFreeThrow = turn.next_play_type === 'FREE_THROW';
+      const isShootingFoul = hasDefensiveFoul && (hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow);
+      
       eventResults.push({
         timeRemaining,
         playerName: finalShooterData.name,
@@ -473,7 +481,10 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         awayScore,
         playerId: shooterId, // Store playerId for made shot images
         playerPhoto: finalShooterData.photo || null, // Store player photo for made shot images
-        lookupSucceeded: lookupSucceeded // ✅ DIAGNOSTIC: Track lookup success
+        lookupSucceeded: lookupSucceeded, // ✅ DIAGNOSTIC: Track lookup success
+        // ✅ FIX: Store foul information for shooting foul announcements
+        hasShootingFoul: isShootingFoul,
+        foulPlayerId: turn.foul_player_id || turn.foul_player?.player_id || null
       });
     } else if (resultType === 'PUTBACK_MAKE' || resultType === 'PUTBACK_MISS') {
       // OREB putback attempts
@@ -953,7 +964,14 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
           prefix = '[Fast Break] ';
         }
         const resultText = event.resultType === 'MAKE' ? 'makes' : 'misses';
-        eventText = `${resultText} the ${event.shotType} shot.`;
+        
+        // ✅ FIX: Check for shooting foul on missed shot
+        // If there's a defensive foul on a miss with free throws, it's a shooting foul
+        if (event.resultType === 'MISS' && event.hasShootingFoul) {
+          eventText = `${resultText} the ${event.shotType} shot. Shooting foul!`;
+        } else {
+          eventText = `${resultText} the ${event.shotType} shot.`;
+        }
       } else if (event.eventType === 'OREB_PUTBACK') {
         // OREB putback
         prefix = '[Off Rebound] ';
