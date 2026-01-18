@@ -51,7 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     btn.addEventListener('click', () => {
-      window.location.href = `/team-roster/${encodeURIComponent(team)}`;
+      // Link to team roster view page with Grid/Player view toggle
+      window.location.href = `/team-roster-view.html?team_name=${encodeURIComponent(team)}&return_url=${encodeURIComponent(window.location.pathname)}`;
     });
   });
 
