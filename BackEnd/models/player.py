@@ -64,36 +64,21 @@ class Player:
             Modified attributes dict with:
             - Exact values copied for: SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT
             - NG = 1.0
-            - CH = random.randint(1, 100)
-            - MO = weighted random (0: 50%, -1/1: 15% each, -2/2: 7.5% each, -3/3: 2.5% each)
-            - EM = random.randint(1, 100)
+            - CH (Character) = random.randint(1, 100)
+            - MO (Momentum) = 0 (always 0 at game init)
+            - EM (Emotion) = random.randint(1, 100)
         """
         # NG is always 1.0 at start of new mode instance
         attributes["NG"] = 1.0
         attributes["anchor_NG"] = 1.0
         
-        # CH is random 1-100
+        # CH (Character) is random 1-100
         attributes["CH"] = random.randint(1, 100)
         attributes["anchor_CH"] = attributes["CH"]
         
-        # MO is weighted random distribution
-        # 0: 50%, -1/1: 15% each, -2/2: 7.5% each, -3/3: 2.5% each
-        mo_roll = random.random()
-        if mo_roll < 0.50:
-            attributes["MO"] = 0
-        elif mo_roll < 0.65:
-            attributes["MO"] = -1
-        elif mo_roll < 0.80:
-            attributes["MO"] = 1
-        elif mo_roll < 0.875:
-            attributes["MO"] = -2
-        elif mo_roll < 0.95:
-            attributes["MO"] = 2
-        elif mo_roll < 0.975:
-            attributes["MO"] = -3
-        else:
-            attributes["MO"] = 3
-        attributes["anchor_MO"] = attributes["MO"]
+        # MO (Momentum) is always 0 at game init for all game modes
+        attributes["MO"] = 0
+        attributes["anchor_MO"] = 0
         
         # EM is random 1-100
         attributes["EM"] = random.randint(1, 100)
