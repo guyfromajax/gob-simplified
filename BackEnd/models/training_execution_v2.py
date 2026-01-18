@@ -551,19 +551,24 @@ def _apply_player_training_points(
     attrs = player.get("attributes", {})
     anchor_key = f"anchor_{attr}"
     
-    # Get player year and calculate year adjustment
+    # Get player year and calculate year adjustments
     year = player.get("year", "").lower() if player.get("year") else ""
-    year_adjustment = 0
+    min_adjustment = 0
+    max_adjustment = 0
     if year == "freshman":
-        year_adjustment = 4
+        min_adjustment = 1
+        max_adjustment = 4
     elif year == "sophomore":
-        year_adjustment = 2
+        min_adjustment = 1
+        max_adjustment = 2
     elif year == "junior":
-        year_adjustment = 0
+        min_adjustment = 0
+        max_adjustment = 0
     elif year == "senior":
-        year_adjustment = -1
+        min_adjustment = 0
+        max_adjustment = -1
     
-    # Get base increase based on points, with year adjustment to max
+    # Get base increase based on points, with year adjustments to min and max
     if points == 1:
         base_min, base_max = 1, 3
     elif points == 2:
@@ -578,8 +583,9 @@ def _apply_player_training_points(
         # For points > 5, use same logic as 5 points
         base_min, base_max = 3, 9
     
-    adjusted_max = max(base_min, base_max + year_adjustment)  # Ensure max >= min
-    increase = random.randint(base_min, adjusted_max)
+    adjusted_min = base_min + min_adjustment
+    adjusted_max = max(adjusted_min, base_max + max_adjustment)  # Ensure max >= min
+    increase = random.randint(adjusted_min, adjusted_max)
     
     # Apply multiplier (for CH in conditioning/film_study)
     increase = int(increase * multiplier)
