@@ -692,7 +692,7 @@ function renderSchedule(data) {
 
 // Store team traits data for sorting
 let teamTraitsDataForSorting = [];
-let teamTraitsSortColumn = 'FT';
+let teamTraitsSortColumn = 'total';
 let teamTraitsSortDirection = 'desc';
 
 function renderTeamTraits(data) {
@@ -700,12 +700,23 @@ function renderTeamTraits(data) {
   
   teamTraitsDataForSorting = data.teams;
   
+  // Calculate totals for each team and add to data
+  teamTraitsDataForSorting.forEach(team => {
+    const attrs = team.attributes || {};
+    const attributes = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
+    let total = 0;
+    attributes.forEach(attr => {
+      total += attrs[attr] || 0;
+    });
+    team.total = total;
+  });
+  
   // Render main table
   const tbody = document.getElementById('team-traits-body');
   if (!tbody) return;
   tbody.innerHTML = '';
   
-  // Sort by default (FT descending)
+  // Sort by default (total descending)
   sortTeamTraitsTable(teamTraitsSortColumn, teamTraitsSortDirection);
   
   // Setup sortable headers
@@ -737,6 +748,19 @@ function sortTeamTraitsTable(columnName, direction) {
   const tbody = document.getElementById('team-traits-body');
   if (!tbody || !teamTraitsDataForSorting.length) return;
   
+  // Ensure totals are calculated for all teams
+  teamTraitsDataForSorting.forEach(team => {
+    if (team.total === undefined) {
+      const attrs = team.attributes || {};
+      const attributes = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
+      let total = 0;
+      attributes.forEach(attr => {
+        total += attrs[attr] || 0;
+      });
+      team.total = total;
+    }
+  });
+  
   teamTraitsDataForSorting.sort((a, b) => {
     let val1, val2;
     
@@ -744,6 +768,10 @@ function sortTeamTraitsTable(columnName, direction) {
       val1 = a.team_name || '';
       val2 = b.team_name || '';
       return direction === 'desc' ? val2.localeCompare(val1) : val1.localeCompare(val2);
+    } else if (columnName === 'total') {
+      // Total column - use calculated total
+      val1 = a.total || 0;
+      val2 = b.total || 0;
     } else {
       // Attribute columns
       const attrsA = a.attributes || {};
@@ -793,6 +821,16 @@ function sortTeamTraitsTable(columnName, direction) {
       td.textContent = value;
       tr.appendChild(td);
     });
+    
+    // Add Total cell
+    const totalCell = document.createElement('td');
+    // Calculate total if not already set
+    if (team.total === undefined) {
+      team.total = attributeValues.reduce((sum, val) => sum + val, 0);
+    }
+    totalCell.textContent = team.total || 0;
+    totalCell.style.fontWeight = 'bold';
+    tr.appendChild(totalCell);
     
     tbody.appendChild(tr);
   });
