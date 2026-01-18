@@ -764,9 +764,9 @@ function createCardFront(player) {
   });
   front.appendChild(flipBtn);
   
-  // Ratings dropdown (outside the link)
-  const dropdown = createRatingsDropdown(player);
-  front.appendChild(dropdown);
+  // Position rating circle (top-left, opposite flip button)
+  const ratingCircle = createPositionRatingCircle(player);
+  front.appendChild(ratingCircle);
   
   // Info bar
   const infoBar = document.createElement('div');
@@ -810,46 +810,104 @@ function createCardFront(player) {
   return front;
 }
 
-function createRatingsDropdown(player) {
-  const dropdown = document.createElement('div');
-  dropdown.className = 'ratings-dropdown';
+function createPositionRatingCircle(player) {
+  const circle = document.createElement('div');
+  circle.className = 'position-rating-circle';
   
-  // Get position ratings from player data
   const posRatings = player.position_ratings || {};
   const entries = Object.entries(posRatings)
     .sort((a, b) => b[1] - a[1]); // Sort by rating desc
   
-  if (entries.length === 0) return dropdown;
+  if (entries.length === 0) {
+    circle.style.display = 'none';
+    return circle;
+  }
   
-  // Use player's highest position
-  const topPos = player.highestPos || entries[0][0];
-  const topRating = player.highestRT || entries[0][1];
+  // Use player's highest position rating
+  const topRating = player.highestRT ?? entries[0][1];
   
-  // Toggle button - shows highest rated position
-  const toggle = document.createElement('button');
-  toggle.className = 'ratings-dropdown-toggle';
-  toggle.innerHTML = `${topPos}: ${topRating} <span style="font-size: 10px;">▼</span>`;
-  toggle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    dropdown.classList.toggle('open');
-    dropdownState[player._id] = dropdown.classList.contains('open');
+  // Display only the highest rating integer value
+  circle.textContent = topRating;
+  circle.setAttribute('aria-label', 'Position rating');
+  
+  // Create tooltip content with all 5 position ratings in descending order
+  const tooltipContent = entries
+    .map(([pos, rating]) => `${pos}: ${rating}`)
+    .join('\n');
+  
+  // Setup tooltip on hover
+  setupPositionRatingTooltip(circle, tooltipContent);
+  
+  return circle;
+}
+
+function setupPositionRatingTooltip(element, tooltipText) {
+  let tooltip = null;
+  
+  element.addEventListener('mouseenter', (e) => {
+    // Create tooltip element
+    tooltip = document.createElement('div');
+    tooltip.className = 'position-rating-tooltip';
+    tooltip.style.cssText = `
+      position: absolute;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.95);
+      color: #fff;
+      font-size: 12px;
+      white-space: pre-line;
+      border-radius: 6px;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+      z-index: 10000;
+      font-family: 'Inter', sans-serif;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      line-height: 1.6;
+      text-align: left;
+    `;
+    tooltip.textContent = tooltipText;
+    document.body.appendChild(tooltip);
+    
+    // Position tooltip near the circle
+    const rect = element.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    
+    // Position to the right of the circle
+    tooltip.style.left = `${rect.right + 8}px`;
+    tooltip.style.top = `${rect.top + rect.height / 2 - tooltipRect.height / 2}px`;
+    tooltip.style.opacity = '0';
+    tooltip.style.visibility = 'visible';
+    
+    // Force reflow, then show
+    tooltip.offsetHeight;
+    tooltip.style.opacity = '1';
   });
-  dropdown.appendChild(toggle);
   
-  // List - all positions sorted by rating
-  const list = document.createElement('div');
-  list.className = 'ratings-dropdown-list';
-  
-  entries.forEach(([pos, rating]) => {
-    const item = document.createElement('div');
-    item.className = 'ratings-dropdown-item';
-    item.innerHTML = `<span>${pos}</span><span>${rating}</span>`;
-    list.appendChild(item);
+  element.addEventListener('mouseleave', () => {
+    if (tooltip) {
+      tooltip.style.opacity = '0';
+      tooltip.style.visibility = 'hidden';
+      // Remove tooltip after transition
+      setTimeout(() => {
+        if (tooltip && tooltip.parentNode) {
+          tooltip.parentNode.removeChild(tooltip);
+        }
+        tooltip = null;
+      }, 200);
+    }
   });
   
-  dropdown.appendChild(list);
-  
-  return dropdown;
+  element.addEventListener('mousemove', (e) => {
+    if (tooltip && tooltip.style.visibility === 'visible') {
+      const rect = element.getBoundingClientRect();
+      const tooltipRect = tooltip.getBoundingClientRect();
+      
+      // Update position to stay near circle
+      tooltip.style.left = `${rect.right + 8}px`;
+      tooltip.style.top = `${rect.top + rect.height / 2 - tooltipRect.height / 2}px`;
+    }
+  });
 }
 
 function createCardBack(player) {
