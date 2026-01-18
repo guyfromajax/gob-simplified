@@ -118,6 +118,11 @@ def update_team_players(team_name: str, json_file: Path):
         # Build update dictionary for attributes
         update_fields = {}
         
+        # Update year field if present
+        new_year = p_json.get("year")
+        if new_year is not None:
+            update_fields["year"] = new_year
+        
         # Update regular attributes
         for attr_key in ATTRIBUTE_KEYS:
             new_value = p_json.get(attr_key)
@@ -147,20 +152,28 @@ def update_team_players(team_name: str, json_file: Path):
         if result.modified_count > 0:
             updated_count += 1
             # Show what changed
-            changed_attrs = []
+            changed_items = []
+            
+            # Check year change
+            if new_year is not None:
+                old_year = db_player.get("year", "N/A")
+                if old_year != new_year:
+                    changed_items.append(f"year:{old_year}→{new_year}")
+            
+            # Check attribute changes
             for attr_key in ATTRIBUTE_KEYS:
                 new_val = p_json.get(attr_key)
                 if new_val is not None:
                     old_val = current_attrs.get(attr_key, "N/A")
                     if old_val != new_val:
-                        changed_attrs.append(f"{attr_key}:{old_val}→{new_val}")
+                        changed_items.append(f"{attr_key}:{old_val}→{new_val}")
             
-            change_summary = ", ".join(changed_attrs[:5])  # Show first 5 changes
-            if len(changed_attrs) > 5:
-                change_summary += f" (+{len(changed_attrs)-5} more)"
+            change_summary = ", ".join(changed_items[:5])  # Show first 5 changes
+            if len(changed_items) > 5:
+                change_summary += f" (+{len(changed_items)-5} more)"
             
             print(f"✅ UPDATED: {team_name} — {first_name} {last_name} (jersey {jersey})")
-            if changed_attrs:
+            if changed_items:
                 print(f"   Changes: {change_summary}")
         else:
             print(f"✓ OK: {team_name} — {first_name} {last_name} (jersey {jersey}) - no changes needed")
