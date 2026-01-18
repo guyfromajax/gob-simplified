@@ -263,7 +263,8 @@ body {
   cursor: pointer;
   font-size: 19px; /* Increased from 16px (20% larger) */
   transition: all 0.2s ease;
-  z-index: 10;
+  z-index: 100; /* Higher z-index to ensure clickability on both front and back */
+  pointer-events: auto; /* Ensure click events work */
 }
 
 .flip-btn:hover {
