@@ -37,7 +37,7 @@ def load_staging_team_files(teams_dir: Path) -> Dict[str, List[Dict]]:
         "ocean_city_staging.json",
         "south_lancaster_staging.json",
         "little_york_staging.json",
-        "xavien.json",  # Include Xavien team
+        "xavien_staging.json",  # Include Xavien team
     ]
     
     for filename in staging_files:
@@ -182,6 +182,47 @@ def generate_report(analysis: Dict) -> str:
         
         report_lines.append(", ".join(attr_strings))
         report_lines.append("")
+    
+    # Add stack rankings for each attribute
+    report_lines.append("")
+    attributes_list = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]
+    
+    for attr in attributes_list:
+        report_lines.append(attr)
+        report_lines.append("")
+        for rank, (team_name, total) in enumerate(rankings[attr], start=1):
+            report_lines.append(f"{rank}. {team_name}: {total}")
+        report_lines.append("")
+    
+    # Generate Top 20 Overall list
+    report_lines.append("Overall")
+    report_lines.append("")
+    
+    # Create list of all (team_name, attribute, value) tuples
+    all_values = []
+    for attr in attributes_list:
+        for team_name, total in rankings[attr]:
+            all_values.append((team_name, attr, total))
+    
+    # Sort by value descending
+    all_values.sort(key=lambda x: x[2], reverse=True)
+    
+    # Top 20
+    for rank, (team_name, attr, value) in enumerate(all_values[:20], start=1):
+        report_lines.append(f"{rank}. {team_name} {attr}: {value}")
+    
+    report_lines.append("")
+    
+    # Generate Top 20 (excluding FT) list
+    report_lines.append("Overall (excluding FT)")
+    report_lines.append("")
+    
+    # Filter out FT values
+    all_values_no_ft = [(team, attr, val) for team, attr, val in all_values if attr != "FT"]
+    
+    # Top 20 (or however many there are)
+    for rank, (team_name, attr, value) in enumerate(all_values_no_ft[:20], start=1):
+        report_lines.append(f"{rank}. {team_name} {attr}: {value}")
     
     return "\n".join(report_lines)
 
