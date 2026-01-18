@@ -765,21 +765,34 @@ function sortTeamTraitsTable(columnName, direction) {
     const tr = document.createElement('tr');
     const attrs = team.attributes || {};
     
-    tr.innerHTML = `
-      <td>${team.team_name || ''}</td>
-      <td>${attrs.SC || 0}</td>
-      <td>${attrs.SH || 0}</td>
-      <td>${attrs.ID || 0}</td>
-      <td>${attrs.OD || 0}</td>
-      <td>${attrs.PS || 0}</td>
-      <td>${attrs.BH || 0}</td>
-      <td>${attrs.RB || 0}</td>
-      <td>${attrs.AG || 0}</td>
-      <td>${attrs.ST || 0}</td>
-      <td>${attrs.ND || 0}</td>
-      <td>${attrs.IQ || 0}</td>
-      <td>${attrs.FT || 0}</td>
-    `;
+    // Create team name cell with primary color and bold styling
+    const teamNameCell = document.createElement('td');
+    teamNameCell.textContent = team.team_name || '';
+    teamNameCell.style.color = team.primary_color || '#000000';
+    teamNameCell.style.fontWeight = 'bold';
+    tr.appendChild(teamNameCell);
+    
+    // Add attribute cells individually
+    const attributeValues = [
+      attrs.SC || 0,
+      attrs.SH || 0,
+      attrs.ID || 0,
+      attrs.OD || 0,
+      attrs.PS || 0,
+      attrs.BH || 0,
+      attrs.RB || 0,
+      attrs.AG || 0,
+      attrs.ST || 0,
+      attrs.ND || 0,
+      attrs.IQ || 0,
+      attrs.FT || 0
+    ];
+    
+    attributeValues.forEach(value => {
+      const td = document.createElement('td');
+      td.textContent = value;
+      tr.appendChild(td);
+    });
     
     tbody.appendChild(tr);
   });

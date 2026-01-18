@@ -2856,28 +2856,31 @@ def get_team_roster(team_name: str, tournament_id: str | None = None, franchise_
     players = []
     for p in player_objects:
         player_id_str = str(p.get("_id"))
-        core_attributes = p.get("attributes", {})  # safely get nested attributes dict
         
-        # ✅ UNIFIED: Merge franchise-specific attributes if available
-        merged_attributes = core_attributes.copy()
+        # ✅ SS&S: For franchise mode, use franchise.players as single source of truth (no merging)
         if franchise_id and player_id_str in franchise_players:
             franchise_player_data = franchise_players[player_id_str]
-            franchise_attrs = franchise_player_data.get("attributes", {})
-            # Franchise attributes override core attributes
-            merged_attributes.update(franchise_attrs)
+            merged_attributes = franchise_player_data.get("attributes", {}).copy()
+            # Ensure anchor_ versions exist (they should after initialization, but be safe)
+            for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
+                if attr_key in merged_attributes and f"anchor_{attr_key}" not in merged_attributes:
+                    merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
+        else:
+            # Base mode or tournament mode - use universal collection attributes
+            core_attributes = p.get("attributes", {})
+            merged_attributes = core_attributes.copy()
+            # Create anchor_ prefixed attributes (like Player class does)
+            for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
+                if attr_key in merged_attributes:
+                    merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
         
-        # Create anchor_ prefixed attributes (like Player class does)
-        for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
-            if attr_key in merged_attributes:
-                merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
-        
-        # ✅ UNIFIED: Use franchise position_ratings if available, otherwise use core
-        position_ratings = p.get("position_ratings", {})
+        # ✅ SS&S: For franchise mode, use franchise.players as single source of truth for position_ratings
         if franchise_id and player_id_str in franchise_players:
             franchise_player_data = franchise_players[player_id_str]
-            franchise_position_ratings = franchise_player_data.get("position_ratings", {})
-            if franchise_position_ratings:
-                position_ratings = franchise_position_ratings
+            position_ratings = franchise_player_data.get("position_ratings", {})
+        else:
+            # Base mode or tournament mode - use universal collection position_ratings
+            position_ratings = p.get("position_ratings", {})
         
         players.append({
             "_id": player_id_str,
