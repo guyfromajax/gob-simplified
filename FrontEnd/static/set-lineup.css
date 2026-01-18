@@ -229,6 +229,15 @@ body {
   pointer-events: auto; /* Ensure the back card can receive pointer events */
 }
 
+/* When card is flipped, ensure the back is interactive */
+.player-card.flipped .player-card-back {
+  pointer-events: auto;
+}
+
+.player-card.flipped .player-card-front {
+  pointer-events: none;
+}
+
 /* ========== CARD FRONT ========== */
 .player-card-front {
   display: flex;
@@ -264,8 +273,8 @@ body {
   cursor: pointer;
   font-size: 19px; /* Increased from 16px (20% larger) */
   transition: all 0.2s ease;
-  z-index: 100; /* Higher z-index to ensure clickability on both front and back */
-  pointer-events: auto; /* Ensure click events work */
+  z-index: 1000; /* Very high z-index to ensure clickability on both front and back */
+  pointer-events: auto !important; /* Force pointer events to work */
 }
 
 .flip-btn:hover {
