@@ -1498,7 +1498,7 @@ function createCardFront(player) {
       left: 50%;
       transform: translateX(-50%);
       color: ${yearColor};
-      opacity: 0.75;
+      opacity: 1.0;
       font-weight: 600;
       font-size: 14px;
       text-transform: capitalize;
