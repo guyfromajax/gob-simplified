@@ -1565,6 +1565,7 @@ def team_traits(franchise_id: str):
             continue
     
     # Aggregate attributes from players
+    # ✅ SS&S: Use franchise.players as single source of truth (no merging with universal collection)
     for pid, player_data in players.items():
         meta = player_data.get("meta", {})
         player_team_id = str(meta.get("team_id", ""))
@@ -1599,12 +1600,13 @@ def team_traits(franchise_id: str):
         if not player_team_id or player_team_id not in team_totals:
             continue
         
-        # Get franchise-specific attributes (anchor_ prefixed if available, otherwise regular)
+        # ✅ SS&S: Get attributes directly from franchise.players (single source of truth)
         player_attrs = player_data.get("attributes", {})
         
         # Sum all attributes for this team
+        # Use anchor_ prefixed if available (post-training values), otherwise use regular attributes
         for attr in attributes:
-            # Try anchor_ prefixed first (franchise-specific), then regular
+            # Try anchor_ prefixed first (franchise-specific evolved values), then regular
             attr_value = player_attrs.get(f"anchor_{attr}", player_attrs.get(attr, 0))
             if isinstance(attr_value, (int, float)):
                 team_totals[player_team_id]["attributes"][attr] += attr_value
@@ -2029,6 +2031,7 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
     logger.info(f"⏱️ [PERF] /franchise/roster Batch player query ({len(team_player_ids)} players): {batch_query_time:.3f}s")
     
     # Build player list with franchise-specific attributes
+    # ✅ SS&S: Use franchise.players as single source of truth (no merging with universal collection)
     processing_start = time.time()
     players = []
     for pid in team_player_ids:
@@ -2038,26 +2041,20 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
             continue
         
         meta = franchise_player_data.get("meta", {})
-        attributes = franchise_player_data.get("attributes", {})
         
-        # Get franchise-specific position ratings (if available), otherwise use core ratings
+        # ✅ SS&S: Get attributes directly from franchise.players (single source of truth)
+        merged_attributes = franchise_player_data.get("attributes", {}).copy()
+        
+        # Ensure anchor_ versions exist (they should after initialization, but be safe)
+        for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
+            if attr_key in merged_attributes and f"anchor_{attr_key}" not in merged_attributes:
+                merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
+        
+        # ✅ SS&S: Get position ratings from franchise.players (single source of truth)
         position_ratings = franchise_player_data.get("position_ratings", {})
         
-        # ✅ PERFORMANCE: Use cached result from batch query instead of individual query
+        # ✅ PERFORMANCE: Use cached result from batch query for height/weight/jersey/year only
         core_player = core_players_dict.get(pid_str)
-        
-        # Use franchise position ratings if available, otherwise fall back to core
-        if not position_ratings and core_player:
-            position_ratings = core_player.get("position_ratings", {})
-        
-        # Merge core attributes with franchise attributes (franchise overrides core)
-        core_attributes = core_player.get("attributes", {}) if core_player else {}
-        merged_attributes = {**core_attributes, **attributes}
-        
-        # Create anchor_ prefixed attributes (like Player class does)
-        for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
-            if attr_key in merged_attributes:
-                merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
         
         first = meta.get("first_name", "")
         last = meta.get("last_name", "")
