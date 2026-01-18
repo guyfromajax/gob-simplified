@@ -1569,6 +1569,33 @@ def team_traits(franchise_id: str):
         meta = player_data.get("meta", {})
         player_team_id = str(meta.get("team_id", ""))
         
+        # ✅ FIX: If team_id is missing or not in team_totals, resolve it from team name (similar to team_stats_aggregator.py)
+        if not player_team_id or player_team_id not in team_totals:
+            # Try to resolve team_id from team name
+            team_name = meta.get("team", "")
+            if team_name:
+                try:
+                    # Try to find team by name
+                    team_doc = db.teams.find_one({"name": team_name}, {"_id": 1})
+                    if team_doc:
+                        resolved_team_id = str(team_doc["_id"])
+                        # If resolved team_id is in team_totals, use it
+                        if resolved_team_id in team_totals:
+                            player_team_id = resolved_team_id
+                        else:
+                            # Team not in franchise_teams, skip this player
+                            continue
+                    else:
+                        # Can't resolve team, skip this player
+                        continue
+                except Exception:
+                    # Can't resolve team, skip this player
+                    continue
+            else:
+                # No team name or team_id, skip this player
+                continue
+        
+        # Final check - skip if still no valid team_id
         if not player_team_id or player_team_id not in team_totals:
             continue
         

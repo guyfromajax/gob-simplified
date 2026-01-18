@@ -106,6 +106,8 @@ Franchise Mode supports multi-season career mode where team and player data pers
   - Each team's row content is displayed in their primary color with bold font
   - Shows format: `Rank. Team Name Attribute: Value`
 - **Data Loading**: ✅ Aggregates from franchise.players object (franchise-specific attributes), not from universal players_collection
+  - If `meta.team_id` is missing for a player, resolves it from the player's `team` name by looking up the team's ObjectId in the teams collection
+  - Uses franchise-specific attributes (anchor_ prefixed if available, otherwise regular attributes)
 - Loaded via `/franchise/team-traits` endpoint
 
 **Standings Tab:**
