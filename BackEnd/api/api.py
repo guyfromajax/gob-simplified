@@ -627,6 +627,76 @@ def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest
         logging.error(f"❌ TIMEOUT RESUME: Error loading from DB: {e}", exc_info=True)
         return None
 
+def handle_timeout_save_and_response(gm: "GameManager", timeout_turn: dict, game_id: str, timeout_reason: str = "USER"):
+    """
+    Unified timeout save and response handler.
+    Used by both user and computer timeouts to ensure identical behavior.
+    
+    Args:
+        gm: GameManager instance
+        timeout_turn: Timeout turn dictionary
+        game_id: Game ID for database save
+        timeout_reason: "USER", "COMPUTER", or "FOUL_OUT"
+    
+    Returns:
+        dict: Consistent timeout response format with saved data from DB
+    """
+    from BackEnd.db import games_collection
+    
+    # Save to DB (same for both user and computer timeouts)
+    db_summary = summarize_game_state(gm, exclude_animations=True)
+    games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
+    
+    # 🔍 DEBUG: Log what was saved (for both user and computer)
+    debug_prefix = "USER" if timeout_reason == "USER" else "COMPUTER"
+    logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] db_summary timeout fields: timeout_next_play_type={db_summary.get('timeout_next_play_type')}, timeout_offense_team_id={db_summary.get('timeout_offense_team_id')}")
+    logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] db_summary score={db_summary.get('score')}, clock={db_summary.get('clock')}, time_remaining={db_summary.get('time_remaining')}")
+    
+    # Verify what was saved to DB
+    saved_doc = games_collection.find_one({"_id": game_id})
+    logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] DB AFTER save - timeout_next_play_type={saved_doc.get('timeout_next_play_type') if saved_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={saved_doc.get('timeout_offense_team_id') if saved_doc else 'DOC_NOT_FOUND'}")
+    logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] DB AFTER save - score={saved_doc.get('score') if saved_doc else 'DOC_NOT_FOUND'}, clock={saved_doc.get('clock') if saved_doc else 'DOC_NOT_FOUND'}, time_remaining={saved_doc.get('time_remaining') if saved_doc else 'DOC_NOT_FOUND'}")
+    
+    # Return consistent response format (same for both user and computer)
+    # Use saved data (db_summary) to ensure response matches what was saved to DB
+    response = {
+        "turn": timeout_turn,
+        "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
+        "time_remaining": db_summary.get("time_remaining", gm.game_state.get("time_remaining", 480)),
+        "clock": db_summary.get("clock", gm.game_state.get("clock", "8:00")),
+        "quarter_complete": False,  # ✅ CRITICAL: Always False for timeout (not quarter end)
+        "quarter": db_summary.get("quarter", gm.quarter),
+        "is_final": False,
+        "home_score": db_summary.get("score", {}).get(gm.home_team.name, gm.score.get(gm.home_team.name, 0)),
+        "away_score": db_summary.get("score", {}).get(gm.away_team.name, gm.score.get(gm.away_team.name, 0)),
+        "home_team_fouls": gm.home_team.team_fouls,
+        "away_team_fouls": gm.away_team.team_fouls,
+        "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
+        "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
+        "offense_team": gm.offense_team.name,
+        "defense_team": gm.defense_team.name,
+        "game_id": game_id,
+        "ineligible_players": gm.game_state.get("ineligible_players", []),
+        "box_score": gm.get_box_score(),
+        "team_totals": {
+            gm.home_team.name: gm.home_team.get_team_game_stats(),
+            gm.away_team.name: gm.away_team.get_team_game_stats()
+        }
+    }
+    
+    # 🔍 DEBUG: Log what's being returned in response
+    logging.warning(f"🔍 [{debug_prefix} TIMEOUT RESPONSE DEBUG] Response data: time_remaining={response['time_remaining']}, clock={response['clock']}, quarter={response['quarter']}, quarter_complete={response['quarter_complete']}")
+    logging.warning(f"🔍 [{debug_prefix} TIMEOUT RESPONSE DEBUG] Response scores: home_score={response['home_score']}, away_score={response['away_score']}")
+    
+    logging.info(
+        f"💾 {debug_prefix} TIMEOUT: Saved game state and returning response: "
+        f"game_id={game_id}, quarter={db_summary.get('quarter')}, "
+        f"clock={db_summary.get('clock')}, time_remaining={db_summary.get('time_remaining')}, "
+        f"next_play_type={timeout_turn.get('next_play_type')}"
+    )
+    
+    return response
+
 def refresh_game_cache_from_db(gm: "GameManager", saved: dict):
     """
     Refresh ongoing_games cache from database after state changes (timeout saves, etc.).
@@ -2584,8 +2654,8 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             del gm.game_state["pending_computer_timeout"]
             
             if timeout_turn:
-                # ✅ COMPUTER TIMEOUT: Save game state immediately (same as user timeouts)
-                # This ensures clock, scores, fouls, etc. are preserved when user returns from lineup screen
+                # ✅ UNIFIED: Use shared helper function for timeout save and response
+                # This ensures user and computer timeouts work identically
                 try:
                     # 🔍 DEBUG: Log state BEFORE save
                     logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] BEFORE save - game_id={game_id}, quarter={gm.quarter}")
@@ -2597,63 +2667,33 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
                     logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] DB BEFORE save - timeout_next_play_type={before_save_doc.get('timeout_next_play_type') if before_save_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={before_save_doc.get('timeout_offense_team_id') if before_save_doc else 'DOC_NOT_FOUND'}")
                     logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] DB BEFORE save - score={before_save_doc.get('score') if before_save_doc else 'DOC_NOT_FOUND'}, clock={before_save_doc.get('clock') if before_save_doc else 'DOC_NOT_FOUND'}")
                     
-                    db_summary = summarize_game_state(gm, exclude_animations=True)
+                    # Remove the TIMEOUT turn from turns so next API call can simulate the actual next turn
+                    timeout_turn = gm.turns.pop()
                     
-                    # 🔍 DEBUG: Log what's being saved
-                    logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] db_summary timeout fields: timeout_next_play_type={db_summary.get('timeout_next_play_type')}, timeout_offense_team_id={db_summary.get('timeout_offense_team_id')}")
-                    logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] db_summary score={db_summary.get('score')}, clock={db_summary.get('clock')}, time_remaining={db_summary.get('time_remaining')}")
+                    # ✅ UNIFIED: Use shared helper function (same as user timeout)
+                    timeout_response = handle_timeout_save_and_response(gm, timeout_turn, game_id, timeout_reason="COMPUTER")
                     
-                    games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
-                    
-                    # 🔍 DEBUG: Verify what was saved to DB
-                    after_save_doc = games_collection.find_one({"_id": game_id})
-                    logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] DB AFTER save - timeout_next_play_type={after_save_doc.get('timeout_next_play_type') if after_save_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={after_save_doc.get('timeout_offense_team_id') if after_save_doc else 'DOC_NOT_FOUND'}")
-                    logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] DB AFTER save - score={after_save_doc.get('score') if after_save_doc else 'DOC_NOT_FOUND'}, clock={after_save_doc.get('clock') if after_save_doc else 'DOC_NOT_FOUND'}, time_remaining={after_save_doc.get('time_remaining') if after_save_doc else 'DOC_NOT_FOUND'}")
-                    
-                    logging.info(
-                        f"💾 COMPUTER TIMEOUT: Saved game state before returning timeout turn: "
-                        f"game_id={game_id}, quarter={db_summary.get('quarter')}, "
-                        f"clock={db_summary.get('clock')}, time_remaining={gm.game_state.get('time_remaining')}, "
-                        f"next_play_type={gm.game_state.get('timeout_next_play_type')}"
+                    # ⏱️ PERFORMANCE: Log timeout return path
+                    total_time = (time.time() - start_time) * 1000
+                    response_size = len(str(timeout_response).encode('utf-8'))
+                    logging.warning(
+                        f"⏱️ [PERF] /api/simulate-turn - TIMEOUT PATH, quarter={gm.quarter}, "
+                        f"response_size: {response_size} bytes, total: {total_time:.2f}ms"
                     )
+                    return timeout_response
                 except Exception as e:
                     logging.error(f"🚨 COMPUTER TIMEOUT: Failed to save game state: {e}")
                     # Don't fail the timeout return if save fails - game is still in memory
-                
-                # Remove the TIMEOUT turn from turns so next API call can simulate the actual next turn
-                timeout_turn = gm.turns.pop()
-                
-                # ✅ SIMPLIFY: Use saved data (db_summary) for response, same as user timeout
-                # This ensures response matches what was saved to DB
-                timeout_response = {
-                    "turn": timeout_turn,
-                    "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
-                    "time_remaining": db_summary.get("time_remaining", gm.game_state.get("time_remaining", 480)),
-                    "clock": db_summary.get("clock", gm.game_state.get("clock", "8:00")),
-                    "quarter_complete": False,  # ✅ CRITICAL: Always False for timeout (not quarter end)
-                    "quarter": db_summary.get("quarter", gm.quarter),
-                    "is_final": False,
-                    "home_score": db_summary.get("score", {}).get(gm.home_team.name, gm.score.get(gm.home_team.name, 0)),
-                    "away_score": db_summary.get("score", {}).get(gm.away_team.name, gm.score.get(gm.away_team.name, 0)),
-                    "home_team_fouls": gm.home_team.team_fouls,
-                    "away_team_fouls": gm.away_team.team_fouls,
-                    "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
-                    "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
-                    "offense_team": gm.offense_team.name,
-                    "defense_team": gm.defense_team.name,
-                    "game_id": game_id,
-                    "ineligible_players": gm.game_state.get("ineligible_players", []),
-                    "box_score": gm.get_box_score(),
-                    "team_totals": {
-                        gm.home_team.name: gm.home_team.get_team_game_stats(),
-                        gm.away_team.name: gm.away_team.get_team_game_stats()
-                    }
-                }
-                
-                # 🔍 DEBUG: Log what's being returned in response
-                logging.warning(f"🔍 [COMPUTER TIMEOUT RESPONSE DEBUG] Response data: time_remaining={timeout_response['time_remaining']}, clock={timeout_response['clock']}, quarter={timeout_response['quarter']}, quarter_complete={timeout_response['quarter_complete']}")
-                logging.warning(f"🔍 [COMPUTER TIMEOUT RESPONSE DEBUG] Response scores: home_score={timeout_response['home_score']}, away_score={timeout_response['away_score']}")
-                logging.warning(f"🔍 [COMPUTER TIMEOUT RESPONSE DEBUG] db_summary scores: {db_summary.get('score')}, db_summary clock={db_summary.get('clock')}, db_summary time_remaining={db_summary.get('time_remaining')}")
+                    # Return timeout turn without save (fallback)
+                    timeout_turn = gm.turns.pop() if gm.turns else None
+                    if timeout_turn:
+                        return {
+                            "turn": timeout_turn,
+                            "time_remaining": gm.game_state.get("time_remaining", 480),
+                            "clock": gm.game_state.get("clock", "8:00"),
+                            "quarter_complete": False,
+                            "quarter": gm.quarter
+                        }
                 # ⏱️ PERFORMANCE: Log timeout return path
                 total_time = (time.time() - start_time) * 1000
                 response_size = len(str(timeout_response).encode('utf-8'))
@@ -2947,46 +2987,46 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
             detail=f"{calling_team.name} has no timeouts remaining."
         )
     
-    # ✅ TIMEOUT: Save game state to database (reuse existing persistence pattern)
-    # This ensures scores, clock, fouls, etc. are preserved when user returns from lineup screen
+    # ✅ UNIFIED: Use shared helper function for timeout save and response
+    # This ensures user and computer timeouts work identically
     try:
         # 🔍 DEBUG: Log state BEFORE save
         logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] BEFORE save - game_id={game_id}, quarter={gm.quarter}")
         logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] gm.game_state timeout fields: timeout_next_play_type={gm.game_state.get('timeout_next_play_type')}, timeout_offense_team_id={gm.game_state.get('timeout_offense_team_id')}")
         logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] gm.score={gm.score}, clock={gm.game_state.get('clock')}, time_remaining={gm.game_state.get('time_remaining')}")
         
-        db_summary = summarize_game_state(gm, exclude_animations=True)
+        # Use unified helper function (same as computer timeout)
+        timeout_response = handle_timeout_save_and_response(gm, timeout_turn, game_id, timeout_reason="USER")
         
-        # 🔍 DEBUG: Log what's being saved
-        logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] db_summary timeout fields: timeout_next_play_type={db_summary.get('timeout_next_play_type')}, timeout_offense_team_id={db_summary.get('timeout_offense_team_id')}")
-        logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] db_summary score={db_summary.get('score')}, clock={db_summary.get('clock')}, time_remaining={db_summary.get('time_remaining')}")
-        
-        games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
-        
-        # 🔍 DEBUG: Verify what was saved to DB
-        saved_doc = games_collection.find_one({"_id": game_id})
-        logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] AFTER save - DB document timeout fields: timeout_next_play_type={saved_doc.get('timeout_next_play_type') if saved_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={saved_doc.get('timeout_offense_team_id') if saved_doc else 'DOC_NOT_FOUND'}")
-        logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] DB document score={saved_doc.get('score') if saved_doc else 'DOC_NOT_FOUND'}, clock={saved_doc.get('clock') if saved_doc else 'DOC_NOT_FOUND'}, time_remaining={saved_doc.get('time_remaining') if saved_doc else 'DOC_NOT_FOUND'}")
-        
-        logging.info(
-            f"💾 TIMEOUT: Saved game state before navigating to lineup screen: "
-            f"game_id={game_id}, quarter={db_summary.get('quarter')}, "
-            f"clock={db_summary.get('clock')}, next_play_type={timeout_turn.get('next_play_type')}"
-        )
+        # Return response with additional fields for user timeout endpoint compatibility
+        return {
+            "message": f"Timeout called by {calling_team.name}",
+            "calling_team": calling_team.name,
+            "timeouts_remaining": getattr(calling_team, 'timeouts', 4),
+            "home_team_timeouts": timeout_response["home_team_timeouts"],
+            "away_team_timeouts": timeout_response["away_team_timeouts"],
+            "clock": timeout_response["clock"],  # ✅ Use saved data from DB (not cache)
+            "time_remaining": timeout_response["time_remaining"],  # ✅ Use saved data from DB (not cache)
+            "turn": timeout_response["turn"],  # Include turn for frontend consistency
+            "quarter": timeout_response["quarter"],
+            "quarter_complete": timeout_response["quarter_complete"],
+            "home_score": timeout_response["home_score"],
+            "away_score": timeout_response["away_score"],
+            "game_id": timeout_response["game_id"]
+        }
     except Exception as e:
         logging.error(f"🚨 TIMEOUT: Failed to save game state: {e}")
         # Don't fail the timeout call if save fails - game is still in memory
-    
-    # Return current timeout counts and clock for frontend display
-    return {
-        "message": f"Timeout called by {calling_team.name}",
-        "calling_team": calling_team.name,
-        "timeouts_remaining": getattr(calling_team, 'timeouts', 4),
-        "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
-        "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
-        "clock": gm.game_state.get("clock", "8:00"),  # ✅ TIMEOUT: Include current clock (backend source of truth)
-        "time_remaining": gm.game_state.get("time_remaining", 480),  # Also include time_remaining for consistency
-    }
+        # Return fallback response
+        return {
+            "message": f"Timeout called by {calling_team.name}",
+            "calling_team": calling_team.name,
+            "timeouts_remaining": getattr(calling_team, 'timeouts', 4),
+            "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
+            "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
+            "clock": gm.game_state.get("clock", "8:00"),
+            "time_remaining": gm.game_state.get("time_remaining", 480),
+        }
 
 
 @app.get("/roster/{team_name}")

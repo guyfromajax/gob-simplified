@@ -52,6 +52,13 @@ The timeout system allows game pauses for strategic adjustments, lineup changes,
 - Frontend calls `/api/call-timeout` endpoint
 - Backend creates `TIMEOUT` turn via `turn_manager.setup_timeout_turn()`
 - `TIMEOUT` turn appended to `gm.turns` array
+- Uses unified `handle_timeout_save_and_response()` helper function
+
+**Computer-Initiated Timeout:**
+- Computer AI detects timeout conditions during game simulation
+- Backend creates `TIMEOUT` turn via `turn_manager.setup_timeout_turn()` in `simulate-turn` endpoint
+- `TIMEOUT` turn appended to `gm.turns` array
+- Uses unified `handle_timeout_save_and_response()` helper function (same as user timeout)
 
 **Foul-Out Timeout:**
 - Player fouls out during shot resolution
@@ -307,7 +314,23 @@ const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
 
 **Critical Fixes (January 2025):**
 
-1. **Computer Timeout State Restoration Bug Fix:**
+1. **Unified Timeout Handler:**
+   - **Problem:** User and computer timeouts had duplicate code paths for saving game state and building responses, leading to inconsistencies and bugs.
+   - **Root Cause:** Two separate endpoints (`/api/call-timeout` for user, `/api/simulate-turn` for computer) each had their own save/response logic, even though they used the same `gm.call_timeout()` method.
+   - **Solution:** Created unified `handle_timeout_save_and_response()` helper function that both endpoints call:
+     - Saves game state to database using `summarize_game_state()`
+     - Returns consistent response format with `clock`, `time_remaining`, `quarter`, `scores`, etc. from saved DB data
+     - Ensures response always matches what was saved to DB
+   - **Impact:** User and computer timeouts now work identically - same save logic, same response format, same behavior
+   - **Location:** `BackEnd/api/api.py` `handle_timeout_save_and_response()` (lines ~2850-2920)
+   - **Applied To:** 
+     - `/api/call-timeout` endpoint (user timeout)
+     - `/api/simulate-turn` endpoint (computer timeout)
+   - **Frontend Changes:** 
+     - Updated `gameScene.js` to store full response data in `turn._responseData` for computer timeouts
+     - Updated `AnimationEngine.handleTimeout()` to extract `clock` and `time_remaining` from `turnData._responseData`
+
+2. **Computer Timeout State Restoration Bug Fix:**
    - **Problem:** When computer called timeout, game state was saved to DB correctly, but when user returned, if game was still in `ongoing_games` (in-memory cache), the system would use stale in-memory state instead of loading the saved DB state. This caused incorrect scores, clock, and other game state to be restored.
    - **Root Cause:** `apply_timeout_resume_state_to_gm()` only restored timeout-specific fields (`timeout_next_play_type`, `clock`, `time_remaining`), but didn't restore scores, fouls, and timeouts from the saved document. When game was in memory, stale values persisted.
    - **Solution:** Updated `apply_timeout_resume_state_to_gm()` to restore ALL critical game state from saved document:
@@ -319,7 +342,7 @@ const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
    - **Location:** `BackEnd/api/api.py` `apply_timeout_resume_state_to_gm()` (lines 630-680)
    - **Applied To:** Both in-memory games (line 1238) and newly-loaded games (line 1556)
 
-2. **Q2-Q4 Timeout Resume Parameter Preservation:**
+3. **Q2-Q4 Timeout Resume Parameter Preservation:**
    - **Location:** `FrontEnd/static/set-lineup.js` (lines 1078-1088)
    - **Problem:** Previous logic forced `resumeFromTimeout = false` for ALL quarters > 1, treating timeouts in Q2-Q4 as quarter breaks
    - **Solution:** Only force `resumeFromTimeout = false` if URL param is already false/missing (true quarter break). Preserve `resumeFromTimeout = true` when URL param indicates timeout resume (any quarter)
@@ -335,7 +358,7 @@ const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
      }
      ```
 
-3. **Prevent Game Reset During Timeout Resume:**
+4. **Prevent Game Reset During Timeout Resume:**
    - **Location:** `FrontEnd/static/set-lineup.js` (lines 126-174)
    - **Problem:** `init-game` was being called when resuming from timeout, creating a new game and resetting all state (scores, clock, quarter)
    - **Solution:** Skip `init-game` call if `game_id` exists in URL OR if `resume_from_timeout=true`
@@ -748,8 +771,10 @@ All three flows use the same core systems:
 **Backend:**
 - `BackEnd/models/turn_manager.py` `setup_timeout_turn()`: Creates timeout turn payload
 - `BackEnd/models/game_manager.py` `determine_next_turn()`: Routes TIMEOUT → next turn
-- `BackEnd/models/game_manager.py` `call_timeout()`: Unified timeout creation method
-- `BackEnd/api/api.py` `call_timeout_endpoint()`: Handles user-initiated timeouts
+- `BackEnd/models/game_manager.py` `call_timeout()`: Unified timeout creation method (used by both user and computer timeouts)
+- `BackEnd/api/api.py` `handle_timeout_save_and_response()`: **Unified helper function** for saving game state and building response (used by both user and computer timeouts)
+- `BackEnd/api/api.py` `call_timeout_endpoint()`: Handles user-initiated timeouts (calls unified helper)
+- `BackEnd/api/api.py` `simulate_turn_endpoint()`: Handles computer timeouts (calls unified helper)
 - `BackEnd/api/api.py` `simulate_quarter_endpoint()`: Handles timeout resume flow
 - `BackEnd/api/api.py` `restore_timeout_resume_state()`: Loads timeout state from database
 - `BackEnd/api/api.py` `apply_timeout_resume_state_to_gm()`: Applies timeout state to GameManager
@@ -761,9 +786,9 @@ All three flows use the same core systems:
 - `FrontEnd/static/js/phaser/utils/timeoutButtonManager.js`: Timeout button logic and state management
 - `FrontEnd/static/js/phaser/utils/foulOutPopup.js`: Foul out popup and navigation
 - `FrontEnd/static/js/shared/timeoutNavigationHelper.js`: Unified navigation helper
-- `FrontEnd/static/js/phaser/animation/AnimationEngine.js` `handleTimeout()`: Handles timeout turn
+- `FrontEnd/static/js/phaser/animation/AnimationEngine.js` `handleTimeout()`: Handles timeout turn (extracts clock/time_remaining from response data)
 - `FrontEnd/static/js/phaser/animation/animateGameTurns.js`: Stops animation loop on timeout
-- `FrontEnd/static/js/phaser/gameScene.js`: Scoreboard immediate update logic
+- `FrontEnd/static/js/phaser/gameScene.js`: Scoreboard immediate update logic, stores response data in `turn._responseData` for computer timeouts
 - `FrontEnd/static/js/phaser/bootGame.js`: Auto-start logic for timeout resume, pre-game container visibility control
 - `FrontEnd/static/set-lineup.js` `restoreLineupFromUrl()`: Pre-populates lineup from URL, preserves `resume_from_timeout` parameter for timeouts in all quarters
 - `FrontEnd/static/set-lineup.js` `loadRoster()`: Skips `init-game` call when `game_id` exists or `resume_from_timeout=true` to prevent game state reset
