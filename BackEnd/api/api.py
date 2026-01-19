@@ -174,10 +174,7 @@ async def startup_event():
     # MongoDB connections are lazy - this just verifies the client exists
     try:
         from BackEnd.db import client, DB_NAME
-        print(f"🔵 [DEBUG] startup_event: MongoDB client exists: {client is not None}", file=sys.stderr, flush=True)
-        print(f"🔵 [DEBUG] startup_event: Target database name: {DB_NAME}", file=sys.stderr, flush=True)
-        print(f"🔵 [DEBUG] startup_event: MONGO_URI set: {bool(os.getenv('MONGO_URI'))}", file=sys.stderr, flush=True)
-        print(f"🔵 [DEBUG] startup_event: MONGO_DB_NAME env var: {os.getenv('MONGO_DB_NAME', 'NOT SET')}", file=sys.stderr, flush=True)
+        # ✅ PERFORMANCE: Removed verbose startup debug prints
         
         # NOTE: We don't test actual DB connection here to avoid blocking startup
         # MongoDB will connect on first real operation. If connection fails, 
