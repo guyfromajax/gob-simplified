@@ -715,8 +715,8 @@ All three flows use the same core systems:
 - `FrontEnd/static/js/phaser/animation/AnimationEngine.js` `handleTimeout()`: Handles timeout turn
 - `FrontEnd/static/js/phaser/animation/animateGameTurns.js`: Stops animation loop on timeout
 - `FrontEnd/static/js/phaser/gameScene.js`: Scoreboard immediate update logic
-- `FrontEnd/static/js/phaser/bootGame.js`: Auto-start logic for timeout resume
-- `FrontEnd/static/set-lineup.js` `restoreLineupFromUrl()`: Pre-populates lineup from URL
+- `FrontEnd/static/js/phaser/bootGame.js`: Auto-start logic for timeout resume, pre-game container visibility control
+- `FrontEnd/static/set-lineup.js` `restoreLineupFromUrl()`: Pre-populates lineup from URL, preserves `resume_from_timeout` parameter for timeouts in all quarters
 - `FrontEnd/static/game-plan.js` `loadSettings()`: Pre-populates game plan from URL
 - `FrontEnd/static/court.html`: Timeout button and progress bar HTML/CSS
 
