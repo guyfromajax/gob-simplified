@@ -592,18 +592,41 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 - Foul/timeout changes: Saved to DB during turn completion
 - Cache refreshed after timeout saves (most critical for consistency)
 
+### Player Energy (NG) Persistence ✅ **FIXED** (January 2025)
+
+**Problem:** After timeouts and quarter breaks, player energy (NG) values were displaying as 100% on the lineup screen and initial court.html load, even though backend maintained correct values.
+
+**Root Causes:**
+1. `summarize_game_state()` only saved lineup players, not bench players, causing bench players to default to 1.0 NG when loading from DB
+2. `/api/game/{game_id}` DB read path was checking top-level `NG` first (which doesn't exist), then defaulting to 1.0 before checking `attributes.NG`
+
+**Solution:**
+1. **Save All Players:** Modified `summarize_game_state()` to save ALL players (lineup + bench) using `team.get_all_players()`, ensuring all players' real-time NG values are persisted
+2. **Correct NG Extraction:** Modified `/api/game/{game_id}` DB read path to extract NG from `attributes.NG` first (where it's saved), with fallback to top-level `NG`, then default to 1.0
+
+**Key Points:**
+- NG values in saved documents are **real-time** values from in-memory Player objects at the moment of save (timeout/quarter break)
+- All players (lineup + bench) are saved to ensure complete energy state
+- Frontend correctly reads NG from `attributes.NG` with proper fallback chain
+
+**Files Changed:**
+- `BackEnd/utils/shared.py` - `summarize_game_state()` (lines 745-768): Save all players, not just lineup
+- `BackEnd/api/api.py` - `get_game_state()` (lines 1097-1120): Extract NG from `attributes.NG` correctly
+
 ### Key Files
 
 **Backend:**
 - `BackEnd/api/api.py`:
   - `refresh_game_cache_from_db()` (lines 630-680): Refreshes cache from DB
-  - `get_game_state()` (lines 823-1050): Supports `source=db` parameter
+  - `get_game_state()` (lines 823-1050): Supports `source=db` parameter, extracts NG from `attributes.NG`
   - `call_timeout_endpoint()` (lines 2825-2891): User timeout save + cache refresh
   - `simulate_turn_endpoint()` (lines 2390-2600): Computer timeout save + cache refresh
+- `BackEnd/utils/shared.py`:
+  - `summarize_game_state()` (lines 745-768): Saves all players (lineup + bench) with real-time NG values
 
 **Frontend:**
 - `FrontEnd/static/set-lineup.js`:
-  - `loadRoster()` (line 190): Uses `source=db` for player energy
+  - `loadRoster()` (line 190): Uses `source=db` for player energy, reads from `attributes.NG`
   - `setHeader()` (line 900): Uses `source=db` for scores/clock
 
 ### Benefits
