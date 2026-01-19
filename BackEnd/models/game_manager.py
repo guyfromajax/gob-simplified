@@ -489,13 +489,13 @@ class GameManager:
                 else:
                     # ✅ TURN-BY-TURN: Defer timeout creation until next API call
                     # This allows the current turn to be animated first, then timeout is created on next /api/simulate-turn call
+                    # DO NOT append inbound_payload - timeout will replace it
                     self.game_state["pending_computer_timeout"] = {
                         "calling_team": calling_team,
                         "turn_type": "SIDE_INBOUND"
                     }
                     logging.info(f"⏸️ COMPUTER TIMEOUT: Deferred for {calling_team.name} (turn-by-turn mode) - will be created on next API call")
-                    # Continue with normal SIP turn - timeout will be created next
-                    self.turns.append(inbound_payload)
+                    # Don't append SIP turn - timeout will replace it on next API call
                     return
             else:
                 # No computer timeout - proceed with SIP
@@ -581,14 +581,13 @@ class GameManager:
                 else:
                     # ✅ TURN-BY-TURN: Defer timeout creation until next API call
                     # This allows the current turn to be animated first, then timeout is created on next /api/simulate-turn call
+                    # DO NOT append inbound_payload - timeout will replace it
                     self.game_state["pending_computer_timeout"] = {
                         "calling_team": calling_team,
                         "turn_type": "BASELINE_INBOUND"
                     }
                     logging.info(f"⏸️ COMPUTER TIMEOUT: Deferred for {calling_team.name} (turn-by-turn mode) - will be created on next API call")
-                    # Continue with normal BIP turn - timeout will be created next
-                    self.turns.append(inbound_payload)
-                    self.text_log.append("Baseline inbound after made shot")
+                    # Don't append BIP turn - timeout will replace it on next API call
                     return
             else:
                 # No computer timeout - proceed with BIP
