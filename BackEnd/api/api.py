@@ -128,34 +128,15 @@ if environment == "development":
 
 # ✅ PERFORMANCE: Removed debug print statements
 
-# ✅ DEBUG: Add CORS logging middleware to trace CORS issues
+# ✅ ERROR HANDLING: Add middleware to catch exceptions early (debug prints removed for performance)
 @app.middleware("http")
 async def cors_debug_middleware(request: Request, call_next):
-    """Debug middleware to log all requests and catch exceptions early"""
-    method = request.method
-    path = request.url.path
-    print(f"🔵 [DEBUG] cors_debug_middleware: {method} {path}", file=sys.stderr, flush=True)
-    
-    origin = request.headers.get("origin")
-    if origin:
-        print(f"🔵 [DEBUG] cors_debug_middleware: Origin: {origin}", file=sys.stderr, flush=True)
-        logger.info(f"🔍 [CORS] Request from origin: {origin}")
-    
-    # Log all headers for debugging
-    print(f"🔵 [DEBUG] cors_debug_middleware: Headers: {dict(request.headers)}", file=sys.stderr, flush=True)
-    
+    """Middleware to catch exceptions early - debug prints removed"""
     try:
         response = await call_next(request)
-        if origin:
-            cors_header = response.headers.get("access-control-allow-origin")
-            print(f"🔵 [DEBUG] cors_debug_middleware: Response status: {response.status_code}, CORS header: {cors_header}", file=sys.stderr, flush=True)
-            logger.info(f"🔍 [CORS] Response CORS header: {cors_header}")
-        print(f"🔵 [DEBUG] cors_debug_middleware: {method} {path} - Status: {response.status_code}", file=sys.stderr, flush=True)
         return response
     except Exception as e:
-        print(f"🔴 [ERROR] cors_debug_middleware: EXCEPTION on {method} {path}: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
-        import traceback
-        traceback.print_exc(file=sys.stderr)
+        logging.error(f"🔴 [ERROR] EXCEPTION on {request.method} {request.url.path}: {type(e).__name__}: {e}", exc_info=True)
         raise
 
 # ✅ PERFORMANCE: Removed debug print statements
@@ -817,7 +798,6 @@ def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
 # 4. Routes
 @app.get("/")
 def root():
-    print("🔵 [DEBUG] root endpoint: GET / called", file=sys.stderr, flush=True)
     return {"message": "GOB Simulation API is live"}
 
 # Note: Health endpoint is registered at the top of the file (line 58) before CORS middleware
@@ -891,8 +871,7 @@ def simulate_game(request: SimulationRequest):
     # print(f"🏀 Final Score: {game.score}")
     # print(f"📊 Team Totals: {game.team_totals}")# show first few entries
 
-    print("\n🔎 DEBUGGING SUMMARY BEFORE INSERT")
-    pprint.pprint(summary)
+    # ✅ PERFORMANCE: Removed verbose debug print
 
     # Log keys and ensure no Player objects remain at the top level
     print("Summary top-level keys:", list(summary.keys()))
