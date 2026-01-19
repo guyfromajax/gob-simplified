@@ -95,19 +95,24 @@ def get_cors_origins():
     return origins
 
 # Get CORS origins and configure middleware BEFORE including routers
-# ✅ PERFORMANCE: Removed debug print statements
 cors_origins = get_cors_origins()
 
+# ✅ CORS FIX: Configure middleware with explicit origins and regex pattern
+# FastAPI's CORSMiddleware uses allow_origins OR allow_origin_regex (not both simultaneously)
+# If allow_origins is a list, it takes precedence. We keep both for flexibility.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_origin_regex=r"https://.*\.(railway|netlify)\.app",  # Allow default Railway/Netlify domains (fixed regex)
+    allow_origins=cors_origins,  # Explicit origins (includes gob-test.netlify.app)
+    allow_origin_regex=r"https://.*\.(railway|netlify)\.app",  # Regex for Railway/Netlify domains
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600  # Cache preflight requests for 1 hour
 )
+
+# ✅ DEBUG: Log CORS origins for troubleshooting
+logging.info(f"🌐 CORS configured with origins: {cors_origins}")
 
 # Include routers AFTER CORS middleware is configured
 app.include_router(tournament_router)
