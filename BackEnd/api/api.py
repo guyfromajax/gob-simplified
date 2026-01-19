@@ -989,6 +989,9 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
         
         # Check database
         if games_collection is not None:
+            # 🔍 DEBUG: Log when reading from DB (for lineup screen)
+            if force_db_read:
+                logging.warning(f"🔍 [GET_GAME_STATE DEBUG] Reading from DB (source=db) - game_id={game_id}, quarter={quarter}")
             # ✅ PERFORMANCE: Use projection to only load needed fields (80-95% reduction in data transfer)
             # Fields needed: players (energy/stats), ineligible_players, score, box_score, quarter, clock,
             # teams (name, team_id, box_score, totals, scouting, attributes, colors, score, timeouts, team_fouls, points_by_quarter),
@@ -1026,7 +1029,11 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
             logging.warning(f"⏱️ [PERF] /api/game/{game_id} - DB query: {query_time:.2f}ms, doc_size: {doc_size} bytes")
             
             if saved:
-                # ✅ PERFORMANCE: Removed debug logging
+                # 🔍 DEBUG: Log what's being read from DB
+                if force_db_read:
+                    logging.warning(f"🔍 [GET_GAME_STATE DEBUG] DB document - quarter={saved.get('quarter')}, clock={saved.get('clock')}, time_remaining={saved.get('time_remaining')}")
+                    logging.warning(f"🔍 [GET_GAME_STATE DEBUG] DB document - score={saved.get('score')}, timeout_next_play_type={saved.get('timeout_next_play_type')}")
+                
                 saved_quarter = saved.get("quarter", 1)
                 
                 # Check if this is a "new game" scenario: user requesting Q1 but saved game is Q2+
@@ -2642,6 +2649,11 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
                         gm.away_team.name: gm.away_team.get_team_game_stats()
                     }
                 }
+                
+                # 🔍 DEBUG: Log what's being returned in response
+                logging.warning(f"🔍 [COMPUTER TIMEOUT RESPONSE DEBUG] Response data: time_remaining={timeout_response['time_remaining']}, clock={timeout_response['clock']}, quarter={timeout_response['quarter']}, quarter_complete={timeout_response['quarter_complete']}")
+                logging.warning(f"🔍 [COMPUTER TIMEOUT RESPONSE DEBUG] Response scores: home_score={timeout_response['home_score']}, away_score={timeout_response['away_score']}")
+                logging.warning(f"🔍 [COMPUTER TIMEOUT RESPONSE DEBUG] db_summary scores: {db_summary.get('score')}, db_summary clock={db_summary.get('clock')}, db_summary time_remaining={db_summary.get('time_remaining')}")
                 # ⏱️ PERFORMANCE: Log timeout return path
                 total_time = (time.time() - start_time) * 1000
                 response_size = len(str(timeout_response).encode('utf-8'))
