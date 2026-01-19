@@ -7,26 +7,7 @@
 
 ## 🔴 Active Bugs & Critical Issues
 
-### 1. Franchise Mode Team Stats Isolation
-**Status:** ⏳ FIX DRAFTED  
-**Priority:** 🔴 HIGH - Data integrity issue  
-**Document:** `bug_fix_franchise_team_stats_isolation.md`
-
-**Problem:** Franchise mode team stats (W/L, PF/PA) are incorrectly reading from and writing to the universal `teams` collection, causing stats to be shared across different game modes and franchise instances.
-
-**Solution:** 
-- Remove writes to universal `teams` collection from franchise routes
-- Calculate W/L and PF/PA from `franchise.results` instead
-- Update `team_stats_aggregator.py` to support franchise results calculation
-
-**Files to Modify:**
-- `BackEnd/api/franchise_routes.py`
-- `BackEnd/utils/team_stats_aggregator.py`
-- `BackEnd/models/franchise_manager.py`
-
----
-
-### 2. Active Bugs from bugs.md
+### 1. Active Bugs from bugs.md
 **Document:** `bugs.md`
 
 **Current Active Bugs:**
@@ -218,6 +199,7 @@ The following items have been completed and moved to `docs/To Do/Archive/`:
 7. ✅ **Tournament Stats Display** - Bug fixes implemented
 8. ✅ **Sim Quarter Feature** - Feature implemented and working
 9. ✅ **Performance Analysis Docs** - Performance issues resolved (archived analysis docs)
+10. ✅ **Franchise Mode Team Stats Isolation** - Franchise stats now isolated from universal teams collection
 
 ---
 

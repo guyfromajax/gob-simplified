@@ -219,9 +219,9 @@ games_collection.update_one(
 - **Tournament Game:** Nested in `tournaments_collection.games.{round}.{game_id}` (with fallback to `games_collection`)
 - **Franchise Game:** Nested in `franchises_collection.games.week_{week}.{game_id}` (with fallback to `games_collection`)
 
-#### URL Parameters (Navigation Only)
+#### URL Parameters (Single Source of Truth for Frontend Detection)
 
-**Purpose:** URL parameters are used for navigation/routing, not business logic. Database is the source of truth.
+**Purpose:** URL parameters are used for navigation/routing AND as the single source of truth for frontend timeout resume detection. Database is used by backend for state restoration, but frontend relies exclusively on URL param for UI decisions.
 
 **Unified Navigation Helper System (SS&S - December 2025):**
 
@@ -240,9 +240,10 @@ All frontend navigation now uses a unified helper (`FrontEnd/static/js/shared/ti
 
 2. **Resume From Timeout Logic:**
    - Set `resume_from_timeout=true` if: `resumeFromTimeout === true` AND `gameId` exists
-   - NOT for quarter breaks (Q2-Q4 without timeout)
-   - NOT for new game start
+   - Set `resume_from_timeout=false` if: `resumeFromTimeout === false` AND `gameId` exists (quarter break)
+   - NOT for new game start (param intentionally omitted when no `gameId`)
    - **Supports any quarter** (Q1-Q4, OT) - removed Q1-only restriction
+   - **Always set when `gameId` exists** - ensures param is never ambiguous
 
 3. **Quarter/Period Logic:**
    - Always sets `quarter` and `period` (Q1-Q4 or OT1+)
@@ -254,7 +255,8 @@ All frontend navigation now uses a unified helper (`FrontEnd/static/js/shared/ti
    - Preserves debug flags
 
 **URL Parameters Used:**
-- `resume_from_timeout=true`: Navigation flag (convenience, not source of truth)
+- `resume_from_timeout=true`: Timeout resume flag (frontend single source of truth for UI decisions)
+- `resume_from_timeout=false`: Quarter break flag (explicitly set to avoid ambiguity)
 - `game_id`: Game identifier
 - `quarter`: Quarter number
 - `period`: Period label (Q1-Q4 or OT1+)
@@ -264,6 +266,36 @@ All frontend navigation now uses a unified helper (`FrontEnd/static/js/shared/ti
 - `week`: Week number (franchise mode)
 - Lineup parameters: `home_pg`, `home_sg`, etc.
 - `clock`: Clock time (preserved for foul out/timeout)
+
+**Frontend Detection Logic (SS&S - January 2025):**
+
+**Location:** `FrontEnd/static/js/phaser/bootGame.js` `initGame()`
+
+**Pattern:**
+```javascript
+// URL param is single source of truth - no database fallback
+const urlResumeFromTimeoutParam = urlParams.get('resume_from_timeout');
+const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
+
+// Safe default: If param is missing, treat as false (quarter break, not timeout resume)
+// This is safe because:
+// 1. If it's a new Q1 game, param is intentionally omitted → false is correct
+// 2. If gameId exists but param is missing (stale URL), false is safer than true
+// 3. If it's truly a timeout resume, the helper should have set it to 'true'
+```
+
+**Key Principles:**
+- **No Database Fallback:** Frontend does NOT check database for timeout state - relies exclusively on URL param
+- **Safe Default:** Missing param = `false` (quarter break), never `true` (timeout resume)
+- **Explicit Setting:** Helper always sets param to `'true'` or `'false'` when `gameId` exists (never ambiguous)
+- **UI Decision Only:** URL param determines whether to show/hide pre-game buttons (backend still uses database for state restoration)
+
+**Why No Database Fallback:**
+- **Stale State Risk:** Database may contain `timeout_next_play_type` from previous timeout that hasn't been cleared yet
+- **Quarter Ambiguity:** Stale timeout state in database doesn't indicate which quarter it applies to
+- **Race Conditions:** After timeout resume, `timeout_next_play_type` may persist until turn completes, causing false positives
+- **Complexity:** Database fallback adds unnecessary complexity and creates multiple sources of truth
+- **Reliability:** URL param is set correctly by helper in all navigation paths - no need for fallback
 
 **Critical Frontend Pattern:**
 - All navigation functions read URL params directly from `window.location.search` when called
