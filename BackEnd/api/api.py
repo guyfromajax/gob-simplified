@@ -1113,6 +1113,10 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                     saved_stats = p.get("stats", {})
                     # Stats are saved as flat dict, so ensure we return them as flat dict
                     # Frontend will check gp.stats?.game first, but since it's flat, will use gp.stats
+                    # ✅ DIAGNOSTIC: Log if stats are empty (for debugging)
+                    if not saved_stats or not any(saved_stats.values()):
+                        player_name = p.get("name", "Unknown")
+                        logging.warning(f"⚠️ [STATS DEBUG] Player {player_name} has empty stats in saved doc - this may be expected for players with no game activity")
                     
                     player_data = {
                         "_id": p.get("playerId") or p.get("player_id"),
@@ -1183,6 +1187,12 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                         home_team_data.get("name"): home_score,
                         away_team_data.get("name"): away_score
                     }
+                    logging.warning(f"🔍 [SCORE DEBUG] Built score from teams object: {saved_score}")
+                # ✅ DIAGNOSTIC: Log score for debugging
+                if not saved_score or not any(saved_score.values()):
+                    logging.warning(f"⚠️ [SCORE DEBUG] Saved score is empty or all zeroes: {saved_score}")
+                else:
+                    logging.info(f"✅ [SCORE DEBUG] Score loaded from DB: {saved_score}")
                 
                 response_data = {
                     "game_id": game_id,
