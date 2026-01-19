@@ -289,6 +289,8 @@ const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
 - **Safe Default:** Missing param = `false` (quarter break), never `true` (timeout resume)
 - **Explicit Setting:** Helper always sets param to `'true'` or `'false'` when `gameId` exists (never ambiguous)
 - **UI Decision Only:** URL param determines whether to show/hide pre-game buttons (backend still uses database for state restoration)
+- **Parameter Preservation:** `resume_from_timeout` parameter is preserved through entire navigation chain (timeout → lineup → court)
+- **Quarter Independence:** Timeouts work in all quarters (Q1-Q4, OT) - parameter is preserved regardless of quarter
 
 **Why No Database Fallback:**
 - **Stale State Risk:** Database may contain `timeout_next_play_type` from previous timeout that hasn't been cleared yet
@@ -302,6 +304,22 @@ const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
 - Does NOT rely on module-level variables that might be stale (especially after async delays)
 - Helper ensures `game_id` and `resume_from_timeout` are always current when navigating
 - **All navigation functions MUST use `TimeoutNavigationHelper`** - manual parameter preservation is fragile and can lose critical state (e.g., `clock` parameter)
+
+**Critical Fix (January 2025):**
+- **Location:** `FrontEnd/static/set-lineup.js` (lines 1078-1088)
+- **Problem:** Previous logic forced `resumeFromTimeout = false` for ALL quarters > 1, treating timeouts in Q2-Q4 as quarter breaks
+- **Solution:** Only force `resumeFromTimeout = false` if URL param is already false/missing (true quarter break). Preserve `resumeFromTimeout = true` when URL param indicates timeout resume (any quarter)
+- **Impact:** Pre-game popup now only appears after quarter breaks, not after timeouts in Q2-Q4
+- **Pattern:**
+  ```javascript
+  // Only force to false if URL param is already false/missing (true quarter break)
+  if (quarter > 1 && !resumeFromTimeout) {
+    resumeFromTimeout = false;
+  } else if (quarter > 1 && resumeFromTimeout) {
+    // Preserve timeout resume even in Q2-Q4
+    // resumeFromTimeout stays true
+  }
+  ```
 
 #### LocalStorage (Frontend State Only)
 
@@ -451,6 +469,10 @@ This prevents stale timeout state from affecting future games.
    - Prevents stale timeout state from affecting future games
 
 9. **Frontend auto-starts game** (bypasses pre-game buttons)
+   - **Location:** `FrontEnd/static/js/phaser/bootGame.js` `initGame()`
+   - Pre-game container is explicitly hidden when `resumeFromTimeout === true`
+   - Pre-game container is explicitly shown when `resumeFromTimeout === false` or missing
+   - Auto-starts game by calling `handleButtonClick(true)` when resuming from timeout
    - Game continues seamlessly
 
 10. **Game continues** with SIP → HCO transition
