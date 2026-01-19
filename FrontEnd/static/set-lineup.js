@@ -666,7 +666,8 @@ function updateSlotDisplay(slot) {
     
     // Get all stats with fallbacks (same pattern as energy)
     const points = stats.PTS || 0;
-    const rebounds = (stats.OREB || 0) + (stats.DREB || 0) + (stats.REB || 0);
+    // REB (TREB) is the total rebounds - use it if available, otherwise calculate from OREB + DREB
+    const rebounds = stats.REB || ((stats.OREB || 0) + (stats.DREB || 0));
     const assists = stats.AST || 0;
     const defA = stats.DEF_A || 0;
     const defS = stats.DEF_S || 0;
