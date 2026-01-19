@@ -739,6 +739,7 @@ class ShotManager:
                 self.game_state["free_throws_remaining"] = self.game_state["free_throws"]
                 # ✅ FIX: Set next_play_type for shooting fouls on missed shots (matches AND-1 pattern)
                 result["next_play_type"] = "FREE_THROW"
+                logging.warning(f"🔍 [SHOOTING FOUL MISS DEBUG] Set next_play_type=FREE_THROW for missed shot, free_throws_remaining={self.game_state['free_throws_remaining']}, shooter={get_name_safe(shooter)}, foul_player={get_name_safe(foul_player)}")
                 text = f"{get_name_safe(foul_player)} fouls {get_name_safe(shooter)} on the shot."
                 possession_flips = False
                 
@@ -1101,6 +1102,9 @@ class ShotManager:
             # This ensures frontend can detect shooting fouls on misses reliably
             if d_foul and self.game_state.get("free_throws_remaining", 0) > 0:
                 result["free_throws_remaining"] = self.game_state["free_throws_remaining"]
+                logging.warning(f"🔍 [SHOOTING FOUL MISS DEBUG] Set free_throws_remaining={result['free_throws_remaining']}, next_play_type={result.get('next_play_type')}, shooter={get_name_safe(shooter)}, foul_player={get_name_safe(foul_player) if d_foul else 'None'}")
+            else:
+                logging.warning(f"🔍 [SHOOTING FOUL MISS DEBUG] NO shooting foul detected: d_foul={d_foul}, free_throws_remaining={self.game_state.get('free_throws_remaining', 0)}, shooter={get_name_safe(shooter)}")
 
         return result
 
