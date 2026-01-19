@@ -2416,15 +2416,17 @@ async function initGame() {
   });
   
   // ✅ CRITICAL FIX: Explicitly control pre-game container visibility
-  // Rule: Show pre-game container UNLESS we're resuming from timeout
+  // Rule: Show pre-game container UNLESS we're resuming from timeout or foul out
+  // Quarter breaks (resume_from_timeout=false or missing) should always show popup
+  // Timeouts and foul outs (resume_from_timeout=true) should hide popup
   // This ensures the container is always in the correct state
   const preGameContainer = document.querySelector('.pre-game-container');
   if (preGameContainer) {
     if (resumeFromTimeout) {
-      console.warn(`🔍 [TIMEOUT DETECTION] HIDING pre-game container (resumeFromTimeout=true)`);
+      console.warn(`🔍 [TIMEOUT DETECTION] HIDING pre-game container (resumeFromTimeout=true - timeout/foul out resume)`);
       preGameContainer.classList.add('hidden');
     } else {
-      console.warn(`🔍 [TIMEOUT DETECTION] SHOWING pre-game container (resumeFromTimeout=false or missing)`);
+      console.warn(`🔍 [TIMEOUT DETECTION] SHOWING pre-game container (resumeFromTimeout=false or missing - quarter break)`);
       preGameContainer.classList.remove('hidden');
     }
   } else {

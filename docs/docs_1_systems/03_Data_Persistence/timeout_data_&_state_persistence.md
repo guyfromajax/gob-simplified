@@ -10,20 +10,43 @@
 
 ---
 
+## Quarter Breaks vs. Timeouts
+
+**Key Difference:**
+- **Quarter Breaks**: Natural game pauses between quarters. `resume_from_timeout=false` (or missing). Pre-game popup appears.
+- **Timeouts**: User/computer-initiated pauses. `resume_from_timeout=true`. Pre-game popup hidden (auto-resume).
+- **Foul Outs**: Automatic timeouts. `resume_from_timeout=true`. Pre-game popup hidden (auto-resume).
+
+**State Management:**
+- Quarter breaks clear timeout state when quarter completes (ensures clean quarter start).
+- Timeouts preserve timeout state for resume (maintains possession and play type).
+- Both save game state identically (scores, stats, energy, etc.).
+
+---
+
 ## 1. Timeout Called / Quarter Break / Player Foul Out
 
 **What Happens:**
+
+**Timeouts (User/Computer/Foul Out):**
 - Backend creates `TIMEOUT` turn via `setup_timeout_turn()`
 - Game state saved to database via `handle_timeout_save_and_response()`
+- Sets `resume_from_timeout=true` in URL
+
+**Quarter Breaks:**
+- Quarter completes naturally (time reaches 0)
+- Game state saved to database via `summarize_game_state()` (same as timeouts)
+- Clears timeout state (if any exists from previous timeout)
+- Sets `resume_from_timeout=false` (or omits param) in URL
 
 **Data Saved to Database (`games` collection):**
 
 **Critical State (for resume):**
-- `timeout_next_play_type`: `"SIDE_INBOUND"` (or `"FREE_THROW"` if applicable)
-- `timeout_offense_team_id`: Team ID that had possession when timeout called
+- `timeout_next_play_type`: `"SIDE_INBOUND"` (or `"FREE_THROW"` if applicable) - **Only for timeouts**
+- `timeout_offense_team_id`: Team ID that had possession when timeout called - **Only for timeouts**
 - `clock`: Current game clock (e.g., `"4:23"`)
 - `time_remaining`: Seconds remaining (e.g., `263`)
-- `quarter`: Current quarter (1-4)
+- `quarter`: Current quarter (1-4) - **Incremented on quarter break**
 
 **Game State:**
 - `score`: `{"Team Name": score}` for both teams
@@ -59,7 +82,9 @@
 
 **State Persistence:**
 - No additional saves (uses data from Step 1)
-- URL params set: `resume_from_timeout=true`, `game_id`, `quarter`, `clock`, etc.
+- URL params set:
+  - **Timeouts/Foul Outs**: `resume_from_timeout=true`, `game_id`, `quarter`, `clock`, etc.
+  - **Quarter Breaks**: `resume_from_timeout=false` (or omitted), `game_id`, `quarter`, `clock`, etc.
 
 ---
 
@@ -130,11 +155,13 @@
 
 ## Key Principles
 
-1. **Database is Single Source of Truth**: All critical game state saved to database at timeout
+1. **Database is Single Source of Truth**: All critical game state saved to database at timeout/quarter break
 2. **Unified Structure**: Uses `teams.{team_id}` structure (with backward compatibility fallback)
 3. **Complete Restoration**: All game state restored when resuming (scores, clock, timeouts, fouls, player stats)
-4. **Possession Preservation**: `timeout_offense_team_id` ensures correct team has possession after timeout
+4. **Possession Preservation**: `timeout_offense_team_id` ensures correct team has possession after timeout (not applicable for quarter breaks)
 5. **Fresh Reads**: Lineup screen always reads from database (`source=db`) to avoid stale data
+6. **Quarter Break State Cleanup**: Quarter breaks explicitly clear timeout state to ensure clean quarter starts
+7. **Popup Logic**: Pre-game popup shows for quarter breaks (`resume_from_timeout=false`), hidden for timeouts/foul outs (`resume_from_timeout=true`)
 
 ---
 
