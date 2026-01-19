@@ -1426,11 +1426,24 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 # Stale timeout data (quarter mismatch or missing next_play_type) - ignore it
                 # logging.warning(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={request.quarter}, next_play_type={timeout_next_play_type})")
                 timeout_saved_state = None  # Clear invalid timeout state
-                # ✅ QUARTER BREAK: Clear resume_from_timeout flag if no valid timeout state
+                # ✅ QUARTER BREAK: Clear resume_from_timeout flag and timeout state if no valid timeout state
                 # This handles cases where resume_from_timeout was incorrectly preserved across quarter boundaries
+                # Quarter breaks should NOT have timeout state - clear it explicitly
                 if request.resume_from_timeout:
                     logging.warning(f"⚠️ QUARTER BREAK: Clearing invalid resume_from_timeout flag (no valid timeout state for quarter {request.quarter})")
                     request.resume_from_timeout = False
+                
+                # ✅ QUARTER BREAK: Explicitly clear any stale timeout state in saved document
+                # This ensures quarter breaks are treated as new quarter starts, not timeout resumes
+                if "timeout_next_play_type" in saved or "timeout_offense_team_id" in saved:
+                    logging.info(f"✅ QUARTER BREAK: Clearing stale timeout state from saved document (quarter {request.quarter})")
+                    update_data = {}
+                    if "timeout_next_play_type" in saved:
+                        update_data["timeout_next_play_type"] = None
+                    if "timeout_offense_team_id" in saved:
+                        update_data["timeout_offense_team_id"] = None
+                    if update_data:
+                        games_collection.update_one({"_id": game_id}, {"$unset": update_data})
         else:
             if request.resume_from_timeout:
                 logging.warning(f"⚠️ TIMEOUT RESUME: URL has resume_from_timeout=true but no timeout state found in DB for game_id={game_id} - treating as normal quarter start")
@@ -2777,6 +2790,15 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             gm.quarter += 1
             gm.game_state["quarter"] = gm.quarter  # ✅ FIX: Ensure game_state is updated
             logging.info(f"✅ Advanced to quarter {gm.quarter}")
+            
+            # ✅ QUARTER BREAK: Clear timeout state when quarter completes (not a timeout resume)
+            # This ensures quarter breaks are treated as new quarter starts, not timeout resumes
+            if "timeout_next_play_type" in gm.game_state:
+                del gm.game_state["timeout_next_play_type"]
+                logging.info(f"✅ QUARTER BREAK: Cleared timeout_next_play_type (quarter break, not timeout)")
+            if "timeout_offense_team_id" in gm.game_state:
+                del gm.game_state["timeout_offense_team_id"]
+                logging.info(f"✅ QUARTER BREAK: Cleared timeout_offense_team_id (quarter break, not timeout)")
         
         # Check if game is final (Q4+ complete and not tied)
         # Use the quarter BEFORE increment to avoid premature final at end of Q3
