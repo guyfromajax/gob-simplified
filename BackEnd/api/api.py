@@ -97,21 +97,23 @@ def get_cors_origins():
 # Get CORS origins and configure middleware BEFORE including routers
 cors_origins = get_cors_origins()
 
-# ✅ CORS FIX: Configure middleware with explicit origins and regex pattern
-# FastAPI's CORSMiddleware uses allow_origins OR allow_origin_regex (not both simultaneously)
-# If allow_origins is a list, it takes precedence. We keep both for flexibility.
+# ✅ CORS FIX: FastAPI's CORSMiddleware can use both allow_origins and allow_origin_regex
+# allow_origin_regex is checked if origin is not in allow_origins
+# This ensures gob-test.netlify.app is explicitly allowed AND any *.netlify.app domain works
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,  # Explicit origins (includes gob-test.netlify.app)
-    allow_origin_regex=r"https://.*\.(railway|netlify)\.app",  # Regex for Railway/Netlify domains
+    allow_origin_regex=r"https://.*\.(railway|netlify)\.app",  # Regex fallback for Railway/Netlify domains
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],  # Explicit methods
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600  # Cache preflight requests for 1 hour
 )
 
-# ✅ DEBUG: Log CORS origins for troubleshooting
+# ✅ DEBUG: Log CORS origins for troubleshooting (use print for startup visibility)
+print(f"🌐 [CORS] Configured with origins: {cors_origins}")
+print(f"🌐 [CORS] Regex pattern: https://.*\\.(railway|netlify)\\.app")
 logging.info(f"🌐 CORS configured with origins: {cors_origins}")
 
 # Include routers AFTER CORS middleware is configured
