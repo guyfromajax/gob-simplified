@@ -641,54 +641,83 @@ def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
     if not saved or not gm:
         return
     
+    # 🔍 DEBUG: Log state BEFORE restore
+    logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] BEFORE restore - game_id={gm.game_id if hasattr(gm, 'game_id') else 'NO_GAME_ID'}, quarter={gm.quarter}")
+    logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] gm.game_state timeout fields: timeout_next_play_type={gm.game_state.get('timeout_next_play_type')}, timeout_offense_team_id={gm.game_state.get('timeout_offense_team_id')}")
+    logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] gm.score={gm.score}, clock={gm.game_state.get('clock')}, time_remaining={gm.game_state.get('time_remaining')}")
+    logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] saved document timeout fields: timeout_next_play_type={saved.get('timeout_next_play_type')}, timeout_offense_team_id={saved.get('timeout_offense_team_id')}")
+    logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] saved document score={saved.get('score')}, clock={saved.get('clock')}, time_remaining={saved.get('time_remaining')}")
+    
     # ✅ CRITICAL FIX: Restore ALL critical game state from saved document
     # This ensures saved state (from timeout save) overwrites any stale in-memory state
     
     # Restore timeout-specific state
+    old_timeout_next_play_type = gm.game_state.get("timeout_next_play_type")
     if "timeout_next_play_type" in saved:
         gm.game_state["timeout_next_play_type"] = saved["timeout_next_play_type"]
+        logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] timeout_next_play_type: {old_timeout_next_play_type} → {saved['timeout_next_play_type']}")
         logging.info(f"🔄 TIMEOUT RESUME: Applied timeout_next_play_type={saved['timeout_next_play_type']}")
     
     if "timeout_offense_team_id" in saved:
+        old_timeout_offense_team_id = gm.game_state.get("timeout_offense_team_id")
         gm.game_state["timeout_offense_team_id"] = saved["timeout_offense_team_id"]
+        logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] timeout_offense_team_id: {old_timeout_offense_team_id} → {saved['timeout_offense_team_id']}")
     
     # Restore clock and time (critical for timeout resume)
+    old_clock = gm.game_state.get("clock")
     if "clock" in saved:
         gm.game_state["clock"] = saved["clock"]
+        logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] clock: {old_clock} → {saved['clock']}")
         logging.info(f"🔄 TIMEOUT RESUME: Restored clock={saved['clock']} from saved document")
     
+    old_time_remaining = gm.game_state.get("time_remaining")
     if "time_remaining" in saved:
         gm.game_state["time_remaining"] = saved["time_remaining"]
+        logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] time_remaining: {old_time_remaining} → {saved['time_remaining']}")
         logging.info(f"🔄 TIMEOUT RESUME: Restored time_remaining={saved['time_remaining']} from saved document")
     
     # ✅ CRITICAL FIX: Restore scores from saved document (overwrites stale in-memory scores)
+    old_scores = dict(gm.score) if gm.score else {}
     if "score" in saved and isinstance(saved["score"], dict):
         # Restore scores for both teams
         for team_name, score_value in saved["score"].items():
             if team_name in gm.score:
+                old_score = gm.score[team_name]
                 gm.score[team_name] = score_value
+                logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] score {team_name}: {old_score} → {score_value}")
                 logging.info(f"🔄 TIMEOUT RESUME: Restored score {team_name}={score_value} from saved document")
     
     # ✅ CRITICAL FIX: Restore team fouls from saved document
     home_team_data = saved.get("home_team", {})
     away_team_data = saved.get("away_team", {})
     
+    old_home_fouls = gm.home_team.team_fouls
     if "team_fouls" in home_team_data:
         gm.home_team.team_fouls = home_team_data["team_fouls"]
+        logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] home team_fouls: {old_home_fouls} → {home_team_data['team_fouls']}")
         logging.info(f"🔄 TIMEOUT RESUME: Restored home team_fouls={home_team_data['team_fouls']} from saved document")
     
+    old_away_fouls = gm.away_team.team_fouls
     if "team_fouls" in away_team_data:
         gm.away_team.team_fouls = away_team_data["team_fouls"]
+        logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] away team_fouls: {old_away_fouls} → {away_team_data['team_fouls']}")
         logging.info(f"🔄 TIMEOUT RESUME: Restored away team_fouls={away_team_data['team_fouls']} from saved document")
     
     # ✅ CRITICAL FIX: Restore team timeouts from saved document
+    old_home_timeouts = gm.home_team.timeouts
     if "timeouts" in home_team_data:
         gm.home_team.timeouts = home_team_data["timeouts"]
+        logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] home timeouts: {old_home_timeouts} → {home_team_data['timeouts']}")
         logging.info(f"🔄 TIMEOUT RESUME: Restored home timeouts={home_team_data['timeouts']} from saved document")
     
+    old_away_timeouts = gm.away_team.timeouts
     if "timeouts" in away_team_data:
         gm.away_team.timeouts = away_team_data["timeouts"]
+        logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] away timeouts: {old_away_timeouts} → {away_team_data['timeouts']}")
         logging.info(f"🔄 TIMEOUT RESUME: Restored away timeouts={away_team_data['timeouts']} from saved document")
+    
+    # 🔍 DEBUG: Log state AFTER restore
+    logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] AFTER restore - gm.score={gm.score}, clock={gm.game_state.get('clock')}, time_remaining={gm.game_state.get('time_remaining')}")
 
 # 4. Routes
 @app.get("/")
@@ -2468,8 +2497,29 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
                 # ✅ COMPUTER TIMEOUT: Save game state immediately (same as user timeouts)
                 # This ensures clock, scores, fouls, etc. are preserved when user returns from lineup screen
                 try:
+                    # 🔍 DEBUG: Log state BEFORE save
+                    logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] BEFORE save - game_id={game_id}, quarter={gm.quarter}")
+                    logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] gm.game_state timeout fields: timeout_next_play_type={gm.game_state.get('timeout_next_play_type')}, timeout_offense_team_id={gm.game_state.get('timeout_offense_team_id')}")
+                    logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] gm.score={gm.score}, clock={gm.game_state.get('clock')}, time_remaining={gm.game_state.get('time_remaining')}")
+                    
+                    # 🔍 DEBUG: Check DB state BEFORE save
+                    before_save_doc = games_collection.find_one({"_id": game_id})
+                    logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] DB BEFORE save - timeout_next_play_type={before_save_doc.get('timeout_next_play_type') if before_save_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={before_save_doc.get('timeout_offense_team_id') if before_save_doc else 'DOC_NOT_FOUND'}")
+                    logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] DB BEFORE save - score={before_save_doc.get('score') if before_save_doc else 'DOC_NOT_FOUND'}, clock={before_save_doc.get('clock') if before_save_doc else 'DOC_NOT_FOUND'}")
+                    
                     db_summary = summarize_game_state(gm, exclude_animations=True)
+                    
+                    # 🔍 DEBUG: Log what's being saved
+                    logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] db_summary timeout fields: timeout_next_play_type={db_summary.get('timeout_next_play_type')}, timeout_offense_team_id={db_summary.get('timeout_offense_team_id')}")
+                    logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] db_summary score={db_summary.get('score')}, clock={db_summary.get('clock')}, time_remaining={db_summary.get('time_remaining')}")
+                    
                     games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
+                    
+                    # 🔍 DEBUG: Verify what was saved to DB
+                    after_save_doc = games_collection.find_one({"_id": game_id})
+                    logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] DB AFTER save - timeout_next_play_type={after_save_doc.get('timeout_next_play_type') if after_save_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={after_save_doc.get('timeout_offense_team_id') if after_save_doc else 'DOC_NOT_FOUND'}")
+                    logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] DB AFTER save - score={after_save_doc.get('score') if after_save_doc else 'DOC_NOT_FOUND'}, clock={after_save_doc.get('clock') if after_save_doc else 'DOC_NOT_FOUND'}, time_remaining={after_save_doc.get('time_remaining') if after_save_doc else 'DOC_NOT_FOUND'}")
+                    
                     logging.info(
                         f"💾 COMPUTER TIMEOUT: Saved game state before returning timeout turn: "
                         f"game_id={game_id}, quarter={db_summary.get('quarter')}, "
@@ -2802,8 +2852,24 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
     # ✅ TIMEOUT: Save game state to database (reuse existing persistence pattern)
     # This ensures scores, clock, fouls, etc. are preserved when user returns from lineup screen
     try:
+        # 🔍 DEBUG: Log state BEFORE save
+        logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] BEFORE save - game_id={game_id}, quarter={gm.quarter}")
+        logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] gm.game_state timeout fields: timeout_next_play_type={gm.game_state.get('timeout_next_play_type')}, timeout_offense_team_id={gm.game_state.get('timeout_offense_team_id')}")
+        logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] gm.score={gm.score}, clock={gm.game_state.get('clock')}, time_remaining={gm.game_state.get('time_remaining')}")
+        
         db_summary = summarize_game_state(gm, exclude_animations=True)
+        
+        # 🔍 DEBUG: Log what's being saved
+        logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] db_summary timeout fields: timeout_next_play_type={db_summary.get('timeout_next_play_type')}, timeout_offense_team_id={db_summary.get('timeout_offense_team_id')}")
+        logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] db_summary score={db_summary.get('score')}, clock={db_summary.get('clock')}, time_remaining={db_summary.get('time_remaining')}")
+        
         games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
+        
+        # 🔍 DEBUG: Verify what was saved to DB
+        saved_doc = games_collection.find_one({"_id": game_id})
+        logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] AFTER save - DB document timeout fields: timeout_next_play_type={saved_doc.get('timeout_next_play_type') if saved_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={saved_doc.get('timeout_offense_team_id') if saved_doc else 'DOC_NOT_FOUND'}")
+        logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] DB document score={saved_doc.get('score') if saved_doc else 'DOC_NOT_FOUND'}, clock={saved_doc.get('clock') if saved_doc else 'DOC_NOT_FOUND'}, time_remaining={saved_doc.get('time_remaining') if saved_doc else 'DOC_NOT_FOUND'}")
+        
         logging.info(
             f"💾 TIMEOUT: Saved game state before navigating to lineup screen: "
             f"game_id={game_id}, quarter={db_summary.get('quarter')}, "
