@@ -222,8 +222,13 @@ def resolve_offensive_rebound(game, rebounder):
             new_rebounder, new_team, new_stat = determine_rebounder(game, bounce_spot, exclude_player_ids, penalize_player_ids)
             
             # Debug: Log when putback miss rebound stat is recorded
-            logging.info(f"🏀 Putback Miss Rebound: {get_name_safe(new_rebounder)} credited with {new_stat} (putback miss)")
+            new_rebounder_id = getattr(new_rebounder, "player_id", None)
+            new_rebounder_name = get_name_safe(new_rebounder)
+            oreb_before = new_rebounder.stats["game"].get(new_stat, 0)
+            logging.info(f"🏀 Putback Miss Rebound: {new_rebounder_name} (ID: {new_rebounder_id}) credited with {new_stat} (putback miss) - Before: {oreb_before}")
             new_rebounder.record_stat(new_stat)
+            oreb_after = new_rebounder.stats["game"].get(new_stat, 0)
+            logging.info(f"🏀 Putback Miss Rebound: {new_rebounder_name} (ID: {new_rebounder_id}) credited with {new_stat} - After: {oreb_after}")
             # DON'T flip possession here - let turn_manager handle it after the rebound
             # This ensures the shot animates to the correct basket before possession flips
             event["possession_flips"] = False

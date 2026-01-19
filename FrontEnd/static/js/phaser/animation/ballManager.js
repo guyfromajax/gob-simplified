@@ -478,21 +478,16 @@ export async function shootBall({
         const teamStyle = isHomeTeam ? 'home' : 'away';
         
         // Check if this is a shooting foul (AND-1 or foul on shot)
-        // ✅ FIX: Use more reliable detection - check for foul_player_id + foul_team
-        // For defensive shooting fouls on MISS: foul_player_id exists, foul_team === "DEFENSE", result === "MISS"
+        // ✅ FIX: Use reliable detection - check for next_play_type or free_throws_remaining (matches backend fields)
         // For AND-1 (MAKE + foul): text includes "AND-1" OR (foul_player_id exists + result === "MAKE" + foul_team === "DEFENSE")
+        // For shooting foul on MISS: next_play_type === "FREE_THROW" OR free_throws_remaining > 0 (now set by backend)
+        const hasFreeThrowsRemaining = (turnData?.free_throws_remaining ?? 0) > 0;
+        const nextPlayTypeIsFreeThrow = turnData?.next_play_type === 'FREE_THROW';
         const hasFoulPlayer = !!(turnData?.foul_player_id || turnData?.foul_player?.player_id);
-        const isDefensiveShootingFoulOnMiss = hasFoulPlayer && 
-                                             turnData?.foul_team === "DEFENSE" && 
-                                             result === "MISS";
         const isAndOne = turnData?.text?.includes('AND-1') || 
                         (hasFoulPlayer && result === "MAKE" && turnData?.foul_team === "DEFENSE");
-        const isShootingFoul = isAndOne || isDefensiveShootingFoulOnMiss;
-        
-        // ✅ DEBUG: Log shooting foul detection for defensive fouls on misses
-        if (result === "MISS" && hasFoulPlayer && turnData?.foul_team === "DEFENSE") {
-          console.log(`🔍 [SHOOTING FOUL DETECTION] Result: ${result}, hasFoulPlayer: ${hasFoulPlayer}, foul_team: ${turnData?.foul_team}, isDefensiveShootingFoulOnMiss: ${isDefensiveShootingFoulOnMiss}, isShootingFoul: ${isShootingFoul}`);
-        }
+        const isShootingFoulOnMiss = result === "MISS" && (hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow);
+        const isShootingFoul = isAndOne || isShootingFoulOnMiss;
         
         // Get shooter/foul player data for announcements
         const shooterSprite = scene.playerSprites?.[shooterId];
@@ -542,20 +537,16 @@ export async function shootBall({
             showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
           }
         } else if (result === "MISS" && isShootingFoul) {
-          // Get foul player data from turnData
-          // ✅ FIX: Check multiple possible locations for foul_player_id
-          const foulPlayerId = turnData?.foul_player_id || 
-                              turnData?.foul_player?.player_id ||
-                              turnData?.events?.find(e => e.event_type === 'FOUL')?.foul_player_id;
-          
-          let foulPlayerData = null;
+          // ✅ FIX: Replicate AND-1 announcement pattern exactly (matches made shot flow)
+          // Get foul player data from turnData (same pattern as AND-1)
+          const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
           if (foulPlayerId && scene) {
             const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
             if (foulPlayerSprite) {
               const foulPlayerTeamId = foulPlayerSprite?.team_id;
               const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
               
-              foulPlayerData = {
+              const foulPlayerData = {
                 playerId: foulPlayerId,
                 photo: foulPlayerSprite?.photo || null,
                 teamName: foulPlayerTeamName
@@ -565,34 +556,16 @@ export async function shootBall({
               const { triggerFoulEffect } = await import('./negativeActionEffects.js');
               triggerFoulEffect(scene, foulPlayerId);
               
-              // Show announcement with player data
+              // Show announcement with player data (matches AND-1 pattern)
               showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
             } else {
-              // Fallback: try to get from playerInfo if sprite not found
-              const foulPlayerInfo = scene.playerInfo?.[foulPlayerId];
-              if (foulPlayerInfo) {
-                const foulPlayerTeamId = foulPlayerInfo.team_id;
-                const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-                
-                foulPlayerData = {
-                  playerId: foulPlayerId,
-                  photo: foulPlayerInfo.photo || null,
-                  teamName: foulPlayerTeamName
-                };
-                
-                // Trigger foul effect even if sprite not found
-                const { triggerFoulEffect } = await import('./negativeActionEffects.js');
-                triggerFoulEffect(scene, foulPlayerId);
-                
-                // Show announcement with player data from playerInfo
-                showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
-              } else {
-                // ✅ FIX: Fallback announcement if player data not found (matches AND-1 pattern)
-                showAnnouncement("Shooting Foul!", 'neutral', null);
-              }
+              // Fallback if sprite not found (matches AND-1 pattern)
+              const { triggerFoulEffect } = await import('./negativeActionEffects.js');
+              triggerFoulEffect(scene, foulPlayerId);
+              showAnnouncement("Shooting Foul!", 'neutral', null);
             }
           } else {
-            // ✅ FIX: Fallback announcement if foulPlayerId not found (matches AND-1 pattern)
+            // Fallback if foulPlayerId not found (matches AND-1 pattern)
             showAnnouncement("Shooting Foul!", 'neutral', null);
           }
         }

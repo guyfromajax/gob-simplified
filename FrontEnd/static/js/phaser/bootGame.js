@@ -2369,51 +2369,21 @@ async function initGame() {
   
   // ✅ FIX: Show pre-game buttons at start of each quarter (not just Q1)
   // Only hide buttons when resuming from timeout (not quarter breaks)
+  // ✅ SS&S: URL param is the single source of truth for timeout resume detection
+  // Safe default: If param is missing, treat as false (quarter break, not timeout resume)
+  // This is safe because:
+  // 1. If it's a new Q1 game, param is intentionally omitted → false is correct
+  // 2. If gameId exists but param is missing (stale URL), false is safer than true
+  // 3. If it's truly a timeout resume, the helper should have set it to 'true'
   const urlResumeFromTimeoutParam = urlParams.get('resume_from_timeout');
-  // ✅ CRITICAL FIX: Explicitly check for 'true' string - if param is 'false' or missing, treat as false
-  // This ensures quarter breaks (resume_from_timeout=false) are never treated as timeout resumes
-  let resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
+  const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
   
-  console.log('🔍 [DEBUG QTR BREAK] bootGame.js initGame() - Reading resume_from_timeout:', {
+  console.log('🔍 [TIMEOUT DETECTION] bootGame.js initGame() - Reading resume_from_timeout:', {
     urlParam: urlResumeFromTimeoutParam,
     parsedValue: resumeFromTimeout,
     quarter: quarter,
     gameId: gameId,
     allUrlParams: Object.fromEntries(urlParams.entries())
-  });
-  
-  // ✅ RESILIENCE: Check database for timeout state as fallback (ONLY if URL param is missing/null)
-  // This makes the system robust - even if URL param is lost, we can still detect timeout resume
-  // ✅ CRITICAL: Only check DB if URL param is missing (null) - if it's explicitly 'false', trust it!
-  // ✅ CRITICAL: Only check for Q1/pre-game (quarter === 0 || quarter === 1) - quarter breaks (Q2+) should never use DB fallback
-  if (urlResumeFromTimeoutParam === null && gameId && (quarter === 0 || quarter === 1)) {
-    // Lightweight check: If URL param missing but we have gameId in Q1, check DB for timeout state
-    // This is a fallback - URL param is still primary source for navigation
-    console.log('🔍 [DEBUG QTR BREAK] bootGame.js - Checking DB fallback (Q1/pre-game only, URL param missing)');
-    try {
-      const response = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}?quarter=${quarter}`));
-      if (response.ok) {
-        const gameData = await response.json();
-        if (gameData.timeout_next_play_type) {
-          console.log('🔍 [DEBUG QTR BREAK] bootGame.js - DB check found timeout state, setting resumeFromTimeout=true');
-          resumeFromTimeout = true;
-        } else {
-          console.log('🔍 [DEBUG QTR BREAK] bootGame.js - DB check found no timeout state');
-        }
-      }
-    } catch (error) {
-      console.warn('⚠️ Could not check DB for timeout state (non-critical):', error);
-      // Non-critical - user can still click "Play Quarter" button
-    }
-  } else if (urlResumeFromTimeoutParam === 'false') {
-    // ✅ CRITICAL: If URL explicitly says 'false', trust it - don't check DB
-    console.log('🔍 [DEBUG QTR BREAK] bootGame.js - URL param explicitly set to false (quarter break), skipping DB check');
-  }
-  
-  console.log('🔍 [DEBUG QTR BREAK] bootGame.js initGame() - Final decision:', {
-    resumeFromTimeout: resumeFromTimeout,
-    willHideButtons: resumeFromTimeout,
-    quarter: quarter
   });
   
   // ✅ FIX: Only hide pre-game buttons when resuming from timeout
@@ -2423,16 +2393,6 @@ async function initGame() {
     if (preGameContainer) {
       console.log(`🎮 Hiding pre-game container (timeout resume)`);
       preGameContainer.classList.add('hidden');
-    } else {
-      console.log('🔍 [DEBUG QTR BREAK] bootGame.js - resumeFromTimeout=true but pre-game container not found');
-    }
-  } else {
-    console.log('🔍 [DEBUG QTR BREAK] bootGame.js - resumeFromTimeout=false, pre-game buttons should be visible');
-    const preGameContainer = document.querySelector('.pre-game-container');
-    if (preGameContainer) {
-      console.log('🔍 [DEBUG QTR BREAK] bootGame.js - Pre-game container found, should be visible');
-    } else {
-      console.log('🔍 [DEBUG QTR BREAK] bootGame.js - Pre-game container NOT found in DOM!');
     }
   }
   

@@ -737,6 +737,8 @@ class ShotManager:
                 self.game_state["offensive_state"] = "FREE_THROW"
                 self.game_state["free_throws"] = 3 if is_three else 2
                 self.game_state["free_throws_remaining"] = self.game_state["free_throws"]
+                # ✅ FIX: Set next_play_type for shooting fouls on missed shots (matches AND-1 pattern)
+                result["next_play_type"] = "FREE_THROW"
                 text = f"{get_name_safe(foul_player)} fouls {get_name_safe(shooter)} on the shot."
                 possession_flips = False
                 
@@ -1094,6 +1096,11 @@ class ShotManager:
             if d_foul and self.game_state.get("free_throws_remaining", 0) > 0:
                 result["free_throws_remaining"] = self.game_state["free_throws_remaining"]
                 result["has_and_one"] = True
+        else:
+            # ✅ FIX: For shooting fouls on missed shots, include free throw info (matches AND-1 pattern)
+            # This ensures frontend can detect shooting fouls on misses reliably
+            if d_foul and self.game_state.get("free_throws_remaining", 0) > 0:
+                result["free_throws_remaining"] = self.game_state["free_throws_remaining"]
 
         return result
 

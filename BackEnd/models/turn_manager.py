@@ -2344,22 +2344,39 @@ class TurnManager:
                     result["possession_flips"] = possession_flips
                     
                     rebounder_id = rebound_data.get("rebounderId")
+                    rebound_type = rebound_data.get("rebound_type", "DREB")
+                    logging.info(f"🔍 [PUTBACK MISS => REBOUND] Looking up rebounder: ID={rebounder_id}, Type={rebound_type}")
+                    
                     new_rebounder = None
+                    players_searched = 0
                     for player in list(off_team.get_all_players()) + list(def_team.get_all_players()):
-                        if getattr(player, "player_id", None) == rebounder_id:
+                        players_searched += 1
+                        player_id = getattr(player, "player_id", None)
+                        if player_id == rebounder_id:
                             new_rebounder = player
+                            new_rebounder_name = get_name_safe(player)
+                            oreb_stat = player.stats["game"].get(rebound_type, 0)
+                            logging.info(f"✅ [PUTBACK MISS => REBOUND] Found rebounder: {new_rebounder_name} (ID: {player_id}), {rebound_type} stat: {oreb_stat}, Players searched: {players_searched}")
                             break
+                    
+                    if new_rebounder is None:
+                        logging.warning(f"⚠️ [PUTBACK MISS => REBOUND] Could not find rebounder with ID={rebounder_id} after searching {players_searched} players")
                     
                     if new_rebounder:
                         text += f" {get_name_safe(new_rebounder)} grabs the rebound."
                         result["text"] = text
                     
                     # If it's another OREB, set pending for next turn
-                    if rebound_data.get("rebound_type") == "OREB" and new_rebounder:
+                    if rebound_type == "OREB" and new_rebounder:
+                        new_rebounder_name = get_name_safe(new_rebounder)
+                        oreb_stat = new_rebounder.stats["game"].get("OREB", 0)
+                        logging.info(f"🔁 [PUTBACK MISS => REBOUND] Setting pending_oreb for next turn: {new_rebounder_name} (ID: {rebounder_id}), Current OREB: {oreb_stat}")
                         game_state["pending_oreb"] = {
                             "rebounder": new_rebounder,
                             "rebounder_id": rebounder_id,
                         }
+                    elif rebound_type == "OREB" and new_rebounder is None:
+                        logging.error(f"❌ [PUTBACK MISS => REBOUND] Cannot set pending_oreb - rebounder not found! ID: {rebounder_id}, Type: {rebound_type}")
                     elif rebound_data.get("rebound_type") == "DREB":
                         # Defensive rebound - preserve next_play_type from original shot
                         # Fast Break is determined DURING the shot (by defense tempo), not after DREB
