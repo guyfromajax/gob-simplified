@@ -282,23 +282,15 @@ class FranchiseManager:
 
         self.save_season_state()
 
-    def _apply_team_result(self, team1_id, team2_id, team1_score, team2_score, sign=1):
-        self.db.teams.update_one(
-            {"_id": team1_id},
-            {"$inc": {"PF": sign * team1_score, "PA": sign * team2_score, "record.W": 0, "record.L": 0}},
-        )
-        self.db.teams.update_one(
-            {"_id": team2_id},
-            {"$inc": {"PF": sign * team2_score, "PA": sign * team1_score, "record.W": 0, "record.L": 0}},
-        )
-        if team1_score > team2_score:
-            self.db.teams.update_one({"_id": team1_id}, {"$inc": {"record.W": sign}})
-            self.db.teams.update_one({"_id": team2_id}, {"$inc": {"record.L": sign}})
-        elif team2_score > team1_score:
-            self.db.teams.update_one({"_id": team2_id}, {"$inc": {"record.W": sign}})
-            self.db.teams.update_one({"_id": team1_id}, {"$inc": {"record.L": sign}})
-
     def _save_game_result(self, team1_id, team2_id, team1_score, team2_score):
+        """
+        Save or update game result in games collection.
+        
+        ✅ FIX: This function no longer updates the universal teams collection.
+        Franchise mode stores W/L and PF/PA in franchise.results, which is calculated
+        when displaying team stats. This ensures franchise stats are isolated from
+        other game modes and franchise instances.
+        """
         existing = self.db.games.find_one(
             {
                 "week": self.week,
@@ -309,18 +301,10 @@ class FranchiseManager:
             }
         )
         if existing:
-            self._apply_team_result(
-                existing["team1_id"],
-                existing["team2_id"],
-                existing["team1_score"],
-                existing["team2_score"],
-                sign=-1,
-            )
             filter_doc = {"_id": existing["_id"]}
         else:
             filter_doc = {"week": self.week, "team1_id": team1_id, "team2_id": team2_id}
 
-        self._apply_team_result(team1_id, team2_id, team1_score, team2_score, sign=1)
         self.db.games.update_one(
             filter_doc,
             {
