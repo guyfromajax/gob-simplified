@@ -468,22 +468,35 @@ class GameManager:
                     self.game_state["computer_timeouts"][calling_team.name][quarter] = {"count": 0, "checked_conditions": set()}
                 self.game_state["computer_timeouts"][calling_team.name][quarter]["count"] += 1
                 
-                # ✅ FULL SIMULATION: Create timeout immediately and rebuild lineups
-                # Note: calling_team can only be set if is_full_simulation is True (checked above)
-                # logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} calling timeout immediately (full simulation mode)")
-                timeout_turn = self.call_timeout(
-                    calling_team=calling_team,
-                    timeout_reason="COMPUTER",
-                    rebuild_both_lineups=True,
-                    game_id=self.game_id  # Pass game_id if available
-                )
-                if timeout_turn:
-                    logging.info(f"✅ COMPUTER TIMEOUT: Created timeout turn and rebuilt lineups for {calling_team.name}")
-                    # Clear timeout_called flag so simulation continues normally
-                    # The timeout turn is just one turn - simulation should continue
-                    self.game_state["timeout_called"] = False
-                # Don't append SIP turn - timeout turn was created instead
-                return
+                # ✅ COMPUTER TIMEOUT: Conditional creation based on simulation mode
+                is_full_simulation = self.game_state.get("_is_full_simulation", False)
+                
+                if is_full_simulation:
+                    # ✅ FULL SIMULATION: Create timeout immediately and rebuild lineups
+                    timeout_turn = self.call_timeout(
+                        calling_team=calling_team,
+                        timeout_reason="COMPUTER",
+                        rebuild_both_lineups=True,
+                        game_id=self.game_id  # Pass game_id if available
+                    )
+                    if timeout_turn:
+                        logging.info(f"✅ COMPUTER TIMEOUT: Created timeout turn immediately (full simulation mode) for {calling_team.name}")
+                        # Clear timeout_called flag so simulation continues normally
+                        # The timeout turn is just one turn - simulation should continue
+                        self.game_state["timeout_called"] = False
+                    # Don't append SIP turn - timeout turn was created instead
+                    return
+                else:
+                    # ✅ TURN-BY-TURN: Defer timeout creation until next API call
+                    # This allows the current turn to be animated first, then timeout is created on next /api/simulate-turn call
+                    self.game_state["pending_computer_timeout"] = {
+                        "calling_team": calling_team,
+                        "turn_type": "SIDE_INBOUND"
+                    }
+                    logging.info(f"⏸️ COMPUTER TIMEOUT: Deferred for {calling_team.name} (turn-by-turn mode) - will be created on next API call")
+                    # Continue with normal SIP turn - timeout will be created next
+                    self.turns.append(inbound_payload)
+                    return
             else:
                 # No computer timeout - proceed with SIP
                 self.turns.append(inbound_payload)
@@ -547,22 +560,36 @@ class GameManager:
                     self.game_state["computer_timeouts"][calling_team.name][quarter] = {"count": 0, "checked_conditions": set()}
                 self.game_state["computer_timeouts"][calling_team.name][quarter]["count"] += 1
                 
-                # ✅ COMPUTER TIMEOUT: Create timeout and rebuild lineups
-                # calling_team is always a computer team (user teams filtered out by should_computer_call_timeout)
-                # logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} calling timeout")
-                timeout_turn = self.call_timeout(
-                    calling_team=calling_team,
-                    timeout_reason="COMPUTER",
-                    rebuild_both_lineups=True,
-                    game_id=self.game_id  # Pass game_id if available
-                )
-                if timeout_turn:
-                    logging.info(f"✅ COMPUTER TIMEOUT: Created timeout turn and rebuilt lineups for {calling_team.name}")
-                    # Clear timeout_called flag so simulation continues normally
-                    # The timeout turn is just one turn - simulation should continue
-                    self.game_state["timeout_called"] = False
-                # Don't append BIP turn - timeout turn was created instead
-                return
+                # ✅ COMPUTER TIMEOUT: Conditional creation based on simulation mode
+                is_full_simulation = self.game_state.get("_is_full_simulation", False)
+                
+                if is_full_simulation:
+                    # ✅ FULL SIMULATION: Create timeout immediately and rebuild lineups
+                    timeout_turn = self.call_timeout(
+                        calling_team=calling_team,
+                        timeout_reason="COMPUTER",
+                        rebuild_both_lineups=True,
+                        game_id=self.game_id  # Pass game_id if available
+                    )
+                    if timeout_turn:
+                        logging.info(f"✅ COMPUTER TIMEOUT: Created timeout turn immediately (full simulation mode) for {calling_team.name}")
+                        # Clear timeout_called flag so simulation continues normally
+                        # The timeout turn is just one turn - simulation should continue
+                        self.game_state["timeout_called"] = False
+                    # Don't append BIP turn - timeout turn was created instead
+                    return
+                else:
+                    # ✅ TURN-BY-TURN: Defer timeout creation until next API call
+                    # This allows the current turn to be animated first, then timeout is created on next /api/simulate-turn call
+                    self.game_state["pending_computer_timeout"] = {
+                        "calling_team": calling_team,
+                        "turn_type": "BASELINE_INBOUND"
+                    }
+                    logging.info(f"⏸️ COMPUTER TIMEOUT: Deferred for {calling_team.name} (turn-by-turn mode) - will be created on next API call")
+                    # Continue with normal BIP turn - timeout will be created next
+                    self.turns.append(inbound_payload)
+                    self.text_log.append("Baseline inbound after made shot")
+                    return
             else:
                 # No computer timeout - proceed with BIP
                 self.turns.append(inbound_payload)
