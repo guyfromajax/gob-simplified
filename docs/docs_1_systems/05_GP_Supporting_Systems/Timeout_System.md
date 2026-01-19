@@ -175,25 +175,75 @@ if (turn.result_type === "TIMEOUT") {
 
 **When Timeout is Called:**
 
+**Unified Timeout Handler (`BackEnd/api/api.py` `handle_timeout_save_and_response()`):**
+```python
+def handle_timeout_save_and_response(gm, timeout_turn, game_id, timeout_reason="USER"):
+    """
+    Unified timeout save and response handler.
+    Used by both user and computer timeouts to ensure identical behavior.
+    """
+    # Save to DB (same for both user and computer timeouts)
+    db_summary = summarize_game_state(gm, exclude_animations=True)
+    games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
+    
+    # Return consistent response format (same for both user and computer)
+    # Use saved data (db_summary) to ensure response matches what was saved to DB
+    return {
+        "turn": timeout_turn,
+        "clock": db_summary.get("clock", gm.game_state.get("clock", "8:00")),
+        "time_remaining": db_summary.get("time_remaining", gm.game_state.get("time_remaining", 480)),
+        "quarter": db_summary.get("quarter", gm.quarter),
+        "quarter_complete": False,  # Always False for timeout (not quarter end)
+        "home_score": db_summary.get("score", {}).get(gm.home_team.name, 0),
+        "away_score": db_summary.get("score", {}).get(gm.away_team.name, 0),
+        "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
+        "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
+        # ... additional fields
+    }
+```
+
 **User-Initiated Timeout (`BackEnd/api/api.py` `call_timeout_endpoint()`):**
 ```python
-# Save timeout state to database
-gm.game_state["timeout_next_play_type"] = "SIDE_INBOUND"  # Always SIP (except free throws)
-gm.game_state["timeout_offense_team_id"] = gm.offense_team.team_id  # Capture possession team
+# Create timeout turn
+timeout_turn = gm.call_timeout(
+    calling_team=calling_team,
+    timeout_reason="USER",
+    rebuild_both_lineups=False,
+    game_id=None  # Don't save here - we'll save below
+)
 
-db_summary = summarize_game_state(gm, exclude_animations=True)
-games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
+# ✅ UNIFIED: Use shared helper function for timeout save and response
+timeout_response = handle_timeout_save_and_response(gm, timeout_turn, game_id, timeout_reason="USER")
 
-# Return timeout response with current clock (backend source of truth)
+# Return response with additional fields for user timeout endpoint compatibility
 return {
     "message": f"Timeout called by {calling_team.name}",
     "calling_team": calling_team.name,
     "timeouts_remaining": getattr(calling_team, 'timeouts', 4),
-    "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
-    "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
-    "clock": gm.game_state.get("clock", "8:00"),  # ✅ Current clock at timeout moment
-    "time_remaining": gm.game_state.get("time_remaining", 480),
+    "clock": timeout_response["clock"],  # ✅ Use saved data from DB (not cache)
+    "time_remaining": timeout_response["time_remaining"],  # ✅ Use saved data from DB (not cache)
+    # ... additional fields from timeout_response
 }
+```
+
+**Computer-Initiated Timeout (`BackEnd/api/api.py` `simulate_turn_endpoint()`):**
+```python
+# Create timeout turn
+timeout_turn = gm.call_timeout(
+    calling_team=calling_team,
+    timeout_reason="COMPUTER",
+    rebuild_both_lineups=True,
+    game_id=game_id
+)
+
+# Remove the TIMEOUT turn from turns so next API call can simulate the actual next turn
+timeout_turn = gm.turns.pop()
+
+# ✅ UNIFIED: Use shared helper function (same as user timeout)
+timeout_response = handle_timeout_save_and_response(gm, timeout_turn, game_id, timeout_reason="COMPUTER")
+
+# Return response (same format as user timeout)
+return timeout_response
 ```
 
 **Foul-Out Timeout (`BackEnd/models/game_manager.py` `simulate_macro_turn()`):**
