@@ -187,7 +187,8 @@ async function loadRoster() {
   if (gameId) {
     console.log("Loading current player energy from game:", gameId);
     try {
-        const gameRes = await fetch(`${API_CONFIG.buildUrl(`/api/game/${gameId}`)}?quarter=1`);
+        // ✅ HYBRID APPROACH: Use source=db to ensure fresh data from database
+        const gameRes = await fetch(`${API_CONFIG.buildUrl(`/api/game/${gameId}`)}?quarter=1&source=db`);
         if (gameRes.ok) {
           const gameData = await gameRes.json();
           const gamePlayers = gameData.players || [];
@@ -895,7 +896,9 @@ async function setHeader() {
   
   if (gameId) {
     try {
-      const gameRes = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}?quarter=1`));
+      // ✅ HYBRID APPROACH: Use source=db to ensure fresh data from database
+      // This is acceptable performance cost (~13 reads per game: timeouts + quarter breaks)
+      const gameRes = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}?quarter=1&source=db`));
       if (gameRes.ok) {
         const gameData = await gameRes.json();
         const score = gameData.score || {};

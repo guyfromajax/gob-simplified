@@ -627,6 +627,80 @@ def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest
         logging.error(f"❌ TIMEOUT RESUME: Error loading from DB: {e}", exc_info=True)
         return None
 
+def refresh_game_cache_from_db(gm: "GameManager", saved: dict):
+    """
+    Refresh ongoing_games cache from database after state changes (timeout saves, etc.).
+    Updates critical game state in the existing GameManager instance to match saved document.
+    This ensures cache stays fresh without requiring full GameManager reconstruction.
+    
+    Args:
+        gm: GameManager instance in ongoing_games cache
+        saved: Saved game document from database
+    """
+    if not saved or not gm:
+        return
+    
+    # Update critical game state from saved document
+    # This is similar to apply_timeout_resume_state_to_gm but for cache refresh
+    
+    # Update timeout state
+    if "timeout_next_play_type" in saved:
+        gm.game_state["timeout_next_play_type"] = saved["timeout_next_play_type"]
+    if "timeout_offense_team_id" in saved:
+        gm.game_state["timeout_offense_team_id"] = saved["timeout_offense_team_id"]
+    
+    # Update clock and time
+    if "clock" in saved:
+        gm.game_state["clock"] = saved["clock"]
+    if "time_remaining" in saved:
+        gm.game_state["time_remaining"] = saved["time_remaining"]
+    
+    # Update scores
+    if "score" in saved and isinstance(saved["score"], dict):
+        for team_name, score_value in saved["score"].items():
+            if team_name in gm.score:
+                gm.score[team_name] = score_value
+    
+    # Update team fouls and timeouts (support both old and new structure)
+    # Try unified structure first (new), then fallback to old structure
+    teams_obj = saved.get("teams", {})
+    home_team_id = saved.get("home_team_id")
+    away_team_id = saved.get("away_team_id")
+    
+    # Unified structure (new)
+    if home_team_id and home_team_id in teams_obj:
+        home_team_data = teams_obj[home_team_id]
+        if "team_fouls" in home_team_data:
+            gm.home_team.team_fouls = home_team_data["team_fouls"]
+        if "timeouts" in home_team_data:
+            gm.home_team.timeouts = home_team_data["timeouts"]
+    # Old structure (backward compatibility)
+    elif "home_team" in saved:
+        home_team_data = saved["home_team"]
+        if "team_fouls" in home_team_data:
+            gm.home_team.team_fouls = home_team_data["team_fouls"]
+        if "timeouts" in home_team_data:
+            gm.home_team.timeouts = home_team_data["timeouts"]
+    
+    # Unified structure (new)
+    if away_team_id and away_team_id in teams_obj:
+        away_team_data = teams_obj[away_team_id]
+        if "team_fouls" in away_team_data:
+            gm.away_team.team_fouls = away_team_data["team_fouls"]
+        if "timeouts" in away_team_data:
+            gm.away_team.timeouts = away_team_data["timeouts"]
+    # Old structure (backward compatibility)
+    elif "away_team" in saved:
+        away_team_data = saved["away_team"]
+        if "team_fouls" in away_team_data:
+            gm.away_team.team_fouls = away_team_data["team_fouls"]
+        if "timeouts" in away_team_data:
+            gm.away_team.timeouts = away_team_data["timeouts"]
+    
+    # Update quarter
+    if "quarter" in saved:
+        gm.quarter = saved["quarter"]
+
 def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
     """
     Apply restored timeout state to GameManager.
@@ -821,20 +895,29 @@ def simulate_game(request: SimulationRequest):
 
 
 @app.get("/api/game/{game_id}")
-def get_game_state(game_id: str, quarter: int | None = None):
+def get_game_state(game_id: str, quarter: int | None = None, source: str | None = None):
     # Fetch current game state for displaying accumulated stats and player energy
     # PERFORMANCE DIAGNOSTIC: This endpoint is instrumented with timing logs.
     # Args:
     #     game_id: Game ID
     #     quarter: Optional quarter query parameter. If quarter=1 and saved game is Q2+,
     #              returns empty stats (new game scenario)
+    #     source: Optional source parameter. If "db", always reads from database (for lineup screen consistency).
+    #             If None or "cache", uses ongoing_games cache if available (for performance during gameplay).
     import time
     endpoint_start = time.time()
     
     try:
-        # ✅ PERFORMANCE: Removed debug logging - only log errors
-        # Check ongoing games first
-        gm = ongoing_games.get(game_id)
+        # ✅ HYBRID APPROACH: If source=db, skip cache and always read from database
+        # This ensures lineup screen always gets fresh data (only ~13 reads per game: timeouts + quarter breaks)
+        # During active gameplay, source is not specified, so we use cache for performance
+        force_db_read = source == "db"
+        
+        # Check ongoing games first (unless forcing DB read)
+        gm = None
+        if not force_db_read:
+            gm = ongoing_games.get(game_id)
+        
         if gm:
             # ✅ PERFORMANCE DIAGNOSTIC: Log in-memory path and measure processing time
             process_start = time.time()
@@ -2520,6 +2603,12 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
                     logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] DB AFTER save - timeout_next_play_type={after_save_doc.get('timeout_next_play_type') if after_save_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={after_save_doc.get('timeout_offense_team_id') if after_save_doc else 'DOC_NOT_FOUND'}")
                     logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] DB AFTER save - score={after_save_doc.get('score') if after_save_doc else 'DOC_NOT_FOUND'}, clock={after_save_doc.get('clock') if after_save_doc else 'DOC_NOT_FOUND'}, time_remaining={after_save_doc.get('time_remaining') if after_save_doc else 'DOC_NOT_FOUND'}")
                     
+                    # ✅ HYBRID APPROACH: Refresh ongoing_games cache from DB after save
+                    # This ensures cache is fresh for subsequent reads during gameplay
+                    if game_id in ongoing_games and after_save_doc:
+                        refresh_game_cache_from_db(ongoing_games[game_id], after_save_doc)
+                        logging.info(f"🔄 COMPUTER TIMEOUT: Refreshed ongoing_games cache from DB for game_id={game_id}")
+                    
                     logging.info(
                         f"💾 COMPUTER TIMEOUT: Saved game state before returning timeout turn: "
                         f"game_id={game_id}, quarter={db_summary.get('quarter')}, "
@@ -2869,6 +2958,12 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
         saved_doc = games_collection.find_one({"_id": game_id})
         logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] AFTER save - DB document timeout fields: timeout_next_play_type={saved_doc.get('timeout_next_play_type') if saved_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={saved_doc.get('timeout_offense_team_id') if saved_doc else 'DOC_NOT_FOUND'}")
         logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] DB document score={saved_doc.get('score') if saved_doc else 'DOC_NOT_FOUND'}, clock={saved_doc.get('clock') if saved_doc else 'DOC_NOT_FOUND'}, time_remaining={saved_doc.get('time_remaining') if saved_doc else 'DOC_NOT_FOUND'}")
+        
+        # ✅ HYBRID APPROACH: Refresh ongoing_games cache from DB after save
+        # This ensures cache is fresh for subsequent reads during gameplay
+        if game_id in ongoing_games and saved_doc:
+            refresh_game_cache_from_db(ongoing_games[game_id], saved_doc)
+            logging.info(f"🔄 TIMEOUT: Refreshed ongoing_games cache from DB for game_id={game_id}")
         
         logging.info(
             f"💾 TIMEOUT: Saved game state before navigating to lineup screen: "
