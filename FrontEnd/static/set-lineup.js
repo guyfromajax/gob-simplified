@@ -125,7 +125,12 @@ async function loadRoster() {
   
   // If no gameId, initialize a new game (for pre-game lineup screen)
   // This creates a game document with initialized players (Emotion, Momentum)
-  if (!gameId && homeTeam && awayTeam) {
+  // ✅ CRITICAL FIX: Don't init if game_id exists in URL (game already exists) or if resuming from timeout
+  // This prevents creating a new game when resuming from timeout, which would reset all game state
+  const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+  const shouldInitGame = !gameId && homeTeam && awayTeam && !resumeFromTimeout;
+  
+  if (shouldInitGame) {
     console.log("No gameId found - initializing new game for pre-game lineup");
     try {
       const mode = modeParam || 'single';
@@ -171,6 +176,10 @@ async function loadRoster() {
     } catch (err) {
       console.warn("Could not initialize game:", err);
     }
+  } else if (gameId) {
+    console.log("Game ID exists - skipping init-game (game already exists)");
+  } else if (resumeFromTimeout) {
+    console.log("Resuming from timeout - skipping init-game (game should already exist)");
   }
   
   // If there's an active game, fetch current player energy levels

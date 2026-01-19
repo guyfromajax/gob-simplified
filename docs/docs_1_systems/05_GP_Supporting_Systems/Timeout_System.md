@@ -305,21 +305,40 @@ const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
 - Helper ensures `game_id` and `resume_from_timeout` are always current when navigating
 - **All navigation functions MUST use `TimeoutNavigationHelper`** - manual parameter preservation is fragile and can lose critical state (e.g., `clock` parameter)
 
-**Critical Fix (January 2025):**
-- **Location:** `FrontEnd/static/set-lineup.js` (lines 1078-1088)
-- **Problem:** Previous logic forced `resumeFromTimeout = false` for ALL quarters > 1, treating timeouts in Q2-Q4 as quarter breaks
-- **Solution:** Only force `resumeFromTimeout = false` if URL param is already false/missing (true quarter break). Preserve `resumeFromTimeout = true` when URL param indicates timeout resume (any quarter)
-- **Impact:** Pre-game popup now only appears after quarter breaks, not after timeouts in Q2-Q4
-- **Pattern:**
-  ```javascript
-  // Only force to false if URL param is already false/missing (true quarter break)
-  if (quarter > 1 && !resumeFromTimeout) {
-    resumeFromTimeout = false;
-  } else if (quarter > 1 && resumeFromTimeout) {
-    // Preserve timeout resume even in Q2-Q4
-    // resumeFromTimeout stays true
-  }
-  ```
+**Critical Fixes (January 2025):**
+
+1. **Q2-Q4 Timeout Resume Parameter Preservation:**
+   - **Location:** `FrontEnd/static/set-lineup.js` (lines 1078-1088)
+   - **Problem:** Previous logic forced `resumeFromTimeout = false` for ALL quarters > 1, treating timeouts in Q2-Q4 as quarter breaks
+   - **Solution:** Only force `resumeFromTimeout = false` if URL param is already false/missing (true quarter break). Preserve `resumeFromTimeout = true` when URL param indicates timeout resume (any quarter)
+   - **Impact:** Pre-game popup now only appears after quarter breaks, not after timeouts in Q2-Q4
+   - **Pattern:**
+     ```javascript
+     // Only force to false if URL param is already false/missing (true quarter break)
+     if (quarter > 1 && !resumeFromTimeout) {
+       resumeFromTimeout = false;
+     } else if (quarter > 1 && resumeFromTimeout) {
+       // Preserve timeout resume even in Q2-Q4
+       // resumeFromTimeout stays true
+     }
+     ```
+
+2. **Prevent Game Reset During Timeout Resume:**
+   - **Location:** `FrontEnd/static/set-lineup.js` (lines 126-174)
+   - **Problem:** `init-game` was being called when resuming from timeout, creating a new game and resetting all state (scores, clock, quarter)
+   - **Solution:** Skip `init-game` call if `game_id` exists in URL OR if `resume_from_timeout=true`
+   - **Impact:** Game state is preserved when resuming from timeout (no reset to 0-0, 8:00, Q1)
+   - **Pattern:**
+     ```javascript
+     // Only init if: no game_id exists AND not resuming from timeout
+     const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+     const shouldInitGame = !gameId && homeTeam && awayTeam && !resumeFromTimeout;
+     
+     if (shouldInitGame) {
+       // Call /api/init-game
+     }
+     ```
+   - **Why This Works:** If `game_id` exists, a game already exists. If `resume_from_timeout=true`, we're resuming an existing game. In both cases, we should NOT create a new game.
 
 #### LocalStorage (Frontend State Only)
 
@@ -435,6 +454,8 @@ This prevents stale timeout state from affecting future games.
    - Navigation uses unified helper (`timeoutNavigationHelper.js`)
    - Helper ensures `game_id` and `resume_from_timeout` are passed correctly
    - Works from any entry point (timeout button, foul out popup)
+   - **✅ CRITICAL FIX (January 2025):** Lineup screen skips `init-game` call when `game_id` exists or `resume_from_timeout=true`
+   - This prevents creating a new game (which would reset scores, clock, quarter) when resuming from timeout
 
 2. **User makes lineup/game plan changes** (or keeps current settings)
    - Can navigate between Lineup, Game Plan, Playbooks, and Play Details screens
@@ -717,6 +738,7 @@ All three flows use the same core systems:
 - `FrontEnd/static/js/phaser/gameScene.js`: Scoreboard immediate update logic
 - `FrontEnd/static/js/phaser/bootGame.js`: Auto-start logic for timeout resume, pre-game container visibility control
 - `FrontEnd/static/set-lineup.js` `restoreLineupFromUrl()`: Pre-populates lineup from URL, preserves `resume_from_timeout` parameter for timeouts in all quarters
+- `FrontEnd/static/set-lineup.js` `loadRoster()`: Skips `init-game` call when `game_id` exists or `resume_from_timeout=true` to prevent game state reset
 - `FrontEnd/static/game-plan.js` `loadSettings()`: Pre-populates game plan from URL
 - `FrontEnd/static/court.html`: Timeout button and progress bar HTML/CSS
 
