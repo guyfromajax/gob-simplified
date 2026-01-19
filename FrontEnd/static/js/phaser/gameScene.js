@@ -1819,6 +1819,16 @@ export function createGameScene(Phaser) {
           // ✅ TIMEOUT: Check if this is a timeout turn - if so, stop the simulation loop
           if (turn.result_type === "TIMEOUT") {
             console.log('⏸️ TIMEOUT: Timeout turn detected in simulateTurnByTurn - stopping simulation loop');
+            // ✅ UNIFIED: Store full response data in turn for animation system to access clock/time_remaining
+            turn._responseData = {
+              clock: turnData.clock,
+              time_remaining: turnData.time_remaining,
+              quarter: turnData.quarter,
+              home_score: turnData.home_score,
+              away_score: turnData.away_score,
+              home_team_timeouts: turnData.home_team_timeouts,
+              away_team_timeouts: turnData.away_team_timeouts
+            };
             // Animate the timeout turn (will handle navigation)
             await animateGameTurns({
               scene: this,

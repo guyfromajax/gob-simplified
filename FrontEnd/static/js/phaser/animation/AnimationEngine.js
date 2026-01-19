@@ -496,19 +496,29 @@ export class AnimationEngine {
       // Import and call showTimeoutPopup (same function used by user timeouts)
       try {
         const { showTimeoutPopup } = await import('../utils/timeoutButtonManager.js');
-        // Create a mock timeoutResult object (showTimeoutPopup expects this structure)
+        // ✅ UNIFIED: Extract clock/time_remaining from API response (same as user timeout)
+        // The response from /api/simulate-turn includes clock and time_remaining
+        // For computer timeouts, this is stored in turnData._responseData (set in gameScene.js)
+        // Fallback to turnData fields for backward compatibility
+        const responseData = turnData._responseData || {};
+        const responseClock = responseData.clock || turnData.clock || this.scene.simData?.clock;
+        const responseTimeRemaining = responseData.time_remaining || turnData.time_remaining;
+        
+        // Store clock in scene so showTimeoutPopup can access it
+        if (this.scene.simData && responseClock) {
+          this.scene.simData.clock = responseClock;
+        }
+        
+        // Create timeoutResult object with clock/time_remaining from response (unified with user timeout)
         const timeoutResult = {
           message: turnData.text || `${turnData.timeout_calling_team?.name || 'Team'} Calls a Timeout`,
           calling_team: turnData.timeout_calling_team?.name || 'Unknown',
-          timeouts_remaining: turnData.home_team_timeouts || turnData.away_team_timeouts || 0,
-          home_team_timeouts: turnData.home_team_timeouts || 0,
-          away_team_timeouts: turnData.away_team_timeouts || 0
+          timeouts_remaining: responseData.home_team_timeouts || responseData.away_team_timeouts || turnData.home_team_timeouts || turnData.away_team_timeouts || 0,
+          home_team_timeouts: responseData.home_team_timeouts || turnData.home_team_timeouts || 0,
+          away_team_timeouts: responseData.away_team_timeouts || turnData.away_team_timeouts || 0,
+          clock: responseClock,  // ✅ UNIFIED: Use clock from API response (same as user timeout)
+          time_remaining: responseTimeRemaining  // ✅ UNIFIED: Use time_remaining from API response
         };
-        // ✅ COMPUTER TIMEOUT: Store clock in scene so showTimeoutPopup can access it
-        // The clock should be in the turnData from the API response
-        if (this.scene.simData && turnData.clock) {
-          this.scene.simData.clock = turnData.clock;
-        }
         // ✅ COMPUTER TIMEOUT: Navigate directly (no popup) - same flow as user timeouts
         const computerTeamName = turnData.timeout_calling_team?.name || 
                                  (typeof turnData.timeout_calling_team === 'string' ? turnData.timeout_calling_team : null) ||
