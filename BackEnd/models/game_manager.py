@@ -438,24 +438,24 @@ class GameManager:
             inbound_payload = self.turn_manager.setup_side_inbound()
             # logging.warning(f"✅ [SIP CREATE] Created SIDE_INBOUND, offense_team={inbound_payload.get('offense_team_id')}, result_was={result.get('current_turn')} {result.get('result_type')}")
             
-            # ✅ COMPUTER TIMEOUT: Only check during full simulation mode (Sim Quarter/Sim Full Game)
-            # Computer timeouts should NOT run during Play Quarter mode (turn-by-turn mode)
-            is_full_simulation = self.game_state.get("_is_full_simulation", False)
+            # ✅ COMPUTER TIMEOUT: Check if any computer team should call timeout
+            # should_computer_call_timeout() already filters out user teams (checks is_user_team flag)
+            # This allows computer teams to call timeouts during Play Quarter mode
+            # Play Quarter: Only computer teams can call timeouts (user team filtered out by should_computer_call_timeout)
+            # Sim Quarter/Sim Full Game: Both teams checked, but user team still filtered out by should_computer_call_timeout
             calling_team = None
             
-            if is_full_simulation:
-                # Check if any computer team should call timeout
-                # Check both teams if both are computer teams, otherwise check the non-user team
-                computer_teams_to_check = []
-                if not self.home_team.is_user_team:
-                    computer_teams_to_check.append(self.home_team)
-                if not self.away_team.is_user_team:
-                    computer_teams_to_check.append(self.away_team)
-                
-                for computer_team in computer_teams_to_check:
-                    if self.turn_manager.should_computer_call_timeout(computer_team, "SIDE_INBOUND"):
-                        calling_team = computer_team
-                        break  # First team to call timeout wins
+            # Check both teams - should_computer_call_timeout will filter out user teams
+            computer_teams_to_check = []
+            if not self.home_team.is_user_team:
+                computer_teams_to_check.append(self.home_team)
+            if not self.away_team.is_user_team:
+                computer_teams_to_check.append(self.away_team)
+            
+            for computer_team in computer_teams_to_check:
+                if self.turn_manager.should_computer_call_timeout(computer_team, "SIDE_INBOUND"):
+                    calling_team = computer_team
+                    break  # First team to call timeout wins
             
             if calling_team:
                 # Increment computer timeout count for this quarter
@@ -517,24 +517,24 @@ class GameManager:
             
             inbound_payload = self.turn_manager.setup_baseline_inbound(next_defensive_setup=next_defensive_setup)
             
-            # ✅ COMPUTER TIMEOUT: Only check during full simulation mode (Sim Quarter/Sim Full Game)
-            # Computer timeouts should NOT run during Play Quarter mode (turn-by-turn mode)
-            is_full_simulation = self.game_state.get("_is_full_simulation", False)
+            # ✅ COMPUTER TIMEOUT: Check if any computer team should call timeout
+            # should_computer_call_timeout() already filters out user teams (checks is_user_team flag)
+            # This allows computer teams to call timeouts during Play Quarter mode
+            # Play Quarter: Only computer teams can call timeouts (user team filtered out by should_computer_call_timeout)
+            # Sim Quarter/Sim Full Game: Both teams checked, but user team still filtered out by should_computer_call_timeout
             calling_team = None
             
-            if is_full_simulation:
-                # Check if any computer team should call timeout
-                # Check both teams if both are computer teams, otherwise check the non-user team
-                computer_teams_to_check = []
-                if not self.home_team.is_user_team:
-                    computer_teams_to_check.append(self.home_team)
-                if not self.away_team.is_user_team:
-                    computer_teams_to_check.append(self.away_team)
-                
-                for computer_team in computer_teams_to_check:
-                    if self.turn_manager.should_computer_call_timeout(computer_team, "BASELINE_INBOUND"):
-                        calling_team = computer_team
-                        break  # First team to call timeout wins
+            # Check both teams - should_computer_call_timeout will filter out user teams
+            computer_teams_to_check = []
+            if not self.home_team.is_user_team:
+                computer_teams_to_check.append(self.home_team)
+            if not self.away_team.is_user_team:
+                computer_teams_to_check.append(self.away_team)
+            
+            for computer_team in computer_teams_to_check:
+                if self.turn_manager.should_computer_call_timeout(computer_team, "BASELINE_INBOUND"):
+                    calling_team = computer_team
+                    break  # First team to call timeout wins
             
             if calling_team:
                 # Increment computer timeout count for this quarter
@@ -547,9 +547,9 @@ class GameManager:
                     self.game_state["computer_timeouts"][calling_team.name][quarter] = {"count": 0, "checked_conditions": set()}
                 self.game_state["computer_timeouts"][calling_team.name][quarter]["count"] += 1
                 
-                # ✅ FULL SIMULATION: Create timeout immediately and rebuild lineups
-                # Note: calling_team can only be set if is_full_simulation is True (checked above)
-                # logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} calling timeout immediately (full simulation mode)")
+                # ✅ COMPUTER TIMEOUT: Create timeout and rebuild lineups
+                # calling_team is always a computer team (user teams filtered out by should_computer_call_timeout)
+                # logging.warning(f"⏸️ COMPUTER TIMEOUT: {calling_team.name} calling timeout")
                 timeout_turn = self.call_timeout(
                     calling_team=calling_team,
                     timeout_reason="COMPUTER",

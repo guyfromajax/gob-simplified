@@ -2370,7 +2370,10 @@ class TurnManager:
                     if rebound_type == "OREB" and new_rebounder:
                         new_rebounder_name = get_name_safe(new_rebounder)
                         oreb_stat = new_rebounder.stats["game"].get("OREB", 0)
-                        logging.info(f"🔁 [PUTBACK MISS => REBOUND] Setting pending_oreb for next turn: {new_rebounder_name} (ID: {rebounder_id}), Current OREB: {oreb_stat}")
+                        # ✅ DEBUG: Log player object info to verify it's the same object
+                        new_rebounder_team = getattr(new_rebounder, "team", None)
+                        new_rebounder_team_id = getattr(new_rebounder, "team_id", None)
+                        logging.warning(f"🔁 [PUTBACK MISS => REBOUND] Setting pending_oreb for next turn: {new_rebounder_name} (ID: {rebounder_id}), Current OREB: {oreb_stat}, team={new_rebounder_team}, team_id={new_rebounder_team_id}, object_id={id(new_rebounder)}")
                         game_state["pending_oreb"] = {
                             "rebounder": new_rebounder,
                             "rebounder_id": rebounder_id,

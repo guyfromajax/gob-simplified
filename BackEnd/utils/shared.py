@@ -225,10 +225,14 @@ def resolve_offensive_rebound(game, rebounder):
             new_rebounder_id = getattr(new_rebounder, "player_id", None)
             new_rebounder_name = get_name_safe(new_rebounder)
             oreb_before = new_rebounder.stats["game"].get(new_stat, 0)
-            logging.info(f"🏀 Putback Miss Rebound: {new_rebounder_name} (ID: {new_rebounder_id}) credited with {new_stat} (putback miss) - Before: {oreb_before}")
+            logging.warning(f"🏀 Putback Miss Rebound: {new_rebounder_name} (ID: {new_rebounder_id}) credited with {new_stat} (putback miss) - Before: {oreb_before}")
             new_rebounder.record_stat(new_stat)
             oreb_after = new_rebounder.stats["game"].get(new_stat, 0)
-            logging.info(f"🏀 Putback Miss Rebound: {new_rebounder_name} (ID: {new_rebounder_id}) credited with {new_stat} - After: {oreb_after}")
+            logging.warning(f"🏀 Putback Miss Rebound: {new_rebounder_name} (ID: {new_rebounder_id}) credited with {new_stat} - After: {oreb_after}")
+            # ✅ DEBUG: Also log team to verify player object
+            new_rebounder_team = getattr(new_rebounder, "team", None)
+            new_rebounder_team_id = getattr(new_rebounder, "team_id", None)
+            logging.warning(f"🏀 Putback Miss Rebound: Player team={new_rebounder_team}, team_id={new_rebounder_team_id}, object_id={id(new_rebounder)}")
             # DON'T flip possession here - let turn_manager handle it after the rebound
             # This ensures the shot animates to the correct basket before possession flips
             event["possession_flips"] = False

@@ -33,10 +33,10 @@ The computer timeout system enables AI-controlled teams to call timeouts during 
 
 **Timeout Timing:**
 - Computer can only call timeouts during BIP (Baseline Inbound) and SIP (Side Inbound) turns
-- **Only during full simulation mode:** Computer timeout checks ONLY run during "Sim Quarter" or "Sim Full Game" modes (when `_is_full_simulation` flag is `True`)
-- **NOT during Play Quarter:** Computer timeout checks do NOT run during "Play Quarter" mode (turn-by-turn mode), even if the user team is playing against a computer opponent
-- Computer timeout is evaluated when the BIP/SIP turn would be created (backend), but only if in full simulation mode
-- **Immediate Creation:** In full simulation mode, computer timeouts are created immediately when conditions are met (no deferred creation needed since animations are skipped)
+- **Play Quarter Mode:** Computer timeout checks run for computer teams only (user team is filtered out by `should_computer_call_timeout()` method)
+- **Sim Quarter / Sim Full Game Mode:** Computer timeout checks run for all teams (user team still filtered out - user teams cannot have computer timeouts called for them)
+- Computer timeout is evaluated when the BIP/SIP turn would be created (backend)
+- **Team Filtering:** `should_computer_call_timeout()` method checks `computer_team.is_user_team` flag and returns `False` if team is user team - this prevents computer from calling timeouts for user teams in all modes
 - User timeout button is only active during the 2-second pause window (after turn is received by frontend)
 - **Precedence:** If computer timeout is called, it takes precedence over user timeout (computer timeout is checked before the BIP/SIP turn is created)
 
@@ -130,13 +130,14 @@ Computer evaluates timeout conditions in order. Each condition only checks once 
 - **Two computer teams:** In games where both teams are computer-controlled, both teams are evaluated for timeout conditions. The first team to meet timeout conditions calls the timeout, and both team lineups are rebuilt using autoset lineup logic.
 
 **Play Quarter Mode (Turn-by-Turn Mode):**
-- Computer timeout checks do NOT run during "Play Quarter" mode (`_is_full_simulation` is `False`)
-- This ensures that when the user is actively playing a quarter, computer opponents cannot call timeouts
-- Computer timeout logic only applies when the user has chosen to simulate quarters ("Sim Quarter" or "Sim Full Game")
+- Computer timeout checks **DO run** during "Play Quarter" mode for computer teams
+- User teams are filtered out by `should_computer_call_timeout()` method (checks `is_user_team` flag)
+- This allows computer opponents to call timeouts during "Play Quarter" mode, but prevents computer from calling timeouts for the user team
 
 **Key Implementation:**
-- Computer timeout checking happens in `game_manager.simulate_macro_turn()` but is gated by `if is_full_simulation:` condition
-- The check occurs when creating SIP (Side Inbound) and BIP (Baseline Inbound) turns, but only if `_is_full_simulation` is `True`
-- When computer timeout is called during full simulation, both `calling_team.lineup` and `other_team.lineup` are rebuilt via `build_lineup_from_mongo()`
+- Computer timeout checking happens in `game_manager.simulate_macro_turn()` when creating SIP (Side Inbound) and BIP (Baseline Inbound) turns
+- `should_computer_call_timeout()` method filters out user teams by checking `computer_team.is_user_team` flag (returns `False` if user team)
+- This allows computer timeout checks to run in all modes (Play Quarter, Sim Quarter, Sim Full Game) while ensuring user teams never have computer timeouts called for them
+- When computer timeout is called, both `calling_team.lineup` and `other_team.lineup` are rebuilt via `build_lineup_from_mongo()`
 - This ensures consistent lineup management across all gameplay modes while respecting the user's choice between "Play Quarter" and "Sim Quarter"
 
