@@ -913,7 +913,7 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
 def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_id: str = None, game_id: str = None):
     """Get game plan settings for a team in the specified mode."""
     try:
-        print(f"🔍 Gameplan API called with: mode={mode}, team_id={team_id}, franchise_id={franchise_id}, tournament_id={tournament_id}, game_id={game_id}")
+        # ✅ PERFORMANCE: Removed verbose debug print
         # Determine which collection to use
         if mode == "franchise":
             if not franchise_id:
