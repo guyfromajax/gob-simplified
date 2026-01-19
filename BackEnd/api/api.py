@@ -1296,6 +1296,23 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
             total_time = (time.time() - endpoint_start) * 1000  # Convert to ms
             logging.warning(f"⏱️ [PERF] /api/game/{game_id} - Total endpoint time: {total_time:.2f}ms")
 
+@app.options("/api/simulate-quarter")
+async def simulate_quarter_options():
+    """
+    Explicit OPTIONS handler for CORS preflight.
+    This ensures CORS works even if middleware has issues.
+    """
+    return Response(
+        status_code=204,
+        headers={
+            "Access-Control-Allow-Origin": "https://gob-test.netlify.app",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
+
 @app.post("/api/simulate-quarter")
 def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = False):
     import time
