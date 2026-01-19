@@ -468,6 +468,22 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       const nextPlayTypeIsFreeThrow = turn.next_play_type === 'FREE_THROW';
       const isShootingFoul = hasDefensiveFoul && (hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow);
       
+      // 🔍 DEBUG: Log shooting foul detection for Sim Quarter text scroll
+      if (resultType === 'MISS') {
+        console.warn('🔍 [SHOOTING FOUL MISS DEBUG] bootGame.js Sim Quarter detection:', {
+          resultType,
+          hasFoulPlayer,
+          foul_player_id: turn.foul_player_id,
+          foul_team: turn.foul_team,
+          hasDefensiveFoul,
+          hasFreeThrowsRemaining,
+          free_throws_remaining: turn.free_throws_remaining,
+          nextPlayTypeIsFreeThrow,
+          next_play_type: turn.next_play_type,
+          isShootingFoul
+        });
+      }
+      
       eventResults.push({
         timeRemaining,
         playerName: finalShooterData.name,
@@ -969,8 +985,20 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         // If there's a defensive foul on a miss with free throws, it's a shooting foul
         if (event.resultType === 'MISS' && event.hasShootingFoul) {
           eventText = `${resultText} the ${event.shotType} shot. Shooting foul!`;
+          console.warn('🔍 [SHOOTING FOUL MISS DEBUG] bootGame.js text scroll: Added "Shooting foul!" to text', {
+            eventText,
+            hasShootingFoul: event.hasShootingFoul,
+            resultType: event.resultType
+          });
         } else {
           eventText = `${resultText} the ${event.shotType} shot.`;
+          if (event.resultType === 'MISS') {
+            console.warn('🔍 [SHOOTING FOUL MISS DEBUG] bootGame.js text scroll: NO "Shooting foul!" added', {
+              eventText,
+              hasShootingFoul: event.hasShootingFoul,
+              resultType: event.resultType
+            });
+          }
         }
       } else if (event.eventType === 'OREB_PUTBACK') {
         // OREB putback
@@ -2378,22 +2406,29 @@ async function initGame() {
   const urlResumeFromTimeoutParam = urlParams.get('resume_from_timeout');
   const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
   
-  console.log('🔍 [TIMEOUT DETECTION] bootGame.js initGame() - Reading resume_from_timeout:', {
+  console.warn('🔍 [TIMEOUT DETECTION] bootGame.js initGame() - Reading resume_from_timeout:', {
     urlParam: urlResumeFromTimeoutParam,
     parsedValue: resumeFromTimeout,
     quarter: quarter,
     gameId: gameId,
-    allUrlParams: Object.fromEntries(urlParams.entries())
+    allUrlParams: Object.fromEntries(urlParams.entries()),
+    currentUrl: window.location.href
   });
   
-  // ✅ FIX: Only hide pre-game buttons when resuming from timeout
-  // Show pre-game buttons at start of each quarter (Q1-Q4, OT)
-  if (resumeFromTimeout) {
-    const preGameContainer = document.querySelector('.pre-game-container');
-    if (preGameContainer) {
-      console.log(`🎮 Hiding pre-game container (timeout resume)`);
+  // ✅ CRITICAL FIX: Explicitly control pre-game container visibility
+  // Rule: Show pre-game container UNLESS we're resuming from timeout
+  // This ensures the container is always in the correct state
+  const preGameContainer = document.querySelector('.pre-game-container');
+  if (preGameContainer) {
+    if (resumeFromTimeout) {
+      console.warn(`🔍 [TIMEOUT DETECTION] HIDING pre-game container (resumeFromTimeout=true)`);
       preGameContainer.classList.add('hidden');
+    } else {
+      console.warn(`🔍 [TIMEOUT DETECTION] SHOWING pre-game container (resumeFromTimeout=false or missing)`);
+      preGameContainer.classList.remove('hidden');
     }
+  } else {
+    console.error('🔍 [TIMEOUT DETECTION] Pre-game container not found!');
   }
   
   if (playBtn) {

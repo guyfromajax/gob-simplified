@@ -489,6 +489,22 @@ export async function shootBall({
         const isShootingFoulOnMiss = result === "MISS" && (hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow);
         const isShootingFoul = isAndOne || isShootingFoulOnMiss;
         
+        // 🔍 DEBUG: Log shooting foul detection for missed shots
+        if (result === "MISS") {
+          console.warn('🔍 [SHOOTING FOUL MISS DEBUG] ballManager.js detection:', {
+            result,
+            hasFreeThrowsRemaining,
+            free_throws_remaining: turnData?.free_throws_remaining,
+            nextPlayTypeIsFreeThrow,
+            next_play_type: turnData?.next_play_type,
+            hasFoulPlayer,
+            foul_player_id: turnData?.foul_player_id,
+            foul_team: turnData?.foul_team,
+            isShootingFoulOnMiss,
+            isShootingFoul
+          });
+        }
+        
         // Get shooter/foul player data for announcements
         const shooterSprite = scene.playerSprites?.[shooterId];
         const shooterInfo = scene.playerInfo?.[shooterId];
