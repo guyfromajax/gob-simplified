@@ -632,22 +632,63 @@ def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
     Apply restored timeout state to GameManager.
     Called after gm is loaded/created.
     Works for all modes (single, tournament, franchise).
+    
+    ✅ CRITICAL FIX (January 2025): When resuming from timeout, restore ALL critical game state
+    from the saved document, not just timeout-specific fields. This ensures that if the game
+    is still in ongoing_games with stale state, we overwrite it with the correct saved state.
+    This fixes the bug where computer timeouts would resume with incorrect scores/clock.
     """
     if not saved or not gm:
         return
     
-    # Restore critical timeout state
+    # ✅ CRITICAL FIX: Restore ALL critical game state from saved document
+    # This ensures saved state (from timeout save) overwrites any stale in-memory state
+    
+    # Restore timeout-specific state
     if "timeout_next_play_type" in saved:
         gm.game_state["timeout_next_play_type"] = saved["timeout_next_play_type"]
         logging.info(f"🔄 TIMEOUT RESUME: Applied timeout_next_play_type={saved['timeout_next_play_type']}")
     
+    if "timeout_offense_team_id" in saved:
+        gm.game_state["timeout_offense_team_id"] = saved["timeout_offense_team_id"]
+    
+    # Restore clock and time (critical for timeout resume)
     if "clock" in saved:
         gm.game_state["clock"] = saved["clock"]
-        # ✅ PERFORMANCE: Removed debug logging
+        logging.info(f"🔄 TIMEOUT RESUME: Restored clock={saved['clock']} from saved document")
     
     if "time_remaining" in saved:
         gm.game_state["time_remaining"] = saved["time_remaining"]
-        # ✅ PERFORMANCE: Removed debug logging
+        logging.info(f"🔄 TIMEOUT RESUME: Restored time_remaining={saved['time_remaining']} from saved document")
+    
+    # ✅ CRITICAL FIX: Restore scores from saved document (overwrites stale in-memory scores)
+    if "score" in saved and isinstance(saved["score"], dict):
+        # Restore scores for both teams
+        for team_name, score_value in saved["score"].items():
+            if team_name in gm.score:
+                gm.score[team_name] = score_value
+                logging.info(f"🔄 TIMEOUT RESUME: Restored score {team_name}={score_value} from saved document")
+    
+    # ✅ CRITICAL FIX: Restore team fouls from saved document
+    home_team_data = saved.get("home_team", {})
+    away_team_data = saved.get("away_team", {})
+    
+    if "team_fouls" in home_team_data:
+        gm.home_team.team_fouls = home_team_data["team_fouls"]
+        logging.info(f"🔄 TIMEOUT RESUME: Restored home team_fouls={home_team_data['team_fouls']} from saved document")
+    
+    if "team_fouls" in away_team_data:
+        gm.away_team.team_fouls = away_team_data["team_fouls"]
+        logging.info(f"🔄 TIMEOUT RESUME: Restored away team_fouls={away_team_data['team_fouls']} from saved document")
+    
+    # ✅ CRITICAL FIX: Restore team timeouts from saved document
+    if "timeouts" in home_team_data:
+        gm.home_team.timeouts = home_team_data["timeouts"]
+        logging.info(f"🔄 TIMEOUT RESUME: Restored home timeouts={home_team_data['timeouts']} from saved document")
+    
+    if "timeouts" in away_team_data:
+        gm.away_team.timeouts = away_team_data["timeouts"]
+        logging.info(f"🔄 TIMEOUT RESUME: Restored away timeouts={away_team_data['timeouts']} from saved document")
 
 # 4. Routes
 @app.get("/")

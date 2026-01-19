@@ -307,7 +307,19 @@ const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
 
 **Critical Fixes (January 2025):**
 
-1. **Q2-Q4 Timeout Resume Parameter Preservation:**
+1. **Computer Timeout State Restoration Bug Fix:**
+   - **Problem:** When computer called timeout, game state was saved to DB correctly, but when user returned, if game was still in `ongoing_games` (in-memory cache), the system would use stale in-memory state instead of loading the saved DB state. This caused incorrect scores, clock, and other game state to be restored.
+   - **Root Cause:** `apply_timeout_resume_state_to_gm()` only restored timeout-specific fields (`timeout_next_play_type`, `clock`, `time_remaining`), but didn't restore scores, fouls, and timeouts from the saved document. When game was in memory, stale values persisted.
+   - **Solution:** Updated `apply_timeout_resume_state_to_gm()` to restore ALL critical game state from saved document:
+     - Scores (overwrites stale in-memory scores)
+     - Team fouls (overwrites stale in-memory fouls)
+     - Team timeouts (overwrites stale in-memory timeouts)
+     - Clock and time_remaining (already restored, but now with logging)
+   - **Impact:** Computer timeouts now correctly restore all game state, matching user timeout behavior
+   - **Location:** `BackEnd/api/api.py` `apply_timeout_resume_state_to_gm()` (lines 630-680)
+   - **Applied To:** Both in-memory games (line 1238) and newly-loaded games (line 1556)
+
+2. **Q2-Q4 Timeout Resume Parameter Preservation:**
    - **Location:** `FrontEnd/static/set-lineup.js` (lines 1078-1088)
    - **Problem:** Previous logic forced `resumeFromTimeout = false` for ALL quarters > 1, treating timeouts in Q2-Q4 as quarter breaks
    - **Solution:** Only force `resumeFromTimeout = false` if URL param is already false/missing (true quarter break). Preserve `resumeFromTimeout = true` when URL param indicates timeout resume (any quarter)
@@ -323,7 +335,7 @@ const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
      }
      ```
 
-2. **Prevent Game Reset During Timeout Resume:**
+3. **Prevent Game Reset During Timeout Resume:**
    - **Location:** `FrontEnd/static/set-lineup.js` (lines 126-174)
    - **Problem:** `init-game` was being called when resuming from timeout, creating a new game and resetting all state (scores, clock, quarter)
    - **Solution:** Skip `init-game` call if `game_id` exists in URL OR if `resume_from_timeout=true`
@@ -373,11 +385,18 @@ The timeout resume system uses a unified architecture that works consistently ac
    - Validates that `timeout_next_play_type` exists in saved document
    - Returns saved document with timeout state, or `None` if not found
 
-2. **`apply_timeout_resume_state_to_gm()`** (`BackEnd/api/api.py` lines 397-430)
+2. **`apply_timeout_resume_state_to_gm()`** (`BackEnd/api/api.py` lines 630-680)
    - Applies restored state to GameManager instance
-   - Restores `timeout_next_play_type` to `gm.game_state`
-   - Restores `timeout_offense_team_id` and flips possession if needed
-   - Restores `clock` and `time_remaining`
+   - **✅ CRITICAL FIX (January 2025):** Restores ALL critical game state from saved document, not just timeout-specific fields
+   - This ensures that if the game is still in `ongoing_games` with stale state, we overwrite it with the correct saved state
+   - This fixes the bug where computer timeouts would resume with incorrect scores/clock when game was still in memory
+   - Restores:
+     - `timeout_next_play_type` to `gm.game_state`
+     - `timeout_offense_team_id` to `gm.game_state`
+     - `clock` and `time_remaining` (critical for timeout resume)
+     - **Scores** from saved document (overwrites stale in-memory scores)
+     - **Team fouls** from saved document (overwrites stale in-memory fouls)
+     - **Team timeouts** from saved document (overwrites stale in-memory timeouts)
    - Works for both in-memory and newly-loaded games
 
 **Unified Flow (`BackEnd/api/api.py` `simulate_quarter_endpoint()`):**
@@ -429,6 +448,10 @@ simulate_quarter(gm, ..., resume_from_timeout=request.resume_from_timeout)
 - **Consistent behavior** across all game modes
 - **New game protection** (only checks timeout state if game_id exists)
 - **Stale data prevention** (validates quarter match before using timeout state)
+- **✅ CRITICAL FIX (January 2025):** Overwrites stale in-memory state with saved DB state
+  - Fixes bug where computer timeouts would resume with incorrect scores/clock when game was still in `ongoing_games`
+  - Ensures saved state (from timeout save) always takes precedence over in-memory state
+  - Applies to both user and computer timeouts for consistency
 
 **Timeout State Cleanup:**
 
@@ -476,10 +499,15 @@ This prevents stale timeout state from affecting future games.
    - `timeout_next_play_type` → Always `"SIDE_INBOUND"` (or `"FREE_THROW"`)
    - `timeout_offense_team_id` → Restores possession team
    - `clock` and `time_remaining` → Restores game clock
+   - **✅ CRITICAL FIX (January 2025):** Also restores scores, fouls, and timeouts from saved document
+   - This ensures saved state overwrites any stale in-memory state (fixes computer timeout bug)
 
 6. **Backend applies state to GameManager** (whether in memory or newly loaded)
    - Uses `apply_timeout_resume_state_to_gm()` helper
+   - **✅ CRITICAL FIX (January 2025):** Restores ALL critical game state, not just timeout-specific fields
+   - This ensures that if game is still in `ongoing_games` with stale state, we overwrite it with correct saved state
    - Works for both in-memory and newly-loaded games
+   - Applied early in the flow (line 1238) if game is in memory, or after DB load (line 1556) if not
 
 7. **Backend creates SIP turn** with correct possession team
    - Uses `timeout_offense_team_id` to ensure correct team has possession
