@@ -1449,6 +1449,20 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             else:
                 # Stale timeout data (quarter mismatch or missing next_play_type) - ignore it
                 # logging.warning(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={request.quarter}, next_play_type={timeout_next_play_type})")
+                
+                # ✅ QUARTER BREAK: Explicitly clear any stale timeout state in saved document BEFORE clearing timeout_saved_state
+                # This ensures quarter breaks are treated as new quarter starts, not timeout resumes
+                # timeout_saved_state still contains the saved document at this point
+                if timeout_saved_state and ("timeout_next_play_type" in timeout_saved_state or "timeout_offense_team_id" in timeout_saved_state):
+                    logging.info(f"✅ QUARTER BREAK: Clearing stale timeout state from saved document (quarter {request.quarter})")
+                    update_data = {}
+                    if "timeout_next_play_type" in timeout_saved_state:
+                        update_data["timeout_next_play_type"] = None
+                    if "timeout_offense_team_id" in timeout_saved_state:
+                        update_data["timeout_offense_team_id"] = None
+                    if update_data:
+                        games_collection.update_one({"_id": game_id}, {"$unset": update_data})
+                
                 timeout_saved_state = None  # Clear invalid timeout state
                 # ✅ QUARTER BREAK: Clear resume_from_timeout flag and timeout state if no valid timeout state
                 # This handles cases where resume_from_timeout was incorrectly preserved across quarter boundaries
@@ -1456,18 +1470,6 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 if request.resume_from_timeout:
                     logging.warning(f"⚠️ QUARTER BREAK: Clearing invalid resume_from_timeout flag (no valid timeout state for quarter {request.quarter})")
                     request.resume_from_timeout = False
-                
-                # ✅ QUARTER BREAK: Explicitly clear any stale timeout state in saved document
-                # This ensures quarter breaks are treated as new quarter starts, not timeout resumes
-                if "timeout_next_play_type" in saved or "timeout_offense_team_id" in saved:
-                    logging.info(f"✅ QUARTER BREAK: Clearing stale timeout state from saved document (quarter {request.quarter})")
-                    update_data = {}
-                    if "timeout_next_play_type" in saved:
-                        update_data["timeout_next_play_type"] = None
-                    if "timeout_offense_team_id" in saved:
-                        update_data["timeout_offense_team_id"] = None
-                    if update_data:
-                        games_collection.update_one({"_id": game_id}, {"$unset": update_data})
         else:
             if request.resume_from_timeout:
                 logging.warning(f"⚠️ TIMEOUT RESUME: URL has resume_from_timeout=true but no timeout state found in DB for game_id={game_id} - treating as normal quarter start")
