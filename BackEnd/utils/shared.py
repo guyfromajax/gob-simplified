@@ -744,14 +744,24 @@ def summarize_game_state(game, exclude_animations=True):
 
     players = []
     for team_key, team_obj in [("home", game.home_team), ("away", game.away_team)]:
-        for pos, player in team_obj.lineup.items():
+        # ✅ SS&S FIX: Save ALL players (lineup + bench) to preserve real-time NG values for all players
+        # Previously only saved lineup players, causing bench players to default to 1.0 NG when loading from DB
+        # This ensures all players' current energy levels are persisted and available after timeout/quarter breaks
+        for player in team_obj.get_all_players():
+            # Get position if player is in lineup, otherwise None
+            pos = None
+            for lineup_pos, lineup_player in team_obj.lineup.items():
+                if lineup_player.player_id == player.player_id:
+                    pos = lineup_pos
+                    break
+            
             coords = getattr(player, "coords", None) or {"x": 0, "y": 0}
             players.append({
                 "playerId": player.player_id,
                 "name": getattr(player, "name", None) or f"{getattr(player, 'first_name', '')} {getattr(player, 'last_name', '')}".strip(),
                 "team": team_key,
                 "team_id": team_obj.team_id,
-                "pos": pos,
+                "pos": pos,  # None for bench players
                 "jersey": player.jersey,
                 "photo": getattr(player, "photo", None),  # Player headshot image
                 "primary_color": getattr(team_obj, "primary_color", "#000000"),
@@ -763,7 +773,7 @@ def summarize_game_state(game, exclude_animations=True):
                     "EM": player.attributes.get("EM", 0),
                     "CH": player.attributes.get("CH", 0),
                     "MO": player.attributes.get("MO", 0),
-                    "NG": player.attributes.get("NG", 1.0)
+                    "NG": player.attributes.get("NG", 1.0)  # ✅ Real-time energy value from in-memory Player object
                 }
             })
 

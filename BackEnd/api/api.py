@@ -1048,13 +1048,17 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                     players = saved.get("players", [])
                     players_with_energy = []
                     for p in players:
+                        # ✅ SS&S FIX: Extract NG from attributes.NG (where it's saved) with fallback to top-level NG
+                        attrs = p.get("attributes", {})
+                        ng_value = attrs.get("NG", p.get("NG", 1.0))  # Check attributes first, then top-level, then default
+                        
                         player_data = {
                             "_id": p.get("playerId") or p.get("player_id"),
                             "name": p.get("name"),
-                            "NG": p.get("NG", 1.0),
+                            "NG": ng_value,  # ✅ Real-time NG from attributes.NG
                             "team": p.get("team"),
                             "stats": {},  # Empty stats for new game
-                            "attributes": p.get("attributes", {})  # ✅ Add attributes (EM, MO, CH, NG) from saved doc
+                            "attributes": attrs  # ✅ Add attributes (EM, MO, CH, NG) from saved doc
                         }
                         players_with_energy.append(player_data)
                     
@@ -1099,13 +1103,18 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                 # Map to include NG, stats, and attributes if available
                 players_with_energy = []
                 for p in players:
+                    # ✅ SS&S FIX: Extract NG from attributes.NG (where it's saved) with fallback to top-level NG
+                    # This ensures real-time energy values saved during timeout are correctly loaded
+                    attrs = p.get("attributes", {})
+                    ng_value = attrs.get("NG", p.get("NG", 1.0))  # Check attributes first, then top-level, then default
+                    
                     player_data = {
                         "_id": p.get("playerId") or p.get("player_id"),
                         "name": p.get("name"),
-                        "NG": p.get("NG", 1.0),  # May be saved in game doc
+                        "NG": ng_value,  # ✅ Real-time NG from attributes.NG (saved during timeout)
                         "team": p.get("team"),
                         "stats": p.get("stats", {}),  # ✅ Add stats from saved doc
-                        "attributes": p.get("attributes", {})  # ✅ Add attributes (EM, MO, CH, NG) from saved doc
+                        "attributes": attrs  # ✅ Add attributes (EM, MO, CH, NG) from saved doc
                     }
                     players_with_energy.append(player_data)
                 
