@@ -1421,12 +1421,14 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 # Override request.resume_from_timeout to ensure simulate_quarter() handles timeout resume
                 request.resume_from_timeout = True
                 logging.info(f"✅ TIMEOUT RESUME: Detected valid timeout state in DB, setting resume_from_timeout=True for simulate_quarter()")
+                # ✅ CRITICAL FIX: Always force reload from DB when resuming from timeout
+                # This ensures we use the latest saved state, not stale in-memory state
+                # This fixes the bug where computer timeout → user timeout shows stale data
                 if gm is not None:
-                    # Game is in memory - apply timeout state now (before simulate_quarter)
-                    logging.info(f"🔍 TIMEOUT RESUME: Applying state to in-memory game")
-                    apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
-                else:
-                    logging.info(f"🔍 TIMEOUT RESUME: Game not in memory, will apply after DB load")
+                    logging.warning(f"🔍 TIMEOUT RESUME: Game in memory, but forcing DB reload to ensure latest state (game_id={game_id})")
+                    del ongoing_games[game_id]
+                    gm = None  # Force reload from DB
+                logging.info(f"🔍 TIMEOUT RESUME: Will load fresh game from DB and apply timeout state")
             else:
                 # Stale timeout data (quarter mismatch or missing next_play_type) - ignore it
                 # logging.warning(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={request.quarter}, next_play_type={timeout_next_play_type})")
@@ -1783,10 +1785,13 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             # Check that timeout_next_play_type exists and quarter matches
                             saved_quarter = saved.get("quarter", 0)
                             if timeout_saved_state.get("timeout_next_play_type") and saved_quarter == request.quarter:
-                                apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
+                                # ✅ CRITICAL FIX: Apply timeout state from the FULL saved document, not just timeout_saved_state
+                                # This ensures we restore ALL game state (scores, clock, etc.) from the latest DB save
+                                # Use 'saved' (the full document) instead of 'timeout_saved_state' (which might be partial)
+                                apply_timeout_resume_state_to_gm(gm, saved)  # Use full saved document
                                 # Override request.resume_from_timeout to ensure simulate_quarter() handles timeout resume
                                 request.resume_from_timeout = True
-                                logging.info(f"✅ TIMEOUT RESUME: Detected valid timeout state in DB (quarter matches), setting resume_from_timeout=True for simulate_quarter()")
+                                logging.info(f"✅ TIMEOUT RESUME: Applied timeout state from full saved document (quarter matches), setting resume_from_timeout=True for simulate_quarter()")
                             else:
                                 logging.warning(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={request.quarter})")
                                 timeout_saved_state = None  # Clear invalid timeout state
