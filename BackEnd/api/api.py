@@ -731,10 +731,26 @@ def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
         logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] timeout_next_play_type: {old_timeout_next_play_type} → {saved['timeout_next_play_type']}")
         logging.info(f"🔄 TIMEOUT RESUME: Applied timeout_next_play_type={saved['timeout_next_play_type']}")
     
+    # ✅ CRITICAL FIX: Restore offense team from timeout_offense_team_id
+    # This ensures the correct team has possession after timeout (e.g., if user called timeout during BIP)
     if "timeout_offense_team_id" in saved:
         old_timeout_offense_team_id = gm.game_state.get("timeout_offense_team_id")
         gm.game_state["timeout_offense_team_id"] = saved["timeout_offense_team_id"]
         logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] timeout_offense_team_id: {old_timeout_offense_team_id} → {saved['timeout_offense_team_id']}")
+        
+        # ✅ SS&S FIX: Set offense_team and defense_team based on timeout_offense_team_id
+        # This is critical for maintaining proper possession (e.g., user calls timeout during BIP)
+        saved_offense_team_id = saved["timeout_offense_team_id"]
+        if saved_offense_team_id == gm.home_team.team_id:
+            gm.offense_team = gm.home_team
+            gm.defense_team = gm.away_team
+            logging.info(f"🔄 TIMEOUT RESUME: Set offense_team to HOME ({gm.home_team.name}) based on timeout_offense_team_id")
+        elif saved_offense_team_id == gm.away_team.team_id:
+            gm.offense_team = gm.away_team
+            gm.defense_team = gm.home_team
+            logging.info(f"🔄 TIMEOUT RESUME: Set offense_team to AWAY ({gm.away_team.name}) based on timeout_offense_team_id")
+        else:
+            logging.warning(f"⚠️ TIMEOUT RESUME: timeout_offense_team_id ({saved_offense_team_id}) does not match home_team_id ({gm.home_team.team_id}) or away_team_id ({gm.away_team.team_id}) - possession may be incorrect")
     
     # Restore clock and time (critical for timeout resume)
     old_clock = gm.game_state.get("clock")
@@ -760,9 +776,21 @@ def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
                 logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] score {team_name}: {old_score} → {score_value}")
                 logging.info(f"🔄 TIMEOUT RESUME: Restored score {team_name}={score_value} from saved document")
     
-    # ✅ CRITICAL FIX: Restore team fouls from saved document
-    home_team_data = saved.get("home_team", {})
-    away_team_data = saved.get("away_team", {})
+    # ✅ CRITICAL FIX: Restore team fouls and timeouts from saved document
+    # Check unified teams structure first, then fall back to old structure
+    teams_obj = saved.get("teams", {})
+    home_team_id = saved.get("home_team_id")
+    away_team_id = saved.get("away_team_id")
+    
+    # Get team data from unified structure (preferred)
+    home_team_data = teams_obj.get(home_team_id, {}) if home_team_id else {}
+    away_team_data = teams_obj.get(away_team_id, {}) if away_team_id else {}
+    
+    # Fallback to old structure for backward compatibility
+    if not home_team_data:
+        home_team_data = saved.get("home_team", {})
+    if not away_team_data:
+        away_team_data = saved.get("away_team", {})
     
     old_home_fouls = gm.home_team.team_fouls
     if "team_fouls" in home_team_data:
@@ -776,7 +804,7 @@ def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
         logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] away team_fouls: {old_away_fouls} → {away_team_data['team_fouls']}")
         logging.info(f"🔄 TIMEOUT RESUME: Restored away team_fouls={away_team_data['team_fouls']} from saved document")
     
-    # ✅ CRITICAL FIX: Restore team timeouts from saved document
+    # ✅ CRITICAL FIX: Restore team timeouts from saved document (unified structure support)
     old_home_timeouts = gm.home_team.timeouts
     if "timeouts" in home_team_data:
         gm.home_team.timeouts = home_team_data["timeouts"]
