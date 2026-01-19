@@ -1205,6 +1205,52 @@ export class ShotAnimationSystem {
       tweenManager: getTweenManagerState()
     });
     
+    // ✅ FIX: Check for shooting foul on missed shot and show announcement (matches ballManager.js pattern)
+    const hasFreeThrowsRemaining = (turnData?.free_throws_remaining ?? 0) > 0;
+    const nextPlayTypeIsFreeThrow = turnData?.next_play_type === 'FREE_THROW';
+    const isShootingFoul = hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow;
+    
+    if (isShootingFoul) {
+      // ✅ FIX: Replicate AND-1 announcement pattern exactly (matches made shot flow from ballManager.js)
+      const { showAnnouncement } = await import('../utils/announcements.js');
+      
+      // Get foul player data from turnData (same pattern as AND-1)
+      const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
+      if (foulPlayerId && this.scene) {
+        const foulPlayerSprite = this.playerSprites?.[foulPlayerId];
+        if (foulPlayerSprite) {
+          // Get team names
+          const homeTeamField = this.scene.simData?.home_team;
+          const awayTeamField = this.scene.simData?.away_team;
+          const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+          const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+          const foulPlayerTeamId = foulPlayerSprite?.team_id;
+          const foulPlayerTeamName = foulPlayerTeamId === this.scene.homeTeamId ? homeTeamName : awayTeamName;
+          
+          const foulPlayerData = {
+            playerId: foulPlayerId,
+            photo: foulPlayerSprite?.photo || null,
+            teamName: foulPlayerTeamName
+          };
+          
+          // Trigger foul effect
+          const { triggerFoulEffect } = await import('./negativeActionEffects.js');
+          triggerFoulEffect(this.scene, foulPlayerId);
+          
+          // Show announcement with player data (matches AND-1 pattern)
+          showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
+        } else {
+          // Fallback if sprite not found (matches AND-1 pattern)
+          const { triggerFoulEffect } = await import('./negativeActionEffects.js');
+          triggerFoulEffect(this.scene, foulPlayerId);
+          showAnnouncement("Shooting Foul!", 'neutral', null);
+        }
+      } else {
+        // Fallback if foulPlayerId not found (matches AND-1 pattern)
+        showAnnouncement("Shooting Foul!", 'neutral', null);
+      }
+    }
+    
     // ✅ PRIORITY 1 FIX: Call onShotEnd() to clear in-flight state before rebound
     // This matches the pattern in ballManager.js (line 626)
     // The ball is no longer in flight, so clear the state to allow attachment to rebounder
