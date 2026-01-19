@@ -497,3 +497,136 @@ This system documents data persistence across all three game modes when users ar
 - Consider using `play_id` (database ID) instead of play names for more robust matching
 - This would prevent issues if play names change in database
 
+---
+
+## In-Game Data Persistence (Hybrid Approach) ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+During active gameplay, game state (scores, clock, quarter, fouls, timeouts, lineups) must be persisted and retrieved consistently. The system uses a **hybrid approach** that balances performance (cache for gameplay) with consistency (database for critical reads).
+
+### Strategy: Cache for Performance, Database for Consistency
+
+**Problem:** Using database as single source of truth for every read would be too expensive (hundreds of DB calls per game). But using only in-memory cache can lead to stale state bugs.
+
+**Solution:** Hybrid approach with clear rules:
+
+1. **During Active Gameplay:** Use `ongoing_games` in-memory cache (fast, many calls)
+2. **After State Changes:** Refresh cache from database (timeout saves, quarter breaks)
+3. **For Lineup Screen:** Always read from database (infrequent, ~13 reads per game)
+
+### Performance Characteristics
+
+**Cache Usage (Active Gameplay):**
+- Turn-by-turn simulation: Uses `ongoing_games` cache
+- Many calls per game (hundreds of turn simulations)
+- Fast response times (no DB queries)
+
+**Database Usage (Critical Reads):**
+- Timeout saves: ~8 reads per game (user + computer timeouts)
+- Quarter breaks: ~4 reads per game (Q2, Q3, Q4, OT)
+- Lineup screen loads: ~13 reads per game total
+- Acceptable performance cost for consistency
+
+### Implementation Details
+
+#### 1. Cache Refresh After State Changes
+
+After any state change (timeout save, quarter break), the `ongoing_games` cache is refreshed from the database:
+
+```python
+# After saving timeout state to DB
+games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
+
+# Refresh cache from DB
+if game_id in ongoing_games and saved_doc:
+    refresh_game_cache_from_db(ongoing_games[game_id], saved_doc)
+```
+
+**Function:** `refresh_game_cache_from_db(gm, saved)`
+- Updates critical game state in existing GameManager instance
+- Updates: scores, clock, time_remaining, quarter, fouls, timeouts, timeout state
+- Ensures cache matches database after state changes
+
+#### 2. Database Reads for Lineup Screen
+
+The `/api/game/{game_id}` endpoint supports a `source` parameter:
+
+- `source=db`: Always reads from database (for lineup screen consistency)
+- `source=cache` or omitted: Uses `ongoing_games` cache if available (for gameplay performance)
+
+**Frontend Usage:**
+```javascript
+// Lineup screen always uses source=db for fresh data
+const gameRes = await fetch(`/api/game/${gameId}?quarter=1&source=db`);
+```
+
+**Backend Implementation:**
+```python
+@app.get("/api/game/{game_id}")
+def get_game_state(game_id: str, quarter: int | None = None, source: str | None = None):
+    force_db_read = source == "db"
+    
+    # Skip cache if forcing DB read
+    if not force_db_read:
+        gm = ongoing_games.get(game_id)
+        if gm:
+            return response_from_cache(gm)
+    
+    # Always read from DB if source=db or cache miss
+    saved = games_collection.find_one({"_id": game_id})
+    return response_from_db(saved)
+```
+
+#### 3. State Changes That Trigger Cache Refresh
+
+**Timeout Saves:**
+- User timeout: `/api/call-timeout` → Save to DB → Refresh cache
+- Computer timeout: `/api/simulate-turn` → Save to DB → Refresh cache
+
+**Quarter Breaks:**
+- Quarter completion: Save to DB → Refresh cache (if game still in memory)
+
+**Other State Changes:**
+- Score changes: Saved to DB during turn completion
+- Foul/timeout changes: Saved to DB during turn completion
+- Cache refreshed after timeout saves (most critical for consistency)
+
+### Key Files
+
+**Backend:**
+- `BackEnd/api/api.py`:
+  - `refresh_game_cache_from_db()` (lines 630-680): Refreshes cache from DB
+  - `get_game_state()` (lines 823-1050): Supports `source=db` parameter
+  - `call_timeout_endpoint()` (lines 2825-2891): User timeout save + cache refresh
+  - `simulate_turn_endpoint()` (lines 2390-2600): Computer timeout save + cache refresh
+
+**Frontend:**
+- `FrontEnd/static/set-lineup.js`:
+  - `loadRoster()` (line 190): Uses `source=db` for player energy
+  - `setHeader()` (line 900): Uses `source=db` for scores/clock
+
+### Benefits
+
+1. **Performance:** Active gameplay uses fast cache (hundreds of calls)
+2. **Consistency:** Lineup screen always gets fresh data from database
+3. **Low Overhead:** Only ~13 DB reads per game (timeouts + quarter breaks)
+4. **Cache Freshness:** Cache refreshed after state changes prevents stale data
+
+### Trade-offs
+
+**Accepted Trade-offs:**
+- Lineup screen DB reads are acceptable (~13 per game)
+- Cache refresh after timeout saves adds minimal overhead
+- Slight complexity in managing two sources (cache + DB)
+
+**Avoided Trade-offs:**
+- Not using DB for every read (would be too expensive)
+- Not using only cache (would cause stale state bugs)
+- Not refreshing cache (would cause inconsistency)
+
+### Related Documentation
+
+- `docs/docs_1_systems/05_GP_Supporting_Systems/Timeout_System.md` - Timeout state persistence
+- `docs/docs_1_systems/05_GP_Supporting_Systems/Computer_Timeout_System.md` - Computer timeout flow
+
