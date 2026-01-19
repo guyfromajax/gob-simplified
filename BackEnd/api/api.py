@@ -2655,10 +2655,16 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
         
         # Get all NEW turns created by this call
         # (simulate_macro_turn can create multiple turns for OREBs, side inbounds, etc.)
+        # ✅ CRITICAL: If pending_computer_timeout was just processed above, timeout_turn was already created and returned
+        # In that case, simulate_macro_turn() wasn't called, so new_turns will be empty - that's expected and correct
         new_turns = gm.turns[turns_before:] if len(gm.turns) > turns_before else []
         
         if not new_turns:
-            # No turns were created (shouldn't happen, but handle gracefully)
+            # No turns were created - this can happen legitimately if pending_computer_timeout was processed above
+            # In that case, the timeout was already returned, so we shouldn't reach here
+            # But handle gracefully: check if pending timeout was just processed (shouldn't happen, but defensive)
+            if gm.game_state.get("pending_computer_timeout"):
+                logging.error(f"🚨 UNEXPECTED: No new turns but pending_computer_timeout still exists! This should have been handled above.")
             latest_turn = None
         elif len(new_turns) == 1:
             # Normal case: one turn created
