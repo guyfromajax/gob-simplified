@@ -2603,12 +2603,6 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
                     logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] DB AFTER save - timeout_next_play_type={after_save_doc.get('timeout_next_play_type') if after_save_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={after_save_doc.get('timeout_offense_team_id') if after_save_doc else 'DOC_NOT_FOUND'}")
                     logging.warning(f"🔍 [COMPUTER TIMEOUT SAVE DEBUG] DB AFTER save - score={after_save_doc.get('score') if after_save_doc else 'DOC_NOT_FOUND'}, clock={after_save_doc.get('clock') if after_save_doc else 'DOC_NOT_FOUND'}, time_remaining={after_save_doc.get('time_remaining') if after_save_doc else 'DOC_NOT_FOUND'}")
                     
-                    # ✅ HYBRID APPROACH: Refresh ongoing_games cache from DB after save
-                    # This ensures cache is fresh for subsequent reads during gameplay
-                    if game_id in ongoing_games and after_save_doc:
-                        refresh_game_cache_from_db(ongoing_games[game_id], after_save_doc)
-                        logging.info(f"🔄 COMPUTER TIMEOUT: Refreshed ongoing_games cache from DB for game_id={game_id}")
-                    
                     logging.info(
                         f"💾 COMPUTER TIMEOUT: Saved game state before returning timeout turn: "
                         f"game_id={game_id}, quarter={db_summary.get('quarter')}, "
@@ -2621,16 +2615,19 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
                 
                 # Remove the TIMEOUT turn from turns so next API call can simulate the actual next turn
                 timeout_turn = gm.turns.pop()
+                
+                # ✅ SIMPLIFY: Use saved data (db_summary) for response, same as user timeout
+                # This ensures response matches what was saved to DB
                 timeout_response = {
                     "turn": timeout_turn,
                     "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
-                    "time_remaining": gm.game_state["time_remaining"],
-                    "clock": gm.game_state.get("clock", "8:00"),
-                    "quarter_complete": False,
-                    "quarter": gm.quarter,
+                    "time_remaining": db_summary.get("time_remaining", gm.game_state.get("time_remaining", 480)),
+                    "clock": db_summary.get("clock", gm.game_state.get("clock", "8:00")),
+                    "quarter_complete": False,  # ✅ CRITICAL: Always False for timeout (not quarter end)
+                    "quarter": db_summary.get("quarter", gm.quarter),
                     "is_final": False,
-                    "home_score": gm.score.get(gm.home_team.name, 0),
-                    "away_score": gm.score.get(gm.away_team.name, 0),
+                    "home_score": db_summary.get("score", {}).get(gm.home_team.name, gm.score.get(gm.home_team.name, 0)),
+                    "away_score": db_summary.get("score", {}).get(gm.away_team.name, gm.score.get(gm.away_team.name, 0)),
                     "home_team_fouls": gm.home_team.team_fouls,
                     "away_team_fouls": gm.away_team.team_fouls,
                     "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
@@ -2958,12 +2955,6 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
         saved_doc = games_collection.find_one({"_id": game_id})
         logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] AFTER save - DB document timeout fields: timeout_next_play_type={saved_doc.get('timeout_next_play_type') if saved_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={saved_doc.get('timeout_offense_team_id') if saved_doc else 'DOC_NOT_FOUND'}")
         logging.warning(f"🔍 [USER TIMEOUT SAVE DEBUG] DB document score={saved_doc.get('score') if saved_doc else 'DOC_NOT_FOUND'}, clock={saved_doc.get('clock') if saved_doc else 'DOC_NOT_FOUND'}, time_remaining={saved_doc.get('time_remaining') if saved_doc else 'DOC_NOT_FOUND'}")
-        
-        # ✅ HYBRID APPROACH: Refresh ongoing_games cache from DB after save
-        # This ensures cache is fresh for subsequent reads during gameplay
-        if game_id in ongoing_games and saved_doc:
-            refresh_game_cache_from_db(ongoing_games[game_id], saved_doc)
-            logging.info(f"🔄 TIMEOUT: Refreshed ongoing_games cache from DB for game_id={game_id}")
         
         logging.info(
             f"💾 TIMEOUT: Saved game state before navigating to lineup screen: "
