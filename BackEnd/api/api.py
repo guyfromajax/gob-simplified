@@ -1108,12 +1108,18 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                     attrs = p.get("attributes", {})
                     ng_value = attrs.get("NG", p.get("NG", 1.0))  # Check attributes first, then top-level, then default
                     
+                    # ✅ SS&S FIX: Ensure stats are properly extracted - saved as flat dict from player.stats.get("game", {})
+                    # Frontend expects either gp.stats.game (nested) or gp.stats (flat), then falls back to {}
+                    saved_stats = p.get("stats", {})
+                    # Stats are saved as flat dict, so ensure we return them as flat dict
+                    # Frontend will check gp.stats?.game first, but since it's flat, will use gp.stats
+                    
                     player_data = {
                         "_id": p.get("playerId") or p.get("player_id"),
                         "name": p.get("name"),
                         "NG": ng_value,  # ✅ Real-time NG from attributes.NG (saved during timeout)
                         "team": p.get("team"),
-                        "stats": p.get("stats", {}),  # ✅ Add stats from saved doc
+                        "stats": saved_stats,  # ✅ Flat game stats dict (PTS, REB, AST, etc.)
                         "attributes": attrs  # ✅ Add attributes (EM, MO, CH, NG) from saved doc
                     }
                     players_with_energy.append(player_data)
@@ -1165,13 +1171,26 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                 # ✅ UNIFIED STRUCTURE: Return unified teams object structure
                 # Frontend should read from teams[home_team_id]/teams[away_team_id]
                 # Keeping backward compatibility home_team/away_team for now (built from teams object)
+                
+                # ✅ SS&S FIX: Extract score from saved document
+                # Score is saved as {"teamName1": score1, "teamName2": score2} at top level
+                saved_score = saved.get("score", {})
+                # If score is empty but teams object has scores, build from teams object (fallback)
+                if not saved_score and home_team_data and away_team_data:
+                    home_score = home_team_data.get("score", 0)
+                    away_score = away_team_data.get("score", 0)
+                    saved_score = {
+                        home_team_data.get("name"): home_score,
+                        away_team_data.get("name"): away_score
+                    }
+                
                 response_data = {
                     "game_id": game_id,
-                    "score": saved.get("score", {}),
+                    "score": saved_score,  # ✅ Team scores: {"teamName1": score1, "teamName2": score2}
                     "box_score": box_score,
                     "quarter": saved.get("quarter", 1),
                     "clock": saved.get("clock", "8:00"),
-                    "players": players_with_energy,
+                    "players": players_with_energy,  # ✅ Includes stats (flat dict) and attributes (EM, MO, NG)
                     # Team IDs for unified structure access
                     "home_team_id": home_team_id,
                     "away_team_id": away_team_id,
