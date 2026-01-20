@@ -183,12 +183,13 @@ async function loadRoster() {
   }
   
   // If there's an active game, fetch current player energy levels
-  // Pass quarter=1 to detect new game scenarios (Q1 request when saved game is Q2+)
+  // Pass actual quarter from URL params to ensure correct stats loading (not hardcoded quarter=1)
+  // Backend detects new game scenarios when quarter=1 is requested but saved game is Q2+
   if (gameId) {
     console.log("Loading current player energy from game:", gameId);
     try {
         // ✅ HYBRID APPROACH: Use source=db to ensure fresh data from database
-        const gameRes = await fetch(`${API_CONFIG.buildUrl(`/api/game/${gameId}`)}?quarter=1&source=db`);
+        const gameRes = await fetch(`${API_CONFIG.buildUrl(`/api/game/${gameId}`)}?quarter=${quarter}&source=db`);
         if (gameRes.ok) {
           const gameData = await gameRes.json();
           const gamePlayers = gameData.players || [];
@@ -899,7 +900,8 @@ async function setHeader() {
     try {
       // ✅ HYBRID APPROACH: Use source=db to ensure fresh data from database
       // This is acceptable performance cost (~13 reads per game: timeouts + quarter breaks)
-      const gameRes = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}?quarter=1&source=db`));
+      // Pass actual quarter from URL params to ensure correct stats loading
+      const gameRes = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}?quarter=${quarter}&source=db`));
       if (gameRes.ok) {
         const gameData = await gameRes.json();
         const score = gameData.score || {};
