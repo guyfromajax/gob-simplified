@@ -3542,20 +3542,20 @@ def init_game(request: dict):
     # during gameplay via _load_playbook_settings(), so no need to copy them here
     if mode == "single":
         if "teams" not in summary:
-        summary["teams"] = {}
-    
-    home_team_id = gm.home_team.team_id
-    away_team_id = gm.away_team.team_id
-    
-    if home_team_id not in summary["teams"]:
-        summary["teams"][home_team_id] = {}
-    if away_team_id not in summary["teams"]:
-        summary["teams"][away_team_id] = {}
-    
+            summary["teams"] = {}
+        
+        home_team_id = gm.home_team.team_id
+        away_team_id = gm.away_team.team_id
+        
+        if home_team_id not in summary["teams"]:
+            summary["teams"][home_team_id] = {}
+        if away_team_id not in summary["teams"]:
+            summary["teams"][away_team_id] = {}
+        
         # For single mode, playbook_settings are stored in game document for persistence
         # They may be loaded from teams collection or come from previous saves
-    summary["teams"][home_team_id]["playbook_settings"] = home_playbook_settings
-    summary["teams"][away_team_id]["playbook_settings"] = away_playbook_settings
+        summary["teams"][home_team_id]["playbook_settings"] = home_playbook_settings
+        summary["teams"][away_team_id]["playbook_settings"] = away_playbook_settings
     summary_time = (time.time() - summary_start) * 1000
     
     # Set GameManager quarter to 1 to match
