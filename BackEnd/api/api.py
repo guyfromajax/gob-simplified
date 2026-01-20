@@ -3515,6 +3515,7 @@ def init_game(request: dict):
     mode = request.get("mode", "single")
     tournament_id = request.get("tournament_id")
     franchise_id = request.get("franchise_id")
+    user_team_side = request.get("user_team_side")  # "home" or "away"
     
     if not home_team or not away_team:
         raise HTTPException(status_code=400, detail="home_team and away_team required")
@@ -3540,9 +3541,17 @@ def init_game(request: dict):
     # Create GameManager (this initializes teams and players)
     gm_start = time.time()
     logging.warning(f"⏱️ [PERF] /api/init-game - Starting GameManager creation")
-    gm = GameManager(home_team, away_team, mode=mode)
+    gm = GameManager(home_team, away_team, mode=mode, user_team_side=user_team_side)
     gm_create_time = (time.time() - gm_start) * 1000
     logging.warning(f"⏱️ [PERF] /api/init-game - GameManager created: {gm_create_time:.2f}ms")
+    
+    # ✅ CRITICAL: Store user_team_side in game_state for persistence
+    # This ensures is_user_team flags persist across game loads
+    if user_team_side:
+        gm.game_state["user_team_side"] = user_team_side
+        logging.warning(f"✅ [INIT-GAME] Set user_team_side in game_state: {user_team_side}")
+    else:
+        logging.warning(f"⚠️ [INIT-GAME] No user_team_side provided - override checking will not work!")
     
     # Initialize game stats (this randomizes EM, CH, MO for all players)
     stats_start = time.time()
@@ -3573,6 +3582,12 @@ def init_game(request: dict):
         summary["tournament_id"] = str(tournament_id)
     elif mode == "franchise" and franchise_id:
         summary["franchise_id"] = str(franchise_id)
+    
+    # ✅ CRITICAL: Store user_team_side in game document for persistence
+    # This ensures is_user_team flags are correctly set when game is loaded from DB
+    if user_team_side:
+        summary["user_team_side"] = user_team_side
+        logging.warning(f"✅ [INIT-GAME] Stored user_team_side in game document: {user_team_side}")
     
     # ✅ SS&S: Store playbook_settings in game document's teams object ONLY for single mode
     # For franchise/tournament mode, settings are accessed directly from franchise/tournament documents
