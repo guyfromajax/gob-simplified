@@ -2077,17 +2077,35 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     home_team_attributes = None
                     away_team_attributes = None
                     
-                    if mode in ["tournament", "single"] and (request.tournament_id or request.game_id):
-                        # Load team attributes from tournament or game document
+                    if mode == "tournament" and request.tournament_id:
+                        # Load team attributes from tournament document
                         home_attrs = load_team_attributes_from_doc(
                             mode, 
-                            request.tournament_id or request.game_id, 
+                            request.tournament_id, 
                             None,  # team_id will be resolved inside the function
                             request.home_team
                         )
                         away_attrs = load_team_attributes_from_doc(
                             mode,
-                            request.tournament_id or request.game_id,
+                            request.tournament_id,
+                            None,
+                            request.away_team
+                        )
+                        if home_attrs:
+                            home_team_attributes = home_attrs
+                        if away_attrs:
+                            away_team_attributes = away_attrs
+                    elif mode == "single" and request.game_id:
+                        # Load team attributes from game document
+                        home_attrs = load_team_attributes_from_doc(
+                            mode, 
+                            request.game_id, 
+                            None,  # team_id will be resolved inside the function
+                            request.home_team
+                        )
+                        away_attrs = load_team_attributes_from_doc(
+                            mode,
+                            request.game_id,
                             None,
                             request.away_team
                         )
@@ -2276,22 +2294,22 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         home_team_attributes = None
         away_team_attributes = None
         
-        # ✅ FIX: Load strategy_settings and playbook_settings from tournament/franchise documents
-        # This ensures settings persist from TCC to gameplay (matches Franchise mode pattern)
+        # ✅ FIX: Load strategy_settings and playbook_settings from mode documents
+        # This ensures settings persist from pre-game to gameplay
         home_settings = None
         away_settings = None
         
-        if mode in ["tournament", "single"] and (request.tournament_id or request.game_id):
-            # Load team attributes from tournament or game document
+        if mode == "tournament" and request.tournament_id:
+            # Load team attributes from tournament document
             home_attrs = load_team_attributes_from_doc(
                 mode, 
-                request.tournament_id or request.game_id, 
+                request.tournament_id, 
                 None,  # team_id will be resolved inside the function
                 request.home_team
             )
             away_attrs = load_team_attributes_from_doc(
                 mode,
-                request.tournament_id or request.game_id,
+                request.tournament_id,
                 None,
                 request.away_team
             )
@@ -2300,45 +2318,61 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             if away_attrs:
                 away_team_attributes = away_attrs
             
-            # Load strategy_settings and playbook_settings from tournament or game document
-            if request.tournament_id:
-                home_settings = load_team_settings_from_doc(
-                    mode,
-                    request.tournament_id,
-                    None,
-                    request.home_team
-                )
-                away_settings = load_team_settings_from_doc(
-                    mode,
-                    request.tournament_id,
-                    None,
-                    request.away_team
-                )
-                # Override strategy_settings if loaded from tournament (unless request has them)
-                if home_settings.get("strategy_settings") and not home_strategy:
-                    home_strategy = home_settings.get("strategy_settings")
-                if away_settings.get("strategy_settings") and not away_strategy:
-                    away_strategy = away_settings.get("strategy_settings")
-            elif request.game_id:
-                # ✅ CRITICAL: Load settings from game document for single game mode
-                # This ensures settings persist from pre-game to gameplay
-                home_settings = load_team_settings_from_doc(
-                    mode,
-                    request.game_id,
-                    None,
-                    request.home_team
-                )
-                away_settings = load_team_settings_from_doc(
-                    mode,
-                    request.game_id,
-                    None,
-                    request.away_team
-                )
-                # Override strategy_settings if loaded from game document (unless request has them)
-                if home_settings.get("strategy_settings") and not home_strategy:
-                    home_strategy = home_settings.get("strategy_settings")
-                if away_settings.get("strategy_settings") and not away_strategy:
-                    away_strategy = away_settings.get("strategy_settings")
+            # Load strategy_settings and playbook_settings from tournament document
+            home_settings = load_team_settings_from_doc(
+                mode,
+                request.tournament_id,
+                None,
+                request.home_team
+            )
+            away_settings = load_team_settings_from_doc(
+                mode,
+                request.tournament_id,
+                None,
+                request.away_team
+            )
+            # Override strategy_settings if loaded from tournament (unless request has them)
+            if home_settings.get("strategy_settings") and not home_strategy:
+                home_strategy = home_settings.get("strategy_settings")
+            if away_settings.get("strategy_settings") and not away_strategy:
+                away_strategy = away_settings.get("strategy_settings")
+        elif mode == "single" and request.game_id:
+            # Load team attributes from game document
+            home_attrs = load_team_attributes_from_doc(
+                mode, 
+                request.game_id, 
+                None,  # team_id will be resolved inside the function
+                request.home_team
+            )
+            away_attrs = load_team_attributes_from_doc(
+                mode,
+                request.game_id,
+                None,
+                request.away_team
+            )
+            if home_attrs:
+                home_team_attributes = home_attrs
+            if away_attrs:
+                away_team_attributes = away_attrs
+            
+            # Load strategy_settings and playbook_settings from game document
+            home_settings = load_team_settings_from_doc(
+                mode,
+                request.game_id,
+                None,
+                request.home_team
+            )
+            away_settings = load_team_settings_from_doc(
+                mode,
+                request.game_id,
+                None,
+                request.away_team
+            )
+            # Override strategy_settings if loaded from game document (unless request has them)
+            if home_settings.get("strategy_settings") and not home_strategy:
+                home_strategy = home_settings.get("strategy_settings")
+            if away_settings.get("strategy_settings") and not away_strategy:
+                away_strategy = away_settings.get("strategy_settings")
         elif mode == "franchise" and request.franchise_id:
             # Load team attributes from franchise document
             home_attrs = load_team_attributes_from_doc(
