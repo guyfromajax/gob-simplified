@@ -1955,16 +1955,21 @@ async function handleSimQuarter() {
   // So we'll rely on button state logic to disable button after game completes
   // This is a safety check - button should already be disabled
   
+  // ✅ SS&S: Require game_id - game document must be created via init-game endpoint
+  // Never generate game_id in simulate-quarter path - this causes settings to be lost
+  // game_id should be in URL params (from init-game response), localStorage is fallback only
   if (!gameId && typeof localStorage !== 'undefined') {
     gameId = localStorage.getItem('game_id');
   }
   if (!gameId) {
-    // Generate a new gameId using standardized MongoDB ObjectId format
-    gameId = generateMongoObjectId();
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('game_id', gameId);
-    }
-    console.log('🎮 Generated new gameId:', gameId);
+    // ✅ SS&S: Fail loudly if game_id missing - game document must exist before simulating
+    // This prevents creating duplicate game documents and losing settings
+    const errorMsg = `❌ game_id required for Q${nextQuarter}. Game document must be created via /api/init-game before simulating. Please navigate to lineup screen first.`;
+    console.error(errorMsg);
+    alert(errorMsg);
+    isSimulating = false;
+    [playBtn, simFullBtn, simQuarterBtn].forEach(btn => { if (btn) btn.disabled = false; });
+    return;
   }
   isSimulating = true;
   const playBtn = document.querySelector('.play-button');
