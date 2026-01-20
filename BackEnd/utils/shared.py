@@ -1015,9 +1015,11 @@ def summarize_game_state(game, exclude_animations=True):
                     # This handles legacy saves where settings were saved under team name keys
                     if not home_playbook_settings:
                         # Try to find by team name (legacy format)
+                        # Check if key itself matches team name (some legacy saves have name='NO_NAME')
                         for tid in teams.keys():
                             team_data = teams.get(tid, {})
-                            if team_data.get("name") == game.home_team.name:
+                            # Match if key equals team name OR team_data.name equals team name
+                            if tid == game.home_team.name or team_data.get("name") == game.home_team.name:
                                 legacy_settings = team_data.get("playbook_settings", {})
                                 if legacy_settings:
                                     home_playbook_settings = legacy_settings
