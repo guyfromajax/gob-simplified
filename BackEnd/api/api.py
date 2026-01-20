@@ -435,19 +435,69 @@ def load_team_settings_from_doc(mode: str, doc_id: str, team_id: str, team_name:
     elif mode == "single":
         try:
             # For single game mode, try both UUID string and ObjectId formats
-            doc = games_collection.find_one({"_id": doc_id})
+            doc = games_collection.find_one(
+                {"_id": doc_id},
+                {"teams": 1, "home_team_id": 1, "away_team_id": 1, "_id": 1}
+            )
             if not doc:
                 try:
-                    doc = games_collection.find_one({"_id": ObjectId(doc_id)})
+                    doc = games_collection.find_one(
+                        {"_id": ObjectId(doc_id)},
+                        {"teams": 1, "home_team_id": 1, "away_team_id": 1, "_id": 1}
+                    )
                 except:
                     pass
-            if doc and team_id:
+            if doc:
                 teams_obj = doc.get("teams", {})
-                team_obj = teams_obj.get(team_id, {}) if teams_obj else {}
-                strategy_settings = team_obj.get("strategy_settings")
-                playbook_settings = team_obj.get("playbook_settings")
+                home_team_id = doc.get("home_team_id")
+                away_team_id = doc.get("away_team_id")
+                
+                # ✅ PHASE 1.1: Use same team ID resolution as save_playbooks()/update_gameplan()
+                # Resolve team_id from team_name if needed (using game document's teams object)
+                resolved_team_id = None
+                
+                # If team_id was provided, try to use it directly (if it's a team_id key)
+                if team_id:
+                    # Step 1: Try direct key match (if team_id looks like a team_id key)
+                    if team_id in teams_obj and (team_id.isupper() and "_" in team_id):
+                        resolved_team_id = team_id
+                    # Step 2: If not found, iterate through teams to find by name match
+                    if not resolved_team_id:
+                        for tid in teams_obj.keys():
+                            team_obj = teams_obj.get(tid, {})
+                            if team_obj.get("name") == team_id:
+                                resolved_team_id = tid
+                                break
+                
+                # If team_name was provided but team_id wasn't resolved, try name matching
+                if not resolved_team_id and team_name:
+                    for tid in teams_obj.keys():
+                        team_obj = teams_obj.get(tid, {})
+                        if team_obj.get("name") == team_name:
+                            resolved_team_id = tid
+                            break
+                    
+                    # Step 3: Try home/away fallback
+                    if not resolved_team_id:
+                        if home_team_id and home_team_id in teams_obj:
+                            home_team_obj = teams_obj.get(home_team_id, {})
+                            if home_team_obj.get("name") == team_name:
+                                resolved_team_id = home_team_id
+                        if not resolved_team_id and away_team_id and away_team_id in teams_obj:
+                            away_team_obj = teams_obj.get(away_team_id, {})
+                            if away_team_obj.get("name") == team_name:
+                                resolved_team_id = away_team_id
+                
+                # Load settings from resolved team_id key
+                if resolved_team_id:
+                    team_obj = teams_obj.get(resolved_team_id, {})
+                    strategy_settings = team_obj.get("strategy_settings")
+                    playbook_settings = team_obj.get("playbook_settings")
+                    logging.warning(f"🔍 [LOAD SETTINGS] Resolved team_id={resolved_team_id} (from team_name={team_name}, team_id={team_id}), found strategy={bool(strategy_settings)}, playbook={bool(playbook_settings)}")
+                else:
+                    logging.warning(f"⚠️ [LOAD SETTINGS] Could not resolve team_id for team_name={team_name}, team_id={team_id}")
         except Exception as e:
-            logging.warning(f"⚠️ Error loading team settings from game doc: {e}")
+            logging.warning(f"⚠️ Error loading team settings from game doc: {e}", exc_info=True)
     
     return {
         "strategy_settings": strategy_settings,
