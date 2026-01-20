@@ -1084,19 +1084,38 @@ def summarize_game_state(game, exclude_animations=True):
     # ✅ Extract strategy_settings before building dictionary (for debugging and clarity)
     home_strategy = getattr(game.home_team, 'strategy_settings', {})
     away_strategy = getattr(game.away_team, 'strategy_settings', {})
-    # ✅ DEBUG: Log strategy_settings being saved
+    
+    # ✅ DIAGNOSTIC: Log strategy_settings being saved
+    logging.warning(f"💾 [PERSIST-SETTINGS] Summarizing game state - GameManager strategy_settings:")
     if home_strategy and 'inside' in home_strategy:
-        logging.warning(f"🔍 [SUMMARIZE] Home strategy_settings inside: {home_strategy.get('inside')}")
+        logging.warning(f"💾 [PERSIST-SETTINGS] Home strategy_settings inside: {home_strategy.get('inside')}, sample={dict(list(home_strategy.items())[:3])}")
     elif home_strategy:
-        logging.warning(f"🔍 [SUMMARIZE] Home strategy_settings keys: {list(home_strategy.keys())}, inside: MISSING")
+        logging.warning(f"💾 [PERSIST-SETTINGS] Home strategy_settings keys: {list(home_strategy.keys())}, inside: MISSING")
     else:
-        logging.warning(f"⚠️ [SUMMARIZE] Home strategy_settings is empty or missing!")
+        logging.warning(f"⚠️ [PERSIST-SETTINGS] Home strategy_settings is empty or missing!")
     if away_strategy and 'inside' in away_strategy:
-        logging.warning(f"🔍 [SUMMARIZE] Away strategy_settings inside: {away_strategy.get('inside')}")
+        logging.warning(f"💾 [PERSIST-SETTINGS] Away strategy_settings inside: {away_strategy.get('inside')}, sample={dict(list(away_strategy.items())[:3])}")
     elif away_strategy:
-        logging.warning(f"🔍 [SUMMARIZE] Away strategy_settings keys: {list(away_strategy.keys())}, inside: MISSING")
+        logging.warning(f"💾 [PERSIST-SETTINGS] Away strategy_settings keys: {list(away_strategy.keys())}, inside: MISSING")
     else:
-        logging.warning(f"⚠️ [SUMMARIZE] Away strategy_settings is empty or missing!")
+        logging.warning(f"⚠️ [PERSIST-SETTINGS] Away strategy_settings is empty or missing!")
+    
+    # ✅ DIAGNOSTIC: Log playbook_settings being saved
+    logging.warning(f"💾 [PERSIST-SETTINGS] Playbook_settings in summary:")
+    if home_playbook_settings:
+        slot_count = len(home_playbook_settings.get("slot_assignments", {}))
+        logging.warning(f"💾 [PERSIST-SETTINGS] Home playbook_settings: slot_assignments={slot_count}, motion={bool(home_playbook_settings.get('motion'))}")
+        if slot_count > 0:
+            sample_slot = next(iter(home_playbook_settings.get("slot_assignments", {}).values()), None)
+            if sample_slot:
+                logging.warning(f"💾 [PERSIST-SETTINGS] Home sample slot: section={sample_slot.get('section')}, playId={sample_slot.get('playId')}, playName={sample_slot.get('playName')}")
+    else:
+        logging.warning(f"⚠️ [PERSIST-SETTINGS] Home playbook_settings is empty or missing!")
+    if away_playbook_settings:
+        slot_count = len(away_playbook_settings.get("slot_assignments", {}))
+        logging.warning(f"💾 [PERSIST-SETTINGS] Away playbook_settings: slot_assignments={slot_count}, motion={bool(away_playbook_settings.get('motion'))}")
+    else:
+        logging.warning(f"⚠️ [PERSIST-SETTINGS] Away playbook_settings is empty or missing!")
     
     # ✅ UNIFIED STRUCTURE: All team data in one place (eliminates home_team/away_team duplication)
     teams_obj = {

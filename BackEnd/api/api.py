@@ -493,9 +493,27 @@ def load_team_settings_from_doc(mode: str, doc_id: str, team_id: str, team_name:
                     team_obj = teams_obj.get(resolved_team_id, {})
                     strategy_settings = team_obj.get("strategy_settings")
                     playbook_settings = team_obj.get("playbook_settings")
-                    logging.warning(f"🔍 [LOAD SETTINGS] Resolved team_id={resolved_team_id} (from team_name={team_name}, team_id={team_id}), found strategy={bool(strategy_settings)}, playbook={bool(playbook_settings)}")
+                    
+                    # ✅ DIAGNOSTIC: Log what we found in DB
+                    logging.warning(f"🔍 [LOAD-SETTINGS] Resolved team_id={resolved_team_id} (from team_name={team_name}, team_id={team_id})")
+                    logging.warning(f"🔍 [LOAD-SETTINGS] Found in DB: strategy={bool(strategy_settings)}, playbook={bool(playbook_settings)}")
+                    
+                    if strategy_settings:
+                        strategy_sample = dict(list(strategy_settings.items())[:5])
+                        logging.warning(f"📋 [LOAD-SETTINGS] Strategy settings sample: {strategy_sample}")
+                        logging.warning(f"📋 [LOAD-SETTINGS] Strategy inside value: {strategy_settings.get('inside', 'MISSING')}")
+                    
+                    if playbook_settings:
+                        slot_count = len(playbook_settings.get("slot_assignments", {}))
+                        logging.warning(f"📋 [LOAD-SETTINGS] Playbook settings: slot_assignments={slot_count}, motion={bool(playbook_settings.get('motion'))}")
+                        if slot_count > 0:
+                            sample_slot = next(iter(playbook_settings.get("slot_assignments", {}).values()), None)
+                            if sample_slot:
+                                logging.warning(f"📋 [LOAD-SETTINGS] Sample slot assignment: section={sample_slot.get('section')}, playId={sample_slot.get('playId')}, playName={sample_slot.get('playName')}")
+                    else:
+                        logging.warning(f"⚠️ [LOAD-SETTINGS] No playbook_settings found in DB for team {resolved_team_id}")
                 else:
-                    logging.warning(f"⚠️ [LOAD SETTINGS] Could not resolve team_id for team_name={team_name}, team_id={team_id}")
+                    logging.warning(f"⚠️ [LOAD-SETTINGS] Could not resolve team_id for team_name={team_name}, team_id={team_id}")
         except Exception as e:
             logging.warning(f"⚠️ Error loading team settings from game doc: {e}", exc_info=True)
     
@@ -607,7 +625,22 @@ def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest
             logging.error(f"❌ TIMEOUT RESUME: timeout_next_play_type missing from saved game {game_id}")
             return None
         
-        # ✅ PERFORMANCE: Removed debug logging
+        # ✅ DIAGNOSTIC: Log what settings are loaded from DB during timeout resume
+        saved_teams = saved.get("teams", {})
+        home_team_id = saved.get("home_team_id")
+        away_team_id = saved.get("away_team_id")
+        
+        if home_team_id:
+            saved_home_strategy = saved_teams.get(home_team_id, {}).get("strategy_settings", {})
+            saved_home_pb = saved_teams.get(home_team_id, {}).get("playbook_settings", {})
+            logging.warning(f"📋 [TIMEOUT-RESUME] Loaded from DB - home strategy inside: {saved_home_strategy.get('inside', 'MISSING') if saved_home_strategy else 'NO_SETTINGS'}")
+            logging.warning(f"📋 [TIMEOUT-RESUME] Loaded from DB - home playbook slot_assignments: {len(saved_home_pb.get('slot_assignments', {})) if saved_home_pb else 0}")
+        if away_team_id:
+            saved_away_strategy = saved_teams.get(away_team_id, {}).get("strategy_settings", {})
+            saved_away_pb = saved_teams.get(away_team_id, {}).get("playbook_settings", {})
+            logging.warning(f"📋 [TIMEOUT-RESUME] Loaded from DB - away strategy inside: {saved_away_strategy.get('inside', 'MISSING') if saved_away_strategy else 'NO_SETTINGS'}")
+            logging.warning(f"📋 [TIMEOUT-RESUME] Loaded from DB - away playbook slot_assignments: {len(saved_away_pb.get('slot_assignments', {})) if saved_away_pb else 0}")
+        
         return saved
     except Exception as e:
         logging.error(f"❌ TIMEOUT RESUME: Error loading from DB: {e}", exc_info=True)
@@ -629,19 +662,56 @@ def handle_timeout_save_and_response(gm: "GameManager", timeout_turn: dict, game
     """
     from BackEnd.db import games_collection
     
+    # ✅ DIAGNOSTIC: Log GameManager state before saving during timeout
+    debug_prefix = "USER" if timeout_reason == "USER" else "COMPUTER"
+    home_before = gm.home_team.strategy_settings.get("inside", "MISSING") if hasattr(gm.home_team, 'strategy_settings') and gm.home_team.strategy_settings else "NO_SETTINGS"
+    away_before = gm.away_team.strategy_settings.get("inside", "MISSING") if hasattr(gm.away_team, 'strategy_settings') and gm.away_team.strategy_settings else "NO_SETTINGS"
+    logging.warning(f"💾 [TIMEOUT-SAVE] BEFORE save: Home inside={home_before}, Away inside={away_before}")
+    
+    # Get playbook_settings from GameManager if available
+    home_pb = getattr(gm.home_team, 'playbook_settings', {})
+    away_pb = getattr(gm.away_team, 'playbook_settings', {})
+    home_slots = len(home_pb.get("slot_assignments", {})) if home_pb else 0
+    away_slots = len(away_pb.get("slot_assignments", {})) if away_pb else 0
+    logging.warning(f"💾 [TIMEOUT-SAVE] BEFORE save: Home slot_assignments={home_slots}, Away slot_assignments={away_slots}")
+    
     # Save to DB (same for both user and computer timeouts)
     db_summary = summarize_game_state(gm, exclude_animations=True)
     games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
     
-    # 🔍 DEBUG: Log what was saved (for both user and computer)
-    debug_prefix = "USER" if timeout_reason == "USER" else "COMPUTER"
+    # ✅ DIAGNOSTIC: Log what was saved in db_summary
+    logging.warning(f"💾 [TIMEOUT-SAVE] Saved db_summary:")
+    home_summary_strategy = db_summary.get("teams", {}).get(db_summary.get("home_team_id", ""), {}).get("strategy_settings", {})
+    away_summary_strategy = db_summary.get("teams", {}).get(db_summary.get("away_team_id", ""), {}).get("strategy_settings", {})
+    home_summary_pb = db_summary.get("teams", {}).get(db_summary.get("home_team_id", ""), {}).get("playbook_settings", {})
+    away_summary_pb = db_summary.get("teams", {}).get(db_summary.get("away_team_id", ""), {}).get("playbook_settings", {})
+    
+    logging.warning(f"💾 [TIMEOUT-SAVE] db_summary home strategy inside: {home_summary_strategy.get('inside', 'MISSING') if home_summary_strategy else 'NO_SETTINGS'}")
+    logging.warning(f"💾 [TIMEOUT-SAVE] db_summary away strategy inside: {away_summary_strategy.get('inside', 'MISSING') if away_summary_strategy else 'NO_SETTINGS'}")
+    logging.warning(f"💾 [TIMEOUT-SAVE] db_summary home playbook slot_assignments: {len(home_summary_pb.get('slot_assignments', {})) if home_summary_pb else 0}")
+    logging.warning(f"💾 [TIMEOUT-SAVE] db_summary away playbook slot_assignments: {len(away_summary_pb.get('slot_assignments', {})) if away_summary_pb else 0}")
     logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] db_summary timeout fields: timeout_next_play_type={db_summary.get('timeout_next_play_type')}, timeout_offense_team_id={db_summary.get('timeout_offense_team_id')}")
     logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] db_summary score={db_summary.get('score')}, clock={db_summary.get('clock')}, time_remaining={db_summary.get('time_remaining')}")
     
-    # Verify what was saved to DB
+    # ✅ DIAGNOSTIC: Verify what was actually saved to DB
     saved_doc = games_collection.find_one({"_id": game_id})
-    logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] DB AFTER save - timeout_next_play_type={saved_doc.get('timeout_next_play_type') if saved_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={saved_doc.get('timeout_offense_team_id') if saved_doc else 'DOC_NOT_FOUND'}")
-    logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] DB AFTER save - score={saved_doc.get('score') if saved_doc else 'DOC_NOT_FOUND'}, clock={saved_doc.get('clock') if saved_doc else 'DOC_NOT_FOUND'}, time_remaining={saved_doc.get('time_remaining') if saved_doc else 'DOC_NOT_FOUND'}")
+    if saved_doc:
+        saved_teams = saved_doc.get("teams", {})
+        home_team_id = saved_doc.get("home_team_id")
+        away_team_id = saved_doc.get("away_team_id")
+        saved_home_strategy = saved_teams.get(home_team_id, {}).get("strategy_settings", {}) if home_team_id else {}
+        saved_away_strategy = saved_teams.get(away_team_id, {}).get("strategy_settings", {}) if away_team_id else {}
+        saved_home_pb = saved_teams.get(home_team_id, {}).get("playbook_settings", {}) if home_team_id else {}
+        saved_away_pb = saved_teams.get(away_team_id, {}).get("playbook_settings", {}) if away_team_id else {}
+        
+        logging.warning(f"✅ [TIMEOUT-SAVE] VERIFIED: Saved to DB - home strategy inside: {saved_home_strategy.get('inside', 'MISSING') if saved_home_strategy else 'NO_SETTINGS'}")
+        logging.warning(f"✅ [TIMEOUT-SAVE] VERIFIED: Saved to DB - away strategy inside: {saved_away_strategy.get('inside', 'MISSING') if saved_away_strategy else 'NO_SETTINGS'}")
+        logging.warning(f"✅ [TIMEOUT-SAVE] VERIFIED: Saved to DB - home playbook slot_assignments: {len(saved_home_pb.get('slot_assignments', {})) if saved_home_pb else 0}")
+        logging.warning(f"✅ [TIMEOUT-SAVE] VERIFIED: Saved to DB - away playbook slot_assignments: {len(saved_away_pb.get('slot_assignments', {})) if saved_away_pb else 0}")
+    else:
+        logging.error(f"❌ [TIMEOUT-SAVE] VERIFICATION FAILED: Could not read saved document from DB")
+    
+    logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] DB AFTER save - timeout_next_play_type={saved_doc.get('timeout_next_play_type') if saved_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={saved_doc.get('timeout_offense_team_id') if saved_doc else 'DOC_NOT_FOUND'}")(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] DB AFTER save - score={saved_doc.get('score') if saved_doc else 'DOC_NOT_FOUND'}, clock={saved_doc.get('clock') if saved_doc else 'DOC_NOT_FOUND'}, time_remaining={saved_doc.get('time_remaining') if saved_doc else 'DOC_NOT_FOUND'}")
     
     # Return consistent response format (same for both user and computer)
     # Use saved data (db_summary) to ensure response matches what was saved to DB
@@ -1481,15 +1551,29 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 None,
                 request.away_team
             )
+            # ✅ DIAGNOSTIC: Log GameManager state before applying settings
+            home_before = gm.home_team.strategy_settings.get("inside", "MISSING") if hasattr(gm.home_team, 'strategy_settings') and gm.home_team.strategy_settings else "NO_SETTINGS"
+            away_before = gm.away_team.strategy_settings.get("inside", "MISSING") if hasattr(gm.away_team, 'strategy_settings') and gm.away_team.strategy_settings else "NO_SETTINGS"
+            logging.warning(f"📊 [APPLY-SETTINGS] BEFORE: Home inside={home_before}, Away inside={away_before}")
+            
             # Apply loaded settings to cached GameManager
             if home_settings and home_settings.get("strategy_settings"):
+                db_inside = home_settings.get("strategy_settings", {}).get("inside", "MISSING")
                 default_settings = gm.home_team._init_strategy_settings()
                 gm.home_team.strategy_settings = {**default_settings, **home_settings.get("strategy_settings")}
-                logging.warning(f"✅ [SIMULATE-QUARTER] Applied DB home strategy_settings to cached GameManager (no request settings)")
+                home_after = gm.home_team.strategy_settings.get("inside", "MISSING")
+                logging.warning(f"✅ [APPLY-SETTINGS] Applied DB home strategy_settings: DB inside={db_inside}, GameManager before={home_before}, after={home_after}")
+            else:
+                logging.warning(f"⚠️ [APPLY-SETTINGS] No DB home strategy_settings to apply (home_settings={bool(home_settings)}, has_strategy={bool(home_settings.get('strategy_settings') if home_settings else False)})")
+            
             if away_settings and away_settings.get("strategy_settings"):
+                db_inside = away_settings.get("strategy_settings", {}).get("inside", "MISSING")
                 default_settings = gm.away_team._init_strategy_settings()
                 gm.away_team.strategy_settings = {**default_settings, **away_settings.get("strategy_settings")}
-                logging.warning(f"✅ [SIMULATE-QUARTER] Applied DB away strategy_settings to cached GameManager (no request settings)")
+                away_after = gm.away_team.strategy_settings.get("inside", "MISSING")
+                logging.warning(f"✅ [APPLY-SETTINGS] Applied DB away strategy_settings: DB inside={db_inside}, GameManager before={away_before}, after={away_after}")
+            else:
+                logging.warning(f"⚠️ [APPLY-SETTINGS] No DB away strategy_settings to apply (away_settings={bool(away_settings)}, has_strategy={bool(away_settings.get('strategy_settings') if away_settings else False)})")
         
         # ✅ TIMEOUT RESUME: Unified state restoration (works for all modes and all paths)
         # Only check database for timeout state if we have a game_id (existing game, not new game start)
@@ -2412,44 +2496,60 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 required_keys = ['offense', 'inside', 'attack', 'outside', 'tempo', 'defense', 'aggression', 'hc_trap', 'fc_press', 'rebounding']
                 return all(key in settings for key in required_keys) and any(settings.get(k) is not None for k in required_keys)
             
+            # ✅ DIAGNOSTIC: Log request vs DB settings comparison
+            db_home_inside = home_settings.get("strategy_settings", {}).get("inside", "MISSING") if home_settings.get("strategy_settings") else "NO_DB_SETTINGS"
+            req_home_inside = home_strategy.get("inside", "MISSING") if home_strategy and isinstance(home_strategy, dict) else "NO_REQUEST"
+            logging.warning(f"📊 [APPLY-SETTINGS] Home team: DB inside={db_home_inside}, Request inside={req_home_inside}, is_valid_request={is_valid_request_settings(home_strategy)}")
+            
             # Home team: DB is source of truth, request only if valid
             if home_settings.get("strategy_settings"):
                 if is_valid_request_settings(home_strategy):
                     # Request has valid settings (user action) - use request but log DB for debugging
-                    logging.warning(f"✅ [SIMULATE-QUARTER] Using request home strategy_settings (user action detected)")
+                    logging.warning(f"✅ [APPLY-SETTINGS] Using request home strategy_settings (user action detected): inside={req_home_inside}")
                     if gm is not None:
                         default_settings = gm.home_team._init_strategy_settings()
                         gm.home_team.strategy_settings = {**default_settings, **home_strategy}
+                        after_inside = gm.home_team.strategy_settings.get("inside", "MISSING")
+                        logging.warning(f"✅ [APPLY-SETTINGS] Applied request home strategy: GameManager inside now={after_inside}")
                 else:
                     # Request is empty/invalid - use DB (server is source of truth)
                     home_strategy = home_settings.get("strategy_settings")
-                    logging.warning(f"✅ [SIMULATE-QUARTER] Applied home strategy_settings from DB (request was empty/invalid)")
+                    logging.warning(f"✅ [APPLY-SETTINGS] Using DB home strategy_settings (request was empty/invalid): inside={db_home_inside}")
                     if gm is not None:
                         default_settings = gm.home_team._init_strategy_settings()
                         gm.home_team.strategy_settings = {**default_settings, **home_strategy}
-                        logging.warning(f"✅ [SIMULATE-QUARTER] Applied DB home strategy_settings to cached GameManager")
+                        after_inside = gm.home_team.strategy_settings.get("inside", "MISSING")
+                        logging.warning(f"✅ [APPLY-SETTINGS] Applied DB home strategy: GameManager inside now={after_inside}")
             elif is_valid_request_settings(home_strategy):
                 # No DB settings but request is valid - use request
                 logging.warning(f"✅ [SIMULATE-QUARTER] Using request home strategy_settings (no DB settings found)")
                 if gm is not None:
                     default_settings = gm.home_team._init_strategy_settings()
                     gm.home_team.strategy_settings = {**default_settings, **home_strategy}
+            # ✅ DIAGNOSTIC: Log request vs DB settings comparison for away team
+            db_away_inside = away_settings.get("strategy_settings", {}).get("inside", "MISSING") if away_settings.get("strategy_settings") else "NO_DB_SETTINGS"
+            req_away_inside = away_strategy.get("inside", "MISSING") if away_strategy and isinstance(away_strategy, dict) else "NO_REQUEST"
+            logging.warning(f"📊 [APPLY-SETTINGS] Away team: DB inside={db_away_inside}, Request inside={req_away_inside}, is_valid_request={is_valid_request_settings(away_strategy)}")
+            
             # Away team: DB is source of truth, request only if valid
             if away_settings.get("strategy_settings"):
                 if is_valid_request_settings(away_strategy):
                     # Request has valid settings (user action) - use request but log DB for debugging
-                    logging.warning(f"✅ [SIMULATE-QUARTER] Using request away strategy_settings (user action detected)")
+                    logging.warning(f"✅ [APPLY-SETTINGS] Using request away strategy_settings (user action detected): inside={req_away_inside}")
                     if gm is not None:
                         default_settings = gm.away_team._init_strategy_settings()
                         gm.away_team.strategy_settings = {**default_settings, **away_strategy}
+                        after_inside = gm.away_team.strategy_settings.get("inside", "MISSING")
+                        logging.warning(f"✅ [APPLY-SETTINGS] Applied request away strategy: GameManager inside now={after_inside}")
                 else:
                     # Request is empty/invalid - use DB (server is source of truth)
                     away_strategy = away_settings.get("strategy_settings")
-                    logging.warning(f"✅ [SIMULATE-QUARTER] Applied away strategy_settings from DB (request was empty/invalid)")
+                    logging.warning(f"✅ [APPLY-SETTINGS] Using DB away strategy_settings (request was empty/invalid): inside={db_away_inside}")
                     if gm is not None:
                         default_settings = gm.away_team._init_strategy_settings()
                         gm.away_team.strategy_settings = {**default_settings, **away_strategy}
-                        logging.warning(f"✅ [SIMULATE-QUARTER] Applied DB away strategy_settings to cached GameManager")
+                        after_inside = gm.away_team.strategy_settings.get("inside", "MISSING")
+                        logging.warning(f"✅ [APPLY-SETTINGS] Applied DB away strategy: GameManager inside now={after_inside}")
             elif is_valid_request_settings(away_strategy):
                 # No DB settings but request is valid - use request
                 logging.warning(f"✅ [SIMULATE-QUARTER] Using request away strategy_settings (no DB settings found)")
