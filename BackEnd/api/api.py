@@ -2434,8 +2434,30 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 if gm is not None:
                     default_settings = gm.home_team._init_strategy_settings()
                     gm.home_team.strategy_settings = {**default_settings, **home_strategy}
-            # OLD CODE BELOW - to be removed
-            if False and home_settings.get("strategy_settings") and not home_strategy:
+            # Away team: DB is source of truth, request only if valid
+            if away_settings.get("strategy_settings"):
+                if is_valid_request_settings(away_strategy):
+                    # Request has valid settings (user action) - use request but log DB for debugging
+                    logging.warning(f"✅ [SIMULATE-QUARTER] Using request away strategy_settings (user action detected)")
+                    if gm is not None:
+                        default_settings = gm.away_team._init_strategy_settings()
+                        gm.away_team.strategy_settings = {**default_settings, **away_strategy}
+                else:
+                    # Request is empty/invalid - use DB (server is source of truth)
+                    away_strategy = away_settings.get("strategy_settings")
+                    logging.warning(f"✅ [SIMULATE-QUARTER] Applied away strategy_settings from DB (request was empty/invalid)")
+                    if gm is not None:
+                        default_settings = gm.away_team._init_strategy_settings()
+                        gm.away_team.strategy_settings = {**default_settings, **away_strategy}
+                        logging.warning(f"✅ [SIMULATE-QUARTER] Applied DB away strategy_settings to cached GameManager")
+            elif is_valid_request_settings(away_strategy):
+                # No DB settings but request is valid - use request
+                logging.warning(f"✅ [SIMULATE-QUARTER] Using request away strategy_settings (no DB settings found)")
+                if gm is not None:
+                    default_settings = gm.away_team._init_strategy_settings()
+                    gm.away_team.strategy_settings = {**default_settings, **away_strategy}
+            # OLD CODE - REMOVED
+            if False:
                 home_strategy = home_settings.get("strategy_settings")
                 logging.warning(f"✅ [SIMULATE-QUARTER] Applied home strategy_settings from DB")
                 # ✅ CRITICAL FIX: If game is in cache, apply settings directly to cached GameManager
