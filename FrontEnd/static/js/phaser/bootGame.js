@@ -125,9 +125,18 @@ console.log('🔍 [Q1 SKIP DEBUG] Quarter initialized:', {
   parsedQuarter: quarter,
   url: window.location.href 
 });
-let gameId =
-  urlParams.get('game_id') ||
-  (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
+// ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
+// game_id is required for Q1 (must be created by init-game) and for Q2+ or timeout resume
+let gameId = urlParams.get('game_id') || null;
+
+// ✅ PHASE 1.1: Fail loudly if game_id is required but missing
+// For single game mode, game_id is required even for Q1 (must be created by init-game)
+if (!gameId && mode === 'single') {
+  const errorMsg = `game_id is required for single game mode but missing from URL. Please navigate from the lineup screen with a valid game_id (created by init-game).`;
+  console.error(`❌ [BOOTGAME] ${errorMsg}`);
+  alert(`Error: ${errorMsg}\n\nPlease return to the lineup screen and try again.`);
+  // Don't redirect - let user see the error
+}
 
 // Initialize scoreboard scores
 // Only reset to 0-0 for fresh Q1 games; for resumed games, loadGameStats.js sets accumulated scores
