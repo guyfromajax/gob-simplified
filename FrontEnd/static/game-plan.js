@@ -35,8 +35,11 @@ const gameId = urlParams.get('game_id') || null;
 const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
 
 // ✅ PHASE 1.1: Fail loudly if game_id is required but missing
-if (!gameId && (quarter > 1 || resumeFromTimeout)) {
-  const errorMsg = `game_id is required but missing from URL. Quarter: ${quarter}, Resume from timeout: ${resumeFromTimeout}. Please navigate from the lineup screen with a valid game_id.`;
+// For single mode, game_id is required for ALL quarters (Q1 must be created by init-game)
+// For tournament/franchise mode, game_id is optional (may not exist yet)
+const isGameIdRequired = (modeParam === 'single') || (quarter > 1) || resumeFromTimeout;
+if (isGameIdRequired && !gameId) {
+  const errorMsg = `game_id is required but missing from URL. Mode: ${modeParam}, Quarter: ${quarter}, Resume from timeout: ${resumeFromTimeout}. Please navigate from the lineup screen with a valid game_id (created by init-game).`;
   console.error(`❌ [GAME-PLAN] ${errorMsg}`);
   alert(`Error: ${errorMsg}\n\nPlease return to the lineup screen and try again.`);
   // Redirect to lineup screen if possible
@@ -407,6 +410,16 @@ function executeNavigateToCourt() {
   const currentGameId = helper.getGameId(currentUrlParams);
   const resumeFromTimeout = helper.getResumeFromTimeout(currentUrlParams);
   const currentMyTeamSide = currentUrlParams.get('my_team');
+  const currentMode = currentUrlParams.get('mode') || 'single';
+  
+  // ✅ PHASE 1.1: Fail loudly if game_id is required but missing before navigating
+  const isGameIdRequired = (currentMode === 'single') || (currentQuarter > 1) || resumeFromTimeout;
+  if (isGameIdRequired && !currentGameId) {
+    const errorMsg = `Cannot navigate to court: game_id is required but missing. Mode: ${currentMode}, Quarter: ${currentQuarter}, Resume from timeout: ${resumeFromTimeout}. Please ensure game_id exists in URL.`;
+    console.error(`❌ [GAME-PLAN] ${errorMsg}`);
+    alert(`Error: ${errorMsg}\n\nPlease return to the lineup screen and try again.`);
+    return;
+  }
   
   // Build lineup object from URL params
   const lineup = {};
