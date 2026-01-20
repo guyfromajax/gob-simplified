@@ -26,6 +26,9 @@ const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 // Note: This is a snapshot of initial URL state - always read from window.location.search when needed
 const gameId = urlParams.get('game_id') || null;
 
+// ✅ FIX: Track if init-game is in progress to prevent duplicate calls
+let initGameInProgress = false;
+
 // ✅ PHASE 1.1: Only use localStorage for explicit "Resume Last Game" feature (not implemented yet)
 // For now, we only read from URL params - fail loudly if game_id is required but missing
 // Note: game_id is optional on lineup screen for new games, but required for Q2+ or timeout resume
