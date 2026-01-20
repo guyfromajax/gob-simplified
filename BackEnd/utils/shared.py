@@ -932,13 +932,20 @@ def summarize_game_state(game, exclude_animations=True):
             if saved_game:
                 teams = saved_game.get("teams", {})
                 
+                # 🔍 DEBUG: Log teams keys and game.home_team/away_team info
+                logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] teams.keys() in saved_game: {list(teams.keys())}")
+                logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] game.home_team.team_id: {game.home_team.team_id}, game.home_team.name: {game.home_team.name}")
+                logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] game.away_team.team_id: {game.away_team.team_id}, game.away_team.name: {game.away_team.name}")
+                
                 # ✅ SS&S: Use the SAME team_id resolution logic as save_playbooks()
                 # This ensures we always find settings using the same keys they were saved with
                 # First try direct lookup with team_id (fastest, most reliable)
                 if game.home_team.team_id in teams:
                     home_actual_team_id = game.home_team.team_id
+                    logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] home_actual_team_id resolved via direct lookup: {home_actual_team_id}")
                 if game.away_team.team_id in teams:
                     away_actual_team_id = game.away_team.team_id
+                    logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] away_actual_team_id resolved via direct lookup: {away_actual_team_id}")
                 
                 # If direct lookup fails, iterate through teams and match by name field
                 # (This matches the save_playbooks() resolution logic exactly)
@@ -948,6 +955,7 @@ def summarize_game_state(game, exclude_animations=True):
                         # Check if team name matches (teams object contains name field)
                         if team_data.get("name") == game.home_team.name:
                             home_actual_team_id = tid
+                            logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] home_actual_team_id resolved via name matching: {home_actual_team_id} (from key '{tid}')")
                             break
                 
                 if not away_actual_team_id:
@@ -956,6 +964,7 @@ def summarize_game_state(game, exclude_animations=True):
                         # Check if team name matches (teams object contains name field)
                         if team_data.get("name") == game.away_team.name:
                             away_actual_team_id = tid
+                            logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] away_actual_team_id resolved via name matching: {away_actual_team_id} (from key '{tid}')")
                             break
                 
                 # Final fallback: try DB lookup if still not found (unlikely, but handles edge cases)
@@ -968,9 +977,10 @@ def summarize_game_state(game, exclude_animations=True):
                             for tid in teams.keys():
                                 if tid == team_id_from_doc or str(tid) == str(team_doc.get("_id")):
                                     home_actual_team_id = tid
+                                    logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] home_actual_team_id resolved via DB lookup: {home_actual_team_id} (from DB team_id: {team_id_from_doc})")
                                     break
-                    except:
-                        pass
+                    except Exception as e:
+                        logging.warning(f"⚠️ [PLAYBOOK SETTINGS DEBUG] DB lookup failed for home team: {e}")
                 
                 if not away_actual_team_id:
                     try:
@@ -981,9 +991,13 @@ def summarize_game_state(game, exclude_animations=True):
                             for tid in teams.keys():
                                 if tid == team_id_from_doc or str(tid) == str(team_doc.get("_id")):
                                     away_actual_team_id = tid
+                                    logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] away_actual_team_id resolved via DB lookup: {away_actual_team_id} (from DB team_id: {team_id_from_doc})")
                                     break
-                    except:
-                        pass
+                    except Exception as e:
+                        logging.warning(f"⚠️ [PLAYBOOK SETTINGS DEBUG] DB lookup failed for away team: {e}")
+                
+                # 🔍 DEBUG: Log final resolved team_id values
+                logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] FINAL: home_actual_team_id={home_actual_team_id}, away_actual_team_id={away_actual_team_id}")
                 
                 # Get playbook_settings for each team (if they exist)
                 # ✅ CRITICAL: Check team_id key first (correct format), then fallback to team name key (legacy format)
