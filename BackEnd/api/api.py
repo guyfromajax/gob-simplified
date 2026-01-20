@@ -2300,7 +2300,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             if away_attrs:
                 away_team_attributes = away_attrs
             
-            # Load strategy_settings and playbook_settings from tournament document
+            # Load strategy_settings and playbook_settings from tournament or game document
             if request.tournament_id:
                 home_settings = load_team_settings_from_doc(
                     mode,
@@ -2315,6 +2315,26 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     request.away_team
                 )
                 # Override strategy_settings if loaded from tournament (unless request has them)
+                if home_settings.get("strategy_settings") and not home_strategy:
+                    home_strategy = home_settings.get("strategy_settings")
+                if away_settings.get("strategy_settings") and not away_strategy:
+                    away_strategy = away_settings.get("strategy_settings")
+            elif request.game_id:
+                # ✅ CRITICAL: Load settings from game document for single game mode
+                # This ensures settings persist from pre-game to gameplay
+                home_settings = load_team_settings_from_doc(
+                    mode,
+                    request.game_id,
+                    None,
+                    request.home_team
+                )
+                away_settings = load_team_settings_from_doc(
+                    mode,
+                    request.game_id,
+                    None,
+                    request.away_team
+                )
+                # Override strategy_settings if loaded from game document (unless request has them)
                 if home_settings.get("strategy_settings") and not home_strategy:
                     home_strategy = home_settings.get("strategy_settings")
                 if away_settings.get("strategy_settings") and not away_strategy:
