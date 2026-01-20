@@ -932,33 +932,58 @@ def summarize_game_state(game, exclude_animations=True):
             if saved_game:
                 teams = saved_game.get("teams", {})
                 
-                # ✅ Find teams by matching team name (most reliable method)
-                # Iterate through all teams in document and match by name
-                for tid in teams.keys():
-                    team_data = teams.get(tid, {})
-                    # Try to get team name from various sources
-                    team_name = None
+                # ✅ SS&S: Use the SAME team_id resolution logic as save_playbooks()
+                # This ensures we always find settings using the same keys they were saved with
+                # First try direct lookup with team_id (fastest, most reliable)
+                if game.home_team.team_id in teams:
+                    home_actual_team_id = game.home_team.team_id
+                if game.away_team.team_id in teams:
+                    away_actual_team_id = game.away_team.team_id
+                
+                # If direct lookup fails, iterate through teams and match by name field
+                # (This matches the save_playbooks() resolution logic exactly)
+                if not home_actual_team_id:
+                    for tid in teams.keys():
+                        team_data = teams.get(tid, {})
+                        # Check if team name matches (teams object contains name field)
+                        if team_data.get("name") == game.home_team.name:
+                            home_actual_team_id = tid
+                            break
+                
+                if not away_actual_team_id:
+                    for tid in teams.keys():
+                        team_data = teams.get(tid, {})
+                        # Check if team name matches (teams object contains name field)
+                        if team_data.get("name") == game.away_team.name:
+                            away_actual_team_id = tid
+                            break
+                
+                # Final fallback: try DB lookup if still not found (unlikely, but handles edge cases)
+                if not home_actual_team_id:
                     try:
-                        # Try to get team name from teams collection
-                        team_doc = db.teams.find_one({"_id": ObjectId(tid)})
-                        if not team_doc:
-                            team_doc = db.teams.find_one({"team_id": tid})
+                        team_doc = db.teams.find_one({"name": game.home_team.name})
                         if team_doc:
-                            team_name = team_doc.get("name")
+                            team_id_from_doc = team_doc.get("team_id")
+                            # Try to find this team_id in the document's teams
+                            for tid in teams.keys():
+                                if tid == team_id_from_doc or str(tid) == str(team_doc.get("_id")):
+                                    home_actual_team_id = tid
+                                    break
                     except:
                         pass
-                    
-                    # Match by team name
-                    if team_name == game.home_team.name:
-                        home_actual_team_id = tid
-                    if team_name == game.away_team.name:
-                        away_actual_team_id = tid
                 
-                # Fallback: try direct lookup with team_id (in case key is team_id string)
-                if not home_actual_team_id and game.home_team.team_id in teams:
-                    home_actual_team_id = game.home_team.team_id
-                if not away_actual_team_id and game.away_team.team_id in teams:
-                    away_actual_team_id = game.away_team.team_id
+                if not away_actual_team_id:
+                    try:
+                        team_doc = db.teams.find_one({"name": game.away_team.name})
+                        if team_doc:
+                            team_id_from_doc = team_doc.get("team_id")
+                            # Try to find this team_id in the document's teams
+                            for tid in teams.keys():
+                                if tid == team_id_from_doc or str(tid) == str(team_doc.get("_id")):
+                                    away_actual_team_id = tid
+                                    break
+                    except:
+                        pass
                 
                 # Get playbook_settings for each team (if they exist)
                 # ✅ CRITICAL: Check team_id key first (correct format), then fallback to team name key (legacy format)
