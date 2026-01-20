@@ -188,13 +188,22 @@ def autoset_strategy_settings(team: TeamManager):
     Returns:
         dict: New strategy settings
     """
+    # ✅ DEBUG: Log if this is being called on a user team (this would be a bug!)
     if team.is_user_team:
+        logging.warning(f"⚠️ [AUTOSET STRATEGY] ERROR: autoset_strategy_settings() called on USER team: {team.name} (is_user_team={team.is_user_team}). This should NOT happen!")
         # Don't autoset strategy for user teams
         return team.strategy_settings
+    
+    # ✅ DEBUG: Log when autoset is called on computer teams
+    old_inside = team.strategy_settings.get('inside', 'MISSING') if hasattr(team, 'strategy_settings') and team.strategy_settings else 'MISSING'
+    logging.warning(f"🔍 [AUTOSET STRATEGY] Autosetting strategy for COMPUTER team: {team.name}, old inside: {old_inside}")
     
     # Regenerate strategy settings using the same logic as initialization
     new_strategy_settings = team._init_strategy_settings()
     team.strategy_settings = new_strategy_settings
+    
+    new_inside = new_strategy_settings.get('inside', 'MISSING')
+    logging.warning(f"🔍 [AUTOSET STRATEGY] New inside: {new_inside}")
     
     return new_strategy_settings
 
