@@ -335,11 +335,8 @@ class PlaybooksUI {
                    urlParams.get('home_id') || 
                    urlParams.get('away_id');
       
-      // For single mode, try to get game_id from localStorage if not in URL
-      let gameId = urlParams.get('game_id');
-      if (!gameId && mode === 'single' && typeof localStorage !== 'undefined') {
-        gameId = localStorage.getItem('game_id');
-      }
+      // ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
+      let gameId = urlParams.get('game_id') || null;
       
       const tournamentId = urlParams.get('tournament_id');
       const franchiseId = urlParams.get('franchise_id');
@@ -2281,6 +2278,32 @@ class PlaybooksUI {
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+  // ✅ PHASE 1.1: Validate game_id requirement for single mode on page load
+  const urlParams = new URLSearchParams(window.location.search);
+  const mode = urlParams.get('mode') || 'single';
+  const gameId = urlParams.get('game_id') || null;
+  const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
+  const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+  const homeTeam = urlParams.get('home');
+  const awayTeam = urlParams.get('away');
+  const myTeamSide = urlParams.get('my_team') || 'home';
+  
+  // ✅ PHASE 1.1: Fail loudly if game_id is required but missing
+  // For single mode, game_id is required for ALL quarters (Q1 must be created by init-game)
+  // For tournament/franchise mode, game_id is optional (may not exist yet)
+  const isGameIdRequired = (mode === 'single') || (quarter > 1) || resumeFromTimeout;
+  if (isGameIdRequired && !gameId) {
+    const errorMsg = `game_id is required but missing from URL. Mode: ${mode}, Quarter: ${quarter}, Resume from timeout: ${resumeFromTimeout}. Please navigate from the lineup screen with a valid game_id (created by init-game).`;
+    console.error(`❌ [PLAYBOOKS] ${errorMsg}`);
+    alert(`Error: ${errorMsg}\n\nPlease return to the lineup screen and try again.`);
+    // Redirect to lineup screen if possible
+    if (homeTeam && awayTeam) {
+      const lineupUrl = `/set-lineup.html?home=${encodeURIComponent(homeTeam)}&away=${encodeURIComponent(awayTeam)}&my_team=${encodeURIComponent(myTeamSide)}&mode=${encodeURIComponent(mode)}&quarter=${quarter}`;
+      window.location.href = lineupUrl;
+    }
+    return;
+  }
+  
   const ui = new PlaybooksUI();
   ui.init();
 });
