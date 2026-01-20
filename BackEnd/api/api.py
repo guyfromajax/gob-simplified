@@ -1556,6 +1556,11 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         home_playbook_settings = home_team_data.get("playbook_settings", {})
                         away_playbook_settings = away_team_data.get("playbook_settings", {})
                         
+                        # ✅ CRITICAL FIX: Restore playbook_settings to game document after GameManager creation
+                        # This ensures playbook_settings persist when navigating to Playbooks page during timeout
+                        # Note: playbook_settings are stored in game document (not TeamManager objects)
+                        # They'll be saved back to DB by summarize_game_state() on next save
+                        
                         # Fallback to old flat structure if teams object doesn't exist (backwards compatibility)
                         if not home_plays and not teams_obj:
                             home_plays = saved.get("team_plays", {}).get(home)
@@ -1808,6 +1813,27 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             gm.away_team.team_fouls = 0
                             gm.home_team.timeouts = 4  # New game starts with 4 timeouts
                             gm.away_team.timeouts = 4  # New game starts with 4 timeouts
+                        
+                        # ✅ CRITICAL FIX: Restore playbook_settings to game document after GameManager creation
+                        # This ensures playbook_settings persist when navigating to Playbooks page during timeout
+                        # playbook_settings are stored in game document, not on TeamManager objects
+                        if home_playbook_settings or away_playbook_settings:
+                            try:
+                                # Update game document with restored playbook_settings
+                                update_data = {}
+                                home_key = home_actual_team_id if home_actual_team_id else gm.home_team.team_id
+                                away_key = away_actual_team_id if away_actual_team_id else gm.away_team.team_id
+                                
+                                if home_playbook_settings:
+                                    update_data[f"teams.{home_key}.playbook_settings"] = home_playbook_settings
+                                if away_playbook_settings:
+                                    update_data[f"teams.{away_key}.playbook_settings"] = away_playbook_settings
+                                
+                                if update_data:
+                                    games_collection.update_one({"_id": game_id}, {"$set": update_data})
+                                    logging.info(f"✅ Restored playbook_settings to game document: home={bool(home_playbook_settings)}, away={bool(away_playbook_settings)}")
+                            except Exception as e:
+                                logging.warning(f"⚠️ Could not restore playbook_settings to game document: {e}", exc_info=True)
                         
                         # ✅ TIMEOUT RESUME: Apply unified timeout state restoration (if resuming from timeout)
                         # This uses the state we loaded earlier from DB (single source of truth)
