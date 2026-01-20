@@ -620,20 +620,48 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 **Root Cause:**
 - `summarize_game_state()` correctly preserved `playbook_settings` from the game document when saving timeout state
 - However, when loading the game from the database after timeout, `playbook_settings` were extracted from the saved document but never explicitly restored back to the game document
-- The Playbooks page loads settings from the game document, so missing settings caused the bug
+- Additionally, team_id key resolution was inconsistent between save and restore, causing settings to be restored to wrong keys
+- The Playbooks page loads settings from the game document, so missing/incorrectly-keyed settings caused the bug
 
 **Solution:**
 - Added explicit restoration of `playbook_settings` to the game document after GameManager creation
-- This ensures that settings saved during timeout are properly restored and available when navigating to the Playbooks page
-- Settings are extracted from the saved document and written back using `games_collection.update_one()` with the correct team keys
+- **Consistent Key Resolution:** Uses same team name matching logic as `summarize_game_state()` to ensure consistent team_id keys between save and restore
+- Settings are extracted from the saved document and written back using `games_collection.update_one()` with the correctly-resolved team keys
+- Added detailed logging to trace playbook_settings save/restore for debugging
 
 **Key Points:**
 - `playbook_settings` are stored in the game document (`teams.{team_id}.playbook_settings`), not on TeamManager objects
 - Settings must be explicitly restored to the game document after loading to ensure they're available for the Playbooks page
-- `strategy_settings` (Game Plan settings) work correctly because they're passed via request and applied to GameManager objects
+- Team_id key resolution uses: name match → direct team_id lookup → saved document home_team_id/away_team_id → GameManager team_id
+- `strategy_settings` (Game Plan settings) are validated before use - only uses request if valid, otherwise preserves DB settings
 
 **Files Changed:**
-- `BackEnd/api/api.py` - `simulate_quarter_endpoint()` (lines 1817-1836): Restore playbook_settings to game document after GameManager creation
+- `BackEnd/api/api.py` - `simulate_quarter_endpoint()` (lines 1824-1847): Restore playbook_settings with consistent key resolution
+- `BackEnd/utils/shared.py` - `summarize_game_state()` (lines 971-974): Enhanced logging for playbook_settings save
+
+### Game Plan Settings Persistence ✅ **FIXED** (February 2025)
+
+**Problem:** Game plan settings (strategy_settings) were not persisting through timeouts when users didn't visit the Game Plan page during timeout navigation.
+
+**Root Cause:**
+- When loading game from database after timeout, code always prioritized `request.strategy_settings` over DB settings
+- If user didn't visit Game Plan page, `request.strategy_settings` could be stale/empty/invalid
+- This caused correct DB settings to be overwritten with invalid request settings
+
+**Solution:**
+- Added validation to check if `request.strategy_settings` has all required keys (valid settings)
+- Only uses `request.strategy_settings` if it's valid (indicates user visited Game Plan page and settings are current)
+- If `request.strategy_settings` is invalid/missing, preserves DB settings instead
+- This ensures settings persist through timeout even if user doesn't visit Game Plan page
+
+**Key Points:**
+- `strategy_settings` are stored in the game document (`teams.{team_id}.strategy_settings`) and on GameManager objects
+- Settings are preserved from GameManager objects when timeout is called via `summarize_game_state()`
+- Request settings are only used if valid (has all required keys), otherwise DB settings are preserved
+- Added logging to trace strategy_settings extraction and validation
+
+**Files Changed:**
+- `BackEnd/api/api.py` - `simulate_quarter_endpoint()` (lines 1573-1611): Validate request.strategy_settings before use
 
 ### Key Files
 

@@ -21,47 +21,43 @@ const tournamentId = urlParams.get('tournament_id');
 const modeParam = urlParams.get('mode');
 const DEBUG = urlParams.has('debug');
 const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
-let gameId = urlParams.get('game_id') ||
-  (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
-const storedHome = typeof localStorage !== 'undefined' ? localStorage.getItem('game_home') : null;
-const storedAway = typeof localStorage !== 'undefined' ? localStorage.getItem('game_away') : null;
+// ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
+// game_id is optional for new games (will be created by init-game), but if present must be in URL
+const gameId = urlParams.get('game_id') || null;
 
-// FIXED: Only clear gameId when teams actually change (new matchup)
-// Don't clear it just because it's Q1 - let backend handle "Q1 but saved Q2+" detection
-// This preserves the init-game flow which needs gameId to exist
-const isNewMatchup = !urlParams.get('game_id') && (storedHome !== homeTeam || storedAway !== awayTeam);
-if (isNewMatchup) {
-  // Teams changed = definitely a new matchup, clear old gameId
-  gameId = null;
-  if (typeof localStorage !== 'undefined') {
-    localStorage.removeItem('game_id');
-    localStorage.setItem('game_home', homeTeam || '');
-    localStorage.setItem('game_away', awayTeam || '');
-  }
-  if (typeof history !== 'undefined' && history.replaceState) {
-    const clean = new URLSearchParams(urlParams);
-    ['quarter', 'period', 'game_id'].forEach(k => clean.delete(k));
-    const qs = clean.toString();
-    history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
-  }
-} else if ((quarter > 1 || urlParams.has('game_id')) &&
-           typeof history !== 'undefined' && history.replaceState) {
-  const clean = new URLSearchParams(urlParams);
-  ['quarter', 'period', 'game_id'].forEach(k => clean.delete(k));
-  const qs = clean.toString();
-  history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
-}
+// ✅ PHASE 1.1: Only use localStorage for explicit "Resume Last Game" feature (not implemented yet)
+// For now, we only read from URL params - fail loudly if game_id is required but missing
+// Note: game_id is optional on lineup screen for new games, but required for Q2+ or timeout resume
 
-// Re-check localStorage for gameId if we still don't have one (user navigating back during active game)
-// Also check if teams match stored teams to ensure gameId is for this matchup
-if (!gameId && typeof localStorage !== 'undefined') {
-  const storedGameId = localStorage.getItem('game_id');
-  const storedHome = localStorage.getItem('game_home');
-  const storedAway = localStorage.getItem('game_away');
-  // Only use stored gameId if teams match (same matchup)
-  if (storedGameId && storedHome === homeTeam && storedAway === awayTeam) {
-    gameId = storedGameId;
-    console.log('[Lineup] Using gameId from localStorage (teams match)');
+// ✅ PHASE 1.1: Clean up URL params if game_id is present but shouldn't be (for new matchups)
+// This ensures URL is clean and doesn't carry stale game_id from previous games
+if (gameId && quarter === 1 && !urlParams.has('resume_from_timeout')) {
+  // If we have a game_id but it's Q1 and not a timeout resume, verify teams match
+  // If teams don't match, this is a new matchup and game_id should be cleared
+  // (Backend will create new game_id via init-game)
+  const storedHome = typeof localStorage !== 'undefined' ? localStorage.getItem('game_home') : null;
+  const storedAway = typeof localStorage !== 'undefined' ? localStorage.getItem('game_away') : null;
+  const isNewMatchup = storedHome && storedAway && (storedHome !== homeTeam || storedAway !== awayTeam);
+  
+  if (isNewMatchup) {
+    // Teams changed = definitely a new matchup, clear game_id from URL
+    if (typeof history !== 'undefined' && history.replaceState) {
+      const clean = new URLSearchParams(urlParams);
+      clean.delete('game_id');
+      const qs = clean.toString();
+      history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+    }
+    // Update stored teams for next check
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('game_home', homeTeam || '');
+      localStorage.setItem('game_away', awayTeam || '');
+    }
+  } else {
+    // Teams match, update stored teams
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('game_home', homeTeam || '');
+      localStorage.setItem('game_away', awayTeam || '');
+    }
   }
 }
 
@@ -69,15 +65,14 @@ if (!gameId && typeof localStorage !== 'undefined') {
 // If user starts Q1 but saved game is Q2+, backend will handle detection via heuristic
 // Frontend just needs to ensure gameId exists for init-game flow to work
 
+// ✅ PHASE 1.1: Log game_id source (should only be URL now)
 console.log('[Lineup] gameId check:', {
   fromUrl: urlParams.get('game_id'),
-  fromLocalStorage: typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null,
   finalGameId: gameId,
   quarter: quarter,
   homeTeam: homeTeam,
   awayTeam: awayTeam,
-  storedHome: typeof localStorage !== 'undefined' ? localStorage.getItem('game_home') : null,
-  storedAway: typeof localStorage !== 'undefined' ? localStorage.getItem('game_away') : null
+  isRequired: quarter > 1 || urlParams.has('resume_from_timeout')
 });
 
 const periodLabel = urlParams.get('period') || `Q${quarter}`;
