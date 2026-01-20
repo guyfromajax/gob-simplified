@@ -2184,30 +2184,47 @@ class PlaybooksUI {
         let playName = null;
         
         // Try to find the actual play from play data
-        if (assignment.section === 'motion') {
-          const play = this.playData.motion?.find(p => {
-            // Check if playId matches actual play.id, or if it's a fallback like "motion-3"
-            return p.id === assignment.playId || 
-                   (assignment.playId.startsWith('motion-') && this.playData.motion?.indexOf(p) === parseInt(assignment.playId.replace('motion-', '')) - 1);
-          });
+        // First, check if playId is already a valid play ID by looking in sections
+        const sectionData = this.state.sections[assignment.section];
+        if (sectionData && sectionData[assignment.playId]) {
+          // playId exists in sections, so it's likely already correct
+          // But we still need to get the play name from playData
+          let play = null;
+          if (assignment.section === 'motion') {
+            play = this.playData.motion?.find(p => p.id === assignment.playId || p.name === assignment.playId);
+          } else if (assignment.section === 'set-play-inside') {
+            play = this.playData.set_play_inside?.find(p => p.id === assignment.playId || p.name === assignment.playId);
+          } else if (assignment.section === 'set-play-attack') {
+            play = this.playData.set_play_attack?.find(p => p.id === assignment.playId || p.name === assignment.playId);
+          } else if (assignment.section === 'set-play-outside') {
+            play = this.playData.set_play_outside?.find(p => p.id === assignment.playId || p.name === assignment.playId);
+          }
+          
           if (play) {
             actualPlayId = play.id || play.name;
             playName = play.name;
           }
-        } else if (assignment.section === 'set-play-inside') {
-          const play = this.playData.set_play_inside?.find(p => p.id === assignment.playId);
-          if (play) {
+        } else if (assignment.playId.startsWith('motion-')) {
+          // Fallback identifier like "motion-3" - find by index
+          const index = parseInt(assignment.playId.replace('motion-', '')) - 1;
+          if (this.playData.motion && this.playData.motion[index]) {
+            const play = this.playData.motion[index];
             actualPlayId = play.id || play.name;
             playName = play.name;
           }
-        } else if (assignment.section === 'set-play-attack') {
-          const play = this.playData.set_play_attack?.find(p => p.id === assignment.playId);
-          if (play) {
-            actualPlayId = play.id || play.name;
-            playName = play.name;
+        } else {
+          // Try to find play by matching playId to play.id or play.name
+          let play = null;
+          if (assignment.section === 'motion') {
+            play = this.playData.motion?.find(p => p.id === assignment.playId || p.name === assignment.playId);
+          } else if (assignment.section === 'set-play-inside') {
+            play = this.playData.set_play_inside?.find(p => p.id === assignment.playId || p.name === assignment.playId);
+          } else if (assignment.section === 'set-play-attack') {
+            play = this.playData.set_play_attack?.find(p => p.id === assignment.playId || p.name === assignment.playId);
+          } else if (assignment.section === 'set-play-outside') {
+            play = this.playData.set_play_outside?.find(p => p.id === assignment.playId || p.name === assignment.playId);
           }
-        } else if (assignment.section === 'set-play-outside') {
-          const play = this.playData.set_play_outside?.find(p => p.id === assignment.playId);
+          
           if (play) {
             actualPlayId = play.id || play.name;
             playName = play.name;
