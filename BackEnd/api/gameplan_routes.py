@@ -1750,18 +1750,25 @@ def save_playbooks(request: PlaybookSettingsRequest):
             home_team_id = doc.get("home_team_id")
             away_team_id = doc.get("away_team_id")
             
-            # First try direct lookup (in case team_id was sent instead of name)
-            if request.team_id in teams:
+            # ✅ CRITICAL FIX: Never use request.team_id directly if it matches a team name key
+            # Check if request.team_id is a team_id key (matches pattern like "BENTLEY_TRUMAN")
+            # or if it's a team name key (matches pattern like "Bentley-Truman" with lowercase/dashes)
+            # We need to differentiate because the document might have BOTH keys
+            is_likely_team_id = request.team_id.isupper() or '_' in request.team_id
+            is_likely_team_name = not is_likely_team_id and ('-' in request.team_id or request.team_id[0].islower())
+            
+            # Try to find by team name - iterate through teams to find match
+            actual_team_id = None
+            for tid in teams.keys():
+                team_obj = teams.get(tid, {})
+                # Check if team name matches (teams object contains name field)
+                if team_obj.get("name") == request.team_id:
+                    actual_team_id = tid
+                    break
+            
+            # If name matching didn't work and request.team_id looks like a team_id, try direct lookup
+            if not actual_team_id and is_likely_team_id and request.team_id in teams:
                 actual_team_id = request.team_id
-            else:
-                # Try to find by team name - iterate through teams to find match
-                actual_team_id = None
-                for tid in teams.keys():
-                    team_obj = teams.get(tid, {})
-                    # Check if team name matches (teams object contains name field)
-                    if team_obj.get("name") == request.team_id:
-                        actual_team_id = tid
-                        break
                 
                 # If still not found, try teams collection lookup by name
                 if not actual_team_id:
