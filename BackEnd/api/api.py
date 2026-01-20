@@ -2087,11 +2087,26 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     logging.warning(f"🔧 [STRATEGY SETTINGS] AFTER GAMEMANAGER (NEW)")
                     logging.warning(f"   - Home: HCT={gm.home_team.strategy_settings.get('hc_trap', 'MISSING')}, FCP={gm.home_team.strategy_settings.get('fc_press', 'MISSING')}")
                     logging.warning(f"   - Away: HCT={gm.away_team.strategy_settings.get('hc_trap', 'MISSING')}, FCP={gm.away_team.strategy_settings.get('fc_press', 'MISSING')}")
-                    # Use the game_id from the request if provided, otherwise generate a new one
-                    if request.game_id:
-                        game_id = request.game_id
-                    else:
-                        game_id = str(uuid.uuid4())
+                    # ✅ SS&S: Require game_id - game document must be created via init-game endpoint
+                    # Never create game document in simulate-quarter - this causes settings to be lost
+                    if not request.game_id:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"game_id required for Q1. Game document must be created via /api/init-game before simulating Q1. This ensures playbook and game plan settings persist."
+                        )
+                    # Verify game document exists in database
+                    saved = games_collection.find_one({"_id": request.game_id}) if games_collection else None
+                    if not saved:
+                        try:
+                            saved = games_collection.find_one({"_id": ObjectId(request.game_id)}) if games_collection else None
+                        except:
+                            pass
+                    if not saved:
+                        raise HTTPException(
+                            status_code=404,
+                            detail=f"Game document {request.game_id} not found. Game document must be created via /api/init-game before simulating Q1. This ensures playbook and game plan settings persist."
+                        )
+                    game_id = request.game_id
                     gm.game_id = game_id  # Store game_id on the GameManager object
                     ongoing_games[game_id] = gm
                     logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ✅ Added game to ongoing_games (timeout resume path): game_id={game_id}, object_id={id(gm)}, quarter={gm.quarter}")
@@ -2302,13 +2317,27 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             mode=mode,  # Pass mode so teams can initialize plays with correct stats structure
             user_team_side=request.user_team_side  # ✅ SS&S: Pass user_team_side to set is_user_team flags
         )
-        # Use the game_id from the request if provided, otherwise generate a new one
-        from BackEnd.utils.game_id_utils import generate_game_id, normalize_game_id
-        
-        if request.game_id:
-            game_id = normalize_game_id(request.game_id)
-        else:
-            game_id = generate_game_id()
+        # ✅ SS&S: Require game_id for Q2-Q4 - cannot start mid-game without existing game document
+        # Game document must be created via init-game endpoint before Q1
+        if not request.game_id:
+            raise HTTPException(
+                status_code=400,
+                detail=f"game_id required for Q{request.quarter}. Game document must be created via /api/init-game before Q1. Cannot start Q{request.quarter} without existing game document."
+            )
+        # Verify game document exists in database
+        from BackEnd.utils.game_id_utils import normalize_game_id
+        game_id = normalize_game_id(request.game_id)
+        saved = games_collection.find_one({"_id": game_id}) if games_collection else None
+        if not saved:
+            try:
+                saved = games_collection.find_one({"_id": ObjectId(game_id)}) if games_collection else None
+            except:
+                pass
+        if not saved:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Game document {game_id} not found for Q{request.quarter}. Game document must be created via /api/init-game before Q1. Cannot resume Q{request.quarter} without existing game document."
+            )
         gm.game_id = game_id  # Store game_id on the GameManager object
         ongoing_games[game_id] = gm
         logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ✅ Added game to ongoing_games (new game path): game_id={game_id}, object_id={id(gm)}, quarter={gm.quarter}")
