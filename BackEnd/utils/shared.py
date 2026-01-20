@@ -1081,6 +1081,23 @@ def summarize_game_state(game, exclude_animations=True):
     # Get cumulative box scores
     cumulative_box = game.get_box_score()
     
+    # ✅ Extract strategy_settings before building dictionary (for debugging and clarity)
+    home_strategy = getattr(game.home_team, 'strategy_settings', {})
+    away_strategy = getattr(game.away_team, 'strategy_settings', {})
+    # ✅ DEBUG: Log strategy_settings being saved
+    if home_strategy and 'inside' in home_strategy:
+        logging.warning(f"🔍 [SUMMARIZE] Home strategy_settings inside: {home_strategy.get('inside')}")
+    elif home_strategy:
+        logging.warning(f"🔍 [SUMMARIZE] Home strategy_settings keys: {list(home_strategy.keys())}, inside: MISSING")
+    else:
+        logging.warning(f"⚠️ [SUMMARIZE] Home strategy_settings is empty or missing!")
+    if away_strategy and 'inside' in away_strategy:
+        logging.warning(f"🔍 [SUMMARIZE] Away strategy_settings inside: {away_strategy.get('inside')}")
+    elif away_strategy:
+        logging.warning(f"🔍 [SUMMARIZE] Away strategy_settings keys: {list(away_strategy.keys())}, inside: MISSING")
+    else:
+        logging.warning(f"⚠️ [SUMMARIZE] Away strategy_settings is empty or missing!")
+    
     # ✅ UNIFIED STRUCTURE: All team data in one place (eliminates home_team/away_team duplication)
     teams_obj = {
         home_key: {
@@ -1102,7 +1119,7 @@ def summarize_game_state(game, exclude_animations=True):
             "box_score": cumulative_box.get(game.home_team.name, {}),
             "totals": game.team_totals.get(game.home_team.name, {}),
             # Persistence fields
-            "strategy_settings": getattr(game.home_team, 'strategy_settings', {}),
+            "strategy_settings": home_strategy,
             "strategy_calls": getattr(game.home_team, 'strategy_calls', {}),  # ✅ SS&S: Persist playcall overrides
             "plays": home_plays,  # ✅ FIX: Use in-memory plays with updated game_stats
             "scouting": getattr(game.home_team, 'scouting_data', {}),
