@@ -23,6 +23,7 @@ const DEBUG = urlParams.has('debug');
 const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 // ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
 // game_id is optional for new games (will be created by init-game), but if present must be in URL
+// Note: This is a snapshot of initial URL state - always read from window.location.search when needed
 const gameId = urlParams.get('game_id') || null;
 
 // ✅ PHASE 1.1: Only use localStorage for explicit "Resume Last Game" feature (not implemented yet)
@@ -123,10 +124,11 @@ async function loadRoster() {
   // ✅ CRITICAL FIX: Don't init if game_id exists in URL (game already exists) or if resuming from timeout
   // This prevents creating a new game when resuming from timeout, which would reset all game state
   const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
-  const shouldInitGame = !gameId && homeTeam && awayTeam && !resumeFromTimeout;
+  const shouldInitGame = !gameId && homeTeam && awayTeam && !resumeFromTimeout && !initGameInProgress;
   
   if (shouldInitGame) {
     console.log("No gameId found - initializing new game for pre-game lineup");
+    initGameInProgress = true; // Prevent duplicate calls
     try {
       const mode = modeParam || 'single';
       const initPayload = {
@@ -149,19 +151,20 @@ async function loadRoster() {
       });
       if (initRes.ok) {
         const initData = await initRes.json();
-        gameId = initData.game_id;
-        console.log("✅ Initialized new game:", gameId);
+        const newGameId = initData.game_id;
+        console.log("✅ Initialized new game:", newGameId);
         
         // Store gameId in localStorage and URL
         if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('game_id', gameId);
+          localStorage.setItem('game_id', newGameId);
           localStorage.setItem('game_home', homeTeam);
           localStorage.setItem('game_away', awayTeam);
         }
         
-        // Update URL with gameId (without page reload)
+        // ✅ SS&S: URL is the source of truth - update URL with gameId (without page reload)
+        // Button handlers will read from window.location.search, not from module-level variable
         const newParams = new URLSearchParams(window.location.search);
-        newParams.set('game_id', gameId);
+        newParams.set('game_id', newGameId);
         if (typeof history !== 'undefined' && history.replaceState) {
           history.replaceState(null, '', `${window.location.pathname}?${newParams.toString()}`);
         }
@@ -170,6 +173,8 @@ async function loadRoster() {
       }
     } catch (err) {
       console.warn("Could not initialize game:", err);
+    } finally {
+      initGameInProgress = false; // Reset flag
     }
   } else if (gameId) {
     console.log("Game ID exists - skipping init-game (game already exists)");
@@ -1147,15 +1152,16 @@ async function init() {
       console.log('🎮 GAME PLAN BUTTON CLICKED! Redirecting to game-plan.html');
       
       // ✅ PHASE 1.1: Ensure game_id exists before navigating (init-game might be in progress)
-      // Read from current URL (might be updated by init-game) and also check local gameId variable
+      // ✅ SS&S: URL is the source of truth - always read from window.location.search
       const currentUrlParams = new URLSearchParams(window.location.search);
-      let currentGameId = currentUrlParams.get('game_id') || gameId; // Use local gameId variable if URL doesn't have it yet
+      let currentGameId = currentUrlParams.get('game_id'); // Read from URL only (source of truth)
       const resumeFromTimeout = currentUrlParams.get('resume_from_timeout') === 'true';
       
-      // ✅ PHASE 1.1: If game_id doesn't exist yet, wait for init-game to complete
-      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout) {
+      // ✅ PHASE 1.1: If game_id doesn't exist yet, wait for init-game to complete (if not already in progress)
+      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && !initGameInProgress) {
         console.log('⏳ [SET-LINEUP] game_id not found, waiting for init-game to complete...');
         
+        initGameInProgress = true; // Prevent duplicate calls
         try {
           const mode = modeParam || 'single';
           const initPayload = {
@@ -1181,7 +1187,7 @@ async function init() {
             currentGameId = initData.game_id;
             console.log(`✅ [SET-LINEUP] Initialized game_id for Game Plan: ${currentGameId}`);
             
-            // Update URL with game_id
+            // ✅ SS&S: URL is the source of truth - update URL with game_id
             currentUrlParams.set('game_id', currentGameId);
             if (typeof history !== 'undefined' && history.replaceState) {
               history.replaceState(null, '', `${window.location.pathname}?${currentUrlParams.toString()}`);
@@ -1194,6 +1200,25 @@ async function init() {
         } catch (err) {
           console.error('❌ [SET-LINEUP] Error initializing game for Game Plan navigation:', err);
           alert('Failed to initialize game. Please try again.');
+          return;
+        } finally {
+          initGameInProgress = false; // Reset flag
+        }
+      } else if (initGameInProgress) {
+        console.log('⏳ [SET-LINEUP] init-game already in progress, waiting...');
+        // Wait for init-game to complete by polling
+        let waitCount = 0;
+        while (initGameInProgress && waitCount < 50) { // Max 5 seconds
+          await new Promise(resolve => setTimeout(resolve, 100));
+          waitCount++;
+          // ✅ SS&S: Re-check URL for game_id (source of truth)
+          const updatedParams = new URLSearchParams(window.location.search);
+          currentGameId = updatedParams.get('game_id');
+          if (currentGameId) break;
+        }
+        if (!currentGameId) {
+          console.error('❌ [SET-LINEUP] init-game did not complete in time');
+          alert('Game initialization is taking longer than expected. Please try again.');
           return;
         }
       }
@@ -1236,15 +1261,16 @@ async function init() {
       console.log('📚 PLAYBOOKS BUTTON CLICKED! Redirecting to playbooks.html');
       
       // ✅ PHASE 1.1: Ensure game_id exists before navigating (init-game might be in progress)
-      // Read from current URL (might be updated by init-game) and also check local gameId variable
+      // ✅ SS&S: URL is the source of truth - always read from window.location.search
       const currentUrlParams = new URLSearchParams(window.location.search);
-      let currentGameId = currentUrlParams.get('game_id') || gameId; // Use local gameId variable if URL doesn't have it yet
+      let currentGameId = currentUrlParams.get('game_id'); // Read from URL only (source of truth)
       const resumeFromTimeout = currentUrlParams.get('resume_from_timeout') === 'true';
       
-      // ✅ PHASE 1.1: If game_id doesn't exist yet, wait for init-game to complete
-      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout) {
+      // ✅ PHASE 1.1: If game_id doesn't exist yet, wait for init-game to complete (if not already in progress)
+      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && !initGameInProgress) {
         console.log('⏳ [SET-LINEUP] game_id not found, waiting for init-game to complete...');
         
+        initGameInProgress = true; // Prevent duplicate calls
         try {
           const mode = modeParam || 'single';
           const initPayload = {
@@ -1270,7 +1296,7 @@ async function init() {
             currentGameId = initData.game_id;
             console.log(`✅ [SET-LINEUP] Initialized game_id for Playbooks: ${currentGameId}`);
             
-            // Update URL with game_id
+            // ✅ SS&S: URL is the source of truth - update URL with game_id
             currentUrlParams.set('game_id', currentGameId);
             if (typeof history !== 'undefined' && history.replaceState) {
               history.replaceState(null, '', `${window.location.pathname}?${currentUrlParams.toString()}`);
@@ -1283,6 +1309,25 @@ async function init() {
         } catch (err) {
           console.error('❌ [SET-LINEUP] Error initializing game for Playbooks navigation:', err);
           alert('Failed to initialize game. Please try again.');
+          return;
+        } finally {
+          initGameInProgress = false; // Reset flag
+        }
+      } else if (initGameInProgress) {
+        console.log('⏳ [SET-LINEUP] init-game already in progress, waiting...');
+        // Wait for init-game to complete by polling
+        let waitCount = 0;
+        while (initGameInProgress && waitCount < 50) { // Max 5 seconds
+          await new Promise(resolve => setTimeout(resolve, 100));
+          waitCount++;
+          // ✅ SS&S: Re-check URL for game_id (source of truth)
+          const updatedParams = new URLSearchParams(window.location.search);
+          currentGameId = updatedParams.get('game_id');
+          if (currentGameId) break;
+        }
+        if (!currentGameId) {
+          console.error('❌ [SET-LINEUP] init-game did not complete in time');
+          alert('Game initialization is taking longer than expected. Please try again.');
           return;
         }
       }

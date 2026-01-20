@@ -1782,27 +1782,22 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
 }
 
 async function showPopup(score) {
-  // Get gameId from multiple sources (module variable, score object, localStorage, URL params)
-  let popupGameId = gameId; // Use module-level gameId first
+  // ✅ PHASE 1.1: URL is source of truth - read from URL first, then module-level variable
+  // Module-level gameId can be valid if updated from server response after simulation
+  const urlParams = new URLSearchParams(window.location.search);
+  let popupGameId = urlParams.get('game_id') || gameId; // URL first, then module variable
+  
   // ❌ COMMENTED OUT: score.gameId check - not used by "Play Quarter" flow (goes through gameScene.js)
   // if (!popupGameId && score && score.gameId) {
   //   popupGameId = score.gameId;
   // }
-  if (!popupGameId && typeof localStorage !== 'undefined') {
-    popupGameId = localStorage.getItem('game_id');
-  }
-  if (!popupGameId) {
-    const params = new URLSearchParams(window.location.search);
-    popupGameId = params.get('game_id');
-  }
   
   console.log('📋 showPopup called:', {
     popupGameId,
     moduleGameId: gameId,
+    gameIdFromURL: urlParams.get('game_id'),
     // ❌ COMMENTED OUT: score.gameId check - not used by "Play Quarter" flow
     // gameIdFromScore: score?.gameId,
-    gameIdFromLocalStorage: typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : 'N/A',
-    gameIdFromParams: new URLSearchParams(window.location.search).get('game_id'),
     score,
     homeTeam,
     awayTeam,
@@ -1812,7 +1807,9 @@ async function showPopup(score) {
   });
   
   if (!popupGameId) {
-    console.error('❌ No game_id found for box score - box score will not have data!');
+    console.error('❌ [BOOTGAME] No game_id found for box score - box score will not have data!');
+    // ✅ PHASE 1.1: Fail loudly - this indicates a navigation/state bug
+    console.error('❌ [BOOTGAME] game_id should be in URL or module variable at this point');
   }
 
   // Use the new game completion popup
@@ -1837,9 +1834,14 @@ async function handleButtonClick(animate) {
     return;
   }
   
-  if (!gameId && typeof localStorage !== 'undefined') {
-    gameId = localStorage.getItem('game_id');
-    console.log('Retrieved gameId from localStorage:', gameId);
+  // ✅ PHASE 1.1: URL is source of truth - read from URL if module-level gameId is missing
+  if (!gameId) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlGameId = urlParams.get('game_id');
+    if (urlGameId) {
+      gameId = urlGameId;
+      console.log('✅ [BOOTGAME] Retrieved gameId from URL:', gameId);
+    }
   }
   
   const startingFresh = !gameId;
@@ -2192,9 +2194,17 @@ async function handleSimQuarter() {
 
 async function handleSimFullGame() {
   if (isSimulating) return;
-  if (!gameId && typeof localStorage !== 'undefined') {
-    gameId = localStorage.getItem('game_id');
+  
+  // ✅ PHASE 1.1: URL is source of truth - read from URL if module-level gameId is missing
+  if (!gameId) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlGameId = urlParams.get('game_id');
+    if (urlGameId) {
+      gameId = urlGameId;
+      console.log('✅ [BOOTGAME] Retrieved gameId from URL:', gameId);
+    }
   }
+  
   if (!gameId) {
     resetGameContext();
   }
