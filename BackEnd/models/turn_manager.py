@@ -1435,19 +1435,36 @@ class TurnManager:
     def set_strategy_calls(self):
         # Ensure strategy_settings are initialized for both teams (but don't overwrite existing settings)
         # Only initialize if it's completely missing (None), not if it's an empty dict
-        if not hasattr(self.game.offense_team, 'strategy_settings') or self.game.offense_team.strategy_settings is None:
+        # ✅ DEBUG: Log current strategy_settings state before checking
+        offense_has_settings = hasattr(self.game.offense_team, 'strategy_settings') and self.game.offense_team.strategy_settings is not None
+        offense_is_empty = isinstance(self.game.offense_team.strategy_settings, dict) and len(self.game.offense_team.strategy_settings) == 0
+        offense_is_user = self.game.offense_team.is_user_team
+        offense_inside = self.game.offense_team.strategy_settings.get('inside', 'MISSING') if offense_has_settings else 'MISSING'
+        logging.warning(f"🔍 [SET_STRATEGY_CALLS] Offense team: {self.game.offense_team.name}, is_user_team: {offense_is_user}, has_settings: {offense_has_settings}, is_empty: {offense_is_empty}, inside: {offense_inside}")
+        
+        if not offense_has_settings:
             logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.game.offense_team.name} missing strategy_settings in set_strategy_calls, initializing with defaults")
             self.game.offense_team.strategy_settings = self.game.offense_team._init_strategy_settings()
-        elif isinstance(self.game.offense_team.strategy_settings, dict) and len(self.game.offense_team.strategy_settings) == 0:
+            logging.warning(f"🔍 [SET_STRATEGY_CALLS] Initialized offense team settings, inside: {self.game.offense_team.strategy_settings.get('inside', 'MISSING')}")
+        elif offense_is_empty:
             logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.game.offense_team.name} has empty strategy_settings dict in set_strategy_calls, initializing with defaults")
             self.game.offense_team.strategy_settings = self.game.offense_team._init_strategy_settings()
+            logging.warning(f"🔍 [SET_STRATEGY_CALLS] Initialized offense team settings (was empty), inside: {self.game.offense_team.strategy_settings.get('inside', 'MISSING')}")
         
-        if not hasattr(self.game.defense_team, 'strategy_settings') or self.game.defense_team.strategy_settings is None:
+        defense_has_settings = hasattr(self.game.defense_team, 'strategy_settings') and self.game.defense_team.strategy_settings is not None
+        defense_is_empty = isinstance(self.game.defense_team.strategy_settings, dict) and len(self.game.defense_team.strategy_settings) == 0
+        defense_is_user = self.game.defense_team.is_user_team
+        defense_inside = self.game.defense_team.strategy_settings.get('inside', 'MISSING') if defense_has_settings else 'MISSING'
+        logging.warning(f"🔍 [SET_STRATEGY_CALLS] Defense team: {self.game.defense_team.name}, is_user_team: {defense_is_user}, has_settings: {defense_has_settings}, is_empty: {defense_is_empty}, inside: {defense_inside}")
+        
+        if not defense_has_settings:
             logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.game.defense_team.name} missing strategy_settings in set_strategy_calls, initializing with defaults")
             self.game.defense_team.strategy_settings = self.game.defense_team._init_strategy_settings()
-        elif isinstance(self.game.defense_team.strategy_settings, dict) and len(self.game.defense_team.strategy_settings) == 0:
+            logging.warning(f"🔍 [SET_STRATEGY_CALLS] Initialized defense team settings, inside: {self.game.defense_team.strategy_settings.get('inside', 'MISSING')}")
+        elif defense_is_empty:
             logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.game.defense_team.name} has empty strategy_settings dict in set_strategy_calls, initializing with defaults")
             self.game.defense_team.strategy_settings = self.game.defense_team._init_strategy_settings()
+            logging.warning(f"🔍 [SET_STRATEGY_CALLS] Initialized defense team settings (was empty), inside: {self.game.defense_team.strategy_settings.get('inside', 'MISSING')}")
         
         # 🐛 DEBUG: Log strategy settings being used
         # ✅ COMMENTED OUT: Strategy settings logs (cluttering transition debugging)
