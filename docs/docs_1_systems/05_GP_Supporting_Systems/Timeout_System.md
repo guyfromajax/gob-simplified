@@ -715,6 +715,15 @@ Current game plan settings are fetched and passed to the game plan screen:
 **Frontend (`FrontEnd/static/game-plan.js` `loadSettings()`):**
 - Parses and applies game plan settings from URL on page load
 
+**Playbook Settings Persistence:**
+- Playbook settings are stored in the game document (`teams.{team_id}.playbook_settings`)
+- When timeout is called, `summarize_game_state()` preserves playbook_settings from the game document
+- When loading game from database after timeout, playbook_settings are extracted from saved document and restored to game document
+- This ensures playbook_settings are available when navigating to Playbooks page during timeout
+- **✅ CRITICAL FIX (February 2025):** Added explicit restoration of playbook_settings to game document after GameManager creation (lines 1817-1836 in `BackEnd/api/api.py`)
+- **Location:** `BackEnd/api/api.py` `simulate_quarter_endpoint()` - restores playbook_settings after GameManager creation
+- **Game Plan Settings:** Strategy settings are passed via `request.strategy_settings` and applied to GameManager, then saved by `summarize_game_state()`
+
 **Lineup Screen Population (Foul Out):**
 - Location: `FrontEnd/static/js/phaser/utils/foulOutPopup.js` `showFoulOutPopup()` function
 - Fetches current lineup from URL parameters (same as timeout flow)
