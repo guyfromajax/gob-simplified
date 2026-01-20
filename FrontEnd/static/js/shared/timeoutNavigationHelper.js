@@ -135,7 +135,8 @@
     // ============================================
     // 8. MODE/TOURNAMENT/FRANCHISE PARAMS
     // ============================================
-    const mode = overrides.mode || sourceParams.get('mode');
+    // ✅ FIX: mode already declared above (line 62) - use existing variable
+    // const mode = overrides.mode || sourceParams.get('mode'); // Already declared above
     const tournamentId = overrides.tournament_id || sourceParams.get('tournament_id');
     const franchiseId = overrides.franchise_id || sourceParams.get('franchise_id');
     const week = overrides.week || sourceParams.get('week');
