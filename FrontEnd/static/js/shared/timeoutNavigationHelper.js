@@ -59,6 +59,8 @@
     const homeId = overrides.home_id || sourceParams.get('home_id');
     const awayId = overrides.away_id || sourceParams.get('away_id');
     const myTeam = overrides.my_team || sourceParams.get('my_team');
+    const mode = overrides.mode || sourceParams.get('mode') || 'single';
+    
     // ✅ SS&S: Preserve team_id (standardized) - prefer team_id over user_team_id
     const teamId = overrides.team_id || sourceParams.get('team_id') || 
                    overrides.user_team_id || sourceParams.get('user_team_id');
@@ -71,8 +73,13 @@
     if (myTeam) params.set('my_team', myTeam);
     // ✅ SS&S: Preserve team_id (standardized parameter name)
     if (teamId) params.set('team_id', teamId);
-    // Keep user_team_id for backward compatibility (if different from team_id)
-    if (userTeamId && userTeamId !== teamId) params.set('user_team_id', userTeamId);
+    // ✅ PHASE 1: Only include user_team_id for franchise/tournament mode (not redundant in single mode)
+    // In single mode, user_team_id can be derived from my_team + home/away, so it's redundant
+    // In franchise/tournament mode, user_team_id is persistent user team identity (required)
+    const isFranchiseOrTournament = mode === 'franchise' || mode === 'tournament';
+    if (isFranchiseOrTournament && userTeamId && userTeamId !== teamId) {
+      params.set('user_team_id', userTeamId);
+    }
     
     // ============================================
     // 3. GAME ID LOGIC (Phase 1.1: Always pass if exists)
