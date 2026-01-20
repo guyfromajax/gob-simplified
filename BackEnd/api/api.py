@@ -1677,7 +1677,11 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                 logging.warning(f"✅ [STRATEGY SETTINGS] Applied DB home_strategy to GameManager (request was invalid): tempo={home_strategy.get('tempo', 'MISSING')}")
                             if away_strategy:
                                 gm.away_team.strategy_settings = dict(away_strategy)
-                                logging.warning(f"✅ [STRATEGY SETTINGS] Applied DB away_strategy to GameManager (request was invalid): tempo={away_strategy.get('tempo', 'MISSING')}")
+                                logging.warning(f"✅ [STRATEGY SETTINGS] Applied DB away_strategy to GameManager (request was invalid): tempo={away_strategy.get('tempo', 'MISSING')}"                        )
+                        
+                        # ✅ VERIFY: Log strategy_settings after GameManager creation to confirm they were applied
+                        if home_strategy or away_strategy:
+                            logging.info(f"✅ [STRATEGY SETTINGS] GameManager created with strategy_settings: home={bool(home_strategy)} (tempo={gm.home_team.strategy_settings.get('tempo', 'MISSING') if home_strategy else 'N/A'}), away={bool(away_strategy)} (tempo={gm.away_team.strategy_settings.get('tempo', 'MISSING') if away_strategy else 'N/A'})")
                         
                         # Debug logging removed - was cluttering logs
                         # logging.debug(f"🔧 AFTER GAMEMANAGER - home.strategy_settings={gm.home_team.strategy_settings.get('tempo', 'MISSING')}, away.strategy_settings={gm.away_team.strategy_settings.get('tempo', 'MISSING')}")
