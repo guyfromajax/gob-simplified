@@ -1465,6 +1465,32 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             except Exception as e:
                 logging.error(f"❌ [STRATEGY SETTINGS] Error updating strategy_settings: {e}", exc_info=True)
         
+        # ✅ CRITICAL FIX: If game is in cache and no request.strategy_settings provided, load from DB
+        # This ensures settings saved pre-game are applied to cached games (e.g., init-game → save settings → simulate-quarter)
+        mode = request.mode or "single"
+        if gm is not None and not request.strategy_settings and mode == "single" and request.game_id:
+            home_settings = load_team_settings_from_doc(
+                mode,
+                request.game_id,
+                None,
+                request.home_team
+            )
+            away_settings = load_team_settings_from_doc(
+                mode,
+                request.game_id,
+                None,
+                request.away_team
+            )
+            # Apply loaded settings to cached GameManager
+            if home_settings and home_settings.get("strategy_settings"):
+                default_settings = gm.home_team._init_strategy_settings()
+                gm.home_team.strategy_settings = {**default_settings, **home_settings.get("strategy_settings")}
+                logging.warning(f"✅ [SIMULATE-QUARTER] Applied DB home strategy_settings to cached GameManager (no request settings)")
+            if away_settings and away_settings.get("strategy_settings"):
+                default_settings = gm.away_team._init_strategy_settings()
+                gm.away_team.strategy_settings = {**default_settings, **away_settings.get("strategy_settings")}
+                logging.warning(f"✅ [SIMULATE-QUARTER] Applied DB away strategy_settings to cached GameManager (no request settings)")
+        
         # ✅ TIMEOUT RESUME: Unified state restoration (works for all modes and all paths)
         # Only check database for timeout state if we have a game_id (existing game, not new game start)
         # Always check database for timeout state if we have a game_id
@@ -2378,11 +2404,22 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             if home_settings.get("strategy_settings") and not home_strategy:
                 home_strategy = home_settings.get("strategy_settings")
                 logging.warning(f"✅ [SIMULATE-QUARTER] Applied home strategy_settings from DB")
+                # ✅ CRITICAL FIX: If game is in cache, apply settings directly to cached GameManager
+                # This fixes the bug where settings are loaded from DB but not applied to cached games
+                if gm is not None:
+                    default_settings = gm.home_team._init_strategy_settings()
+                    gm.home_team.strategy_settings = {**default_settings, **home_strategy}
+                    logging.warning(f"✅ [SIMULATE-QUARTER] Applied DB home strategy_settings to cached GameManager")
             elif home_settings.get("strategy_settings") and home_strategy:
                 logging.warning(f"⚠️ [SIMULATE-QUARTER] Skipped DB home strategy_settings (request.strategy_settings takes precedence)")
             if away_settings.get("strategy_settings") and not away_strategy:
                 away_strategy = away_settings.get("strategy_settings")
                 logging.warning(f"✅ [SIMULATE-QUARTER] Applied away strategy_settings from DB")
+                # ✅ CRITICAL FIX: If game is in cache, apply settings directly to cached GameManager
+                if gm is not None:
+                    default_settings = gm.away_team._init_strategy_settings()
+                    gm.away_team.strategy_settings = {**default_settings, **away_strategy}
+                    logging.warning(f"✅ [SIMULATE-QUARTER] Applied DB away strategy_settings to cached GameManager")
             elif away_settings.get("strategy_settings") and away_strategy:
                 logging.warning(f"⚠️ [SIMULATE-QUARTER] Skipped DB away strategy_settings (request.strategy_settings takes precedence)")
         elif mode == "franchise" and request.franchise_id:
