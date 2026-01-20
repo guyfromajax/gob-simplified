@@ -3101,33 +3101,47 @@
         const setPlayAttack = data.set_play_attack || [];
         const setPlayOutside = data.set_play_outside || [];
         
-        // Build map of frontend playId (like "motion-1") to play name
-        // The API returns plays with name, but slot assignments use frontend IDs
-        // We need to reconstruct the frontend ID mapping
+        // Build map of play IDs to play names
+        // Slot assignments may use:
+        // - Frontend IDs (like "motion-1") - legacy format
+        // - MongoDB ObjectIds (like "68fa42c33a0eec681847f886") - current format
+        // - Play names (like "5-0 Motion") - fallback
         const playIdToName = {};
         const playIdToPlay = {}; // Store full play object for focus lookup
         motionPlays.forEach((play, index) => {
           const frontendId = `motion-${index + 1}`;
-          playIdToName[frontendId] = play.name;
-          playIdToName[play.name] = play.name; // Also map name to name for direct lookup
+          playIdToName[frontendId] = play.name; // Map frontend ID
+          playIdToName[play.name] = play.name; // Map name to name
+          if (play.play_id) {
+            playIdToName[play.play_id] = play.name; // ✅ Map MongoDB ObjectId to play name
+          }
           playIdToPlay[play.name] = play;
         });
         setPlayInside.forEach((play, index) => {
           const frontendId = `set-inside-${index + 1}`;
           playIdToName[frontendId] = play.name;
           playIdToName[play.name] = play.name;
+          if (play.play_id) {
+            playIdToName[play.play_id] = play.name; // ✅ Map MongoDB ObjectId to play name
+          }
           playIdToPlay[play.name] = play;
         });
         setPlayAttack.forEach((play, index) => {
           const frontendId = `set-attack-${index + 1}`;
           playIdToName[frontendId] = play.name;
           playIdToName[play.name] = play.name;
+          if (play.play_id) {
+            playIdToName[play.play_id] = play.name; // ✅ Map MongoDB ObjectId to play name
+          }
           playIdToPlay[play.name] = play;
         });
         setPlayOutside.forEach((play, index) => {
           const frontendId = `set-outside-${index + 1}`;
           playIdToName[frontendId] = play.name;
           playIdToName[play.name] = play.name;
+          if (play.play_id) {
+            playIdToName[play.play_id] = play.name; // ✅ Map MongoDB ObjectId to play name
+          }
           playIdToPlay[play.name] = play;
         });
         
@@ -3153,14 +3167,20 @@
             let playFocus = null;
             
             if (assignment.playName) {
+              // ✅ Use playName if available (most reliable)
               playName = assignment.playName;
             } else if (assignment.playId) {
-              // Try to find play name from playId (frontend ID like "motion-1")
+              // ✅ Try to find play name from playId
+              // playId may be: frontend ID ("motion-1"), MongoDB ObjectId ("68fa42c33a0eec681847f886"), or play name
               playName = playIdToName[assignment.playId];
               if (!playName) {
-                // Fallback: try to find by matching playId as name
+                // ✅ Fallback: try to find by matching playId to play_id (MongoDB ObjectId) or name
                 const allPlays = [...motionPlays, ...setPlayInside, ...setPlayAttack, ...setPlayOutside];
-                const play = allPlays.find(p => p.name === assignment.playId);
+                const play = allPlays.find(p => 
+                  p.play_id === assignment.playId || 
+                  p.name === assignment.playId ||
+                  p.name === assignment.playName
+                );
                 playName = play ? play.name : null;
               }
             }
