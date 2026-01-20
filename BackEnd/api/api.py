@@ -2456,8 +2456,6 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 if gm is not None:
                     default_settings = gm.away_team._init_strategy_settings()
                     gm.away_team.strategy_settings = {**default_settings, **away_strategy}
-            # OLD CODE - REMOVED
-            if False:
                 home_strategy = home_settings.get("strategy_settings")
                 logging.warning(f"✅ [SIMULATE-QUARTER] Applied home strategy_settings from DB")
                 # ✅ CRITICAL FIX: If game is in cache, apply settings directly to cached GameManager
