@@ -657,10 +657,8 @@ class PlaybooksUI {
                    urlParams.get('user_team_id') || 
                    urlParams.get('home_id') || 
                    urlParams.get('away_id');
-      let gameId = urlParams.get('game_id');
-      if (!gameId && mode === 'single' && typeof localStorage !== 'undefined') {
-        gameId = localStorage.getItem('game_id');
-      }
+      // ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
+      let gameId = urlParams.get('game_id') || null;
       const tournamentId = urlParams.get('tournament_id');
       const franchiseId = urlParams.get('franchise_id');
       
