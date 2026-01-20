@@ -1167,8 +1167,8 @@ def update_gameplan(request: GamePlanUpdateRequest):
             if not actual_team_id:
                 for tid in teams.keys():
                     team_obj = teams.get(tid, {})
-                    # Match if key equals team name OR team_obj.name equals team name
-                    if tid == request.team_id or team_obj.get("name") == request.team_id:
+                    # Match if key equals team name OR team_obj.name equals team name (case-insensitive)
+                    if tid == request.team_id or (team_obj.get("name") or "").lower() == (request.team_id or "").lower():
                         actual_team_id = tid
                         break
             
@@ -1816,8 +1816,8 @@ def save_playbooks(request: PlaybookSettingsRequest):
             if not actual_team_id:
                 for tid in teams.keys():
                     team_obj = teams.get(tid, {})
-                    # Match if key equals team name OR team_obj.name equals team name
-                    if tid == request.team_id or team_obj.get("name") == request.team_id:
+                    # Match if key equals team name OR team_obj.name equals team name (case-insensitive)
+                    if tid == request.team_id or (team_obj.get("name") or "").lower() == (request.team_id or "").lower():
                         actual_team_id = tid
                         break
             
