@@ -1769,17 +1769,19 @@ def save_playbooks(request: PlaybookSettingsRequest):
             # If name matching didn't work and request.team_id looks like a team_id, try direct lookup
             if not actual_team_id and is_likely_team_id and request.team_id in teams:
                 actual_team_id = request.team_id
-                
-                # If still not found, try teams collection lookup by name
-                if not actual_team_id:
-                    team_doc = db.teams.find_one({"name": request.team_id})
-                    if team_doc:
-                        team_id_from_doc = team_doc.get("team_id")
-                        # Try to find this team_id in the document's teams
-                        for tid in teams.keys():
-                            if tid == team_id_from_doc or str(tid) == str(team_doc.get("_id")):
-                                actual_team_id = tid
-                                break
+            
+            # ✅ FIX: DB lookup and home/away fallback should run regardless of is_likely_team_id
+            # This ensures we try all resolution paths even when name matching fails
+            if not actual_team_id:
+                # Try teams collection lookup by name
+                team_doc = db.teams.find_one({"name": request.team_id})
+                if team_doc:
+                    team_id_from_doc = team_doc.get("team_id")
+                    # Try to find this team_id in the document's teams
+                    for tid in teams.keys():
+                        if tid == team_id_from_doc or str(tid) == str(team_doc.get("_id")):
+                            actual_team_id = tid
+                            break
                 
                 # If still not found, try using home_team_id/away_team_id as fallback
                 # (This handles edge cases where team name doesn't match exactly)
@@ -1793,33 +1795,33 @@ def save_playbooks(request: PlaybookSettingsRequest):
                         away_team_obj = teams.get(away_team_id, {})
                         if away_team_obj.get("name") == request.team_id:
                             actual_team_id = away_team_id
-                
-                # ✅ CRITICAL FIX: Never use request.team_id as-is if it's a team name
-                # This was causing settings to be saved to wrong key (team name instead of team_id)
-                # The game document's teams object uses team_id keys (e.g., "BENTLEY_TRUMAN"), not team names
-                # We MUST resolve to the correct team_id key that exists in the teams object
-                if not actual_team_id:
-                    logger.error(f"❌ [PLAYBOOKS SAVE] Could not resolve team name '{request.team_id}' to team_id. Available teams keys: {list(teams.keys())[:3]}")
-                    logger.error(f"❌ [PLAYBOOKS SAVE] home_team_id={home_team_id}, away_team_id={away_team_id}")
-                    # Log team names for debugging
+            
+            # ✅ CRITICAL FIX: Never use request.team_id as-is if it's a team name
+            # This was causing settings to be saved to wrong key (team name instead of team_id)
+            # The game document's teams object uses team_id keys (e.g., "BENTLEY_TRUMAN"), not team names
+            # We MUST resolve to the correct team_id key that exists in the teams object
+            if not actual_team_id:
+                logger.error(f"❌ [PLAYBOOKS SAVE] Could not resolve team name '{request.team_id}' to team_id. Available teams keys: {list(teams.keys())[:3]}")
+                logger.error(f"❌ [PLAYBOOKS SAVE] home_team_id={home_team_id}, away_team_id={away_team_id}")
+                # Log team names for debugging
+                for tid in teams.keys():
+                    team_obj = teams.get(tid, {})
+                    logger.error(f"❌ [PLAYBOOKS SAVE] Team key '{tid}': name='{team_obj.get('name')}'")
+                raise HTTPException(status_code=400, detail=f"Could not resolve team name '{request.team_id}' to team_id in game document. Available teams: {list(teams.keys())}")
+            
+            # ✅ VERIFY: Ensure actual_team_id is a valid team_id key (not a team name)
+            # Log warning if we somehow got a team name key (this shouldn't happen with proper resolution)
+            if actual_team_id in teams:
+                team_obj_check = teams.get(actual_team_id, {})
+                if team_obj_check.get("name") == actual_team_id:
+                    # This means actual_team_id is actually a team name, not a team_id - this is wrong!
+                    logger.error(f"❌ [PLAYBOOKS SAVE] ERROR: actual_team_id '{actual_team_id}' appears to be a team name, not a team_id! This will cause persistence issues.")
+                    # Try to find the correct team_id key
                     for tid in teams.keys():
-                        team_obj = teams.get(tid, {})
-                        logger.error(f"❌ [PLAYBOOKS SAVE] Team key '{tid}': name='{team_obj.get('name')}'")
-                    raise HTTPException(status_code=400, detail=f"Could not resolve team name '{request.team_id}' to team_id in game document. Available teams: {list(teams.keys())}")
-                
-                # ✅ VERIFY: Ensure actual_team_id is a valid team_id key (not a team name)
-                # Log warning if we somehow got a team name key (this shouldn't happen with proper resolution)
-                if actual_team_id in teams:
-                    team_obj_check = teams.get(actual_team_id, {})
-                    if team_obj_check.get("name") == actual_team_id:
-                        # This means actual_team_id is actually a team name, not a team_id - this is wrong!
-                        logger.error(f"❌ [PLAYBOOKS SAVE] ERROR: actual_team_id '{actual_team_id}' appears to be a team name, not a team_id! This will cause persistence issues.")
-                        # Try to find the correct team_id key
-                        for tid in teams.keys():
-                            if teams.get(tid, {}).get("name") == actual_team_id:
-                                actual_team_id = tid
-                                logger.warning(f"✅ [PLAYBOOKS SAVE] Corrected: Using team_id key '{actual_team_id}' instead of team name")
-                                break
+                        if teams.get(tid, {}).get("name") == actual_team_id:
+                            actual_team_id = tid
+                            logger.warning(f"✅ [PLAYBOOKS SAVE] Corrected: Using team_id key '{actual_team_id}' instead of team name")
+                            break
         
         logger.warning(f"🔍 [PLAYBOOKS SAVE] Resolved actual_team_id: {actual_team_id} (from request.team_id: {request.team_id})")
         
