@@ -3481,46 +3481,19 @@ def init_game(request: dict):
     if not home_team or not away_team:
         raise HTTPException(status_code=400, detail="home_team and away_team required")
     
-    # ✅ FIX: Load playbook_settings from tournament/franchise document before creating GameManager
-    # This ensures playbook_settings are stored in the initial game document
+    # ✅ SS&S: Load playbook_settings for single mode only (franchise/tournament mode loads from their documents during gameplay)
+    # For franchise/tournament mode, _load_playbook_settings() loads directly from franchise/tournament documents
+    # For single mode, we need to store them in the game document since that's where they're accessed from
     settings_start = time.time()
     home_playbook_settings = {}
     away_playbook_settings = {}
     
-    if mode == "tournament" and tournament_id:
-        home_settings = load_team_settings_from_doc(
-            mode,
-            tournament_id,
-            None,
-            home_team
-        )
-        away_settings = load_team_settings_from_doc(
-            mode,
-            tournament_id,
-            None,
-            away_team
-        )
-        if home_settings:
-            home_playbook_settings = home_settings.get("playbook_settings", {})
-        if away_settings:
-            away_playbook_settings = away_settings.get("playbook_settings", {})
-    elif mode == "franchise" and franchise_id:
-        home_settings = load_team_settings_from_doc(
-            mode,
-            franchise_id,
-            None,
-            home_team
-        )
-        away_settings = load_team_settings_from_doc(
-            mode,
-            franchise_id,
-            None,
-            away_team
-        )
-        if home_settings:
-            home_playbook_settings = home_settings.get("playbook_settings", {})
-        if away_settings:
-            away_playbook_settings = away_settings.get("playbook_settings", {})
+    # Only load playbook_settings for single mode (they'll be stored in game document)
+    # For franchise/tournament mode, settings are accessed directly from franchise/tournament documents
+    if mode == "single":
+        # For single mode, playbook_settings may be loaded from teams collection or game document
+        # They'll be stored in the game document below for persistence
+        pass
     settings_time = (time.time() - settings_start) * 1000
     
     # Generate game_id
@@ -3563,21 +3536,25 @@ def init_game(request: dict):
     elif mode == "franchise" and franchise_id:
         summary["franchise_id"] = str(franchise_id)
     
-    # ✅ FIX: Store playbook_settings in game document's teams object
-    # This ensures playbook_settings are available from the start and persist through saves
-    if "teams" not in summary:
-        summary["teams"] = {}
-    
-    home_team_id = gm.home_team.team_id
-    away_team_id = gm.away_team.team_id
-    
-    if home_team_id not in summary["teams"]:
-        summary["teams"][home_team_id] = {}
-    if away_team_id not in summary["teams"]:
-        summary["teams"][away_team_id] = {}
-    
-    summary["teams"][home_team_id]["playbook_settings"] = home_playbook_settings
-    summary["teams"][away_team_id]["playbook_settings"] = away_playbook_settings
+    # ✅ SS&S: Store playbook_settings in game document's teams object ONLY for single mode
+    # For franchise/tournament mode, settings are accessed directly from franchise/tournament documents
+    # during gameplay via _load_playbook_settings(), so no need to copy them here
+    if mode == "single":
+        if "teams" not in summary:
+            summary["teams"] = {}
+        
+        home_team_id = gm.home_team.team_id
+        away_team_id = gm.away_team.team_id
+        
+        if home_team_id not in summary["teams"]:
+            summary["teams"][home_team_id] = {}
+        if away_team_id not in summary["teams"]:
+            summary["teams"][away_team_id] = {}
+        
+        # For single mode, playbook_settings are stored in game document for persistence
+        # They may be loaded from teams collection or come from previous saves
+        summary["teams"][home_team_id]["playbook_settings"] = home_playbook_settings
+        summary["teams"][away_team_id]["playbook_settings"] = away_playbook_settings
     summary_time = (time.time() - summary_start) * 1000
     
     # Set GameManager quarter to 1 to match
