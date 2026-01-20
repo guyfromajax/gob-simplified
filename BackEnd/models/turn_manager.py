@@ -1250,8 +1250,16 @@ class TurnManager:
             return None
         
         try:
-            game_doc = games_collection.find_one({"_id": ObjectId(game_id)})
+            # ✅ FIX: Try both UUID string and ObjectId formats for game_id
+            game_doc = games_collection.find_one({"_id": game_id})
             if not game_doc:
+                try:
+                    game_doc = games_collection.find_one({"_id": ObjectId(game_id)})
+                except:
+                    pass
+            
+            if not game_doc:
+                logging.warning(f"⚠️ [LOAD PLAYBOOK] Game document not found: game_id={game_id}")
                 return None
             
             # Check if this is a tournament or franchise game
@@ -1282,23 +1290,63 @@ class TurnManager:
                 doc = game_doc
             
             if not doc:
+                logging.warning(f"⚠️ [LOAD PLAYBOOK] Mode document not found: mode={mode}, doc_id={doc_id}")
                 return None
+            
+            # ✅ PHASE 1.1: Resolve team_id to match document key format
+            # For single game mode, team_id might need resolution from team name
+            resolved_team_id = team_id
+            if mode == "single":
+                teams_obj = doc.get("teams", {})
+                # team_id is already from TeamManager.team_id, which should be correct
+                # But check if it exists in document (it should if saved correctly)
+                if team_id not in teams_obj:
+                    # Try to find by team name (fallback for legacy data)
+                    offense_team_name = offense_team.name
+                    for tid in teams_obj.keys():
+                        team_obj = teams_obj.get(tid, {})
+                        if team_obj.get("name") == offense_team_name:
+                            resolved_team_id = tid
+                            logging.warning(f"⚠️ [LOAD PLAYBOOK] Resolved team_id from name: {team_id} → {resolved_team_id}")
+                            break
             
             # Get playbook settings for the appropriate team
             if is_offense_user:
                 if mode == "franchise":
-                    team_obj = doc.get("franchise_teams", {}).get(team_id, {})
+                    team_obj = doc.get("franchise_teams", {}).get(resolved_team_id, {})
                 else:
-                    team_obj = doc.get("teams", {}).get(team_id, {})
-                return team_obj.get("playbook_settings")
+                    team_obj = doc.get("teams", {}).get(resolved_team_id, {})
+                playbook_settings = team_obj.get("playbook_settings")
+                if playbook_settings:
+                    logging.warning(f"✅ [LOAD PLAYBOOK] Loaded playbook_settings for offense team: team_id={resolved_team_id}")
+                else:
+                    logging.warning(f"⚠️ [LOAD PLAYBOOK] No playbook_settings found for offense team: team_id={resolved_team_id}")
+                return playbook_settings
             elif is_defense_user:
                 # For defense, we need the defense team's ID
                 def_team_id = defense_team.team_id
+                resolved_def_team_id = def_team_id
+                if mode == "single":
+                    teams_obj = doc.get("teams", {})
+                    if def_team_id not in teams_obj:
+                        # Try to find by team name (fallback for legacy data)
+                        defense_team_name = defense_team.name
+                        for tid in teams_obj.keys():
+                            team_obj = teams_obj.get(tid, {})
+                            if team_obj.get("name") == defense_team_name:
+                                resolved_def_team_id = tid
+                                logging.warning(f"⚠️ [LOAD PLAYBOOK] Resolved defense team_id from name: {def_team_id} → {resolved_def_team_id}")
+                                break
                 if mode == "franchise":
-                    team_obj = doc.get("franchise_teams", {}).get(def_team_id, {})
+                    team_obj = doc.get("franchise_teams", {}).get(resolved_def_team_id, {})
                 else:
-                    team_obj = doc.get("teams", {}).get(def_team_id, {})
-                return team_obj.get("playbook_settings")
+                    team_obj = doc.get("teams", {}).get(resolved_def_team_id, {})
+                playbook_settings = team_obj.get("playbook_settings")
+                if playbook_settings:
+                    logging.warning(f"✅ [LOAD PLAYBOOK] Loaded playbook_settings for defense team: team_id={resolved_def_team_id}")
+                else:
+                    logging.warning(f"⚠️ [LOAD PLAYBOOK] No playbook_settings found for defense team: team_id={resolved_def_team_id}")
+                return playbook_settings
         except Exception as e:
             logging.warning(f"⚠️ Error loading playbook settings: {e}")
             return None
