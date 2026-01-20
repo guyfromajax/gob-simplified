@@ -2173,8 +2173,57 @@ class PlaybooksUI {
         }
       });
       
-      // Include slot assignments and motion dropdowns in playbook settings
-      playbookSettings.slot_assignments = this.state.slotAssignments;
+      // ✅ FIX: Convert slot assignments to use actual play IDs/names instead of fallback identifiers
+      // Convert playId (which might be "motion-3") to actual play ID or play name
+      const convertedSlotAssignments = {};
+      Object.keys(this.state.slotAssignments).forEach(slotNum => {
+        const assignment = this.state.slotAssignments[slotNum];
+        if (!assignment) return;
+        
+        let actualPlayId = assignment.playId;
+        let playName = null;
+        
+        // Try to find the actual play from play data
+        if (assignment.section === 'motion') {
+          const play = this.playData.motion?.find(p => {
+            // Check if playId matches actual play.id, or if it's a fallback like "motion-3"
+            return p.id === assignment.playId || 
+                   (assignment.playId.startsWith('motion-') && this.playData.motion?.indexOf(p) === parseInt(assignment.playId.replace('motion-', '')) - 1);
+          });
+          if (play) {
+            actualPlayId = play.id || play.name;
+            playName = play.name;
+          }
+        } else if (assignment.section === 'set-play-inside') {
+          const play = this.playData.set_play_inside?.find(p => p.id === assignment.playId);
+          if (play) {
+            actualPlayId = play.id || play.name;
+            playName = play.name;
+          }
+        } else if (assignment.section === 'set-play-attack') {
+          const play = this.playData.set_play_attack?.find(p => p.id === assignment.playId);
+          if (play) {
+            actualPlayId = play.id || play.name;
+            playName = play.name;
+          }
+        } else if (assignment.section === 'set-play-outside') {
+          const play = this.playData.set_play_outside?.find(p => p.id === assignment.playId);
+          if (play) {
+            actualPlayId = play.id || play.name;
+            playName = play.name;
+          }
+        }
+        
+        // Save with actual play ID/name and playName for backward compatibility
+        convertedSlotAssignments[slotNum] = {
+          section: assignment.section,
+          playId: actualPlayId || assignment.playId, // Use actual play ID if found, otherwise keep original
+          playName: playName || assignment.playName || actualPlayId, // Include playName for clarity
+          ...(assignment.dropdown ? { dropdown: assignment.dropdown } : {})
+        };
+      });
+      
+      playbookSettings.slot_assignments = convertedSlotAssignments;
       playbookSettings.motion_dropdowns = this.state.motionDropdowns;
       
       // Include man_defense percentages (was missing before)
