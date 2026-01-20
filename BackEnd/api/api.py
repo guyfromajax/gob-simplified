@@ -1538,6 +1538,13 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         # ✅ CRITICAL FIX: If game is in cache and no request.strategy_settings provided, load from DB
         # This ensures settings saved pre-game are applied to cached games (e.g., init-game → save settings → simulate-quarter)
         mode = request.mode or "single"
+        
+        # ✅ DIAGNOSTIC: Log why settings loading might be skipped
+        if gm is not None:
+            logging.warning(f"🔍 [APPLY-SETTINGS] Condition check: gm is not None={gm is not None}, not request.strategy_settings={not request.strategy_settings}, mode={mode}, request.game_id={bool(request.game_id)}")
+            if request.strategy_settings:
+                logging.warning(f"🔍 [APPLY-SETTINGS] request.strategy_settings is present: {bool(request.strategy_settings)}, type={type(request.strategy_settings)}")
+        
         if gm is not None and not request.strategy_settings and mode == "single" and request.game_id:
             home_settings = load_team_settings_from_doc(
                 mode,
@@ -1566,6 +1573,14 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             else:
                 logging.warning(f"⚠️ [APPLY-SETTINGS] No DB home strategy_settings to apply (home_settings={bool(home_settings)}, has_strategy={bool(home_settings.get('strategy_settings') if home_settings else False)})")
             
+            # ✅ CRITICAL FIX: Also apply playbook_settings to GameManager
+            if home_settings and home_settings.get("playbook_settings"):
+                db_slots = len(home_settings.get("playbook_settings", {}).get("slot_assignments", {}))
+                gm.home_team.playbook_settings = home_settings.get("playbook_settings")
+                logging.warning(f"✅ [APPLY-SETTINGS] Applied DB home playbook_settings: slot_assignments={db_slots}")
+            else:
+                logging.warning(f"⚠️ [APPLY-SETTINGS] No DB home playbook_settings to apply (home_settings={bool(home_settings)}, has_playbook={bool(home_settings.get('playbook_settings') if home_settings else False)})")
+            
             if away_settings and away_settings.get("strategy_settings"):
                 db_inside = away_settings.get("strategy_settings", {}).get("inside", "MISSING")
                 default_settings = gm.away_team._init_strategy_settings()
@@ -1574,6 +1589,14 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 logging.warning(f"✅ [APPLY-SETTINGS] Applied DB away strategy_settings: DB inside={db_inside}, GameManager before={away_before}, after={away_after}")
             else:
                 logging.warning(f"⚠️ [APPLY-SETTINGS] No DB away strategy_settings to apply (away_settings={bool(away_settings)}, has_strategy={bool(away_settings.get('strategy_settings') if away_settings else False)})")
+            
+            # ✅ CRITICAL FIX: Also apply playbook_settings to GameManager
+            if away_settings and away_settings.get("playbook_settings"):
+                db_slots = len(away_settings.get("playbook_settings", {}).get("slot_assignments", {}))
+                gm.away_team.playbook_settings = away_settings.get("playbook_settings")
+                logging.warning(f"✅ [APPLY-SETTINGS] Applied DB away playbook_settings: slot_assignments={db_slots}")
+            else:
+                logging.warning(f"⚠️ [APPLY-SETTINGS] No DB away playbook_settings to apply (away_settings={bool(away_settings)}, has_playbook={bool(away_settings.get('playbook_settings') if away_settings else False)})")
         
         # ✅ TIMEOUT RESUME: Unified state restoration (works for all modes and all paths)
         # Only check database for timeout state if we have a game_id (existing game, not new game start)
