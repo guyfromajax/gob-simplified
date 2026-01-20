@@ -2188,20 +2188,21 @@ class PlaybooksUI {
         const sectionData = this.state.sections[assignment.section];
         if (sectionData && sectionData[assignment.playId]) {
           // playId exists in sections, so it's likely already correct
-          // But we still need to get the play name from playData
+          // But we still need to get the play name and play_id from playData
           let play = null;
           if (assignment.section === 'motion') {
-            play = this.playData.motion?.find(p => p.id === assignment.playId || p.name === assignment.playId);
+            play = this.playData.motion?.find(p => p.id === assignment.playId || p.play_id === assignment.playId || p.name === assignment.playId);
           } else if (assignment.section === 'set-play-inside') {
-            play = this.playData.set_play_inside?.find(p => p.id === assignment.playId || p.name === assignment.playId);
+            play = this.playData.set_play_inside?.find(p => p.id === assignment.playId || p.play_id === assignment.playId || p.name === assignment.playId);
           } else if (assignment.section === 'set-play-attack') {
-            play = this.playData.set_play_attack?.find(p => p.id === assignment.playId || p.name === assignment.playId);
+            play = this.playData.set_play_attack?.find(p => p.id === assignment.playId || p.play_id === assignment.playId || p.name === assignment.playId);
           } else if (assignment.section === 'set-play-outside') {
-            play = this.playData.set_play_outside?.find(p => p.id === assignment.playId || p.name === assignment.playId);
+            play = this.playData.set_play_outside?.find(p => p.id === assignment.playId || p.play_id === assignment.playId || p.name === assignment.playId);
           }
           
           if (play) {
-            actualPlayId = play.id || play.name;
+            // Use play_id (MongoDB ObjectId) if available, otherwise use name
+            actualPlayId = play.play_id || play.id || play.name;
             playName = play.name;
           }
         } else if (assignment.playId.startsWith('motion-')) {
@@ -2209,33 +2210,36 @@ class PlaybooksUI {
           const index = parseInt(assignment.playId.replace('motion-', '')) - 1;
           if (this.playData.motion && this.playData.motion[index]) {
             const play = this.playData.motion[index];
-            actualPlayId = play.id || play.name;
+            // Use play_id (MongoDB ObjectId) if available, otherwise use name
+            actualPlayId = play.play_id || play.id || play.name;
             playName = play.name;
           }
         } else {
-          // Try to find play by matching playId to play.id or play.name
+          // Try to find play by matching playId to play.id, play.play_id, or play.name
           let play = null;
           if (assignment.section === 'motion') {
-            play = this.playData.motion?.find(p => p.id === assignment.playId || p.name === assignment.playId);
+            play = this.playData.motion?.find(p => p.id === assignment.playId || p.play_id === assignment.playId || p.name === assignment.playId);
           } else if (assignment.section === 'set-play-inside') {
-            play = this.playData.set_play_inside?.find(p => p.id === assignment.playId || p.name === assignment.playId);
+            play = this.playData.set_play_inside?.find(p => p.id === assignment.playId || p.play_id === assignment.playId || p.name === assignment.playId);
           } else if (assignment.section === 'set-play-attack') {
-            play = this.playData.set_play_attack?.find(p => p.id === assignment.playId || p.name === assignment.playId);
+            play = this.playData.set_play_attack?.find(p => p.id === assignment.playId || p.play_id === assignment.playId || p.name === assignment.playId);
           } else if (assignment.section === 'set-play-outside') {
-            play = this.playData.set_play_outside?.find(p => p.id === assignment.playId || p.name === assignment.playId);
+            play = this.playData.set_play_outside?.find(p => p.id === assignment.playId || p.play_id === assignment.playId || p.name === assignment.playId);
           }
           
           if (play) {
-            actualPlayId = play.id || play.name;
+            // Use play_id (MongoDB ObjectId) if available, otherwise use name
+            actualPlayId = play.play_id || play.id || play.name;
             playName = play.name;
           }
         }
         
-        // Save with actual play ID/name and playName for backward compatibility
+        // ✅ Save with actual play_id (MongoDB ObjectId) if available, otherwise use play name
+        // This ensures slot assignments reference the universal plays collection correctly
         convertedSlotAssignments[slotNum] = {
           section: assignment.section,
-          playId: actualPlayId || assignment.playId, // Use actual play ID if found, otherwise keep original
-          playName: playName || assignment.playName || actualPlayId, // Include playName for clarity
+          playId: actualPlayId || assignment.playId, // Use play_id (ObjectId) if found, otherwise play name
+          playName: playName || assignment.playName || actualPlayId, // Include playName for human readability
           ...(assignment.dropdown ? { dropdown: assignment.dropdown } : {})
         };
       });
