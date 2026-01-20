@@ -1754,7 +1754,9 @@ def save_playbooks(request: PlaybookSettingsRequest):
             actual_team_id = None
             
             # Step 1: Try direct key match (if request.team_id is already a team_id key)
-            if request.team_id in teams:
+            # ✅ CRITICAL: Only match if it looks like a team_id (uppercase, underscores)
+            # This prevents matching legacy team name keys (e.g., "South Lancaster")
+            if request.team_id in teams and (request.team_id.isupper() and "_" in request.team_id):
                 actual_team_id = request.team_id
             
             # Step 2: If not found, iterate through teams to find by name match
