@@ -1787,10 +1787,17 @@ def save_playbooks(request: PlaybookSettingsRequest):
                         if away_team_obj.get("name") == request.team_id:
                             actual_team_id = away_team_id
                 
-                # Final fallback: use request.team_id as-is (might be team_id already)
+                # ✅ CRITICAL FIX: Never use request.team_id as-is if it's a team name
+                # This was causing settings to be saved to wrong key (team name instead of team_id)
+                # The game document's teams object uses team_id keys (e.g., "BENTLEY_TRUMAN"), not team names
                 if not actual_team_id:
-                    actual_team_id = request.team_id
-                    logger.warning(f"⚠️ [PLAYBOOKS SAVE] Could not resolve team name '{request.team_id}' to team_id, using as-is")
+                    logger.error(f"❌ [PLAYBOOKS SAVE] Could not resolve team name '{request.team_id}' to team_id. Available teams keys: {list(teams.keys())[:3]}")
+                    logger.error(f"❌ [PLAYBOOKS SAVE] home_team_id={home_team_id}, away_team_id={away_team_id}")
+                    # Log team names for debugging
+                    for tid in teams.keys():
+                        team_obj = teams.get(tid, {})
+                        logger.error(f"❌ [PLAYBOOKS SAVE] Team key '{tid}': name='{team_obj.get('name')}'")
+                    raise HTTPException(status_code=400, detail=f"Could not resolve team name '{request.team_id}' to team_id in game document. Available teams: {list(teams.keys())}")
         
         logger.warning(f"🔍 [PLAYBOOKS SAVE] Resolved actual_team_id: {actual_team_id} (from request.team_id: {request.team_id})")
         
