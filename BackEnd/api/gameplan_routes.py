@@ -1163,22 +1163,27 @@ def update_gameplan(request: GamePlanUpdateRequest):
                 actual_team_id = request.team_id
             
             # Step 2: If not found, iterate through teams to find by name match
+            # ✅ FIX: Also check if key itself matches (handles legacy team name keys)
             if not actual_team_id:
                 for tid in teams.keys():
                     team_obj = teams.get(tid, {})
-                    if team_obj.get("name") == request.team_id:
+                    # Match if key equals team name OR team_obj.name equals team name
+                    if tid == request.team_id or team_obj.get("name") == request.team_id:
                         actual_team_id = tid
                         break
             
             # Step 3: If still not found, try home/away fallback (only if they exist in teams)
+            # ✅ FIX: Also check if key itself matches (handles legacy team name keys)
             if not actual_team_id:
                 if home_team_id and home_team_id in teams:
                     home_team_obj = teams.get(home_team_id, {})
-                    if home_team_obj.get("name") == request.team_id:
+                    # Match if key equals team name OR team_obj.name equals team name
+                    if home_team_id == request.team_id or home_team_obj.get("name") == request.team_id:
                         actual_team_id = home_team_id
                 if not actual_team_id and away_team_id and away_team_id in teams:
                     away_team_obj = teams.get(away_team_id, {})
-                    if away_team_obj.get("name") == request.team_id:
+                    # Match if key equals team name OR team_obj.name equals team name
+                    if away_team_id == request.team_id or away_team_obj.get("name") == request.team_id:
                         actual_team_id = away_team_id
             
             # Step 4: Fail loudly if resolution failed
@@ -1807,22 +1812,27 @@ def save_playbooks(request: PlaybookSettingsRequest):
                 actual_team_id = request.team_id
             
             # Step 2: If not found, iterate through teams to find by name match
+            # ✅ FIX: Also check if key itself matches (handles legacy team name keys)
             if not actual_team_id:
                 for tid in teams.keys():
                     team_obj = teams.get(tid, {})
-                    if team_obj.get("name") == request.team_id:
+                    # Match if key equals team name OR team_obj.name equals team name
+                    if tid == request.team_id or team_obj.get("name") == request.team_id:
                         actual_team_id = tid
                         break
             
             # Step 3: If still not found, try home/away fallback (only if they exist in teams)
+            # ✅ FIX: Also check if key itself matches (handles legacy team name keys)
             if not actual_team_id:
                 if home_team_id and home_team_id in teams:
                     home_team_obj = teams.get(home_team_id, {})
-                    if home_team_obj.get("name") == request.team_id:
+                    # Match if key equals team name OR team_obj.name equals team name
+                    if home_team_id == request.team_id or home_team_obj.get("name") == request.team_id:
                         actual_team_id = home_team_id
                 if not actual_team_id and away_team_id and away_team_id in teams:
                     away_team_obj = teams.get(away_team_id, {})
-                    if away_team_obj.get("name") == request.team_id:
+                    # Match if key equals team name OR team_obj.name equals team name
+                    if away_team_id == request.team_id or away_team_obj.get("name") == request.team_id:
                         actual_team_id = away_team_id
             
             # Step 4: Fail loudly if resolution failed
