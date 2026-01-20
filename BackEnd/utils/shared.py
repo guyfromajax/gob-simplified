@@ -969,9 +969,14 @@ def summarize_game_state(game, exclude_animations=True):
                     away_playbook_settings = away_team_data.get("playbook_settings", {})
                 
                 if home_playbook_settings or away_playbook_settings:
-                    logging.info(f"✅ Preserved playbook_settings: home={bool(home_playbook_settings)} (key={home_actual_team_id}), away={bool(away_playbook_settings)} (key={away_actual_team_id})")
+                    logging.info(f"✅ [PLAYBOOK SETTINGS SAVE] Preserved playbook_settings: home={bool(home_playbook_settings)} (key={home_actual_team_id}), away={bool(away_playbook_settings)} (key={away_actual_team_id})")
+                    if home_playbook_settings:
+                        logging.info(f"🔍 [PLAYBOOK SETTINGS SAVE] Home settings keys: {list(home_playbook_settings.keys())[:5]}")
+                    if away_playbook_settings:
+                        logging.info(f"🔍 [PLAYBOOK SETTINGS SAVE] Away settings keys: {list(away_playbook_settings.keys())[:5]}")
                 else:
-                    logging.warning(f"⚠️ No playbook_settings found in database: teams keys={list(teams.keys())[:3]}, home_team.name={game.home_team.name}, away_team.name={game.away_team.name}")
+                    logging.warning(f"⚠️ [PLAYBOOK SETTINGS SAVE] No playbook_settings found in database: teams keys={list(teams.keys())[:3]}, home_team.name={game.home_team.name}, away_team.name={game.away_team.name}")
+                    logging.warning(f"⚠️ [PLAYBOOK SETTINGS SAVE] home_actual_team_id={home_actual_team_id}, away_actual_team_id={away_actual_team_id}")
         except Exception as e:
             # If we can't load playbook_settings, continue without them (non-critical)
             logging.warning(f"⚠️ Could not preserve playbook_settings from database: {e}", exc_info=True)
