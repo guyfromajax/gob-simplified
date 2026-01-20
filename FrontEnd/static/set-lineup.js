@@ -140,6 +140,12 @@ async function loadRoster() {
         mode: mode
       };
       
+      // ✅ CRITICAL: Pass user_team_side to init-game so GameManager can set is_user_team flags
+      // This ensures user team settings are protected from autoset_strategy_settings()
+      if (myTeamSide) {
+        initPayload.user_team_side = myTeamSide; // "home" or "away"
+      }
+      
       // Add mode-specific IDs for playbook settings persistence
       if (mode === 'tournament' && tournamentId) {
         initPayload.tournament_id = tournamentId;
