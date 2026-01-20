@@ -2368,11 +2368,22 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 None,
                 request.away_team
             )
+            # ✅ DEBUG: Log what we loaded
+            logging.warning(f"🔍 [SIMULATE-QUARTER] Loaded settings - home_strategy={bool(home_strategy)}, home_settings={bool(home_settings.get('strategy_settings'))}, away_strategy={bool(away_strategy)}, away_settings={bool(away_settings.get('strategy_settings'))}")
+            if home_settings.get("strategy_settings"):
+                sample = dict(list(home_settings.get("strategy_settings", {}).items())[:3])
+                logging.warning(f"🔍 [SIMULATE-QUARTER] Home settings sample: {sample}")
             # Override strategy_settings if loaded from game document (unless request has them)
             if home_settings.get("strategy_settings") and not home_strategy:
                 home_strategy = home_settings.get("strategy_settings")
+                logging.warning(f"✅ [SIMULATE-QUARTER] Applied home strategy_settings from DB")
+            elif home_settings.get("strategy_settings") and home_strategy:
+                logging.warning(f"⚠️ [SIMULATE-QUARTER] Skipped DB home strategy_settings (request.strategy_settings takes precedence)")
             if away_settings.get("strategy_settings") and not away_strategy:
                 away_strategy = away_settings.get("strategy_settings")
+                logging.warning(f"✅ [SIMULATE-QUARTER] Applied away strategy_settings from DB")
+            elif away_settings.get("strategy_settings") and away_strategy:
+                logging.warning(f"⚠️ [SIMULATE-QUARTER] Skipped DB away strategy_settings (request.strategy_settings takes precedence)")
         elif mode == "franchise" and request.franchise_id:
             # Load team attributes from franchise document
             home_attrs = load_team_attributes_from_doc(
