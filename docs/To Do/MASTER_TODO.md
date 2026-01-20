@@ -27,7 +27,29 @@
 
 ## ⚠️ In Progress / Needs Verification
 
-### 1. Frontend Performance Fix Plan
+### 1. Sunset Use of Team Name Keys
+**Status:** 🔄 IN PROGRESS  
+**Priority:** 🟡 MEDIUM - Reduces complexity and prevents bugs  
+**Related Bug:** Playbook settings not persisting through timeouts
+
+**Problem:** Game documents use `team_id` keys (e.g., "BENTLEY_TRUMAN") in the `teams` object, but some code paths were saving/reading using team name keys (e.g., "Bentley-Truman"), causing key mismatches and persistence issues.
+
+**Completed:**
+- ✅ Updated `save_playbooks()` to always resolve to team_id (no fallback to team name)
+- ✅ Added temporary fallback in `summarize_game_state()` to read from both team_id and team name keys (backward compatibility)
+
+**Remaining:**
+- ⏳ Migrate existing game documents with team name keys to team_id keys
+- ⏳ Remove temporary fallback logic once all documents are migrated
+- ⏳ Verify all code paths use team_id keys consistently
+
+**Files:**
+- `BackEnd/api/gameplan_routes.py` - `save_playbooks()` function
+- `BackEnd/utils/shared.py` - `summarize_game_state()` function
+
+---
+
+### 2. Frontend Performance Fix Plan
 **Status:** ⏳ IN PROGRESS  
 **Priority:** 🔴 CRITICAL - Blocking user experience  
 **Document:** `frontend_performance_fix_plan.md`
