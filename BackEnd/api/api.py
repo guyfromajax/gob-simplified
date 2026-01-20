@@ -1636,20 +1636,13 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             except Exception as e:
                                 logging.error(f"❌ [STRATEGY SETTINGS] Error processing strategy_settings from request: {e}, using DB settings", exc_info=True)
                         
-                        # ✅ CRITICAL FIX: Apply DB strategy_settings to GameManager objects if request was invalid/missing
-                        # This ensures DB settings are actually used when request.strategy_settings is invalid
-                        if not (request.strategy_settings and request.user_team_side and isinstance(request.strategy_settings, dict) and all(key in request.strategy_settings for key in ['offense', 'inside', 'attack', 'outside', 'tempo', 'defense', 'aggression', 'hc_trap', 'fc_press', 'rebounding'])):
-                            # Request is invalid - apply DB settings to GameManager objects
-                            if home_strategy:
-                                gm.home_team.strategy_settings = dict(home_strategy)
-                                logging.info(f"✅ [STRATEGY SETTINGS] Applied DB home_strategy to GameManager (request was invalid)")
-                            if away_strategy:
-                                gm.away_team.strategy_settings = dict(away_strategy)
-                                logging.info(f"✅ [STRATEGY SETTINGS] Applied DB away_strategy to GameManager (request was invalid)")
-                        
                         # Debug logging removed - was cluttering logs
                         # logging.debug(f"🔧 LOADING FROM DB - home_strategy={home_strategy}, away_strategy={away_strategy}")
                         
+                        # ✅ CRITICAL: Pass DB strategy_settings to GameManager constructor
+                        # If request was invalid/missing, home_strategy/away_strategy already contain DB settings
+                        # If request was valid, home_strategy/away_strategy contain request settings
+                        # GameManager constructor will apply these settings correctly
                         gm = GameManager(
                             home, 
                             away,
