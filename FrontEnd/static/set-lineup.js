@@ -1143,8 +1143,60 @@ async function init() {
   const gameplanBtn = document.getElementById('gameplan-optional');
   console.log('🔍 Game Plan button found:', gameplanBtn);
   if (gameplanBtn) {
-    gameplanBtn.addEventListener('click', () => {
+    gameplanBtn.addEventListener('click', async () => {
       console.log('🎮 GAME PLAN BUTTON CLICKED! Redirecting to game-plan.html');
+      
+      // ✅ PHASE 1.1: Ensure game_id exists before navigating (init-game might be in progress)
+      // Read from current URL (might be updated by init-game) and also check local gameId variable
+      const currentUrlParams = new URLSearchParams(window.location.search);
+      let currentGameId = currentUrlParams.get('game_id') || gameId; // Use local gameId variable if URL doesn't have it yet
+      const resumeFromTimeout = currentUrlParams.get('resume_from_timeout') === 'true';
+      
+      // ✅ PHASE 1.1: If game_id doesn't exist yet, wait for init-game to complete
+      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout) {
+        console.log('⏳ [SET-LINEUP] game_id not found, waiting for init-game to complete...');
+        
+        try {
+          const mode = modeParam || 'single';
+          const initPayload = {
+            home_team: homeTeam,
+            away_team: awayTeam,
+            mode: mode
+          };
+          
+          if (mode === 'tournament' && tournamentId) {
+            initPayload.tournament_id = tournamentId;
+          } else if (mode === 'franchise' && franchiseId) {
+            initPayload.franchise_id = franchiseId;
+          }
+          
+          const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(initPayload)
+          });
+          
+          if (initRes.ok) {
+            const initData = await initRes.json();
+            currentGameId = initData.game_id;
+            console.log(`✅ [SET-LINEUP] Initialized game_id for Game Plan: ${currentGameId}`);
+            
+            // Update URL with game_id
+            currentUrlParams.set('game_id', currentGameId);
+            if (typeof history !== 'undefined' && history.replaceState) {
+              history.replaceState(null, '', `${window.location.pathname}?${currentUrlParams.toString()}`);
+            }
+          } else {
+            console.error('❌ [SET-LINEUP] Failed to initialize game for Game Plan navigation');
+            alert('Failed to initialize game. Please try again.');
+            return;
+          }
+        } catch (err) {
+          console.error('❌ [SET-LINEUP] Error initializing game for Game Plan navigation:', err);
+          alert('Failed to initialize game. Please try again.');
+          return;
+        }
+      }
       
       // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
       const helper = window.TimeoutNavigationHelper;
@@ -1153,14 +1205,12 @@ async function init() {
         return;
       }
       
-      const currentGameId = helper.getGameId(urlParams);
-      const resumeFromTimeout = helper.getResumeFromTimeout(urlParams);
-      
+      // Use current URL params (might have been updated by init-game)
       const params = helper.buildGameNavigationParams({
-        sourceParams: urlParams,
+        sourceParams: currentUrlParams,
         targetQuarter: quarter,
         gameId: currentGameId,
-        resumeFromTimeout: resumeFromTimeout, // ✅ SS&S: Supports any quarter (backend supports this)
+        resumeFromTimeout: resumeFromTimeout,
         lineup: lineup,
         myTeamSide: myTeamSide
       });
