@@ -1210,15 +1210,23 @@ def update_gameplan(request: GamePlanUpdateRequest):
             tournament_doc=doc if request.mode == "tournament" else None
         )
         
+        # ✅ DIAGNOSTIC: Log what strategy_settings we're about to save
+        strategy_sample = dict(list(request.strategy_settings.items())[:5]) if request.strategy_settings else {}
+        logger.warning(f"💾 [SAVE-GAMEPLAN] About to save strategy_settings for team {actual_team_id}: sample={strategy_sample}")
+        
         # Update settings in the appropriate document
         if request.mode == "franchise":
+            update_path = f"franchise_teams.{actual_team_id}.strategy_settings"
             update_fields = {
-                f"franchise_teams.{actual_team_id}.strategy_settings": request.strategy_settings
+                update_path: request.strategy_settings
             }
         else:
+            update_path = f"teams.{actual_team_id}.strategy_settings"
             update_fields = {
-                f"teams.{actual_team_id}.strategy_settings": request.strategy_settings
+                update_path: request.strategy_settings
             }
+        
+        logger.warning(f"💾 [SAVE-GAMEPLAN] Update path: {update_path}, doc_id={doc_id}, mode={request.mode}")
         
         # Handle different ID formats for different modes
         if request.mode == "single":
@@ -1226,11 +1234,47 @@ def update_gameplan(request: GamePlanUpdateRequest):
                 {"_id": doc_id},
                 {"$set": update_fields}
             )
+            # If not found, try as ObjectId
+            if result.matched_count == 0:
+                try:
+                    result = collection.update_one(
+                        {"_id": ObjectId(doc_id)},
+                        {"$set": update_fields}
+                    )
+                except:
+                    pass
         else:
             result = collection.update_one(
                 {"_id": ObjectId(doc_id)},
                 {"$set": update_fields}
             )
+        
+        # ✅ DIAGNOSTIC: Log DB write result
+        if result and result.matched_count > 0:
+            logger.warning(f"✅ [SAVE-GAMEPLAN] DB write SUCCESS: matched={result.matched_count}, modified={result.modified_count}")
+            
+            # ✅ DIAGNOSTIC: Verify settings were actually saved
+            verify_doc = collection.find_one({"_id": doc_id if request.mode == "single" else ObjectId(doc_id)}, {update_path: 1})
+            if verify_doc:
+                if request.mode == "franchise":
+                    saved_settings = verify_doc.get("franchise_teams", {}).get(actual_team_id, {}).get("strategy_settings")
+                else:
+                    saved_settings = verify_doc.get("teams", {}).get(actual_team_id, {}).get("strategy_settings")
+                
+                if saved_settings:
+                    saved_sample = dict(list(saved_settings.items())[:5])
+                    logger.warning(f"✅ [SAVE-GAMEPLAN] VERIFIED: Settings saved to DB: sample={saved_sample}")
+                    # Verify key values match
+                    if saved_settings.get("inside") == request.strategy_settings.get("inside"):
+                        logger.warning(f"✅ [SAVE-GAMEPLAN] VERIFIED: inside value matches: {saved_settings.get('inside')}")
+                    else:
+                        logger.error(f"❌ [SAVE-GAMEPLAN] VERIFICATION FAILED: inside mismatch! saved={saved_settings.get('inside')}, requested={request.strategy_settings.get('inside')}")
+                else:
+                    logger.error(f"❌ [SAVE-GAMEPLAN] VERIFICATION FAILED: No strategy_settings found in saved document")
+            else:
+                logger.error(f"❌ [SAVE-GAMEPLAN] VERIFICATION FAILED: Could not read back saved document")
+        else:
+            logger.error(f"❌ [SAVE-GAMEPLAN] DB write FAILED: matched={result.matched_count if result else 0}, doc_id={doc_id}")
         
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} not found")
@@ -1854,6 +1898,15 @@ def save_playbooks(request: PlaybookSettingsRequest):
         
         logger.warning(f"🔍 [PLAYBOOKS SAVE] Resolved actual_team_id: {actual_team_id} (from request.team_id: {request.team_id})")
         
+        # ✅ DIAGNOSTIC: Log slot_assignments being saved
+        if request.playbook_settings and request.playbook_settings.get("slot_assignments"):
+            slot_count = len(request.playbook_settings.get("slot_assignments", {}))
+            logger.warning(f"📋 [SAVE-PLAYBOOKS] Saving {slot_count} slot assignments for team {actual_team_id}")
+            # Log sample slot assignment
+            sample_slot = next(iter(request.playbook_settings.get("slot_assignments", {}).values()), None)
+            if sample_slot:
+                logger.warning(f"📋 [SAVE-PLAYBOOKS] Sample slot assignment: section={sample_slot.get('section')}, playId={sample_slot.get('playId')}, playName={sample_slot.get('playName')}")
+        
         # ✅ FIX: Ensure team objects exist AFTER resolving actual_team_id
         # This ensures we're using the correct team_id when creating/updating team objects
         ensure_team_objects_exist(
@@ -1903,6 +1956,10 @@ def save_playbooks(request: PlaybookSettingsRequest):
         logger.warning(f"🔍 [PLAYBOOKS SAVE] actual_team_id: {actual_team_id}")
         logger.warning(f"🔍 [PLAYBOOKS SAVE] doc_id: {doc_id}")
         
+        # ✅ DIAGNOSTIC: Log what we're about to write to DB
+        logger.warning(f"💾 [SAVE-PLAYBOOKS] About to write to DB: update_path={update_path}, doc_id={doc_id}, mode={request.mode}")
+        logger.warning(f"💾 [SAVE-PLAYBOOKS] Settings structure: slot_assignments={bool(request.playbook_settings.get('slot_assignments'))}, motion={bool(request.playbook_settings.get('motion'))}, set_play_inside={bool(request.playbook_settings.get('set_play_inside'))}")
+        
         # For single game mode, try both UUID string and ObjectId formats
         if request.mode == "single":
             # ✅ SINGLE GAME CROSS-INSTANCE PERSISTENCE: Save to both game document AND core teams collection
@@ -1922,6 +1979,12 @@ def save_playbooks(request: PlaybookSettingsRequest):
                     )
                 except:
                     pass
+            
+            # ✅ DIAGNOSTIC: Log DB write result
+            if result and result.matched_count > 0:
+                logger.warning(f"✅ [SAVE-PLAYBOOKS] DB write SUCCESS: matched={result.matched_count}, modified={result.modified_count}")
+            else:
+                logger.error(f"❌ [SAVE-PLAYBOOKS] DB write FAILED: matched={result.matched_count if result else 0}, doc_id={doc_id}")
             
             # 2. Save to core teams collection (for cross-instance persistence)
             # Resolve team_id to ObjectId for teams collection lookup
