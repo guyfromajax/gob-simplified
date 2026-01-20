@@ -1004,7 +1004,13 @@ def summarize_game_state(game, exclude_animations=True):
                 # This provides backward compatibility for existing games that have settings under team name keys
                 if home_actual_team_id:
                     home_team_data = teams.get(home_actual_team_id, {})
+                    logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] home_team_data keys: {list(home_team_data.keys()) if isinstance(home_team_data, dict) else 'NOT_DICT'}")
+                    logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] home_team_data has playbook_settings: {bool(home_team_data.get('playbook_settings'))}")
                     home_playbook_settings = home_team_data.get("playbook_settings", {})
+                    if home_playbook_settings:
+                        logging.warning(f"✅ [PLAYBOOK SETTINGS DEBUG] Found home playbook_settings with keys: {list(home_playbook_settings.keys())[:5]}")
+                    else:
+                        logging.warning(f"⚠️ [PLAYBOOK SETTINGS DEBUG] NO home playbook_settings found under key '{home_actual_team_id}'")
                     # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
                     # This handles legacy saves where settings were saved under team name keys
                     if not home_playbook_settings:
@@ -1019,7 +1025,13 @@ def summarize_game_state(game, exclude_animations=True):
                                     break
                 if away_actual_team_id:
                     away_team_data = teams.get(away_actual_team_id, {})
+                    logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] away_team_data keys: {list(away_team_data.keys()) if isinstance(away_team_data, dict) else 'NOT_DICT'}")
+                    logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] away_team_data has playbook_settings: {bool(away_team_data.get('playbook_settings'))}")
                     away_playbook_settings = away_team_data.get("playbook_settings", {})
+                    if away_playbook_settings:
+                        logging.warning(f"✅ [PLAYBOOK SETTINGS DEBUG] Found away playbook_settings with keys: {list(away_playbook_settings.keys())[:5]}")
+                    else:
+                        logging.warning(f"⚠️ [PLAYBOOK SETTINGS DEBUG] NO away playbook_settings found under key '{away_actual_team_id}'")
                     # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
                     if not away_playbook_settings:
                         # Try to find by team name (legacy format)
