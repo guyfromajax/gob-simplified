@@ -1563,6 +1563,18 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         home_playbook_settings = home_team_data.get("playbook_settings", {})
                         away_playbook_settings = away_team_data.get("playbook_settings", {})
                         
+                        # ✅ DEBUG: Log playbook_settings extraction
+                        logging.warning(f"🔍 [PLAYBOOK SETTINGS LOAD] Extracted from DB: home={bool(home_playbook_settings)} (key={home_team_id}), away={bool(away_playbook_settings)} (key={away_team_id})")
+                        if home_playbook_settings:
+                            logging.warning(f"🔍 [PLAYBOOK SETTINGS LOAD] Home settings keys: {list(home_playbook_settings.keys())[:5]}")
+                            logging.warning(f"🔍 [PLAYBOOK SETTINGS LOAD] Home settings sample: motion={bool(home_playbook_settings.get('motion'))}, set_play_inside={bool(home_playbook_settings.get('set_play_inside'))}")
+                        if away_playbook_settings:
+                            logging.warning(f"🔍 [PLAYBOOK SETTINGS LOAD] Away settings keys: {list(away_playbook_settings.keys())[:5]}")
+                            logging.warning(f"🔍 [PLAYBOOK SETTINGS LOAD] Away settings sample: motion={bool(away_playbook_settings.get('motion'))}, set_play_inside={bool(away_playbook_settings.get('set_play_inside'))}")
+                        if not home_playbook_settings and not away_playbook_settings:
+                            logging.warning(f"⚠️ [PLAYBOOK SETTINGS LOAD] No playbook_settings found in DB: home_team_id={home_team_id}, away_team_id={away_team_id}")
+                            logging.warning(f"⚠️ [PLAYBOOK SETTINGS LOAD] teams_obj keys: {list(teams_obj.keys())[:3] if teams_obj else 'NO_TEAMS_OBJ'}")
+                        
                         # ✅ CRITICAL FIX: Restore playbook_settings to game document after GameManager creation
                         # This ensures playbook_settings persist when navigating to Playbooks page during timeout
                         # Note: playbook_settings are stored in game document (not TeamManager objects)
@@ -1624,6 +1636,17 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             except Exception as e:
                                 logging.error(f"❌ [STRATEGY SETTINGS] Error processing strategy_settings from request: {e}, using DB settings", exc_info=True)
                         
+                        # ✅ CRITICAL FIX: Apply DB strategy_settings to GameManager objects if request was invalid/missing
+                        # This ensures DB settings are actually used when request.strategy_settings is invalid
+                        if not (request.strategy_settings and request.user_team_side and isinstance(request.strategy_settings, dict) and all(key in request.strategy_settings for key in ['offense', 'inside', 'attack', 'outside', 'tempo', 'defense', 'aggression', 'hc_trap', 'fc_press', 'rebounding'])):
+                            # Request is invalid - apply DB settings to GameManager objects
+                            if home_strategy:
+                                gm.home_team.strategy_settings = dict(home_strategy)
+                                logging.info(f"✅ [STRATEGY SETTINGS] Applied DB home_strategy to GameManager (request was invalid)")
+                            if away_strategy:
+                                gm.away_team.strategy_settings = dict(away_strategy)
+                                logging.info(f"✅ [STRATEGY SETTINGS] Applied DB away_strategy to GameManager (request was invalid)")
+                        
                         # Debug logging removed - was cluttering logs
                         # logging.debug(f"🔧 LOADING FROM DB - home_strategy={home_strategy}, away_strategy={away_strategy}")
                         
@@ -1643,6 +1666,18 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             mode="single",  # Loaded games are always single mode from games_collection
                             user_team_side=request.user_team_side  # ✅ SS&S: Set is_user_team flags
                         )
+                        
+                        # ✅ CRITICAL FIX: Apply DB strategy_settings to GameManager objects if request was invalid/missing
+                        # This ensures DB settings are actually used when request.strategy_settings is invalid
+                        # Must be done AFTER GameManager creation so we can update the objects
+                        if not (request.strategy_settings and request.user_team_side and isinstance(request.strategy_settings, dict) and all(key in request.strategy_settings for key in ['offense', 'inside', 'attack', 'outside', 'tempo', 'defense', 'aggression', 'hc_trap', 'fc_press', 'rebounding'])):
+                            # Request is invalid - apply DB settings to GameManager objects
+                            if home_strategy:
+                                gm.home_team.strategy_settings = dict(home_strategy)
+                                logging.warning(f"✅ [STRATEGY SETTINGS] Applied DB home_strategy to GameManager (request was invalid): tempo={home_strategy.get('tempo', 'MISSING')}")
+                            if away_strategy:
+                                gm.away_team.strategy_settings = dict(away_strategy)
+                                logging.warning(f"✅ [STRATEGY SETTINGS] Applied DB away_strategy to GameManager (request was invalid): tempo={away_strategy.get('tempo', 'MISSING')}")
                         
                         # Debug logging removed - was cluttering logs
                         # logging.debug(f"🔧 AFTER GAMEMANAGER - home.strategy_settings={gm.home_team.strategy_settings.get('tempo', 'MISSING')}, away.strategy_settings={gm.away_team.strategy_settings.get('tempo', 'MISSING')}")
