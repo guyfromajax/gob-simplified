@@ -961,12 +961,37 @@ def summarize_game_state(game, exclude_animations=True):
                     away_actual_team_id = game.away_team.team_id
                 
                 # Get playbook_settings for each team (if they exist)
+                # ✅ CRITICAL: Check team_id key first (correct format), then fallback to team name key (legacy format)
+                # This provides backward compatibility for existing games that have settings under team name keys
                 if home_actual_team_id:
                     home_team_data = teams.get(home_actual_team_id, {})
                     home_playbook_settings = home_team_data.get("playbook_settings", {})
+                    # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
+                    # This handles legacy saves where settings were saved under team name keys
+                    if not home_playbook_settings:
+                        # Try to find by team name (legacy format)
+                        for tid in teams.keys():
+                            team_data = teams.get(tid, {})
+                            if team_data.get("name") == game.home_team.name:
+                                legacy_settings = team_data.get("playbook_settings", {})
+                                if legacy_settings:
+                                    home_playbook_settings = legacy_settings
+                                    logging.warning(f"⚠️ [PLAYBOOK SETTINGS SAVE] Found legacy settings under team name key '{tid}' for home team, please migrate to team_id key '{home_actual_team_id}'")
+                                    break
                 if away_actual_team_id:
                     away_team_data = teams.get(away_actual_team_id, {})
                     away_playbook_settings = away_team_data.get("playbook_settings", {})
+                    # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
+                    if not away_playbook_settings:
+                        # Try to find by team name (legacy format)
+                        for tid in teams.keys():
+                            team_data = teams.get(tid, {})
+                            if team_data.get("name") == game.away_team.name:
+                                legacy_settings = team_data.get("playbook_settings", {})
+                                if legacy_settings:
+                                    away_playbook_settings = legacy_settings
+                                    logging.warning(f"⚠️ [PLAYBOOK SETTINGS SAVE] Found legacy settings under team name key '{tid}' for away team, please migrate to team_id key '{away_actual_team_id}'")
+                                    break
                 
                 if home_playbook_settings or away_playbook_settings:
                     logging.warning(f"✅ [PLAYBOOK SETTINGS SAVE] Preserved playbook_settings: home={bool(home_playbook_settings)} (key={home_actual_team_id}), away={bool(away_playbook_settings)} (key={away_actual_team_id})")
