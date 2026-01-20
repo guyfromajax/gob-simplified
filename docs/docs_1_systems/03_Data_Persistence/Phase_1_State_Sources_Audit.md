@@ -372,6 +372,16 @@ For each state variable, we document:
 2. Remove `franchise_id` localStorage fallback from `bootGame.js`
 3. Simplify `playbook_settings` team ID resolution in `gameplan_routes.py`
 4. Add explicit error handling for missing required pointers
+5. **Add `game_id` normalization at API entry points** (Standardize to ObjectId format)
+   - Normalize at route handler level for:
+     - `GET /api/game/{game_id}` (path param)
+     - `POST /api/simulate-quarter` (request.game_id)
+     - `GET/PUT /api/gameplan` (game_id query/body param)
+     - `GET/POST /api/playbooks` (game_id query/body param)
+     - `POST /api/call-timeout` (request.game_id if present)
+   - Use `normalize_game_id()` from `game_id_utils.py` at entry point
+   - Keep try-both format lookup in DB queries (temporary backward compatibility)
+   - Log when normalization occurs (to track format inconsistencies)
 
 ### Phase 1.2: Fix Medium Priority Violations (Week 1-2)
 1. Restrict localStorage writes to explicit "Resume Last Game" feature only
