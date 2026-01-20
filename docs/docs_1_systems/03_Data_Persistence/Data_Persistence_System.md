@@ -613,6 +613,28 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 - `BackEnd/utils/shared.py` - `summarize_game_state()` (lines 745-768): Save all players, not just lineup
 - `BackEnd/api/api.py` - `get_game_state()` (lines 1097-1120): Extract NG from `attributes.NG` correctly
 
+### Playbook Settings Persistence ✅ **FIXED** (February 2025)
+
+**Problem:** Playbook settings were not persisting through timeouts. When users navigated to the Playbooks page during timeout, settings were missing or incorrect, even though they were saved correctly during the timeout.
+
+**Root Cause:**
+- `summarize_game_state()` correctly preserved `playbook_settings` from the game document when saving timeout state
+- However, when loading the game from the database after timeout, `playbook_settings` were extracted from the saved document but never explicitly restored back to the game document
+- The Playbooks page loads settings from the game document, so missing settings caused the bug
+
+**Solution:**
+- Added explicit restoration of `playbook_settings` to the game document after GameManager creation
+- This ensures that settings saved during timeout are properly restored and available when navigating to the Playbooks page
+- Settings are extracted from the saved document and written back using `games_collection.update_one()` with the correct team keys
+
+**Key Points:**
+- `playbook_settings` are stored in the game document (`teams.{team_id}.playbook_settings`), not on TeamManager objects
+- Settings must be explicitly restored to the game document after loading to ensure they're available for the Playbooks page
+- `strategy_settings` (Game Plan settings) work correctly because they're passed via request and applied to GameManager objects
+
+**Files Changed:**
+- `BackEnd/api/api.py` - `simulate_quarter_endpoint()` (lines 1817-1836): Restore playbook_settings to game document after GameManager creation
+
 ### Key Files
 
 **Backend:**
