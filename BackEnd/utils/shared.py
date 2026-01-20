@@ -1019,21 +1019,15 @@ def summarize_game_state(game, exclude_animations=True):
                                     break
                 
                 if home_playbook_settings or away_playbook_settings:
-                    logging.warning(f"✅ [PLAYBOOK SETTINGS SAVE] Preserved playbook_settings: home={bool(home_playbook_settings)} (key={home_actual_team_id}), away={bool(away_playbook_settings)} (key={away_actual_team_id})")
-                    if home_playbook_settings:
-                        logging.warning(f"🔍 [PLAYBOOK SETTINGS SAVE] Home settings keys: {list(home_playbook_settings.keys())[:5]}")
-                        logging.warning(f"🔍 [PLAYBOOK SETTINGS SAVE] Home settings sample: motion={bool(home_playbook_settings.get('motion'))}, set_play_inside={bool(home_playbook_settings.get('set_play_inside'))}")
-                    if away_playbook_settings:
-                        logging.warning(f"🔍 [PLAYBOOK SETTINGS SAVE] Away settings keys: {list(away_playbook_settings.keys())[:5]}")
-                        logging.warning(f"🔍 [PLAYBOOK SETTINGS SAVE] Away settings sample: motion={bool(away_playbook_settings.get('motion'))}, set_play_inside={bool(away_playbook_settings.get('set_play_inside'))}")
+                    logging.warning(f"✅ [PLAYBOOK SETTINGS DEBUG] SUCCESS: Preserved playbook_settings - home={bool(home_playbook_settings)} (key={home_actual_team_id}), away={bool(away_playbook_settings)} (key={away_actual_team_id})")
                 else:
-                    logging.warning(f"⚠️ [PLAYBOOK SETTINGS SAVE] No playbook_settings found in database: teams keys={list(teams.keys())[:3]}, home_team.name={game.home_team.name}, away_team.name={game.away_team.name}")
-                    logging.warning(f"⚠️ [PLAYBOOK SETTINGS SAVE] home_actual_team_id={home_actual_team_id}, away_actual_team_id={away_actual_team_id}")
-                    logging.warning(f"⚠️ [PLAYBOOK SETTINGS SAVE] Checking all team keys for playbook_settings...")
+                    logging.warning(f"❌ [PLAYBOOK SETTINGS DEBUG] FAILED: No playbook_settings found - home_actual_team_id={home_actual_team_id}, away_actual_team_id={away_actual_team_id}")
+                    logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] Checking all team keys in document...")
                     for tid in teams.keys():
                         team_data = teams.get(tid, {})
                         has_playbook = bool(team_data.get("playbook_settings"))
-                        logging.warning(f"⚠️ [PLAYBOOK SETTINGS SAVE] Team key {tid}: has_playbook_settings={has_playbook}")
+                        team_name = team_data.get("name", "NO_NAME")
+                        logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] Team key '{tid}': name='{team_name}', has_playbook_settings={has_playbook}")
         except Exception as e:
             # If we can't load playbook_settings, continue without them (non-critical)
             logging.warning(f"⚠️ Could not preserve playbook_settings from database: {e}", exc_info=True)
