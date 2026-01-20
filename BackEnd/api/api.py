@@ -491,8 +491,8 @@ def load_team_settings_from_doc(mode: str, doc_id: str, team_id: str, team_name:
                 # Load settings from resolved team_id key
                 if resolved_team_id:
                     team_obj = teams_obj.get(resolved_team_id, {})
-                    strategy_settings = team_obj.get("strategy_settings")
-                    playbook_settings = team_obj.get("playbook_settings")
+                strategy_settings = team_obj.get("strategy_settings")
+                playbook_settings = team_obj.get("playbook_settings")
                     logging.warning(f"🔍 [LOAD SETTINGS] Resolved team_id={resolved_team_id} (from team_name={team_name}, team_id={team_id}), found strategy={bool(strategy_settings)}, playbook={bool(playbook_settings)}")
                 else:
                     logging.warning(f"⚠️ [LOAD SETTINGS] Could not resolve team_id for team_name={team_name}, team_id={team_id}")
@@ -592,10 +592,10 @@ def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest
         # simulate_quarter_endpoint() saves to games_collection
         # Always read from games_collection - this is where we save, so this is the source of truth
         if games_collection is not None:
-            saved = games_collection.find_one({"_id": game_id})
-            if saved:
+                saved = games_collection.find_one({"_id": game_id})
+                if saved:
                 logging.info(f"✅ TIMEOUT RESUME: Found game in games_collection (where we save)")
-            else:
+        else:
                 logging.warning(f"⚠️ TIMEOUT RESUME: Game {game_id} not found in games_collection")
         
         if not saved:
@@ -998,7 +998,7 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
         # Check ongoing games first (unless forcing DB read)
         gm = None
         if not force_db_read:
-            gm = ongoing_games.get(game_id)
+        gm = ongoing_games.get(game_id)
         
         if gm:
             # ✅ PERFORMANCE DIAGNOSTIC: Log in-memory path and measure processing time
@@ -1201,7 +1201,8 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                     # ✅ DIAGNOSTIC: Log if stats are empty (for debugging)
                     if not saved_stats or not any(saved_stats.values()):
                         player_name = p.get("name", "Unknown")
-                        logging.warning(f"⚠️ [STATS DEBUG] Player {player_name} has empty stats in saved doc - this may be expected for players with no game activity")
+                        # ✅ REMOVED: Stats debug log (cluttering Railway logs)
+                        # logging.warning(f"⚠️ [STATS DEBUG] Player {player_name} has empty stats in saved doc - this may be expected for players with no game activity")
                     
                     player_data = {
                         "_id": p.get("playerId") or p.get("player_id"),
@@ -1273,11 +1274,11 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                         away_team_data.get("name"): away_score
                     }
                     logging.warning(f"🔍 [SCORE DEBUG] Built score from teams object: {saved_score}")
-                # ✅ DIAGNOSTIC: Log score for debugging
-                if not saved_score or not any(saved_score.values()):
-                    logging.warning(f"⚠️ [SCORE DEBUG] Saved score is empty or all zeroes: {saved_score}")
-                else:
-                    logging.info(f"✅ [SCORE DEBUG] Score loaded from DB: {saved_score}")
+                # ✅ REMOVED: Score debug log (cluttering Railway logs)
+                # if not saved_score or not any(saved_score.values()):
+                #     logging.warning(f"⚠️ [SCORE DEBUG] Saved score is empty or all zeroes: {saved_score}")
+                # else:
+                #     logging.info(f"✅ [SCORE DEBUG] Score loaded from DB: {saved_score}")
                 
                 response_data = {
                     "game_id": game_id,
@@ -1654,31 +1655,31 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                     
                                     if has_valid_request_settings:
                                         # Request has valid settings - user visited Game Plan page and settings are current
-                                        if request.user_team_side == "home":
-                                            old_hct = home_strategy.get('hc_trap', 'MISSING') if home_strategy else 'MISSING'
-                                            old_fcp = home_strategy.get('fc_press', 'MISSING') if home_strategy else 'MISSING'
-                                            if home_strategy is None:
-                                                home_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
+                                    if request.user_team_side == "home":
+                                        old_hct = home_strategy.get('hc_trap', 'MISSING') if home_strategy else 'MISSING'
+                                        old_fcp = home_strategy.get('fc_press', 'MISSING') if home_strategy else 'MISSING'
+                                        if home_strategy is None:
+                                            home_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
                                                 logging.info(f"✅ [STRATEGY SETTINGS] Using request.strategy_settings for home team (DB had None)")
-                                            else:
+                                        else:
                                                 # DB has settings, but request is valid - user visited Game Plan, use request
-                                                home_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
+                                            home_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
                                                 logging.info(f"✅ [STRATEGY SETTINGS] Using request.strategy_settings for home team (user visited Game Plan)")
-                                            new_hct = request.strategy_settings.get('hc_trap', 'MISSING')
-                                            new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
+                                        new_hct = request.strategy_settings.get('hc_trap', 'MISSING')
+                                        new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
                                             logging.info(f"   - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
-                                        elif request.user_team_side == "away":
-                                            old_hct = away_strategy.get('hc_trap', 'MISSING') if away_strategy else 'MISSING'
-                                            old_fcp = away_strategy.get('fc_press', 'MISSING') if away_strategy else 'MISSING'
-                                            if away_strategy is None:
-                                                away_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
+                                    elif request.user_team_side == "away":
+                                        old_hct = away_strategy.get('hc_trap', 'MISSING') if away_strategy else 'MISSING'
+                                        old_fcp = away_strategy.get('fc_press', 'MISSING') if away_strategy else 'MISSING'
+                                        if away_strategy is None:
+                                            away_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
                                                 logging.info(f"✅ [STRATEGY SETTINGS] Using request.strategy_settings for away team (DB had None)")
-                                            else:
+                                        else:
                                                 # DB has settings, but request is valid - user visited Game Plan, use request
-                                                away_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
+                                            away_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
                                                 logging.info(f"✅ [STRATEGY SETTINGS] Using request.strategy_settings for away team (user visited Game Plan)")
-                                            new_hct = request.strategy_settings.get('hc_trap', 'MISSING')
-                                            new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
+                                        new_hct = request.strategy_settings.get('hc_trap', 'MISSING')
+                                        new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
                                             logging.info(f"   - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
                                     else:
                                         # Request settings are invalid/missing - user didn't visit Game Plan, preserve DB settings
@@ -2174,7 +2175,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             status_code=404,
                             detail=f"Game document {request.game_id} not found. Game document must be created via /api/init-game before simulating Q1. This ensures playbook and game plan settings persist."
                         )
-                    game_id = request.game_id
+                        game_id = request.game_id
                     gm.game_id = game_id  # Store game_id on the GameManager object
                     ongoing_games[game_id] = gm
                     logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ✅ Added game to ongoing_games (timeout resume path): game_id={game_id}, object_id={id(gm)}, quarter={gm.quarter}")
@@ -2319,23 +2320,23 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 away_team_attributes = away_attrs
             
             # Load strategy_settings and playbook_settings from tournament document
-            home_settings = load_team_settings_from_doc(
-                mode,
-                request.tournament_id,
-                None,
-                request.home_team
-            )
-            away_settings = load_team_settings_from_doc(
-                mode,
-                request.tournament_id,
-                None,
-                request.away_team
-            )
-            # Override strategy_settings if loaded from tournament (unless request has them)
-            if home_settings.get("strategy_settings") and not home_strategy:
-                home_strategy = home_settings.get("strategy_settings")
-            if away_settings.get("strategy_settings") and not away_strategy:
-                away_strategy = away_settings.get("strategy_settings")
+                home_settings = load_team_settings_from_doc(
+                    mode,
+                    request.tournament_id,
+                    None,
+                    request.home_team
+                )
+                away_settings = load_team_settings_from_doc(
+                    mode,
+                    request.tournament_id,
+                    None,
+                    request.away_team
+                )
+                # Override strategy_settings if loaded from tournament (unless request has them)
+                if home_settings.get("strategy_settings") and not home_strategy:
+                    home_strategy = home_settings.get("strategy_settings")
+                if away_settings.get("strategy_settings") and not away_strategy:
+                    away_strategy = away_settings.get("strategy_settings")
         elif mode == "single" and request.game_id:
             # Load team attributes from game document
             home_attrs = load_team_attributes_from_doc(
@@ -2441,7 +2442,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             )
         # Verify game document exists in database
         from BackEnd.utils.game_id_utils import normalize_game_id
-        game_id = normalize_game_id(request.game_id)
+            game_id = normalize_game_id(request.game_id)
         saved = games_collection.find_one({"_id": game_id}) if games_collection else None
         if not saved:
             try:
@@ -2981,12 +2982,12 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
                     timeout_turn = gm.turns.pop() if gm.turns else None
                     if timeout_turn:
                         return {
-                            "turn": timeout_turn,
+                    "turn": timeout_turn,
                             "time_remaining": gm.game_state.get("time_remaining", 480),
-                            "clock": gm.game_state.get("clock", "8:00"),
-                            "quarter_complete": False,
+                    "clock": gm.game_state.get("clock", "8:00"),
+                    "quarter_complete": False,
                             "quarter": gm.quarter
-                        }
+                }
                 # ⏱️ PERFORMANCE: Log timeout return path
                 total_time = (time.time() - start_time) * 1000
                 response_size = len(str(timeout_response).encode('utf-8'))
@@ -3326,15 +3327,15 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
         logging.error(f"🚨 TIMEOUT: Failed to save game state: {e}")
         # Don't fail the timeout call if save fails - game is still in memory
         # Return fallback response
-        return {
-            "message": f"Timeout called by {calling_team.name}",
-            "calling_team": calling_team.name,
-            "timeouts_remaining": getattr(calling_team, 'timeouts', 4),
-            "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
-            "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
+    return {
+        "message": f"Timeout called by {calling_team.name}",
+        "calling_team": calling_team.name,
+        "timeouts_remaining": getattr(calling_team, 'timeouts', 4),
+        "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
+        "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
             "clock": gm.game_state.get("clock", "8:00"),
             "time_remaining": gm.game_state.get("time_remaining", 480),
-        }
+    }
 
 
 @app.get("/roster/{team_name}")
@@ -3422,10 +3423,10 @@ def get_team_roster(team_name: str, tournament_id: str | None = None, franchise_
             # Base mode or tournament mode - use universal collection attributes
             core_attributes = p.get("attributes", {})
             merged_attributes = core_attributes.copy()
-            # Create anchor_ prefixed attributes (like Player class does)
-            for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
-                if attr_key in merged_attributes:
-                    merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
+        # Create anchor_ prefixed attributes (like Player class does)
+        for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
+            if attr_key in merged_attributes:
+                merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
         
         # ✅ SS&S: For franchise mode, use franchise.players as single source of truth for position_ratings
         if franchise_id and player_id_str in franchise_players:
@@ -3540,21 +3541,21 @@ def init_game(request: dict):
     # For franchise/tournament mode, settings are accessed directly from franchise/tournament documents
     # during gameplay via _load_playbook_settings(), so no need to copy them here
     if mode == "single":
-        if "teams" not in summary:
-            summary["teams"] = {}
-        
-        home_team_id = gm.home_team.team_id
-        away_team_id = gm.away_team.team_id
-        
-        if home_team_id not in summary["teams"]:
-            summary["teams"][home_team_id] = {}
-        if away_team_id not in summary["teams"]:
-            summary["teams"][away_team_id] = {}
-        
+    if "teams" not in summary:
+        summary["teams"] = {}
+    
+    home_team_id = gm.home_team.team_id
+    away_team_id = gm.away_team.team_id
+    
+    if home_team_id not in summary["teams"]:
+        summary["teams"][home_team_id] = {}
+    if away_team_id not in summary["teams"]:
+        summary["teams"][away_team_id] = {}
+    
         # For single mode, playbook_settings are stored in game document for persistence
         # They may be loaded from teams collection or come from previous saves
-        summary["teams"][home_team_id]["playbook_settings"] = home_playbook_settings
-        summary["teams"][away_team_id]["playbook_settings"] = away_playbook_settings
+    summary["teams"][home_team_id]["playbook_settings"] = home_playbook_settings
+    summary["teams"][away_team_id]["playbook_settings"] = away_playbook_settings
     summary_time = (time.time() - summary_start) * 1000
     
     # Set GameManager quarter to 1 to match
