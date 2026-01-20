@@ -1037,9 +1037,11 @@ def summarize_game_state(game, exclude_animations=True):
                     # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
                     if not away_playbook_settings:
                         # Try to find by team name (legacy format)
+                        # Check if key itself matches team name (some legacy saves have name='NO_NAME')
                         for tid in teams.keys():
                             team_data = teams.get(tid, {})
-                            if team_data.get("name") == game.away_team.name:
+                            # Match if key equals team name OR team_data.name equals team name
+                            if tid == game.away_team.name or team_data.get("name") == game.away_team.name:
                                 legacy_settings = team_data.get("playbook_settings", {})
                                 if legacy_settings:
                                     away_playbook_settings = legacy_settings
