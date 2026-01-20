@@ -75,18 +75,12 @@
     if (userTeamId && userTeamId !== teamId) params.set('user_team_id', userTeamId);
     
     // ============================================
-    // 3. GAME ID LOGIC (SS&S Rules)
+    // 3. GAME ID LOGIC (Phase 1.1: Always pass if exists)
     // ============================================
-    // Rule: Pass game_id if:
-    //   - Quarter > 1 (quarter breaks, overtime)
-    //   - OR resumeFromTimeout is true (timeout/foul out resume, any quarter)
-    //   - NOT for new Q1 game start
-    const shouldPassGameId = gameId && (
-      targetQuarter > 1 ||  // Quarter breaks, overtime
-      resumeFromTimeout     // Timeout/foul out resume (any quarter)
-    );
-    
-    if (shouldPassGameId) {
+    // ✅ PHASE 1.1: Always pass game_id if it exists (it's a Pointer that points to Truth)
+    // Previous logic excluded Q1 new games, but game_id should always be in URL when it exists
+    // This ensures game_id persists through navigation (lineup → game-plan → court)
+    if (gameId) {
       params.set('game_id', gameId);
     }
     
