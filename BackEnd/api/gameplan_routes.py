@@ -1085,11 +1085,18 @@ def update_gameplan(request: GamePlanUpdateRequest):
         
         # ✅ PERFORMANCE: Load document with projection first (only needed fields)
         if request.mode == "single":
-            doc = collection.find_one({"_id": doc_id})
+            # ✅ PHASE 1.1: Load teams, home_team_id, away_team_id for team ID resolution
+            doc = collection.find_one(
+                {"_id": doc_id},
+                {"teams": 1, "home_team_id": 1, "away_team_id": 1, "_id": 1}
+            )
             if not doc:
                 # Try as ObjectId if UUID string lookup failed
                 try:
-                    doc = collection.find_one({"_id": ObjectId(doc_id)})
+                    doc = collection.find_one(
+                        {"_id": ObjectId(doc_id)},
+                        {"teams": 1, "home_team_id": 1, "away_team_id": 1, "_id": 1}
+                    )
                 except:
                     pass
         else:
@@ -1139,17 +1146,57 @@ def update_gameplan(request: GamePlanUpdateRequest):
             if request.team_id and request.team_id != actual_team_id:
                 logger.warning(f"⚠️ [GAME PLAN SAVE] URL team_id ({request.team_id}) doesn't match tournament document user_team_object_id ({actual_team_id}). Using tournament document value.")
         else:
-            # For single mode, resolve team_id to ObjectId
-            try:
-                # Try as ObjectId first
-                test_oid = ObjectId(request.team_id)
-                actual_team_id = str(test_oid)
-            except:
-                # If not ObjectId, resolve by name
-                team_doc = db.teams.find_one({"name": request.team_id})
-                if team_doc:
-                    actual_team_id = str(team_doc["_id"])
-                # If not found, use original (will fail in ensure_team_objects_exist if invalid)
+            # ✅ PHASE 1.1: Simplified team ID resolution for Single Game mode (same as save_playbooks)
+            # Game document stores teams using team_id as keys (e.g., "SOUTH_LANCASTER")
+            # Frontend may send team name (e.g., "South Lancaster") or team_id
+            # Resolution strategy: Try direct key match first, then name match, then fail loudly
+            teams = doc.get("teams", {})
+            home_team_id = doc.get("home_team_id")
+            away_team_id = doc.get("away_team_id")
+            
+            actual_team_id = None
+            
+            # Step 1: Try direct key match (if request.team_id is already a team_id key)
+            # ✅ CRITICAL: Only match if it looks like a team_id (uppercase, underscores)
+            # This prevents matching legacy team name keys (e.g., "South Lancaster")
+            if request.team_id in teams and (request.team_id.isupper() and "_" in request.team_id):
+                actual_team_id = request.team_id
+            
+            # Step 2: If not found, iterate through teams to find by name match
+            if not actual_team_id:
+                for tid in teams.keys():
+                    team_obj = teams.get(tid, {})
+                    if team_obj.get("name") == request.team_id:
+                        actual_team_id = tid
+                        break
+            
+            # Step 3: If still not found, try home/away fallback (only if they exist in teams)
+            if not actual_team_id:
+                if home_team_id and home_team_id in teams:
+                    home_team_obj = teams.get(home_team_id, {})
+                    if home_team_obj.get("name") == request.team_id:
+                        actual_team_id = home_team_id
+                if not actual_team_id and away_team_id and away_team_id in teams:
+                    away_team_obj = teams.get(away_team_id, {})
+                    if away_team_obj.get("name") == request.team_id:
+                        actual_team_id = away_team_id
+            
+            # Step 4: Fail loudly if resolution failed
+            if not actual_team_id:
+                available_teams = {tid: teams.get(tid, {}).get("name", "unknown") for tid in teams.keys()}
+                logger.error(f"❌ [GAME PLAN SAVE] Could not resolve team '{request.team_id}' to team_id. Available teams: {available_teams}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Could not resolve team '{request.team_id}' to team_id in game document. Available teams: {list(available_teams.keys())}"
+                )
+            
+            # ✅ PHASE 1.1: Verify resolved team_id is valid (sanity check)
+            if actual_team_id not in teams:
+                logger.error(f"❌ [GAME PLAN SAVE] Resolved team_id '{actual_team_id}' not found in teams object!")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Internal error: Resolved team_id '{actual_team_id}' not found in game document"
+                )
         
         # ✅ PERFORMANCE: Ensure team objects exist, passing pre-loaded doc to avoid double-load
         ensure_team_objects_exist(
