@@ -2400,8 +2400,42 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             if home_settings.get("strategy_settings"):
                 sample = dict(list(home_settings.get("strategy_settings", {}).items())[:3])
                 logging.warning(f"🔍 [SIMULATE-QUARTER] Home settings sample: {sample}")
-            # Override strategy_settings if loaded from game document (unless request has them)
-            if home_settings.get("strategy_settings") and not home_strategy:
+            # ✅ SS&S: Server (DB) is source of truth - always load from DB first
+            # Only use request settings if they're explicitly provided AND valid (representing user action)
+            # If request settings are empty/invalid, ignore them and use DB
+            
+            # Helper to check if request settings are valid (not empty/stale)
+            def is_valid_request_settings(settings: dict | None) -> bool:
+                if not settings or not isinstance(settings, dict):
+                    return False
+                # Must have all required keys to be considered valid
+                required_keys = ['offense', 'inside', 'attack', 'outside', 'tempo', 'defense', 'aggression', 'hc_trap', 'fc_press', 'rebounding']
+                return all(key in settings for key in required_keys) and any(settings.get(k) is not None for k in required_keys)
+            
+            # Home team: DB is source of truth, request only if valid
+            if home_settings.get("strategy_settings"):
+                if is_valid_request_settings(home_strategy):
+                    # Request has valid settings (user action) - use request but log DB for debugging
+                    logging.warning(f"✅ [SIMULATE-QUARTER] Using request home strategy_settings (user action detected)")
+                    if gm is not None:
+                        default_settings = gm.home_team._init_strategy_settings()
+                        gm.home_team.strategy_settings = {**default_settings, **home_strategy}
+                else:
+                    # Request is empty/invalid - use DB (server is source of truth)
+                    home_strategy = home_settings.get("strategy_settings")
+                    logging.warning(f"✅ [SIMULATE-QUARTER] Applied home strategy_settings from DB (request was empty/invalid)")
+                    if gm is not None:
+                        default_settings = gm.home_team._init_strategy_settings()
+                        gm.home_team.strategy_settings = {**default_settings, **home_strategy}
+                        logging.warning(f"✅ [SIMULATE-QUARTER] Applied DB home strategy_settings to cached GameManager")
+            elif is_valid_request_settings(home_strategy):
+                # No DB settings but request is valid - use request
+                logging.warning(f"✅ [SIMULATE-QUARTER] Using request home strategy_settings (no DB settings found)")
+                if gm is not None:
+                    default_settings = gm.home_team._init_strategy_settings()
+                    gm.home_team.strategy_settings = {**default_settings, **home_strategy}
+            # OLD CODE BELOW - to be removed
+            if False and home_settings.get("strategy_settings") and not home_strategy:
                 home_strategy = home_settings.get("strategy_settings")
                 logging.warning(f"✅ [SIMULATE-QUARTER] Applied home strategy_settings from DB")
                 # ✅ CRITICAL FIX: If game is in cache, apply settings directly to cached GameManager
