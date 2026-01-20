@@ -29,7 +29,25 @@ const tournamentId = urlParams.get('tournament_id');
 const modeParam = urlParams.get('mode');
 const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 const periodLabel = urlParams.get('period') || `Q${quarter}`;
-const gameId = urlParams.get('game_id') || (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
+// ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
+// game_id is required for Q2+ or timeout resume, optional for Q1 (will be created by init-game)
+const gameId = urlParams.get('game_id') || null;
+const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+
+// ✅ PHASE 1.1: Fail loudly if game_id is required but missing
+if (!gameId && (quarter > 1 || resumeFromTimeout)) {
+  const errorMsg = `game_id is required but missing from URL. Quarter: ${quarter}, Resume from timeout: ${resumeFromTimeout}. Please navigate from the lineup screen with a valid game_id.`;
+  console.error(`❌ [GAME-PLAN] ${errorMsg}`);
+  alert(`Error: ${errorMsg}\n\nPlease return to the lineup screen and try again.`);
+  // Redirect to lineup screen if possible
+  if (homeTeam && awayTeam) {
+    const lineupUrl = `/set-lineup.html?home=${encodeURIComponent(homeTeam)}&away=${encodeURIComponent(awayTeam)}&home_id=${encodeURIComponent(homeId || '')}&away_id=${encodeURIComponent(awayId || '')}&my_team=${encodeURIComponent(myTeamSide || 'home')}&mode=${encodeURIComponent(modeParam || 'single')}`;
+    if (franchiseId) lineupUrl += `&franchise_id=${encodeURIComponent(franchiseId)}`;
+    if (tournamentId) lineupUrl += `&tournament_id=${encodeURIComponent(tournamentId)}`;
+    window.location.href = lineupUrl;
+  }
+}
+
 const DEBUG = urlParams.has('debug');
 
 // Lineup params (passed from set-lineup)

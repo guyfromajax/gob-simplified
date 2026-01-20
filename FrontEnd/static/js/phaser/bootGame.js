@@ -86,18 +86,22 @@ console.warn('⚠️ [BOOTGAME] CRITICAL CHECK - game_id:', bootGameParams.game_
 const tournamentId = urlParams.get('tournament_id');
 const homeTeam = urlParams.get('home');
 const awayTeam = urlParams.get('away');
+// ✅ PHASE 1.1: Remove localStorage fallback - franchise_id must come from URL params only
 const queryFranchiseId = urlParams.get('franchise_id');
-const storedFranchiseId =
-  typeof localStorage !== 'undefined'
-    ? localStorage.getItem('franchise_id') || localStorage.getItem('franchiseId')
-    : null;
-// ✅ FIX: Only use storedFranchiseId if mode is explicitly 'franchise' or queryFranchiseId exists
-// This prevents Single Game mode from accidentally using franchise_id from localStorage
 const urlMode = urlParams.get('mode');
-const franchiseId = queryFranchiseId || (urlMode === 'franchise' ? storedFranchiseId : null);
-if (queryFranchiseId && typeof localStorage !== 'undefined') {
-  localStorage.setItem('franchise_id', queryFranchiseId);
+const franchiseId = queryFranchiseId || null;
+
+// ✅ PHASE 1.1: Fail loudly if franchise_id is required but missing
+if (!franchiseId && urlMode === 'franchise') {
+  const errorMsg = `franchise_id is required for franchise mode but missing from URL. Please navigate from the franchise command center with a valid franchise_id.`;
+  console.error(`❌ [BOOTGAME] ${errorMsg}`);
+  alert(`Error: ${errorMsg}\n\nPlease return to the franchise command center and try again.`);
+  // Redirect to franchise select if possible
+  window.location.href = '/franchise-select-team.html';
 }
+
+// ✅ PHASE 1.1: Only write to localStorage for explicit "Resume Last Game" feature (not implemented yet)
+// For now, we don't write franchise_id to localStorage - it must always come from URL
 const weekParam = parseInt(urlParams.get('week'), 10);
 if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined') {
   localStorage.setItem('franchise_week', weekParam);
@@ -1955,17 +1959,14 @@ async function handleSimQuarter() {
   // So we'll rely on button state logic to disable button after game completes
   // This is a safety check - button should already be disabled
   
-  // ✅ SS&S: Require game_id - game document must be created via init-game endpoint
-  // Never generate game_id in simulate-quarter path - this causes settings to be lost
-  // game_id should be in URL params (from init-game response), localStorage is fallback only
-  if (!gameId && typeof localStorage !== 'undefined') {
-    gameId = localStorage.getItem('game_id');
-  }
+  // ✅ PHASE 1.1: Require game_id from URL params only - no localStorage fallback
+  // game_id must be in URL params (from init-game response or navigation)
+  // This prevents creating duplicate game documents and losing settings
   if (!gameId) {
-    // ✅ SS&S: Fail loudly if game_id missing - game document must exist before simulating
+    // ✅ PHASE 1.1: Fail loudly if game_id missing - game document must exist before simulating
     // This prevents creating duplicate game documents and losing settings
     const errorMsg = `❌ game_id required for Q${nextQuarter}. Game document must be created via /api/init-game before simulating. Please navigate to lineup screen first.`;
-    console.error(errorMsg);
+    console.error(`❌ [BOOTGAME] ${errorMsg}`);
     alert(errorMsg);
     isSimulating = false;
     [playBtn, simFullBtn, simQuarterBtn].forEach(btn => { if (btn) btn.disabled = false; });

@@ -135,8 +135,8 @@
 **Team State:**
 - `teams.{team_id}.timeouts`: Restored from unified teams structure (with fallback to old structure)
 - `teams.{team_id}.team_fouls`: Restored from saved document
-- `teams.{team_id}.strategy_settings`: Restored from saved document (Game Plan settings)
-- `teams.{team_id}.playbook_settings`: Restored from saved document and explicitly written back to game document
+- `teams.{team_id}.strategy_settings`: Restored from saved document (Game Plan settings), with validation of request.strategy_settings
+- `teams.{team_id}.playbook_settings`: Restored from saved document and explicitly written back to game document using consistent team_id key resolution
 
 **Player State:**
 - `players[].attributes.NG`: Energy values restored for all players (lineup + bench)

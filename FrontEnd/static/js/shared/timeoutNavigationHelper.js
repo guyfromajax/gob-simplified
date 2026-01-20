@@ -187,14 +187,15 @@
   }
 
   /**
-   * Helper to get game ID from URL or localStorage
+   * Helper to get game ID from URL params only (PHASE 1.1: Removed localStorage fallback)
    * 
    * @param {URLSearchParams} urlParams - URL parameters
-   * @returns {string|null} Game ID or null
+   * @returns {string|null} Game ID or null (from URL only)
    */
   function getGameId(urlParams) {
-    return urlParams.get('game_id') ||
-      (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
+    // ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
+    // Callers should fail loudly if game_id is required but missing
+    return urlParams.get('game_id') || null;
   }
 
   // ✅ SS&S: Make available as global (for script tag loading)
