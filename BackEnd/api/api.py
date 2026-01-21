@@ -494,24 +494,20 @@ def load_team_settings_from_doc(mode: str, doc_id: str, team_id: str, team_name:
                     strategy_settings = team_obj.get("strategy_settings")
                     playbook_settings = team_obj.get("playbook_settings")
                     
-                    # ✅ DIAGNOSTIC: Log what we found in DB
-                    logging.warning(f"🔍 [LOAD-SETTINGS] Resolved team_id={resolved_team_id} (from team_name={team_name}, team_id={team_id})")
-                    logging.warning(f"🔍 [LOAD-SETTINGS] Found in DB: strategy={bool(strategy_settings)}, playbook={bool(playbook_settings)}")
+                    # ✅ TRACE: Log what we found in DB
+                    trace_id_load = f"load_{doc_id}_{resolved_team_id}"
+                    logging.warning(f"🟢 [TRACE-LOAD] {trace_id_load} | LOAD-TEAM-SETTINGS | resolved_team_id={resolved_team_id}, team_name={team_name}")
+                    logging.warning(f"🟢 [TRACE-LOAD] {trace_id_load} | FOUND IN DB | strategy={bool(strategy_settings)}, playbook={bool(playbook_settings)}")
                     
                     if strategy_settings:
-                        strategy_sample = dict(list(strategy_settings.items())[:5])
-                        logging.warning(f"📋 [LOAD-SETTINGS] Strategy settings sample: {strategy_sample}")
-                        logging.warning(f"📋 [LOAD-SETTINGS] Strategy inside value: {strategy_settings.get('inside', 'MISSING')}")
+                        strategy_inside = strategy_settings.get('inside', 'MISSING')
+                        logging.warning(f"🟢 [TRACE-LOAD] {trace_id_load} | STRATEGY LOADED | inside={strategy_inside}")
                     
                     if playbook_settings:
                         slot_count = len(playbook_settings.get("slot_assignments", {}))
-                        logging.warning(f"📋 [LOAD-SETTINGS] Playbook settings: slot_assignments={slot_count}, motion={bool(playbook_settings.get('motion'))}")
-                        if slot_count > 0:
-                            sample_slot = next(iter(playbook_settings.get("slot_assignments", {}).values()), None)
-                            if sample_slot:
-                                logging.warning(f"📋 [LOAD-SETTINGS] Sample slot assignment: section={sample_slot.get('section')}, playId={sample_slot.get('playId')}, playName={sample_slot.get('playName')}")
+                        logging.warning(f"🟢 [TRACE-LOAD] {trace_id_load} | PLAYBOOK LOADED | slot_assignments={slot_count}")
                     else:
-                        logging.warning(f"⚠️ [LOAD-SETTINGS] No playbook_settings found in DB for team {resolved_team_id}")
+                        logging.warning(f"🟢 [TRACE-LOAD] {trace_id_load} | PLAYBOOK MISSING | No playbook_settings found in DB")
                 else:
                     logging.warning(f"⚠️ [LOAD-SETTINGS] Could not resolve team_id for team_name={team_name}, team_id={team_id}")
         except Exception as e:
@@ -2462,6 +2458,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 away_team_attributes = away_attrs
             
             # Load strategy_settings and playbook_settings from game document
+            trace_id = f"sim_q{request.quarter}_{request.game_id}"
+            logging.warning(f"🟢 [TRACE-LOAD] {trace_id} | LOADING FROM DB | game_id={request.game_id}")
             home_settings = load_team_settings_from_doc(
                 mode,
                 request.game_id,
@@ -2474,11 +2472,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 None,
                 request.away_team
             )
-            # ✅ DEBUG: Log what we loaded
-            logging.warning(f"🔍 [SIMULATE-QUARTER] Loaded settings - home_strategy={bool(home_strategy)}, home_settings={bool(home_settings.get('strategy_settings'))}, away_strategy={bool(away_strategy)}, away_settings={bool(away_settings.get('strategy_settings'))}")
-            if home_settings.get("strategy_settings"):
-                sample = dict(list(home_settings.get("strategy_settings", {}).items())[:3])
-                logging.warning(f"🔍 [SIMULATE-QUARTER] Home settings sample: {sample}")
+            # ✅ TRACE: Log what we loaded
+            home_db_inside = home_settings.get("strategy_settings", {}).get("inside", "MISSING") if home_settings.get("strategy_settings") else "NO_DB_SETTINGS"
+            away_db_inside = away_settings.get("strategy_settings", {}).get("inside", "MISSING") if away_settings.get("strategy_settings") else "NO_DB_SETTINGS"
+            home_slots = len(home_settings.get("playbook_settings", {}).get("slot_assignments", {})) if home_settings.get("playbook_settings") else 0
+            away_slots = len(away_settings.get("playbook_settings", {}).get("slot_assignments", {})) if away_settings.get("playbook_settings") else 0
+            logging.warning(f"🟢 [TRACE-LOAD] {trace_id} | LOADED FROM DB | home_strategy_inside={home_db_inside}, away_strategy_inside={away_db_inside}, home_slots={home_slots}, away_slots={away_slots}")
             # ✅ SS&S: Server (DB) is source of truth - always load from DB first
             # Only use request settings if they're explicitly provided AND valid (representing user action)
             # If request settings are empty/invalid, ignore them and use DB
@@ -2491,30 +2490,32 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 required_keys = ['offense', 'inside', 'attack', 'outside', 'tempo', 'defense', 'aggression', 'hc_trap', 'fc_press', 'rebounding']
                 return all(key in settings for key in required_keys) and any(settings.get(k) is not None for k in required_keys)
             
-            # ✅ DIAGNOSTIC: Log request vs DB settings comparison
+            # ✅ TRACE: Log request vs DB settings comparison
             db_home_inside = home_settings.get("strategy_settings", {}).get("inside", "MISSING") if home_settings.get("strategy_settings") else "NO_DB_SETTINGS"
             req_home_inside = home_strategy.get("inside", "MISSING") if home_strategy and isinstance(home_strategy, dict) else "NO_REQUEST"
-            logging.warning(f"📊 [APPLY-SETTINGS] Home team: DB inside={db_home_inside}, Request inside={req_home_inside}, is_valid_request={is_valid_request_settings(home_strategy)}")
+            logging.warning(f"🟡 [TRACE-APPLY] {trace_id} | HOME TEAM | DB inside={db_home_inside}, Request inside={req_home_inside}, is_valid_request={is_valid_request_settings(home_strategy)}, gm_exists={gm is not None}")
             
             # Home team: DB is source of truth, request only if valid
             if home_settings.get("strategy_settings"):
                 if is_valid_request_settings(home_strategy):
                     # Request has valid settings (user action) - use request but log DB for debugging
-                    logging.warning(f"✅ [APPLY-SETTINGS] Using request home strategy_settings (user action detected): inside={req_home_inside}")
+                    logging.warning(f"🟡 [TRACE-APPLY] {trace_id} | HOME TEAM | DECISION: Using REQUEST (user action)")
                     if gm is not None:
+                        before_inside = gm.home_team.strategy_settings.get("inside", "MISSING") if gm.home_team.strategy_settings else "MISSING"
                         default_settings = gm.home_team._init_strategy_settings()
                         gm.home_team.strategy_settings = {**default_settings, **home_strategy}
                         after_inside = gm.home_team.strategy_settings.get("inside", "MISSING")
-                        logging.warning(f"✅ [APPLY-SETTINGS] Applied request home strategy: GameManager inside now={after_inside}")
+                        logging.warning(f"🟡 [TRACE-APPLY] {trace_id} | HOME TEAM | APPLIED REQUEST | before_inside={before_inside}, after_inside={after_inside}")
                 else:
                     # Request is empty/invalid - use DB (server is source of truth)
                     home_strategy = home_settings.get("strategy_settings")
-                    logging.warning(f"✅ [APPLY-SETTINGS] Using DB home strategy_settings (request was empty/invalid): inside={db_home_inside}")
+                    logging.warning(f"🟡 [TRACE-APPLY] {trace_id} | HOME TEAM | DECISION: Using DB (request invalid)")
                     if gm is not None:
+                        before_inside = gm.home_team.strategy_settings.get("inside", "MISSING") if gm.home_team.strategy_settings else "MISSING"
                         default_settings = gm.home_team._init_strategy_settings()
                         gm.home_team.strategy_settings = {**default_settings, **home_strategy}
                         after_inside = gm.home_team.strategy_settings.get("inside", "MISSING")
-                        logging.warning(f"✅ [APPLY-SETTINGS] Applied DB home strategy: GameManager inside now={after_inside}")
+                        logging.warning(f"🟡 [TRACE-APPLY] {trace_id} | HOME TEAM | APPLIED DB | before_inside={before_inside}, after_inside={after_inside}")
             elif is_valid_request_settings(home_strategy):
                 # No DB settings but request is valid - use request
                 logging.warning(f"✅ [SIMULATE-QUARTER] Using request home strategy_settings (no DB settings found)")
@@ -2526,8 +2527,10 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             if home_settings and home_settings.get("playbook_settings"):
                 db_slots = len(home_settings.get("playbook_settings", {}).get("slot_assignments", {}))
                 if gm is not None:
+                    before_slots = len(gm.home_team.playbook_settings.get("slot_assignments", {})) if gm.home_team.playbook_settings else 0
                     gm.home_team.playbook_settings = home_settings.get("playbook_settings")
-                    logging.warning(f"✅ [APPLY-SETTINGS] Applied DB home playbook_settings: slot_assignments={db_slots}")
+                    after_slots = len(gm.home_team.playbook_settings.get("slot_assignments", {})) if gm.home_team.playbook_settings else 0
+                    logging.warning(f"🟡 [TRACE-APPLY] {trace_id} | HOME TEAM | APPLIED PLAYBOOK | before_slots={before_slots}, after_slots={after_slots}")
             # ✅ DIAGNOSTIC: Log request vs DB settings comparison for away team
             db_away_inside = away_settings.get("strategy_settings", {}).get("inside", "MISSING") if away_settings.get("strategy_settings") else "NO_DB_SETTINGS"
             req_away_inside = away_strategy.get("inside", "MISSING") if away_strategy and isinstance(away_strategy, dict) else "NO_REQUEST"
@@ -2623,6 +2626,11 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             if away_settings.get("strategy_settings") and not away_strategy:
                 away_strategy = away_settings.get("strategy_settings")
         
+        # ✅ TRACE: Log what we're passing to GameManager
+        home_init_inside = home_strategy.get("inside", "MISSING") if home_strategy and isinstance(home_strategy, dict) else "NO_SETTINGS"
+        away_init_inside = away_strategy.get("inside", "MISSING") if away_strategy and isinstance(away_strategy, dict) else "NO_SETTINGS"
+        logging.warning(f"🟡 [TRACE-APPLY] {trace_id} | GAMEMANAGER INIT | home_strategy_inside={home_init_inside}, away_strategy_inside={away_init_inside}, user_team_side={request.user_team_side}")
+        
         gm = GameManager(
             request.home_team, 
             request.away_team,
@@ -2633,6 +2641,11 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             mode=mode,  # Pass mode so teams can initialize plays with correct stats structure
             user_team_side=request.user_team_side  # ✅ SS&S: Pass user_team_side to set is_user_team flags
         )
+        
+        # ✅ TRACE: Log what GameManager actually has after initialization
+        home_after_init = gm.home_team.strategy_settings.get("inside", "MISSING") if gm.home_team.strategy_settings else "MISSING"
+        away_after_init = gm.away_team.strategy_settings.get("inside", "MISSING") if gm.away_team.strategy_settings else "MISSING"
+        logging.warning(f"🟡 [TRACE-APPLY] {trace_id} | GAMEMANAGER AFTER INIT | home_inside={home_after_init}, away_inside={away_after_init}")
         # ✅ SS&S: Require game_id for Q2-Q4 - cannot start mid-game without existing game document
         # Game document must be created via init-game endpoint before Q1
         if not request.game_id:

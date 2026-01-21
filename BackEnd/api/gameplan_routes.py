@@ -1060,10 +1060,11 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
         defaults = get_default_settings()
         strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
         
-        # ✅ DEBUG: Log strategy_settings for diagnosis
+        # ✅ TRACE: Log strategy_settings loaded from DB
+        trace_id = f"{mode}_{doc_id}_{team_id}"
         inside_value = strategy_settings.get("inside") if strategy_settings else None
         team_id_for_log = actual_team_id if mode == "single" and 'actual_team_id' in locals() else (authoritative_team_id if mode in ["franchise", "tournament"] else "N/A")
-        logger.warning(f"🔍 [GET-GAMEPLAN] mode={mode}, team_id={team_id_for_log}, inside={inside_value}, has_settings={bool(strategy_settings)}")
+        logger.warning(f"🟢 [TRACE-LOAD] {trace_id} | GET-GAMEPLAN | team_id={team_id_for_log}, inside={inside_value}, has_settings={bool(strategy_settings)}")
         
         # ✅ FIX: Normalize legacy keys and ensure all required fields exist
         # Map old key names to new ones (for backward compatibility)
@@ -1243,9 +1244,11 @@ def update_gameplan(request: GamePlanUpdateRequest):
             tournament_doc=doc if request.mode == "tournament" else None
         )
         
-        # ✅ DIAGNOSTIC: Log what strategy_settings we're about to save
+        # ✅ TRACE: Log what strategy_settings we're about to save (with trace ID)
+        trace_id = f"{request.mode}_{doc_id}_{actual_team_id}"
         strategy_sample = dict(list(request.strategy_settings.items())[:5]) if request.strategy_settings else {}
-        logger.warning(f"💾 [SAVE-GAMEPLAN] About to save strategy_settings for team {actual_team_id}: sample={strategy_sample}")
+        inside_value = request.strategy_settings.get("inside", "MISSING") if request.strategy_settings else "MISSING"
+        logger.warning(f"🔵 [TRACE-SAVE] {trace_id} | SAVE-GAMEPLAN START | team={actual_team_id}, inside={inside_value}, sample={strategy_sample}")
         
         # Update settings in the appropriate document
         if request.mode == "franchise":
@@ -1282,9 +1285,9 @@ def update_gameplan(request: GamePlanUpdateRequest):
                 {"$set": update_fields}
             )
         
-        # ✅ DIAGNOSTIC: Log DB write result
+        # ✅ TRACE: Log DB write result
         if result and result.matched_count > 0:
-            logger.warning(f"✅ [SAVE-GAMEPLAN] DB write SUCCESS: matched={result.matched_count}, modified={result.modified_count}")
+            logger.warning(f"🔵 [TRACE-SAVE] {trace_id} | DB WRITE SUCCESS | matched={result.matched_count}, modified={result.modified_count}")
             
             # ✅ DIAGNOSTIC: Verify settings were actually saved
             verify_doc = collection.find_one({"_id": doc_id if request.mode == "single" else ObjectId(doc_id)}, {update_path: 1})
@@ -1299,9 +1302,9 @@ def update_gameplan(request: GamePlanUpdateRequest):
                     logger.warning(f"✅ [SAVE-GAMEPLAN] VERIFIED: Settings saved to DB: sample={saved_sample}")
                     # Verify key values match
                     if saved_settings.get("inside") == request.strategy_settings.get("inside"):
-                        logger.warning(f"✅ [SAVE-GAMEPLAN] VERIFIED: inside value matches: {saved_settings.get('inside')}")
+                        logger.warning(f"🔵 [TRACE-SAVE] {trace_id} | DB VERIFY SUCCESS | inside={saved_settings.get('inside')} matches request")
                     else:
-                        logger.error(f"❌ [SAVE-GAMEPLAN] VERIFICATION FAILED: inside mismatch! saved={saved_settings.get('inside')}, requested={request.strategy_settings.get('inside')}")
+                        logger.error(f"🔴 [TRACE-SAVE] {trace_id} | DB VERIFY FAILED | inside mismatch! saved={saved_settings.get('inside')}, requested={request.strategy_settings.get('inside')}")
                 else:
                     logger.error(f"❌ [SAVE-GAMEPLAN] VERIFICATION FAILED: No strategy_settings found in saved document")
             else:
@@ -1333,9 +1336,11 @@ def update_gameplan(request: GamePlanUpdateRequest):
                         
                         if target_team:
                             # Apply strategy_settings
+                            before_inside = target_team.strategy_settings.get("inside", "MISSING") if target_team.strategy_settings else "MISSING"
                             default_settings = target_team._init_strategy_settings()
                             target_team.strategy_settings = {**default_settings, **request.strategy_settings}
-                            logger.warning(f"✅ [SAVE-GAMEPLAN] Applied strategy_settings to cached GameManager: team={target_team.name}, inside={request.strategy_settings.get('inside')}")
+                            after_inside = target_team.strategy_settings.get("inside", "MISSING")
+                            logger.warning(f"🔵 [TRACE-SAVE] {trace_id} | APPLIED TO GAMEMANAGER | team={target_team.name}, before_inside={before_inside}, after_inside={after_inside}")
                         else:
                             logger.warning(f"⚠️ [SAVE-GAMEPLAN] Team {actual_team_id} not found in cached GameManager (home={gm.home_team.team_id}, away={gm.away_team.team_id})")
             except Exception as e:
