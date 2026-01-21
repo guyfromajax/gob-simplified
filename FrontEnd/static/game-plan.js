@@ -436,12 +436,12 @@ function executeNavigateToCourt() {
   if (currentCId) lineup['C'] = currentCId;
   
   // ✅ DEBUG: Log timeout resume state
+  // ✅ PHASE 1.1: Removed localStorage.game_id read - URL is the source of truth
   console.log('🔍 [GAME-PLAN] executeNavigateToCourt() timeout state:', {
     currentGameId,
     currentQuarter,
     resumeFromTimeout,
-    urlGameId: currentUrlParams.get('game_id'),
-    localStorageGameId: typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null
+    urlGameId: currentUrlParams.get('game_id')
   });
   
   const params = helper.buildGameNavigationParams({
