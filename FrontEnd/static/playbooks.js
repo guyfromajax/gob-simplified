@@ -1033,13 +1033,15 @@ class PlaybooksUI {
         pill.dataset.slot = i;
         
         // Check if this slot is assigned to this play (check all dropdown variants for motion)
-        const isAssigned = this.isSlotAssignedToPlay(i, sectionKey, play.id);
+        // Pass full play object to check both frontend ID and MongoDB ObjectId
+        const isAssigned = this.isSlotAssignedToPlay(i, sectionKey, play);
         if (isAssigned) {
           pill.classList.add('assigned');
           // Show badge with the dropdown value that this slot is assigned to
           if (sectionKey === 'motion') {
             const assignment = this.state.slotAssignments[i];
-            if (assignment && assignment.playId === play.id) {
+            // ✅ Check both play.id (frontend ID) and play.play_id (MongoDB ObjectId)
+            if (assignment && (assignment.playId === play.id || assignment.playId === play.play_id)) {
               const badge = document.createElement('span');
               badge.className = 'slot-badge';
               badge.textContent = assignment.dropdown[0]; // I, A, or O
@@ -1079,17 +1081,21 @@ class PlaybooksUI {
     return row;
   }
   
-  isSlotAssignedToPlay(slotNumber, sectionKey, playId) {
+  isSlotAssignedToPlay(slotNumber, sectionKey, play) {
     const assignment = this.state.slotAssignments[slotNumber];
     if (!assignment) return false;
+    
+    // ✅ Simple fix: Check if assignment.playId matches either play.id (frontend ID) or play.play_id (MongoDB ObjectId)
+    // assignment.playId is a MongoDB ObjectId, so it will match play.play_id
+    const playIdMatches = assignment.playId === play.id || assignment.playId === play.play_id;
     
     // For motion, check if slot is assigned to this play (regardless of current dropdown)
     // The badge will show which dropdown variant it's assigned to
     if (sectionKey === 'motion') {
-      return assignment.section === 'motion' && assignment.playId === playId;
+      return assignment.section === 'motion' && playIdMatches;
     }
     
-    return assignment.section === sectionKey && assignment.playId === playId;
+    return assignment.section === sectionKey && playIdMatches;
   }
   
   handleMotionDropdownChange(playId, dropdownValue, dropdownElement) {
