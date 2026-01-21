@@ -3095,11 +3095,18 @@
         const slotAssignments = data.slot_assignments || {};
         const motionDropdowns = data.motion_dropdowns || {};
         
+        // ✅ DIAGNOSTIC: Log slot assignments structure
+        console.log('🔍 [PLAYCALL CENTER] Slot assignments from API:', slotAssignments);
+        console.log('🔍 [PLAYCALL CENTER] Slot assignment keys:', Object.keys(slotAssignments));
+        
         // Get play data to map playId to play name
         const motionPlays = data.motion || [];
         const setPlayInside = data.set_play_inside || [];
         const setPlayAttack = data.set_play_attack || [];
         const setPlayOutside = data.set_play_outside || [];
+        
+        // ✅ DIAGNOSTIC: Log play arrays
+        console.log('🔍 [PLAYCALL CENTER] Play arrays - motion:', motionPlays.length, 'inside:', setPlayInside.length, 'attack:', setPlayAttack.length, 'outside:', setPlayOutside.length);
         
         // Build map of play IDs to play names
         // Slot assignments may use:
@@ -3187,6 +3194,7 @@
             
             if (!playName) {
               console.warn(`⚠️ [PLAYCALL CENTER] Could not find play name for slot ${slot}, assignment:`, assignment);
+              console.warn(`⚠️ [PLAYCALL CENTER] Available playIdToName keys:`, Object.keys(playIdToName).slice(0, 10));
               continue;
             }
             
