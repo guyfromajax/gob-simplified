@@ -1818,12 +1818,18 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 playbook_settings = team_obj.get("playbook_settings", {})
         elif mode == "single" and not use_gamemanager_settings:
             # ✅ SS&S: GameManager not available - use load_team_settings_from_doc() (same as simulate_quarter_endpoint)
+            # This function handles team_id resolution correctly, so use its result directly
             from BackEnd.api.api import load_team_settings_from_doc
             settings = load_team_settings_from_doc(mode, doc_id, team_id, team_id)
-            playbook_settings = settings.get("playbook_settings", {}) or team_obj.get("playbook_settings", {})
+            playbook_settings = settings.get("playbook_settings")  # Use None if missing, don't fallback to team_obj
+            if not playbook_settings:
+                # Only fallback to team_obj if load_team_settings_from_doc() returned None (not empty dict)
+                playbook_settings = team_obj.get("playbook_settings", {})
             if playbook_settings:
                 slot_count = len(playbook_settings.get("slot_assignments", {}))
                 logger.warning(f"✅ [GET-PLAYBOOKS] Using load_team_settings_from_doc() (same as game start): slot_assignments={slot_count}")
+            else:
+                logger.warning(f"⚠️ [GET-PLAYBOOKS] load_team_settings_from_doc() returned no playbook_settings, using empty dict")
         else:
             playbook_settings = team_obj.get("playbook_settings", {})
         
