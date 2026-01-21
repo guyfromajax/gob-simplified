@@ -15,6 +15,37 @@ logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 
+# ✅ PHASE 1.1: Add explicit OPTIONS handlers for CORS preflight
+@router.options("/api/gameplan")
+async def gameplan_options():
+    """Explicit OPTIONS handler for CORS preflight."""
+    from fastapi import Response
+    return Response(
+        status_code=204,
+        headers={
+            "Access-Control-Allow-Origin": "*",  # Will be overridden by middleware, but ensures it's there
+            "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
+
+@router.options("/api/playbooks")
+async def playbooks_options():
+    """Explicit OPTIONS handler for CORS preflight."""
+    from fastapi import Response
+    return Response(
+        status_code=204,
+        headers={
+            "Access-Control-Allow-Origin": "*",  # Will be overridden by middleware, but ensures it's there
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
+
 @router.get("/game-plan.html")
 def serve_game_plan_html():
     """Return the game plan page so query params work in production."""
