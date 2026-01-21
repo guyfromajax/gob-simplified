@@ -9,6 +9,7 @@ from typing import Optional
 from BackEnd.db import db
 from BackEnd.api.franchise_routes import get_user_team_from_franchise
 from BackEnd.api.tournament_routes import get_user_team_from_tournament
+from BackEnd.api.api import ongoing_games
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -1279,6 +1280,33 @@ def update_gameplan(request: GamePlanUpdateRequest):
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} not found")
         
+        # ✅ SS&S: Apply settings immediately to GameManager if game is in cache
+        # This ensures GameManager always reflects what's in DB (single source of truth)
+        if request.mode == "single" and request.game_id and result and result.matched_count > 0:
+            try:
+                gm = ongoing_games.get(request.game_id)
+                if gm:
+                    # Verify game_id matches
+                    if hasattr(gm, 'game_id') and str(gm.game_id) != str(request.game_id):
+                        logger.warning(f"⚠️ [SAVE-GAMEPLAN] Game ID mismatch: cache={gm.game_id}, request={request.game_id}")
+                    else:
+                        # Determine which team to update
+                        target_team = None
+                        if actual_team_id == gm.home_team.team_id:
+                            target_team = gm.home_team
+                        elif actual_team_id == gm.away_team.team_id:
+                            target_team = gm.away_team
+                        
+                        if target_team:
+                            # Apply strategy_settings
+                            default_settings = target_team._init_strategy_settings()
+                            target_team.strategy_settings = {**default_settings, **request.strategy_settings}
+                            logger.warning(f"✅ [SAVE-GAMEPLAN] Applied strategy_settings to cached GameManager: team={target_team.name}, inside={request.strategy_settings.get('inside')}")
+                        else:
+                            logger.warning(f"⚠️ [SAVE-GAMEPLAN] Team {actual_team_id} not found in cached GameManager (home={gm.home_team.team_id}, away={gm.away_team.team_id})")
+            except Exception as e:
+                logger.warning(f"⚠️ [SAVE-GAMEPLAN] Error applying to cached GameManager (non-critical): {e}")
+        
         logger.info(f"✅ Updated game plan for team {request.team_id} in {request.mode} mode")
         return {"success": True, "message": "Game plan saved successfully"}
     
@@ -2079,6 +2107,33 @@ def save_playbooks(request: PlaybookSettingsRequest):
                 logger.warning(f"⚠️ [PLAYBOOKS SAVE] Could not verify save - document not found")
         except Exception as e:
             logger.warning(f"⚠️ [PLAYBOOKS SAVE] Error during verification (non-critical): {e}")
+        
+        # ✅ SS&S: Apply settings immediately to GameManager if game is in cache
+        # This ensures GameManager always reflects what's in DB (single source of truth)
+        if request.mode == "single" and request.game_id and result and result.matched_count > 0:
+            try:
+                gm = ongoing_games.get(request.game_id)
+                if gm:
+                    # Verify game_id matches
+                    if hasattr(gm, 'game_id') and str(gm.game_id) != str(request.game_id):
+                        logger.warning(f"⚠️ [SAVE-PLAYBOOKS] Game ID mismatch: cache={gm.game_id}, request={request.game_id}")
+                    else:
+                        # Determine which team to update
+                        target_team = None
+                        if actual_team_id == gm.home_team.team_id:
+                            target_team = gm.home_team
+                        elif actual_team_id == gm.away_team.team_id:
+                            target_team = gm.away_team
+                        
+                        if target_team:
+                            # Apply playbook_settings
+                            target_team.playbook_settings = request.playbook_settings
+                            slot_count = len(request.playbook_settings.get("slot_assignments", {}))
+                            logger.warning(f"✅ [SAVE-PLAYBOOKS] Applied playbook_settings to cached GameManager: team={target_team.name}, slot_assignments={slot_count}")
+                        else:
+                            logger.warning(f"⚠️ [SAVE-PLAYBOOKS] Team {actual_team_id} not found in cached GameManager (home={gm.home_team.team_id}, away={gm.away_team.team_id})")
+            except Exception as e:
+                logger.warning(f"⚠️ [SAVE-PLAYBOOKS] Error applying to cached GameManager (non-critical): {e}")
         
         logger.warning(f"✅ Saved playbook settings for team {actual_team_id} in {request.mode} mode")
         return {"success": True, "message": "Playbook settings saved successfully"}
