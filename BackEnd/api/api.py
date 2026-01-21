@@ -1310,17 +1310,32 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                     away_team_data = saved.get("away_team", {})
                     logging.warning(f"⚠️ Using legacy away_team structure (teams object not found)")
                 
+                # ✅ FIX: Extract team names with fallbacks to ensure we always have strings (never None)
+                # This prevents TypeError when using None as dictionary keys
+                home_team_name = (
+                    home_team_data.get("name") or 
+                    saved.get("home_team", {}).get("name") or 
+                    (home_team_id if home_team_id else "") or
+                    ""
+                )
+                away_team_name = (
+                    away_team_data.get("name") or 
+                    saved.get("away_team", {}).get("name") or 
+                    (away_team_id if away_team_id else "") or
+                    ""
+                )
+                
                 # Extract scouting data from teams object (contains playcall stats for S2 tab)
                 home_scouting = home_team_data.get("scouting", {})
                 away_scouting = away_team_data.get("scouting", {})
                 
                 # Build team_stats structure (for S2 tab - playcall stats)
                 team_stats = {
-                    home_team_data.get("name"): {
+                    home_team_name: {
                         "offense": home_scouting.get("offense", {}),
                         "defense": home_scouting.get("defense", {})
                     },
-                    away_team_data.get("name"): {
+                    away_team_name: {
                         "offense": away_scouting.get("offense", {}),
                         "defense": away_scouting.get("defense", {})
                     }
@@ -1329,9 +1344,7 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                 # Build box_score from nested structure (unified structure stores it in teams[team_id].box_score)
                 box_score = saved.get("box_score", {})
                 if not box_score:
-                    # Build from unified teams structure
-                    home_team_name = home_team_data.get("name")
-                    away_team_name = away_team_data.get("name")
+                    # Build from unified teams structure (use extracted team names)
                     if home_team_name and "box_score" in home_team_data:
                         box_score[home_team_name] = home_team_data.get("box_score", {})
                     if away_team_name and "box_score" in away_team_data:
@@ -1349,8 +1362,8 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                     home_score = home_team_data.get("score", 0)
                     away_score = away_team_data.get("score", 0)
                     saved_score = {
-                        home_team_data.get("name"): home_score,
-                        away_team_data.get("name"): away_score
+                        home_team_name: home_score,
+                        away_team_name: away_score
                     }
                     logging.warning(f"🔍 [SCORE DEBUG] Built score from teams object: {saved_score}")
                 # ✅ REMOVED: Score debug log (cluttering Railway logs)
@@ -1373,18 +1386,18 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                     "teams": teams_obj,
                     # Team-level stats (for S1/S2/S3 tabs and scoreboard)
                     "team_totals": {
-                        home_team_data.get("name"): home_team_data.get("totals", {}),
-                        away_team_data.get("name"): away_team_data.get("totals", {})
+                        home_team_name: home_team_data.get("totals", {}),
+                        away_team_name: away_team_data.get("totals", {})
                     },
                     "team_stats": team_stats,  # Playcall stats for S2 tab
                     "points_by_quarter": {
-                        home_team_data.get("name"): home_team_data.get("points_by_quarter", [0, 0, 0, 0]),
-                        away_team_data.get("name"): away_team_data.get("points_by_quarter", [0, 0, 0, 0])
+                        home_team_name: home_team_data.get("points_by_quarter", [0, 0, 0, 0]),
+                        away_team_name: away_team_data.get("points_by_quarter", [0, 0, 0, 0])
                     },
                     # ✅ BACKWARD COMPATIBILITY: Keep home_team/away_team in response (built from teams object)
                     # TODO: Remove these after frontend is updated to use teams[home_team_id]/teams[away_team_id]
                     "home_team": {
-                        "name": home_team_data.get("name"),
+                        "name": home_team_name,
                         "team_fouls": home_team_data.get("team_fouls", 0),
                         "attributes": home_team_data.get("attributes", {}),  # Team attributes for S3 tab
                         "colors": home_team_data.get("colors", {}),
@@ -1395,7 +1408,7 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                         "totals": home_team_data.get("totals", {})
                     },
                     "away_team": {
-                        "name": away_team_data.get("name"),
+                        "name": away_team_name,
                         "team_fouls": away_team_data.get("team_fouls", 0),
                         "attributes": away_team_data.get("attributes", {}),  # Team attributes for S3 tab
                         "colors": away_team_data.get("colors", {}),
