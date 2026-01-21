@@ -928,6 +928,14 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
         elif mode == "single":
             if not game_id:
                 raise HTTPException(status_code=400, detail="game_id required for single game mode")
+            # ✅ PHASE 1.1: Normalize game_id at entry point (standardize to ObjectId format)
+            from BackEnd.utils.game_id_utils import normalize_game_id
+            original_game_id = game_id
+            game_id = normalize_game_id(game_id)
+            if original_game_id != game_id:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"🔍 [NORMALIZE] GET /api/gameplan - Normalized game_id from '{original_game_id}' to '{game_id}'")
             doc_id = game_id
             collection = db.games
             
@@ -1160,7 +1168,15 @@ def update_gameplan(request: GamePlanUpdateRequest):
         elif request.mode == "single":
             if not request.game_id:
                 raise HTTPException(status_code=400, detail="game_id required for single game mode")
-            doc_id = request.game_id
+            # ✅ PHASE 1.1: Normalize game_id at entry point (standardize to ObjectId format)
+            from BackEnd.utils.game_id_utils import normalize_game_id
+            original_game_id = request.game_id
+            game_id = normalize_game_id(request.game_id)
+            if original_game_id != game_id:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"🔍 [NORMALIZE] PUT /api/gameplan - Normalized game_id from '{original_game_id}' to '{game_id}'")
+            doc_id = game_id
             collection = db.games
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode: {request.mode}")
@@ -1431,6 +1447,14 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         elif mode == "single":
             if not game_id:
                 raise HTTPException(status_code=400, detail="game_id required for single game mode")
+            # ✅ PHASE 1.1: Normalize game_id at entry point (standardize to ObjectId format)
+            from BackEnd.utils.game_id_utils import normalize_game_id
+            original_game_id = game_id
+            game_id = normalize_game_id(game_id)
+            if original_game_id != game_id:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"🔍 [NORMALIZE] GET /api/playbooks - Normalized game_id from '{original_game_id}' to '{game_id}'")
             doc_id = game_id
             collection = db.games
             
@@ -2025,7 +2049,15 @@ def save_playbooks(request: PlaybookSettingsRequest):
         elif request.mode == "single":
             if not request.game_id:
                 raise HTTPException(status_code=400, detail="game_id required for single game mode")
-            doc_id = request.game_id
+            # ✅ PHASE 1.1: Normalize game_id at entry point (standardize to ObjectId format)
+            from BackEnd.utils.game_id_utils import normalize_game_id
+            original_game_id = request.game_id
+            game_id = normalize_game_id(request.game_id)
+            if original_game_id != game_id:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"🔍 [NORMALIZE] POST /api/playbooks - Normalized game_id from '{original_game_id}' to '{game_id}'")
+            doc_id = game_id
             collection = db.games
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode: {request.mode}")

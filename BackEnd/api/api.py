@@ -1055,6 +1055,13 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
     import time
     endpoint_start = time.time()
     
+    # ✅ PHASE 1.1: Normalize game_id at entry point (standardize to ObjectId format)
+    from BackEnd.utils.game_id_utils import normalize_game_id
+    original_game_id = game_id
+    game_id = normalize_game_id(game_id)
+    if original_game_id != game_id:
+        logger.warning(f"🔍 [NORMALIZE] GET /api/game - Normalized game_id from '{original_game_id}' to '{game_id}'")
+    
     try:
         # ✅ HYBRID APPROACH: If source=db, skip cache and always read from database
         # This ensures lineup screen always gets fresh data (only ~13 reads per game: timeouts + quarter breaks)
@@ -2729,9 +2736,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 status_code=400,
                 detail=f"game_id required for Q{request.quarter}. Game document must be created via /api/init-game before Q1. Cannot start Q{request.quarter} without existing game document."
             )
-        # Verify game document exists in database
+        # ✅ PHASE 1.1: Normalize game_id at entry point (standardize to ObjectId format)
         from BackEnd.utils.game_id_utils import normalize_game_id
+        original_game_id = request.game_id
         game_id = normalize_game_id(request.game_id)
+        if original_game_id != game_id:
+            logger.warning(f"🔍 [NORMALIZE] POST /api/simulate-quarter - Normalized game_id from '{original_game_id}' to '{game_id}'")
         saved = games_collection.find_one({"_id": game_id}) if games_collection else None
         if not saved:
             try:
@@ -3558,10 +3568,16 @@ async def set_playcall_override_endpoint(raw_request: Request):
 async def call_timeout_endpoint(request: CallTimeoutRequest):
     # User-initiated timeout endpoint.
     # Creates a TIMEOUT turn and saves game state before navigating to lineup screen.
-    game_id = request.game_id
+    # ✅ PHASE 1.1: Normalize game_id at entry point (standardize to ObjectId format)
+    from BackEnd.utils.game_id_utils import normalize_game_id
+    original_game_id = request.game_id
+    game_id = normalize_game_id(request.game_id) if request.game_id else None
+    if original_game_id != game_id:
+        logger.warning(f"🔍 [NORMALIZE] POST /api/call-timeout - Normalized game_id from '{original_game_id}' to '{game_id}'")
+    
     calling_team_side = request.calling_team  # 'home' or 'away'
     
-    gm = ongoing_games.get(game_id)
+    gm = ongoing_games.get(game_id) if game_id else None
     if gm is None:
         raise HTTPException(status_code=404, detail=f"Game {game_id} not found.")
     
