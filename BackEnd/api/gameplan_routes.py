@@ -1669,8 +1669,35 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         set_plays_attack.sort(key=lambda x: x["name"])
         set_plays_outside.sort(key=lambda x: x["name"])
         
+        # ✅ FIX: Reload team_obj from latest doc to ensure we have fresh playbook_settings
+        # This ensures slot_assignments and other settings are current after all document reloads
+        if mode == "franchise":
+            doc = collection.find_one({"_id": ObjectId(doc_id)})
+            franchise_teams = doc.get("franchise_teams", {})
+            team_obj = franchise_teams.get(actual_team_id, {}) if actual_team_id else {}
+        elif mode == "tournament":
+            doc = collection.find_one({"_id": ObjectId(doc_id)})
+            teams = doc.get("teams", {})
+            team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
+        else:
+            # For single mode, try both formats
+            doc = collection.find_one({"_id": doc_id})
+            if not doc:
+                try:
+                    doc = collection.find_one({"_id": ObjectId(doc_id)})
+                except:
+                    pass
+            teams = doc.get("teams", {}) if doc else {}
+            team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
+        
         # Get playbook settings (percentages, slot assignments, motion dropdowns, and position filters)
         playbook_settings = team_obj.get("playbook_settings", {})
+        
+        # ✅ DEBUG: Log slot_assignments for diagnosis
+        slot_count = len(playbook_settings.get("slot_assignments", {})) if playbook_settings else 0
+        logger.warning(f"🔍 [GET-PLAYBOOKS] actual_team_id={actual_team_id}, slot_assignments count={slot_count}")
+        if slot_count > 0:
+            logger.warning(f"🔍 [GET-PLAYBOOKS] slot_assignments keys: {list(playbook_settings.get('slot_assignments', {}).keys())}")
         # ✅ PERFORMANCE: Removed debug logging - only log actual errors
         
         # ✅ SINGLE GAME CROSS-INSTANCE PERSISTENCE: Check core teams collection if game document has no settings
