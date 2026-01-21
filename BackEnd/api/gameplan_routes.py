@@ -1730,7 +1730,24 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             
             logger.warning(f"✅ [GET PLAYBOOKS] plays populated, reloaded team_obj has {len(team_obj.get('plays', {}))} plays")
         
-        plays = team_obj.get("plays", {})
+        # ✅ SS&S: Get plays from GameManager if available, otherwise from team_obj
+        plays = {}
+        if mode == "single" and use_gamemanager_settings and gm:
+            # Use GameManager plays (single source of truth during gameplay)
+            target_team = None
+            if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+                target_team = gm.home_team
+            elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+                target_team = gm.away_team
+            
+            if target_team and hasattr(target_team, 'plays') and target_team.plays:
+                plays = target_team.plays
+                logger.warning(f"✅ [GET-PLAYBOOKS] Using GameManager plays: {len(plays)} plays")
+            else:
+                plays = team_obj.get("plays", {})
+        else:
+            plays = team_obj.get("plays", {})
+        
         # ✅ PERFORMANCE: Removed debug logging
         
         # Organize plays by type and focus
