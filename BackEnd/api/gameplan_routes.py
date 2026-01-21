@@ -937,8 +937,6 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
             original_game_id = game_id
             game_id = normalize_game_id(game_id)
             if original_game_id != game_id:
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.warning(f"🔍 [NORMALIZE] GET /api/gameplan - Normalized game_id from '{original_game_id}' to '{game_id}'")
             doc_id = game_id
             collection = db.games
@@ -1177,8 +1175,6 @@ def update_gameplan(request: GamePlanUpdateRequest):
             original_game_id = request.game_id
             game_id = normalize_game_id(request.game_id)
             if original_game_id != game_id:
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.warning(f"🔍 [NORMALIZE] PUT /api/gameplan - Normalized game_id from '{original_game_id}' to '{game_id}'")
             doc_id = game_id
             collection = db.games
@@ -1456,8 +1452,6 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             original_game_id = game_id
             game_id = normalize_game_id(game_id)
             if original_game_id != game_id:
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.warning(f"🔍 [NORMALIZE] GET /api/playbooks - Normalized game_id from '{original_game_id}' to '{game_id}'")
             doc_id = game_id
             collection = db.games
@@ -2058,8 +2052,6 @@ def save_playbooks(request: PlaybookSettingsRequest):
             original_game_id = request.game_id
             game_id = normalize_game_id(request.game_id)
             if original_game_id != game_id:
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.warning(f"🔍 [NORMALIZE] POST /api/playbooks - Normalized game_id from '{original_game_id}' to '{game_id}'")
             doc_id = game_id
             collection = db.games
