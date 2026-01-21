@@ -917,26 +917,7 @@ def summarize_game_state(game, exclude_animations=True):
     away_actual_team_id = None
     
     # 🔍 DEBUG: Check if GameManager has settings (for diagnostic purposes)
-    # This helps us understand if settings are being lost between application and summarize
-    if hasattr(game.home_team, 'playbook_settings'):
-        gm_home_settings = game.home_team.playbook_settings
-        if gm_home_settings:
-            slot_count = len(gm_home_settings.get("slot_assignments", {}))
-            logging.warning(f"🔍 [SUMMARIZE DEBUG] GameManager HAS home playbook_settings: slot_assignments={slot_count} (but DB is source of truth)")
-        else:
-            logging.warning(f"🔍 [SUMMARIZE DEBUG] GameManager home playbook_settings is empty/None")
-    else:
-        logging.warning(f"🔍 [SUMMARIZE DEBUG] GameManager home_team has NO playbook_settings attribute")
-    
-    if hasattr(game.away_team, 'playbook_settings'):
-        gm_away_settings = game.away_team.playbook_settings
-        if gm_away_settings:
-            slot_count = len(gm_away_settings.get("slot_assignments", {}))
-            logging.warning(f"🔍 [SUMMARIZE DEBUG] GameManager HAS away playbook_settings: slot_assignments={slot_count} (but DB is source of truth)")
-        else:
-            logging.warning(f"🔍 [SUMMARIZE DEBUG] GameManager away playbook_settings is empty/None")
-    else:
-        logging.warning(f"🔍 [SUMMARIZE DEBUG] GameManager away_team has NO playbook_settings attribute")
+    # ✅ REMOVED: Verbose SUMMARIZE DEBUG logs - redundant with trace logs
     
     # ✅ SS&S: DB is source of truth - load from DB for persistence
     if exclude_animations and hasattr(game, 'game_id') and game.game_id:
@@ -1080,36 +1061,15 @@ def summarize_game_state(game, exclude_animations=True):
     home_strategy = getattr(game.home_team, 'strategy_settings', {})
     away_strategy = getattr(game.away_team, 'strategy_settings', {})
     
-    # ✅ DIAGNOSTIC: Log strategy_settings being saved
-    logging.warning(f"💾 [PERSIST-SETTINGS] Summarizing game state - GameManager strategy_settings:")
-    if home_strategy and 'inside' in home_strategy:
-        logging.warning(f"💾 [PERSIST-SETTINGS] Home strategy_settings inside: {home_strategy.get('inside')}, sample={dict(list(home_strategy.items())[:3])}")
-    elif home_strategy:
-        logging.warning(f"💾 [PERSIST-SETTINGS] Home strategy_settings keys: {list(home_strategy.keys())}, inside: MISSING")
-    else:
+    # ✅ REMOVED: Verbose PERSIST-SETTINGS logs - redundant with trace logs (keep only warnings)
+    # Only log warnings if settings are missing (these indicate problems)
+    if not home_strategy or not isinstance(home_strategy, dict) or len(home_strategy) == 0:
         logging.warning(f"⚠️ [PERSIST-SETTINGS] Home strategy_settings is empty or missing!")
-    if away_strategy and 'inside' in away_strategy:
-        logging.warning(f"💾 [PERSIST-SETTINGS] Away strategy_settings inside: {away_strategy.get('inside')}, sample={dict(list(away_strategy.items())[:3])}")
-    elif away_strategy:
-        logging.warning(f"💾 [PERSIST-SETTINGS] Away strategy_settings keys: {list(away_strategy.keys())}, inside: MISSING")
-    else:
+    if not away_strategy or not isinstance(away_strategy, dict) or len(away_strategy) == 0:
         logging.warning(f"⚠️ [PERSIST-SETTINGS] Away strategy_settings is empty or missing!")
-    
-    # ✅ DIAGNOSTIC: Log playbook_settings being saved
-    logging.warning(f"💾 [PERSIST-SETTINGS] Playbook_settings in summary:")
-    if home_playbook_settings:
-        slot_count = len(home_playbook_settings.get("slot_assignments", {}))
-        logging.warning(f"💾 [PERSIST-SETTINGS] Home playbook_settings: slot_assignments={slot_count}, motion={bool(home_playbook_settings.get('motion'))}")
-        if slot_count > 0:
-            sample_slot = next(iter(home_playbook_settings.get("slot_assignments", {}).values()), None)
-            if sample_slot:
-                logging.warning(f"💾 [PERSIST-SETTINGS] Home sample slot: section={sample_slot.get('section')}, playId={sample_slot.get('playId')}, playName={sample_slot.get('playName')}")
-    else:
+    if not home_playbook_settings or not isinstance(home_playbook_settings, dict):
         logging.warning(f"⚠️ [PERSIST-SETTINGS] Home playbook_settings is empty or missing!")
-    if away_playbook_settings:
-        slot_count = len(away_playbook_settings.get("slot_assignments", {}))
-        logging.warning(f"💾 [PERSIST-SETTINGS] Away playbook_settings: slot_assignments={slot_count}, motion={bool(away_playbook_settings.get('motion'))}")
-    else:
+    if not away_playbook_settings or not isinstance(away_playbook_settings, dict):
         logging.warning(f"⚠️ [PERSIST-SETTINGS] Away playbook_settings is empty or missing!")
     
     # ✅ UNIFIED STRUCTURE: All team data in one place (eliminates home_team/away_team duplication)

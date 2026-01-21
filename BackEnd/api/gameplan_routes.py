@@ -1733,9 +1733,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         
         # ✅ DEBUG: Log slot_assignments for diagnosis
         slot_count = len(playbook_settings.get("slot_assignments", {})) if playbook_settings else 0
-        logger.warning(f"🔍 [GET-PLAYBOOKS] actual_team_id={actual_team_id}, slot_assignments count={slot_count}")
-        if slot_count > 0:
-            logger.warning(f"🔍 [GET-PLAYBOOKS] slot_assignments keys: {list(playbook_settings.get('slot_assignments', {}).keys())}")
+        # ✅ REMOVED: Verbose GET-PLAYBOOKS logs - redundant with trace logs
         # ✅ PERFORMANCE: Removed debug logging - only log actual errors
         
         # ✅ SINGLE GAME CROSS-INSTANCE PERSISTENCE: Check core teams collection if game document has no settings
@@ -1978,16 +1976,9 @@ def save_playbooks(request: PlaybookSettingsRequest):
                     detail=f"Internal error: Resolved team_id '{actual_team_id}' not found in game document"
                 )
         
-        logger.warning(f"🔍 [PLAYBOOKS SAVE] Resolved actual_team_id: {actual_team_id} (from request.team_id: {request.team_id})")
+        # ✅ REMOVED: Verbose resolved team_id log - redundant with trace logs
         
-        # ✅ DIAGNOSTIC: Log slot_assignments being saved
-        if request.playbook_settings and request.playbook_settings.get("slot_assignments"):
-            slot_count = len(request.playbook_settings.get("slot_assignments", {}))
-            logger.warning(f"📋 [SAVE-PLAYBOOKS] Saving {slot_count} slot assignments for team {actual_team_id}")
-            # Log sample slot assignment
-            sample_slot = next(iter(request.playbook_settings.get("slot_assignments", {}).values()), None)
-            if sample_slot:
-                logger.warning(f"📋 [SAVE-PLAYBOOKS] Sample slot assignment: section={sample_slot.get('section')}, playId={sample_slot.get('playId')}, playName={sample_slot.get('playName')}")
+        # ✅ REMOVED: Verbose slot assignment logs - redundant with trace logs
         
         # ✅ FIX: Ensure team objects exist AFTER resolving actual_team_id
         # This ensures we're using the correct team_id when creating/updating team objects
@@ -2034,13 +2025,7 @@ def save_playbooks(request: PlaybookSettingsRequest):
         else:
             update_path = f"teams.{actual_team_id}.playbook_settings"
         
-        logger.warning(f"🔍 [PLAYBOOKS SAVE] Update path: {update_path}")
-        logger.warning(f"🔍 [PLAYBOOKS SAVE] actual_team_id: {actual_team_id}")
-        logger.warning(f"🔍 [PLAYBOOKS SAVE] doc_id: {doc_id}")
-        
-        # ✅ DIAGNOSTIC: Log what we're about to write to DB
-        logger.warning(f"💾 [SAVE-PLAYBOOKS] About to write to DB: update_path={update_path}, doc_id={doc_id}, mode={request.mode}")
-        logger.warning(f"💾 [SAVE-PLAYBOOKS] Settings structure: slot_assignments={bool(request.playbook_settings.get('slot_assignments'))}, motion={bool(request.playbook_settings.get('motion'))}, set_play_inside={bool(request.playbook_settings.get('set_play_inside'))}")
+        # ✅ REMOVED: Verbose save logs - redundant with trace logs
         
         # For single game mode, try both UUID string and ObjectId formats
         if request.mode == "single":
@@ -2098,16 +2083,13 @@ def save_playbooks(request: PlaybookSettingsRequest):
                 logger.warning(f"⚠️ Error saving to core teams collection (non-critical): {e}")
         else:
             # ✅ CRITICAL: Log the exact data being saved before the update
-            logger.warning(f"🔍 [PLAYBOOKS SAVE] About to save playbook_settings with {len(request.playbook_settings.get('motion', {}))} motion plays")
-            if request.playbook_settings.get('motion'):
-                sample_motion = dict(list(request.playbook_settings.get('motion', {}).items())[:3])
-                logger.warning(f"🔍 [PLAYBOOKS SAVE] Sample motion percentages being saved: {sample_motion}")
+        # ✅ REMOVED: Verbose motion plays logs - redundant with trace logs
             
             result = collection.update_one(
                 {"_id": ObjectId(doc_id)},
                 {"$set": {update_path: request.playbook_settings}}
             )
-            logger.warning(f"🔍 [PLAYBOOKS SAVE] MongoDB update result: matched={result.matched_count}, modified={result.modified_count}")
+        # ✅ REMOVED: Verbose MongoDB update result log - redundant with trace logs
             
             if result.matched_count == 0:
                 logger.error(f"❌ [PLAYBOOKS SAVE] Document not found: mode={request.mode}, doc_id={doc_id}")
