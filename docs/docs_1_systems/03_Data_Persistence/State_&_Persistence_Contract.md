@@ -204,6 +204,8 @@
 
 ## 4. Implementation Plan
 
+**⚠️ NOTE: This section has been consolidated into the Unified Work Plan. See `Unified_State_Persistence_Work_Plan.md` for the current implementation plan with specific tasks and progress tracking.**
+
 ### Phase 1: Establish Truth Sources (Week 1)
 
 **Goal:** Document and enforce single authoritative source for each variable.
