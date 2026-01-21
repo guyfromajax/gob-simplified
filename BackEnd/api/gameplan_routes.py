@@ -1814,6 +1814,15 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             if target_team and hasattr(target_team, 'playbook_settings') and target_team.playbook_settings:
                 playbook_settings = target_team.playbook_settings
                 logger.warning(f"✅ [GET-PLAYBOOKS] Using GameManager playbook_settings: slot_assignments={len(playbook_settings.get('slot_assignments', {}))}")
+                # ✅ DEBUG: Log GameManager playbook_settings structure
+                logger.warning(f"🔍 [GET-PLAYBOOKS DEBUG] GameManager playbook_settings structure:")
+                logger.warning(f"   - Type: {type(playbook_settings)}")
+                logger.warning(f"   - Top-level keys: {list(playbook_settings.keys()) if isinstance(playbook_settings, dict) else 'NOT A DICT'}")
+                if isinstance(playbook_settings, dict):
+                    logger.warning(f"   - motion type: {type(playbook_settings.get('motion'))}, keys: {list(playbook_settings.get('motion', {}).keys())[:3]}")
+                    logger.warning(f"   - set_play_inside type: {type(playbook_settings.get('set_play_inside'))}, keys: {list(playbook_settings.get('set_play_inside', {}).keys())[:3]}")
+                    logger.warning(f"   - set_play_attack type: {type(playbook_settings.get('set_play_attack'))}, keys: {list(playbook_settings.get('set_play_attack', {}).keys())[:3]}")
+                    logger.warning(f"   - set_play_outside type: {type(playbook_settings.get('set_play_outside'))}, keys: {list(playbook_settings.get('set_play_outside', {}).keys())[:3]}")
             else:
                 playbook_settings = team_obj.get("playbook_settings", {})
         elif mode == "single" and not use_gamemanager_settings:
@@ -1887,14 +1896,21 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             if key not in position_filters:
                 position_filters[key] = []
         
-        # ✅ PERFORMANCE: Removed debug logging
+        # ✅ DEBUG: Log extracted percentages to see what we're returning
         # Get saved playbook percentages (motion, set_play, zone_defense)
-        motion_percentages = playbook_settings.get("motion", {})
-        set_play_inside_percentages = playbook_settings.get("set_play_inside", {})
-        set_play_attack_percentages = playbook_settings.get("set_play_attack", {})
-        set_play_outside_percentages = playbook_settings.get("set_play_outside", {})
-        zone_defense_percentages = playbook_settings.get("zone_defense", {})
-        man_defense_percentages = playbook_settings.get("man_defense", {})
+        motion_percentages = playbook_settings.get("motion", {}) if playbook_settings else {}
+        set_play_inside_percentages = playbook_settings.get("set_play_inside", {}) if playbook_settings else {}
+        set_play_attack_percentages = playbook_settings.get("set_play_attack", {}) if playbook_settings else {}
+        set_play_outside_percentages = playbook_settings.get("set_play_outside", {}) if playbook_settings else {}
+        zone_defense_percentages = playbook_settings.get("zone_defense", {}) if playbook_settings else {}
+        man_defense_percentages = playbook_settings.get("man_defense", {}) if playbook_settings else {}
+        
+        # ✅ DEBUG: Log extracted percentages structure
+        logger.warning(f"🔍 [GET-PLAYBOOKS DEBUG] Extracted percentages structure:")
+        logger.warning(f"   - motion_percentages type: {type(motion_percentages)}, keys: {list(motion_percentages.keys())[:3] if isinstance(motion_percentages, dict) else 'NOT A DICT'}")
+        logger.warning(f"   - set_play_inside_percentages type: {type(set_play_inside_percentages)}, keys: {list(set_play_inside_percentages.keys())[:3] if isinstance(set_play_inside_percentages, dict) else 'NOT A DICT'}")
+        logger.warning(f"   - set_play_attack_percentages type: {type(set_play_attack_percentages)}, keys: {list(set_play_attack_percentages.keys())[:3] if isinstance(set_play_attack_percentages, dict) else 'NOT A DICT'}")
+        logger.warning(f"   - set_play_outside_percentages type: {type(set_play_outside_percentages)}, keys: {list(set_play_outside_percentages.keys())[:3] if isinstance(set_play_outside_percentages, dict) else 'NOT A DICT'}")
         
         # Get even_distribution_all flag (defaults to False if not set)
         even_distribution_all = playbook_settings.get("even_distribution_all", False)
@@ -2081,6 +2097,18 @@ def save_playbooks(request: PlaybookSettingsRequest):
         # ✅ REMOVED: Verbose resolved team_id log - redundant with trace logs
         
         # ✅ REMOVED: Verbose slot assignment logs - redundant with trace logs
+        
+        # ✅ DEBUG: Log playbook_settings structure being saved (before ensure_team_objects_exist)
+        if request.playbook_settings:
+            logger.warning(f"🔍 [SAVE-PLAYBOOKS DEBUG] playbook_settings structure BEFORE save:")
+            logger.warning(f"   - Top-level keys: {list(request.playbook_settings.keys())}")
+            logger.warning(f"   - motion keys: {list(request.playbook_settings.get('motion', {}).keys())}")
+            logger.warning(f"   - set_play_inside keys: {list(request.playbook_settings.get('set_play_inside', {}).keys())}")
+            logger.warning(f"   - set_play_attack keys: {list(request.playbook_settings.get('set_play_attack', {}).keys())}")
+            logger.warning(f"   - set_play_outside keys: {list(request.playbook_settings.get('set_play_outside', {}).keys())}")
+            logger.warning(f"   - slot_assignments count: {len(request.playbook_settings.get('slot_assignments', {}))}")
+            slot_sample = dict(list(request.playbook_settings.get('slot_assignments', {}).items())[:2])
+            logger.warning(f"   - slot_assignments sample: {slot_sample}")
         
         # ✅ FIX: Ensure team objects exist AFTER resolving actual_team_id
         # This ensures we're using the correct team_id when creating/updating team objects
