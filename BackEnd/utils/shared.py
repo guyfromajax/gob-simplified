@@ -1020,7 +1020,6 @@ def summarize_game_state(game, exclude_animations=True):
                     home_team_data = teams.get(home_actual_team_id, {})
                     home_playbook_settings = home_team_data.get("playbook_settings", {})
                     # ✅ REMOVED: Verbose debug logs - only log success/failure
-                    if not home_playbook_settings:
                     # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
                     # This handles legacy saves where settings were saved under team name keys
                     if not home_playbook_settings:
@@ -1039,7 +1038,6 @@ def summarize_game_state(game, exclude_animations=True):
                     away_team_data = teams.get(away_actual_team_id, {})
                     away_playbook_settings = away_team_data.get("playbook_settings", {})
                     # ✅ REMOVED: Verbose debug logs - only log success/failure
-                    if not away_playbook_settings:
                     # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
                     if not away_playbook_settings:
                         # Try to find by team name (legacy format)

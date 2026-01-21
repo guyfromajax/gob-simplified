@@ -1030,27 +1030,31 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
         
         # ✅ FIX: Reload team_obj from latest doc to ensure we have fresh strategy_settings
         # This ensures strategy_settings are current after ensure_team_objects_exist updates
-        if mode == "franchise":
-            doc = collection.find_one({"_id": ObjectId(doc_id)})
-            if doc:
-                franchise_teams = doc.get("franchise_teams", {})
-                team_obj = franchise_teams.get(authoritative_team_id, {})
-        elif mode == "tournament":
-            doc = collection.find_one({"_id": ObjectId(doc_id)})
-            if doc:
-                teams_dict = doc.get("teams", {})
-                team_obj = teams_dict.get(authoritative_team_id, {})
-        else:
-            # For single mode, try both formats
-            doc = collection.find_one({"_id": doc_id})
-            if not doc:
-                try:
-                    doc = collection.find_one({"_id": ObjectId(doc_id)})
-                except:
-                    pass
-            if doc:
-                teams_dict = doc.get("teams", {})
-                team_obj = teams_dict.get(actual_team_id, {}) if actual_team_id else {}
+        try:
+            if mode == "franchise":
+                reloaded_doc = collection.find_one({"_id": ObjectId(doc_id)})
+                if reloaded_doc and 'authoritative_team_id' in locals():
+                    franchise_teams = reloaded_doc.get("franchise_teams", {})
+                    team_obj = franchise_teams.get(authoritative_team_id, team_obj)
+            elif mode == "tournament":
+                reloaded_doc = collection.find_one({"_id": ObjectId(doc_id)})
+                if reloaded_doc and 'authoritative_team_id' in locals():
+                    teams_dict = reloaded_doc.get("teams", {})
+                    team_obj = teams_dict.get(authoritative_team_id, team_obj)
+            else:
+                # For single mode, try both formats
+                reloaded_doc = collection.find_one({"_id": doc_id})
+                if not reloaded_doc:
+                    try:
+                        reloaded_doc = collection.find_one({"_id": ObjectId(doc_id)})
+                    except:
+                        pass
+                if reloaded_doc and 'actual_team_id' in locals():
+                    teams_dict = reloaded_doc.get("teams", {})
+                    team_obj = teams_dict.get(actual_team_id, team_obj) if actual_team_id else team_obj
+        except Exception as e:
+            # If reload fails, keep existing team_obj (non-critical)
+            logger.warning(f"⚠️ [GET-GAMEPLAN] Failed to reload team_obj (non-critical): {e}")
         
         # Get settings or return defaults
         defaults = get_default_settings()
