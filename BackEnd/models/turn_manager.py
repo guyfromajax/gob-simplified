@@ -1226,11 +1226,12 @@ class TurnManager:
 
     def _load_playbook_settings(self, team_id):
         """
-        Load playbook settings from team document.
+        Load playbook settings from GameManager (single source of truth during gameplay).
+        Falls back to DB only if GameManager doesn't have settings.
         Returns dict with play percentages or None if not found/not user team.
         """
-        from BackEnd.db import games_collection, tournaments_collection, franchises_collection
-        from bson import ObjectId
+        # ✅ SS&S: GameManager is single source of truth during gameplay
+        # Check GameManager first, only fall back to DB if not found
         
         # Only load playbook settings for user teams (CPU teams use equal weights)
         offense_team = self.game.offense_team
@@ -1244,9 +1245,26 @@ class TurnManager:
             # CPU vs CPU - use equal weights
             return None
         
+        # ✅ STEP 1: Check GameManager first (single source of truth during gameplay)
+        if is_offense_user:
+            if hasattr(offense_team, 'playbook_settings') and offense_team.playbook_settings:
+                slot_count = len(offense_team.playbook_settings.get("slot_assignments", {}))
+                logging.warning(f"✅ [LOAD PLAYBOOK] Using GameManager for offense team: slot_assignments={slot_count}")
+                return offense_team.playbook_settings
+        elif is_defense_user:
+            if hasattr(defense_team, 'playbook_settings') and defense_team.playbook_settings:
+                slot_count = len(defense_team.playbook_settings.get("slot_assignments", {}))
+                logging.warning(f"✅ [LOAD PLAYBOOK] Using GameManager for defense team: slot_assignments={slot_count}")
+                return defense_team.playbook_settings
+        
+        # ✅ STEP 2: Fall back to DB if GameManager doesn't have settings (shouldn't happen, but safety net)
+        from BackEnd.db import games_collection, tournaments_collection, franchises_collection
+        from bson import ObjectId
+        
         # Get game document
         game_id = getattr(self.game, 'game_id', None)
         if not game_id:
+            logging.warning(f"⚠️ [LOAD PLAYBOOK] No game_id, cannot load from DB")
             return None
         
         try:
@@ -1343,9 +1361,11 @@ class TurnManager:
                     team_obj = doc.get("teams", {}).get(resolved_def_team_id, {})
                 playbook_settings = team_obj.get("playbook_settings")
                 if playbook_settings:
-                    logging.warning(f"✅ [LOAD PLAYBOOK] Loaded playbook_settings for defense team: team_id={resolved_def_team_id}")
+                    logging.warning(f"⚠️ [LOAD PLAYBOOK] Fallback to DB for defense team: team_id={resolved_def_team_id} (GameManager should have settings)")
+                    # ✅ SS&S: Apply to GameManager so future calls use GameManager
+                    defense_team.playbook_settings = playbook_settings
                 else:
-                    logging.warning(f"⚠️ [LOAD PLAYBOOK] No playbook_settings found for defense team: team_id={resolved_def_team_id}")
+                    logging.warning(f"⚠️ [LOAD PLAYBOOK] No playbook_settings found in DB for defense team: team_id={resolved_def_team_id}")
                 return playbook_settings
         except Exception as e:
             logging.warning(f"⚠️ Error loading playbook settings: {e}")

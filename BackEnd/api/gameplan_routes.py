@@ -1385,8 +1385,32 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 raise HTTPException(status_code=400, detail="game_id required for single game mode")
             doc_id = game_id
             collection = db.games
+            
+            # ✅ SS&S: Check GameManager first (single source of truth during gameplay)
+            gm = None
+            use_gamemanager_settings = False
+            try:
+                from BackEnd.api.api import ongoing_games
+                gm = ongoing_games.get(game_id)
+                if gm:
+                    # Determine which team
+                    target_team = None
+                    if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+                        target_team = gm.home_team
+                    elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+                        target_team = gm.away_team
+                    
+                    if target_team and hasattr(target_team, 'playbook_settings') and target_team.playbook_settings:
+                        slot_count = len(target_team.playbook_settings.get("slot_assignments", {}))
+                        logger.warning(f"✅ [GET-PLAYBOOKS] Found GameManager settings for single mode: team={target_team.name}, slot_assignments={slot_count}")
+                        use_gamemanager_settings = True
+            except Exception as e:
+                logger.warning(f"⚠️ [GET-PLAYBOOKS] Error checking GameManager: {e}")
+                gm = None
+                use_gamemanager_settings = False
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
+            use_gamemanager_settings = False
         
         # ✅ PERFORMANCE DIAGNOSTIC: Measure database query time
         query_start = time.time()
@@ -1729,7 +1753,22 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
         # Get playbook settings (percentages, slot assignments, motion dropdowns, and position filters)
-        playbook_settings = team_obj.get("playbook_settings", {})
+        # ✅ SS&S: Use GameManager settings if available (single source of truth during gameplay)
+        if mode == "single" and use_gamemanager_settings and gm:
+            # Use GameManager settings (already verified above)
+            target_team = None
+            if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+                target_team = gm.home_team
+            elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+                target_team = gm.away_team
+            
+            if target_team and hasattr(target_team, 'playbook_settings') and target_team.playbook_settings:
+                playbook_settings = target_team.playbook_settings
+                logger.warning(f"✅ [GET-PLAYBOOKS] Using GameManager playbook_settings: slot_assignments={len(playbook_settings.get('slot_assignments', {}))}")
+            else:
+                playbook_settings = team_obj.get("playbook_settings", {})
+        else:
+            playbook_settings = team_obj.get("playbook_settings", {})
         
         # ✅ DEBUG: Log slot_assignments for diagnosis
         slot_count = len(playbook_settings.get("slot_assignments", {})) if playbook_settings else 0

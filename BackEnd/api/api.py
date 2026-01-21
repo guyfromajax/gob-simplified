@@ -1416,6 +1416,79 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
             if total_time > 100:
                 logging.warning(f"⚠️ [PERF] Slow endpoint: /api/game/{game_id} - {total_time:.2f}ms")
 
+@app.get("/api/game/{game_id}/playbook-settings")
+def get_game_playbook_settings(game_id: str, team_id: str):
+    """
+    Get current playbook settings from GameManager (single source of truth during gameplay).
+    Falls back to DB if game is not in memory.
+    Returns format compatible with /api/playbooks for frontend consistency.
+    """
+    from BackEnd.db import games_collection
+    from bson import ObjectId
+    
+    # ✅ SS&S: GameManager is single source of truth during gameplay
+    gm = ongoing_games.get(game_id)
+    
+    if gm:
+        # Game is in memory - return settings from GameManager
+        # Determine which team
+        target_team = None
+        if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+            target_team = gm.home_team
+        elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+            target_team = gm.away_team
+        
+        if target_team and hasattr(target_team, 'playbook_settings') and target_team.playbook_settings:
+            playbook_settings = target_team.playbook_settings
+            slot_count = len(playbook_settings.get("slot_assignments", {}))
+            logging.warning(f"✅ [GAME-PLAYBOOK] Returning playbook_settings from GameManager: team={target_team.name}, slot_assignments={slot_count}")
+            
+            # Return format compatible with /api/playbooks response
+            return {
+                "slot_assignments": playbook_settings.get("slot_assignments", {}),
+                "motion_dropdowns": playbook_settings.get("motion_dropdowns", {}),
+                "source": "gamemanager"  # Indicate source for debugging
+            }
+    
+    # Fallback to DB if game not in memory
+    try:
+        doc = games_collection.find_one({"_id": game_id})
+        if not doc:
+            try:
+                doc = games_collection.find_one({"_id": ObjectId(game_id)})
+            except:
+                pass
+        
+        if doc:
+            teams = doc.get("teams", {})
+            # Find team by team_id or name
+            team_obj = None
+            for tid, tdata in teams.items():
+                if tid == team_id or tdata.get("name") == team_id:
+                    team_obj = tdata
+                    break
+            
+            if team_obj:
+                playbook_settings = team_obj.get("playbook_settings", {})
+                if playbook_settings:
+                    slot_count = len(playbook_settings.get("slot_assignments", {}))
+                    logging.warning(f"✅ [GAME-PLAYBOOK] Returning playbook_settings from DB (fallback): slot_assignments={slot_count}")
+                    return {
+                        "slot_assignments": playbook_settings.get("slot_assignments", {}),
+                        "motion_dropdowns": playbook_settings.get("motion_dropdowns", {}),
+                        "source": "database"  # Indicate source for debugging
+                    }
+    except Exception as e:
+        logging.warning(f"⚠️ [GAME-PLAYBOOK] Error loading from DB: {e}")
+    
+    # Return empty if not found
+    logging.warning(f"⚠️ [GAME-PLAYBOOK] No playbook_settings found for game_id={game_id}, team_id={team_id}")
+    return {
+        "slot_assignments": {},
+        "motion_dropdowns": {},
+        "source": "none"
+    }
+
 @app.options("/api/simulate-quarter")
 async def simulate_quarter_options():
     """
