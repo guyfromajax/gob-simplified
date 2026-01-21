@@ -679,8 +679,12 @@ def handle_timeout_save_and_response(gm: "GameManager", timeout_turn: dict, game
     logging.warning(f"💾 [TIMEOUT-SAVE] BEFORE save: Home slot_assignments={home_slots}, Away slot_assignments={away_slots}")
     
     # Save to DB (same for both user and computer timeouts)
+    from bson import ObjectId
     db_summary = summarize_game_state(gm, exclude_animations=True)
-    games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
+    game_id_type = type(game_id).__name__
+    logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] Saving with _id: '{game_id}' (type: {game_id_type})")
+    result = games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
+    logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] Update result - matched: {result.matched_count}, modified: {result.modified_count}, upserted_id: {result.upserted_id}")
     
     # ✅ DIAGNOSTIC: Log what was saved in db_summary
     logging.warning(f"💾 [TIMEOUT-SAVE] Saved db_summary:")
@@ -697,8 +701,19 @@ def handle_timeout_save_and_response(gm: "GameManager", timeout_turn: dict, game
     logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] db_summary score={db_summary.get('score')}, clock={db_summary.get('clock')}, time_remaining={db_summary.get('time_remaining')}")
     
     # ✅ DIAGNOSTIC: Verify what was actually saved to DB
+    from bson import ObjectId
+    logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] Verifying save - querying with _id: '{game_id}' (type: {type(game_id).__name__})")
     saved_doc = games_collection.find_one({"_id": game_id})
+    if not saved_doc and isinstance(game_id, str):
+        logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] String query failed during verification, trying ObjectId...")
+        try:
+            saved_doc = games_collection.find_one({"_id": ObjectId(game_id)})
+        except Exception as e:
+            logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] ObjectId verification query failed: {e}")
     if saved_doc:
+        saved_id_type = type(saved_doc.get("_id")).__name__
+        saved_id_value = str(saved_doc.get("_id"))
+        logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] ✅ Verification found document with _id: '{saved_id_value}' (type: {saved_id_type})")
         saved_teams = saved_doc.get("teams", {})
         home_team_id = saved_doc.get("home_team_id")
         away_team_id = saved_doc.get("away_team_id")
@@ -1064,10 +1079,15 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
     
     # ✅ PHASE 1.1: Normalize game_id at entry point (standardize to ObjectId format)
     from BackEnd.utils.game_id_utils import normalize_game_id
+    from bson import ObjectId
     original_game_id = game_id
+    original_game_id_type = type(original_game_id).__name__
     game_id = normalize_game_id(game_id)
+    game_id_type = type(game_id).__name__
     if original_game_id != game_id:
-        logger.warning(f"🔍 [NORMALIZE] GET /api/game - Normalized game_id from '{original_game_id}' to '{game_id}'")
+        logger.warning(f"🔍 [NORMALIZE] GET /api/game - Normalized game_id from '{original_game_id}' ({original_game_id_type}) to '{game_id}' ({game_id_type})")
+    else:
+        logger.warning(f"🔍 [DB LOOKUP DEBUG] GET /api/game - game_id: '{game_id}' (type: {game_id_type})")
     
     try:
         # ✅ HYBRID APPROACH: If source=db, skip cache and always read from database
@@ -1178,13 +1198,25 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
             query_start = time.time()
             
             # Try both string and ObjectId lookups with projection
+            query_type = type(game_id).__name__
+            logger.warning(f"🔍 [DB LOOKUP DEBUG] Querying with _id: '{game_id}' (type: {query_type})")
             saved = games_collection.find_one({"_id": game_id}, projection)
             if not saved and isinstance(game_id, str):
+                logger.warning(f"🔍 [DB LOOKUP DEBUG] String query failed, trying ObjectId format...")
                 try:
-                    saved = games_collection.find_one({"_id": ObjectId(game_id)}, projection)
+                    oid_game_id = ObjectId(game_id)
+                    saved = games_collection.find_one({"_id": oid_game_id}, projection)
+                    if saved:
+                        saved_id_type = type(saved.get("_id")).__name__
+                        logger.warning(f"🔍 [DB LOOKUP DEBUG] ✅ Found with ObjectId! Document _id type: {saved_id_type}")
                 except Exception as e:
-                    # Only log actual errors
-                    pass
+                    logger.warning(f"🔍 [DB LOOKUP DEBUG] ❌ ObjectId conversion failed: {e}")
+            elif saved:
+                saved_id_type = type(saved.get("_id")).__name__
+                saved_id_value = str(saved.get("_id"))
+                logger.warning(f"🔍 [DB LOOKUP DEBUG] ✅ Found with string! Document _id: '{saved_id_value}' (type: {saved_id_type})")
+            else:
+                logger.warning(f"🔍 [DB LOOKUP DEBUG] ❌ No document found with string query")
             
             query_time = (time.time() - query_start) * 1000  # Convert to ms
             # ✅ REMOVED: Verbose PERF and DEBUG logs - only log on errors or slow queries (>100ms)
@@ -1426,11 +1458,18 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                 logging.warning(f"⚠️ [PERF] Slow DB path: /api/game/{game_id} - {total_time:.2f}ms")
                 return response_data
         
-            logging.error(f"❌ [BOX_SCORE] Game not found in database: game_id={game_id}")
+            logging.error(f"❌ [BOX_SCORE] Game not found in database: game_id={game_id} (type: {type(game_id).__name__})")
             # Try to find any games with similar IDs for debugging
             if isinstance(game_id, str) and len(game_id) > 10:
-                similar = list(games_collection.find({"_id": {"$regex": game_id[:10]}}).limit(5))
-                logging.info(f"🔍 [BOX_SCORE] Found {len(similar)} similar game IDs (first 10 chars): {[str(g.get('_id')) for g in similar]}")
+                # Try to find documents with similar string _id
+                similar_str = list(games_collection.find({"_id": {"$regex": game_id[:10]}}).limit(5))
+                logger.warning(f"🔍 [DB LOOKUP DEBUG] Found {len(similar_str)} similar string IDs: {[str(g.get('_id')) + ' (type: ' + type(g.get('_id')).__name__ + ')' for g in similar_str]}")
+                # Also try ObjectId search
+                try:
+                    similar_oid = list(games_collection.find({"_id": {"$gte": ObjectId(game_id[:8] + "0" * 16), "$lt": ObjectId(game_id[:8] + "f" * 16)}}).limit(5))
+                    logger.warning(f"🔍 [DB LOOKUP DEBUG] Found {len(similar_oid)} similar ObjectId IDs: {[str(g.get('_id')) + ' (type: ' + type(g.get('_id')).__name__ + ')' for g in similar_oid]}")
+                except Exception as e:
+                    logger.warning(f"🔍 [DB LOOKUP DEBUG] Could not search ObjectId range: {e}")
         raise HTTPException(status_code=404, detail=f"Game {game_id} not found")
     except Exception as e:
         logging.exception(f"Error fetching game state for {game_id}")
