@@ -3718,6 +3718,8 @@ def init_game(request: dict):
     gm_start = time.time()
     logging.warning(f"⏱️ [PERF] /api/init-game - Starting GameManager creation")
     gm = GameManager(home_team, away_team, mode=mode, user_team_side=user_team_side)
+    # ✅ CRITICAL: Set game_id on GameManager immediately after creation
+    gm.game_id = game_id
     gm_create_time = (time.time() - gm_start) * 1000
     logging.warning(f"⏱️ [PERF] /api/init-game - GameManager created: {gm_create_time:.2f}ms")
     
