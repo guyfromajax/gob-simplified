@@ -1554,17 +1554,20 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             # ✅ CRITICAL FIX: Always apply playbook_settings to GameManager when game is cached
             # Strategy_settings are handled later with proper validity checks, but playbook_settings must be loaded here
             # This ensures playbook_settings saved pre-game are available during gameplay
+            trace_id_cached = f"sim_q{request.quarter}_{request.game_id}_cached"
             if home_settings and home_settings.get("playbook_settings"):
                 db_slots = len(home_settings.get("playbook_settings", {}).get("slot_assignments", {}))
+                before_slots = len(gm.home_team.playbook_settings.get("slot_assignments", {})) if gm.home_team.playbook_settings else 0
                 gm.home_team.playbook_settings = home_settings.get("playbook_settings")
-                logging.warning(f"✅ [APPLY-SETTINGS] Applied DB home playbook_settings to cached GameManager: slot_assignments={db_slots}")
-            # ✅ REMOVED: Verbose warning - only log when settings ARE applied
+                after_slots = len(gm.home_team.playbook_settings.get("slot_assignments", {})) if gm.home_team.playbook_settings else 0
+                logging.warning(f"🟡 [TRACE-APPLY] {trace_id_cached} | HOME TEAM | APPLIED PLAYBOOK (CACHED) | before_slots={before_slots}, after_slots={after_slots}")
             
             if away_settings and away_settings.get("playbook_settings"):
                 db_slots = len(away_settings.get("playbook_settings", {}).get("slot_assignments", {}))
+                before_slots = len(gm.away_team.playbook_settings.get("slot_assignments", {})) if gm.away_team.playbook_settings else 0
                 gm.away_team.playbook_settings = away_settings.get("playbook_settings")
-                logging.warning(f"✅ [APPLY-SETTINGS] Applied DB away playbook_settings to cached GameManager: slot_assignments={db_slots}")
-            # ✅ REMOVED: Verbose warning - only log when settings ARE applied
+                after_slots = len(gm.away_team.playbook_settings.get("slot_assignments", {})) if gm.away_team.playbook_settings else 0
+                logging.warning(f"🟡 [TRACE-APPLY] {trace_id_cached} | AWAY TEAM | APPLIED PLAYBOOK (CACHED) | before_slots={before_slots}, after_slots={after_slots}")
         
         # ✅ TIMEOUT RESUME: Unified state restoration (works for all modes and all paths)
         # Only check database for timeout state if we have a game_id (existing game, not new game start)
