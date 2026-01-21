@@ -340,6 +340,116 @@
 
 ---
 
+#### Phase 5.7: Game-Scoped Settings for Franchise/Tournament Mode (Week 3)
+
+**Goal:** Enable game-specific settings in franchise/tournament mode without affecting master settings.
+
+**Status:** ⏳ Pending (depends on Phase 5.1-5.6)
+
+**Rationale:** Currently, settings changes during franchise/tournament gameplay save to the franchise/tournament document (master settings), affecting all games. This feature allows users to make game-specific adjustments during gameplay without disrupting their master playbooks/game plans. Settings are scoped to the active game document and revert to master settings when the game ends.
+
+**User Value:**
+- Master settings in franchise/tournament document remain unchanged
+- Game-specific adjustments possible during active gameplay
+- Settings automatically revert to master when starting new game
+- Flexibility to experiment without affecting long-term strategy
+
+**Prerequisites:**
+- Phase 5.1-5.5 complete (simplified architecture in place)
+- Phase 5.6 complete (base architecture tested and working)
+
+**Tasks:**
+
+1. **Game Initialization: Copy Settings from Master**
+   - **Action:** In `init-game`, copy `playbook_settings` and `strategy_settings` from franchise/tournament doc to game doc
+   - **Files:** `BackEnd/api/api.py` → `init_game()`
+   - **Logic:** On game start, copy master settings to game doc as baseline
+   - **Validation:** Game doc initialized with master settings, franchise/tournament doc unchanged
+
+2. **Save Flow: Conditional Save Location**
+   - **Action:** Modify `save_playbooks()` and `update_gameplan()` to save to game doc if game is active, otherwise save to franchise/tournament doc
+   - **Files:** `BackEnd/api/gameplan_routes.py` → `save_playbooks()`, `update_gameplan()`
+   - **Logic:**
+     ```
+     If F/T mode:
+       If game_id provided AND game exists AND game is active (quarter > 0):
+         Save to game doc (game-specific settings)
+       Else:
+         Save to franchise/tournament doc (master settings)
+     ```
+   - **Validation:** Settings saved to correct document based on context
+
+3. **Load Flow: Game Doc → Master Fallback**
+   - **Action:** Modify `get_playbooks()` and `get_gameplan()` to load from game doc first, fallback to franchise/tournament doc
+   - **Files:** `BackEnd/api/gameplan_routes.py` → `get_playbooks()`, `get_gameplan()`
+   - **Logic:**
+     ```
+     If F/T mode:
+       If game_id provided AND game exists AND game has settings:
+         Load from game doc (game-specific settings)
+       Else:
+         Load from franchise/tournament doc (master settings)
+     ```
+   - **Validation:** Settings loaded from correct document based on context
+
+4. **Settings Application: Game Doc → Master Fallback**
+   - **Action:** Modify `simulate-quarter` to load from game doc first, fallback to franchise/tournament doc
+   - **Files:** `BackEnd/api/api.py` → `simulate_quarter_endpoint()`, `load_team_settings_from_doc()`
+   - **Logic:** Try game doc first, fallback to master if missing
+   - **Validation:** Settings applied from correct source at game start
+
+5. **Timeout Persistence: Preserve Game Doc Settings**
+   - **Action:** Ensure `summarize_game_state()` preserves game doc settings during timeout
+   - **Files:** `BackEnd/utils/shared.py` → `summarize_game_state()`
+   - **Logic:** Game doc settings already preserved (no change needed)
+   - **Validation:** Game-scoped settings survive timeouts
+
+6. **Comprehensive Testing**
+   - **Action:** Test all scenarios:
+     - Settings initialized from master at game start
+     - Settings changes during gameplay save to game doc
+     - Master settings in franchise/tournament doc unchanged
+     - Settings persist through timeout
+     - Settings revert to master when starting new game
+     - Settings load correctly from game doc during active gameplay
+     - Settings load correctly from master when no active game
+   - **Validation:** All scenarios work correctly
+
+**Edge Cases to Handle:**
+- User changes settings before starting game → Saves to master (franchise/tournament doc)
+- User changes settings during active gameplay → Saves to game doc
+- User changes settings during timeout → Saves to game doc
+- User resumes game → Loads from game doc
+- User starts new game → Loads from master (franchise/tournament doc)
+- User visits Command Center → Loads from master (franchise/tournament doc)
+
+**Complexity Assessment:**
+- **Game Initialization:** Low (2 hours) - straightforward copy operation
+- **Save Flow Updates:** Medium (4-6 hours) - conditional logic, game state detection
+- **Load Flow Updates:** Medium (4-6 hours) - similar conditional logic
+- **Settings Application:** Low (2 hours) - fallback logic adjustment
+- **Timeout Persistence:** Low (1 hour) - already works if settings in game doc
+- **Testing:** Medium (4-6 hours) - comprehensive scenario coverage
+- **Total:** 16-22 hours (2-3 days)
+
+**Success Criteria:**
+- ✅ Settings initialized from franchise/tournament doc at game start
+- ✅ Settings changes during active gameplay save to game doc only
+- ✅ Master settings in franchise/tournament doc remain unchanged
+- ✅ Settings persist through timeouts (scoped to game doc)
+- ✅ Settings revert to master when starting new game
+- ✅ Settings load correctly from game doc during active gameplay
+- ✅ Settings load correctly from master when no active game
+- ✅ All tests pass
+- ✅ All existing functionality continues to work
+
+**Dependencies:**
+- Phase 5.1-5.5 must be complete (simplified architecture foundation)
+- Phase 5.6 must be complete (base architecture tested and validated)
+- Helper function `get_settings_source()` recommended to reduce complexity
+
+---
+
 ### Phase 6: Migration & Cleanup (Week 3)
 
 **Goal:** Remove all patchwork code and enforce new contract.
