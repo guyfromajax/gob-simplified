@@ -14,7 +14,7 @@
  * @param {Object} options.recoveryOptions.redirectParams - Parameters for redirect URL
  * @param {string} options.recoveryOptions.redirectLabel - Label for redirect button
  */
-export function showMissingPointerError({
+function showMissingPointerError({
   missingPointer,
   message,
   mode = 'single',

@@ -154,10 +154,17 @@ async def global_exception_handler(request: Request, exc: Exception):
     print(f"🔴 [ERROR] Global exception handler: {type(exc).__name__}: {str(exc)}", file=sys.stderr, flush=True)
     import traceback
     traceback.print_exc(file=sys.stderr)
-    return JSONResponse(
+    # ✅ CORS FIX: Ensure CORS headers are included even on error responses
+    response = JSONResponse(
         status_code=500,
         content={"error": "Internal server error", "type": type(exc).__name__, "message": str(exc)}
     )
+    # CORS headers will be added by middleware, but explicitly set origin header for safety
+    origin = request.headers.get("origin")
+    if origin and (origin in cors_origins or any(origin.startswith(p) for p in ["https://", "http://localhost"])):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
 
 # ✅ Add startup event to verify app is ready
 @app.on_event("startup")
