@@ -158,7 +158,7 @@ function buildLineupUrl(params) {
   return `/set-lineup.html?${urlParams.toString()}`;
 }
 
-// Export for use in other modules
+// Make available on window object (no ES6 export to avoid module syntax issues)
 if (typeof window !== 'undefined') {
   window.ErrorHandler = {
     showMissingPointerError
