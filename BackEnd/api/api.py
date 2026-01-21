@@ -1538,8 +1538,6 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         # This ensures settings saved pre-game are applied to cached games (e.g., init-game → save settings → simulate-quarter)
         mode = request.mode or "single"
         
-        # ✅ DIAGNOSTIC: Log why settings loading might be skipped
-        if gm is not None:
         # ✅ CRITICAL FIX: Always load playbook_settings from DB when game is cached (for single mode)
         # Strategy_settings are handled later with proper validity checks
         if gm is not None and mode == "single" and request.game_id:
@@ -1564,8 +1562,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 db_slots = len(home_settings.get("playbook_settings", {}).get("slot_assignments", {}))
                 gm.home_team.playbook_settings = home_settings.get("playbook_settings")
                 logging.warning(f"✅ [APPLY-SETTINGS] Applied DB home playbook_settings to cached GameManager: slot_assignments={db_slots}")
-            else:
-                # ✅ REMOVED: Verbose warning - only log when settings ARE applied
+            # ✅ REMOVED: Verbose warning - only log when settings ARE applied
+            
             if away_settings and away_settings.get("playbook_settings"):
                 db_slots = len(away_settings.get("playbook_settings", {}).get("slot_assignments", {}))
                 gm.away_team.playbook_settings = away_settings.get("playbook_settings")
