@@ -367,6 +367,8 @@ For each state variable, we document:
 
 ## Recommended Implementation Order
 
+**⚠️ NOTE: This section has been consolidated into the Unified Work Plan. See `Unified_State_Persistence_Work_Plan.md` for the current implementation plan.**
+
 ### Phase 1.1: Fix Critical Violations (Week 1)
 1. Remove `game_id` localStorage fallbacks from `set-lineup.js` and `game-plan.js`
 2. Remove `franchise_id` localStorage fallback from `bootGame.js`
