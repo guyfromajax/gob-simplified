@@ -9,7 +9,6 @@ from typing import Optional
 from BackEnd.db import db
 from BackEnd.api.franchise_routes import get_user_team_from_franchise
 from BackEnd.api.tournament_routes import get_user_team_from_tournament
-from BackEnd.api.api import ongoing_games
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -1284,6 +1283,8 @@ def update_gameplan(request: GamePlanUpdateRequest):
         # This ensures GameManager always reflects what's in DB (single source of truth)
         if request.mode == "single" and request.game_id and result and result.matched_count > 0:
             try:
+                # Lazy import to avoid circular dependency
+                from BackEnd.api.api import ongoing_games
                 gm = ongoing_games.get(request.game_id)
                 if gm:
                     # Verify game_id matches
@@ -2112,6 +2113,8 @@ def save_playbooks(request: PlaybookSettingsRequest):
         # This ensures GameManager always reflects what's in DB (single source of truth)
         if request.mode == "single" and request.game_id and result and result.matched_count > 0:
             try:
+                # Lazy import to avoid circular dependency
+                from BackEnd.api.api import ongoing_games
                 gm = ongoing_games.get(request.game_id)
                 if gm:
                     # Verify game_id matches
