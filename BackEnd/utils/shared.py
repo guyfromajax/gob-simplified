@@ -1000,27 +1000,20 @@ def summarize_game_state(game, exclude_animations=True):
                         # Only log actual errors
                         pass
                 
-                # ✅ FIX: GameManager is source of truth for CURRENT state, DB is source of truth for PERSISTENCE
-                # Check GameManager first (current state), then fall back to DB (persistence)
-                # This ensures settings applied to GameManager are preserved when summarizing
+                # ✅ CONTRACT-ALIGNED: DB is source of truth (Contract says "Server always wins")
+                # Try DB first, then GameManager as safety net if DB lookup fails
+                # This aligns with Contract while providing fallback during root cause investigation
                 
-                # Home team: Check GameManager first
-                if hasattr(game.home_team, 'playbook_settings') and game.home_team.playbook_settings:
-                    home_playbook_settings = game.home_team.playbook_settings
-                    slot_count = len(home_playbook_settings.get("slot_assignments", {}))
-                    logging.warning(f"✅ [SUMMARIZE] Using GameManager home playbook_settings: slot_assignments={slot_count}")
-                elif home_actual_team_id:
-                    # Fall back to DB if GameManager doesn't have settings
+                # Home team: Check DB first (Contract-compliant)
+                if home_actual_team_id:
                     home_team_data = teams.get(home_actual_team_id, {})
                     home_playbook_settings = home_team_data.get("playbook_settings", {})
                     if home_playbook_settings:
                         slot_count = len(home_playbook_settings.get("slot_assignments", {}))
-                        logging.warning(f"✅ [SUMMARIZE] Found home playbook_settings in DB: slot_assignments={slot_count}")
+                        logging.warning(f"✅ [SUMMARIZE] Found home playbook_settings in DB (source of truth): slot_assignments={slot_count}")
                     else:
                         logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings in DB for home_actual_team_id={home_actual_team_id}, trying legacy lookup")
-                    # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
-                    if not home_playbook_settings:
-                        # Try to find by team name (legacy format)
+                        # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
                         for tid in teams.keys():
                             team_data = teams.get(tid, {})
                             if tid == game.home_team.name or team_data.get("name") == game.home_team.name:
@@ -1029,26 +1022,30 @@ def summarize_game_state(game, exclude_animations=True):
                                     home_playbook_settings = legacy_settings
                                     logging.warning(f"⚠️ [SUMMARIZE] Found legacy settings under team name key '{tid}' for home team")
                                     break
+                    
+                    # ✅ SAFETY NET: If DB lookup failed, check GameManager (temporary fallback during root cause investigation)
+                    if not home_playbook_settings and hasattr(game.home_team, 'playbook_settings') and game.home_team.playbook_settings:
+                        home_playbook_settings = game.home_team.playbook_settings
+                        slot_count = len(home_playbook_settings.get("slot_assignments", {}))
+                        logging.warning(f"⚠️ [SUMMARIZE] DB lookup failed, using GameManager as safety net: slot_assignments={slot_count} (ROOT CAUSE NEEDS FIXING)")
                 else:
                     logging.warning(f"⚠️ [SUMMARIZE] Could not resolve home_actual_team_id, cannot load playbook_settings from DB")
+                    # Last resort: check GameManager
+                    if hasattr(game.home_team, 'playbook_settings') and game.home_team.playbook_settings:
+                        home_playbook_settings = game.home_team.playbook_settings
+                        slot_count = len(home_playbook_settings.get("slot_assignments", {}))
+                        logging.warning(f"⚠️ [SUMMARIZE] Team ID resolution failed, using GameManager: slot_assignments={slot_count} (ROOT CAUSE NEEDS FIXING)")
                 
-                # Away team: Check GameManager first
-                if hasattr(game.away_team, 'playbook_settings') and game.away_team.playbook_settings:
-                    away_playbook_settings = game.away_team.playbook_settings
-                    slot_count = len(away_playbook_settings.get("slot_assignments", {}))
-                    logging.warning(f"✅ [SUMMARIZE] Using GameManager away playbook_settings: slot_assignments={slot_count}")
-                elif away_actual_team_id:
-                    # Fall back to DB if GameManager doesn't have settings
+                # Away team: Check DB first (Contract-compliant)
+                if away_actual_team_id:
                     away_team_data = teams.get(away_actual_team_id, {})
                     away_playbook_settings = away_team_data.get("playbook_settings", {})
                     if away_playbook_settings:
                         slot_count = len(away_playbook_settings.get("slot_assignments", {}))
-                        logging.warning(f"✅ [SUMMARIZE] Found away playbook_settings in DB: slot_assignments={slot_count}")
+                        logging.warning(f"✅ [SUMMARIZE] Found away playbook_settings in DB (source of truth): slot_assignments={slot_count}")
                     else:
                         logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings in DB for away_actual_team_id={away_actual_team_id}, trying legacy lookup")
-                    # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
-                    if not away_playbook_settings:
-                        # Try to find by team name (legacy format)
+                        # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
                         for tid in teams.keys():
                             team_data = teams.get(tid, {})
                             if tid == game.away_team.name or team_data.get("name") == game.away_team.name:
@@ -1057,8 +1054,19 @@ def summarize_game_state(game, exclude_animations=True):
                                     away_playbook_settings = legacy_settings
                                     logging.warning(f"⚠️ [SUMMARIZE] Found legacy settings under team name key '{tid}' for away team")
                                     break
+                    
+                    # ✅ SAFETY NET: If DB lookup failed, check GameManager (temporary fallback during root cause investigation)
+                    if not away_playbook_settings and hasattr(game.away_team, 'playbook_settings') and game.away_team.playbook_settings:
+                        away_playbook_settings = game.away_team.playbook_settings
+                        slot_count = len(away_playbook_settings.get("slot_assignments", {}))
+                        logging.warning(f"⚠️ [SUMMARIZE] DB lookup failed, using GameManager as safety net: slot_assignments={slot_count} (ROOT CAUSE NEEDS FIXING)")
                 else:
                     logging.warning(f"⚠️ [SUMMARIZE] Could not resolve away_actual_team_id, cannot load playbook_settings from DB")
+                    # Last resort: check GameManager
+                    if hasattr(game.away_team, 'playbook_settings') and game.away_team.playbook_settings:
+                        away_playbook_settings = game.away_team.playbook_settings
+                        slot_count = len(away_playbook_settings.get("slot_assignments", {}))
+                        logging.warning(f"⚠️ [SUMMARIZE] Team ID resolution failed, using GameManager: slot_assignments={slot_count} (ROOT CAUSE NEEDS FIXING)")
                 
                 # ✅ REMOVED: Verbose success/failure logs - only log if settings are missing when expected
         except Exception as e:
