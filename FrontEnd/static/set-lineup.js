@@ -6,7 +6,7 @@ console.log('✅ set-lineup.js loaded at', new Date().toISOString());
   if (s && s.src.includes('__BUILD_TS__')) {
     const now = Date.now().toString();
     s.src = s.src.replace('__BUILD_TS__', now);
-    console.log('🔄 Updated script src with cache buster', s.src);
+    // Cache buster updated silently
   }
 })();
 const homeTeam = urlParams.get('home');
@@ -1008,10 +1008,11 @@ function restoreLineupFromUrl() {
     if (playerId) {
       lineup[pos] = playerId;
       restoredCount++;
-      console.log(`[restoreLineupFromUrl] Restored ${pos}: ${playerId}`);
     }
   });
-  console.log(`[restoreLineupFromUrl] Restored ${restoredCount} players from URL`);
+  if (restoredCount > 0) {
+    console.log(`[restoreLineupFromUrl] Restored ${restoredCount} players from URL`);
+  }
 }
 
 /**
@@ -2203,30 +2204,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (thead) {
         initAttributeTooltips(thead, ['th']);
         
-        // Verify tooltips were set by checking all th elements
-        const allTh = thead.querySelectorAll('th');
-        let verifiedCount = 0;
-        allTh.forEach(th => {
-          const text = th.textContent.trim();
-          const actualTitle = th.getAttribute('title');
-          if (actualTitle) {
-            verifiedCount++;
-            console.log(`[TOOLTIP VERIFY] ✅ "${text}" has title: "${actualTitle}"`);
-          } else {
-            console.warn(`[TOOLTIP VERIFY] ❌ "${text}" has no title attribute`);
-          }
-        });
-        console.log(`[TOOLTIP VERIFY] Verified ${verifiedCount}/${allTh.length} tooltips are set`);
-        
-        // Test: Check first th element
-        const firstTh = thead.querySelector('th');
-        if (firstTh) {
-          const firstTitle = firstTh.getAttribute('title');
-          console.log(`[TOOLTIP TEST] First th "${firstTh.textContent.trim()}" has title: "${firstTitle || 'NONE'}"`);
-          if (firstTitle) {
-            console.log(`[TOOLTIP TEST] Try hovering over "${firstTh.textContent.trim()}" header - tooltip should appear after 1-2 seconds`);
-          }
-        }
+        // Tooltips initialized (verification logs removed for cleaner console)
       } else {
         console.warn('[TOOLTIP] thead element not found');
       }
