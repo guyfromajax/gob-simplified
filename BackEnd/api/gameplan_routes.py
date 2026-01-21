@@ -1096,6 +1096,14 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                 logger.warning(f"✅ [GET-GAMEPLAN] Using GameManager strategy_settings: inside={strategy_settings.get('inside')}")
             else:
                 strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
+        elif mode == "single" and not use_gamemanager_settings:
+            # ✅ SS&S: GameManager not available - use load_team_settings_from_doc() (same as simulate_quarter_endpoint)
+            from BackEnd.api.api import load_team_settings_from_doc
+            settings = load_team_settings_from_doc(mode, doc_id, team_id, team_id)
+            strategy_settings = settings.get("strategy_settings") or team_obj.get("strategy_settings", defaults["strategy_settings"])
+            if strategy_settings:
+                inside_value = strategy_settings.get("inside")
+                logger.warning(f"✅ [GET-GAMEPLAN] Using load_team_settings_from_doc() (same as game start): inside={inside_value}")
         else:
             strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
         
