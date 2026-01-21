@@ -163,9 +163,9 @@ async function loadRoster() {
         const newGameId = initData.game_id;
         console.log("✅ Initialized new game:", newGameId);
         
-        // Store gameId in localStorage and URL
+        // ✅ PHASE 1.1: Only store game_home/game_away for team matching check (not game_id fallback)
+        // game_id is only stored in URL (source of truth)
         if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('game_id', newGameId);
           localStorage.setItem('game_home', homeTeam);
           localStorage.setItem('game_away', awayTeam);
         }
