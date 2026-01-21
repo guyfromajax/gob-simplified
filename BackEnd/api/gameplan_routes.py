@@ -930,8 +930,34 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                 raise HTTPException(status_code=400, detail="game_id required for single game mode")
             doc_id = game_id
             collection = db.games
+            
+            # ✅ SS&S: Check GameManager first (single source of truth during gameplay)
+            # Reuses same pattern as /api/playbooks for consistency
+            gm = None
+            use_gamemanager_settings = False
+            try:
+                from BackEnd.api.api import ongoing_games
+                gm = ongoing_games.get(game_id)
+                if gm:
+                    # Determine which team
+                    target_team = None
+                    if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+                        target_team = gm.home_team
+                    elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+                        target_team = gm.away_team
+                    
+                    if target_team and hasattr(target_team, 'strategy_settings') and target_team.strategy_settings:
+                        inside_value = target_team.strategy_settings.get("inside")
+                        logger.warning(f"✅ [GET-GAMEPLAN] Found GameManager settings for single mode: team={target_team.name}, inside={inside_value}")
+                        use_gamemanager_settings = True
+            except Exception as e:
+                logger.warning(f"⚠️ [GET-GAMEPLAN] Error checking GameManager: {e}")
+                gm = None
+                use_gamemanager_settings = False
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
+            gm = None
+            use_gamemanager_settings = False
         
         # ✅ SS&S: Use document's user_team_object_id as authoritative source (aligns with Franchise pattern)
         # ✅ PERFORMANCE: Load document with projection (only needed fields) - reduces from 402KB to ~10KB (98% reduction)
@@ -991,42 +1017,40 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
             teams = ensure_team_objects_exist(mode, doc_id, authoritative_team_id, tournament_doc=doc)
             team_obj = teams.get(authoritative_team_id, {})
         else:
-            # For single mode, try ObjectId first, then resolve name
-            teams = ensure_team_objects_exist(mode, doc_id, team_id)
+            # ✅ SS&S: For single mode, use load_team_settings_from_doc() (same as simulate_quarter_endpoint)
+            # This ensures consistency and reuses the same loading logic that works at game start
             actual_team_id = None
+            team_obj = {}
             
-            # Strategy 1: Try direct ObjectId lookup
-            if team_id in teams:
-                actual_team_id = team_id
+            # First check GameManager (if available)
+            if use_gamemanager_settings and gm:
+                # GameManager has settings - we'll use them directly later
+                # Still need to get actual_team_id for logging purposes
+                target_team = None
+                if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+                    actual_team_id = gm.home_team.team_id
+                elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+                    actual_team_id = gm.away_team.team_id
             else:
-                # Strategy 2: Try to resolve as ObjectId
-                try:
-                    test_oid = ObjectId(team_id)
-                    if str(test_oid) in teams:
-                        actual_team_id = str(test_oid)
-                except:
-                    pass
+                # GameManager not available - use load_team_settings_from_doc() (same logic as game start)
+                from BackEnd.api.api import load_team_settings_from_doc
+                settings = load_team_settings_from_doc(mode, doc_id, team_id, team_id)
                 
-                # Strategy 3: Resolve team name to ObjectId
-                if not actual_team_id:
+                # Extract team_id from the loaded settings (for consistency)
+                # We still need to load team_obj for other fields (plays, etc.)
+                teams = ensure_team_objects_exist(mode, doc_id, team_id)
+                
+                # Resolve actual_team_id using same logic as load_team_settings_from_doc()
+                if team_id in teams and (team_id.isupper() and "_" in team_id):
+                    actual_team_id = team_id
+                else:
                     for tid in teams.keys():
-                        try:
-                            team_doc = db.teams.find_one({"_id": ObjectId(tid)})
-                            if team_doc and (team_doc["name"] == team_id or str(team_doc["_id"]) == team_id):
-                                actual_team_id = tid
-                                break
-                        except:
-                            continue
+                        team_data = teams.get(tid, {})
+                        if team_data.get("name") == team_id:
+                            actual_team_id = tid
+                            break
                 
-                # Strategy 4: Try teams collection lookup by name
-                if not actual_team_id:
-                    team_doc = db.teams.find_one({"name": team_id})
-                    if team_doc:
-                        team_oid = str(team_doc["_id"])
-                        if team_oid in teams:
-                            actual_team_id = team_oid
-            
-            team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
+                team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
         # ✅ FIX: Reload team_obj from latest doc to ensure we have fresh strategy_settings
         # This ensures strategy_settings are current after ensure_team_objects_exist updates
@@ -1057,14 +1081,30 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
             logger.warning(f"⚠️ [GET-GAMEPLAN] Failed to reload team_obj (non-critical): {e}")
         
         # Get settings or return defaults
+        # ✅ SS&S: Use GameManager settings if available (single source of truth during gameplay)
         defaults = get_default_settings()
-        strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
+        if mode == "single" and use_gamemanager_settings and gm:
+            # Use GameManager settings (already verified above)
+            target_team = None
+            if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+                target_team = gm.home_team
+            elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+                target_team = gm.away_team
+            
+            if target_team and hasattr(target_team, 'strategy_settings') and target_team.strategy_settings:
+                strategy_settings = target_team.strategy_settings
+                logger.warning(f"✅ [GET-GAMEPLAN] Using GameManager strategy_settings: inside={strategy_settings.get('inside')}")
+            else:
+                strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
+        else:
+            strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
         
-        # ✅ TRACE: Log strategy_settings loaded from DB
+        # ✅ TRACE: Log strategy_settings loaded from DB or GameManager
         trace_id = f"{mode}_{doc_id}_{team_id}"
         inside_value = strategy_settings.get("inside") if strategy_settings else None
         team_id_for_log = actual_team_id if mode == "single" and 'actual_team_id' in locals() else (authoritative_team_id if mode in ["franchise", "tournament"] else "N/A")
-        logger.warning(f"🟢 [TRACE-LOAD] {trace_id} | GET-GAMEPLAN | team_id={team_id_for_log}, inside={inside_value}, has_settings={bool(strategy_settings)}")
+        source = "GameManager" if (mode == "single" and use_gamemanager_settings and gm) else "DB"
+        logger.warning(f"🟢 [TRACE-LOAD] {trace_id} | GET-GAMEPLAN | team_id={team_id_for_log}, inside={inside_value}, has_settings={bool(strategy_settings)}, source={source}")
         
         # ✅ FIX: Normalize legacy keys and ensure all required fields exist
         # Map old key names to new ones (for backward compatibility)
@@ -1754,6 +1794,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         
         # Get playbook settings (percentages, slot assignments, motion dropdowns, and position filters)
         # ✅ SS&S: Use GameManager settings if available (single source of truth during gameplay)
+        # If GameManager not available, use load_team_settings_from_doc() (same logic as game start)
         if mode == "single" and use_gamemanager_settings and gm:
             # Use GameManager settings (already verified above)
             target_team = None
@@ -1767,6 +1808,14 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 logger.warning(f"✅ [GET-PLAYBOOKS] Using GameManager playbook_settings: slot_assignments={len(playbook_settings.get('slot_assignments', {}))}")
             else:
                 playbook_settings = team_obj.get("playbook_settings", {})
+        elif mode == "single" and not use_gamemanager_settings:
+            # ✅ SS&S: GameManager not available - use load_team_settings_from_doc() (same as simulate_quarter_endpoint)
+            from BackEnd.api.api import load_team_settings_from_doc
+            settings = load_team_settings_from_doc(mode, doc_id, team_id, team_id)
+            playbook_settings = settings.get("playbook_settings", {}) or team_obj.get("playbook_settings", {})
+            if playbook_settings:
+                slot_count = len(playbook_settings.get("slot_assignments", {}))
+                logger.warning(f"✅ [GET-PLAYBOOKS] Using load_team_settings_from_doc() (same as game start): slot_assignments={slot_count}")
         else:
             playbook_settings = team_obj.get("playbook_settings", {})
         
