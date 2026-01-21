@@ -993,44 +993,50 @@ def summarize_game_state(game, exclude_animations=True):
                         # Only log actual errors
                         pass
                 
-                # ✅ SS&S: DB is source of truth - always load from DB
-                # Get playbook_settings for each team from DB
-                # ✅ CRITICAL: Check team_id key first (correct format), then fallback to team name key (legacy format)
-                # This provides backward compatibility for existing games that have settings under team name keys
-                if home_actual_team_id:
+                # ✅ FIX: GameManager is source of truth for CURRENT state, DB is source of truth for PERSISTENCE
+                # Check GameManager first (current state), then fall back to DB (persistence)
+                # This ensures settings applied to GameManager are preserved when summarizing
+                
+                # Home team: Check GameManager first
+                if hasattr(game.home_team, 'playbook_settings') and game.home_team.playbook_settings:
+                    home_playbook_settings = game.home_team.playbook_settings
+                    slot_count = len(home_playbook_settings.get("slot_assignments", {}))
+                    logging.warning(f"✅ [SUMMARIZE] Using GameManager home playbook_settings: slot_assignments={slot_count}")
+                elif home_actual_team_id:
+                    # Fall back to DB if GameManager doesn't have settings
                     home_team_data = teams.get(home_actual_team_id, {})
                     home_playbook_settings = home_team_data.get("playbook_settings", {})
-                    # ✅ REMOVED: Verbose debug logs - only log success/failure
                     # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
-                    # This handles legacy saves where settings were saved under team name keys
                     if not home_playbook_settings:
                         # Try to find by team name (legacy format)
-                        # Check if key itself matches team name (some legacy saves have name='NO_NAME')
                         for tid in teams.keys():
                             team_data = teams.get(tid, {})
-                            # Match if key equals team name OR team_data.name equals team name
                             if tid == game.home_team.name or team_data.get("name") == game.home_team.name:
                                 legacy_settings = team_data.get("playbook_settings", {})
                                 if legacy_settings:
                                     home_playbook_settings = legacy_settings
-                                    logging.warning(f"⚠️ [PLAYBOOK SETTINGS SAVE] Found legacy settings under team name key '{tid}' for home team, please migrate to team_id key '{home_actual_team_id}'")
+                                    logging.warning(f"⚠️ [SUMMARIZE] Found legacy settings under team name key '{tid}' for home team")
                                     break
-                if away_actual_team_id:
+                
+                # Away team: Check GameManager first
+                if hasattr(game.away_team, 'playbook_settings') and game.away_team.playbook_settings:
+                    away_playbook_settings = game.away_team.playbook_settings
+                    slot_count = len(away_playbook_settings.get("slot_assignments", {}))
+                    logging.warning(f"✅ [SUMMARIZE] Using GameManager away playbook_settings: slot_assignments={slot_count}")
+                elif away_actual_team_id:
+                    # Fall back to DB if GameManager doesn't have settings
                     away_team_data = teams.get(away_actual_team_id, {})
                     away_playbook_settings = away_team_data.get("playbook_settings", {})
-                    # ✅ REMOVED: Verbose debug logs - only log success/failure
                     # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
                     if not away_playbook_settings:
                         # Try to find by team name (legacy format)
-                        # Check if key itself matches team name (some legacy saves have name='NO_NAME')
                         for tid in teams.keys():
                             team_data = teams.get(tid, {})
-                            # Match if key equals team name OR team_data.name equals team name
                             if tid == game.away_team.name or team_data.get("name") == game.away_team.name:
                                 legacy_settings = team_data.get("playbook_settings", {})
                                 if legacy_settings:
                                     away_playbook_settings = legacy_settings
-                                    logging.warning(f"⚠️ [PLAYBOOK SETTINGS SAVE] Found legacy settings under team name key '{tid}' for away team, please migrate to team_id key '{away_actual_team_id}'")
+                                    logging.warning(f"⚠️ [SUMMARIZE] Found legacy settings under team name key '{tid}' for away team")
                                     break
                 
                 # ✅ REMOVED: Verbose success/failure logs - only log if settings are missing when expected
