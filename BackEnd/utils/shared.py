@@ -938,13 +938,20 @@ def summarize_game_state(game, exclude_animations=True):
             if saved_game:
                 teams = saved_game.get("teams", {})
                 
+                # ✅ TRACE: Log available team keys for debugging
+                available_team_keys = list(teams.keys())
+                logging.warning(f"🔍 [SUMMARIZE] Available team keys in DB: {available_team_keys}")
+                logging.warning(f"🔍 [SUMMARIZE] Looking for home_team_id={game.home_team.team_id}, away_team_id={game.away_team.team_id}")
+                
                 # ✅ SS&S: Use the SAME team_id resolution logic as save_playbooks()
                 # This ensures we always find settings using the same keys they were saved with
                 # First try direct lookup with team_id (fastest, most reliable)
                 if game.home_team.team_id in teams:
                     home_actual_team_id = game.home_team.team_id
+                    logging.warning(f"✅ [SUMMARIZE] Found home_actual_team_id={home_actual_team_id} via direct lookup")
                 if game.away_team.team_id in teams:
                     away_actual_team_id = game.away_team.team_id
+                    logging.warning(f"✅ [SUMMARIZE] Found away_actual_team_id={away_actual_team_id} via direct lookup")
                 
                 # If direct lookup fails, iterate through teams and match by name field
                 # (This matches the save_playbooks() resolution logic exactly)
@@ -1006,6 +1013,11 @@ def summarize_game_state(game, exclude_animations=True):
                     # Fall back to DB if GameManager doesn't have settings
                     home_team_data = teams.get(home_actual_team_id, {})
                     home_playbook_settings = home_team_data.get("playbook_settings", {})
+                    if home_playbook_settings:
+                        slot_count = len(home_playbook_settings.get("slot_assignments", {}))
+                        logging.warning(f"✅ [SUMMARIZE] Found home playbook_settings in DB: slot_assignments={slot_count}")
+                    else:
+                        logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings in DB for home_actual_team_id={home_actual_team_id}, trying legacy lookup")
                     # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
                     if not home_playbook_settings:
                         # Try to find by team name (legacy format)
@@ -1017,6 +1029,8 @@ def summarize_game_state(game, exclude_animations=True):
                                     home_playbook_settings = legacy_settings
                                     logging.warning(f"⚠️ [SUMMARIZE] Found legacy settings under team name key '{tid}' for home team")
                                     break
+                else:
+                    logging.warning(f"⚠️ [SUMMARIZE] Could not resolve home_actual_team_id, cannot load playbook_settings from DB")
                 
                 # Away team: Check GameManager first
                 if hasattr(game.away_team, 'playbook_settings') and game.away_team.playbook_settings:
@@ -1027,6 +1041,11 @@ def summarize_game_state(game, exclude_animations=True):
                     # Fall back to DB if GameManager doesn't have settings
                     away_team_data = teams.get(away_actual_team_id, {})
                     away_playbook_settings = away_team_data.get("playbook_settings", {})
+                    if away_playbook_settings:
+                        slot_count = len(away_playbook_settings.get("slot_assignments", {}))
+                        logging.warning(f"✅ [SUMMARIZE] Found away playbook_settings in DB: slot_assignments={slot_count}")
+                    else:
+                        logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings in DB for away_actual_team_id={away_actual_team_id}, trying legacy lookup")
                     # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
                     if not away_playbook_settings:
                         # Try to find by team name (legacy format)
@@ -1038,6 +1057,8 @@ def summarize_game_state(game, exclude_animations=True):
                                     away_playbook_settings = legacy_settings
                                     logging.warning(f"⚠️ [SUMMARIZE] Found legacy settings under team name key '{tid}' for away team")
                                     break
+                else:
+                    logging.warning(f"⚠️ [SUMMARIZE] Could not resolve away_actual_team_id, cannot load playbook_settings from DB")
                 
                 # ✅ REMOVED: Verbose success/failure logs - only log if settings are missing when expected
         except Exception as e:
