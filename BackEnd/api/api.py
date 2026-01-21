@@ -1105,9 +1105,10 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                 }
             }
             
-            # ✅ PERFORMANCE DIAGNOSTIC: Log processing time for in-memory path
+            # ✅ REMOVED: Verbose PERF log - only log if slow (>50ms)
             process_time = (time.time() - process_start) * 1000  # Convert to ms
-            logging.warning(f"⏱️ [PERF] /api/game/{game_id} - In-memory processing: {process_time:.2f}ms")
+            if process_time > 50:
+                logging.warning(f"⚠️ [PERF] Slow in-memory processing: /api/game/{game_id} - {process_time:.2f}ms")
             
             response_data = {
                 "game_id": game_id,
@@ -1135,7 +1136,9 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
             }
             response_size = len(json.dumps(response_data))
             total_time = (time.time() - endpoint_start) * 1000
-            logging.warning(f"⏱️ [PERF] /api/game/{game_id} - In-memory path: processing: {process_time:.2f}ms, response_size: {response_size} bytes, total: {total_time:.2f}ms")
+            # ✅ REMOVED: Verbose PERF log - only log if slow (>100ms)
+            if total_time > 100:
+                logging.warning(f"⚠️ [PERF] Slow in-memory path: /api/game/{game_id} - {total_time:.2f}ms")
             return response_data
         
         # Check database
