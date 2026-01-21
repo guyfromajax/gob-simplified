@@ -919,10 +919,11 @@ def summarize_game_state(game, exclude_animations=True):
     # 🔍 DEBUG: Check if GameManager has settings (for diagnostic purposes)
     # ✅ REMOVED: Verbose SUMMARIZE DEBUG logs - redundant with trace logs
     
-    # ✅ SS&S: DB is source of truth - load from DB for persistence
-    if exclude_animations and hasattr(game, 'game_id') and game.game_id:
-        # Only preserve playbook_settings when saving to database (exclude_animations=True)
-        # and game_id exists (game has been initialized)
+    # ✅ FIX: Always try to load playbook_settings (from GameManager or DB) regardless of exclude_animations
+    # For frontend (exclude_animations=False): GameManager has current state
+    # For DB save (exclude_animations=True): DB is source of truth, but GameManager is safety net
+    # This ensures settings are available in both frontend response AND DB save
+    if hasattr(game, 'game_id') and game.game_id:
         try:
             from BackEnd.db import games_collection, db
             from bson import ObjectId
@@ -1070,8 +1071,28 @@ def summarize_game_state(game, exclude_animations=True):
                 
                 # ✅ REMOVED: Verbose success/failure logs - only log if settings are missing when expected
         except Exception as e:
-            # If we can't load playbook_settings, continue without them (non-critical)
-            logging.warning(f"⚠️ Could not preserve playbook_settings from database: {e}", exc_info=True)
+            # If we can't load playbook_settings from DB, try GameManager as fallback
+            logging.warning(f"⚠️ Could not load playbook_settings from database: {e}, trying GameManager fallback")
+            # Fallback to GameManager if DB load failed
+            if not home_playbook_settings and hasattr(game.home_team, 'playbook_settings') and game.home_team.playbook_settings:
+                home_playbook_settings = game.home_team.playbook_settings
+                slot_count = len(home_playbook_settings.get("slot_assignments", {}))
+                logging.warning(f"✅ [SUMMARIZE] DB load failed, using GameManager fallback for home: slot_assignments={slot_count}")
+            if not away_playbook_settings and hasattr(game.away_team, 'playbook_settings') and game.away_team.playbook_settings:
+                away_playbook_settings = game.away_team.playbook_settings
+                slot_count = len(away_playbook_settings.get("slot_assignments", {}))
+                logging.warning(f"✅ [SUMMARIZE] DB load failed, using GameManager fallback for away: slot_assignments={slot_count}")
+    
+    # ✅ FINAL FALLBACK: If DB loading didn't run (no game_id) or didn't find settings, check GameManager
+    # This ensures settings are available even when DB loading fails
+    if not home_playbook_settings and hasattr(game.home_team, 'playbook_settings') and game.home_team.playbook_settings:
+        home_playbook_settings = game.home_team.playbook_settings
+        slot_count = len(home_playbook_settings.get("slot_assignments", {}))
+        logging.warning(f"✅ [SUMMARIZE] Using GameManager for home (no DB load): slot_assignments={slot_count}")
+    if not away_playbook_settings and hasattr(game.away_team, 'playbook_settings') and game.away_team.playbook_settings:
+        away_playbook_settings = game.away_team.playbook_settings
+        slot_count = len(away_playbook_settings.get("slot_assignments", {}))
+        logging.warning(f"✅ [SUMMARIZE] Using GameManager for away (no DB load): slot_assignments={slot_count}")
     
     # ✅ UNIFIED TEAM STRUCTURE: Create single teams object with ALL team data
     # ✅ Use resolved team_id keys if we found them, otherwise use game.home_team.team_id
