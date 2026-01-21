@@ -191,17 +191,37 @@ class PlaybooksState {
     const assignment = this.slotAssignments[slotNumber];
     if (!assignment) return null;
     
-    // Try to find play in loaded play data
+    // ✅ Simple fix: Use playName if available (same as court.html)
+    if (assignment.playName) {
+      // For motion, include dropdown (focus)
+      if (assignment.section === 'motion') {
+        return `${assignment.playName} (${assignment.dropdown || '-'})`;
+      }
+      // For set plays, determine focus from section
+      if (assignment.section === 'set-play-inside') {
+        return `${assignment.playName} (Inside)`;
+      }
+      if (assignment.section === 'set-play-attack') {
+        return `${assignment.playName} (Attack)`;
+      }
+      if (assignment.section === 'set-play-outside') {
+        return `${assignment.playName} (Outside)`;
+      }
+      // Fallback: just return the play name
+      return assignment.playName;
+    }
+    
+    // Fallback: Try to find play in loaded play data (legacy support)
     let play = null;
     if (playData) {
       if (assignment.section === 'motion') {
-        play = playData.motion?.find(p => p.id === assignment.playId);
+        play = playData.motion?.find(p => p.id === assignment.playId || p.play_id === assignment.playId || p.name === assignment.playId);
       } else if (assignment.section === 'set-play-inside') {
-        play = playData.set_play_inside?.find(p => p.id === assignment.playId);
+        play = playData.set_play_inside?.find(p => p.id === assignment.playId || p.play_id === assignment.playId || p.name === assignment.playId);
       } else if (assignment.section === 'set-play-attack') {
-        play = playData.set_play_attack?.find(p => p.id === assignment.playId);
+        play = playData.set_play_attack?.find(p => p.id === assignment.playId || p.play_id === assignment.playId || p.name === assignment.playId);
       } else if (assignment.section === 'set-play-outside') {
-        play = playData.set_play_outside?.find(p => p.id === assignment.playId);
+        play = playData.set_play_outside?.find(p => p.id === assignment.playId || p.play_id === assignment.playId || p.name === assignment.playId);
       }
     }
     
