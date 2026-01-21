@@ -1071,9 +1071,8 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
             gm = ongoing_games.get(game_id)
         
         if gm:
-            # ✅ PERFORMANCE DIAGNOSTIC: Log in-memory path and measure processing time
+            # ✅ PERFORMANCE: Measure processing time (only log if slow)
             process_start = time.time()
-            logging.warning(f"⏱️ [PERF] /api/game/{game_id} - Using in-memory game (no DB query)")
             # Get players with current energy levels, stats, and attributes
             # Include ALL players (not just lineup) so roster merge works correctly
             players = []
@@ -1141,9 +1140,7 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
         
         # Check database
         if games_collection is not None:
-            # 🔍 DEBUG: Log when reading from DB (for lineup screen)
-            if force_db_read:
-                logging.warning(f"🔍 [GET_GAME_STATE DEBUG] Reading from DB (source=db) - game_id={game_id}, quarter={quarter}")
+            # ✅ REMOVED: Verbose debug logs - only log on errors
             # ✅ PERFORMANCE: Use projection to only load needed fields (80-95% reduction in data transfer)
             # Fields needed: players (energy/stats), ineligible_players, score, box_score, quarter, clock,
             # teams (name, team_id, box_score, totals, scouting, attributes, colors, score, timeouts, team_fouls, points_by_quarter),
@@ -1177,14 +1174,13 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                     pass
             
             query_time = (time.time() - query_start) * 1000  # Convert to ms
-            doc_size = len(str(saved)) if saved else 0
-            logging.warning(f"⏱️ [PERF] /api/game/{game_id} - DB query: {query_time:.2f}ms, doc_size: {doc_size} bytes")
+            # ✅ REMOVED: Verbose PERF and DEBUG logs - only log on errors or slow queries (>100ms)
+            if query_time > 100:
+                doc_size = len(str(saved)) if saved else 0
+                logging.warning(f"⚠️ [PERF] Slow DB query: /api/game/{game_id} - {query_time:.2f}ms, doc_size: {doc_size} bytes")
             
             if saved:
-                # 🔍 DEBUG: Log what's being read from DB
-                if force_db_read:
-                    logging.warning(f"🔍 [GET_GAME_STATE DEBUG] DB document - quarter={saved.get('quarter')}, clock={saved.get('clock')}, time_remaining={saved.get('time_remaining')}")
-                    logging.warning(f"🔍 [GET_GAME_STATE DEBUG] DB document - score={saved.get('score')}, timeout_next_play_type={saved.get('timeout_next_play_type')}")
+                # ✅ REMOVED: Verbose debug logs
                 
                 saved_quarter = saved.get("quarter", 1)
                 
@@ -1399,7 +1395,9 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                 }
                 response_size = len(json.dumps(response_data))
                 total_time = (time.time() - endpoint_start) * 1000
-                logging.warning(f"⏱️ [PERF] /api/game/{game_id} - DB path: query: {query_time:.2f}ms, response_size: {response_size} bytes, total: {total_time:.2f}ms")
+                # ✅ REMOVED: Verbose PERF log - only log if slow (>100ms)
+            if total_time > 100:
+                logging.warning(f"⚠️ [PERF] Slow DB path: /api/game/{game_id} - {total_time:.2f}ms")
                 return response_data
         
             logging.error(f"❌ [BOX_SCORE] Game not found in database: game_id={game_id}")
@@ -1415,7 +1413,9 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
         # ✅ PERFORMANCE DIAGNOSTIC: Log total endpoint time (if not already logged)
         if 'endpoint_start' in locals() and 'response_size' not in locals():
             total_time = (time.time() - endpoint_start) * 1000  # Convert to ms
-            logging.warning(f"⏱️ [PERF] /api/game/{game_id} - Total endpoint time: {total_time:.2f}ms")
+            # ✅ REMOVED: Verbose PERF log - only log if slow (>100ms)
+            if total_time > 100:
+                logging.warning(f"⚠️ [PERF] Slow endpoint: /api/game/{game_id} - {total_time:.2f}ms")
 
 @app.options("/api/simulate-quarter")
 async def simulate_quarter_options():
@@ -1457,16 +1457,11 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
     if game_id:
         gm = ongoing_games.get(game_id)
         # ✅ DEBUG: Track ongoing_games state at start of simulate_quarter_endpoint
-        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] simulate_quarter_endpoint START: game_id={game_id}, full_sim={request.full_sim}, quarter={request.quarter}")
-        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game in ongoing_games: {gm is not None}")
-        if gm:
-            logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game object found - object_id={id(gm)}, current_quarter={gm.quarter}")
-            # Preserve user_team_side from in-memory game
-            if gm.game_state.get("user_team_side"):
-                preserved_user_team_side = gm.game_state.get("user_team_side")
-                logging.warning(f"✅ [USER_TEAM_SIDE] Preserved from in-memory game: {preserved_user_team_side}")
-        else:
-            logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game NOT in ongoing_games - will load from DB. Available games: {list(ongoing_games.keys())}")
+        # ✅ REMOVED: Verbose ONGOING_GAMES DEBUG logs - only log errors
+        # Preserve user_team_side from in-memory game
+        if gm and gm.game_state.get("user_team_side"):
+            preserved_user_team_side = gm.game_state.get("user_team_side")
+            logging.warning(f"✅ [USER_TEAM_SIDE] Preserved from in-memory game: {preserved_user_team_side}")
         if gm is not None and (
             request.home_team != gm.home_team.name
             or request.away_team != gm.away_team.name
@@ -1490,7 +1485,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             logging.info(
                 f"🆕 New game: game_id={game_id} in memory at Q{gm.quarter}, but user requested Q1. Removing from memory to reload from DB."
             )
-            logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ⚠️ Removing game from ongoing_games (new game scenario): game_id={game_id}")
+            # ✅ REMOVED: Verbose debug log
             del ongoing_games[game_id]
             gm = None  # Force reload from DB where new game detection will run
         
@@ -1542,10 +1537,6 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         
         # ✅ DIAGNOSTIC: Log why settings loading might be skipped
         if gm is not None:
-            logging.warning(f"🔍 [APPLY-SETTINGS] Condition check: gm is not None={gm is not None}, not request.strategy_settings={not request.strategy_settings}, mode={mode}, request.game_id={bool(request.game_id)}")
-            if request.strategy_settings:
-                logging.warning(f"🔍 [APPLY-SETTINGS] request.strategy_settings is present: {bool(request.strategy_settings)}, type={type(request.strategy_settings)}")
-        
         # ✅ CRITICAL FIX: Always load playbook_settings from DB when game is cached (for single mode)
         # Strategy_settings are handled later with proper validity checks
         if gm is not None and mode == "single" and request.game_id:
@@ -1561,10 +1552,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 None,
                 request.away_team
             )
-            # ✅ DIAGNOSTIC: Log GameManager state before applying settings
-            home_before = gm.home_team.strategy_settings.get("inside", "MISSING") if hasattr(gm.home_team, 'strategy_settings') and gm.home_team.strategy_settings else "NO_SETTINGS"
-            away_before = gm.away_team.strategy_settings.get("inside", "MISSING") if hasattr(gm.away_team, 'strategy_settings') and gm.away_team.strategy_settings else "NO_SETTINGS"
-            logging.warning(f"📊 [APPLY-SETTINGS] BEFORE: Home inside={home_before}, Away inside={away_before}")
+            # ✅ REMOVED: Verbose BEFORE logs - only log when settings are applied
             
             # ✅ CRITICAL FIX: Always apply playbook_settings to GameManager when game is cached
             # Strategy_settings are handled later with proper validity checks, but playbook_settings must be loaded here
@@ -1574,14 +1562,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 gm.home_team.playbook_settings = home_settings.get("playbook_settings")
                 logging.warning(f"✅ [APPLY-SETTINGS] Applied DB home playbook_settings to cached GameManager: slot_assignments={db_slots}")
             else:
-                logging.warning(f"⚠️ [APPLY-SETTINGS] No DB home playbook_settings to apply (home_settings={bool(home_settings)}, has_playbook={bool(home_settings.get('playbook_settings') if home_settings else False)})")
-            
+                # ✅ REMOVED: Verbose warning - only log when settings ARE applied
             if away_settings and away_settings.get("playbook_settings"):
                 db_slots = len(away_settings.get("playbook_settings", {}).get("slot_assignments", {}))
                 gm.away_team.playbook_settings = away_settings.get("playbook_settings")
                 logging.warning(f"✅ [APPLY-SETTINGS] Applied DB away playbook_settings to cached GameManager: slot_assignments={db_slots}")
-            else:
-                logging.warning(f"⚠️ [APPLY-SETTINGS] No DB away playbook_settings to apply (away_settings={bool(away_settings)}, has_playbook={bool(away_settings.get('playbook_settings') if away_settings else False)})")
+            # ✅ REMOVED: Verbose warning - only log when settings ARE applied
         
         # ✅ TIMEOUT RESUME: Unified state restoration (works for all modes and all paths)
         # Only check database for timeout state if we have a game_id (existing game, not new game start)
@@ -2143,7 +2129,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         
                         ongoing_games[game_id] = gm
                         # ✅ DEBUG: Track when game is added to ongoing_games
-                        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ✅ Added game to ongoing_games: game_id={game_id}, object_id={id(gm)}, quarter={gm.quarter}, full_sim={request.full_sim}")
+                        # ✅ REMOVED: Verbose debug log
                         if debug:
                             logging.debug(
                                 "simulate_quarter_endpoint loaded from DB: %s vs %s",
@@ -2296,7 +2282,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         game_id = request.game_id
                     gm.game_id = game_id  # Store game_id on the GameManager object
                     ongoing_games[game_id] = gm
-                    logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ✅ Added game to ongoing_games (timeout resume path): game_id={game_id}, object_id={id(gm)}, quarter={gm.quarter}")
+                    # ✅ REMOVED: Verbose debug log
                     source = "new"
                     
                     # Save teams object to database for skeleton lookup during simulation
@@ -2669,7 +2655,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             )
         gm.game_id = game_id  # Store game_id on the GameManager object
         ongoing_games[game_id] = gm
-        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ✅ Added game to ongoing_games (new game path): game_id={game_id}, object_id={id(gm)}, quarter={gm.quarter}")
+        # ✅ REMOVED: Verbose debug log
         source = "new"
         
         # Save teams object to database for skeleton lookup during simulation
@@ -2910,11 +2896,10 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
 
     # ✅ DEBUG: Check ongoing_games state after simulate_quarter completes
     gm_after_sim = ongoing_games.get(game_id)
-    logging.warning(f"🔍 [ONGOING_GAMES DEBUG] After simulate_quarter() completes: game_id={game_id}, in_ongoing_games={gm_after_sim is not None}")
-    if gm_after_sim:
-        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game still in ongoing_games - object_id={id(gm_after_sim)}, quarter={gm_after_sim.quarter}, full_sim={request.full_sim}")
-    else:
-        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ⚠️ Game NOT in ongoing_games after simulate_quarter! Available games: {list(ongoing_games.keys())}")
+    # ✅ REMOVED: Verbose debug logs - only log if game is unexpectedly missing
+    gm_after_sim = ongoing_games.get(game_id)
+    if not gm_after_sim and not request.full_sim:
+        logging.warning(f"⚠️ [ONGOING_GAMES] Game NOT in ongoing_games after simulate_quarter! Available games: {list(ongoing_games.keys())}")
     
     # Save to database (WITHOUT animations to reduce document size)
     db_save_start = time.time()
@@ -3390,12 +3375,9 @@ async def set_playcall_override_endpoint(raw_request: Request):
     gm = ongoing_games.get(game_id)
     
     # ✅ DEBUG: Track ongoing_games state for playcall override issue
-    logging.warning(f"🔍 [ONGOING_GAMES DEBUG] set_playcall_override called: game_id={game_id}")
-    logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game in ongoing_games: {gm is not None}")
-    if gm:
-        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] Game object found - object_id={id(gm)}, quarter={gm.quarter}")
-    else:
-        logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ❌ Game NOT in ongoing_games! Available games: {list(ongoing_games.keys())}")
+    # ✅ REMOVED: Verbose debug logs - only log if game is missing
+    if not gm:
+        logging.warning(f"⚠️ [ONGOING_GAMES] Game NOT in ongoing_games! Available games: {list(ongoing_games.keys())}")
     
     if gm is None:
         raise HTTPException(
@@ -3798,7 +3780,7 @@ def init_game(request: dict):
     
     # Store in ongoing_games so /api/game/{game_id} can access it
     ongoing_games[game_id] = gm
-    logging.warning(f"🔍 [ONGOING_GAMES DEBUG] ✅ Added game to ongoing_games (init-game path): game_id={game_id}, object_id={id(gm)}, quarter={gm.quarter}")
+    # ✅ REMOVED: Verbose debug log
     
     response_data = {"game_id": game_id}
     response_size = len(json.dumps(response_data))

@@ -1782,19 +1782,7 @@ def save_playbooks(request: PlaybookSettingsRequest):
     Stores in teams.{team_id}.playbook_settings in the appropriate mode document.
     """
     try:
-        logger.warning(f"🔍 [PLAYBOOKS SAVE] Received save request: mode={request.mode}, team_id={request.team_id}")
-        logger.warning(f"🔍 [PLAYBOOKS SAVE] playbook_settings keys: {list(request.playbook_settings.keys()) if request.playbook_settings else 'EMPTY'}")
-        if request.playbook_settings:
-            logger.warning(f"🔍 [PLAYBOOKS SAVE] motion keys: {list(request.playbook_settings.get('motion', {}).keys())}")
-            logger.warning(f"🔍 [PLAYBOOKS SAVE] set_play_inside keys: {list(request.playbook_settings.get('set_play_inside', {}).keys())}")
-            logger.warning(f"🔍 [PLAYBOOKS SAVE] set_play_attack keys: {list(request.playbook_settings.get('set_play_attack', {}).keys())}")
-            logger.warning(f"🔍 [PLAYBOOKS SAVE] set_play_outside keys: {list(request.playbook_settings.get('set_play_outside', {}).keys())}")
-            logger.warning(f"🔍 [PLAYBOOKS SAVE] zone_defense keys: {list(request.playbook_settings.get('zone_defense', {}).keys())}")
-            logger.warning(f"🔍 [PLAYBOOKS SAVE] man_defense keys: {list(request.playbook_settings.get('man_defense', {}).keys())}")
-            # Log sample percentages
-            if request.playbook_settings.get('motion'):
-                sample_motion = dict(list(request.playbook_settings.get('motion', {}).items())[:3])
-                logger.warning(f"🔍 [PLAYBOOKS SAVE] Sample motion percentages: {sample_motion}")
+        # ✅ REMOVED: Verbose field-by-field logs - only log errors
         # Determine which collection to use
         if request.mode == "franchise":
             if not request.franchise_id:
