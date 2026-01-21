@@ -786,9 +786,17 @@ class PlaybooksUI {
     let plays = [];
     const isOffenseSection = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'].includes(sectionKey);
     
+    // ✅ DIAGNOSTIC: Log playData to diagnose timeout rendering issue
+    if (isOffenseSection && (!this.playData || !this.playData[sectionKey === 'motion' ? 'motion' : `set_play_${sectionKey.replace('set-play-', '')}`])) {
+      console.warn(`⚠️ [RENDER] playData missing for ${sectionKey}:`, this.playData);
+    }
+    
     // Get plays based on section
     if (sectionKey === 'motion') {
       const motionPlays = this.playData.motion || [];
+      if (motionPlays.length === 0) {
+        console.warn('⚠️ [RENDER] motion plays array is empty!');
+      }
       // Filter by position FIRST (for offense sections), then fill to 4 slots
       if (isOffenseSection) {
         const filteredPlays = motionPlays.filter(play => {

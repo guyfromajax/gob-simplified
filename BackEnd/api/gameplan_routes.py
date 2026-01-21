@@ -1818,6 +1818,22 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             if target_team and hasattr(target_team, 'playbook_settings') and target_team.playbook_settings:
                 playbook_settings = target_team.playbook_settings
                 logger.warning(f"✅ [GET-PLAYBOOKS] Using GameManager playbook_settings: slot_assignments={len(playbook_settings.get('slot_assignments', {}))}")
+                # ✅ CRITICAL FIX: Check if position_filters are empty (same issue as DB path)
+                # GameManager's playbook_settings may have empty position_filters, which causes plays to not render
+                position_filters = playbook_settings.get("position_filters", {})
+                all_empty = True
+                if position_filters:
+                    for key in ["standard", "PG", "SG", "SF", "PF", "C"]:
+                        if position_filters.get(key) and len(position_filters[key]) > 0:
+                            all_empty = False
+                            break
+                
+                if not position_filters or all_empty:
+                    # Position filters are missing or empty, populate them
+                    logger.warning(f"🔍 [GET-PLAYBOOKS] GameManager position_filters empty, populating...")
+                    new_playbook_settings = initialize_playbook_settings()
+                    playbook_settings["position_filters"] = new_playbook_settings["position_filters"]
+                    logger.warning(f"✅ [GET-PLAYBOOKS] Populated GameManager position_filters")
                 # ✅ DEBUG: Log GameManager playbook_settings structure
                 logger.warning(f"🔍 [GET-PLAYBOOKS DEBUG] GameManager playbook_settings structure:")
                 logger.warning(f"   - Type: {type(playbook_settings)}")
