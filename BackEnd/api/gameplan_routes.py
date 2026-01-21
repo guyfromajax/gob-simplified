@@ -1894,8 +1894,19 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             except Exception as e:
                 logger.warning(f"⚠️ Error loading from core teams collection (non-critical): {e}")
         
-        slot_assignments = playbook_settings.get("slot_assignments", {})
-        motion_dropdowns = playbook_settings.get("motion_dropdowns", {})
+        slot_assignments = playbook_settings.get("slot_assignments", {}) if playbook_settings else {}
+        motion_dropdowns = playbook_settings.get("motion_dropdowns", {}) if playbook_settings else {}
+        
+        # ✅ DEBUG: Log slot_assignments structure when returning to frontend
+        if slot_assignments:
+            logger.warning(f"🔍 [GET-PLAYBOOKS DEBUG] slot_assignments structure:")
+            logger.warning(f"   - Type: {type(slot_assignments)}")
+            logger.warning(f"   - Keys (slot numbers): {list(slot_assignments.keys())}")
+            if isinstance(slot_assignments, dict):
+                for slot_num, assignment in list(slot_assignments.items())[:2]:
+                    logger.warning(f"   - Slot {slot_num}: {assignment}")
+        else:
+            logger.warning(f"🔍 [GET-PLAYBOOKS DEBUG] slot_assignments is empty or missing")
         
         # Get position filters (merge with defaults if missing)
         default_position_filters = {
