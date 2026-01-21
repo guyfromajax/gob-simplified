@@ -69,11 +69,25 @@
    - **Telemetry:** Log when normalization occurs (track format inconsistencies)
    - **Validation:** All API entry points normalize `game_id` format
 
+6. **Validate Lineup Screen Data Display** (Post-Phase 1.1 Validation)
+   - **Action:** After completing tasks 1-5, verify lineup screen displays accurate player data
+   - **Validation:** 
+     - Lineup screen correctly displays NG (energy) values during timeout/quarter breaks
+     - Lineup screen correctly displays player stats (PTS, REB, AST, etc.) during timeout/quarter breaks
+     - Data matches values from game state (no defaulting to 100% or 0)
+   - **If Validation Fails:** 
+     - Create blocking bug fix task (Phase 1.1.6 or Phase 1.1 Bug Fix)
+     - Investigate frontend data parsing/matching logic
+     - Fix before proceeding to Phase 1.2
+   - **Rationale:** Phase 1.1 refactoring (especially team ID standardization) may resolve format/ID inconsistencies causing display issues
+   - **Validation:** Lineup screen displays accurate player data (NG and stats) from game state
+
 **Success Criteria:**
 - ✅ No localStorage fallbacks for `game_id` or `franchise_id`
 - ✅ Missing pointers trigger explicit error screens
 - ✅ Team ID resolution uses canonical `team_id` keys only
 - ✅ All API entry points normalize `game_id` format
+- ✅ Lineup screen displays accurate player data (NG and stats) from game state
 - ✅ All tests pass
 
 ---
