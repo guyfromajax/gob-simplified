@@ -188,6 +188,11 @@
     const apiConfigScript = document.createElement('script');
     apiConfigScript.src = `${staticPrefix}/js/config/api-config.js`;
     apiConfigScript.onload = () => {
+      // ✅ PHASE 1.1: Load error handler before game-plan.js
+      const errorHandlerScript = document.createElement('script');
+      errorHandlerScript.src = `${staticPrefix}/js/shared/errorHandler.js`;
+      document.head.appendChild(errorHandlerScript);
+      
       // After API config loads, load game-plan.js using the helper
       script.src = `${API_CONFIG.getStaticPath()}/game-plan.js?v=${cacheBuster}`;
       script.onload = () => {

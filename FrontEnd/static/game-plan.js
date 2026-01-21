@@ -41,13 +41,39 @@ const isGameIdRequired = (modeParam === 'single') || (quarter > 1) || resumeFrom
 if (isGameIdRequired && !gameId) {
   const errorMsg = `game_id is required but missing from URL. Mode: ${modeParam}, Quarter: ${quarter}, Resume from timeout: ${resumeFromTimeout}. Please navigate from the lineup screen with a valid game_id (created by init-game).`;
   console.error(`❌ [GAME-PLAN] ${errorMsg}`);
-  alert(`Error: ${errorMsg}\n\nPlease return to the lineup screen and try again.`);
-  // Redirect to lineup screen if possible
-  if (homeTeam && awayTeam) {
-    const lineupUrl = `/set-lineup.html?home=${encodeURIComponent(homeTeam)}&away=${encodeURIComponent(awayTeam)}&home_id=${encodeURIComponent(homeId || '')}&away_id=${encodeURIComponent(awayId || '')}&my_team=${encodeURIComponent(myTeamSide || 'home')}&mode=${encodeURIComponent(modeParam || 'single')}`;
-    if (franchiseId) lineupUrl += `&franchise_id=${encodeURIComponent(franchiseId)}`;
-    if (tournamentId) lineupUrl += `&tournament_id=${encodeURIComponent(tournamentId)}`;
-    window.location.href = lineupUrl;
+  
+  // Show error screen if errorHandler is available
+  if (typeof window !== 'undefined' && window.ErrorHandler) {
+    window.ErrorHandler.showMissingPointerError({
+      missingPointer: 'game_id',
+      message: errorMsg,
+      mode: modeParam || 'single',
+      recoveryOptions: {
+        redirectTo: 'lineup',
+        redirectParams: {
+          home: homeTeam,
+          away: awayTeam,
+          home_id: homeId || '',
+          away_id: awayId || '',
+          my_team: myTeamSide || 'home',
+          mode: modeParam || 'single',
+          quarter: quarter,
+          franchise_id: franchiseId || undefined,
+          tournament_id: tournamentId || undefined
+        },
+        redirectLabel: 'Return to Lineup'
+      }
+    });
+  } else {
+    // Fallback if errorHandler not loaded
+    alert(`Error: ${errorMsg}\n\nPlease return to the lineup screen and try again.`);
+    // Redirect to lineup screen if possible
+    if (homeTeam && awayTeam) {
+      const lineupUrl = `/set-lineup.html?home=${encodeURIComponent(homeTeam)}&away=${encodeURIComponent(awayTeam)}&home_id=${encodeURIComponent(homeId || '')}&away_id=${encodeURIComponent(awayId || '')}&my_team=${encodeURIComponent(myTeamSide || 'home')}&mode=${encodeURIComponent(modeParam || 'single')}`;
+      if (franchiseId) lineupUrl += `&franchise_id=${encodeURIComponent(franchiseId)}`;
+      if (tournamentId) lineupUrl += `&tournament_id=${encodeURIComponent(tournamentId)}`;
+      window.location.href = lineupUrl;
+    }
   }
 }
 

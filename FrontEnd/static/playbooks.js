@@ -2397,11 +2397,33 @@ document.addEventListener('DOMContentLoaded', () => {
   if (isGameIdRequired && !gameId) {
     const errorMsg = `game_id is required but missing from URL. Mode: ${mode}, Quarter: ${quarter}, Resume from timeout: ${resumeFromTimeout}. Please navigate from the lineup screen with a valid game_id (created by init-game).`;
     console.error(`❌ [PLAYBOOKS] ${errorMsg}`);
-    alert(`Error: ${errorMsg}\n\nPlease return to the lineup screen and try again.`);
-    // Redirect to lineup screen if possible
-    if (homeTeam && awayTeam) {
-      const lineupUrl = `/set-lineup.html?home=${encodeURIComponent(homeTeam)}&away=${encodeURIComponent(awayTeam)}&my_team=${encodeURIComponent(myTeamSide)}&mode=${encodeURIComponent(mode)}&quarter=${quarter}`;
-      window.location.href = lineupUrl;
+    
+    // Show error screen if errorHandler is available
+    if (typeof window !== 'undefined' && window.ErrorHandler) {
+      window.ErrorHandler.showMissingPointerError({
+        missingPointer: 'game_id',
+        message: errorMsg,
+        mode: mode || 'single',
+        recoveryOptions: {
+          redirectTo: 'lineup',
+          redirectParams: {
+            home: homeTeam,
+            away: awayTeam,
+            my_team: myTeamSide,
+            mode: mode,
+            quarter: quarter
+          },
+          redirectLabel: 'Return to Lineup'
+        }
+      });
+    } else {
+      // Fallback if errorHandler not loaded
+      alert(`Error: ${errorMsg}\n\nPlease return to the lineup screen and try again.`);
+      // Redirect to lineup screen if possible
+      if (homeTeam && awayTeam) {
+        const lineupUrl = `/set-lineup.html?home=${encodeURIComponent(homeTeam)}&away=${encodeURIComponent(awayTeam)}&my_team=${encodeURIComponent(myTeamSide)}&mode=${encodeURIComponent(mode)}&quarter=${quarter}`;
+        window.location.href = lineupUrl;
+      }
     }
     return;
   }
