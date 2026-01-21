@@ -186,7 +186,7 @@ class TeamManager:
         roster_start = time.time()
         self.players = self._load_roster()
         roster_time = (time.time() - roster_start) * 1000
-        logging.warning(f"⏱️ [PERF] TeamManager({name}) - _load_roster: {roster_time:.2f}ms")
+        # ✅ REMOVED: Verbose performance logs - redundant
         
         self.lineup = self._load_lineup()
         
@@ -194,7 +194,7 @@ class TeamManager:
         team_doc_start = time.time()
         team_doc = teams_collection.find_one({"name": name})
         team_doc_time = (time.time() - team_doc_start) * 1000
-        logging.warning(f"⏱️ [PERF] TeamManager({name}) - teams_collection.find_one: {team_doc_time:.2f}ms")
+        # ✅ REMOVED: Verbose performance logs - redundant
         if not team_doc:
             print(f"⚠️ No team document found for team: {name}")
         self.team_id = team_doc.get("team_id") if team_doc else None
@@ -216,7 +216,7 @@ class TeamManager:
         else:
             self.scouting_data = self._init_scouting_data()
         scouting_time = (time.time() - scouting_start) * 1000
-        logging.warning(f"⏱️ [PERF] TeamManager({name}) - scouting_data: {scouting_time:.2f}ms")
+        # ✅ REMOVED: Verbose performance logs - redundant
 
         # Use provided strategy_settings or fall back to random initialization
         # MALLEABLE: Generated per game instance (not loaded from universal teams collection)
@@ -273,7 +273,7 @@ class TeamManager:
         else:
             self.plays = self._init_plays_from_universal(mode)
         plays_time = (time.time() - plays_start) * 1000
-        logging.warning(f"⏱️ [PERF] TeamManager({name}) - plays initialization: {plays_time:.2f}ms")
+        # ✅ REMOVED: Verbose performance logs - redundant
         
         # Use provided team_attributes or generate random values
         # MALLEABLE: Generated per game instance (not loaded from universal teams collection)
