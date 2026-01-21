@@ -909,11 +909,36 @@ def summarize_game_state(game, exclude_animations=True):
     
     # ✅ PRESERVE playbook_settings from database when saving game state
     # This ensures slot_assignments and other playbook settings persist across timeout/quarter saves
+    # ✅ SS&S: DB is source of truth - always load from DB for persistence
+    # GameManager is just a cache - we preserve what's in DB, not what's in cache
     home_playbook_settings = {}
     away_playbook_settings = {}
     home_actual_team_id = None
     away_actual_team_id = None
     
+    # 🔍 DEBUG: Check if GameManager has settings (for diagnostic purposes)
+    # This helps us understand if settings are being lost between application and summarize
+    if hasattr(game.home_team, 'playbook_settings'):
+        gm_home_settings = game.home_team.playbook_settings
+        if gm_home_settings:
+            slot_count = len(gm_home_settings.get("slot_assignments", {}))
+            logging.warning(f"🔍 [SUMMARIZE DEBUG] GameManager HAS home playbook_settings: slot_assignments={slot_count} (but DB is source of truth)")
+        else:
+            logging.warning(f"🔍 [SUMMARIZE DEBUG] GameManager home playbook_settings is empty/None")
+    else:
+        logging.warning(f"🔍 [SUMMARIZE DEBUG] GameManager home_team has NO playbook_settings attribute")
+    
+    if hasattr(game.away_team, 'playbook_settings'):
+        gm_away_settings = game.away_team.playbook_settings
+        if gm_away_settings:
+            slot_count = len(gm_away_settings.get("slot_assignments", {}))
+            logging.warning(f"🔍 [SUMMARIZE DEBUG] GameManager HAS away playbook_settings: slot_assignments={slot_count} (but DB is source of truth)")
+        else:
+            logging.warning(f"🔍 [SUMMARIZE DEBUG] GameManager away playbook_settings is empty/None")
+    else:
+        logging.warning(f"🔍 [SUMMARIZE DEBUG] GameManager away_team has NO playbook_settings attribute")
+    
+    # ✅ SS&S: DB is source of truth - load from DB for persistence
     if exclude_animations and hasattr(game, 'game_id') and game.game_id:
         # Only preserve playbook_settings when saving to database (exclude_animations=True)
         # and game_id exists (game has been initialized)
@@ -999,16 +1024,18 @@ def summarize_game_state(game, exclude_animations=True):
                 # 🔍 DEBUG: Log final resolved team_id values
                 logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] FINAL: home_actual_team_id={home_actual_team_id}, away_actual_team_id={away_actual_team_id}")
                 
-                # Get playbook_settings for each team (if they exist)
+                # ✅ SS&S: DB is source of truth - always load from DB
+                # Get playbook_settings for each team from DB
                 # ✅ CRITICAL: Check team_id key first (correct format), then fallback to team name key (legacy format)
                 # This provides backward compatibility for existing games that have settings under team name keys
                 if home_actual_team_id:
                     home_team_data = teams.get(home_actual_team_id, {})
+                    logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] Loading home playbook_settings from DB (source of truth)")
                     logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] home_team_data keys: {list(home_team_data.keys()) if isinstance(home_team_data, dict) else 'NOT_DICT'}")
                     logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] home_team_data has playbook_settings: {bool(home_team_data.get('playbook_settings'))}")
                     home_playbook_settings = home_team_data.get("playbook_settings", {})
                     if home_playbook_settings:
-                        logging.warning(f"✅ [PLAYBOOK SETTINGS DEBUG] Found home playbook_settings with keys: {list(home_playbook_settings.keys())[:5]}")
+                        logging.warning(f"✅ [PLAYBOOK SETTINGS DEBUG] Found home playbook_settings in DB with keys: {list(home_playbook_settings.keys())[:5]}")
                     else:
                         logging.warning(f"⚠️ [PLAYBOOK SETTINGS DEBUG] NO home playbook_settings found under key '{home_actual_team_id}'")
                     # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
@@ -1027,11 +1054,12 @@ def summarize_game_state(game, exclude_animations=True):
                                     break
                 if away_actual_team_id:
                     away_team_data = teams.get(away_actual_team_id, {})
+                    logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] Loading away playbook_settings from DB (source of truth)")
                     logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] away_team_data keys: {list(away_team_data.keys()) if isinstance(away_team_data, dict) else 'NOT_DICT'}")
                     logging.warning(f"🔍 [PLAYBOOK SETTINGS DEBUG] away_team_data has playbook_settings: {bool(away_team_data.get('playbook_settings'))}")
                     away_playbook_settings = away_team_data.get("playbook_settings", {})
                     if away_playbook_settings:
-                        logging.warning(f"✅ [PLAYBOOK SETTINGS DEBUG] Found away playbook_settings with keys: {list(away_playbook_settings.keys())[:5]}")
+                        logging.warning(f"✅ [PLAYBOOK SETTINGS DEBUG] Found away playbook_settings in DB with keys: {list(away_playbook_settings.keys())[:5]}")
                     else:
                         logging.warning(f"⚠️ [PLAYBOOK SETTINGS DEBUG] NO away playbook_settings found under key '{away_actual_team_id}'")
                     # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
