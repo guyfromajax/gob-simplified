@@ -93,11 +93,26 @@ const franchiseId = queryFranchiseId || null;
 
 // ✅ PHASE 1.1: Fail loudly if franchise_id is required but missing
 if (!franchiseId && urlMode === 'franchise') {
-  const errorMsg = `franchise_id is required for franchise mode but missing from URL. Please navigate from the franchise command center with a valid franchise_id.`;
-  console.error(`❌ [BOOTGAME] ${errorMsg}`);
-  alert(`Error: ${errorMsg}\n\nPlease return to the franchise command center and try again.`);
-  // Redirect to franchise select if possible
-  window.location.href = '/franchise-select-team.html';
+  // Show error screen immediately (errorHandler.js should be loaded before bootGame.js)
+  if (typeof window !== 'undefined' && window.ErrorHandler) {
+    window.ErrorHandler.showMissingPointerError({
+      missingPointer: 'franchise_id',
+      message: 'franchise_id is required for franchise mode but missing from URL. Please navigate from the franchise command center with a valid franchise_id.',
+      mode: 'franchise',
+      recoveryOptions: {
+        redirectTo: 'franchise-select',
+        redirectLabel: 'Go to Franchise Select'
+      }
+    });
+  } else {
+    // Fallback if errorHandler not loaded yet
+    const errorMsg = `franchise_id is required for franchise mode but missing from URL. Please navigate from the franchise command center with a valid franchise_id.`;
+    console.error(`❌ [BOOTGAME] ${errorMsg}`);
+    alert(`Error: ${errorMsg}\n\nPlease return to the franchise command center and try again.`);
+    window.location.href = '/franchise-select-team.html';
+  }
+  // Prevent further execution
+  throw new Error('Missing franchise_id');
 }
 
 // ✅ PHASE 1.1: Only write to localStorage for explicit "Resume Last Game" feature (not implemented yet)

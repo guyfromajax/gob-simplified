@@ -3900,9 +3900,14 @@
     document.head.appendChild(timeoutHelperScript);
   </script>
   <script type="module">
-    // Load bootGame.js with environment-aware path
+    // ✅ PHASE 1.1: Load error handler before bootGame.js
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const staticPrefix = isLocalhost ? '/static' : '';
+    const errorHandlerScript = document.createElement('script');
+    errorHandlerScript.src = `${staticPrefix}/js/shared/errorHandler.js`;
+    document.head.appendChild(errorHandlerScript);
+    
+    // Load bootGame.js with environment-aware path
     const bootGameScript = document.createElement('script');
     bootGameScript.type = 'module';
     bootGameScript.src = `${staticPrefix}/js/phaser/bootGame.js`;
