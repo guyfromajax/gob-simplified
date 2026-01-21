@@ -391,6 +391,100 @@ For each state variable, we document:
 1. Add optional frontend cache for `playbook_settings` in gameStore
 2. Add telemetry for state read/write sources
 
+### Phase 1.4: Architecture Simplification & Redesign (Week 2-3)
+**Goal:** Simplify the persistence architecture by removing complexity, standardizing formats, and establishing clear ownership.
+
+**Rationale:** Current architecture has too many moving parts (team ID resolution, multiple document reloads, legacy compatibility, dual application). This creates multiple failure points and makes debugging difficult. Simplification will reduce bugs, improve maintainability, and increase reliability.
+
+**Core Principles:**
+1. **Single Source of Truth:** DB only (no in-memory cache for settings)
+2. **Single Format:** Standardize on `team_id` (e.g., "MORRISTOWN") - no ObjectId, no team names
+3. **Single Save Point:** `/api/playbooks` and `/api/gameplan` save to DB and apply to GameManager in one transaction
+4. **Single Load Point:** `simulate-quarter` loads settings once and applies them
+5. **Fail Loudly:** No silent fallbacks - if team_id can't be resolved, error immediately
+6. **Clear Ownership:** Each setting has one place it's saved, one place it's loaded
+
+**Steps:**
+
+1. **Standardize Team ID Format**
+   - **Decision:** Use canonical `team_id` format everywhere (e.g., "MORRISTOWN", "OCEAN_CITY")
+   - **Actions:**
+     - Remove ObjectId format handling (normalize to string at API entry points)
+     - Remove team name → team_id resolution (require team_id everywhere)
+     - Update all API endpoints to accept only `team_id` format
+     - Update frontend to always send `team_id` (not team name)
+   - **Validation:** All API calls use `team_id` format, no name resolution needed
+
+2. **Remove Legacy Compatibility**
+   - **Decision:** Migrate existing data once, then remove all fallbacks
+   - **Actions:**
+     - Create one-time migration script to convert team name keys → team_id keys in all game documents
+     - Run migration script on staging, verify data integrity
+     - Remove legacy team name key fallbacks from:
+       - `save_playbooks()` in `gameplan_routes.py`
+       - `update_gameplan()` in `gameplan_routes.py`
+       - `get_playbooks()` in `gameplan_routes.py`
+       - `get_gameplan()` in `gameplan_routes.py`
+       - `load_team_settings_from_doc()` in `api.py`
+       - `summarize_game_state()` in `shared.py`
+     - Remove ObjectId format fallbacks (keep normalization at entry points only)
+   - **Validation:** All code paths use `team_id` only, no fallback logic remains
+
+3. **Simplify Settings Save/Load Flow**
+   - **Decision:** Single save point, single load point, clear data flow
+   - **Actions:**
+     - **Save Flow:**
+       - `save_playbooks()` / `update_gameplan()` → Save to DB (with team_id key) → Apply to GameManager (if in cache) → Return success
+       - Remove all intermediate reloads and fallbacks
+     - **Load Flow:**
+       - `simulate-quarter` → Load from DB once (by team_id) → Apply to GameManager → Start simulation
+       - Remove multiple document reloads in `get_playbooks()` and `get_gameplan()`
+       - Remove cross-instance persistence fallbacks (core teams collection lookup)
+   - **Validation:** Settings save/load happens in exactly one place each, no duplicate logic
+
+4. **Create Settings Manager Class (Optional)**
+   - **Decision:** Extract all save/load logic into single class for better organization
+   - **Actions:**
+     - Create `SettingsManager` class in `BackEnd/utils/settings_manager.py`
+     - Move all save/load logic from scattered locations into this class
+     - Methods: `save_playbook_settings()`, `load_playbook_settings()`, `save_strategy_settings()`, `load_strategy_settings()`
+     - Update all API endpoints to use SettingsManager
+   - **Validation:** All settings operations go through SettingsManager, no scattered code
+
+5. **Simplify Mode Handling**
+   - **Decision:** Same storage structure for all modes, just different document types
+   - **Actions:**
+     - Ensure all modes use identical `teams.{team_id}.playbook_settings` structure
+     - Ensure all modes use identical `teams.{team_id}.strategy_settings` structure
+     - Remove mode-specific branching in save/load logic (use mode only to select collection)
+   - **Validation:** Save/load logic is identical across all modes, only collection differs
+
+6. **Add Comprehensive Tests**
+   - **Actions:**
+     - Test: Save playbook settings → Verify DB write → Verify GameManager update
+     - Test: Save game plan settings → Verify DB write → Verify GameManager update
+     - Test: Load settings on game start → Verify settings applied to GameManager
+     - Test: Settings persist through timeout → Verify settings loaded correctly on resume
+     - Test: Team ID resolution fails → Verify explicit error (not silent fallback)
+   - **Validation:** All tests pass, no silent failures
+
+**Trade-offs:**
+- **One-time data migration required:** Need to migrate existing game documents to use `team_id` keys only
+- **Backward compatibility broken:** Old data formats will no longer work (but migration handles this)
+- **Short-term complexity:** Migration adds temporary complexity, but long-term simplification is worth it
+
+**Success Criteria:**
+- ✅ All team ID resolution uses single format (`team_id` string)
+- ✅ No legacy fallback code remains
+- ✅ Settings save/load happens in exactly one place each
+- ✅ All tests pass
+- ✅ Settings persist correctly through entire game flow (init → save → gameplay → timeout → resume)
+
+**Dependencies:**
+- Phase 1.1 must be complete (critical violations fixed)
+- Phase 1.2 should be complete (localStorage restrictions)
+- Data migration script must be tested on staging before production
+
 ---
 
 ## Next Steps
@@ -399,8 +493,9 @@ For each state variable, we document:
 2. **Begin Phase 1.1** → Fix critical violations
 3. **Add tests** → Verify fixes don't break existing functionality
 4. **Continue audit** → Document remaining state variables (player stats, NG, attributes, etc.)
+5. **Plan Phase 1.4** → Design data migration strategy and SettingsManager class structure
 
 ---
 
-**Document Status:** Initial audit complete for core state variables. Ready for review and Phase 1.1 implementation.
+**Document Status:** Initial audit complete for core state variables. Phase 1.4 (Architecture Simplification) added. Ready for review and Phase 1.1 implementation.
 
