@@ -20,6 +20,10 @@ if (franchiseBtn) {
   });
 }
 
+// ⏸️ TABLED: Resume Last Game feature - Exact game state restoration
+// TODO: Revisit after Phase 1.3+ and site go-live priorities complete
+// See: docs/To Do/resume_last_game_exact_state.md
+/*
 // ✅ PHASE 1.2: Check for saved game and show Resume Last Game section
 async function checkForSavedGame() {
   const resumeSection = document.getElementById('resume-game-section');
@@ -132,10 +136,13 @@ async function checkForSavedGame() {
     }
   }
 }
+*/
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Check for saved game first
-  checkForSavedGame();
+  // ⏸️ TABLED: Resume Last Game feature - Exact game state restoration
+  // TODO: Revisit after Phase 1.3+ and site go-live priorities complete
+  // See: docs/To Do/resume_last_game_exact_state.md
+  // checkForSavedGame();
   
   const teamButtons = document.querySelectorAll('.team-button');
   const modeContainer = document.querySelector('.mode-container');

@@ -402,6 +402,12 @@ export function createGameScene(Phaser) {
       });
       this.isFinal = simData.is_final;
       
+      // ⏸️ TABLED: Resume Last Game feature - Exact game state restoration
+      // TODO: Revisit after Phase 1.3+ and site go-live priorities complete
+      // Current implementation resumes at lineup screen (functional but basic)
+      // Future enhancement: Resume at exact moment (play step, time remaining, mid-animation, etc.)
+      // See: docs/To Do/resume_last_game_exact_state.md
+      /*
       // ✅ PHASE 1.2: Save game_id and user_team_side to localStorage when user quits mid-game (only for single mode, only if not final)
       // This enables "Resume Last Game" feature - save only when user explicitly quits (beforeunload)
       if (this.mode === 'single' && this.gameId && !this.isFinal && typeof window !== 'undefined') {
@@ -427,6 +433,7 @@ export function createGameScene(Phaser) {
           }
         });
       }
+      */
       
       if (DEBUG_FLOW) {
         console.log(
