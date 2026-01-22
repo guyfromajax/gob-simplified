@@ -416,12 +416,16 @@ class PlaybooksUI {
       }
       
       // ✅ PHASE 1.3: Check cache first (optional, disposable)
+      // Wait for gameStore to be available (handles async module loading)
       let data = null;
       if (window.gameStore) {
         data = window.gameStore.getPlaybookSettings();
         if (data) {
           console.log('✅ [PLAYBOOKS] Cache hit - using cached playbook settings');
         }
+      } else {
+        // gameStore not loaded yet - log for debugging
+        console.log('🔍 [PLAYBOOKS] gameStore not available yet (module may still be loading)');
       }
       
       // If cache miss, load from backend
