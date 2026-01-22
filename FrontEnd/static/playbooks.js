@@ -501,8 +501,46 @@ class PlaybooksUI {
         console.log('🔍 [DEBUG OUTSIDE PLAYS] Mapped set_play_outside:', this.playData.set_play_outside);
         console.log('🔍 [DEBUG OUTSIDE PLAYS] Count:', this.playData.set_play_outside.length);
       } else {
-        console.error('❌ Failed to load plays from API:', response.status);
-        // Fallback to empty plays
+        let errorDetail = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorDetail = errorData.detail || errorData.message || errorDetail;
+        } catch (e) {
+          // Keep default errorDetail
+        }
+        console.error('❌ Failed to load plays from API:', errorDetail);
+        
+        // ✅ Phase 4: Log error telemetry
+        if (window.ErrorHandler && window.ErrorHandler.logErrorTelemetry) {
+          window.ErrorHandler.logErrorTelemetry('API_ERROR', {
+            endpoint: '/api/playbooks',
+            status: response.status,
+            errorDetail,
+            mode,
+            teamId,
+            gameId,
+            url: window.location.href
+          });
+        }
+        
+        // ✅ Phase 4: Show error screen for 404 (document not found)
+        if (response.status === 404 && window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
+          const pointerType = mode === 'single' ? 'game_id' : (mode === 'franchise' ? 'franchise_id' : 'tournament_id');
+          const pointerValue = mode === 'single' ? gameId : (mode === 'franchise' ? franchiseId : tournamentId);
+          window.ErrorHandler.showMissingTruthError({
+            pointerType,
+            pointerValue: pointerValue || 'unknown',
+            message: errorDetail,
+            mode,
+            recoveryOptions: {
+              redirectTo: mode === 'single' ? 'mode-select' : (mode === 'franchise' ? 'franchise-select' : 'tournament-select'),
+              redirectLabel: mode === 'single' ? 'Go to Mode Select' : (mode === 'franchise' ? 'Go to Franchise Select' : 'Go to Tournament Select')
+            }
+          });
+          return; // Don't proceed with empty plays
+        }
+        
+        // For other errors, fallback to empty plays (non-critical - UI can still function)
         this.playData = {
           motion: [],
           set_play_inside: [],
@@ -512,7 +550,20 @@ class PlaybooksUI {
       }
     } catch (error) {
       console.error('❌ Error loading plays:', error);
-      // Fallback to empty plays
+      
+      // ✅ Phase 4: Log error telemetry
+      if (window.ErrorHandler && window.ErrorHandler.logErrorTelemetry) {
+        window.ErrorHandler.logErrorTelemetry('API_ERROR', {
+          endpoint: '/api/playbooks',
+          error: error.message,
+          mode,
+          teamId,
+          gameId,
+          url: window.location.href
+        });
+      }
+      
+      // Fallback to empty plays (non-critical - UI can still function)
       this.playData = {
         motion: [],
         set_play_inside: [],
