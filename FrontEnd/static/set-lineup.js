@@ -998,7 +998,10 @@ function resolveTeam() {
     teamName = myTeamSide === 'away' ? awayTeam : homeTeam;
     return !!teamName;
   }
-  const storedId = userTeamIdParam || localStorage.getItem('userTeamId') || localStorage.getItem('franchise_user_team');
+  // ✅ PHASE 2.4: Removed localStorage fallback - user_team_id must come from URL
+  // For franchise/tournament mode, user_team_id should be in URL
+  // For single game mode, my_team ('home' or 'away') should be in URL
+  const storedId = userTeamIdParam;
   if (storedId) {
     if (storedId === homeId || storedId === homeTeam) {
       myTeamSide = 'home';

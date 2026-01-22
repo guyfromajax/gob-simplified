@@ -2431,20 +2431,7 @@ async function handleSimFullGame() {
       awayTeam
     });
     
-    // ❌ COMMENTED OUT: No longer needed since we call showGameCompletionPopup directly
-    // // Add gameId to finalScore so showPopup can access it
-    // finalScore.gameId = gameId;
-    // 
-    // // Ensure gameId is in localStorage before showing popup
-    // if (gameId && typeof localStorage !== 'undefined') {
-    //   const storedGameId = localStorage.getItem('game_id');
-    //   if (storedGameId !== gameId) {
-    //     localStorage.setItem('game_id', gameId);
-    //     console.log('💾 Re-saved gameId to localStorage in finalize step:', gameId);
-    //   }
-    // }
-    // 
-    // showPopup(finalScore);
+    // ✅ PHASE 2.4: Removed commented localStorage fallback code
   } catch (err) {
     console.error('Error simming full game:', err);
     // ✅ FIX: Show actual error message instead of generic message

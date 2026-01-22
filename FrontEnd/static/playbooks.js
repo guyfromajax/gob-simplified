@@ -2163,16 +2163,9 @@ class PlaybooksUI {
                      urlParams.get('user_team_id') || 
                      urlParams.get('home_id') || 
                      urlParams.get('away_id');
-      // ✅ PHASE 1.3: Instrument state read (with violation detection for localStorage fallback)
+      // ✅ PHASE 1.3: Instrument state read
+      // ✅ PHASE 2.4: Removed localStorage fallback - game_id must come from URL
       let gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id')) : urlParams.get('game_id');
-      if (!gameId && mode === 'single' && typeof localStorage !== 'undefined') {
-        // ⚠️ CONTRACT VIOLATION: localStorage fallback for game_id (should be removed)
-        const localStorageGameId = localStorage.getItem('game_id');
-        if (window.StateTelemetry) {
-          window.StateTelemetry.logLocalStorageRead('game_id', localStorageGameId);
-        }
-        gameId = localStorageGameId;
-      }
       const tournamentId = urlParams.get('tournament_id');
       const franchiseId = urlParams.get('franchise_id');
       

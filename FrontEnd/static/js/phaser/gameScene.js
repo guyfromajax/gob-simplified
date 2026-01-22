@@ -57,15 +57,7 @@ export function createGameScene(Phaser) {
         // ✅ REMOVED: Quarter transition debug logging (cluttering console)
         
         this.gameId = gameStore.getGameId();
-        // ✅ DEBUG: Commented out fix - adding debug logs instead
-        // if (!this.gameId && this.quarter > 1 && typeof localStorage !== 'undefined') {
-        //   const storedGameId = localStorage.getItem('game_id');
-        //   if (storedGameId) {
-        //     console.warn('⚠️ [GAMESCENE] gameId not in gameStore for Q' + this.quarter + ', using localStorage:', storedGameId);
-        //     this.gameId = storedGameId;
-        //     gameStore.setGameId(storedGameId);
-        //   }
-        // }
+        // ✅ PHASE 2.4: Removed commented localStorage fallback code
         
         if (!this.gameId && typeof localStorage !== 'undefined') {
           localStorage.removeItem('game_id');
@@ -1637,15 +1629,7 @@ export function createGameScene(Phaser) {
             return;
           }
           
-          // ✅ DEBUG: Commented out fix - adding debug logs instead
-          // let gameIdForNavigation = this.gameId;
-          // if (!gameIdForNavigation && typeof localStorage !== 'undefined') {
-          //   gameIdForNavigation = localStorage.getItem('game_id');
-          //   if (gameIdForNavigation) {
-          //     console.warn('⚠️ [GAMESCENE] gameId was null, using localStorage fallback:', gameIdForNavigation);
-          //     this.gameId = gameIdForNavigation;
-          //   }
-          // }
+          // ✅ PHASE 2.4: Removed localStorage fallback - game_id must come from URL
           
           // ✅ QUARTER BREAK: Quarter breaks should NOT have resume_from_timeout
           // Helper will automatically exclude it for quarter breaks (resumeFromTimeout=false)
