@@ -1,18 +1,45 @@
 
 
-1. Playcall Override During Opening Tip Sequence -- When a user selects a playcall override during the opening tip sequence (before the game is initialized), the play is highlighted in the playcall center UI but the override never reaches the backend. The frontend `setPlaycallOverride()` function blocks the API call because `game_id` is `null` at that point (the game hasn't been created yet via `/api/simulate-quarter`). The override only works after the first turn is simulated and `game_id` becomes available. **Solution:** Either queue the override and send it after game initialization, or defer the `game_id` check until the first turn is simulated.
-2. Defensive Foul on missed shot attempt not announcing via our Announcement System
+
 3. Scouting Report button does not appear in the TCC
-4. Next column on Standings tab not populating on the Standings tab on FCC
-5. Since going to production, Playcall Center overrides are not working
-6. Since going to production, the computer is calling timeouts for the user team
+4. rebound not resistering to player stats when he gets an OREB from a missed OREB putback attempt (note he made teh follow up shot)
+5. Playbook settings are not persisting through timeouts
+6. Some Fast Break made shots are skipping teh BIP step
+
 7. Elminate "Simulating Q5..."
 10. User is still able to put fouled out players into the lineup on the Lineup Selection screen
-11. Need to add quarter to the right of Time Remaining on the Lineup Screen
-12. Computer is calling timeout for the user team in Play Quarter situations
-13. We've lost the 1 second hold of the basketball on the basket on a Fast Break make in Play Quarter situations
-15. Play Quarter situation, when I return from a timeout, I'm being cued with the Play Quarter / Sim Quarter pop up. That should only appear after quarter breaks. Not Timeout Breaks (or Player Foul Out Breaks if its wired to do so there as well)
-16. EOG Progression in Franchise Mode is broken -- I Sim Quarter for the first three quarters and Play Quarter for the fourth in this instance. When the game ended, it took me back to the Lineup Screen, had me press Play Game, then had me press either Sim Quarter or Play Quarter (I pressed Sim Quarter just to test what would happen) then it temproarly showed the text scroll pop, then it went to the proper EOG sequence with the EOG pop up wiht the buttons to the Box Score or FCC.
+8. Ok quick side task. For the Game Plan screen, when the user presses Save Game Plan, the UI design is nice. The green button pop up appears right in the center of the screen. For the Playbooks page, when the user presses Save Playbooks, we get a subtle yellow confirmtion box in the lower right corner. Let's rework Playbooks confirmation to perfectly mirror Game Plan confirmation.
+
+## Future Cleanup (Non-Critical Warnings)
+
+### State Telemetry Violations (Phase 1.3)
+- **Issue**: `game_id` is being read/written to `gameStore` when it should come from URL according to State & Persistence Contract
+- **Location**: Multiple locations detected by Phase 1.3 telemetry
+- **Impact**: Low - telemetry is working as intended, detecting contract violations
+- **Action**: Future cleanup - refactor to use URL as source of truth for `game_id` instead of `gameStore`
+- **Priority**: Low (informational only, not causing bugs)
+
+### Missing Rebound Data Warning
+- **Issue**: ShotAnimationSystem reports "Rebound data missing, skipping embedded rebound" for some MISS shots
+- **Location**: `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js`
+- **Impact**: Low - may be expected if rebound is handled in separate turn, but worth monitoring
+- **Action**: Investigate if this is expected behavior or if rebound data should always be present
+- **Priority**: Low (monitoring only)
+
+### Invalid State Transition Warning
+- **Issue**: State machine attempts no-op transition (HalfCourt -> HalfCourt)
+- **Location**: `FrontEnd/static/js/phaser/animation/AnimationEngine.js` → `handleBaselineInbound()`
+- **Impact**: Low - harmless but indicates unnecessary `safeTransition()` call
+- **Action**: Review `handleBaselineInbound()` to avoid calling `safeTransition()` when already in target state
+- **Priority**: Low (code cleanup)
+
+### Missing Team Background Images (404s)
+- **Issue**: 404 errors for team background images (e.g., `south_lancaster-background.png`, `little_york-background.png`)
+- **Location**: `FrontEnd/static/images/team-backgrounds/`
+- **Impact**: Low - missing assets, doesn't affect functionality
+- **Action**: Add missing team background images or update references
+- **Priority**: Low (cosmetic only)
+
 
 ## Fixed Bugs (January 2025)
 

@@ -255,7 +255,7 @@
 
 **Goal:** Simplify the persistence architecture by removing complexity, standardizing formats, and establishing clear ownership.
 
-**Status:** ⏳ Pending (depends on Phase 1.1, 1.2)
+**Status:** 🔄 In Progress (Phase 5.1 started)
 
 **Rationale:** Current architecture has too many moving parts (team ID resolution, multiple document reloads, legacy compatibility, dual application). This creates multiple failure points and makes debugging difficult. Simplification will reduce bugs, improve maintainability, and increase reliability.
 

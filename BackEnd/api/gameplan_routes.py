@@ -87,6 +87,78 @@ def get_default_settings():
     }
 
 
+def normalize_team_id_to_canonical(team_id: str, mode: str, doc: dict = None) -> str:
+    """
+    ✅ PHASE 5.1: Normalize team_id to canonical format (e.g., "MORRISTOWN", "OCEAN_CITY").
+    
+    This function normalizes team_id at API entry points to ensure consistent format.
+    For single mode, it resolves team names to canonical team_id keys in the game document.
+    For franchise/tournament mode, it uses the document's authoritative team_id.
+    
+    Args:
+        team_id: Team identifier (could be team name, ObjectId, or canonical team_id)
+        mode: Game mode ("single", "franchise", "tournament")
+        doc: Game/franchise/tournament document (required for single mode)
+    
+    Returns:
+        Canonical team_id string (e.g., "SOUTH_LANCASTER")
+    
+    Raises:
+        HTTPException: If team_id cannot be resolved to canonical format
+    """
+    if not team_id:
+        raise HTTPException(status_code=400, detail="team_id is required")
+    
+    # For franchise/tournament mode, use document's authoritative team_id
+    if mode == "franchise":
+        if not doc:
+            raise HTTPException(status_code=400, detail="Document required for franchise mode")
+        user_team_id, user_team_object_id = get_user_team_from_franchise(doc)
+        # For now, return the ObjectId string (will be standardized later)
+        return str(user_team_object_id) if user_team_object_id else user_team_id
+    elif mode == "tournament":
+        if not doc:
+            raise HTTPException(status_code=400, detail="Document required for tournament mode")
+        user_team_id, user_team_object_id = get_user_team_from_tournament(doc)
+        # For now, return the ObjectId string (will be standardized later)
+        return str(user_team_object_id) if user_team_object_id else user_team_id
+    else:
+        # Single mode: Resolve to canonical team_id key in game document
+        if not doc:
+            raise HTTPException(status_code=400, detail="Game document required for single mode")
+        
+        teams = doc.get("teams", {})
+        home_team_id = doc.get("home_team_id")
+        away_team_id = doc.get("away_team_id")
+        
+        # Step 1: Try direct key match (if team_id is already a canonical team_id)
+        if team_id in teams and (team_id.isupper() and "_" in team_id):
+            return team_id
+        
+        # Step 2: Try name match (iterate through teams)
+        for tid in teams.keys():
+            team_obj = teams.get(tid, {})
+            if tid == team_id or (team_obj.get("name") or "").lower() == (team_id or "").lower():
+                return tid
+        
+        # Step 3: Try home/away fallback
+        if home_team_id and home_team_id in teams:
+            home_team_obj = teams.get(home_team_id, {})
+            if home_team_id == team_id or home_team_obj.get("name") == team_id:
+                return home_team_id
+        if away_team_id and away_team_id in teams:
+            away_team_obj = teams.get(away_team_id, {})
+            if away_team_id == team_id or away_team_obj.get("name") == team_id:
+                return away_team_id
+        
+        # Step 4: Fail loudly
+        available_teams = {tid: teams.get(tid, {}).get("name", "unknown") for tid in teams.keys()}
+        raise HTTPException(
+            status_code=400,
+            detail=f"Could not resolve team '{team_id}' to canonical team_id. Available teams: {list(available_teams.keys())}"
+        )
+
+
 def populate_team_plays(mode="single"):
     """
     Populate team plays with REFERENCES to universal plays collection (not full skeletons).
@@ -2160,56 +2232,12 @@ def save_playbooks(request: PlaybookSettingsRequest):
             
             # ✅ PERFORMANCE: Removed debug logging - only log actual errors
         else:
-            # ✅ PHASE 1.1: Simplified team ID resolution for Single Game mode
-            # Game document stores teams using team_id as keys (e.g., "BENTLEY_TRUMAN")
-            # Frontend may send team name (e.g., "Bentley-Truman") or team_id
-            # Resolution strategy: Try direct key match first, then name match, then fail loudly
+            # ✅ PHASE 5.1: Use normalization helper for single mode
+            # This centralizes team_id resolution logic and ensures consistent format
+            actual_team_id = normalize_team_id_to_canonical(request.team_id, request.mode, doc)
+            
+            # ✅ PHASE 5.1: Verify resolved team_id is valid (sanity check)
             teams = doc.get("teams", {})
-            home_team_id = doc.get("home_team_id")
-            away_team_id = doc.get("away_team_id")
-            
-            actual_team_id = None
-            
-            # Step 1: Try direct key match (if request.team_id is already a team_id key)
-            # ✅ CRITICAL: Only match if it looks like a team_id (uppercase, underscores)
-            # This prevents matching legacy team name keys (e.g., "South Lancaster")
-            if request.team_id in teams and (request.team_id.isupper() and "_" in request.team_id):
-                actual_team_id = request.team_id
-            
-            # Step 2: If not found, iterate through teams to find by name match
-            # ✅ FIX: Also check if key itself matches (handles legacy team name keys)
-            if not actual_team_id:
-                for tid in teams.keys():
-                    team_obj = teams.get(tid, {})
-                    # Match if key equals team name OR team_obj.name equals team name (case-insensitive)
-                    if tid == request.team_id or (team_obj.get("name") or "").lower() == (request.team_id or "").lower():
-                        actual_team_id = tid
-                        break
-            
-            # Step 3: If still not found, try home/away fallback (only if they exist in teams)
-            # ✅ FIX: Also check if key itself matches (handles legacy team name keys)
-            if not actual_team_id:
-                if home_team_id and home_team_id in teams:
-                    home_team_obj = teams.get(home_team_id, {})
-                    # Match if key equals team name OR team_obj.name equals team name
-                    if home_team_id == request.team_id or home_team_obj.get("name") == request.team_id:
-                        actual_team_id = home_team_id
-                if not actual_team_id and away_team_id and away_team_id in teams:
-                    away_team_obj = teams.get(away_team_id, {})
-                    # Match if key equals team name OR team_obj.name equals team name
-                    if away_team_id == request.team_id or away_team_obj.get("name") == request.team_id:
-                        actual_team_id = away_team_id
-            
-            # Step 4: Fail loudly if resolution failed
-            if not actual_team_id:
-                available_teams = {tid: teams.get(tid, {}).get("name", "unknown") for tid in teams.keys()}
-                logger.error(f"❌ [PLAYBOOKS SAVE] Could not resolve team '{request.team_id}' to team_id. Available teams: {available_teams}")
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Could not resolve team '{request.team_id}' to team_id in game document. Available teams: {list(available_teams.keys())}"
-                )
-            
-            # ✅ PHASE 1.1: Verify resolved team_id is valid (sanity check)
             if actual_team_id not in teams:
                 logger.error(f"❌ [PLAYBOOKS SAVE] Resolved team_id '{actual_team_id}' not found in teams object!")
                 raise HTTPException(
