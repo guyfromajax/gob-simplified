@@ -394,6 +394,17 @@ class PlaybooksUI {
       });
       
       if (!teamId) {
+        // ✅ Phase 4: Log error telemetry for missing team_id
+        if (window.ErrorHandler && window.ErrorHandler.logErrorTelemetry) {
+          window.ErrorHandler.logErrorTelemetry('MISSING_TEAM_ID', {
+            mode,
+            gameId,
+            tournamentId,
+            franchiseId,
+            url: window.location.href,
+            message: 'No team_id found in URL params, using empty plays'
+          });
+        }
         console.warn('⚠️ No team_id found in URL params, using empty plays');
         this.playData = {
           motion: [],
