@@ -1277,7 +1277,8 @@ function setupLockerRoomButton() {
     lockerRoomUrl = '/franchise-command-center.html';
     const franchiseParams = new URLSearchParams();
     franchiseParams.set('mode', 'franchise'); // ✅ Always include mode for consistency
-    const finalFranchiseId = urlFranchiseId || (typeof localStorage !== 'undefined' ? localStorage.getItem('franchise_id') : null);
+    // ✅ PHASE 2.4: Removed localStorage fallback - franchise_id must come from URL
+    const finalFranchiseId = urlFranchiseId;
     if (finalFranchiseId) {
       franchiseParams.set('franchise_id', finalFranchiseId);
     }
@@ -1288,25 +1289,10 @@ function setupLockerRoomButton() {
       lockerRoomUrl += `?${franchiseParams.toString()}`;
     }
   } else {
-    // Fallback: Check localStorage as last resort (for backward compatibility)
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('activeTournament')) {
-      navMode = 'tournament';
-      lockerRoomUrl = '/tournament.html';
-      const storedTournamentId = localStorage.getItem('activeTournament');
-      if (storedTournamentId) {
-        lockerRoomUrl += `?tournament_id=${storedTournamentId}`;
-      }
-    } else if (typeof localStorage !== 'undefined' && localStorage.getItem('franchise_id')) {
-      navMode = 'franchise';
-      lockerRoomUrl = '/franchise-command-center.html';
-      const storedFranchiseId = localStorage.getItem('franchise_id');
-      if (storedFranchiseId) {
-        lockerRoomUrl += `?franchise_id=${storedFranchiseId}`;
-      }
-    } else {
-      navMode = 'single';
-      lockerRoomUrl = '/mode-select.html';
-    }
+    // ✅ PHASE 2.4: Removed localStorage fallbacks - mode and IDs must come from URL
+    // If no mode/ID in URL, default to single game mode
+    navMode = 'single';
+    lockerRoomUrl = '/mode-select.html';
   }
 
   cleanButton.addEventListener('click', (e) => {

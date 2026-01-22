@@ -1290,7 +1290,14 @@ if (playbooksBtn) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  franchiseId = localStorage.getItem('franchiseId');
+  // ✅ PHASE 2.4: Removed localStorage fallback - franchise_id must come from URL
+  const urlParams = new URLSearchParams(window.location.search);
+  franchiseId = urlParams.get('franchise_id');
+  if (!franchiseId) {
+    console.error('❌ [FCC] franchise_id is required but missing from URL. Redirecting to franchise select.');
+    window.location.href = '/franchise-select-team.html';
+    return;
+  }
   if (franchiseId) {
     playNowBtn.disabled = false;
   }

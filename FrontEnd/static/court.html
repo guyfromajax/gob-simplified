@@ -3306,14 +3306,9 @@
       function getGameContext() {
         const urlParams = new URLSearchParams(window.location.search);
         
-        // Try multiple sources for game_id (in order of preference)
-        // 1. URL params (most reliable during active gameplay)
+        // ✅ PHASE 2.4: Removed localStorage fallback - game_id must come from URL
+        // URL params are the source of truth during active gameplay
         let gameId = urlParams.get('game_id');
-        
-        // 2. localStorage (fallback if URL doesn't have it yet)
-        if (!gameId && typeof localStorage !== 'undefined') {
-          gameId = localStorage.getItem('game_id');
-        }
         
         const userTeamSide = urlParams.get('my_team'); // "home" or "away"
         
@@ -3329,7 +3324,6 @@
           gameId,
           userTeamSide,
           url_gameId: new URLSearchParams(window.location.search).get('game_id'),
-          localStorage_gameId: typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : 'N/A',
           url: window.location.search
         };
         if (!gameId || !userTeamSide) {
