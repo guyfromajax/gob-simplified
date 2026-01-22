@@ -20,7 +20,102 @@ if (franchiseBtn) {
   });
 }
 
+// ✅ PHASE 1.2: Check for saved game and show Resume Last Game section
+async function checkForSavedGame() {
+  const resumeSection = document.getElementById('resume-game-section');
+  const resumeTeams = document.getElementById('resume-teams');
+  const resumeScore = document.getElementById('resume-score');
+  const resumeQuarter = document.getElementById('resume-quarter');
+  const resumeBtn = document.getElementById('resume-game-btn');
+  
+  if (!resumeSection || !resumeTeams || !resumeScore || !resumeQuarter || !resumeBtn) {
+    return; // Elements not found, skip resume feature
+  }
+  
+  // Check localStorage for saved game_id
+  const lastGameId = typeof localStorage !== 'undefined' ? localStorage.getItem('last_game_id') : null;
+  
+  if (!lastGameId) {
+    resumeSection.style.display = 'none';
+    return; // No saved game
+  }
+  
+  try {
+    // Fetch game document to verify it exists and is active
+    const gameRes = await fetch(API_CONFIG.buildUrl(`/api/game/${lastGameId}`));
+    
+    if (!gameRes.ok) {
+      // Game not found or error - clear saved game_id
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('last_game_id');
+      }
+      resumeSection.style.display = 'none';
+      return;
+    }
+    
+    const gameData = await gameRes.json();
+    
+    // Extract game info
+    const homeTeam = gameData.home_team?.name || gameData.teams?.[gameData.home_team_id]?.name || 'Home';
+    const awayTeam = gameData.away_team?.name || gameData.teams?.[gameData.away_team_id]?.name || 'Away';
+    
+    // Get scores from score object (keys are team names)
+    const homeScore = gameData.score?.[homeTeam] || gameData.home_team?.score || 0;
+    const awayScore = gameData.score?.[awayTeam] || gameData.away_team?.score || 0;
+    const quarter = gameData.quarter || 1;
+    
+    // Determine period label (Q1-Q4, OT1, OT2, etc.)
+    let period = `Q${quarter}`;
+    if (quarter > 4) {
+      period = `OT${quarter - 4}`;
+    }
+    
+    const clock = gameData.clock || '0:00';
+    
+    // Check if game is likely final (quarter > 4 and clock is 0:00, or quarter is very high)
+    // Note: We can't reliably detect final from this endpoint, but we can make reasonable assumptions
+    const isLikelyFinal = (quarter > 4 && clock === '0:00') || quarter > 10;
+    
+    if (isLikelyFinal) {
+      // Game is likely complete - clear saved game_id
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('last_game_id');
+      }
+      resumeSection.style.display = 'none';
+      return;
+    }
+    
+    // Display game info
+    resumeTeams.textContent = `${homeTeam} vs ${awayTeam}`;
+    resumeScore.textContent = `${homeScore} - ${awayScore}`;
+    resumeQuarter.textContent = `${period}, ${clock} remaining`;
+    
+    // Set up resume button
+    resumeBtn.onclick = () => {
+      // Clear saved game_id (one-time use)
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('last_game_id');
+      }
+      // Navigate to lineup screen with game_id
+      window.location.href = `/set-lineup.html?game_id=${encodeURIComponent(lastGameId)}&resume_from_timeout=true&mode=single`;
+    };
+    
+    // Show resume section
+    resumeSection.style.display = 'block';
+  } catch (error) {
+    console.error('Error checking for saved game:', error);
+    resumeSection.style.display = 'none';
+    // Clear invalid saved game_id
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('last_game_id');
+    }
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  // Check for saved game first
+  checkForSavedGame();
+  
   const teamButtons = document.querySelectorAll('.team-button');
   const modeContainer = document.querySelector('.mode-container');
   const teamGrid = document.getElementById('team-grid');

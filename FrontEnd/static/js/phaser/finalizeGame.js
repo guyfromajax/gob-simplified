@@ -257,10 +257,12 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
     game.events.emit("gameComplete", finalScore);
   }
 
+  // ✅ PHASE 1.2: Clear both game_id and last_game_id when game completes
   if (typeof localStorage !== 'undefined') {
     localStorage.removeItem('game_id');
+    localStorage.removeItem('last_game_id'); // Clear resume game reference
     if (DEBUG_GAME_ID) {
-      console.debug('Cleared game_id after finalize');
+      console.debug('Cleared game_id and last_game_id after finalize');
     }
   }
 
