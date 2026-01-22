@@ -1623,10 +1623,9 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         # Check if this is a "new game" scenario: user wants Q1 but saved game is Q2+
         # In this case, remove from memory and reload from DB (which will run new game detection)
         if gm is not None and request.quarter == 1 and gm.quarter > 1:
-            logging.info(
-                f"🆕 New game: game_id={game_id} in memory at Q{gm.quarter}, but user requested Q1. Removing from memory to reload from DB."
+            logging.warning(
+                f"🆕 [ONGOING_GAMES] Removing game from cache: game_id={game_id}, reason='New game scenario (Q1 requested but game in memory at Q{gm.quarter})'"
             )
-            # ✅ REMOVED: Verbose debug log
             del ongoing_games[game_id]
             gm = None  # Force reload from DB where new game detection will run
         
@@ -1740,6 +1739,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 # This fixes the bug where computer timeout → user timeout shows stale data
                 if gm is not None:
                     logging.warning(f"🔍 TIMEOUT RESUME: Game in memory, but forcing DB reload to ensure latest state (game_id={game_id})")
+                    logging.warning(f"🔄 [ONGOING_GAMES] Removing game from cache: game_id={game_id}, reason='Timeout resume - forcing DB reload'")
                     del ongoing_games[game_id]
                     gm = None  # Force reload from DB
                 logging.info(f"🔍 TIMEOUT RESUME: Will load fresh game from DB and apply timeout state")
