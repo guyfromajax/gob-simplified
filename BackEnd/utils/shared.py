@@ -1013,16 +1013,8 @@ def summarize_game_state(game, exclude_animations=True):
                         slot_count = len(home_playbook_settings.get("slot_assignments", {}))
                         logging.warning(f"✅ [SUMMARIZE] Found home playbook_settings in DB (source of truth): slot_assignments={slot_count}")
                     else:
-                        logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings in DB for home_actual_team_id={home_actual_team_id}, trying legacy lookup")
-                        # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
-                        for tid in teams.keys():
-                            team_data = teams.get(tid, {})
-                            if tid == game.home_team.name or team_data.get("name") == game.home_team.name:
-                                legacy_settings = team_data.get("playbook_settings", {})
-                                if legacy_settings:
-                                    home_playbook_settings = legacy_settings
-                                    logging.warning(f"⚠️ [SUMMARIZE] Found legacy settings under team name key '{tid}' for home team")
-                                    break
+                        logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings in DB for home_actual_team_id={home_actual_team_id}")
+                        # ✅ PHASE 5.2: Removed legacy team name key fallback (not needed for new games)
                     
                     # ✅ SAFETY NET: If DB lookup failed, check GameManager (temporary fallback during root cause investigation)
                     if not home_playbook_settings and hasattr(game.home_team, 'playbook_settings') and game.home_team.playbook_settings:
@@ -1045,16 +1037,8 @@ def summarize_game_state(game, exclude_animations=True):
                         slot_count = len(away_playbook_settings.get("slot_assignments", {}))
                         logging.warning(f"✅ [SUMMARIZE] Found away playbook_settings in DB (source of truth): slot_assignments={slot_count}")
                     else:
-                        logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings in DB for away_actual_team_id={away_actual_team_id}, trying legacy lookup")
-                        # ✅ TEMPORARY FALLBACK: Check team name key if team_id key doesn't have settings
-                        for tid in teams.keys():
-                            team_data = teams.get(tid, {})
-                            if tid == game.away_team.name or team_data.get("name") == game.away_team.name:
-                                legacy_settings = team_data.get("playbook_settings", {})
-                                if legacy_settings:
-                                    away_playbook_settings = legacy_settings
-                                    logging.warning(f"⚠️ [SUMMARIZE] Found legacy settings under team name key '{tid}' for away team")
-                                    break
+                        logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings in DB for away_actual_team_id={away_actual_team_id}")
+                        # ✅ PHASE 5.2: Removed legacy team name key fallback (not needed for new games)
                     
                     # ✅ SAFETY NET: If DB lookup failed, check GameManager (temporary fallback during root cause investigation)
                     if not away_playbook_settings and hasattr(game.away_team, 'playbook_settings') and game.away_team.playbook_settings:

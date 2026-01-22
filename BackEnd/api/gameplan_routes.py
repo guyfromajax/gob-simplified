@@ -128,30 +128,21 @@ def normalize_team_id_to_canonical(team_id: str, mode: str, doc: dict = None) ->
             raise HTTPException(status_code=400, detail="Game document required for single mode")
         
         teams = doc.get("teams", {})
-        home_team_id = doc.get("home_team_id")
-        away_team_id = doc.get("away_team_id")
         
         # Step 1: Try direct key match (if team_id is already a canonical team_id)
         if team_id in teams and (team_id.isupper() and "_" in team_id):
             return team_id
         
-        # Step 2: Try name match (iterate through teams)
+        # Step 2: Try name match (iterate through teams to find by team name)
+        # ✅ PHASE 5.2: Simplified - removed home/away fallback (not needed for new games)
+        # Frontend may still send team names, so we keep name resolution for compatibility
         for tid in teams.keys():
             team_obj = teams.get(tid, {})
+            # Match if key equals team_id OR team_obj.name equals team_id (case-insensitive)
             if tid == team_id or (team_obj.get("name") or "").lower() == (team_id or "").lower():
                 return tid
         
-        # Step 3: Try home/away fallback
-        if home_team_id and home_team_id in teams:
-            home_team_obj = teams.get(home_team_id, {})
-            if home_team_id == team_id or home_team_obj.get("name") == team_id:
-                return home_team_id
-        if away_team_id and away_team_id in teams:
-            away_team_obj = teams.get(away_team_id, {})
-            if away_team_id == team_id or away_team_obj.get("name") == team_id:
-                return away_team_id
-        
-        # Step 4: Fail loudly
+        # Step 3: Fail loudly if not found
         available_teams = {tid: teams.get(tid, {}).get("name", "unknown") for tid in teams.keys()}
         raise HTTPException(
             status_code=400,
