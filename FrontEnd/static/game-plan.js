@@ -330,12 +330,16 @@ async function loadSettings() {
     }
     
     // ✅ PHASE 1.3: Check cache first (optional, disposable)
+    // Wait for gameStore to be available (handles async module loading)
     let data = null;
     if (window.gameStore) {
       data = window.gameStore.getStrategySettings();
       if (data) {
         console.log('✅ [GAME-PLAN] Cache hit - using cached strategy settings');
       }
+    } else {
+      // gameStore not loaded yet - log for debugging
+      console.log('🔍 [GAME-PLAN] gameStore not available yet (module may still be loading)');
     }
     
     // If cache miss, load from backend
