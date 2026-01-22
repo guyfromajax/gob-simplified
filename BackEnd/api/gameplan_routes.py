@@ -914,8 +914,14 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
 
 
 @router.get("/api/gameplan")
-def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_id: str = None, game_id: str = None):
-    """Get game plan settings for a team in the specified mode."""
+def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_id: str = None, game_id: str = None, source: str = None):
+    """
+    Get game plan settings for a team in the specified mode.
+    
+    Args:
+        source: Optional source parameter. If "db", always reads from database (for lineup screen consistency).
+                If None or "cache", prefers DB but allows cache as fallback (for performance during gameplay).
+    """
     try:
         # ✅ PERFORMANCE: Removed verbose debug print
         # Determine which collection to use
@@ -941,29 +947,34 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
             doc_id = game_id
             collection = db.games
             
-            # ✅ SS&S: Check GameManager first (single source of truth during gameplay)
-            # Reuses same pattern as /api/playbooks for consistency
+            # ✅ PHASE 3.2: Prefer DB reads over cache reads
+            # If source=db, skip cache and always read from database
+            # Otherwise, prefer DB but allow cache as fallback for performance
+            force_db_read = source == "db"
             gm = None
             use_gamemanager_settings = False
-            try:
-                from BackEnd.api.api import ongoing_games
-                gm = ongoing_games.get(game_id)
-                if gm:
-                    # Determine which team
-                    target_team = None
-                    if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
-                        target_team = gm.home_team
-                    elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
-                        target_team = gm.away_team
-                    
-                    if target_team and hasattr(target_team, 'strategy_settings') and target_team.strategy_settings:
-                        inside_value = target_team.strategy_settings.get("inside")
-                        logger.warning(f"✅ [GET-GAMEPLAN] Found GameManager settings for single mode: team={target_team.name}, inside={inside_value}")
-                        use_gamemanager_settings = True
-            except Exception as e:
-                logger.warning(f"⚠️ [GET-GAMEPLAN] Error checking GameManager: {e}")
-                gm = None
-                use_gamemanager_settings = False
+            
+            # Only check cache if not forcing DB read
+            if not force_db_read:
+                try:
+                    from BackEnd.api.api import ongoing_games
+                    gm = ongoing_games.get(game_id)
+                    if gm:
+                        # Determine which team
+                        target_team = None
+                        if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+                            target_team = gm.home_team
+                        elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+                            target_team = gm.away_team
+                        
+                        if target_team and hasattr(target_team, 'strategy_settings') and target_team.strategy_settings:
+                            inside_value = target_team.strategy_settings.get("inside")
+                            logger.warning(f"✅ [GET-GAMEPLAN] Found GameManager settings for single mode: team={target_team.name}, inside={inside_value}")
+                            use_gamemanager_settings = True
+                except Exception as e:
+                    logger.warning(f"⚠️ [GET-GAMEPLAN] Error checking GameManager: {e}")
+                    gm = None
+                    use_gamemanager_settings = False
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
             gm = None
@@ -1432,7 +1443,7 @@ def update_gameplan(request: GamePlanUpdateRequest):
 
 
 @router.get("/api/playbooks")
-def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_id: str = None, game_id: str = None):
+def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_id: str = None, game_id: str = None, source: str = None):
     """
     Get plays for a team from the appropriate mode document.
     Returns plays organized by type (motion, set_play) and focus (inside, attack, outside).
@@ -1467,28 +1478,34 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             doc_id = game_id
             collection = db.games
             
-            # ✅ SS&S: Check GameManager first (single source of truth during gameplay)
+            # ✅ PHASE 3.2: Prefer DB reads over cache reads
+            # If source=db, skip cache and always read from database
+            # Otherwise, prefer DB but allow cache as fallback for performance
+            force_db_read = source == "db"
             gm = None
             use_gamemanager_settings = False
-            try:
-                from BackEnd.api.api import ongoing_games
-                gm = ongoing_games.get(game_id)
-                if gm:
-                    # Determine which team
-                    target_team = None
-                    if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
-                        target_team = gm.home_team
-                    elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
-                        target_team = gm.away_team
-                    
-                    if target_team and hasattr(target_team, 'playbook_settings') and target_team.playbook_settings:
-                        slot_count = len(target_team.playbook_settings.get("slot_assignments", {}))
-                        logger.warning(f"✅ [GET-PLAYBOOKS] Found GameManager settings for single mode: team={target_team.name}, slot_assignments={slot_count}")
-                        use_gamemanager_settings = True
-            except Exception as e:
-                logger.warning(f"⚠️ [GET-PLAYBOOKS] Error checking GameManager: {e}")
-                gm = None
-                use_gamemanager_settings = False
+            
+            # Only check cache if not forcing DB read
+            if not force_db_read:
+                try:
+                    from BackEnd.api.api import ongoing_games
+                    gm = ongoing_games.get(game_id)
+                    if gm:
+                        # Determine which team
+                        target_team = None
+                        if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+                            target_team = gm.home_team
+                        elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+                            target_team = gm.away_team
+                        
+                        if target_team and hasattr(target_team, 'playbook_settings') and target_team.playbook_settings:
+                            slot_count = len(target_team.playbook_settings.get("slot_assignments", {}))
+                            logger.warning(f"✅ [GET-PLAYBOOKS] Found GameManager settings for single mode: team={target_team.name}, slot_assignments={slot_count}")
+                            use_gamemanager_settings = True
+                except Exception as e:
+                    logger.warning(f"⚠️ [GET-PLAYBOOKS] Error checking GameManager: {e}")
+                    gm = None
+                    use_gamemanager_settings = False
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
             use_gamemanager_settings = False
