@@ -415,27 +415,96 @@ class PlaybooksUI {
         return;
       }
       
-      // Build API URL
-      const params = new URLSearchParams();
-      params.set('mode', mode);
-      params.set('team_id', teamId);
-      if (mode === 'single' && gameId) {
-        params.set('game_id', gameId);
-      } else if (mode === 'tournament' && tournamentId) {
-        params.set('tournament_id', tournamentId);
-      } else if (mode === 'franchise' && franchiseId) {
-        params.set('franchise_id', franchiseId);
+      // ✅ PHASE 1.3: Check cache first (optional, disposable)
+      let data = null;
+      if (window.gameStore) {
+        data = window.gameStore.getPlaybookSettings();
+        if (data) {
+          console.log('✅ [PLAYBOOKS] Cache hit - using cached playbook settings');
+        }
       }
       
-        const response = await fetch(`${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`);
-      if (response.ok) {
-        const data = await response.json();
-        
-        // ✅ PHASE 1.3: Log backend read
-        if (window.StateTelemetry) {
-          window.StateTelemetry.logBackendRead('playbook_settings', data, '/api/playbooks');
+      // If cache miss, load from backend
+      if (!data) {
+        // Build API URL
+        const params = new URLSearchParams();
+        params.set('mode', mode);
+        params.set('team_id', teamId);
+        if (mode === 'single' && gameId) {
+          params.set('game_id', gameId);
+        } else if (mode === 'tournament' && tournamentId) {
+          params.set('tournament_id', tournamentId);
+        } else if (mode === 'franchise' && franchiseId) {
+          params.set('franchise_id', franchiseId);
         }
         
+        const response = await fetch(`${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`);
+        if (response.ok) {
+          data = await response.json();
+          
+          // ✅ PHASE 1.3: Log backend read
+          if (window.StateTelemetry) {
+            window.StateTelemetry.logBackendRead('playbook_settings', data, '/api/playbooks');
+          }
+          
+          // ✅ PHASE 1.3: Update cache after successful backend load
+          if (window.gameStore) {
+            window.gameStore.setPlaybookSettings(data);
+            console.log('✅ [PLAYBOOKS] Updated cache with backend data');
+          }
+        } else {
+          let errorDetail = `HTTP ${response.status}: ${response.statusText}`;
+          try {
+            const errorData = await response.json();
+            errorDetail = errorData.detail || errorData.message || errorDetail;
+          } catch (e) {
+            // Keep default errorDetail
+          }
+          console.error('❌ Failed to load plays from API:', errorDetail);
+          
+          // ✅ Phase 4: Log error telemetry
+          if (window.ErrorHandler && window.ErrorHandler.logErrorTelemetry) {
+            window.ErrorHandler.logErrorTelemetry('API_ERROR', {
+              endpoint: '/api/playbooks',
+              status: response.status,
+              errorDetail,
+              mode,
+              teamId,
+              gameId,
+              url: window.location.href
+            });
+          }
+          
+          // ✅ Phase 4: Show error screen for 404 (document not found)
+          if (response.status === 404 && window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
+            const pointerType = mode === 'single' ? 'game_id' : (mode === 'franchise' ? 'franchise_id' : 'tournament_id');
+            const pointerValue = mode === 'single' ? gameId : (mode === 'franchise' ? franchiseId : tournamentId);
+            window.ErrorHandler.showMissingTruthError({
+              pointerType,
+              pointerValue: pointerValue || 'unknown',
+              message: errorDetail,
+              mode,
+              recoveryOptions: {
+                redirectTo: mode === 'single' ? 'mode-select' : (mode === 'franchise' ? 'franchise-select' : 'tournament-select'),
+                redirectLabel: mode === 'single' ? 'Go to Mode Select' : (mode === 'franchise' ? 'Go to Franchise Select' : 'Go to Tournament Select')
+              }
+            });
+            return; // Don't proceed with empty plays
+          }
+          
+          // For other errors, fallback to empty plays (non-critical - UI can still function)
+          this.playData = {
+            motion: [],
+            set_play_inside: [],
+            set_play_attack: [],
+            set_play_outside: []
+          };
+          return;
+        }
+      }
+      
+      // Process data (from cache or API)
+      if (data) {
         // Store position filters from API
         this.positionFilters = data.position_filters || {
           standard: [],
@@ -500,53 +569,6 @@ class PlaybooksUI {
         console.log('🔍 [DEBUG OUTSIDE PLAYS] API response set_play_outside:', data.set_play_outside);
         console.log('🔍 [DEBUG OUTSIDE PLAYS] Mapped set_play_outside:', this.playData.set_play_outside);
         console.log('🔍 [DEBUG OUTSIDE PLAYS] Count:', this.playData.set_play_outside.length);
-      } else {
-        let errorDetail = `HTTP ${response.status}: ${response.statusText}`;
-        try {
-          const errorData = await response.json();
-          errorDetail = errorData.detail || errorData.message || errorDetail;
-        } catch (e) {
-          // Keep default errorDetail
-        }
-        console.error('❌ Failed to load plays from API:', errorDetail);
-        
-        // ✅ Phase 4: Log error telemetry
-        if (window.ErrorHandler && window.ErrorHandler.logErrorTelemetry) {
-          window.ErrorHandler.logErrorTelemetry('API_ERROR', {
-            endpoint: '/api/playbooks',
-            status: response.status,
-            errorDetail,
-            mode,
-            teamId,
-            gameId,
-            url: window.location.href
-          });
-        }
-        
-        // ✅ Phase 4: Show error screen for 404 (document not found)
-        if (response.status === 404 && window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
-          const pointerType = mode === 'single' ? 'game_id' : (mode === 'franchise' ? 'franchise_id' : 'tournament_id');
-          const pointerValue = mode === 'single' ? gameId : (mode === 'franchise' ? franchiseId : tournamentId);
-          window.ErrorHandler.showMissingTruthError({
-            pointerType,
-            pointerValue: pointerValue || 'unknown',
-            message: errorDetail,
-            mode,
-            recoveryOptions: {
-              redirectTo: mode === 'single' ? 'mode-select' : (mode === 'franchise' ? 'franchise-select' : 'tournament-select'),
-              redirectLabel: mode === 'single' ? 'Go to Mode Select' : (mode === 'franchise' ? 'Go to Franchise Select' : 'Go to Tournament Select')
-            }
-          });
-          return; // Don't proceed with empty plays
-        }
-        
-        // For other errors, fallback to empty plays (non-critical - UI can still function)
-        this.playData = {
-          motion: [],
-          set_play_inside: [],
-          set_play_attack: [],
-          set_play_outside: []
-        };
       }
     } catch (error) {
       console.error('❌ Error loading plays:', error);
@@ -2461,6 +2483,13 @@ class PlaybooksUI {
         const result = await response.json();
         console.log('✅ [PLAYBOOKS SAVE] Playbook settings saved successfully:', result);
         console.log('✅ [PLAYBOOKS SAVE] Response status:', response.status);
+        
+        // ✅ PHASE 1.3: Invalidate cache after successful save (cache must be rebuilt from truth)
+        if (window.gameStore) {
+          window.gameStore.invalidatePlaybookSettings('settings saved to backend');
+          console.log('✅ [PLAYBOOKS] Invalidated cache after save');
+        }
+        
         return true;
       } else {
         const errorText = await response.text();

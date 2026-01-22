@@ -119,20 +119,34 @@
 
 #### Phase 1.3: Add Improvements (Week 2)
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
 **Tasks:**
-1. **Add optional frontend cache for `playbook_settings` in gameStore**
+1. **Add optional frontend cache for `playbook_settings` in gameStore** ✅ **COMPLETE**
    - **Action:** Add cache mirror in `gameStore` (disposable, rebuild from truth)
    - **Action:** Invalidate cache after DB writes
    - **Validation:** Cache improves performance, doesn't affect correctness
+   - **Implementation:**
+     - Added `playbook_settings` and `strategy_settings` cache to `gameStore.js`
+     - Added getter/setter methods with telemetry logging
+     - Added cache invalidation methods
+     - Updated `playbooks.js` to check cache first, then load from backend, then update cache
+     - Updated `game-plan.js` to check cache first, then load from backend, then update cache
+     - Added cache invalidation after successful saves in both files
+     - Exposed gameStore globally for non-module scripts
+     - Added gameStore module loading in HTML files
 
-2. **Add telemetry for state read/write sources**
+2. **Add telemetry for state read/write sources** ✅ **COMPLETE**
    - **Action:** Log every state read (which source, which variable)
    - **Action:** Log every state write (which source, which variable)
    - **Action:** Log cache hits/misses
    - **Action:** Log contract violations (state read from wrong source)
    - **Validation:** Telemetry captures all state operations
+   - **Implementation:**
+     - `stateTelemetry.js` already fully implemented with all telemetry features
+     - Integrated telemetry logging in `gameStore.js` for all cache operations
+     - Integrated telemetry logging in `playbooks.js` and `game-plan.js` for backend reads/writes
+     - Cache hits/misses logged automatically via gameStore methods
 
 **Success Criteria:**
 - ✅ Frontend cache improves performance without affecting correctness
@@ -422,7 +436,7 @@
 
 **Goal:** Enable game-specific settings in franchise/tournament mode without affecting master settings.
 
-**Status:** 🔄 In Progress (Tasks 1-4 complete, Tasks 5-6 pending)
+**Status:** 🔄 In Progress (Tasks 1-5 complete, Task 6 blocked by bug)
 
 **Rationale:** Currently, settings changes during franchise/tournament gameplay save to the franchise/tournament document (master settings), affecting all games. This feature allows users to make game-specific adjustments during gameplay without disrupting their master playbooks/game plans. Settings are scoped to the active game document and revert to master settings when the game ends.
 
@@ -489,13 +503,18 @@
      - Added game doc → master fallback logic in `load_team_settings_from_doc()`
      - Updated all `simulate-quarter` call sites to pass `game_id`
 
-5. **Timeout Persistence: Preserve Game Doc Settings**
+5. **Timeout Persistence: Preserve Game Doc Settings** ✅ **VERIFIED**
    - **Action:** Ensure `summarize_game_state()` preserves game doc settings during timeout
    - **Files:** `BackEnd/utils/shared.py` → `summarize_game_state()`
    - **Logic:** Game doc settings already preserved (no change needed)
    - **Validation:** Game-scoped settings survive timeouts
+   - **Verification:**
+     - `summarize_game_state()` already includes `strategy_settings` and `playbook_settings` in teams object
+     - Timeout resume loads full game document from `games_collection` (includes settings)
+     - Phase 5.7 Task 4 ensures `load_team_settings_from_doc()` loads from game doc first
+     - Settings flow: Game doc → GameManager → `summarize_game_state()` → Preserved
 
-6. **Comprehensive Testing**
+6. **Comprehensive Testing** ⏸️ **BLOCKED**
    - **Action:** Test all scenarios:
      - Settings initialized from master at game start
      - Settings changes during gameplay save to game doc
@@ -505,6 +524,10 @@
      - Settings load correctly from game doc during active gameplay
      - Settings load correctly from master when no active game
    - **Validation:** All scenarios work correctly
+   - **Status:** Blocked by bug documented in `docs/To Do/phase5_7_game_scoped_settings_bug.md`
+     - Settings are saving to master doc instead of game doc during gameplay
+     - Root cause: Likely `game_id` not being passed in save requests from frontend
+     - Testing cannot proceed until bug is fixed
 
 **Edge Cases to Handle:**
 - User changes settings before starting game → Saves to master (franchise/tournament doc)
