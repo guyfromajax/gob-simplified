@@ -279,6 +279,25 @@ function validateOffenseSettings() {
 
 async function loadSettings() {
   try {
+    // ✅ PHASE 2: Validate game_id before loading settings
+    if (gameId && modeParam === 'single' && window.PointerValidation) {
+      try {
+        await window.PointerValidation.validateGameId(gameId);
+        console.log(`✅ [GAME-PLAN] game_id validated: ${gameId}`);
+      } catch (error) {
+        console.error(`❌ [GAME-PLAN] Invalid game_id: ${error.message}`);
+        if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
+          window.ErrorHandler.showMissingPointerError({
+            missingPointer: 'game_id',
+            message: `Invalid game_id: ${gameId}. ${error.message}`,
+            mode: modeParam,
+            recoveryAction: 'redirect_to_lineup'
+          });
+        }
+        return; // Don't proceed with loading
+      }
+    }
+    
     let mode = modeParam || 'single';
     
     // ✅ SS&S: Always load from database (single source of truth for all modes)

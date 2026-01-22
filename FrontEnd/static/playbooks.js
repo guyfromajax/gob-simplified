@@ -313,6 +313,29 @@ class PlaybooksUI {
   }
   
   async init() {
+    // ✅ PHASE 2: Validate game_id before loading settings
+    const urlParams = new URLSearchParams(window.location.search);
+    const mode = urlParams.get('mode') || 'single';
+    const gameId = urlParams.get('game_id');
+    
+    if (gameId && mode === 'single' && window.PointerValidation) {
+      try {
+        await window.PointerValidation.validateGameId(gameId);
+        console.log(`✅ [PLAYBOOKS] game_id validated: ${gameId}`);
+      } catch (error) {
+        console.error(`❌ [PLAYBOOKS] Invalid game_id: ${error.message}`);
+        if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
+          window.ErrorHandler.showMissingPointerError({
+            missingPointer: 'game_id',
+            message: `Invalid game_id: ${gameId}. ${error.message}`,
+            mode: mode,
+            recoveryAction: 'redirect_to_lineup'
+          });
+        }
+        return; // Don't proceed with loading
+      }
+    }
+    
     // Load plays from API first
     await this.loadPlays();
     

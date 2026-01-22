@@ -198,6 +198,11 @@
       telemetryScript.src = `${staticPrefix}/js/shared/stateTelemetry.js`;
       document.head.appendChild(telemetryScript);
       
+      // ✅ PHASE 2: Load pointer validation before game-plan.js
+      const pointerValidationScript = document.createElement('script');
+      pointerValidationScript.src = `${staticPrefix}/js/shared/pointerValidation.js`;
+      document.head.appendChild(pointerValidationScript);
+      
       // After API config loads, load game-plan.js using the helper
       script.src = `${API_CONFIG.getStaticPath()}/game-plan.js?v=${cacheBuster}`;
       script.onload = () => {
