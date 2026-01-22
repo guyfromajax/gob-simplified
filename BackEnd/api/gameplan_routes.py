@@ -1134,20 +1134,22 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                 from BackEnd.api.api import load_team_settings_from_doc
                 settings = load_team_settings_from_doc(mode, doc_id, team_id, team_id)
                 
-                # Extract team_id from the loaded settings (for consistency)
-                # We still need to load team_obj for other fields (plays, etc.)
-                teams = ensure_team_objects_exist(mode, doc_id, team_id)
+                # ✅ PHASE 5.1: Use normalization helper for single mode
+                # This centralizes team_id resolution logic and ensures consistent format
+                # Load document first (needed for normalization)
+                doc = collection.find_one({"_id": doc_id})
+                if not doc:
+                    try:
+                        doc = collection.find_one({"_id": ObjectId(doc_id)})
+                    except:
+                        pass
+                if not doc:
+                    raise HTTPException(status_code=404, detail="Game document not found")
                 
-                # Resolve actual_team_id using same logic as load_team_settings_from_doc()
-                if team_id in teams and (team_id.isupper() and "_" in team_id):
-                    actual_team_id = team_id
-                else:
-                    for tid in teams.keys():
-                        team_data = teams.get(tid, {})
-                        if team_data.get("name") == team_id:
-                            actual_team_id = tid
-                            break
+                actual_team_id = normalize_team_id_to_canonical(team_id, mode, doc)
                 
+                # Ensure team objects exist and get team_obj
+                teams = ensure_team_objects_exist(mode, doc_id, actual_team_id)
                 team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
         # ✅ FIX: Reload team_obj from latest doc to ensure we have fresh strategy_settings
