@@ -1658,55 +1658,12 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             team_obj = teams.get(authoritative_team_id, {})
             actual_team_id = authoritative_team_id
         else:
-            # ✅ PHASE 1.1: Simplified team ID resolution for Single Game mode (same as save_playbooks/update_gameplan)
-            # Game document stores teams using team_id as keys (e.g., "SOUTH_LANCASTER")
-            # Frontend may send team name (e.g., "South Lancaster") or team_id
-            # Resolution strategy: Try direct key match first, then name match, then fail loudly
+            # ✅ PHASE 5.1: Use normalization helper for single mode
+            # This centralizes team_id resolution logic and ensures consistent format
+            actual_team_id = normalize_team_id_to_canonical(team_id, mode, doc)
+            
+            # Get team_obj using resolved actual_team_id
             teams = doc.get("teams", {})
-            home_team_id = doc.get("home_team_id")
-            away_team_id = doc.get("away_team_id")
-            
-            actual_team_id = None
-            
-            # Step 1: Try direct key match (if team_id is already a team_id key)
-            # ✅ CRITICAL: Only match if it looks like a team_id (uppercase, underscores)
-            # This prevents matching legacy team name keys (e.g., "South Lancaster")
-            if team_id in teams and (team_id.isupper() and "_" in team_id):
-                actual_team_id = team_id
-            
-            # Step 2: If not found, iterate through teams to find by name match
-            # ✅ FIX: Also check if key itself matches (handles legacy team name keys)
-            if not actual_team_id:
-                for tid in teams.keys():
-                    team_obj = teams.get(tid, {})
-                    # Match if key equals team name OR team_obj.name equals team name (case-insensitive)
-                    if tid == team_id or (team_obj.get("name") or "").lower() == (team_id or "").lower():
-                        actual_team_id = tid
-                        break
-            
-            # Step 3: If still not found, try home/away fallback (only if they exist in teams)
-            # ✅ FIX: Also check if key itself matches (handles legacy team name keys)
-            if not actual_team_id:
-                if home_team_id and home_team_id in teams:
-                    home_team_obj = teams.get(home_team_id, {})
-                    # Match if key equals team name OR team_obj.name equals team name
-                    if home_team_id == team_id or home_team_obj.get("name") == team_id:
-                        actual_team_id = home_team_id
-                if not actual_team_id and away_team_id and away_team_id in teams:
-                    away_team_obj = teams.get(away_team_id, {})
-                    # Match if key equals team name OR team_obj.name equals team name
-                    if away_team_id == team_id or away_team_obj.get("name") == team_id:
-                        actual_team_id = away_team_id
-            
-            # Step 4: Fail loudly if resolution failed
-            if not actual_team_id:
-                available_teams = {tid: teams.get(tid, {}).get("name", "unknown") for tid in teams.keys()}
-                logger.error(f"❌ [GET-PLAYBOOKS] Could not resolve team '{team_id}' to team_id. Available teams: {available_teams}")
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Could not resolve team '{team_id}' to team_id in game document. Available teams: {list(available_teams.keys())}"
-                )
-            
             team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
         # ✅ PERFORMANCE: Removed debug logging
