@@ -155,6 +155,40 @@ if (!gameId && mode === 'single') {
   // Don't redirect - let user see the error
 }
 
+/**
+ * ✅ PHASE 2: Validate that game_id points to existing document
+ * Called before critical operations (starting game, simulating quarter)
+ */
+async function validateGameIdIfPresent() {
+  if (!gameId || mode !== 'single') {
+    return; // No validation needed
+  }
+
+  if (!window.PointerValidation) {
+    console.warn('⚠️ [BOOTGAME] PointerValidation not available, skipping validation');
+    return; // Validation utility not loaded, skip (non-critical)
+  }
+
+  try {
+    await window.PointerValidation.validateGameId(gameId);
+    console.log(`✅ [BOOTGAME] game_id validated: ${gameId}`);
+  } catch (error) {
+    const errorMsg = `Invalid game_id: ${gameId}. ${error.message}`;
+    console.error(`❌ [BOOTGAME] ${errorMsg}`);
+    if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
+      window.ErrorHandler.showMissingPointerError({
+        missingPointer: 'game_id',
+        message: errorMsg,
+        mode: mode,
+        recoveryAction: 'redirect_to_lineup'
+      });
+    } else {
+      alert(`Error: ${errorMsg}\n\nPlease return to the lineup screen and try again.`);
+    }
+    throw error; // Re-throw to prevent proceeding
+  }
+}
+
 // Initialize scoreboard scores
 // Only reset to 0-0 for fresh Q1 games; for resumed games, loadGameStats.js sets accumulated scores
 // ✅ REFACTOR: Direct DOM update (same pattern as other scoreboard items)
@@ -1843,6 +1877,13 @@ async function showPopup(score) {
 }
 
 async function handleButtonClick(animate) {
+  // ✅ PHASE 2: Validate game_id before starting game
+  try {
+    await validateGameIdIfPresent();
+  } catch (error) {
+    // Validation failed - error already shown, don't proceed
+    return;
+  }
   console.log('handleButtonClick called with animate:', animate);
   console.log('Current state:', { isSimulating, gameId, quarter, homeTeam, awayTeam });
   

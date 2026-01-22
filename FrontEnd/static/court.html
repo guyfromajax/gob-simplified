@@ -3912,6 +3912,11 @@
     telemetryScript.src = `${staticPrefix}/js/shared/stateTelemetry.js`;
     document.head.appendChild(telemetryScript);
     
+    // ✅ PHASE 2: Load pointer validation before bootGame.js
+    const pointerValidationScript = document.createElement('script');
+    pointerValidationScript.src = `${staticPrefix}/js/shared/pointerValidation.js`;
+    document.head.appendChild(pointerValidationScript);
+    
     // Load bootGame.js with environment-aware path
     const bootGameScript = document.createElement('script');
     bootGameScript.type = 'module';

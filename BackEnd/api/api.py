@@ -37,6 +37,7 @@ from .franchise_routes import router as franchise_router
 from .gameplan_routes import router as gameplan_router
 from .play_routes import router as play_router
 from .skeleton_routes import router as skeleton_router
+from .pointer_validation_routes import router as pointer_validation_router
 import traceback
 from unidecode import unidecode
 from typing import Optional
@@ -123,6 +124,7 @@ app.include_router(franchise_router)
 app.include_router(gameplan_router)
 app.include_router(play_router)
 app.include_router(skeleton_router)
+app.include_router(pointer_validation_router)
 
 templates = Jinja2Templates(directory="FrontEnd/static")
 
