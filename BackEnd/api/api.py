@@ -479,23 +479,13 @@ def load_team_settings_from_doc(mode: str, doc_id: str, team_id: str, team_name:
                                 break
                 
                 # If team_name was provided but team_id wasn't resolved, try name matching
+                # ✅ PHASE 5.2: Simplified - removed home/away fallback (not needed for new games)
                 if not resolved_team_id and team_name:
                     for tid in teams_obj.keys():
                         team_obj = teams_obj.get(tid, {})
                         if team_obj.get("name") == team_name:
                             resolved_team_id = tid
                             break
-                    
-                    # Step 3: Try home/away fallback
-                    if not resolved_team_id:
-                        if home_team_id and home_team_id in teams_obj:
-                            home_team_obj = teams_obj.get(home_team_id, {})
-                            if home_team_obj.get("name") == team_name:
-                                resolved_team_id = home_team_id
-                        if not resolved_team_id and away_team_id and away_team_id in teams_obj:
-                            away_team_obj = teams_obj.get(away_team_id, {})
-                            if away_team_obj.get("name") == team_name:
-                                resolved_team_id = away_team_id
                 
                 # Load settings from resolved team_id key
                 if resolved_team_id:
