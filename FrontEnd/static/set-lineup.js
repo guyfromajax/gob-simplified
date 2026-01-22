@@ -67,12 +67,28 @@ async function validatePointersOnLoad() {
       console.log(`✅ [SET-LINEUP] game_id validated: ${gameId}`);
     } catch (error) {
       console.error(`❌ [SET-LINEUP] Invalid game_id: ${error.message}`);
-      if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
+      // ✅ Phase 4: Use showMissingTruthError for invalid pointer (document not found)
+      if (window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
+        window.ErrorHandler.showMissingTruthError({
+          pointerType: 'game_id',
+          pointerValue: gameId,
+          message: `Invalid game_id: ${gameId}. ${error.message}`,
+          mode: mode,
+          recoveryOptions: {
+            redirectTo: 'mode-select',
+            redirectLabel: 'Go to Mode Select'
+          }
+        });
+      } else if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
+        // Fallback to missing pointer error if missing truth error not available
         window.ErrorHandler.showMissingPointerError({
           missingPointer: 'game_id',
           message: `Invalid game_id: ${gameId}. ${error.message}`,
           mode: mode,
-          recoveryAction: 'redirect_to_mode_select'
+          recoveryOptions: {
+            redirectTo: 'mode-select',
+            redirectLabel: 'Go to Mode Select'
+          }
         });
       }
       return false;

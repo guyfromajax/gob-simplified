@@ -1766,6 +1766,25 @@ export function createGameScene(Phaser) {
             // Only mark quarter complete if backend explicitly says so (quarter_complete=true)
             if (response.status === 404 && errorData.detail && errorData.detail.includes('not found')) {
               console.error('⚠️ Game was cleared from backend memory. This may indicate a backend restart or timeout.');
+              
+              // ✅ Phase 4: Show missing truth error screen for game not found
+              if (window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
+                const urlParams = new URLSearchParams(window.location.search);
+                const gameId = urlParams.get('game_id');
+                const mode = urlParams.get('mode') || 'single';
+                
+                window.ErrorHandler.showMissingTruthError({
+                  pointerType: 'game_id',
+                  pointerValue: gameId || 'unknown',
+                  message: errorData.detail || 'Game was cleared from backend memory. This may indicate a backend restart or timeout.',
+                  mode,
+                  recoveryOptions: {
+                    redirectTo: 'mode-select',
+                    redirectLabel: 'Go to Mode Select'
+                  }
+                });
+              }
+              
               // ✅ FIX: Don't break - throw error to be caught by outer catch block
               // This prevents quarter completion logic from running
               throw new Error(`Game not found: ${errorData.detail || 'Game was cleared from backend memory'}`);

@@ -175,15 +175,31 @@ async function validateGameIdIfPresent() {
   } catch (error) {
     const errorMsg = `Invalid game_id: ${gameId}. ${error.message}`;
     console.error(`❌ [BOOTGAME] ${errorMsg}`);
-    if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
+    // ✅ Phase 4: Use showMissingTruthError for invalid pointer (document not found)
+    if (window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
+      window.ErrorHandler.showMissingTruthError({
+        pointerType: 'game_id',
+        pointerValue: gameId,
+        message: errorMsg,
+        mode: mode,
+        recoveryOptions: {
+          redirectTo: 'mode-select',
+          redirectLabel: 'Go to Mode Select'
+        }
+      });
+    } else if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
+      // Fallback to missing pointer error if missing truth error not available
       window.ErrorHandler.showMissingPointerError({
         missingPointer: 'game_id',
         message: errorMsg,
         mode: mode,
-        recoveryAction: 'redirect_to_lineup'
+        recoveryOptions: {
+          redirectTo: 'mode-select',
+          redirectLabel: 'Go to Mode Select'
+        }
       });
     } else {
-      alert(`Error: ${errorMsg}\n\nPlease return to the lineup screen and try again.`);
+      alert(`Error: ${errorMsg}\n\nPlease return to the mode select screen and try again.`);
     }
     throw error; // Re-throw to prevent proceeding
   }
@@ -2137,8 +2153,9 @@ async function handleSimQuarter() {
     if (!res.ok) {
       // ✅ FIX: Extract actual error message from backend for better debugging
       let errorDetail = `HTTP ${res.status}: ${res.statusText}`;
+      let errorData = {};
       try {
-        const errorData = await res.json();
+        errorData = await res.json();
         errorDetail = errorData.detail || errorData.message || errorDetail;
       } catch (e) {
         try {
@@ -2148,6 +2165,21 @@ async function handleSimQuarter() {
         }
       }
       console.error(`❌ Q${nextQuarter} simulation failed:`, errorDetail);
+      
+      // ✅ Phase 4: Show missing truth error screen for 404 (game not found)
+      if (res.status === 404 && errorDetail.includes('not found') && window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
+        window.ErrorHandler.showMissingTruthError({
+          pointerType: 'game_id',
+          pointerValue: gameId || 'unknown',
+          message: errorDetail,
+          mode: mode || 'single',
+          recoveryOptions: {
+            redirectTo: 'mode-select',
+            redirectLabel: 'Go to Mode Select'
+          }
+        });
+      }
+      
       throw new Error(`Q${nextQuarter} simulation failed: ${errorDetail}`);
     }
     const lastSummary = await res.json();

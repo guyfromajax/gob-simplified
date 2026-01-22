@@ -40,6 +40,22 @@ async function validatePointer(pointerType, pointerValue) {
       const errorData = await response.json().catch(() => ({ detail: response.statusText }));
       const errorMsg = errorData.detail || `Failed to validate ${pointerType}`;
       console.error(`❌ [VALIDATE-POINTER] ${pointerType} validation failed:`, errorMsg);
+      
+      // ✅ Phase 4: Show missing truth error screen for 404 (document not found)
+      if (response.status === 404 && window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
+        const mode = new URLSearchParams(window.location.search).get('mode') || 'single';
+        window.ErrorHandler.showMissingTruthError({
+          pointerType,
+          pointerValue,
+          message: errorMsg,
+          mode,
+          recoveryOptions: {
+            redirectTo: mode === 'single' ? 'mode-select' : (mode === 'franchise' ? 'franchise-select' : 'tournament-select'),
+            redirectLabel: mode === 'single' ? 'Go to Mode Select' : (mode === 'franchise' ? 'Go to Franchise Select' : 'Go to Tournament Select')
+          }
+        });
+      }
+      
       throw new Error(errorMsg);
     }
   } catch (error) {
