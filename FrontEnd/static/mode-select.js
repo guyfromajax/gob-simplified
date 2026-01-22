@@ -45,9 +45,10 @@ async function checkForSavedGame() {
     const gameRes = await fetch(API_CONFIG.buildUrl(`/api/game/${lastGameId}`));
     
     if (!gameRes.ok) {
-      // Game not found or error - clear saved game_id
+      // Game not found or error - clear saved game_id and user_team_side
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem('last_game_id');
+        localStorage.removeItem('last_game_user_team_side');
       }
       resumeSection.style.display = 'none';
       return;
@@ -77,9 +78,10 @@ async function checkForSavedGame() {
     const isLikelyFinal = (quarter > 4 && clock === '0:00') || quarter > 10;
     
     if (isLikelyFinal) {
-      // Game is likely complete - clear saved game_id
+      // Game is likely complete - clear saved game_id and user_team_side
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem('last_game_id');
+        localStorage.removeItem('last_game_user_team_side');
       }
       resumeSection.style.display = 'none';
       return;
@@ -90,14 +92,32 @@ async function checkForSavedGame() {
     resumeScore.textContent = `${homeScore} - ${awayScore}`;
     resumeQuarter.textContent = `${period}, ${clock} remaining`;
     
+    // Get user_team_side from localStorage (saved when game was quit)
+    const userTeamSide = typeof localStorage !== 'undefined' ? localStorage.getItem('last_game_user_team_side') : null;
+    
     // Set up resume button
     resumeBtn.onclick = () => {
-      // Clear saved game_id (one-time use)
+      // Clear saved game_id and user_team_side (one-time use)
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem('last_game_id');
+        localStorage.removeItem('last_game_user_team_side');
       }
-      // Navigate to lineup screen with game_id
-      window.location.href = `/set-lineup.html?game_id=${encodeURIComponent(lastGameId)}&resume_from_timeout=true&mode=single`;
+      // Build URL with all required parameters
+      const params = new URLSearchParams({
+        game_id: lastGameId,
+        resume_from_timeout: 'true',
+        mode: 'single',
+        home: homeTeam,
+        away: awayTeam,
+        quarter: quarter.toString(),
+        period: period
+      });
+      // Add user_team_side if we have it
+      if (userTeamSide) {
+        params.set('my_team', userTeamSide);
+      }
+      // Navigate to lineup screen
+      window.location.href = `/set-lineup.html?${params.toString()}`;
     };
     
     // Show resume section
@@ -105,9 +125,10 @@ async function checkForSavedGame() {
   } catch (error) {
     console.error('Error checking for saved game:', error);
     resumeSection.style.display = 'none';
-    // Clear invalid saved game_id
+    // Clear invalid saved game_id and user_team_side
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('last_game_id');
+      localStorage.removeItem('last_game_user_team_side');
     }
   }
 }
