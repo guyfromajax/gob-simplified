@@ -1075,8 +1075,9 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                 logger.warning(f"⚠️ [GET GAMEPLAN] URL team_id ({team_id}) doesn't match franchise document user_team_object_id ({authoritative_team_id}). Using franchise document value.")
             
             # ✅ PERFORMANCE: Ensure team objects exist (only checks/creates the requested team, not all 8)
+            # ✅ PHASE 5.3: Use returned teams dict directly - ensure_team_objects_exist() already reloads internally
             franchise_teams = ensure_team_objects_exist(mode, doc_id, authoritative_team_id, franchise_doc=doc)
-            team_obj = franchise_teams.get(authoritative_team_id, {})
+            team_obj = franchise_teams.get(authoritative_team_id, {}) if isinstance(franchise_teams, dict) else {}
         elif mode == "tournament":
             # ✅ PERFORMANCE: Load document with projection (only needed fields)
             doc = collection.find_one(
@@ -1103,8 +1104,9 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                 logger.warning(f"⚠️ [GET GAMEPLAN] URL team_id ({team_id}) doesn't match tournament document user_team_object_id ({authoritative_team_id}). Using tournament document value.")
             
             # ✅ PERFORMANCE: Ensure team objects exist (only checks/creates the requested team)
+            # ✅ PHASE 5.3: Use returned teams dict directly - ensure_team_objects_exist() already reloads internally
             teams = ensure_team_objects_exist(mode, doc_id, authoritative_team_id, tournament_doc=doc)
-            team_obj = teams.get(authoritative_team_id, {})
+            team_obj = teams.get(authoritative_team_id, {}) if isinstance(teams, dict) else {}
         else:
             # ✅ SS&S: For single mode, use load_team_settings_from_doc() (same as simulate_quarter_endpoint)
             # This ensures consistency and reuses the same loading logic that works at game start
@@ -1143,33 +1145,18 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                 teams = ensure_team_objects_exist(mode, doc_id, actual_team_id)
                 team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
-        # ✅ FIX: Reload team_obj from latest doc to ensure we have fresh strategy_settings
-        # This ensures strategy_settings are current after ensure_team_objects_exist updates
-        try:
-            if mode == "franchise":
-                reloaded_doc = collection.find_one({"_id": ObjectId(doc_id)})
-                if reloaded_doc and 'authoritative_team_id' in locals():
-                    franchise_teams = reloaded_doc.get("franchise_teams", {})
-                    team_obj = franchise_teams.get(authoritative_team_id, team_obj)
-            elif mode == "tournament":
-                reloaded_doc = collection.find_one({"_id": ObjectId(doc_id)})
-                if reloaded_doc and 'authoritative_team_id' in locals():
-                    teams_dict = reloaded_doc.get("teams", {})
-                    team_obj = teams_dict.get(authoritative_team_id, team_obj)
-            else:
-                # For single mode, try both formats
-                reloaded_doc = collection.find_one({"_id": doc_id})
-                if not reloaded_doc:
-                    try:
-                        reloaded_doc = collection.find_one({"_id": ObjectId(doc_id)})
-                    except:
-                        pass
-                if reloaded_doc and 'actual_team_id' in locals():
-                    teams_dict = reloaded_doc.get("teams", {})
-                    team_obj = teams_dict.get(actual_team_id, team_obj) if actual_team_id else team_obj
-        except Exception as e:
-            # If reload fails, keep existing team_obj (non-critical)
-            logger.warning(f"⚠️ [GET-GAMEPLAN] Failed to reload team_obj (non-critical): {e}")
+        # ✅ PHASE 5.3: Use returned teams dict from ensure_team_objects_exist() directly
+        # ensure_team_objects_exist() already reloads internally, so no need to reload again
+        # Note: For single mode, teams is set in the else block above, so we use it here
+        if mode == "franchise" and 'authoritative_team_id' in locals() and 'franchise_teams' in locals():
+            # ensure_team_objects_exist() returns franchise_teams dict for franchise mode
+            team_obj = franchise_teams.get(authoritative_team_id, team_obj) if isinstance(franchise_teams, dict) else team_obj
+        elif mode == "tournament" and 'authoritative_team_id' in locals() and 'teams' in locals():
+            # ensure_team_objects_exist() returns teams dict for tournament mode
+            team_obj = teams.get(authoritative_team_id, team_obj) if isinstance(teams, dict) else team_obj
+        elif mode == "single" and 'actual_team_id' in locals() and 'teams' in locals():
+            # ensure_team_objects_exist() returns teams dict for single mode
+            team_obj = teams.get(actual_team_id, team_obj) if (isinstance(teams, dict) and actual_team_id) else team_obj
         
         # Get settings or return defaults
         # ✅ SS&S: Use GameManager settings if available (single source of truth during gameplay)
@@ -1398,30 +1385,10 @@ def update_gameplan(request: GamePlanUpdateRequest):
                 {"$set": update_fields}
             )
         
-        # ✅ TRACE: Log DB write result
+        # ✅ PHASE 5.3: Removed verification reload - trust MongoDB update result
+        # If update succeeded (matched_count > 0), settings are saved
         if result and result.matched_count > 0:
             logger.warning(f"🔵 [TRACE-SAVE] {trace_id} | DB WRITE SUCCESS | matched={result.matched_count}, modified={result.modified_count}")
-            
-            # ✅ DIAGNOSTIC: Verify settings were actually saved
-            verify_doc = collection.find_one({"_id": doc_id if request.mode == "single" else ObjectId(doc_id)}, {update_path: 1})
-            if verify_doc:
-                if request.mode == "franchise":
-                    saved_settings = verify_doc.get("franchise_teams", {}).get(actual_team_id, {}).get("strategy_settings")
-                else:
-                    saved_settings = verify_doc.get("teams", {}).get(actual_team_id, {}).get("strategy_settings")
-                
-                if saved_settings:
-                    saved_sample = dict(list(saved_settings.items())[:5])
-                    logger.warning(f"✅ [SAVE-GAMEPLAN] VERIFIED: Settings saved to DB: sample={saved_sample}")
-                    # Verify key values match
-                    if saved_settings.get("inside") == request.strategy_settings.get("inside"):
-                        logger.warning(f"🔵 [TRACE-SAVE] {trace_id} | DB VERIFY SUCCESS | inside={saved_settings.get('inside')} matches request")
-                    else:
-                        logger.error(f"🔴 [TRACE-SAVE] {trace_id} | DB VERIFY FAILED | inside mismatch! saved={saved_settings.get('inside')}, requested={request.strategy_settings.get('inside')}")
-                else:
-                    logger.error(f"❌ [SAVE-GAMEPLAN] VERIFICATION FAILED: No strategy_settings found in saved document")
-            else:
-                logger.error(f"❌ [SAVE-GAMEPLAN] VERIFICATION FAILED: Could not read back saved document")
         else:
             logger.error(f"❌ [SAVE-GAMEPLAN] DB write FAILED: matched={result.matched_count if result else 0}, doc_id={doc_id}")
         
@@ -1632,22 +1599,14 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             plays_count = len(team_obj_check.get("plays", {})) if team_obj_check else 0
             # ✅ PERFORMANCE: Removed debug logging
         
-        # ✅ PERFORMANCE: Update in-memory doc with returned teams dict if needed
-        # This ensures we have the latest data without reloading from database
-        if mode == "franchise" and isinstance(teams_dict, dict):
-            doc["franchise_teams"] = teams_dict
-        elif mode == "tournament" and isinstance(teams_dict, dict):
-            doc["teams"] = teams_dict
-        elif mode == "single" and isinstance(teams_dict, dict):
-            doc["teams"] = teams_dict
-        
-        # Get team_obj using authoritative team_id
+        # ✅ PHASE 5.3: Use returned teams dict from ensure_team_objects_exist() directly
+        # This avoids unnecessary document reloads - ensure_team_objects_exist() already reloads internally
         if mode == "franchise":
-            franchise_teams = doc.get("franchise_teams", {})
+            franchise_teams = teams_dict if isinstance(teams_dict, dict) else doc.get("franchise_teams", {})
             team_obj = franchise_teams.get(authoritative_team_id, {})
             actual_team_id = authoritative_team_id
         elif mode == "tournament":
-            teams = doc.get("teams", {})
+            teams = teams_dict if isinstance(teams_dict, dict) else doc.get("teams", {})
             team_obj = teams.get(authoritative_team_id, {})
             actual_team_id = authoritative_team_id
         else:
@@ -1655,8 +1614,8 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             # This centralizes team_id resolution logic and ensures consistent format
             actual_team_id = normalize_team_id_to_canonical(team_id, mode, doc)
             
-            # Get team_obj using resolved actual_team_id
-            teams = doc.get("teams", {})
+            # Get team_obj using returned teams dict or doc
+            teams = teams_dict if isinstance(teams_dict, dict) else doc.get("teams", {})
             team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
         # ✅ PERFORMANCE: Removed debug logging
@@ -1925,35 +1884,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         # ✅ REMOVED: Verbose GET-PLAYBOOKS logs - redundant with trace logs
         # ✅ PERFORMANCE: Removed debug logging - only log actual errors
         
-        # ✅ SINGLE GAME CROSS-INSTANCE PERSISTENCE: Check core teams collection if game document has no settings
-        if mode == "single" and (not playbook_settings or len(playbook_settings) == 0 or not any(playbook_settings.get(k) for k in ["motion", "set_play_inside", "set_play_attack", "set_play_outside", "zone_defense", "man_defense", "slot_assignments"])):
-            try:
-                # Try to load from core teams collection
-                team_doc = db.teams.find_one({"name": team_id})
-                if not team_doc:
-                    team_doc = db.teams.find_one({"team_id": team_id})
-                if not team_doc:
-                    try:
-                        team_doc = db.teams.find_one({"_id": ObjectId(team_id)})
-                    except:
-                        pass
-                
-                if team_doc:
-                    core_playbook_settings = team_doc.get("playbook_settings", {})
-                    if core_playbook_settings and any(core_playbook_settings.get(k) for k in ["motion", "set_play_inside", "set_play_attack", "set_play_outside", "zone_defense", "man_defense", "slot_assignments"]):
-                        playbook_settings = core_playbook_settings
-                        # Also update the game document with these settings for consistency
-                        try:
-                            if mode == "single":
-                                from BackEnd.db import games_collection
-                                games_collection.update_one(
-                                    {"_id": doc_id},
-                                    {"$set": {f"teams.{actual_team_id}.playbook_settings": playbook_settings}}
-                                )
-                        except:
-                            pass  # Non-critical
-            except Exception as e:
-                logger.warning(f"⚠️ Error loading from core teams collection (non-critical): {e}")
+        # ✅ PHASE 5.3: Removed core teams collection fallback - game document is single source of truth
         
         slot_assignments = playbook_settings.get("slot_assignments", {}) if playbook_settings else {}
         motion_dropdowns = playbook_settings.get("motion_dropdowns", {}) if playbook_settings else {}
@@ -2216,10 +2147,7 @@ def save_playbooks(request: PlaybookSettingsRequest):
         
         # For single game mode, try both UUID string and ObjectId formats
         if request.mode == "single":
-            # ✅ SINGLE GAME CROSS-INSTANCE PERSISTENCE: Save to both game document AND core teams collection
-            # This ensures settings persist across Single Game instances
-            
-            # 1. Save to game document (for current game instance)
+            # ✅ PHASE 5.3: Simplified save flow - save to game document only (single source of truth)
             result = collection.update_one(
                 {"_id": doc_id},
                 {"$set": {update_path: request.playbook_settings}}
@@ -2233,41 +2161,6 @@ def save_playbooks(request: PlaybookSettingsRequest):
                     )
                 except:
                     pass
-            
-            # ✅ DIAGNOSTIC: Log DB write result
-            if result and result.matched_count > 0:
-                logger.warning(f"✅ [SAVE-PLAYBOOKS] DB write SUCCESS: matched={result.matched_count}, modified={result.modified_count}")
-            else:
-                logger.error(f"❌ [SAVE-PLAYBOOKS] DB write FAILED: matched={result.matched_count if result else 0}, doc_id={doc_id}")
-            
-            # 2. Save to core teams collection (for cross-instance persistence)
-            # Resolve team_id to ObjectId for teams collection lookup
-            team_obj_id = actual_team_id
-            try:
-                # Try to find team in core teams collection
-                team_doc = db.teams.find_one({"name": request.team_id})
-                if not team_doc:
-                    # Try by team_id
-                    team_doc = db.teams.find_one({"team_id": request.team_id})
-                if not team_doc:
-                    # Try as ObjectId
-                    try:
-                        team_doc = db.teams.find_one({"_id": ObjectId(actual_team_id)})
-                    except:
-                        pass
-                
-                if team_doc:
-                    team_obj_id = str(team_doc.get("_id"))
-                    db.teams.update_one(
-                        {"_id": ObjectId(team_obj_id)},
-                        {"$set": {"playbook_settings": request.playbook_settings}},
-                        upsert=False  # Don't create if doesn't exist
-                    )
-                    logger.warning(f"✅ Saved playbook settings to core teams collection for team {team_obj_id} (cross-instance persistence)")
-                else:
-                    logger.warning(f"⚠️ Could not find team in core teams collection for cross-instance persistence: {request.team_id}")
-            except Exception as e:
-                logger.warning(f"⚠️ Error saving to core teams collection (non-critical): {e}")
         else:
             # ✅ CRITICAL: Log the exact data being saved before the update
         # ✅ REMOVED: Verbose motion plays logs - redundant with trace logs
@@ -2289,48 +2182,8 @@ def save_playbooks(request: PlaybookSettingsRequest):
             logger.error(f"❌ [PLAYBOOKS SAVE] Document not found: mode={request.mode}, doc_id={doc_id}")
             raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
         
-        # Verify the save by reading it back
-        try:
-            if request.mode == "franchise":
-                verify_doc = collection.find_one(
-                    {"_id": ObjectId(doc_id)},
-                    {"franchise_teams": 1, "_id": 1}
-                )
-                if verify_doc:
-                    saved_settings = verify_doc.get("franchise_teams", {}).get(actual_team_id, {}).get("playbook_settings", {})
-                    logger.warning(f"✅ [PLAYBOOKS SAVE] Verified save - motion keys: {list(saved_settings.get('motion', {}).keys())}")
-                    logger.warning(f"✅ [PLAYBOOKS SAVE] Verified save - set_play_inside keys: {list(saved_settings.get('set_play_inside', {}).keys())}")
-                    if saved_settings.get('motion'):
-                        sample = dict(list(saved_settings.get('motion', {}).items())[:3])
-                        logger.warning(f"✅ [PLAYBOOKS SAVE] Verified save - sample motion percentages: {sample}")
-                        # ✅ CRITICAL: Log ALL motion percentages to verify they match what was sent
-                        all_motion = saved_settings.get('motion', {})
-                        logger.warning(f"✅ [PLAYBOOKS SAVE] Verified save - ALL motion percentages: {all_motion}")
-                    else:
-                        logger.error(f"❌ [PLAYBOOKS SAVE] Verified save - motion is EMPTY or MISSING!")
-                else:
-                    logger.error(f"❌ [PLAYBOOKS SAVE] Verification failed - document not found")
-            elif request.mode == "tournament":
-                verify_doc = collection.find_one(
-                    {"_id": ObjectId(doc_id)},
-                    {"teams": 1, "_id": 1}
-                )
-                if verify_doc:
-                    saved_settings = verify_doc.get("teams", {}).get(actual_team_id, {}).get("playbook_settings", {})
-                    logger.warning(f"✅ [PLAYBOOKS SAVE] Verified save - motion keys: {list(saved_settings.get('motion', {}).keys())}")
-                    logger.warning(f"✅ [PLAYBOOKS SAVE] Verified save - set_play_inside keys: {list(saved_settings.get('set_play_inside', {}).keys())}")
-            else:
-                verify_doc = collection.find_one({"_id": doc_id}, {"teams": 1, "_id": 1})
-                if verify_doc:
-                    saved_settings = verify_doc.get("teams", {}).get(actual_team_id, {}).get("playbook_settings", {})
-                    logger.warning(f"✅ [PLAYBOOKS SAVE] Verified save - motion keys: {list(saved_settings.get('motion', {}).keys())}")
-                    logger.warning(f"✅ [PLAYBOOKS SAVE] Verified save - set_play_inside keys: {list(saved_settings.get('set_play_inside', {}).keys())}")
-            
-            if not verify_doc:
-                logger.warning(f"⚠️ [PLAYBOOKS SAVE] Could not verify save - document not found")
-        except Exception as e:
-            logger.warning(f"⚠️ [PLAYBOOKS SAVE] Error during verification (non-critical): {e}")
-        
+        # ✅ PHASE 5.3: Removed verification reload - trust MongoDB update result
+        # If update succeeded (matched_count > 0), settings are saved
         # ✅ SS&S: Apply settings immediately to GameManager if game is in cache
         # This ensures GameManager always reflects what's in DB (single source of truth)
         if request.mode == "single" and request.game_id and result and result.matched_count > 0:
