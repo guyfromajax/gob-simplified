@@ -1,7 +1,35 @@
 /**
- * Error Handler Utility for Missing Required Pointers
- * Phase 1.1: Provides explicit error screens with recovery flows
+ * Error Handler Utility for State & Persistence Errors
+ * Phase 1.1 & Phase 4: Provides explicit error screens with recovery flows and telemetry
  */
+
+/**
+ * Log error telemetry (Phase 4)
+ */
+function logErrorTelemetry(errorType, errorDetails) {
+  const timestamp = new Date().toISOString();
+  const logData = {
+    timestamp,
+    errorType,
+    ...errorDetails
+  };
+  
+  // Log to console
+  console.error(`🔴 [ERROR TELEMETRY] ${errorType}:`, logData);
+  
+  // Store in sessionStorage for monitoring (last 10 errors)
+  try {
+    const errorLog = JSON.parse(sessionStorage.getItem('errorTelemetry') || '[]');
+    errorLog.push(logData);
+    // Keep only last 10 errors
+    if (errorLog.length > 10) {
+      errorLog.shift();
+    }
+    sessionStorage.setItem('errorTelemetry', JSON.stringify(errorLog));
+  } catch (e) {
+    // Ignore sessionStorage errors (may not be available)
+  }
+}
 
 /**
  * Show error screen for missing required pointer
@@ -20,6 +48,14 @@ function showMissingPointerError({
   mode = 'single',
   recoveryOptions = {}
 }) {
+  // ✅ Phase 4: Log error telemetry
+  logErrorTelemetry('MISSING_POINTER', {
+    missingPointer,
+    message,
+    mode,
+    recoveryAction: recoveryOptions.redirectTo || 'lineup',
+    url: window.location.href
+  });
   const {
     redirectTo = 'lineup',
     redirectParams = {},
@@ -158,10 +194,296 @@ function buildLineupUrl(params) {
   return `/set-lineup.html?${urlParams.toString()}`;
 }
 
+/**
+ * Show error screen for missing truth (document not found)
+ * Phase 4: Error screen for when pointer exists but document doesn't
+ * @param {Object} options - Error configuration
+ * @param {string} options.pointerType - The pointer type (game_id, franchise_id, tournament_id)
+ * @param {string} options.pointerValue - The pointer value that was invalid
+ * @param {string} options.message - Detailed error message
+ * @param {string} options.mode - Current game mode (single, franchise, tournament)
+ * @param {Object} options.recoveryOptions - Recovery flow options
+ */
+function showMissingTruthError({
+  pointerType,
+  pointerValue,
+  message,
+  mode = 'single',
+  recoveryOptions = {}
+}) {
+  // ✅ Phase 4: Log error telemetry
+  logErrorTelemetry('MISSING_TRUTH', {
+    pointerType,
+    pointerValue,
+    message,
+    mode,
+    recoveryAction: recoveryOptions.redirectTo || 'mode-select',
+    url: window.location.href
+  });
+
+  const {
+    redirectTo = 'mode-select',
+    redirectParams = {},
+    redirectLabel = 'Go to Mode Select'
+  } = recoveryOptions;
+
+  // Build recovery URL
+  let recoveryUrl = '/';
+  switch (redirectTo) {
+    case 'lineup':
+      recoveryUrl = buildLineupUrl(redirectParams);
+      break;
+    case 'mode-select':
+      recoveryUrl = '/mode-select.html';
+      break;
+    case 'franchise-select':
+      recoveryUrl = '/franchise-select-team.html';
+      break;
+    case 'tournament-select':
+      recoveryUrl = '/tournament-select.html';
+      break;
+    case 'homepage':
+      recoveryUrl = '/homepage.html';
+      break;
+    default:
+      recoveryUrl = redirectTo;
+  }
+
+  // Create error screen HTML
+  const errorHtml = `
+    <div class="error-screen" style="
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #1e1e1e;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      font-family: 'Bebas Neue', 'Inter', sans-serif;
+      padding: 20px;
+      box-sizing: border-box;
+    ">
+      <div class="error-content" style="
+        max-width: 600px;
+        text-align: center;
+        background: #2a2a2a;
+        padding: 40px;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      ">
+        <h1 style="
+          font-size: 48px;
+          margin-bottom: 20px;
+          color: #ff6200;
+        ">❌ Error</h1>
+        <h2 style="
+          font-size: 24px;
+          margin-bottom: 20px;
+          color: #fff;
+        ">Document Not Found</h2>
+        <p style="
+          font-size: 16px;
+          line-height: 1.6;
+          margin-bottom: 15px;
+          color: #ccc;
+        ">The ${pointerType.replace('_', ' ')} you're looking for doesn't exist in the database.</p>
+        <p style="
+          font-size: 14px;
+          line-height: 1.6;
+          margin-bottom: 30px;
+          color: #999;
+          font-style: italic;
+        ">${message}</p>
+        <div style="
+          display: flex;
+          gap: 15px;
+          justify-content: center;
+          flex-wrap: wrap;
+        ">
+          <button onclick="window.location.href='${recoveryUrl}'" style="
+            background: #ff6200;
+            color: #fff;
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+            font-family: 'Bebas Neue', sans-serif;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+          " onmouseover="this.style.background='#ff7a33'" onmouseout="this.style.background='#ff6200'">
+            ${redirectLabel}
+          </button>
+          <button onclick="window.location.href='/homepage.html'" style="
+            background: #444;
+            color: #fff;
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+            font-family: 'Bebas Neue', sans-serif;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+          " onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'">
+            Go to Homepage
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Replace page content with error screen
+  document.body.innerHTML = errorHtml;
+  document.title = 'Error - Document Not Found';
+
+  // Log to console for debugging
+  console.error(`❌ [ERROR HANDLER] Missing truth for ${pointerType} (${pointerValue}): ${message}`);
+}
+
+/**
+ * Show error screen for version mismatch
+ * Phase 4: Error screen for when cache version doesn't match expected version
+ * @param {Object} options - Error configuration
+ * @param {string} options.cacheType - The cache type (ongoing_games, gameStore, etc.)
+ * @param {string} options.expectedVersion - Expected version
+ * @param {string} options.actualVersion - Actual version found
+ * @param {string} options.message - Detailed error message
+ * @param {Object} options.recoveryOptions - Recovery flow options
+ */
+function showVersionMismatchError({
+  cacheType,
+  expectedVersion,
+  actualVersion,
+  message,
+  recoveryOptions = {}
+}) {
+  // ✅ Phase 4: Log error telemetry
+  logErrorTelemetry('VERSION_MISMATCH', {
+    cacheType,
+    expectedVersion,
+    actualVersion,
+    message,
+    recoveryAction: recoveryOptions.redirectTo || 'reload',
+    url: window.location.href
+  });
+
+  const {
+    redirectTo = 'reload',
+    redirectLabel = 'Reload Page'
+  } = recoveryOptions;
+
+  // Build recovery action
+  let recoveryAction = "window.location.reload()";
+  if (redirectTo !== 'reload') {
+    recoveryAction = `window.location.href='${redirectTo}'`;
+  }
+
+  // Create error screen HTML
+  const errorHtml = `
+    <div class="error-screen" style="
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #1e1e1e;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      font-family: 'Bebas Neue', 'Inter', sans-serif;
+      padding: 20px;
+      box-sizing: border-box;
+    ">
+      <div class="error-content" style="
+        max-width: 600px;
+        text-align: center;
+        background: #2a2a2a;
+        padding: 40px;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      ">
+        <h1 style="
+          font-size: 48px;
+          margin-bottom: 20px;
+          color: #ffaa00;
+        ">⚠️ Version Mismatch</h1>
+        <h2 style="
+          font-size: 24px;
+          margin-bottom: 20px;
+          color: #fff;
+        ">Cache Out of Sync</h2>
+        <p style="
+          font-size: 16px;
+          line-height: 1.6;
+          margin-bottom: 15px;
+          color: #ccc;
+        ">The cached data is out of date and needs to be refreshed.</p>
+        <p style="
+          font-size: 14px;
+          line-height: 1.6;
+          margin-bottom: 30px;
+          color: #999;
+          font-style: italic;
+        ">${message}</p>
+        <div style="
+          display: flex;
+          gap: 15px;
+          justify-content: center;
+          flex-wrap: wrap;
+        ">
+          <button onclick="${recoveryAction}" style="
+            background: #ff6200;
+            color: #fff;
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+            font-family: 'Bebas Neue', sans-serif;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+          " onmouseover="this.style.background='#ff7a33'" onmouseout="this.style.background='#ff6200'">
+            ${redirectLabel}
+          </button>
+          <button onclick="window.location.href='/homepage.html'" style="
+            background: #444;
+            color: #fff;
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+            font-family: 'Bebas Neue', sans-serif;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+          " onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'">
+            Go to Homepage
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Replace page content with error screen
+  document.body.innerHTML = errorHtml;
+  document.title = 'Error - Version Mismatch';
+
+  // Log to console for debugging
+  console.error(`❌ [ERROR HANDLER] Version mismatch for ${cacheType}: Expected ${expectedVersion}, got ${actualVersion}`);
+}
+
 // Make available on window object (no ES6 export to avoid module syntax issues)
 if (typeof window !== 'undefined') {
   window.ErrorHandler = {
-    showMissingPointerError
+    showMissingPointerError,
+    showMissingTruthError,
+    showVersionMismatchError,
+    logErrorTelemetry
   };
 }
 

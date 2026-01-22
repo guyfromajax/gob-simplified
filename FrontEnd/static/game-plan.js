@@ -286,12 +286,28 @@ async function loadSettings() {
         console.log(`✅ [GAME-PLAN] game_id validated: ${gameId}`);
       } catch (error) {
         console.error(`❌ [GAME-PLAN] Invalid game_id: ${error.message}`);
-        if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
+        // ✅ Phase 4: Use showMissingTruthError for invalid pointer (document not found)
+        if (window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
+          window.ErrorHandler.showMissingTruthError({
+            pointerType: 'game_id',
+            pointerValue: gameId,
+            message: `Invalid game_id: ${gameId}. ${error.message}`,
+            mode: modeParam || 'single',
+            recoveryOptions: {
+              redirectTo: 'mode-select',
+              redirectLabel: 'Go to Mode Select'
+            }
+          });
+        } else if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
+          // Fallback to missing pointer error if missing truth error not available
           window.ErrorHandler.showMissingPointerError({
             missingPointer: 'game_id',
             message: `Invalid game_id: ${gameId}. ${error.message}`,
-            mode: modeParam,
-            recoveryAction: 'redirect_to_lineup'
+            mode: modeParam || 'single',
+            recoveryOptions: {
+              redirectTo: 'mode-select',
+              redirectLabel: 'Go to Mode Select'
+            }
           });
         }
         return; // Don't proceed with loading
@@ -316,14 +332,43 @@ async function loadSettings() {
     console.log('🔍 [GAME-PLAN] Loading settings from database:', params.toString());
     const res = await fetch(`${API_CONFIG.buildUrl('/api/gameplan')}?${params.toString()}`);
     if (!res.ok) {
-      console.error('❌ [GAME-PLAN] Failed to load game plan settings, status:', res.status);
-      // Use defaults if API fails
-      currentSettings = {
-        strategy_settings: {
-          'offense': 2, 'inside': 2, 'attack': 2, 'outside': 2, 'fast_breaks': 2,
-          'defense': 2, 'aggression': 2, 'hc_trap': 2, 'fc_press': 2, 'rebounding': 2
+      let errorDetail = `HTTP ${res.status}: ${res.statusText}`;
+      let errorData = {};
+      try {
+        errorData = await res.json();
+        errorDetail = errorData.detail || errorData.message || errorDetail;
+      } catch (e) {
+        try {
+          errorDetail = await res.text();
+        } catch (e2) {
+          // Keep default errorDetail
         }
-      };
+      }
+      console.error('❌ [GAME-PLAN] Failed to load game plan settings:', errorDetail);
+      
+      // ✅ Phase 4: Remove silent default - show error screen for API failures
+      if (res.status === 404 && errorDetail.includes('not found')) {
+        // Document not found - show missing truth error
+        if (window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
+          const pointerType = mode === 'single' ? 'game_id' : (mode === 'franchise' ? 'franchise_id' : 'tournament_id');
+          const pointerValue = mode === 'single' ? gameId : (mode === 'franchise' ? franchiseId : tournamentId);
+          window.ErrorHandler.showMissingTruthError({
+            pointerType,
+            pointerValue: pointerValue || 'unknown',
+            message: errorDetail,
+            mode: mode,
+            recoveryOptions: {
+              redirectTo: mode === 'single' ? 'mode-select' : (mode === 'franchise' ? 'franchise-select' : 'tournament-select'),
+              redirectLabel: mode === 'single' ? 'Go to Mode Select' : (mode === 'franchise' ? 'Go to Franchise Select' : 'Go to Tournament Select')
+            }
+          });
+        }
+      } else {
+        // Other API errors - show generic error
+        console.error('❌ [GAME-PLAN] API error loading settings - cannot proceed without settings');
+        alert(`Error: Failed to load game plan settings. ${errorDetail}\n\nPlease try refreshing the page or return to the lineup screen.`);
+      }
+      // ✅ Phase 4: Don't use silent defaults - fail explicitly
       return;
     }
     
