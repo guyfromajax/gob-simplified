@@ -283,20 +283,18 @@
 
 #### Phase 5.2: Remove Legacy Compatibility
 
+**Status:** ✅ Complete
+
 **Tasks:**
-1. **Decision:** Migrate existing data once, then remove all fallbacks
-2. **Actions:**
-   - Create one-time migration script to convert team name keys → team_id keys in all game documents
-   - Run migration script on staging, verify data integrity
-   - Remove legacy team name key fallbacks from:
-     - `save_playbooks()` in `gameplan_routes.py`
-     - `update_gameplan()` in `gameplan_routes.py`
-     - `get_playbooks()` in `gameplan_routes.py`
-     - `get_gameplan()` in `gameplan_routes.py`
-     - `load_team_settings_from_doc()` in `api.py`
-     - `summarize_game_state()` in `shared.py`
-   - Remove ObjectId format fallbacks (keep normalization at entry points only)
-3. **Validation:** All code paths use `team_id` only, no fallback logic remains
+1. ✅ **Decision:** No migration needed - existing game/franchise/tournament documents don't need to be preserved
+2. ✅ **Actions:**
+   - ✅ Removed migration script (not needed)
+   - ✅ Simplified `normalize_team_id_to_canonical()` - removed home/away fallback (legacy-specific)
+   - ✅ Simplified `load_team_settings_from_doc()` - removed home/away fallback
+   - ✅ Removed legacy team name key fallback from `summarize_game_state()`
+   - ✅ Kept frontend name resolution for compatibility (frontend may still send team names)
+   - ✅ New games will use canonical format from the start
+3. ⏳ **Validation:** Testing in progress - awaiting user confirmation
 
 #### Phase 5.3: Simplify Settings Save/Load Flow
 
