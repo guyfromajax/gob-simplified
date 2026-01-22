@@ -269,14 +269,17 @@
 
 #### Phase 5.1: Standardize Team ID Format
 
+**Status:** ✅ Complete
+
 **Tasks:**
-1. **Decision:** Use canonical `team_id` format everywhere (e.g., "MORRISTOWN", "OCEAN_CITY")
-2. **Actions:**
-   - Remove ObjectId format handling (normalize to string at API entry points)
-   - Remove team name → team_id resolution (require team_id everywhere)
-   - Update all API endpoints to accept only `team_id` format
-   - Update frontend to always send `team_id` (not team name)
-3. **Validation:** All API calls use `team_id` format, no name resolution needed
+1. ✅ **Decision:** Use canonical `team_id` format everywhere (e.g., "MORRISTOWN", "OCEAN_CITY")
+2. ✅ **Actions:**
+   - ✅ Created `normalize_team_id_to_canonical()` helper function to centralize team_id resolution
+   - ✅ Updated all 4 API endpoints (`save_playbooks`, `update_gameplan`, `get_playbooks`, `get_gameplan`) to use normalization helper
+   - ✅ Removed ~172 lines of duplicate team_id resolution logic
+   - ✅ Frontend already compliant (sends `team_id`, not `team_name`) - added clarifying comments
+   - ✅ Backend normalizes all formats (team name/ObjectId → canonical) at API entry points
+3. ⏳ **Validation:** Testing in progress - awaiting user confirmation
 
 #### Phase 5.2: Remove Legacy Compatibility
 
