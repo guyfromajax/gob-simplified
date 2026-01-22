@@ -87,6 +87,45 @@ def get_default_settings():
     }
 
 
+def get_collection_and_doc_id(mode: str, franchise_id: str = None, tournament_id: str = None, game_id: str = None):
+    """
+    ✅ PHASE 5.5: Helper to get collection and doc_id based on mode.
+    
+    Returns:
+        tuple: (collection, doc_id) where doc_id is normalized
+    """
+    if mode == "franchise":
+        if not franchise_id:
+            raise HTTPException(status_code=400, detail="franchise_id required for franchise mode")
+        return db.franchises, franchise_id
+    elif mode == "tournament":
+        if not tournament_id:
+            raise HTTPException(status_code=400, detail="tournament_id required for tournament mode")
+        return db.tournaments, tournament_id
+    elif mode == "single":
+        if not game_id:
+            raise HTTPException(status_code=400, detail="game_id required for single game mode")
+        from BackEnd.utils.game_id_utils import normalize_game_id
+        normalized_game_id = normalize_game_id(game_id)
+        return db.games, normalized_game_id
+    else:
+        raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
+
+
+def get_team_settings_path(mode: str, team_id: str) -> str:
+    """
+    ✅ PHASE 5.5: Helper to get the MongoDB update path for team settings.
+    
+    Returns:
+        str: Update path like "franchise_teams.{team_id}.playbook_settings" or "teams.{team_id}.playbook_settings"
+    """
+    if mode == "franchise":
+        return f"franchise_teams.{team_id}"
+    else:
+        # Tournament and single both use "teams"
+        return f"teams.{team_id}"
+
+
 def normalize_team_id_to_canonical(team_id: str, mode: str, doc: dict = None) -> str:
     """
     ✅ PHASE 5.1: Normalize team_id to canonical format (e.g., "MORRISTOWN", "OCEAN_CITY").
@@ -986,29 +1025,12 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                 If None or "cache", prefers DB but allows cache as fallback (for performance during gameplay).
     """
     try:
-        # ✅ PERFORMANCE: Removed verbose debug print
-        # Determine which collection to use
-        if mode == "franchise":
-            if not franchise_id:
-                raise HTTPException(status_code=400, detail="franchise_id required for franchise mode")
-            doc_id = franchise_id
-            collection = db.franchises
-        elif mode == "tournament":
-            if not tournament_id:
-                raise HTTPException(status_code=400, detail="tournament_id required for tournament mode")
-            doc_id = tournament_id
-            collection = db.tournaments
-        elif mode == "single":
-            if not game_id:
-                raise HTTPException(status_code=400, detail="game_id required for single game mode")
-            # ✅ PHASE 1.1: Normalize game_id at entry point (standardize to ObjectId format)
-            from BackEnd.utils.game_id_utils import normalize_game_id
-            original_game_id = game_id
-            game_id = normalize_game_id(game_id)
-            if original_game_id != game_id:
-                logger.warning(f"🔍 [NORMALIZE] GET /api/gameplan - Normalized game_id from '{original_game_id}' to '{game_id}'")
-            doc_id = game_id
-            collection = db.games
+        # ✅ PHASE 5.5: Use helper to get collection and doc_id (simplifies mode handling)
+        collection, doc_id = get_collection_and_doc_id(mode, franchise_id, tournament_id, game_id)
+        
+        # ✅ PHASE 1.1: Log normalization if game_id was changed
+        if mode == "single" and game_id and game_id != doc_id:
+            logger.warning(f"🔍 [NORMALIZE] GET /api/gameplan - Normalized game_id from '{game_id}' to '{doc_id}'")
             
             # ✅ PHASE 3.2: Prefer DB reads over cache reads
             # If source=db, skip cache and always read from database
@@ -1336,17 +1358,11 @@ def update_gameplan(request: GamePlanUpdateRequest):
         # ✅ PHASE 1.3: Telemetry - Log state write
         logger.warning(f"🟢 [STATE-WRITE] [update_gameplan] strategy_settings to backend | team_id={actual_team_id}, inside={inside_value}, endpoint=/api/gameplan")
         
-        # Update settings in the appropriate document
-        if request.mode == "franchise":
-            update_path = f"franchise_teams.{actual_team_id}.strategy_settings"
-            update_fields = {
-                update_path: request.strategy_settings
-            }
-        else:
-            update_path = f"teams.{actual_team_id}.strategy_settings"
-            update_fields = {
-                update_path: request.strategy_settings
-            }
+        # ✅ PHASE 5.5: Use helper to get update path (same logic for all modes)
+        update_path = f"{get_team_settings_path(request.mode, actual_team_id)}.strategy_settings"
+        update_fields = {
+            update_path: request.strategy_settings
+        }
         
         logger.warning(f"💾 [SAVE-GAMEPLAN] Update path: {update_path}, doc_id={doc_id}, mode={request.mode}")
         
@@ -1439,28 +1455,16 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
     
     try:
         # ✅ PERFORMANCE: Removed debug logging - only log errors and critical events
-        # Determine which collection to use
-        if mode == "franchise":
-            if not franchise_id:
-                raise HTTPException(status_code=400, detail="franchise_id required for franchise mode")
-            doc_id = franchise_id
-            collection = db.franchises
-        elif mode == "tournament":
-            if not tournament_id:
-                raise HTTPException(status_code=400, detail="tournament_id required for tournament mode")
-            doc_id = tournament_id
-            collection = db.tournaments
-        elif mode == "single":
-            if not game_id:
-                raise HTTPException(status_code=400, detail="game_id required for single game mode")
-            # ✅ PHASE 1.1: Normalize game_id at entry point (standardize to ObjectId format)
-            from BackEnd.utils.game_id_utils import normalize_game_id
-            original_game_id = game_id
-            game_id = normalize_game_id(game_id)
-            if original_game_id != game_id:
-                logger.warning(f"🔍 [NORMALIZE] GET /api/playbooks - Normalized game_id from '{original_game_id}' to '{game_id}'")
-            doc_id = game_id
-            collection = db.games
+        # ✅ PHASE 5.5: Use helper to get collection and doc_id (simplifies mode handling)
+        collection, doc_id = get_collection_and_doc_id(mode, franchise_id, tournament_id, game_id)
+        
+        # ✅ PHASE 1.1: Log normalization if game_id was changed
+        if mode == "single" and game_id and game_id != doc_id:
+            logger.warning(f"🔍 [NORMALIZE] GET /api/playbooks - Normalized game_id from '{game_id}' to '{doc_id}'")
+        
+        # ✅ PHASE 5.5: Use normalized doc_id for single mode cache lookup
+        if mode == "single":
+            game_id = doc_id  # Use normalized game_id for cache lookup
             
             # ✅ PHASE 3.2: Prefer DB reads over cache reads
             # If source=db, skip cache and always read from database
@@ -1979,31 +1983,13 @@ def save_playbooks(request: PlaybookSettingsRequest):
     Stores in teams.{team_id}.playbook_settings in the appropriate mode document.
     """
     try:
-        # ✅ REMOVED: Verbose field-by-field logs - only log errors
-        # Determine which collection to use
-        if request.mode == "franchise":
-            if not request.franchise_id:
-                raise HTTPException(status_code=400, detail="franchise_id required for franchise mode")
-            doc_id = request.franchise_id
-            collection = db.franchises
-        elif request.mode == "tournament":
-            if not request.tournament_id:
-                raise HTTPException(status_code=400, detail="tournament_id required for tournament mode")
-            doc_id = request.tournament_id
-            collection = db.tournaments
-        elif request.mode == "single":
-            if not request.game_id:
-                raise HTTPException(status_code=400, detail="game_id required for single game mode")
-            # ✅ PHASE 1.1: Normalize game_id at entry point (standardize to ObjectId format)
-            from BackEnd.utils.game_id_utils import normalize_game_id
-            original_game_id = request.game_id
-            game_id = normalize_game_id(request.game_id)
-            if original_game_id != game_id:
-                logger.warning(f"🔍 [NORMALIZE] POST /api/playbooks - Normalized game_id from '{original_game_id}' to '{game_id}'")
-            doc_id = game_id
-            collection = db.games
-        else:
-            raise HTTPException(status_code=400, detail=f"Invalid mode: {request.mode}")
+        # ✅ PHASE 5.5: Use helper to get collection and doc_id (simplifies mode handling)
+        collection, doc_id = get_collection_and_doc_id(
+            request.mode,
+            request.franchise_id,
+            request.tournament_id,
+            request.game_id
+        )
         
         # ✅ PERFORMANCE: Load document first with projection (only needed fields)
         if request.mode == "single":
@@ -2127,11 +2113,8 @@ def save_playbooks(request: PlaybookSettingsRequest):
         if not doc:
             raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
         
-        # Update playbook_settings in the appropriate document
-        if request.mode == "franchise":
-            update_path = f"franchise_teams.{actual_team_id}.playbook_settings"
-        else:
-            update_path = f"teams.{actual_team_id}.playbook_settings"
+        # ✅ PHASE 5.5: Use helper to get update path (same logic for all modes)
+        update_path = f"{get_team_settings_path(request.mode, actual_team_id)}.playbook_settings"
         
         # ✅ REMOVED: Verbose save logs - redundant with trace logs
         
