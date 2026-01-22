@@ -1,8 +1,11 @@
-// ✅ PHASE 1.3: Import state telemetry
-import { logGameStoreRead, logGameStoreWrite, setContext } from '../shared/stateTelemetry.js';
+// ✅ PHASE 1.3: Use window.StateTelemetry (loaded as script before this module)
+// stateTelemetry.js is loaded as a regular script, so we access it via window
+const StateTelemetry = typeof window !== 'undefined' && window.StateTelemetry;
 
 // Set context for telemetry
-setContext('gameStore');
+if (StateTelemetry) {
+  StateTelemetry.setContext('gameStore');
+}
 
 const state = {
   teams: { home: null, away: null },
@@ -60,13 +63,17 @@ export default {
   // Game ID
   setGameId(id) {
     // ✅ PHASE 1.3: Log state write
-    logGameStoreWrite('game_id', id);
+    if (StateTelemetry) {
+      StateTelemetry.logGameStoreWrite('game_id', id);
+    }
     state.gameId = id || null;
   },
   getGameId() {
     // ✅ PHASE 1.3: Log state read
     const value = state.gameId;
-    logGameStoreRead('game_id', value);
+    if (StateTelemetry) {
+      StateTelemetry.logGameStoreRead('game_id', value);
+    }
     return value;
   },
 

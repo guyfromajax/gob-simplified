@@ -367,3 +367,25 @@ if (typeof module !== 'undefined' && module.exports) {
 
 })(); // End IIFE
 
+// ✅ PHASE 1.3: Export as ES6 module (for import statements)
+// Exports must be outside IIFE to work as ES6 module
+// Functions are exposed via window.StateTelemetry inside IIFE for script loading
+export {
+  setContext,
+  logStateRead,
+  logStateWrite,
+  logCacheHit,
+  logCacheMiss,
+  logCacheInvalidation,
+  logUrlRead,
+  logLocalStorageRead,
+  logLocalStorageWrite,
+  logGameStoreRead,
+  logGameStoreWrite,
+  logBackendRead,
+  logBackendWrite,
+  configureTelemetry,
+  getTelemetryConfig,
+  SOURCE_TYPES
+};
+
