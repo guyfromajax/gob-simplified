@@ -422,7 +422,7 @@
 
 **Goal:** Enable game-specific settings in franchise/tournament mode without affecting master settings.
 
-**Status:** ⏳ Pending (depends on Phase 5.1-5.6)
+**Status:** 🔄 In Progress (Tasks 1-4 complete, Tasks 5-6 pending)
 
 **Rationale:** Currently, settings changes during franchise/tournament gameplay save to the franchise/tournament document (master settings), affecting all games. This feature allows users to make game-specific adjustments during gameplay without disrupting their master playbooks/game plans. Settings are scoped to the active game document and revert to master settings when the game ends.
 
@@ -438,13 +438,14 @@
 
 **Tasks:**
 
-1. **Game Initialization: Copy Settings from Master**
+1. **Game Initialization: Copy Settings from Master** ✅ **COMPLETE**
    - **Action:** In `init-game`, copy `playbook_settings` and `strategy_settings` from franchise/tournament doc to game doc
    - **Files:** `BackEnd/api/api.py` → `init_game()`
    - **Logic:** On game start, copy master settings to game doc as baseline
    - **Validation:** Game doc initialized with master settings, franchise/tournament doc unchanged
+   - **Implementation:** Added logic in `init_game()` to copy settings from franchise/tournament doc to game doc for user team
 
-2. **Save Flow: Conditional Save Location**
+2. **Save Flow: Conditional Save Location** ✅ **COMPLETE**
    - **Action:** Modify `save_playbooks()` and `update_gameplan()` to save to game doc if game is active, otherwise save to franchise/tournament doc
    - **Files:** `BackEnd/api/gameplan_routes.py` → `save_playbooks()`, `update_gameplan()`
    - **Logic:**
@@ -456,8 +457,12 @@
          Save to franchise/tournament doc (master settings)
      ```
    - **Validation:** Settings saved to correct document based on context
+   - **Implementation:** 
+     - Created `get_save_location_for_franchise_tournament()` helper function
+     - Updated `save_playbooks()` and `update_gameplan()` to use conditional save logic
+     - Resolves team_id from game doc when saving to game doc
 
-3. **Load Flow: Game Doc → Master Fallback**
+3. **Load Flow: Game Doc → Master Fallback** ✅ **COMPLETE**
    - **Action:** Modify `get_playbooks()` and `get_gameplan()` to load from game doc first, fallback to franchise/tournament doc
    - **Files:** `BackEnd/api/gameplan_routes.py` → `get_playbooks()`, `get_gameplan()`
    - **Logic:**
@@ -469,12 +474,20 @@
          Load from franchise/tournament doc (master settings)
      ```
    - **Validation:** Settings loaded from correct document based on context
+   - **Implementation:**
+     - Updated `get_playbooks()` and `get_gameplan()` to try game doc first
+     - Falls back to master doc if game doc doesn't have settings
+     - Resolves team_id correctly for both game doc and master doc
 
-4. **Settings Application: Game Doc → Master Fallback**
+4. **Settings Application: Game Doc → Master Fallback** ✅ **COMPLETE**
    - **Action:** Modify `simulate-quarter` to load from game doc first, fallback to franchise/tournament doc
    - **Files:** `BackEnd/api/api.py` → `simulate_quarter_endpoint()`, `load_team_settings_from_doc()`
    - **Logic:** Try game doc first, fallback to master if missing
    - **Validation:** Settings applied from correct source at game start
+   - **Implementation:**
+     - Updated `load_team_settings_from_doc()` to accept optional `game_id` parameter
+     - Added game doc → master fallback logic in `load_team_settings_from_doc()`
+     - Updated all `simulate-quarter` call sites to pass `game_id`
 
 5. **Timeout Persistence: Preserve Game Doc Settings**
    - **Action:** Ensure `summarize_game_state()` preserves game doc settings during timeout

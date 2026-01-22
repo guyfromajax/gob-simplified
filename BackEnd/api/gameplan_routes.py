@@ -6,7 +6,7 @@ from pathlib import Path
 import logging
 from typing import Optional
 
-from BackEnd.db import db
+from BackEnd.db import db, games_collection
 from BackEnd.api.franchise_routes import get_user_team_from_franchise
 from BackEnd.api.tournament_routes import get_user_team_from_tournament
 
@@ -127,6 +127,95 @@ def get_team_settings_path(mode: str, team_id: str) -> str:
     else:
         # Tournament and single both use "teams"
         return f"teams.{team_id}"
+
+
+def get_save_location_for_franchise_tournament(mode: str, game_id: str = None, franchise_id: str = None, tournament_id: str = None):
+    """
+    ✅ PHASE 5.7: Determine save location for franchise/tournament mode.
+    
+    If game_id is provided AND game exists AND game is active (quarter > 0):
+        Save to game doc (game-specific settings)
+    Else:
+        Save to franchise/tournament doc (master settings)
+    
+    Args:
+        mode: Game mode ("franchise" or "tournament")
+        game_id: Optional game ID
+        franchise_id: Franchise ID (for franchise mode)
+        tournament_id: Tournament ID (for tournament mode)
+    
+    Returns:
+        tuple: (collection, doc_id, is_game_doc) where:
+            - collection: MongoDB collection to save to
+            - doc_id: Document ID to save to
+            - is_game_doc: True if saving to game doc, False if saving to master doc
+    """
+    from BackEnd.db import games_collection, franchises_collection, tournaments_collection
+    
+    # If no game_id provided, always save to master
+    if not game_id:
+        if mode == "franchise":
+            return franchises_collection, franchise_id, False
+        elif mode == "tournament":
+            return tournaments_collection, tournament_id, False
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid mode for get_save_location: {mode}")
+    
+    # Check if game exists and is active
+    try:
+        game_doc = games_collection.find_one(
+            {"_id": game_id},
+            {"quarter": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "_id": 1}
+        )
+        if not game_doc:
+            # Try as ObjectId
+            try:
+                game_doc = games_collection.find_one(
+                    {"_id": ObjectId(game_id)},
+                    {"quarter": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "_id": 1}
+                )
+            except:
+                pass
+        
+        if game_doc:
+            # Verify game belongs to this franchise/tournament
+            game_mode = game_doc.get("mode")
+            game_franchise_id = game_doc.get("franchise_id")
+            game_tournament_id = game_doc.get("tournament_id")
+            
+            if mode == "franchise":
+                if game_mode == "franchise" and str(game_franchise_id) == str(franchise_id):
+                    quarter = game_doc.get("quarter", 0)
+                    if quarter > 0:
+                        # Game is active - save to game doc
+                        return games_collection, game_id, True
+            elif mode == "tournament":
+                if game_mode == "tournament" and str(game_tournament_id) == str(tournament_id):
+                    quarter = game_doc.get("quarter", 0)
+                    if quarter > 0:
+                        # Game is active - save to game doc
+                        return games_collection, game_id, True
+        
+        # Game doesn't exist or isn't active - save to master
+        if mode == "franchise":
+            return franchises_collection, franchise_id, False
+        elif mode == "tournament":
+            return tournaments_collection, tournament_id, False
+    except Exception as e:
+        logger.warning(f"⚠️ [PHASE 5.7] Error checking game status, defaulting to master save: {e}")
+        # On error, default to master save
+        if mode == "franchise":
+            return franchises_collection, franchise_id, False
+        elif mode == "tournament":
+            return tournaments_collection, tournament_id, False
+    
+    # Fallback to master
+    if mode == "franchise":
+        return franchises_collection, franchise_id, False
+    elif mode == "tournament":
+        return tournaments_collection, tournament_id, False
+    else:
+        raise HTTPException(status_code=400, detail=f"Invalid mode for get_save_location: {mode}")
 
 
 def normalize_team_id_to_canonical(team_id: str, mode: str, doc: dict = None) -> str:
@@ -1071,20 +1160,105 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                 use_gamemanager_settings = False
         # For tournament/franchise modes, GameManager is not used - continue to DB load
         
-        # ✅ SS&S: Use document's user_team_object_id as authoritative source (aligns with Franchise pattern)
-        # ✅ PERFORMANCE: Load document with projection (only needed fields) - reduces from 402KB to ~10KB (98% reduction)
-        if mode == "franchise":
-            doc = collection.find_one(
-                {"_id": ObjectId(doc_id)},
-                {
-                    "user_team_id": 1,
-                    "user_team_object_id": 1,
-                    "franchise_teams": 1,
-                    "_id": 1
-                }
-            )
-            if not doc:
-                raise HTTPException(status_code=404, detail="Franchise document not found")
+        # ✅ PHASE 5.7: For franchise/tournament mode, try game doc first, fallback to master doc
+        doc = None
+        load_from_game_doc = False
+        game_doc_team_id = None
+        
+        if mode in ["franchise", "tournament"] and game_id:
+            # Try to load from game doc first
+            try:
+                game_doc = games_collection.find_one(
+                    {"_id": game_id},
+                    {"teams": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "home_team": 1, "away_team": 1, "_id": 1}
+                )
+                if not game_doc:
+                    try:
+                        game_doc = games_collection.find_one(
+                            {"_id": ObjectId(game_id)},
+                            {"teams": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "home_team": 1, "away_team": 1, "_id": 1}
+                        )
+                    except:
+                        pass
+                
+                if game_doc:
+                    # Verify game belongs to this franchise/tournament
+                    game_mode = game_doc.get("mode")
+                    game_franchise_id = game_doc.get("franchise_id")
+                    game_tournament_id = game_doc.get("tournament_id")
+                    
+                    if (mode == "franchise" and game_mode == "franchise" and str(game_franchise_id) == str(franchise_id)) or \
+                       (mode == "tournament" and game_mode == "tournament" and str(game_tournament_id) == str(tournament_id)):
+                        # Game belongs to this franchise/tournament - check if it has settings
+                        game_teams = game_doc.get("teams", {})
+                        # Get user team name from master doc to find matching team_id in game doc
+                        master_doc = collection.find_one(
+                            {"_id": ObjectId(doc_id)},
+                            {"franchise_teams": 1 if mode == "franchise" else None, 
+                             "teams": 1 if mode == "tournament" else None,
+                             "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+                        )
+                        if master_doc:
+                            user_team_name = None
+                            if mode == "franchise":
+                                user_team_name, _ = get_user_team_from_franchise(master_doc)
+                            elif mode == "tournament":
+                                user_team_name, _ = get_user_team_from_tournament(master_doc)
+                            
+                            # Find matching team_id in game doc
+                            for tid, team_obj in game_teams.items():
+                                if team_obj.get("name") == user_team_name:
+                                    game_doc_team_id = tid
+                                    # Check if game doc has strategy_settings for this team
+                                    if team_obj.get("strategy_settings"):
+                                        # Game doc has settings - use it
+                                        doc = game_doc
+                                        load_from_game_doc = True
+                                        logger.warning(f"✅ [PHASE 5.7] Loading gameplan from game doc (game_id={game_id}, team_id={game_doc_team_id})")
+                                        break
+            except Exception as e:
+                logger.warning(f"⚠️ [PHASE 5.7] Error checking game doc, falling back to master: {e}")
+        
+        # If not loading from game doc, load from master doc (existing logic)
+        if not load_from_game_doc:
+            # ✅ SS&S: Use document's user_team_object_id as authoritative source (aligns with Franchise pattern)
+            # ✅ PERFORMANCE: Load document with projection (only needed fields) - reduces from 402KB to ~10KB (98% reduction)
+            if mode == "franchise":
+                doc = collection.find_one(
+                    {"_id": ObjectId(doc_id)},
+                    {
+                        "user_team_id": 1,
+                        "user_team_object_id": 1,
+                        "franchise_teams": 1,
+                        "_id": 1
+                    }
+                )
+                if not doc:
+                    raise HTTPException(status_code=404, detail="Franchise document not found")
+            elif mode == "tournament":
+                # ✅ PERFORMANCE: Load document with projection (only needed fields)
+                doc = collection.find_one(
+                    {"_id": ObjectId(doc_id)},
+                    {
+                        "user_team_id": 1,
+                        "user_team_object_id": 1,
+                        "teams": 1,
+                        "_id": 1
+                    }
+                )
+                if not doc:
+                    raise HTTPException(status_code=404, detail="Tournament document not found")
+            else:
+                # Single mode - handled below
+                pass
+        
+        # ✅ PHASE 5.7: Resolve team_id - use game_doc_team_id if loading from game doc, otherwise use master doc team_id
+        if load_from_game_doc and game_doc_team_id:
+            # Loading from game doc - use game doc team_id
+            authoritative_team_id = game_doc_team_id
+            team_obj = doc.get("teams", {}).get(authoritative_team_id, {})
+            logger.warning(f"✅ [PHASE 5.7] Using game doc team_id: {authoritative_team_id}")
+        elif mode == "franchise":
             # ✅ SS&S: Always use franchise document's user_team_object_id as source of truth
             user_team_id_name, user_team_object_id = get_user_team_from_franchise(doc)
             if not user_team_id_name or not user_team_object_id:
@@ -1102,18 +1276,6 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
             franchise_teams = ensure_team_objects_exist(mode, doc_id, authoritative_team_id, franchise_doc=doc)
             team_obj = franchise_teams.get(authoritative_team_id, {}) if isinstance(franchise_teams, dict) else {}
         elif mode == "tournament":
-            # ✅ PERFORMANCE: Load document with projection (only needed fields)
-            doc = collection.find_one(
-                {"_id": ObjectId(doc_id)},
-                {
-                    "user_team_id": 1,
-                    "user_team_object_id": 1,
-                    "teams": 1,
-                    "_id": 1
-                }
-            )
-            if not doc:
-                raise HTTPException(status_code=404, detail="Tournament document not found")
             # ✅ MIGRATION: Use tournament document's user_team_object_id as source of truth
             user_team_id_name, user_team_object_id = get_user_team_from_tournament(doc)
             if not user_team_id_name or not user_team_object_id:
@@ -1359,13 +1521,74 @@ def update_gameplan(request: GamePlanUpdateRequest):
         # ✅ PHASE 1.3: Telemetry - Log state write
         logger.warning(f"🟢 [STATE-WRITE] [update_gameplan] strategy_settings to backend | team_id={actual_team_id}, inside={inside_value}, endpoint=/api/gameplan")
         
-        # ✅ PHASE 5.5: Use helper to get update path (same logic for all modes)
-        update_path = f"{get_team_settings_path(request.mode, actual_team_id)}.strategy_settings"
+        # ✅ PHASE 5.7: Determine save location for franchise/tournament mode
+        # If game is active, save to game doc; otherwise save to master doc
+        save_to_game_doc = False
+        game_doc_team_id = actual_team_id  # Default to actual_team_id
+        if request.mode in ["franchise", "tournament"]:
+            save_collection, save_doc_id, save_to_game_doc = get_save_location_for_franchise_tournament(
+                request.mode,
+                request.game_id,
+                request.franchise_id,
+                request.tournament_id
+            )
+            # Update collection and doc_id if saving to game doc
+            if save_to_game_doc:
+                collection = save_collection
+                doc_id = save_doc_id
+                # ✅ PHASE 5.7: Resolve team_id from game document when saving to game doc
+                try:
+                    game_doc = games_collection.find_one(
+                        {"_id": save_doc_id},
+                        {"teams": 1, "home_team": 1, "away_team": 1, "_id": 1}
+                    )
+                    if not game_doc:
+                        try:
+                            game_doc = games_collection.find_one(
+                                {"_id": ObjectId(save_doc_id)},
+                                {"teams": 1, "home_team": 1, "away_team": 1, "_id": 1}
+                            )
+                        except:
+                            pass
+                    
+                    if game_doc:
+                        # Find team_id in game doc that matches the user team
+                        user_team_name = None
+                        if request.mode == "franchise":
+                            user_team_name, _ = get_user_team_from_franchise(doc)
+                        elif request.mode == "tournament":
+                            user_team_name, _ = get_user_team_from_tournament(doc)
+                        
+                        # Find matching team_id in game doc
+                        game_teams = game_doc.get("teams", {})
+                        for tid, team_obj in game_teams.items():
+                            if team_obj.get("name") == user_team_name:
+                                game_doc_team_id = tid
+                                break
+                        
+                        logger.warning(f"✅ [PHASE 5.7] Resolved game doc team_id: {game_doc_team_id} (from master team_id: {actual_team_id})")
+                except Exception as e:
+                    logger.warning(f"⚠️ [PHASE 5.7] Error resolving game doc team_id, using actual_team_id: {e}")
+                    game_doc_team_id = actual_team_id
+                
+                logger.warning(f"✅ [PHASE 5.7] Saving gameplan to game doc (game_id={save_doc_id})")
+            else:
+                # Keep existing collection/doc_id (master doc)
+                logger.warning(f"✅ [PHASE 5.7] Saving gameplan to master doc (franchise_id={request.franchise_id or request.tournament_id})")
+        
+        # ✅ PHASE 5.5: Use helper to get update path
+        # If saving to game doc, use "teams" path with game doc team_id (like single mode)
+        # If saving to master doc, use mode-specific path with master team_id
+        if save_to_game_doc:
+            update_path = f"teams.{game_doc_team_id}.strategy_settings"
+        else:
+            update_path = f"{get_team_settings_path(request.mode, actual_team_id)}.strategy_settings"
+        
         update_fields = {
             update_path: request.strategy_settings
         }
         
-        logger.warning(f"💾 [SAVE-GAMEPLAN] Update path: {update_path}, doc_id={doc_id}, mode={request.mode}")
+        logger.warning(f"💾 [SAVE-GAMEPLAN] Update path: {update_path}, doc_id={doc_id}, mode={request.mode}, save_to_game_doc={save_to_game_doc}")
         
         # ✅ PHASE 1.3: Telemetry - Log state write
         inside_value = request.strategy_settings.get("inside", "MISSING") if request.strategy_settings else "MISSING"
@@ -1387,10 +1610,27 @@ def update_gameplan(request: GamePlanUpdateRequest):
                 except:
                     pass
         else:
-            result = collection.update_one(
-                {"_id": ObjectId(doc_id)},
-                {"$set": update_fields}
-            )
+            # ✅ PHASE 5.7: For franchise/tournament, save to determined location (game doc or master doc)
+            if save_to_game_doc:
+                # Saving to game doc - use string ID (may need ObjectId conversion)
+                result = collection.update_one(
+                    {"_id": doc_id},
+                    {"$set": update_fields}
+                )
+                if result.matched_count == 0:
+                    try:
+                        result = collection.update_one(
+                            {"_id": ObjectId(doc_id)},
+                            {"$set": update_fields}
+                        )
+                    except:
+                        pass
+            else:
+                # Saving to master doc - use ObjectId
+                result = collection.update_one(
+                    {"_id": ObjectId(doc_id)},
+                    {"$set": update_fields}
+                )
         
         # ✅ PHASE 5.3: Removed verification reload - trust MongoDB update result
         # If update succeeded (matched_count > 0), settings are saved
@@ -1508,42 +1748,106 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         # ✅ PERFORMANCE DIAGNOSTIC: Measure database query time
         query_start = time.time()
         
-        # ✅ PERFORMANCE: Load document with projection (only needed fields) to reduce data transfer
-        # For single game mode, try both UUID string and ObjectId formats
-        if mode == "single":
-            # ✅ PERFORMANCE: Add projection for Single Game mode - only fetch teams, home_team_id, away_team_id
-            # This reduces data transfer by 70-90% for game documents (especially after Q1+)
-            doc = collection.find_one(
-                {"_id": doc_id},
-                {"teams": 1, "home_team_id": 1, "away_team_id": 1, "_id": 1}
-            )
-            if not doc:
-                # Try as ObjectId if UUID string lookup failed
-                try:
+        # ✅ PHASE 5.7: For franchise/tournament mode, try game doc first, fallback to master doc
+        doc = None
+        load_from_game_doc = False
+        game_doc_team_id = None
+        
+        if mode in ["franchise", "tournament"] and game_id:
+            # Try to load from game doc first
+            try:
+                game_doc = games_collection.find_one(
+                    {"_id": game_id},
+                    {"teams": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "home_team": 1, "away_team": 1, "_id": 1}
+                )
+                if not game_doc:
+                    try:
+                        game_doc = games_collection.find_one(
+                            {"_id": ObjectId(game_id)},
+                            {"teams": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "home_team": 1, "away_team": 1, "_id": 1}
+                        )
+                    except:
+                        pass
+                
+                if game_doc:
+                    # Verify game belongs to this franchise/tournament
+                    game_mode = game_doc.get("mode")
+                    game_franchise_id = game_doc.get("franchise_id")
+                    game_tournament_id = game_doc.get("tournament_id")
+                    
+                    if (mode == "franchise" and game_mode == "franchise" and str(game_franchise_id) == str(franchise_id)) or \
+                       (mode == "tournament" and game_mode == "tournament" and str(game_tournament_id) == str(tournament_id)):
+                        # Game belongs to this franchise/tournament - check if it has settings
+                        game_teams = game_doc.get("teams", {})
+                        # Get user team name from master doc to find matching team_id in game doc
+                        master_doc = collection.find_one(
+                            {"_id": ObjectId(doc_id)},
+                            {"franchise_teams": 1 if mode == "franchise" else None, 
+                             "teams": 1 if mode == "tournament" else None,
+                             "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+                        )
+                        if master_doc:
+                            user_team_name = None
+                            if mode == "franchise":
+                                user_team_name, _ = get_user_team_from_franchise(master_doc)
+                            elif mode == "tournament":
+                                user_team_name, _ = get_user_team_from_tournament(master_doc)
+                            
+                            # Find matching team_id in game doc
+                            for tid, team_obj in game_teams.items():
+                                if team_obj.get("name") == user_team_name:
+                                    game_doc_team_id = tid
+                                    # Check if game doc has playbook_settings for this team
+                                    if team_obj.get("playbook_settings"):
+                                        # Game doc has settings - use it
+                                        doc = game_doc
+                                        load_from_game_doc = True
+                                        logger.warning(f"✅ [PHASE 5.7] Loading playbooks from game doc (game_id={game_id}, team_id={game_doc_team_id})")
+                                        break
+            except Exception as e:
+                logger.warning(f"⚠️ [PHASE 5.7] Error checking game doc, falling back to master: {e}")
+        
+        # If not loading from game doc, load from master doc (existing logic)
+        if not load_from_game_doc:
+            # ✅ PERFORMANCE: Load document with projection (only needed fields) to reduce data transfer
+            # For single game mode, try both UUID string and ObjectId formats
+            if mode == "single":
+                # ✅ PERFORMANCE: Add projection for Single Game mode - only fetch teams, home_team_id, away_team_id
+                # This reduces data transfer by 70-90% for game documents (especially after Q1+)
+                doc = collection.find_one(
+                    {"_id": doc_id},
+                    {"teams": 1, "home_team_id": 1, "away_team_id": 1, "_id": 1}
+                )
+                if not doc:
+                    # Try as ObjectId if UUID string lookup failed
+                    try:
+                        doc = collection.find_one(
+                            {"_id": ObjectId(doc_id)},
+                            {"teams": 1, "home_team_id": 1, "away_team_id": 1, "_id": 1}
+                        )
+                    except:
+                        pass
+            else:
+                # ✅ PERFORMANCE: Use projection for franchise/tournament modes
+                if mode == "franchise":
                     doc = collection.find_one(
                         {"_id": ObjectId(doc_id)},
-                        {"teams": 1, "home_team_id": 1, "away_team_id": 1, "_id": 1}
+                        {"franchise_teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
                     )
-                except:
-                    pass
-        else:
-            # ✅ PERFORMANCE: Use projection for franchise/tournament modes
-            if mode == "franchise":
-                doc = collection.find_one(
-                    {"_id": ObjectId(doc_id)},
-                    {"franchise_teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
-                )
-            elif mode == "tournament":
-                doc = collection.find_one(
-                    {"_id": ObjectId(doc_id)},
-                    {"teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
-                )
-            else:
-                doc = collection.find_one({"_id": ObjectId(doc_id)})
+                elif mode == "tournament":
+                    doc = collection.find_one(
+                        {"_id": ObjectId(doc_id)},
+                        {"teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+                    )
+                else:
+                    doc = collection.find_one({"_id": ObjectId(doc_id)})
+            
+            if not load_from_game_doc:
+                logger.warning(f"✅ [PHASE 5.7] Loading playbooks from master doc (franchise_id={franchise_id or tournament_id})")
         
         query_time = (time.time() - query_start) * 1000  # Convert to ms
         doc_size = len(str(doc)) if doc else 0
-        logger.warning(f"⏱️ [PERF] /api/playbooks - DB query: {query_time:.2f}ms, doc_size: {doc_size} bytes, mode: {mode}")
+        logger.warning(f"⏱️ [PERF] /api/playbooks - DB query: {query_time:.2f}ms, doc_size: {doc_size} bytes, mode: {mode}, load_from_game_doc={load_from_game_doc}")
         
         if not doc:
             raise HTTPException(status_code=404, detail=f"{mode.capitalize()} document not found")
@@ -1553,8 +1857,12 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         
         # ✅ FIX: Get authoritative team_id FIRST, then ensure team objects exist
         # Get team plays
-        # ✅ SS&S: Use document's user_team_object_id as authoritative source (aligns with Franchise pattern)
-        if mode == "franchise":
+        # ✅ PHASE 5.7: If loading from game doc, use game_doc_team_id; otherwise use master doc team_id
+        if load_from_game_doc and game_doc_team_id:
+            # Loading from game doc - use game doc team_id
+            authoritative_team_id = game_doc_team_id
+            logger.warning(f"✅ [PHASE 5.7] Using game doc team_id: {authoritative_team_id}")
+        elif mode == "franchise":
             # Always use franchise document's user_team_object_id as source of truth
             user_team_id_name, user_team_object_id = get_user_team_from_franchise(doc)
             if not user_team_id_name or not user_team_object_id:
@@ -1578,38 +1886,46 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             # For single mode, use the provided team_id
             authoritative_team_id = team_id
         
-        # ✅ PERFORMANCE: Ensure team objects exist, passing pre-loaded doc to avoid double-load
-        # The function returns the teams dict and updates the database if needed
-        teams_dict = ensure_team_objects_exist(
-            mode, doc_id, authoritative_team_id,
-            franchise_doc=doc if mode == "franchise" else None,
-            tournament_doc=doc if mode == "tournament" else None
-        )
-        
-        # ✅ DEBUG: Log if plays were populated by ensure_team_objects_exist
-        if mode == "franchise" and isinstance(teams_dict, dict):
-            team_obj_check = teams_dict.get(authoritative_team_id, {})
-            plays_count = len(team_obj_check.get("plays", {})) if team_obj_check else 0
-            # ✅ PERFORMANCE: Removed debug logging
-        
-        # ✅ PHASE 5.3: Use returned teams dict from ensure_team_objects_exist() directly
-        # This avoids unnecessary document reloads - ensure_team_objects_exist() already reloads internally
-        if mode == "franchise":
-            franchise_teams = teams_dict if isinstance(teams_dict, dict) else doc.get("franchise_teams", {})
-            team_obj = franchise_teams.get(authoritative_team_id, {})
-            actual_team_id = authoritative_team_id
-        elif mode == "tournament":
-            teams = teams_dict if isinstance(teams_dict, dict) else doc.get("teams", {})
+        # ✅ PHASE 5.7: If loading from game doc, skip ensure_team_objects_exist (team objects already exist)
+        # Otherwise, ensure team objects exist in master doc
+        if load_from_game_doc:
+            # Loading from game doc - team objects already exist from init_game
+            teams = doc.get("teams", {})
             team_obj = teams.get(authoritative_team_id, {})
             actual_team_id = authoritative_team_id
         else:
-            # ✅ PHASE 5.1: Use normalization helper for single mode
-            # This centralizes team_id resolution logic and ensures consistent format
-            actual_team_id = normalize_team_id_to_canonical(team_id, mode, doc)
+            # ✅ PERFORMANCE: Ensure team objects exist, passing pre-loaded doc to avoid double-load
+            # The function returns the teams dict and updates the database if needed
+            teams_dict = ensure_team_objects_exist(
+                mode, doc_id, authoritative_team_id,
+                franchise_doc=doc if mode == "franchise" else None,
+                tournament_doc=doc if mode == "tournament" else None
+            )
             
-            # Get team_obj using returned teams dict or doc
-            teams = teams_dict if isinstance(teams_dict, dict) else doc.get("teams", {})
-            team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
+            # ✅ DEBUG: Log if plays were populated by ensure_team_objects_exist
+            if mode == "franchise" and isinstance(teams_dict, dict):
+                team_obj_check = teams_dict.get(authoritative_team_id, {})
+                plays_count = len(team_obj_check.get("plays", {})) if team_obj_check else 0
+                # ✅ PERFORMANCE: Removed debug logging
+            
+            # ✅ PHASE 5.3: Use returned teams dict from ensure_team_objects_exist() directly
+            # This avoids unnecessary document reloads - ensure_team_objects_exist() already reloads internally
+            if mode == "franchise":
+                franchise_teams = teams_dict if isinstance(teams_dict, dict) else doc.get("franchise_teams", {})
+                team_obj = franchise_teams.get(authoritative_team_id, {})
+                actual_team_id = authoritative_team_id
+            elif mode == "tournament":
+                teams = teams_dict if isinstance(teams_dict, dict) else doc.get("teams", {})
+                team_obj = teams.get(authoritative_team_id, {})
+                actual_team_id = authoritative_team_id
+            else:
+                # ✅ PHASE 5.1: Use normalization helper for single mode
+                # This centralizes team_id resolution logic and ensures consistent format
+                actual_team_id = normalize_team_id_to_canonical(team_id, mode, doc)
+                
+                # Get team_obj using returned teams dict or doc
+                teams = teams_dict if isinstance(teams_dict, dict) else doc.get("teams", {})
+                team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
         # ✅ PERFORMANCE: Removed debug logging
         # Ensure playbook_settings exists (even if ensure_team_objects_exist missed it)
@@ -2109,8 +2425,70 @@ def save_playbooks(request: PlaybookSettingsRequest):
         if not doc:
             raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
         
-        # ✅ PHASE 5.5: Use helper to get update path (same logic for all modes)
-        update_path = f"{get_team_settings_path(request.mode, actual_team_id)}.playbook_settings"
+        # ✅ PHASE 5.7: Determine save location for franchise/tournament mode
+        # If game is active, save to game doc; otherwise save to master doc
+        save_to_game_doc = False
+        game_doc_team_id = actual_team_id  # Default to actual_team_id
+        if request.mode in ["franchise", "tournament"]:
+            save_collection, save_doc_id, save_to_game_doc = get_save_location_for_franchise_tournament(
+                request.mode,
+                request.game_id,
+                request.franchise_id,
+                request.tournament_id
+            )
+            # Update collection and doc_id if saving to game doc
+            if save_to_game_doc:
+                collection = save_collection
+                doc_id = save_doc_id
+                # ✅ PHASE 5.7: Resolve team_id from game document when saving to game doc
+                # The game doc uses different team_id keys than the franchise/tournament doc
+                try:
+                    game_doc = games_collection.find_one(
+                        {"_id": save_doc_id},
+                        {"teams": 1, "home_team": 1, "away_team": 1, "_id": 1}
+                    )
+                    if not game_doc:
+                        try:
+                            game_doc = games_collection.find_one(
+                                {"_id": ObjectId(save_doc_id)},
+                                {"teams": 1, "home_team": 1, "away_team": 1, "_id": 1}
+                            )
+                        except:
+                            pass
+                    
+                    if game_doc:
+                        # Find team_id in game doc that matches the user team
+                        # Get user team name from franchise/tournament doc
+                        user_team_name = None
+                        if request.mode == "franchise":
+                            user_team_name, _ = get_user_team_from_franchise(doc)
+                        elif request.mode == "tournament":
+                            user_team_name, _ = get_user_team_from_tournament(doc)
+                        
+                        # Find matching team_id in game doc
+                        game_teams = game_doc.get("teams", {})
+                        for tid, team_obj in game_teams.items():
+                            if team_obj.get("name") == user_team_name:
+                                game_doc_team_id = tid
+                                break
+                        
+                        logger.warning(f"✅ [PHASE 5.7] Resolved game doc team_id: {game_doc_team_id} (from master team_id: {actual_team_id})")
+                except Exception as e:
+                    logger.warning(f"⚠️ [PHASE 5.7] Error resolving game doc team_id, using actual_team_id: {e}")
+                    game_doc_team_id = actual_team_id
+                
+                logger.warning(f"✅ [PHASE 5.7] Saving playbooks to game doc (game_id={save_doc_id})")
+            else:
+                # Keep existing collection/doc_id (master doc)
+                logger.warning(f"✅ [PHASE 5.7] Saving playbooks to master doc (franchise_id={request.franchise_id or request.tournament_id})")
+        
+        # ✅ PHASE 5.5: Use helper to get update path
+        # If saving to game doc, use "teams" path with game doc team_id (like single mode)
+        # If saving to master doc, use mode-specific path with master team_id
+        if save_to_game_doc:
+            update_path = f"teams.{game_doc_team_id}.playbook_settings"
+        else:
+            update_path = f"{get_team_settings_path(request.mode, actual_team_id)}.playbook_settings"
         
         # ✅ REMOVED: Verbose save logs - redundant with trace logs
         
@@ -2131,17 +2509,33 @@ def save_playbooks(request: PlaybookSettingsRequest):
                 except:
                     pass
         else:
-            # ✅ CRITICAL: Log the exact data being saved before the update
-        # ✅ REMOVED: Verbose motion plays logs - redundant with trace logs
+            # ✅ PHASE 5.7: For franchise/tournament, save to determined location (game doc or master doc)
+            # ✅ REMOVED: Verbose motion plays logs - redundant with trace logs
             
-            result = collection.update_one(
-                {"_id": ObjectId(doc_id)},
-                {"$set": {update_path: request.playbook_settings}}
-            )
+            if save_to_game_doc:
+                # Saving to game doc - use string ID (may need ObjectId conversion)
+                result = collection.update_one(
+                    {"_id": doc_id},
+                    {"$set": {update_path: request.playbook_settings}}
+                )
+                if result.matched_count == 0:
+                    try:
+                        result = collection.update_one(
+                            {"_id": ObjectId(doc_id)},
+                            {"$set": {update_path: request.playbook_settings}}
+                        )
+                    except:
+                        pass
+            else:
+                # Saving to master doc - use ObjectId
+                result = collection.update_one(
+                    {"_id": ObjectId(doc_id)},
+                    {"$set": {update_path: request.playbook_settings}}
+                )
         # ✅ REMOVED: Verbose MongoDB update result log - redundant with trace logs
             
             if result.matched_count == 0:
-                logger.error(f"❌ [PLAYBOOKS SAVE] Document not found: mode={request.mode}, doc_id={doc_id}")
+                logger.error(f"❌ [PLAYBOOKS SAVE] Document not found: mode={request.mode}, doc_id={doc_id}, save_to_game_doc={save_to_game_doc}")
                 raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
             
             if result.modified_count == 0:

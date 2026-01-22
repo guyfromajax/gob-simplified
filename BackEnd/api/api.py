@@ -409,9 +409,15 @@ def load_team_attributes_from_doc(mode: str, doc_id: str, team_id: str, team_nam
     
     return attrs if attrs else None
 
-def load_team_settings_from_doc(mode: str, doc_id: str, team_id: str, team_name: str):
-    """Load strategy_settings and playbook_settings from tournament/franchise doc."""
+def load_team_settings_from_doc(mode: str, doc_id: str, team_id: str, team_name: str, game_id: str = None):
+    """
+    Load strategy_settings and playbook_settings from tournament/franchise doc.
+    
+    ✅ PHASE 5.7: For franchise/tournament mode, tries game doc first, then falls back to master doc.
+    """
     from BackEnd.db import franchises_collection
+    from BackEnd.api.franchise_routes import get_user_team_from_franchise
+    from BackEnd.api.tournament_routes import get_user_team_from_tournament
     
     # Resolve team_id from team_name if not provided
     if not team_id and team_name:
@@ -422,25 +428,79 @@ def load_team_settings_from_doc(mode: str, doc_id: str, team_id: str, team_name:
     strategy_settings = None
     playbook_settings = None
     
-    if mode == "tournament":
+    # ✅ PHASE 5.7: For franchise/tournament mode, try game doc first, fallback to master doc
+    if mode in ["franchise", "tournament"] and game_id:
         try:
-            doc = tournaments_collection.find_one({"_id": ObjectId(doc_id)})
-            if doc and team_id:
-                team_obj = doc.get("teams", {}).get(team_id, {})
-                strategy_settings = team_obj.get("strategy_settings")
-                playbook_settings = team_obj.get("playbook_settings")
+            game_doc = games_collection.find_one(
+                {"_id": game_id},
+                {"teams": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "home_team": 1, "away_team": 1, "_id": 1}
+            )
+            if not game_doc:
+                try:
+                    game_doc = games_collection.find_one(
+                        {"_id": ObjectId(game_id)},
+                        {"teams": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "home_team": 1, "away_team": 1, "_id": 1}
+                    )
+                except:
+                    pass
+            
+            if game_doc:
+                # Verify game belongs to this franchise/tournament
+                game_mode = game_doc.get("mode")
+                game_franchise_id = game_doc.get("franchise_id")
+                game_tournament_id = game_doc.get("tournament_id")
+                
+                if (mode == "franchise" and game_mode == "franchise" and str(game_franchise_id) == str(doc_id)) or \
+                   (mode == "tournament" and game_mode == "tournament" and str(game_tournament_id) == str(doc_id)):
+                    # Game belongs to this franchise/tournament - try to load settings from game doc
+                    game_teams = game_doc.get("teams", {})
+                    # Get user team name from master doc to find matching team_id in game doc
+                    master_doc = None
+                    if mode == "franchise":
+                        master_doc = franchises_collection.find_one({"_id": ObjectId(doc_id)}, {"franchise_teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1})
+                    elif mode == "tournament":
+                        master_doc = tournaments_collection.find_one({"_id": ObjectId(doc_id)}, {"teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1})
+                    
+                    if master_doc:
+                        user_team_name = None
+                        if mode == "franchise":
+                            user_team_name, _ = get_user_team_from_franchise(master_doc)
+                        elif mode == "tournament":
+                            user_team_name, _ = get_user_team_from_tournament(master_doc)
+                        
+                        # Find matching team_id in game doc and check if it has settings
+                        for tid, team_obj in game_teams.items():
+                            if team_obj.get("name") == user_team_name:
+                                # Check if game doc has settings for this team
+                                if team_obj.get("strategy_settings") or team_obj.get("playbook_settings"):
+                                    strategy_settings = team_obj.get("strategy_settings")
+                                    playbook_settings = team_obj.get("playbook_settings")
+                                    logging.warning(f"✅ [PHASE 5.7] Loaded settings from game doc (game_id={game_id}, team_id={tid})")
+                                    break
         except Exception as e:
-            logging.warning(f"⚠️ Error loading team settings from tournament doc: {e}")
-    elif mode == "franchise":
-        try:
-            # ✅ PERFORMANCE: Only fetch franchise_teams field (reduces from 402KB to ~50KB, 87% reduction)
-            doc = franchises_collection.find_one({"_id": ObjectId(doc_id)}, {"franchise_teams": 1})
-            if doc and team_id:
-                team_obj = doc.get("franchise_teams", {}).get(team_id, {})
-                strategy_settings = team_obj.get("strategy_settings")
-                playbook_settings = team_obj.get("playbook_settings")
-        except Exception as e:
-            logging.warning(f"⚠️ Error loading team settings from franchise doc: {e}")
+            logging.warning(f"⚠️ [PHASE 5.7] Error loading from game doc, falling back to master: {e}")
+    
+    # If settings not loaded from game doc, load from master doc (existing logic)
+    if strategy_settings is None and playbook_settings is None:
+        if mode == "tournament":
+            try:
+                doc = tournaments_collection.find_one({"_id": ObjectId(doc_id)})
+                if doc and team_id:
+                    team_obj = doc.get("teams", {}).get(team_id, {})
+                    strategy_settings = team_obj.get("strategy_settings")
+                    playbook_settings = team_obj.get("playbook_settings")
+            except Exception as e:
+                logging.warning(f"⚠️ Error loading team settings from tournament doc: {e}")
+        elif mode == "franchise":
+            try:
+                # ✅ PERFORMANCE: Only fetch franchise_teams field (reduces from 402KB to ~50KB, 87% reduction)
+                doc = franchises_collection.find_one({"_id": ObjectId(doc_id)}, {"franchise_teams": 1})
+                if doc and team_id:
+                    team_obj = doc.get("franchise_teams", {}).get(team_id, {})
+                    strategy_settings = team_obj.get("strategy_settings")
+                    playbook_settings = team_obj.get("playbook_settings")
+            except Exception as e:
+                logging.warning(f"⚠️ Error loading team settings from franchise doc: {e}")
     elif mode == "single":
         try:
             # For single game mode, try both UUID string and ObjectId formats
@@ -2454,34 +2514,40 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         away_playbook_settings = {}
                         
                         if mode == "tournament" and request.tournament_id:
+                            # ✅ PHASE 5.7: Try game doc first, fallback to master doc
                             home_settings = load_team_settings_from_doc(
                                 mode,
                                 request.tournament_id,
                                 None,
-                                request.home_team
+                                request.home_team,
+                                game_id=request.game_id
                             )
                             away_settings = load_team_settings_from_doc(
                                 mode,
                                 request.tournament_id,
                                 None,
-                                request.away_team
+                                request.away_team,
+                                game_id=request.game_id
                             )
                             if home_settings:
                                 home_playbook_settings = home_settings.get("playbook_settings", {})
                             if away_settings:
                                 away_playbook_settings = away_settings.get("playbook_settings", {})
                         elif mode == "franchise" and request.franchise_id:
+                            # ✅ PHASE 5.7: Try game doc first, fallback to master doc
                             home_settings = load_team_settings_from_doc(
                                 mode,
                                 request.franchise_id,
                                 None,
-                                request.home_team
+                                request.home_team,
+                                game_id=request.game_id
                             )
                             away_settings = load_team_settings_from_doc(
                                 mode,
                                 request.franchise_id,
                                 None,
-                                request.away_team
+                                request.away_team,
+                                game_id=request.game_id
                             )
                             if home_settings:
                                 home_playbook_settings = home_settings.get("playbook_settings", {})
@@ -2765,18 +2831,21 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             if away_attrs:
                 away_team_attributes = away_attrs
             
-            # Load strategy_settings and playbook_settings from franchise document
+            # ✅ PHASE 5.7: Load strategy_settings and playbook_settings from franchise document
+            # Try game doc first, fallback to master doc
             home_settings = load_team_settings_from_doc(
                 mode,
                 request.franchise_id,
                 None,
-                request.home_team
+                request.home_team,
+                game_id=request.game_id
             )
             away_settings = load_team_settings_from_doc(
                 mode,
                 request.franchise_id,
                 None,
-                request.away_team
+                request.away_team,
+                game_id=request.game_id
             )
             # Override strategy_settings if loaded from franchise (unless request has them)
             if home_settings.get("strategy_settings") and not home_strategy:
@@ -2850,17 +2919,20 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             away_playbook_settings = {}
             
             if mode == "tournament" and request.tournament_id:
+                # ✅ PHASE 5.7: Try game doc first, fallback to master doc
                 home_settings = load_team_settings_from_doc(
                     mode,
                     request.tournament_id,
                     None,
-                    request.home_team
+                    request.home_team,
+                    game_id=request.game_id
                 )
                 away_settings = load_team_settings_from_doc(
                     mode,
                     request.tournament_id,
                     None,
-                    request.away_team
+                    request.away_team,
+                    game_id=request.game_id
                 )
                 if home_settings:
                     home_playbook_settings = home_settings.get("playbook_settings", {})
@@ -3938,25 +4010,97 @@ def init_game(request: dict):
         summary["user_team_side"] = user_team_side
         logging.warning(f"✅ [INIT-GAME] Stored user_team_side in game document: {user_team_side}")
     
-    # ✅ SS&S: Store playbook_settings in game document's teams object ONLY for single mode
-    # For franchise/tournament mode, settings are accessed directly from franchise/tournament documents
-    # during gameplay via _load_playbook_settings(), so no need to copy them here
+    # ✅ PHASE 5.7: Store settings in game document for all modes
+    # For single mode: Settings may be loaded from teams collection or come from previous saves
+    # For franchise/tournament mode: Copy master settings from franchise/tournament doc to game doc as baseline
+    if "teams" not in summary:
+        summary["teams"] = {}
+    
+    home_team_id = gm.home_team.team_id
+    away_team_id = gm.away_team.team_id
+    
+    if home_team_id not in summary["teams"]:
+        summary["teams"][home_team_id] = {}
+    if away_team_id not in summary["teams"]:
+        summary["teams"][away_team_id] = {}
+    
     if mode == "single":
-        if "teams" not in summary:
-            summary["teams"] = {}
-        
-        home_team_id = gm.home_team.team_id
-        away_team_id = gm.away_team.team_id
-        
-        if home_team_id not in summary["teams"]:
-            summary["teams"][home_team_id] = {}
-        if away_team_id not in summary["teams"]:
-            summary["teams"][away_team_id] = {}
-        
         # For single mode, playbook_settings are stored in game document for persistence
         # They may be loaded from teams collection or come from previous saves
         summary["teams"][home_team_id]["playbook_settings"] = home_playbook_settings
         summary["teams"][away_team_id]["playbook_settings"] = away_playbook_settings
+    elif mode == "franchise" and franchise_id:
+        # ✅ PHASE 5.7: Copy master settings from franchise doc to game doc as baseline
+        from BackEnd.api.franchise_routes import get_user_team_from_franchise
+        from BackEnd.db import franchises_collection
+        
+        try:
+            franchise_doc = franchises_collection.find_one(
+                {"_id": ObjectId(franchise_id)},
+                {"franchise_teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+            )
+            if franchise_doc:
+                user_team_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+                if user_team_object_id:
+                    franchise_teams = franchise_doc.get("franchise_teams", {})
+                    user_team_obj = franchise_teams.get(str(user_team_object_id), {})
+                    
+                    # Copy master settings to game doc for user team
+                    master_playbook = user_team_obj.get("playbook_settings", {})
+                    master_strategy = user_team_obj.get("strategy_settings", {})
+                    
+                    # Determine which team is the user team
+                    user_team_id_in_game = None
+                    if user_team_side == "home" or (not user_team_side and home_team == user_team_name):
+                        user_team_id_in_game = home_team_id
+                    elif user_team_side == "away" or (not user_team_side and away_team == user_team_name):
+                        user_team_id_in_game = away_team_id
+                    
+                    if user_team_id_in_game:
+                        if master_playbook:
+                            summary["teams"][user_team_id_in_game]["playbook_settings"] = master_playbook.copy()
+                            logging.warning(f"✅ [PHASE 5.7] Copied playbook_settings from franchise master to game doc for team {user_team_id_in_game}")
+                        if master_strategy:
+                            summary["teams"][user_team_id_in_game]["strategy_settings"] = master_strategy.copy()
+                            logging.warning(f"✅ [PHASE 5.7] Copied strategy_settings from franchise master to game doc for team {user_team_id_in_game}")
+        except Exception as e:
+            logging.warning(f"⚠️ [PHASE 5.7] Error copying settings from franchise master: {e}")
+    elif mode == "tournament" and tournament_id:
+        # ✅ PHASE 5.7: Copy master settings from tournament doc to game doc as baseline
+        from BackEnd.api.tournament_routes import get_user_team_from_tournament
+        from BackEnd.db import tournaments_collection
+        
+        try:
+            tournament_doc = tournaments_collection.find_one(
+                {"_id": ObjectId(tournament_id)},
+                {"teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+            )
+            if tournament_doc:
+                user_team_name, user_team_object_id = get_user_team_from_tournament(tournament_doc)
+                if user_team_object_id:
+                    tournament_teams = tournament_doc.get("teams", {})
+                    user_team_obj = tournament_teams.get(str(user_team_object_id), {})
+                    
+                    # Copy master settings to game doc for user team
+                    master_playbook = user_team_obj.get("playbook_settings", {})
+                    master_strategy = user_team_obj.get("strategy_settings", {})
+                    
+                    # Determine which team is the user team
+                    user_team_id_in_game = None
+                    if user_team_side == "home" or (not user_team_side and home_team == user_team_name):
+                        user_team_id_in_game = home_team_id
+                    elif user_team_side == "away" or (not user_team_side and away_team == user_team_name):
+                        user_team_id_in_game = away_team_id
+                    
+                    if user_team_id_in_game:
+                        if master_playbook:
+                            summary["teams"][user_team_id_in_game]["playbook_settings"] = master_playbook.copy()
+                            logging.warning(f"✅ [PHASE 5.7] Copied playbook_settings from tournament master to game doc for team {user_team_id_in_game}")
+                        if master_strategy:
+                            summary["teams"][user_team_id_in_game]["strategy_settings"] = master_strategy.copy()
+                            logging.warning(f"✅ [PHASE 5.7] Copied strategy_settings from tournament master to game doc for team {user_team_id_in_game}")
+        except Exception as e:
+            logging.warning(f"⚠️ [PHASE 5.7] Error copying settings from tournament master: {e}")
     summary_time = (time.time() - summary_start) * 1000
     
     # Set GameManager quarter to 1 to match
