@@ -731,7 +731,8 @@ def handle_timeout_save_and_response(gm: "GameManager", timeout_turn: dict, game
     else:
         logging.error(f"❌ [TIMEOUT-SAVE] VERIFICATION FAILED: Could not read saved document from DB")
     
-    logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] DB AFTER save - timeout_next_play_type={saved_doc.get('timeout_next_play_type') if saved_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={saved_doc.get('timeout_offense_team_id') if saved_doc else 'DOC_NOT_FOUND'}")(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] DB AFTER save - score={saved_doc.get('score') if saved_doc else 'DOC_NOT_FOUND'}, clock={saved_doc.get('clock') if saved_doc else 'DOC_NOT_FOUND'}, time_remaining={saved_doc.get('time_remaining') if saved_doc else 'DOC_NOT_FOUND'}")
+    logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] DB AFTER save - timeout_next_play_type={saved_doc.get('timeout_next_play_type') if saved_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={saved_doc.get('timeout_offense_team_id') if saved_doc else 'DOC_NOT_FOUND'}")
+    logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] DB AFTER save - score={saved_doc.get('score') if saved_doc else 'DOC_NOT_FOUND'}, clock={saved_doc.get('clock') if saved_doc else 'DOC_NOT_FOUND'}, time_remaining={saved_doc.get('time_remaining') if saved_doc else 'DOC_NOT_FOUND'}")
     
     # Return consistent response format (same for both user and computer)
     # Use saved data (db_summary) to ensure response matches what was saved to DB

@@ -4810,6 +4810,11 @@ def resolve_full_court_press_logic(game: "GameManager"):
         # For defensive fouls in bonus, offensive_state is already set to FREE_THROW above
         if game_state.get("offensive_state") != "FREE_THROW":
             next_play_type = "SIDE_INBOUND"
+            # ✅ FIX: Clear offensive_state to prevent FCP loop
+            # SIDE_INBOUND always transitions to HCO, so clear pressure state immediately
+            # This prevents the frontend from seeing "FCP" and routing to FCP again
+            if game_state.get("offensive_state") in ["FCP", "HCT"]:
+                game_state["offensive_state"] = "HCO"
     # For DEAD BALL, O_FOUL, D_FOUL: next_play_type is now set to SIDE_INBOUND (unless FREE_THROW)
     
     # Calculate time elapsed for FCP phase
@@ -5876,6 +5881,11 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         # For defensive fouls in bonus, offensive_state is already set to FREE_THROW above
         if game_state.get("offensive_state") != "FREE_THROW":
             next_play_type = "SIDE_INBOUND"
+            # ✅ FIX: Clear offensive_state to prevent HCT loop
+            # SIDE_INBOUND always transitions to HCO, so clear pressure state immediately
+            # This prevents the frontend from seeing "HCT" and routing to HCT again
+            if game_state.get("offensive_state") in ["FCP", "HCT"]:
+                game_state["offensive_state"] = "HCO"
     # For DEAD BALL, O_FOUL, D_FOUL: next_play_type is now set to SIDE_INBOUND (unless FREE_THROW)
     
     # Calculate time elapsed for HCT phase
