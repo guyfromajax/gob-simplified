@@ -9,22 +9,29 @@ console.log('✅ set-lineup.js loaded at', new Date().toISOString());
     // Cache buster updated silently
   }
 })();
-const homeTeam = urlParams.get('home');
-const awayTeam = urlParams.get('away');
+
+// ✅ PHASE 1.3: Set telemetry context
+if (window.StateTelemetry) {
+  window.StateTelemetry.setContext('set-lineup');
+}
+
+// ✅ PHASE 1.3: Instrument URL parameter reads
+const homeTeam = window.StateTelemetry ? window.StateTelemetry.logUrlRead('home', urlParams.get('home')) : urlParams.get('home');
+const awayTeam = window.StateTelemetry ? window.StateTelemetry.logUrlRead('away', urlParams.get('away')) : urlParams.get('away');
 const homeId = urlParams.get('home_id');
 const awayId = urlParams.get('away_id');
 let myTeamSide = urlParams.get('my_team');
-const userTeamIdParam = urlParams.get('user_team_id');
-const franchiseId = urlParams.get('franchise_id');
+const userTeamIdParam = window.StateTelemetry ? window.StateTelemetry.logUrlRead('user_team_id', urlParams.get('user_team_id')) : urlParams.get('user_team_id');
+const franchiseId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('franchise_id', urlParams.get('franchise_id')) : urlParams.get('franchise_id');
 const weekParam = urlParams.get('week');
-const tournamentId = urlParams.get('tournament_id');
+const tournamentId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('tournament_id', urlParams.get('tournament_id')) : urlParams.get('tournament_id');
 const modeParam = urlParams.get('mode');
 const DEBUG = urlParams.has('debug');
 const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 // ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
 // game_id is optional for new games (will be created by init-game), but if present must be in URL
 // Note: This is a snapshot of initial URL state - always read from window.location.search when needed
-const gameId = urlParams.get('game_id') || null;
+const gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
 
 // ✅ FIX: Track if init-game is in progress to prevent duplicate calls
 let initGameInProgress = false;
