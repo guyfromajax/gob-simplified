@@ -1145,18 +1145,8 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                 teams = ensure_team_objects_exist(mode, doc_id, actual_team_id)
                 team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
-        # ✅ PHASE 5.3: Use returned teams dict from ensure_team_objects_exist() directly
-        # ensure_team_objects_exist() already reloads internally, so no need to reload again
-        # Note: For single mode, teams is set in the else block above, so we use it here
-        if mode == "franchise" and 'authoritative_team_id' in locals() and 'franchise_teams' in locals():
-            # ensure_team_objects_exist() returns franchise_teams dict for franchise mode
-            team_obj = franchise_teams.get(authoritative_team_id, team_obj) if isinstance(franchise_teams, dict) else team_obj
-        elif mode == "tournament" and 'authoritative_team_id' in locals() and 'teams' in locals():
-            # ensure_team_objects_exist() returns teams dict for tournament mode
-            team_obj = teams.get(authoritative_team_id, team_obj) if isinstance(teams, dict) else team_obj
-        elif mode == "single" and 'actual_team_id' in locals() and 'teams' in locals():
-            # ensure_team_objects_exist() returns teams dict for single mode
-            team_obj = teams.get(actual_team_id, team_obj) if (isinstance(teams, dict) and actual_team_id) else team_obj
+        # ✅ PHASE 5.3: team_obj is already set from ensure_team_objects_exist() return value
+        # No need to reload - ensure_team_objects_exist() already reloads internally
         
         # Get settings or return defaults
         # ✅ SS&S: Use GameManager settings if available (single source of truth during gameplay)
