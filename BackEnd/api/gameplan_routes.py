@@ -970,7 +970,12 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                         if target_team and hasattr(target_team, 'strategy_settings') and target_team.strategy_settings:
                             inside_value = target_team.strategy_settings.get("inside")
                             logger.warning(f"✅ [GET-GAMEPLAN] Found GameManager settings for single mode: team={target_team.name}, inside={inside_value}")
+                            logger.warning(f"✅ [CACHE-TELEMETRY] Cache HIT: get_gameplan({game_id}) - using GameManager cache")
                             use_gamemanager_settings = True
+                        else:
+                            logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: get_gameplan({game_id}) - GameManager found but no strategy_settings, reading from DB")
+                    else:
+                        logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: get_gameplan({game_id}) - GameManager not available, reading from DB")
                 except Exception as e:
                     logger.warning(f"⚠️ [GET-GAMEPLAN] Error checking GameManager: {e}")
                     gm = None
@@ -1502,11 +1507,19 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                         if target_team and hasattr(target_team, 'playbook_settings') and target_team.playbook_settings:
                             slot_count = len(target_team.playbook_settings.get("slot_assignments", {}))
                             logger.warning(f"✅ [GET-PLAYBOOKS] Found GameManager settings for single mode: team={target_team.name}, slot_assignments={slot_count}")
+                            logger.warning(f"✅ [CACHE-TELEMETRY] Cache HIT: get_playbooks({game_id}) - using GameManager cache")
                             use_gamemanager_settings = True
+                        else:
+                            logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: get_playbooks({game_id}) - GameManager found but no playbook_settings, reading from DB")
+                    else:
+                        logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: get_playbooks({game_id}) - GameManager not available, reading from DB")
                 except Exception as e:
                     logger.warning(f"⚠️ [GET-PLAYBOOKS] Error checking GameManager: {e}")
+                    logger.warning(f"❌ [CACHE-TELEMETRY] Cache ERROR: get_playbooks({game_id}) - exception checking cache: {e}")
                     gm = None
                     use_gamemanager_settings = False
+            else:
+                logger.warning(f"🔄 [CACHE-TELEMETRY] Cache SKIP: get_playbooks({game_id}) - source=db, forcing DB read")
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
             use_gamemanager_settings = False
