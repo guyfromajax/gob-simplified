@@ -737,7 +737,7 @@ def handle_timeout_save_and_response(gm: "GameManager", timeout_turn: dict, game
     # ✅ PHASE 3.3: Refresh cache after DB write to ensure cache matches DB
     if saved_doc and game_id in ongoing_games:
         refresh_game_cache_from_db(ongoing_games[game_id], saved_doc)
-        logger.warning(f"✅ [CACHE-INVALIDATION] Refreshed ongoing_games cache after timeout save: game_id={game_id}")
+        logger.warning(f"🔄 [CACHE-TELEMETRY] Cache REFRESHED: handle_timeout_save_and_response({game_id}) - refreshed cache after timeout save")
     
     # Return consistent response format (same for both user and computer)
     # Use saved data (db_summary) to ensure response matches what was saved to DB
@@ -1610,6 +1610,10 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
     preserved_user_team_side = None
     if game_id:
         gm = ongoing_games.get(game_id)
+        if gm:
+            logger.warning(f"✅ [CACHE-TELEMETRY] Cache HIT: simulate_quarter_endpoint({game_id}) - using ongoing_games cache")
+        else:
+            logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: simulate_quarter_endpoint({game_id}) - cache not available, will load from DB")
         # ✅ DEBUG: Track ongoing_games state at start of simulate_quarter_endpoint
         # ✅ REMOVED: Verbose ONGOING_GAMES DEBUG logs - only log errors
         # Preserve user_team_side from in-memory game
@@ -1640,6 +1644,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 f"🆕 [ONGOING_GAMES] Removing game from cache: game_id={game_id}, reason='New game scenario (Q1 requested but game in memory at Q{gm.quarter})'"
             )
             del ongoing_games[game_id]
+            logger.warning(f"🔄 [CACHE-TELEMETRY] Cache INVALIDATED: simulate_quarter_endpoint({game_id}) - removed from cache (new game scenario)")
             gm = None  # Force reload from DB where new game detection will run
         
         # ✅ SS&S: Ensure user_team_side is set in in-memory game if missing
@@ -1754,6 +1759,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     logging.warning(f"🔍 TIMEOUT RESUME: Game in memory, but forcing DB reload to ensure latest state (game_id={game_id})")
                     logging.warning(f"🔄 [ONGOING_GAMES] Removing game from cache: game_id={game_id}, reason='Timeout resume - forcing DB reload'")
                     del ongoing_games[game_id]
+                    logger.warning(f"🔄 [CACHE-TELEMETRY] Cache INVALIDATED: simulate_quarter_endpoint({game_id}) - removed from cache (timeout resume)")
                     gm = None  # Force reload from DB
                 logging.info(f"🔍 TIMEOUT RESUME: Will load fresh game from DB and apply timeout state")
             else:
@@ -2283,6 +2289,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         logging.warning(f"🔍 [BEFORE_SIM_DEBUG] gm.quarter={gm.quarter}, request.quarter={request.quarter}, gm.score={gm.score}")
                         
                         ongoing_games[game_id] = gm
+                        logger.warning(f"✅ [CACHE-TELEMETRY] Cache POPULATED: simulate_quarter_endpoint({game_id}) - added to ongoing_games cache (resume from timeout)")
                         # ✅ DEBUG: Track when game is added to ongoing_games
                         # ✅ REMOVED: Verbose debug log
                         if debug:
@@ -2437,6 +2444,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         game_id = request.game_id
                     gm.game_id = game_id  # Store game_id on the GameManager object
                     ongoing_games[game_id] = gm
+                    logger.warning(f"✅ [CACHE-TELEMETRY] Cache POPULATED: simulate_quarter_endpoint({game_id}) - added to ongoing_games cache (new game)")
                     # ✅ REMOVED: Verbose debug log
                     source = "new"
                     
@@ -2832,6 +2840,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             )
         gm.game_id = game_id  # Store game_id on the GameManager object
         ongoing_games[game_id] = gm
+        logger.warning(f"✅ [CACHE-TELEMETRY] Cache POPULATED: simulate_quarter_endpoint({game_id}) - added to ongoing_games cache (new game)")
         # ✅ REMOVED: Verbose debug log
         source = "new"
         
@@ -3134,7 +3143,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             saved_doc_full = games_collection.find_one({"_id": game_id_oid})
             if saved_doc_full:
                 refresh_game_cache_from_db(ongoing_games[game_id], saved_doc_full)
-                logger.warning(f"✅ [CACHE-INVALIDATION] Refreshed ongoing_games cache after simulate_quarter save: game_id={game_id}")
+                logger.warning(f"🔄 [CACHE-TELEMETRY] Cache REFRESHED: simulate_quarter_endpoint({game_id}) - refreshed cache after quarter save")
         
         # ✅ DEBUG: Verify what was actually saved
         saved_doc = games_collection.find_one({"_id": game_id_oid}, {"quarter": 1, "is_final": 1, "week": 1})
@@ -3970,6 +3979,7 @@ def init_game(request: dict):
     
     # Store in ongoing_games so /api/game/{game_id} can access it
     ongoing_games[game_id] = gm
+    logger.warning(f"✅ [CACHE-TELEMETRY] Cache POPULATED: init_game({game_id}) - added to ongoing_games cache")
     # ✅ REMOVED: Verbose debug log
     
     response_data = {"game_id": game_id}
