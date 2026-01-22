@@ -410,9 +410,10 @@ async function saveSettingsQuietly() {
     let mode = modeParam || 'single';
     
     // ✅ SS&S: Always save to database (single source of truth for all modes)
+    // ✅ PHASE 5.1: Send team_id (backend will normalize to canonical format if needed)
     const payload = {
       mode,
-      team_id: teamId,
+      team_id: teamId, // Can be team name, ObjectId, or canonical format - backend normalizes
       strategy_settings: currentSettings.strategy_settings
     };
     
