@@ -2393,9 +2393,10 @@ class PlaybooksUI {
       console.log('🔍 [PLAYBOOKS] Saving even_distribution_all flag:', playbookSettings.even_distribution_all);
       
       // Build request body
+      // ✅ PHASE 5.1: Send team_id (backend will normalize to canonical format if needed)
       const requestBody = {
         mode: mode,
-        team_id: teamId,
+        team_id: teamId, // Can be team name, ObjectId, or canonical format - backend normalizes
         playbook_settings: playbookSettings
       };
       console.log('🔍 [PLAYBOOKS SAVE] Request body (mode, team_id, franchise_id, tournament_id, game_id):', {
