@@ -1454,8 +1454,8 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                 response_size = len(json.dumps(response_data))
                 total_time = (time.time() - endpoint_start) * 1000
                 # ✅ REMOVED: Verbose PERF log - only log if slow (>100ms)
-            if total_time > 100:
-                logging.warning(f"⚠️ [PERF] Slow DB path: /api/game/{game_id} - {total_time:.2f}ms")
+                if total_time > 100:
+                    logging.warning(f"⚠️ [PERF] Slow DB path: /api/game/{game_id} - {total_time:.2f}ms")
                 return response_data
         
             logging.error(f"❌ [BOX_SCORE] Game not found in database: game_id={game_id} (type: {type(game_id).__name__})")
