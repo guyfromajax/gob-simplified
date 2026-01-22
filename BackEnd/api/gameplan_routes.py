@@ -1618,11 +1618,8 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         # Note: Key might exist but value could be None or empty dict
         if actual_team_id and (not team_obj or not team_obj.get("playbook_settings")):
             playbook_settings = initialize_playbook_settings()
-            # ✅ FIX: Use correct path based on mode (franchise_teams for franchise, teams for tournament/single)
-            if mode == "franchise":
-                team_key = f"franchise_teams.{actual_team_id}"
-            else:
-                team_key = f"teams.{actual_team_id}"
+            # ✅ PHASE 5.5: Use helper to get update path (same logic for all modes)
+            team_key = get_team_settings_path(mode, actual_team_id)
             
             if mode == "single":
                 collection.update_one(
