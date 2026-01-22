@@ -257,13 +257,16 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
     game.events.emit("gameComplete", finalScore);
   }
 
+  // ⏸️ TABLED: Resume Last Game feature - Exact game state restoration
+  // TODO: Revisit after Phase 1.3+ and site go-live priorities complete
+  // See: docs/To Do/resume_last_game_exact_state.md
   // ✅ PHASE 1.2: Clear both game_id and last_game_id when game completes
   if (typeof localStorage !== 'undefined') {
     localStorage.removeItem('game_id');
-    localStorage.removeItem('last_game_id'); // Clear resume game reference
-    localStorage.removeItem('last_game_user_team_side'); // Clear resume user team side
+    // localStorage.removeItem('last_game_id'); // Clear resume game reference
+    // localStorage.removeItem('last_game_user_team_side'); // Clear resume user team side
     if (DEBUG_GAME_ID) {
-      console.debug('Cleared game_id, last_game_id, and last_game_user_team_side after finalize');
+      console.debug('Cleared game_id after finalize');
     }
   }
 
