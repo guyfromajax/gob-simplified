@@ -1105,8 +1105,16 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
         
         # Check ongoing games first (unless forcing DB read)
         gm = None
+        cache_hit = False
         if not force_db_read:
             gm = ongoing_games.get(game_id)
+            if gm:
+                cache_hit = True
+                logger.warning(f"✅ [CACHE-TELEMETRY] Cache HIT: get_game_state({game_id}) - using ongoing_games cache")
+            else:
+                logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: get_game_state({game_id}) - cache not available, reading from DB")
+        else:
+            logger.warning(f"🔄 [CACHE-TELEMETRY] Cache SKIP: get_game_state({game_id}) - source=db, forcing DB read")
         
         if gm:
             # ✅ PERFORMANCE: Measure processing time (only log if slow)

@@ -1119,6 +1119,7 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                 strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
         elif mode == "single" and not use_gamemanager_settings:
             # ✅ SS&S: GameManager not available - use load_team_settings_from_doc() (same as simulate_quarter_endpoint)
+            logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: get_gameplan({game_id}) - GameManager not available, reading from DB")
             from BackEnd.api.api import load_team_settings_from_doc
             settings = load_team_settings_from_doc(mode, doc_id, team_id, team_id)
             strategy_settings = settings.get("strategy_settings") or team_obj.get("strategy_settings", defaults["strategy_settings"])
