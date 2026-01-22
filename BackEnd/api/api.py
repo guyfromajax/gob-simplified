@@ -2533,6 +2533,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         
         # Get mode from request (default to "single")
         mode = request.mode or "single"
+        # ✅ Ensure trace_id always defined (used in GAMEMANAGER INIT logs regardless of mode/path)
+        trace_id = f"sim_q{request.quarter}_{request.game_id or 'no_id'}"
         
         # Load team attributes from tournament/franchise/single game documents if available
         home_team_attributes = None
