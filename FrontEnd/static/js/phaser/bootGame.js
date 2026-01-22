@@ -2112,9 +2112,7 @@ async function handleSimQuarter() {
     
     // Update gameId from response
     gameId = gId;
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('game_id', gameId);
-    }
+    // ✅ PHASE 1.2: Removed automatic localStorage write - only save for explicit "Resume Last Game" feature
     
     // ✅ NEW: Show scrolling text popup with shot results
     console.log('🔍 [SIM QUARTER] About to call showSimQuarterResults');
@@ -2366,13 +2364,7 @@ async function handleSimFullGame() {
     }
 
     gameId = gId;
-    // Save gameId to localStorage so box score can access it
-    if (gameId && typeof localStorage !== 'undefined') {
-      localStorage.setItem('game_id', gameId);
-      console.log('💾 Saved gameId to localStorage:', gameId);
-    } else {
-      console.warn('⚠️ Could not save gameId to localStorage:', { gameId, gId, hasLocalStorage: typeof localStorage !== 'undefined' });
-    }
+    // ✅ PHASE 1.2: Removed automatic localStorage write - only save for explicit "Resume Last Game" feature
     quarter = lastSummary.quarter || currentQ;
     periodLabel = lastSummary.period_label || (quarter > 4 ? `OT${quarter - 4}` : `Q${quarter}`);
 

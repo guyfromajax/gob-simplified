@@ -10,6 +10,18 @@
 <body>
   <h1 id="page-title">CHOOSE YOUR GAME MODE</h1>
   <div class="mode-wrapper">
+  <!-- ✅ PHASE 1.2: Resume Last Game Section (only shown if saved game exists) -->
+  <div id="resume-game-section" class="resume-game-section" style="display: none;">
+    <h2>Continue Your Game</h2>
+    <div class="resume-game-card">
+      <div class="resume-game-info">
+        <div class="resume-teams" id="resume-teams"></div>
+        <div class="resume-score" id="resume-score"></div>
+        <div class="resume-quarter" id="resume-quarter"></div>
+      </div>
+      <button id="resume-game-btn" class="resume-button">Resume Game</button>
+    </div>
+  </div>
   <div class="mode-container">
     <div class="mode-card">
       <h2>Scrimmage</h2>

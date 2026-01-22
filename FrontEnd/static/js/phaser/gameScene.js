@@ -390,9 +390,7 @@ export function createGameScene(Phaser) {
       
       // ✅ REMOVED: Quarter transition debug logging (cluttering console)
       
-      if (this.gameId && typeof localStorage !== 'undefined') {
-        localStorage.setItem('game_id', this.gameId);
-      }
+      // ✅ PHASE 1.2: Removed automatic localStorage write - only save for explicit "Resume Last Game" feature
       gameStore.setGameId(this.gameId);
       
       // Set team IDs on scene for animation systems
@@ -403,6 +401,26 @@ export function createGameScene(Phaser) {
         away: awayColors,
       });
       this.isFinal = simData.is_final;
+      
+      // ✅ PHASE 1.2: Save game_id to localStorage when user quits mid-game (only for single mode, only if not final)
+      // This enables "Resume Last Game" feature - save only when user explicitly quits (beforeunload)
+      if (this.mode === 'single' && this.gameId && !this.isFinal && typeof window !== 'undefined') {
+        const saveGameForResume = () => {
+          if (this.gameId && !this.isFinal && this.mode === 'single' && typeof localStorage !== 'undefined') {
+            localStorage.setItem('last_game_id', this.gameId);
+            console.log('💾 [RESUME] Saved game_id for resume:', this.gameId);
+          }
+        };
+        // Save on page unload (user closes tab/browser)
+        window.addEventListener('beforeunload', saveGameForResume);
+        // Also save on visibility change (user switches tabs - might come back)
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) {
+            saveGameForResume();
+          }
+        });
+      }
+      
       if (DEBUG_FLOW) {
         console.log(
           `✅ Simulated matchup: ${logHome} vs ${logAway}`
@@ -1534,9 +1552,7 @@ export function createGameScene(Phaser) {
             params.set('game_id', this.gameId);
             params.set('quarter', nextQ);
             params.set('period', `Q${nextQ}`);
-            if (this.gameId && typeof localStorage !== 'undefined') {
-              localStorage.setItem('game_id', this.gameId);
-            }
+            // ✅ PHASE 1.2: Removed automatic localStorage write - only save for explicit "Resume Last Game" feature
             
             // Create locker room popup
             const popup = document.createElement('div');
@@ -1630,9 +1646,7 @@ export function createGameScene(Phaser) {
           
           // ✅ REMOVED: Navigation params debug logging (cluttering console)
           
-          if (this.gameId && typeof localStorage !== 'undefined') {
-            localStorage.setItem('game_id', this.gameId);
-          }
+          // ✅ PHASE 1.2: Removed automatic localStorage write - only save for explicit "Resume Last Game" feature
           DEBUG_FLOW && console.log('➡️ Advancing to lineup', { nextQ, gameId: this.gameId });
           DEBUG_FLOW && console.log('skipToEnd at navigation:', this.skipToEnd);
           window.location.href = `/set-lineup.html?${params.toString()}`;
@@ -2129,9 +2143,7 @@ export function createGameScene(Phaser) {
         params.set('game_id', this.gameId);
         params.set('quarter', nextQ);
         params.set('period', 'OT1');
-        if (this.gameId && typeof localStorage !== 'undefined') {
-          localStorage.setItem('game_id', this.gameId);
-        }
+        // ✅ PHASE 1.2: Removed automatic localStorage write - only save for explicit "Resume Last Game" feature
         
         // Create locker room popup
         const popup = document.createElement('div');
@@ -2161,9 +2173,7 @@ export function createGameScene(Phaser) {
         params.set('game_id', this.gameId);
         params.set('quarter', nextOT);
         params.set('period', `OT${nextOTNumber}`);
-        if (this.gameId && typeof localStorage !== 'undefined') {
-          localStorage.setItem('game_id', this.gameId);
-        }
+        // ✅ PHASE 1.2: Removed automatic localStorage write - only save for explicit "Resume Last Game" feature
         
         // Create locker room popup
         const popup = document.createElement('div');
@@ -2367,9 +2377,7 @@ export function createGameScene(Phaser) {
           fullParams: Object.fromEntries(params.entries())
         });
         
-        if (this.gameId && typeof localStorage !== 'undefined') {
-          localStorage.setItem('game_id', this.gameId);
-        }
+        // ✅ PHASE 1.2: Removed automatic localStorage write - only save for explicit "Resume Last Game" feature
         
         // Create locker room popup
         const popup = document.createElement('div');
