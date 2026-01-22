@@ -1043,35 +1043,33 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
         use_gamemanager_settings = False
         
         # Only check cache if not forcing DB read (single mode only)
+        # For tournament/franchise modes, skip GameManager and load directly from DB
         if mode == "single" and not force_db_read:
-                try:
-                    from BackEnd.api.api import ongoing_games
-                    gm = ongoing_games.get(game_id)
-                    if gm:
-                        # Determine which team
-                        target_team = None
-                        if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
-                            target_team = gm.home_team
-                        elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
-                            target_team = gm.away_team
-                        
-                        if target_team and hasattr(target_team, 'strategy_settings') and target_team.strategy_settings:
-                            inside_value = target_team.strategy_settings.get("inside")
-                            logger.warning(f"✅ [GET-GAMEPLAN] Found GameManager settings for single mode: team={target_team.name}, inside={inside_value}")
-                            logger.warning(f"✅ [CACHE-TELEMETRY] Cache HIT: get_gameplan({game_id}) - using GameManager cache")
-                            use_gamemanager_settings = True
-                        else:
-                            logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: get_gameplan({game_id}) - GameManager found but no strategy_settings, reading from DB")
+            try:
+                from BackEnd.api.api import ongoing_games
+                gm = ongoing_games.get(game_id)
+                if gm:
+                    # Determine which team
+                    target_team = None
+                    if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+                        target_team = gm.home_team
+                    elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+                        target_team = gm.away_team
+                    
+                    if target_team and hasattr(target_team, 'strategy_settings') and target_team.strategy_settings:
+                        inside_value = target_team.strategy_settings.get("inside")
+                        logger.warning(f"✅ [GET-GAMEPLAN] Found GameManager settings for single mode: team={target_team.name}, inside={inside_value}")
+                        logger.warning(f"✅ [CACHE-TELEMETRY] Cache HIT: get_gameplan({game_id}) - using GameManager cache")
+                        use_gamemanager_settings = True
                     else:
-                        logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: get_gameplan({game_id}) - GameManager not available, reading from DB")
-                except Exception as e:
-                    logger.warning(f"⚠️ [GET-GAMEPLAN] Error checking GameManager: {e}")
-                    gm = None
-                    use_gamemanager_settings = False
-        else:
-            raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
-            gm = None
-            use_gamemanager_settings = False
+                        logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: get_gameplan({game_id}) - GameManager found but no strategy_settings, reading from DB")
+                else:
+                    logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: get_gameplan({game_id}) - GameManager not available, reading from DB")
+            except Exception as e:
+                logger.warning(f"⚠️ [GET-GAMEPLAN] Error checking GameManager: {e}")
+                gm = None
+                use_gamemanager_settings = False
+        # For tournament/franchise modes, GameManager is not used - continue to DB load
         
         # ✅ SS&S: Use document's user_team_object_id as authoritative source (aligns with Franchise pattern)
         # ✅ PERFORMANCE: Load document with projection (only needed fields) - reduces from 402KB to ~10KB (98% reduction)
