@@ -1503,9 +1503,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                     use_gamemanager_settings = False
             else:
                 logger.warning(f"🔄 [CACHE-TELEMETRY] Cache SKIP: get_playbooks({game_id}) - source=db, forcing DB read")
-        else:
-            raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
-            use_gamemanager_settings = False
+        # For tournament/franchise modes, GameManager is not used - continue to DB load
         
         # ✅ PERFORMANCE DIAGNOSTIC: Measure database query time
         query_start = time.time()
