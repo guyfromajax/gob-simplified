@@ -1696,14 +1696,14 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             trace_id_cached = f"sim_q{request.quarter}_{request.game_id}_cached"
             if home_settings and home_settings.get("playbook_settings"):
                 db_slots = len(home_settings.get("playbook_settings", {}).get("slot_assignments", {}))
-                before_slots = len(gm.home_team.playbook_settings.get("slot_assignments", {})) if gm.home_team.playbook_settings else 0
+                before_slots = len(getattr(gm.home_team, 'playbook_settings', {}).get("slot_assignments", {})) if getattr(gm.home_team, 'playbook_settings', None) else 0
                 gm.home_team.playbook_settings = home_settings.get("playbook_settings")
                 after_slots = len(gm.home_team.playbook_settings.get("slot_assignments", {})) if gm.home_team.playbook_settings else 0
                 logging.warning(f"🟡 [TRACE-APPLY] {trace_id_cached} | HOME TEAM | APPLIED PLAYBOOK (CACHED) | before_slots={before_slots}, after_slots={after_slots}")
             
             if away_settings and away_settings.get("playbook_settings"):
                 db_slots = len(away_settings.get("playbook_settings", {}).get("slot_assignments", {}))
-                before_slots = len(gm.away_team.playbook_settings.get("slot_assignments", {})) if gm.away_team.playbook_settings else 0
+                before_slots = len(getattr(gm.away_team, 'playbook_settings', {}).get("slot_assignments", {})) if getattr(gm.away_team, 'playbook_settings', None) else 0
                 gm.away_team.playbook_settings = away_settings.get("playbook_settings")
                 after_slots = len(gm.away_team.playbook_settings.get("slot_assignments", {})) if gm.away_team.playbook_settings else 0
                 logging.warning(f"🟡 [TRACE-APPLY] {trace_id_cached} | AWAY TEAM | APPLIED PLAYBOOK (CACHED) | before_slots={before_slots}, after_slots={after_slots}")
@@ -2671,7 +2671,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             if home_settings and home_settings.get("playbook_settings"):
                 db_slots = len(home_settings.get("playbook_settings", {}).get("slot_assignments", {}))
                 if gm is not None:
-                    before_slots = len(gm.home_team.playbook_settings.get("slot_assignments", {})) if gm.home_team.playbook_settings else 0
+                    before_slots = len(getattr(gm.home_team, 'playbook_settings', {}).get("slot_assignments", {})) if getattr(gm.home_team, 'playbook_settings', None) else 0
                     gm.home_team.playbook_settings = home_settings.get("playbook_settings")
                     after_slots = len(gm.home_team.playbook_settings.get("slot_assignments", {})) if gm.home_team.playbook_settings else 0
                     logging.warning(f"🟡 [TRACE-APPLY] {trace_id} | HOME TEAM | APPLIED PLAYBOOK | before_slots={before_slots}, after_slots={after_slots}")
