@@ -193,6 +193,11 @@
       errorHandlerScript.src = `${staticPrefix}/js/shared/errorHandler.js`;
       document.head.appendChild(errorHandlerScript);
       
+      // ✅ PHASE 1.3: Load state telemetry before game-plan.js
+      const telemetryScript = document.createElement('script');
+      telemetryScript.src = `${staticPrefix}/js/shared/stateTelemetry.js`;
+      document.head.appendChild(telemetryScript);
+      
       // After API config loads, load game-plan.js using the helper
       script.src = `${API_CONFIG.getStaticPath()}/game-plan.js?v=${cacheBuster}`;
       script.onload = () => {

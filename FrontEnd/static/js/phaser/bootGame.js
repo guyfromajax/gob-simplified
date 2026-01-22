@@ -83,13 +83,14 @@ const bootGameParams = {
 console.log('🔍 [BOOTGAME] Court page loaded with URL params:', bootGameParams);
 console.warn('⚠️ [BOOTGAME] CRITICAL CHECK - game_id:', bootGameParams.game_id, 'resume_from_timeout:', bootGameParams.resume_from_timeout);
 
-const tournamentId = urlParams.get('tournament_id');
+// ✅ PHASE 1.3: Instrument state reads
+const tournamentId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('tournament_id', urlParams.get('tournament_id')) : urlParams.get('tournament_id');
 const homeTeam = urlParams.get('home');
 const awayTeam = urlParams.get('away');
 // ✅ PHASE 1.1: Remove localStorage fallback - franchise_id must come from URL params only
 const queryFranchiseId = urlParams.get('franchise_id');
 const urlMode = urlParams.get('mode');
-const franchiseId = queryFranchiseId || null;
+const franchiseId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('franchise_id', queryFranchiseId || null) : (queryFranchiseId || null);
 
 // ✅ PHASE 1.1: Fail loudly if franchise_id is required but missing
 if (!franchiseId && urlMode === 'franchise') {
@@ -142,7 +143,8 @@ console.log('🔍 [Q1 SKIP DEBUG] Quarter initialized:', {
 });
 // ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
 // game_id is required for Q1 (must be created by init-game) and for Q2+ or timeout resume
-let gameId = urlParams.get('game_id') || null;
+// ✅ PHASE 1.3: Instrument state read
+let gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
 
 // ✅ PHASE 1.1: Fail loudly if game_id is required but missing
 // For single game mode, game_id is required even for Q1 (must be created by init-game)

@@ -397,6 +397,11 @@ class PlaybooksUI {
       if (response.ok) {
         const data = await response.json();
         
+        // ✅ PHASE 1.3: Log backend read
+        if (window.StateTelemetry) {
+          window.StateTelemetry.logBackendRead('playbook_settings', data, '/api/playbooks');
+        }
+        
         // Store position filters from API
         this.positionFilters = data.position_filters || {
           standard: [],
@@ -702,6 +707,10 @@ class PlaybooksUI {
       const response = await fetch(`${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
+        // ✅ PHASE 1.3: Log backend read
+        if (window.StateTelemetry) {
+          window.StateTelemetry.logBackendRead('playbook_settings', data, '/api/playbooks (slot_assignments)');
+        }
         console.log('🔍 [PLAYBOOKS] API response for slot assignments:', data);
         
         if (data.slot_assignments && this.state) {
@@ -2131,10 +2140,15 @@ class PlaybooksUI {
                      urlParams.get('user_team_id') || 
                      urlParams.get('home_id') || 
                      urlParams.get('away_id');
-      // Try to get game_id from URL, fallback to localStorage
-      let gameId = urlParams.get('game_id');
+      // ✅ PHASE 1.3: Instrument state read (with violation detection for localStorage fallback)
+      let gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id')) : urlParams.get('game_id');
       if (!gameId && mode === 'single' && typeof localStorage !== 'undefined') {
-        gameId = localStorage.getItem('game_id');
+        // ⚠️ CONTRACT VIOLATION: localStorage fallback for game_id (should be removed)
+        const localStorageGameId = localStorage.getItem('game_id');
+        if (window.StateTelemetry) {
+          window.StateTelemetry.logLocalStorageRead('game_id', localStorageGameId);
+        }
+        gameId = localStorageGameId;
       }
       const tournamentId = urlParams.get('tournament_id');
       const franchiseId = urlParams.get('franchise_id');
@@ -2322,6 +2336,11 @@ class PlaybooksUI {
         requestBody.franchise_id = franchiseId;
       }
       
+      // ✅ PHASE 1.3: Log backend write
+      if (window.StateTelemetry) {
+        window.StateTelemetry.logBackendWrite('playbook_settings', requestBody, '/api/playbooks');
+      }
+      
       // Save to API
       const response = await fetch(API_CONFIG.buildUrl('/api/playbooks'), {
         method: 'POST',
@@ -2380,10 +2399,16 @@ class PlaybooksUI {
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+  // ✅ PHASE 1.3: Set telemetry context
+  if (window.StateTelemetry) {
+    window.StateTelemetry.setContext('playbooks');
+  }
+  
   // ✅ PHASE 1.1: Validate game_id requirement for single mode on page load
   const urlParams = new URLSearchParams(window.location.search);
   const mode = urlParams.get('mode') || 'single';
-  const gameId = urlParams.get('game_id') || null;
+  // ✅ PHASE 1.3: Instrument state read
+  const gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
   const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
   const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
   const homeTeam = urlParams.get('home');
