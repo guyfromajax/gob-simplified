@@ -1777,12 +1777,17 @@ export function createGameScene(Phaser) {
               errorData = { detail: `HTTP ${response.status}: ${response.statusText}` };
             }
             console.error('❌ /api/simulate-turn failed:', errorData);
-            // If game not found, the backend likely cleared it from memory
-            // This can happen if the backend restarts or the game times out
+            // ✅ FIX: Don't assume 404 = quarter complete
+            // A 404 could mean: game not found, backend restart, network issue, etc.
+            // Only mark quarter complete if backend explicitly says so (quarter_complete=true)
             if (response.status === 404 && errorData.detail && errorData.detail.includes('not found')) {
               console.error('⚠️ Game was cleared from backend memory. This may indicate a backend restart or timeout.');
+              // ✅ FIX: Don't break - throw error to be caught by outer catch block
+              // This prevents quarter completion logic from running
+              throw new Error(`Game not found: ${errorData.detail || 'Game was cleared from backend memory'}`);
             }
-            break;
+            // ✅ FIX: For other errors, throw to prevent quarter completion
+            throw new Error(`API error: ${errorData.detail || `HTTP ${response.status}`}`);
           }
           
           const turnData = await response.json();
@@ -2086,23 +2091,37 @@ export function createGameScene(Phaser) {
           
         } catch (error) {
           console.error('❌ Error in turn-by-turn loop:', error);
-          // ✅ FIX: Don't end quarter on animation errors - only end if backend signals completion
+          // ✅ FIX: Don't end quarter on API errors (404, network issues, etc.)
+          // Only end quarter if backend explicitly signals completion (quarter_complete=true)
           // Check if the current or last turn data indicates quarter completion before breaking
-          // Note: turnData is set before animateGameTurns, so it should be available even if animation fails
           const dataToCheck = turnData || lastTurnData;
           if (dataToCheck && (dataToCheck.quarter_complete === true || dataToCheck.time_remaining <= 0)) {
             // Backend signaled quarter completion - exit loop normally
-            console.log('✅ Quarter complete detected after animation error, exiting loop');
+            console.log('✅ Quarter complete detected after error, exiting loop');
             quarterComplete = true;
             lastTurnData = dataToCheck;
             break;
           }
+          // ✅ FIX: For API errors (404, network issues), don't continue - show error and exit
+          // This prevents premature quarter completion
+          if (error.message && (error.message.includes('Game not found') || error.message.includes('API error'))) {
+            console.error('❌ Critical API error - stopping simulation:', error.message);
+            // Don't set quarterComplete - exit loop without triggering quarter completion
+            break;
+          }
           // For animation errors (like missing showAnnouncement), log and continue
           // The backend will signal quarter completion when time_remaining <= 0
-          // Continue to next iteration to check for quarter completion
           console.warn('⚠️ Animation error occurred, continuing to next turn');
           continue;
         }
+      }
+      
+      // ✅ FIX: Only proceed with quarter completion if backend explicitly signaled it
+      // Don't complete quarter on API errors (404, network issues, etc.)
+      if (!quarterComplete) {
+        console.warn('⚠️ Simulation loop ended but quarter not complete. This may indicate an API error or game state issue.');
+        // Don't proceed with quarter completion logic - return early
+        return;
       }
       
       console.log(`🏁 Quarter ${this.quarter} finished! Total turns: ${turnCount}`);
