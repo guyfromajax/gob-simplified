@@ -1090,7 +1090,7 @@ async function init() {
   
   const btn = document.getElementById('play-now');
   if (btn) {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       if (btn.classList.contains('disabled')) return;
       
       // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
@@ -1100,38 +1100,83 @@ async function init() {
         return;
       }
       
-      const currentGameId = helper.getGameId(urlParams);
-      let resumeFromTimeout = helper.getResumeFromTimeout(urlParams);
+      // ✅ PHASE 1.1: Read from current URL (source of truth), not stale module-level urlParams
+      const currentUrlParams = new URLSearchParams(window.location.search);
+      let currentGameId = currentUrlParams.get('game_id') || null;
+      let resumeFromTimeout = currentUrlParams.get('resume_from_timeout') === 'true';
+      const modeParam = currentUrlParams.get('mode') || 'single';
       
       // ✅ CRITICAL FIX: Only force resumeFromTimeout=false for quarter breaks (quarter > 1)
       // BUT: If we're actually resuming from a timeout (URL param says true), preserve it
-      // Rule: Quarter breaks are never timeout resumes UNLESS the URL explicitly says we're resuming from timeout
-      // This fixes the bug where timeouts in Q2-Q4 were being treated as quarter breaks
       if (quarter > 1 && !resumeFromTimeout) {
-        // Only force to false if URL param is already false/missing (true quarter break)
         resumeFromTimeout = false;
         console.warn('🔍 [DEBUG QTR BREAK] set-lineup.js - Quarter break detected (Q' + quarter + '), forcing resumeFromTimeout=false');
       } else if (quarter > 1 && resumeFromTimeout) {
-        // Preserve timeout resume even in Q2-Q4
         console.warn('🔍 [DEBUG TIMEOUT] set-lineup.js - Timeout resume detected (Q' + quarter + '), preserving resumeFromTimeout=true');
       }
       
+      // ✅ PHASE 1.1: Ensure game_id exists before navigating (same as Game Plan / Playbooks)
+      // PLAY GAME bypasses game plan; if user clicks before init-game completes, we'd navigate without game_id
+      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && modeParam === 'single' && quarter === 1) {
+        if (!initGameInProgress) {
+          console.log('⏳ [SET-LINEUP] PLAY GAME: game_id not found, calling init-game...');
+          initGameInProgress = true;
+          try {
+            const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: 'single' };
+            if (myTeamSide) initPayload.user_team_side = myTeamSide;
+            const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(initPayload)
+            });
+            if (initRes.ok) {
+              const initData = await initRes.json();
+              currentGameId = initData.game_id;
+              currentUrlParams.set('game_id', currentGameId);
+              if (typeof history !== 'undefined' && history.replaceState) {
+                history.replaceState(null, '', `${window.location.pathname}?${currentUrlParams.toString()}`);
+              }
+              console.log('✅ [SET-LINEUP] PLAY GAME: Initialized game_id:', currentGameId);
+            }
+          } catch (e) {
+            console.warn('Could not initialize game for PLAY GAME:', e);
+          } finally {
+            initGameInProgress = false;
+          }
+        } else {
+          let waitCount = 0;
+          while (initGameInProgress && waitCount < 50) {
+            await new Promise(r => setTimeout(r, 100));
+            waitCount++;
+            const u = new URLSearchParams(window.location.search);
+            currentGameId = u.get('game_id');
+            if (currentGameId) break;
+          }
+          if (!currentGameId) {
+            console.error('❌ [SET-LINEUP] PLAY GAME: init-game did not complete in time');
+            if (typeof window !== 'undefined' && window.alert) {
+              window.alert('Game initialization is taking longer than expected. Please try again.');
+            }
+            return;
+          }
+        }
+      }
+      
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Before building params:', {
-        quarter: quarter,
+        quarter,
         gameId: currentGameId,
-        resumeFromTimeout: resumeFromTimeout,
-        urlResumeFromTimeout: urlParams.get('resume_from_timeout'),
-        allUrlParams: Object.fromEntries(urlParams.entries())
+        resumeFromTimeout,
+        allUrlParams: Object.fromEntries(currentUrlParams.entries())
       });
       
       const params = helper.buildGameNavigationParams({
-        sourceParams: urlParams,
+        sourceParams: currentUrlParams,
         targetQuarter: quarter,
         gameId: currentGameId,
-        resumeFromTimeout: resumeFromTimeout, // ✅ SS&S: Supports any quarter (backend supports this)
+        resumeFromTimeout,
         lineup: lineup,
         myTeamSide: myTeamSide,
-        clock: urlParams.get('clock')
+        clock: currentUrlParams.get('clock')
       });
       
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - After building params:', {
@@ -1141,9 +1186,7 @@ async function init() {
         fullParams: Object.fromEntries(params.entries())
       });
       
-      if (DEBUG) {
-        params.set('debug', '1');
-      }
+      if (DEBUG) params.set('debug', '1');
       if (DEBUG) {
         console.debug('🔀 Redirecting to court.html (bypassing game plan)', { home: homeTeam, away: awayTeam, gameId: currentGameId });
       }
