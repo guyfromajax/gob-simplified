@@ -94,6 +94,9 @@ def get_collection_and_doc_id(mode: str, franchise_id: str = None, tournament_id
     Returns:
         tuple: (collection, doc_id) where doc_id is normalized
     """
+    # ✅ PHASE 5.5: Normalize mode (strip whitespace, lowercase) to handle edge cases
+    mode = mode.strip().lower() if mode else ""
+    
     if mode == "franchise":
         if not franchise_id:
             raise HTTPException(status_code=400, detail="franchise_id required for franchise mode")
@@ -1031,16 +1034,16 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
         # ✅ PHASE 1.1: Log normalization if game_id was changed
         if mode == "single" and game_id and game_id != doc_id:
             logger.warning(f"🔍 [NORMALIZE] GET /api/gameplan - Normalized game_id from '{game_id}' to '{doc_id}'")
-            
-            # ✅ PHASE 3.2: Prefer DB reads over cache reads
-            # If source=db, skip cache and always read from database
-            # Otherwise, prefer DB but allow cache as fallback for performance
-            force_db_read = source == "db"
-            gm = None
-            use_gamemanager_settings = False
-            
-            # Only check cache if not forcing DB read
-            if not force_db_read:
+        
+        # ✅ PHASE 3.2: Prefer DB reads over cache reads
+        # If source=db, skip cache and always read from database
+        # Otherwise, prefer DB but allow cache as fallback for performance
+        force_db_read = source == "db"
+        gm = None
+        use_gamemanager_settings = False
+        
+        # Only check cache if not forcing DB read (single mode only)
+        if mode == "single" and not force_db_read:
                 try:
                     from BackEnd.api.api import ongoing_games
                     gm = ongoing_games.get(game_id)
