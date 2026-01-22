@@ -327,13 +327,16 @@
 
 #### Phase 5.5: Simplify Mode Handling
 
+**Status:** ✅ Complete
+
 **Tasks:**
-1. **Decision:** Same storage structure for all modes, just different document types
-2. **Actions:**
-   - Ensure all modes use identical `teams.{team_id}.playbook_settings` structure
-   - Ensure all modes use identical `teams.{team_id}.strategy_settings` structure
-   - Remove mode-specific branching in save/load logic (use mode only to select collection)
-3. **Validation:** Save/load logic is identical across all modes, only collection differs
+1. ✅ **Decision:** Same storage structure for all modes, just different document types
+2. ✅ **Actions:**
+   - ✅ Created `get_collection_and_doc_id()` helper to centralize collection/doc_id selection
+   - ✅ Created `get_team_settings_path()` helper to centralize update path generation
+   - ✅ Refactored `save_playbooks()`, `update_gameplan()`, `get_gameplan()`, `get_playbooks()` to use helpers
+   - ✅ Removed mode-specific branching in save/load logic (mode only used to select collection/path)
+3. ⏳ **Validation:** Testing in progress - awaiting user confirmation
 
 #### Phase 5.6: Add Comprehensive Tests
 
