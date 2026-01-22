@@ -8,7 +8,7 @@ valid documents in the database, ensuring we fail loudly when pointers are inval
 
 from fastapi import HTTPException
 from bson import ObjectId
-from BackEnd.utils.db import db
+from BackEnd.db import db
 from BackEnd.utils.game_id_utils import normalize_game_id
 import logging
 
