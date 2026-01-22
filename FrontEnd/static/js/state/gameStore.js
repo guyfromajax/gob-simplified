@@ -1,3 +1,9 @@
+// ✅ PHASE 1.3: Import state telemetry
+import { logGameStoreRead, logGameStoreWrite, setContext } from '../shared/stateTelemetry.js';
+
+// Set context for telemetry
+setContext('gameStore');
+
 const state = {
   teams: { home: null, away: null },
   colors: { home: {}, away: {} },
@@ -53,10 +59,15 @@ export default {
 
   // Game ID
   setGameId(id) {
+    // ✅ PHASE 1.3: Log state write
+    logGameStoreWrite('game_id', id);
     state.gameId = id || null;
   },
   getGameId() {
-    return state.gameId;
+    // ✅ PHASE 1.3: Log state read
+    const value = state.gameId;
+    logGameStoreRead('game_id', value);
+    return value;
   },
 
   reset() {
