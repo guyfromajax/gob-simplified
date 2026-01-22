@@ -298,17 +298,21 @@
 
 #### Phase 5.3: Simplify Settings Save/Load Flow
 
+**Status:** ✅ Complete
+
 **Tasks:**
-1. **Decision:** Single save point, single load point, clear data flow
-2. **Actions:**
-   - **Save Flow:**
+1. ✅ **Decision:** Single save point, single load point, clear data flow
+2. ✅ **Actions:**
+   - ✅ **Save Flow:**
      - `save_playbooks()` / `update_gameplan()` → Save to DB (with team_id key) → Apply to GameManager (if in cache) → Return success
-     - Remove all intermediate reloads and fallbacks
-   - **Load Flow:**
+     - ✅ Removed cross-instance persistence (save to core teams collection)
+     - ✅ Removed verification reloads (trust MongoDB update result)
+   - ✅ **Load Flow:**
      - `simulate-quarter` → Load from DB once (by team_id) → Apply to GameManager → Start simulation
-     - Remove multiple document reloads in `get_playbooks()` and `get_gameplan()`
-     - Remove cross-instance persistence fallbacks (core teams collection lookup)
-3. **Validation:** Settings save/load happens in exactly one place each, no duplicate logic
+     - ✅ Simplified document reloads - use returned teams dict from `ensure_team_objects_exist()` directly
+     - ✅ Removed core teams collection fallback from `get_playbooks()`
+     - ✅ Removed redundant reloads in `get_gameplan()` and `get_playbooks()`
+3. ⏳ **Validation:** Testing in progress - awaiting user confirmation
 
 #### Phase 5.4: Create Settings Manager Class (Optional)
 
