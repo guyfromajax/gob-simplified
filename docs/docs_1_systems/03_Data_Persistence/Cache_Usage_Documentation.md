@@ -136,14 +136,19 @@ Caches are **performance mirrors** of truth (database), never truth itself. They
 1. **After DB writes:**
    - `save_playbooks()`: Updates `GameManager` directly (bidirectional sync)
    - `update_gameplan()`: Updates `GameManager` directly (bidirectional sync)
-   - `handle_timeout_save_and_response()`: Calls `refresh_game_cache_from_db()` to sync cache
+   - `handle_timeout_save_and_response()`: Calls `refresh_game_cache_from_db()` to sync cache after DB write
+   - `simulate_quarter_endpoint()`: Calls `refresh_game_cache_from_db()` to sync cache after DB write
 
 2. **On navigation:**
-   - Frontend caches (`gameStore`, `teamColorCache`) cleared on page unload
-   - Backend cache (`ongoing_games`) persists across requests but cleared on specific triggers
+   - Frontend caches (`gameStore`, `teamColorCache`) automatically cleared on page unload (module re-initialization)
+   - Backend cache (`ongoing_games`) persists across requests but cleared on specific triggers:
+     - New game scenario (Q1 requested but cached game is Q2+)
+     - Timeout resume (forces DB reload)
+     - Server restart
 
 3. **On version mismatch:**
    - Not currently implemented (future enhancement)
+   - Planned: Invalidate cache when backend version changes
 
 ### Manual Invalidation
 

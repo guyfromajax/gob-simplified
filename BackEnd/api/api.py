@@ -734,6 +734,11 @@ def handle_timeout_save_and_response(gm: "GameManager", timeout_turn: dict, game
     logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] DB AFTER save - timeout_next_play_type={saved_doc.get('timeout_next_play_type') if saved_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={saved_doc.get('timeout_offense_team_id') if saved_doc else 'DOC_NOT_FOUND'}")
     logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] DB AFTER save - score={saved_doc.get('score') if saved_doc else 'DOC_NOT_FOUND'}, clock={saved_doc.get('clock') if saved_doc else 'DOC_NOT_FOUND'}, time_remaining={saved_doc.get('time_remaining') if saved_doc else 'DOC_NOT_FOUND'}")
     
+    # ✅ PHASE 3.3: Refresh cache after DB write to ensure cache matches DB
+    if saved_doc and game_id in ongoing_games:
+        refresh_game_cache_from_db(ongoing_games[game_id], saved_doc)
+        logger.warning(f"✅ [CACHE-INVALIDATION] Refreshed ongoing_games cache after timeout save: game_id={game_id}")
+    
     # Return consistent response format (same for both user and computer)
     # Use saved data (db_summary) to ensure response matches what was saved to DB
     response = {
@@ -3115,6 +3120,13 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             logging.info(f"🎯 [SAVE] Q4/FINAL SAVE: game_id={game_id}, quarter={quarter_saving}, is_final={is_final_saving}, gm.quarter={gm.quarter}")
         
         games_collection.update_one({"_id": game_id_oid}, {"$set": db_summary}, upsert=True)
+        
+        # ✅ PHASE 3.3: Refresh cache after DB write to ensure cache matches DB
+        if game_id in ongoing_games:
+            saved_doc_full = games_collection.find_one({"_id": game_id_oid})
+            if saved_doc_full:
+                refresh_game_cache_from_db(ongoing_games[game_id], saved_doc_full)
+                logger.warning(f"✅ [CACHE-INVALIDATION] Refreshed ongoing_games cache after simulate_quarter save: game_id={game_id}")
         
         # ✅ DEBUG: Verify what was actually saved
         saved_doc = games_collection.find_one({"_id": game_id_oid}, {"quarter": 1, "is_final": 1, "week": 1})
