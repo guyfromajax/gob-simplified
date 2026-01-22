@@ -33,6 +33,125 @@ const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 // Note: This is a snapshot of initial URL state - always read from window.location.search when needed
 const gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
 
+// ✅ PHASE 2: Validate pointers on page load (if present)
+// Note: game_id is optional for new Q1 games, but if present must be valid
+// franchise_id and tournament_id are required for their respective modes
+async function validatePointersOnLoad() {
+  const mode = modeParam || 'single';
+  const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+  const currentQuarter = parseInt(urlParams.get('quarter'), 10) || 1;
+  
+  // For single mode, game_id is required for Q2+ or timeout resume
+  const isGameIdRequired = (mode === 'single') && ((currentQuarter > 1) || resumeFromTimeout);
+  
+  if (isGameIdRequired && !gameId) {
+    const errorMsg = `game_id is required but missing from URL. Mode: ${mode}, Quarter: ${currentQuarter}, Resume from timeout: ${resumeFromTimeout}. Please navigate from a valid game state.`;
+    console.error(`❌ [SET-LINEUP] ${errorMsg}`);
+    if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
+      window.ErrorHandler.showMissingPointerError({
+        missingPointer: 'game_id',
+        message: errorMsg,
+        mode: mode,
+        recoveryAction: 'redirect_to_mode_select'
+      });
+    } else {
+      alert(`Error: ${errorMsg}\n\nPlease return to the mode select screen and try again.`);
+    }
+    return false;
+  }
+  
+  // Validate that game_id points to existing document (if present)
+  if (gameId && mode === 'single' && window.PointerValidation) {
+    try {
+      await window.PointerValidation.validateGameId(gameId);
+      console.log(`✅ [SET-LINEUP] game_id validated: ${gameId}`);
+    } catch (error) {
+      console.error(`❌ [SET-LINEUP] Invalid game_id: ${error.message}`);
+      if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
+        window.ErrorHandler.showMissingPointerError({
+          missingPointer: 'game_id',
+          message: `Invalid game_id: ${gameId}. ${error.message}`,
+          mode: mode,
+          recoveryAction: 'redirect_to_mode_select'
+        });
+      }
+      return false;
+    }
+  }
+  
+  // Validate franchise_id if in franchise mode
+  if (mode === 'franchise') {
+    if (!franchiseId) {
+      const errorMsg = `franchise_id is required for franchise mode but missing from URL.`;
+      console.error(`❌ [SET-LINEUP] ${errorMsg}`);
+      if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
+        window.ErrorHandler.showMissingPointerError({
+          missingPointer: 'franchise_id',
+          message: errorMsg,
+          mode: mode,
+          recoveryAction: 'redirect_to_franchise_select'
+        });
+      }
+      return false;
+    }
+    
+    if (window.PointerValidation) {
+      try {
+        await window.PointerValidation.validateFranchiseId(franchiseId);
+        console.log(`✅ [SET-LINEUP] franchise_id validated: ${franchiseId}`);
+      } catch (error) {
+        console.error(`❌ [SET-LINEUP] Invalid franchise_id: ${error.message}`);
+        if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
+          window.ErrorHandler.showMissingPointerError({
+            missingPointer: 'franchise_id',
+            message: `Invalid franchise_id: ${franchiseId}. ${error.message}`,
+            mode: mode,
+            recoveryAction: 'redirect_to_franchise_select'
+          });
+        }
+        return false;
+      }
+    }
+  }
+  
+  // Validate tournament_id if in tournament mode
+  if (mode === 'tournament') {
+    if (!tournamentId) {
+      const errorMsg = `tournament_id is required for tournament mode but missing from URL.`;
+      console.error(`❌ [SET-LINEUP] ${errorMsg}`);
+      if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
+        window.ErrorHandler.showMissingPointerError({
+          missingPointer: 'tournament_id',
+          message: errorMsg,
+          mode: mode,
+          recoveryAction: 'redirect_to_tournament_select'
+        });
+      }
+      return false;
+    }
+    
+    if (window.PointerValidation) {
+      try {
+        await window.PointerValidation.validateTournamentId(tournamentId);
+        console.log(`✅ [SET-LINEUP] tournament_id validated: ${tournamentId}`);
+      } catch (error) {
+        console.error(`❌ [SET-LINEUP] Invalid tournament_id: ${error.message}`);
+        if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
+          window.ErrorHandler.showMissingPointerError({
+            missingPointer: 'tournament_id',
+            message: `Invalid tournament_id: ${tournamentId}. ${error.message}`,
+            mode: mode,
+            recoveryAction: 'redirect_to_tournament_select'
+          });
+        }
+        return false;
+      }
+    }
+  }
+  
+  return true;
+}
+
 // ✅ FIX: Track if init-game is in progress to prevent duplicate calls
 let initGameInProgress = false;
 
@@ -1068,6 +1187,15 @@ function removeIneligiblePlayersFromLineup() {
 }
 
 async function init() {
+  // ✅ PHASE 2: Validate pointers on page load
+  const validationPassed = await validatePointersOnLoad();
+  if (!validationPassed) {
+    // Validation failed - error screen already shown, disable functionality
+    const btn = document.getElementById('play-now');
+    if (btn) btn.classList.add('disabled');
+    return;
+  }
+  
   if (!resolveTeam()) {
     alert("Can't determine your team for this game. Please return and relaunch.");
     const btn = document.getElementById('play-now');
