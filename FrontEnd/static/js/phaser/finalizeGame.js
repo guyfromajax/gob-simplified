@@ -261,8 +261,9 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   if (typeof localStorage !== 'undefined') {
     localStorage.removeItem('game_id');
     localStorage.removeItem('last_game_id'); // Clear resume game reference
+    localStorage.removeItem('last_game_user_team_side'); // Clear resume user team side
     if (DEBUG_GAME_ID) {
-      console.debug('Cleared game_id and last_game_id after finalize');
+      console.debug('Cleared game_id, last_game_id, and last_game_user_team_side after finalize');
     }
   }
 

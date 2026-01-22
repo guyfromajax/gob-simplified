@@ -402,13 +402,20 @@ export function createGameScene(Phaser) {
       });
       this.isFinal = simData.is_final;
       
-      // ✅ PHASE 1.2: Save game_id to localStorage when user quits mid-game (only for single mode, only if not final)
+      // ✅ PHASE 1.2: Save game_id and user_team_side to localStorage when user quits mid-game (only for single mode, only if not final)
       // This enables "Resume Last Game" feature - save only when user explicitly quits (beforeunload)
       if (this.mode === 'single' && this.gameId && !this.isFinal && typeof window !== 'undefined') {
         const saveGameForResume = () => {
           if (this.gameId && !this.isFinal && this.mode === 'single' && typeof localStorage !== 'undefined') {
             localStorage.setItem('last_game_id', this.gameId);
-            console.log('💾 [RESUME] Saved game_id for resume:', this.gameId);
+            // Also save user_team_side so we can identify which team the user was playing
+            if (this.userTeamSide) {
+              localStorage.setItem('last_game_user_team_side', this.userTeamSide);
+            }
+            console.log('💾 [RESUME] Saved game_id and user_team_side for resume:', {
+              game_id: this.gameId,
+              user_team_side: this.userTeamSide
+            });
           }
         };
         // Save on page unload (user closes tab/browser)
