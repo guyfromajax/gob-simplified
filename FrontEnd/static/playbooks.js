@@ -1797,17 +1797,31 @@ class PlaybooksUI {
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const mode = urlParams.get('mode') || 'single';
-      const teamId = urlParams.get('team_id') || 
-                     urlParams.get('user_team_id') || 
-                     urlParams.get('home_id') || 
-                     urlParams.get('away_id');
       
-      if (!teamId) return;
+      // ✅ FIX: Use franchise_id/tournament_id for franchise/tournament modes (more stable than team_id)
+      // For franchise/tournament, there's only one user team, so use the document ID as the key
+      // For single mode, use team_id as before
+      let storageKey;
+      if (mode === 'franchise') {
+        const franchiseId = urlParams.get('franchise_id');
+        if (!franchiseId) return;
+        storageKey = `playbooks_position_filters_franchise_${franchiseId}`;
+      } else if (mode === 'tournament') {
+        const tournamentId = urlParams.get('tournament_id');
+        if (!tournamentId) return;
+        storageKey = `playbooks_position_filters_tournament_${tournamentId}`;
+      } else {
+        // Single mode: use team_id as before
+        const teamId = urlParams.get('team_id') || 
+                       urlParams.get('user_team_id') || 
+                       urlParams.get('home_id') || 
+                       urlParams.get('away_id');
+        if (!teamId) return;
+        storageKey = `playbooks_position_filters_single_${teamId}`;
+      }
       
-      // Create a unique key for this team/mode combination
-      const storageKey = `playbooks_position_filters_${mode}_${teamId}`;
       localStorage.setItem(storageKey, JSON.stringify(this.selectedPositions));
-      console.log('💾 [POSITION FILTER] Saved selections to localStorage:', this.selectedPositions);
+      console.log('💾 [POSITION FILTER] Saved selections to localStorage:', this.selectedPositions, 'key:', storageKey);
     } catch (error) {
       console.error('❌ Error saving position filter selections:', error);
     }
@@ -1817,20 +1831,34 @@ class PlaybooksUI {
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const mode = urlParams.get('mode') || 'single';
-      const teamId = urlParams.get('team_id') || 
-                     urlParams.get('user_team_id') || 
-                     urlParams.get('home_id') || 
-                     urlParams.get('away_id');
       
-      if (!teamId) return;
+      // ✅ FIX: Use franchise_id/tournament_id for franchise/tournament modes (more stable than team_id)
+      // For franchise/tournament, there's only one user team, so use the document ID as the key
+      // For single mode, use team_id as before
+      let storageKey;
+      if (mode === 'franchise') {
+        const franchiseId = urlParams.get('franchise_id');
+        if (!franchiseId) return;
+        storageKey = `playbooks_position_filters_franchise_${franchiseId}`;
+      } else if (mode === 'tournament') {
+        const tournamentId = urlParams.get('tournament_id');
+        if (!tournamentId) return;
+        storageKey = `playbooks_position_filters_tournament_${tournamentId}`;
+      } else {
+        // Single mode: use team_id as before
+        const teamId = urlParams.get('team_id') || 
+                       urlParams.get('user_team_id') || 
+                       urlParams.get('home_id') || 
+                       urlParams.get('away_id');
+        if (!teamId) return;
+        storageKey = `playbooks_position_filters_single_${teamId}`;
+      }
       
-      // Create a unique key for this team/mode combination
-      const storageKey = `playbooks_position_filters_${mode}_${teamId}`;
       const saved = localStorage.getItem(storageKey);
       
       if (saved) {
         this.selectedPositions = JSON.parse(saved);
-        console.log('📂 [POSITION FILTER] Loaded selections from localStorage:', this.selectedPositions);
+        console.log('📂 [POSITION FILTER] Loaded selections from localStorage:', this.selectedPositions, 'key:', storageKey);
         
         // Apply selections to UI buttons
         this.selectedPositions.forEach(position => {
@@ -1839,6 +1867,8 @@ class PlaybooksUI {
             button.classList.add('selected');
           }
         });
+      } else {
+        console.log('📂 [POSITION FILTER] No saved selections found for key:', storageKey);
       }
     } catch (error) {
       console.error('❌ Error loading position filter selections:', error);
