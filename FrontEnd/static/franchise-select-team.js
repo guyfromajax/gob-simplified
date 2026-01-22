@@ -32,7 +32,7 @@ async function selectTeam(team) {
     const data = await res.json();
     localStorage.setItem("franchiseId", data.franchise_id);
     localStorage.setItem("franchise_user_team", team);
-    window.location.href = "./franchise-command-center.html";
+    window.location.href = `./franchise-command-center.html?franchise_id=${encodeURIComponent(data.franchise_id)}`;
   } catch (err) {
     console.error(err);
     alert("Unable to start franchise");
