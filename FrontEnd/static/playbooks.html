@@ -143,6 +143,11 @@
   <script src="/js/shared/errorHandler.js"></script>
   <!-- ✅ PHASE 1.3: Load state telemetry before playbooks.js -->
   <script src="/js/shared/stateTelemetry.js"></script>
+  <!-- ✅ PHASE 1.3: Load gameStore module for optional cache -->
+  <script type="module">
+    import gameStore from '/js/state/gameStore.js';
+    // gameStore is already exposed globally in gameStore.js, but ensure it's loaded
+  </script>
   <!-- ✅ PHASE 2: Load pointer validation before playbooks.js -->
   <script src="/js/shared/pointerValidation.js"></script>
   <script src="playbooks.js"></script>

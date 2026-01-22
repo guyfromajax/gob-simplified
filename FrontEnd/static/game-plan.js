@@ -329,53 +329,71 @@ async function loadSettings() {
       params.set('game_id', gameId);
     }
     
-    console.log('🔍 [GAME-PLAN] Loading settings from database:', params.toString());
-    const res = await fetch(`${API_CONFIG.buildUrl('/api/gameplan')}?${params.toString()}`);
-    if (!res.ok) {
-      let errorDetail = `HTTP ${res.status}: ${res.statusText}`;
-      let errorData = {};
-      try {
-        errorData = await res.json();
-        errorDetail = errorData.detail || errorData.message || errorDetail;
-      } catch (e) {
-        try {
-          errorDetail = await res.text();
-        } catch (e2) {
-          // Keep default errorDetail
-        }
+    // ✅ PHASE 1.3: Check cache first (optional, disposable)
+    let data = null;
+    if (window.gameStore) {
+      data = window.gameStore.getStrategySettings();
+      if (data) {
+        console.log('✅ [GAME-PLAN] Cache hit - using cached strategy settings');
       }
-      console.error('❌ [GAME-PLAN] Failed to load game plan settings:', errorDetail);
-      
-      // ✅ Phase 4: Remove silent default - show error screen for API failures
-      if (res.status === 404 && errorDetail.includes('not found')) {
-        // Document not found - show missing truth error
-        if (window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
-          const pointerType = mode === 'single' ? 'game_id' : (mode === 'franchise' ? 'franchise_id' : 'tournament_id');
-          const pointerValue = mode === 'single' ? gameId : (mode === 'franchise' ? franchiseId : tournamentId);
-          window.ErrorHandler.showMissingTruthError({
-            pointerType,
-            pointerValue: pointerValue || 'unknown',
-            message: errorDetail,
-            mode: mode,
-            recoveryOptions: {
-              redirectTo: mode === 'single' ? 'mode-select' : (mode === 'franchise' ? 'franchise-select' : 'tournament-select'),
-              redirectLabel: mode === 'single' ? 'Go to Mode Select' : (mode === 'franchise' ? 'Go to Franchise Select' : 'Go to Tournament Select')
-            }
-          });
-        }
-      } else {
-        // Other API errors - show generic error
-        console.error('❌ [GAME-PLAN] API error loading settings - cannot proceed without settings');
-        alert(`Error: Failed to load game plan settings. ${errorDetail}\n\nPlease try refreshing the page or return to the lineup screen.`);
-      }
-      // ✅ Phase 4: Don't use silent defaults - fail explicitly
-      return;
     }
     
-    const data = await res.json();
-    // ✅ PHASE 1.3: Log backend read
-    if (window.StateTelemetry) {
-      window.StateTelemetry.logBackendRead('strategy_settings', data, '/api/gameplan');
+    // If cache miss, load from backend
+    if (!data) {
+      console.log('🔍 [GAME-PLAN] Loading settings from database:', params.toString());
+      const res = await fetch(`${API_CONFIG.buildUrl('/api/gameplan')}?${params.toString()}`);
+      if (!res.ok) {
+        let errorDetail = `HTTP ${res.status}: ${res.statusText}`;
+        let errorData = {};
+        try {
+          errorData = await res.json();
+          errorDetail = errorData.detail || errorData.message || errorDetail;
+        } catch (e) {
+          try {
+            errorDetail = await res.text();
+          } catch (e2) {
+            // Keep default errorDetail
+          }
+        }
+        console.error('❌ [GAME-PLAN] Failed to load game plan settings:', errorDetail);
+        
+        // ✅ Phase 4: Remove silent default - show error screen for API failures
+        if (res.status === 404 && errorDetail.includes('not found')) {
+          // Document not found - show missing truth error
+          if (window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
+            const pointerType = mode === 'single' ? 'game_id' : (mode === 'franchise' ? 'franchise_id' : 'tournament_id');
+            const pointerValue = mode === 'single' ? gameId : (mode === 'franchise' ? franchiseId : tournamentId);
+            window.ErrorHandler.showMissingTruthError({
+              pointerType,
+              pointerValue: pointerValue || 'unknown',
+              message: errorDetail,
+              mode: mode,
+              recoveryOptions: {
+                redirectTo: mode === 'single' ? 'mode-select' : (mode === 'franchise' ? 'franchise-select' : 'tournament-select'),
+                redirectLabel: mode === 'single' ? 'Go to Mode Select' : (mode === 'franchise' ? 'Go to Franchise Select' : 'Go to Tournament Select')
+              }
+            });
+          }
+        } else {
+          // Other API errors - show generic error
+          console.error('❌ [GAME-PLAN] API error loading settings - cannot proceed without settings');
+          alert(`Error: Failed to load game plan settings. ${errorDetail}\n\nPlease try refreshing the page or return to the lineup screen.`);
+        }
+        // ✅ Phase 4: Don't use silent defaults - fail explicitly
+        return;
+      }
+      
+      data = await res.json();
+      // ✅ PHASE 1.3: Log backend read
+      if (window.StateTelemetry) {
+        window.StateTelemetry.logBackendRead('strategy_settings', data, '/api/gameplan');
+      }
+      
+      // ✅ PHASE 1.3: Update cache after successful backend load
+      if (window.gameStore) {
+        window.gameStore.setStrategySettings(data);
+        console.log('✅ [GAME-PLAN] Updated cache with backend data');
+      }
     }
     currentSettings = data;
     console.log('✅ [GAME-PLAN] Loaded settings from database:', currentSettings);
@@ -442,6 +460,13 @@ async function saveSettingsQuietly() {
     }
     
     console.log('✅ [GAME-PLAN] Saved game plan to database (quietly)');
+    
+    // ✅ PHASE 1.3: Invalidate cache after successful save (cache must be rebuilt from truth)
+    if (window.gameStore) {
+      window.gameStore.invalidateStrategySettings('settings saved to backend');
+      console.log('✅ [GAME-PLAN] Invalidated cache after save');
+    }
+    
     return true;
   } catch (err) {
     console.error('❌ [GAME-PLAN] Error saving settings quietly:', err);
