@@ -1124,6 +1124,10 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
         source = "GameManager" if (mode == "single" and use_gamemanager_settings and gm) else "DB"
         logger.warning(f"🟢 [TRACE-LOAD] {trace_id} | GET-GAMEPLAN | team_id={team_id_for_log}, inside={inside_value}, has_settings={bool(strategy_settings)}, source={source}")
         
+        # ✅ PHASE 1.3: Telemetry - Log state read
+        source_type = "gameStore" if (mode == "single" and use_gamemanager_settings and gm) else "backend"
+        logger.warning(f"🔵 [STATE-READ] [get_gameplan] strategy_settings from {source_type} | team_id={team_id_for_log}, inside={inside_value}")
+        
         # ✅ FIX: Normalize legacy keys and ensure all required fields exist
         # Map old key names to new ones (for backward compatibility)
         if "half_court_trap" in strategy_settings and "hc_trap" not in strategy_settings:
@@ -1314,6 +1318,9 @@ def update_gameplan(request: GamePlanUpdateRequest):
         inside_value = request.strategy_settings.get("inside", "MISSING") if request.strategy_settings else "MISSING"
         logger.warning(f"🔵 [TRACE-SAVE] {trace_id} | SAVE-GAMEPLAN START | team={actual_team_id}, inside={inside_value}, sample={strategy_sample}")
         
+        # ✅ PHASE 1.3: Telemetry - Log state write
+        logger.warning(f"🟢 [STATE-WRITE] [update_gameplan] strategy_settings to backend | team_id={actual_team_id}, inside={inside_value}, endpoint=/api/gameplan")
+        
         # Update settings in the appropriate document
         if request.mode == "franchise":
             update_path = f"franchise_teams.{actual_team_id}.strategy_settings"
@@ -1327,6 +1334,10 @@ def update_gameplan(request: GamePlanUpdateRequest):
             }
         
         logger.warning(f"💾 [SAVE-GAMEPLAN] Update path: {update_path}, doc_id={doc_id}, mode={request.mode}")
+        
+        # ✅ PHASE 1.3: Telemetry - Log state write
+        inside_value = request.strategy_settings.get("inside", "MISSING") if request.strategy_settings else "MISSING"
+        logger.warning(f"🟢 [STATE-WRITE] [update_gameplan] strategy_settings to backend | team_id={actual_team_id}, inside={inside_value}, endpoint=/api/gameplan")
         
         # Handle different ID formats for different modes
         if request.mode == "single":
@@ -1984,6 +1995,12 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         # Get even_distribution_all flag (defaults to False if not set)
         even_distribution_all = playbook_settings.get("even_distribution_all", False)
         
+        # ✅ PHASE 1.3: Telemetry - Log state read
+        source_type = "gameStore" if (mode == "single" and use_gamemanager_settings and gm) else "backend"
+        slot_count = len(playbook_settings.get("slot_assignments", {})) if playbook_settings else 0
+        team_id_for_log = actual_team_id if mode == "single" and 'actual_team_id' in locals() else (authoritative_team_id if mode in ["franchise", "tournament"] else team_id)
+        logger.warning(f"🔵 [STATE-READ] [get_playbooks] playbook_settings from {source_type} | team_id={team_id_for_log}, slot_assignments={slot_count}, endpoint=/api/playbooks")
+        
         return {
             "motion": motion_plays,
             "set_play_inside": set_plays_inside,
@@ -2379,6 +2396,11 @@ def save_playbooks(request: PlaybookSettingsRequest):
                 logger.warning(f"⚠️ [SAVE-PLAYBOOKS] Error applying to cached GameManager (non-critical): {e}")
         
         logger.warning(f"✅ Saved playbook settings for team {actual_team_id} in {request.mode} mode")
+        
+        # ✅ PHASE 1.3: Telemetry - Log state write (after successful save)
+        slot_count = len(request.playbook_settings.get("slot_assignments", {})) if request.playbook_settings else 0
+        logger.warning(f"🟢 [STATE-WRITE] [save_playbooks] playbook_settings to backend | team_id={actual_team_id}, slot_assignments={slot_count}, endpoint=/api/playbooks")
+        
         return {"success": True, "message": "Playbook settings saved successfully"}
     
     except HTTPException:

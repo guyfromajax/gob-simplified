@@ -1,6 +1,11 @@
 // Parse URL parameters
 const urlParams = new URLSearchParams(window.location.search);
 
+// ✅ PHASE 1.3: Set telemetry context
+if (window.StateTelemetry) {
+  window.StateTelemetry.setContext('game-plan');
+}
+
 // ✅ DEBUG: Log URL params when game-plan page loads
 const pageLoadParams = {
   fullUrl: window.location.href,
@@ -23,15 +28,16 @@ const homeId = urlParams.get('home_id');
 const awayId = urlParams.get('away_id');
 const myTeamSide = urlParams.get('my_team');
 const userTeamIdParam = urlParams.get('user_team_id');
-const franchiseId = urlParams.get('franchise_id');
+const franchiseId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('franchise_id', urlParams.get('franchise_id')) : urlParams.get('franchise_id');
 const weekParam = urlParams.get('week');
-const tournamentId = urlParams.get('tournament_id');
+const tournamentId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('tournament_id', urlParams.get('tournament_id')) : urlParams.get('tournament_id');
 const modeParam = urlParams.get('mode');
 const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 const periodLabel = urlParams.get('period') || `Q${quarter}`;
 // ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
 // game_id is required for Q2+ or timeout resume, optional for Q1 (will be created by init-game)
-const gameId = urlParams.get('game_id') || null;
+// ✅ PHASE 1.3: Instrument state read
+const gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
 const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
 
 // ✅ PHASE 1.1: Fail loudly if game_id is required but missing
@@ -303,6 +309,10 @@ async function loadSettings() {
     }
     
     const data = await res.json();
+    // ✅ PHASE 1.3: Log backend read
+    if (window.StateTelemetry) {
+      window.StateTelemetry.logBackendRead('strategy_settings', data, '/api/gameplan');
+    }
     currentSettings = data;
     console.log('✅ [GAME-PLAN] Loaded settings from database:', currentSettings);
     
@@ -348,6 +358,11 @@ async function saveSettingsQuietly() {
       payload.tournament_id = tournamentId;
     } else if (mode === 'single' && gameId) {
       payload.game_id = gameId;
+    }
+    
+    // ✅ PHASE 1.3: Log backend write
+    if (window.StateTelemetry) {
+      window.StateTelemetry.logBackendWrite('strategy_settings', payload, '/api/gameplan');
     }
     
     const res = await fetch(API_CONFIG.buildUrl('/api/gameplan'), {

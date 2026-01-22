@@ -87,7 +87,11 @@
     // ✅ PHASE 1.1: Always pass game_id if it exists (it's a Pointer that points to Truth)
     // Previous logic excluded Q1 new games, but game_id should always be in URL when it exists
     // This ensures game_id persists through navigation (lineup → game-plan → court)
+    // ✅ PHASE 1.3: Log state write (URL parameter write)
     if (gameId) {
+      if (window.StateTelemetry) {
+        window.StateTelemetry.logStateWrite('game_id', window.StateTelemetry.SOURCE_TYPES.URL, gameId, 'timeoutNavigationHelper.js');
+      }
       params.set('game_id', gameId);
     }
     
@@ -142,8 +146,19 @@
     const week = overrides.week || sourceParams.get('week');
     
     if (mode) params.set('mode', mode);
-    if (tournamentId) params.set('tournament_id', tournamentId);
-    if (franchiseId) params.set('franchise_id', franchiseId);
+    // ✅ PHASE 1.3: Log state writes (URL parameter writes)
+    if (tournamentId) {
+      if (window.StateTelemetry) {
+        window.StateTelemetry.logStateWrite('tournament_id', window.StateTelemetry.SOURCE_TYPES.URL, tournamentId, 'timeoutNavigationHelper.js');
+      }
+      params.set('tournament_id', tournamentId);
+    }
+    if (franchiseId) {
+      if (window.StateTelemetry) {
+        window.StateTelemetry.logStateWrite('franchise_id', window.StateTelemetry.SOURCE_TYPES.URL, franchiseId, 'timeoutNavigationHelper.js');
+      }
+      params.set('franchise_id', franchiseId);
+    }
     if (week) params.set('week', week);
     
     // ============================================

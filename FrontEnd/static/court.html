@@ -3907,6 +3907,11 @@
     errorHandlerScript.src = `${staticPrefix}/js/shared/errorHandler.js`;
     document.head.appendChild(errorHandlerScript);
     
+    // ✅ PHASE 1.3: Load state telemetry before bootGame.js
+    const telemetryScript = document.createElement('script');
+    telemetryScript.src = `${staticPrefix}/js/shared/stateTelemetry.js`;
+    document.head.appendChild(telemetryScript);
+    
     // Load bootGame.js with environment-aware path
     const bootGameScript = document.createElement('script');
     bootGameScript.type = 'module';
