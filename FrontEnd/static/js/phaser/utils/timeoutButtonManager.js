@@ -16,7 +16,9 @@ export const ENABLE_TIMEOUT_BUTTON = true;
 // State tracking
 let buttonInitialized = false;
 let timeoutQueued = false; // Tracks if timeout is queued (highlighted)
+let timeoutQueuedAtTurnIndex = null; // Track which turn index the timeout was queued at
 let timeoutSound = null; // Audio object for button click sound
+let airhornSound = null; // Audio object for airhorn sound (plays when timeout executes)
 
 /**
  * Initialize the timeout button
@@ -32,17 +34,25 @@ export function initTimeoutButton() {
         return;
     }
     
-    // Load sound effect
+    // Load sound effects
     try {
         // Use API_CONFIG to get correct static path for local vs production
         const API_CONFIG = window.API_CONFIG;
         const staticPath = API_CONFIG ? API_CONFIG.getStaticPath() : '/static';
-        const soundPath = `${staticPath}/sounds/buttonClickSound.wav`;
-        timeoutSound = new Audio(soundPath);
+        
+        // Button click sound (plays when button is clicked)
+        const clickSoundPath = `${staticPath}/sounds/buttonClickSound.wav`;
+        timeoutSound = new Audio(clickSoundPath);
         timeoutSound.volume = 0.5; // Set volume to 50%
-        console.log('✅ [TIMEOUT] Sound loaded:', soundPath);
+        console.log('✅ [TIMEOUT] Click sound loaded:', clickSoundPath);
+        
+        // Airhorn sound (plays when timeout executes/popup appears)
+        const airhornPath = `${staticPath}/sounds/Timeout - Airhorn.mp3`;
+        airhornSound = new Audio(airhornPath);
+        airhornSound.volume = 0.7; // Set volume to 70%
+        console.log('✅ [TIMEOUT] Airhorn sound loaded:', airhornPath);
     } catch (error) {
-        console.warn('⚠️ [TIMEOUT] Could not load sound effect:', error);
+        console.warn('⚠️ [TIMEOUT] Could not load sound effects:', error);
     }
     
     button.addEventListener('click', handleTimeoutButtonClick);
@@ -247,15 +257,33 @@ export async function killCurrentTurnAndExecuteTimeout(scene, turnData) {
 /**
  * Check if timeout is queued and should be executed
  * Called at the start of each turn
+ * Only executes if:
+ * 1. Timeout is queued
+ * 2. Current turn is eligible
+ * 3. This is a different turn than when it was queued (wait for NEXT eligible turn)
  */
 export async function checkAndExecuteQueuedTimeout(scene, turnData) {
     if (!ENABLE_TIMEOUT_BUTTON || !timeoutQueued) {
         return false;
     }
     
+    // Get current turn index
+    const currentTurnIndex = turnData?.index || scene.currentTurn || null;
+    
+    // Only execute if this is a different turn than when it was queued
+    // This ensures we wait for the NEXT eligible turn, not execute on the same turn
+    if (timeoutQueuedAtTurnIndex !== null && currentTurnIndex !== null) {
+        if (currentTurnIndex === timeoutQueuedAtTurnIndex) {
+            // Same turn as when queued, don't execute yet
+            console.log('⏸️ TIMEOUT: Same turn as when queued, waiting for next turn');
+            return false;
+        }
+    }
+    
     // Check if current turn is eligible
     if (checkTimeoutEligibility(scene, turnData)) {
         // Execute the timeout
+        console.log('⏸️ TIMEOUT: Executing at start of eligible turn', currentTurnIndex);
         await handleTimeoutButtonClick(true); // Pass true to skip toggle (just execute)
         return true;
     }
@@ -315,10 +343,17 @@ async function handleTimeoutButtonClick(executeOnly = false) {
             return;
         }
         
-        // Always queue and wait for the START of the next eligible turn
-        // Don't execute immediately even if current turn is eligible
-        console.log('⏸️ TIMEOUT: Queued - will execute at start of next eligible turn');
-        return;
+        // Check if current turn is eligible
+        const currentTurnData = scene.currentTurnData || {};
+        if (checkTimeoutEligibility(scene, currentTurnData)) {
+            // Current turn is eligible, execute immediately
+            console.log('⏸️ TIMEOUT: Current turn is eligible, executing immediately');
+            // Continue to execute timeout below (don't return)
+        } else {
+            // Not eligible, queue and wait for next eligible turn
+            console.log('⏸️ TIMEOUT: Queued - will execute at start of next eligible turn');
+            return;
+        }
     }
     
     // Execute the timeout
@@ -373,6 +408,18 @@ async function handleTimeoutButtonClick(executeOnly = false) {
         // Reset queue state
         resetTimeoutQueue();
         
+        // Play airhorn sound when timeout executes (popup appears)
+        if (airhornSound) {
+            try {
+                airhornSound.currentTime = 0; // Reset to start
+                airhornSound.play().catch(err => {
+                    console.warn('⚠️ [TIMEOUT] Could not play airhorn:', err);
+                });
+            } catch (error) {
+                console.warn('⚠️ [TIMEOUT] Airhorn play error:', error);
+            }
+        }
+        
         // Show popup first, then navigate when user clicks "Go To Timeout" button
         await showUserTimeoutPopup(result, gameId, scene);
         
@@ -385,6 +432,7 @@ async function handleTimeoutButtonClick(executeOnly = false) {
 
 /**
  * Show user timeout popup with "Go To Timeout" button
+ * Uses same styling as End of Quarter popup
  * @param {Object} timeoutResult - Timeout result object
  * @param {string} gameId - Game ID
  * @param {Object} scene - Game scene object
@@ -407,69 +455,101 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
         ? ((homeTeamId && teamsObj[homeTeamId]?.name) || scene.simData?.home_team?.name || scene.homeTeam?.name || 'Your Team')
         : ((awayTeamId && teamsObj[awayTeamId]?.name) || scene.simData?.away_team?.name || scene.awayTeam?.name || 'Your Team');
     
-    // Create overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'user-timeout-popup';
-    overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.7);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10000;
+    // Create popup (matching game-completion-popup style)
+    const popup = document.createElement('div');
+    popup.className = 'user-timeout-popup';
+    popup.innerHTML = `
+        <div class="user-timeout-content">
+            <h2>${userTeamName} Called Timeout</h2>
+            <div class="button-container">
+                <button class="timeout-button go-to-timeout-button">Go To Timeout</button>
+            </div>
+        </div>
     `;
     
-    // Create modal
-    const modal = document.createElement('div');
-    modal.style.cssText = `
-        background: #1a1a1a;
-        border: 2px solid #28a745;
-        border-radius: 8px;
-        padding: 24px;
-        max-width: 400px;
-        width: 90%;
-        color: #fff;
-        text-align: center;
-    `;
+    // Add styles if not already present
+    if (!document.getElementById('user-timeout-popup-styles')) {
+        const style = document.createElement('style');
+        style.id = 'user-timeout-popup-styles';
+        style.textContent = `
+            .user-timeout-popup {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.85);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+            }
+
+            .user-timeout-content {
+                background: #fff;
+                border: 6px solid #c0c0c0;
+                border-radius: 12px;
+                padding: 40px 60px;
+                display: flex;
+                flex-direction: column;
+                gap: 30px;
+                align-items: center;
+                min-width: 400px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            }
+
+            .user-timeout-content h2 {
+                font-size: 36px;
+                font-weight: bold;
+                color: #333;
+                margin: 0;
+                font-family: 'Bebas Neue', sans-serif;
+                letter-spacing: 2px;
+            }
+
+            .button-container {
+                display: flex;
+                gap: 20px;
+                width: 100%;
+                justify-content: center;
+            }
+
+            .timeout-button {
+                padding: 15px 40px;
+                font-size: 18px;
+                font-weight: bold;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                text-decoration: none;
+                display: inline-block;
+                transition: all 0.3s;
+                font-family: 'Inter', sans-serif;
+            }
+
+            .go-to-timeout-button {
+                background: #ff9800;
+                color: #fff;
+            }
+
+            .go-to-timeout-button:hover {
+                background: #f57c00;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(255, 152, 0, 0.3);
+            }
+        `;
+        document.head.appendChild(style);
+    }
     
-    // Message
-    const messageEl = document.createElement('p');
-    messageEl.textContent = `${userTeamName} called timeout`;
-    messageEl.style.cssText = `
-        font-size: 1.25rem;
-        margin-bottom: 24px;
-        font-weight: 600;
-        color: #28a745;
-    `;
-    
-    // Go To Timeout button
-    const goToTimeoutBtn = document.createElement('button');
-    goToTimeoutBtn.textContent = 'Go To Timeout';
-    goToTimeoutBtn.style.cssText = `
-        padding: 12px 30px;
-        background: #28a745;
-        color: #fff;
-        border: none;
-        border-radius: 4px;
-        font-weight: 600;
-        font-size: 1rem;
-        cursor: pointer;
-        width: 100%;
-    `;
+    // Add click handler for button
+    const goToTimeoutBtn = popup.querySelector('.go-to-timeout-button');
     goToTimeoutBtn.addEventListener('click', async () => {
-        overlay.remove();
+        popup.remove();
         // Navigate to lineup screen
         await showTimeoutPopup(timeoutResult, gameId, scene);
     });
     
-    modal.appendChild(messageEl);
-    modal.appendChild(goToTimeoutBtn);
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
+    document.body.appendChild(popup);
 }
 
 /**
