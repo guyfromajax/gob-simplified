@@ -370,31 +370,19 @@ export async function checkAndExecuteQueuedTimeout(scene, turnData) {
         return false;
     }
     
-    // If queued during eligible turn, execute immediately (even if same turn index)
-    if (timeoutQueuedDuringEligibleTurn) {
-        console.log('🔍 [TIMEOUT DEBUG] Queued during eligible turn, executing immediately');
-        console.log('⏸️ TIMEOUT: Executing immediately (queued during eligible turn)', currentTurnIndex);
-        await handleTimeoutButtonClick(true); // Pass true to skip toggle (just execute)
-        return true;
-    }
+    // ✅ FIX 1: Instead of executing immediately, set a flag to execute after turn completes
+    // This ensures the popup appears only after the turn animation finishes
+    console.log('🔍 [TIMEOUT DEBUG] Eligible turn detected, setting flag to execute after turn completes');
     
-    // Otherwise, only execute if this is a different turn than when it was queued
-    // This ensures we wait for the NEXT eligible turn, not execute on the same turn
-    console.log('🔍 [TIMEOUT DEBUG] Comparing turn indices - queued at:', timeoutQueuedAtTurnIndex, 'current:', currentTurnIndex);
-    if (timeoutQueuedAtTurnIndex !== null && currentTurnIndex !== null) {
-        if (currentTurnIndex === timeoutQueuedAtTurnIndex) {
-            // Same turn as when queued, don't execute yet
-            console.log('🔍 [TIMEOUT DEBUG] Same turn as when queued, waiting for next turn');
-            console.log('⏸️ TIMEOUT: Same turn as when queued, waiting for next turn');
-            return false;
-        }
-    }
+    // Store timeout execution data to be processed after turn completes
+    scene.timeoutPendingExecution = {
+        timeoutQueuedDuringEligibleTurn: timeoutQueuedDuringEligibleTurn,
+        currentTurnIndex: currentTurnIndex,
+        timeoutQueuedAtTurnIndex: timeoutQueuedAtTurnIndex
+    };
     
-    // Different turn and eligible, execute the timeout
-    console.log('🔍 [TIMEOUT DEBUG] Different turn and eligible, executing timeout');
-    console.log('⏸️ TIMEOUT: Executing at start of eligible turn', currentTurnIndex);
-    await handleTimeoutButtonClick(true); // Pass true to skip toggle (just execute)
-    return true;
+    console.log('⏸️ TIMEOUT: Queued for execution after turn completes', currentTurnIndex);
+    return true; // Return true to indicate timeout is queued (but don't execute yet)
 }
 
 /**
@@ -709,15 +697,26 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
         document.head.appendChild(style);
     }
     
-    // Add click handler for button
+    // ✅ FIX 2: Add click handler for button - navigation only happens on explicit click
     const goToTimeoutBtn = popup.querySelector('.go-to-timeout-button');
     goToTimeoutBtn.addEventListener('click', async () => {
+        console.log('🔍 [TIMEOUT DEBUG] User clicked "Go To Timeout" button');
         popup.remove();
-        // Navigate to lineup screen
+        
+        // Clear pending timeout data from scene
+        if (scene.pendingTimeoutResult) {
+            delete scene.pendingTimeoutResult;
+        }
+        if (scene.pendingTimeoutGameId) {
+            delete scene.pendingTimeoutGameId;
+        }
+        
+        // Navigate to lineup screen - only happens when user explicitly clicks button
         await showTimeoutPopup(timeoutResult, gameId, scene);
     });
     
     document.body.appendChild(popup);
+    console.log('🔍 [TIMEOUT DEBUG] User timeout popup displayed, waiting for user to click button');
 }
 
 /**
