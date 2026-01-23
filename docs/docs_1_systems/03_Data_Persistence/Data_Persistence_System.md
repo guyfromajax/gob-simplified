@@ -361,6 +361,8 @@ This system documents data persistence across all three game modes when users ar
 
 ## Known Issues & Fixes (January 2025-2026)
 
+**Note:** All major persistence issues have been resolved through the Unified State Persistence refactoring (Phases 1-5.7). The fixes documented below are historical and have been integrated into the current system. For complete implementation history, see `Unified_State_Persistence_Work_Plan.md`.
+
 ### ✅ Fixed: Playbook Percentage Persistence (0% Values)
 
 **Issue:** Playbook percentages were not persisting correctly, especially 0% values. When users set percentages and saved, then reloaded the playbooks page, percentages would reset to 0 or default values.
