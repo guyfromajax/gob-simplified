@@ -134,44 +134,65 @@ function isUserTeamOnOffense(scene, turnData) {
  * @returns {boolean} - True if eligible, false otherwise
  */
 export function checkTimeoutEligibility(scene, turnData) {
+    console.log('🔍 [TIMEOUT DEBUG] checkTimeoutEligibility called with turnData:', {
+        result_type: turnData?.result_type,
+        current_turn: turnData?.current_turn,
+        possession_team_id: turnData?.possession_team_id,
+        index: turnData?.index
+    });
+    
     if (!ENABLE_TIMEOUT_BUTTON) {
+        console.log('🔍 [TIMEOUT DEBUG] ENABLE_TIMEOUT_BUTTON is false');
         return false;
     }
     
     ensureButtonInitialized();
     
     if (!scene || !turnData) {
+        console.log('🔍 [TIMEOUT DEBUG] Missing scene or turnData:', { hasScene: !!scene, hasTurnData: !!turnData });
         return false;
     }
     
     // Get user team side
     const userTeamSide = scene.userTeamSide || scene.simData?.user_team_side;
+    console.log('🔍 [TIMEOUT DEBUG] userTeamSide:', userTeamSide);
     if (!userTeamSide) {
+        console.log('🔍 [TIMEOUT DEBUG] No userTeamSide found');
         return false;
     }
     
     // Get possession team ID
     const possessionTeamId = turnData?.possession_team_id;
+    console.log('🔍 [TIMEOUT DEBUG] possessionTeamId:', possessionTeamId);
     if (!possessionTeamId) {
+        console.log('🔍 [TIMEOUT DEBUG] No possessionTeamId found');
         return false;
     }
     
     // Get home/away team IDs
     const homeTeamId = scene.simData?.home_team_id;
     const awayTeamId = scene.simData?.away_team_id;
+    console.log('🔍 [TIMEOUT DEBUG] Team IDs:', { homeTeamId, awayTeamId });
     
     // Check 1: Is offense_team == user's team?
     const userTeamId = userTeamSide === 'home' ? homeTeamId : awayTeamId;
+    console.log('🔍 [TIMEOUT DEBUG] Check 1 - userTeamId:', userTeamId, 'possessionTeamId:', possessionTeamId);
     if (possessionTeamId === userTeamId) {
+        console.log('🔍 [TIMEOUT DEBUG] Check 1 PASSED - user team on offense');
         return true;
     }
+    console.log('🔍 [TIMEOUT DEBUG] Check 1 FAILED - user team not on offense');
     
     // Check 2: Is current turn BIP or SIP?
     const currentTurn = turnData?.current_turn || turnData?.result_type;
+    console.log('🔍 [TIMEOUT DEBUG] Check 2 - currentTurn:', currentTurn);
     if (currentTurn === 'SIDE_INBOUND' || currentTurn === 'BASELINE_INBOUND') {
+        console.log('🔍 [TIMEOUT DEBUG] Check 2 PASSED - BIP or SIP turn');
         return true;
     }
+    console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - not BIP or SIP');
     
+    console.log('🔍 [TIMEOUT DEBUG] Both checks failed - NOT eligible');
     return false;
 }
 
@@ -288,22 +309,40 @@ export async function killCurrentTurnAndExecuteTimeout(scene, turnData) {
  *    - OR this is a different turn than when it was queued (wait for NEXT eligible turn)
  */
 export async function checkAndExecuteQueuedTimeout(scene, turnData) {
+    console.log('🔍 [TIMEOUT DEBUG] checkAndExecuteQueuedTimeout called');
+    console.log('🔍 [TIMEOUT DEBUG] timeoutQueued:', timeoutQueued);
+    console.log('🔍 [TIMEOUT DEBUG] timeoutQueuedDuringEligibleTurn:', timeoutQueuedDuringEligibleTurn);
+    console.log('🔍 [TIMEOUT DEBUG] timeoutQueuedAtTurnIndex:', timeoutQueuedAtTurnIndex);
+    
     if (!ENABLE_TIMEOUT_BUTTON || !timeoutQueued) {
+        console.log('🔍 [TIMEOUT DEBUG] Not enabled or not queued, returning false');
         return false;
     }
     
     // ✅ STATE CONTRACT: Use fresh turnData from AnimationRouter (authoritative source)
     // Get current turn index
     const currentTurnIndex = turnData?.index || scene.currentTurn || null;
+    console.log('🔍 [TIMEOUT DEBUG] Current turn index:', currentTurnIndex);
+    console.log('🔍 [TIMEOUT DEBUG] turnData from AnimationRouter:', {
+        result_type: turnData?.result_type,
+        current_turn: turnData?.current_turn,
+        possession_team_id: turnData?.possession_team_id,
+        index: turnData?.index
+    });
     
     // Check if current turn is eligible
-    if (!checkTimeoutEligibility(scene, turnData)) {
+    const isEligible = checkTimeoutEligibility(scene, turnData);
+    console.log('🔍 [TIMEOUT DEBUG] Current turn eligibility:', isEligible);
+    
+    if (!isEligible) {
         // Not eligible, don't execute
+        console.log('🔍 [TIMEOUT DEBUG] Current turn not eligible, returning false');
         return false;
     }
     
     // If queued during eligible turn, execute immediately (even if same turn index)
     if (timeoutQueuedDuringEligibleTurn) {
+        console.log('🔍 [TIMEOUT DEBUG] Queued during eligible turn, executing immediately');
         console.log('⏸️ TIMEOUT: Executing immediately (queued during eligible turn)', currentTurnIndex);
         await handleTimeoutButtonClick(true); // Pass true to skip toggle (just execute)
         return true;
@@ -311,15 +350,18 @@ export async function checkAndExecuteQueuedTimeout(scene, turnData) {
     
     // Otherwise, only execute if this is a different turn than when it was queued
     // This ensures we wait for the NEXT eligible turn, not execute on the same turn
+    console.log('🔍 [TIMEOUT DEBUG] Comparing turn indices - queued at:', timeoutQueuedAtTurnIndex, 'current:', currentTurnIndex);
     if (timeoutQueuedAtTurnIndex !== null && currentTurnIndex !== null) {
         if (currentTurnIndex === timeoutQueuedAtTurnIndex) {
             // Same turn as when queued, don't execute yet
+            console.log('🔍 [TIMEOUT DEBUG] Same turn as when queued, waiting for next turn');
             console.log('⏸️ TIMEOUT: Same turn as when queued, waiting for next turn');
             return false;
         }
     }
     
     // Different turn and eligible, execute the timeout
+    console.log('🔍 [TIMEOUT DEBUG] Different turn and eligible, executing timeout');
     console.log('⏸️ TIMEOUT: Executing at start of eligible turn', currentTurnIndex);
     await handleTimeoutButtonClick(true); // Pass true to skip toggle (just execute)
     return true;
@@ -364,10 +406,17 @@ async function handleTimeoutButtonClick(executeOnly = false) {
         // Toggle timeout queue state
         timeoutQueued = !timeoutQueued;
         
+        console.log('🔍 [TIMEOUT DEBUG] Button clicked - timeoutQueued:', timeoutQueued);
+        
         if (timeoutQueued) {
             // Store the current turn index when queued
             const currentTurnIndex = scene.currentTurn || scene.currentTurnData?.index || null;
             timeoutQueuedAtTurnIndex = currentTurnIndex;
+            
+            console.log('🔍 [TIMEOUT DEBUG] Current turn index:', currentTurnIndex);
+            console.log('🔍 [TIMEOUT DEBUG] scene.currentTurn:', scene.currentTurn);
+            console.log('🔍 [TIMEOUT DEBUG] scene.currentTurnData?.index:', scene.currentTurnData?.index);
+            console.log('🔍 [TIMEOUT DEBUG] scene.simData?.turns length:', scene.simData?.turns?.length);
             
             // ✅ Get real-time turn data from server truth (scene.simData.turns)
             // Primary: scene.simData.turns[scene.currentTurn] (fresh from server)
@@ -375,13 +424,27 @@ async function handleTimeoutButtonClick(executeOnly = false) {
             let currentTurnData = null;
             if (scene.currentTurn !== null && scene.currentTurn !== undefined && scene.simData?.turns) {
                 currentTurnData = scene.simData.turns[scene.currentTurn];
+                console.log('🔍 [TIMEOUT DEBUG] Got turn data from scene.simData.turns[' + scene.currentTurn + ']:', {
+                    result_type: currentTurnData?.result_type,
+                    current_turn: currentTurnData?.current_turn,
+                    possession_team_id: currentTurnData?.possession_team_id,
+                    index: currentTurnData?.index
+                });
             }
             if (!currentTurnData) {
                 currentTurnData = scene.currentTurnData || {};
+                console.log('🔍 [TIMEOUT DEBUG] Using fallback scene.currentTurnData:', {
+                    result_type: currentTurnData?.result_type,
+                    current_turn: currentTurnData?.current_turn,
+                    possession_team_id: currentTurnData?.possession_team_id,
+                    index: currentTurnData?.index
+                });
             }
             
             // Check eligibility using simple two-step check
+            console.log('🔍 [TIMEOUT DEBUG] Checking eligibility...');
             const isEligible = checkTimeoutEligibility(scene, currentTurnData);
+            console.log('🔍 [TIMEOUT DEBUG] Eligibility result:', isEligible);
             
             if (isEligible) {
                 // Current turn is eligible, set flag for immediate execution
@@ -392,6 +455,8 @@ async function handleTimeoutButtonClick(executeOnly = false) {
                 timeoutQueuedDuringEligibleTurn = false;
                 console.log('⏸️ TIMEOUT: Queued at turn index', currentTurnIndex, '- will execute at start of next eligible turn');
             }
+            
+            console.log('🔍 [TIMEOUT DEBUG] timeoutQueuedDuringEligibleTurn set to:', timeoutQueuedDuringEligibleTurn);
             
             updateButtonHighlight(true);
             updateTimeoutButtonState(true, 'Timeout queued');
@@ -405,15 +470,18 @@ async function handleTimeoutButtonClick(executeOnly = false) {
         
         // If we're toggling off, don't execute
         if (!timeoutQueued) {
+            console.log('🔍 [TIMEOUT DEBUG] Toggled off, returning early');
             return;
         }
         
         // If queued during eligible turn, execute immediately
         if (timeoutQueuedDuringEligibleTurn) {
+            console.log('🔍 [TIMEOUT DEBUG] Executing immediately - timeoutQueuedDuringEligibleTurn is true');
             console.log('⏸️ TIMEOUT: Executing immediately (current turn is eligible)');
             // Continue to execute timeout below (don't return)
         } else {
             // Not eligible, queue and wait for next eligible turn
+            console.log('🔍 [TIMEOUT DEBUG] Queued for next eligible turn - timeoutQueuedDuringEligibleTurn is false');
             console.log('⏸️ TIMEOUT: Queued - will execute at start of next eligible turn');
             return;
         }
