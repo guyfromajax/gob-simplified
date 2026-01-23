@@ -1646,10 +1646,6 @@ async function runInboundSetup({
     // Only use skeleton positions if we have positions for key players (SF and PG at minimum)
     if (skeletonPositions.SF && skeletonPositions.PG) {
       useSkeletonPositions = true;
-        pressureType,
-        positions: Object.keys(skeletonPositions),
-        source: 'turnData.offense_setup_positions'
-      });
     }
   }
   
@@ -2202,13 +2198,11 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   
   // ✅ VALIDATION: Ensure we have exactly 5 offensive and 5 defensive players
   if (offensiveCount !== 5 || defensiveCount !== 5) {
-    // Player classification validation (keep warning for actual errors)
-    if (offensiveCount !== 5 || defensiveCount !== 5) {
-      console.warn('⚠️ [PLAYER CLASSIFICATION] Expected 5 offensive and 5 defensive players, but got:', {
-        offensiveCount,
-        defensiveCount
-      });
-    }
+    console.warn('⚠️ [PLAYER CLASSIFICATION] Expected 5 offensive and 5 defensive players, but got:', {
+      offensiveCount,
+      defensiveCount
+    });
+  }
 
   // ============================================================================
   // STEAL HCO SETUP: Animate stealer moving back before HCO skeleton starts
