@@ -56,8 +56,13 @@ export function initTimeoutButton() {
         console.warn('⚠️ [TIMEOUT] Could not load sound effects:', error);
     }
     
-    button.addEventListener('click', handleTimeoutButtonClick);
+    console.log('🔍 [TIMEOUT DEBUG] Attaching click listener to timeout button');
+    button.addEventListener('click', (e) => {
+        console.log('🔍 [TIMEOUT DEBUG] Timeout button clicked! Event:', e);
+        handleTimeoutButtonClick(false);
+    });
     buttonInitialized = true;
+    console.log('🔍 [TIMEOUT DEBUG] Timeout button initialized, buttonInitialized:', buttonInitialized);
     
     // Make button always live (enabled)
     updateTimeoutButtonState(true, 'Timeout available');
