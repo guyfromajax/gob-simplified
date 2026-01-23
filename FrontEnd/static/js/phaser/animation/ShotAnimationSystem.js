@@ -383,8 +383,6 @@ export class ShotAnimationSystem {
       playerClassifications[anim.playerId] = isOffensivePlayer ? 'offense' : 'defense';
       
       if (isOffensivePlayer) {
-      
-      if (isOffensivePlayer) {
         offensiveCount++;
       } else {
         defensiveCount++;
