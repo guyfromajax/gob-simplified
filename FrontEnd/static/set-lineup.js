@@ -346,15 +346,15 @@ async function loadRoster() {
           const gamePlayers = gameData.players || [];
           const ineligiblePlayers = gameData.ineligible_players || [];
           
-          // Mark ineligible players in roster
+          // ✅ FOUL OUT FIX: Mark ineligible players in roster
           if (ineligiblePlayers.length > 0) {
-            console.log(`Found ${ineligiblePlayers.length} ineligible players (fouled out)`);
+            console.log(`✅ [FOUL-OUT] Found ${ineligiblePlayers.length} ineligible players (fouled out) from API:`, ineligiblePlayers);
             roster.forEach(player => {
               const playerId = player._id || player.playerId || player.player_id;
               if (playerId && ineligiblePlayers.includes(String(playerId))) {
                 player.ineligible = true;
                 player.fouled_out = true;
-                console.log(`Marked ${player.name} as ineligible (fouled out)`);
+                console.log(`✅ [FOUL-OUT] Marked ${player.name} (ID: ${playerId}) as ineligible (fouled out)`);
                 
                 // Note: Lineup removal will happen in removeIneligiblePlayersFromLineup()
                 // which is called after restoreLineupFromUrl() to ensure proper order
@@ -366,6 +366,8 @@ async function loadRoster() {
             } else if (currentView === 'player') {
               renderPlayerView();
             }
+          } else {
+            console.log(`✅ [FOUL-OUT] No ineligible players found in API response`);
           }
           
           console.log(`Found ${gamePlayers.length} players with energy data from game`);
@@ -1168,6 +1170,8 @@ function removeIneligiblePlayersFromLineup() {
   const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
   let removedCount = 0;
   
+  console.log(`🔍 [FOUL-OUT] Checking lineup for fouled-out players. Current lineup:`, lineup);
+  
   positions.forEach(pos => {
     const playerId = lineup[pos];
     if (!playerId) return;
@@ -1180,7 +1184,7 @@ function removeIneligiblePlayersFromLineup() {
     
     // If player is ineligible (fouled out), remove from lineup
     if (player && (player.ineligible || player.fouled_out)) {
-      console.log(`✅ [FOUL-OUT] Removing ${player.name} from ${pos} slot (fouled out)`);
+      console.log(`✅ [FOUL-OUT] Removing ${player.name} (ID: ${playerId}) from ${pos} slot (fouled out)`);
       lineup[pos] = null;
       removedCount++;
       
@@ -1196,12 +1200,17 @@ function removeIneligiblePlayersFromLineup() {
           const removeBtn = slot.querySelector('.remove-btn');
           if (removeBtn) removeBtn.hidden = true;
         }
+        console.log(`✅ [FOUL-OUT] Cleared ${pos} slot display`);
+      } else {
+        console.warn(`⚠️ [FOUL-OUT] Slot element not found for position ${pos}`);
       }
     }
   });
   
   if (removedCount > 0) {
-    console.log(`✅ [FOUL-OUT] Removed ${removedCount} fouled-out player(s) from lineup`);
+    console.log(`✅ [FOUL-OUT] Removed ${removedCount} fouled-out player(s) from lineup. Updated lineup:`, lineup);
+  } else {
+    console.log(`✅ [FOUL-OUT] No fouled-out players found in lineup`);
   }
 }
 
@@ -1232,6 +1241,37 @@ async function init() {
   // ✅ FOUL OUT: Remove ineligible players from lineup AFTER restoring from URL
   // This ensures fouled-out players are removed even if they were in the URL params
   removeIneligiblePlayersFromLineup();
+  
+  // ✅ FOUL OUT FIX: Add diagnostic helper function for browser console
+  window.checkFoulOutStatus = function() {
+    const fouledOutPlayers = roster.filter(p => p.fouled_out || p.ineligible);
+    const lineupPositions = ['PG', 'SG', 'SF', 'PF', 'C'];
+    const fouledOutInLineup = lineupPositions.filter(pos => {
+      const playerId = lineup[pos];
+      if (!playerId) return false;
+      const player = roster.find(p => {
+        const pId = p._id || p.playerId || p.player_id;
+        return String(pId) === String(playerId);
+      });
+      return player && (player.fouled_out || player.ineligible);
+    });
+    
+    console.log('🔍 [FOUL-OUT STATUS CHECK]');
+    console.log(`- Fouled-out players in roster: ${fouledOutPlayers.length}`);
+    console.log(`- Fouled-out players:`, fouledOutPlayers.map(p => `${p.name} (ID: ${p._id || p.playerId || p.player_id})`));
+    console.log(`- Fouled-out players in lineup: ${fouledOutInLineup.length}`);
+    console.log(`- Positions with fouled-out players:`, fouledOutInLineup);
+    console.log(`- Current lineup state:`, lineup);
+    console.log(`- Roster players with fouled_out flag:`, roster.filter(p => p.fouled_out).map(p => p.name));
+    console.log(`- Roster players with ineligible flag:`, roster.filter(p => p.ineligible).map(p => p.name));
+    
+    return {
+      fouledOutCount: fouledOutPlayers.length,
+      fouledOutPlayers: fouledOutPlayers.map(p => ({ name: p.name, id: p._id || p.playerId || p.player_id })),
+      fouledOutInLineup: fouledOutInLineup,
+      lineup: { ...lineup }
+    };
+  };
   
   updateAllSlotDisplays(); // Display restored lineup in slots
   updatePlayButton(); // Update play button state based on restored lineup

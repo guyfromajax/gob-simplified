@@ -226,6 +226,43 @@
 
 ---
 
+### ✅ Test 10: Foul Out Player Lineup Removal & Visual Indicators
+**Objective:** Verify fouled-out player is removed from lineup and visually disabled
+
+**Steps:**
+1. Trigger a foul out for a player on the USER'S team
+2. Navigate to lineup screen
+3. Verify the fouled-out player's position is EMPTY (no player selected)
+4. Verify all other 4 positions still show their players
+5. Switch to Grid view (if not already)
+6. Verify the fouled-out player's row has grey overlay (background: #d3d3d3, opacity: 0.7)
+7. Verify the fouled-out player's row is not draggable (cannot drag to lineup)
+8. Switch to Player view
+9. Verify the fouled-out player's card has grey overlay (background: #d3d3d3, opacity: 0.7)
+10. Verify the fouled-out player's card is not draggable (cannot drag to lineup)
+11. Verify the fouled-out player's card cannot be clicked to fill slot
+12. Open browser console and run `checkFoulOutStatus()` to verify diagnostic output
+
+**Expected Result:** 
+- Fouled-out player position is empty
+- Other 4 positions remain populated
+- Grey overlay on Grid view row
+- Grey overlay on Player view card
+- Drag/drop disabled for fouled-out player
+- Click disabled for fouled-out player card
+- Diagnostic function shows correct status
+
+**Actual Result:** [ ] PASS [ ] FAIL
+**Notes:** 
+
+**Console Verification:**
+- Run `checkFoulOutStatus()` in browser console
+- Should show fouled-out player in roster
+- Should show empty position in lineup
+- Should show correct lineup state
+
+---
+
 ## Test Summary
 
 **Total Tests:** 9
