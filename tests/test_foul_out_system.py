@@ -362,52 +362,48 @@ class TestIneligiblePlayersAPI:
     
     def test_api_returns_ineligible_players_in_memory(self):
         """Test that /api/game/{game_id} returns ineligible_players when game is in memory."""
-        from BackEnd.api.api import get_game_state
-        from BackEnd.models.game_manager import GameManager
-        
-        # Create game
-        gm = GameManager("Team A", "Team B")
-        gm.game_id = "test_game_123"
+        # Use build_mock_game() to create a properly initialized game
+        game = build_mock_game()
+        game.game_id = "test_game_123"
         
         # Trigger foul out
-        player = gm.home_team.lineup["PG"]
+        player = game.home_team.lineup["PG"]
         for _ in range(5):
             player.record_stat("F")
         
         from BackEnd.engine.phase_resolution import check_and_handle_foul_out
-        check_and_handle_foul_out(player, gm.game_state, gm.home_team)
+        check_and_handle_foul_out(player, game.game_state, game.home_team)
         
         # Verify ineligible_players is in game_state
-        assert player.player_id in gm.game_state.get("ineligible_players", [])
+        assert player.player_id in game.game_state.get("ineligible_players", [])
         
         # Mock the API endpoint (simplified - actual endpoint requires more setup)
         # The key test is that ineligible_players is in game_state, which the API reads from
-        ineligible_players = gm.game_state.get("ineligible_players", [])
+        ineligible_players = game.game_state.get("ineligible_players", [])
         assert len(ineligible_players) > 0
         assert player.player_id in ineligible_players
     
     def test_ineligible_players_persists_in_game_state(self):
         """Test that ineligible_players is saved to and loaded from database correctly."""
-        from BackEnd.models.game_manager import GameManager
         from BackEnd.utils.shared import summarize_game_state
         from BackEnd.engine.phase_resolution import check_and_handle_foul_out
         
-        # Create game
-        gm = GameManager("Team A", "Team B")
-        gm.game_id = "test_game_456"
+        # Use build_mock_game() to create a properly initialized game
+        game = build_mock_game()
+        game.game_id = "test_game_456"
         
         # Trigger foul out
-        player = gm.home_team.lineup["PG"]
+        player = game.home_team.lineup["PG"]
         for _ in range(5):
             player.record_stat("F")
         
-        check_and_handle_foul_out(player, gm.game_state, gm.home_team)
+        check_and_handle_foul_out(player, game.game_state, game.home_team)
         
         # Verify ineligible_players is in game_state
-        assert player.player_id in gm.game_state.get("ineligible_players", [])
+        assert player.player_id in game.game_state.get("ineligible_players", [])
         
         # Simulate save to database
-        db_summary = summarize_game_state(gm, exclude_animations=True)
+        db_summary = summarize_game_state(game, exclude_animations=True)
         assert "ineligible_players" in db_summary
         assert player.player_id in db_summary["ineligible_players"]
         
