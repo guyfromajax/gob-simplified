@@ -39,9 +39,7 @@ export function resolveOffenseTeamId({ scene, turnData, playerSprites = null, pa
   // Priority 2: scene.offenseTeamId (scene state - kept in sync by PossessionManager)
   if (scene?.offenseTeamId) {
     const resolved = scene.offenseTeamId;
-    console.log('🔍 [offenseTeamIdResolver] Path 2: scene.offenseTeamId', {
-      value: resolved,
-      type: typeof resolved,
+    // Resolved from scene.offenseTeamId
       isObjectId: /^[0-9a-f]{24}$/i.test(String(resolved)),
       resultType: turnData?.result_type,
       turnIndex: turnData?.index

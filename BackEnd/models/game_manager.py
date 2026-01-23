@@ -781,6 +781,7 @@ class GameManager:
 
     def get_box_score(self):
         """Get box score with all players (lineup + bench) to match team totals."""
+        import logging
         box_score = {}
         for team in [self.home_team, self.away_team]:
             team_box = {}
@@ -788,6 +789,13 @@ class GameManager:
             # First, add lineup players with their positions
             for pos, player in team.lineup.items():
                 if player:  # Skip None players
+                    # 🔍 DEBUG: Log player object used in box score for putback miss bug
+                    player_obj_id = id(player)
+                    oreb_stat = player.stats["game"].get("OREB", 0)
+                    dreb_stat = player.stats["game"].get("DREB", 0)
+                    reb_stat = player.stats["game"].get("REB", 0)
+                    logging.warning(f"🔍 [BOX_SCORE] Lineup player: {player.get_name()} (ID: {player.player_id}, Pos: {pos}), "
+                                  f"Object ID: {player_obj_id}, OREB: {oreb_stat}, DREB: {dreb_stat}, REB: {reb_stat}")
                     team_box[pos] = {
                     "name": player.get_name(),
                         "playerId": player.player_id,
@@ -803,6 +811,13 @@ class GameManager:
                     # Handle multiple bench players with same position by appending player_id
                     if pos in team_box:
                         pos = f"{pos}_{player.player_id[:8]}"
+                    # 🔍 DEBUG: Log bench player object used in box score
+                    player_obj_id = id(player)
+                    oreb_stat = player.stats["game"].get("OREB", 0)
+                    dreb_stat = player.stats["game"].get("DREB", 0)
+                    reb_stat = player.stats["game"].get("REB", 0)
+                    logging.warning(f"🔍 [BOX_SCORE] Bench player: {player.get_name()} (ID: {player.player_id}, Pos: {pos}), "
+                                  f"Object ID: {player_obj_id}, OREB: {oreb_stat}, DREB: {dreb_stat}, REB: {reb_stat}")
                     team_box[pos] = {
                         "name": player.get_name(),
                         "playerId": player.player_id,

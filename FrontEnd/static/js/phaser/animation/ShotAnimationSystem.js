@@ -258,10 +258,7 @@ export class ShotAnimationSystem {
       };
     };
     
-    console.log(`🔍 [STATE COMPARISON] Before ${isMake ? 'MAKE' : 'MISS'} handling`, {
-      resultType: turnData.result_type,
-      tweenManager: getTweenManagerState(),
-      ballController: getBallControllerState(),
+    // Handle shot result
       sceneFlags: getSceneFlags(),
       hasRebounderId: !!turnData.rebounderId,
       hasReboundType: !!turnData.rebound_type
@@ -380,53 +377,14 @@ export class ShotAnimationSystem {
     // TODO: Remove if this fix doesn't resolve the animation sync issue
     this._skeletonDefensivePlayerIds = [];
     
-    // 🔍 DEBUG: Log team_id format mismatch detection
-    const sampleSprite = turnData.animations.length > 0 ? this.playerSprites[turnData.animations[0]?.playerId] : null;
-    if (sampleSprite && offenseTeamId) {
-      console.log('🔍 [ShotAnimationSystem] Team ID Comparison Debug:', {
-        spriteTeamId: sampleSprite.team_id,
-        spriteTeamIdType: typeof sampleSprite.team_id,
-        spriteTeamIdIsObjectId: /^[0-9a-f]{24}$/i.test(String(sampleSprite.team_id)),
-        offenseTeamId: offenseTeamId,
-        offenseTeamIdType: typeof offenseTeamId,
-        offenseTeamIdIsObjectId: /^[0-9a-f]{24}$/i.test(String(offenseTeamId)),
-        match: String(sampleSprite.team_id) === String(offenseTeamId),
-        resultType: turnData?.result_type,
-        turnIndex: turnData?.index,
-        playerSpritesCount: Object.keys(this.playerSprites).length
-      });
-    }
-    
-    // 🔍 DEBUG: Log offenseTeamId before classification
-    console.warn('🔍 [PLAYER CLASSIFICATION DEBUG] Before classification:', {
-      offenseTeamId,
-      offenseTeamIdType: typeof offenseTeamId,
-      resultType: turnData?.result_type,
-      currentTurn: turnData?.current_turn,
-      nextTurn: turnData?.next_turn,
-      offensivePlaycall: turnData?.offensive_playcall,
-      offensivePlayType: turnData?.offensive_play_type,
-      totalAnimations: turnData.animations?.length
-    });
-    
     for (const anim of turnData.animations) {
       const sprite = this.playerSprites[anim.playerId];
       if (!sprite) {
-        console.warn('⚠️ [ShotAnimationSystem] Missing sprite for playerId:', anim.playerId);
         continue;
       }
       
       const isOffensivePlayer = offenseTeamId ? String(sprite.team_id) === String(offenseTeamId) : false;
       playerClassifications[anim.playerId] = isOffensivePlayer ? 'offense' : 'defense';
-      
-      // 🔍 DEBUG: Log first few player classifications
-      if (Object.keys(playerClassifications).length <= 3) {
-        console.warn('🔍 [PLAYER CLASSIFICATION DEBUG] Player:', {
-          playerId: anim.playerId,
-          spriteTeamId: sprite.team_id,
-          spriteTeamIdType: typeof sprite.team_id,
-          offenseTeamId,
-          offenseTeamIdType: typeof offenseTeamId,
           match: String(sprite.team_id) === String(offenseTeamId),
           isOffensivePlayer
         });
@@ -1178,32 +1136,8 @@ export class ShotAnimationSystem {
   async handleMissedShot(rimCoords, turnData) {
     // ✅ REMOVED: Missed shot logging (cluttering console)
 
-    // 🔍 STATE COMPARISON: Log state at start of handleMissedShot
-    const getTweenManagerState = () => {
-      if (!this.scene.tweens) return null;
-      try {
-        const total = typeof this.scene.tweens.getAll === 'function' 
-          ? this.scene.tweens.getAll().length 
-          : 'N/A';
-        return { total };
-      } catch (error) {
-        return { error: error.message };
-      }
-    };
-    console.log(`🔍 [MISS HANDLER] Start`, {
-      _getBackTweensCount: this._getBackTweens ? this._getBackTweens.length : 0,
-      tweenManager: getTweenManagerState(),
-      ballControllerState: this.ballController ? {
-        isAttached: this.ballController.isAttached,
-        isInFlight: this.ballController.isInFlight
-      } : null
-    });
-
     // Animate ball bounce from rim
     await this.animateBallBounce(rimCoords, turnData);
-    console.log(`🔍 [MISS HANDLER] After animateBallBounce()`, {
-      tweenManager: getTweenManagerState()
-    });
     
     // ✅ FIX: Check for shooting foul on missed shot and show announcement (matches ballManager.js pattern)
     const hasFreeThrowsRemaining = (turnData?.free_throws_remaining ?? 0) > 0;
@@ -1255,13 +1189,6 @@ export class ShotAnimationSystem {
     // This matches the pattern in ballManager.js (line 626)
     // The ball is no longer in flight, so clear the state to allow attachment to rebounder
     this.ballController.onShotEnd();
-    console.log(`🔍 [MISS HANDLER] After onShotEnd()`, {
-      ballControllerState: {
-        isAttached: this.ballController.isAttached,
-        isInFlight: this.ballController.isInFlight
-      },
-      tweenManager: getTweenManagerState()
-    });
     
     // ✅ FIX: Stop get-back player animations when rebound is secured
     // Players may not have reached their destination, which is fine
@@ -1270,41 +1197,10 @@ export class ShotAnimationSystem {
     // ✅ PRIORITY 2 FIX: Add validation to ensure rebound_type is set
     // Check if this shot turn includes rebound data
     if (turnData.rebounderId && turnData.rebound_type) {
-      console.log(`🔍 [MISS HANDLER] Before handleEmbeddedRebound()`, {
-        rebounderId: turnData.rebounderId,
-        reboundType: turnData.rebound_type,
-        tweenManager: getTweenManagerState(),
-        _getBackTweensCount: this._getBackTweens ? this._getBackTweens.length : 0
-      });
-      // ✅ COMMENTED OUT: Verbose rebound logs (cluttering console)
-      // console.log('🎬 ShotAnimationSystem: Handling embedded rebound', {
-      //   rebounderId: turnData.rebounderId,
-      //   rebound_type: turnData.rebound_type
-      // });
-      
       // Handle the rebound within the shot turn
       await this.handleEmbeddedRebound(turnData);
-      
-      // 🔍 DEBUG: Verify playerSprites state after embedded rebound
-      console.log('🔍 [MISS HANDLER] After handleEmbeddedRebound() - playerSprites state:', {
-        playerSpritesCount: Object.keys(this.playerSprites).length,
-        samplePlayerIds: Object.keys(this.playerSprites).slice(0, 5),
-        sampleTeamIds: Object.keys(this.playerSprites).slice(0, 5).map(id => {
-          const sprite = this.playerSprites[id];
-          return sprite ? { id, team_id: sprite.team_id, type: typeof sprite.team_id } : null;
-        }).filter(Boolean),
-        resultType: turnData?.result_type,
-        turnIndex: turnData?.index
-      });
     } else {
-      // ✅ PRIORITY 2 FIX: Add defensive logging when rebound data is missing
-      console.warn('🎬 ShotAnimationSystem: Rebound data missing, skipping embedded rebound', {
-        hasRebounderId: !!turnData.rebounderId,
-        hasReboundType: !!turnData.rebound_type,
-        rebounderId: turnData.rebounderId,
-        rebound_type: turnData.rebound_type,
-        note: 'This may cause DREB/outlet pass to be skipped'
-      });
+      // Rebound data missing - transition to REBOUNDING state (fallback)
       // Transition to REBOUNDING state (fallback)
       if (this.stateMachine) {
         this.stateMachine.transition(AnimationStates.REBOUNDING, {
@@ -1319,11 +1215,6 @@ export class ShotAnimationSystem {
    * Handle rebound that's embedded within a shot turn
    */
   async handleEmbeddedRebound(turnData) {
-    // ✅ COMMENTED OUT: Verbose rebound logs (cluttering console)
-    // console.log('🎬 ShotAnimationSystem: Processing embedded rebound', {
-    //   rebounderId: turnData.rebounderId,
-    //   rebound_type: turnData.rebound_type
-    // });
 
     // Get the rebounder sprite
     const rebounderSprite = this.playerSprites[turnData.rebounderId];
@@ -1366,10 +1257,7 @@ export class ShotAnimationSystem {
         return { error: error.message };
       }
     };
-    console.log(`🔍 [EMBEDDED REBOUND] Before animatePlayerCollapse()`, {
-      _getBackTweensCount: this._getBackTweens ? this._getBackTweens.length : 0,
-      tweenManager: getTweenManagerState()
-    });
+    // Animate player collapse
     
     // ✅ TEMP FIX: Kill skeleton defensive tweens before animatePlayerCollapse() to prevent conflict
     // This addresses the animation sync issue where defenders move before passes in HCO MISS => DREB
@@ -1384,23 +1272,12 @@ export class ShotAnimationSystem {
           killedCount++;
         }
       }
-      const afterKillSkeleton = getTweenManagerState();
-      console.log(`🔧 [TEMP FIX] Killed skeleton defensive tweens before animatePlayerCollapse()`, {
-        defensivePlayerIds: this._skeletonDefensivePlayerIds.length,
-        killedCount,
-        beforeKillSkeleton,
-        afterKillSkeleton
-      });
       // Clear the list after cleanup
       this._skeletonDefensivePlayerIds = [];
     }
     
     // Start non-rebounder animations first and store tween references
     const collapseTweens = await this.animatePlayerCollapse(rebounderSprite, { x: ballBounceX, y: ballBounceY }, turnData);
-    console.log(`🔍 [EMBEDDED REBOUND] After animatePlayerCollapse()`, {
-      collapseTweensCount: collapseTweens ? collapseTweens.length : 0,
-      tweenManager: getTweenManagerState()
-    });
     
     const rebounderPromise = new Promise((resolve) => {
       this.scene.tweens.add({
@@ -1419,12 +1296,6 @@ export class ShotAnimationSystem {
               }
             });
           }
-          const afterKillCollapse = getTweenManagerState();
-          console.log(`🔍 [EMBEDDED REBOUND] After killing collapseTweens`, {
-            beforeKillCollapse,
-            afterKillCollapse,
-            killedCollapseCount: collapseTweens ? collapseTweens.length : 0
-          });
           
           // Attach ball to rebounder once they reach the bounce spot
           this.ballController.attachToPlayer(rebounderSprite, {
@@ -1441,12 +1312,6 @@ export class ShotAnimationSystem {
             });
             this._getBackTweens = [];
           }
-          const afterKillGetBack = getTweenManagerState();
-          console.log(`🔍 [EMBEDDED REBOUND] After killing _getBackTweens`, {
-            beforeKillGetBack,
-            afterKillGetBack,
-            killedGetBackCount: this._getBackTweens ? 0 : 'N/A'
-          });
           
           resolve();
         }
@@ -1470,36 +1335,16 @@ export class ShotAnimationSystem {
       // This prevents collapse animations from interfering with outlet pass timing
       // TODO: Remove if this fix doesn't resolve the animation sync issue
       if (collapseTweens && collapseTweens.length > 0 && this.scene.tweens) {
-        const beforeKillCollapse = getTweenManagerState();
         collapseTweens.forEach(tween => {
           if (tween && this.scene.tweens) {
             this.scene.tweens.killTweensOf(tween.targets);
           }
-        });
-        const afterKillCollapse = getTweenManagerState();
-        console.log(`🔧 [TEMP FIX] Killed collapseTweens before handleDefensiveRebound() / outlet pass`, {
-          collapseTweensCount: collapseTweens.length,
-          beforeKillCollapse,
-          afterKillCollapse
         });
       }
       
       // ✅ REVERTED: Back to embedded DREB handling (standalone step approach didn't fix animation sync issue)
       await this.handleDefensiveRebound(rebounderSprite, turnData);
     } else if (turnData.rebound_type === 'OREB') {
-      // ✅ DEBUG: Track OREB handling to see if putback is coming
-      const nextTurn = this.scene.simData?.turns?.[(this.scene.currentTurn || 0) + 1];
-      const nextNextTurn = this.scene.simData?.turns?.[(this.scene.currentTurn || 0) + 2];
-      console.log('🔍 [OREB HANDLING DEBUG]', {
-        turnIndex: this.scene.currentTurn,
-        rebounderId: turnData.rebounderId,
-        nextTurnResult: nextTurn?.result_type || null,
-        nextNextTurnResult: nextNextTurn?.result_type || null,
-        willSeePutback: nextTurn?.result_type === 'PUTBACK_MAKE' || nextTurn?.result_type === 'PUTBACK_MISS',
-        willSeePutbackAfterOREB: (nextTurn?.result_type === 'OREB' || nextTurn?.result_type === 'OREB_KICKOUT') && 
-                                  (nextNextTurn?.result_type === 'PUTBACK_MAKE' || nextNextTurn?.result_type === 'PUTBACK_MISS')
-      });
-      // ✅ REMOVED: Calling handleOffensiveRebound logging (cluttering console)
       await this.handleOffensiveRebound(rebounderSprite, turnData);
     } else {
       // ✅ REMOVED: Unknown rebound type logging (cluttering console)

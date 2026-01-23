@@ -34,7 +34,6 @@ async function validatePointer(pointerType, pointerValue) {
     
     if (response.ok) {
       const data = await response.json();
-      console.log(`✅ [VALIDATE-POINTER] ${pointerType} is valid:`, data);
       return true;
     } else {
       const errorData = await response.json().catch(() => ({ detail: response.statusText }));

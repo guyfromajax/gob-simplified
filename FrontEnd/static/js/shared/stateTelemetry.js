@@ -16,12 +16,12 @@
 
 // Configuration
 const TELEMETRY_CONFIG = {
-  enabled: true, // Set to false to disable all telemetry
+  enabled: false, // Set to false to disable all telemetry (disabled by default - was for Phase 1.3 work)
   logLevel: 'info', // 'debug', 'info', 'warn', 'error'
-  logReads: true, // Log state reads
-  logWrites: true, // Log state writes
-  logViolations: true, // Log contract violations
-  logCache: true, // Log cache hits/misses
+  logReads: false, // Log state reads
+  logWrites: false, // Log state writes
+  logViolations: false, // Log contract violations
+  logCache: false, // Log cache hits/misses
   groupByPage: true, // Group logs by page/component
 };
 

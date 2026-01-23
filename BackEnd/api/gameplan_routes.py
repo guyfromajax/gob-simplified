@@ -1146,14 +1146,11 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                         target_team = gm.away_team
                     
                     if target_team and hasattr(target_team, 'strategy_settings') and target_team.strategy_settings:
-                        inside_value = target_team.strategy_settings.get("inside")
-                        logger.warning(f"✅ [GET-GAMEPLAN] Found GameManager settings for single mode: team={target_team.name}, inside={inside_value}")
-                        logger.warning(f"✅ [CACHE-TELEMETRY] Cache HIT: get_gameplan({game_id}) - using GameManager cache")
                         use_gamemanager_settings = True
                     else:
-                        logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: get_gameplan({game_id}) - GameManager found but no strategy_settings, reading from DB")
+                        use_gamemanager_settings = False
                 else:
-                    logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: get_gameplan({game_id}) - GameManager not available, reading from DB")
+                    use_gamemanager_settings = False
             except Exception as e:
                 logger.warning(f"⚠️ [GET-GAMEPLAN] Error checking GameManager: {e}")
                 gm = None
@@ -1214,10 +1211,9 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                                         # Game doc has settings - use it
                                         doc = game_doc
                                         load_from_game_doc = True
-                                        logger.warning(f"✅ [PHASE 5.7] Loading gameplan from game doc (game_id={game_id}, team_id={game_doc_team_id})")
                                         break
             except Exception as e:
-                logger.warning(f"⚠️ [PHASE 5.7] Error checking game doc, falling back to master: {e}")
+                pass
         
         # If not loading from game doc, load from master doc (existing logic)
         if not load_from_game_doc:
@@ -1257,7 +1253,6 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
             # Loading from game doc - use game doc team_id
             authoritative_team_id = game_doc_team_id
             team_obj = doc.get("teams", {}).get(authoritative_team_id, {})
-            logger.warning(f"✅ [PHASE 5.7] Using game doc team_id: {authoritative_team_id}")
         elif mode == "franchise":
             # ✅ SS&S: Always use franchise document's user_team_object_id as source of truth
             user_team_id_name, user_team_object_id = get_user_team_from_franchise(doc)
@@ -1346,31 +1341,16 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
             
             if target_team and hasattr(target_team, 'strategy_settings') and target_team.strategy_settings:
                 strategy_settings = target_team.strategy_settings
-                logger.warning(f"✅ [GET-GAMEPLAN] Using GameManager strategy_settings: inside={strategy_settings.get('inside')}")
             else:
                 strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
         elif mode == "single" and not use_gamemanager_settings:
             # ✅ SS&S: GameManager not available - use load_team_settings_from_doc() (same as simulate_quarter_endpoint)
-            logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: get_gameplan({game_id}) - GameManager not available, reading from DB")
             from BackEnd.api.api import load_team_settings_from_doc
             settings = load_team_settings_from_doc(mode, doc_id, team_id, team_id)
             strategy_settings = settings.get("strategy_settings") or team_obj.get("strategy_settings", defaults["strategy_settings"])
-            if strategy_settings:
-                inside_value = strategy_settings.get("inside")
-                logger.warning(f"✅ [GET-GAMEPLAN] Using load_team_settings_from_doc() (same as game start): inside={inside_value}")
         else:
             strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
         
-        # ✅ TRACE: Log strategy_settings loaded from DB or GameManager
-        trace_id = f"{mode}_{doc_id}_{team_id}"
-        inside_value = strategy_settings.get("inside") if strategy_settings else None
-        team_id_for_log = actual_team_id if mode == "single" and 'actual_team_id' in locals() else (authoritative_team_id if mode in ["franchise", "tournament"] else "N/A")
-        source = "GameManager" if (mode == "single" and use_gamemanager_settings and gm) else "DB"
-        logger.warning(f"🟢 [TRACE-LOAD] {trace_id} | GET-GAMEPLAN | team_id={team_id_for_log}, inside={inside_value}, has_settings={bool(strategy_settings)}, source={source}")
-        
-        # ✅ PHASE 1.3: Telemetry - Log state read
-        source_type = "gameStore" if (mode == "single" and use_gamemanager_settings and gm) else "backend"
-        logger.warning(f"🔵 [STATE-READ] [get_gameplan] strategy_settings from {source_type} | team_id={team_id_for_log}, inside={inside_value}")
         
         # ✅ FIX: Normalize legacy keys and ensure all required fields exist
         # Map old key names to new ones (for backward compatibility)
@@ -1518,9 +1498,6 @@ def update_gameplan(request: GamePlanUpdateRequest):
         inside_value = request.strategy_settings.get("inside", "MISSING") if request.strategy_settings else "MISSING"
         logger.warning(f"🔵 [TRACE-SAVE] {trace_id} | SAVE-GAMEPLAN START | team={actual_team_id}, inside={inside_value}, sample={strategy_sample}")
         
-        # ✅ PHASE 1.3: Telemetry - Log state write
-        logger.warning(f"🟢 [STATE-WRITE] [update_gameplan] strategy_settings to backend | team_id={actual_team_id}, inside={inside_value}, endpoint=/api/gameplan")
-        
         # ✅ PHASE 5.7: Determine save location for franchise/tournament mode
         # If game is active, save to game doc; otherwise save to master doc
         save_to_game_doc = False
@@ -1566,15 +1543,8 @@ def update_gameplan(request: GamePlanUpdateRequest):
                                 game_doc_team_id = tid
                                 break
                         
-                        logger.warning(f"✅ [PHASE 5.7] Resolved game doc team_id: {game_doc_team_id} (from master team_id: {actual_team_id})")
                 except Exception as e:
-                    logger.warning(f"⚠️ [PHASE 5.7] Error resolving game doc team_id, using actual_team_id: {e}")
                     game_doc_team_id = actual_team_id
-                
-                logger.warning(f"✅ [PHASE 5.7] Saving gameplan to game doc (game_id={save_doc_id})")
-            else:
-                # Keep existing collection/doc_id (master doc)
-                logger.warning(f"✅ [PHASE 5.7] Saving gameplan to master doc (franchise_id={request.franchise_id or request.tournament_id})")
         
         # ✅ PHASE 5.5: Use helper to get update path
         # If saving to game doc, use "teams" path with game doc team_id (like single mode)
@@ -1589,10 +1559,6 @@ def update_gameplan(request: GamePlanUpdateRequest):
         }
         
         logger.warning(f"💾 [SAVE-GAMEPLAN] Update path: {update_path}, doc_id={doc_id}, mode={request.mode}, save_to_game_doc={save_to_game_doc}")
-        
-        # ✅ PHASE 1.3: Telemetry - Log state write
-        inside_value = request.strategy_settings.get("inside", "MISSING") if request.strategy_settings else "MISSING"
-        logger.warning(f"🟢 [STATE-WRITE] [update_gameplan] strategy_settings to backend | team_id={actual_team_id}, inside={inside_value}, endpoint=/api/gameplan")
         
         # Handle different ID formats for different modes
         if request.mode == "single":
@@ -1728,21 +1694,14 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                             target_team = gm.away_team
                         
                         if target_team and hasattr(target_team, 'playbook_settings') and target_team.playbook_settings:
-                            slot_count = len(target_team.playbook_settings.get("slot_assignments", {}))
-                            logger.warning(f"✅ [GET-PLAYBOOKS] Found GameManager settings for single mode: team={target_team.name}, slot_assignments={slot_count}")
-                            logger.warning(f"✅ [CACHE-TELEMETRY] Cache HIT: get_playbooks({game_id}) - using GameManager cache")
                             use_gamemanager_settings = True
                         else:
-                            logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: get_playbooks({game_id}) - GameManager found but no playbook_settings, reading from DB")
+                            use_gamemanager_settings = False
                     else:
-                        logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: get_playbooks({game_id}) - GameManager not available, reading from DB")
+                        use_gamemanager_settings = False
                 except Exception as e:
-                    logger.warning(f"⚠️ [GET-PLAYBOOKS] Error checking GameManager: {e}")
-                    logger.warning(f"❌ [CACHE-TELEMETRY] Cache ERROR: get_playbooks({game_id}) - exception checking cache: {e}")
                     gm = None
                     use_gamemanager_settings = False
-            else:
-                logger.warning(f"🔄 [CACHE-TELEMETRY] Cache SKIP: get_playbooks({game_id}) - source=db, forcing DB read")
         # For tournament/franchise modes, GameManager is not used - continue to DB load
         
         # ✅ PERFORMANCE DIAGNOSTIC: Measure database query time
@@ -1802,10 +1761,9 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                                         # Game doc has settings - use it
                                         doc = game_doc
                                         load_from_game_doc = True
-                                        logger.warning(f"✅ [PHASE 5.7] Loading playbooks from game doc (game_id={game_id}, team_id={game_doc_team_id})")
                                         break
             except Exception as e:
-                logger.warning(f"⚠️ [PHASE 5.7] Error checking game doc, falling back to master: {e}")
+                pass
         
         # If not loading from game doc, load from master doc (existing logic)
         if not load_from_game_doc:
@@ -1843,7 +1801,6 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                     doc = collection.find_one({"_id": ObjectId(doc_id)})
             
             if not load_from_game_doc:
-                logger.warning(f"✅ [PHASE 5.7] Loading playbooks from master doc (franchise_id={franchise_id or tournament_id})")
         
         query_time = (time.time() - query_start) * 1000  # Convert to ms
         doc_size = len(str(doc)) if doc else 0
@@ -1861,7 +1818,6 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         if load_from_game_doc and game_doc_team_id:
             # Loading from game doc - use game doc team_id
             authoritative_team_id = game_doc_team_id
-            logger.warning(f"✅ [PHASE 5.7] Using game doc team_id: {authoritative_team_id}")
         elif mode == "franchise":
             # Always use franchise document's user_team_object_id as source of truth
             user_team_id_name, user_team_object_id = get_user_team_from_franchise(doc)
@@ -2140,7 +2096,6 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             
             if target_team and hasattr(target_team, 'playbook_settings') and target_team.playbook_settings:
                 playbook_settings = target_team.playbook_settings
-                logger.warning(f"✅ [GET-PLAYBOOKS] Using GameManager playbook_settings: slot_assignments={len(playbook_settings.get('slot_assignments', {}))}")
                 # ✅ CRITICAL FIX: Check if position_filters are empty (same issue as DB path)
                 # GameManager's playbook_settings may have empty position_filters, which causes plays to not render
                 position_filters = playbook_settings.get("position_filters", {})
@@ -2153,19 +2108,8 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 
                 if not position_filters or all_empty:
                     # Position filters are missing or empty, populate them
-                    logger.warning(f"🔍 [GET-PLAYBOOKS] GameManager position_filters empty, populating...")
                     new_playbook_settings = initialize_playbook_settings()
                     playbook_settings["position_filters"] = new_playbook_settings["position_filters"]
-                    logger.warning(f"✅ [GET-PLAYBOOKS] Populated GameManager position_filters")
-                # ✅ DEBUG: Log GameManager playbook_settings structure
-                logger.warning(f"🔍 [GET-PLAYBOOKS DEBUG] GameManager playbook_settings structure:")
-                logger.warning(f"   - Type: {type(playbook_settings)}")
-                logger.warning(f"   - Top-level keys: {list(playbook_settings.keys()) if isinstance(playbook_settings, dict) else 'NOT A DICT'}")
-                if isinstance(playbook_settings, dict):
-                    logger.warning(f"   - motion type: {type(playbook_settings.get('motion'))}, keys: {list(playbook_settings.get('motion', {}).keys())[:3]}")
-                    logger.warning(f"   - set_play_inside type: {type(playbook_settings.get('set_play_inside'))}, keys: {list(playbook_settings.get('set_play_inside', {}).keys())[:3]}")
-                    logger.warning(f"   - set_play_attack type: {type(playbook_settings.get('set_play_attack'))}, keys: {list(playbook_settings.get('set_play_attack', {}).keys())[:3]}")
-                    logger.warning(f"   - set_play_outside type: {type(playbook_settings.get('set_play_outside'))}, keys: {list(playbook_settings.get('set_play_outside', {}).keys())[:3]}")
             else:
                 playbook_settings = team_obj.get("playbook_settings", {})
         elif mode == "single" and not use_gamemanager_settings:
@@ -2177,34 +2121,11 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             if not playbook_settings:
                 # Only fallback to team_obj if load_team_settings_from_doc() returned None (not empty dict)
                 playbook_settings = team_obj.get("playbook_settings", {})
-            if playbook_settings:
-                slot_count = len(playbook_settings.get("slot_assignments", {}))
-                logger.warning(f"✅ [GET-PLAYBOOKS] Using load_team_settings_from_doc() (same as game start): slot_assignments={slot_count}")
-            else:
-                logger.warning(f"⚠️ [GET-PLAYBOOKS] load_team_settings_from_doc() returned no playbook_settings, using empty dict")
         else:
             playbook_settings = team_obj.get("playbook_settings", {})
         
-        # ✅ DEBUG: Log slot_assignments for diagnosis
-        slot_count = len(playbook_settings.get("slot_assignments", {})) if playbook_settings else 0
-        # ✅ REMOVED: Verbose GET-PLAYBOOKS logs - redundant with trace logs
-        # ✅ PERFORMANCE: Removed debug logging - only log actual errors
-        
-        # ✅ PHASE 5.3: Removed core teams collection fallback - game document is single source of truth
-        
         slot_assignments = playbook_settings.get("slot_assignments", {}) if playbook_settings else {}
         motion_dropdowns = playbook_settings.get("motion_dropdowns", {}) if playbook_settings else {}
-        
-        # ✅ DEBUG: Log slot_assignments structure when returning to frontend
-        if slot_assignments:
-            logger.warning(f"🔍 [GET-PLAYBOOKS DEBUG] slot_assignments structure:")
-            logger.warning(f"   - Type: {type(slot_assignments)}")
-            logger.warning(f"   - Keys (slot numbers): {list(slot_assignments.keys())}")
-            if isinstance(slot_assignments, dict):
-                for slot_num, assignment in list(slot_assignments.items())[:2]:
-                    logger.warning(f"   - Slot {slot_num}: {assignment}")
-        else:
-            logger.warning(f"🔍 [GET-PLAYBOOKS DEBUG] slot_assignments is empty or missing")
         
         # Get position filters (merge with defaults if missing)
         default_position_filters = {
@@ -2231,21 +2152,8 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         zone_defense_percentages = playbook_settings.get("zone_defense", {}) if playbook_settings else {}
         man_defense_percentages = playbook_settings.get("man_defense", {}) if playbook_settings else {}
         
-        # ✅ DEBUG: Log extracted percentages structure
-        logger.warning(f"🔍 [GET-PLAYBOOKS DEBUG] Extracted percentages structure:")
-        logger.warning(f"   - motion_percentages type: {type(motion_percentages)}, keys: {list(motion_percentages.keys())[:3] if isinstance(motion_percentages, dict) else 'NOT A DICT'}")
-        logger.warning(f"   - set_play_inside_percentages type: {type(set_play_inside_percentages)}, keys: {list(set_play_inside_percentages.keys())[:3] if isinstance(set_play_inside_percentages, dict) else 'NOT A DICT'}")
-        logger.warning(f"   - set_play_attack_percentages type: {type(set_play_attack_percentages)}, keys: {list(set_play_attack_percentages.keys())[:3] if isinstance(set_play_attack_percentages, dict) else 'NOT A DICT'}")
-        logger.warning(f"   - set_play_outside_percentages type: {type(set_play_outside_percentages)}, keys: {list(set_play_outside_percentages.keys())[:3] if isinstance(set_play_outside_percentages, dict) else 'NOT A DICT'}")
-        
         # Get even_distribution_all flag (defaults to False if not set)
         even_distribution_all = playbook_settings.get("even_distribution_all", False)
-        
-        # ✅ PHASE 1.3: Telemetry - Log state read
-        source_type = "gameStore" if (mode == "single" and use_gamemanager_settings and gm) else "backend"
-        slot_count = len(playbook_settings.get("slot_assignments", {})) if playbook_settings else 0
-        team_id_for_log = actual_team_id if mode == "single" and 'actual_team_id' in locals() else (authoritative_team_id if mode in ["franchise", "tournament"] else team_id)
-        logger.warning(f"🔵 [STATE-READ] [get_playbooks] playbook_settings from {source_type} | team_id={team_id_for_log}, slot_assignments={slot_count}, endpoint=/api/playbooks")
         
         return {
             "motion": motion_plays,
@@ -2373,18 +2281,6 @@ def save_playbooks(request: PlaybookSettingsRequest):
         # ✅ REMOVED: Verbose resolved team_id log - redundant with trace logs
         
         # ✅ REMOVED: Verbose slot assignment logs - redundant with trace logs
-        
-        # ✅ DEBUG: Log playbook_settings structure being saved (before ensure_team_objects_exist)
-        if request.playbook_settings:
-            logger.warning(f"🔍 [SAVE-PLAYBOOKS DEBUG] playbook_settings structure BEFORE save:")
-            logger.warning(f"   - Top-level keys: {list(request.playbook_settings.keys())}")
-            logger.warning(f"   - motion keys: {list(request.playbook_settings.get('motion', {}).keys())}")
-            logger.warning(f"   - set_play_inside keys: {list(request.playbook_settings.get('set_play_inside', {}).keys())}")
-            logger.warning(f"   - set_play_attack keys: {list(request.playbook_settings.get('set_play_attack', {}).keys())}")
-            logger.warning(f"   - set_play_outside keys: {list(request.playbook_settings.get('set_play_outside', {}).keys())}")
-            logger.warning(f"   - slot_assignments count: {len(request.playbook_settings.get('slot_assignments', {}))}")
-            slot_sample = dict(list(request.playbook_settings.get('slot_assignments', {}).items())[:2])
-            logger.warning(f"   - slot_assignments sample: {slot_sample}")
         
         # ✅ FIX: Ensure team objects exist AFTER resolving actual_team_id
         # This ensures we're using the correct team_id when creating/updating team objects

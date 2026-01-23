@@ -301,12 +301,6 @@ export class AnimationEngine {
     if (hasFCPHCTSetup) {
       this.scene.currentPressureType = turnData.next_defensive_setup; // "FCP" or "HCT"
       this.scene.pressureSequenceActive = true;
-      console.log('🎯 [FCP/HCT SETUP DETECTED] Positioning players and animating inbound pass', {
-        pressureType: this.scene.currentPressureType,
-        pressureSequenceActive: this.scene.pressureSequenceActive,
-        result_type: turnData.result_type,
-        next_defensive_setup: turnData.next_defensive_setup
-      });
       // ✅ NEW APPROACH: Animate the inbound pass HERE (using skeleton step 0 positions)
       // Skeleton will start from old step 1 (after the pass is complete)
     } else {

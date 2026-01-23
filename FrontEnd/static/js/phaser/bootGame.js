@@ -80,8 +80,6 @@ const bootGameParams = {
   quarter: urlParams.get('quarter'),
   allParams: Object.fromEntries(urlParams.entries())
 };
-console.log('🔍 [BOOTGAME] Court page loaded with URL params:', bootGameParams);
-console.warn('⚠️ [BOOTGAME] CRITICAL CHECK - game_id:', bootGameParams.game_id, 'resume_from_timeout:', bootGameParams.resume_from_timeout);
 
 // ✅ PHASE 1.3: Instrument state reads
 const tournamentId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('tournament_id', urlParams.get('tournament_id')) : urlParams.get('tournament_id');
@@ -135,10 +133,7 @@ const teamId = urlParams.get('team_id') || (userTeamSide === 'home' ? urlParams.
 // On pre-game screen, quarter param is missing, so default to 0
 // This ensures "Sim Quarter" button simulates Q1 (0 + 1 = 1), not Q2 (1 + 1 = 2)
 let quarter = urlParams.has('quarter') ? parseInt(urlParams.get('quarter'), 10) : 0;
-console.log('🔍 [Q1 SKIP DEBUG] Quarter initialized:', { 
-  urlHasQuarter: urlParams.has('quarter'), 
-  urlQuarter: urlParams.get('quarter'), 
-  parsedQuarter: quarter,
+// Quarter initialization
   url: window.location.href 
 });
 // ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
@@ -171,7 +166,6 @@ async function validateGameIdIfPresent() {
 
   try {
     await window.PointerValidation.validateGameId(gameId);
-    console.log(`✅ [BOOTGAME] game_id validated: ${gameId}`);
   } catch (error) {
     const errorMsg = `Invalid game_id: ${gameId}. ${error.message}`;
     console.error(`❌ [BOOTGAME] ${errorMsg}`);
@@ -247,8 +241,6 @@ async function loadGamePlanSettings() {
     const res = await fetch(API_CONFIG.buildUrl(`/api/gameplan?${params.toString()}`));
     if (res.ok) {
       gamePlanSettings = await res.json();
-      console.log(`📋 Loaded game plan settings from database (${mode} mode):`, gamePlanSettings);
-      console.log('   - Aggression setting:', gamePlanSettings?.strategy_settings?.aggression);
     } else {
       console.error(`❌ Failed to load game plan settings (${mode} mode), status:`, res.status);
     }
@@ -1890,11 +1882,7 @@ async function handleButtonClick(animate) {
     // Validation failed - error already shown, don't proceed
     return;
   }
-  console.log('handleButtonClick called with animate:', animate);
-  console.log('Current state:', { isSimulating, gameId, quarter, homeTeam, awayTeam });
-  
   if (isSimulating) {
-    console.log('Already simulating, returning early');
     return;
   }
   
@@ -2018,7 +2006,7 @@ async function handleSimQuarter() {
   const nextQuarter = quarter + 1;
   
   // ✅ DEBUG: Log quarter calculation for debugging (including Q1 skip investigation)
-  console.log(`🔍 [Q1 SKIP DEBUG] handleSimQuarter called:`, {
+  // Handle sim quarter
     currentQuarter: quarter,
     nextQuarter: nextQuarter,
     urlQuarter: urlParams.get('quarter'),
@@ -2510,15 +2498,6 @@ async function initGame() {
   const urlResumeFromTimeoutParam = urlParams.get('resume_from_timeout');
   const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
   
-  console.warn('🔍 [TIMEOUT DETECTION] bootGame.js initGame() - Reading resume_from_timeout:', {
-    urlParam: urlResumeFromTimeoutParam,
-    parsedValue: resumeFromTimeout,
-    quarter: quarter,
-    gameId: gameId,
-    allUrlParams: Object.fromEntries(urlParams.entries()),
-    currentUrl: window.location.href
-  });
-  
   // ✅ CRITICAL FIX: Explicitly control pre-game container visibility
   // Rule: Show pre-game container UNLESS we're resuming from timeout or foul out
   // Quarter breaks (resume_from_timeout=false or missing) should always show popup
@@ -2527,24 +2506,16 @@ async function initGame() {
   const preGameContainer = document.querySelector('.pre-game-container');
   if (preGameContainer) {
     if (resumeFromTimeout) {
-      console.warn(`🔍 [TIMEOUT DETECTION] HIDING pre-game container (resumeFromTimeout=true - timeout/foul out resume)`);
       preGameContainer.classList.add('hidden');
     } else {
-      console.warn(`🔍 [TIMEOUT DETECTION] SHOWING pre-game container (resumeFromTimeout=false or missing - quarter break)`);
       preGameContainer.classList.remove('hidden');
     }
-  } else {
-    console.error('🔍 [TIMEOUT DETECTION] Pre-game container not found!');
   }
   
   if (playBtn) {
-    console.log('Adding click listener to Play Quarter button');
     playBtn.addEventListener('click', async () => {
-      console.log('🚨 BUTTON CLICKED: Play Quarter button clicked!');
-      console.log('🚨 BUTTON CLICKED: About to call handleButtonClick');
       try {
         await handleButtonClick(true);
-        console.log('🚨 BUTTON CLICKED: handleButtonClick completed successfully');
       } catch (error) {
         console.error('🚨 BUTTON CLICKED: handleButtonClick failed:', error);
       }
