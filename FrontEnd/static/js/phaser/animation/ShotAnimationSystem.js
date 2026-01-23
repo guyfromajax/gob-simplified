@@ -381,10 +381,8 @@ export class ShotAnimationSystem {
       
       const isOffensivePlayer = offenseTeamId ? String(sprite.team_id) === String(offenseTeamId) : false;
       playerClassifications[anim.playerId] = isOffensivePlayer ? 'offense' : 'defense';
-          match: String(sprite.team_id) === String(offenseTeamId),
-          isOffensivePlayer
-        });
-      }
+      
+      if (isOffensivePlayer) {
       
       if (isOffensivePlayer) {
         offensiveCount++;
