@@ -439,12 +439,16 @@ async function saveSettingsQuietly() {
       strategy_settings: currentSettings.strategy_settings
     };
     
+    // ✅ PHASE 5.7: Include game_id when available (for all modes)
+    // Backend will determine if game is active and save to game doc or master doc accordingly
+    if (gameId) {
+      payload.game_id = gameId;
+    }
+    
     if (mode === 'franchise' && franchiseId) {
       payload.franchise_id = franchiseId;
     } else if (mode === 'tournament' && tournamentId) {
       payload.tournament_id = tournamentId;
-    } else if (mode === 'single' && gameId) {
-      payload.game_id = gameId;
     }
     
     // ✅ PHASE 1.3: Log backend write
