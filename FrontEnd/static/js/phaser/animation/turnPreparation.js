@@ -202,6 +202,23 @@ export async function finalizeTurnAfterAnimation({
   turnIndex,
   updateDebugScore 
 }) {
+  // ✅ TIMEOUT: Check if timeout is pending execution after turn completes
+  if (scene.timeoutPendingExecution) {
+    const { timeoutQueuedDuringEligibleTurn, currentTurnIndex, timeoutQueuedAtTurnIndex } = scene.timeoutPendingExecution;
+    console.log('🔍 [TIMEOUT DEBUG] Turn completed, executing pending timeout');
+    
+    // Clear the flag
+    delete scene.timeoutPendingExecution;
+    
+    // Import and execute timeout
+    try {
+      const { handleTimeoutButtonClick } = await import('../utils/timeoutButtonManager.js');
+      await handleTimeoutButtonClick(true); // Pass true to skip toggle (just execute)
+    } catch (error) {
+      console.error('❌ TIMEOUT: Failed to execute pending timeout after turn completion:', error);
+    }
+  }
+  
   // ✅ UNIVERSAL TRANSITION HANDLER - Handle possession flips and state transitions
   // This runs FIRST to ensure possession is correct before other finalization steps
   handleTurnTransition(scene, turn);
