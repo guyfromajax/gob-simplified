@@ -16,6 +16,7 @@ import AnimationEngine from './AnimationEngine.js';
 import { getBallController } from './BallControllerAdapter.js';
 import { DebugFlags, animationDebugLog } from '../utils/debugFlags.js';
 import { prepareTurnForAnimation, finalizeTurnAfterAnimation } from './turnPreparation.js';
+import { ENABLE_TIMEOUT_BUTTON } from '../utils/timeoutButtonManager.js';
 
 export class AnimationRouter {
   constructor(scene, playerSprites, ballSprite, onUpdate, onAction = null, updateDebugScore = null) {
