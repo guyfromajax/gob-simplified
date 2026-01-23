@@ -2166,10 +2166,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   
   // 🔍 DEBUG: Log team_id format mismatch detection
   // Classify players as offense or defense
-      turnIndex: turnData?.index,
-      playerSpritesCount: Object.keys(playerSprites).length
-    });
-  }
   
   for (const anim of turnData.animations) {
     const sprite = playerSprites[anim.playerId];
