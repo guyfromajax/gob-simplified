@@ -1,8 +1,9 @@
 # Phase 5.7: Game-Scoped Settings Bug - Settings Persisting to Master Doc
 
-**Status:** 🔴 Bug - Settings changes during gameplay saving to master doc instead of game doc
+**Status:** ✅ Fixed - Settings changes during gameplay now save to game doc correctly
 
-**Date:** 2024-12-XX
+**Date:** 2024-12-XX  
+**Fixed:** 2025-01-XX
 
 **Issue:**
 Settings changes made during active gameplay in franchise/tournament mode are persisting back to the FCC (master settings) instead of being scoped to the game document only.
@@ -60,5 +61,10 @@ Based on Railway logs, the conditional save logic (`[PHASE 5.7] Saving playbooks
 
 **Fix Priority:** Medium (not blocking, but breaks expected behavior)
 
-**Related:** Phase 5.7 implementation (Tasks 1-4 complete, Tasks 5-6 pending)
+**Fix Applied:**
+- Updated `game-plan.js` to include `game_id` in save payload when available (all modes)
+- Updated `playbooks.js` to include `game_id` in save payload when available (all modes)
+- Backend logic already handles conditional save correctly (checks if game is active)
+
+**Related:** Phase 5.7 implementation (Tasks 1-5 complete, Task 6 unblocked)
 

@@ -555,7 +555,7 @@
      - Phase 5.7 Task 4 ensures `load_team_settings_from_doc()` loads from game doc first
      - Settings flow: Game doc → GameManager → `summarize_game_state()` → Preserved
 
-6. **Comprehensive Testing** ⏸️ **BLOCKED**
+6. **Comprehensive Testing** ✅ **UNBLOCKED**
    - **Action:** Test all scenarios:
      - Settings initialized from master at game start
      - Settings changes during gameplay save to game doc
@@ -565,10 +565,10 @@
      - Settings load correctly from game doc during active gameplay
      - Settings load correctly from master when no active game
    - **Validation:** All scenarios work correctly
-   - **Status:** Blocked by bug documented in `docs/To Do/phase5_7_game_scoped_settings_bug.md`
-     - Settings are saving to master doc instead of game doc during gameplay
-     - Root cause: Likely `game_id` not being passed in save requests from frontend
-     - Testing cannot proceed until bug is fixed
+   - **Status:** Bug fixed - `game_id` now included in save requests for all modes
+     - **Fix:** Updated `game-plan.js` and `playbooks.js` to include `game_id` when available
+     - **Result:** Backend conditional save logic now works correctly (saves to game doc during active gameplay)
+     - **Testing:** Ready to proceed with comprehensive testing
 
 **Edge Cases to Handle:**
 - User changes settings before starting game → Saves to master (franchise/tournament doc)
