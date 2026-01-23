@@ -244,17 +244,10 @@ async function handleTimeoutButtonClick(executeOnly = false) {
             return;
         }
         
-        // If we're toggling on, check if current turn is eligible
-        const currentTurnData = scene.currentTurnData || {};
-        if (checkTimeoutEligibility(scene, currentTurnData)) {
-            // Current turn is eligible, execute immediately
-            console.log('⏸️ TIMEOUT: Current turn is eligible, executing immediately');
-            // Continue to execute timeout below
-        } else {
-            // Not eligible yet, wait for next eligible turn
-            console.log('⏸️ TIMEOUT: Queued - waiting for eligible turn');
-            return;
-        }
+        // Always queue and wait for the START of the next eligible turn
+        // Don't execute immediately even if current turn is eligible
+        console.log('⏸️ TIMEOUT: Queued - will execute at start of next eligible turn');
+        return;
     }
     
     // Execute the timeout
@@ -309,14 +302,103 @@ async function handleTimeoutButtonClick(executeOnly = false) {
         // Reset queue state
         resetTimeoutQueue();
         
-        // Navigate to lineup screen
-        await showTimeoutPopup(result, gameId, scene);
+        // Show popup first, then navigate when user clicks "Go To Timeout" button
+        await showUserTimeoutPopup(result, gameId, scene);
         
     } catch (error) {
         console.error('❌ TIMEOUT: Error calling timeout', error);
         alert('Failed to call timeout. Please try again.');
         resetTimeoutQueue();
     }
+}
+
+/**
+ * Show user timeout popup with "Go To Timeout" button
+ * @param {Object} timeoutResult - Timeout result object
+ * @param {string} gameId - Game ID
+ * @param {Object} scene - Game scene object
+ */
+async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
+    // Remove any existing popup
+    const existingPopup = document.querySelector('.user-timeout-popup');
+    if (existingPopup) {
+        existingPopup.remove();
+    }
+    
+    // Get user team name
+    const urlParams = new URLSearchParams(window.location.search);
+    const myTeamSide = scene.userTeamSide || urlParams.get('my_team');
+    const homeTeamId = scene.simData?.home_team_id;
+    const awayTeamId = scene.simData?.away_team_id;
+    const teamsObj = scene.simData?.teams || {};
+    
+    const userTeamName = myTeamSide === 'home' 
+        ? ((homeTeamId && teamsObj[homeTeamId]?.name) || scene.simData?.home_team?.name || scene.homeTeam?.name || 'Your Team')
+        : ((awayTeamId && teamsObj[awayTeamId]?.name) || scene.simData?.away_team?.name || scene.awayTeam?.name || 'Your Team');
+    
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'user-timeout-popup';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+    
+    // Create modal
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        background: #1a1a1a;
+        border: 2px solid #28a745;
+        border-radius: 8px;
+        padding: 24px;
+        max-width: 400px;
+        width: 90%;
+        color: #fff;
+        text-align: center;
+    `;
+    
+    // Message
+    const messageEl = document.createElement('p');
+    messageEl.textContent = `${userTeamName} called timeout`;
+    messageEl.style.cssText = `
+        font-size: 1.25rem;
+        margin-bottom: 24px;
+        font-weight: 600;
+        color: #28a745;
+    `;
+    
+    // Go To Timeout button
+    const goToTimeoutBtn = document.createElement('button');
+    goToTimeoutBtn.textContent = 'Go To Timeout';
+    goToTimeoutBtn.style.cssText = `
+        padding: 12px 30px;
+        background: #28a745;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        width: 100%;
+    `;
+    goToTimeoutBtn.addEventListener('click', async () => {
+        overlay.remove();
+        // Navigate to lineup screen
+        await showTimeoutPopup(timeoutResult, gameId, scene);
+    });
+    
+    modal.appendChild(messageEl);
+    modal.appendChild(goToTimeoutBtn);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
 }
 
 /**
