@@ -520,6 +520,8 @@ class PlaybooksUI {
         };
         
         console.log('🔍 [POSITION FILTERS] Loaded from API:', this.positionFilters);
+        console.log('🔍 [POSITION FILTERS] Data source:', data.position_filters ? 'has position_filters' : 'missing position_filters, using defaults');
+        console.log('🔍 [POSITION FILTERS] positionFilters keys:', Object.keys(this.positionFilters));
         
         // Store saved playbook percentages for later use
         this.savedPlaybookPercentages = data.playbook_percentages || {};
@@ -1926,7 +1928,9 @@ class PlaybooksUI {
     // Union (OR) logic: play must be in ANY selected position array
     // "Standard" is treated like any other position - only shows plays in its list
     if (!this.positionFilters) {
-      console.log('🔍 [SHOULD SHOW PLAY] No positionFilters loaded, hiding play:', playId);
+      console.log('❌ [SHOULD SHOW PLAY] No positionFilters loaded, hiding play:', playId);
+      console.log('❌ [SHOULD SHOW PLAY] positionFilters is:', this.positionFilters);
+      console.log('❌ [SHOULD SHOW PLAY] This may indicate cached data is missing position_filters');
       return false;
     }
     
