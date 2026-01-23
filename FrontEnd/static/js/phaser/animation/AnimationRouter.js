@@ -155,6 +155,20 @@ export class AnimationRouter {
         // Processing (log removed)
       }
 
+      // ✅ TIMEOUT: Check if we should kill current turn instantly (during active turn)
+      if (ENABLE_TIMEOUT_BUTTON) {
+        const { shouldKillCurrentTurnInstantly, killCurrentTurnAndExecuteTimeout } = await import('../utils/timeoutButtonManager.js');
+        // Store current turn data for timeout check
+        this.scene.currentTurnData = turnData;
+        if (shouldKillCurrentTurnInstantly(this.scene, turnData)) {
+          const killed = await killCurrentTurnAndExecuteTimeout(this.scene, turnData);
+          if (killed) {
+            // Timeout was executed, stop processing this turn
+            return;
+          }
+        }
+      }
+      
       // ✅ PHASE 2.1: Enhanced context object with all required parameters
       const context = {
         playerSprites: this.playerSprites,
