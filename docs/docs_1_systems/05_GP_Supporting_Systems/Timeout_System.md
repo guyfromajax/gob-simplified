@@ -684,19 +684,23 @@ This prevents stale timeout state from affecting future games.
 - `ENABLE_TIMEOUT_BUTTON = true` (feature flag for modularity)
 
 **Button State:**
-- **Live:** Button is enabled and clickable (during 2.5-second pause window)
-- **Dead:** Button is disabled with reduced opacity (all other times)
+- **Always Live:** Button is always enabled and clickable (no restrictions)
+- **Highlighted:** When user presses button, green highlight effect appears (indicates timeout is queued)
+- **Toggleable:** User can press button again to cancel timeout queue (removes highlight)
 
-**2.5-Second Pause Window:**
-- The timeout button is live during a mandatory 2.5-second pause at the start of SIP and BIP turns
-- Location: `FrontEnd/static/js/phaser/animation/turnAnimation.js`
-- Progress bar appears during pause (orange fill with green border)
-- Button becomes dead when inbound pass starts
-
-**Timeout Eligibility:**
-- The button is live for all SIP and BIP turns if:
-  - The turn is a SIP or BIP turn
-  - The team has timeouts remaining (checked via `/api/call-timeout` endpoint)
+**Timeout Eligibility Check:**
+- Location: `FrontEnd/static/js/phaser/utils/timeoutButtonManager.js` `checkTimeoutEligibility()`
+- **Two-step check (in order):**
+  1. **BIP/SIP Check (Always Eligible):** If turn is `BASELINE_INBOUND` or `SIDE_INBOUND`, timeout is always eligible (checked first)
+  2. **User Team Offense Check:** If user's team is on offense, timeout is eligible
+- **Field Resolution:**
+  - Uses `offense_team_id` as primary field (SS&S canonical field, set for all turns)
+  - Falls back to `possession_team_id` for backward compatibility (deprecated, only set for some turn types)
+  - **Note:** `possession_team_id` is not set for `BASELINE_INBOUND` turns, so `offense_team_id` is required
+- **Eligible Turns:**
+  - Any possession where the user team is on offense
+  - Any `BASELINE_INBOUND` (BIP) turn
+  - Any `SIDE_INBOUND` (SIP) turn
 
 **Animation Freezing:**
 - When timeout button is pressed, all animations are immediately paused
