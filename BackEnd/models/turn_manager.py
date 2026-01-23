@@ -1461,44 +1461,18 @@ class TurnManager:
         offense_has_settings = hasattr(self.game.offense_team, 'strategy_settings') and self.game.offense_team.strategy_settings is not None
         offense_is_empty = isinstance(self.game.offense_team.strategy_settings, dict) and len(self.game.offense_team.strategy_settings) == 0
         offense_is_user = self.game.offense_team.is_user_team
-        offense_inside = self.game.offense_team.strategy_settings.get('inside', 'MISSING') if offense_has_settings else 'MISSING'
-        logging.warning(f"🔴 [TRACE-OVERWRITE] {trace_id} | OFFENSE CHECK | team={self.game.offense_team.name}, is_user={offense_is_user}, has_settings={offense_has_settings}, is_empty={offense_is_empty}, inside={offense_inside}")
-        
         if not offense_has_settings:
-            logging.warning(f"🔴 [TRACE-OVERWRITE] {trace_id} | OFFENSE OVERWRITE | Missing settings, initializing with defaults")
-            before_inside = offense_inside
             self.game.offense_team.strategy_settings = self.game.offense_team._init_strategy_settings()
-            after_inside = self.game.offense_team.strategy_settings.get('inside', 'MISSING')
-            logging.warning(f"🔴 [TRACE-OVERWRITE] {trace_id} | OFFENSE OVERWRITE | before_inside={before_inside}, after_inside={after_inside}")
         elif offense_is_empty:
-            logging.warning(f"🔴 [TRACE-OVERWRITE] {trace_id} | OFFENSE OVERWRITE | Empty dict detected, initializing with defaults")
-            before_inside = offense_inside
             self.game.offense_team.strategy_settings = self.game.offense_team._init_strategy_settings()
-            after_inside = self.game.offense_team.strategy_settings.get('inside', 'MISSING')
-            logging.warning(f"🔴 [TRACE-OVERWRITE] {trace_id} | OFFENSE OVERWRITE | before_inside={before_inside}, after_inside={after_inside}")
-        else:
-            logging.warning(f"🟢 [TRACE-OVERWRITE] {trace_id} | OFFENSE PRESERVED | Settings exist, not overwriting, inside={offense_inside}")
         
         defense_has_settings = hasattr(self.game.defense_team, 'strategy_settings') and self.game.defense_team.strategy_settings is not None
         defense_is_empty = isinstance(self.game.defense_team.strategy_settings, dict) and len(self.game.defense_team.strategy_settings) == 0
-        defense_is_user = self.game.defense_team.is_user_team
-        defense_inside = self.game.defense_team.strategy_settings.get('inside', 'MISSING') if defense_has_settings else 'MISSING'
-        logging.warning(f"🔴 [TRACE-OVERWRITE] {trace_id} | DEFENSE CHECK | team={self.game.defense_team.name}, is_user={defense_is_user}, has_settings={defense_has_settings}, is_empty={defense_is_empty}, inside={defense_inside}")
         
         if not defense_has_settings:
-            logging.warning(f"🔴 [TRACE-OVERWRITE] {trace_id} | DEFENSE OVERWRITE | Missing settings, initializing with defaults")
-            before_inside = defense_inside
             self.game.defense_team.strategy_settings = self.game.defense_team._init_strategy_settings()
-            after_inside = self.game.defense_team.strategy_settings.get('inside', 'MISSING')
-            logging.warning(f"🔴 [TRACE-OVERWRITE] {trace_id} | DEFENSE OVERWRITE | before_inside={before_inside}, after_inside={after_inside}")
         elif defense_is_empty:
-            logging.warning(f"🔴 [TRACE-OVERWRITE] {trace_id} | DEFENSE OVERWRITE | Empty dict detected, initializing with defaults")
-            before_inside = defense_inside
             self.game.defense_team.strategy_settings = self.game.defense_team._init_strategy_settings()
-            after_inside = self.game.defense_team.strategy_settings.get('inside', 'MISSING')
-            logging.warning(f"🔴 [TRACE-OVERWRITE] {trace_id} | DEFENSE OVERWRITE | before_inside={before_inside}, after_inside={after_inside}")
-        else:
-            logging.warning(f"🟢 [TRACE-OVERWRITE] {trace_id} | DEFENSE PRESERVED | Settings exist, not overwriting, inside={defense_inside}")
         
         # 🐛 DEBUG: Log strategy settings being used
         # ✅ COMMENTED OUT: Strategy settings logs (cluttering transition debugging)
@@ -2466,9 +2440,38 @@ class TurnManager:
                         # This ensures the stat is on the same object instance used for delta computation.
                         # The stat was already recorded in shared.py, but we re-record here to guarantee
                         # it's on the correct object instance (matches HCO miss pattern in shot_manager.py).
+                        
+                        # 🔍 DEBUG: Log BEFORE stat recording
+                        rebounder_name = get_name_safe(new_rebounder)
+                        rebounder_obj_id = id(new_rebounder)
+                        rebounder_team = getattr(new_rebounder, "team", None)
+                        rebounder_team_id = getattr(new_rebounder, "team_id", None)
+                        rebounder_pos = None
+                        for pos, player in (off_team.lineup.items() if new_rebounder in off_team.get_all_players() else def_team.lineup.items()):
+                            if player.player_id == rebounder_id:
+                                rebounder_pos = pos
+                                break
+                        
+                        oreb_before = new_rebounder.stats["game"].get("OREB", 0)
+                        dreb_before = new_rebounder.stats["game"].get("DREB", 0)
+                        reb_before = new_rebounder.stats["game"].get("REB", 0)
+                        logging.warning(f"🔍 [PUTBACK MISS => REBOUND] BEFORE record_stat: {rebounder_name} (ID: {rebounder_id}, Pos: {rebounder_pos}), "
+                                      f"Object ID: {rebounder_obj_id}, Team: {rebounder_team}, Team ID: {rebounder_team_id}, "
+                                      f"OREB: {oreb_before}, DREB: {dreb_before}, REB: {reb_before}, Recording: {rebound_type}")
+                        
+                        # Record the stat
                         new_rebounder.record_stat(rebound_type)
-                        logging.info(f"✅ [PUTBACK MISS => REBOUND] Re-recorded {rebound_type} stat for {get_name_safe(new_rebounder)} (ID: {rebounder_id})")
-                        text += f" {get_name_safe(new_rebounder)} grabs the rebound."
+                        
+                        # 🔍 DEBUG: Log AFTER stat recording
+                        oreb_after = new_rebounder.stats["game"].get("OREB", 0)
+                        dreb_after = new_rebounder.stats["game"].get("DREB", 0)
+                        reb_after = new_rebounder.stats["game"].get("REB", 0)
+                        logging.warning(f"🔍 [PUTBACK MISS => REBOUND] AFTER record_stat: {rebounder_name} (ID: {rebounder_id}), "
+                                      f"Object ID: {rebounder_obj_id}, "
+                                      f"OREB: {oreb_after} (Δ{oreb_after - oreb_before}), DREB: {dreb_after} (Δ{dreb_after - dreb_before}), REB: {reb_after} (Δ{reb_after - reb_before})")
+                        
+                        logging.info(f"✅ [PUTBACK MISS => REBOUND] Re-recorded {rebound_type} stat for {rebounder_name} (ID: {rebounder_id})")
+                        text += f" {rebounder_name} grabs the rebound."
                         result["text"] = text
                     
                     # If it's another OREB, set pending for next turn

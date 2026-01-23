@@ -404,18 +404,9 @@ def simulate_quarter(
         
         # ✅ TIMEOUT: Only clear timeout state and return early if we actually handled a timeout resume
         if resume_from_timeout:
-            # 🔍 DEBUG: Log state BEFORE clearing
-            logging.warning(f"🔍 [TIMEOUT CLEAR DEBUG] BEFORE clear - game_id={game_id}, quarter={gm.quarter}")
-            logging.warning(f"🔍 [TIMEOUT CLEAR DEBUG] gm.game_state timeout fields: timeout_next_play_type={gm.game_state.get('timeout_next_play_type')}, timeout_offense_team_id={gm.game_state.get('timeout_offense_team_id')}")
-            logging.warning(f"🔍 [TIMEOUT CLEAR DEBUG] gm.score={gm.score}, clock={gm.game_state.get('clock')}, time_remaining={gm.game_state.get('time_remaining')}")
-            
             # ✅ TIMEOUT: Clear timeout state from memory
-            old_timeout_next_play_type = gm.game_state.pop("timeout_next_play_type", None)
-            old_timeout_offense_team_id = gm.game_state.pop("timeout_offense_team_id", None)  # Also clear possession team
-            
-            # 🔍 DEBUG: Log what was cleared from memory
-            logging.warning(f"🔍 [TIMEOUT CLEAR DEBUG] Cleared from memory: timeout_next_play_type={old_timeout_next_play_type}, timeout_offense_team_id={old_timeout_offense_team_id}")
-            logging.warning(f"🔍 [TIMEOUT CLEAR DEBUG] AFTER memory clear - gm.game_state timeout fields: timeout_next_play_type={gm.game_state.get('timeout_next_play_type')}, timeout_offense_team_id={gm.game_state.get('timeout_offense_team_id')}")
+            gm.game_state.pop("timeout_next_play_type", None)
+            gm.game_state.pop("timeout_offense_team_id", None)  # Also clear possession team
             
             # ✅ TIMEOUT: Clear timeout state from database after resume (defensive cleanup)
             # This prevents stale timeout state from affecting future games
@@ -423,20 +414,10 @@ def simulate_quarter(
                 try:
                     from BackEnd.db import games_collection
                     
-                    # 🔍 DEBUG: Check DB state BEFORE clearing
-                    before_clear_doc = games_collection.find_one({"_id": game_id})
-                    logging.warning(f"🔍 [TIMEOUT CLEAR DEBUG] DB BEFORE clear - timeout_next_play_type={before_clear_doc.get('timeout_next_play_type') if before_clear_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={before_clear_doc.get('timeout_offense_team_id') if before_clear_doc else 'DOC_NOT_FOUND'}")
-                    logging.warning(f"🔍 [TIMEOUT CLEAR DEBUG] DB BEFORE clear - score={before_clear_doc.get('score') if before_clear_doc else 'DOC_NOT_FOUND'}, clock={before_clear_doc.get('clock') if before_clear_doc else 'DOC_NOT_FOUND'}")
-                    
                     games_collection.update_one(
                         {"_id": game_id},
                         {"$unset": {"timeout_next_play_type": "", "timeout_offense_team_id": ""}}
                     )
-                    
-                    # 🔍 DEBUG: Verify DB state AFTER clearing
-                    after_clear_doc = games_collection.find_one({"_id": game_id})
-                    logging.warning(f"🔍 [TIMEOUT CLEAR DEBUG] DB AFTER clear - timeout_next_play_type={after_clear_doc.get('timeout_next_play_type') if after_clear_doc else 'DOC_NOT_FOUND'}, timeout_offense_team_id={after_clear_doc.get('timeout_offense_team_id') if after_clear_doc else 'DOC_NOT_FOUND'}")
-                    logging.warning(f"🔍 [TIMEOUT CLEAR DEBUG] DB AFTER clear - score={after_clear_doc.get('score') if after_clear_doc else 'DOC_NOT_FOUND'}, clock={after_clear_doc.get('clock') if after_clear_doc else 'DOC_NOT_FOUND'}")
                     
                     logging.info(f"🧹 TIMEOUT RESUME: Cleared timeout state from database for game_id={game_id}")
                 except Exception as e:

@@ -1646,7 +1646,6 @@ async function runInboundSetup({
     // Only use skeleton positions if we have positions for key players (SF and PG at minimum)
     if (skeletonPositions.SF && skeletonPositions.PG) {
       useSkeletonPositions = true;
-      console.log('✅ [FCP/HCT INBOUND] Using skeleton step 0 positions from backend', {
         pressureType,
         positions: Object.keys(skeletonPositions),
         source: 'turnData.offense_setup_positions'
@@ -1904,7 +1903,6 @@ async function runInboundSetup({
     });
   } else {
     // Fallback to hardcoded SF→PG pass
-    console.log('🏀 [BASELINE_INBOUND] Using fallback hardcoded SF→PG pass');
     await runPass(scene, {
       fromId: sfId,
       toId: pgId,
@@ -2173,7 +2171,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // 🔍 DEBUG: Log team_id format mismatch detection
   const sampleSprite = turnData.animations.length > 0 ? playerSprites[turnData.animations[0]?.playerId] : null;
   if (sampleSprite && offenseTeamId) {
-    console.log('🔍 [turnAnimation] Team ID Comparison Debug:', {
       spriteTeamId: sampleSprite.team_id,
       spriteTeamIdType: typeof sampleSprite.team_id,
       spriteTeamIdIsObjectId: /^[0-9a-f]{24}$/i.test(String(sampleSprite.team_id)),
@@ -2190,7 +2187,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   for (const anim of turnData.animations) {
     const sprite = playerSprites[anim.playerId];
     if (!sprite) {
-      console.warn('⚠️ [turnAnimation] Missing sprite for playerId:', anim.playerId);
       continue;
     }
     
@@ -2206,22 +2202,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   
   // ✅ VALIDATION: Ensure we have exactly 5 offensive and 5 defensive players
   if (offensiveCount !== 5 || defensiveCount !== 5) {
-    console.warn('⚠️ [PLAYER CLASSIFICATION] Expected 5 offensive and 5 defensive players, but got:', {
-      offensiveCount,
-      defensiveCount,
-      offenseTeamId,
-      offenseTeamIdType: typeof offenseTeamId,
-      offenseTeamIdIsObjectId: /^[0-9a-f]{24}$/i.test(String(offenseTeamId)),
-      turnDataId: turnData?.id,
-      resultType: turnData?.result_type,
-      totalAnimations: turnData.animations?.length,
-      playerSpritesKeys: Object.keys(playerSprites),
-      sampleSpriteTeamIds: turnData.animations.slice(0, 3).map(a => {
-        const s = playerSprites[a.playerId];
-        return s ? { playerId: a.playerId, team_id: s.team_id, type: typeof s.team_id } : null;
-      }).filter(Boolean)
-    });
-  }
+    // Player classification validation (keep warning for actual errors)
+    if (offensiveCount !== 5 || defensiveCount !== 5) {
+      console.warn('⚠️ [PLAYER CLASSIFICATION] Expected 5 offensive and 5 defensive players, but got:', {
+        offensiveCount,
+        defensiveCount
+      });
+    }
 
   // ============================================================================
   // STEAL HCO SETUP: Animate stealer moving back before HCO skeleton starts

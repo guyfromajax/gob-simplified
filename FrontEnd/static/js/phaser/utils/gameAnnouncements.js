@@ -22,11 +22,7 @@ import { triggerFoulEffect, triggerTurnoverEffect, triggerMadeShotFlash } from '
  * @param {Object} context - Additional context (rebounderId, shooterId, etc.)
  */
 export function announceGameEvent(eventType, turnData, scene, context = {}) {
-  console.log('📢 [GAME ANNOUNCEMENT]', {
-    eventType,
-    result_type: turnData?.result_type,
-    turn_index: turnData?.index
-  });
+  // Game announcement
 
   // Get team context
   const homeTeamId = scene?.simData?.home_team_id;

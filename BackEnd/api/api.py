@@ -688,13 +688,9 @@ def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest
         if home_team_id:
             saved_home_strategy = saved_teams.get(home_team_id, {}).get("strategy_settings", {})
             saved_home_pb = saved_teams.get(home_team_id, {}).get("playbook_settings", {})
-            logging.warning(f"📋 [TIMEOUT-RESUME] Loaded from DB - home strategy inside: {saved_home_strategy.get('inside', 'MISSING') if saved_home_strategy else 'NO_SETTINGS'}")
-            logging.warning(f"📋 [TIMEOUT-RESUME] Loaded from DB - home playbook slot_assignments: {len(saved_home_pb.get('slot_assignments', {})) if saved_home_pb else 0}")
         if away_team_id:
             saved_away_strategy = saved_teams.get(away_team_id, {}).get("strategy_settings", {})
             saved_away_pb = saved_teams.get(away_team_id, {}).get("playbook_settings", {})
-            logging.warning(f"📋 [TIMEOUT-RESUME] Loaded from DB - away strategy inside: {saved_away_strategy.get('inside', 'MISSING') if saved_away_strategy else 'NO_SETTINGS'}")
-            logging.warning(f"📋 [TIMEOUT-RESUME] Loaded from DB - away playbook slot_assignments: {len(saved_away_pb.get('slot_assignments', {})) if saved_away_pb else 0}")
         
         return saved
     except Exception as e:
@@ -787,7 +783,6 @@ def handle_timeout_save_and_response(gm: "GameManager", timeout_turn: dict, game
     # ✅ PHASE 3.3: Refresh cache after DB write to ensure cache matches DB
     if saved_doc and game_id in ongoing_games:
         refresh_game_cache_from_db(ongoing_games[game_id], saved_doc)
-        logger.warning(f"🔄 [CACHE-TELEMETRY] Cache REFRESHED: handle_timeout_save_and_response({game_id}) - refreshed cache after timeout save")
     
     # Return consistent response format (same for both user and computer)
     # Use saved data (db_summary) to ensure response matches what was saved to DB
@@ -917,29 +912,18 @@ def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
     if not saved or not gm:
         return
     
-    # 🔍 DEBUG: Log state BEFORE restore
-    logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] BEFORE restore - game_id={gm.game_id if hasattr(gm, 'game_id') else 'NO_GAME_ID'}, quarter={gm.quarter}")
-    logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] gm.game_state timeout fields: timeout_next_play_type={gm.game_state.get('timeout_next_play_type')}, timeout_offense_team_id={gm.game_state.get('timeout_offense_team_id')}")
-    logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] gm.score={gm.score}, clock={gm.game_state.get('clock')}, time_remaining={gm.game_state.get('time_remaining')}")
-    logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] saved document timeout fields: timeout_next_play_type={saved.get('timeout_next_play_type')}, timeout_offense_team_id={saved.get('timeout_offense_team_id')}")
-    logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] saved document score={saved.get('score')}, clock={saved.get('clock')}, time_remaining={saved.get('time_remaining')}")
-    
     # ✅ CRITICAL FIX: Restore ALL critical game state from saved document
     # This ensures saved state (from timeout save) overwrites any stale in-memory state
     
     # Restore timeout-specific state
-    old_timeout_next_play_type = gm.game_state.get("timeout_next_play_type")
     if "timeout_next_play_type" in saved:
         gm.game_state["timeout_next_play_type"] = saved["timeout_next_play_type"]
-        logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] timeout_next_play_type: {old_timeout_next_play_type} → {saved['timeout_next_play_type']}")
         logging.info(f"🔄 TIMEOUT RESUME: Applied timeout_next_play_type={saved['timeout_next_play_type']}")
     
     # ✅ CRITICAL FIX: Restore offense team from timeout_offense_team_id
     # This ensures the correct team has possession after timeout (e.g., if user called timeout during BIP)
     if "timeout_offense_team_id" in saved:
-        old_timeout_offense_team_id = gm.game_state.get("timeout_offense_team_id")
         gm.game_state["timeout_offense_team_id"] = saved["timeout_offense_team_id"]
-        logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] timeout_offense_team_id: {old_timeout_offense_team_id} → {saved['timeout_offense_team_id']}")
         
         # ✅ SS&S FIX: Set offense_team and defense_team based on timeout_offense_team_id
         # This is critical for maintaining proper possession (e.g., user calls timeout during BIP)
@@ -956,27 +940,20 @@ def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
             logging.warning(f"⚠️ TIMEOUT RESUME: timeout_offense_team_id ({saved_offense_team_id}) does not match home_team_id ({gm.home_team.team_id}) or away_team_id ({gm.away_team.team_id}) - possession may be incorrect")
     
     # Restore clock and time (critical for timeout resume)
-    old_clock = gm.game_state.get("clock")
     if "clock" in saved:
         gm.game_state["clock"] = saved["clock"]
-        logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] clock: {old_clock} → {saved['clock']}")
         logging.info(f"🔄 TIMEOUT RESUME: Restored clock={saved['clock']} from saved document")
     
-    old_time_remaining = gm.game_state.get("time_remaining")
     if "time_remaining" in saved:
         gm.game_state["time_remaining"] = saved["time_remaining"]
-        logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] time_remaining: {old_time_remaining} → {saved['time_remaining']}")
         logging.info(f"🔄 TIMEOUT RESUME: Restored time_remaining={saved['time_remaining']} from saved document")
     
     # ✅ CRITICAL FIX: Restore scores from saved document (overwrites stale in-memory scores)
-    old_scores = dict(gm.score) if gm.score else {}
     if "score" in saved and isinstance(saved["score"], dict):
         # Restore scores for both teams
         for team_name, score_value in saved["score"].items():
             if team_name in gm.score:
-                old_score = gm.score[team_name]
                 gm.score[team_name] = score_value
-                logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] score {team_name}: {old_score} → {score_value}")
                 logging.info(f"🔄 TIMEOUT RESUME: Restored score {team_name}={score_value} from saved document")
     
     # ✅ CRITICAL FIX: Restore team fouls and timeouts from saved document
@@ -995,33 +972,22 @@ def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
     if not away_team_data:
         away_team_data = saved.get("away_team", {})
     
-    old_home_fouls = gm.home_team.team_fouls
     if "team_fouls" in home_team_data:
         gm.home_team.team_fouls = home_team_data["team_fouls"]
-        logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] home team_fouls: {old_home_fouls} → {home_team_data['team_fouls']}")
         logging.info(f"🔄 TIMEOUT RESUME: Restored home team_fouls={home_team_data['team_fouls']} from saved document")
     
-    old_away_fouls = gm.away_team.team_fouls
     if "team_fouls" in away_team_data:
         gm.away_team.team_fouls = away_team_data["team_fouls"]
-        logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] away team_fouls: {old_away_fouls} → {away_team_data['team_fouls']}")
         logging.info(f"🔄 TIMEOUT RESUME: Restored away team_fouls={away_team_data['team_fouls']} from saved document")
     
     # ✅ CRITICAL FIX: Restore team timeouts from saved document (unified structure support)
-    old_home_timeouts = gm.home_team.timeouts
     if "timeouts" in home_team_data:
         gm.home_team.timeouts = home_team_data["timeouts"]
-        logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] home timeouts: {old_home_timeouts} → {home_team_data['timeouts']}")
         logging.info(f"🔄 TIMEOUT RESUME: Restored home timeouts={home_team_data['timeouts']} from saved document")
     
-    old_away_timeouts = gm.away_team.timeouts
     if "timeouts" in away_team_data:
         gm.away_team.timeouts = away_team_data["timeouts"]
-        logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] away timeouts: {old_away_timeouts} → {away_team_data['timeouts']}")
         logging.info(f"🔄 TIMEOUT RESUME: Restored away timeouts={away_team_data['timeouts']} from saved document")
-    
-    # 🔍 DEBUG: Log state AFTER restore
-    logging.warning(f"🔍 [TIMEOUT RESTORE DEBUG] AFTER restore - gm.score={gm.score}, clock={gm.game_state.get('clock')}, time_remaining={gm.game_state.get('time_remaining')}")
 
 # 4. Routes
 @app.get("/")
@@ -1142,11 +1108,6 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
     original_game_id_type = type(original_game_id).__name__
     game_id = normalize_game_id(game_id)
     game_id_type = type(game_id).__name__
-    if original_game_id != game_id:
-        logger.warning(f"🔍 [NORMALIZE] GET /api/game - Normalized game_id from '{original_game_id}' ({original_game_id_type}) to '{game_id}' ({game_id_type})")
-    else:
-        logger.warning(f"🔍 [DB LOOKUP DEBUG] GET /api/game - game_id: '{game_id}' (type: {game_id_type})")
-    
     try:
         # ✅ HYBRID APPROACH: If source=db, skip cache and always read from database
         # This ensures lineup screen always gets fresh data (only ~13 reads per game: timeouts + quarter breaks)
@@ -1160,11 +1121,6 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
             gm = ongoing_games.get(game_id)
             if gm:
                 cache_hit = True
-                logger.warning(f"✅ [CACHE-TELEMETRY] Cache HIT: get_game_state({game_id}) - using ongoing_games cache")
-            else:
-                logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: get_game_state({game_id}) - cache not available, reading from DB")
-        else:
-            logger.warning(f"🔄 [CACHE-TELEMETRY] Cache SKIP: get_game_state({game_id}) - source=db, forcing DB read")
         
         if gm:
             # ✅ PERFORMANCE: Measure processing time (only log if slow)
@@ -1266,25 +1222,13 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
             query_start = time.time()
             
             # Try both string and ObjectId lookups with projection
-            query_type = type(game_id).__name__
-            logger.warning(f"🔍 [DB LOOKUP DEBUG] Querying with _id: '{game_id}' (type: {query_type})")
             saved = games_collection.find_one({"_id": game_id}, projection)
             if not saved and isinstance(game_id, str):
-                logger.warning(f"🔍 [DB LOOKUP DEBUG] String query failed, trying ObjectId format...")
                 try:
                     oid_game_id = ObjectId(game_id)
                     saved = games_collection.find_one({"_id": oid_game_id}, projection)
-                    if saved:
-                        saved_id_type = type(saved.get("_id")).__name__
-                        logger.warning(f"🔍 [DB LOOKUP DEBUG] ✅ Found with ObjectId! Document _id type: {saved_id_type}")
-                except Exception as e:
-                    logger.warning(f"🔍 [DB LOOKUP DEBUG] ❌ ObjectId conversion failed: {e}")
-            elif saved:
-                saved_id_type = type(saved.get("_id")).__name__
-                saved_id_value = str(saved.get("_id"))
-                logger.warning(f"🔍 [DB LOOKUP DEBUG] ✅ Found with string! Document _id: '{saved_id_value}' (type: {saved_id_type})")
-            else:
-                logger.warning(f"🔍 [DB LOOKUP DEBUG] ❌ No document found with string query")
+                except Exception:
+                    pass
             
             query_time = (time.time() - query_start) * 1000  # Convert to ms
             # ✅ REMOVED: Verbose PERF and DEBUG logs - only log on errors or slow queries (>100ms)
@@ -1666,10 +1610,6 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
     preserved_user_team_side = None
     if game_id:
         gm = ongoing_games.get(game_id)
-        if gm:
-            logger.warning(f"✅ [CACHE-TELEMETRY] Cache HIT: simulate_quarter_endpoint({game_id}) - using ongoing_games cache")
-        else:
-            logger.warning(f"❌ [CACHE-TELEMETRY] Cache MISS: simulate_quarter_endpoint({game_id}) - cache not available, will load from DB")
         # ✅ DEBUG: Track ongoing_games state at start of simulate_quarter_endpoint
         # ✅ REMOVED: Verbose ONGOING_GAMES DEBUG logs - only log errors
         # Preserve user_team_side from in-memory game
@@ -1700,7 +1640,6 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 f"🆕 [ONGOING_GAMES] Removing game from cache: game_id={game_id}, reason='New game scenario (Q1 requested but game in memory at Q{gm.quarter})'"
             )
             del ongoing_games[game_id]
-            logger.warning(f"🔄 [CACHE-TELEMETRY] Cache INVALIDATED: simulate_quarter_endpoint({game_id}) - removed from cache (new game scenario)")
             gm = None  # Force reload from DB where new game detection will run
         
         # ✅ SS&S: Ensure user_team_side is set in in-memory game if missing
@@ -1815,7 +1754,6 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     logging.warning(f"🔍 TIMEOUT RESUME: Game in memory, but forcing DB reload to ensure latest state (game_id={game_id})")
                     logging.warning(f"🔄 [ONGOING_GAMES] Removing game from cache: game_id={game_id}, reason='Timeout resume - forcing DB reload'")
                     del ongoing_games[game_id]
-                    logger.warning(f"🔄 [CACHE-TELEMETRY] Cache INVALIDATED: simulate_quarter_endpoint({game_id}) - removed from cache (timeout resume)")
                     gm = None  # Force reload from DB
                 logging.info(f"🔍 TIMEOUT RESUME: Will load fresh game from DB and apply timeout state")
             else:
@@ -2345,7 +2283,6 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         logging.warning(f"🔍 [BEFORE_SIM_DEBUG] gm.quarter={gm.quarter}, request.quarter={request.quarter}, gm.score={gm.score}")
                         
                         ongoing_games[game_id] = gm
-                        logger.warning(f"✅ [CACHE-TELEMETRY] Cache POPULATED: simulate_quarter_endpoint({game_id}) - added to ongoing_games cache (resume from timeout)")
                         # ✅ DEBUG: Track when game is added to ongoing_games
                         # ✅ REMOVED: Verbose debug log
                         if debug:
@@ -2500,7 +2437,6 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         game_id = request.game_id
                     gm.game_id = game_id  # Store game_id on the GameManager object
                     ongoing_games[game_id] = gm
-                    logger.warning(f"✅ [CACHE-TELEMETRY] Cache POPULATED: simulate_quarter_endpoint({game_id}) - added to ongoing_games cache (new game)")
                     # ✅ REMOVED: Verbose debug log
                     source = "new"
                     
@@ -2905,7 +2841,6 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             )
         gm.game_id = game_id  # Store game_id on the GameManager object
         ongoing_games[game_id] = gm
-        logger.warning(f"✅ [CACHE-TELEMETRY] Cache POPULATED: simulate_quarter_endpoint({game_id}) - added to ongoing_games cache (new game)")
         # ✅ REMOVED: Verbose debug log
         source = "new"
         
@@ -3211,7 +3146,6 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             saved_doc_full = games_collection.find_one({"_id": game_id_oid})
             if saved_doc_full:
                 refresh_game_cache_from_db(ongoing_games[game_id], saved_doc_full)
-                logger.warning(f"🔄 [CACHE-TELEMETRY] Cache REFRESHED: simulate_quarter_endpoint({game_id}) - refreshed cache after quarter save")
         
         # ✅ DEBUG: Verify what was actually saved
         saved_doc = games_collection.find_one({"_id": game_id_oid}, {"quarter": 1, "is_final": 1, "week": 1})
@@ -4119,7 +4053,6 @@ def init_game(request: dict):
     
     # Store in ongoing_games so /api/game/{game_id} can access it
     ongoing_games[game_id] = gm
-    logger.warning(f"✅ [CACHE-TELEMETRY] Cache POPULATED: init_game({game_id}) - added to ongoing_games cache")
     # ✅ REMOVED: Verbose debug log
     
     response_data = {"game_id": game_id}

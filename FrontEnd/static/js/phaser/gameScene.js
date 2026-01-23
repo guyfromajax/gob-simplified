@@ -484,7 +484,6 @@ export function createGameScene(Phaser) {
         const hasPosition = p.pos !== null && p.pos !== undefined; // Only include players in current lineup
         
         if (!isBall && !hasPosition) {
-          console.log(`🚫 Filtering out inactive player (no position): ${p.name} (${id})`);
         }
         
         return !isBall && hasPosition;
@@ -1996,15 +1995,7 @@ export function createGameScene(Phaser) {
           const userTeamName = this.userTeamSide === 'home' ? homeTeam : awayTeam;
           const userHasOffenseNext = nextOffenseTeam === userTeamName;
           
-          console.log('🔍 Quick Adjust Check (SIMPLIFIED):', {
-            nextOffenseTeam_from_API: turnData.offense_team,
-            userTeamName,
-            userHasOffenseNext,
-            nextIsHCO,
-            currentIsFastBreak,
-            currentIsFreethrow,
-            userTeamSide: this.userTeamSide
-          });
+          // Quick Adjust Check
           
           // ==================== CLIPBOARD COUNTDOWN (DISABLED FOR NOW) ====================
           // User can preset calls anytime; no forced decision window

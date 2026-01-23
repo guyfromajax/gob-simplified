@@ -35,10 +35,7 @@ export function getDefenderIdFromTurn(turnData) {
   // 3. defender as object (converted Player object)
   if (turnData.defender?.player_id) return turnData.defender.player_id;
   
-  // 4. No defender found
-  console.log('⚠️ NO DEFENDER FOUND in turn:', {
-    result_type: turnData.result_type,
-    offensive_state: turnData.offensive_state,
+  // 4. No defender found (expected for some turn types)
     turnData_keys: Object.keys(turnData)
   });
   return null;

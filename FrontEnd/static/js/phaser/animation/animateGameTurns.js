@@ -81,14 +81,7 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
       scene.rebounderId = null;
     }
     
-    // 🔍 DEBUG: Log putback sequence
-    console.log('🔍 [PUTBACK DEBUG] Starting putback sequence', {
-      rebounderId,
-      shotInProgressBefore: scene._shotInProgress,
-      resultType: turnData.result_type,
-      ballControllerAttached: scene.ballController?.isAttached,
-      ballControllerOwner: scene.ballController?.currentOwner?.playerId
-    });
+    // Start putback sequence
     
     // ✅ PHASE 2.5: Use BallController lifecycle methods for putback
     // ✅ PHASE 2.9: Add defensive state synchronization for putbacks
@@ -114,10 +107,6 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
     // This prevents the flash where ball briefly attaches to rebounder
     // Check both ballController (from adapter) and scene.ballController for redundancy
     if (ballController && ballController.isAttached) {
-      console.log('🔍 [PUTBACK DEBUG] Detaching ball from previous owner before putback', {
-        rebounderId,
-        previousOwner: ballController.currentOwner?.playerId
-      });
       ballController.detachFromPlayer('putback_prep', { reason: 'prevent_attachment_flash' });
     }
     // Also check scene.ballController as fallback (some code might use this directly)
@@ -146,13 +135,6 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
       ballSprite.setVisible(true);
     }
     
-    // 🔍 DEBUG: Log ball positioning
-    console.log('🔍 [PUTBACK DEBUG] Ball positioned at rebounder location (not attached)', {
-      rebounderId,
-      ballPosition: { x: ballSprite?.x, y: ballSprite?.y },
-      rebounderPosition: { x: rebounderSprite.x, y: rebounderSprite.y },
-      fromCoords
-    });
     
     const shotResult = await shootBall({
       scene,
@@ -174,9 +156,6 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
     
     // Handle putback make - run inbound setup
     if (turnData.result_type === "PUTBACK_MAKE") {
-      // ✅ DEBUG: Track putback make path
-      const previousTurn = scene.simData?.turns?.[(scene.currentTurn || 0) - 1];
-      console.log('🔍 [PUTBACK MAKE DEBUG]', {
         turnIndex: scene.currentTurn,
         rebounderId: rebounderId,
         previousTurnResult: previousTurn?.result_type,
@@ -214,7 +193,6 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
       const ballController = getBallController();
       if (ballController) {
         ballController.onPutbackEnd();
-        console.log('🔍 [PUTBACK MAKE] Called onPutbackEnd() before inbound setup');
       }
       
       // Check for defensive pressure
@@ -281,7 +259,7 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
         }
         
         // ✅ DEBUG: Track DREB after putback miss
-        console.log('🔍 [PUTBACK MISS => DREB DEBUG]', {
+        // Putback miss => DREB
           turnIndex: scene.currentTurn,
           rebounderId: turnData.rebounderId,
           next_play_type: turnData.next_play_type,
@@ -762,34 +740,9 @@ export async function animateGameTurns({ //hasBallAtStep
       const previousShooterId = previousTurn?.shooter_id || null;
       const previousShooterName = previousShooterId ? (playerSprites[previousShooterId]?.name || 'unknown') : null;
       
-      console.log('🔍 [PUTBACK/OREB PATH DEBUG]', {
-        turnIndex: i,
-        currentTurnResult: turn.result_type,
-        previousTurnResult,
-        twoTurnsAgoResult: twoTurnsAgo?.result_type || null,
-        wasMISS,
-        wasOREB,
-        path: wasMISS && wasOREB 
-          ? 'HCO => MISS => OREB => Putback' 
-          : (wasMISS && previousTurnResult === 'MISS')
-          ? 'HCO => MISS => Putback (embedded OREB)'
-          : 'Direct Putback/OREB',
-        rebounderId: turn.rebounderId,
-        rebounderName: rebounderName,
-        previousShooterId: previousShooterId,
-        previousShooterName: previousShooterName,
-        isOwnReboundPutback: turn.rebounderId === previousShooterId,
-        next_play_type: turn.next_play_type,
-        sceneCurrentTurn: scene.currentTurn,
-        willProcessThisTurn: true
-      });
-      // ✅ Also log separately for easier reading
-      console.log(`🔍 PUTBACK TURN: ${turn.result_type} - Rebounder: ${rebounderName || 'none'} (${turn.rebounderId || 'none'}) - Previous Shooter: ${previousShooterName || 'none'} (${previousShooterId || 'none'}) - Own Rebound Putback: ${turn.rebounderId === previousShooterId}`);
-      
-      // ✅ DEBUG: Check if ball controller state might be blocking this
+      // Process putback/OREB turn
       const { getBallController } = await import('./BallControllerAdapter.js');
       const ballController = getBallController();
-      console.log('🔍 [PUTBACK TURN BALL STATE]', {
         ballState: ballController?.getState?.() || 'unknown',
         ballHolder: scene.gameState?.ballHolder || null,
         rebounderId: turn.rebounderId
@@ -1066,7 +1019,6 @@ export async function animateGameTurns({ //hasBallAtStep
 
     // ✅ DEBUG: Log HCO routing decision
     if (turn.result_type === "HCO") {
-      console.log('🔍 [HCO RESULT_TYPE ROUTING]', {
         turn_index: i,
         has_animations: !!turn.animations?.length,
         animation_count: turn.animations?.length || 0,
@@ -1106,14 +1058,6 @@ export async function animateGameTurns({ //hasBallAtStep
 
     // 🔍 DIAGNOSTIC: Always log when window.ROUTER_DEBUG is set (moved outside block for visibility)
     if (typeof window !== 'undefined' && window.ROUTER_DEBUG) {
-      console.log('🔍 [DIAGNOSTIC] Turn', i, {
-        shouldDebugHCO,
-        window_ROUTER_DEBUG: window.ROUTER_DEBUG,
-        fast_break: turn.fast_break,
-        result_type: turn.result_type,
-        DEBUG_FLOW,
-        debugEnabled
-      });
     }
 
     // ✅ PHASE 2.5: Standard HCO turns now route through AnimationRouter
