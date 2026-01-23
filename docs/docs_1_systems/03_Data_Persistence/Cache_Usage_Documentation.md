@@ -236,12 +236,7 @@ Caches are **performance mirrors** of truth (database), never truth itself. They
 
 ## Future Enhancements
 
-1. **Cache telemetry** (Phase 3 Task 4):
-   - Log cache hits/misses
-   - Track cache performance metrics
-   - Monitor cache invalidation events
-
-2. **Version-based invalidation:**
+1. **Version-based invalidation:**
    - Invalidate cache on version mismatch
    - Ensure cache compatibility across deployments
 
