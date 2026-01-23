@@ -164,7 +164,23 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
             window.refreshLeaders?.();
           } else {
             localStorage.setItem("activeTournament", JSON.stringify(updated));
-            window.location.href = "/tournament.html";
+            // ✅ PHASE 2: Include tournament_id and team_id in navigation URL
+            const params = new URLSearchParams();
+            if (tournamentId) {
+              params.set('tournament_id', tournamentId);
+              // Try to get team_id from URL, updated tournament state, or simData
+              const urlParams = new URLSearchParams(window.location.search);
+              const teamId = urlParams.get('team_id') || 
+                            updated?.user_team_id || 
+                            updated?.user_team_object_id ||
+                            simData?.user_team_id ||
+                            (game && game.user_team_id);
+              if (teamId) {
+                params.set('team_id', teamId);
+              }
+            }
+            const url = params.toString() ? `/tournament.html?${params.toString()}` : '/tournament.html';
+            window.location.href = url;
           }
         } catch (e) {
           console.error("Failed to update tournament state", e);

@@ -306,8 +306,8 @@ backBtn.addEventListener('click', function() {
   } else if (from === 'game-plan') {
     window.location.href = '/game-plan.html?' + urlParams.toString();
   } else {
-    // Default fallback
-    window.location.href = '/game-plan.html';
+    // ✅ PHASE 2: Preserve URL params in fallback (includes game_id if present)
+    window.location.href = '/game-plan.html?' + urlParams.toString();
   }
 });
 

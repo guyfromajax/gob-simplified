@@ -692,8 +692,8 @@ function executeNavigateToCommandCenter() {
     const finalUrl = teamIdParam ? `${url}&team_id=${encodeURIComponent(teamIdParam)}` : url;
     window.location.href = finalUrl;
   } else {
-    // Fallback to home
-    window.location.href = '/';
+    // ✅ PHASE 2: Navigate to mode-select instead of homepage (more appropriate)
+    window.location.href = '/mode-select.html';
   }
 }
 
