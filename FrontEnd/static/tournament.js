@@ -1599,7 +1599,8 @@ function handleTournamentUpdate(doc) {
 
 window.handleTournamentUpdate = handleTournamentUpdate;
 
-document.addEventListener("DOMContentLoaded", async () => {
+async function initializeTournament() {
+  console.log('🔍 [TOURNAMENT INIT] initializeTournament() called, readyState:', document.readyState);
   // ✅ MIGRATION (Task 6.1): Use command center data endpoint (aligns with Franchise pattern)
   let commandCenterData = null;
   try {
@@ -1854,7 +1855,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       window.location.href = '/mode-select.html';
     });
   }
-});
+}
+
+// ✅ FIX: Check readyState - if page is already loaded, run immediately
+// Otherwise wait for DOMContentLoaded (handles case where script loads late)
+if (document.readyState === 'loading') {
+  // DOM is still loading, wait for DOMContentLoaded
+  document.addEventListener('DOMContentLoaded', initializeTournament);
+} else {
+  // DOM is already loaded (interactive or complete), run immediately
+  console.log('🚀 [TOURNAMENT] DOM already loaded, calling initializeTournament() immediately');
+  initializeTournament();
+}
 
 // Team Report and Playbook Summary functions (adapted from training-report.js)
 const TEAM_ATTR_NAMES = {
