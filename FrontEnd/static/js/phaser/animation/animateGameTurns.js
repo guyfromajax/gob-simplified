@@ -156,14 +156,6 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
     
     // Handle putback make - run inbound setup
     if (turnData.result_type === "PUTBACK_MAKE") {
-        turnIndex: scene.currentTurn,
-        rebounderId: rebounderId,
-        previousTurnResult: previousTurn?.result_type,
-        wasOREB: previousTurn?.result_type === 'OREB' || previousTurn?.result_type === 'OREB_KICKOUT',
-        next_play_type: turnData.next_play_type,
-        possession_flips: turnData.possession_flips,
-        willCallInbound: !turnData.possession_flips && turnData.next_play_type !== "FAST_BREAK"
-      });
       
       // ✅ FIX: Don't call runInboundSetup() here if next_play_type === "BASELINE_INBOUND"
       // The BASELINE_INBOUND turn will handle the inbound setup via AnimationEngine.handleBaselineInbound()
@@ -260,11 +252,6 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
         
         // ✅ DEBUG: Track DREB after putback miss
         // Putback miss => DREB
-          turnIndex: scene.currentTurn,
-          rebounderId: turnData.rebounderId,
-          next_play_type: turnData.next_play_type,
-          willCallRunDefensiveReboundSetup: turnData.rebound_type === "DREB" && turnData.next_play_type !== "FAST_BREAK"
-        });
         
         // ✅ PHASE 2.5: Use BallController lifecycle method for putback end
         const { getBallController } = await import('./BallControllerAdapter.js');
@@ -743,10 +730,6 @@ export async function animateGameTurns({ //hasBallAtStep
       // Process putback/OREB turn
       const { getBallController } = await import('./BallControllerAdapter.js');
       const ballController = getBallController();
-        ballState: ballController?.getState?.() || 'unknown',
-        ballHolder: scene.gameState?.ballHolder || null,
-        rebounderId: turn.rebounderId
-      });
       
       // ✅ PHASE 2.6: Route through AnimationRouter
       // handleOrebTurn, announcements, and score updates are handled by handler
@@ -1019,15 +1002,6 @@ export async function animateGameTurns({ //hasBallAtStep
 
     // ✅ DEBUG: Log HCO routing decision
     if (turn.result_type === "HCO") {
-        turn_index: i,
-        has_animations: !!turn.animations?.length,
-        animation_count: turn.animations?.length || 0,
-        pressureSequenceActive: scene.pressureSequenceActive,
-        next_defensive_setup: turn.next_defensive_setup,
-        fcp_shot: turn.fcp_shot,
-        hct_shot: turn.hct_shot,
-        will_route_to_router: !!(turn.animations && turn.animations.length > 0)
-      });
       
       // ✅ FIX: Route ALL HCO result_type turns with animations through AnimationRouter
       // This includes FCP/HCT → HCO transitions (press break) and regular HCO setup turns
