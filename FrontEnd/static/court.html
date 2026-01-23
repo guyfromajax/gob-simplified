@@ -1813,17 +1813,31 @@
     
     /* Timeout button highlight effect when queued */
     #timeout-btn.timeout-btn-highlighted {
-      background-color: #32cd32; /* Brighter green */
-      box-shadow: 0 0 20px rgba(40, 167, 69, 0.8), 0 0 40px rgba(40, 167, 69, 0.4);
-      animation: timeoutPulse 1.5s ease-in-out infinite;
+      background-color: #00ff41; /* Bright lime green */
+      border: 3px solid #00ff00; /* Bright green border */
+      box-shadow: 0 0 30px rgba(0, 255, 65, 1), 
+                  0 0 60px rgba(0, 255, 65, 0.8),
+                  0 0 90px rgba(0, 255, 65, 0.5),
+                  inset 0 0 20px rgba(255, 255, 255, 0.3); /* Inner glow */
+      animation: timeoutPulse 1s ease-in-out infinite;
+      transform: scale(1.05); /* Slightly larger */
+      font-weight: 900; /* Extra bold text */
     }
     
     @keyframes timeoutPulse {
       0%, 100% {
-        box-shadow: 0 0 20px rgba(40, 167, 69, 0.8), 0 0 40px rgba(40, 167, 69, 0.4);
+        box-shadow: 0 0 30px rgba(0, 255, 65, 1), 
+                    0 0 60px rgba(0, 255, 65, 0.8),
+                    0 0 90px rgba(0, 255, 65, 0.5),
+                    inset 0 0 20px rgba(255, 255, 255, 0.3);
+        transform: scale(1.05);
       }
       50% {
-        box-shadow: 0 0 30px rgba(40, 167, 69, 1), 0 0 60px rgba(40, 167, 69, 0.6);
+        box-shadow: 0 0 50px rgba(0, 255, 65, 1), 
+                    0 0 100px rgba(0, 255, 65, 1),
+                    0 0 150px rgba(0, 255, 65, 0.8),
+                    inset 0 0 30px rgba(255, 255, 255, 0.5);
+        transform: scale(1.08);
       }
     }
     
