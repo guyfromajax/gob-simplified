@@ -397,22 +397,7 @@ export class ShotAnimationSystem {
     if (offensiveCount !== 5 || defensiveCount !== 5) {
       console.warn('⚠️ [PLAYER CLASSIFICATION] Expected 5 offensive and 5 defensive players, but got:', {
         offensiveCount,
-        defensiveCount,
-        offenseTeamId,
-        offenseTeamIdType: typeof offenseTeamId,
-        offenseTeamIdIsObjectId: /^[0-9a-f]{24}$/i.test(String(offenseTeamId)),
-        turnDataId: turnData?.id,
-        resultType: turnData?.result_type,
-        currentTurn: turnData?.current_turn,
-        nextTurn: turnData?.next_turn,
-        offensivePlaycall: turnData?.offensive_playcall,
-        offensivePlayType: turnData?.offensive_play_type,
-        totalAnimations: turnData.animations?.length,
-        playerSpritesKeys: Object.keys(this.playerSprites),
-        sampleSpriteTeamIds: turnData.animations.slice(0, 3).map(a => {
-          const s = this.playerSprites[a.playerId];
-          return s ? { playerId: a.playerId, team_id: s.team_id, type: typeof s.team_id } : null;
-        }).filter(Boolean)
+        defensiveCount
       });
     }
     
