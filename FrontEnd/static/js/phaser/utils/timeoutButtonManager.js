@@ -241,40 +241,65 @@ export function resetTimeoutQueue() {
  * Conditions:
  * 1. User team is on offense (any turn type) → kill instantly
  * 2. BIP or SIP turn (any team) → kill instantly, UNLESS we've transitioned to HCO/FCP/HCT and away team is on offense
+ * 
+ * IMPORTANT: Only kill if timeout was queued during an eligible turn (immediate execution)
+ * If timeout was queued during non-eligible turn, wait for next eligible turn via checkAndExecuteQueuedTimeout
  */
 export function shouldKillCurrentTurnInstantly(scene, turnData) {
+    console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly called');
+    console.log('🔍 [TIMEOUT DEBUG] timeoutQueued:', timeoutQueued);
+    console.log('🔍 [TIMEOUT DEBUG] timeoutQueuedDuringEligibleTurn:', timeoutQueuedDuringEligibleTurn);
+    
     if (!ENABLE_TIMEOUT_BUTTON || !timeoutQueued) {
+        console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: Not enabled or not queued, returning false');
         return false;
     }
     
     if (!scene || !turnData) {
+        console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: Missing scene or turnData, returning false');
+        return false;
+    }
+    
+    // ✅ CRITICAL FIX: Only kill instantly if timeout was queued during an eligible turn
+    // If queued during non-eligible turn, wait for checkAndExecuteQueuedTimeout to handle it
+    if (!timeoutQueuedDuringEligibleTurn) {
+        console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: Timeout queued during non-eligible turn, waiting for next eligible turn');
         return false;
     }
     
     const currentTurn = turnData?.current_turn || turnData?.result_type;
+    console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: currentTurn:', currentTurn);
     
     // Condition 1: User team is on offense (any turn type) → kill instantly
-    if (isUserTeamOnOffense(scene, turnData)) {
+    const userOnOffense = isUserTeamOnOffense(scene, turnData);
+    console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: userOnOffense:', userOnOffense);
+    if (userOnOffense) {
+        console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: User on offense, returning true');
         return true;
     }
     
     // Condition 2: BIP or SIP turn
     if (currentTurn === 'SIDE_INBOUND' || currentTurn === 'BASELINE_INBOUND') {
+        console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: BIP/SIP turn detected');
         // Kill instantly for BIP/SIP, but only if we haven't transitioned to next turn
         // Check if we're still in the inbound phase (not yet in HCO/FCP/HCT)
         const isInboundPhase = scene.stateMachine?.is('Inbound') || 
                                scene.isInboundSetup === true;
         
+        console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: isInboundPhase:', isInboundPhase);
         if (isInboundPhase) {
+            console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: Still in BIP/SIP phase, returning true');
             return true; // Still in BIP/SIP phase, kill instantly
         }
         
         // We've transitioned past BIP/SIP to HCO/FCP/HCT
         // Only kill if user team is on offense (already checked above, so return false)
         // If away team is on offense, don't kill
+        console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: Past BIP/SIP phase, returning false');
         return false;
     }
     
+    console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: No conditions met, returning false');
     return false;
 }
 
