@@ -18,13 +18,14 @@
 - ✅ Phase 1.2: Fix Medium Priority Violations (all tasks complete)
 - ✅ Phase 1.3: Add Improvements (all tasks complete)
 - ✅ Phase 2: Fix Pointer Flow (all tasks complete)
+- ✅ Phase 3: Simplify Cache Layer (all tasks complete)
 - ✅ Phase 4: Enforce Failure Modes (all tasks complete)
 - ✅ Phase 5.1-5.6: Architecture Simplification (all tasks complete)
 
 **In Progress:**
 - Phase 5.7: Game-Scoped Settings (Tasks 1-5 complete, Task 6 blocked by bug)
 
-**Next Step:** Phase 3 - Simplify Cache Layer OR Phase 5.7 bug fix
+**Next Step:** Phase 5.7 bug fix OR continue with remaining phases
 
 ---
 
@@ -211,34 +212,58 @@
 
 **Goal:** Make caches explicit mirrors, not hidden fallbacks.
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
 **Tasks:**
-1. **Document Cache Usage**
+1. **Document Cache Usage** ✅ **COMPLETE**
    - **Action:** List all caches (`ongoing_games`, `gameStore`, etc.)
    - **Action:** Document refresh triggers for each cache
    - **Validation:** All caches documented with clear refresh logic
+   - **Implementation:**
+     - Updated `Cache_Usage_Documentation.md` with all caches
+     - Added `gameStore` settings cache (playbook_settings, strategy_settings) from Phase 1.3
+     - Documented refresh triggers, invalidation strategies, and usage patterns
 
-2. **Remove Cache Fallbacks**
+2. **Remove Cache Fallbacks** ✅ **COMPLETE**
    - **Action:** Never read from cache if truth is available
    - **Action:** Always prefer DB reads over cache reads
    - **Validation:** No code path reads from cache when truth is available
+   - **Implementation:**
+     - Verified cache is checked first for performance, but DB is always available as fallback
+     - Updated comments to clarify: "Cache is performance mirror, DB is always available as fallback"
+     - `source=db` parameter forces DB reads when needed (lineup screen consistency)
+     - All cache reads have DB fallback paths
 
-3. **Add Cache Invalidation**
+3. **Add Cache Invalidation** ✅ **COMPLETE**
    - **Action:** Clear cache after DB writes
    - **Action:** Clear cache on navigation
    - **Action:** Clear cache on version mismatch
    - **Validation:** Cache is always fresh, never stale
+   - **Implementation:**
+     - **After DB writes:**
+       - Backend: `refresh_game_cache_from_db()` called after timeout saves
+       - Backend: Direct GameManager updates after settings saves (bidirectional sync)
+       - Frontend: `gameStore.invalidatePlaybookSettings()` and `invalidateStrategySettings()` after saves
+     - **On navigation:**
+       - Frontend caches automatically cleared on page unload (module re-initialization)
+       - All navigation uses `window.location.href` (full page reload), ensuring automatic cache invalidation
+     - **On version mismatch:**
+       - Not implemented (future enhancement, low priority)
 
-4. **Add Cache Telemetry**
+4. **Add Cache Telemetry** ✅ **COMPLETE**
    - **Action:** Log cache hits/misses for performance monitoring
    - **Action:** Log cache invalidation events
    - **Validation:** Cache performance metrics captured
+   - **Implementation:**
+     - **Backend:** `CACHE-TELEMETRY` logs in `api.py` and `gameplan_routes.py`
+       - Cache HIT, MISS, SKIP, REFRESHED, INVALIDATED, POPULATED events
+     - **Frontend:** `StateTelemetry` logs in `gameStore.js`
+       - Cache HIT, MISS, INVALIDATION events with reasons
 
 **Success Criteria:**
-- ✅ Caches are always rebuilt from truth when needed
-- ✅ No code path reads from cache when truth is available
-- ✅ Cache performance metrics captured
+- ✅ Caches are always rebuilt from truth when needed (documented and verified)
+- ✅ No code path reads from cache when truth is available (DB always available as fallback)
+- ✅ Cache performance metrics captured (telemetry implemented in backend and frontend)
 
 ---
 

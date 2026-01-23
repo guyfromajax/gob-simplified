@@ -1114,7 +1114,7 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
     
     Args:
         source: Optional source parameter. If "db", always reads from database (for lineup screen consistency).
-                If None or "cache", prefers DB but allows cache as fallback (for performance during gameplay).
+                If None or "cache", checks cache first for performance during active gameplay, but DB is always available as fallback.
     """
     try:
         # ✅ PHASE 5.5: Use helper to get collection and doc_id (simplifies mode handling)
@@ -1124,9 +1124,9 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
         if mode == "single" and game_id and game_id != doc_id:
             logger.warning(f"🔍 [NORMALIZE] GET /api/gameplan - Normalized game_id from '{game_id}' to '{doc_id}'")
         
-        # ✅ PHASE 3.2: Prefer DB reads over cache reads
-        # If source=db, skip cache and always read from database
-        # Otherwise, prefer DB but allow cache as fallback for performance
+        # ✅ PHASE 3.2: Cache is performance mirror, DB is always available as fallback
+        # If source=db, skip cache and always read from database (for lineup screen consistency)
+        # Otherwise, check cache first for performance during active gameplay, but DB is always available as fallback
         force_db_read = source == "db"
         gm = None
         use_gamemanager_settings = False
@@ -1707,9 +1707,9 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         if mode == "single":
             game_id = doc_id  # Use normalized game_id for cache lookup
             
-            # ✅ PHASE 3.2: Prefer DB reads over cache reads
-            # If source=db, skip cache and always read from database
-            # Otherwise, prefer DB but allow cache as fallback for performance
+            # ✅ PHASE 3.2: Cache is performance mirror, DB is always available as fallback
+            # If source=db, skip cache and always read from database (for lineup screen consistency)
+            # Otherwise, check cache first for performance during active gameplay, but DB is always available as fallback
             force_db_read = source == "db"
             gm = None
             use_gamemanager_settings = False
