@@ -36,8 +36,6 @@ export function getDefenderIdFromTurn(turnData) {
   if (turnData.defender?.player_id) return turnData.defender.player_id;
   
   // 4. No defender found (expected for some turn types)
-    turnData_keys: Object.keys(turnData)
-  });
   return null;
 }
 
