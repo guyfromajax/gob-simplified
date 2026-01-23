@@ -3,10 +3,11 @@
  * Modular timeout button functionality with feature flag
  * 
  * Features:
- * - 2-second pause during BIP/SIP turns
- * - Progress bar countdown
- * - Button state management (live/dead)
- * - Integration with animation flow
+ * - Always-live timeout button
+ * - Toggle state management (queue/cancel timeout)
+ * - Highlight effect when timeout is queued
+ * - Sound effect on button click
+ * - Automatic timeout execution when eligible turn is reached
  */
 
 // ✅ FEATURE FLAG: Set to false to completely disable timeout button functionality
@@ -14,10 +15,8 @@ export const ENABLE_TIMEOUT_BUTTON = true;
 
 // State tracking
 let buttonInitialized = false;
-let pauseStartTime = null;
-let pauseDuration = 2000; // 2 seconds
-let playersPositioned = false;
-let inboundPassStarted = false;
+let timeoutQueued = false; // Tracks if timeout is queued (highlighted)
+let timeoutSound = null; // Audio object for button click sound
 
 /**
  * Initialize the timeout button
@@ -33,9 +32,19 @@ export function initTimeoutButton() {
         return;
     }
     
+    // Load sound effect
+    try {
+        timeoutSound = new Audio('/static/sounds/buttonClickSound.wav');
+        timeoutSound.volume = 0.5; // Set volume to 50%
+    } catch (error) {
+        console.warn('⚠️ [TIMEOUT] Could not load sound effect:', error);
+    }
+    
     button.addEventListener('click', handleTimeoutButtonClick);
     buttonInitialized = true;
-    resetTimeoutButton();
+    
+    // Make button always live (enabled)
+    updateTimeoutButtonState(true, 'Timeout available');
 }
 
 /**
@@ -48,7 +57,7 @@ function ensureButtonInitialized() {
 }
 
 /**
- * Update button state (live/dead)
+ * Update button state (always live now, but manages highlight)
  */
 export function updateTimeoutButtonState(isLive, reason = '') {
     if (!ENABLE_TIMEOUT_BUTTON) {
@@ -62,14 +71,48 @@ export function updateTimeoutButtonState(isLive, reason = '') {
         return;
     }
     
-    button.disabled = !isLive;
-    button.style.opacity = isLive ? '1' : '0.3';
-    button.style.cursor = isLive ? 'pointer' : 'not-allowed';
-    button.title = isLive ? 'Call Timeout' : (reason || 'Timeout not available');
+    // Button is always enabled now
+    button.disabled = false;
+    button.style.opacity = '1';
+    button.style.cursor = 'pointer';
+    button.title = timeoutQueued ? 'Cancel Timeout' : 'Call Timeout';
+}
+
+/**
+ * Check if user team is on offense for current turn
+ */
+function isUserTeamOnOffense(scene, turnData) {
+    if (!scene || !turnData) {
+        return false;
+    }
+    
+    // Get user team ID
+    const userTeamSide = scene.userTeamSide || scene.simData?.user_team_side;
+    if (!userTeamSide) {
+        return false;
+    }
+    
+    // Get possession team ID from turn data
+    const possessionTeamId = turnData.possession_team_id || turnData.offense_team_id;
+    if (!possessionTeamId) {
+        return false;
+    }
+    
+    // Get user team ID based on side
+    const homeTeamId = scene.simData?.home_team_id;
+    const awayTeamId = scene.simData?.away_team_id;
+    const userTeamId = userTeamSide === 'home' ? homeTeamId : awayTeamId;
+    
+    // Compare possession team with user team
+    return String(possessionTeamId) === String(userTeamId);
 }
 
 /**
  * Check if timeout is eligible for current turn
+ * Eligible if:
+ * 1. User team is on offense
+ * 2. Turn is BASELINE_INBOUND
+ * 3. Turn is SIDE_INBOUND
  */
 export function checkTimeoutEligibility(scene, turnData) {
     if (!ENABLE_TIMEOUT_BUTTON) {
@@ -78,148 +121,169 @@ export function checkTimeoutEligibility(scene, turnData) {
     
     ensureButtonInitialized();
     
+    if (!scene || !turnData) {
+        return false;
+    }
+    
     const currentTurn = turnData?.current_turn || turnData?.result_type;
-    const isEligible = currentTurn === 'SIDE_INBOUND' || currentTurn === 'BASELINE_INBOUND';
     
-    // Check if team has timeouts remaining (would need to check from game state)
-    // For now, assume eligible if it's a BIP/SIP turn
+    // Check if it's a BIP or SIP turn
+    if (currentTurn === 'SIDE_INBOUND' || currentTurn === 'BASELINE_INBOUND') {
+        return true;
+    }
     
-    return isEligible;
+    // Check if user team is on offense
+    if (isUserTeamOnOffense(scene, turnData)) {
+        return true;
+    }
+    
+    return false;
 }
 
 /**
- * Start the 2-second pause
- * Returns a promise that resolves after 2 seconds
+ * Add or remove highlight effect from timeout button
  */
-export function startTimeoutPause(scene) {
-    if (!ENABLE_TIMEOUT_BUTTON) {
-        return Promise.resolve();
-    }
-    
-    ensureButtonInitialized();
-    
-    const isEligible = checkTimeoutEligibility(scene, scene.currentTurnData || {});
-    if (!isEligible) {
-        return Promise.resolve();
-    }
-    
-    pauseStartTime = Date.now();
-    playersPositioned = false;
-    inboundPassStarted = false;
-    
-    // Make button live immediately
-    updateTimeoutButtonState(true, 'Timeout available');
-    
-    // Show and start progress bar
-    showProgressBar();
-    startProgressBarAnimation();
-    
-    // Return promise that resolves after pause duration
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve();
-        }, pauseDuration);
-    });
-}
-
-/**
- * Mark that players have reached their positions
- */
-export function markPlayersPositioned() {
-    if (!ENABLE_TIMEOUT_BUTTON) {
-        return;
-    }
-    
-    playersPositioned = true;
-    
-    // If 2 seconds have elapsed, ensure button is live
-    if (pauseStartTime && Date.now() - pauseStartTime >= pauseDuration) {
-        updateTimeoutButtonState(true, 'Timeout available');
-    }
-}
-
-/**
- * Mark that inbound pass has started
- */
-export function markInboundPassStarted() {
-    if (!ENABLE_TIMEOUT_BUTTON) {
-        return;
-    }
-    
-    inboundPassStarted = true;
-    updateTimeoutButtonState(false, 'Inbound pass in progress');
-    hideProgressBar();
-}
-
-/**
- * Reset timeout button state
- */
-export function resetTimeoutButton() {
-    if (!ENABLE_TIMEOUT_BUTTON) {
-        return;
-    }
-    
-    ensureButtonInitialized();
-    
-    pauseStartTime = null;
-    playersPositioned = false;
-    inboundPassStarted = false;
-    
-    updateTimeoutButtonState(false, 'Timeout not available');
-    hideProgressBar();
-}
-
-/**
- * Handle timeout button click
- */
-async function handleTimeoutButtonClick() {
+function updateButtonHighlight(highlighted) {
     if (!ENABLE_TIMEOUT_BUTTON) {
         return;
     }
     
     const button = document.getElementById('timeout-btn');
-    if (!button || button.disabled) {
+    if (!button) {
         return;
     }
     
-    // Get game context from scene (would need to be passed or accessed)
-    // For now, we'll need to get this from the current game scene
-    const scene = window.currentGameScene; // This would need to be set by gameScene.js
+    if (highlighted) {
+        button.classList.add('timeout-btn-highlighted');
+    } else {
+        button.classList.remove('timeout-btn-highlighted');
+    }
+}
+
+/**
+ * Reset timeout queue state (called after timeout is executed or game resets)
+ */
+export function resetTimeoutQueue() {
+    if (!ENABLE_TIMEOUT_BUTTON) {
+        return;
+    }
+    
+    timeoutQueued = false;
+    updateButtonHighlight(false);
+    updateTimeoutButtonState(true, 'Timeout available');
+}
+
+/**
+ * Check if timeout is queued and should be executed
+ * Called at the start of each turn
+ */
+export async function checkAndExecuteQueuedTimeout(scene, turnData) {
+    if (!ENABLE_TIMEOUT_BUTTON || !timeoutQueued) {
+        return false;
+    }
+    
+    // Check if current turn is eligible
+    if (checkTimeoutEligibility(scene, turnData)) {
+        // Execute the timeout
+        await handleTimeoutButtonClick(true); // Pass true to skip toggle (just execute)
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * Handle timeout button click
+ * @param {boolean} executeOnly - If true, execute timeout without toggling state (used when eligible turn is reached)
+ */
+async function handleTimeoutButtonClick(executeOnly = false) {
+    if (!ENABLE_TIMEOUT_BUTTON) {
+        return;
+    }
+    
+    const button = document.getElementById('timeout-btn');
+    if (!button) {
+        return;
+    }
+    
+    // Get game context from scene
+    const scene = window.currentGameScene;
     
     if (!scene) {
         console.error('❌ TIMEOUT: Cannot access game scene');
         return;
     }
     
+    // If executeOnly is false, toggle the queue state
+    if (!executeOnly) {
+        // Play sound effect
+        if (timeoutSound) {
+            try {
+                timeoutSound.currentTime = 0; // Reset to start
+                timeoutSound.play().catch(err => {
+                    console.warn('⚠️ [TIMEOUT] Could not play sound:', err);
+                });
+            } catch (error) {
+                console.warn('⚠️ [TIMEOUT] Sound play error:', error);
+            }
+        }
+        
+        // Toggle timeout queue state
+        timeoutQueued = !timeoutQueued;
+        updateButtonHighlight(timeoutQueued);
+        updateTimeoutButtonState(true, timeoutQueued ? 'Timeout queued' : 'Timeout available');
+        
+        if (timeoutQueued) {
+            console.log('⏸️ TIMEOUT: Queued - will execute when eligible turn is reached');
+        } else {
+            console.log('⏸️ TIMEOUT: Cancelled - removed from queue');
+        }
+        
+        // If we're toggling off, don't execute
+        if (!timeoutQueued) {
+            return;
+        }
+        
+        // If we're toggling on, check if current turn is eligible
+        const currentTurnData = scene.currentTurnData || {};
+        if (checkTimeoutEligibility(scene, currentTurnData)) {
+            // Current turn is eligible, execute immediately
+            console.log('⏸️ TIMEOUT: Current turn is eligible, executing immediately');
+            // Continue to execute timeout below
+        } else {
+            // Not eligible yet, wait for next eligible turn
+            console.log('⏸️ TIMEOUT: Queued - waiting for eligible turn');
+            return;
+        }
+    }
+    
+    // Execute the timeout
     // Get game ID and team info from scene
     const gameId = scene.gameId || scene.simData?.game_id;
-    // ✅ TIMEOUT: Use scene.userTeamSide (set in init()) or fallback to URL param
-    // scene.userTeamSide is the authoritative source (set from bootGame.js data.userTeamSide)
-    // URL param 'my_team' is the fallback (set when navigating to court.html)
     const urlParams = new URLSearchParams(window.location.search);
     const myTeamSide = scene.userTeamSide || urlParams.get('my_team');
-    
-    // Log for debugging
-    console.log('⏸️ TIMEOUT: Determining calling team', {
-      sceneUserTeamSide: scene.userTeamSide,
-      urlParamMyTeam: urlParams.get('my_team'),
-      simDataUserTeamSide: scene.simData?.user_team_side,
-      finalMyTeamSide: myTeamSide
-    });
     
     if (!myTeamSide) {
         console.error('❌ TIMEOUT: Cannot determine user team side (myTeamSide is undefined)');
         alert('Cannot determine your team for this game. Please return and relaunch.');
+        resetTimeoutQueue();
         return;
     }
     
     if (!gameId) {
         console.error('❌ TIMEOUT: Cannot determine game ID');
+        resetTimeoutQueue();
         return;
     }
     
     try {
         // Call timeout API
+        const API_CONFIG = window.API_CONFIG;
+        if (!API_CONFIG) {
+            console.error('❌ TIMEOUT: API_CONFIG not available');
+            resetTimeoutQueue();
+            return;
+        }
         const response = await fetch(API_CONFIG.buildUrl('/api/call-timeout'), {
             method: 'POST',
             headers: {
@@ -235,19 +299,23 @@ async function handleTimeoutButtonClick() {
             const error = await response.json();
             console.error('❌ TIMEOUT: API error', error);
             alert(error.detail || 'Failed to call timeout');
+            resetTimeoutQueue();
             return;
         }
         
         const result = await response.json();
         console.log('✅ TIMEOUT: Called successfully', result);
         
-        // Navigate to lineup screen (will be handled by timeout popup)
-        // For now, we'll show a popup and navigate
+        // Reset queue state
+        resetTimeoutQueue();
+        
+        // Navigate to lineup screen
         await showTimeoutPopup(result, gameId, scene);
         
     } catch (error) {
         console.error('❌ TIMEOUT: Error calling timeout', error);
         alert('Failed to call timeout. Please try again.');
+        resetTimeoutQueue();
     }
 }
 
@@ -437,65 +505,5 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
     window.location.href = `/set-lineup.html?${params.toString()}`;
 }
 
-/**
- * Show progress bar
- */
-function showProgressBar() {
-    const wrapper = document.getElementById('timeout-progress-bar-wrapper');
-    if (wrapper) {
-        wrapper.style.display = 'block';
-    }
-}
-
-/**
- * Hide progress bar
- */
-function hideProgressBar() {
-    const wrapper = document.getElementById('timeout-progress-bar-wrapper');
-    if (wrapper) {
-        wrapper.style.display = 'none';
-    }
-    const bar = document.getElementById('timeout-progress-bar');
-    if (bar) {
-        bar.style.width = '100%';
-    }
-}
-
-/**
- * Start progress bar animation
- */
-function startProgressBarAnimation() {
-    const bar = document.getElementById('timeout-progress-bar');
-    if (!bar) {
-        return;
-    }
-    
-    // Reset to full
-    bar.style.width = '100%';
-    bar.style.transition = 'none';
-    
-    // Start animation
-    setTimeout(() => {
-        bar.style.transition = `width ${pauseDuration}ms linear`;
-        bar.style.width = '0%';
-    }, 10);
-}
-
-/**
- * Update progress bar based on elapsed time
- */
-export function updateProgressBar() {
-    if (!ENABLE_TIMEOUT_BUTTON || !pauseStartTime) {
-        return;
-    }
-    
-    const elapsed = Date.now() - pauseStartTime;
-    const remaining = Math.max(0, pauseDuration - elapsed);
-    const percentage = (remaining / pauseDuration) * 100;
-    
-    const bar = document.getElementById('timeout-progress-bar');
-    if (bar) {
-        bar.style.width = `${percentage}%`;
-    }
-}
+// Progress bar functions removed - no longer needed
 

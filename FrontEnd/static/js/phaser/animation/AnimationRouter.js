@@ -115,6 +115,18 @@ export class AnimationRouter {
       // ✅ PHASE 2.3: Get turnIndex from prepared turn (prepareTurnForAnimation sets turn.index)
       turnIndex = turnData.index ?? turnIndex;
       
+      // ✅ TIMEOUT: Check if timeout is queued and current turn is eligible
+      if (ENABLE_TIMEOUT_BUTTON) {
+        const { checkAndExecuteQueuedTimeout } = await import('../utils/timeoutButtonManager.js');
+        // Store current turn data for timeout eligibility check
+        this.scene.currentTurnData = turnData;
+        const timeoutExecuted = await checkAndExecuteQueuedTimeout(this.scene, turnData);
+        if (timeoutExecuted) {
+          // Timeout was executed, stop processing this turn
+          return;
+        }
+      }
+      
       if (shouldLog && isHCO) {
         console.log('🔍 HCO_ROUTER_START', {
           result_type: turnData.result_type,
