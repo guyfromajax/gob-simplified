@@ -2474,6 +2474,19 @@ class PlaybooksUI {
         team_id: teamId, // Can be team name, ObjectId, or canonical format - backend normalizes
         playbook_settings: playbookSettings
       };
+      
+      // ✅ PHASE 5.7: Include game_id when available (for all modes)
+      // Backend will determine if game is active and save to game doc or master doc accordingly
+      if (gameId) {
+        requestBody.game_id = gameId;
+      }
+      
+      if (mode === 'tournament' && tournamentId) {
+        requestBody.tournament_id = tournamentId;
+      } else if (mode === 'franchise' && franchiseId) {
+        requestBody.franchise_id = franchiseId;
+      }
+      
       console.log('🔍 [PLAYBOOKS SAVE] Request body (mode, team_id, franchise_id, tournament_id, game_id):', {
         mode: mode,
         team_id: teamId,
@@ -2481,14 +2494,6 @@ class PlaybooksUI {
         tournament_id: tournamentId,
         game_id: gameId
       });
-      
-      if (mode === 'single' && gameId) {
-        requestBody.game_id = gameId;
-      } else if (mode === 'tournament' && tournamentId) {
-        requestBody.tournament_id = tournamentId;
-      } else if (mode === 'franchise' && franchiseId) {
-        requestBody.franchise_id = franchiseId;
-      }
       
       // ✅ PHASE 1.3: Log backend write
       if (window.StateTelemetry) {
