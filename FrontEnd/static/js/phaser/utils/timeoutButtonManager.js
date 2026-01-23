@@ -125,10 +125,13 @@ function isUserTeamOnOffense(scene, turnData) {
 
 /**
  * Check if timeout is eligible for current turn
- * Eligible if:
- * 1. User team is on offense
- * 2. Turn is BASELINE_INBOUND
- * 3. Turn is SIDE_INBOUND
+ * Simple two-step check (in order):
+ * 1. Is offense_team == user's team? → Eligible
+ * 2. Is current turn BIP or SIP? → Eligible
+ * 
+ * @param {Object} scene - Game scene
+ * @param {Object} turnData - Turn data (from scene.simData.turns or AnimationRouter)
+ * @returns {boolean} - True if eligible, false otherwise
  */
 export function checkTimeoutEligibility(scene, turnData) {
     if (!ENABLE_TIMEOUT_BUTTON) {
@@ -141,15 +144,31 @@ export function checkTimeoutEligibility(scene, turnData) {
         return false;
     }
     
-    const currentTurn = turnData?.current_turn || turnData?.result_type;
+    // Get user team side
+    const userTeamSide = scene.userTeamSide || scene.simData?.user_team_side;
+    if (!userTeamSide) {
+        return false;
+    }
     
-    // Check if it's a BIP or SIP turn
-    if (currentTurn === 'SIDE_INBOUND' || currentTurn === 'BASELINE_INBOUND') {
+    // Get possession team ID
+    const possessionTeamId = turnData?.possession_team_id;
+    if (!possessionTeamId) {
+        return false;
+    }
+    
+    // Get home/away team IDs
+    const homeTeamId = scene.simData?.home_team_id;
+    const awayTeamId = scene.simData?.away_team_id;
+    
+    // Check 1: Is offense_team == user's team?
+    const userTeamId = userTeamSide === 'home' ? homeTeamId : awayTeamId;
+    if (possessionTeamId === userTeamId) {
         return true;
     }
     
-    // Check if user team is on offense
-    if (isUserTeamOnOffense(scene, turnData)) {
+    // Check 2: Is current turn BIP or SIP?
+    const currentTurn = turnData?.current_turn || turnData?.result_type;
+    if (currentTurn === 'SIDE_INBOUND' || currentTurn === 'BASELINE_INBOUND') {
         return true;
     }
     
@@ -346,21 +365,30 @@ async function handleTimeoutButtonClick(executeOnly = false) {
         timeoutQueued = !timeoutQueued;
         
         if (timeoutQueued) {
-            // Store the current turn index when queued (to ensure we wait for NEXT eligible turn)
+            // Store the current turn index when queued
             const currentTurnIndex = scene.currentTurn || scene.currentTurnData?.index || null;
             timeoutQueuedAtTurnIndex = currentTurnIndex;
             
-            // ✅ STATE CONTRACT: Check eligibility using scene.currentTurnData (UI-only state)
-            // If it's empty/stale (no result_type or current_turn), default to "not eligible"
-            const currentTurnData = scene.currentTurnData || {};
-            const hasValidTurnData = currentTurnData.result_type || currentTurnData.current_turn;
+            // ✅ Get real-time turn data from server truth (scene.simData.turns)
+            // Primary: scene.simData.turns[scene.currentTurn] (fresh from server)
+            // Fallback: scene.currentTurnData (may be stale)
+            let currentTurnData = null;
+            if (scene.currentTurn !== null && scene.currentTurn !== undefined && scene.simData?.turns) {
+                currentTurnData = scene.simData.turns[scene.currentTurn];
+            }
+            if (!currentTurnData) {
+                currentTurnData = scene.currentTurnData || {};
+            }
             
-            if (hasValidTurnData && checkTimeoutEligibility(scene, currentTurnData)) {
+            // Check eligibility using simple two-step check
+            const isEligible = checkTimeoutEligibility(scene, currentTurnData);
+            
+            if (isEligible) {
                 // Current turn is eligible, set flag for immediate execution
                 timeoutQueuedDuringEligibleTurn = true;
-                console.log('⏸️ TIMEOUT: Queued during eligible turn - will execute immediately');
+                console.log('⏸️ TIMEOUT: Current turn is eligible, executing immediately');
             } else {
-                // Not eligible or can't determine (stale/empty data), queue and wait
+                // Not eligible, queue and wait for next eligible turn
                 timeoutQueuedDuringEligibleTurn = false;
                 console.log('⏸️ TIMEOUT: Queued at turn index', currentTurnIndex, '- will execute at start of next eligible turn');
             }
@@ -382,7 +410,7 @@ async function handleTimeoutButtonClick(executeOnly = false) {
         
         // If queued during eligible turn, execute immediately
         if (timeoutQueuedDuringEligibleTurn) {
-            console.log('⏸️ TIMEOUT: Current turn is eligible, executing immediately');
+            console.log('⏸️ TIMEOUT: Executing immediately (current turn is eligible)');
             // Continue to execute timeout below (don't return)
         } else {
             // Not eligible, queue and wait for next eligible turn
