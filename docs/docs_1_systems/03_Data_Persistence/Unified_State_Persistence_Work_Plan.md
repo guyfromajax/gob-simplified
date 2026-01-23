@@ -478,7 +478,7 @@
 
 **Goal:** Enable game-specific settings in franchise/tournament mode without affecting master settings.
 
-**Status:** 🔄 In Progress (Tasks 1-5 complete, Task 6 blocked by bug)
+**Status:** ✅ Complete
 
 **Rationale:** Currently, settings changes during franchise/tournament gameplay save to the franchise/tournament document (master settings), affecting all games. This feature allows users to make game-specific adjustments during gameplay without disrupting their master playbooks/game plans. Settings are scoped to the active game document and revert to master settings when the game ends.
 
