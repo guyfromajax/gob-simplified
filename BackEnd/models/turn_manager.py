@@ -2462,6 +2462,12 @@ class TurnManager:
                         logging.warning(f"⚠️ [PUTBACK MISS => REBOUND] Could not find rebounder with ID={rebounder_id} after searching {players_searched} players")
                     
                     if new_rebounder:
+                        # ✅ FIX: Re-record rebound stat on the player object found by lookup
+                        # This ensures the stat is on the same object instance used for delta computation.
+                        # The stat was already recorded in shared.py, but we re-record here to guarantee
+                        # it's on the correct object instance (matches HCO miss pattern in shot_manager.py).
+                        new_rebounder.record_stat(rebound_type)
+                        logging.info(f"✅ [PUTBACK MISS => REBOUND] Re-recorded {rebound_type} stat for {get_name_safe(new_rebounder)} (ID: {rebounder_id})")
                         text += f" {get_name_safe(new_rebounder)} grabs the rebound."
                         result["text"] = text
                     
