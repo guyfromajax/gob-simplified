@@ -1799,8 +1799,6 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                     )
                 else:
                     doc = collection.find_one({"_id": ObjectId(doc_id)})
-            
-            if not load_from_game_doc:
         
         query_time = (time.time() - query_start) * 1000  # Convert to ms
         doc_size = len(str(doc)) if doc else 0
