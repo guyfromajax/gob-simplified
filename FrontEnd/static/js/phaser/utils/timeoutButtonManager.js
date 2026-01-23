@@ -370,8 +370,10 @@ export async function checkAndExecuteQueuedTimeout(scene, turnData) {
         return false;
     }
     
-    // ✅ FIX 1: Instead of executing immediately, set a flag to execute after turn completes
+    // ✅ FIX 1: Set flag to execute timeout after turn completes
     // This ensures the popup appears only after the turn animation finishes
+    // Note: If queued during eligible turn, shouldKillCurrentTurnInstantly will handle killing the turn
+    // But we still wait for turn completion before showing popup
     console.log('🔍 [TIMEOUT DEBUG] Eligible turn detected, setting flag to execute after turn completes');
     
     // Store timeout execution data to be processed after turn completes
@@ -726,8 +728,23 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
  * @param {Object} scene - Game scene object
  * @param {boolean} [computerTimeout=false] - Whether this is a computer timeout
  * @param {string} [computerTeamName] - Name of the computer team that called timeout
+ * 
+ * ✅ FIX 2: For user timeouts, this should ONLY be called when user clicks "Go To Timeout" button
+ * Computer timeouts can call this directly for automatic navigation
  */
 export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTimeout = false, computerTeamName = null) {
+    console.log('🔍 [TIMEOUT DEBUG] showTimeoutPopup called', { computerTimeout, hasResult: !!timeoutResult });
+    
+    // ✅ FIX 2: Guard against auto-navigation for user timeouts
+    // If this is a user timeout (not computer), make sure it's being called from button click
+    if (!computerTimeout) {
+        // Check if user timeout popup is still showing (user hasn't clicked button yet)
+        const userPopup = document.querySelector('.user-timeout-popup');
+        if (userPopup) {
+            console.warn('⚠️ [TIMEOUT] showTimeoutPopup called for user timeout but popup still showing - ignoring navigation');
+            return; // Don't navigate if popup is still showing
+        }
+    }
     // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
     // Use global helper (works in both regular scripts and modules)
     const helper = window.TimeoutNavigationHelper;
