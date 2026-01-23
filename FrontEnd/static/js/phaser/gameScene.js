@@ -157,6 +157,11 @@ export function createGameScene(Phaser) {
       // Expose gameScene globally for Playcall Center tooltips
       window.currentGameScene = this;
       
+      // ✅ TIMEOUT: Initialize timeout button
+      if (ENABLE_TIMEOUT_BUTTON) {
+        initTimeoutButton();
+      }
+      
       // Reset pause state BEFORE killing tweens
       this.isPaused = false;
       if (this.tweens) {
