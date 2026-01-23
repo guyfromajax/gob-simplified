@@ -1,6 +1,9 @@
 const DEBUG_BRACKET = window.DEBUG_BRACKET || false;
 const DEBUG_GAME_ID = window.DEBUG_GAME_ID || false;
 
+// ✅ SS&S: Import shared status display utility
+import { showStatus, hideStatus } from './utils/statusDisplay.js';
+
 export async function finalizeGame({ simData, tournamentId, franchiseId, game }) {
   // ✅ UNIFIED STRUCTURE: Extract team names with priority: unified structure > backward compatibility
   // Unified structure: simData.teams[home_team_id].name (preferred)
@@ -123,11 +126,17 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
         console.log('📤 [FINALIZE_GAME] game_document has box_score?', !!requestBody.game_document.box_score);
       }
       
+      // ✅ Show "Simulating Computer Games" when transitioning to computer games
+      showStatus('Simulating Computer Games...');
+      
       const res = await fetch(saveResultUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
       });
+      
+      // Hide status after response (whether success or error)
+      hideStatus();
       console.log('📥 [FINALIZE_GAME] Response status:', res.status, res.statusText);
       console.log('📥 [FINALIZE_GAME] Response ok?', res.ok);
       
@@ -244,11 +253,18 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
         requestBody.game_document = simData.final_game_document;
       }
       
+      // ✅ Show "Simulating Computer Games" when transitioning to computer games
+      showStatus('Simulating Computer Games...');
+      
       const res = await fetch(API_CONFIG.buildUrl("/franchise/complete-week"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
       });
+      
+      // Hide status after response (whether success or error)
+      hideStatus();
+      
       if (!res.ok) {
         console.error("❌ Failed to complete franchise week:", await res.text());
       } else {
