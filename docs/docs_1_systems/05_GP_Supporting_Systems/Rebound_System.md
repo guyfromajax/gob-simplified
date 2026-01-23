@@ -7,6 +7,30 @@ A unified system that handles rebound logic for all missed shot instances.
 
 **Note - we need to animate rebounders into position during shot attempt**
 
+## Rebound Stat Recording
+
+### Standard Flow (HCO, Fast Break, Free Throw)
+- Rebound stat (DREB/OREB) is recorded immediately after determining the rebounder
+- Stat is recorded in the same function that creates the turn result
+- Example: `shot_manager.py` records stat on line 900-901, then computes deltas using the same player object
+
+### OREB Putback Miss Flow (Special Case)
+**Problem:** When a putback misses and results in another rebound, the stat recording flow is split across two functions:
+1. `resolve_offensive_rebound()` in `shared.py` (line 229) records the stat on the rebounder object returned by `determine_rebounder()`
+2. `resolve_offensive_rebound_turn()` in `turn_manager.py` looks up the player again by ID (line 2454) for delta computation
+
+**Solution:** After looking up the rebounder by ID in `turn_manager.py`, re-record the rebound stat on that player object to ensure it's on the same instance used for delta computation. This matches the pattern used in HCO misses and guarantees stat consistency.
+
+**Implementation:**
+- Location: `BackEnd/models/turn_manager.py` line ~2464
+- After finding `new_rebounder` by ID lookup, call `new_rebounder.record_stat(rebound_type)`
+- This ensures the stat is recorded on the correct object instance, even if the lookup returns a different reference than the one used in `shared.py`
+
+**Why This Matters:**
+- Supports consecutive OREB scenarios: HCO miss => OREB => Putback Miss => OREB => Putback Miss => OREB => Putback Miss => DREB
+- Each OREB is a separate turn, and each rebounder must have their stat properly recorded
+- Stat deltas are computed by comparing current stats to `pre_stats` snapshot, so the stat must be on the same object instance used for delta computation
+
 **Rebound Resolution Flow (8 Steps)**
 1. Calculdate the mised shot bounce spot
     -bounce spot has wider variance on longer shots
