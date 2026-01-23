@@ -330,12 +330,18 @@ async function handleTimeoutButtonClick(executeOnly = false) {
         
         // Toggle timeout queue state
         timeoutQueued = !timeoutQueued;
-        updateButtonHighlight(timeoutQueued);
-        updateTimeoutButtonState(true, timeoutQueued ? 'Timeout queued' : 'Timeout available');
         
         if (timeoutQueued) {
-            console.log('⏸️ TIMEOUT: Queued - will execute when eligible turn is reached');
+            // Store the current turn index when queued (to ensure we wait for NEXT eligible turn)
+            const currentTurnIndex = scene.currentTurn || scene.currentTurnData?.index || null;
+            timeoutQueuedAtTurnIndex = currentTurnIndex;
+            updateButtonHighlight(true);
+            updateTimeoutButtonState(true, 'Timeout queued');
+            console.log('⏸️ TIMEOUT: Queued at turn index', currentTurnIndex);
         } else {
+            timeoutQueuedAtTurnIndex = null;
+            updateButtonHighlight(false);
+            updateTimeoutButtonState(true, 'Timeout available');
             console.log('⏸️ TIMEOUT: Cancelled - removed from queue');
         }
         
