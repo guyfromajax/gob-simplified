@@ -372,12 +372,16 @@ export async function checkAndExecuteQueuedTimeout(scene, turnData) {
  * @param {boolean} executeOnly - If true, execute timeout without toggling state (used when eligible turn is reached)
  */
 async function handleTimeoutButtonClick(executeOnly = false) {
+    console.log('🔍 [TIMEOUT DEBUG] handleTimeoutButtonClick called - executeOnly:', executeOnly);
+    
     if (!ENABLE_TIMEOUT_BUTTON) {
+        console.log('🔍 [TIMEOUT DEBUG] ENABLE_TIMEOUT_BUTTON is false, returning');
         return;
     }
     
     const button = document.getElementById('timeout-btn');
     if (!button) {
+        console.log('🔍 [TIMEOUT DEBUG] Button not found, returning');
         return;
     }
     
@@ -389,8 +393,11 @@ async function handleTimeoutButtonClick(executeOnly = false) {
         return;
     }
     
+    console.log('🔍 [TIMEOUT DEBUG] Scene found, executeOnly:', executeOnly);
+    
     // If executeOnly is false, toggle the queue state
     if (!executeOnly) {
+        console.log('🔍 [TIMEOUT DEBUG] User clicked button (executeOnly=false)');
         // Play sound effect
         if (timeoutSound) {
             try {
