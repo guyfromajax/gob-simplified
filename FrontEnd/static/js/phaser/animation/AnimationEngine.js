@@ -168,16 +168,6 @@ export class AnimationEngine {
       "STEAL" // ✅ FIX: STEAL is not a shot attempt
     ]);
     
-    // 🔍 DEBUG: Log routing decision for FOUL, HCO, STEAL, and other non-shot types
-    if (turnData.result_type === "FOUL" || turnData.result_type === "HCO" || 
-        turnData.result_type === "STEAL" || turnData.result_type === "DEAD_BALL" ||
-        turnData.result_type === "DEAD_BALL_TURNOVER" || nonShotResultTypes.has(turnData.result_type)) {
-      const isInNonShotSet = nonShotResultTypes.has(turnData.result_type);
-      const isShotAttempt = this.isShotAttempt(turnData);
-      const willRouteToShot = !isInNonShotSet && isShotAttempt;
-      const willRouteToDefault = isInNonShotSet || !isShotAttempt;
-      
-    }
     
     // Shot attempt detection (only if not a non-shot result type)
     if (!nonShotResultTypes.has(turnData.result_type) && this.isShotAttempt(turnData)) {
