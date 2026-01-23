@@ -354,7 +354,9 @@ class PlaybooksUI {
     this.renderAssignedPlays();
     
     this.renderAll();
+    console.log('🔍 [INIT] About to call attachEventListeners()');
     this.attachEventListeners();
+    console.log('🔍 [INIT] attachEventListeners() completed');
     
     // Update Even Distribution button states after rendering (restored from localStorage)
     Object.keys(this.evenDistributionEnabled).forEach(sectionKey => {
@@ -1444,6 +1446,7 @@ class PlaybooksUI {
   }
   
   attachEventListeners() {
+    console.log('🔍 [ATTACH LISTENERS] attachEventListeners() called');
     const submitBtn = document.getElementById('submit-btn');
     if (submitBtn) {
       submitBtn.addEventListener('click', () => {
@@ -1497,11 +1500,18 @@ class PlaybooksUI {
     
     // Position filter button listeners
     const positionButtons = document.querySelectorAll('.position-filter-btn');
-    positionButtons.forEach(btn => {
+    console.log('🔍 [ATTACH LISTENERS] Found position buttons:', positionButtons.length);
+    if (positionButtons.length === 0) {
+      console.error('❌ [ATTACH LISTENERS] No position filter buttons found! Buttons may not exist in DOM yet.');
+    }
+    positionButtons.forEach((btn, index) => {
+      console.log(`🔍 [ATTACH LISTENERS] Attaching listener to button ${index + 1}: ${btn.dataset.position}`);
       btn.addEventListener('click', () => {
+        console.log(`🔍 [BUTTON CLICK] Position filter button clicked: ${btn.dataset.position}`);
         this.handlePositionFilterClick(btn);
       });
     });
+    console.log('✅ [ATTACH LISTENERS] Position filter button listeners attached');
   }
   
   handleEvenDistribution(sectionKey) {
@@ -1700,8 +1710,13 @@ class PlaybooksUI {
   }
   
   handlePositionFilterClick(button) {
+    console.log('🔍 [HANDLE POSITION FILTER] handlePositionFilterClick called');
+    console.log('🔍 [HANDLE POSITION FILTER] button:', button);
+    console.log('🔍 [HANDLE POSITION FILTER] button.dataset:', button.dataset);
     const position = button.dataset.position;
+    console.log('🔍 [HANDLE POSITION FILTER] position:', position);
     const isSelected = button.classList.contains('selected');
+    console.log('🔍 [HANDLE POSITION FILTER] isSelected:', isSelected);
     
     if (isSelected) {
       // Deselect if already selected
