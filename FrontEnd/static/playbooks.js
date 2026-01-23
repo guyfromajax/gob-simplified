@@ -2540,16 +2540,86 @@ class PlaybooksUI {
   }
   
   showToast(message, isError = false) {
-    const toast = document.getElementById('toast');
-    if (!toast) return;
+    // For errors, use the existing toast (lower right corner)
+    if (isError) {
+      const toast = document.getElementById('toast');
+      if (!toast) return;
+      
+      toast.textContent = message;
+      toast.className = `toast error`;
+      toast.classList.add('show');
+      
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+      return;
+    }
     
-    toast.textContent = message;
-    toast.className = `toast ${isError ? 'error' : ''}`;
-    toast.classList.add('show');
+    // For success, use centered popup (matching Game Plan design)
+    this.showSuccessPopup(message);
+  }
+  
+  showSuccessPopup(message) {
+    // Create modal overlay (matching Game Plan design)
+    const overlay = document.createElement('div');
+    overlay.className = 'playbooks-success-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    `;
     
-    setTimeout(() => {
-      toast.classList.remove('show');
-    }, 3000);
+    // Create modal
+    const modal = document.createElement('div');
+    modal.className = 'playbooks-success-modal';
+    modal.style.cssText = `
+      background: #1a1a1a;
+      border: 2px solid #00ff00;
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 400px;
+      width: 90%;
+      color: #fff;
+      text-align: center;
+    `;
+    
+    // Message
+    const messageEl = document.createElement('p');
+    messageEl.textContent = message;
+    messageEl.style.cssText = `
+      font-size: 1.125rem;
+      margin-bottom: 20px;
+      font-weight: 600;
+      color: #00ff00;
+    `;
+    
+    // OK button
+    const okBtn = document.createElement('button');
+    okBtn.textContent = 'OK';
+    okBtn.style.cssText = `
+      padding: 10px 30px;
+      background: #00ff00;
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      font-weight: 600;
+      cursor: pointer;
+    `;
+    okBtn.addEventListener('click', () => {
+      overlay.remove();
+    });
+    
+    modal.appendChild(messageEl);
+    modal.appendChild(okBtn);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
   }
   
   debouncedSave() {
