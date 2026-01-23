@@ -184,6 +184,7 @@ export function resetTimeoutQueue() {
     }
     
     timeoutQueued = false;
+    timeoutQueuedAtTurnIndex = null;
     updateButtonHighlight(false);
     updateTimeoutButtonState(true, 'Timeout available');
 }
