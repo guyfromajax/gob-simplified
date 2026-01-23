@@ -165,6 +165,25 @@ h1, h2, h3, h4, h5, h6 {
   background: #f0f7ff;
 }
 
+/* Scouting Report - Gray fill (matches Franchise pattern) */
+#tournament-container #scouting-report-btn.secondary-btn {
+  background: #9e9d9d;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+#tournament-container #scouting-report-btn.secondary-btn:hover {
+  background: #8a8989;
+  transform: translateY(-1px);
+}
+
 .play-now-btn {
   background: #ff6600;
   color: #fff;

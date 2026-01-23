@@ -6,25 +6,25 @@ Bentley-Truman (6747):
 SC: 533 (1), SH: 469 (2), ID: 556 (2), OD: 514 (3), PS: 584 (1), BH: 439 (1), RB: 510 (2), AG: 595 (1), ST: 519 (2), ND: 677 (2), IQ: 608 (2), FT: 743 (2), CH: 0 (1)
 
 Four Corners (6276):
-SC: 475 (2), SH: 460 (3), ID: 480 (4), OD: 517 (2), PS: 496 (4), BH: 367 (4), RB: 429 (7), AG: 576 (2), ST: 455 (5), ND: 761 (1), IQ: 535 (4), FT: 725 (3), CH: 0 (3)
+SC: 475 (2), SH: 460 (3), ID: 480 (4), OD: 517 (2), PS: 496 (4), BH: 367 (5), RB: 429 (8), AG: 576 (2), ST: 455 (4), ND: 761 (1), IQ: 535 (4), FT: 725 (3), CH: 0 (3)
 
-Lancaster (6285):
-SC: 462 (5), SH: 390 (6), ID: 633 (1), OD: 549 (1), PS: 530 (2), BH: 361 (6), RB: 553 (1), AG: 537 (3), ST: 615 (1), ND: 559 (4), IQ: 499 (6), FT: 597 (5), CH: 0 (2)
+Lancaster (6240):
+SC: 462 (5), SH: 390 (6), ID: 633 (1), OD: 549 (1), PS: 530 (2), BH: 361 (6), RB: 553 (1), AG: 537 (3), ST: 615 (1), ND: 559 (4), IQ: 469 (6), FT: 582 (7), CH: 0 (2)
 
 Little York (5652):
-SC: 474 (3), SH: 438 (4), ID: 472 (5), OD: 346 (8), PS: 520 (3), BH: 331 (7), RB: 433 (6), AG: 450 (7), ST: 442 (6), ND: 433 (7), IQ: 717 (1), FT: 596 (6), CH: 0 (7)
+SC: 474 (3), SH: 438 (4), ID: 472 (5), OD: 346 (8), PS: 520 (3), BH: 331 (7), RB: 433 (7), AG: 450 (7), ST: 442 (6), ND: 433 (7), IQ: 717 (1), FT: 596 (6), CH: 0 (7)
 
 Morristown (5880):
 SC: 466 (4), SH: 401 (5), ID: 507 (3), OD: 433 (5), PS: 480 (6), BH: 418 (2), RB: 441 (5), AG: 451 (6), ST: 511 (3), ND: 516 (6), IQ: 599 (3), FT: 657 (4), CH: 0 (4)
 
 Ocean City (5713):
-SC: 413 (7), SH: 536 (1), ID: 345 (8), OD: 408 (6), PS: 494 (5), BH: 395 (3), RB: 453 (4), AG: 531 (4), ST: 409 (7), ND: 518 (5), IQ: 467 (7), FT: 744 (1), CH: 0 (5)
+SC: 413 (7), SH: 536 (1), ID: 345 (8), OD: 408 (7), PS: 494 (5), BH: 395 (3), RB: 453 (3), AG: 531 (4), ST: 409 (7), ND: 518 (5), IQ: 467 (7), FT: 744 (1), CH: 0 (5)
 
-South Lancaster (5645):
-SC: 460 (6), SH: 345 (7), ID: 454 (6), OD: 476 (4), PS: 423 (7), BH: 367 (5), RB: 465 (3), AG: 474 (5), ST: 472 (4), ND: 592 (3), IQ: 528 (5), FT: 589 (7), CH: 0 (6)
+South Lancaster (5620):
+SC: 458 (6), SH: 377 (7), ID: 423 (6), OD: 462 (4), PS: 423 (7), BH: 387 (4), RB: 435 (6), AG: 464 (5), ST: 452 (5), ND: 592 (3), IQ: 528 (5), FT: 619 (5), CH: 0 (6)
 
-Xavien (4735):
-SC: 353 (8), SH: 330 (8), ID: 372 (7), OD: 399 (7), PS: 402 (8), BH: 310 (8), RB: 423 (8), AG: 427 (8), ST: 367 (8), ND: 431 (8), IQ: 400 (8), FT: 521 (8), CH: 0 (8)
+Xavien (4785):
+SC: 353 (8), SH: 330 (8), ID: 382 (7), OD: 419 (6), PS: 402 (8), BH: 310 (8), RB: 443 (4), AG: 427 (8), ST: 367 (8), ND: 431 (8), IQ: 400 (8), FT: 521 (8), CH: 0 (8)
 
 
 SC
@@ -34,7 +34,7 @@ SC
 3. Little York: 474
 4. Morristown: 466
 5. Lancaster: 462
-6. South Lancaster: 460
+6. South Lancaster: 458
 7. Ocean City: 413
 8. Xavien: 353
 
@@ -46,7 +46,7 @@ SH
 4. Little York: 438
 5. Morristown: 401
 6. Lancaster: 390
-7. South Lancaster: 345
+7. South Lancaster: 377
 8. Xavien: 330
 
 ID
@@ -56,8 +56,8 @@ ID
 3. Morristown: 507
 4. Four Corners: 480
 5. Little York: 472
-6. South Lancaster: 454
-7. Xavien: 372
+6. South Lancaster: 423
+7. Xavien: 382
 8. Ocean City: 345
 
 OD
@@ -65,10 +65,10 @@ OD
 1. Lancaster: 549
 2. Four Corners: 517
 3. Bentley-Truman: 514
-4. South Lancaster: 476
+4. South Lancaster: 462
 5. Morristown: 433
-6. Ocean City: 408
-7. Xavien: 399
+6. Xavien: 419
+7. Ocean City: 408
 8. Little York: 346
 
 PS
@@ -87,8 +87,8 @@ BH
 1. Bentley-Truman: 439
 2. Morristown: 418
 3. Ocean City: 395
-4. Four Corners: 367
-5. South Lancaster: 367
+4. South Lancaster: 387
+5. Four Corners: 367
 6. Lancaster: 361
 7. Little York: 331
 8. Xavien: 310
@@ -97,12 +97,12 @@ RB
 
 1. Lancaster: 553
 2. Bentley-Truman: 510
-3. South Lancaster: 465
-4. Ocean City: 453
+3. Ocean City: 453
+4. Xavien: 443
 5. Morristown: 441
-6. Little York: 433
-7. Four Corners: 429
-8. Xavien: 423
+6. South Lancaster: 435
+7. Little York: 433
+8. Four Corners: 429
 
 AG
 
@@ -110,7 +110,7 @@ AG
 2. Four Corners: 576
 3. Lancaster: 537
 4. Ocean City: 531
-5. South Lancaster: 474
+5. South Lancaster: 464
 6. Morristown: 451
 7. Little York: 450
 8. Xavien: 427
@@ -120,8 +120,8 @@ ST
 1. Lancaster: 615
 2. Bentley-Truman: 519
 3. Morristown: 511
-4. South Lancaster: 472
-5. Four Corners: 455
+4. Four Corners: 455
+5. South Lancaster: 452
 6. Little York: 442
 7. Ocean City: 409
 8. Xavien: 367
@@ -144,7 +144,7 @@ IQ
 3. Morristown: 599
 4. Four Corners: 535
 5. South Lancaster: 528
-6. Lancaster: 499
+6. Lancaster: 469
 7. Ocean City: 467
 8. Xavien: 400
 
@@ -154,9 +154,9 @@ FT
 2. Bentley-Truman: 743
 3. Four Corners: 725
 4. Morristown: 657
-5. Lancaster: 597
+5. South Lancaster: 619
 6. Little York: 596
-7. South Lancaster: 589
+7. Lancaster: 582
 8. Xavien: 521
 
 Overall
@@ -169,15 +169,15 @@ Overall
 6. Bentley-Truman ND: 677
 7. Morristown FT: 657
 8. Lancaster ID: 633
-9. Lancaster ST: 615
-10. Bentley-Truman IQ: 608
-11. Morristown IQ: 599
-12. Lancaster FT: 597
+9. South Lancaster FT: 619
+10. Lancaster ST: 615
+11. Bentley-Truman IQ: 608
+12. Morristown IQ: 599
 13. Little York FT: 596
 14. Bentley-Truman AG: 595
 15. South Lancaster ND: 592
-16. South Lancaster FT: 589
-17. Bentley-Truman PS: 584
+16. Bentley-Truman PS: 584
+17. Lancaster FT: 582
 18. Four Corners AG: 576
 19. Lancaster ND: 559
 20. Bentley-Truman ID: 556
@@ -197,6 +197,8 @@ Overall (excluding FT)
 11. Four Corners AG: 576
 12. Lancaster ND: 559
 13. Bentley-Truman ID: 556
+
+
 14. Lancaster RB: 553
 15. Lancaster OD: 549
 16. Lancaster AG: 537

@@ -110,3 +110,38 @@ DeGroot: -20 (-20 PS) (-230)
 Garza: -30 (-20 OD, -20 AG, +10 FT) (-260)
 Ali: -10 (-10 AG) (-270)
 Dimes: -10 (-10 AG) (-280)
+
+**Little York**
+Smith: -40 (-20 OD, -20 IQ)
+Buford: -40 (-10 SH, -30 ND) (-80)
+Largefoot: -50 (-30 SH, -20 ID) (-130)
+Farrabee: -30 (-15 SC, -15 ST) (-160)
+Landraneau: -10 (-20 SC, -20 ID, -20 RB, +50 IQ) (-170)
+Dutta: -20 (-20 SC) (-190)
+Herndon: -30 (-30 RB) (-220)
+McBurns: -25 (-10 SH, -15 OD, -30 RB, +30 IQ) -245
+Roose: -25 (-15 SH, -10 PS) -270
+Cotton: -10 (+10 IQ, -20 FT)
+
+**Ocean City**
+La: -60 (-20 OD, -30 PS, -10 BH)
+Holliday: -20 (-10 SC, -10 OD) (-80)
+Mingus: -40 (-30 ID, -10 IQ) (-120)
+Fabrizio: -50 (-20 SH, -15 ID, -15 PS) (-170)
+Aldrete: -10 (-10 ID) (-180)
+James: -45 (-45 IQ) (-225)
+D'Amore: -20 (-20 SH) (-245)
+Rutherford: -25 (-20 BH, -5 IQ) (-270)
+Preston: -10 (-10 SC) -280
+
+**South Lancaster**
+Ferdinand: -50 (-10 PS, -20 BH, -20 IQ)
+Felix: -50 (-20 SH, -10 PS, -20 IQ) (-100)
+Axelford: -10 (-10 AG) (-110)
+Baldwin: -10 (-20 SC, +10 ID) (-120)
+Crawford: -20 (-20 IQ) (-140)
+Hayes: -40 (-20 PS, -20 BH) (-180)
+Fullenkamp: -40 (-10 ID, -20 PS, -10 BH) (-220)
+Carrozza: -20 (-10 PS, -10 IQ) (-240)
+Stanhope: -10 (-10 RB) (-250)
+O'Callahan: -30 (-20 SH, -10 BH)
