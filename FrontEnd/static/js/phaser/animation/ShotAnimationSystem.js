@@ -223,41 +223,6 @@ export class ShotAnimationSystem {
     const isMake = turnData.result_type === 'MAKE';
     const rimCoords = this.getRimCoordinates(turnData);
     
-    // 🔍 STATE COMPARISON: Log tween manager and scene state before MAKE vs MISS handling
-    const getTweenManagerState = () => {
-      if (!this.scene.tweens) return null;
-      try {
-        const total = typeof this.scene.tweens.getAll === 'function' 
-          ? this.scene.tweens.getAll().length 
-          : 'N/A';
-        const paused = typeof this.scene.tweens.isPaused === 'function'
-          ? this.scene.tweens.isPaused()
-          : 'N/A';
-        const timeScale = this.scene.tweens.timeScale || 'N/A';
-        return { total, paused, timeScale };
-      } catch (error) {
-        return { error: error.message };
-      }
-    };
-    
-    const getBallControllerState = () => {
-      if (!this.ballController) return null;
-      return {
-        isAttached: this.ballController.isAttached,
-        isInFlight: this.ballController.isInFlight,
-        currentOwner: this.ballController.currentOwner?.playerId || null
-      };
-    };
-    
-    const getSceneFlags = () => {
-      return {
-        skipToEnd: this.scene.skipToEnd,
-        _getBackTweens: this._getBackTweens ? this._getBackTweens.length : 0,
-        _previousTurnWasInbound: this.scene._previousTurnWasInbound,
-        _previousTurnWasOpeningTip: this.scene._previousTurnWasOpeningTip
-      };
-    };
-    
     // Handle shot result
     
     // Execute make or miss handling
