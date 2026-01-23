@@ -2559,7 +2559,8 @@ class PlaybooksUI {
 // INITIALIZATION
 // ============================================================================
 
-document.addEventListener('DOMContentLoaded', () => {
+function initializePlaybooks() {
+  console.log('🔍 [PLAYBOOKS INIT] initializePlaybooks() called, readyState:', document.readyState);
   // ✅ PHASE 1.3: Set telemetry context
   if (window.StateTelemetry) {
     window.StateTelemetry.setContext('playbooks');
@@ -2616,5 +2617,16 @@ document.addEventListener('DOMContentLoaded', () => {
   
   const ui = new PlaybooksUI();
   ui.init();
-});
+}
+
+// ✅ FIX: Check readyState - if page is already loaded, run immediately
+// Otherwise wait for DOMContentLoaded (handles case where script loads late)
+if (document.readyState === 'loading') {
+  // DOM is still loading, wait for DOMContentLoaded
+  document.addEventListener('DOMContentLoaded', initializePlaybooks);
+} else {
+  // DOM is already loaded (interactive or complete), run immediately
+  console.log('🚀 [PLAYBOOKS] DOM already loaded, calling initializePlaybooks() immediately');
+  initializePlaybooks();
+}
 
