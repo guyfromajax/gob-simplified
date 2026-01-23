@@ -132,6 +132,84 @@ The `next_play_type` in the timeout turn is **always** `"SIDE_INBOUND"` (except 
 
 **Used By:** `turn_manager.py` `setup_timeout_turn()` to determine `next_play_type` for foul-out timeouts
 
+### Foul Out Player Lineup Removal & Visual Indicators
+
+**Purpose:** Removes fouled-out players from lineup and visually disables them on lineup screen
+
+**Backend Implementation:**
+
+**Ineligible Players Tracking:**
+- Location: `game_state["ineligible_players"]` array
+- Set By: `check_and_handle_foul_out()` in `phase_resolution.py` (line 135-136)
+- Contains: Array of player IDs with 5+ fouls
+- Persisted: Saved to database via `summarize_game_state()` and returned in `/api/game/{game_id}` response
+
+**API Response:**
+- Location: `BackEnd/api/api.py` `/api/game/{game_id}` endpoint
+- **✅ FIX (January 2025):** Added `ineligible_players` to response in all three paths:
+  - In-memory path (line ~1215): `"ineligible_players": gm.game_state.get("ineligible_players", [])`
+  - Database path (line ~1479): `"ineligible_players": saved.get("ineligible_players", [])`
+  - New game path (line ~1334): `"ineligible_players": []` (empty for new games)
+
+**Frontend Implementation:**
+
+**Lineup Removal:**
+- Location: `FrontEnd/static/set-lineup.js` `removeIneligiblePlayersFromLineup()` (lines 1167-1206)
+- Called: After `restoreLineupFromUrl()` to ensure fouled-out players are removed even if they were in URL params
+- Logic:
+  1. Iterates through all lineup positions (PG, SG, SF, PF, C)
+  2. Finds player in roster by ID
+  3. If player has `fouled_out` or `ineligible` flag, removes from lineup (sets position to `null`)
+  4. Clears slot display (removes player card, marks slot as empty, disables drag)
+
+**Visual Indicators:**
+- Location: `FrontEnd/static/set-lineup.js` and `FrontEnd/static/set-lineup.css`
+- Grid View (lines 513-519):
+  - Adds `.ineligible` class to table row
+  - Grey background: `#d3d3d3`
+  - Opacity: `0.7`
+  - `pointer-events: none` (disables interactions)
+  - `cursor: not-allowed`
+  - `draggable: false`
+- Player View (lines 1731-1737):
+  - Adds `.ineligible` class to player card
+  - Same styling as Grid view (grey background, opacity, disabled interactions)
+  - `draggable: false`
+  - Click handler disabled (cannot fill slot)
+
+**Player Marking:**
+- Location: `FrontEnd/static/set-lineup.js` `loadRoster()` (lines 347-369)
+- Logic:
+  1. Fetches game data from `/api/game/{game_id}` endpoint
+  2. Extracts `ineligible_players` array from response
+  3. Marks matching players in roster with `fouled_out = true` and `ineligible = true`
+  4. Re-renders views to show visual indicators
+
+**Diagnostic Helper:**
+- Location: `FrontEnd/static/set-lineup.js` (added after `removeIneligiblePlayersFromLineup()`)
+- Function: `window.checkFoulOutStatus()`
+- Usage: Run in browser console to verify foul-out status
+- Returns: Object with fouled-out player count, names, positions, and lineup state
+- Purpose: Helps debug foul-out lineup removal issues
+
+**Flow:**
+1. Player fouls out → Added to `game_state["ineligible_players"]` in backend
+2. Game state saved to database → `ineligible_players` array persisted
+3. User navigates to lineup screen → Frontend calls `/api/game/{game_id}`
+4. API returns `ineligible_players` → Frontend receives array of player IDs
+5. Frontend marks players → Sets `fouled_out = true` and `ineligible = true` in roster
+6. Frontend removes from lineup → `removeIneligiblePlayersFromLineup()` clears position
+7. Frontend applies visual indicators → Grey overlay and disabled interactions
+8. User sees empty position → Can select replacement player
+
+**Key Files:**
+- `BackEnd/engine/phase_resolution.py` `check_and_handle_foul_out()`: Adds player to `ineligible_players`
+- `BackEnd/api/api.py` `/api/game/{game_id}`: Returns `ineligible_players` in response
+- `FrontEnd/static/set-lineup.js` `loadRoster()`: Marks fouled-out players
+- `FrontEnd/static/set-lineup.js` `removeIneligiblePlayersFromLineup()`: Removes from lineup
+- `FrontEnd/static/set-lineup.js` `renderRoster()` and `renderPlayerView()`: Apply visual indicators
+- `FrontEnd/static/set-lineup.css`: Styles for `.ineligible` class
+
 ### Possession Flip Logic
 
 **Offensive Fouls:** Possession flips during SIP setup (not during foul resolution)

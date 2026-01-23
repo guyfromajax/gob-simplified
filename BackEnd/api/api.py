@@ -1213,6 +1213,8 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                 "quarter": gm.quarter,
                 "clock": gm.game_state.get("clock", "8:00"),
                 "players": players,
+                # ✅ FOUL OUT FIX: Include ineligible_players (fouled-out players) in response
+                "ineligible_players": gm.game_state.get("ineligible_players", []),
                 # Team-level stats (for S1/S2/S3 tabs and scoreboard)
                 "team_totals": gm.team_totals,
                 "team_stats": team_stats,  # Playcall stats for S2 tab
@@ -1332,6 +1334,8 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                         "quarter": 1,
                         "clock": "12:00",
                         "players": players_with_energy,
+                        # ✅ FOUL OUT FIX: Include ineligible_players (empty for new game)
+                        "ineligible_players": [],
                         "team_totals": {
                             home_team_data.get("name", ""): {},
                             away_team_data.get("name", ""): {}
@@ -1477,6 +1481,8 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                     "quarter": saved.get("quarter", 1),
                     "clock": saved.get("clock", "8:00"),
                     "players": players_with_energy,  # ✅ Includes stats (flat dict) and attributes (EM, MO, NG)
+                    # ✅ FOUL OUT FIX: Include ineligible_players (fouled-out players) from saved document
+                    "ineligible_players": saved.get("ineligible_players", []),
                     # Team IDs for unified structure access
                     "home_team_id": home_team_id,
                     "away_team_id": away_team_id,
