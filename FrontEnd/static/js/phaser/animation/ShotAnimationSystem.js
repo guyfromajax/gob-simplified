@@ -259,10 +259,6 @@ export class ShotAnimationSystem {
     };
     
     // Handle shot result
-      sceneFlags: getSceneFlags(),
-      hasRebounderId: !!turnData.rebounderId,
-      hasReboundType: !!turnData.rebound_type
-    });
     
     // Execute make or miss handling
     if (isMake) {
