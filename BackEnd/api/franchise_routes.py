@@ -2129,64 +2129,14 @@ def get_scouting_report(franchise_id: str, team_name: str):
         sort=[("_id", -1)]  # Most recent first
     )
     
-    plays_data = []
-    
-    if last_game:
-        # Extract play usage from game document
-        teams_obj = last_game.get("teams", {})
-        
-        # Game documents use team_id strings (like "LITTLE_YORK") as keys, not ObjectIds
-        # We need to find the team key by matching team name or team_id
-        team_key = None
-        
-        # Try multiple matching strategies
-        for key in teams_obj.keys():
-            # Strategy 1: Match by team_id field (e.g., "LITTLE_YORK")
-            if team_id_field and key == team_id_field:
-                team_key = key
-                break
-            # Strategy 2: Match by team name
-            if key == team_name:
-                team_key = key
-                break
-            # Strategy 3: Try to match by ObjectId (if key is an ObjectId string)
-            try:
-                if len(key) == 24:  # ObjectId string length
-                    key_obj_id = ObjectId(key)
-                    if key_obj_id == ObjectId(team_object_id):
-                        team_key = key
-                        break
-                    # Also check if this ObjectId matches our team
-                    key_team_doc = db.teams.find_one({"_id": key_obj_id})
-                    if key_team_doc and key_team_doc.get("name") == team_name:
-                        team_key = key
-                        break
-            except Exception:
-                pass
-        
-        if team_key:
-            team_plays = teams_obj.get(team_key, {}).get("plays", {})
-            
-            # Calculate total playcalls for usage %
-            total_playcalls = 0
-            for play_name, play_data in team_plays.items():
-                game_stats = play_data.get("game_stats", {})
-                times_run = game_stats.get("times_run", 0)
-                total_playcalls += times_run
-            
-            # Build plays array
-            for play_name, play_data in team_plays.items():
-                game_stats = play_data.get("game_stats", {})
-                times_run = game_stats.get("times_run", 0)
-                successes = game_stats.get("successes", 0)
-                
-                if times_run > 0:  # Only include plays that were actually run
-                    plays_data.append({
-                        "name": play_name,
-                        "times_run": times_run,
-                        "successes": successes,
-                        "total_playcalls": total_playcalls
-                    })
+    # ✅ SS&S: Use shared utility function to extract plays from game document
+    from BackEnd.utils.scouting_utils import extract_plays_from_game_document
+    plays_data = extract_plays_from_game_document(
+        last_game,
+        team_name,
+        team_object_id,
+        team_id_field
+    )
     
     return {
         "team_attributes": team_attributes,

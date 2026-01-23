@@ -719,6 +719,68 @@ def get_tournament_team_data(tournament_id: str, team_id: str = None, team_name:
     }
 
 
+@router.get("/tournament/scouting-report")
+def get_tournament_scouting_report(tournament_id: str, team_name: str):
+    """
+    Get scouting report for a team in tournament mode, including last game's play usage data.
+    
+    Returns:
+    - team_attributes: Team attribute values
+    - plays: Array of plays with game_stats from last completed game
+    """
+    try:
+        tid = ObjectId(tournament_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid tournament ID")
+    
+    # Get tournament document
+    tournament_doc = tournaments_collection.find_one({"_id": tid})
+    if not tournament_doc:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    
+    # Get team document to resolve ObjectId and team_id
+    team_doc = teams_collection.find_one({"name": team_name})
+    if not team_doc:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    team_object_id = str(team_doc["_id"])
+    
+    # Get team_id field for querying games (e.g., "XAVIEN")
+    team_id_field = team_doc.get("team_id")
+    
+    # Get team attributes from tournament document
+    tournament_teams = tournament_doc.get("teams", {})
+    team_obj = tournament_teams.get(team_object_id, {})
+    team_attributes = team_obj.get("attributes", {})
+    
+    # Find last completed game for this team in tournament
+    # Match against home_team_id and away_team_id (which are team_id strings like "XAVIEN")
+    last_game = games_collection.find_one(
+        {
+            "tournament_id": str(tournament_id),
+            "$or": [
+                {"home_team_id": team_id_field},
+                {"away_team_id": team_id_field}
+            ]
+        },
+        sort=[("_id", -1)]  # Most recent first
+    )
+    
+    # ✅ SS&S: Use shared utility function to extract plays from game document
+    from BackEnd.utils.scouting_utils import extract_plays_from_game_document
+    plays_data = extract_plays_from_game_document(
+        last_game,
+        team_name,
+        team_object_id,
+        team_id_field
+    )
+    
+    return {
+        "team_attributes": team_attributes,
+        "plays": plays_data
+    }
+
+
 @router.get("/tournament/roster")
 def get_tournament_roster(tournament_id: str, team_name: str = None):
     """

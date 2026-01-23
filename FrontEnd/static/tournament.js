@@ -1703,6 +1703,9 @@ async function initializeTournament() {
   // ✅ MIGRATION: Update CTA using command center data (aligns with Franchise)
   updateCTA(commandCenterData);
   
+  // Update scouting report button visibility
+  updateScoutingButton(commandCenterData);
+  
   // Initialize tooltips for table headers
   if (typeof initAttributeTooltips !== 'undefined') {
     const rosterTable = document.querySelector('#roster-tab .roster-table');
@@ -1857,15 +1860,132 @@ async function initializeTournament() {
   }
 }
 
+// Scouting Report functionality
+let upcomingOpponent = null;
+let upcomingOpponentId = null;
+
+function updateScoutingButton(data) {
+  const scoutingBtn = document.getElementById('scouting-report-btn');
+  if (!scoutingBtn) return;
+  
+  // For tournaments, show button if tournament is not completed and user is not eliminated
+  const completed = data?.completed || tournament?.completed || false;
+  const currentRound = data?.current_round || tournament?.current_round || 1;
+  
+  if (completed) {
+    scoutingBtn.style.display = 'none';
+    return;
+  }
+  
+  // Check if user is eliminated (need tournament object for bracket data)
+  if (tournament) {
+    const roundKey = currentRound === 3 ? 'final' : `round${currentRound}`;
+    const matchups = tournament.bracket?.[roundKey] || [];
+    // Compare with team name (bracket uses team names, not ObjectIds)
+    const userMatch = matchups.find(m => m.home_team === userTeamName || m.away_team === userTeamName);
+    
+    // User is out of the tournament when no matchup exists or their matchup is finished
+    const eliminated = !userMatch || !!userMatch.winner;
+    if (eliminated) {
+      scoutingBtn.style.display = 'none';
+      return;
+    }
+    
+    // Determine upcoming opponent from bracket
+    if (userMatch) {
+      if (userTeamName === userMatch.home_team) {
+        upcomingOpponent = userMatch.away_team;
+        upcomingOpponentId = userMatch.away_team; // Use team name as ID for now
+      } else if (userTeamName === userMatch.away_team) {
+        upcomingOpponent = userMatch.home_team;
+        upcomingOpponentId = userMatch.home_team; // Use team name as ID for now
+      }
+      
+      if (upcomingOpponent) {
+        scoutingBtn.style.display = 'block';
+      } else {
+        scoutingBtn.style.display = 'none';
+      }
+    } else {
+      scoutingBtn.style.display = 'none';
+    }
+  } else {
+    scoutingBtn.style.display = 'none';
+  }
+}
+
+async function loadScoutingReport() {
+  if (!upcomingOpponent || !tournament || !tournament._id) {
+    alert('No upcoming opponent found');
+    return;
+  }
+  
+  const modal = document.getElementById('scouting-report-modal');
+  const loading = document.getElementById('scouting-loading');
+  const content = document.getElementById('scouting-content');
+  const title = document.getElementById('scouting-report-title');
+  
+  modal.style.display = 'flex';
+  loading.style.display = 'block';
+  content.style.display = 'none';
+  title.textContent = `Scouting Report: ${upcomingOpponent}`;
+  
+  try {
+    // Load opponent team data and last game play usage
+    const [teamDataRes, playUsageRes] = await Promise.all([
+      fetch(`${API_CONFIG.buildUrl('/tournament/team-data')}?tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(upcomingOpponent)}`),
+      fetch(`${API_CONFIG.buildUrl('/tournament/scouting-report')}?tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(upcomingOpponent)}`)
+    ]);
+    
+    if (!teamDataRes.ok) throw new Error('Failed to load team data');
+    if (!playUsageRes.ok) throw new Error('Failed to load play usage');
+    
+    const teamData = await teamDataRes.json();
+    const playUsage = await playUsageRes.json();
+    
+    // ✅ SS&S: Use shared rendering functions
+    if (typeof renderScoutingTeamReport === 'function' && typeof createTeamAttrItem === 'function') {
+      renderScoutingTeamReport(teamData.team_attributes || {}, createTeamAttrItem);
+    } else {
+      console.error('Scouting report rendering functions not available');
+    }
+    
+    if (typeof renderPlayUsage === 'function') {
+      renderPlayUsage(playUsage.plays || [], 'No previous game data available. Opponent has not played a game yet this tournament.');
+    } else {
+      console.error('Play usage rendering function not available');
+    }
+    
+    loading.style.display = 'none';
+    content.style.display = 'block';
+  } catch (error) {
+    console.error('Error loading scouting report:', error);
+    loading.textContent = `Error loading scouting report: ${error.message}`;
+  }
+}
+
+// ✅ SS&S: Removed duplicate functions - now using shared functions from scoutingReport.js
+// renderScoutingTeamReport, renderPlayUsage, and setupScoutingReport are now in /js/shared/scoutingReport.js
+
 // ✅ FIX: Check readyState - if page is already loaded, run immediately
 // Otherwise wait for DOMContentLoaded (handles case where script loads late)
 if (document.readyState === 'loading') {
   // DOM is still loading, wait for DOMContentLoaded
-  document.addEventListener('DOMContentLoaded', initializeTournament);
+  document.addEventListener('DOMContentLoaded', () => {
+    initializeTournament();
+    // ✅ SS&S: Initialize scouting report using shared function
+    if (typeof setupScoutingReport === 'function') {
+      setupScoutingReport(loadScoutingReport);
+    }
+  });
 } else {
   // DOM is already loaded (interactive or complete), run immediately
   console.log('🚀 [TOURNAMENT] DOM already loaded, calling initializeTournament() immediately');
   initializeTournament();
+  // ✅ SS&S: Initialize scouting report using shared function
+  if (typeof setupScoutingReport === 'function') {
+    setupScoutingReport(loadScoutingReport);
+  }
 }
 
 // Team Report and Playbook Summary functions (adapted from training-report.js)

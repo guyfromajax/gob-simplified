@@ -9,6 +9,7 @@
 7. Elminate "Simulating Q5..."
 10. User is still able to put fouled out players into the lineup on the Lineup Selection screen
 8. Ok quick side task. For the Game Plan screen, when the user presses Save Game Plan, the UI design is nice. The green button pop up appears right in the center of the screen. For the Playbooks page, when the user presses Save Playbooks, we get a subtle yellow confirmtion box in the lower right corner. Let's rework Playbooks confirmation to perfectly mirror Game Plan confirmation.
+9. Sim full game or rest of game, we need to bring back the "Simulatin Q" for that,  but stop at Q4 -- and say "simulating other games" after that.
 
 ## Future Cleanup (Non-Critical Warnings)
 

@@ -32,63 +32,68 @@ Height is used as a direct factor in PF and C position calculations.
 ## Position Weights
 
 ### Point Guard (PG)
+BH, IQ, PS, (OD, AG), (SH, SC)
 
-- **PS** (Passing): 20%
-- **BH** (Ball Handling): 20%
-- **IQ** (Basketball IQ): 20%
-- **SH** (Shooting): 10%
-- **OD** (Outside Defense): 10%
-- **AG** (Agility): 10%
-- **FT** (Free Throw): 5%
-- **SC** (Scoring): 5%
+- **PS** (Passing): 15% // was 20%
+- **BH** (Ball Handling): 30% // was 20%
+- **IQ** (Basketball IQ): 25% // was 20%
+- **SH** (Shooting): 5% // was 10%
+- **OD** (Outside Defense): 10% // was 10%
+- **AG** (Agility): 10% // was 10%
+- **FT** (Free Throw): 5% // was 5%
+- **SC** (Scoring): 0% // was 5%
 
 ### Shooting Guard (SG)
+SH, OD, (AG, SC), (IQ, PS)
 
-- **SH** (Shooting): 20%
-- **OD** (Outside Defense): 20%
-- **AG** (Agility): 20%
+- **SH** (Shooting): 40% // was 20%
+- **OD** (Outside Defense): 25% // was 20%
+- **AG** (Agility): 10% // was 20%
 - **SC** (Scoring): 10%
-- **PS** (Passing): 10%
-- **BH** (Ball Handling): 10%
-- **FT** (Free Throw): 5%
-- **IQ** (Basketball IQ): 5%
+- **PS** (Passing): 5% // was 10%
+- **BH** (Ball Handling): 0% // was 10%
+- **FT** (Free Throw): 5% // was 5%
+- **IQ** (Basketball IQ): 5% // was 5%
 
 ### Small Forward (SF)
+(AG, ST), (SC, SH, ID, OD), (RB, IQ)
 
-- **AG** (Agility): 20%
-- **ST** (Strength): 20%
+- **AG** (Agility): 25% // was 20%
+- **ST** (Strength): 25% // was 20%
 - **SC** (Scoring): 10%
 - **SH** (Shooting): 10%
 - **ID** (Inside Defense): 10%
 - **OD** (Outside Defense): 10%
-- **FT** (Free Throw): 5%
+- **FT** (Free Throw): 5% // was 5%
 - **IQ** (Basketball IQ): 5%
-- **PS** (Passing): 5%
-- **RB** (Rebounding): 5%
+- **PS** (Passing): 0% // was 5%
+- **RB** (Rebounding): 0%
 
 ### Power Forward (PF)
+RB, ST, ID, (height, IQ, SC)
 
-- **RB** (Rebounding): 25%
-- **ST** (Strength): 20%
-- **IQ** (Basketball IQ): 15% (10% + 5% per spec)
-- **SC** (Scoring): 10%
-- **ID** (Inside Defense): 10%
+- **RB** (Rebounding): 35% // was 25%
+- **ST** (Strength): 30% // was 20%
+- **IQ** (Basketball IQ): 5% // was 15%
+- **SC** (Scoring): 5% // was 10%
+- **ID** (Inside Defense): 15% // was 10%
 - **height**: 5%
-- **FT** (Free Throw): 5%
-- **PS** (Passing): 5%
-- **SH** (Shooting): 5%
+- **FT** (Free Throw): 5% // was 5%
+- **PS** (Passing): 0% // was 5%
+- **SH** (Shooting): 0% // was 5%
 
 ### Center (C)
+(SC, ID, height), (ST, RB), IQ
 
-- **SC** (Scoring): 20%
-- **ID** (Inside Defense): 20%
+- **SC** (Scoring): 25% // was 20%
+- **ID** (Inside Defense): 25% // was 20%
 - **height**: 20%
 - **ST** (Strength): 10%
 - **RB** (Rebounding): 10%
-- **PS** (Passing): 5%
-- **IQ** (Basketball IQ): 5%
-- **FT** (Free Throw): 5%
-- **AG** (Agility): 5%
+- **PS** (Passing): 0% // was 5%
+- **IQ** (Basketball IQ): 5% // was 5%
+- **FT** (Free Throw): 5% // was 5%
+- **AG** (Agility): 0% // was 5%
 
 ## When Position Ratings Are Calculated
 

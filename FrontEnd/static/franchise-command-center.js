@@ -2146,11 +2146,18 @@ async function loadScoutingReport() {
     const teamData = await teamDataRes.json();
     const playUsage = await playUsageRes.json();
     
-    // Render Team Report
-    renderScoutingTeamReport(teamData.team_attributes || {});
+    // ✅ SS&S: Use shared rendering functions
+    if (typeof renderScoutingTeamReport === 'function' && typeof createTeamAttrItem === 'function') {
+      renderScoutingTeamReport(teamData.team_attributes || {}, createTeamAttrItem);
+    } else {
+      console.error('Scouting report rendering functions not available');
+    }
     
-    // Render Play Usage
-    renderPlayUsage(playUsage.plays || []);
+    if (typeof renderPlayUsage === 'function') {
+      renderPlayUsage(playUsage.plays || [], 'No previous game data available. Opponent has not played a game yet this season.');
+    } else {
+      console.error('Play usage rendering function not available');
+    }
     
     loading.style.display = 'none';
     content.style.display = 'block';
@@ -2160,98 +2167,20 @@ async function loadScoutingReport() {
   }
 }
 
-function renderScoutingTeamReport(teamAttrs) {
-  const grid = document.getElementById('scouting-team-attributes-grid');
-  if (!grid) return;
-  
-  grid.innerHTML = '';
-  
-  const attrOrder = [
-    'shot_threshold',
-    'rebound_modifier',
-    'offensive_efficiency',
-    'defensive_efficiency',
-    'fb_efficiency',
-    'pt_efficiency',
-    'fight',
-    'discipline',
-    'momentum_score',
-    'team_chemistry',
-    'fb_opp_modifier',
-    'pt_opp_modifier'
-  ];
-  
-  attrOrder.forEach(attrKey => {
-    const item = createTeamAttrItem(attrKey, teamAttrs[attrKey], 0);
-    if (item) grid.appendChild(item);
-  });
-}
+// ✅ SS&S: Removed duplicate functions - now using shared functions from scoutingReport.js
+// renderScoutingTeamReport, renderPlayUsage, and setupScoutingReport are now in /js/shared/scoutingReport.js
 
-function renderPlayUsage(plays) {
-  const tbody = document.getElementById('play-usage-body');
-  if (!tbody) return;
-  
-  tbody.innerHTML = '';
-  
-  if (plays.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #666;">No previous game data available. Opponent has not played a game yet this season.</td></tr>';
-    return;
-  }
-  
-  // Calculate total playcalls for usage %
-  const totalPlaycalls = plays.reduce((sum, p) => sum + (p.times_run || 0), 0);
-  
-  // Sort by times_run descending
-  plays.sort((a, b) => (b.times_run || 0) - (a.times_run || 0));
-  
-  plays.forEach(play => {
-    const timesRun = play.times_run || 0;
-    const successes = play.successes || 0;
-    const successRate = timesRun > 0 ? ((successes / timesRun) * 100).toFixed(1) : '0.0';
-    const usagePct = totalPlaycalls > 0 ? ((timesRun / totalPlaycalls) * 100).toFixed(1) : '0.0';
-    
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${play.name || 'Unknown'}</td>
-      <td>${timesRun}</td>
-      <td>${successRate}%</td>
-      <td>${usagePct}%</td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
-// Setup scouting report button (run after DOM is ready)
-function setupScoutingReport() {
-  const scoutingBtn = document.getElementById('scouting-report-btn');
-  const modal = document.getElementById('scouting-report-modal');
-  const closeBtn = document.querySelector('.scouting-modal-close');
-  
-  if (scoutingBtn) {
-    scoutingBtn.addEventListener('click', loadScoutingReport);
-  }
-  
-  if (closeBtn) {
-    closeBtn.addEventListener('click', () => {
-      if (modal) modal.style.display = 'none';
-    });
-  }
-  
-  // Close modal when clicking outside
-  if (modal) {
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        modal.style.display = 'none';
-      }
-    });
-  }
-}
-
-// Initialize on DOMContentLoaded
+// ✅ SS&S: Initialize scouting report using shared function
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', setupScoutingReport);
+  document.addEventListener('DOMContentLoaded', () => {
+    if (typeof setupScoutingReport === 'function') {
+      setupScoutingReport(loadScoutingReport);
+    }
+  });
 } else {
-  setupScoutingReport();
+  if (typeof setupScoutingReport === 'function') {
+    setupScoutingReport(loadScoutingReport);
+  }
 }
 
 // ============================================================================
