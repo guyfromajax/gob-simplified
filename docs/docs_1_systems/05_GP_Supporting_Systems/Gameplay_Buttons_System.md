@@ -56,8 +56,12 @@
 2. Calculates `nextQuarter = quarter + 1`
 3. Auto-generates lineups for both teams
 4. POST to `/api/simulate-quarter` with `full_sim: true`
-5. Displays results in popup (`showSimQuarterResults()`)
+5. Displays results in popup (`showSimQuarterResults()`) with text scroll
 6. Navigates to lineup screen after quarter completes
+
+**Status Text Display**:
+- Does NOT show "Simulating Q..." text (uses text scroll popup instead)
+- Popup header shows "Simulating Q#..." but main display is scrolling shot results
 
 **Backend** (`api.py` - `/api/simulate-quarter`):
 - `full_sim=True` (explicit in request)
@@ -78,12 +82,19 @@
 1. User clicks `.sim-full-game-button` → calls `handleSimFullGame()`
 2. Loops from current quarter through Q4
 3. For each quarter:
+   - Shows "Simulating Q1...", "Simulating Q2...", etc. (stops at Q4, no Q5+)
    - Auto-generates lineups
    - POST to `/api/simulate-quarter` with `full_sim: true`
    - Waits for response
    - Increments to next quarter
 4. Stops when `lastSummary.is_final === true`
-5. Navigates to completion popup
+5. Clears status text
+6. Navigates to completion popup
+
+**Status Text Display**:
+- Shows "Simulating Q1...", "Simulating Q2...", "Simulating Q3...", "Simulating Q4..." during simulation
+- Does NOT show for Sim Quarter button (uses text scroll popup instead)
+- When transitioning to computer games (Tournament/Franchise modes), shows "Simulating Computer Games..." instead of "Simulating Q5..."
 
 **Backend**: Same as Sim Quarter (calls `/api/simulate-quarter` multiple times)
 

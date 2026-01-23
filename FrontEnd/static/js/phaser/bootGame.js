@@ -280,18 +280,8 @@ const GameScene = createGameScene(Phaser);
 let game;
 let isSimulating = false;
 
-function showStatus(msg) {
-  let el = document.getElementById('sim-status');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'sim-status';
-    el.style.color = '#fff';
-    el.style.fontFamily = 'Bebas Neue, sans-serif';
-    const container = document.getElementById('phaser-container');
-    if (container) container.appendChild(el);
-  }
-  el.textContent = msg;
-}
+// ✅ SS&S: Import shared status display utility
+import { showStatus, hideStatus } from './utils/statusDisplay.js';
 
 /**
  * Show scrolling text popup with shot results during Sim Quarter
@@ -2332,7 +2322,13 @@ async function handleSimFullGame() {
     let gId = gameId;
     let lastSummary;
     while (true) {
-      // ✅ REMOVED: showStatus call - redundant with popup header
+      // ✅ Show "Simulating Q1", "Simulating Q2", etc. for Sim Full Game / Sim Rest of Game
+      // Stop at Q4 (don't show Q5+)
+      if (currentQ <= 4) {
+        const periodLabel = currentQ <= 4 ? `Q${currentQ}` : `OT${currentQ - 4}`;
+        showStatus(`Simulating ${periodLabel}...`);
+      }
+      
       const payload = {
         home_team: homeTeam,
         away_team: awayTeam,
@@ -2436,12 +2432,26 @@ async function handleSimFullGame() {
       // But we need to manually increment currentQ to move to the next iteration
       currentQ += 1;
       console.log(`✅ Q${currentQ - 1} fully simulated, backend reports next quarter=${lastSummary.quarter}, moving to Q${currentQ}`);
+      
+      // ✅ Clear status after Q4 completes (before transitioning to computer games)
+      if (currentQ > 4) {
+        const statusEl = document.getElementById('sim-status');
+        if (statusEl) {
+          statusEl.style.display = 'none';
+        }
+      }
     }
 
     gameId = gId;
     // ✅ PHASE 1.2: Removed automatic localStorage write - only save for explicit "Resume Last Game" feature
     quarter = lastSummary.quarter || currentQ;
     periodLabel = lastSummary.period_label || (quarter > 4 ? `OT${quarter - 4}` : `Q${quarter}`);
+    
+    // ✅ Clear status after user's game completes (before transitioning to computer games)
+    const statusEl = document.getElementById('sim-status');
+    if (statusEl) {
+      statusEl.style.display = 'none';
+    }
 
     console.log('📊 Final game summary from last quarter response:', {
       gameId,
