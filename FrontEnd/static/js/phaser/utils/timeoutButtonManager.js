@@ -34,8 +34,13 @@ export function initTimeoutButton() {
     
     // Load sound effect
     try {
-        timeoutSound = new Audio('/static/sounds/buttonClickSound.wav');
+        // Use API_CONFIG to get correct static path for local vs production
+        const API_CONFIG = window.API_CONFIG;
+        const staticPath = API_CONFIG ? API_CONFIG.getStaticPath() : '/static';
+        const soundPath = `${staticPath}/sounds/buttonClickSound.wav`;
+        timeoutSound = new Audio(soundPath);
         timeoutSound.volume = 0.5; // Set volume to 50%
+        console.log('✅ [TIMEOUT] Sound loaded:', soundPath);
     } catch (error) {
         console.warn('⚠️ [TIMEOUT] Could not load sound effect:', error);
     }
@@ -171,6 +176,72 @@ export function resetTimeoutQueue() {
     timeoutQueued = false;
     updateButtonHighlight(false);
     updateTimeoutButtonState(true, 'Timeout available');
+}
+
+/**
+ * Check if we should kill the current turn instantly (during active turn)
+ * Conditions:
+ * 1. User team is on offense (any turn type) → kill instantly
+ * 2. BIP or SIP turn (any team) → kill instantly, UNLESS we've transitioned to HCO/FCP/HCT and away team is on offense
+ */
+export function shouldKillCurrentTurnInstantly(scene, turnData) {
+    if (!ENABLE_TIMEOUT_BUTTON || !timeoutQueued) {
+        return false;
+    }
+    
+    if (!scene || !turnData) {
+        return false;
+    }
+    
+    const currentTurn = turnData?.current_turn || turnData?.result_type;
+    
+    // Condition 1: User team is on offense (any turn type) → kill instantly
+    if (isUserTeamOnOffense(scene, turnData)) {
+        return true;
+    }
+    
+    // Condition 2: BIP or SIP turn
+    if (currentTurn === 'SIDE_INBOUND' || currentTurn === 'BASELINE_INBOUND') {
+        // Kill instantly for BIP/SIP, but only if we haven't transitioned to next turn
+        // Check if we're still in the inbound phase (not yet in HCO/FCP/HCT)
+        const isInboundPhase = scene.stateMachine?.is('Inbound') || 
+                               scene.isInboundSetup === true;
+        
+        if (isInboundPhase) {
+            return true; // Still in BIP/SIP phase, kill instantly
+        }
+        
+        // We've transitioned past BIP/SIP to HCO/FCP/HCT
+        // Only kill if user team is on offense (already checked above, so return false)
+        // If away team is on offense, don't kill
+        return false;
+    }
+    
+    return false;
+}
+
+/**
+ * Kill current turn instantly (pause tweens, set flags, execute timeout)
+ */
+export async function killCurrentTurnAndExecuteTimeout(scene, turnData) {
+    if (!ENABLE_TIMEOUT_BUTTON || !timeoutQueued) {
+        return false;
+    }
+    
+    console.log('⏸️ TIMEOUT: Killing current turn instantly');
+    
+    // Pause all tweens immediately
+    if (scene.tweens) {
+        scene.tweens.pauseAll();
+        console.log('⏸️ TIMEOUT: Paused all tweens');
+    }
+    
+    // Set flag to stop animation loop
+    scene.timeoutCalled = true;
+    
+    // Execute the timeout
+    await handleTimeoutButtonClick(true); // Pass true to skip toggle (just execute)
+    return true;
 }
 
 /**
