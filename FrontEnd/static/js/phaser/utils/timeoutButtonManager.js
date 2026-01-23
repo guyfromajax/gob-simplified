@@ -130,9 +130,12 @@ function isUserTeamOnOffense(scene, turnData) {
 
 /**
  * Check if timeout is eligible for current turn
- * Simple two-step check (in order):
- * 1. Is offense_team == user's team? → Eligible
- * 2. Is current turn BIP or SIP? → Eligible
+ * Two-step check (in order):
+ * 1. Is current turn BIP or SIP? → Always eligible (checked first)
+ * 2. Is offense_team == user's team? → Eligible
+ * 
+ * Uses `offense_team_id` as primary field (SS&S canonical), with `possession_team_id` as fallback
+ * for backward compatibility.
  * 
  * @param {Object} scene - Game scene
  * @param {Object} turnData - Turn data (from scene.simData.turns or AnimationRouter)
@@ -142,6 +145,7 @@ export function checkTimeoutEligibility(scene, turnData) {
     console.log('🔍 [TIMEOUT DEBUG] checkTimeoutEligibility called with turnData:', {
         result_type: turnData?.result_type,
         current_turn: turnData?.current_turn,
+        offense_team_id: turnData?.offense_team_id,
         possession_team_id: turnData?.possession_team_id,
         index: turnData?.index
     });
@@ -166,11 +170,24 @@ export function checkTimeoutEligibility(scene, turnData) {
         return false;
     }
     
-    // Get possession team ID
-    const possessionTeamId = turnData?.possession_team_id;
-    console.log('🔍 [TIMEOUT DEBUG] possessionTeamId:', possessionTeamId);
-    if (!possessionTeamId) {
-        console.log('🔍 [TIMEOUT DEBUG] No possessionTeamId found');
+    // Check 1: Is current turn BIP or SIP? (Always eligible, checked first)
+    const currentTurn = turnData?.current_turn || turnData?.result_type;
+    console.log('🔍 [TIMEOUT DEBUG] Check 1 - currentTurn:', currentTurn);
+    if (currentTurn === 'SIDE_INBOUND' || currentTurn === 'BASELINE_INBOUND') {
+        console.log('🔍 [TIMEOUT DEBUG] Check 1 PASSED - BIP or SIP turn (always eligible)');
+        return true;
+    }
+    console.log('🔍 [TIMEOUT DEBUG] Check 1 FAILED - not BIP or SIP');
+    
+    // Check 2: Is offense_team == user's team?
+    // Use offense_team_id as primary (SS&S canonical), with possession_team_id as fallback
+    const offenseTeamId = turnData?.offense_team_id || turnData?.possession_team_id;
+    console.log('🔍 [TIMEOUT DEBUG] offenseTeamId (primary):', turnData?.offense_team_id);
+    console.log('🔍 [TIMEOUT DEBUG] possessionTeamId (fallback):', turnData?.possession_team_id);
+    console.log('🔍 [TIMEOUT DEBUG] resolved offenseTeamId:', offenseTeamId);
+    
+    if (!offenseTeamId) {
+        console.log('🔍 [TIMEOUT DEBUG] No offense_team_id or possession_team_id found');
         return false;
     }
     
@@ -179,23 +196,14 @@ export function checkTimeoutEligibility(scene, turnData) {
     const awayTeamId = scene.simData?.away_team_id;
     console.log('🔍 [TIMEOUT DEBUG] Team IDs:', { homeTeamId, awayTeamId });
     
-    // Check 1: Is offense_team == user's team?
+    // Check 2: Is offense_team == user's team?
     const userTeamId = userTeamSide === 'home' ? homeTeamId : awayTeamId;
-    console.log('🔍 [TIMEOUT DEBUG] Check 1 - userTeamId:', userTeamId, 'possessionTeamId:', possessionTeamId);
-    if (possessionTeamId === userTeamId) {
-        console.log('🔍 [TIMEOUT DEBUG] Check 1 PASSED - user team on offense');
+    console.log('🔍 [TIMEOUT DEBUG] Check 2 - userTeamId:', userTeamId, 'offenseTeamId:', offenseTeamId);
+    if (String(offenseTeamId) === String(userTeamId)) {
+        console.log('🔍 [TIMEOUT DEBUG] Check 2 PASSED - user team on offense');
         return true;
     }
-    console.log('🔍 [TIMEOUT DEBUG] Check 1 FAILED - user team not on offense');
-    
-    // Check 2: Is current turn BIP or SIP?
-    const currentTurn = turnData?.current_turn || turnData?.result_type;
-    console.log('🔍 [TIMEOUT DEBUG] Check 2 - currentTurn:', currentTurn);
-    if (currentTurn === 'SIDE_INBOUND' || currentTurn === 'BASELINE_INBOUND') {
-        console.log('🔍 [TIMEOUT DEBUG] Check 2 PASSED - BIP or SIP turn');
-        return true;
-    }
-    console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - not BIP or SIP');
+    console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - user team not on offense');
     
     console.log('🔍 [TIMEOUT DEBUG] Both checks failed - NOT eligible');
     return false;
