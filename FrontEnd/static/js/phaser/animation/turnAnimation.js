@@ -2165,16 +2165,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   let defensiveCount = 0;
   
   // 🔍 DEBUG: Log team_id format mismatch detection
-  const sampleSprite = turnData.animations.length > 0 ? playerSprites[turnData.animations[0]?.playerId] : null;
-  if (sampleSprite && offenseTeamId) {
-      spriteTeamId: sampleSprite.team_id,
-      spriteTeamIdType: typeof sampleSprite.team_id,
-      spriteTeamIdIsObjectId: /^[0-9a-f]{24}$/i.test(String(sampleSprite.team_id)),
-      offenseTeamId: offenseTeamId,
-      offenseTeamIdType: typeof offenseTeamId,
-      offenseTeamIdIsObjectId: /^[0-9a-f]{24}$/i.test(String(offenseTeamId)),
-      match: String(sampleSprite.team_id) === String(offenseTeamId),
-      resultType: turnData?.result_type,
+  // Classify players as offense or defense
       turnIndex: turnData?.index,
       playerSpritesCount: Object.keys(playerSprites).length
     });
