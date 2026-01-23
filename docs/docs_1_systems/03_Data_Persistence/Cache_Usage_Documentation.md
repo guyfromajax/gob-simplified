@@ -58,7 +58,7 @@ Caches are **performance mirrors** of truth (database), never truth itself. They
 
 **Location:** `FrontEnd/static/js/state/gameStore.js`  
 **Type:** JavaScript module with in-memory state object  
-**Purpose:** UI state cache for teams, rosters, colors, and `game_id`  
+**Purpose:** UI state cache for teams, rosters, colors, `game_id`, and optional settings cache  
 **Lifetime:** Runtime only (cleared on page unload)
 
 **What It Stores:**
@@ -67,28 +67,37 @@ Caches are **performance mirrors** of truth (database), never truth itself. They
   teams: { home: null, away: null },
   colors: { home: {}, away: {} },
   rosters: { home: null, away: null },
-  gameId: null
+  gameId: null,
+  // ✅ PHASE 1.3: Optional cache for settings (disposable, rebuild from truth)
+  playbook_settings: null,  // Cached playbook settings (backend is source of truth)
+  strategy_settings: null  // Cached strategy settings (backend is source of truth)
 }
 ```
 
 **When Populated:**
 1. **`bootGame.js`**: When game initializes, calls `gameStore.setTeams()`, `gameStore.setColors()`, `gameStore.setRosters()`, `gameStore.setGameId()`
 2. **`gameScene.js`**: Updates `gameId` during gameplay
+3. **`playbooks.js`** (Phase 1.3): After successful backend load, calls `gameStore.setPlaybookSettings()`
+4. **`game-plan.js`** (Phase 1.3): After successful backend load, calls `gameStore.setStrategySettings()`
 
 **When Cleared/Invalidated:**
 1. **Page navigation**: State lost on page unload
-2. **Manual reset**: `gameStore.reset()` clears all state
+2. **Manual reset**: `gameStore.reset()` clears all state (including settings cache)
 3. **Game completion**: State cleared when game ends
+4. **After DB writes** (Phase 1.3): `gameStore.invalidatePlaybookSettings()` and `gameStore.invalidateStrategySettings()` called after successful saves
 
 **Refresh Triggers:**
 - **On game start**: Populated from API response (`/api/simulate-quarter`)
 - **On navigation**: State is rebuilt from URL params and API calls
+- **On settings load** (Phase 1.3): Settings cache populated after successful backend load
+- **After settings save** (Phase 1.3): Settings cache invalidated, will be repopulated on next load
 - **No automatic refresh**: Must be explicitly populated
 
 **Usage Pattern:**
 - **UI rendering**: Read from `gameStore` to avoid repeated API calls
+- **Settings cache** (Phase 1.3): Optional performance optimization - checked first, falls back to backend if cache miss
 - **Not authoritative**: Always backed by URL params and API responses
-- **Performance optimization**: Reduces API calls during active gameplay
+- **Performance optimization**: Reduces API calls during active gameplay and page navigation
 
 ---
 
@@ -134,17 +143,27 @@ Caches are **performance mirrors** of truth (database), never truth itself. They
 ### Automatic Invalidation
 
 1. **After DB writes:**
-   - `save_playbooks()`: Updates `GameManager` directly (bidirectional sync)
-   - `update_gameplan()`: Updates `GameManager` directly (bidirectional sync)
-   - `handle_timeout_save_and_response()`: Calls `refresh_game_cache_from_db()` to sync cache after DB write
-   - `simulate_quarter_endpoint()`: Calls `refresh_game_cache_from_db()` to sync cache after DB write
+   - **Backend:**
+     - `save_playbooks()`: Updates `GameManager` directly (bidirectional sync)
+     - `update_gameplan()`: Updates `GameManager` directly (bidirectional sync)
+     - `handle_timeout_save_and_response()`: Calls `refresh_game_cache_from_db()` to sync cache after DB write
+     - `simulate_quarter_endpoint()`: Calls `refresh_game_cache_from_db()` to sync cache after DB write
+   - **Frontend** (Phase 1.3):
+     - `playbooks.js`: After successful save, calls `gameStore.invalidatePlaybookSettings('backend_save')`
+     - `game-plan.js`: After successful save, calls `gameStore.invalidateStrategySettings('backend_save')`
 
 2. **On navigation:**
-   - Frontend caches (`gameStore`, `teamColorCache`) automatically cleared on page unload (module re-initialization)
-   - Backend cache (`ongoing_games`) persists across requests but cleared on specific triggers:
-     - New game scenario (Q1 requested but cached game is Q2+)
-     - Timeout resume (forces DB reload)
-     - Server restart
+   - **Frontend caches:**
+     - `gameStore` (teams, rosters, colors, gameId): Automatically cleared on page unload (module re-initialization)
+     - `gameStore` (playbook_settings, strategy_settings): Automatically cleared on page unload (module re-initialization)
+     - `teamColorCache`: Automatically cleared on page unload (module re-initialization)
+     - **Note:** No manual invalidation needed - JavaScript modules are re-initialized on each page load, ensuring fresh cache
+   - **Backend cache (`ongoing_games`):**
+     - Persists across requests but cleared on specific triggers:
+       - New game scenario (Q1 requested but cached game is Q2+)
+       - Timeout resume (forces DB reload)
+       - Server restart
+     - **Note:** Backend cache persists across page navigations (same game_id), which is correct for active gameplay
 
 3. **On version mismatch:**
    - Not currently implemented (future enhancement)
@@ -168,13 +187,30 @@ Caches are **performance mirrors** of truth (database), never truth itself. They
 
 ## Cache Performance Metrics
 
-**Current Status:** Not yet implemented (Phase 3 Task 4)
+**Current Status:** ✅ Implemented (Phase 1.3 and Phase 3 Task 4)
 
-**Planned Metrics:**
+**Backend Telemetry:**
+- **Location:** `BackEnd/api/api.py` and `BackEnd/api/gameplan_routes.py`
+- **Logs:**
+  - `✅ [CACHE-TELEMETRY] Cache HIT` - Cache read successful
+  - `❌ [CACHE-TELEMETRY] Cache MISS` - Cache not available, reading from DB
+  - `🔄 [CACHE-TELEMETRY] Cache SKIP` - source=db, forcing DB read
+  - `🔄 [CACHE-TELEMETRY] Cache REFRESHED` - Cache updated after DB write
+  - `🔄 [CACHE-TELEMETRY] Cache INVALIDATED` - Cache cleared
+  - `✅ [CACHE-TELEMETRY] Cache POPULATED` - Cache entry added
+
+**Frontend Telemetry:**
+- **Location:** `FrontEnd/static/js/state/gameStore.js` (via `StateTelemetry`)
+- **Logs:**
+  - `🟢 [CACHE-HIT]` - Cache read successful
+  - `🟡 [CACHE-MISS]` - Cache not available, reading from backend
+  - `🔴 [CACHE-INVALIDATION]` - Cache cleared (with reason)
+
+**Metrics Captured:**
 - Cache hit rate (reads from cache vs DB)
 - Cache miss rate (reads from DB when cache available)
-- Cache invalidation frequency
-- Cache size (number of entries)
+- Cache invalidation frequency (with reasons)
+- Cache population events
 
 ---
 
