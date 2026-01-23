@@ -17,6 +17,7 @@ export const ENABLE_TIMEOUT_BUTTON = true;
 let buttonInitialized = false;
 let timeoutQueued = false; // Tracks if timeout is queued (highlighted)
 let timeoutQueuedAtTurnIndex = null; // Track which turn index the timeout was queued at
+let timeoutQueuedDuringEligibleTurn = false; // Track if timeout was queued during an eligible turn (for immediate execution)
 let timeoutSound = null; // Audio object for button click sound
 let airhornSound = null; // Audio object for airhorn sound (plays when timeout executes)
 
@@ -185,6 +186,7 @@ export function resetTimeoutQueue() {
     
     timeoutQueued = false;
     timeoutQueuedAtTurnIndex = null;
+    timeoutQueuedDuringEligibleTurn = false;
     updateButtonHighlight(false);
     updateTimeoutButtonState(true, 'Timeout available');
 }
@@ -258,20 +260,37 @@ export async function killCurrentTurnAndExecuteTimeout(scene, turnData) {
 /**
  * Check if timeout is queued and should be executed
  * Called at the start of each turn
+ * ✅ STATE CONTRACT: Uses fresh turnData from AnimationRouter (authoritative source for current turn)
  * Only executes if:
  * 1. Timeout is queued
  * 2. Current turn is eligible
- * 3. This is a different turn than when it was queued (wait for NEXT eligible turn)
+ * 3. Either:
+ *    - Queued during eligible turn (execute immediately, even if same turn)
+ *    - OR this is a different turn than when it was queued (wait for NEXT eligible turn)
  */
 export async function checkAndExecuteQueuedTimeout(scene, turnData) {
     if (!ENABLE_TIMEOUT_BUTTON || !timeoutQueued) {
         return false;
     }
     
+    // ✅ STATE CONTRACT: Use fresh turnData from AnimationRouter (authoritative source)
     // Get current turn index
     const currentTurnIndex = turnData?.index || scene.currentTurn || null;
     
-    // Only execute if this is a different turn than when it was queued
+    // Check if current turn is eligible
+    if (!checkTimeoutEligibility(scene, turnData)) {
+        // Not eligible, don't execute
+        return false;
+    }
+    
+    // If queued during eligible turn, execute immediately (even if same turn index)
+    if (timeoutQueuedDuringEligibleTurn) {
+        console.log('⏸️ TIMEOUT: Executing immediately (queued during eligible turn)', currentTurnIndex);
+        await handleTimeoutButtonClick(true); // Pass true to skip toggle (just execute)
+        return true;
+    }
+    
+    // Otherwise, only execute if this is a different turn than when it was queued
     // This ensures we wait for the NEXT eligible turn, not execute on the same turn
     if (timeoutQueuedAtTurnIndex !== null && currentTurnIndex !== null) {
         if (currentTurnIndex === timeoutQueuedAtTurnIndex) {
@@ -281,15 +300,10 @@ export async function checkAndExecuteQueuedTimeout(scene, turnData) {
         }
     }
     
-    // Check if current turn is eligible
-    if (checkTimeoutEligibility(scene, turnData)) {
-        // Execute the timeout
-        console.log('⏸️ TIMEOUT: Executing at start of eligible turn', currentTurnIndex);
-        await handleTimeoutButtonClick(true); // Pass true to skip toggle (just execute)
-        return true;
-    }
-    
-    return false;
+    // Different turn and eligible, execute the timeout
+    console.log('⏸️ TIMEOUT: Executing at start of eligible turn', currentTurnIndex);
+    await handleTimeoutButtonClick(true); // Pass true to skip toggle (just execute)
+    return true;
 }
 
 /**
@@ -335,11 +349,27 @@ async function handleTimeoutButtonClick(executeOnly = false) {
             // Store the current turn index when queued (to ensure we wait for NEXT eligible turn)
             const currentTurnIndex = scene.currentTurn || scene.currentTurnData?.index || null;
             timeoutQueuedAtTurnIndex = currentTurnIndex;
+            
+            // ✅ STATE CONTRACT: Check eligibility using scene.currentTurnData (UI-only state)
+            // If it's empty/stale (no result_type or current_turn), default to "not eligible"
+            const currentTurnData = scene.currentTurnData || {};
+            const hasValidTurnData = currentTurnData.result_type || currentTurnData.current_turn;
+            
+            if (hasValidTurnData && checkTimeoutEligibility(scene, currentTurnData)) {
+                // Current turn is eligible, set flag for immediate execution
+                timeoutQueuedDuringEligibleTurn = true;
+                console.log('⏸️ TIMEOUT: Queued during eligible turn - will execute immediately');
+            } else {
+                // Not eligible or can't determine (stale/empty data), queue and wait
+                timeoutQueuedDuringEligibleTurn = false;
+                console.log('⏸️ TIMEOUT: Queued at turn index', currentTurnIndex, '- will execute at start of next eligible turn');
+            }
+            
             updateButtonHighlight(true);
             updateTimeoutButtonState(true, 'Timeout queued');
-            console.log('⏸️ TIMEOUT: Queued at turn index', currentTurnIndex);
         } else {
             timeoutQueuedAtTurnIndex = null;
+            timeoutQueuedDuringEligibleTurn = false;
             updateButtonHighlight(false);
             updateTimeoutButtonState(true, 'Timeout available');
             console.log('⏸️ TIMEOUT: Cancelled - removed from queue');
@@ -350,10 +380,8 @@ async function handleTimeoutButtonClick(executeOnly = false) {
             return;
         }
         
-        // Check if current turn is eligible
-        const currentTurnData = scene.currentTurnData || {};
-        if (checkTimeoutEligibility(scene, currentTurnData)) {
-            // Current turn is eligible, execute immediately
+        // If queued during eligible turn, execute immediately
+        if (timeoutQueuedDuringEligibleTurn) {
             console.log('⏸️ TIMEOUT: Current turn is eligible, executing immediately');
             // Continue to execute timeout below (don't return)
         } else {
