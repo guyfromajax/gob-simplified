@@ -457,6 +457,7 @@ const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
    - **Frontend Changes:** 
      - Updated `gameScene.js` to store full response data in `turn._responseData` for computer timeouts
      - Updated `AnimationEngine.handleTimeout()` to extract `clock` and `time_remaining` from `turnData._responseData`
+     - **✅ FIX (January 2025):** `AnimationEngine.handleTimeout()` now checks `timeout_reason === 'USER'` and skips navigation for user timeouts (navigation is handled by `showUserTimeoutPopup` button click). Only computer timeouts trigger automatic navigation.
 
 2. **Computer Timeout State Restoration Bug Fix:**
    - **Problem:** When computer called timeout, game state was saved to DB correctly, but when user returned, if game was still in `ongoing_games` (in-memory cache), the system would use stale in-memory state instead of loading the saved DB state. This caused incorrect scores, clock, and other game state to be restored.
@@ -723,6 +724,18 @@ This prevents stale timeout state from affecting future games.
   - Animation loop is stopped (`scene.timeoutCalled = true`)
   - Popup appears immediately after animations stop
   - User experience: Animation stops → Popup appears (instantaneous)
+
+**User Timeout Navigation Flow:**
+- **Step 1:** User presses timeout button → `handleTimeoutButtonClick()` is called
+- **Step 2:** API is called (`/api/call-timeout`) → Timeout turn is created and saved to database
+- **Step 3:** `showUserTimeoutPopup()` displays popup with "Go To Timeout" button
+- **Step 4:** User clicks "Go To Timeout" button → Sets `scene.userTimeoutButtonClicked = true` → Calls `showTimeoutPopup()` with `computerTimeout=false`
+- **Step 5:** `showTimeoutPopup()` checks guards:
+  - Safeguard 1: Checks if popup still exists (should be removed by button click)
+  - Safeguard 2: Checks if `scene.userTimeoutButtonClicked === true` (set by button click)
+  - If both pass, navigation proceeds to lineup screen
+- **Step 6:** `AnimationEngine.handleTimeout()` is called for the timeout turn → Checks `timeout_reason === 'USER'` → Skips navigation (already handled by popup button click)
+- **Key Point:** `AnimationEngine.handleTimeout()` only navigates for computer timeouts (`timeout_reason !== 'USER'`). User timeout navigation is handled exclusively by the popup button click.
 
 **Animation Freezing:**
 - When timeout button is pressed, all animations are immediately paused
