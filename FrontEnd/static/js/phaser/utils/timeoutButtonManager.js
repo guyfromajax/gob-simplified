@@ -357,20 +357,10 @@ export async function checkAndExecuteQueuedTimeout(scene, turnData) {
         return false;
     }
     
-    // ✅ STATE CONTRACT: Use fresh turnData from AnimationRouter (authoritative source)
-    // Get current turn index
-    const currentTurnIndex = turnData?.index || scene.currentTurn || null;
-    console.log('🔍 [TIMEOUT DEBUG] Current turn index:', currentTurnIndex);
-    console.log('🔍 [TIMEOUT DEBUG] turnData from AnimationRouter:', {
-        result_type: turnData?.result_type,
-        current_turn: turnData?.current_turn,
-        possession_team_id: turnData?.possession_team_id,
-        index: turnData?.index
-    });
-    
-    // Check if current turn is eligible
-    const isEligible = checkTimeoutEligibility(scene, turnData);
-    console.log('🔍 [TIMEOUT DEBUG] Current turn eligibility:', isEligible);
+    // ✅ SIMPLIFIED: Use eligibility flag set at start of turn (single source of truth)
+    // This eliminates stale data issues - eligibility was determined once with fresh turnData
+    const isEligible = scene.currentTurnTimeoutEligible;
+    console.log('🔍 [TIMEOUT DEBUG] Current turn eligibility (from flag):', isEligible);
     
     if (!isEligible) {
         // Not eligible, don't execute - keep flag set and check again on next turn
@@ -458,33 +448,10 @@ async function handleTimeoutButtonClick(executeOnly = false) {
             console.log('🔍 [TIMEOUT DEBUG] scene.currentTurnData?.index:', scene.currentTurnData?.index);
             console.log('🔍 [TIMEOUT DEBUG] scene.simData?.turns length:', scene.simData?.turns?.length);
             
-            // ✅ Get real-time turn data from server truth (scene.simData.turns)
-            // Primary: scene.simData.turns[scene.currentTurn] (fresh from server)
-            // Fallback: scene.currentTurnData (may be stale)
-            let currentTurnData = null;
-            if (scene.currentTurn !== null && scene.currentTurn !== undefined && scene.simData?.turns) {
-                currentTurnData = scene.simData.turns[scene.currentTurn];
-                console.log('🔍 [TIMEOUT DEBUG] Got turn data from scene.simData.turns[' + scene.currentTurn + ']:', {
-                    result_type: currentTurnData?.result_type,
-                    current_turn: currentTurnData?.current_turn,
-                    possession_team_id: currentTurnData?.possession_team_id,
-                    index: currentTurnData?.index
-                });
-            }
-            if (!currentTurnData) {
-                currentTurnData = scene.currentTurnData || {};
-                console.log('🔍 [TIMEOUT DEBUG] Using fallback scene.currentTurnData:', {
-                    result_type: currentTurnData?.result_type,
-                    current_turn: currentTurnData?.current_turn,
-                    possession_team_id: currentTurnData?.possession_team_id,
-                    index: currentTurnData?.index
-                });
-            }
-            
-            // Check eligibility using simple two-step check
-            console.log('🔍 [TIMEOUT DEBUG] Checking eligibility...');
-            const isEligible = checkTimeoutEligibility(scene, currentTurnData);
-            console.log('🔍 [TIMEOUT DEBUG] Eligibility result:', isEligible);
+            // ✅ SIMPLIFIED: Use eligibility flag set at start of turn (single source of truth)
+            // This eliminates stale data issues - no need to re-check eligibility with potentially stale data
+            const isEligible = scene.currentTurnTimeoutEligible ?? false;
+            console.log('🔍 [TIMEOUT DEBUG] Current turn eligibility (from flag):', isEligible);
             
             if (isEligible) {
                 // Current turn is eligible, set flag for immediate execution
@@ -725,6 +692,10 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
     goToTimeoutBtn.addEventListener('click', async () => {
         console.log('🔍 [TIMEOUT DEBUG] User clicked "Go To Timeout" button');
         
+        // ✅ SAFEGUARD: Set flag to indicate user explicitly clicked button
+        // This prevents auto-navigation from other code paths
+        scene.userTimeoutButtonClicked = true;
+        
         // Remove popup BEFORE navigation (ensures guard check passes)
         popup.remove();
         
@@ -738,7 +709,6 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
         
         // Navigate to lineup screen - only happens when user explicitly clicks button
         // Note: computerTimeout=false (default) ensures guard check runs
-        // The guard in showTimeoutPopup will verify the popup was removed (indicating button click)
         await showTimeoutPopup(timeoutResult, gameId, scene, false);
     });
     
@@ -763,7 +733,7 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
     // ✅ FIX 2: Guard against auto-navigation for user timeouts
     // If this is a user timeout (not computer), make sure it's being called from button click
     if (!computerTimeout) {
-        // Check if user timeout popup is still showing (user hasn't clicked button yet)
+        // ✅ SAFEGUARD 1: Check if user timeout popup is still showing (user hasn't clicked button yet)
         const userPopup = document.querySelector('.user-timeout-popup');
         if (userPopup) {
             console.warn('⚠️ [TIMEOUT] showTimeoutPopup called for user timeout but popup still showing - ignoring navigation');
@@ -771,11 +741,18 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
             return; // Don't navigate if popup is still showing
         }
         
-        // ✅ ADDITIONAL SAFEGUARD: Double-check that we're not auto-navigating
-        // If this is a user timeout and we reach here, it means the popup was removed
-        // This should ONLY happen when the user clicks the "Go To Timeout" button
-        // Log a warning if we're here without explicit user interaction
-        console.log('✅ [TIMEOUT] User timeout navigation proceeding (popup was removed, indicating button click)');
+        // ✅ SAFEGUARD 2: Check if user explicitly clicked the button
+        // This flag is set ONLY when the user clicks "Go To Timeout" button
+        if (!scene.userTimeoutButtonClicked) {
+            console.warn('⚠️ [TIMEOUT] showTimeoutPopup called for user timeout but button was not clicked - ignoring navigation');
+            console.warn('⚠️ [TIMEOUT] Navigation should only happen when user explicitly clicks "Go To Timeout" button');
+            return; // Don't navigate if button wasn't clicked
+        }
+        
+        // Clear the flag after checking (prevents reuse)
+        delete scene.userTimeoutButtonClicked;
+        
+        console.log('✅ [TIMEOUT] User timeout navigation proceeding (user explicitly clicked button)');
     }
     // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
     // Use global helper (works in both regular scripts and modules)
