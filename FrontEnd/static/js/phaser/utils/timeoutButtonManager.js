@@ -317,8 +317,6 @@ export function resetTimeoutQueue() {
     updateTimeoutButtonState(true, 'Timeout available');
 }
 
-// ✅ REMOVED: shouldKillCurrentTurnInstantly and killCurrentTurnAndExecuteTimeout
-// Timeouts now only execute at the start of eligible turns, never mid-turn
 
 /**
  * Check if timeout is queued and should be executed

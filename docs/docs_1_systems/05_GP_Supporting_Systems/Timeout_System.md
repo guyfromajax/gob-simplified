@@ -15,7 +15,6 @@
    - `GET /api/gameplan` - Fetch game plan settings
 5. **Database Storage**: `timeout_next_play_type`, `timeout_offense_team_id` in game document
 6. **Navigation Helper**: `TimeoutNavigationHelper` (unified parameter building)
-7. **Button Window**: 2.5-second pause during SIP/BIP turns
 
 **System Flow (10 Steps)**
 
@@ -48,7 +47,7 @@ The timeout system allows game pauses for strategic adjustments, lineup changes,
 ### Timeout Turn Creation
 
 **User-Initiated Timeout:**
-- User presses timeout button during SIP/BIP turn (2.5-second pause window)
+- User presses timeout button (always live, no restrictions)
 - Frontend calls `/api/call-timeout` endpoint
 - Backend creates `TIMEOUT` turn via `turn_manager.setup_timeout_turn()`
 - `TIMEOUT` turn appended to `gm.turns` array
