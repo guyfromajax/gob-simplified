@@ -179,18 +179,28 @@ export function checkTimeoutEligibility(scene, turnData) {
     }
     console.log('🔍 [TIMEOUT DEBUG] Check 1 FAILED - not BIP or SIP');
     
-    // Check 2: Is current turn HCO AND previous turn was DREB AND user team is on offense?
+    // Check 2: Is current turn HCO AND previous turn was MISS with DREB AND user team is on offense?
     // This covers DREB => HCO transition when user team gets the defensive rebound
+    // Note: DREB is not a turn type - it's a property of a MISS turn (rebound_type: "DREB")
     if (currentTurn === 'HCO' || turnData?.result_type === 'HCO') {
         console.log('🔍 [TIMEOUT DEBUG] Check 2 - Current turn is HCO, checking previous turn and offense team');
         
-        // Check if previous turn was DREB
+        // Check if previous turn was MISS with DREB
         const previousTurn = scene.previousTurnData;
-        const previousTurnType = previousTurn?.current_turn || previousTurn?.result_type;
-        console.log('🔍 [TIMEOUT DEBUG] Previous turn type:', previousTurnType);
+        const previousResultType = previousTurn?.result_type;
+        const previousReboundType = previousTurn?.rebound_type;
+        const previousNextPlayType = previousTurn?.next_play_type;
+        console.log('🔍 [TIMEOUT DEBUG] Previous turn:', {
+            result_type: previousResultType,
+            rebound_type: previousReboundType,
+            next_play_type: previousNextPlayType
+        });
         
-        if (previousTurnType === 'DREB') {
-            console.log('🔍 [TIMEOUT DEBUG] Previous turn was DREB, checking if user team is on offense');
+        // Check if previous turn was MISS with DREB (not Fast Break)
+        // DREB => HCO: previous turn is MISS with rebound_type: "DREB" and next_play_type: "HCO"
+        // DREB => Fast Break: previous turn is MISS with rebound_type: "DREB" and next_play_type: "FAST_BREAK" (not eligible)
+        if (previousResultType === 'MISS' && previousReboundType === 'DREB' && previousNextPlayType === 'HCO') {
+            console.log('🔍 [TIMEOUT DEBUG] Previous turn was MISS with DREB => HCO, checking if user team is on offense');
             
             // Check if user team is on offense
             const offenseTeamId = turnData?.offense_team_id || turnData?.possession_team_id;
@@ -210,7 +220,11 @@ export function checkTimeoutEligibility(scene, turnData) {
             }
             console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - user team not on offense');
         } else {
-            console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - previous turn was not DREB (was:', previousTurnType, ')');
+            console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - previous turn was not MISS with DREB => HCO', {
+                was_miss: previousResultType === 'MISS',
+                had_dreb: previousReboundType === 'DREB',
+                was_hco: previousNextPlayType === 'HCO'
+            });
         }
     } else {
         console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - current turn is not HCO');
