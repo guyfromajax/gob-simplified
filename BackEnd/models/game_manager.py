@@ -199,7 +199,23 @@ class GameManager:
         
         # Store next_play_type and offense_team_id for resume
         self.game_state["timeout_next_play_type"] = timeout_turn.get("next_play_type", "SIDE_INBOUND")
-        self.game_state["timeout_offense_team_id"] = self.offense_team.team_id
+        
+        # ✅ FIX: For DREB => HCO transitions, read offense_team_id from the last turn (which was updated after flip)
+        # For SIP/BIP, self.offense_team.team_id is already correct (possession flipped before turn creation)
+        # This fixes the bug where timeout_offense_team_id was saved as the wrong team during DREB => HCO
+        last_turn = self.turns[-1] if self.turns else None
+        if (last_turn and 
+            last_turn.get("next_play_type") == "HCO" and 
+            last_turn.get("rebound_type") == "DREB" and
+            last_turn.get("offense_team_id")):
+            # DREB => HCO transition: use the turn's offense_team_id (updated after flip at line 347)
+            timeout_offense_team_id = last_turn.get("offense_team_id")
+            logging.info(f"✅ TIMEOUT: DREB => HCO transition detected - using last turn's offense_team_id: {timeout_offense_team_id} (was: {self.offense_team.team_id})")
+        else:
+            # SIP/BIP or other cases: use GameManager's offense_team (already correct)
+            timeout_offense_team_id = self.offense_team.team_id
+        
+        self.game_state["timeout_offense_team_id"] = timeout_offense_team_id
         
         # 🔍 DEBUG: Log GameManager state when timeout is called (for DREB => HCO bug diagnosis)
         logging.warning(f"🔍 [TIMEOUT DEBUG] call_timeout() - GameManager state:")
@@ -212,9 +228,10 @@ class GameManager:
         logging.warning(f"🔍 [TIMEOUT DEBUG]   - Last turn in self.turns: {self.turns[-1].get('result_type') if self.turns else 'NO_TURNS'}")
         logging.warning(f"🔍 [TIMEOUT DEBUG]   - Last turn offense_team_id: {self.turns[-1].get('offense_team_id') if self.turns else 'NO_TURNS'}")
         logging.warning(f"🔍 [TIMEOUT DEBUG]   - Last turn next_play_type: {self.turns[-1].get('next_play_type') if self.turns else 'NO_TURNS'}")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - Last turn rebound_type: {self.turns[-1].get('rebound_type') if self.turns else 'NO_TURNS'}")
         logging.warning(f"🔍 [TIMEOUT DEBUG]   - Stored timeout_offense_team_id: {self.game_state['timeout_offense_team_id']}")
         
-        logging.info(f"✅ TIMEOUT: Stored next_play_type '{self.game_state['timeout_next_play_type']}' and offense_team_id '{self.offense_team.team_id}' for resume")
+        logging.info(f"✅ TIMEOUT: Stored next_play_type '{self.game_state['timeout_next_play_type']}' and offense_team_id '{timeout_offense_team_id}' for resume")
         
         # Rebuild lineups
         from BackEnd.utils.db_utils import build_lineup_from_mongo, autoset_strategy_settings
