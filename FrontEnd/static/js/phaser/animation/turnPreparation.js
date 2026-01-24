@@ -202,31 +202,10 @@ export async function finalizeTurnAfterAnimation({
   turnIndex,
   updateDebugScore 
 }) {
-  // ✅ TIMEOUT: Check if timeout is pending execution after turn completes
-  // This ensures the popup and sound only appear AFTER the turn animation fully completes
-  if (scene.timeoutPendingExecution) {
-    const { timeoutQueuedDuringEligibleTurn, currentTurnIndex, timeoutQueuedAtTurnIndex } = scene.timeoutPendingExecution;
-    console.log('🔍 [TIMEOUT DEBUG] Turn completed, executing pending timeout', {
-      turnIndex: turnIndex ?? turn?.index,
-      result_type: turn?.result_type,
-      timeoutQueuedDuringEligibleTurn,
-      currentTurnIndex,
-      timeoutQueuedAtTurnIndex
-    });
-    
-    // Clear the flag BEFORE executing (prevents double execution)
-    delete scene.timeoutPendingExecution;
-    
-    // Import and execute timeout (this will show popup and play sound)
-    // This happens AFTER turn animation completes, ensuring smooth UX
-    try {
-      const { handleTimeoutButtonClick } = await import('../utils/timeoutButtonManager.js');
-      await handleTimeoutButtonClick(true); // Pass true to skip toggle (just execute)
-      console.log('✅ [TIMEOUT DEBUG] Timeout executed successfully after turn completion');
-    } catch (error) {
-      console.error('❌ TIMEOUT: Failed to execute pending timeout after turn completion:', error);
-    }
-  }
+  // ✅ TIMEOUT: Removed deferred execution path
+  // Scenario A: Executes immediately in handleTimeoutButtonClick when button is pressed during eligible turn
+  // Scenario B: Executes immediately in checkAndExecuteQueuedTimeout when eligible turn is reached
+  // No need to wait for turn completion - popup appears immediately in both scenarios
   
   // ✅ UNIVERSAL TRANSITION HANDLER - Handle possession flips and state transitions
   // This runs FIRST to ensure possession is correct before other finalization steps
