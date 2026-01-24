@@ -116,12 +116,23 @@ export class AnimationRouter {
       // ✅ PHASE 2.3: Get turnIndex from prepared turn (prepareTurnForAnimation sets turn.index)
       turnIndex = turnData.index ?? turnIndex;
       
-      // ✅ TIMEOUT: Check if timeout is queued and current turn is eligible
-      // Scenario B: If timeout was queued during ineligible turn, execute immediately when eligible turn is reached
+      // ✅ TIMEOUT: Determine eligibility at start of each turn (single source of truth)
+      // This eliminates stale data issues - eligibility is determined once with fresh turnData
       if (ENABLE_TIMEOUT_BUTTON) {
-        const { checkAndExecuteQueuedTimeout } = await import('../utils/timeoutButtonManager.js');
+        const { checkTimeoutEligibility, checkAndExecuteQueuedTimeout } = await import('../utils/timeoutButtonManager.js');
         // Store current turn data for timeout eligibility check
         this.scene.currentTurnData = turnData;
+        
+        // Set eligibility flag at start of turn (used by both button press and queued timeout check)
+        this.scene.currentTurnTimeoutEligible = checkTimeoutEligibility(this.scene, turnData);
+        console.log('🔍 [TIMEOUT DEBUG] Turn eligibility set at start:', {
+          turnIndex: turnIndex ?? turnData.index,
+          result_type: turnData.result_type,
+          current_turn: turnData.current_turn,
+          eligible: this.scene.currentTurnTimeoutEligible
+        });
+        
+        // Check if queued timeout should execute (Scenario B: queued from ineligible turn)
         const timeoutExecuted = await checkAndExecuteQueuedTimeout(this.scene, turnData);
         if (timeoutExecuted) {
           // Timeout was executed (Scenario B: queued from ineligible turn, now executing at start of eligible turn)

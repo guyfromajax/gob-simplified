@@ -688,8 +688,15 @@ This prevents stale timeout state from affecting future games.
 - **Highlighted:** When user presses button, green highlight effect appears (indicates timeout is queued)
 - **Toggleable:** User can press button again to cancel timeout queue (removes highlight)
 
-**Timeout Eligibility Check:**
-- Location: `FrontEnd/static/js/phaser/utils/timeoutButtonManager.js` `checkTimeoutEligibility()`
+**Timeout Eligibility System:**
+- **Single Source of Truth:** Eligibility is determined once at the start of each turn and stored in `scene.currentTurnTimeoutEligible`
+- **Location:** Set in `FrontEnd/static/js/phaser/animation/AnimationRouter.js` `processTurn()` at the start of each turn
+- **Eliminates Stale Data:** By determining eligibility once with fresh `turnData` from AnimationRouter, we avoid issues with stale data when the button is pressed mid-turn
+- **Used By:**
+  - Button press handler (`handleTimeoutButtonClick`) - reads flag to determine if current turn is eligible
+  - Queued timeout checker (`checkAndExecuteQueuedTimeout`) - reads flag to determine if queued timeout should execute
+
+**Eligibility Criteria (`checkTimeoutEligibility()` function):**
 - **Two-step check (in order):**
   1. **BIP/SIP Check (Always Eligible):** If turn is `BASELINE_INBOUND` or `SIDE_INBOUND`, timeout is always eligible (checked first)
   2. **User Team Offense Check:** If user's team is on offense, timeout is eligible
@@ -701,6 +708,10 @@ This prevents stale timeout state from affecting future games.
   - Any possession where the user team is on offense
   - Any `BASELINE_INBOUND` (BIP) turn
   - Any `SIDE_INBOUND` (SIP) turn
+
+**Execution Flow:**
+- **Scenario A (Eligible Turn):** User presses button → Reads `scene.currentTurnTimeoutEligible` → If `true`, executes timeout immediately (popup appears)
+- **Scenario B (Ineligible Turn):** User presses button → Reads `scene.currentTurnTimeoutEligible` → If `false`, sets `timeoutQueued = true` → At start of next turn, `checkAndExecuteQueuedTimeout` reads flag → If eligible, executes timeout immediately
 
 **Animation Freezing:**
 - When timeout button is pressed, all animations are immediately paused
