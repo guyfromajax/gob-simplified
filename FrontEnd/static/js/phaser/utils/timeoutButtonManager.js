@@ -130,9 +130,9 @@ function isUserTeamOnOffense(scene, turnData) {
 
 /**
  * Check if timeout is eligible for current turn
- * Two-step check (in order):
+ * Three-step check (in order):
  * 1. Is current turn BIP or SIP? → Always eligible (checked first)
- * 2. Is offense_team == user's team? → Eligible
+ * 2. Is current turn HCO AND previous turn was DREB AND user team is on offense? → Eligible
  * 
  * Uses `offense_team_id` as primary field (SS&S canonical), with `possession_team_id` as fallback
  * for backward compatibility.
@@ -179,33 +179,44 @@ export function checkTimeoutEligibility(scene, turnData) {
     }
     console.log('🔍 [TIMEOUT DEBUG] Check 1 FAILED - not BIP or SIP');
     
-    // Check 2: Is offense_team == user's team?
-    // Use offense_team_id as primary (SS&S canonical), with possession_team_id as fallback
-    const offenseTeamId = turnData?.offense_team_id || turnData?.possession_team_id;
-    console.log('🔍 [TIMEOUT DEBUG] offenseTeamId (primary):', turnData?.offense_team_id);
-    console.log('🔍 [TIMEOUT DEBUG] possessionTeamId (fallback):', turnData?.possession_team_id);
-    console.log('🔍 [TIMEOUT DEBUG] resolved offenseTeamId:', offenseTeamId);
-    
-    if (!offenseTeamId) {
-        console.log('🔍 [TIMEOUT DEBUG] No offense_team_id or possession_team_id found');
-        return false;
+    // Check 2: Is current turn HCO AND previous turn was DREB AND user team is on offense?
+    // This covers DREB => HCO transition when user team gets the defensive rebound
+    if (currentTurn === 'HCO' || turnData?.result_type === 'HCO') {
+        console.log('🔍 [TIMEOUT DEBUG] Check 2 - Current turn is HCO, checking previous turn and offense team');
+        
+        // Check if previous turn was DREB
+        const previousTurn = scene.previousTurnData;
+        const previousTurnType = previousTurn?.current_turn || previousTurn?.result_type;
+        console.log('🔍 [TIMEOUT DEBUG] Previous turn type:', previousTurnType);
+        
+        if (previousTurnType === 'DREB') {
+            console.log('🔍 [TIMEOUT DEBUG] Previous turn was DREB, checking if user team is on offense');
+            
+            // Check if user team is on offense
+            const offenseTeamId = turnData?.offense_team_id || turnData?.possession_team_id;
+            if (!offenseTeamId) {
+                console.log('🔍 [TIMEOUT DEBUG] No offense_team_id or possession_team_id found');
+                return false;
+            }
+            
+            const homeTeamId = scene.simData?.home_team_id;
+            const awayTeamId = scene.simData?.away_team_id;
+            const userTeamId = userTeamSide === 'home' ? homeTeamId : awayTeamId;
+            
+            console.log('🔍 [TIMEOUT DEBUG] Check 2 - userTeamId:', userTeamId, 'offenseTeamId:', offenseTeamId);
+            if (String(offenseTeamId) === String(userTeamId)) {
+                console.log('🔍 [TIMEOUT DEBUG] Check 2 PASSED - DREB => HCO transition with user team on offense');
+                return true;
+            }
+            console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - user team not on offense');
+        } else {
+            console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - previous turn was not DREB (was:', previousTurnType, ')');
+        }
+    } else {
+        console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - current turn is not HCO');
     }
     
-    // Get home/away team IDs
-    const homeTeamId = scene.simData?.home_team_id;
-    const awayTeamId = scene.simData?.away_team_id;
-    console.log('🔍 [TIMEOUT DEBUG] Team IDs:', { homeTeamId, awayTeamId });
-    
-    // Check 2: Is offense_team == user's team?
-    const userTeamId = userTeamSide === 'home' ? homeTeamId : awayTeamId;
-    console.log('🔍 [TIMEOUT DEBUG] Check 2 - userTeamId:', userTeamId, 'offenseTeamId:', offenseTeamId);
-    if (String(offenseTeamId) === String(userTeamId)) {
-        console.log('🔍 [TIMEOUT DEBUG] Check 2 PASSED - user team on offense');
-        return true;
-    }
-    console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - user team not on offense');
-    
-    console.log('🔍 [TIMEOUT DEBUG] Both checks failed - NOT eligible');
+    console.log('🔍 [TIMEOUT DEBUG] All checks failed - NOT eligible');
     return false;
 }
 
@@ -373,6 +384,20 @@ export async function checkAndExecuteQueuedTimeout(scene, turnData) {
     // and we've now reached an eligible turn
     console.log('🔍 [TIMEOUT DEBUG] Eligible turn detected, executing timeout immediately');
     console.log('⏸️ TIMEOUT: Executing at start of eligible turn (queued from ineligible turn)');
+    
+    // ✅ IMMEDIATE TURN KILLING: Stop all animations before executing timeout
+    // This ensures the turn stops instantly when timeout executes
+    console.log('⏸️ TIMEOUT: Killing current turn animations immediately');
+    
+    // Pause all tweens (stops all animations)
+    if (scene.tweens) {
+        scene.tweens.pauseAll();
+        console.log('⏸️ TIMEOUT: All tweens paused');
+    }
+    
+    // Stop animation loop
+    scene.timeoutCalled = true;
+    console.log('⏸️ TIMEOUT: Animation loop stopped (scene.timeoutCalled = true)');
     
     // Execute timeout immediately (call API, show popup, play sound)
     // handleTimeoutButtonClick is in the same file, so we can call it directly
@@ -546,13 +571,22 @@ async function handleTimeoutButtonClick(executeOnly = false) {
         // Reset queue state
         resetTimeoutQueue();
         
-        // ✅ TIMING FIX: Play airhorn sound and show popup ONLY after turn completes
-        // This ensures the popup doesn't appear mid-animation
-        // The sound and popup are triggered from finalizeTurnAfterAnimation, which runs
-        // after the turn animation fully completes
+        // ✅ IMMEDIATE TURN KILLING: Stop all animations before showing popup
+        // This ensures the turn stops instantly when timeout is called
+        // User will see animation stop and popup appear immediately
+        console.log('⏸️ TIMEOUT: Killing current turn animations immediately');
+        
+        // Pause all tweens (stops all animations)
+        if (scene.tweens) {
+            scene.tweens.pauseAll();
+            console.log('⏸️ TIMEOUT: All tweens paused');
+        }
+        
+        // Stop animation loop
+        scene.timeoutCalled = true;
+        console.log('⏸️ TIMEOUT: Animation loop stopped (scene.timeoutCalled = true)');
         
         // Play airhorn sound when timeout executes (popup appears)
-        // Note: This is called from finalizeTurnAfterAnimation, ensuring timing is correct
         if (airhornSound) {
             try {
                 airhornSound.currentTime = 0; // Reset to start
@@ -564,9 +598,8 @@ async function handleTimeoutButtonClick(executeOnly = false) {
             }
         }
         
-        // Show popup first, then navigate when user clicks "Go To Timeout" button
-        // Note: This is called from finalizeTurnAfterAnimation, ensuring popup appears
-        // only after the turn animation fully completes
+        // Show popup immediately (turn is already stopped)
+        // User will see: animation stops → popup appears (instantaneous)
         await showUserTimeoutPopup(result, gameId, scene);
         
     } catch (error) {
