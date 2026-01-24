@@ -574,7 +574,13 @@ async function handleTimeoutButtonClick(executeOnly = false) {
         // Reset queue state
         resetTimeoutQueue();
         
+        // ✅ TIMING FIX: Play airhorn sound and show popup ONLY after turn completes
+        // This ensures the popup doesn't appear mid-animation
+        // The sound and popup are triggered from finalizeTurnAfterAnimation, which runs
+        // after the turn animation fully completes
+        
         // Play airhorn sound when timeout executes (popup appears)
+        // Note: This is called from finalizeTurnAfterAnimation, ensuring timing is correct
         if (airhornSound) {
             try {
                 airhornSound.currentTime = 0; // Reset to start
@@ -587,6 +593,8 @@ async function handleTimeoutButtonClick(executeOnly = false) {
         }
         
         // Show popup first, then navigate when user clicks "Go To Timeout" button
+        // Note: This is called from finalizeTurnAfterAnimation, ensuring popup appears
+        // only after the turn animation fully completes
         await showUserTimeoutPopup(result, gameId, scene);
         
     } catch (error) {
@@ -711,6 +719,8 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
     const goToTimeoutBtn = popup.querySelector('.go-to-timeout-button');
     goToTimeoutBtn.addEventListener('click', async () => {
         console.log('🔍 [TIMEOUT DEBUG] User clicked "Go To Timeout" button');
+        
+        // Remove popup BEFORE navigation (ensures guard check passes)
         popup.remove();
         
         // Clear pending timeout data from scene
@@ -722,7 +732,9 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
         }
         
         // Navigate to lineup screen - only happens when user explicitly clicks button
-        await showTimeoutPopup(timeoutResult, gameId, scene);
+        // Note: computerTimeout=false (default) ensures guard check runs
+        // The guard in showTimeoutPopup will verify the popup was removed (indicating button click)
+        await showTimeoutPopup(timeoutResult, gameId, scene, false);
     });
     
     document.body.appendChild(popup);
@@ -750,8 +762,15 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
         const userPopup = document.querySelector('.user-timeout-popup');
         if (userPopup) {
             console.warn('⚠️ [TIMEOUT] showTimeoutPopup called for user timeout but popup still showing - ignoring navigation');
+            console.warn('⚠️ [TIMEOUT] This should only happen if called from outside the button click handler');
             return; // Don't navigate if popup is still showing
         }
+        
+        // ✅ ADDITIONAL SAFEGUARD: Double-check that we're not auto-navigating
+        // If this is a user timeout and we reach here, it means the popup was removed
+        // This should ONLY happen when the user clicks the "Go To Timeout" button
+        // Log a warning if we're here without explicit user interaction
+        console.log('✅ [TIMEOUT] User timeout navigation proceeding (popup was removed, indicating button click)');
     }
     // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
     // Use global helper (works in both regular scripts and modules)

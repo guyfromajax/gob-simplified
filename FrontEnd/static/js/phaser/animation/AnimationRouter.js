@@ -117,15 +117,15 @@ export class AnimationRouter {
       turnIndex = turnData.index ?? turnIndex;
       
       // ✅ TIMEOUT: Check if timeout is queued and current turn is eligible
+      // Note: We set the flag here but don't execute until turn completes (in finalizeTurnAfterAnimation)
       if (ENABLE_TIMEOUT_BUTTON) {
         const { checkAndExecuteQueuedTimeout } = await import('../utils/timeoutButtonManager.js');
         // Store current turn data for timeout eligibility check
         this.scene.currentTurnData = turnData;
-        const timeoutExecuted = await checkAndExecuteQueuedTimeout(this.scene, turnData);
-        if (timeoutExecuted) {
-          // Timeout was executed, stop processing this turn
-          return;
-        }
+        const timeoutQueued = await checkAndExecuteQueuedTimeout(this.scene, turnData);
+        // Note: checkAndExecuteQueuedTimeout sets scene.timeoutPendingExecution flag
+        // but doesn't execute the timeout - that happens in finalizeTurnAfterAnimation
+        // We continue processing the turn normally, and the timeout will execute after animation completes
       }
       
       if (shouldLog && isHCO) {
