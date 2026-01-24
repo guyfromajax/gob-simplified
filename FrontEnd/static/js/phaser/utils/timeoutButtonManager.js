@@ -16,8 +16,6 @@ export const ENABLE_TIMEOUT_BUTTON = true;
 // State tracking
 let buttonInitialized = false;
 let timeoutQueued = false; // Tracks if timeout is queued (highlighted)
-let timeoutQueuedAtTurnIndex = null; // Track which turn index the timeout was queued at
-let timeoutQueuedDuringEligibleTurn = false; // Track if timeout was queued during an eligible turn (for immediate execution)
 let timeoutSound = null; // Audio object for button click sound
 let airhornSound = null; // Audio object for airhorn sound (plays when timeout executes)
 
@@ -78,7 +76,8 @@ function ensureButtonInitialized() {
 }
 
 /**
- * Update button state (always live now, but manages highlight)
+ * Update button state (manages highlight and disabled state)
+ * Button is disabled when user team has 0 timeouts remaining
  */
 export function updateTimeoutButtonState(isLive, reason = '') {
     if (!ENABLE_TIMEOUT_BUTTON) {
@@ -92,7 +91,37 @@ export function updateTimeoutButtonState(isLive, reason = '') {
         return;
     }
     
-    // Button is always enabled now
+    // Check if user team has timeouts remaining
+    const scene = window.currentGameScene;
+    let userTimeoutsRemaining = null;
+    
+    if (scene && scene.simData) {
+        const userTeamSide = scene.userTeamSide || scene.simData?.user_team_side;
+        if (userTeamSide) {
+            // Get timeout count from simData (same pattern as gameScene.js)
+            const homeTimeouts = scene.simData?.home_team_timeouts ?? 
+                                scene.simData?.timeouts?.home ?? 
+                                scene.simData?.homeTeam?.timeouts;
+            const awayTimeouts = scene.simData?.away_team_timeouts ?? 
+                                scene.simData?.timeouts?.away ?? 
+                                scene.simData?.awayTeam?.timeouts;
+            
+            userTimeoutsRemaining = userTeamSide === 'home' ? homeTimeouts : awayTimeouts;
+        }
+    }
+    
+    // Disable button if 0 timeouts remaining
+    if (userTimeoutsRemaining !== null && userTimeoutsRemaining <= 0) {
+        button.disabled = true;
+        button.style.opacity = '0.5';
+        button.style.cursor = 'not-allowed';
+        button.title = 'No timeouts remaining';
+        // Remove highlight if disabled
+        updateButtonHighlight(false);
+        return;
+    }
+    
+    // Button is enabled
     button.disabled = false;
     button.style.opacity = '1';
     button.style.cursor = 'pointer';
@@ -170,18 +199,39 @@ export function checkTimeoutEligibility(scene, turnData) {
         return false;
     }
     
-    // Check 1: Is current turn BIP or SIP? (Always eligible, checked first)
+    // Check 1: Is current turn BIP or SIP? (Always eligible if user team on offense, checked first)
     const currentTurn = turnData?.current_turn || turnData?.result_type;
     console.log('🔍 [TIMEOUT DEBUG] Check 1 - currentTurn:', currentTurn);
     if (currentTurn === 'SIDE_INBOUND' || currentTurn === 'BASELINE_INBOUND') {
-        console.log('🔍 [TIMEOUT DEBUG] Check 1 PASSED - BIP or SIP turn (always eligible)');
-        return true;
+        // Check if user team is on offense
+        const offenseTeamId = turnData?.offense_team_id || turnData?.possession_team_id;
+        if (!offenseTeamId) {
+            console.log('🔍 [TIMEOUT DEBUG] Check 1 FAILED - No offense_team_id or possession_team_id found');
+            return false;
+        }
+        
+        const homeTeamId = scene.simData?.home_team_id;
+        const awayTeamId = scene.simData?.away_team_id;
+        const userTeamId = userTeamSide === 'home' ? homeTeamId : awayTeamId;
+        
+        if (String(offenseTeamId) === String(userTeamId)) {
+            console.log('🔍 [TIMEOUT DEBUG] Check 1 PASSED - BIP or SIP turn with user team on offense');
+            return true;
+        }
+        console.log('🔍 [TIMEOUT DEBUG] Check 1 FAILED - BIP/SIP but user team not on offense');
     }
     console.log('🔍 [TIMEOUT DEBUG] Check 1 FAILED - not BIP or SIP');
     
     // Check 2: Is current turn HCO AND previous turn was MISS with DREB AND user team is on offense?
     // This covers DREB => HCO transition when user team gets the defensive rebound
     // Note: DREB is not a turn type - it's a property of a MISS turn (rebound_type: "DREB")
+    // ✅ EXCLUDE: MISS/DREB turns themselves are NOT eligible (even if current_turn is HCO)
+    // We want to wait for the NEXT HCO turn after DREB animation completes
+    if (turnData?.result_type === 'MISS' && turnData?.rebound_type === 'DREB') {
+        console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - Current turn is MISS/DREB (not eligible, wait for next HCO turn)');
+        return false;
+    }
+    
     if (currentTurn === 'HCO' || turnData?.result_type === 'HCO') {
         console.log('🔍 [TIMEOUT DEBUG] Check 2 - Current turn is HCO, checking previous turn and offense team');
         
@@ -263,119 +313,29 @@ export function resetTimeoutQueue() {
     }
     
     timeoutQueued = false;
-    timeoutQueuedAtTurnIndex = null;
-    timeoutQueuedDuringEligibleTurn = false;
     updateButtonHighlight(false);
     updateTimeoutButtonState(true, 'Timeout available');
 }
 
-/**
- * Check if we should kill the current turn instantly (during active turn)
- * Conditions:
- * 1. User team is on offense (any turn type) → kill instantly
- * 2. BIP or SIP turn (any team) → kill instantly, UNLESS we've transitioned to HCO/FCP/HCT and away team is on offense
- * 
- * IMPORTANT: Only kill if timeout was queued during an eligible turn (immediate execution)
- * If timeout was queued during non-eligible turn, wait for next eligible turn via checkAndExecuteQueuedTimeout
- */
-export function shouldKillCurrentTurnInstantly(scene, turnData) {
-    console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly called');
-    console.log('🔍 [TIMEOUT DEBUG] timeoutQueued:', timeoutQueued);
-    console.log('🔍 [TIMEOUT DEBUG] timeoutQueuedDuringEligibleTurn:', timeoutQueuedDuringEligibleTurn);
-    
-    if (!ENABLE_TIMEOUT_BUTTON || !timeoutQueued) {
-        console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: Not enabled or not queued, returning false');
-        return false;
-    }
-    
-    if (!scene || !turnData) {
-        console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: Missing scene or turnData, returning false');
-        return false;
-    }
-    
-    // ✅ CRITICAL FIX: Only kill instantly if timeout was queued during an eligible turn
-    // If queued during non-eligible turn, wait for checkAndExecuteQueuedTimeout to handle it
-    if (!timeoutQueuedDuringEligibleTurn) {
-        console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: Timeout queued during non-eligible turn, waiting for next eligible turn');
-        return false;
-    }
-    
-    const currentTurn = turnData?.current_turn || turnData?.result_type;
-    console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: currentTurn:', currentTurn);
-    
-    // Condition 1: User team is on offense (any turn type) → kill instantly
-    const userOnOffense = isUserTeamOnOffense(scene, turnData);
-    console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: userOnOffense:', userOnOffense);
-    if (userOnOffense) {
-        console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: User on offense, returning true');
-        return true;
-    }
-    
-    // Condition 2: BIP or SIP turn
-    if (currentTurn === 'SIDE_INBOUND' || currentTurn === 'BASELINE_INBOUND') {
-        console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: BIP/SIP turn detected');
-        // Kill instantly for BIP/SIP, but only if we haven't transitioned to next turn
-        // Check if we're still in the inbound phase (not yet in HCO/FCP/HCT)
-        const isInboundPhase = scene.stateMachine?.is('Inbound') || 
-                               scene.isInboundSetup === true;
-        
-        console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: isInboundPhase:', isInboundPhase);
-        if (isInboundPhase) {
-            console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: Still in BIP/SIP phase, returning true');
-            return true; // Still in BIP/SIP phase, kill instantly
-        }
-        
-        // We've transitioned past BIP/SIP to HCO/FCP/HCT
-        // Only kill if user team is on offense (already checked above, so return false)
-        // If away team is on offense, don't kill
-        console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: Past BIP/SIP phase, returning false');
-        return false;
-    }
-    
-    console.log('🔍 [TIMEOUT DEBUG] shouldKillCurrentTurnInstantly: No conditions met, returning false');
-    return false;
-}
-
-/**
- * Kill current turn instantly (pause tweens, set flags, execute timeout)
- */
-export async function killCurrentTurnAndExecuteTimeout(scene, turnData) {
-    if (!ENABLE_TIMEOUT_BUTTON || !timeoutQueued) {
-        return false;
-    }
-    
-    console.log('⏸️ TIMEOUT: Killing current turn instantly');
-    
-    // Pause all tweens immediately
-    if (scene.tweens) {
-        scene.tweens.pauseAll();
-        console.log('⏸️ TIMEOUT: Paused all tweens');
-    }
-    
-    // Set flag to stop animation loop
-    scene.timeoutCalled = true;
-    
-    // Execute the timeout
-    await handleTimeoutButtonClick(true); // Pass true to skip toggle (just execute)
-    return true;
-}
+// ✅ REMOVED: shouldKillCurrentTurnInstantly and killCurrentTurnAndExecuteTimeout
+// Timeouts now only execute at the start of eligible turns, never mid-turn
 
 /**
  * Check if timeout is queued and should be executed
- * Called at the start of each turn
- * ✅ STATE CONTRACT: Uses fresh turnData from AnimationRouter (authoritative source for current turn)
- * Only executes if:
- * 1. Timeout is queued
- * 2. Current turn is eligible
- * 3. Either:
- *    - Queued during eligible turn (execute immediately, even if same turn)
- *    - OR this is a different turn than when it was queued (wait for NEXT eligible turn)
+ * Called at the start of each turn (before any animations)
+ * ✅ SIMPLIFIED: Timeouts only execute at the start of eligible turns, never mid-turn
+ * 
+ * Execution conditions:
+ * 1. Timeout is queued (user clicked button)
+ * 2. Current turn is eligible (BIP, SIP, or HCO after DREB with user team on offense)
+ * 3. User team has timeouts remaining (checked in handleTimeoutButtonClick)
+ * 
+ * If conditions are met, timeout executes immediately and turn processing stops.
+ * If not, turn processes normally and timeout waits for next eligible turn.
  */
 export async function checkAndExecuteQueuedTimeout(scene, turnData) {
     console.log('🔍 [TIMEOUT DEBUG] checkAndExecuteQueuedTimeout called');
     console.log('🔍 [TIMEOUT DEBUG] timeoutQueued:', timeoutQueued);
-    console.log('🔍 [TIMEOUT DEBUG] timeoutQueuedDuringEligibleTurn:', timeoutQueuedDuringEligibleTurn);
-    console.log('🔍 [TIMEOUT DEBUG] timeoutQueuedAtTurnIndex:', timeoutQueuedAtTurnIndex);
     
     if (!ENABLE_TIMEOUT_BUTTON || !timeoutQueued) {
         console.log('🔍 [TIMEOUT DEBUG] Not enabled or not queued, returning false');
@@ -393,15 +353,13 @@ export async function checkAndExecuteQueuedTimeout(scene, turnData) {
         return false;
     }
     
-    // ✅ SCENARIO B: Eligible turn detected - execute timeout immediately
-    // This happens when timeout was queued during an ineligible turn
-    // and we've now reached an eligible turn
+    // ✅ Eligible turn detected - execute timeout immediately at start of turn
     console.log('🔍 [TIMEOUT DEBUG] Eligible turn detected, executing timeout immediately');
-    console.log('⏸️ TIMEOUT: Executing at start of eligible turn (queued from ineligible turn)');
+    console.log('⏸️ TIMEOUT: Executing at start of eligible turn');
     
     // ✅ IMMEDIATE TURN KILLING: Stop all animations before executing timeout
-    // This ensures the turn stops instantly when timeout executes
-    console.log('⏸️ TIMEOUT: Killing current turn animations immediately');
+    // This ensures the turn stops instantly when timeout executes (before any animations play)
+    console.log('⏸️ TIMEOUT: Stopping turn animations before they start');
     
     // Pause all tweens (stops all animations)
     if (scene.tweens) {
@@ -457,9 +415,14 @@ async function handleTimeoutButtonClick(executeOnly = false) {
     
     console.log('🔍 [TIMEOUT DEBUG] Scene found, executeOnly:', executeOnly);
     
-    // If executeOnly is false, toggle the queue state
+    // ✅ SIMPLIFIED: Button click only toggles queue state, never executes immediately
+    // Timeouts only execute at the start of eligible turns (checked in checkAndExecuteQueuedTimeout)
     if (!executeOnly) {
         console.log('🔍 [TIMEOUT DEBUG] User clicked button (executeOnly=false)');
+        
+        // Check if user team has timeouts remaining (button state is managed by updateTimeoutButtonState)
+        // Button is automatically disabled when timeouts = 0
+        
         // Play sound effect
         if (timeoutSound) {
             try {
@@ -478,59 +441,18 @@ async function handleTimeoutButtonClick(executeOnly = false) {
         console.log('🔍 [TIMEOUT DEBUG] Button clicked - timeoutQueued:', timeoutQueued);
         
         if (timeoutQueued) {
-            // Store the current turn index when queued
-            const currentTurnIndex = scene.currentTurn || scene.currentTurnData?.index || null;
-            timeoutQueuedAtTurnIndex = currentTurnIndex;
-            
-            console.log('🔍 [TIMEOUT DEBUG] Current turn index:', currentTurnIndex);
-            console.log('🔍 [TIMEOUT DEBUG] scene.currentTurn:', scene.currentTurn);
-            console.log('🔍 [TIMEOUT DEBUG] scene.currentTurnData?.index:', scene.currentTurnData?.index);
-            console.log('🔍 [TIMEOUT DEBUG] scene.simData?.turns length:', scene.simData?.turns?.length);
-            
-            // ✅ SIMPLIFIED: Use eligibility flag set at start of turn (single source of truth)
-            // This eliminates stale data issues - no need to re-check eligibility with potentially stale data
-            const isEligible = scene.currentTurnTimeoutEligible ?? false;
-            console.log('🔍 [TIMEOUT DEBUG] Current turn eligibility (from flag):', isEligible);
-            
-            if (isEligible) {
-                // Current turn is eligible, set flag for immediate execution
-                timeoutQueuedDuringEligibleTurn = true;
-                console.log('⏸️ TIMEOUT: Current turn is eligible, executing immediately');
-            } else {
-                // Not eligible, queue and wait for next eligible turn
-                timeoutQueuedDuringEligibleTurn = false;
-                console.log('⏸️ TIMEOUT: Queued at turn index', currentTurnIndex, '- will execute at start of next eligible turn');
-            }
-            
-            console.log('🔍 [TIMEOUT DEBUG] timeoutQueuedDuringEligibleTurn set to:', timeoutQueuedDuringEligibleTurn);
-            
             updateButtonHighlight(true);
-            updateTimeoutButtonState(true, 'Timeout queued');
+            updateTimeoutButtonState(true, 'Timeout queued - will execute at start of next eligible turn');
+            console.log('⏸️ TIMEOUT: Queued - will execute at start of next eligible turn');
         } else {
-            timeoutQueuedAtTurnIndex = null;
-            timeoutQueuedDuringEligibleTurn = false;
             updateButtonHighlight(false);
             updateTimeoutButtonState(true, 'Timeout available');
             console.log('⏸️ TIMEOUT: Cancelled - removed from queue');
         }
         
-        // If we're toggling off, don't execute
-        if (!timeoutQueued) {
-            console.log('🔍 [TIMEOUT DEBUG] Toggled off, returning early');
-            return;
-        }
-        
-        // If queued during eligible turn, execute immediately
-        if (timeoutQueuedDuringEligibleTurn) {
-            console.log('🔍 [TIMEOUT DEBUG] Executing immediately - timeoutQueuedDuringEligibleTurn is true');
-            console.log('⏸️ TIMEOUT: Executing immediately (current turn is eligible)');
-            // Continue to execute timeout below (don't return)
-        } else {
-            // Not eligible, queue and wait for next eligible turn
-            console.log('🔍 [TIMEOUT DEBUG] Queued for next eligible turn - timeoutQueuedDuringEligibleTurn is false');
-            console.log('⏸️ TIMEOUT: Queued - will execute at start of next eligible turn');
-            return;
-        }
+        // ✅ SIMPLIFIED: Never execute immediately - always wait for start of next eligible turn
+        // This ensures timeouts only execute at turn boundaries, never mid-turn
+        return;
     }
     
     // Execute the timeout
