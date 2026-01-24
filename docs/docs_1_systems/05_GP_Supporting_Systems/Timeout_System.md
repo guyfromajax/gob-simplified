@@ -685,45 +685,65 @@ This prevents stale timeout state from affecting future games.
 - `ENABLE_TIMEOUT_BUTTON = true` (feature flag for modularity)
 
 **Button State:**
-- **Always Live:** Button is always enabled and clickable (no restrictions)
+- **Always Live:** Button is always enabled and clickable (no restrictions during gameplay)
+- **Disabled When:** User team has 0 timeouts remaining (button is greyed out and not clickable)
 - **Highlighted:** When user presses button, green highlight effect appears (indicates timeout is queued)
 - **Toggleable:** User can press button again to cancel timeout queue (removes highlight)
+
+**✅ SIMPLIFIED APPROACH (January 2025):**
+- **Single Execution Point:** Timeouts only execute at the start of eligible turns, never mid-turn
+- **Linear Flow:** Button click → Queue timeout → Wait for next eligible turn → Execute at turn start
+- **No Mid-Turn Execution:** Removed complex logic for immediate execution during active turns
+- **Benefits:**
+  - Simpler code (one execution path instead of two)
+  - No mid-turn state management
+  - Clearer logic (eligibility check → queued check → execute or continue)
+  - Easier to debug (timeouts only happen at turn boundaries)
 
 **Timeout Eligibility System:**
 - **Single Source of Truth:** Eligibility is determined once at the start of each turn and stored in `scene.currentTurnTimeoutEligible`
 - **Location:** Set in `FrontEnd/static/js/phaser/animation/AnimationRouter.js` `processTurn()` at the start of each turn
 - **Eliminates Stale Data:** By determining eligibility once with fresh `turnData` from AnimationRouter, we avoid issues with stale data when the button is pressed mid-turn
 - **Used By:**
-  - Button press handler (`handleTimeoutButtonClick`) - reads flag to determine if current turn is eligible
-  - Queued timeout checker (`checkAndExecuteQueuedTimeout`) - reads flag to determine if queued timeout should execute
+  - Queued timeout checker (`checkAndExecuteQueuedTimeout`) - reads flag to determine if queued timeout should execute at start of turn
 
 **Eligibility Criteria (`checkTimeoutEligibility()` function):**
 - **Two-step check (in order):**
-  1. **BIP/SIP Check (Always Eligible):** If turn is `BASELINE_INBOUND` or `SIDE_INBOUND`, timeout is always eligible (checked first)
-  2. **DREB => HCO Transition Check:** If current turn is `HCO` AND previous turn was `DREB` AND user's team is on offense, timeout is eligible
+  1. **BIP/SIP Check:** If turn is `BASELINE_INBOUND` or `SIDE_INBOUND` AND user's team is on offense, timeout is eligible (checked first)
+  2. **DREB => HCO Transition Check:** If current turn is `HCO` AND previous turn was `MISS` with `rebound_type: "DREB"` AND `next_play_type: "HCO"` AND user's team is on offense, timeout is eligible
+- **Exclusion:** MISS turns with `rebound_type: "DREB"` are explicitly excluded (timeout waits for the next HCO turn after DREB animation completes)
 - **Field Resolution:**
   - Uses `offense_team_id` as primary field (SS&S canonical field, set for all turns)
   - Falls back to `possession_team_id` for backward compatibility (deprecated, only set for some turn types)
   - **Note:** `possession_team_id` is not set for `BASELINE_INBOUND` turns, so `offense_team_id` is required
 - **Eligible Turns:**
-  - Any `BASELINE_INBOUND` (BIP) turn
-  - Any `SIDE_INBOUND` (SIP) turn
+  - Any `BASELINE_INBOUND` (BIP) turn with user's team on offense
+  - Any `SIDE_INBOUND` (SIP) turn with user's team on offense
   - `DREB => HCO` transition when user's team is on offense (defensive rebound leading to half-court offense)
 - **Not Eligible:**
+  - MISS turns with `rebound_type: "DREB"` (timeout waits for next HCO turn)
   - `DREB => Fast Break` transitions (even if user team is on offense)
   - Any other turn types
   - HCO turns that didn't come from DREB (e.g., normal HCO after a made shot)
 
 **Execution Flow:**
-- **Scenario A (Eligible Turn):** User presses button → Reads `scene.currentTurnTimeoutEligible` → If `true`, kills turn animations immediately → Executes timeout (calls API) → Shows popup immediately
-- **Scenario B (Ineligible Turn):** User presses button → Reads `scene.currentTurnTimeoutEligible` → If `false`, sets `timeoutQueued = true` → At start of next turn, `checkAndExecuteQueuedTimeout` reads flag → If eligible, kills turn animations immediately → Executes timeout → Shows popup immediately
+- **Button Click:** User presses button → Plays sound effect → Toggles `timeoutQueued` flag → Updates button highlight → Returns (never executes immediately)
+- **Turn Start Check:** At start of each turn, `checkAndExecuteQueuedTimeout()` is called:
+  - If `timeoutQueued = true` AND `scene.currentTurnTimeoutEligible = true`:
+    - Pause all animations (before they start)
+    - Stop animation loop (`scene.timeoutCalled = true`)
+    - Execute timeout (call API, show popup, play airhorn sound)
+    - Return `true` (stop processing this turn)
+  - If not eligible, turn processes normally and timeout waits for next eligible turn
+- **Key Point:** Timeouts only execute at turn boundaries (start of eligible turns), never mid-turn, even if the current turn is eligible
 
-**Turn Killing:**
-- When timeout is called during an eligible turn, all animations are stopped immediately:
-  - All tweens are paused (`scene.tweens.pauseAll()`)
-  - Animation loop is stopped (`scene.timeoutCalled = true`)
-  - Popup appears immediately after animations stop
-  - User experience: Animation stops → Popup appears (instantaneous)
+**Turn Execution (Simplified):**
+- When timeout executes at start of eligible turn, animations are stopped before they start:
+  - All tweens are paused (`scene.tweens.pauseAll()`) - prevents any animations from playing
+  - Animation loop is stopped (`scene.timeoutCalled = true`) - prevents turn processing from continuing
+  - Timeout API is called → Popup appears → User clicks "Go To Timeout" → Navigation to lineup screen
+  - User experience: Turn stops before animations play → Popup appears → User navigates to lineup
+- **Key Point:** Timeouts only execute at turn boundaries (start of eligible turns), never mid-turn. This ensures clean execution and prevents animation conflicts.
 
 **User Timeout Navigation Flow:**
 - **Step 1:** User presses timeout button → `handleTimeoutButtonClick()` is called
