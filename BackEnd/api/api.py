@@ -925,6 +925,15 @@ def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
     if "timeout_offense_team_id" in saved:
         gm.game_state["timeout_offense_team_id"] = saved["timeout_offense_team_id"]
         
+        # 🔍 DEBUG: Log resume state (for DREB => HCO bug diagnosis)
+        logging.warning(f"🔍 [TIMEOUT DEBUG] apply_timeout_resume_state_to_gm() - Resume state:")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - saved['timeout_offense_team_id']: {saved['timeout_offense_team_id']}")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - saved['timeout_next_play_type']: {saved.get('timeout_next_play_type')}")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - gm.home_team.team_id: {gm.home_team.team_id}")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - gm.away_team.team_id: {gm.away_team.team_id}")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - gm.offense_team.name BEFORE restore: {gm.offense_team.name}")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - gm.offense_team.team_id BEFORE restore: {gm.offense_team.team_id}")
+        
         # ✅ SS&S FIX: Set offense_team and defense_team based on timeout_offense_team_id
         # This is critical for maintaining proper possession (e.g., user calls timeout during BIP)
         saved_offense_team_id = saved["timeout_offense_team_id"]
@@ -932,10 +941,14 @@ def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
             gm.offense_team = gm.home_team
             gm.defense_team = gm.away_team
             logging.info(f"🔄 TIMEOUT RESUME: Set offense_team to HOME ({gm.home_team.name}) based on timeout_offense_team_id")
+            logging.warning(f"🔍 [TIMEOUT DEBUG]   - gm.offense_team.name AFTER restore: {gm.offense_team.name}")
+            logging.warning(f"🔍 [TIMEOUT DEBUG]   - gm.offense_team.team_id AFTER restore: {gm.offense_team.team_id}")
         elif saved_offense_team_id == gm.away_team.team_id:
             gm.offense_team = gm.away_team
             gm.defense_team = gm.home_team
             logging.info(f"🔄 TIMEOUT RESUME: Set offense_team to AWAY ({gm.away_team.name}) based on timeout_offense_team_id")
+            logging.warning(f"🔍 [TIMEOUT DEBUG]   - gm.offense_team.name AFTER restore: {gm.offense_team.name}")
+            logging.warning(f"🔍 [TIMEOUT DEBUG]   - gm.offense_team.team_id AFTER restore: {gm.offense_team.team_id}")
         else:
             logging.warning(f"⚠️ TIMEOUT RESUME: timeout_offense_team_id ({saved_offense_team_id}) does not match home_team_id ({gm.home_team.team_id}) or away_team_id ({gm.away_team.team_id}) - possession may be incorrect")
     
@@ -3677,6 +3690,16 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
         raise HTTPException(status_code=404, detail=f"Game {game_id} not found.")
     
     calling_team = gm.home_team if calling_team_side == 'home' else gm.away_team
+    
+    # 🔍 DEBUG: Log GameManager state BEFORE call_timeout (for DREB => HCO bug diagnosis)
+    logging.warning(f"🔍 [TIMEOUT DEBUG] call_timeout_endpoint() - BEFORE call_timeout():")
+    logging.warning(f"🔍 [TIMEOUT DEBUG]   - gm.offense_team.name: {gm.offense_team.name}")
+    logging.warning(f"🔍 [TIMEOUT DEBUG]   - gm.offense_team.team_id: {gm.offense_team.team_id}")
+    logging.warning(f"🔍 [TIMEOUT DEBUG]   - gm.defense_team.name: {gm.defense_team.name}")
+    logging.warning(f"🔍 [TIMEOUT DEBUG]   - gm.defense_team.team_id: {gm.defense_team.team_id}")
+    logging.warning(f"🔍 [TIMEOUT DEBUG]   - Last turn in gm.turns: {gm.turns[-1].get('result_type') if gm.turns else 'NO_TURNS'}")
+    logging.warning(f"🔍 [TIMEOUT DEBUG]   - Last turn offense_team_id: {gm.turns[-1].get('offense_team_id') if gm.turns else 'NO_TURNS'}")
+    logging.warning(f"🔍 [TIMEOUT DEBUG]   - Last turn next_play_type: {gm.turns[-1].get('next_play_type') if gm.turns else 'NO_TURNS'}")
     
     # Use unified timeout creation method (same as computer timeouts)
     timeout_turn = gm.call_timeout(

@@ -553,6 +553,22 @@ async function handleTimeoutButtonClick(executeOnly = false) {
     }
     
     try {
+        // 🔍 DEBUG: Log current turn data before calling timeout API (for DREB => HCO bug diagnosis)
+        const currentTurnData = scene.currentTurnData || scene.simData?.turns?.[scene.currentTurn] || null;
+        console.log('🔍 [TIMEOUT DEBUG] handleTimeoutButtonClick() - BEFORE API call:');
+        console.log('🔍 [TIMEOUT DEBUG]   - scene.currentTurn:', scene.currentTurn);
+        console.log('🔍 [TIMEOUT DEBUG]   - scene.currentTurnData?.result_type:', scene.currentTurnData?.result_type);
+        console.log('🔍 [TIMEOUT DEBUG]   - scene.currentTurnData?.current_turn:', scene.currentTurnData?.current_turn);
+        console.log('🔍 [TIMEOUT DEBUG]   - scene.currentTurnData?.offense_team_id:', scene.currentTurnData?.offense_team_id);
+        console.log('🔍 [TIMEOUT DEBUG]   - scene.currentTurnData?.next_play_type:', scene.currentTurnData?.next_play_type);
+        console.log('🔍 [TIMEOUT DEBUG]   - scene.previousTurnData?.result_type:', scene.previousTurnData?.result_type);
+        console.log('🔍 [TIMEOUT DEBUG]   - scene.previousTurnData?.rebound_type:', scene.previousTurnData?.rebound_type);
+        console.log('🔍 [TIMEOUT DEBUG]   - scene.previousTurnData?.next_play_type:', scene.previousTurnData?.next_play_type);
+        console.log('🔍 [TIMEOUT DEBUG]   - scene.previousTurnData?.offense_team_id:', scene.previousTurnData?.offense_team_id);
+        console.log('🔍 [TIMEOUT DEBUG]   - scene.userTeamSide:', scene.userTeamSide);
+        console.log('🔍 [TIMEOUT DEBUG]   - scene.simData?.home_team_id:', scene.simData?.home_team_id);
+        console.log('🔍 [TIMEOUT DEBUG]   - scene.simData?.away_team_id:', scene.simData?.away_team_id);
+        
         // Call timeout API
         const API_CONFIG = window.API_CONFIG;
         if (!API_CONFIG) {

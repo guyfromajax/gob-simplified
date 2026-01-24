@@ -200,6 +200,20 @@ class GameManager:
         # Store next_play_type and offense_team_id for resume
         self.game_state["timeout_next_play_type"] = timeout_turn.get("next_play_type", "SIDE_INBOUND")
         self.game_state["timeout_offense_team_id"] = self.offense_team.team_id
+        
+        # 🔍 DEBUG: Log GameManager state when timeout is called (for DREB => HCO bug diagnosis)
+        logging.warning(f"🔍 [TIMEOUT DEBUG] call_timeout() - GameManager state:")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - self.offense_team.name: {self.offense_team.name}")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - self.offense_team.team_id: {self.offense_team.team_id}")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - self.defense_team.name: {self.defense_team.name}")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - self.defense_team.team_id: {self.defense_team.team_id}")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - timeout_turn.get('offense_team_id'): {timeout_turn.get('offense_team_id')}")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - timeout_turn.get('next_play_type'): {timeout_turn.get('next_play_type')}")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - Last turn in self.turns: {self.turns[-1].get('result_type') if self.turns else 'NO_TURNS'}")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - Last turn offense_team_id: {self.turns[-1].get('offense_team_id') if self.turns else 'NO_TURNS'}")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - Last turn next_play_type: {self.turns[-1].get('next_play_type') if self.turns else 'NO_TURNS'}")
+        logging.warning(f"🔍 [TIMEOUT DEBUG]   - Stored timeout_offense_team_id: {self.game_state['timeout_offense_team_id']}")
+        
         logging.info(f"✅ TIMEOUT: Stored next_play_type '{self.game_state['timeout_next_play_type']}' and offense_team_id '{self.offense_team.team_id}' for resume")
         
         # Rebuild lineups
