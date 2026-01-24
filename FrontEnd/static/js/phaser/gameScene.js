@@ -1882,11 +1882,8 @@ export function createGameScene(Phaser) {
               ballSprite: this.ballSprite,
               onUpdate: updateScoreboard
             });
-            // ✅ FIX: Explicitly return after timeout turn to prevent quarter completion logic
-            // Timeout turns should exit immediately - navigation is handled by timeoutButtonManager
-            // Break out of the while loop and return from function to prevent quarter completion
-            console.log('⏸️ TIMEOUT: Exiting simulateTurnByTurn after timeout turn - preventing quarter completion');
-            return;
+            // Break out of the while loop - don't make any more API calls
+            break;
           }
           
           // Handle BATCH turns (e.g., HCO miss → OREB)
