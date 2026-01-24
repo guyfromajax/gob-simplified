@@ -373,26 +373,31 @@ export async function checkAndExecuteQueuedTimeout(scene, turnData) {
     console.log('🔍 [TIMEOUT DEBUG] Current turn eligibility:', isEligible);
     
     if (!isEligible) {
-        // Not eligible, don't execute
-        console.log('🔍 [TIMEOUT DEBUG] Current turn not eligible, returning false');
+        // Not eligible, don't execute - keep flag set and check again on next turn
+        console.log('🔍 [TIMEOUT DEBUG] Current turn not eligible, returning false (will check next turn)');
         return false;
     }
     
-    // ✅ FIX 1: Set flag to execute timeout after turn completes
-    // This ensures the popup appears only after the turn animation finishes
-    // Note: If queued during eligible turn, shouldKillCurrentTurnInstantly will handle killing the turn
-    // But we still wait for turn completion before showing popup
-    console.log('🔍 [TIMEOUT DEBUG] Eligible turn detected, setting flag to execute after turn completes');
+    // ✅ SCENARIO B: Eligible turn detected - execute timeout immediately
+    // This happens when timeout was queued during an ineligible turn
+    // and we've now reached an eligible turn
+    console.log('🔍 [TIMEOUT DEBUG] Eligible turn detected, executing timeout immediately');
+    console.log('⏸️ TIMEOUT: Executing at start of eligible turn (queued from ineligible turn)');
     
-    // Store timeout execution data to be processed after turn completes
-    scene.timeoutPendingExecution = {
-        timeoutQueuedDuringEligibleTurn: timeoutQueuedDuringEligibleTurn,
-        currentTurnIndex: currentTurnIndex,
-        timeoutQueuedAtTurnIndex: timeoutQueuedAtTurnIndex
-    };
+    // Execute timeout immediately (call API, show popup, play sound)
+    // handleTimeoutButtonClick is in the same file, so we can call it directly
+    try {
+        await handleTimeoutButtonClick(true); // Pass true to skip toggle (just execute)
+        console.log('✅ [TIMEOUT DEBUG] Timeout executed successfully at start of eligible turn');
+    } catch (error) {
+        console.error('❌ TIMEOUT: Failed to execute timeout at start of eligible turn:', error);
+        // Reset queue on error
+        resetTimeoutQueue();
+        return false;
+    }
     
-    console.log('⏸️ TIMEOUT: Queued for execution after turn completes', currentTurnIndex);
-    return true; // Return true to indicate timeout is queued (but don't execute yet)
+    // Return true to indicate timeout was executed (stop processing this turn)
+    return true;
 }
 
 /**
