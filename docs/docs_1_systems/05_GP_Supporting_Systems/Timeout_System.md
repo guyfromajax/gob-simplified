@@ -699,19 +699,30 @@ This prevents stale timeout state from affecting future games.
 **Eligibility Criteria (`checkTimeoutEligibility()` function):**
 - **Two-step check (in order):**
   1. **BIP/SIP Check (Always Eligible):** If turn is `BASELINE_INBOUND` or `SIDE_INBOUND`, timeout is always eligible (checked first)
-  2. **User Team Offense Check:** If user's team is on offense, timeout is eligible
+  2. **DREB => HCO Transition Check:** If current turn is `HCO` AND previous turn was `DREB` AND user's team is on offense, timeout is eligible
 - **Field Resolution:**
   - Uses `offense_team_id` as primary field (SS&S canonical field, set for all turns)
   - Falls back to `possession_team_id` for backward compatibility (deprecated, only set for some turn types)
   - **Note:** `possession_team_id` is not set for `BASELINE_INBOUND` turns, so `offense_team_id` is required
 - **Eligible Turns:**
-  - Any possession where the user team is on offense
   - Any `BASELINE_INBOUND` (BIP) turn
   - Any `SIDE_INBOUND` (SIP) turn
+  - `DREB => HCO` transition when user's team is on offense (defensive rebound leading to half-court offense)
+- **Not Eligible:**
+  - `DREB => Fast Break` transitions (even if user team is on offense)
+  - Any other turn types
+  - HCO turns that didn't come from DREB (e.g., normal HCO after a made shot)
 
 **Execution Flow:**
-- **Scenario A (Eligible Turn):** User presses button → Reads `scene.currentTurnTimeoutEligible` → If `true`, executes timeout immediately (popup appears)
-- **Scenario B (Ineligible Turn):** User presses button → Reads `scene.currentTurnTimeoutEligible` → If `false`, sets `timeoutQueued = true` → At start of next turn, `checkAndExecuteQueuedTimeout` reads flag → If eligible, executes timeout immediately
+- **Scenario A (Eligible Turn):** User presses button → Reads `scene.currentTurnTimeoutEligible` → If `true`, kills turn animations immediately → Executes timeout (calls API) → Shows popup immediately
+- **Scenario B (Ineligible Turn):** User presses button → Reads `scene.currentTurnTimeoutEligible` → If `false`, sets `timeoutQueued = true` → At start of next turn, `checkAndExecuteQueuedTimeout` reads flag → If eligible, kills turn animations immediately → Executes timeout → Shows popup immediately
+
+**Turn Killing:**
+- When timeout is called during an eligible turn, all animations are stopped immediately:
+  - All tweens are paused (`scene.tweens.pauseAll()`)
+  - Animation loop is stopped (`scene.timeoutCalled = true`)
+  - Popup appears immediately after animations stop
+  - User experience: Animation stops → Popup appears (instantaneous)
 
 **Animation Freezing:**
 - When timeout button is pressed, all animations are immediately paused

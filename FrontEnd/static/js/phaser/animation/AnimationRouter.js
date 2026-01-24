@@ -123,12 +123,18 @@ export class AnimationRouter {
         // Store current turn data for timeout eligibility check
         this.scene.currentTurnData = turnData;
         
+        // ✅ Store previous turn data for DREB => HCO eligibility check
+        // This is needed to check if previous turn was DREB when current turn is HCO
+        // Note: previousTurnData is set at the end of each turn processing, so it contains the last processed turn
+        // For the first turn, previousTurnData will be undefined (which is fine - first turn can't be DREB => HCO)
+        
         // Set eligibility flag at start of turn (used by both button press and queued timeout check)
         this.scene.currentTurnTimeoutEligible = checkTimeoutEligibility(this.scene, turnData);
         console.log('🔍 [TIMEOUT DEBUG] Turn eligibility set at start:', {
           turnIndex: turnIndex ?? turnData.index,
           result_type: turnData.result_type,
           current_turn: turnData.current_turn,
+          previous_turn: this.scene.previousTurnData?.current_turn || this.scene.previousTurnData?.result_type,
           eligible: this.scene.currentTurnTimeoutEligible
         });
         
@@ -229,6 +235,10 @@ export class AnimationRouter {
           turnIndex: turnIndex ?? turnData.index ?? null,
           updateDebugScore: this.updateDebugScore
         });
+        
+        // ✅ TIMEOUT: Store current turn as previous turn for next turn's eligibility check
+        // This is used to check if previous turn was DREB when current turn is HCO
+        this.scene.previousTurnData = turnData;
         if (shouldLog && isHCO) {
           console.log('🔍 HCO_ROUTER_END', {
             result_type: turnData.result_type,
