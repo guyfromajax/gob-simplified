@@ -472,7 +472,19 @@ export class AnimationEngine {
       this.scene.events.emit('textScroll', turnData.text);
     }
     
-    // ✅ COMPUTER TIMEOUT: Navigate to lineup screen (same as user timeouts)
+    // ✅ USER TIMEOUT: Skip navigation - showUserTimeoutPopup already handled it
+    // User timeouts are handled by timeoutButtonManager.js:
+    // 1. User presses timeout button → handleTimeoutButtonClick() is called
+    // 2. API is called → showUserTimeoutPopup() displays popup with "Go To Timeout" button
+    // 3. User clicks button → showTimeoutPopup() is called with computerTimeout=false
+    // 4. AnimationEngine.handleTimeout() is called for the timeout turn
+    // 5. We skip navigation here because user timeout navigation is handled by the popup button click
+    if (turnData.timeout_reason === 'USER') {
+      console.log('⏸️ USER TIMEOUT: Skipping navigation - already handled by timeoutButtonManager');
+      return; // Don't navigate - showUserTimeoutPopup already handled it
+    }
+    
+    // ✅ COMPUTER TIMEOUT: Navigate to lineup screen automatically
     // For computer timeouts, we need to trigger navigation immediately
     // User timeouts navigate via button click, but computer timeouts need automatic navigation
     const gameId = this.scene.gameId || this.scene.simData?.game_id;
