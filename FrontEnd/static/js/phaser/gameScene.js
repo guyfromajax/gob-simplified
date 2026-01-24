@@ -1701,6 +1701,7 @@ export function createGameScene(Phaser) {
       let lastAwayScore = initialSimData.away_score || 0;
       let nextQuarterNumber = this.quarter + 1; // Will be updated when quarter completes
       let lastTurnData = null; // Track last turn data to check is_final
+      let timeoutTurnDetected = false; // ✅ FIX: Track if timeout turn was detected to prevent quarter completion logic
       
       // Initialize with any turns from the initial simulation (e.g., opening tip, inbound)
       const initialTurns = initialSimData.turns || [];
@@ -1859,6 +1860,8 @@ export function createGameScene(Phaser) {
           // ✅ TIMEOUT: Check if this is a timeout turn - if so, stop the simulation loop
           if (turn.result_type === "TIMEOUT") {
             console.log('⏸️ TIMEOUT: Timeout turn detected in simulateTurnByTurn - stopping simulation loop');
+            // ✅ FIX: Set flag to prevent quarter completion logic
+            timeoutTurnDetected = true;
             // ✅ UNIFIED: Store full response data in turn for animation system to access clock/time_remaining
             turn._responseData = {
               clock: turnData.clock,
@@ -2113,6 +2116,13 @@ export function createGameScene(Phaser) {
           console.warn('⚠️ Animation error occurred, continuing to next turn');
           continue;
         }
+      }
+      
+      // ✅ FIX: Skip quarter completion logic if timeout turn was detected
+      // Timeout turns should exit immediately - navigation is handled by timeoutButtonManager
+      if (timeoutTurnDetected) {
+        console.log('⏸️ TIMEOUT: Exiting simulateTurnByTurn after timeout turn - preventing quarter completion');
+        return;
       }
       
       // ✅ FIX: Only proceed with quarter completion if backend explicitly signaled it
