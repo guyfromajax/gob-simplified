@@ -1534,7 +1534,14 @@ export function createGameScene(Phaser) {
           // Initial turns (opening tip for Q1, empty for Q2+) are passed in
           // Turns are generated on-demand via /api/simulate-turn calls
           // ✅ REMOVED: Starting quarter logging (cluttering console)
-          await this.simulateTurnByTurn(simData, updateScoreboard);
+          const turnResult = await this.simulateTurnByTurn(simData, updateScoreboard);
+          
+          // ✅ FIX: Skip quarter completion logic if timeout was detected
+          // Timeout navigation is handled by timeoutButtonManager, so we should exit here
+          if (turnResult?.timeoutDetected) {
+            console.log('⏸️ TIMEOUT: simulateTurnByTurn returned timeoutDetected=true - skipping quarter completion logic');
+            return; // Exit - timeout navigation is handled elsewhere
+          }
           
           console.log('🎬 GameScene: Turn-by-turn simulation completed');
           if (DEBUG_FLOW) {
@@ -2122,7 +2129,7 @@ export function createGameScene(Phaser) {
       // Timeout turns should exit immediately - navigation is handled by timeoutButtonManager
       if (timeoutTurnDetected) {
         console.log('⏸️ TIMEOUT: Exiting simulateTurnByTurn after timeout turn - preventing quarter completion');
-        return;
+        return { timeoutDetected: true };
       }
       
       // ✅ FIX: Only proceed with quarter completion if backend explicitly signaled it
@@ -2130,7 +2137,7 @@ export function createGameScene(Phaser) {
       if (!quarterComplete) {
         console.warn('⚠️ Simulation loop ended but quarter not complete. This may indicate an API error or game state issue.');
         // Don't proceed with quarter completion logic - return early
-        return;
+        return { timeoutDetected: false };
       }
       
       console.log(`🏁 Quarter ${this.quarter} finished! Total turns: ${turnCount}`);
