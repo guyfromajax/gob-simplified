@@ -67,7 +67,7 @@ const DEBUG_BRACKET = window.DEBUG_BRACKET || false;
 
 const leaderBoards = [
   { title: "Points", key: "PTS" },
-  { title: "3-Pointers Made", key: "TPM" },
+  { title: "3-Pointers Made", key: "3PTM" },
   { title: "Rebounds", key: "REB" },
   { title: "Assists", key: "AST" },
   { title: "Steals", key: "STL" },
@@ -582,8 +582,8 @@ function sortRosterStats(statKey) {
     'FGM': 'FGM',
     'FGA': 'FGA',
     'FG%': 'FG%',
-    'TPM': 'TPM',
-    'TPA': 'TPA',
+    '3PTM': '3PTM',
+    '3PTA': '3PTA',
     '3PT%': '3PT%',
     'FTM': 'FTM',
     'FTA': 'FTA',
@@ -613,8 +613,8 @@ function sortRosterStats(statKey) {
       val1 = a.FGA > 0 ? (a.FGM || 0) / a.FGA : 0;
       val2 = b.FGA > 0 ? (b.FGM || 0) / b.FGA : 0;
     } else if (dataKey === '3PT%') {
-      val1 = a.TPA > 0 ? (a.TPM || 0) / a.TPA : 0;
-      val2 = b.TPA > 0 ? (b.TPM || 0) / b.TPA : 0;
+      val1 = a["3PTA"] > 0 ? (a["3PTM"] || 0) / a["3PTA"] : 0;
+      val2 = b["3PTA"] > 0 ? (b["3PTM"] || 0) / b["3PTA"] : 0;
     } else if (dataKey === 'FT%') {
       val1 = a.FTA > 0 ? (a.FTM || 0) / a.FTA : 0;
       val2 = b.FTA > 0 ? (b.FTM || 0) / b.FTA : 0;
@@ -2434,9 +2434,9 @@ function renderRosterStatsTable(players) {
         }
       });
     }
-    // ✅ FIX: Map 3PTM/3PTA to TPM/TPA for display (database stores as 3PTM/3PTA, frontend expects TPM/TPA)
-    const tpm = stats['3PTM'] || stats.TPM || 0;
-    const tpa = stats['3PTA'] || stats.TPA || 0;
+    // Use 3PTM/3PTA directly (standardized field names)
+    const tpm = stats['3PTM'] || 0;
+    const tpa = stats['3PTA'] || 0;
     
     // Calculate percentages
     const fgPct = stats.FGA > 0 ? ((stats.FGM || 0) / stats.FGA * 100).toFixed(1) : '0.0';
@@ -2504,8 +2504,8 @@ function sortRosterStats(statKey) {
     'FGM': 'FGM',
     'FGA': 'FGA',
     'FG%': 'FG%',
-    'TPM': 'TPM',
-    'TPA': 'TPA',
+    '3PTM': '3PTM',
+    '3PTA': '3PTA',
     '3PT%': '3PT%',
     'FTM': 'FTM',
     'FTA': 'FTA',
