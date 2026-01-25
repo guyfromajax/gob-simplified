@@ -844,7 +844,9 @@ class GameManager:
                         "jersey": player.jersey,
                         **player.stats["game"]
         }
-            box_score[team.name] = team_box
+            # ✅ SS&S: Use team_id as key instead of team.name
+            team_key = team.team_id if team.team_id else team.name
+            box_score[team_key] = team_box
         return box_score
 
     def to_dict(self):

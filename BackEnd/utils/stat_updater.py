@@ -1124,115 +1124,48 @@ def finalize_game(
         
         logger.info(f"✅ [FINALIZE_GAME] Game document found, processing stats (SS&S pattern)")
         
-        # ✅ SS&S: Extract box_score from game document (same structure as Franchise mode)
-        home_team_obj = game.get("home_team", {})
-        away_team_obj = game.get("away_team", {})
+        # ✅ SS&S: Use team_id directly for box_score keys (no team name extraction needed)
         home_team_id = game.get("home_team_id")
         away_team_id = game.get("away_team_id")
-        home_team_name = None
-        away_team_name = None
         
-        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Extracting team names - home_team_obj type: {type(home_team_obj)}, away_team_obj type: {type(away_team_obj)}")
-        logger.info(f"🔍 [FINALIZE_GAME DEBUG] home_team_id: {home_team_id}, away_team_id: {away_team_id}")
+        if not home_team_id or not away_team_id:
+            logger.error(f"❌ [FINALIZE_GAME] Missing team_id: home_team_id={home_team_id}, away_team_id={away_team_id}")
+            return
+        
+        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Using team_id keys: home={home_team_id}, away={away_team_id}")
         
         box_score = game.get("box_score", {})
         logger.info(f"🔍 [FINALIZE_GAME DEBUG] Top-level box_score exists: {bool(box_score)}, keys: {list(box_score.keys()) if box_score else []}")
         
+        # ✅ SS&S: Build box_score from nested team objects if not at top level (using team_id keys)
         if not box_score:
-            # Build box_score from nested team objects (new structure from summarize_game_state)
-            if home_team_obj and isinstance(home_team_obj, dict):
-                home_team_name = home_team_obj.get("name")
-                logger.info(f"🔍 [FINALIZE_GAME DEBUG] Extracted home_team_name from home_team_obj: {home_team_name}")
-                if home_team_name and "box_score" in home_team_obj:
-                    box_score[home_team_name] = home_team_obj.get("box_score", {})
-                    logger.info(f"🔍 [FINALIZE_GAME DEBUG] Added home team box_score with {len(box_score[home_team_name])} players")
-            elif home_team_id:
-                # Fallback: Look up team name from team_id (team_id is a string like "XAVIEN", not ObjectId)
-                try:
-                    team_doc = teams_collection.find_one({"team_id": home_team_id}, {"name": 1})
-                    if team_doc:
-                        home_team_name = team_doc.get("name")
-                        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Looked up home_team_name from team_id '{home_team_id}': {home_team_name}")
-                    else:
-                        logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] No team found with team_id='{home_team_id}'")
-                except Exception as e:
-                    logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] Could not look up home_team_name from team_id '{home_team_id}': {e}")
+            home_team_obj = game.get("home_team", {})
+            away_team_obj = game.get("away_team", {})
             
-            if away_team_obj and isinstance(away_team_obj, dict):
-                away_team_name = away_team_obj.get("name")
-                logger.info(f"🔍 [FINALIZE_GAME DEBUG] Extracted away_team_name from away_team_obj: {away_team_name}")
-                if away_team_name and "box_score" in away_team_obj:
-                    box_score[away_team_name] = away_team_obj.get("box_score", {})
-                    logger.info(f"🔍 [FINALIZE_GAME DEBUG] Added away team box_score with {len(box_score[away_team_name])} players")
-            elif away_team_id:
-                # Fallback: Look up team name from team_id (team_id is a string like "XAVIEN", not ObjectId)
-                try:
-                    team_doc = teams_collection.find_one({"team_id": away_team_id}, {"name": 1})
-                    if team_doc:
-                        away_team_name = team_doc.get("name")
-                        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Looked up away_team_name from team_id '{away_team_id}': {away_team_name}")
-                    else:
-                        logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] No team found with team_id='{away_team_id}'")
-                except Exception as e:
-                    logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] Could not look up away_team_name from team_id '{away_team_id}': {e}")
-        else:
-            # If box_score exists at top level, extract team names from team objects
-            if isinstance(home_team_obj, dict):
-                home_team_name = home_team_obj.get("name")
-                logger.info(f"🔍 [FINALIZE_GAME DEBUG] Extracted home_team_name from home_team_obj dict: {home_team_name}")
-            elif isinstance(home_team_obj, str):
-                home_team_name = home_team_obj
-                logger.info(f"🔍 [FINALIZE_GAME DEBUG] home_team_obj is string: {home_team_name}")
-            elif home_team_id:
-                # Fallback: Look up team name from team_id (team_id is a string like "XAVIEN", not ObjectId)
-                try:
-                    team_doc = teams_collection.find_one({"team_id": home_team_id}, {"name": 1})
-                    if team_doc:
-                        home_team_name = team_doc.get("name")
-                        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Looked up home_team_name from team_id '{home_team_id}': {home_team_name}")
-                    else:
-                        logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] No team found with team_id='{home_team_id}'")
-                except Exception as e:
-                    logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] Could not look up home_team_name from team_id '{home_team_id}': {e}")
+            if home_team_obj and isinstance(home_team_obj, dict) and "box_score" in home_team_obj:
+                box_score[home_team_id] = home_team_obj.get("box_score", {})
+                logger.info(f"🔍 [FINALIZE_GAME DEBUG] Added home team box_score with {len(box_score[home_team_id])} players (key: {home_team_id})")
             
-            if isinstance(away_team_obj, dict):
-                away_team_name = away_team_obj.get("name")
-                logger.info(f"🔍 [FINALIZE_GAME DEBUG] Extracted away_team_name from away_team_obj dict: {away_team_name}")
-            elif isinstance(away_team_obj, str):
-                away_team_name = away_team_obj
-                logger.info(f"🔍 [FINALIZE_GAME DEBUG] away_team_obj is string: {away_team_name}")
-            elif away_team_id:
-                # Fallback: Look up team name from team_id (team_id is a string like "XAVIEN", not ObjectId)
-                try:
-                    team_doc = teams_collection.find_one({"team_id": away_team_id}, {"name": 1})
-                    if team_doc:
-                        away_team_name = team_doc.get("name")
-                        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Looked up away_team_name from team_id '{away_team_id}': {away_team_name}")
-                    else:
-                        logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] No team found with team_id='{away_team_id}'")
-                except Exception as e:
-                    logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] Could not look up away_team_name from team_id '{away_team_id}': {e}")
+            if away_team_obj and isinstance(away_team_obj, dict) and "box_score" in away_team_obj:
+                box_score[away_team_id] = away_team_obj.get("box_score", {})
+                logger.info(f"🔍 [FINALIZE_GAME DEBUG] Added away team box_score with {len(box_score[away_team_id])} players (key: {away_team_id})")
         
-        # ✅ FIX: If box_score exists at top level but team names are still None, use box_score keys
-        if box_score and (not home_team_name or not away_team_name):
-            box_score_keys = list(box_score.keys())
-            if len(box_score_keys) >= 2:
-                if not home_team_name:
-                    home_team_name = box_score_keys[0]
-                    logger.info(f"🔍 [FINALIZE_GAME DEBUG] Using first box_score key as home_team_name: {home_team_name}")
-                if not away_team_name:
-                    away_team_name = box_score_keys[1]
-                    logger.info(f"🔍 [FINALIZE_GAME DEBUG] Using second box_score key as away_team_name: {away_team_name}")
-            elif len(box_score_keys) == 1:
-                if not home_team_name:
-                    home_team_name = box_score_keys[0]
-                    logger.info(f"🔍 [FINALIZE_GAME DEBUG] Using only box_score key as home_team_name: {home_team_name}")
-        
-        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Final team names: home={home_team_name}, away={away_team_name}")
+        # ✅ SS&S: Resolve team names for metadata only (not for box_score lookup)
+        home_team_name = None
+        away_team_name = None
+        try:
+            home_team_doc = teams_collection.find_one({"team_id": home_team_id}, {"name": 1})
+            if home_team_doc:
+                home_team_name = home_team_doc.get("name")
+            away_team_doc = teams_collection.find_one({"team_id": away_team_id}, {"name": 1})
+            if away_team_doc:
+                away_team_name = away_team_doc.get("name")
+        except Exception as e:
+            logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] Could not resolve team names: {e}")
         
         logger.info(f"🔍 [FINALIZE_GAME] Processing box_score with {len(box_score)} teams: {list(box_score.keys())}")
         logger.info(f"🔍 [FINALIZE_GAME DEBUG] box_score structure check:")
-        for team_name, team_box in box_score.items():
+        for team_id_key, team_box in box_score.items():
             if isinstance(team_box, dict):
                 logger.info(f"🔍 [FINALIZE_GAME DEBUG]   Team '{team_name}': {len(team_box)} players")
                 # Log first player's structure
@@ -1242,61 +1175,25 @@ def finalize_game(
                     if isinstance(first_player, dict):
                         logger.info(f"🔍 [FINALIZE_GAME DEBUG]     Sample player at '{first_pos}': playerId={first_player.get('playerId')}, PTS={first_player.get('PTS', 'N/A')}, FGM={first_player.get('FGM', 'N/A')}")
         
-        # ✅ SS&S: Build team_name -> team_id map from tournament.teams
-        tournament_doc = tournaments_collection.find_one({"_id": tid}, {"teams": 1})
-        tournament_teams = tournament_doc.get("teams", {}) if tournament_doc else {}
-        team_name_to_id: Dict[str, str] = {}
-        for team_id_str, team_data in tournament_teams.items():
-            # Look up team name from teams collection
-            try:
-                team_obj_id = ObjectId(team_id_str)
-                team_doc = teams_collection.find_one({"_id": team_obj_id}, {"name": 1})
-                if team_doc:
-                    team_name = team_doc.get("name")
-                    if team_name:
-                        team_name_to_id[team_name] = team_id_str
-            except Exception:
-                continue
-        
-        # ✅ SS&S: Process ALL players from box_score and build single inc_doc (like Franchise)
+        # ✅ SS&S: Process ALL players from box_score and build single inc_doc (using team_id keys)
         inc_doc: Dict[str, Any] = {}
         set_doc: Dict[str, Any] = {}
         processed_player_ids = set()
         players_processed = 0
         
-        for team_name in [home_team_name, away_team_name]:
-            if not team_name:
-                logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] team_name is None/empty, skipping")
+        for team_id_key in [home_team_id, away_team_id]:
+            if not team_id_key:
+                logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] team_id is None/empty, skipping")
                 continue
             
-            # ✅ FIX: Try exact match first, then case-insensitive match, then use first available key
-            team_box = box_score.get(team_name, {})
-            if not team_box:
-                # Try case-insensitive match
-                box_score_keys = list(box_score.keys())
-                matched_key = None
-                for key in box_score_keys:
-                    if key.lower() == team_name.lower():
-                        matched_key = key
-                        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Matched team_name '{team_name}' to box_score key '{matched_key}' (case-insensitive)")
-                        break
-                
-                if matched_key:
-                    team_box = box_score[matched_key]
-                elif box_score_keys:
-                    # Last resort: use first available key (shouldn't happen, but prevents total failure)
-                    matched_key = box_score_keys[0]
-                    team_box = box_score[matched_key]
-                    logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] team_name '{team_name}' not found in box_score, using first available key '{matched_key}'")
-                else:
-                    logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team: {team_name} (box_score is empty)")
-                    continue
+            # ✅ SS&S: Use team_id directly as key (no name lookup needed)
+            team_box = box_score.get(team_id_key, {})
             
             if not team_box:
-                logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team: {team_name} (available teams: {list(box_score.keys())})")
+                logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team_id: {team_id_key} (available keys: {list(box_score.keys())})")
                 continue
             
-            logger.info(f"🔍 [FINALIZE_GAME DEBUG] Processing team '{team_name}': {len(team_box)} players in box_score")
+            logger.info(f"🔍 [FINALIZE_GAME DEBUG] Processing team_id '{team_id_key}': {len(team_box)} players in box_score")
             team_players_processed = 0
             
             for pos_key, player_data in team_box.items():
@@ -1341,11 +1238,10 @@ def finalize_game(
                 # If GP is already in inc_doc, it means this player was processed twice (shouldn't happen)
                 # Don't increment again - this is a bug if it happens
                 
-                # Set meta.team_id if team_name is in our map
-                if team_name in team_name_to_id:
-                    set_doc[f"players.{pid_str}.meta.team_id"] = team_name_to_id[team_name]
+                # ✅ SS&S: Set meta.team_id directly (no name lookup needed)
+                set_doc[f"players.{pid_str}.meta.team_id"] = team_id_key
             
-            logger.info(f"🔍 [FINALIZE_GAME DEBUG] Team '{team_name}': processed {team_players_processed} players")
+            logger.info(f"🔍 [FINALIZE_GAME DEBUG] Team '{team_id_key}': processed {team_players_processed} players")
         
         logger.info(f"🔍 [FINALIZE_GAME] Processed {players_processed} players total, {len(inc_doc)} stat increments")
         logger.info(f"🔍 [FINALIZE_GAME DEBUG] inc_doc size: {len(inc_doc)}, set_doc size: {len(set_doc)}, processed_player_ids: {len(processed_player_ids)}")

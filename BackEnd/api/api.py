@@ -1392,14 +1392,16 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                     }
                 }
                 
-                # Build box_score from nested structure (unified structure stores it in teams[team_id].box_score)
+                # ✅ SS&S: Build box_score from nested structure using team_id keys (not team names)
                 box_score = saved.get("box_score", {})
                 if not box_score:
-                    # Build from unified teams structure (use extracted team names)
-                    if home_team_name and "box_score" in home_team_data:
-                        box_score[home_team_name] = home_team_data.get("box_score", {})
-                    if away_team_name and "box_score" in away_team_data:
-                        box_score[away_team_name] = away_team_data.get("box_score", {})
+                    # Build from unified teams structure (use team_id keys)
+                    home_team_id = saved.get("home_team_id")
+                    away_team_id = saved.get("away_team_id")
+                    if home_team_id and "box_score" in home_team_data:
+                        box_score[home_team_id] = home_team_data.get("box_score", {})
+                    if away_team_id and "box_score" in away_team_data:
+                        box_score[away_team_id] = away_team_data.get("box_score", {})
                 
                 # ✅ UNIFIED STRUCTURE: Return unified teams object structure
                 # Frontend should read from teams[home_team_id]/teams[away_team_id]
@@ -3925,8 +3927,8 @@ def get_lineup_for_matchups(game_id: str):
     }
 
 
-@app.get("/roster/{team_name}")
-def get_team_roster(team_name: str, tournament_id: str | None = None, franchise_id: str | None = None, response: Response = None):
+@app.get("/roster/{team_identifier}")
+def get_team_roster(team_identifier: str, team_id: str | None = None, tournament_id: str | None = None, franchise_id: str | None = None, response: Response = None):
     endpoint_start = time.time()
     # ✅ FIX: Add cache-busting headers to ensure browser fetches fresh player data
     # This ensures updated player attributes (year, jersey, height, etc.) show up immediately
@@ -3935,40 +3937,59 @@ def get_team_roster(team_name: str, tournament_id: str | None = None, franchise_
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
     
-    # ✅ UNIFIED: Support both tournament_id and franchise_id for mode-specific attributes
-    # Tournament ID is currently ignored (future enhancement), franchise_id merges attributes
-
-    # ✅ PERFORMANCE: Use MongoDB query for case-insensitive team lookup instead of loading all teams
-    # This reduces data transfer from loading 8-16 teams to just 1 query
-    normalized_name = unidecode(team_name.strip().replace("-", " ")).lower()
+    # ✅ SS&S: Prefer team_id query parameter, fallback to team_identifier path parameter
+    # team_identifier can be either team_id string, ObjectId, or team_name (for backward compatibility)
+    lookup_value = team_id if team_id else team_identifier
     
-    # Use MongoDB aggregation for case-insensitive matching
-    pipeline = [
-        {
-            "$addFields": {
-                "normalized_name": {
-                    "$toLower": {"$replaceAll": {"input": "$name", "find": "-", "replacement": " "}}
-                }
-            }
-        },
-        {
-            "$match": {
-                "normalized_name": normalized_name
-            }
-        },
-        {
-            "$limit": 1
-        }
-    ]
-    
+    # ✅ SS&S: Try multiple lookup strategies in order of preference
+    team_doc = None
     query_start = time.time()
-    team_result = list(teams_collection.aggregate(pipeline))
+    
+    # Strategy 1: Try team_id string lookup first (SS&S preferred)
+    team_doc = teams_collection.find_one({"team_id": lookup_value})
+    
+    # Strategy 2: If not found and looks like ObjectId, try ObjectId lookup and get team_id string
+    if not team_doc and len(lookup_value) == 24 and all(c in '0123456789abcdefABCDEF' for c in lookup_value):
+        try:
+            from bson import ObjectId
+            obj_id = ObjectId(lookup_value)
+            team_doc = teams_collection.find_one({"_id": obj_id})
+            if team_doc:
+                # Get team_id string from the document for future lookups
+                lookup_value = team_doc.get("team_id", lookup_value)
+        except Exception:
+            pass
+    
+    # Strategy 3: If not found, try team_name lookup (backward compatibility)
+    if not team_doc:
+        normalized_name = unidecode(lookup_value.strip().replace("-", " ")).lower()
+        pipeline = [
+            {
+                "$addFields": {
+                    "normalized_name": {
+                        "$toLower": {"$replaceAll": {"input": "$name", "find": "-", "replacement": " "}}
+                    }
+                }
+            },
+            {
+                "$match": {
+                    "normalized_name": normalized_name
+                }
+            },
+            {
+                "$limit": 1
+            }
+        ]
+        team_result = list(teams_collection.aggregate(pipeline))
+        team_doc = team_result[0] if team_result else None
+    
     query_time = (time.time() - query_start) * 1000
-    match = team_result[0]["name"] if team_result else None
-
-    if not match:
-        print(f"❌ No team found matching: {normalized_name}")
-        raise HTTPException(status_code=404, detail=f"No players found for team '{team_name}'")
+    
+    if not team_doc:
+        print(f"❌ No team found matching: {lookup_value}")
+        raise HTTPException(status_code=404, detail=f"No players found for team '{lookup_value}'")
+    
+    match = team_doc.get("name")
 
     load_start = time.time()
     team_doc, player_objects = load_roster(match)
