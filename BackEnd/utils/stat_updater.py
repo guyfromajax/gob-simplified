@@ -1627,6 +1627,25 @@ def finalize_game(
         home_team_name = home_team_obj.get("name") if isinstance(home_team_obj, dict) else (game.get('home_team') if isinstance(game.get('home_team'), str) else None)
         away_team_name = away_team_obj.get("name") if isinstance(away_team_obj, dict) else (game.get('away_team') if isinstance(game.get('away_team'), str) else None)
         
+        # ✅ FIX: If team names are still None, look up from team_id (same as tournament mode)
+        if not home_team_name and home_team_id:
+            try:
+                team_doc = teams_collection.find_one({"team_id": home_team_id}, {"name": 1})
+                if team_doc:
+                    home_team_name = team_doc.get("name")
+                    logger.info(f"🔍 [FINALIZE_GAME DEBUG] Looked up home_team_name from team_id '{home_team_id}': {home_team_name}")
+            except Exception as e:
+                logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] Could not look up home_team_name from team_id '{home_team_id}': {e}")
+        
+        if not away_team_name and away_team_id:
+            try:
+                team_doc = teams_collection.find_one({"team_id": away_team_id}, {"name": 1})
+                if team_doc:
+                    away_team_name = team_doc.get("name")
+                    logger.info(f"🔍 [FINALIZE_GAME DEBUG] Looked up away_team_name from team_id '{away_team_id}': {away_team_name}")
+            except Exception as e:
+                logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] Could not look up away_team_name from team_id '{away_team_id}': {e}")
+        
         quarter = game.get('quarter', 1)
         is_final = game.get('is_final', False)
         print(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, quarter={quarter}, is_final={is_final}, home={home_team_name}, away={away_team_name}")
@@ -1651,11 +1670,46 @@ def finalize_game(
                 home_team_name = home_team_obj.get("name")
             elif isinstance(home_team_obj, str):
                 home_team_name = home_team_obj
+            elif not home_team_name and home_team_id:
+                # Fallback: Look up team name from team_id
+                try:
+                    team_doc = teams_collection.find_one({"team_id": home_team_id}, {"name": 1})
+                    if team_doc:
+                        home_team_name = team_doc.get("name")
+                        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Looked up home_team_name from team_id '{home_team_id}': {home_team_name}")
+                except Exception as e:
+                    logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] Could not look up home_team_name from team_id '{home_team_id}': {e}")
             
             if isinstance(away_team_obj, dict):
                 away_team_name = away_team_obj.get("name")
             elif isinstance(away_team_obj, str):
                 away_team_name = away_team_obj
+            elif not away_team_name and away_team_id:
+                # Fallback: Look up team name from team_id
+                try:
+                    team_doc = teams_collection.find_one({"team_id": away_team_id}, {"name": 1})
+                    if team_doc:
+                        away_team_name = team_doc.get("name")
+                        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Looked up away_team_name from team_id '{away_team_id}': {away_team_name}")
+                except Exception as e:
+                    logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] Could not look up away_team_name from team_id '{away_team_id}': {e}")
+        
+        # ✅ FIX: If box_score exists at top level but team names are still None, use box_score keys (same as tournament mode)
+        if box_score and (not home_team_name or not away_team_name):
+            box_score_keys = list(box_score.keys())
+            if len(box_score_keys) >= 2:
+                if not home_team_name:
+                    home_team_name = box_score_keys[0]
+                    logger.info(f"🔍 [FINALIZE_GAME DEBUG] Using first box_score key as home_team_name: {home_team_name}")
+                if not away_team_name:
+                    away_team_name = box_score_keys[1]
+                    logger.info(f"🔍 [FINALIZE_GAME DEBUG] Using second box_score key as away_team_name: {away_team_name}")
+            elif len(box_score_keys) == 1:
+                if not home_team_name:
+                    home_team_name = box_score_keys[0]
+                    logger.info(f"🔍 [FINALIZE_GAME DEBUG] Using only box_score key as home_team_name: {home_team_name}")
+        
+        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Final team names: home={home_team_name}, away={away_team_name}")
         
         logger.info(f"🔍 [FINALIZE_GAME] Processing {len(players)} players, box_score keys: {list(box_score.keys())}, home_team: {home_team_name}, away_team: {away_team_name}")
         logger.info(f"🔍 [FINALIZE_GAME] box_score structure check - has {len(box_score)} teams, keys: {list(box_score.keys())}")
