@@ -130,15 +130,16 @@ export function updateTimeoutButtonState(isLive, reason = '') {
 
 /**
  * Check if user team is on offense for current turn
+ * Uses scene.teamId (universal identifier) instead of computing from userTeamSide
  */
 function isUserTeamOnOffense(scene, turnData) {
     if (!scene || !turnData) {
         return false;
     }
     
-    // Get user team ID
-    const userTeamSide = scene.userTeamSide || scene.simData?.user_team_side;
-    if (!userTeamSide) {
+    // ✅ SS&S: Use scene.teamId (universal identifier) instead of computing from userTeamSide
+    const userTeamId = scene.teamId;
+    if (!userTeamId) {
         return false;
     }
     
@@ -147,11 +148,6 @@ function isUserTeamOnOffense(scene, turnData) {
     if (!possessionTeamId) {
         return false;
     }
-    
-    // Get user team ID based on side
-    const homeTeamId = scene.simData?.home_team_id;
-    const awayTeamId = scene.simData?.away_team_id;
-    const userTeamId = userTeamSide === 'home' ? homeTeamId : awayTeamId;
     
     // Compare possession team with user team
     return String(possessionTeamId) === String(userTeamId);
@@ -245,9 +241,12 @@ export function checkTimeoutEligibility(scene, turnData) {
                 return false;
             }
             
-            const homeTeamId = scene.simData?.home_team_id;
-            const awayTeamId = scene.simData?.away_team_id;
-            const userTeamId = userTeamSide === 'home' ? homeTeamId : awayTeamId;
+            // ✅ SS&S: Use scene.teamId (universal identifier) instead of computing from userTeamSide
+            const userTeamId = scene.teamId;
+            if (!userTeamId) {
+                console.log('🔍 [TIMEOUT DEBUG] No scene.teamId found');
+                return false;
+            }
             
             console.log('🔍 [TIMEOUT DEBUG] Check 2 - userTeamId:', userTeamId, 'offenseTeamId:', offenseTeamId);
             if (String(offenseTeamId) === String(userTeamId)) {
