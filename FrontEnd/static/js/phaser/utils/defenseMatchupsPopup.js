@@ -377,24 +377,42 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
  * Example: If user PG is dragged to SG slot, user PG guards computer SG
  */
 function handleUserPositionSwap(draggedRow, targetRow, popup, gameId) {
+    console.log('🟢 [DEFENSE MATCHUPS SWAP] Starting swap');
+    
     const userRowsContainer = popup.querySelector('.user-team-column .player-rows');
-    const userRows = Array.from(popup.querySelectorAll('.user-team-row'));
+    if (!userRowsContainer) {
+        console.error('🔴 [DEFENSE MATCHUPS SWAP] Container not found');
+        return;
+    }
+    
+    // Query fresh - don't use cached array, query from container children
+    const userRows = Array.from(userRowsContainer.children).filter(el => el.classList.contains('user-team-row'));
     
     // Get the original player positions (data-position stays as player's actual position)
     const draggedPlayerPos = draggedRow.dataset.position;
     const targetPlayerPos = targetRow.dataset.position;
     
-    // Swap the rows in the DOM
-    const draggedIndex = userRows.indexOf(draggedRow);
-    const targetIndex = userRows.indexOf(targetRow);
+    console.log('🟢 [DEFENSE MATCHUPS SWAP] Positions:', { 
+        dragged: draggedPlayerPos, 
+        target: targetPlayerPos,
+        totalRows: userRows.length
+    });
+    
+    // Get indices from container children (not from array indexOf)
+    const draggedIndex = Array.from(userRowsContainer.children).indexOf(draggedRow);
+    const targetIndex = Array.from(userRowsContainer.children).indexOf(targetRow);
+    
+    console.log('🟢 [DEFENSE MATCHUPS SWAP] Indices:', { dragged: draggedIndex, target: targetIndex });
     
     // Swap DOM elements
     if (draggedIndex < targetIndex) {
         // Dragged is before target - insert target after dragged
+        console.log('🟢 [DEFENSE MATCHUPS SWAP] Swapping: dragged before target');
         userRowsContainer.insertBefore(targetRow, draggedRow.nextSibling);
         userRowsContainer.insertBefore(draggedRow, targetRow);
     } else {
         // Dragged is after target - insert dragged after target
+        console.log('🟢 [DEFENSE MATCHUPS SWAP] Swapping: dragged after target');
         userRowsContainer.insertBefore(draggedRow, targetRow.nextSibling);
         userRowsContainer.insertBefore(targetRow, draggedRow);
     }
@@ -404,11 +422,14 @@ function handleUserPositionSwap(draggedRow, targetRow, popup, gameId) {
     // data-position remains the player's actual position (PG, SG, etc.)
     // Slot position is determined by DOM order (index in POSITIONS array)
     const newMatchups = {};
-    const updatedUserRows = Array.from(popup.querySelectorAll('.user-team-row'));
+    const updatedUserRows = Array.from(userRowsContainer.children).filter(el => el.classList.contains('user-team-row'));
+    console.log('🟢 [DEFENSE MATCHUPS SWAP] After swap, found', updatedUserRows.length, 'rows');
+    
     updatedUserRows.forEach((row, index) => {
         const userPlayerPos = row.dataset.position; // Player's actual position (PG, SG, etc.)
         const slotPosition = POSITIONS[index]; // The slot they're in (PG slot, SG slot, etc.)
         newMatchups[userPlayerPos] = slotPosition; // This user position guards the computer position in this slot
+        console.log(`🟢 [DEFENSE MATCHUPS SWAP] Row ${index}: ${userPlayerPos} guards ${slotPosition}`);
     });
     
     // Store matchups in popup
@@ -416,6 +437,8 @@ function handleUserPositionSwap(draggedRow, targetRow, popup, gameId) {
     
     // Update visual display
     updatePopupDisplay(popup, newMatchups);
+    
+    console.log('🟢 [DEFENSE MATCHUPS SWAP] Swap complete');
 }
 
 /**
