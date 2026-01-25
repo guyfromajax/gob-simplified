@@ -1407,25 +1407,23 @@ async function loadRoster() {
       return;
     }
     // ✅ SS&S: Use team_id instead of team_name for roster endpoint
-    // Get team_id from commandCenterData or tournament document
+    // Get team_id from tournament document or userTeamId (which is set from commandCenterData in initializeTournament)
     let teamIdForRoster = null;
-    if (commandCenterData && commandCenterData.team_id) {
-      teamIdForRoster = commandCenterData.team_id;
-    } else if (tournament && tournament.user_team_object_id) {
+    if (tournament && tournament.user_team_object_id) {
       teamIdForRoster = tournament.user_team_object_id;
     } else if (userTeamId) {
-      // Fallback: use userTeamId if it's a team_id string (not ObjectId)
-      // Check if it looks like an ObjectId (24 hex chars) or team_id string
-      teamIdForRoster = userTeamId.length === 24 ? null : userTeamId;
+      // userTeamId is already set from commandCenterData in initializeTournament()
+      teamIdForRoster = userTeamId;
+    }
+    
+    // Fallback to team_name for backward compatibility
+    if (!teamIdForRoster && userTeamName) {
+      teamIdForRoster = userTeamName;
     }
     
     if (!teamIdForRoster) {
-      console.error('❌ [DEBUG loadRoster] No team_id found - cannot load roster');
-      // Fallback to team_name for backward compatibility
-      if (!userTeamName) {
-        return;
-      }
-      teamIdForRoster = userTeamName;
+      console.error('❌ [DEBUG loadRoster] No team_id or team_name found - cannot load roster');
+      return;
     }
     
     let data = null;
