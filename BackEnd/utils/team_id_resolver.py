@@ -66,10 +66,12 @@ def resolve_team_id_to_canonical(
     # Use override if provided, otherwise use module-level collection
     collection = teams_collection_override or teams_collection
     
-    # Step 1: Check if already in canonical format
-    # Canonical format: all caps, contains underscore or is single word in caps
-    if _is_canonical_format(team_identifier):
-        return team_identifier
+    # Step 1: For single mode, ALWAYS resolve from game document first (don't trust input format)
+    # This ensures we get the actual canonical team_id from the document, not just assume input is correct
+    if mode == "single" and doc:
+        canonical_id = _resolve_from_game_document(team_identifier, doc)
+        if canonical_id:
+            return canonical_id
     
     # Step 2: For franchise/tournament mode, resolve from document's user_team_object_id
     if mode in ("franchise", "tournament") and doc:
@@ -77,11 +79,10 @@ def resolve_team_id_to_canonical(
         if canonical_id:
             return canonical_id
     
-    # Step 3: Try to resolve from document context (for single mode)
-    if mode == "single" and doc:
-        canonical_id = _resolve_from_game_document(team_identifier, doc)
-        if canonical_id:
-            return canonical_id
+    # Step 3: Check if already in canonical format (only if we don't have document context)
+    # Canonical format: all caps, contains underscore or is single word in caps
+    if _is_canonical_format(team_identifier):
+        return team_identifier
     
     # Step 4: Try to resolve from database (if available)
     if HAS_DB and collection:
