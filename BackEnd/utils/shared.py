@@ -1130,7 +1130,8 @@ def summarize_game_state(game, exclude_animations=True):
             "timeouts": getattr(game.home_team, 'timeouts', 4),  # Default to 4 if not set (backward compatibility)
             # Data fields (single source of truth)
             "attributes": getattr(game.home_team, 'team_attributes', {}),
-            "box_score": cumulative_box.get(game.home_team.name, {}),
+            # ✅ SS&S: Use team_id to look up box_score (cumulative_box now uses team_id keys)
+            "box_score": cumulative_box.get(game.home_team.team_id, cumulative_box.get(game.home_team.name, {})),
             "totals": game.team_totals.get(game.home_team.name, {}),
             # Persistence fields
             "strategy_settings": home_strategy,
@@ -1155,7 +1156,8 @@ def summarize_game_state(game, exclude_animations=True):
             "timeouts": getattr(game.away_team, 'timeouts', 4),  # Default to 4 if not set (backward compatibility)
             # Data fields (single source of truth)
             "attributes": getattr(game.away_team, 'team_attributes', {}),
-            "box_score": cumulative_box.get(game.away_team.name, {}),
+            # ✅ SS&S: Use team_id to look up box_score (cumulative_box now uses team_id keys)
+            "box_score": cumulative_box.get(game.away_team.team_id, cumulative_box.get(game.away_team.name, {})),
             "totals": game.team_totals.get(game.away_team.name, {}),
             # Persistence fields
             "strategy_settings": getattr(game.away_team, 'strategy_settings', {}),
