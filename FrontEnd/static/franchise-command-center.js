@@ -140,10 +140,12 @@ function renderLeaders(data) {
   const categories = Object.keys(data);
   const primaryColor = getTeamPrimaryColor(userTeamNameForLeaders);
   
-  // Map category names for display
+  // Map category names for display (backward compatibility for old "TPM"/"TPA" keys)
   const categoryNameMap = {
-    'TPM': '3PTM',
-    'TPA': '3PTA'
+    'TPM': '3PTM',  // Legacy key support
+    'TPA': '3PTA',  // Legacy key support
+    '3PTM': '3PTM', // ✅ SS&S: Standardized key (backend now uses this)
+    '3PTA': '3PTA'  // ✅ SS&S: Standardized key (backend now uses this)
   };
   
   categories.forEach(cat => {
