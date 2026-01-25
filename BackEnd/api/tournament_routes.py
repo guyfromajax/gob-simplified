@@ -720,9 +720,12 @@ def get_tournament_team_data(tournament_id: str, team_id: str = None, team_name:
 
 
 @router.get("/tournament/scouting-report")
-def get_tournament_scouting_report(tournament_id: str, team_name: str):
+def get_tournament_scouting_report(tournament_id: str, team_id: str = None, team_name: str = None):
     """
     Get scouting report for a team in tournament mode, including last game's play usage data.
+    
+    ✅ SS&S: Prefers team_id (ObjectId) for consistent navigation.
+    Falls back to team_name resolution for backward compatibility.
     
     Returns:
     - team_attributes: Team attribute values
@@ -738,8 +741,24 @@ def get_tournament_scouting_report(tournament_id: str, team_name: str):
     if not tournament_doc:
         raise HTTPException(status_code=404, detail="Tournament not found")
     
-    # Get team document to resolve ObjectId and team_id
-    team_doc = teams_collection.find_one({"name": team_name})
+    # ✅ SS&S: Prefer team_id (ObjectId) if provided, fallback to team_name
+    team_doc = None
+    if team_id:
+        try:
+            # Try ObjectId lookup first
+            obj_id = ObjectId(team_id)
+            team_doc = teams_collection.find_one({"_id": obj_id})
+        except Exception:
+            # If not a valid ObjectId, try team_id string lookup
+            team_doc = teams_collection.find_one({"team_id": team_id})
+    
+    # Fallback to team_name lookup
+    if not team_doc and team_name:
+        team_doc = teams_collection.find_one({"name": team_name})
+        if not team_doc:
+            # Try case-insensitive match
+            team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_name}$", "$options": "i"}})
+    
     if not team_doc:
         raise HTTPException(status_code=404, detail="Team not found")
     
@@ -768,9 +787,11 @@ def get_tournament_scouting_report(tournament_id: str, team_name: str):
     
     # ✅ SS&S: Use shared utility function to extract plays from game document
     from BackEnd.utils.scouting_utils import extract_plays_from_game_document
+    # Get team name for the utility function (it needs it for display)
+    team_name_for_utility = team_doc.get("name", team_name or "")
     plays_data = extract_plays_from_game_document(
         last_game,
-        team_name,
+        team_name_for_utility,
         team_object_id,
         team_id_field
     )
@@ -782,9 +803,12 @@ def get_tournament_scouting_report(tournament_id: str, team_name: str):
 
 
 @router.get("/tournament/roster")
-def get_tournament_roster(tournament_id: str, team_name: str = None):
+def get_tournament_roster(tournament_id: str, team_id: str = None, team_name: str = None):
     """
     Get roster with tournament-specific player attributes.
+    
+    ✅ SS&S: Prefers team_id (ObjectId) for consistent navigation.
+    Falls back to team_name resolution for backward compatibility.
     
     Similar to /franchise/roster, this endpoint merges tournament-specific attributes
     (EM, CH, MO) with base attributes from the universal collection. Future training
@@ -800,36 +824,43 @@ def get_tournament_roster(tournament_id: str, team_name: str = None):
     if not tournament_doc:
         raise HTTPException(status_code=404, detail="Tournament not found")
     
-    # Get team name from tournament if not provided
-    if not team_name:
-        team_name = tournament_doc.get("user_team_id")
-    
-    if not team_name:
-        raise HTTPException(status_code=404, detail="Team not found")
-    
-    # Get team document - try multiple strategies to handle both formatted and unformatted team names
+    # ✅ SS&S: Prefer team_id (ObjectId) if provided, fallback to team_name
     team_doc = None
+    if team_id:
+        try:
+            # Try ObjectId lookup first
+            obj_id = ObjectId(team_id)
+            team_doc = teams_collection.find_one({"_id": obj_id})
+        except Exception:
+            # If not a valid ObjectId, try team_id string lookup
+            team_doc = teams_collection.find_one({"team_id": team_id})
     
-    # Strategy 1: Try exact match first
-    team_doc = teams_collection.find_one({"name": team_name})
-    
-    # Strategy 2: If not found, try case-insensitive match
+    # Fallback to team_name lookup
     if not team_doc:
-        team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_name}$", "$options": "i"}})
+        if not team_name:
+            team_name = tournament_doc.get("user_team_id")
+        
+        if team_name:
+            # Strategy 1: Try exact match first
+            team_doc = teams_collection.find_one({"name": team_name})
+            
+            # Strategy 2: If not found, try case-insensitive match
+            if not team_doc:
+                team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_name}$", "$options": "i"}})
+            
+            # Strategy 3: If still not found, try normalized name (replace dashes with spaces, title case)
+            if not team_doc:
+                normalized_name = team_name.replace("-", " ").title()
+                team_doc = teams_collection.find_one({"name": normalized_name})
+            
+            # Strategy 4: Fallback to tournament's user_team_id
+            if not team_doc:
+                fallback_team_name = tournament_doc.get("user_team_id")
+                if fallback_team_name and fallback_team_name != team_name:
+                    team_doc = teams_collection.find_one({"name": fallback_team_name})
     
-    # Strategy 3: If still not found, try normalized name (replace dashes with spaces, title case)
     if not team_doc:
-        normalized_name = team_name.replace("-", " ").title()
-        team_doc = teams_collection.find_one({"name": normalized_name})
-    
-    # Strategy 4: Fallback to tournament's user_team_id
-    if not team_doc:
-        fallback_team_name = tournament_doc.get("user_team_id")
-        if fallback_team_name and fallback_team_name != team_name:
-            team_doc = teams_collection.find_one({"name": fallback_team_name})
-    
-    if not team_doc:
-        raise HTTPException(status_code=404, detail=f"Team not found: {team_name}")
+        raise HTTPException(status_code=404, detail=f"Team not found: {team_id or team_name}")
     
     # ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
     tournament_players = tournament_doc.get("players", {}) or tournament_doc.get("player_stats", {})  # Backward compatibility
