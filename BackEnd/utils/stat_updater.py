@@ -1299,21 +1299,24 @@ def finalize_game(
                             "last_name": player_doc.get("last_name", ""),
                             "team": player_doc.get("team", ""),
                         }
-                        # Use team_id from team_name_to_id map if available
-                        # Find which team this player belongs to by checking box_score
-                        team_name_for_player = None
-                        for tname in [home_team_name, away_team_name]:
-                            if tname and tname in box_score:
-                                team_box = box_score[tname]
+                        # ✅ SS&S: Find which team this player belongs to by checking box_score (using team_id keys)
+                        # Determine which team_id this player belongs to by searching box_score
+                        player_team_id = None
+                        for team_id_key in [home_team_id, away_team_id]:
+                            if team_id_key and team_id_key in box_score:
+                                team_box = box_score[team_id_key]
                                 for pos_data in team_box.values():
                                     if isinstance(pos_data, dict) and str(pos_data.get("playerId")) == pid_str:
-                                        team_name_for_player = tname
+                                        player_team_id = team_id_key
                                         break
-                                if team_name_for_player:
+                                if player_team_id:
                                     break
-                        if team_name_for_player and team_name_for_player in team_name_to_id:
-                            meta["team_id"] = team_name_to_id[team_name_for_player]
+                        
+                        # ✅ SS&S: Set meta.team_id directly (no name lookup needed)
+                        if player_team_id:
+                            meta["team_id"] = player_team_id
                         else:
+                            # Fallback to player_doc team_id if we couldn't find player in box_score
                             tid_val = player_doc.get("team_id")
                             if tid_val is not None:
                                 meta["team_id"] = str(tid_val)
