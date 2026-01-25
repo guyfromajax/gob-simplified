@@ -237,27 +237,41 @@ function createPlayerRow(player, teamType, position, currentMatchups, guardingUs
  */
 function initializeDragAndDrop(popup, gameId, onResolve) {
     const userRowsContainer = popup.querySelector('.user-team-column .player-rows');
-    if (!userRowsContainer) return;
+    if (!userRowsContainer) {
+        console.error('🔴 [DEFENSE MATCHUPS DND] Container not found');
+        return;
+    }
     
-    // Make all user rows draggable
+    console.log('🔵 [DEFENSE MATCHUPS DND] Initializing drag-and-drop');
+    
+    // Make all user rows draggable (query fresh each time)
     const userRows = popup.querySelectorAll('.user-team-row');
-    userRows.forEach(row => {
+    console.log('🔵 [DEFENSE MATCHUPS DND] Found', userRows.length, 'user rows');
+    userRows.forEach((row, index) => {
         row.draggable = true;
+        console.log(`🔵 [DEFENSE MATCHUPS DND] Row ${index}: position=${row.dataset.position}, draggable=${row.draggable}`);
     });
     
     // Event delegation on container (like Lineup Screen pattern)
     // dragstart - store dragged row's position in dataTransfer
     userRowsContainer.addEventListener('dragstart', (e) => {
         const row = e.target.closest('.user-team-row');
-        if (!row) return;
+        if (!row) {
+            console.log('🔴 [DEFENSE MATCHUPS DND] dragstart: no row found');
+            return;
+        }
         
         const position = row.dataset.position;
+        console.log('🟢 [DEFENSE MATCHUPS DND] dragstart:', { position, rowIndex: Array.from(userRowsContainer.children).indexOf(row) });
+        
         if (position) {
             e.dataTransfer.setData('text/plain', position);
             e.dataTransfer.setData('application/x-user-position', position);
             e.dataTransfer.effectAllowed = 'move';
             row.style.opacity = '0.5';
+            console.log('🟢 [DEFENSE MATCHUPS DND] dragstart: data set, opacity set');
         } else {
+            console.log('🔴 [DEFENSE MATCHUPS DND] dragstart: no position, preventing default');
             e.preventDefault();
         }
     });
@@ -265,11 +279,14 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
     // dragend - reset visual state
     userRowsContainer.addEventListener('dragend', (e) => {
         const row = e.target.closest('.user-team-row');
+        console.log('🟡 [DEFENSE MATCHUPS DND] dragend:', { hasRow: !!row });
+        
         if (row) {
             row.style.opacity = '1';
         }
         // Reset all row backgrounds (query fresh)
         const allRows = popup.querySelectorAll('.user-team-row');
+        console.log('🟡 [DEFENSE MATCHUPS DND] dragend: resetting', allRows.length, 'rows');
         allRows.forEach(r => r.style.backgroundColor = '');
     });
     
@@ -295,22 +312,45 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
     // drop - handle the swap
     userRowsContainer.addEventListener('drop', (e) => {
         const targetRow = e.target.closest('.user-team-row');
-        if (!targetRow) return;
+        if (!targetRow) {
+            console.log('🔴 [DEFENSE MATCHUPS DND] drop: no target row');
+            return;
+        }
         
         e.preventDefault();
         targetRow.style.backgroundColor = '';
         
         // Get dragged position from dataTransfer
         const draggedPosition = e.dataTransfer.getData('application/x-user-position');
-        if (!draggedPosition) return;
+        console.log('🟢 [DEFENSE MATCHUPS DND] drop:', { 
+            draggedPosition, 
+            targetPosition: targetRow.dataset.position,
+            hasDraggedPosition: !!draggedPosition
+        });
+        
+        if (!draggedPosition) {
+            console.log('🔴 [DEFENSE MATCHUPS DND] drop: no dragged position in dataTransfer');
+            return;
+        }
         
         // Find dragged row by position (query fresh)
-        const draggedRow = Array.from(popup.querySelectorAll('.user-team-row'))
-            .find(row => row.dataset.position === draggedPosition);
+        const allRows = Array.from(popup.querySelectorAll('.user-team-row'));
+        console.log('🟢 [DEFENSE MATCHUPS DND] drop: found', allRows.length, 'total rows');
+        const draggedRow = allRows.find(row => row.dataset.position === draggedPosition);
         
-        if (draggedRow && draggedRow !== targetRow) {
-            handleUserPositionSwap(draggedRow, targetRow, popup, gameId);
+        if (!draggedRow) {
+            console.log('🔴 [DEFENSE MATCHUPS DND] drop: dragged row not found for position', draggedPosition);
+            console.log('🔴 [DEFENSE MATCHUPS DND] drop: available positions:', allRows.map(r => r.dataset.position));
+            return;
         }
+        
+        if (draggedRow === targetRow) {
+            console.log('🟡 [DEFENSE MATCHUPS DND] drop: same row, no swap needed');
+            return;
+        }
+        
+        console.log('🟢 [DEFENSE MATCHUPS DND] drop: calling handleUserPositionSwap');
+        handleUserPositionSwap(draggedRow, targetRow, popup, gameId);
     });
     
     // Submit button handler
