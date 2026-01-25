@@ -229,7 +229,7 @@ function createPlayerRow(player, teamType, position, currentMatchups, guardingUs
 
 /**
  * Initialize drag-and-drop functionality
- * Uses event delegation pattern (like Lineup Screen) for robust drag-and-drop
+ * Uses data + re-render pattern (like Lineup Screen) for robust drag-and-drop
  * User can only drag and drop within the user team column to swap positions
  * @param {HTMLElement} popup - Popup element
  * @param {string} gameId - Game ID
@@ -242,36 +242,28 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
         return;
     }
     
-    console.log('🔵 [DEFENSE MATCHUPS DND] Initializing drag-and-drop');
+    // Get initial order from popup data (array of positions in current order)
+    let userTeamOrder = getCurrentUserTeamOrder(popup);
     
-    // Make all user rows draggable (query fresh each time)
+    // Make all user rows draggable
     const userRows = popup.querySelectorAll('.user-team-row');
-    console.log('🔵 [DEFENSE MATCHUPS DND] Found', userRows.length, 'user rows');
-    userRows.forEach((row, index) => {
+    userRows.forEach(row => {
         row.draggable = true;
-        console.log(`🔵 [DEFENSE MATCHUPS DND] Row ${index}: position=${row.dataset.position}, draggable=${row.draggable}`);
     });
     
     // Event delegation on container (like Lineup Screen pattern)
     // dragstart - store dragged row's position in dataTransfer
     userRowsContainer.addEventListener('dragstart', (e) => {
         const row = e.target.closest('.user-team-row');
-        if (!row) {
-            console.log('🔴 [DEFENSE MATCHUPS DND] dragstart: no row found');
-            return;
-        }
+        if (!row) return;
         
         const position = row.dataset.position;
-        console.log('🟢 [DEFENSE MATCHUPS DND] dragstart:', { position, rowIndex: Array.from(userRowsContainer.children).indexOf(row) });
-        
         if (position) {
             e.dataTransfer.setData('text/plain', position);
             e.dataTransfer.setData('application/x-user-position', position);
             e.dataTransfer.effectAllowed = 'move';
             row.style.opacity = '0.5';
-            console.log('🟢 [DEFENSE MATCHUPS DND] dragstart: data set, opacity set');
         } else {
-            console.log('🔴 [DEFENSE MATCHUPS DND] dragstart: no position, preventing default');
             e.preventDefault();
         }
     });
@@ -279,14 +271,11 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
     // dragend - reset visual state
     userRowsContainer.addEventListener('dragend', (e) => {
         const row = e.target.closest('.user-team-row');
-        console.log('🟡 [DEFENSE MATCHUPS DND] dragend:', { hasRow: !!row });
-        
         if (row) {
             row.style.opacity = '1';
         }
-        // Reset all row backgrounds (query fresh)
+        // Reset all row backgrounds
         const allRows = popup.querySelectorAll('.user-team-row');
-        console.log('🟡 [DEFENSE MATCHUPS DND] dragend: resetting', allRows.length, 'rows');
         allRows.forEach(r => r.style.backgroundColor = '');
     });
     
@@ -296,7 +285,6 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
         if (row) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-            // Highlight target row (will be cleared in drop or dragleave)
             row.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
         }
     });
@@ -309,48 +297,43 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
         }
     });
     
-    // drop - handle the swap
+    // drop - handle the swap (data + re-render pattern)
     userRowsContainer.addEventListener('drop', (e) => {
         const targetRow = e.target.closest('.user-team-row');
-        if (!targetRow) {
-            console.log('🔴 [DEFENSE MATCHUPS DND] drop: no target row');
-            return;
-        }
+        if (!targetRow) return;
         
         e.preventDefault();
         targetRow.style.backgroundColor = '';
         
         // Get dragged position from dataTransfer
         const draggedPosition = e.dataTransfer.getData('application/x-user-position');
-        console.log('🟢 [DEFENSE MATCHUPS DND] drop:', { 
-            draggedPosition, 
-            targetPosition: targetRow.dataset.position,
-            hasDraggedPosition: !!draggedPosition
-        });
+        if (!draggedPosition) return;
         
-        if (!draggedPosition) {
-            console.log('🔴 [DEFENSE MATCHUPS DND] drop: no dragged position in dataTransfer');
-            return;
-        }
+        const targetPosition = targetRow.dataset.position;
+        if (draggedPosition === targetPosition) return; // Same row, no swap
         
-        // Find dragged row by position (query fresh)
-        const allRows = Array.from(popup.querySelectorAll('.user-team-row'));
-        console.log('🟢 [DEFENSE MATCHUPS DND] drop: found', allRows.length, 'total rows');
-        const draggedRow = allRows.find(row => row.dataset.position === draggedPosition);
+        // Update data structure (swap positions in order array)
+        const draggedIndex = userTeamOrder.indexOf(draggedPosition);
+        const targetIndex = userTeamOrder.indexOf(targetPosition);
         
-        if (!draggedRow) {
-            console.log('🔴 [DEFENSE MATCHUPS DND] drop: dragged row not found for position', draggedPosition);
-            console.log('🔴 [DEFENSE MATCHUPS DND] drop: available positions:', allRows.map(r => r.dataset.position));
-            return;
-        }
+        if (draggedIndex === -1 || targetIndex === -1) return; // Invalid positions
         
-        if (draggedRow === targetRow) {
-            console.log('🟡 [DEFENSE MATCHUPS DND] drop: same row, no swap needed');
-            return;
-        }
+        // Swap in data structure
+        userTeamOrder[draggedIndex] = targetPosition;
+        userTeamOrder[targetIndex] = draggedPosition;
         
-        console.log('🟢 [DEFENSE MATCHUPS DND] drop: calling handleUserPositionSwap');
-        handleUserPositionSwap(draggedRow, targetRow, popup, gameId);
+        // Store updated order in popup
+        popup.dataset.userTeamOrder = JSON.stringify(userTeamOrder);
+        
+        // Re-render user team rows based on new order
+        renderUserTeamRows(popup, userTeamOrder);
+        
+        // Recalculate matchups based on new order
+        const newMatchups = calculateMatchupsFromOrder(userTeamOrder);
+        storeMatchupsInPopup(popup, newMatchups);
+        
+        // Update visual display (computer team colors)
+        updatePopupDisplay(popup, newMatchups);
     });
     
     // Submit button handler
@@ -370,94 +353,55 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
 }
 
 /**
- * Handle user position swap when user drags and drops within user team column
- * Swaps the two players' positions and recalculates matchups based on new order
- * 
- * Logic: After swap, user position in slot X guards computer position X
- * Example: If user PG is dragged to SG slot, user PG guards computer SG
+ * Get current user team order from popup data
  */
-function handleUserPositionSwap(draggedRow, targetRow, popup, gameId) {
-    console.log('🟢 [DEFENSE MATCHUPS SWAP] Starting swap');
-    
-    const userRowsContainer = popup.querySelector('.user-team-column .player-rows');
-    if (!userRowsContainer) {
-        console.error('🔴 [DEFENSE MATCHUPS SWAP] Container not found');
-        return;
+function getCurrentUserTeamOrder(popup) {
+    if (popup.dataset.userTeamOrder) {
+        return JSON.parse(popup.dataset.userTeamOrder);
     }
-    
-    // Query fresh - don't use cached array, query from container children
-    const userRows = Array.from(userRowsContainer.children).filter(el => el.classList.contains('user-team-row'));
-    
-    // Get the original player positions (data-position stays as player's actual position)
-    const draggedPlayerPos = draggedRow.dataset.position;
-    const targetPlayerPos = targetRow.dataset.position;
-    
-    console.log('🟢 [DEFENSE MATCHUPS SWAP] Positions:', { 
-        dragged: draggedPlayerPos, 
-        target: targetPlayerPos,
-        totalRows: userRows.length
-    });
-    
-    // Get indices from container children (not from array indexOf)
-    const allChildren = Array.from(userRowsContainer.children);
-    const draggedIndex = allChildren.indexOf(draggedRow);
-    const targetIndex = allChildren.indexOf(targetRow);
-    
-    console.log('🟢 [DEFENSE MATCHUPS SWAP] Indices:', { 
-        dragged: draggedIndex, 
-        target: targetIndex,
-        draggedRowElement: draggedRow,
-        targetRowElement: targetRow,
-        allChildrenOrder: allChildren.map((el, i) => ({ index: i, position: el.dataset.position, element: el }))
-    });
-    
-    // Swap DOM elements
-    if (draggedIndex < targetIndex) {
-        // Dragged is before target - insert target after dragged
-        console.log('🟢 [DEFENSE MATCHUPS SWAP] Swapping: dragged before target');
-        userRowsContainer.insertBefore(targetRow, draggedRow.nextSibling);
-        userRowsContainer.insertBefore(draggedRow, targetRow);
-    } else {
-        // Dragged is after target - insert dragged after target
-        console.log('🟢 [DEFENSE MATCHUPS SWAP] Swapping: dragged after target');
-        userRowsContainer.insertBefore(draggedRow, targetRow.nextSibling);
-        userRowsContainer.insertBefore(targetRow, draggedRow);
-    }
-    
-    // Recalculate matchups based on new DOM order
-    // Matchups: user position in slot X guards computer position X
-    // data-position remains the player's actual position (PG, SG, etc.)
-    // Slot position is determined by DOM order (index in POSITIONS array)
-    const newMatchups = {};
-    const updatedUserRows = Array.from(userRowsContainer.children).filter(el => el.classList.contains('user-team-row'));
-    console.log('🟢 [DEFENSE MATCHUPS SWAP] After swap, found', updatedUserRows.length, 'rows');
-    
-    updatedUserRows.forEach((row, index) => {
-        const userPlayerPos = row.dataset.position; // Player's actual position (PG, SG, etc.)
+    // Default order
+    return POSITIONS.slice();
+}
+
+/**
+ * Calculate matchups from user team order
+ * Matchups: user position in slot X guards computer position X
+ */
+function calculateMatchupsFromOrder(userTeamOrder) {
+    const matchups = {};
+    userTeamOrder.forEach((userPosition, index) => {
         const slotPosition = POSITIONS[index]; // The slot they're in (PG slot, SG slot, etc.)
-        newMatchups[userPlayerPos] = slotPosition; // This user position guards the computer position in this slot
-        console.log(`🟢 [DEFENSE MATCHUPS SWAP] Row ${index}: ${userPlayerPos} guards ${slotPosition}`, {
-            rowElement: row,
-            rowIndexInContainer: Array.from(userRowsContainer.children).indexOf(row)
-        });
+        matchups[userPosition] = slotPosition; // This user position guards the computer position in this slot
     });
+    return matchups;
+}
+
+/**
+ * Re-render user team rows based on current order (data + re-render pattern)
+ */
+function renderUserTeamRows(popup, userTeamOrder) {
+    const userRowsContainer = popup.querySelector('.user-team-column .player-rows');
+    if (!userRowsContainer) return;
     
-    console.log('🟢 [DEFENSE MATCHUPS SWAP] Final matchups:', newMatchups);
-    console.log('🟢 [DEFENSE MATCHUPS SWAP] Container children order after swap:', 
-        Array.from(userRowsContainer.children).map((el, i) => ({ 
-            index: i, 
-            position: el.dataset.position, 
-            className: el.className 
-        }))
-    );
+    // Get user team data
+    const userTeam = JSON.parse(popup.dataset.userTeamData);
+    const currentMatchups = getCurrentMatchupsFromPopup(popup);
     
-    // Store matchups in popup
-    storeMatchupsInPopup(popup, newMatchups);
+    // Build rows in new order
+    const userRows = userTeamOrder.map(pos => {
+        const player = userTeam.players.find(p => p.position === pos);
+        if (!player) return '';
+        return createPlayerRow(player, 'user', pos, currentMatchups);
+    }).join('');
     
-    // Update visual display
-    updatePopupDisplay(popup, newMatchups);
+    // Replace container content
+    userRowsContainer.innerHTML = userRows;
     
-    console.log('🟢 [DEFENSE MATCHUPS SWAP] Swap complete');
+    // Re-attach draggable attribute to new rows
+    const newRows = userRowsContainer.querySelectorAll('.user-team-row');
+    newRows.forEach(row => {
+        row.draggable = true;
+    });
 }
 
 /**
