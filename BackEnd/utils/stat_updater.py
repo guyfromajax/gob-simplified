@@ -1180,7 +1180,7 @@ def finalize_game(
         logger.info(f"🔍 [FINALIZE_GAME DEBUG] box_score structure check:")
         for team_id_key, team_box in box_score.items():
             if isinstance(team_box, dict):
-                logger.info(f"🔍 [FINALIZE_GAME DEBUG]   Team '{team_name}': {len(team_box)} players")
+                logger.info(f"🔍 [FINALIZE_GAME DEBUG]   Team '{team_id_key}': {len(team_box)} players")
                 # Log first player's structure
                 first_pos = list(team_box.keys())[0] if team_box else None
                 if first_pos:
