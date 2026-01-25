@@ -4059,8 +4059,8 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
     process_time = (time.time() - process_start) * 1000
 
     response_data = {
-        "team": team.get("name", team_name),
-        "team_name": team.get("name", team_name),
+        "team": team.get("name", match if match else team_identifier),
+        "team_name": team.get("name", match if match else team_identifier),
         "players": players
     }
     
