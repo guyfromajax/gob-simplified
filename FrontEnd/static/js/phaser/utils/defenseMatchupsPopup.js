@@ -144,6 +144,20 @@ function createPopupElement(userTeam, computerTeam, currentMatchups, gameId) {
 }
 
 /**
+ * Format player name as "First Initial. Last Name"
+ * @param {string} fullName - Full player name (e.g., "Kermit Prospect")
+ * @returns {string} - Formatted name (e.g., "K. Prospect")
+ */
+function formatPlayerName(fullName) {
+    if (!fullName) return '';
+    const parts = fullName.trim().split(' ');
+    if (parts.length === 1) return parts[0];
+    const firstName = parts[0];
+    const lastName = parts.slice(1).join(' ');
+    return `${firstName.charAt(0).toUpperCase()}. ${lastName}`;
+}
+
+/**
  * Create a player row element
  */
 function createPlayerRow(player, teamType, position, currentMatchups, guardingUserPos = null) {
@@ -201,7 +215,7 @@ function createPlayerRow(player, teamType, position, currentMatchups, guardingUs
                 ${position}
             </div>
             <img class="player-headshot" src="${player.headshot_url}" alt="${player.name}" onerror="this.style.display='none';">
-            <div class="player-name">${player.name}</div>
+            <div class="player-name">${formatPlayerName(player.name)}</div>
             ${statStrip}
         </div>
     `;
