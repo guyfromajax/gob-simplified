@@ -276,17 +276,10 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
     // dragover - allow drop and show visual feedback
     userRowsContainer.addEventListener('dragover', (e) => {
         const row = e.target.closest('.user-team-row');
-        if (!row) return;
-        
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        
-        // Get dragged position from dataTransfer
-        const draggedPosition = e.dataTransfer.getData('application/x-user-position');
-        const targetPosition = row.dataset.position;
-        
-        // Highlight if different row
-        if (draggedPosition && draggedPosition !== targetPosition) {
+        if (row) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            // Highlight target row (will be cleared in drop or dragleave)
             row.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
         }
     });
