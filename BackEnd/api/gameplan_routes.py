@@ -9,6 +9,7 @@ from typing import Optional
 from BackEnd.db import db, games_collection
 from BackEnd.api.franchise_routes import get_user_team_from_franchise
 from BackEnd.api.tournament_routes import get_user_team_from_tournament
+from BackEnd.utils.team_id_resolver import resolve_team_id_to_canonical as unified_resolve_team_id_to_canonical
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -220,11 +221,10 @@ def get_save_location_for_franchise_tournament(mode: str, game_id: str = None, f
 
 def normalize_team_id_to_canonical(team_id: str, mode: str, doc: dict = None) -> str:
     """
-    ✅ PHASE 5.1: Normalize team_id to canonical format (e.g., "MORRISTOWN", "OCEAN_CITY").
+    ✅ UNIFIED: Normalize team_id to canonical format using unified resolver.
     
-    This function normalizes team_id at API entry points to ensure consistent format.
-    For single mode, it resolves team names to canonical team_id keys in the game document.
-    For franchise/tournament mode, it uses the document's authoritative team_id.
+    This is a wrapper around the unified team_id_resolver that maintains backward
+    compatibility with existing code (raises HTTPException instead of ValueError).
     
     Args:
         team_id: Team identifier (could be team name, ObjectId, or canonical team_id)
@@ -232,7 +232,7 @@ def normalize_team_id_to_canonical(team_id: str, mode: str, doc: dict = None) ->
         doc: Game/franchise/tournament document (required for single mode)
     
     Returns:
-        Canonical team_id string (e.g., "SOUTH_LANCASTER")
+        Canonical team_id string (e.g., "MORRISTOWN", "OCEAN_CITY")
     
     Raises:
         HTTPException: If team_id cannot be resolved to canonical format
@@ -240,44 +240,19 @@ def normalize_team_id_to_canonical(team_id: str, mode: str, doc: dict = None) ->
     if not team_id:
         raise HTTPException(status_code=400, detail="team_id is required")
     
-    # For franchise/tournament mode, use document's authoritative team_id
-    if mode == "franchise":
-        if not doc:
-            raise HTTPException(status_code=400, detail="Document required for franchise mode")
-        user_team_id, user_team_object_id = get_user_team_from_franchise(doc)
-        # For now, return the ObjectId string (will be standardized later)
-        return str(user_team_object_id) if user_team_object_id else user_team_id
-    elif mode == "tournament":
-        if not doc:
-            raise HTTPException(status_code=400, detail="Document required for tournament mode")
-        user_team_id, user_team_object_id = get_user_team_from_tournament(doc)
-        # For now, return the ObjectId string (will be standardized later)
-        return str(user_team_object_id) if user_team_object_id else user_team_id
-    else:
-        # Single mode: Resolve to canonical team_id key in game document
-        if not doc:
-            raise HTTPException(status_code=400, detail="Game document required for single mode")
-        
-        teams = doc.get("teams", {})
-        
-        # Step 1: Try direct key match (if team_id is already a canonical team_id)
-        if team_id in teams and (team_id.isupper() and "_" in team_id):
-            return team_id
-        
-        # Step 2: Try name match (iterate through teams to find by team name)
-        # ✅ PHASE 5.2: Simplified - removed home/away fallback (not needed for new games)
-        # Frontend may still send team names, so we keep name resolution for compatibility
-        for tid in teams.keys():
-            team_obj = teams.get(tid, {})
-            # Match if key equals team_id OR team_obj.name equals team_id (case-insensitive)
-            if tid == team_id or (team_obj.get("name") or "").lower() == (team_id or "").lower():
-                return tid
-        
-        # Step 3: Fail loudly if not found
-        available_teams = {tid: teams.get(tid, {}).get("name", "unknown") for tid in teams.keys()}
+    try:
+        # Use unified resolver
+        canonical_id = unified_resolve_team_id_to_canonical(
+            team_id,
+            mode=mode,
+            doc=doc
+        )
+        return canonical_id
+    except ValueError as e:
+        # Convert ValueError to HTTPException for API compatibility
         raise HTTPException(
             status_code=400,
-            detail=f"Could not resolve team '{team_id}' to canonical team_id. Available teams: {list(available_teams.keys())}"
+            detail=str(e)
         )
 
 
