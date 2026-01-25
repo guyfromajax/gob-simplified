@@ -1412,6 +1412,7 @@ async function loadRoster() {
     let url = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?tournament_id=${encodeURIComponent(tournament._id)}`;
     console.log('🔍 [DEBUG loadRoster] Fetching roster from:', url);
     let res = await fetch(url);
+    let dataLoaded = false; // Track if data was loaded from retry
     
     // ✅ FIX: Handle 404 errors - stale userTeamId from localStorage
     if (!res.ok && res.status === 404) {
@@ -1433,6 +1434,7 @@ async function loadRoster() {
             res = await fetch(url);
             if (res.ok) {
               data = await res.json();
+              dataLoaded = true; // Mark that data was loaded from retry
               console.log('✅ [DEBUG loadRoster] Retry successful with corrected userTeamId');
             } else {
               throw new Error(`Retry failed: ${res.status} ${res.statusText}`);
@@ -1458,6 +1460,7 @@ async function loadRoster() {
           res = await fetch(url);
           if (res.ok) {
             data = await res.json();
+            dataLoaded = true; // Mark that data was loaded from retry
             console.log('✅ [DEBUG loadRoster] Retry successful with tournament document userTeamId');
           } else {
             console.error('❌ [DEBUG loadRoster] All retry attempts failed - cannot load roster');
@@ -1471,8 +1474,17 @@ async function loadRoster() {
     } else if (!res.ok) {
       console.error('❌ [DEBUG loadRoster] Roster endpoint error:', res.status, res.statusText);
       return;
-    } else {
+    } else if (!dataLoaded) {
+      // Only load data if it wasn't already loaded from a retry
       data = await res.json();
+    }
+    
+    // Process roster data (common for both initial fetch and retry)
+    if (!data) {
+      console.error('❌ [DEBUG loadRoster] No data loaded - cannot process roster');
+      return;
+    }
+    
     console.log('🔍 [DEBUG loadRoster] Roster API response:', {
       playersCount: data.players?.length || 0,
       hasPlayers: !!data.players,
