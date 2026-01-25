@@ -167,7 +167,14 @@ class GameManager:
             "last_rebound": None,
             "last_stealer": None,
             "last_turnover_player": None,
-            "ineligible_players": []  # Track players with 5+ fouls (fouled out)
+            "ineligible_players": [],  # Track players with 5+ fouls (fouled out)
+            "man_defense_matchups": {  # Custom defensive matchups for man defense (resets at each break)
+                "PG": "PG",
+                "SG": "SG",
+                "SF": "SF",
+                "PF": "PF",
+                "C": "C"
+            }
         }
 
 
@@ -185,6 +192,11 @@ class GameManager:
         Returns:
             dict: Timeout turn payload
         """
+        # ✅ MAN DEFENSE MATCHUPS: Reset to defaults at start of timeout break
+        from BackEnd.utils.man_defense_matchups import reset_matchups_to_defaults
+        reset_matchups_to_defaults(self.game_state)
+        logging.info("✅ TIMEOUT: Reset man defense matchups to defaults")
+        
         # Check if team has timeouts remaining (skip for FOUL_OUT)
         if timeout_reason != "FOUL_OUT":
             if not self.turn_manager.can_call_timeout(calling_team):
@@ -377,6 +389,11 @@ class GameManager:
 
         # ✅ TIMEOUT: Check for foul out and create timeout turn
         if result.get("fouled_out"):
+            # ✅ MAN DEFENSE MATCHUPS: Reset to defaults at start of foul out break
+            from BackEnd.utils.man_defense_matchups import reset_matchups_to_defaults
+            reset_matchups_to_defaults(self.game_state)
+            logging.info("✅ FOUL OUT: Reset man defense matchups to defaults")
+            
             foul_out_player_data = result.get("foul_out_player", {})
             # Find the actual player object
             foul_out_player = None

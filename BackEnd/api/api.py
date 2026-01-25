@@ -3480,6 +3480,11 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             gm.game_state["quarter"] = gm.quarter  # ✅ FIX: Ensure game_state is updated
             logging.info(f"✅ Advanced to quarter {gm.quarter}")
             
+            # ✅ MAN DEFENSE MATCHUPS: Reset to defaults at start of quarter break
+            from BackEnd.utils.man_defense_matchups import reset_matchups_to_defaults
+            reset_matchups_to_defaults(gm.game_state)
+            logging.info("✅ QUARTER BREAK: Reset man defense matchups to defaults")
+            
             # ✅ QUARTER BREAK: Clear timeout state when quarter completes (not a timeout resume)
             # This ensures quarter breaks are treated as new quarter starts, not timeout resumes
             if "timeout_next_play_type" in gm.game_state:
