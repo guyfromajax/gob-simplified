@@ -47,7 +47,7 @@ def aggregate_team_stats_from_players(
         team_id_str = str(team_id)
         team_stats_map[team_id_str] = {
             "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
-            "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
+            "FGM": 0, "FGA": 0, "3PTM": 0, "3PTA": 0, "FTM": 0, "FTA": 0,
             "DREB": 0, "OREB": 0, "TREB": 0,
             "TO": 0, "F": 0,
             "DEF_A": 0, "DEF_S": 0, "SCR_A": 0, "SCR_S": 0
@@ -107,7 +107,7 @@ def aggregate_team_stats_from_players(
                 # Team not in tournament/franchise, but player has stats - initialize it
                 team_stats_map[resolved_team_id] = {
                     "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
-                    "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
+                    "FGM": 0, "FGA": 0, "3PTM": 0, "3PTA": 0, "FTM": 0, "FTA": 0,
                     "DREB": 0, "OREB": 0, "TREB": 0,
                     "TO": 0, "F": 0,
                     "DEF_A": 0, "DEF_S": 0, "SCR_A": 0, "SCR_S": 0
@@ -122,24 +122,18 @@ def aggregate_team_stats_from_players(
         if team_id_str not in team_stats_map:
             team_stats_map[team_id_str] = {
                 "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
-                "FGM": 0, "FGA": 0, "TPM": 0, "TPA": 0, "FTM": 0, "FTA": 0,
+                "FGM": 0, "FGA": 0, "3PTM": 0, "3PTA": 0, "FTM": 0, "FTA": 0,
                 "DREB": 0, "OREB": 0, "TREB": 0,
                 "TO": 0, "F": 0,
                 "DEF_A": 0, "DEF_S": 0, "SCR_A": 0, "SCR_S": 0
             }
         
         players_with_stats += 1
-        # Sum all stats for this team (map 3PTM to TPM for output)
+        # Sum all stats for this team (use 3PTM/3PTA directly, no mapping needed)
         for stat, val in season_stats.items():
             if isinstance(val, (int, float)):
-                output_stat = stat
-                if stat == "3PTM":
-                    output_stat = "TPM"
-                elif stat == "3PTA":
-                    output_stat = "TPA"
-                
-                if output_stat in team_stats_map[team_id_str]:
-                    team_stats_map[team_id_str][output_stat] += val
+                if stat in team_stats_map[team_id_str]:
+                    team_stats_map[team_id_str][stat] += val
     
     if logger:
         log_func(f"🔍 [{collection_type.upper()}_TEAM_STATS] Processed {players_with_stats} players with stats, "

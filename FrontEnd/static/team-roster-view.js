@@ -407,9 +407,9 @@ function renderStats() {
       tr.appendChild(td);
     };
     
-    // Map 3PTM/3PTA to TPM/TPA for display
-    const tpm = stats['3PTM'] || stats.TPM || 0;
-    const tpa = stats['3PTA'] || stats.TPA || 0;
+    // Use 3PTM/3PTA directly (standardized field names)
+    const tpm = stats['3PTM'] || 0;
+    const tpa = stats['3PTA'] || 0;
     const fgm = stats.FGM || 0;
     const fga = stats.FGA || 0;
     const ftm = stats.FTM || 0;
@@ -541,10 +541,10 @@ function sortStats() {
       val1 = fga1 > 0 ? (a.stats.FGM || 0) / fga1 : 0;
       val2 = fga2 > 0 ? (b.stats.FGM || 0) / fga2 : 0;
     } else if (statsSortColumn === '3PT%') {
-      const tpa1 = a.stats['3PTA'] || a.stats.TPA || 0;
-      const tpa2 = b.stats['3PTA'] || b.stats.TPA || 0;
-      const tpm1 = a.stats['3PTM'] || a.stats.TPM || 0;
-      const tpm2 = b.stats['3PTM'] || b.stats.TPM || 0;
+      const tpa1 = a.stats['3PTA'] || 0;
+      const tpa2 = b.stats['3PTA'] || 0;
+      const tpm1 = a.stats['3PTM'] || 0;
+      const tpm2 = b.stats['3PTM'] || 0;
       val1 = tpa1 > 0 ? tpm1 / tpa1 : 0;
       val2 = tpa2 > 0 ? tpm2 / tpa2 : 0;
     } else if (statsSortColumn === 'FT%') {

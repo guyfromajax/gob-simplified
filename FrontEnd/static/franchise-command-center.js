@@ -1849,9 +1849,9 @@ function renderRosterStatsTable(players) {
   
   players.forEach(p => {
     const stats = p.stats?.season || {};
-    // ✅ FIX: Map 3PTM/3PTA to TPM/TPA for display (database stores as 3PTM/3PTA, frontend expects TPM/TPA)
-    const tpm = stats['3PTM'] || stats.TPM || 0;
-    const tpa = stats['3PTA'] || stats.TPA || 0;
+    // Use 3PTM/3PTA directly (standardized field names)
+    const tpm = stats['3PTM'] || 0;
+    const tpa = stats['3PTA'] || 0;
     
     // Calculate percentages
     const fgPct = stats.FGA > 0 ? ((stats.FGM || 0) / stats.FGA * 100).toFixed(1) : '0.0';
@@ -1892,8 +1892,8 @@ function sortRosterStats(statKey) {
     'FGM': 'FGM',
     'FGA': 'FGA',
     'FG%': 'FG%',
-    '3PTM': 'TPM',
-    'TPA': 'TPA',
+    '3PTM': '3PTM',
+    '3PTA': '3PTA',
     '3PT%': '3PT%',
     'FTM': 'FTM',
     'FTA': 'FTA',
