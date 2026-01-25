@@ -1408,10 +1408,71 @@ async function loadRoster() {
     }
     // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint
     // Use userTeamId directly (not formatted) - backend handles name resolution
-    const url = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?tournament_id=${encodeURIComponent(tournament._id)}`;
+    let data = null;
+    let url = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?tournament_id=${encodeURIComponent(tournament._id)}`;
     console.log('🔍 [DEBUG loadRoster] Fetching roster from:', url);
-    const res = await fetch(url);
-    const data = await res.json();
+    let res = await fetch(url);
+    
+    // ✅ FIX: Handle 404 errors - stale userTeamId from localStorage
+    if (!res.ok && res.status === 404) {
+      console.error('❌ [DEBUG loadRoster] Roster endpoint returned 404 - userTeamId may be stale:', userTeamId);
+      console.error('   Attempting to reload userTeamId from command center data or tournament document...');
+      
+      // Try to reload userTeamId from command center data
+      try {
+        const commandCenterRes = await fetch(`${API_CONFIG.buildUrl('/tournament/command-center/data')}?tournament_id=${encodeURIComponent(tournament._id)}&_=${Date.now()}`, { cache: "no-store" });
+        if (commandCenterRes.ok) {
+          const commandCenterData = await commandCenterRes.json();
+          if (commandCenterData && commandCenterData.team_id) {
+            console.log('✅ [DEBUG loadRoster] Reloaded userTeamId from command center data:', commandCenterData.team_id);
+            userTeamId = commandCenterData.team_id;
+            localStorage.setItem("userTeamId", userTeamId);
+            
+            // Retry with correct userTeamId
+            url = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?tournament_id=${encodeURIComponent(tournament._id)}`;
+            res = await fetch(url);
+            if (res.ok) {
+              data = await res.json();
+              console.log('✅ [DEBUG loadRoster] Retry successful with corrected userTeamId');
+            } else {
+              throw new Error(`Retry failed: ${res.status} ${res.statusText}`);
+            }
+          } else {
+            throw new Error('commandCenterData.team_id not found');
+          }
+        } else {
+          throw new Error(`Failed to load command center data: ${commandCenterRes.status}`);
+        }
+      } catch (error) {
+        console.error('❌ [DEBUG loadRoster] Failed to reload userTeamId from command center:', error);
+        console.error('   Falling back to tournament document...');
+        
+        // Fallback: Try to get userTeamId from tournament document
+        if (tournament && tournament.user_team_object_id) {
+          userTeamId = tournament.user_team_object_id;
+          localStorage.setItem("userTeamId", userTeamId);
+          console.log('✅ [DEBUG loadRoster] Using userTeamId from tournament document:', userTeamId);
+          
+          // Retry with tournament document userTeamId
+          url = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?tournament_id=${encodeURIComponent(tournament._id)}`;
+          res = await fetch(url);
+          if (res.ok) {
+            data = await res.json();
+            console.log('✅ [DEBUG loadRoster] Retry successful with tournament document userTeamId');
+          } else {
+            console.error('❌ [DEBUG loadRoster] All retry attempts failed - cannot load roster');
+            return;
+          }
+        } else {
+          console.error('❌ [DEBUG loadRoster] Cannot recover - no valid userTeamId found');
+          return;
+        }
+      }
+    } else if (!res.ok) {
+      console.error('❌ [DEBUG loadRoster] Roster endpoint error:', res.status, res.statusText);
+      return;
+    } else {
+      data = await res.json();
     console.log('🔍 [DEBUG loadRoster] Roster API response:', {
       playersCount: data.players?.length || 0,
       hasPlayers: !!data.players,
@@ -1627,13 +1688,18 @@ async function initializeTournament() {
     // Populate top bar using structured data (aligns with Franchise)
     populateTop(commandCenterData);
     
+    // ✅ FIX: Always prioritize commandCenterData.team_id over localStorage (fixes stale userTeamId bug)
     // Update userTeamId and userTeamName from command center data
     if (commandCenterData.team) {
       userTeamName = commandCenterData.team; // Team name for bracket comparisons
     }
     if (commandCenterData.team_id) {
+      // ✅ SS&S: commandCenterData.team_id is authoritative - always use it, even if localStorage has a different value
       userTeamId = commandCenterData.team_id; // ObjectId for API calls
       localStorage.setItem("userTeamId", userTeamId);
+      console.log('✅ [TOURNAMENT INIT] Set userTeamId from commandCenterData:', userTeamId);
+    } else {
+      console.warn('⚠️ [TOURNAMENT INIT] commandCenterData.team_id not found - using existing userTeamId:', userTeamId);
     }
     
     // ✅ FIX: Store user team name for leaderboard highlighting (matches Franchise pattern)
