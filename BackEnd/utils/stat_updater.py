@@ -1268,7 +1268,30 @@ def finalize_game(
             if not team_name:
                 logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] team_name is None/empty, skipping")
                 continue
+            
+            # ✅ FIX: Try exact match first, then case-insensitive match, then use first available key
             team_box = box_score.get(team_name, {})
+            if not team_box:
+                # Try case-insensitive match
+                box_score_keys = list(box_score.keys())
+                matched_key = None
+                for key in box_score_keys:
+                    if key.lower() == team_name.lower():
+                        matched_key = key
+                        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Matched team_name '{team_name}' to box_score key '{matched_key}' (case-insensitive)")
+                        break
+                
+                if matched_key:
+                    team_box = box_score[matched_key]
+                elif box_score_keys:
+                    # Last resort: use first available key (shouldn't happen, but prevents total failure)
+                    matched_key = box_score_keys[0]
+                    team_box = box_score[matched_key]
+                    logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] team_name '{team_name}' not found in box_score, using first available key '{matched_key}'")
+                else:
+                    logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team: {team_name} (box_score is empty)")
+                    continue
+            
             if not team_box:
                 logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team: {team_name} (available teams: {list(box_score.keys())})")
                 continue
@@ -1757,9 +1780,32 @@ def finalize_game(
             if not team_name:
                 logger.warning(f"⚠️ [FINALIZE_GAME] team_name is None/empty, skipping")
                 continue
+            
+            # ✅ FIX: Try exact match first, then case-insensitive match, then use first available key
             team_box = box_score.get(team_name, {})
             if not team_box:
-                logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team: {team_name} (box_score keys: {list(box_score.keys())})")
+                # Try case-insensitive match
+                box_score_keys = list(box_score.keys())
+                matched_key = None
+                for key in box_score_keys:
+                    if key.lower() == team_name.lower():
+                        matched_key = key
+                        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Matched team_name '{team_name}' to box_score key '{matched_key}' (case-insensitive)")
+                        break
+                
+                if matched_key:
+                    team_box = box_score[matched_key]
+                elif box_score_keys:
+                    # Last resort: use first available key (shouldn't happen, but prevents total failure)
+                    matched_key = box_score_keys[0]
+                    team_box = box_score[matched_key]
+                    logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] team_name '{team_name}' not found in box_score, using first available key '{matched_key}'")
+                else:
+                    logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team: {team_name} (box_score is empty)")
+                    continue
+            
+            if not team_box:
+                logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team: {team_name} (available teams: {list(box_score.keys())})")
                 continue
             
             logger.info(f"🔍 [FINALIZE_GAME] Processing team '{team_name}' - found {len(team_box)} players in box_score")
