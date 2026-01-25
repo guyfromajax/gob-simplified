@@ -1154,6 +1154,16 @@ def finalize_game(
                 away_team_name = away_team_obj
         
         logger.info(f"🔍 [FINALIZE_GAME] Processing box_score with {len(box_score)} teams: {list(box_score.keys())}")
+        logger.info(f"🔍 [FINALIZE_GAME DEBUG] box_score structure check:")
+        for team_name, team_box in box_score.items():
+            if isinstance(team_box, dict):
+                logger.info(f"🔍 [FINALIZE_GAME DEBUG]   Team '{team_name}': {len(team_box)} players")
+                # Log first player's structure
+                first_pos = list(team_box.keys())[0] if team_box else None
+                if first_pos:
+                    first_player = team_box[first_pos]
+                    if isinstance(first_player, dict):
+                        logger.info(f"🔍 [FINALIZE_GAME DEBUG]     Sample player at '{first_pos}': playerId={first_player.get('playerId')}, PTS={first_player.get('PTS', 'N/A')}, FGM={first_player.get('FGM', 'N/A')}")
         
         # ✅ SS&S: Build team_name -> team_id map from tournament.teams
         tournament_doc = tournaments_collection.find_one({"_id": tid}, {"teams": 1})
@@ -1179,11 +1189,15 @@ def finalize_game(
         
         for team_name in [home_team_name, away_team_name]:
             if not team_name:
+                logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] team_name is None/empty, skipping")
                 continue
             team_box = box_score.get(team_name, {})
             if not team_box:
-                logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team: {team_name}")
+                logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team: {team_name} (available teams: {list(box_score.keys())})")
                 continue
+            
+            logger.info(f"🔍 [FINALIZE_GAME DEBUG] Processing team '{team_name}': {len(team_box)} players in box_score")
+            team_players_processed = 0
             
             for pos_key, player_data in team_box.items():
                 if not isinstance(player_data, dict):
@@ -1202,9 +1216,13 @@ def finalize_game(
                     continue
                 
                 players_processed += 1
+                team_players_processed += 1
                 
                 # Clean stats and build increments
-                for stat, val in _clean_stat_block(stat_block).items():
+                cleaned_stats = _clean_stat_block(stat_block)
+                logger.info(f"🔍 [FINALIZE_GAME DEBUG] Player {pid_str} ({player_data.get('name', 'Unknown')}): {len(cleaned_stats)} cleaned stats, sample: PTS={cleaned_stats.get('PTS', 0)}, FGM={cleaned_stats.get('FGM', 0)}")
+                
+                for stat, val in cleaned_stats.items():
                     if stat in ["playerId", "name", "jersey", "x", "y", "coords", "team", "pos"]:
                         continue
                     # MIN special handling: Convert seconds to minutes
@@ -1226,8 +1244,11 @@ def finalize_game(
                 # Set meta.team_id if team_name is in our map
                 if team_name in team_name_to_id:
                     set_doc[f"players.{pid_str}.meta.team_id"] = team_name_to_id[team_name]
+            
+            logger.info(f"🔍 [FINALIZE_GAME DEBUG] Team '{team_name}': processed {team_players_processed} players")
         
-        logger.info(f"🔍 [FINALIZE_GAME] Processed {players_processed} players, {len(inc_doc)} stat increments")
+        logger.info(f"🔍 [FINALIZE_GAME] Processed {players_processed} players total, {len(inc_doc)} stat increments")
+        logger.info(f"🔍 [FINALIZE_GAME DEBUG] inc_doc size: {len(inc_doc)}, set_doc size: {len(set_doc)}, processed_player_ids: {len(processed_player_ids)}")
         
         # ✅ DEBUG: Log sample of what's being saved
         if inc_doc:
@@ -1301,15 +1322,23 @@ def finalize_game(
         update: Dict[str, Any] = {"$addToSet": {"applied_games": game_id}}
         if inc_doc:
             update["$inc"] = inc_doc
+            logger.info(f"🔍 [FINALIZE_GAME DEBUG] Added $inc with {len(inc_doc)} increments")
+        else:
+            logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] inc_doc is EMPTY - no $inc in update!")
         if set_doc:
             update["$set"] = set_doc
+            logger.info(f"🔍 [FINALIZE_GAME DEBUG] Added $set with {len(set_doc)} fields")
         if set_on_insert_doc:
             update["$setOnInsert"] = set_on_insert_doc
+            logger.info(f"🔍 [FINALIZE_GAME DEBUG] Added $setOnInsert with {len(set_on_insert_doc)} fields")
         
         # ✅ SS&S: Single atomic update with document-level applied_games check (like Franchise)
         # ✅ FIX: Normalize game_id to string for consistent comparison
         game_id_str = str(game_id)
         logger.info(f"🔍 [FINALIZE_GAME] Executing single atomic update (SS&S pattern), game_id={game_id_str}")
+        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Update operation keys: {list(update.keys())}")
+        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Query filter: _id={tid}, applied_games not in [{game_id_str}, {game_id}, {gid}]")
+        
         # Check both string and ObjectId formats in applied_games
         result = tournaments_collection.update_one(
             {
@@ -1324,15 +1353,25 @@ def finalize_game(
         )
         
         logger.info(f"🔍 [FINALIZE_GAME] Update result: matched={result.matched_count}, modified={result.modified_count}")
+        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Update result details: matched={result.matched_count}, modified={result.modified_count}, upserted_id={result.upserted_id}")
         
         if result.modified_count == 0:
+            logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] Update modified_count is 0!")
             check_doc = tournaments_collection.find_one({"_id": tid}, {"applied_games": 1})
             if check_doc:
                 applied = check_doc.get("applied_games", [])
+                logger.info(f"🔍 [FINALIZE_GAME DEBUG] Tournament applied_games: {applied}")
+                logger.info(f"🔍 [FINALIZE_GAME DEBUG] Checking if game_id {game_id} (str: {game_id_str}, ObjectId: {gid}) is in applied_games")
                 if game_id in applied or str(game_id) in [str(g) for g in applied]:
                     logger.info(f"ℹ️ [FINALIZE_GAME] Game {game_id} already in applied_games, skipping (idempotent)")
                 else:
                     logger.warning(f"⚠️ [FINALIZE_GAME] Update had no effect. Tournament applied_games: {applied}, game_id={game_id}")
+                    logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] Query matched={result.matched_count} but modified=0. This could mean:")
+                    logger.warning(f"⚠️ [FINALIZE_GAME DEBUG]   1. Game already in applied_games (but check above should catch this)")
+                    logger.warning(f"⚠️ [FINALIZE_GAME DEBUG]   2. inc_doc was empty and no other updates were needed")
+                    logger.warning(f"⚠️ [FINALIZE_GAME DEBUG]   3. MongoDB update failed silently")
+            else:
+                logger.error(f"❌ [FINALIZE_GAME DEBUG] Tournament document not found for _id={tid}")
             return
         
         # ✅ SS&S: Calculate per_game and percentages for all updated players (like Franchise)
