@@ -1860,7 +1860,14 @@ class Animator:
             
             
             # Get the offensive player this defender is guarding
-            off_pos_to_guard = def_pos  # Man-to-man by position
+            # ✅ MAN DEFENSE MATCHUPS: Check for custom matchups, fallback to position-on-position
+            off_pos_to_guard = def_pos  # Default: position-on-position
+            matchups = self.game.game_state.get("man_defense_matchups", {})
+            if matchups and def_pos in matchups:
+                # Custom matchup exists: defensive position guards the specified offensive position
+                off_pos_to_guard = matchups[def_pos]
+            # If no custom matchup, off_pos_to_guard remains def_pos (position-on-position)
+            
             off_coords_list = offensive_positions_by_step.get(off_pos_to_guard, [])
             
             def_movement = []
