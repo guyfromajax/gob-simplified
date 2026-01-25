@@ -1875,13 +1875,29 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # ✅ SS&S: Restore strategy_calls (playcall overrides) from database
                         home_strategy_calls = home_team_data.get("strategy_calls")
                         away_strategy_calls = away_team_data.get("strategy_calls")
-                        # ✅ FIX: Extract playbook_settings from game document when resuming
-                        # This ensures playbook_settings are available when resuming games (Q2-Q4)
-                        home_playbook_settings = home_team_data.get("playbook_settings", {})
-                        away_playbook_settings = away_team_data.get("playbook_settings", {})
+                        # ✅ UNIFIED: Extract playbook_settings using unified extract function
+                        # This ensures consistent team_id resolution (same logic as save_playbooks)
+                        from BackEnd.utils.team_settings_manager import extract_team_settings
+                        
+                        # Extract using team names (will be resolved to canonical team_id internally)
+                        home_playbook_settings = extract_team_settings(
+                            saved_doc=saved,
+                            team_identifier=home,  # Team name
+                            settings_type="playbook_settings",
+                            mode="single",
+                            game_doc=saved  # Pass saved doc for team_id resolution
+                        ) or {}
+                        
+                        away_playbook_settings = extract_team_settings(
+                            saved_doc=saved,
+                            team_identifier=away,  # Team name
+                            settings_type="playbook_settings",
+                            mode="single",
+                            game_doc=saved  # Pass saved doc for team_id resolution
+                        ) or {}
                         
                         # ✅ DEBUG: Log playbook_settings extraction
-                        logging.warning(f"🔍 [PLAYBOOK SETTINGS LOAD] Extracted from DB: home={bool(home_playbook_settings)} (key={home_team_id}), away={bool(away_playbook_settings)} (key={away_team_id})")
+                        logging.warning(f"🔍 [PLAYBOOK SETTINGS LOAD] Extracted from DB: home={bool(home_playbook_settings)} (team={home}), away={bool(away_playbook_settings)} (team={away})")
                         if home_playbook_settings:
                             logging.warning(f"🔍 [PLAYBOOK SETTINGS LOAD] Home settings keys: {list(home_playbook_settings.keys())[:5]}")
                             logging.warning(f"🔍 [PLAYBOOK SETTINGS LOAD] Home settings sample: motion={bool(home_playbook_settings.get('motion'))}, set_play_inside={bool(home_playbook_settings.get('set_play_inside'))}")
@@ -1889,7 +1905,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             logging.warning(f"🔍 [PLAYBOOK SETTINGS LOAD] Away settings keys: {list(away_playbook_settings.keys())[:5]}")
                             logging.warning(f"🔍 [PLAYBOOK SETTINGS LOAD] Away settings sample: motion={bool(away_playbook_settings.get('motion'))}, set_play_inside={bool(away_playbook_settings.get('set_play_inside'))}")
                         if not home_playbook_settings and not away_playbook_settings:
-                            logging.warning(f"⚠️ [PLAYBOOK SETTINGS LOAD] No playbook_settings found in DB: home_team_id={home_team_id}, away_team_id={away_team_id}")
+                            logging.warning(f"⚠️ [PLAYBOOK SETTINGS LOAD] No playbook_settings found in DB: home={home}, away={away}")
                             logging.warning(f"⚠️ [PLAYBOOK SETTINGS LOAD] teams_obj keys: {list(teams_obj.keys())[:3] if teams_obj else 'NO_TEAMS_OBJ'}")
                         
                         # ✅ CRITICAL FIX: Restore playbook_settings to game document after GameManager creation
