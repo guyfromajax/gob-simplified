@@ -34,7 +34,6 @@ let dontShowAgainThisGame = false; // Track "Don't show again" checkbox state
 export async function showDefenseMatchupsPopup(gameId, scene) {
     // Check if user has checked "Don't show again this game"
     if (dontShowAgainThisGame) {
-        console.log("⏸️ DEFENSE MATCHUPS: Skipping popup (user selected 'Don't show again')");
         return Promise.resolve();
     }
     
@@ -246,7 +245,6 @@ function createPlayerRow(player, teamType, position, currentMatchups, guardingUs
 function initializeDragAndDrop(popup, gameId, onResolve) {
     const userRowsContainer = popup.querySelector('.user-team-column .player-rows');
     if (!userRowsContainer) {
-        console.error('🔴 [DEFENSE MATCHUPS DND] Container not found');
         return;
     }
     
@@ -507,7 +505,6 @@ async function handleSubmit(popup, gameId) {
         
         // Close popup
         popup.remove();
-        console.log("✅ DEFENSE MATCHUPS: Saved successfully", matchups);
         
     } catch (error) {
         console.error("❌ DEFENSE MATCHUPS: Failed to save:", error);
