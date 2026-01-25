@@ -157,21 +157,21 @@ function createPlayerRow(player, teamType, position, currentMatchups, guardingUs
         ? POSITION_COLORS[position]
         : (guardingUserPos ? POSITION_COLORS[guardingUserPos] : '#c0c0c0');
     
-    // Build stat strip
+    // Build stat strip - single integer values (divide by 10, floor) like lineup screen
     let statStrip = '';
     if (isUserTeam) {
         // User team: ID, OD, AG, ST, ND, IQ, NG, DEF%
         const attrs = player.attributes;
         statStrip = `
             <div class="stat-strip">
-                <div class="stat-item"><span class="stat-label">ID</span><span class="stat-value">${attrs.ID}</span></div>
-                <div class="stat-item"><span class="stat-label">OD</span><span class="stat-value">${attrs.OD}</span></div>
-                <div class="stat-item"><span class="stat-label">AG</span><span class="stat-value">${attrs.AG}</span></div>
-                <div class="stat-item"><span class="stat-label">ST</span><span class="stat-value">${attrs.ST}</span></div>
-                <div class="stat-item"><span class="stat-label">ND</span><span class="stat-value">${attrs.ND}</span></div>
-                <div class="stat-item"><span class="stat-label">IQ</span><span class="stat-value">${attrs.IQ}</span></div>
-                <div class="stat-item"><span class="stat-label">NG</span><span class="stat-value">${attrs.NG}%</span></div>
-                <div class="stat-item"><span class="stat-label">DEF%</span><span class="stat-value">${attrs['DEF%']}%</span></div>
+                <div class="stat-item"><span class="stat-label">ID</span><span class="stat-value">${Math.floor((attrs.ID || 0) / 10)}</span></div>
+                <div class="stat-item"><span class="stat-label">OD</span><span class="stat-value">${Math.floor((attrs.OD || 0) / 10)}</span></div>
+                <div class="stat-item"><span class="stat-label">AG</span><span class="stat-value">${Math.floor((attrs.AG || 0) / 10)}</span></div>
+                <div class="stat-item"><span class="stat-label">ST</span><span class="stat-value">${Math.floor((attrs.ST || 0) / 10)}</span></div>
+                <div class="stat-item"><span class="stat-label">ND</span><span class="stat-value">${Math.floor((attrs.ND || 0) / 10)}</span></div>
+                <div class="stat-item"><span class="stat-label">IQ</span><span class="stat-value">${Math.floor((attrs.IQ || 0) / 10)}</span></div>
+                <div class="stat-item"><span class="stat-label">NG</span><span class="stat-value">${attrs.NG || 0}%</span></div>
+                <div class="stat-item"><span class="stat-label">DEF%</span><span class="stat-value">${attrs['DEF%'] || 0}%</span></div>
             </div>
         `;
     } else {
@@ -179,14 +179,14 @@ function createPlayerRow(player, teamType, position, currentMatchups, guardingUs
         const stats = player.stats;
         statStrip = `
             <div class="stat-strip">
-                <div class="stat-item"><span class="stat-label">SC</span><span class="stat-value">${stats.SC}</span></div>
-                <div class="stat-item"><span class="stat-label">SH</span><span class="stat-value">${stats.SH}</span></div>
-                <div class="stat-item"><span class="stat-label">AG</span><span class="stat-value">${stats.AG}</span></div>
-                <div class="stat-item"><span class="stat-label">ST</span><span class="stat-value">${stats.ST}</span></div>
-                <div class="stat-item"><span class="stat-label">ND</span><span class="stat-value">${stats.ND}</span></div>
-                <div class="stat-item"><span class="stat-label">IQ</span><span class="stat-value">${stats.IQ}</span></div>
-                <div class="stat-item"><span class="stat-label">NG</span><span class="stat-value">${stats.NG}%</span></div>
-                <div class="stat-item"><span class="stat-label">PTS</span><span class="stat-value">${stats.PTS}</span></div>
+                <div class="stat-item"><span class="stat-label">SC</span><span class="stat-value">${Math.floor((stats.SC || 0) / 10)}</span></div>
+                <div class="stat-item"><span class="stat-label">SH</span><span class="stat-value">${Math.floor((stats.SH || 0) / 10)}</span></div>
+                <div class="stat-item"><span class="stat-label">AG</span><span class="stat-value">${Math.floor((stats.AG || 0) / 10)}</span></div>
+                <div class="stat-item"><span class="stat-label">ST</span><span class="stat-value">${Math.floor((stats.ST || 0) / 10)}</span></div>
+                <div class="stat-item"><span class="stat-label">ND</span><span class="stat-value">${Math.floor((stats.ND || 0) / 10)}</span></div>
+                <div class="stat-item"><span class="stat-label">IQ</span><span class="stat-value">${Math.floor((stats.IQ || 0) / 10)}</span></div>
+                <div class="stat-item"><span class="stat-label">NG</span><span class="stat-value">${stats.NG || 0}%</span></div>
+                <div class="stat-item"><span class="stat-label">PTS</span><span class="stat-value">${stats.PTS || 0}</span></div>
             </div>
         `;
     }
@@ -461,10 +461,10 @@ function addPopupStyles() {
             background: #fff;
             border: 4px solid #c0c0c0;
             border-radius: 8px;
-            padding: 24px 48px;
+            padding: 20px 48px;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 12px;
             align-items: center;
             min-width: 1000px;
             max-width: 1200px;
@@ -491,7 +491,7 @@ function addPopupStyles() {
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
         }
 
         .team-header {
@@ -499,7 +499,7 @@ function addPopupStyles() {
             font-weight: 600;
             color: #2a2a2a;
             text-align: center;
-            padding: 6px 12px;
+            padding: 4px 12px;
             background: #f5f5f5;
             border-radius: 4px;
             font-family: 'Inter', sans-serif;
@@ -509,14 +509,14 @@ function addPopupStyles() {
         .player-rows {
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: 3px;
         }
 
         .player-row {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 8px 10px;
+            padding: 6px 10px;
             border-radius: 4px;
             background: #fafafa;
             cursor: move;
@@ -575,7 +575,7 @@ function addPopupStyles() {
         .stat-strip {
             display: flex;
             gap: 8px;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             flex: 1;
             align-items: center;
         }
@@ -607,10 +607,10 @@ function addPopupStyles() {
         .matchups-controls {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
             align-items: center;
             width: 100%;
-            margin-top: 4px;
+            margin-top: 2px;
         }
 
         .submit-matchups-button {
