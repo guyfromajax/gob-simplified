@@ -581,7 +581,7 @@ def recompute_tournament_leaders(tournament_id: str, limit: int = 10) -> Dict[st
         ("AST", "MIN"),
         ("STL", "MIN"),
         ("BLK", "MIN"),
-        ("TPM", "TPA"),
+        ("3PTM", "3PTA"),  # ✅ SS&S: Use standardized field name "3PTM" instead of "TPM"
         ("FG%", "FGA"),
         ("FT%", "FTA"),
     ]
@@ -595,9 +595,9 @@ def recompute_tournament_leaders(tournament_id: str, limit: int = 10) -> Dict[st
             makes = stats.get("FTM", 0)
             attempts = stats.get("FTA", 0)
             return (makes / attempts * 100) if attempts else 0.0
-        if key == "TPM":
+        if key == "3PTM":  # ✅ SS&S: Use standardized field name
             return stats.get("3PTM", 0)
-        if key == "TPA":
+        if key == "3PTA":  # ✅ SS&S: Use standardized field name
             return stats.get("3PTA", 0)
         return stats.get(key, 0)
 
@@ -612,8 +612,8 @@ def recompute_tournament_leaders(tournament_id: str, limit: int = 10) -> Dict[st
                 continue
             if stat == "FT%" and season.get("FTA", 0) == 0:
                 continue
-            if stat == "TPM":
-                attempts = season.get("3PTA", season.get("TPA", 0))
+            if stat == "3PTM":  # ✅ SS&S: Use standardized field name
+                attempts = season.get("3PTA", 0)
                 if attempts == 0:
                     continue
             entries.append(
