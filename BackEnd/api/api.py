@@ -2235,6 +2235,16 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                 if update_data:
                                     games_collection.update_one({"_id": game_id}, {"$set": update_data})
                                     logging.info(f"✅ [PLAYBOOK SETTINGS RESTORE] Restored playbook_settings to game document: home={bool(home_playbook_settings)} (key={home_key}), away={bool(away_playbook_settings)} (key={away_key})")
+                                
+                                # ✅ CRITICAL FIX: Apply playbook_settings to GameManager team objects (not just database)
+                                # This ensures playbook_settings are available during gameplay after timeout resume
+                                # Mirrors how strategy_settings are applied (lines 1985-1989)
+                                if home_playbook_settings:
+                                    gm.home_team.playbook_settings = dict(home_playbook_settings)
+                                    logging.info(f"✅ [PLAYBOOK SETTINGS RESTORE] Applied home_playbook_settings to GameManager: slot_assignments={len(home_playbook_settings.get('slot_assignments', {}))}")
+                                if away_playbook_settings:
+                                    gm.away_team.playbook_settings = dict(away_playbook_settings)
+                                    logging.info(f"✅ [PLAYBOOK SETTINGS RESTORE] Applied away_playbook_settings to GameManager: slot_assignments={len(away_playbook_settings.get('slot_assignments', {}))}")
                             except Exception as e:
                                 logging.warning(f"⚠️ [PLAYBOOK SETTINGS RESTORE] Could not restore playbook_settings to game document: {e}", exc_info=True)
                         
