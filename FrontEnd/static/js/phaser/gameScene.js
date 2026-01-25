@@ -225,9 +225,8 @@ export function createGameScene(Phaser) {
 
       // ✅ NEW GAME DETECTION: Determine if this is a truly new game
       // New game if: no game_id, OR Q1 with no game_id in URL and not resuming from timeout
-      const timeoutUrlParams = new URLSearchParams(window.location.search);
-      const urlGameId = timeoutUrlParams.get('game_id');
-      const resumeFromTimeout = timeoutUrlParams.get('resume_from_timeout') === 'true';
+      // Reuse urlParams and resumeFromTimeout from above (lines 167-168)
+      const urlGameId = urlParams.get('game_id');
       const isNewGameStart = !this.gameId || 
                         (this.quarter === 1 && !urlGameId && !resumeFromTimeout);
       
