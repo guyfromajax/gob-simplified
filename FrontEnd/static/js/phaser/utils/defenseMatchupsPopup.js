@@ -108,18 +108,24 @@ function createPopupElement(userTeam, computerTeam, currentMatchups, gameId) {
     // Store initial matchups in popup data attribute
     popup.dataset.matchups = JSON.stringify(currentMatchups);
     
+    // Get team colors with fallbacks
+    const userPrimaryColor = userTeam.primary_color || "#000000";
+    const userSecondaryColor = userTeam.secondary_color || "#ffffff";
+    const computerPrimaryColor = computerTeam.primary_color || "#000000";
+    const computerSecondaryColor = computerTeam.secondary_color || "#ffffff";
+    
     popup.innerHTML = `
         <div class="defense-matchups-content">
             <h2>DEFENSE MATCHUPS</h2>
             <div class="matchups-container">
                 <div class="team-column user-team-column">
-                    <div class="team-header">${userTeam.team_name}</div>
+                    <div class="team-header" style="background-color: ${userPrimaryColor}; color: ${userSecondaryColor}; border: 2px solid ${userSecondaryColor};">${userTeam.team_name}</div>
                     <div class="player-rows">
                         ${userRows}
                     </div>
                 </div>
                 <div class="team-column computer-team-column">
-                    <div class="team-header">${computerTeam.team_name}</div>
+                    <div class="team-header" style="background-color: ${computerPrimaryColor}; color: ${computerSecondaryColor}; border: 2px solid ${computerSecondaryColor};">${computerTeam.team_name}</div>
                     <div class="player-rows">
                         ${computerRows}
                     </div>
@@ -511,13 +517,12 @@ function addPopupStyles() {
         .team-header {
             font-size: 18px;
             font-weight: 600;
-            color: #2a2a2a;
             text-align: center;
             padding: 4px 12px;
-            background: #f5f5f5;
             border-radius: 4px;
             font-family: 'Inter', sans-serif;
             letter-spacing: 0.5px;
+            border: 2px solid;
         }
 
         .player-rows {
@@ -529,8 +534,8 @@ function addPopupStyles() {
         .player-row {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 6px 10px;
+            gap: 8px;
+            padding: 6px 8px;
             border-radius: 4px;
             background: #fafafa;
             cursor: move;
@@ -581,14 +586,14 @@ function addPopupStyles() {
             font-size: 14px;
             font-weight: 600;
             color: #1a1a1a;
-            min-width: 110px;
+            min-width: 90px;
             flex-shrink: 0;
             font-family: 'Inter', sans-serif;
         }
 
         .stat-strip {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             flex-wrap: nowrap;
             flex: 1;
             align-items: center;
@@ -599,7 +604,7 @@ function addPopupStyles() {
             flex-direction: column;
             align-items: center;
             gap: 1px;
-            min-width: 32px;
+            min-width: 28px;
         }
 
         .stat-label {

@@ -3934,11 +3934,15 @@ def get_lineup_for_matchups(game_id: str):
     return {
         "user_team": {
             "team_name": user_team.name,
-            "players": user_players
+            "players": user_players,
+            "primary_color": getattr(user_team, "primary_color", "#000000"),
+            "secondary_color": getattr(user_team, "secondary_color", "#ffffff")
         },
         "computer_team": {
             "team_name": computer_team.name,
-            "players": computer_players
+            "players": computer_players,
+            "primary_color": getattr(computer_team, "primary_color", "#000000"),
+            "secondary_color": getattr(computer_team, "secondary_color", "#ffffff")
         },
         "current_matchups": matchups
     }
