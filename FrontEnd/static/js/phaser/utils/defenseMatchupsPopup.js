@@ -229,19 +229,21 @@ function createPlayerRow(player, teamType, position, currentMatchups, guardingUs
 
 /**
  * Initialize drag-and-drop functionality
+ * User can only drag and drop within the user team column to swap positions
  * @param {HTMLElement} popup - Popup element
  * @param {string} gameId - Game ID
  * @param {Function} onResolve - Callback to resolve promise when popup is closed
  */
 function initializeDragAndDrop(popup, gameId, onResolve) {
+    const userRowsContainer = popup.querySelector('.user-team-column .player-rows');
     const userRows = popup.querySelectorAll('.user-team-row');
-    const computerRows = popup.querySelectorAll('.computer-team-row');
     
     let draggedRow = null;
     
-    // Make user team rows draggable
+    // Make user team rows draggable and drop targets
     userRows.forEach(row => {
         row.draggable = true;
+        
         row.addEventListener('dragstart', (e) => {
             draggedRow = row;
             e.dataTransfer.effectAllowed = 'move';
@@ -251,27 +253,31 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
         row.addEventListener('dragend', () => {
             row.style.opacity = '1';
             draggedRow = null;
+            // Reset all row backgrounds
+            userRows.forEach(r => r.style.backgroundColor = '');
         });
-    });
-    
-    // Make computer team rows drop targets
-    computerRows.forEach(row => {
+        
+        // Make each user row a drop target
         row.addEventListener('dragover', (e) => {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-            row.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+            if (row !== draggedRow) {
+                row.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+            }
         });
         
         row.addEventListener('dragleave', () => {
-            row.style.backgroundColor = '';
+            if (row !== draggedRow) {
+                row.style.backgroundColor = '';
+            }
         });
         
         row.addEventListener('drop', (e) => {
             e.preventDefault();
             row.style.backgroundColor = '';
             
-            if (draggedRow && draggedRow.classList.contains('user-team-row')) {
-                handleMatchupChange(draggedRow, row, popup, gameId);
+            if (draggedRow && draggedRow !== row) {
+                handleUserPositionSwap(draggedRow, row, popup, gameId);
             }
         });
     });
@@ -293,65 +299,52 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
 }
 
 /**
- * Handle matchup change when user drags and drops
- * Implements 1-to-1 mapping: swapping if needed
+ * Handle user position swap when user drags and drops within user team column
+ * Swaps the two players' positions and recalculates matchups based on new order
  */
-function handleMatchupChange(userRow, computerRow, popup, gameId) {
-    const userPosition = userRow.dataset.position;
-    const computerPosition = computerRow.dataset.position;
+function handleUserPositionSwap(draggedRow, targetRow, popup, gameId) {
+    const userRowsContainer = popup.querySelector('.user-team-column .player-rows');
+    const userRows = Array.from(popup.querySelectorAll('.user-team-row'));
     
-    // Get current matchups from popup DOM
-    const currentMatchups = getCurrentMatchupsFromPopup(popup);
+    // Get the original positions
+    const draggedPosition = draggedRow.dataset.position;
+    const targetPosition = targetRow.dataset.position;
     
-    // Check if userPosition was already guarding something
-    const previouslyGuarded = currentMatchups[userPosition];
+    // Swap the rows in the DOM
+    const draggedIndex = userRows.indexOf(draggedRow);
+    const targetIndex = userRows.indexOf(targetRow);
     
-    // Check if computerPosition is already being guarded by someone else
-    let previousGuardian = null;
-    for (const [userPos, guardedPos] of Object.entries(currentMatchups)) {
-        if (guardedPos === computerPosition && userPos !== userPosition) {
-            previousGuardian = userPos;
-            break;
-        }
-    }
-    
-    // Implement swap if needed (1-to-1 mapping)
-    if (previouslyGuarded && previouslyGuarded !== computerPosition) {
-        // User position was guarding something else - swap
-        if (previousGuardian) {
-            // Swap: userPosition guards computerPosition, previousGuardian guards previouslyGuarded
-            currentMatchups[userPosition] = computerPosition;
-            currentMatchups[previousGuardian] = previouslyGuarded;
-        } else {
-            // No previous guardian - just reassign
-            currentMatchups[userPosition] = computerPosition;
-        }
-    } else if (previousGuardian) {
-        // Computer position is guarded by someone else - swap
-        if (previouslyGuarded) {
-            currentMatchups[previousGuardian] = previouslyGuarded;
-        } else {
-            // Clear previous guardian (they guard nothing now, but we need 1-to-1, so swap with default)
-            currentMatchups[previousGuardian] = previousGuardian; // Default: same position
-        }
-        currentMatchups[userPosition] = computerPosition;
+    // Swap DOM elements
+    if (draggedIndex < targetIndex) {
+        // Dragged is before target - insert target after dragged
+        userRowsContainer.insertBefore(targetRow, draggedRow.nextSibling);
+        userRowsContainer.insertBefore(draggedRow, targetRow);
     } else {
-        // Simple assignment
-        currentMatchups[userPosition] = computerPosition;
+        // Dragged is after target - insert dragged after target
+        userRowsContainer.insertBefore(draggedRow, targetRow.nextSibling);
+        userRowsContainer.insertBefore(targetRow, draggedRow);
     }
     
-    // Ensure all positions are assigned (fill defaults for any missing)
-    POSITIONS.forEach(pos => {
-        if (!(pos in currentMatchups)) {
-            currentMatchups[pos] = pos; // Default: same position
-        }
+    // Update data-position attributes to reflect new slot positions
+    // After swap, draggedRow is now in targetPosition's slot, targetRow is in draggedPosition's slot
+    draggedRow.dataset.position = targetPosition;
+    targetRow.dataset.position = draggedPosition;
+    
+    // Recalculate matchups based on new position order
+    // Matchups are now: user position in slot X guards computer position X
+    const newMatchups = {};
+    const updatedUserRows = Array.from(popup.querySelectorAll('.user-team-row'));
+    updatedUserRows.forEach((row, index) => {
+        const userPos = row.dataset.position; // The actual player's position (PG, SG, etc.)
+        const slotPosition = POSITIONS[index]; // The slot they're in (PG slot, SG slot, etc.)
+        newMatchups[userPos] = slotPosition; // This user position guards the computer position in this slot
     });
     
     // Store matchups in popup
-    storeMatchupsInPopup(popup, currentMatchups);
+    storeMatchupsInPopup(popup, newMatchups);
     
     // Update visual display
-    updatePopupDisplay(popup, currentMatchups);
+    updatePopupDisplay(popup, newMatchups);
 }
 
 /**
