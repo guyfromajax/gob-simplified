@@ -159,8 +159,8 @@ function isUserTeamOnOffense(scene, turnData) {
 
 /**
  * Check if timeout is eligible for current turn
- * Three-step check (in order):
- * 1. Is current turn BIP or SIP? → Always eligible (checked first)
+ * Two-step check (in order):
+ * 1. Is current turn BIP or SIP? → Always eligible (regardless of offense team)
  * 2. Is current turn HCO AND previous turn was DREB AND user team is on offense? → Eligible
  * 
  * Uses `offense_team_id` as primary field (SS&S canonical), with `possession_team_id` as fallback
