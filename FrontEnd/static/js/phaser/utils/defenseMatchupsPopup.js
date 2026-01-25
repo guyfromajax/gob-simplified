@@ -229,6 +229,7 @@ function createPlayerRow(player, teamType, position, currentMatchups, guardingUs
 
 /**
  * Initialize drag-and-drop functionality
+ * Uses event delegation pattern (like Lineup Screen) for robust drag-and-drop
  * User can only drag and drop within the user team column to swap positions
  * @param {HTMLElement} popup - Popup element
  * @param {string} gameId - Game ID
@@ -236,50 +237,87 @@ function createPlayerRow(player, teamType, position, currentMatchups, guardingUs
  */
 function initializeDragAndDrop(popup, gameId, onResolve) {
     const userRowsContainer = popup.querySelector('.user-team-column .player-rows');
+    if (!userRowsContainer) return;
+    
+    // Make all user rows draggable
     const userRows = popup.querySelectorAll('.user-team-row');
-    
-    let draggedRow = null;
-    
-    // Make user team rows draggable and drop targets
     userRows.forEach(row => {
         row.draggable = true;
+    });
+    
+    // Event delegation on container (like Lineup Screen pattern)
+    // dragstart - store dragged row's position in dataTransfer
+    userRowsContainer.addEventListener('dragstart', (e) => {
+        const row = e.target.closest('.user-team-row');
+        if (!row) return;
         
-        row.addEventListener('dragstart', (e) => {
-            draggedRow = row;
+        const position = row.dataset.position;
+        if (position) {
+            e.dataTransfer.setData('text/plain', position);
+            e.dataTransfer.setData('application/x-user-position', position);
             e.dataTransfer.effectAllowed = 'move';
             row.style.opacity = '0.5';
-        });
-        
-        row.addEventListener('dragend', () => {
+        } else {
+            e.preventDefault();
+        }
+    });
+    
+    // dragend - reset visual state
+    userRowsContainer.addEventListener('dragend', (e) => {
+        const row = e.target.closest('.user-team-row');
+        if (row) {
             row.style.opacity = '1';
-            draggedRow = null;
-            // Reset all row backgrounds
-            userRows.forEach(r => r.style.backgroundColor = '');
-        });
+        }
+        // Reset all row backgrounds (query fresh)
+        const allRows = popup.querySelectorAll('.user-team-row');
+        allRows.forEach(r => r.style.backgroundColor = '');
+    });
+    
+    // dragover - allow drop and show visual feedback
+    userRowsContainer.addEventListener('dragover', (e) => {
+        const row = e.target.closest('.user-team-row');
+        if (!row) return;
         
-        // Make each user row a drop target
-        row.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            if (row !== draggedRow) {
-                row.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-            }
-        });
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
         
-        row.addEventListener('dragleave', () => {
-            if (row !== draggedRow) {
-                row.style.backgroundColor = '';
-            }
-        });
+        // Get dragged position from dataTransfer
+        const draggedPosition = e.dataTransfer.getData('application/x-user-position');
+        const targetPosition = row.dataset.position;
         
-        row.addEventListener('drop', (e) => {
-            e.preventDefault();
+        // Highlight if different row
+        if (draggedPosition && draggedPosition !== targetPosition) {
+            row.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+        }
+    });
+    
+    // dragleave - remove highlight
+    userRowsContainer.addEventListener('dragleave', (e) => {
+        const row = e.target.closest('.user-team-row');
+        if (row) {
             row.style.backgroundColor = '';
-            
-            if (draggedRow && draggedRow !== row) {
-                handleUserPositionSwap(draggedRow, row, popup, gameId);
-            }
-        });
+        }
+    });
+    
+    // drop - handle the swap
+    userRowsContainer.addEventListener('drop', (e) => {
+        const targetRow = e.target.closest('.user-team-row');
+        if (!targetRow) return;
+        
+        e.preventDefault();
+        targetRow.style.backgroundColor = '';
+        
+        // Get dragged position from dataTransfer
+        const draggedPosition = e.dataTransfer.getData('application/x-user-position');
+        if (!draggedPosition) return;
+        
+        // Find dragged row by position (query fresh)
+        const draggedRow = Array.from(popup.querySelectorAll('.user-team-row'))
+            .find(row => row.dataset.position === draggedPosition);
+        
+        if (draggedRow && draggedRow !== targetRow) {
+            handleUserPositionSwap(draggedRow, targetRow, popup, gameId);
+        }
     });
     
     // Submit button handler
