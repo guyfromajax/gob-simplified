@@ -473,7 +473,8 @@ export function createGameScene(Phaser) {
         console.log(`✅ TIMEOUT RESUME: Using first turn clock: ${liveClock}`);
       } else {
         // For new games or non-timeout resumes, use URL param or simData
-        const urlClock = timeoutUrlParams.get('clock');
+        // Reuse urlParams from above (line 167)
+        const urlClock = urlParams.get('clock');
         liveClock = urlClock || simData.clock || '8:00';
       }
       
@@ -1511,7 +1512,8 @@ export function createGameScene(Phaser) {
           }
 
           // ✅ DEFENSE MATCHUPS: Show popup before animation starts (if needed)
-          if (this.shouldShowMatchupsPopup) {
+          // Only show popup if animate=true (Play Quarter was pressed), not for Sim Quarter/Sim Full Game
+          if (this.shouldShowMatchupsPopup && this.animate) {
             try {
               const { showDefenseMatchupsPopup, resetDontShowAgainFlag } = await import('./utils/defenseMatchupsPopup.js');
               // Reset "Don't show again" flag at start of new game (Q1)
