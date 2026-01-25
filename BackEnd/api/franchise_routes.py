@@ -1441,7 +1441,7 @@ def leaders(
     start_time = time.time()
     logger.info(f"⏱️ [PERF] /franchise/leaders START - franchise_id={franchise_id}, scope={scope}")
     
-    categories = ["PTS", "AST", "TPM", "REB", "BLK", "STL"]
+    categories = ["PTS", "AST", "3PTM", "REB", "BLK", "STL"]  # ✅ SS&S: Use standardized field name "3PTM" instead of "TPM"
     result: dict[str, list[dict[str, Any]]] = {}
     for cat in categories:
         cat_start = time.time()

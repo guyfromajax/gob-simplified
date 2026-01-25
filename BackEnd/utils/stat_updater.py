@@ -1589,16 +1589,32 @@ def finalize_game(
         players = game.get("players", [])
         
         # ✅ UNIFIED STRUCTURE: Build box_score from unified teams object
-        # summarize_game_state() stores box_score in teams[team_id].box_score
+        # summarize_game_state() stores box_score in teams[team_id].box_score (using team_id keys)
         box_score = game.get("box_score", {})
         if not box_score:
-            # Build box_score from unified teams structure
-            if home_team_obj and isinstance(home_team_obj, dict) and home_team_name:
-                if "box_score" in home_team_obj:
-                    box_score[home_team_name] = home_team_obj.get("box_score", {})
-            if away_team_obj and isinstance(away_team_obj, dict) and away_team_name:
-                if "box_score" in away_team_obj:
-                    box_score[away_team_name] = away_team_obj.get("box_score", {})
+            # ✅ SS&S: Build box_score from unified teams structure using team_id keys (matches tournament mode)
+            teams_obj = game.get("teams", {})
+            if teams_obj and isinstance(teams_obj, dict):
+                if home_team_id and home_team_id in teams_obj and "box_score" in teams_obj[home_team_id]:
+                    box_score[home_team_id] = teams_obj[home_team_id].get("box_score", {})
+                    logger.info(f"🔍 [FINALIZE_GAME DEBUG] Added home team box_score from teams object with {len(box_score[home_team_id])} players (key: {home_team_id})")
+                
+                if away_team_id and away_team_id in teams_obj and "box_score" in teams_obj[away_team_id]:
+                    box_score[away_team_id] = teams_obj[away_team_id].get("box_score", {})
+                    logger.info(f"🔍 [FINALIZE_GAME DEBUG] Added away team box_score from teams object with {len(box_score[away_team_id])} players (key: {away_team_id})")
+            
+            # Fallback: Check legacy home_team/away_team structure (backward compatibility)
+            if not box_score:
+                if home_team_obj and isinstance(home_team_obj, dict) and home_team_name:
+                    if "box_score" in home_team_obj:
+                        # ✅ SS&S: Use team_id as key if available, otherwise use team_name
+                        box_score_key = home_team_id if home_team_id else home_team_name
+                        box_score[box_score_key] = home_team_obj.get("box_score", {})
+                if away_team_obj and isinstance(away_team_obj, dict) and away_team_name:
+                    if "box_score" in away_team_obj:
+                        # ✅ SS&S: Use team_id as key if available, otherwise use team_name
+                        box_score_key = away_team_id if away_team_id else away_team_name
+                        box_score[box_score_key] = away_team_obj.get("box_score", {})
         else:
             # If box_score exists at top level, extract team names from team objects (matches tournament mode)
             if isinstance(home_team_obj, dict):
@@ -1684,43 +1700,32 @@ def finalize_game(
         players_processed = 0
         
         # ✅ SS&S: Process ALL players from box_score (not just lineup players from players array)
-        # box_score structure: {team_name: {pos: {playerId, name, jersey, stats...}, ...}, ...}
+        # box_score structure: {team_id: {pos: {playerId, name, jersey, stats...}, ...}, ...} (using team_id keys)
         # This includes all players who participated (lineup + bench), not just final lineup
         processed_player_ids = set()  # Track processed players to avoid double-counting
         
-        for team_name in [home_team_name, away_team_name]:
-            if not team_name:
-                logger.warning(f"⚠️ [FINALIZE_GAME] team_name is None/empty, skipping")
+        # ✅ SS&S: Use team_id keys directly (matches tournament mode pattern)
+        for team_id_key in [home_team_id, away_team_id]:
+            if not team_id_key:
+                logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] team_id is None/empty, skipping")
                 continue
             
-            # ✅ FIX: Try exact match first, then case-insensitive match, then use first available key
-            team_box = box_score.get(team_name, {})
+            # ✅ SS&S: Use team_id directly as key (no name lookup needed)
+            team_box = box_score.get(team_id_key, {})
+            
+            # ✅ FALLBACK: If team_id key not found, try team_name (backward compatibility)
             if not team_box:
-                # Try case-insensitive match
-                box_score_keys = list(box_score.keys())
-                matched_key = None
-                for key in box_score_keys:
-                    if key.lower() == team_name.lower():
-                        matched_key = key
-                        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Matched team_name '{team_name}' to box_score key '{matched_key}' (case-insensitive)")
-                        break
-                
-                if matched_key:
-                    team_box = box_score[matched_key]
-                elif box_score_keys:
-                    # Last resort: use first available key (shouldn't happen, but prevents total failure)
-                    matched_key = box_score_keys[0]
-                    team_box = box_score[matched_key]
-                    logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] team_name '{team_name}' not found in box_score, using first available key '{matched_key}'")
-                else:
-                    logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team: {team_name} (box_score is empty)")
-                    continue
+                team_name_for_lookup = home_team_name if team_id_key == home_team_id else away_team_name
+                if team_name_for_lookup:
+                    team_box = box_score.get(team_name_for_lookup, {})
+                    if team_box:
+                        logger.info(f"🔍 [FINALIZE_GAME DEBUG] Found box_score using team_name fallback: '{team_name_for_lookup}'")
             
             if not team_box:
-                logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team: {team_name} (available teams: {list(box_score.keys())})")
+                logger.warning(f"⚠️ [FINALIZE_GAME] No box_score data for team_id: {team_id_key} (available keys: {list(box_score.keys())})")
                 continue
             
-            logger.info(f"🔍 [FINALIZE_GAME] Processing team '{team_name}' - found {len(team_box)} players in box_score")
+            logger.info(f"🔍 [FINALIZE_GAME DEBUG] Processing team_id '{team_id_key}': {len(team_box)} players in box_score")
             
             # Process all players in this team's box_score
             team_players_processed = 0
