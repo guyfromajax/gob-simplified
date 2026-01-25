@@ -3990,16 +3990,20 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
         raise HTTPException(status_code=404, detail=f"No players found for team '{lookup_value}'")
     
     match = team_doc.get("name")
+    
+    if not match:
+        print(f"❌ Team document found but has no 'name' field: {lookup_value}")
+        raise HTTPException(status_code=404, detail=f"Team document missing name field for '{lookup_value}'")
 
     load_start = time.time()
     team_doc, player_objects = load_roster(match)
     load_time = (time.time() - load_start) * 1000
 
     if not player_objects:
-        print(f"❌ No players found for {team_name}")
-        raise HTTPException(status_code=404, detail=f"No players found for team '{team_name}'")
+        print(f"❌ No players found for {match}")
+        raise HTTPException(status_code=404, detail=f"No players found for team '{match}'")
 
-    team = team_doc or {"name": team_name}
+    team = team_doc or {"name": match}
 
     # ✅ UNIFIED: Load franchise-specific attributes if franchise_id is provided
     franchise_players = {}
@@ -4067,7 +4071,7 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
     # Measure response size
     response_size = len(json.dumps(response_data))
     total_time = (time.time() - endpoint_start) * 1000
-    logging.warning(f"⏱️ [PERF] /roster/{team_name} - DB query: {query_time:.2f}ms, load_roster: {load_time:.2f}ms, processing: {process_time:.2f}ms, response_size: {response_size} bytes, total: {total_time:.2f}ms")
+    logging.warning(f"⏱️ [PERF] /roster/{team_identifier} - DB query: {query_time:.2f}ms, load_roster: {load_time:.2f}ms, processing: {process_time:.2f}ms, response_size: {response_size} bytes, total: {total_time:.2f}ms")
     
     return response_data
 
