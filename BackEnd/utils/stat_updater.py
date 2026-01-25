@@ -1139,16 +1139,29 @@ def finalize_game(
         
         # ✅ SS&S: Build box_score from nested team objects if not at top level (using team_id keys)
         if not box_score:
-            home_team_obj = game.get("home_team", {})
-            away_team_obj = game.get("away_team", {})
+            # First, check the unified teams object structure (current format)
+            teams_obj = game.get("teams", {})
+            if teams_obj and isinstance(teams_obj, dict):
+                if home_team_id in teams_obj and "box_score" in teams_obj[home_team_id]:
+                    box_score[home_team_id] = teams_obj[home_team_id].get("box_score", {})
+                    logger.info(f"🔍 [FINALIZE_GAME DEBUG] Added home team box_score from teams object with {len(box_score[home_team_id])} players (key: {home_team_id})")
+                
+                if away_team_id in teams_obj and "box_score" in teams_obj[away_team_id]:
+                    box_score[away_team_id] = teams_obj[away_team_id].get("box_score", {})
+                    logger.info(f"🔍 [FINALIZE_GAME DEBUG] Added away team box_score from teams object with {len(box_score[away_team_id])} players (key: {away_team_id})")
             
-            if home_team_obj and isinstance(home_team_obj, dict) and "box_score" in home_team_obj:
-                box_score[home_team_id] = home_team_obj.get("box_score", {})
-                logger.info(f"🔍 [FINALIZE_GAME DEBUG] Added home team box_score with {len(box_score[home_team_id])} players (key: {home_team_id})")
-            
-            if away_team_obj and isinstance(away_team_obj, dict) and "box_score" in away_team_obj:
-                box_score[away_team_id] = away_team_obj.get("box_score", {})
-                logger.info(f"🔍 [FINALIZE_GAME DEBUG] Added away team box_score with {len(box_score[away_team_id])} players (key: {away_team_id})")
+            # Fallback: Check legacy home_team/away_team structure (backward compatibility)
+            if not box_score:
+                home_team_obj = game.get("home_team", {})
+                away_team_obj = game.get("away_team", {})
+                
+                if home_team_obj and isinstance(home_team_obj, dict) and "box_score" in home_team_obj:
+                    box_score[home_team_id] = home_team_obj.get("box_score", {})
+                    logger.info(f"🔍 [FINALIZE_GAME DEBUG] Added home team box_score from legacy structure with {len(box_score[home_team_id])} players (key: {home_team_id})")
+                
+                if away_team_obj and isinstance(away_team_obj, dict) and "box_score" in away_team_obj:
+                    box_score[away_team_id] = away_team_obj.get("box_score", {})
+                    logger.info(f"🔍 [FINALIZE_GAME DEBUG] Added away team box_score from legacy structure with {len(box_score[away_team_id])} players (key: {away_team_id})")
         
         # ✅ SS&S: Resolve team names for metadata only (not for box_score lookup)
         home_team_name = None
