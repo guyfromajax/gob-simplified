@@ -1163,18 +1163,29 @@ def finalize_game(
                     box_score[away_team_id] = away_team_obj.get("box_score", {})
                     logger.info(f"🔍 [FINALIZE_GAME DEBUG] Added away team box_score from legacy structure with {len(box_score[away_team_id])} players (key: {away_team_id})")
         
-        # ✅ SS&S: Resolve team names for metadata only (not for box_score lookup)
+        # ✅ SS&S: Resolve team names and ObjectIds for metadata (not for box_score lookup)
         home_team_name = None
         away_team_name = None
+        home_team_object_id = None
+        away_team_object_id = None
         try:
-            home_team_doc = teams_collection.find_one({"team_id": home_team_id}, {"name": 1})
+            home_team_doc = teams_collection.find_one({"team_id": home_team_id}, {"name": 1, "_id": 1})
             if home_team_doc:
                 home_team_name = home_team_doc.get("name")
-            away_team_doc = teams_collection.find_one({"team_id": away_team_id}, {"name": 1})
+                home_team_object_id = str(home_team_doc.get("_id"))
+            away_team_doc = teams_collection.find_one({"team_id": away_team_id}, {"name": 1, "_id": 1})
             if away_team_doc:
                 away_team_name = away_team_doc.get("name")
+                away_team_object_id = str(away_team_doc.get("_id"))
         except Exception as e:
-            logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] Could not resolve team names: {e}")
+            logger.warning(f"⚠️ [FINALIZE_GAME DEBUG] Could not resolve team names/ObjectIds: {e}")
+        
+        # ✅ FIX: Build team_id_key -> ObjectId map for meta.team_id assignment
+        team_id_to_object_id = {}
+        if home_team_id and home_team_object_id:
+            team_id_to_object_id[home_team_id] = home_team_object_id
+        if away_team_id and away_team_object_id:
+            team_id_to_object_id[away_team_id] = away_team_object_id
         
         logger.info(f"🔍 [FINALIZE_GAME] Processing box_score with {len(box_score)} teams: {list(box_score.keys())}")
         logger.info(f"🔍 [FINALIZE_GAME DEBUG] box_score structure check:")
@@ -1251,8 +1262,14 @@ def finalize_game(
                 # If GP is already in inc_doc, it means this player was processed twice (shouldn't happen)
                 # Don't increment again - this is a bug if it happens
                 
-                # ✅ SS&S: Set meta.team_id directly (no name lookup needed)
-                set_doc[f"players.{pid_str}.meta.team_id"] = team_id_key
+                # ✅ FIX: Set meta.team_id to ObjectId string (not team_id string) for aggregation compatibility
+                # tournament.teams and franchise.franchise_teams use ObjectId strings as keys
+                team_object_id = team_id_to_object_id.get(team_id_key)
+                if team_object_id:
+                    set_doc[f"players.{pid_str}.meta.team_id"] = team_object_id
+                    logger.debug(f"🔍 [FINALIZE_GAME] Setting meta.team_id for player {pid_str}: {team_object_id} (from team_id_key: {team_id_key})")
+                else:
+                    logger.warning(f"⚠️ [FINALIZE_GAME] Cannot resolve ObjectId for team_id_key '{team_id_key}' - cannot set meta.team_id for player {pid_str}")
             
             logger.info(f"🔍 [FINALIZE_GAME DEBUG] Team '{team_id_key}': processed {team_players_processed} players")
         
