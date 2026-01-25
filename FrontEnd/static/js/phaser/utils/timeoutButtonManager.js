@@ -199,26 +199,12 @@ export function checkTimeoutEligibility(scene, turnData) {
         return false;
     }
     
-    // Check 1: Is current turn BIP or SIP? (Always eligible if user team on offense, checked first)
+    // Check 1: Is current turn BIP or SIP? (Always eligible, regardless of offense team)
     const currentTurn = turnData?.current_turn || turnData?.result_type;
     console.log('🔍 [TIMEOUT DEBUG] Check 1 - currentTurn:', currentTurn);
     if (currentTurn === 'SIDE_INBOUND' || currentTurn === 'BASELINE_INBOUND') {
-        // Check if user team is on offense
-        const offenseTeamId = turnData?.offense_team_id || turnData?.possession_team_id;
-        if (!offenseTeamId) {
-            console.log('🔍 [TIMEOUT DEBUG] Check 1 FAILED - No offense_team_id or possession_team_id found');
-            return false;
-        }
-        
-        const homeTeamId = scene.simData?.home_team_id;
-        const awayTeamId = scene.simData?.away_team_id;
-        const userTeamId = userTeamSide === 'home' ? homeTeamId : awayTeamId;
-        
-        if (String(offenseTeamId) === String(userTeamId)) {
-            console.log('🔍 [TIMEOUT DEBUG] Check 1 PASSED - BIP or SIP turn with user team on offense');
-            return true;
-        }
-        console.log('🔍 [TIMEOUT DEBUG] Check 1 FAILED - BIP/SIP but user team not on offense');
+        console.log('🔍 [TIMEOUT DEBUG] Check 1 PASSED - BIP or SIP turn (always eligible)');
+        return true;
     }
     console.log('🔍 [TIMEOUT DEBUG] Check 1 FAILED - not BIP or SIP');
     
