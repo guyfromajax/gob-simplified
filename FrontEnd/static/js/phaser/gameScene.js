@@ -162,6 +162,15 @@ export function createGameScene(Phaser) {
         initTimeoutButton();
       }
       
+      // ✅ DEFENSE MATCHUPS: Store trigger info for after simData loads
+      // We'll show the popup after simData is fetched but before animation starts
+      const urlParams = new URLSearchParams(window.location.search);
+      const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+      const fromLineup = urlParams.get('from') === 'set-lineup';
+      const isQ1Start = this.quarter === 1 && !resumeFromTimeout && !fromLineup;
+      const isAfterBreak = resumeFromTimeout || fromLineup;
+      this.shouldShowMatchupsPopup = (isQ1Start || isAfterBreak) && this.gameId;
+      
       // Reset pause state BEFORE killing tweens
       this.isPaused = false;
       if (this.tweens) {
@@ -1500,6 +1509,28 @@ export function createGameScene(Phaser) {
             simData.players.forEach(p => {
               console.log(`Sprite initialized: ${p.name} -> ${p.team}`);
             });
+          }
+
+          // ✅ DEFENSE MATCHUPS: Show popup before animation starts (if needed)
+          if (this.shouldShowMatchupsPopup) {
+            try {
+              const { showDefenseMatchupsPopup, resetDontShowAgainFlag } = await import('./utils/defenseMatchupsPopup.js');
+              // Reset "Don't show again" flag at start of new game (Q1)
+              const urlParams = new URLSearchParams(window.location.search);
+              const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+              const fromLineup = urlParams.get('from') === 'set-lineup';
+              const isQ1Start = this.quarter === 1 && !resumeFromTimeout && !fromLineup;
+              
+              if (isQ1Start) {
+                resetDontShowAgainFlag();
+              }
+              
+              // Show popup and wait for user to submit before starting animation
+              await showDefenseMatchupsPopup(this.gameId, this);
+            } catch (error) {
+              console.error('❌ DEFENSE MATCHUPS: Failed to show popup:', error);
+              // Don't block gameplay if popup fails
+            }
           }
 
           this.ballSprite = this.add.image(0, 0, "ball").setVisible(true).setDepth(1000).setScale(1.5);  // 50% larger

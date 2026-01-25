@@ -247,6 +247,11 @@ class CallTimeoutRequest(BaseModel):
     offense_override: str | None = None  # e.g., "Inside", "Attack", "Outside"
     defense_override: str | None = None  # e.g., "Zone", "Man"
     # Mode context
+
+
+class SaveManDefenseMatchupsRequest(BaseModel):
+    game_id: str
+    matchups: dict[str, str]  # {"PG": "PG", "SG": "SG", ...} - defensive position → offensive position
     mode: str | None = None  # "single", "tournament", or "franchise"
 
 
@@ -3759,6 +3764,183 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
         "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
             "clock": gm.game_state.get("clock", "8:00"),
             "time_remaining": gm.game_state.get("time_remaining", 480),
+    }
+
+
+@app.post("/api/save-man-defense-matchups")
+def save_man_defense_matchups(request: SaveManDefenseMatchupsRequest):
+    """
+    Save custom man defense matchups for a game.
+    Matchups are stored in game_state and reset to defaults at each break.
+    
+    Args:
+        request: SaveManDefenseMatchupsRequest with game_id and matchups dict
+                matchups format: {"PG": "SG", "SG": "PG", "SF": "SF", "PF": "PF", "C": "C"}
+                (defensive position → offensive position)
+    
+    Returns:
+        Success message and updated matchups
+    """
+    from BackEnd.utils.game_id_utils import normalize_game_id
+    from BackEnd.utils.man_defense_matchups import validate_man_defense_matchups
+    
+    game_id = normalize_game_id(request.game_id) if request.game_id else None
+    if not game_id:
+        raise HTTPException(status_code=400, detail="game_id is required")
+    
+    # Validate matchups
+    is_valid, error_message = validate_man_defense_matchups(request.matchups)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=f"Invalid matchups: {error_message}")
+    
+    # Get game from memory or database
+    gm = ongoing_games.get(game_id)
+    if gm is None:
+        # Try to load from database
+        game_doc = games_collection.find_one({"_id": ObjectId(game_id)})
+        if not game_doc:
+            raise HTTPException(status_code=404, detail=f"Game {game_id} not found")
+        # Game exists in DB but not in memory - this is OK, we'll save to DB
+        # Matchups will be loaded when game is next accessed
+        games_collection.update_one(
+            {"_id": ObjectId(game_id)},
+            {"$set": {"man_defense_matchups": request.matchups}}
+        )
+        logging.info(f"✅ Saved man defense matchups to DB for game {game_id}")
+    else:
+        # Game is in memory - update game_state
+        gm.game_state["man_defense_matchups"] = request.matchups.copy()
+        logging.info(f"✅ Saved man defense matchups to in-memory game {game_id}")
+        
+        # Also save to database for persistence
+        try:
+            from BackEnd.utils.shared import summarize_game_state
+            db_summary = summarize_game_state(gm, exclude_animations=True)
+            games_collection.update_one({"_id": ObjectId(game_id)}, {"$set": db_summary}, upsert=True)
+        except Exception as e:
+            logging.error(f"⚠️ Failed to save matchups to DB: {e}")
+            # Don't fail the request if DB save fails - matchups are in memory
+    
+    return {
+        "message": "Man defense matchups saved successfully",
+        "matchups": request.matchups
+    }
+
+
+@app.get("/api/game/{game_id}/lineup-for-matchups")
+def get_lineup_for_matchups(game_id: str):
+    """
+    Get lineup data for both teams with player stats and attributes for the matchups popup.
+    
+    Returns:
+        Dict with user_team and computer_team lineups, each containing:
+        - players: List of players with position, name, headshot, attributes, stats
+        - team_name: Team name
+    """
+    from BackEnd.utils.game_id_utils import normalize_game_id
+    
+    game_id = normalize_game_id(game_id) if game_id else None
+    if not game_id:
+        raise HTTPException(status_code=400, detail="game_id is required")
+    
+    # Get game from memory or database
+    gm = ongoing_games.get(game_id)
+    if gm is None:
+        raise HTTPException(status_code=404, detail=f"Game {game_id} not found")
+    
+    # Determine user team side
+    user_team_side = gm.game_state.get("user_team_side")
+    if not user_team_side:
+        raise HTTPException(status_code=400, detail="Cannot determine user team side")
+    
+    user_team = gm.home_team if user_team_side == "home" else gm.away_team
+    computer_team = gm.away_team if user_team_side == "home" else gm.home_team
+    
+    # Get current matchups (defaults if not set)
+    matchups = gm.game_state.get("man_defense_matchups", {
+        "PG": "PG", "SG": "SG", "SF": "SF", "PF": "PF", "C": "C"
+    })
+    
+    def build_player_data(team, position):
+        """Build player data for a specific position"""
+        player = team.lineup.get(position)
+        if not player:
+            return None
+        
+        # Get attributes
+        attrs = player.attributes
+        # Get game stats
+        stats = player.stats.get("game", {})
+        
+        # Calculate DEF% (defensive win percentage)
+        def_a = stats.get("DEF_A", 0)
+        def_s = stats.get("DEF_S", 0)
+        def_pct = round((def_s / def_a * 100)) if def_a > 0 else 0
+        
+        # Get NG as percentage
+        ng = attrs.get("NG", 1.0)
+        ng_percent = round(ng * 100)
+        
+        return {
+            "player_id": player.player_id,
+            "position": position,
+            "name": player.name,
+            "headshot_url": f"/images/players/{player.player_id}.png",
+            "attributes": {
+                "ID": attrs.get("ID", 0),
+                "OD": attrs.get("OD", 0),
+                "AG": attrs.get("AG", 0),
+                "ST": attrs.get("ST", 0),
+                "ND": attrs.get("ND", 0),
+                "IQ": attrs.get("IQ", 0),
+                "NG": ng_percent,
+                "DEF%": def_pct  # User team only
+            },
+            "stats": {
+                "SC": attrs.get("SC", 0),  # Computer team only
+                "SH": attrs.get("SH", 0),  # Computer team only
+                "AG": attrs.get("AG", 0),
+                "ST": attrs.get("ST", 0),
+                "ND": attrs.get("ND", 0),
+                "IQ": attrs.get("IQ", 0),
+                "NG": ng_percent,
+                "PTS": stats.get("PTS", 0)  # Computer team only
+            }
+        }
+    
+    # Build user team lineup
+    user_players = []
+    for pos in ["PG", "SG", "SF", "PF", "C"]:
+        player_data = build_player_data(user_team, pos)
+        if player_data:
+            user_players.append(player_data)
+    
+    # Build computer team lineup
+    computer_players = []
+    for pos in ["PG", "SG", "SF", "PF", "C"]:
+        player_data = build_player_data(computer_team, pos)
+        if player_data:
+            # Determine which user position is guarding this computer position
+            # Reverse lookup: find user_pos where matchups[user_pos] == computer_pos
+            guarding_user_pos = None
+            for user_pos, guarded_pos in matchups.items():
+                if guarded_pos == pos:
+                    guarding_user_pos = user_pos
+                    break
+            
+            player_data["guarding_user_position"] = guarding_user_pos or pos  # Fallback to same position
+            computer_players.append(player_data)
+    
+    return {
+        "user_team": {
+            "team_name": user_team.name,
+            "players": user_players
+        },
+        "computer_team": {
+            "team_name": computer_team.name,
+            "players": computer_players
+        },
+        "current_matchups": matchups
     }
 
 
