@@ -1692,23 +1692,29 @@ def finalize_game(
         else:
             logger.info(f"✅ [FINALIZE_GAME] away_team_name '{away_team_name}' found in box_score")
 
-        # ✅ SS&S: Build team_name -> team_id map from franchise_teams
+        # ✅ SS&S: Build team_name -> ObjectId map from franchise_teams (for team_name lookup)
+        # Also build team_id -> ObjectId map (for direct team_id_key lookup)
         franchise_doc = db.franchises.find_one({"_id": fid}, {"franchise_teams": 1})
         franchise_teams = franchise_doc.get("franchise_teams", {}) if franchise_doc else {}
         team_name_to_id: Dict[str, str] = {}
+        team_id_to_object_id: Dict[str, str] = {}  # ✅ FIX: Map team_id strings to ObjectId strings
         for team_id_str, team_data in franchise_teams.items():
-            # Look up team name from teams collection
+            # Look up team name and team_id from teams collection
             try:
                 team_obj_id = ObjectId(team_id_str)
-                team_doc = teams_collection.find_one({"_id": team_obj_id}, {"name": 1})
+                team_doc = teams_collection.find_one({"_id": team_obj_id}, {"name": 1, "team_id": 1})
                 if team_doc:
                     team_name = team_doc.get("name")
+                    team_id_field = team_doc.get("team_id")  # e.g., "MORRISTOWN"
                     if team_name:
-                        team_name_to_id[team_name] = team_id_str
+                        team_name_to_id[team_name] = team_id_str  # ObjectId string
+                    if team_id_field:
+                        team_id_to_object_id[team_id_field] = team_id_str  # ✅ FIX: Map team_id string -> ObjectId string
             except Exception:
                 continue
         
         logger.info(f"🔍 [FINALIZE_GAME] Built team_name_to_id map: {team_name_to_id}")
+        logger.info(f"🔍 [FINALIZE_GAME] Built team_id_to_object_id map: {team_id_to_object_id}")
         if not team_name_to_id:
             logger.warning(f"⚠️ [FINALIZE_GAME] team_name_to_id map is EMPTY - team_id lookups will fail")
 
@@ -1744,6 +1750,20 @@ def finalize_game(
             
             logger.info(f"🔍 [FINALIZE_GAME DEBUG] Processing team_id '{team_id_key}': {len(team_box)} players in box_score")
             
+            # ✅ FIX: Determine team_name for this team_id_key (for logging/debugging)
+            current_team_name = home_team_name if team_id_key == home_team_id else away_team_name
+            
+            # ✅ FIX: Resolve team_id_key to ObjectId string for meta.team_id assignment
+            # team_id_key is a team_id string (e.g., "MORRISTOWN"), but franchise.franchise_teams uses ObjectId strings as keys
+            team_object_id = team_id_to_object_id.get(team_id_key)
+            if not team_object_id:
+                # Fallback: Try to resolve via team_name
+                if current_team_name and current_team_name in team_name_to_id:
+                    team_object_id = team_name_to_id[current_team_name]
+                    logger.info(f"🔍 [FINALIZE_GAME] Resolved team_id_key '{team_id_key}' to ObjectId via team_name '{current_team_name}': {team_object_id}")
+                else:
+                    logger.warning(f"⚠️ [FINALIZE_GAME] Cannot resolve ObjectId for team_id_key '{team_id_key}' (team_name: {current_team_name})")
+            
             # Process all players in this team's box_score
             team_players_processed = 0
             for pos_key, player_data in team_box.items():
@@ -1765,7 +1785,7 @@ def finalize_game(
                 # Get stats from player_data (box_score includes all stats)
                 stat_block = player_data
                 if not stat_block:
-                    logger.warning(f"⚠️ [FINALIZE_GAME] No stats found for player {pid_str} (team={team_name}, pos={pos_key})")
+                    logger.warning(f"⚠️ [FINALIZE_GAME] No stats found for player {pid_str} (team={current_team_name}, pos={pos_key})")
                     continue
                 
                 players_processed += 1
@@ -1773,7 +1793,7 @@ def finalize_game(
                 
                 # ✅ DEBUG: Log first player's stats to verify structure
                 if team_players_processed == 1:
-                    logger.info(f"🔍 [FINALIZE_GAME] First player from {team_name}: pid={pid_str}, stats keys: {list(stat_block.keys())[:10]}...")
+                    logger.info(f"🔍 [FINALIZE_GAME] First player from {current_team_name}: pid={pid_str}, stats keys: {list(stat_block.keys())[:10]}...")
                 
                 stats_added = 0
                 for stat, val in _clean_stat_block(stat_block).items():
@@ -1794,7 +1814,7 @@ def finalize_game(
                 
                 # ✅ DEBUG: Log if no stats were added
                 if stats_added == 0:
-                    logger.warning(f"⚠️ [FINALIZE_GAME] No stats added for player {pid_str} (team={team_name}, pos={pos_key}) - cleaned stats: {_clean_stat_block(stat_block)}")
+                    logger.warning(f"⚠️ [FINALIZE_GAME] No stats added for player {pid_str} (team={current_team_name}, pos={pos_key}) - cleaned stats: {_clean_stat_block(stat_block)}")
                 
                 # ✅ SS&S: Increment GP (games played) for all players who participated
                 inc_doc[f"players.{pid_str}.season.GP"] = inc_doc.get(
@@ -1804,14 +1824,15 @@ def finalize_game(
                     f"players.{pid_str}.career.GP", 0
                 ) + 1
                 
-                # ✅ SS&S: Set meta.team_id if team_name is in our map
-                if team_name in team_name_to_id:
-                    set_doc[f"players.{pid_str}.meta.team_id"] = team_name_to_id[team_name]
-                    logger.debug(f"🔍 [FINALIZE_GAME] Setting meta.team_id for player {pid_str}: {team_name_to_id[team_name]}")
+                # ✅ FIX: Set meta.team_id to ObjectId string (not team_id string) for aggregation compatibility
+                # franchise.franchise_teams uses ObjectId strings as keys
+                if team_object_id:
+                    set_doc[f"players.{pid_str}.meta.team_id"] = team_object_id
+                    logger.debug(f"🔍 [FINALIZE_GAME] Setting meta.team_id for player {pid_str}: {team_object_id} (from team_id_key: {team_id_key})")
                 else:
-                    logger.warning(f"⚠️ [FINALIZE_GAME] team_name '{team_name}' not in team_name_to_id map - cannot set meta.team_id for player {pid_str}")
+                    logger.warning(f"⚠️ [FINALIZE_GAME] Cannot resolve ObjectId for team_id_key '{team_id_key}' - cannot set meta.team_id for player {pid_str}")
             
-            logger.info(f"🔍 [FINALIZE_GAME] Processed {team_players_processed} players from team '{team_name}'")
+            logger.info(f"🔍 [FINALIZE_GAME] Processed {team_players_processed} players from team '{current_team_name}'")
         
         logger.info(f"🔍 [FINALIZE_GAME] Processed {players_processed} players, {len(inc_doc)} stat increments, {len(set_doc)} meta fields to set")
         
