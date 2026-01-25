@@ -1001,57 +1001,82 @@ def summarize_game_state(game, exclude_animations=True):
                         # Only log actual errors
                         pass
                 
-                # ✅ CONTRACT-ALIGNED: DB is source of truth (Contract says "Server always wins")
-                # Try DB first, then GameManager as safety net if DB lookup fails
-                # This aligns with Contract while providing fallback during root cause investigation
+                # ✅ CRITICAL FIX: During active gameplay (timeout saves), GameManager is source of truth for playbook_settings
+                # GameManager has the current, active settings that are being used during gameplay
+                # Database may have stale or empty settings from initial game creation
+                # Priority: GameManager (active gameplay) > Database (persistence)
                 
-                # Home team: Check DB first (Contract-compliant)
-                if home_actual_team_id:
-                    home_team_data = teams.get(home_actual_team_id, {})
-                    home_playbook_settings = home_team_data.get("playbook_settings", {})
-                    if home_playbook_settings:
-                        slot_count = len(home_playbook_settings.get("slot_assignments", {}))
-                        logging.warning(f"✅ [SUMMARIZE] Found home playbook_settings in DB (source of truth): slot_assignments={slot_count}")
+                # Home team: Check GameManager first (active gameplay source of truth)
+                if hasattr(game.home_team, 'playbook_settings') and game.home_team.playbook_settings:
+                    # Check if GameManager has non-empty playbook_settings
+                    gm_slots = len(game.home_team.playbook_settings.get("slot_assignments", {}))
+                    if gm_slots > 0 or any(game.home_team.playbook_settings.get(key, {}) for key in ["motion", "set_play_inside", "set_play_attack", "set_play_outside"]):
+                        home_playbook_settings = game.home_team.playbook_settings
+                        logging.warning(f"✅ [SUMMARIZE] Using GameManager home playbook_settings (active gameplay): slot_assignments={gm_slots}")
                     else:
-                        logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings in DB for home_actual_team_id={home_actual_team_id}")
-                        # ✅ PHASE 5.2: Removed legacy team name key fallback (not needed for new games)
-                    
-                    # ✅ SAFETY NET: If DB lookup failed, check GameManager (temporary fallback during root cause investigation)
-                    if not home_playbook_settings and hasattr(game.home_team, 'playbook_settings') and game.home_team.playbook_settings:
-                        home_playbook_settings = game.home_team.playbook_settings
-                        slot_count = len(home_playbook_settings.get("slot_assignments", {}))
-                        logging.warning(f"⚠️ [SUMMARIZE] DB lookup failed, using GameManager as safety net: slot_assignments={slot_count} (ROOT CAUSE NEEDS FIXING)")
+                        # GameManager has empty settings, try DB
+                        if home_actual_team_id:
+                            home_team_data = teams.get(home_actual_team_id, {})
+                            db_settings = home_team_data.get("playbook_settings", {})
+                            if db_settings:
+                                home_playbook_settings = db_settings
+                                slot_count = len(db_settings.get("slot_assignments", {}))
+                                logging.warning(f"✅ [SUMMARIZE] GameManager empty, using DB home playbook_settings: slot_assignments={slot_count}")
+                            else:
+                                home_playbook_settings = {}  # No settings anywhere
+                                logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings found for home team (GameManager empty, DB empty)")
+                        else:
+                            home_playbook_settings = {}  # Can't resolve team_id
+                            logging.warning(f"⚠️ [SUMMARIZE] Could not resolve home_actual_team_id, GameManager empty")
                 else:
-                    logging.warning(f"⚠️ [SUMMARIZE] Could not resolve home_actual_team_id, cannot load playbook_settings from DB")
-                    # Last resort: check GameManager
-                    if hasattr(game.home_team, 'playbook_settings') and game.home_team.playbook_settings:
-                        home_playbook_settings = game.home_team.playbook_settings
-                        slot_count = len(home_playbook_settings.get("slot_assignments", {}))
-                        logging.warning(f"⚠️ [SUMMARIZE] Team ID resolution failed, using GameManager: slot_assignments={slot_count} (ROOT CAUSE NEEDS FIXING)")
+                    # GameManager doesn't have playbook_settings, try DB
+                    if home_actual_team_id:
+                        home_team_data = teams.get(home_actual_team_id, {})
+                        home_playbook_settings = home_team_data.get("playbook_settings", {})
+                        if home_playbook_settings:
+                            slot_count = len(home_playbook_settings.get("slot_assignments", {}))
+                            logging.warning(f"✅ [SUMMARIZE] GameManager missing, using DB home playbook_settings: slot_assignments={slot_count}")
+                        else:
+                            logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings found for home team (GameManager missing, DB empty)")
+                    else:
+                        home_playbook_settings = {}  # Can't resolve team_id
+                        logging.warning(f"⚠️ [SUMMARIZE] Could not resolve home_actual_team_id, GameManager missing")
                 
-                # Away team: Check DB first (Contract-compliant)
-                if away_actual_team_id:
-                    away_team_data = teams.get(away_actual_team_id, {})
-                    away_playbook_settings = away_team_data.get("playbook_settings", {})
-                    if away_playbook_settings:
-                        slot_count = len(away_playbook_settings.get("slot_assignments", {}))
-                        logging.warning(f"✅ [SUMMARIZE] Found away playbook_settings in DB (source of truth): slot_assignments={slot_count}")
+                # Away team: Check GameManager first (active gameplay source of truth)
+                if hasattr(game.away_team, 'playbook_settings') and game.away_team.playbook_settings:
+                    # Check if GameManager has non-empty playbook_settings
+                    gm_slots = len(game.away_team.playbook_settings.get("slot_assignments", {}))
+                    if gm_slots > 0 or any(game.away_team.playbook_settings.get(key, {}) for key in ["motion", "set_play_inside", "set_play_attack", "set_play_outside"]):
+                        away_playbook_settings = game.away_team.playbook_settings
+                        logging.warning(f"✅ [SUMMARIZE] Using GameManager away playbook_settings (active gameplay): slot_assignments={gm_slots}")
                     else:
-                        logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings in DB for away_actual_team_id={away_actual_team_id}")
-                        # ✅ PHASE 5.2: Removed legacy team name key fallback (not needed for new games)
-                    
-                    # ✅ SAFETY NET: If DB lookup failed, check GameManager (temporary fallback during root cause investigation)
-                    if not away_playbook_settings and hasattr(game.away_team, 'playbook_settings') and game.away_team.playbook_settings:
-                        away_playbook_settings = game.away_team.playbook_settings
-                        slot_count = len(away_playbook_settings.get("slot_assignments", {}))
-                        logging.warning(f"⚠️ [SUMMARIZE] DB lookup failed, using GameManager as safety net: slot_assignments={slot_count} (ROOT CAUSE NEEDS FIXING)")
+                        # GameManager has empty settings, try DB
+                        if away_actual_team_id:
+                            away_team_data = teams.get(away_actual_team_id, {})
+                            db_settings = away_team_data.get("playbook_settings", {})
+                            if db_settings:
+                                away_playbook_settings = db_settings
+                                slot_count = len(db_settings.get("slot_assignments", {}))
+                                logging.warning(f"✅ [SUMMARIZE] GameManager empty, using DB away playbook_settings: slot_assignments={slot_count}")
+                            else:
+                                away_playbook_settings = {}  # No settings anywhere
+                                logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings found for away team (GameManager empty, DB empty)")
+                        else:
+                            away_playbook_settings = {}  # Can't resolve team_id
+                            logging.warning(f"⚠️ [SUMMARIZE] Could not resolve away_actual_team_id, GameManager empty")
                 else:
-                    logging.warning(f"⚠️ [SUMMARIZE] Could not resolve away_actual_team_id, cannot load playbook_settings from DB")
-                    # Last resort: check GameManager
-                    if hasattr(game.away_team, 'playbook_settings') and game.away_team.playbook_settings:
-                        away_playbook_settings = game.away_team.playbook_settings
-                        slot_count = len(away_playbook_settings.get("slot_assignments", {}))
-                        logging.warning(f"⚠️ [SUMMARIZE] Team ID resolution failed, using GameManager: slot_assignments={slot_count} (ROOT CAUSE NEEDS FIXING)")
+                    # GameManager doesn't have playbook_settings, try DB
+                    if away_actual_team_id:
+                        away_team_data = teams.get(away_actual_team_id, {})
+                        away_playbook_settings = away_team_data.get("playbook_settings", {})
+                        if away_playbook_settings:
+                            slot_count = len(away_playbook_settings.get("slot_assignments", {}))
+                            logging.warning(f"✅ [SUMMARIZE] GameManager missing, using DB away playbook_settings: slot_assignments={slot_count}")
+                        else:
+                            logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings found for away team (GameManager missing, DB empty)")
+                    else:
+                        away_playbook_settings = {}  # Can't resolve team_id
+                        logging.warning(f"⚠️ [SUMMARIZE] Could not resolve away_actual_team_id, GameManager missing")
                 
                 # ✅ REMOVED: Verbose success/failure logs - only log if settings are missing when expected
         except Exception as e:
@@ -1083,6 +1108,17 @@ def summarize_game_state(game, exclude_animations=True):
     # This ensures we use the same key format that was used when saving playbook_settings
     home_key = home_actual_team_id if home_actual_team_id else game.home_team.team_id
     away_key = away_actual_team_id if away_actual_team_id else game.away_team.team_id
+    
+    # 🔍 DEBUG: Log team_id keys used for saving playbook_settings during timeout
+    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE] Team ID keys for playbook_settings save:")
+    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   game.home_team.team_id = '{game.home_team.team_id}'")
+    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   game.away_team.team_id = '{game.away_team.team_id}'")
+    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   home_actual_team_id = '{home_actual_team_id}'")
+    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   away_actual_team_id = '{away_actual_team_id}'")
+    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   FINAL home_key = '{home_key}'")
+    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   FINAL away_key = '{away_key}'")
+    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   home_playbook_settings has slot_assignments: {len(home_playbook_settings.get('slot_assignments', {})) if home_playbook_settings else 0}")
+    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   away_playbook_settings has slot_assignments: {len(away_playbook_settings.get('slot_assignments', {})) if away_playbook_settings else 0}")
     
     # Process turns: exclude animations for database persistence, keep for real-time frontend
     from copy import deepcopy
