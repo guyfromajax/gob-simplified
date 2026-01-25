@@ -1879,6 +1879,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # This ensures consistent team_id resolution (same logic as save_playbooks)
                         from BackEnd.utils.team_settings_manager import extract_team_settings
                         
+                        # 🔍 DEBUG: Log before extraction
+                        logging.warning(f"🔍 [TIMEOUT-RESUME] Starting playbook_settings extraction:")
+                        logging.warning(f"🔍 [TIMEOUT-RESUME]   home team name = '{home}'")
+                        logging.warning(f"🔍 [TIMEOUT-RESUME]   away team name = '{away}'")
+                        logging.warning(f"🔍 [TIMEOUT-RESUME]   saved_doc teams keys: {list(saved.get('teams', {}).keys())}")
+                        
                         # Extract using team names (will be resolved to canonical team_id internally)
                         home_playbook_settings = extract_team_settings(
                             saved_doc=saved,
@@ -1896,17 +1902,21 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             game_doc=saved  # Pass saved doc for team_id resolution
                         ) or {}
                         
-                        # ✅ DEBUG: Log playbook_settings extraction
-                        logging.warning(f"🔍 [PLAYBOOK SETTINGS LOAD] Extracted from DB: home={bool(home_playbook_settings)} (team={home}), away={bool(away_playbook_settings)} (team={away})")
+                        # ✅ DEBUG: Log playbook_settings extraction result
+                        logging.warning(f"🔍 [TIMEOUT-RESUME] Extraction complete:")
+                        logging.warning(f"🔍 [TIMEOUT-RESUME]   home_playbook_settings found: {bool(home_playbook_settings)}")
+                        logging.warning(f"🔍 [TIMEOUT-RESUME]   away_playbook_settings found: {bool(away_playbook_settings)}")
                         if home_playbook_settings:
-                            logging.warning(f"🔍 [PLAYBOOK SETTINGS LOAD] Home settings keys: {list(home_playbook_settings.keys())[:5]}")
-                            logging.warning(f"🔍 [PLAYBOOK SETTINGS LOAD] Home settings sample: motion={bool(home_playbook_settings.get('motion'))}, set_play_inside={bool(home_playbook_settings.get('set_play_inside'))}")
+                            slot_count = len(home_playbook_settings.get("slot_assignments", {}))
+                            logging.warning(f"🔍 [TIMEOUT-RESUME]   home slot_assignments count: {slot_count}")
+                            logging.warning(f"🔍 [TIMEOUT-RESUME]   home settings keys: {list(home_playbook_settings.keys())[:5]}")
                         if away_playbook_settings:
-                            logging.warning(f"🔍 [PLAYBOOK SETTINGS LOAD] Away settings keys: {list(away_playbook_settings.keys())[:5]}")
-                            logging.warning(f"🔍 [PLAYBOOK SETTINGS LOAD] Away settings sample: motion={bool(away_playbook_settings.get('motion'))}, set_play_inside={bool(away_playbook_settings.get('set_play_inside'))}")
+                            slot_count = len(away_playbook_settings.get("slot_assignments", {}))
+                            logging.warning(f"🔍 [TIMEOUT-RESUME]   away slot_assignments count: {slot_count}")
+                            logging.warning(f"🔍 [TIMEOUT-RESUME]   away settings keys: {list(away_playbook_settings.keys())[:5]}")
                         if not home_playbook_settings and not away_playbook_settings:
-                            logging.warning(f"⚠️ [PLAYBOOK SETTINGS LOAD] No playbook_settings found in DB: home={home}, away={away}")
-                            logging.warning(f"⚠️ [PLAYBOOK SETTINGS LOAD] teams_obj keys: {list(teams_obj.keys())[:3] if teams_obj else 'NO_TEAMS_OBJ'}")
+                            logging.warning(f"⚠️ [TIMEOUT-RESUME] ❌ NO playbook_settings extracted for either team!")
+                            logging.warning(f"⚠️ [TIMEOUT-RESUME]   This indicates a team_id key mismatch between save and extract")
                         
                         # ✅ CRITICAL FIX: Restore playbook_settings to game document after GameManager creation
                         # This ensures playbook_settings persist when navigating to Playbooks page during timeout

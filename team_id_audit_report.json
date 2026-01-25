@@ -1,0 +1,399 @@
+{
+  "summary": {
+    "total_references": 3068,
+    "files_scanned": 150,
+    "files_with_usage": 73,
+    "high_risk_locations": 1884
+  },
+  "format_breakdown": {
+    "objectid_string": 129,
+    "team_id_string": 596,
+    "team_name": 30,
+    "ambiguous": 2313
+  },
+  "top_files": [
+    {
+      "file": "FrontEnd/static/tournament.js",
+      "count": 300
+    },
+    {
+      "file": "BackEnd/api/api.py",
+      "count": 270
+    },
+    {
+      "file": "BackEnd/utils/stat_updater.py",
+      "count": 256
+    },
+    {
+      "file": "BackEnd/api/gameplan_routes.py",
+      "count": 172
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "count": 148
+    },
+    {
+      "file": "FrontEnd/static/franchise-command-center.js",
+      "count": 133
+    },
+    {
+      "file": "FrontEnd/static/js/phaser/animation/turnAnimation.js",
+      "count": 130
+    },
+    {
+      "file": "FrontEnd/static/box-score.js",
+      "count": 100
+    },
+    {
+      "file": "FrontEnd/static/js/phaser/utils/timeoutButtonManager.js",
+      "count": 99
+    },
+    {
+      "file": "BackEnd/utils/team_stats_aggregator.py",
+      "count": 90
+    },
+    {
+      "file": "FrontEnd/static/js/phaser/gameScene.js",
+      "count": 78
+    },
+    {
+      "file": "FrontEnd/static/js/phaser/animation/possession/normalizeTurn.js",
+      "count": 75
+    },
+    {
+      "file": "FrontEnd/static/playbooks.js",
+      "count": 72
+    },
+    {
+      "file": "BackEnd/api/tournament_routes.py",
+      "count": 69
+    },
+    {
+      "file": "BackEnd/models/turn_manager.py",
+      "count": 63
+    },
+    {
+      "file": "BackEnd/utils/shared.py",
+      "count": 60
+    },
+    {
+      "file": "FrontEnd/static/js/phaser/animation/ballManager.js",
+      "count": 54
+    },
+    {
+      "file": "FrontEnd/static/js/phaser/animation/animateGameTurns.js",
+      "count": 53
+    },
+    {
+      "file": "FrontEnd/static/js/phaser/bootGame.js",
+      "count": 52
+    },
+    {
+      "file": "FrontEnd/static/js/phaser/utils/offenseTeamIdResolver.js",
+      "count": 52
+    }
+  ],
+  "high_risk_locations": [
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 43,
+      "pattern": "team_id\\s*[=:]",
+      "context": "user_team_id = franchise_doc.get(\""
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 43,
+      "pattern": "user_team_id",
+      "context": "user_team_id = franchise_doc.get"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 43,
+      "pattern": "user_team_id",
+      "context": "franchise_doc.get(\"user_team_id\")"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 378,
+      "pattern": "team_id\\s*[=:]",
+      "context": "user_team_id = selection.team_name"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 378,
+      "pattern": "user_team_id",
+      "context": "user_team_id = selection.team_na"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 386,
+      "pattern": "team_id\\s*[=:]",
+      "context": "tialize_season(user_team_id=user_team_id, user_t"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 386,
+      "pattern": "user_team_id",
+      "context": "r.initialize_season(user_team_id=user_team_id, user_"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 386,
+      "pattern": "user_team_id",
+      "context": "season(user_team_id=user_team_id, user_team_object_i"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 423,
+      "pattern": "team_id\\s*[=:]",
+      "context": "user_team_id = ObjectId(user_team_"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 423,
+      "pattern": "user_team_id",
+      "context": "user_team_id = ObjectId(user_tea"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 450,
+      "pattern": "user_team_id",
+      "context": "if str(user_team_id) in [matchup_data.g"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 473,
+      "pattern": "team_id\\s*[=:]",
+      "context": "or home_id == user_team_id:"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 473,
+      "pattern": "user_team_id",
+      "context": "if away_id == user_team_id or home_id == user_"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 473,
+      "pattern": "user_team_id",
+      "context": "am_id or home_id == user_team_id:"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 510,
+      "pattern": "home_team_id",
+      "context": "\") or game_doc.get(\"home_team_id\")"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 511,
+      "pattern": "away_team_id",
+      "context": "\") or game_doc.get(\"away_team_id\")"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 901,
+      "pattern": "team_id\\s*[=:]",
+      "context": "team_id = None"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 928,
+      "pattern": "team_id\\s*[=:]",
+      "context": "team_name, team_id = get_user_team_from_"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 968,
+      "pattern": "team_id\\s*[=:]",
+      "context": "team_id = str(team_doc.get(\"_"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 972,
+      "pattern": "team_id\\s*[=:]",
+      "context": "team_id = None"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1110,
+      "pattern": "team_id_str",
+      "context": "team_id_str = str(t[\"_id\"])"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1111,
+      "pattern": "team_id_str",
+      "context": "standings_data.get(team_id_str, {\"W\": 0, \"L\": 0, \""
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1130,
+      "pattern": "team_id_str",
+      "context": "t\": matchup_map.get(team_id_str, \"\")"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1172,
+      "pattern": "user_team_id",
+      "context": "user_team_id, user_team_object_i"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1175,
+      "pattern": "user_team_id",
+      "context": "team_name = user_team_id"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1179,
+      "pattern": "team_id\\s*[=:]",
+      "context": "team_id = str(team_doc[\"_id\"]"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1181,
+      "pattern": "team_id\\s*[=:]",
+      "context": "team_id = None"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1183,
+      "pattern": "team_id\\s*[=:]",
+      "context": "team_id = None"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1186,
+      "pattern": "team_id\\s*[=:]",
+      "context": "team_id = user_team_object_id"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1187,
+      "pattern": "user_team_id",
+      "context": "team_name = user_team_id"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1554,
+      "pattern": "team_id_str",
+      "context": "ne({\"_id\": ObjectId(team_id_str)}, {\"name\": 1, \"pri"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1556,
+      "pattern": "team_id_str",
+      "context": "eam_doc.get(\"name\", team_id_str)"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1557,
+      "pattern": "team_id_str",
+      "context": "team_names[team_id_str] = team_name"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1558,
+      "pattern": "team_id_str",
+      "context": "team_totals[team_id_str] = {"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1571,
+      "pattern": "team_id\\s*[=:]",
+      "context": "player_team_id = str(meta.get(\"team_"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1582,
+      "pattern": "team_id\\s*[=:]",
+      "context": "resolved_team_id = str(team_doc[\"_id\"]"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1585,
+      "pattern": "team_id\\s*[=:]",
+      "context": "player_team_id = resolved_team_id"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1641,
+      "pattern": "meta\\.team_id",
+      "context": "se ``players`` by ``meta.team_id`` and returns the r"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1641,
+      "pattern": "\\.team_id",
+      "context": "`players`` by ``meta.team_id`` and returns the r"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1653,
+      "pattern": "team_id_str",
+      "context": "team_id_str = str(team_id)"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1657,
+      "pattern": "team_id_str",
+      "context": ".get(\"team_id\")) != team_id_str:"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1717,
+      "pattern": "user_team_id",
+      "context": "user_team_id, user_team_object_i"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1718,
+      "pattern": "user_team_id",
+      "context": "team_name = user_team_id"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1840,
+      "pattern": "team_id\\s*[=:]",
+      "context": "(franchise_id: str, team_id: str = None, team_na"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1851,
+      "pattern": "team_id\\s*[=:]",
+      "context": "_id={franchise_id}, team_id={team_id}, team_name"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1865,
+      "pattern": "team_id\\s*[=:]",
+      "context": "actual_team_id = team_id"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1871,
+      "pattern": "team_id\\s*[=:]",
+      "context": "actual_team_id = str(team_doc[\"_id\"]"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1877,
+      "pattern": "team_id\\s*[=:]",
+      "context": "actual_team_id = str(team_doc[\"_id\"]"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1888,
+      "pattern": "user_team_id",
+      "context": "user_team_id, user_team_object_i"
+    },
+    {
+      "file": "BackEnd/api/franchise_routes.py",
+      "line": 1889,
+      "pattern": "user_team_id",
+      "context": "team_name = user_team_id"
+    }
+  ],
+  "database_issues": null
+}

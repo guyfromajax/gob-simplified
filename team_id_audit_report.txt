@@ -1,0 +1,157 @@
+================================================================================
+TEAM ID FORMAT AUDIT REPORT
+================================================================================
+
+📊 SUMMARY
+   Total team ID references found: 3068
+   Files with team ID usage: 73
+   High-risk locations: 1884
+
+📋 FORMAT BREAKDOWN
+   objectid_string: 129 references
+   team_id_string: 596 references
+   team_name: 30 references
+   ambiguous: 2313 references
+
+🔴 HIGH-RISK LOCATIONS (Lookups/Assignments)
+   These locations do lookups or assignments and are most likely to cause bugs:
+
+   BackEnd/api/api.py: 181 high-risk locations
+      Line 345: team_id = str(team_doc.get("_
+      Line 417: : str, doc_id: str, team_id: str, team_name: str
+      Line 431: team_id = str(team_doc.get("_
+      ... and 178 more
+
+   BackEnd/api/franchise_routes.py: 102 high-risk locations
+      Line 43: user_team_id = franchise_doc.get("
+      Line 43: user_team_id = franchise_doc.get
+      Line 43: franchise_doc.get("user_team_id")
+      ... and 99 more
+
+   BackEnd/api/gameplan_routes.py: 118 high-risk locations
+      Line 221: eam_id_to_canonical(team_id: str, mode: str, doc
+      Line 247: user_team_id, user_team_object_i
+      Line 253: user_team_id, user_team_object_i
+      ... and 115 more
+
+   BackEnd/api/tournament_routes.py: 41 high-risk locations
+      Line 37: user_team_id = tournament_doc.get(
+      Line 37: user_team_id = tournament_doc.ge
+      Line 37: tournament_doc.get("user_team_id")
+      ... and 38 more
+
+   BackEnd/models/animator.py: 24 high-risk locations
+      Line 73: ense = offense_team.team_id == self.game.away_tea
+      Line 73: fense = offense_team.team_id == self.game.away_t
+      Line 73: self.game.away_team.team_id
+      ... and 21 more
+
+   BackEnd/models/franchise_manager.py: 7 high-risk locations
+      Line 109: e_season(self, user_team_id: str | None = None,
+      Line 109: ialize_season(self, user_team_id: str | None = None,
+      Line 177: team_id = str(team["_id"])
+      ... and 4 more
+
+   BackEnd/models/game_manager.py: 14 high-risk locations
+      Line 124: team.name}, offense_team_id={offense_team.team_i
+      Line 124: eam_id={offense_team.team_id}, defense_team={def
+      Line 224: timeout_offense_team_id = last_turn.get("offe
+      ... and 11 more
+
+   BackEnd/models/shot_manager.py: 24 high-risk locations
+      Line 55: st_break = def_team.team_id == self.game.home_tea
+      Line 55: ast_break = def_team.team_id == self.game.home_t
+      Line 55: self.game.home_team.team_id
+      ... and 21 more
+
+   BackEnd/models/team_manager.py: 2 high-risk locations
+      Line 200: self.team_id = team_doc.get("team_
+      Line 200: self.team_id = team_doc.get("tea
+
+   BackEnd/models/training_manager.py: 5 high-risk locations
+      Line 45: on_type, date=date, team_id=str(self.team_doc["_
+      Line 72: pe: str, date: str, team_id: str, franchise_id:
+      Line 75: self.team_id = team_id
+      ... and 2 more
+
+   BackEnd/models/turn_manager.py: 44 high-risk locations
+      Line 77: ense = offense_team.team_id == game.away_team.tea
+      Line 77: fense = offense_team.team_id == game.away_team.t
+      Line 77: id == game.away_team.team_id
+      ... and 41 more
+
+   BackEnd/tournament/tournament_manager.py: 13 high-risk locations
+      Line 18: __init__(self, user_team_id: str | None = None,
+      Line 18: def __init__(self, user_team_id: str | None = None,
+      Line 20: self.user_team_id = user_team_id
+      ... and 10 more
+
+   BackEnd/utils/franchise_standings.py: 1 high-risk locations
+      Line 34: standings_data[str(team_id_str)] = {"PF": 0, "PA":
+
+   BackEnd/utils/quarter_start.py: 3 high-risk locations
+      Line 55: ense = offense_team.team_id == game.away_team.tea
+      Line 55: fense = offense_team.team_id == game.away_team.t
+      Line 55: id == game.away_team.team_id
+
+   BackEnd/utils/shared.py: 39 high-risk locations
+      Line 212: _offense = off_team.team_id == game.away_team.tea
+      Line 212: y_offense = off_team.team_id == game.away_team.t
+      Line 212: id == game.away_team.team_id
+      ... and 36 more
+
+   BackEnd/utils/stat_updater.py: 177 high-risk locations
+      Line 209: ocument to preserve meta.team_id
+      Line 209: ent to preserve meta.team_id
+      Line 254: : Preserve existing meta.team_id from tournament doc
+      ... and 174 more
+
+   BackEnd/utils/team_stats_aggregator.py: 60 high-risk locations
+      Line 47: team_id_str = str(team_id)
+      Line 48: team_stats_map[team_id_str] = {
+      Line 58: players_without_team_id = 0
+      ... and 57 more
+
+   FrontEnd/static/box-score.js: 92 high-risk locations
+      Line 82: const homeTeamId = gameData.home_team_
+      Line 82: meTeamId = gameData.home_team_id;
+      Line 82: const homeTeamId = gameData.home_tea
+      ... and 89 more
+
+   FrontEnd/static/franchise-command-center.js: 99 high-risk locations
+      Line 15: let userTeamId = null; // Will be re
+      Line 15: let userTeamId = null; // Will be
+      Line 15: let userTeamId = null; // Will be
+      ... and 96 more
+
+   FrontEnd/static/game-plan.js: 40 high-risk locations
+      Line 30: am = urlParams.get('user_team_id');
+      Line 30: const userTeamIdParam = urlParams.ge
+      Line 30: const userTeamIdParam = urlParams.ge
+      ... and 37 more
+
+📁 FILES WITH MOST TEAM ID USAGE
+   FrontEnd/static/tournament.js: 300 references
+   BackEnd/api/api.py: 270 references
+   BackEnd/utils/stat_updater.py: 256 references
+   BackEnd/api/gameplan_routes.py: 172 references
+   BackEnd/api/franchise_routes.py: 148 references
+   FrontEnd/static/franchise-command-center.js: 133 references
+   FrontEnd/static/js/phaser/animation/turnAnimation.js: 130 references
+   FrontEnd/static/box-score.js: 100 references
+   FrontEnd/static/js/phaser/utils/timeoutButtonManager.js: 99 references
+   BackEnd/utils/team_stats_aggregator.py: 90 references
+   FrontEnd/static/js/phaser/gameScene.js: 78 references
+   FrontEnd/static/js/phaser/animation/possession/normalizeTurn.js: 75 references
+   FrontEnd/static/playbooks.js: 72 references
+   BackEnd/api/tournament_routes.py: 69 references
+   BackEnd/models/turn_manager.py: 63 references
+
+💡 RECOMMENDATIONS
+   1. Start with high-risk locations (lookups/assignments)
+   2. Create unified resolve_team_id() helper function
+   3. Add validation at API boundaries
+   4. Migrate database documents with format mismatches
+   5. Replace usage incrementally, file by file
+
+================================================================================
