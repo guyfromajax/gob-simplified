@@ -90,8 +90,16 @@ function createPopupElement(userTeam, computerTeam, currentMatchups, gameId) {
     const popup = document.createElement('div');
     popup.className = 'defense-matchups-popup';
     
-    // Build user team rows
-    const userRows = POSITIONS.map(pos => {
+    // Store initial user team order (default: PG, SG, SF, PF, C)
+    const initialOrder = POSITIONS.slice(); // Copy array
+    popup.dataset.userTeamOrder = JSON.stringify(initialOrder);
+    
+    // Store user team and computer team data for re-rendering
+    popup.dataset.userTeamData = JSON.stringify(userTeam);
+    popup.dataset.computerTeamData = JSON.stringify(computerTeam);
+    
+    // Build user team rows (in initial order)
+    const userRows = initialOrder.map(pos => {
         const player = userTeam.players.find(p => p.position === pos);
         if (!player) return '';
         return createPlayerRow(player, 'user', pos, currentMatchups);
