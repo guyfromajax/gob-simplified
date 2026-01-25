@@ -399,10 +399,17 @@ function handleUserPositionSwap(draggedRow, targetRow, popup, gameId) {
     });
     
     // Get indices from container children (not from array indexOf)
-    const draggedIndex = Array.from(userRowsContainer.children).indexOf(draggedRow);
-    const targetIndex = Array.from(userRowsContainer.children).indexOf(targetRow);
+    const allChildren = Array.from(userRowsContainer.children);
+    const draggedIndex = allChildren.indexOf(draggedRow);
+    const targetIndex = allChildren.indexOf(targetRow);
     
-    console.log('🟢 [DEFENSE MATCHUPS SWAP] Indices:', { dragged: draggedIndex, target: targetIndex });
+    console.log('🟢 [DEFENSE MATCHUPS SWAP] Indices:', { 
+        dragged: draggedIndex, 
+        target: targetIndex,
+        draggedRowElement: draggedRow,
+        targetRowElement: targetRow,
+        allChildrenOrder: allChildren.map((el, i) => ({ index: i, position: el.dataset.position, element: el }))
+    });
     
     // Swap DOM elements
     if (draggedIndex < targetIndex) {
@@ -429,8 +436,20 @@ function handleUserPositionSwap(draggedRow, targetRow, popup, gameId) {
         const userPlayerPos = row.dataset.position; // Player's actual position (PG, SG, etc.)
         const slotPosition = POSITIONS[index]; // The slot they're in (PG slot, SG slot, etc.)
         newMatchups[userPlayerPos] = slotPosition; // This user position guards the computer position in this slot
-        console.log(`🟢 [DEFENSE MATCHUPS SWAP] Row ${index}: ${userPlayerPos} guards ${slotPosition}`);
+        console.log(`🟢 [DEFENSE MATCHUPS SWAP] Row ${index}: ${userPlayerPos} guards ${slotPosition}`, {
+            rowElement: row,
+            rowIndexInContainer: Array.from(userRowsContainer.children).indexOf(row)
+        });
     });
+    
+    console.log('🟢 [DEFENSE MATCHUPS SWAP] Final matchups:', newMatchups);
+    console.log('🟢 [DEFENSE MATCHUPS SWAP] Container children order after swap:', 
+        Array.from(userRowsContainer.children).map((el, i) => ({ 
+            index: i, 
+            position: el.dataset.position, 
+            className: el.className 
+        }))
+    );
     
     // Store matchups in popup
     storeMatchupsInPopup(popup, newMatchups);
