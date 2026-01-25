@@ -1407,10 +1407,14 @@ async function loadRoster() {
       return;
     }
     // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint
-    // Use userTeamId directly (not formatted) - backend handles name resolution
+    // ✅ FIX: Use userTeamName (team name) not userTeamId (ObjectId) - roster endpoint expects team name
+    if (!userTeamName) {
+      console.error('❌ [DEBUG loadRoster] No userTeamName found - cannot load roster');
+      return;
+    }
     let data = null;
-    let url = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?tournament_id=${encodeURIComponent(tournament._id)}`;
-    console.log('🔍 [DEBUG loadRoster] Fetching roster from:', url);
+    let url = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamName)}`)}?tournament_id=${encodeURIComponent(tournament._id)}`;
+    console.log('🔍 [DEBUG loadRoster] Fetching roster from:', url, '(using team name:', userTeamName, ')');
     let res = await fetch(url);
     let dataLoaded = false; // Track if data was loaded from retry
     
@@ -1429,8 +1433,11 @@ async function loadRoster() {
             userTeamId = commandCenterData.team_id;
             localStorage.setItem("userTeamId", userTeamId);
             
-            // Retry with correct userTeamId
-            url = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?tournament_id=${encodeURIComponent(tournament._id)}`;
+            // Retry with correct userTeamName (roster endpoint expects team name, not ObjectId)
+            if (commandCenterData.team) {
+              userTeamName = commandCenterData.team;
+            }
+            url = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamName)}`)}?tournament_id=${encodeURIComponent(tournament._id)}`;
             res = await fetch(url);
             if (res.ok) {
               data = await res.json();
@@ -1455,8 +1462,11 @@ async function loadRoster() {
           localStorage.setItem("userTeamId", userTeamId);
           console.log('✅ [DEBUG loadRoster] Using userTeamId from tournament document:', userTeamId);
           
-          // Retry with tournament document userTeamId
-          url = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?tournament_id=${encodeURIComponent(tournament._id)}`;
+          // Retry with tournament document userTeamName (roster endpoint expects team name, not ObjectId)
+          if (tournament.user_team_id) {
+            userTeamName = tournament.user_team_id;
+          }
+          url = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamName)}`)}?tournament_id=${encodeURIComponent(tournament._id)}`;
           res = await fetch(url);
           if (res.ok) {
             data = await res.json();
