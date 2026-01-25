@@ -1854,8 +1854,10 @@ def _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_
                             # Fallback: use ball handler's position
                             defender = def_lineup.get(ball_handler_pos)
                     else:
-                        # Man defense: defender matches position
-                        defender = def_lineup.get(ball_handler_pos)
+                        # Man defense: check custom matchups first, fallback to position-on-position
+                        from BackEnd.utils.man_defense_matchups import get_defender_position_for_man_defense
+                        defender_pos = get_defender_position_for_man_defense(ball_handler_pos, game.game_state)
+                        defender = def_lineup.get(defender_pos)
                     
                     if defender:
                         # Calculate offense and defense values
@@ -2029,8 +2031,10 @@ def _check_dead_ball_turnover(game, skeleton, calibrated_dead_ball_to):
                             # Fallback: use ball handler's position
                             defender = def_lineup.get(ball_handler_pos)
                     else:
-                        # Man defense: defender matches position
-                        defender = def_lineup.get(ball_handler_pos)
+                        # Man defense: check custom matchups first, fallback to position-on-position
+                        from BackEnd.utils.man_defense_matchups import get_defender_position_for_man_defense
+                        defender_pos = get_defender_position_for_man_defense(ball_handler_pos, game.game_state)
+                        defender = def_lineup.get(defender_pos)
                     
                     if defender:
                         # Calculate scores
@@ -3540,8 +3544,10 @@ def resolve_half_court_offense_logic(game):
                 
                 defender = def_lineup.get(defender_pos) if defender_pos else def_lineup.get("PG")
             else:
-                # Man-to-man: defender matches ball handler position
-                defender = def_lineup.get(ball_handler_pos) if ball_handler_pos else def_lineup.get("PG")
+                # Man-to-man: check custom matchups first, fallback to position-on-position
+                from BackEnd.utils.man_defense_matchups import get_defender_position_for_man_defense
+                defender_pos = get_defender_position_for_man_defense(ball_handler_pos, game.game_state) if ball_handler_pos else "PG"
+                defender = def_lineup.get(defender_pos) if defender_pos else def_lineup.get("PG")
             
             if defender:
                 roles["defender"] = defender
