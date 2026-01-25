@@ -301,14 +301,17 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
 /**
  * Handle user position swap when user drags and drops within user team column
  * Swaps the two players' positions and recalculates matchups based on new order
+ * 
+ * Logic: After swap, user position in slot X guards computer position X
+ * Example: If user PG is dragged to SG slot, user PG guards computer SG
  */
 function handleUserPositionSwap(draggedRow, targetRow, popup, gameId) {
     const userRowsContainer = popup.querySelector('.user-team-column .player-rows');
     const userRows = Array.from(popup.querySelectorAll('.user-team-row'));
     
-    // Get the original positions
-    const draggedPosition = draggedRow.dataset.position;
-    const targetPosition = targetRow.dataset.position;
+    // Get the original player positions (data-position stays as player's actual position)
+    const draggedPlayerPos = draggedRow.dataset.position;
+    const targetPlayerPos = targetRow.dataset.position;
     
     // Swap the rows in the DOM
     const draggedIndex = userRows.indexOf(draggedRow);
@@ -325,19 +328,16 @@ function handleUserPositionSwap(draggedRow, targetRow, popup, gameId) {
         userRowsContainer.insertBefore(targetRow, draggedRow);
     }
     
-    // Update data-position attributes to reflect new slot positions
-    // After swap, draggedRow is now in targetPosition's slot, targetRow is in draggedPosition's slot
-    draggedRow.dataset.position = targetPosition;
-    targetRow.dataset.position = draggedPosition;
-    
-    // Recalculate matchups based on new position order
-    // Matchups are now: user position in slot X guards computer position X
+    // Recalculate matchups based on new DOM order
+    // Matchups: user position in slot X guards computer position X
+    // data-position remains the player's actual position (PG, SG, etc.)
+    // Slot position is determined by DOM order (index in POSITIONS array)
     const newMatchups = {};
     const updatedUserRows = Array.from(popup.querySelectorAll('.user-team-row'));
     updatedUserRows.forEach((row, index) => {
-        const userPos = row.dataset.position; // The actual player's position (PG, SG, etc.)
+        const userPlayerPos = row.dataset.position; // Player's actual position (PG, SG, etc.)
         const slotPosition = POSITIONS[index]; // The slot they're in (PG slot, SG slot, etc.)
-        newMatchups[userPos] = slotPosition; // This user position guards the computer position in this slot
+        newMatchups[userPlayerPos] = slotPosition; // This user position guards the computer position in this slot
     });
     
     // Store matchups in popup
