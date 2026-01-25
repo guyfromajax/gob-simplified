@@ -99,12 +99,12 @@ async function loadGameData(gameId) {
   const mode = urlParams.get('mode');
   
   if (homeTeamName && awayTeamName) {
-    await mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournamentId, mode);
+    await mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournamentId, mode, homeTeamId, awayTeamId);
   }
 }
 
 // Fetch and merge full rosters with game data to ensure all 12 players are shown
-async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournamentId, mode) {
+async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournamentId, mode, homeTeamId = null, awayTeamId = null) {
   const fetchRoster = async (team) => {
     // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint for all modes
     let path = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(team)}`);
@@ -128,8 +128,12 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournam
     fetchRoster(awayTeamName),
   ]);
 
+  // ✅ SS&S: Get team_id values for box_score lookup
+  const homeTeamId = gameData.home_team_id;
+  const awayTeamId = gameData.away_team_id;
+  
   // Map roster players to box-score-ready format
-  const mapPlayers = (players, teamKey, teamName) =>
+  const mapPlayers = (players, teamKey, teamName, teamId) =>
     players.map((p) => {
       // Check if this player is in the game data (lineup players)
       const gamePlayer = gameData.players?.find(
@@ -137,7 +141,8 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournam
       );
       
       // Check if this player has box score stats
-      const boxScore = gameData.box_score?.[teamName] || {};
+      // ✅ SS&S: box_score uses team_id keys, fallback to team_name for backward compatibility
+      const boxScore = (teamId && gameData.box_score?.[teamId]) || gameData.box_score?.[teamName] || {};
       const boxScorePlayer = Object.entries(boxScore).find(
         ([pos, playerData]) => 
           typeof playerData === 'object' && 
@@ -175,8 +180,8 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournam
   });
   
   gameData.players = [
-    ...sortByRT(mapPlayers(homeRoster, 'home', homeTeamName)),
-    ...sortByRT(mapPlayers(awayRoster, 'away', awayTeamName)),
+    ...sortByRT(mapPlayers(homeRoster, 'home', homeTeamName, homeTeamId)),
+    ...sortByRT(mapPlayers(awayRoster, 'away', awayTeamName, awayTeamId)),
   ];
   
   console.log(`Merged full rosters: ${homeRoster.length} home players, ${awayRoster.length} away players`);
