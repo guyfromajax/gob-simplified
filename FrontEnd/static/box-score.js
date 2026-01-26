@@ -70,11 +70,39 @@ async function loadGameData(gameId) {
     gameId,
     hasBoxScore: !!gameData.box_score,
     boxScoreKeys: gameData.box_score ? Object.keys(gameData.box_score) : [],
+    boxScoreStructure: gameData.box_score,
     hasPlayers: !!gameData.players,
     playerCount: gameData.players ? gameData.players.length : 0,
     score: gameData.score,
-    quarter: gameData.quarter
+    quarter: gameData.quarter,
+    home_team_id: gameData.home_team_id,
+    away_team_id: gameData.away_team_id,
+    hasTeams: !!gameData.teams,
+    teamsKeys: gameData.teams ? Object.keys(gameData.teams) : []
   });
+  
+  // ✅ DEBUG: Log box_score structure in detail
+  if (gameData.box_score) {
+    for (const [teamKey, teamBox] of Object.entries(gameData.box_score)) {
+      if (typeof teamBox === 'object' && teamBox !== null) {
+        const playerCount = Object.keys(teamBox).length;
+        const samplePlayers = Object.entries(teamBox).slice(0, 3).map(([pos, p]) => ({
+          pos,
+          playerId: p?.playerId || p?.player_id,
+          name: p?.name,
+          hasStats: p && typeof p === 'object' && Object.keys(p).length > 0
+        }));
+        console.log(`🔍 [BOX-SCORE DEBUG] Initial box_score[${teamKey}]:`, {
+          playerCount,
+          samplePlayers
+        });
+      } else {
+        console.warn(`⚠️ [BOX-SCORE DEBUG] box_score[${teamKey}] is not an object:`, typeof teamBox);
+      }
+    }
+  } else {
+    console.warn('⚠️ [BOX-SCORE DEBUG] gameData.box_score is missing or empty!');
+  }
   
   // Fetch full rosters to ensure all 12 players are shown
   const urlParams = new URLSearchParams(window.location.search);
@@ -105,6 +133,19 @@ async function loadGameData(gameId) {
 
 // Fetch and merge full rosters with game data to ensure all 12 players are shown
 async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournamentId, mode, homeTeamId = null, awayTeamId = null) {
+  console.log('🔍 [BOX-SCORE DEBUG] mergeFullRosters() called:', {
+    homeTeamName,
+    awayTeamName,
+    franchiseId,
+    tournamentId,
+    mode,
+    homeTeamId,
+    awayTeamId,
+    hasGameData: !!gameData,
+    boxScoreKeys: gameData?.box_score ? Object.keys(gameData.box_score) : [],
+    boxScoreStructure: gameData?.box_score
+  });
+
   const fetchRoster = async (team) => {
     // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint for all modes
     let path = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(team)}`);
@@ -114,13 +155,29 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournam
     } else if (mode === 'tournament' && tournamentId) {
       params.append('tournament_id', tournamentId);
     }
+    // Note: Single game mode has no params (loads from universal collection)
     if (params.toString()) {
       path += `?${params.toString()}`;
     }
+    console.log(`🔍 [BOX-SCORE DEBUG] Fetching roster for ${team} from: ${path} (mode=${mode || 'single'})`);
     const res = await fetch(path);
-    if (!res.ok) throw new Error(`Failed to load roster for ${team}`);
+    if (!res.ok) {
+      console.error(`❌ [BOX-SCORE DEBUG] Failed to load roster for ${team}: ${res.status} ${res.statusText}`);
+      throw new Error(`Failed to load roster for ${team}`);
+    }
     const data = await res.json();
-    return Array.isArray(data.players) ? data.players : [];
+    const players = Array.isArray(data.players) ? data.players : [];
+    console.log(`🔍 [BOX-SCORE DEBUG] Roster fetch for ${team}: ${players.length} players returned`);
+    if (players.length > 0) {
+      const samplePlayer = players[0];
+      console.log(`🔍 [BOX-SCORE DEBUG] Sample player from ${team}:`, {
+        _id: samplePlayer._id,
+        name: samplePlayer.name,
+        playerId: samplePlayer.playerId,
+        hasAttributes: !!samplePlayer.attributes
+      });
+    }
+    return players;
   };
 
   const [homeRoster, awayRoster] = await Promise.all([
@@ -132,40 +189,90 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournam
   const homeTeamId = gameData.home_team_id;
   const awayTeamId = gameData.away_team_id;
   
+  console.log('🔍 [BOX-SCORE DEBUG] After roster fetch:', {
+    homeRosterCount: homeRoster.length,
+    awayRosterCount: awayRoster.length,
+    homeTeamId,
+    awayTeamId,
+    boxScoreKeys: gameData?.box_score ? Object.keys(gameData.box_score) : []
+  });
+  
   // Map roster players to box-score-ready format
-  const mapPlayers = (players, teamKey, teamName, teamId) =>
-    players.map((p) => {
+  const mapPlayers = (players, teamKey, teamName, teamId) => {
+    console.log(`🔍 [BOX-SCORE DEBUG] mapPlayers() for ${teamKey} (${teamName}):`, {
+      playerCount: players.length,
+      teamId,
+      boxScoreKeys: gameData?.box_score ? Object.keys(gameData.box_score) : []
+    });
+    
+    // ✅ SS&S: box_score uses team_id keys, fallback to team_name for backward compatibility
+    const boxScore = (teamId && gameData.box_score?.[teamId]) || gameData.box_score?.[teamName] || {};
+    console.log(`🔍 [BOX-SCORE DEBUG] Box score lookup for ${teamKey}:`, {
+      teamId,
+      teamName,
+      usingTeamId: !!(teamId && gameData.box_score?.[teamId]),
+      usingTeamName: !!gameData.box_score?.[teamName],
+      boxScoreKeys: Object.keys(boxScore),
+      boxScorePlayerCount: Object.keys(boxScore).length
+    });
+    
+    return players.map((p, idx) => {
       // Check if this player is in the game data (lineup players)
       const gamePlayer = gameData.players?.find(
         gp => (gp.playerId || gp._id || gp.player_id) === (p._id || p.playerId)
       );
       
       // Check if this player has box score stats
-      // ✅ SS&S: box_score uses team_id keys, fallback to team_name for backward compatibility
-      const boxScore = (teamId && gameData.box_score?.[teamId]) || gameData.box_score?.[teamName] || {};
       const boxScorePlayer = Object.entries(boxScore).find(
         ([pos, playerData]) => 
           typeof playerData === 'object' && 
           playerData.name === p.name ||
           (playerData.playerId || playerData.player_id) === (p._id || p.playerId)
       )?.[1];
+      
+      if (idx < 2 || boxScorePlayer) { // Log first 2 players or any with box score match
+        console.log(`🔍 [BOX-SCORE DEBUG] Player ${p.name} (${p._id}):`, {
+          foundInGameData: !!gamePlayer,
+          foundInBoxScore: !!boxScorePlayer,
+          boxScorePlayerId: boxScorePlayer?.playerId || boxScorePlayer?.player_id,
+          boxScorePlayerName: boxScorePlayer?.name,
+          rosterPlayerId: p._id || p.playerId,
+          rosterPlayerName: p.name
+        });
+      }
 
       // Calculate highest RT from position_ratings
       const posRatings = p.position_ratings || {};
       const rtValues = Object.values(posRatings);
       const highestRT = rtValues.length > 0 ? Math.max(...rtValues) : -Infinity;
 
+      const finalStats = gamePlayer?.stats?.game || boxScorePlayer || gamePlayer?.stats || {};
+      const hasStats = Object.keys(finalStats).length > 0;
+      
+      if (idx < 2 || hasStats) { // Log first 2 players or any with stats
+        console.log(`🔍 [BOX-SCORE DEBUG] Final player data for ${p.name}:`, {
+          playerId: p._id || p.playerId,
+          hasStats,
+          statKeys: Object.keys(finalStats),
+          statSample: Object.keys(finalStats).slice(0, 5).reduce((acc, key) => {
+            acc[key] = finalStats[key];
+            return acc;
+          }, {})
+        });
+      }
+      
       return {
         playerId: p._id || p.playerId,
         team: teamKey,
         name: p.name,
         jersey: boxScorePlayer?.jersey !== undefined ? boxScorePlayer.jersey : (typeof p.jersey === 'number' ? p.jersey : (p.jersey !== undefined && p.jersey !== null && p.jersey !== '' ? p.jersey : '')),
         pos: p.pos || p.position || null,
-        stats: gamePlayer?.stats?.game || boxScorePlayer || gamePlayer?.stats || {},
+        stats: finalStats,
         year: p.year || 'SR',
         highestRT: highestRT,
       };
     });
+  };
 
   // Merge roster players with game data players and sort by RT
   const positionOrder = ['PG', 'SG', 'SF', 'PF', 'C'];
@@ -179,12 +286,23 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournam
     return (a.jersey || 0) - (b.jersey || 0);
   });
   
-  gameData.players = [
-    ...sortByRT(mapPlayers(homeRoster, 'home', homeTeamName, homeTeamId)),
-    ...sortByRT(mapPlayers(awayRoster, 'away', awayTeamName, awayTeamId)),
-  ];
+  const homeMapped = sortByRT(mapPlayers(homeRoster, 'home', homeTeamName, homeTeamId));
+  const awayMapped = sortByRT(mapPlayers(awayRoster, 'away', awayTeamName, awayTeamId));
   
-  console.log(`Merged full rosters: ${homeRoster.length} home players, ${awayRoster.length} away players`);
+  gameData.players = [...homeMapped, ...awayMapped];
+  
+  const playersWithStats = gameData.players.filter(p => Object.keys(p.stats || {}).length > 0);
+  console.log(`🔍 [BOX-SCORE DEBUG] Merged full rosters:`, {
+    homeRosterCount: homeRoster.length,
+    awayRosterCount: awayRoster.length,
+    totalMappedPlayers: gameData.players.length,
+    playersWithStats: playersWithStats.length,
+    samplePlayerWithStats: playersWithStats[0] ? {
+      name: playersWithStats[0].name,
+      playerId: playersWithStats[0].playerId,
+      statKeys: Object.keys(playersWithStats[0].stats || {})
+    } : null
+  });
 }
 
 // Render all box score sections

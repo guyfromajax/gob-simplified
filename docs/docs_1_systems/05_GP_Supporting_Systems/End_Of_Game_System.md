@@ -21,13 +21,18 @@
    - `FrontEnd/static/box-score.js` - Handles "Go To Locker Room" button navigation
    - `BackEnd/api/api.py` - ObjectId serialization for tournament/franchise endpoints
 
-**End of Game System Flow (5 Steps)**
+**End of Game System Flow (6 Steps)**
 
 1. **Game Completion Detection**: Game completes when Q4 ends (or overtime), detected in `gameScene.js` when `quarter === 4` and game is finalized
-2. **Completion Popup Display**: Shows final score, "Box Score" button, and "Go To Locker Room" button with all navigation parameters
-3. **Navigation Anchor Preservation**: Preserves complete navigation anchor set (mode, doc_id, team_id) for seamless return to command center
-4. **Box Score Navigation**: User can navigate to Box Score page with all context parameters preserved
-5. **Command Center Navigation**: User can navigate to appropriate Command Center (Tournament, Franchise, or Mode Select) with complete navigation context
+2. **Backend Game Finalization** (Franchise Mode Only): 
+   - Frontend calls `/franchise/save-result` endpoint
+   - Player stats are finalized via `stat_updater.finalize_game()`
+   - **Team attributes are updated** based on game performance (win/loss, score differential, etc.)
+   - Updated team attributes are saved to `franchise.franchise_teams.{team_id}` and reflected in the game's box score
+3. **Completion Popup Display**: Shows final score, "Box Score" button, and "Go To Locker Room" button with all navigation parameters
+4. **Navigation Anchor Preservation**: Preserves complete navigation anchor set (mode, doc_id, team_id) for seamless return to command center
+5. **Box Score Navigation**: User can navigate to Box Score page with all context parameters preserved (box score reflects updated team attributes)
+6. **Command Center Navigation**: User can navigate to appropriate Command Center (Tournament, Franchise, or Mode Select) with complete navigation context
 
 **Long Form Documentation**
 
