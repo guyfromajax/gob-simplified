@@ -3942,7 +3942,9 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
         raise HTTPException(status_code=404, detail=f"Team document missing name field for '{lookup_value}'")
 
     load_start = time.time()
-    team_doc, player_objects = load_roster(match)
+    # ✅ FIX: Pass franchise_id to load_roster() so it loads trained attributes from franchise.players
+    # This ensures Roster tab displays trained values (e.g., SH in 90s) instead of universal collection values (e.g., SH in 80s)
+    team_doc, player_objects = load_roster(match, franchise_id=franchise_id)
     load_time = (time.time() - load_start) * 1000
 
     if not player_objects:
