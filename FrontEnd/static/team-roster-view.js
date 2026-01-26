@@ -112,9 +112,34 @@ async function loadRoster() {
     if (!response.ok) throw new Error(`Failed to load roster: ${response.status}`);
     const data = await response.json();
     
+    // ✅ DEBUG: Log what we received from backend
+    console.log('🔍 [ROSTER VIEW] Received roster data:', {
+      playerCount: data.players?.length || 0,
+      samplePlayer: data.players?.[0] ? {
+        name: data.players[0].name || `${data.players[0].first_name} ${data.players[0].last_name}`,
+        _id: data.players[0]._id,
+        attributes: data.players[0].attributes || {},
+        hasAnchor_SH: 'anchor_SH' in (data.players[0].attributes || {}),
+        hasSH: 'SH' in (data.players[0].attributes || {}),
+        SH_value: data.players[0].attributes?.SH,
+        anchor_SH_value: data.players[0].attributes?.anchor_SH
+      } : null
+    });
+    
     rosterData = (data.players || []).map(p => {
       const attrs = p.attributes || {};
       const posRatings = p.position_ratings || {};
+      
+      // ✅ DEBUG: Log attribute values for Kevin Nelson or first player
+      const playerName = p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim();
+      if (playerName.includes('Nelson') || (p === data.players[0] && data.players.length > 0)) {
+        console.log(`🔍 [ROSTER VIEW] Processing ${playerName}:`, {
+          _id: p._id,
+          SH: attrs.SH,
+          anchor_SH: attrs.anchor_SH,
+          allAttrKeys: Object.keys(attrs)
+        });
+      }
       
       // Calculate highest RT
       let highestRT = -Infinity;
