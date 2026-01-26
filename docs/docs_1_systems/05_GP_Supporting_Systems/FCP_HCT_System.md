@@ -77,6 +77,49 @@
     - Track team-level defensive success (if applicable)
     - Set `next_play_type` and `offensive_state` for transition system
 
+**Stopper System**
+
+The stopper system truncates FCP/HCT "base" variant skeletons at strategic points to execute non-shot outcomes (fouls, turnovers, steals). It applies to all non-SHOT results except HCO (which uses the full skeleton).
+
+**Stopper System Flow (5 Steps)**
+
+1. **Determine if Stopper System Applies**
+   - Applies to: `O_FOUL`, `D_FOUL`, `DEAD_BALL_TURNOVER`, `STEAL`
+   - Does NOT apply to: `SHOT` (uses full "shot" variant skeleton), `HCO` (uses full "base" variant skeleton)
+
+2. **Select Stop Step Index**
+   - **Fouls (O_FOUL/D_FOUL)**: Random step between step 1 and second-to-last step
+     - Excludes step 0 (initial positions) and final step
+     - Example: 7-step skeleton → randomly selects from steps 1-5
+   - **Steals/Turnovers (STEAL/DEAD_BALL_TURNOVER)**: Middle step blast radius
+     - Calculates middle of steps 1 through second-to-last
+     - Excludes step 0 and final step
+     - Choose a step randomly ±2 from the middle step, clamped to valid range
+     - Example: 8-step skeleton (0-7) → excludes step 0 and step 7 → available steps 1-6 → middle step is 3 → blast radius is steps 1-5 → randomly selects from steps 1-5
+
+3. **Truncate Skeleton**
+   - Deep copy skeleton to avoid mutating cached original
+   - Truncate to: `steps[:stop_step_index + 1]` (includes the stop step)
+   - Preserves step 0 (press/trap break positions)
+
+4. **Find Ball Handler at Stop Step**
+   - Check stop step for ball possession actions: `"handle_ball"`, `"receive"`, `"pass"`
+   - If not found, check previous step
+   - Extract ball handler position, location, and coordinates
+
+5. **Create Stopper Step**
+   - Timestamp: `stop_step.timestamp + 300ms`
+   - Action mapping: `O_FOUL` → "o_foul", `D_FOUL` → "d_foul", `DEAD_BALL_TURNOVER` → "dead_ball_turnover", `STEAL` → "steal"
+   - Add ball handler to stopper step's `pos_actions` (ball remains with them)
+   - Add stopper event to `events` array
+   - Replace skeleton: `truncated_steps + [stopper_step]`
+
+**Integration with FCP/HCT:**
+- Uses "base" variant skeleton (has step 0 with press/trap break positions)
+- Ball handler determined from stop step (where event occurs)
+- Defender determined by position-matching to ball handler
+- Frontend animates truncated skeleton normally (no special handling needed)
+
 **Long Form Documentation**
 
 ### Overview

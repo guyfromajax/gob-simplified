@@ -2631,11 +2631,18 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
         # If skeleton has 7 steps (0-6), choose from steps 1-5
         stop_step_index = random.randint(1, len(steps) - 2) if len(steps) > 2 else 1
     elif result in ["DEAD_BALL_TURNOVER", "STEAL"]:
-        # Strategic step - use middle step, excluding step 0 for consistency with fouls
+        # Middle step with blast radius (±2 steps from middle)
         # Calculate middle of steps 1 through len(steps)-1 (excluding step 0 and final step)
         if len(steps) > 2:
-            # Middle of steps 1 to len(steps)-2
-            stop_step_index = 1 + (len(steps) - 2 - 1) // 2
+            # Calculate middle step
+            middle_step = 1 + (len(steps) - 2 - 1) // 2
+            
+            # Create blast radius: middle ± 2, clamped to valid range (step 1 to second-to-last)
+            min_step = max(1, middle_step - 2)
+            max_step = min(len(steps) - 2, middle_step + 2)
+            
+            # Randomly select from blast radius
+            stop_step_index = random.randint(min_step, max_step)
         else:
             stop_step_index = 1
     else:
