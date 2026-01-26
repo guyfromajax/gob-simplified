@@ -3942,10 +3942,21 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
         raise HTTPException(status_code=404, detail=f"Team document missing name field for '{lookup_value}'")
 
     load_start = time.time()
+    # ✅ DEBUG: Log franchise_id being passed to load_roster()
+    logging.warning(f"🔍 [ROSTER DEBUG] /roster/{team_identifier} - franchise_id={franchise_id}, team_name={match}")
     # ✅ FIX: Pass franchise_id to load_roster() so it loads trained attributes from franchise.players
     # This ensures Roster tab displays trained values (e.g., SH in 90s) instead of universal collection values (e.g., SH in 80s)
     team_doc, player_objects = load_roster(match, franchise_id=franchise_id)
     load_time = (time.time() - load_start) * 1000
+    # ✅ DEBUG: Log what load_roster() returned
+    if player_objects:
+        sample_player = player_objects[0]
+        sample_attrs = sample_player.get("attributes", {})
+        sample_sh = sample_attrs.get("SH", "MISSING")
+        sample_anchor_sh = sample_attrs.get("anchor_SH", "MISSING")
+        logging.warning(f"🔍 [ROSTER DEBUG] load_roster() returned {len(player_objects)} players. Sample player SH={sample_sh}, anchor_SH={sample_anchor_sh}")
+    else:
+        logging.warning(f"🔍 [ROSTER DEBUG] load_roster() returned NO players!")
 
     if not player_objects:
         print(f"❌ No players found for {match}")
@@ -3959,10 +3970,17 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
     players = []
     for p in player_objects:
         player_id_str = str(p.get("_id"))
+        player_name = f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
         
         # ✅ SS&S: Trust load_roster() - it already loaded franchise attributes if franchise_id was provided
         # No need to re-check or re-merge - load_roster() handles franchise mode correctly
         merged_attributes = p.get("attributes", {}).copy()
+        
+        # ✅ DEBUG: Log attributes for first player (or specific player if Kevin Nelson)
+        if len(players) == 0 or "Nelson" in player_name:
+            sh_val = merged_attributes.get("SH", "MISSING")
+            anchor_sh_val = merged_attributes.get("anchor_SH", "MISSING")
+            logging.warning(f"🔍 [ROSTER DEBUG] Processing player {player_name} ({player_id_str}): SH={sh_val}, anchor_SH={anchor_sh_val}")
         
         # Ensure anchor_ versions exist (they should after initialization, but be safe)
         for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
@@ -3972,18 +3990,25 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
         # Use position_ratings from player_objects (already loaded from franchise if franchise_id provided)
         position_ratings = p.get("position_ratings", {})
         
+        final_attrs = merged_attributes.copy()
         players.append({
             "_id": player_id_str,
             "first_name": p.get("first_name", ""),
             "last_name": p.get("last_name", ""),
-            "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+            "name": player_name,
             "year": p.get("year"),
             "height": p.get("height"),
             "weight": p.get("weight"),
             "jersey": p.get("jersey", 0),
             "position_ratings": position_ratings,
-            "attributes": merged_attributes,  # Return merged attributes (franchise overrides core)
+            "attributes": final_attrs,  # Return merged attributes (franchise overrides core)
         })
+        
+        # ✅ DEBUG: Log final attributes for first player (or Kevin Nelson)
+        if len(players) == 1 or "Nelson" in player_name:
+            final_sh = final_attrs.get("SH", "MISSING")
+            final_anchor_sh = final_attrs.get("anchor_SH", "MISSING")
+            logging.warning(f"🔍 [ROSTER DEBUG] Final response for {player_name}: SH={final_sh}, anchor_SH={final_anchor_sh}")
     process_time = (time.time() - process_start) * 1000
 
     response_data = {
