@@ -49,12 +49,10 @@ def save_team_settings(
     from BackEnd.api.gameplan_routes import normalize_team_id_to_canonical
     
     try:
-        # Resolve team_id to canonical format
-        actual_team_id = normalize_team_id_to_canonical(team_id, mode, None)
-        
-        # Determine collection and document ID
+        # Determine collection and document ID first
         if mode == "single" and game_id:
-            # Game-scoped save
+            # Game-scoped save - resolve to canonical format
+            actual_team_id = normalize_team_id_to_canonical(team_id, mode, None)
             from BackEnd.db import games_collection
             collection = games_collection
             doc_id = game_id
@@ -71,10 +69,14 @@ def save_team_settings(
             )
             
             if is_game_doc:
-                # Saving to game doc (uses "teams" structure like single mode)
+                # Saving to game doc - resolve to canonical format (game docs use canonical keys)
+                actual_team_id = normalize_team_id_to_canonical(team_id, mode, None)
                 update_path = f"teams.{actual_team_id}.{settings_type}"
             else:
-                # Saving to master doc (uses "franchise_teams" for franchise, "teams" for tournament)
+                # ✅ FIX: Saving to master doc - use ObjectId string directly (master docs use ObjectId keys)
+                # Tournament/franchise master docs store teams with ObjectId strings as keys
+                # (from user_team_object_id), not canonical format
+                actual_team_id = team_id  # Use ObjectId string directly, don't normalize
                 if mode == "franchise":
                     update_path = f"franchise_teams.{actual_team_id}.{settings_type}"
                 else:  # tournament
