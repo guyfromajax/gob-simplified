@@ -17,7 +17,7 @@
 
 2. **Mode-Specific Attribute Ranges**:
    - **Single Game & Tournament**: Most attributes use `random.randint(-10, 10)`, `team_chemistry=random(7-25)`, `rebound_modifier=random(0.0-0.4)`
-   - **Franchise**: Most attributes use `random.randint(-3, 3)`, `team_chemistry=random(7-13)`, `rebound_modifier=0.2` (fixed)
+   - **Franchise**: Most attributes use `random.randint(-1, 1)`, `team_chemistry=random(7-10)`, `rebound_modifier=0.2` (fixed)
 
 3. **Initialization Source**: Universal `teams` collection in MongoDB → Team objects → Fallback to `TeamManager.init_team_attributes()`
 
@@ -71,10 +71,10 @@ All team attributes are stored in team objects across all game modes:
 - `rebound_modifier`: `random.randint(0, 40) / 100.0` (random 0.0-0.4 in 0.01 increments)
 
 **Franchise Mode:**
-- Attribute range: `random.randint(-3, 3)` for:
+- Attribute range: `random.randint(-1, 1)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
 - `shot_threshold`: `random.randint(-10, 190)`
-- `team_chemistry`: `random.randint(7, 13)` (lower range for more challenging progression)
+- `team_chemistry`: `random.randint(7, 10)` (tighter range for more controlled progression)
 - `rebound_modifier`: `0.2` (fixed center value)
 
 **New Attributes**: All default to `0` if not present in the universal collection.

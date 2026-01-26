@@ -260,16 +260,16 @@ Initialized via `TeamManager.init_team_attributes(mode)` with mode-specific rang
 
 **Franchise Mode:**
 - `shot_threshold`: `random.randint(-10, 190)`
-- `discipline`: `random.randint(-3, 3)` (formerly `turnover_modifier`)
-- `fight`: `random.randint(-3, 3)` (formerly `foul_modifier`)
+- `discipline`: `random.randint(-1, 1)` (formerly `turnover_modifier`)
+- `fight`: `random.randint(-1, 1)` (formerly `foul_modifier`)
 - `rebound_modifier`: `0.2` (fixed center value)
-- `offensive_efficiency`: `random.randint(-3, 3)`
-- `team_chemistry`: `random.randint(7, 13)` (lower range for more challenging progression)
-- `defensive_efficiency`: `random.randint(-3, 3)`
-- `fb_efficiency`: `random.randint(-3, 3)`
-- `pt_efficiency`: `random.randint(-3, 3)`
-- `fb_opp_modifier`: `random.randint(-3, 3)`
-- `pt_opp_modifier`: `random.randint(-3, 3)`
+- `offensive_efficiency`: `random.randint(-1, 1)`
+- `team_chemistry`: `random.randint(7, 10)` (tighter range for more controlled progression)
+- `defensive_efficiency`: `random.randint(-1, 1)`
+- `fb_efficiency`: `random.randint(-1, 1)`
+- `pt_efficiency`: `random.randint(-1, 1)`
+- `fb_opp_modifier`: `random.randint(-1, 1)`
+- `pt_opp_modifier`: `random.randint(-1, 1)`
 
 **Note:** `momentum_score` exists in some legacy code paths but is NOT initialized in the standard `init_team_attributes()` flow.
 

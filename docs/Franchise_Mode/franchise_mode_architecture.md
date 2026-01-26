@@ -442,17 +442,17 @@ Similarly:
     "TEAM_ID_123": {
       // Team Attributes (mode-specific, randomized on initialization)
       // ✅ Initialized via TeamManager.init_team_attributes(mode="franchise")
-      "team_chemistry": 7-13,              // Franchise mode range
-      "offensive_efficiency": -3 to +3,    // Franchise mode range
+      "team_chemistry": 7-10,              // Franchise mode range
+      "offensive_efficiency": -1 to +1,    // Franchise mode range
       "shot_threshold": -10 to 190,      // Randomized (center at 90 for pill display)
-      "discipline": -3 to +3,            // Formerly turnover_modifier
-      "fight": -3 to +3,                 // Formerly foul_modifier
+      "discipline": -1 to +1,            // Formerly turnover_modifier
+      "fight": -1 to +1,                 // Formerly foul_modifier
       "rebound_modifier": 0.8 | 0.9 | 1.0 | 1.1 | 1.2,
-      "defensive_efficiency": -3 to +3,
-      "fb_efficiency": -3 to +3,
-      "pt_efficiency": -3 to +3,
-      "fb_opp_modifier": -3 to +3,
-      "pt_opp_modifier": -3 to +3,
+      "defensive_efficiency": -1 to +1,
+      "fb_efficiency": -1 to +1,
+      "pt_efficiency": -1 to +1,
+      "fb_opp_modifier": -1 to +1,
+      "pt_opp_modifier": -1 to +1,
       
       // Strategy Settings (user-configurable, persist across all instances)
       // ✅ Initialized with defaults (all = 2) when team objects are created
@@ -704,17 +704,17 @@ See **Section 4: PLAYER EVOLUTION** above for complete structure.
   "franchise_teams": {
     "TEAM_ID_1": {
       // Team attributes (mode-specific, randomized on init)
-      team_chemistry: 7-13,
-      offensive_efficiency: -3 to +3,
+      team_chemistry: 7-10,
+      offensive_efficiency: -1 to +1,
       shot_threshold: -10 to 190,      // Center at 90 for pill display
-      discipline: -3 to +3,            // Formerly turnover_modifier
-      fight: -3 to +3,                  // Formerly foul_modifier
+      discipline: -1 to +1,            // Formerly turnover_modifier
+      fight: -1 to +1,                  // Formerly foul_modifier
       rebound_modifier: 0.8-1.2,
-      defensive_efficiency: -3 to +3,
-      fb_efficiency: -3 to +3,
-      pt_efficiency: -3 to +3,
-      fb_opp_modifier: -3 to +3,
-      pt_opp_modifier: -3 to +3,
+      defensive_efficiency: -1 to +1,
+      fb_efficiency: -1 to +1,
+      pt_efficiency: -1 to +1,
+      fb_opp_modifier: -1 to +1,
+      pt_opp_modifier: -1 to +1,
       
       // Strategy settings (user-configurable)
       strategy_settings: {...},

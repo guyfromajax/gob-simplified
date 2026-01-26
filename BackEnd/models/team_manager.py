@@ -386,8 +386,8 @@ class TeamManager:
         # Mode-specific ranges
         if mode == "franchise":
             # Franchise mode: tighter ranges for more controlled progression
-            attr_range = (-3, 3)
-            team_chemistry = random.randint(7, 13)
+            attr_range = (-1, 1)
+            team_chemistry = random.randint(7, 10)
             # Franchise: All teams start at center value (0.2)
             rebound_modifier = 0.2
         else:

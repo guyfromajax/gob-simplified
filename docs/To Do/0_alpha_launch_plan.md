@@ -5,6 +5,31 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 
 ---
 
+## 📋 Executive Summary
+
+**Quick reference for each step. Detailed implementation below.**
+
+| Step | Task | Key Deliverables |
+|------|------|------------------|
+| **-1** | **Verify Current State** | Confirm staging/production deployed, infrastructure working, data cleanup plan documented |
+| **0** | **Lock Alpha Rules & Data Safety** | `IS_ALPHA=true` flag, alpha badge/disclaimers, OTP system setup, data wipe script |
+| **1** | **Authentication** | Signup/login pages, JWT auth, OTP validation (when `IS_ALPHA=true`), protected endpoints |
+| **2** | **Custom Domains** | `www.geekedoutbasketball.com` + `api.geekedoutbasketball.com`, DNS configured, CORS updated |
+| **3** | **Analytics & Marketing Pixels** | GA4 setup, core events tracked, Facebook/LinkedIn pixels (optional), GTM (optional) |
+| **4** | **Error Tracking** | Sentry (or similar) configured, backend + frontend error capture, user context attached |
+| **5** | **Security Hardening** | CORS review, env var security, input validation, password security, security headers |
+| **6** | **Rate Limiting** | Login/signup rate limits, simulation endpoint limits, 429 responses |
+| **7** | **Cost Guardrails** | MongoDB/Railway alerts, in-app caps (max games/tournaments per user), backup verification |
+| **8** | **Legal & Compliance** | Terms of Service (`/terms.html`), Privacy Policy (`/privacy.html`), cookie consent (if needed) |
+| **9** | **Basic Monitoring** | Uptime monitoring (UptimeRobot), email alerts, performance monitoring (optional) |
+| **10** | **End-to-End Testing** | Full flow tests, failure scenarios, quality gate (no game-breaking bugs) |
+| **11** | **Minimal Email** | Email provider setup (SendGrid/Mailgun/Postmark), password reset flow only |
+| **12** | **Admin/Support Tools** | Admin role system, support email/feedback button, basic admin actions |
+
+**Launch Day:** Wipe dev data, verify all systems, launch announcement, monitor first hour
+
+---
+
 ## Step -1 — Verify Current State (Foundation Check)
 
 ### -1.1 Staging/Production Deployment Status
@@ -29,6 +54,9 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
   - [ ] `teams` collection (universal reference data - keep)
   - [ ] `players` collection (universal reference data - keep)
   - [ ] `plays` collection (universal reference data - keep)
+  - [ ] `fcp_skeletons` collection (universal reference data - keep)
+  - [ ] `hct_skeletons` collection (universal reference data - keep)
+  - [ ] `defenses` collection (universal reference data - keep)
 - [ ] Create wipe script and test in staging
 
 ---
@@ -42,8 +70,8 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 - [ ] **Note:** `IS_ALPHA` flag controls whether one-time passwords (OTPs) are required for signup
 
 ### 0.2 Alpha Data Disclaimer
-- [ ] Add copy: **“This is an alpha. Data may be wiped without notice.”**
-- [ ] Add copy: **“Gameplay balance and features may change.”**
+- [ ] Add copy: **"This is an alpha. Data may be wiped without notice."**
+- [ ] Add copy: **"Gameplay balance and features may change."**
 
 ### 0.3 Data Versioning (Future-proof now)
 - [ ] Add `version` field to user documents
@@ -52,7 +80,7 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 ### 0.4 Data Wipe Capability (You need this)
 - [ ] Create a safe script/process to wipe alpha data (users + all dependent game data)
 - [ ] Script should wipe: `games`, `tournaments`, `franchises`, `users` collections
-- [ ] Script should preserve: `teams`, `players`, `plays` (universal reference data)
+- [ ] Script should preserve: `teams`, `players`, `plays`, `fcp_skeletons`, `hct_skeletons`, `defenses` (universal reference data)
 - [ ] **OTP Collection:** Decide whether to wipe `alpha_otps` collection or preserve for tracking
 - [ ] Test wipe process in staging
 - [ ] Document exactly how to run it
@@ -60,10 +88,11 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 ### 0.5 One-Time Password (OTP) System Setup
 - [ ] Create `alpha_otps` collection in MongoDB
 - [ ] OTP schema: `otp_code` (unique string), `used` (boolean), `used_by_email` (string, nullable), `used_at` (timestamp, nullable), `created_at` (timestamp)
-- [ ] Create script to generate ~200 OTP codes (8-12 character alphanumeric codes)
+- [ ] Create script to generate **50 OTP codes** (8-12 character alphanumeric codes) - limits alpha to 25-50 users
 - [ ] Insert OTPs into database (all marked as `used: false`)
 - [ ] Store OTP list securely (for distribution to alpha testers)
 - [ ] **Note:** OTPs are only validated when `IS_ALPHA=true`
+- [ ] **Access Tracking:** Each OTP is permanently linked to an email when used (`used_by_email` field). Query `alpha_otps` collection to see who has access and when they signed up (`used_at` timestamp)
 
 ---
 
@@ -110,7 +139,7 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 - [ ] Ensure unauthorized returns clean 401/403
 
 ### 1.5 Frontend Integration
-- [ ] Add “Sign Up” / “Log In” links on homepage
+- [ ] Add "Sign Up" / "Log In" links on homepage
 - [ ] Hide authenticated-only features while logged out
 - [ ] Show basic user state while logged in
 
@@ -191,6 +220,12 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
   - [ ] Add tag code to all pages (or via GTM)
   - [ ] Test tag fires correctly
 
+- [ ] **Twitter Pixel** (if using Twitter/X Ads) - Optional
+  - [ ] Create Twitter Pixel
+  - [ ] Get Pixel ID
+  - [ ] Add pixel code to all pages (or via GTM)
+  - [ ] Test pixel fires correctly
+
 - [ ] **Consider Google Tag Manager (GTM)**
   - [ ] More flexible than adding pixels directly
   - [ ] Easier to add/remove tags without code changes
@@ -238,6 +273,8 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 - [ ] Verify Pydantic models validate all request data
 - [ ] Test invalid input handling (malformed JSON, wrong types, etc.)
 - [ ] Verify error messages don't leak sensitive info
+- [ ] Test NoSQL injection prevention (MongoDB query validation)
+- [ ] Test XSS prevention (if user-generated content exists)
 
 ### 5.4 Password Security
 - [ ] Use bcrypt or argon2 for password hashing (already in Step 1)
@@ -271,9 +308,17 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 
 ### 7.0 Backup Strategy (Verify)
 - [ ] Check MongoDB Atlas tier (free tier has automated backups)
-- [ ] Verify backup retention period
-- [ ] Document backup restoration process (if needed)
-- [ ] **Note:** Free tier backups may be sufficient for alpha
+- [ ] **If on free tier (M0):**
+  - [ ] Set up manual backup process (weekly/monthly exports)
+  - [ ] Document how to export database (`mongodump` command or MongoDB Compass)
+  - [ ] Store exports in safe location
+  - [ ] Test restoration process
+- [ ] **If on paid tier (M10+):**
+  - [ ] Verify automated backups are enabled (usually enabled by default)
+  - [ ] Verify backup retention period (7 days minimum recommended)
+  - [ ] Test backup restoration process
+  - [ ] Document how to restore from backup
+- [ ] Document disaster recovery procedures (database restore, redeploy process)
 
 ### 7.1 Provider Alerts
 - [ ] Configure MongoDB Atlas usage alerts
@@ -296,14 +341,14 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 ### 8.1 Terms of Service
 - [ ] Create `/terms.html`
 - [ ] Add footer link on all pages
-- [ ] Add signup checkbox: “I agree to the Terms”
+- [ ] Add signup checkbox: "I agree to the Terms"
 
 ### 8.2 Privacy Policy
 - [ ] Create `/privacy.html`
 - [ ] Include: data collected, cookies, analytics, retention
 
 ### 8.3 Cookie Consent (Only If Needed)
-- [ ] Decide if you’ll serve users in jurisdictions requiring consent
+- [ ] Decide if you'll serve users in jurisdictions requiring consent
 - [ ] Implement banner if required (basic is fine)
 
 ---
@@ -329,6 +374,11 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 - [ ] Monitor API response times (Railway logs or external service)
 - [ ] Set alerts for slow endpoints (> 2 seconds for alpha)
 - [ ] Monitor error rates
+- [ ] **Database Monitoring (Optional):**
+  - [ ] Enable MongoDB Atlas monitoring (free tier)
+  - [ ] Monitor database connection pool
+  - [ ] Monitor query performance
+  - [ ] Set up alerts for database issues
 
 ### 9.5 Verification
 - [ ] Confirm alerts actually fire (simulate downtime if feasible)
@@ -336,7 +386,7 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 
 ---
 
-## Step 10 — End-to-End “No Surprises” Testing (Go/No-Go)
+## Step 10 — End-to-End "No Surprises" Testing (Go/No-Go)
 
 > **Note:** See `Final_Testing_Checklist.md` for detailed test scenarios.
 
@@ -363,9 +413,9 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 
 ### 11.1 Provider Setup
 - [ ] Choose provider (SendGrid/Mailgun/Postmark/etc.)
-  - [ ] SendGrid: Free tier (100 emails/day)
-  - [ ] Mailgun: Free tier (5,000 emails/month)
-  - [ ] Postmark: Free tier (100 emails/month)
+  - [ ] **SendGrid:** Free tier (100 emails/day)
+  - [ ] **Mailgun:** Free tier (5,000 emails/month)
+  - [ ] **Postmark:** Free tier (100 emails/month)
 - [ ] Create account and verify domain (if required)
 - [ ] Add API key to production environment variables
 - [ ] Send a test email successfully
@@ -401,7 +451,11 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 
 ### 12.3 Support & Feedback
 - [ ] Support email address visible
-- [ ] “Report bug” link or button
+- [ ] "Report bug" link or button
+- [ ] **User Documentation (Optional):**
+  - [ ] How to play guide
+  - [ ] FAQ page
+  - [ ] Tutorial/onboarding flow (can be post-launch)
 
 ---
 
@@ -436,11 +490,11 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 3. **Feature Flags:** Not needed - core features (Single Game, Tournament, Franchise, Sim Quarter) are stable and working. No flags required.
 4. **Email Service:** Password reset only for alpha (full service post-launch)
 5. **Security:** Essential items only (Steps 1, 5, 6). Advanced security post-launch.
-6. **Data Wipe:** Will wipe `games`, `tournaments`, `franchises`, `users` at launch. Preserve universal reference data (`teams`, `players`, `plays`).
-7. **Alpha Access Control:** One-time passwords (OTPs) required for signup when `IS_ALPHA=true`. ~200 OTPs generated, each usable once by one email. OTP validation disabled when `IS_ALPHA=false`.
+6. **Data Wipe:** Will wipe `games`, `tournaments`, `franchises`, `users` at launch. Preserve universal reference data (`teams`, `players`, `plays`, `fcp_skeletons`, `hct_skeletons`, `defenses`).
+7. **Alpha Access Control:** One-time passwords (OTPs) required for signup when `IS_ALPHA=true`. 50 OTPs generated (limits alpha to 25-50 users), each usable once by one email. Each OTP is permanently linked to the email that uses it (`used_by_email` field) for access tracking. OTP validation disabled when `IS_ALPHA=false`.
 
 ### Testing Reference
-- See `Final_Testing_Checklist.md` for detailed test scenarios (Step 11 references this)
+- See `Final_Testing_Checklist.md` for detailed test scenarios (Step 10 references this)
 
 ### OTP Implementation Reference
 - See `OTP_Implementation_Guide.md` for detailed implementation guide for one-time passwords
