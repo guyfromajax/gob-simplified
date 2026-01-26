@@ -1914,6 +1914,11 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # If request was invalid/missing, home_strategy/away_strategy already contain DB settings
                         # If request was valid, home_strategy/away_strategy contain request settings
                         # GameManager constructor will apply these settings correctly
+                        # ✅ FRANCHISE MODE: Extract franchise_id from saved game document if present
+                        saved_franchise_id = saved.get("franchise_id")
+                        saved_mode = saved.get("mode", "single")
+                        franchise_id_for_roster = saved_franchise_id if saved_mode == "franchise" else None
+                        
                         gm = GameManager(
                             home, 
                             away,
@@ -1927,8 +1932,9 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             away_plays_data=away_plays,
                             home_strategy_calls=home_strategy_calls,  # ✅ SS&S: Restore playcall overrides
                             away_strategy_calls=away_strategy_calls,  # ✅ SS&S: Restore playcall overrides
-                            mode="single",  # Loaded games are always single mode from games_collection
-                            user_team_side=request.user_team_side  # ✅ SS&S: Set is_user_team flags
+                            mode=saved_mode,  # Use saved mode (could be franchise/tournament)
+                            user_team_side=request.user_team_side,  # ✅ SS&S: Set is_user_team flags
+                            franchise_id=franchise_id_for_roster  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
                         )
                         
                         # ✅ UNIFIED: Apply both strategy_settings and playbook_settings to GameManager
@@ -2343,7 +2349,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         home_team_attributes=home_team_attributes,
                         away_team_attributes=away_team_attributes,
                         mode=mode,  # Pass mode so teams can initialize plays with correct stats structure
-                        user_team_side=request.user_team_side  # ✅ SS&S: Set is_user_team flags
+                        user_team_side=request.user_team_side,  # ✅ SS&S: Set is_user_team flags
+                        franchise_id=request.franchise_id if mode == "franchise" else None  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
                     )
                     
                     # ✅ SS&S: Ensure user_team_side is set in game_state (GameManager should set it, but double-check)
@@ -2751,7 +2758,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             home_team_attributes=home_team_attributes,
             away_team_attributes=away_team_attributes,
             mode=mode,  # Pass mode so teams can initialize plays with correct stats structure
-            user_team_side=request.user_team_side  # ✅ SS&S: Pass user_team_side to set is_user_team flags
+            user_team_side=request.user_team_side,  # ✅ SS&S: Pass user_team_side to set is_user_team flags
+            franchise_id=request.franchise_id if mode == "franchise" else None  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
         )
         
         # ✅ TRACE: Log what GameManager actually has after initialization
@@ -4052,7 +4060,7 @@ def init_game(request: dict):
     # Create GameManager (this initializes teams and players)
     gm_start = time.time()
     logging.warning(f"⏱️ [PERF] /api/init-game - Starting GameManager creation")
-    gm = GameManager(home_team, away_team, mode=mode, user_team_side=user_team_side)
+    gm = GameManager(home_team, away_team, mode=mode, user_team_side=user_team_side, franchise_id=franchise_id if mode == "franchise" else None)  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
     # ✅ CRITICAL: Set game_id on GameManager immediately after creation
     gm.game_id = game_id
     gm_create_time = (time.time() - gm_start) * 1000

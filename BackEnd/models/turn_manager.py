@@ -2257,9 +2257,16 @@ class TurnManager:
         from BackEnd.utils.shared import resolve_offensive_rebound, get_name_safe, unpack_game_context, serialize_lineup
         from BackEnd.models.shot_manager import ShotManager
         
+        logging.warning(f"🔍 [RESOLVE_OREB_TURN] ENTRY: Function called")
         pending_oreb = self.game.game_state.get("pending_oreb")
         if not pending_oreb:
+            logging.warning(f"🔍 [RESOLVE_OREB_TURN] No pending_oreb, returning None")
             return None
+        
+        rebounder = pending_oreb.get("rebounder")
+        rebounder_id = pending_oreb.get("rebounder_id")
+        rebounder_name = get_name_safe(rebounder) if rebounder else "UNKNOWN"
+        logging.warning(f"🔍 [RESOLVE_OREB_TURN] Processing OREB for: {rebounder_name} (ID: {rebounder_id}), Object ID: {id(rebounder) if rebounder else 'N/A'}")
         
         # Clear the pending OREB immediately (before processing)
         # If this OREB results in another OREB, it will be set again
@@ -2276,6 +2283,7 @@ class TurnManager:
         
         # Resolve what happens with the offensive rebound
         oreb_event = resolve_offensive_rebound(self.game, rebounder)
+        logging.warning(f"🔍 [RESOLVE_OREB_TURN] After resolve_offensive_rebound: event_type={oreb_event.get('event_type')}, result={oreb_event.get('result')}, has_rebound={'rebound' in oreb_event}")
         
         if oreb_event["event_type"] == "PUTBACK_ATTEMPT":
             self.logger.log("putbackStart")
@@ -2418,7 +2426,7 @@ class TurnManager:
                     
                     rebounder_id = rebound_data.get("rebounderId")
                     rebound_type = rebound_data.get("rebound_type", "DREB")
-                    logging.info(f"🔍 [PUTBACK MISS => REBOUND] Looking up rebounder: ID={rebounder_id}, Type={rebound_type}")
+                    logging.warning(f"🔍 [PUTBACK MISS => REBOUND] Looking up rebounder: ID={rebounder_id}, Type={rebound_type}, rebound_data keys: {list(rebound_data.keys())}")
                     
                     new_rebounder = None
                     players_searched = 0
@@ -2504,15 +2512,19 @@ class TurnManager:
                 for team in (self.game.home_team, self.game.away_team):
                     for player in team.get_all_players():
                         prev = pre_stats.get(player.player_id, {})
-                diff = {}
-                for stat in player.stats["game"]:
-                    if stat == "REB" or stat == "Outlet_Score_List":
-                        continue  # Skip REB (calculated) and Outlet_Score_List (list, not numeric)
-                    current_val = player.stats["game"].get(stat, 0)
-                    prev_val = prev.get(stat, 0)
-                    delta = current_val - prev_val
-                    if delta != 0:
-                        diff[stat] = delta
+                        diff = {}
+                        for stat in player.stats["game"]:
+                            if stat == "REB" or stat == "Outlet_Score_List":
+                                continue  # Skip REB (calculated) and Outlet_Score_List (list, not numeric)
+                            current_val = player.stats["game"].get(stat, 0)
+                            prev_val = prev.get(stat, 0)
+                            delta = current_val - prev_val
+                            if delta != 0:
+                                diff[stat] = delta
+                                # 🔍 DEBUG: Log OREB/DREB deltas specifically
+                                if stat in {"OREB", "DREB"}:
+                                    logging.warning(f"🔍 [DELTA COMPUTATION] {get_name_safe(player)} (ID: {player.player_id}), Object ID: {id(player)}, "
+                                                  f"Stat: {stat}, Prev: {prev_val}, Current: {current_val}, Delta: {delta}")
                         if diff:
                             deltas[player.player_id] = {"team": team.name, "stats": diff}
                 
