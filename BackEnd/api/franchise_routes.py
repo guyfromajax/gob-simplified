@@ -2285,7 +2285,8 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
         if not core_player:
             try:
-                core_player = db.players.find_one({"_id": ObjectId(pid_str)}, {"year": 1})
+                # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
+                core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
             except:
                 pass
         
@@ -2411,7 +2412,8 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         core_player = db.players.find_one({"_id": pid}, {"height": 1})
         if not core_player:
             try:
-                core_player = db.players.find_one({"_id": ObjectId(pid)}, {"height": 1})
+                # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
+                core_player = db.players.find_one({"_id": pid}, {"height": 1})
             except:
                 pass
         height = core_player.get("height") if core_player else None
@@ -2596,7 +2598,8 @@ def run_franchise_training(req: FranchiseTrainingRequest):
                 core_player = db.players.find_one({"_id": pid}, {"height": 1})
                 if not core_player:
                     try:
-                        core_player = db.players.find_one({"_id": ObjectId(pid)}, {"height": 1})
+                        # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
+                        core_player = db.players.find_one({"_id": pid}, {"height": 1})
                     except:
                         pass
                 height = core_player.get("height") if core_player else None

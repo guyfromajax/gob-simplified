@@ -1304,9 +1304,9 @@ def finalize_game(
             if pid_str not in existing_players:
                 # Get player metadata from players_collection
                 try:
-                    player_obj_id = ObjectId(pid_str)
+                    # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
                     player_doc = players_collection.find_one(
-                        {"_id": player_obj_id},
+                        {"_id": pid_str},
                         {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1}
                     )
                     if player_doc:
@@ -1879,9 +1879,9 @@ def finalize_game(
                 players_to_initialize += 1
                 # Get player metadata from players_collection
                 try:
-                    player_obj_id = ObjectId(pid_str)
+                    # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
                     player_doc = players_collection.find_one(
-                        {"_id": player_obj_id},
+                        {"_id": pid_str},
                         {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1}
                     )
                     if player_doc:
