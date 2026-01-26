@@ -874,29 +874,13 @@
         <!-- Variant Tabs -->
       <div id="variant-tabs-container" class="variant-tabs-container">
         <div class="variant-tabs">
-          <div class="variant-tab active" data-variant="hco" onclick="switchVariant('hco')">
+          <div class="variant-tab active" data-variant="base" onclick="switchVariant('base')">
             <span class="status-indicator not-started"></span>
-            HCO
+            Base
           </div>
           <div class="variant-tab" data-variant="shot" onclick="switchVariant('shot')">
             <span class="status-indicator not-started"></span>
             Shot
-          </div>
-          <div class="variant-tab" data-variant="o_foul" onclick="switchVariant('o_foul')">
-            <span class="status-indicator not-started"></span>
-            Offensive Foul
-          </div>
-          <div class="variant-tab" data-variant="d_foul" onclick="switchVariant('d_foul')">
-            <span class="status-indicator not-started"></span>
-            Defensive Foul
-          </div>
-          <div class="variant-tab" data-variant="dead_ball_turnover" onclick="switchVariant('dead_ball_turnover')">
-            <span class="status-indicator not-started"></span>
-            Dead Ball Turnover
-          </div>
-          <div class="variant-tab" data-variant="steal" onclick="switchVariant('steal')">
-            <span class="status-indicator not-started"></span>
-            Steal
           </div>
         </div>
 
@@ -990,10 +974,8 @@
             <div class="form-group" style="margin: 0; flex: 1;">
               <label for="animate-variant-select" style="font-size: 0.85rem;">Select Variant</label>
               <select id="animate-variant-select">
-                <option value="successful">Successful</option>
-                <option value="mid_play_change">Mid-Play Change</option>
-                <option value="contested">Contested</option>
-                <option value="broken">Broken</option>
+                <option value="base">Base</option>
+                <option value="shot">Shot</option>
               </select>
             </div>
             <button id="animate-btn" onclick="startAnimation()" class="btn-animate">▶️ Animate</button>
@@ -1158,51 +1140,7 @@
             { steps: [], complete: false, currentStep: 1 }
           ]
         },
-        hco: {
-          currentVersionIndex: 0,
-          versions: [
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 }
-          ]
-        },
-        o_foul: {
-          currentVersionIndex: 0,
-          versions: [
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 }
-          ]
-        },
-        d_foul: {
-          currentVersionIndex: 0,
-          versions: [
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 }
-          ]
-        },
-        dead_ball_turnover: {
-          currentVersionIndex: 0,
-          versions: [
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 },
-            { steps: [], complete: false, currentStep: 1 }
-          ]
-        },
-        steal: {
+        base: {
           currentVersionIndex: 0,
           versions: [
             { steps: [], complete: false, currentStep: 1 },
@@ -1217,7 +1155,7 @@
     };
 
     // Current variant being edited
-    let currentVariant = 'hco';
+    let currentVariant = 'base';
     
     // Helper to get current variant data
     function getCurrentVariantData() {
@@ -1322,7 +1260,26 @@
       
       // Load all variants
       const variants = skeletonData.variants || {};
-      ['hco', 'shot', 'o_foul', 'd_foul', 'dead_ball_turnover', 'steal'].forEach(variant => {
+      
+      // Backward compatibility: Map old variant names to new ones
+      // Old variants (hco, o_foul, d_foul, dead_ball_turnover, steal) all map to "base"
+      if (variants.hco && !variants.base) {
+        variants.base = variants.hco;
+      }
+      if (variants.o_foul && !variants.base) {
+        variants.base = variants.o_foul;
+      }
+      if (variants.d_foul && !variants.base) {
+        variants.base = variants.d_foul;
+      }
+      if (variants.dead_ball_turnover && !variants.base) {
+        variants.base = variants.dead_ball_turnover;
+      }
+      if (variants.steal && !variants.base) {
+        variants.base = variants.steal;
+      }
+      
+      ['base', 'shot'].forEach(variant => {
         if (variants[variant]) {
           // All variants have version structure
           const versions = variants[variant].versions || [];
@@ -1374,7 +1331,7 @@
       });
       
       // Start editing
-      currentVariant = 'hco';
+      currentVariant = 'base';
       
       // Hide load section, show step 2
       document.getElementById('load-play-section').classList.add('hidden');
@@ -1673,7 +1630,7 @@
     }
 
     function updateVariantTabs() {
-      ['hco', 'shot', 'o_foul', 'd_foul', 'dead_ball_turnover', 'steal'].forEach(variant => {
+      ['base', 'shot'].forEach(variant => {
         const tab = document.querySelector(`.variant-tab[data-variant="${variant}"]`);
         const indicator = tab.querySelector('.status-indicator');
         const variantData = playState.variants[variant];
@@ -1694,11 +1651,7 @@
       const variantData = getCurrentVariantData();
       const variantNames = {
         shot: 'Shot',
-        hco: 'HCO',
-        o_foul: 'Offensive Foul',
-        d_foul: 'Defensive Foul',
-        dead_ball_turnover: 'Dead Ball Turnover',
-        steal: 'Steal'
+        base: 'Base'
       };
       
       document.getElementById('current-variant-name').textContent = variantNames[currentVariant];
@@ -2037,12 +1990,16 @@
       if (!select) return;
       
       // Update all options based on variant data
-      ['successful', 'mid_play_change', 'contested', 'broken'].forEach(variant => {
+      ['base', 'shot'].forEach(variant => {
         const variantData = playState.variants[variant];
         const option = select.querySelector(`option[value="${variant}"]`);
         
         if (option) {
-          if (variantData.steps.length === 0) {
+          const versionIndex = variantData?.currentVersionIndex || 0;
+          const versionData = variantData?.versions?.[versionIndex];
+          const steps = versionData?.steps || [];
+          
+          if (steps.length === 0) {
             // No steps - disable and grey out
             option.disabled = true;
             option.style.color = 'rgba(255, 255, 255, 0.3)';
@@ -2052,14 +2009,19 @@
             option.disabled = false;
             option.style.color = '#fff';
             const baseName = option.textContent.split(' (')[0];
-            option.textContent = `${baseName} (${variantData.steps.length} steps)`;
+            option.textContent = `${baseName} (${steps.length} steps)`;
           }
         }
       });
       
       // Select first available variant
-      const firstAvailable = ['successful', 'mid_play_change', 'contested', 'broken']
-        .find(v => playState.variants[v].steps.length > 0);
+      const firstAvailable = ['base', 'shot']
+        .find(v => {
+          const variantData = playState.variants[v];
+          const versionIndex = variantData?.currentVersionIndex || 0;
+          const versionData = variantData?.versions?.[versionIndex];
+          return versionData && versionData.steps && versionData.steps.length > 0;
+        });
       if (firstAvailable) {
         select.value = firstAvailable;
       }
@@ -2072,15 +2034,20 @@
       
       const variantData = playState.variants[selectedVariant];
       console.log('Variant data:', variantData);
-      console.log('Steps count:', variantData ? variantData.steps.length : 'no variant data');
       
-      if (!variantData || variantData.steps.length === 0) {
+      // Get current version from variant
+      const versionIndex = variantData?.currentVersionIndex || 0;
+      const versionData = variantData?.versions?.[versionIndex];
+      const steps = versionData?.steps || [];
+      console.log('Steps count:', steps.length);
+      
+      if (!variantData || !versionData || steps.length === 0) {
         console.log('❌ No steps to animate');
         alert('This variant has no steps to animate!');
         return;
       }
       
-      console.log('✅ Starting animation with', variantData.steps.length, 'steps');
+      console.log('✅ Starting animation with', steps.length, 'steps');
       
       // Stop any existing animation
       stopAnimation();
@@ -2115,19 +2082,22 @@
       }
       
       const variantData = playState.variants[selectedVariant];
+      const versionIndex = variantData?.currentVersionIndex || 0;
+      const versionData = variantData?.versions?.[versionIndex];
+      const steps = versionData?.steps || [];
       
-      if (animationStepIndex >= variantData.steps.length) {
+      if (animationStepIndex >= steps.length) {
         // Animation complete
         console.log('✅ Animation complete');
         stopAnimation();
         return;
       }
       
-      const step = variantData.steps[animationStepIndex];
+      const step = steps[animationStepIndex];
       console.log('Current step data:', step);
       
       const statusDiv = document.getElementById('animation-status');
-      statusDiv.textContent = `Animating Step ${animationStepIndex + 1} of ${variantData.steps.length}`;
+      statusDiv.textContent = `Animating Step ${animationStepIndex + 1} of ${steps.length}`;
       
       // Update positions
       previousStepAssignments = {...currentStepAssignments};
@@ -4006,39 +3976,13 @@
     }
 
     async function savePlayToDatabase() {
-      // ✅ AUTO-SAVE: If saving HCO variant, copy it to all other variants
-      if (currentVariant === 'hco') {
-        const hcoVariant = playState.variants.hco;
-        const otherVariants = ['shot', 'o_foul', 'd_foul', 'dead_ball_turnover', 'steal'];
-        
-        // Copy each version of HCO to corresponding version of other variants
-        for (const otherVariantName of otherVariants) {
-          const otherVariant = playState.variants[otherVariantName];
-          // Ensure both have versions arrays
-          if (Array.isArray(hcoVariant.versions) && Array.isArray(otherVariant.versions)) {
-            for (let i = 0; i < hcoVariant.versions.length && i < otherVariant.versions.length; i++) {
-              const hcoVersion = hcoVariant.versions[i];
-              // Deep clone the steps
-              otherVariant.versions[i].steps = JSON.parse(JSON.stringify(hcoVersion.steps || []));
-              otherVariant.versions[i].currentStep = hcoVersion.currentStep || 1;
-              otherVariant.versions[i].complete = hcoVersion.complete || false;
-            }
-          }
-        }
-        console.log('✅ Auto-saved HCO variant to all 5 other variants');
-      }
-      
-      // Build HCT skeleton data with all variants
+      // Build HCT skeleton data with base and shot variants only
       const skeletonData = {
         name: playState.name || 'Unnamed HCT Skeleton',
         play: playState.name || 'Unnamed HCT Skeleton', // Also include 'play' field for compatibility
         variants: {
-          shot: buildVariantVersions('shot'),
-          hco: buildVariantVersions('hco'),
-          o_foul: buildVariantVersions('o_foul'),
-          d_foul: buildVariantVersions('d_foul'),
-          dead_ball_turnover: buildVariantVersions('dead_ball_turnover'),
-          steal: buildVariantVersions('steal')
+          base: buildVariantVersions('base'),
+          shot: buildVariantVersions('shot')
         }
       };
 
