@@ -9,6 +9,7 @@ from bson import ObjectId
 
 
 def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict | None, List[Dict]]:
+    from bson import ObjectId  # ✅ FIX: Import at function level so it's available throughout
     try:
         # Find the team document by name
         team_doc = teams_collection.find_one({"name": team_name})
@@ -40,7 +41,7 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                             # Match by team_id (ObjectId string)
                             if str(player_team_id) == str(team_id) or meta.get("team") == team_name:
                                 # Get base player data from universal collection
-                                from bson import ObjectId
+                                # ✅ FIX: ObjectId already imported at function level
                                 base_player = players_collection.find_one({"_id": ObjectId(player_id_str)})
                                 if base_player:
                                     # Merge franchise-specific attributes into base player
