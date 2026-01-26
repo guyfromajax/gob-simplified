@@ -85,20 +85,20 @@ def resolve_team_id_to_canonical(
         return team_identifier
     
     # Step 4: Try to resolve from database (if available)
-    if HAS_DB and collection:
+    if HAS_DB and collection is not None:
         canonical_id = _resolve_from_database(team_identifier, collection)
         if canonical_id:
             return canonical_id
     
     # Step 5: Try ObjectId lookup (if it's an ObjectId string)
     if _is_objectid_string(team_identifier):
-        if HAS_DB and collection:
+        if HAS_DB and collection is not None:
             canonical_id = _resolve_objectid_to_canonical(team_identifier, collection)
             if canonical_id:
                 return canonical_id
     
     # Step 6: Try name-based resolution (case-insensitive, with underscore normalization)
-    if HAS_DB and collection:
+    if HAS_DB and collection is not None:
         canonical_id = _resolve_name_to_canonical(team_identifier, collection)
         if canonical_id:
             return canonical_id
@@ -161,7 +161,7 @@ def _resolve_from_franchise_tournament_document(
             return None
         
         # Resolve ObjectId to canonical team_id
-        if HAS_DB and collection:
+        if HAS_DB and collection is not None:
             canonical_id = _resolve_objectid_to_canonical(user_team_object_id, collection)
             if canonical_id:
                 return canonical_id
@@ -316,7 +316,7 @@ def resolve_team_id_to_object_id(
     # Then look up ObjectId from canonical team_id
     collection = teams_collection_override or teams_collection
     
-    if HAS_DB and collection:
+    if HAS_DB and collection is not None:
         try:
             team_doc = collection.find_one({"team_id": canonical_id}, {"_id": 1})
             if team_doc:
