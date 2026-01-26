@@ -4986,9 +4986,13 @@ def get_fcp_skeleton(result_type, game_context=None):
                     # Randomly select one non-empty version
                     selected_version = random.choice(non_empty_versions)
                     selected_steps = selected_version.get("steps", [])
+                    selected_version_name = selected_version.get("version", "v1")
                     skeleton_data = {
-                        "steps": selected_steps
+                        "steps": selected_steps,
+                        "version": selected_version_name
                     }
+                    
+                    logging.debug(f"Selected FCP {variant_name} {selected_version_name} (from {len(non_empty_versions)} available)")
                     
                     # Apply opposite side logic if game context is provided
                     if game_context:
@@ -5083,9 +5087,13 @@ def get_hct_skeleton(result_type, game_context=None):
                     # Randomly select one non-empty version
                     selected_version = random.choice(non_empty_versions)
                     selected_steps = selected_version.get("steps", [])
+                    selected_version_name = selected_version.get("version", "v1")
                     skeleton_data = {
-                        "steps": selected_steps
+                        "steps": selected_steps,
+                        "version": selected_version_name
                     }
+                    
+                    logging.debug(f"Selected HCT {variant_name} {selected_version_name} (from {len(non_empty_versions)} available)")
                     
                     # Apply opposite side logic if game context is provided
                     if game_context:
