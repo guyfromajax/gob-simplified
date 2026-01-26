@@ -305,9 +305,12 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
 ### Skeleton System ✅ **UPDATED** (January 2025)
 
 **Skeleton Sources:**
-- FCP skeletons: MongoDB `fcp_skeletons` collection
-- HCT skeletons: MongoDB `hct_skeletons` collection
-- **Variant Structure**: Two variants per skeleton type:
+- FCP skeletons: MongoDB `fcp_skeletons` collection (stored in `gob-staging` database)
+- HCT skeletons: MongoDB `hct_skeletons` collection (stored in `gob-staging` database)
+- **Storage**: All skeletons saved to `gob-staging` for testing before production migration
+
+**Variant Structure:**
+- Two variants per skeleton type:
   - `"base"` - Standard press/trap break skeleton (used for all non-shot results: O_FOUL, D_FOUL, STEAL, DEAD_BALL_TURNOVER, HCO)
   - `"shot"` - Shot attempt skeleton (used for SHOT results)
 - **Critical**: FCP/HCT "base" variants have step 0 with press/trap break positions (unlike HCO skeletons which don't have step 0)
@@ -316,8 +319,38 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
   - SHOT results map to `"shot"` variant
 - **Stopper System Integration**: FCP/HCT non-shot results use "base" variant skeletons with stopper system applied (truncation + stopper step)
 
+**Version System:**
+- **Structure**: Matches offensive plays structure - each variant supports multiple versions (v1, v2, v3, etc.)
+- **Version Selection**: Engine randomly selects from available non-empty versions for each variant
+- **Database Structure**:
+  ```json
+  {
+    "_id": ObjectId("..."),
+    "name": "Standard",
+    "variants": {
+      "base": {
+        "versions": [
+          {"version": "v1", "steps": [...], "complete": false},
+          {"version": "v2", "steps": [...], "complete": false},
+          {"version": "v3", "steps": [...], "complete": false}
+        ]
+      },
+      "shot": {
+        "versions": [
+          {"version": "v1", "steps": [...], "complete": false}
+        ]
+      }
+    }
+  }
+  ```
+- **Version Fields**: Each version object includes:
+  - `version` (str) - Version identifier ("v1", "v2", "v3", etc.)
+  - `steps` (array) - Array of skeleton steps
+  - `complete` (bool) - Completion status (optional)
+- **Backward Compatibility**: Engine defaults to "v1" if version field is missing (supports old skeletons)
+
 **Skeleton Structure:**
-- Each skeleton contains `steps` array
+- Each version contains `steps` array
 - Each step has `pos_actions` dict mapping positions to actions
 - Actions include: `"handle_ball"`, `"receive"`, `"pass"`, `"shoot"`, `"screen"`, etc.
 - Ball handler determined by checking for ball possession actions in steps
@@ -327,22 +360,45 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
 - Animations include player movements, ball movements, and defender positioning
 - Frontend uses skeleton data to animate press break sequences
 
+**Skeleton Builders:**
+- **FCP Builder**: `FrontEnd/static/fcp-skeletons.html` - Create/edit FCP skeletons
+- **HCT Builder**: `FrontEnd/static/hct-skeletons.html` - Create/edit HCT skeletons
+- **Access**: Available via Netlify at `/fcp-skeletons.html` and `/hct-skeletons.html`
+- **Save Behavior**: All new/updated skeletons save to `gob-staging` database (name-based upsert matching)
+- **Version Management**: Builders support creating multiple versions (v1-v6) for each variant
+- See `Plays_Page_System.md` for detailed builder documentation
+
 ### Key Files
 
+**Backend:**
 - `BackEnd/engine/phase_resolution.py`
   - `resolve_full_court_press_logic()` - FCP outcome resolution
   - `resolve_half_court_trap_logic()` - HCT outcome resolution
+  - `get_fcp_skeleton()` - FCP skeleton retrieval with version selection
+  - `get_hct_skeleton()` - HCT skeleton retrieval with version selection
   - `get_ball_handler_from_skeleton()` - Dynamic ball handler determination
   - `select_foul_player()` - Probabilistic foul player selection
   - `_record_fcp_stats()` - FCP stat tracking helper
   - `_record_hct_stats()` - HCT stat tracking helper
   - `apply_energy_decay()` - Energy decay for active players
+- `BackEnd/api/skeleton_routes.py`
+  - `create_fcp_skeleton()` - Create/update FCP skeleton (name-based upsert)
+  - `create_hct_skeleton()` - Create/update HCT skeleton (name-based upsert)
+  - `get_all_fcp_skeletons()` - Fetch all FCP skeletons
+  - `get_all_hct_skeletons()` - Fetch all HCT skeletons
 - `BackEnd/models/turn_manager.py`
   - `determine_defensive_pressure_type()` - Determines if FCP/HCT should be applied
 - `BackEnd/playcall_skeletons/fcp_skeletons.py` - FCP skeleton definitions (legacy fallback)
 - `BackEnd/playcall_skeletons/hct_skeletons.py` - HCT skeleton definitions (legacy fallback)
 - `BackEnd/models/animator.py` - Skeleton to animation conversion
+
+**Frontend:**
+- `FrontEnd/static/fcp-skeletons.html` - FCP skeleton builder UI
+- `FrontEnd/static/hct-skeletons.html` - HCT skeleton builder UI
 - `FrontEnd/static/js/phaser/animation/animateGameTurns.js` - FCP/HCT detection and state tracking
+
+**Migration:**
+- `scripts/migrate_fcp_hct_to_version_structure.py` - Migration script to add version fields to existing skeletons
 
 ### Future Enhancements
 
