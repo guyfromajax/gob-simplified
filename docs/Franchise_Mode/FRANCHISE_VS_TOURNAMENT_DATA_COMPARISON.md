@@ -33,17 +33,17 @@
 | **Storage Path** | `franchise_teams.{team_id}` | `teams.{team_id}` | ⚠️ **DIFFERENT** - Intentional naming difference |
 | **Initialization** | ✅ All 8 teams upfront | ✅ All 8 teams upfront | ✅ Same |
 | **Team Attributes** | | | |
-| `team_chemistry` | ✅ 7-13 (franchise range) | ✅ 7-25 (tournament range) | ✅ Same concept, different ranges |
-| `offensive_efficiency` | ✅ -3 to +3 | ✅ -10 to +10 | ✅ Same concept, different ranges |
+| `team_chemistry` | ✅ 7-10 (franchise range) | ✅ 7-25 (tournament range) | ✅ Same concept, different ranges |
+| `offensive_efficiency` | ✅ -1 to +1 | ✅ -10 to +10 | ✅ Same concept, different ranges |
 | `shot_threshold` | ✅ -10 to 190 | ✅ -10 to 190 | ✅ Same (center at 90 for pill display) |
-| `discipline` | ✅ -3 to +3 | ✅ -10 to +10 | ✅ Same concept, different ranges (formerly turnover_modifier) |
-| `fight` | ✅ -3 to +3 | ✅ -10 to +10 | ✅ Same concept, different ranges (formerly foul_modifier) |
+| `discipline` | ✅ -1 to +1 | ✅ -10 to +10 | ✅ Same concept, different ranges (formerly turnover_modifier) |
+| `fight` | ✅ -1 to +1 | ✅ -10 to +10 | ✅ Same concept, different ranges (formerly foul_modifier) |
 | `rebound_modifier` | ✅ 0.8-1.2 | ✅ 0.8-1.2 | ✅ Same |
-| `defensive_efficiency` | ✅ -3 to +3 | ✅ -10 to +10 | ✅ Same concept, different ranges |
-| `fb_efficiency` | ✅ -3 to +3 | ✅ -10 to +10 | ✅ Same concept, different ranges |
-| `pt_efficiency` | ✅ -3 to +3 | ✅ -10 to +10 | ✅ Same concept, different ranges |
-| `fb_opp_modifier` | ✅ -3 to +3 | ✅ -10 to +10 | ✅ Same concept, different ranges |
-| `pt_opp_modifier` | ✅ -3 to +3 | ✅ -10 to +10 | ✅ Same concept, different ranges |
+| `defensive_efficiency` | ✅ -1 to +1 | ✅ -10 to +10 | ✅ Same concept, different ranges |
+| `fb_efficiency` | ✅ -1 to +1 | ✅ -10 to +10 | ✅ Same concept, different ranges |
+| `pt_efficiency` | ✅ -1 to +1 | ✅ -10 to +10 | ✅ Same concept, different ranges |
+| `fb_opp_modifier` | ✅ -1 to +1 | ✅ -10 to +10 | ✅ Same concept, different ranges |
+| `pt_opp_modifier` | ✅ -1 to +1 | ✅ -10 to +10 | ✅ Same concept, different ranges |
 | **Strategy Settings** | | | |
 | `strategy_settings` | ✅ `{offense, inside, attack, outside, tempo, defense, aggression, hc_trap, fc_press, rebounding}` | ✅ Same structure | ✅ Same |
 | **Plays Data** | | | |

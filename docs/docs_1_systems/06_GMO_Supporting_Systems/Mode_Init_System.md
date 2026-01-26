@@ -8,7 +8,7 @@
 
 2. **Team Attribute Ranges**:
    - **Single Game & Tournament**: `random.randint(-10, 10)` for most attributes, `team_chemistry=random(7-25)`, `rebound_modifier=random(0.0-0.4)`
-   - **Franchise**: `random.randint(-3, 3)` for most attributes, `team_chemistry=random(7-13)`, `rebound_modifier=0.2` (fixed)
+   - **Franchise**: `random.randint(-1, 1)` for most attributes, `team_chemistry=random(7-10)`, `rebound_modifier=0.2` (fixed)
 
 3. **Common Team Attributes** (all modes):
    - `shot_threshold`: `random.randint(-10, 190)`
@@ -82,9 +82,9 @@ The Mode Initialization System diversifies attribute values when users create a 
 - `rebound_modifier`: `random.randint(0, 40) / 100.0` (random 0.0-0.4 in 0.01 increments)
 
 **Franchise Mode:**
-- Attribute range: `random.randint(-3, 3)` for:
+- Attribute range: `random.randint(-1, 1)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
-- `team_chemistry`: `random.randint(7, 13)` (lower range for more challenging progression)
+- `team_chemistry`: `random.randint(7, 10)` (tighter range for more controlled progression)
 - `rebound_modifier`: `0.2` (fixed center value)
 
 **Implementation:**

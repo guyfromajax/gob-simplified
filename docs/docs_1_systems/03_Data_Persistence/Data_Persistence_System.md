@@ -96,17 +96,17 @@ This system documents data persistence across all three game modes when users ar
 **For each of the 8 teams in the franchise:**
 
 **Team Attributes** (mode-specific, randomized on init, updated by training):
-- `team_chemistry`: 7-13 (franchise mode range)
-- `offensive_efficiency`: -3 to +3
+- `team_chemistry`: 7-10 (franchise mode range)
+- `offensive_efficiency`: -1 to +1
 - `shot_threshold`: -10 to 190 (randomized, center at 90 for pill display)
-- `discipline`: -3 to +3 (formerly `turnover_modifier`)
-- `fight`: -3 to +3 (formerly `foul_modifier`)
+- `discipline`: -1 to +1 (formerly `turnover_modifier`)
+- `fight`: -1 to +1 (formerly `foul_modifier`)
 - `rebound_modifier`: 0.2 (fixed center value for Franchise mode)
-- `defensive_efficiency`: -3 to +3
-- `fb_efficiency`: -3 to +3
-- `pt_efficiency`: -3 to +3
-- `fb_opp_modifier`: -3 to +3
-- `pt_opp_modifier`: -3 to +3
+- `defensive_efficiency`: -1 to +1
+- `fb_efficiency`: -1 to +1
+- `pt_efficiency`: -1 to +1
+- `fb_opp_modifier`: -1 to +1
+- `pt_opp_modifier`: -1 to +1
 
 **Strategy Settings & Playbook Settings:**
 - See "Game Plan & Playbook Settings Persistence" section below for complete documentation

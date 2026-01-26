@@ -17,16 +17,16 @@ Franchise Mode supports multi-season career mode where team and player data pers
 
 **Team Attributes:**
 - `shot_threshold`: `random.randint(-10, 190)`
-- `discipline`: `random.randint(-3, 3)` (formerly `turnover_modifier`)
-- `fight`: `random.randint(-3, 3)` (formerly `foul_modifier`)
+- `discipline`: `random.randint(-1, 1)` (formerly `turnover_modifier`)
+- `fight`: `random.randint(-1, 1)` (formerly `foul_modifier`)
 - `rebound_modifier`: `0.2` (fixed center value)
-- `offensive_efficiency`: `random.randint(-3, 3)`
-- `team_chemistry`: `random.randint(7, 13)` (lower range for more challenging progression)
-- `defensive_efficiency`: `random.randint(-3, 3)`
-- `fb_efficiency`: `random.randint(-3, 3)`
-- `pt_efficiency`: `random.randint(-3, 3)`
-- `fb_opp_modifier`: `random.randint(-3, 3)`
-- `pt_opp_modifier`: `random.randint(-3, 3)`
+- `offensive_efficiency`: `random.randint(-1, 1)`
+- `team_chemistry`: `random.randint(7, 10)` (tighter range for more controlled progression)
+- `defensive_efficiency`: `random.randint(-1, 1)`
+- `fb_efficiency`: `random.randint(-1, 1)`
+- `pt_efficiency`: `random.randint(-1, 1)`
+- `fb_opp_modifier`: `random.randint(-1, 1)`
+- `pt_opp_modifier`: `random.randint(-1, 1)`
 
 **Initialization:**
 - **Upfront Initialization**: All 8 teams initialized when franchise season is created
@@ -219,7 +219,7 @@ After completing the regular season (week 14), the top 8 teams advance to a sing
    - `scouting_data`: Initialized via `populate_scouting_data(mode="franchise")`
    - `playbook_settings`: Even distribution across all plays in each category (via `initialize_playbook_settings()`)
    - **Team attributes**: Initialized via `TeamManager.init_team_attributes(mode="franchise")`
-     - Uses Franchise mode attribute ranges (narrower ranges: -3 to +3, lower team_chemistry: 7-13, fixed rebound_modifier: 0.2)
+     - Uses Franchise mode attribute ranges (narrower ranges: -1 to +1, tighter team_chemistry: 7-10, fixed rebound_modifier: 0.2)
 
 **Fallback Trigger:** `ensure_team_objects_exist()` when accessing Game Plan or Playbooks
 
