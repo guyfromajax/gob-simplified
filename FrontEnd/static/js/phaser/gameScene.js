@@ -2153,7 +2153,8 @@ export function createGameScene(Phaser) {
           // ✅ FIX: Don't end quarter on API errors (404, network issues, etc.)
           // Only end quarter if backend explicitly signals completion (quarter_complete=true)
           // Check if the current or last turn data indicates quarter completion before breaking
-          const dataToCheck = turnData || lastTurnData;
+          // ✅ FIX: Use lastTurnData (turnData may be undefined if error occurred before assignment)
+          const dataToCheck = lastTurnData;
           if (dataToCheck && (dataToCheck.quarter_complete === true || dataToCheck.time_remaining <= 0)) {
             // Backend signaled quarter completion - exit loop normally
             console.log('✅ Quarter complete detected after error, exiting loop');

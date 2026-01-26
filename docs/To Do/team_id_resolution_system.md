@@ -59,16 +59,19 @@ In Franchise mode, when users navigate from the Franchise Command Center to the 
 
 We have **4-5 different implementations** of team name → ObjectId resolution:
 
-#### 1. `ensure_team_objects_exist()` (gameplan_routes.py:250-260)
-- **Scope:** Single/Tournament modes only
+#### 1. `ensure_team_objects_exist()` (gameplan_routes.py:760-1082)
+- **Scope:** All three modes (franchise, tournament, single)
 - **Logic:** 
-  ```python
-  team = db.teams.find_one({"name": team_id})
-  if not team:
-      team = db.teams.find_one({"_id": ObjectId(team_id)})
-  actual_team_id = str(team["_id"])
-  ```
-- **Status:** ✅ Works for single/tournament, ❌ NOT used for franchise
+  - **Franchise mode (lines 820-876):** Uses `team_id` directly as ObjectId string (no lookup needed). Works with `franchise_teams` dictionary.
+  - **Tournament mode (lines 894-904):** Does `db.teams.find_one()` lookup to convert name/ObjectId to ObjectId string:
+    ```python
+    team = db.teams.find_one({"name": team_id})
+    if not team:
+        team = db.teams.find_one({"_id": ObjectId(team_id)})
+    actual_team_id = str(team["_id"])
+    ```
+  - **Single mode (lines 882-890):** Uses canonical `team_id` directly (e.g., "FOUR_CORNERS") - no lookup needed. Works with `teams` dictionary using canonical keys.
+- **Status:** ✅ Used for all three modes. Called in `get_gameplan()` (franchise: 1246, tournament: 1263) and `get_playbooks()` (all modes: 1605-1609)
 
 #### 2. `get_playbooks()` (gameplan_routes.py:535-618)
 - **Scope:** All modes (franchise + tournament/single)

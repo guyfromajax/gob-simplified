@@ -237,6 +237,74 @@ def extract_team_settings(
         return None
 
 
+def _transform_playbook_api_response_to_db_structure(playbook_settings: dict) -> dict:
+    """
+    Transform playbook settings from API response structure to database structure.
+    
+    API response structure (from /api/playbooks GET):
+    {
+        "slot_assignments": {...},
+        "motion_dropdowns": {...},
+        "position_filters": {...},
+        "even_distribution_all": bool,
+        "motion": [...],  # Play lists (not percentages)
+        "set_play_inside": [...],
+        "playbook_percentages": {
+            "motion": {...},  # Actual percentages
+            "set_play_inside": {...},
+            ...
+        }
+    }
+    
+    Database structure (what GameManager expects):
+    {
+        "slot_assignments": {...},
+        "motion_dropdowns": {...},
+        "position_filters": {...},
+        "even_distribution_all": bool,
+        "motion": {...},  # Percentages dict (not play lists)
+        "set_play_inside": {...},
+        ...
+    }
+    """
+    # ✅ FIX: Safety check - handle non-dict types (list, None, etc.)
+    if not isinstance(playbook_settings, dict):
+        logger.error(f"❌ [TRANSFORM-PLAYBOOK] playbook_settings is not a dict (type: {type(playbook_settings)}), returning empty dict")
+        return {}
+    
+    # Check if this is the API response structure (has playbook_percentages nested)
+    if "playbook_percentages" in playbook_settings:
+        # Transform: extract percentages from nested structure
+        percentages = playbook_settings.get("playbook_percentages", {})
+        
+        # Build database structure
+        db_structure = {
+            "slot_assignments": playbook_settings.get("slot_assignments", {}),
+            "motion_dropdowns": playbook_settings.get("motion_dropdowns", {}),
+            "position_filters": playbook_settings.get("position_filters", {}),
+            "even_distribution_all": playbook_settings.get("even_distribution_all", False),
+            # Flatten percentages to top level
+            "motion": percentages.get("motion", {}),
+            "set_play_inside": percentages.get("set_play_inside", {}),
+            "set_play_attack": percentages.get("set_play_attack", {}),
+            "set_play_outside": percentages.get("set_play_outside", {}),
+            "zone_defense": percentages.get("zone_defense", {}),
+            "man_defense": percentages.get("man_defense", {})
+        }
+        
+        logger.info(f"✅ [UNIFIED-SETTINGS] Transformed API response structure to DB structure for playbook_settings")
+        return db_structure
+    
+    # Already in database structure (or missing playbook_percentages key)
+    # Check if it has motion at top level (database structure) or if it's missing percentages entirely
+    if "motion" in playbook_settings and isinstance(playbook_settings.get("motion"), dict):
+        # Already in database structure
+        return playbook_settings
+    
+    # If we get here, it might be missing percentages - return as-is (will be handled by validation)
+    return playbook_settings
+
+
 def load_and_apply_team_settings_to_gamemanager(
     saved_doc: dict,
     home_team_name: str,
@@ -330,19 +398,25 @@ def load_and_apply_team_settings_to_gamemanager(
     # Playbook_settings: Override with request if valid (has slot_assignments or other keys)
     if request_playbook_settings and user_team_side:
         try:
-            if isinstance(request_playbook_settings, dict):
+            # ✅ FIX: Safety check - ensure it's a dict, not a list or other type
+            if not isinstance(request_playbook_settings, dict):
+                logger.error(f"❌ [UNIFIED-SETTINGS] request_playbook_settings is not a dict (type: {type(request_playbook_settings)}), skipping")
+            else:
+                # ✅ FIX: Transform API response structure to database structure
+                transformed_playbook = _transform_playbook_api_response_to_db_structure(request_playbook_settings)
+                
                 # Check if request has valid playbook settings (has slot_assignments or other playbook keys)
-                has_slot_assignments = bool(request_playbook_settings.get("slot_assignments"))
-                has_playbook_keys = any(key in request_playbook_settings for key in ["motion", "set_play_inside", "set_play_attack", "set_play_outside", "zone_defense", "man_defense"])
+                has_slot_assignments = bool(transformed_playbook.get("slot_assignments"))
+                has_playbook_keys = any(key in transformed_playbook for key in ["motion", "set_play_inside", "set_play_attack", "set_play_outside", "zone_defense", "man_defense"])
                 has_valid_request_playbook = has_slot_assignments or has_playbook_keys
                 
                 if has_valid_request_playbook:
                     if user_team_side == "home":
-                        home_playbook = dict(request_playbook_settings)
+                        home_playbook = dict(transformed_playbook)
                         slot_count = len(home_playbook.get("slot_assignments", {}))
                         logger.info(f"✅ [UNIFIED-SETTINGS] Using request playbook_settings for home team (user visited Playbooks): slot_assignments={slot_count}")
                     elif user_team_side == "away":
-                        away_playbook = dict(request_playbook_settings)
+                        away_playbook = dict(transformed_playbook)
                         slot_count = len(away_playbook.get("slot_assignments", {}))
                         logger.info(f"✅ [UNIFIED-SETTINGS] Using request playbook_settings for away team (user visited Playbooks): slot_assignments={slot_count}")
         except Exception as e:
