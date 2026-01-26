@@ -1259,8 +1259,9 @@ class ShotManager:
     
     def check_defensive_foul_on_shot(self, defender, defense_score, shot_type, shooter=None, shooter_location=None):
         """
-        Determines if a defensive foul occurs based on defender skill and team fight.
+        Determines if a defensive foul occurs based on defender skill and team discipline.
         Uses hard and soft thresholds that vary by shot_type.
+        Higher discipline = less likely to foul (thresholds are reduced by discipline value).
         Returns (bool, player) → (was_foul_committed, fouling_defender)
         """
         if not defender:
