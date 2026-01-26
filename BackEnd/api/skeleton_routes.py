@@ -6,13 +6,32 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Dict, List, Any, Optional
-from BackEnd.db import fcp_skeletons_collection, hct_skeletons_collection
+from BackEnd.db import fcp_skeletons_collection, hct_skeletons_collection, client, DB_NAME
 from bson import ObjectId
 from pathlib import Path
+import os
 
 router = APIRouter()
 
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
+
+
+def get_staging_collection(collection_name: str):
+    """
+    Get collection from gob-staging database for safe testing.
+    All skeleton builders save to staging first, then can be migrated to production.
+    
+    Args:
+        collection_name: Name of the collection (e.g., "fcp_skeletons", "hct_skeletons", "plays")
+        
+    Returns:
+        Collection from gob-staging database
+    """
+    if not client:
+        raise HTTPException(status_code=500, detail="MongoDB client not available")
+    
+    staging_db = client["gob-staging"]
+    return staging_db[collection_name]
 
 
 @router.get("/fcp-skeletons.html")
@@ -38,12 +57,17 @@ async def create_fcp_skeleton(skeleton_data: SkeletonCreate):
     """
     Create or update an FCP skeleton in MongoDB.
     
+    ✅ SAFETY: Always saves to gob-staging database for testing before production migration.
+    
     Args:
         skeleton_data: FCP skeleton data from builder
         
     Returns:
         dict: Created/updated skeleton document with _id
     """
+    # Always use staging collection for safety
+    staging_collection = get_staging_collection("fcp_skeletons")
+    
     skeleton_dict = skeleton_data.dict(exclude_none=True)
     
     # Remove _id from dict if present (will handle separately)
@@ -52,26 +76,26 @@ async def create_fcp_skeleton(skeleton_data: SkeletonCreate):
     if skeleton_id:
         # Update existing skeleton
         try:
-            result = fcp_skeletons_collection.update_one(
+            result = staging_collection.update_one(
                 {"_id": ObjectId(skeleton_id)},
                 {"$set": skeleton_dict}
             )
             if result.matched_count == 0:
                 raise HTTPException(status_code=404, detail="FCP skeleton not found")
-            saved_skeleton = fcp_skeletons_collection.find_one({"_id": ObjectId(skeleton_id)})
+            saved_skeleton = staging_collection.find_one({"_id": ObjectId(skeleton_id)})
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Error updating skeleton: {str(e)}")
     else:
         # Insert new skeleton
-        result = fcp_skeletons_collection.insert_one(skeleton_dict)
-        saved_skeleton = fcp_skeletons_collection.find_one({"_id": result.inserted_id})
+        result = staging_collection.insert_one(skeleton_dict)
+        saved_skeleton = staging_collection.find_one({"_id": result.inserted_id})
     
     saved_skeleton["_id"] = str(saved_skeleton["_id"])
     
     action = "updated" if skeleton_id else "created"
     
     return {
-        "message": f"FCP skeleton {action} successfully",
+        "message": f"FCP skeleton {action} successfully to gob-staging",
         "skeleton": saved_skeleton,
         "was_update": skeleton_id is not None
     }
@@ -82,11 +106,14 @@ async def get_all_fcp_skeletons():
     """
     Get all FCP skeletons from MongoDB.
     
+    ✅ Returns skeletons from gob-staging (where builders save).
+    
     Returns:
         dict: List of all FCP skeletons
     """
     try:
-        skeletons = list(fcp_skeletons_collection.find({}))
+        staging_collection = get_staging_collection("fcp_skeletons")
+        skeletons = list(staging_collection.find({}))
         for skeleton in skeletons:
             skeleton["_id"] = str(skeleton["_id"])
         
@@ -103,12 +130,17 @@ async def create_hct_skeleton(skeleton_data: SkeletonCreate):
     """
     Create or update an HCT skeleton in MongoDB.
     
+    ✅ SAFETY: Always saves to gob-staging database for testing before production migration.
+    
     Args:
         skeleton_data: HCT skeleton data from builder
         
     Returns:
         dict: Created/updated skeleton document with _id
     """
+    # Always use staging collection for safety
+    staging_collection = get_staging_collection("hct_skeletons")
+    
     skeleton_dict = skeleton_data.dict(exclude_none=True)
     
     # Remove _id from dict if present (will handle separately)
@@ -117,26 +149,26 @@ async def create_hct_skeleton(skeleton_data: SkeletonCreate):
     if skeleton_id:
         # Update existing skeleton
         try:
-            result = hct_skeletons_collection.update_one(
+            result = staging_collection.update_one(
                 {"_id": ObjectId(skeleton_id)},
                 {"$set": skeleton_dict}
             )
             if result.matched_count == 0:
                 raise HTTPException(status_code=404, detail="HCT skeleton not found")
-            saved_skeleton = hct_skeletons_collection.find_one({"_id": ObjectId(skeleton_id)})
+            saved_skeleton = staging_collection.find_one({"_id": ObjectId(skeleton_id)})
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Error updating skeleton: {str(e)}")
     else:
         # Insert new skeleton
-        result = hct_skeletons_collection.insert_one(skeleton_dict)
-        saved_skeleton = hct_skeletons_collection.find_one({"_id": result.inserted_id})
+        result = staging_collection.insert_one(skeleton_dict)
+        saved_skeleton = staging_collection.find_one({"_id": result.inserted_id})
     
     saved_skeleton["_id"] = str(saved_skeleton["_id"])
     
     action = "updated" if skeleton_id else "created"
     
     return {
-        "message": f"HCT skeleton {action} successfully",
+        "message": f"HCT skeleton {action} successfully to gob-staging",
         "skeleton": saved_skeleton,
         "was_update": skeleton_id is not None
     }
@@ -147,11 +179,14 @@ async def get_all_hct_skeletons():
     """
     Get all HCT skeletons from MongoDB.
     
+    ✅ Returns skeletons from gob-staging (where builders save).
+    
     Returns:
         dict: List of all HCT skeletons
     """
     try:
-        skeletons = list(hct_skeletons_collection.find({}))
+        staging_collection = get_staging_collection("hct_skeletons")
+        skeletons = list(staging_collection.find({}))
         for skeleton in skeletons:
             skeleton["_id"] = str(skeleton["_id"])
         

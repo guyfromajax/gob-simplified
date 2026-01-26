@@ -6,13 +6,28 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Dict, List, Any, Optional
-from BackEnd.db import plays_collection
+from BackEnd.db import plays_collection, client
 from bson import ObjectId
 from pathlib import Path
 
 router = APIRouter()
 
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
+
+
+def get_staging_plays_collection():
+    """
+    Get plays collection from gob-staging database for safe testing.
+    All play builders save to staging first, then can be migrated to production.
+    
+    Returns:
+        Plays collection from gob-staging database
+    """
+    if not client:
+        raise HTTPException(status_code=500, detail="MongoDB client not available")
+    
+    staging_db = client["gob-staging"]
+    return staging_db["plays"]
 
 
 @router.get("/play-builder-v2.html")
@@ -45,6 +60,8 @@ async def create_play(play_data: PlayCreate):
     """
     Create or update a play in MongoDB.
     
+    ✅ SAFETY: Always saves to gob-staging database for testing before production migration.
+    
     DEVELOPMENT MODE: If a play with the same name exists, it will be overwritten.
     This allows iterating on universal plays during development.
     
@@ -54,6 +71,9 @@ async def create_play(play_data: PlayCreate):
     Returns:
         dict: Created/updated play document with _id
     """
+    # Always use staging collection for safety
+    staging_collection = get_staging_plays_collection()
+    
     # Convert to dict
     play_dict = play_data.dict()
     
@@ -61,7 +81,7 @@ async def create_play(play_data: PlayCreate):
     # This prevents Plays Builder from losing copy when Play Builder V2 saves
     existing_copy = None
     if play_dict.get("name"):
-        existing_play = plays_collection.find_one({"name": play_dict["name"]})
+        existing_play = staging_collection.find_one({"name": play_dict["name"]})
         if existing_play and existing_play.get("copy"):
             existing_copy = existing_play.get("copy")
     
@@ -91,20 +111,20 @@ async def create_play(play_data: PlayCreate):
     
     # UPSERT: Update if exists (by name), insert if new
     # This allows overwriting plays during development
-    result = plays_collection.update_one(
+    result = staging_collection.update_one(
         {"name": play_dict["name"]},  # Find by name
         {"$set": play_dict},           # Update all fields
         upsert=True                    # Insert if doesn't exist
     )
     
     # Get the document (either newly inserted or existing one)
-    saved_play = plays_collection.find_one({"name": play_dict["name"]})
+    saved_play = staging_collection.find_one({"name": play_dict["name"]})
     saved_play["_id"] = str(saved_play["_id"])
     
     action = "updated" if result.matched_count > 0 else "created"
     
     return {
-        "message": f"Play {action} successfully",
+        "message": f"Play {action} successfully to gob-staging",
         "play": saved_play,
         "was_update": result.matched_count > 0
     }
@@ -115,10 +135,13 @@ async def get_all_plays():
     """
     Get all plays from the database.
     
+    ✅ Returns plays from gob-staging (where builders save).
+    
     Returns:
         list: All play documents
     """
-    plays = list(plays_collection.find({}))
+    staging_collection = get_staging_plays_collection()
+    plays = list(staging_collection.find({}))
     
     # Convert ObjectId to string
     for play in plays:
@@ -132,6 +155,8 @@ async def get_play_by_name(play_name: str):
     """
     Get a specific play by name (URL decoded).
     
+    ✅ Returns play from gob-staging (where builders save).
+    
     Args:
         play_name: Play name (URL encoded, will be decoded)
         
@@ -140,8 +165,9 @@ async def get_play_by_name(play_name: str):
     """
     try:
         from urllib.parse import unquote
+        staging_collection = get_staging_plays_collection()
         decoded_name = unquote(play_name)
-        play = plays_collection.find_one({"name": decoded_name})
+        play = staging_collection.find_one({"name": decoded_name})
         if not play:
             raise HTTPException(status_code=404, detail=f"Play '{decoded_name}' not found")
         
@@ -158,6 +184,8 @@ async def get_play(play_id: str):
     """
     Get a specific play by ID.
     
+    ✅ Returns play from gob-staging (where builders save).
+    
     Args:
         play_id: MongoDB ObjectId as string
         
@@ -165,7 +193,8 @@ async def get_play(play_id: str):
         dict: Play document
     """
     try:
-        play = plays_collection.find_one({"_id": ObjectId(play_id)})
+        staging_collection = get_staging_plays_collection()
+        play = staging_collection.find_one({"_id": ObjectId(play_id)})
         if not play:
             raise HTTPException(status_code=404, detail="Play not found")
         

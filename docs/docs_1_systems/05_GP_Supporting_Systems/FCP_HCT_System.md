@@ -12,7 +12,7 @@
 1. Apply Energy Decay
    - Apply energy decay to all active players (offense and defense) via `apply_energy_decay()`
 
-2. Track Defensive Attempt
+2. Track Defensive Attempt Stat
    - Increment `def_scouting["defense"]["FCP"]["used"]` or `def_scouting["defense"]["HCT"]["used"]`
 
 3. Calculate Offense Score
@@ -28,12 +28,17 @@
    - **Note**: Scores are attribute-based (not purely random), with a random multiplier applied
 
 5. Determine Outcome Type
-   - **FCP Success**: `if (offenseScore + 500) > defenseScore`
-     - If `offenseScore - defenseScore > 1000`: Weighted random `["D_FOUL", "HCO", "SHOT"]` with weights `[0.3, 0.5, 0.2]`
+   - BSM (Base Success Modifier) = 500 for FCP, 300 for HCT
+      - BSM += random.randint(1, offense team chemistry) * offense team fight if offense team fight > 0, else += random.randint(1, offense team chemistry)
+      - BSM -= random.randint(1, defenese team chemistry) * defense team discipline if defense team discipline > 0 else -= random.randint(1, defense team chemistry)
+    - DST (Defense Safety Threshold) = 600 for FCP, 800 for HCT
+      - DST += random.randint(1, defense team chemistry) * defense team discipline if defense team discipline > 0 else += random.randint(1, defense team chemistry)
+   - **FCP Success**: `if (offenseScore + BSM) > defenseScore`
+     - If `offenseScore - defenseScore > DST`: Weighted random `["D_FOUL", "HCO", "SHOT"]` with weights `[0.3, 0.5, 0.2]`
      - Otherwise: `"HCO"` (press break)
    - **FCP Failure**: Otherwise → Weighted random `["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"]` with weights `[0.2, 0.5, 0.3]`
-   - **HCT Success**: `if (offenseScore + 300) > defenseScore` (lower threshold than FCP)
-     - If `offenseScore - defenseScore > 1000`: Weighted random `["D_FOUL", "HCO", "SHOT"]` with weights `[0.3, 0.5, 0.2]`
+   - **HCT Success**: `if (offenseScore + BSM) > defenseScore` (lower threshold than FCP)
+     - If `offenseScore - defenseScore > DST`: Weighted random `["D_FOUL", "HCO", "SHOT"]` with weights `[0.3, 0.5, 0.2]`
      - Otherwise: `"HCO"` (trap break)
    - **HCT Failure**: Otherwise → Weighted random `["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"]` with weights `[0.2, 0.5, 0.3]`
 
