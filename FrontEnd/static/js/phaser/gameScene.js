@@ -63,6 +63,7 @@ export function createGameScene(Phaser) {
           localStorage.removeItem('game_id');
         }
         this.gamePlanSettings = data.gamePlanSettings;
+        this.playbookSettings = data.playbookSettings; // ✅ UNIFIED: Store playbook settings (same pattern as gamePlanSettings)
         this.userTeamSide = data.userTeamSide;
         // ✅ SS&S: Store team_id (ObjectId) for navigation anchor preservation
         this.teamId = data.teamId;
@@ -283,9 +284,9 @@ export function createGameScene(Phaser) {
       if (Object.keys(this.homeLineup).length) payload.home_lineup = this.homeLineup;
       if (Object.keys(this.awayLineup).length) payload.away_lineup = this.awayLineup;
       
-      // ✅ CRITICAL FIX: Send game plan settings for ALL quarters (not just Q1)
-      // This ensures strategy_settings are available when resuming games from DB
-      // If DB has None/missing strategy_settings, backend can use request.strategy_settings as fallback
+      // ✅ UNIFIED: Send both game plan and playbook settings for ALL quarters (not just Q1)
+      // This ensures settings are available when resuming games from DB
+      // If DB has None/missing settings, backend can use request settings as fallback
       if (this.gamePlanSettings && this.userTeamSide) {
         payload.user_team_side = this.userTeamSide;
         payload.strategy_settings = this.gamePlanSettings.strategy_settings;
@@ -299,6 +300,23 @@ export function createGameScene(Phaser) {
           hasSettings: !!this.gamePlanSettings, 
           userTeamSide: this.userTeamSide,
           gamePlanSettings: this.gamePlanSettings
+        });
+      }
+      
+      // ✅ UNIFIED: Send playbook settings (same pattern as strategy_settings)
+      if (this.playbookSettings && this.userTeamSide) {
+        payload.playbook_settings = this.playbookSettings;
+        const slotCount = this.playbookSettings.slot_assignments ? Object.keys(this.playbookSettings.slot_assignments).length : 0;
+        console.log('🎮 [gameScene] Sending playbook settings to backend:', {
+          user_team_side: this.userTeamSide,
+          slot_assignments: slotCount,
+          quarter: this.quarter
+        });
+      } else if (this.quarter === 1) {
+        console.warn('⚠️ [gameScene] Not sending playbook settings:', { 
+          hasSettings: !!this.playbookSettings, 
+          userTeamSide: this.userTeamSide,
+          playbookSettings: this.playbookSettings
         });
       }
       

@@ -1,13 +1,19 @@
 """
-Unified team settings save/extract functions for strategy_settings and playbook_settings.
+Unified Team Settings Manager
 
-This module provides a single code path for saving and extracting team settings,
-eliminating duplicate logic and ensuring consistent team_id resolution across all settings types.
+This module provides unified functions for saving and extracting team settings
+(strategy_settings and playbook_settings) to ensure consistent team_id resolution
+and reduce code duplication.
+
+Key Functions:
+- save_team_settings(): Unified save function for both settings types
+- extract_team_settings(): Unified extract function for both settings types
+- load_and_apply_team_settings_to_gamemanager(): Unified function to load both settings
+  from DB/request and apply them to GameManager consistently
 """
 
 import logging
-from typing import Optional, Dict, Any, Callable
-from bson import ObjectId
+from typing import Optional, Dict, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -20,239 +26,88 @@ def save_team_settings(
     game_id: Optional[str] = None,
     franchise_id: Optional[str] = None,
     tournament_id: Optional[str] = None,
-    validate_fn: Optional[Callable[[dict], bool]] = None,
-    apply_to_gamemanager: bool = True
-) -> tuple[bool, str, str]:
+    validate_fn: Optional[callable] = None,  # Optional validation function
+    apply_to_gamemanager: bool = False
+) -> Tuple[bool, Optional[str], Optional[str]]:
     """
-    Unified function to save team settings (strategy_settings or playbook_settings).
+    Unified function to save team settings to the appropriate document.
     
     Args:
         settings_type: "strategy_settings" or "playbook_settings"
         settings_data: The settings dictionary to save
-        team_id: Team identifier (will be normalized)
+        team_id: Team identifier (name, ObjectId, or canonical team_id)
         mode: "single", "franchise", or "tournament"
         game_id: Optional game ID for game-scoped saves
-        franchise_id: Optional franchise ID
-        tournament_id: Optional tournament ID
-        validate_fn: Optional validation function for settings_data
-        apply_to_gamemanager: Whether to apply to cached GameManager if available
+        franchise_id: Optional franchise ID for franchise mode
+        tournament_id: Optional tournament ID for tournament mode
+        validate_fn: Optional validation function (for strategy_settings)
+        apply_to_gamemanager: Whether to apply settings to cached GameManager
     
     Returns:
-        tuple: (success: bool, actual_team_id: str, collection_name: str)
+        Tuple of (success, actual_team_id, collection_name)
     """
-    from BackEnd.api.gameplan_routes import (
-        get_collection_and_doc_id,
-        get_save_location_for_franchise_tournament,
-        get_team_settings_path,
-        ensure_team_objects_exist,
-        normalize_team_id_to_canonical
-    )
-    from BackEnd.api.franchise_routes import get_user_team_from_franchise
-    from BackEnd.api.tournament_routes import get_user_team_from_tournament
-    from BackEnd.db import games_collection
+    from BackEnd.api.gameplan_routes import normalize_team_id_to_canonical
     
     try:
-        # Validate settings if validation function provided
-        if validate_fn and not validate_fn(settings_data):
-            logger.error(f"❌ [SAVE-TEAM-SETTINGS] Validation failed for {settings_type}")
-            return False, None, None
-        
-        # Get collection and doc_id
-        collection, doc_id = get_collection_and_doc_id(
-            mode,
-            franchise_id,
-            tournament_id,
-            game_id
-        )
-        
-        # Load document
-        if mode == "single":
-            doc = collection.find_one({"_id": doc_id})
-            if not doc:
-                try:
-                    doc = collection.find_one({"_id": ObjectId(doc_id)})
-                except:
-                    pass
-        else:
-            if mode == "franchise":
-                doc = collection.find_one(
-                    {"_id": ObjectId(doc_id)},
-                    {"franchise_teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
-                )
-            elif mode == "tournament":
-                doc = collection.find_one(
-                    {"_id": ObjectId(doc_id)},
-                    {"teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
-                )
-            else:
-                doc = collection.find_one({"_id": ObjectId(doc_id)})
-        
-        if not doc:
-            logger.error(f"❌ [SAVE-TEAM-SETTINGS] Document not found: {mode}={doc_id}")
-            return False, None, None
-        
         # Resolve team_id to canonical format
-        actual_team_id = team_id
+        actual_team_id = normalize_team_id_to_canonical(team_id, mode, None)
         
-        if mode == "franchise":
-            user_team_id_name, user_team_object_id = get_user_team_from_franchise(doc)
-            if not user_team_id_name or not user_team_object_id:
-                logger.error(f"❌ [SAVE-TEAM-SETTINGS] User team not found in franchise document")
-                return False, None, None
-            actual_team_id = user_team_object_id
-        elif mode == "tournament":
-            user_team_id_name, user_team_object_id = get_user_team_from_tournament(doc)
-            if not user_team_id_name or not user_team_object_id:
-                logger.error(f"❌ [SAVE-TEAM-SETTINGS] User team not found in tournament document")
-                return False, None, None
-            actual_team_id = user_team_object_id
+        # Determine collection and document ID
+        if mode == "single" and game_id:
+            # Game-scoped save
+            from BackEnd.db import games_collection
+            collection = games_collection
+            doc_id = game_id
+            update_path = f"teams.{actual_team_id}.{settings_type}"
+        elif mode == "franchise" and franchise_id:
+            from BackEnd.db import franchises_collection
+            collection = franchises_collection
+            doc_id = franchise_id
+            update_path = f"franchise_teams.{actual_team_id}.{settings_type}"
+        elif mode == "tournament" and tournament_id:
+            from BackEnd.db import tournaments_collection
+            collection = tournaments_collection
+            doc_id = tournament_id
+            update_path = f"teams.{actual_team_id}.{settings_type}"
         else:
-            # Single mode: normalize to canonical
-            actual_team_id = normalize_team_id_to_canonical(team_id, mode, doc)
-            
-            # Verify resolved team_id exists in document
-            teams = doc.get("teams", {})
-            if actual_team_id not in teams:
-                logger.error(f"❌ [SAVE-TEAM-SETTINGS] Resolved team_id '{actual_team_id}' not found in teams object!")
+            logger.error(f"❌ [SAVE-TEAM-SETTINGS] Invalid mode/ID combination: mode={mode}, game_id={game_id}, franchise_id={franchise_id}, tournament_id={tournament_id}")
+            return False, None, None
+        
+        # Validate if validation function provided
+        if validate_fn:
+            try:
+                validate_fn(settings_data)
+            except Exception as e:
+                logger.error(f"❌ [SAVE-TEAM-SETTINGS] Validation failed: {e}")
                 return False, None, None
         
-        # Ensure team objects exist
-        ensure_team_objects_exist(
-            mode, doc_id, actual_team_id,
-            franchise_doc=doc if mode == "franchise" else None,
-            tournament_doc=doc if mode == "tournament" else None
+        # Update database
+        from bson import ObjectId
+        try:
+            doc_id_obj = ObjectId(doc_id)
+        except:
+            doc_id_obj = doc_id
+        
+        collection.update_one(
+            {"_id": doc_id_obj},
+            {"$set": {update_path: settings_data}}
         )
         
-        # Reload document after ensure_team_objects_exist
-        if mode == "franchise":
-            doc = collection.find_one(
-                {"_id": ObjectId(doc_id)},
-                {"franchise_teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
-            )
-        elif mode == "tournament":
-            doc = collection.find_one(
-                {"_id": ObjectId(doc_id)},
-                {"teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
-            )
-        elif mode == "single":
-            doc = collection.find_one(
-                {"_id": doc_id},
-                {"teams": 1, "home_team_id": 1, "away_team_id": 1, "_id": 1}
-            )
-            if not doc:
-                try:
-                    doc = collection.find_one(
-                        {"_id": ObjectId(doc_id)},
-                        {"teams": 1, "home_team_id": 1, "away_team_id": 1, "_id": 1}
-                    )
-                except:
-                    pass
-        
-        if not doc:
-            logger.error(f"❌ [SAVE-TEAM-SETTINGS] Document not found after reload: {mode}={doc_id}")
-            return False, None, None
-        
-        # Determine save location (game doc vs master doc) for franchise/tournament
-        save_to_game_doc = False
-        game_doc_team_id = actual_team_id
-        if mode in ["franchise", "tournament"]:
-            save_collection, save_doc_id, save_to_game_doc = get_save_location_for_franchise_tournament(
-                mode,
-                game_id,
-                franchise_id,
-                tournament_id
-            )
-            if save_to_game_doc:
-                collection = save_collection
-                doc_id = save_doc_id
-                # Resolve team_id from game document
-                try:
-                    game_doc = games_collection.find_one(
-                        {"_id": save_doc_id},
-                        {"teams": 1, "home_team": 1, "away_team": 1, "_id": 1}
-                    )
-                    if not game_doc:
-                        try:
-                            game_doc = games_collection.find_one(
-                                {"_id": ObjectId(save_doc_id)},
-                                {"teams": 1, "home_team": 1, "away_team": 1, "_id": 1}
-                            )
-                        except:
-                            pass
-                    
-                    if game_doc:
-                        # Find team_id in game doc that matches user team
-                        user_team_name = None
-                        if mode == "franchise":
-                            user_team_name, _ = get_user_team_from_franchise(doc)
-                        elif mode == "tournament":
-                            user_team_name, _ = get_user_team_from_tournament(doc)
-                        
-                        if user_team_name:
-                            game_teams = game_doc.get("teams", {})
-                            for tid, team_obj in game_teams.items():
-                                if team_obj.get("name") == user_team_name:
-                                    game_doc_team_id = tid
-                                    break
-                except Exception as e:
-                    logger.warning(f"⚠️ [SAVE-TEAM-SETTINGS] Error resolving game doc team_id: {e}")
-                    game_doc_team_id = actual_team_id
-        
-        # Build update path
-        if save_to_game_doc:
-            update_path = f"teams.{game_doc_team_id}.{settings_type}"
-        else:
-            update_path = f"{get_team_settings_path(mode, actual_team_id)}.{settings_type}"
-        
-        # Save to database
-        if mode == "single":
-            # Try both UUID string and ObjectId formats
-            try:
-                result = collection.update_one(
-                    {"_id": doc_id},
-                    {"$set": {update_path: settings_data}}
-                )
-                if result.matched_count == 0:
-                    result = collection.update_one(
-                        {"_id": ObjectId(doc_id)},
-                        {"$set": {update_path: settings_data}}
-                    )
-            except:
-                result = collection.update_one(
-                    {"_id": ObjectId(doc_id)},
-                    {"$set": {update_path: settings_data}}
-                )
-        else:
-            result = collection.update_one(
-                {"_id": ObjectId(doc_id)},
-                {"$set": {update_path: settings_data}}
-            )
-        
-        if result.matched_count == 0:
-            logger.error(f"❌ [SAVE-TEAM-SETTINGS] Failed to save {settings_type}: document not found")
-            return False, None, None
-        
-        # Apply to GameManager if requested and game is in cache
-        if apply_to_gamemanager and game_id and mode == "single":
-            try:
-                from BackEnd.api.api import ongoing_games
-                gm = ongoing_games.get(game_id)
-                if gm:
-                    target_team = None
-                    if actual_team_id == gm.home_team.team_id:
-                        target_team = gm.home_team
-                    elif actual_team_id == gm.away_team.team_id:
-                        target_team = gm.away_team
-                    
-                    if target_team:
-                        if settings_type == "strategy_settings":
-                            default_settings = target_team._init_strategy_settings()
-                            target_team.strategy_settings = {**default_settings, **settings_data}
-                        else:
-                            target_team.playbook_settings = settings_data
-                        logger.info(f"✅ [SAVE-TEAM-SETTINGS] Applied {settings_type} to cached GameManager")
-            except Exception as e:
-                logger.warning(f"⚠️ [SAVE-TEAM-SETTINGS] Error applying to GameManager: {e}")
+        # Optionally apply to GameManager
+        if apply_to_gamemanager and game_id:
+            from BackEnd.api.api import ongoing_games
+            gm = ongoing_games.get(game_id)
+            if gm:
+                if settings_type == "strategy_settings":
+                    if gm.home_team.team_id == actual_team_id or gm.home_team.name == team_id:
+                        gm.home_team.strategy_settings = dict(settings_data)
+                    elif gm.away_team.team_id == actual_team_id or gm.away_team.name == team_id:
+                        gm.away_team.strategy_settings = dict(settings_data)
+                elif settings_type == "playbook_settings":
+                    if gm.home_team.team_id == actual_team_id or gm.home_team.name == team_id:
+                        gm.home_team.playbook_settings = dict(settings_data)
+                    elif gm.away_team.team_id == actual_team_id or gm.away_team.name == team_id:
+                        gm.away_team.playbook_settings = dict(settings_data)
         
         return True, actual_team_id, collection.name
     
@@ -369,3 +224,132 @@ def extract_team_settings(
         logger.error(f"❌ [EXTRACT-TEAM-SETTINGS] Error extracting {settings_type}: {e}", exc_info=True)
         return None
 
+
+def load_and_apply_team_settings_to_gamemanager(
+    saved_doc: dict,
+    home_team_name: str,
+    away_team_name: str,
+    mode: str,
+    request_strategy_settings: Optional[dict] = None,
+    request_playbook_settings: Optional[dict] = None,
+    user_team_side: Optional[str] = None,
+    gm=None  # Optional GameManager instance (if already created)
+) -> Tuple[Dict, Dict, Dict, Dict]:
+    """
+    Unified function to load both strategy_settings and playbook_settings from DB/request
+    and apply them to GameManager consistently.
+    
+    This ensures both settings types follow the same logic:
+    1. Extract from DB
+    2. Override with request if valid (user visited respective page)
+    3. Apply to GameManager
+    
+    Args:
+        saved_doc: The saved game document
+        home_team_name: Home team name
+        away_team_name: Away team name
+        mode: "single", "franchise", or "tournament"
+        request_strategy_settings: Optional strategy_settings from request (if user visited Game Plan)
+        request_playbook_settings: Optional playbook_settings from request (if user visited Playbooks)
+        user_team_side: "home" or "away" (for determining which team gets request settings)
+        gm: Optional GameManager instance (if already created, settings will be applied directly)
+    
+    Returns:
+        Tuple of (home_strategy, away_strategy, home_playbook, away_playbook)
+    """
+    from BackEnd.utils.team_settings_manager import extract_team_settings
+    
+    # Extract both settings from DB
+    home_strategy_db = extract_team_settings(
+        saved_doc=saved_doc,
+        team_identifier=home_team_name,
+        settings_type="strategy_settings",
+        mode=mode,
+        game_doc=saved_doc if mode == "single" else None
+    ) or {}
+    
+    away_strategy_db = extract_team_settings(
+        saved_doc=saved_doc,
+        team_identifier=away_team_name,
+        settings_type="strategy_settings",
+        mode=mode,
+        game_doc=saved_doc if mode == "single" else None
+    ) or {}
+    
+    home_playbook_db = extract_team_settings(
+        saved_doc=saved_doc,
+        team_identifier=home_team_name,
+        settings_type="playbook_settings",
+        mode=mode,
+        game_doc=saved_doc if mode == "single" else None
+    ) or {}
+    
+    away_playbook_db = extract_team_settings(
+        saved_doc=saved_doc,
+        team_identifier=away_team_name,
+        settings_type="playbook_settings",
+        mode=mode,
+        game_doc=saved_doc if mode == "single" else None
+    ) or {}
+    
+    # Determine final settings (request overrides DB if valid)
+    home_strategy = home_strategy_db
+    away_strategy = away_strategy_db
+    home_playbook = home_playbook_db
+    away_playbook = away_playbook_db
+    
+    # Strategy_settings: Override with request if valid
+    if request_strategy_settings and user_team_side:
+        try:
+            if isinstance(request_strategy_settings, dict):
+                required_keys = ['offense', 'inside', 'attack', 'outside', 'tempo', 'defense', 'aggression', 'hc_trap', 'fc_press', 'rebounding']
+                has_valid_request_settings = all(key in request_strategy_settings for key in required_keys)
+                
+                if has_valid_request_settings:
+                    if user_team_side == "home":
+                        home_strategy = dict(request_strategy_settings)
+                        logger.info(f"✅ [UNIFIED-SETTINGS] Using request strategy_settings for home team (user visited Game Plan)")
+                    elif user_team_side == "away":
+                        away_strategy = dict(request_strategy_settings)
+                        logger.info(f"✅ [UNIFIED-SETTINGS] Using request strategy_settings for away team (user visited Game Plan)")
+        except Exception as e:
+            logger.error(f"❌ [UNIFIED-SETTINGS] Error processing request strategy_settings: {e}, using DB settings", exc_info=True)
+    
+    # Playbook_settings: Override with request if valid (has slot_assignments or other keys)
+    if request_playbook_settings and user_team_side:
+        try:
+            if isinstance(request_playbook_settings, dict):
+                # Check if request has valid playbook settings (has slot_assignments or other playbook keys)
+                has_slot_assignments = bool(request_playbook_settings.get("slot_assignments"))
+                has_playbook_keys = any(key in request_playbook_settings for key in ["motion", "set_play_inside", "set_play_attack", "set_play_outside", "zone_defense", "man_defense"])
+                has_valid_request_playbook = has_slot_assignments or has_playbook_keys
+                
+                if has_valid_request_playbook:
+                    if user_team_side == "home":
+                        home_playbook = dict(request_playbook_settings)
+                        slot_count = len(home_playbook.get("slot_assignments", {}))
+                        logger.info(f"✅ [UNIFIED-SETTINGS] Using request playbook_settings for home team (user visited Playbooks): slot_assignments={slot_count}")
+                    elif user_team_side == "away":
+                        away_playbook = dict(request_playbook_settings)
+                        slot_count = len(away_playbook.get("slot_assignments", {}))
+                        logger.info(f"✅ [UNIFIED-SETTINGS] Using request playbook_settings for away team (user visited Playbooks): slot_assignments={slot_count}")
+        except Exception as e:
+            logger.error(f"❌ [UNIFIED-SETTINGS] Error processing request playbook_settings: {e}, using DB settings", exc_info=True)
+    
+    # Apply to GameManager if provided
+    if gm:
+        # Apply strategy_settings
+        if home_strategy:
+            gm.home_team.strategy_settings = dict(home_strategy)
+        if away_strategy:
+            gm.away_team.strategy_settings = dict(away_strategy)
+        
+        # Apply playbook_settings
+        if home_playbook:
+            gm.home_team.playbook_settings = dict(home_playbook)
+        if away_playbook:
+            gm.away_team.playbook_settings = dict(away_playbook)
+        
+        logger.info(f"✅ [UNIFIED-SETTINGS] Applied settings to GameManager: home_strategy={bool(home_strategy)}, away_strategy={bool(away_strategy)}, home_playbook={bool(home_playbook)}, away_playbook={bool(away_playbook)}")
+    
+    return home_strategy, away_strategy, home_playbook, away_playbook

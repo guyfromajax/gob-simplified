@@ -210,6 +210,7 @@ if ((quarter === 0 || quarter === 1) && !gameId) {
 
 // Load game plan settings (async function to be called before game starts)
 let gamePlanSettings = null;
+let playbookSettings = null;
 
 async function loadGamePlanSettings() {
   if (!userTeamSide) {
@@ -244,6 +245,42 @@ async function loadGamePlanSettings() {
     }
   } catch (e) {
     console.error(`❌ Error loading game plan settings (${mode} mode):`, e);
+  }
+}
+
+async function loadPlaybookSettings() {
+  if (!userTeamSide) {
+    console.log('⚠️ No user team side specified, skipping playbook load');
+    return;
+  }
+  
+  // Try multiple parameter names (different pages use different names)
+  const teamId = urlParams.get('team_id') || 
+                 urlParams.get('user_team_id') ||
+                 (userTeamSide === 'home' ? urlParams.get('home_id') : urlParams.get('away_id'));
+  
+  // ✅ SS&S: Always load from database (single source of truth for all modes)
+  try {
+    const params = new URLSearchParams();
+    params.set('mode', mode);
+    params.set('team_id', teamId);
+    
+    if (mode === 'franchise' && franchiseId) {
+      params.set('franchise_id', franchiseId);
+    } else if (mode === 'tournament' && tournamentId) {
+      params.set('tournament_id', tournamentId);
+    } else if (mode === 'single' && gameId) {
+      params.set('game_id', gameId);
+    }
+    
+    const res = await fetch(API_CONFIG.buildUrl(`/api/playbooks?${params.toString()}`));
+    if (res.ok) {
+      playbookSettings = await res.json();
+    } else {
+      console.error(`❌ Failed to load playbook settings (${mode} mode), status:`, res.status);
+    }
+  } catch (e) {
+    console.error(`❌ Error loading playbook settings (${mode} mode):`, e);
   }
 }
 let periodLabel = urlParams.get('period') || `Q${quarter}`;
@@ -1760,8 +1797,9 @@ async function fetchTeamRoster(teamName) {
 async function startGame({ homeRoster, awayRoster, animate = true }) {
   DEBUG && console.log('[bootGame] startGame', { quarter, animate });
   
-  // Load game plan settings before starting the game
+  // Load game plan and playbook settings before starting the game
   await loadGamePlanSettings();
+  await loadPlaybookSettings();
   
   // ✅ REMOVED: Quarter transition debug logging (cluttering console)
   
@@ -1808,6 +1846,7 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
     periodLabel,
     quarter,
     gamePlanSettings,
+    playbookSettings, // ✅ UNIFIED: Pass playbook settings (same pattern as gamePlanSettings)
     userTeamSide,
     mode,
     teamId, // ✅ SS&S: Pass team_id (ObjectId) for navigation anchor preservation
@@ -2030,8 +2069,9 @@ async function handleSimQuarter() {
   const simQuarterBtn = document.querySelector('.sim-to-fourth-button');
   [playBtn, simFullBtn, simQuarterBtn].forEach(btn => { if (btn) btn.disabled = true; });
 
-  // Load game plan settings before simulating
+  // Load game plan and playbook settings before simulating
   await loadGamePlanSettings();
+  await loadPlaybookSettings();
 
   // Fetch rosters for auto-set lineup generation (needed for Q2-Q4)
   let homeRoster, awayRoster;
@@ -2280,8 +2320,9 @@ async function handleSimFullGame() {
   const sim4Btn = document.querySelector('.sim-to-fourth-button');
   [playBtn, simFullBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = true; });
 
-  // Load game plan settings before simulating
+  // Load game plan and playbook settings before simulating
   await loadGamePlanSettings();
+  await loadPlaybookSettings();
 
   // Fetch rosters for auto-set lineup generation
   let homeRoster, awayRoster;
