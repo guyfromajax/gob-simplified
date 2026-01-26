@@ -3903,6 +3903,7 @@
       /**
        * Build versions array for a variant.
        * Versions are already stored as an array in playState.
+       * Adds version field (v1, v2, etc.) to match offensive plays structure.
        */
       const variant = playState.variants[variantName];
       if (!variant || !variant.versions || !Array.isArray(variant.versions)) {
@@ -3910,7 +3911,9 @@
       }
       
       // Build array from versions array (already in correct order)
+      // Add version field to match offensive plays structure
       const versionsArray = variant.versions.map((versionData, index) => ({
+        version: `v${index + 1}`,  // v1, v2, v3, etc.
         steps: versionData.steps || [],
         complete: versionData.complete || false
       }));
@@ -3929,31 +3932,8 @@
         }
       };
 
-      // ✅ FIX: Check for existing skeleton by name if skeletonId not set
-      // This ensures all variants with the same name stay in the same document
-      if (!playState.skeletonId && skeletonData.name) {
-        try {
-          const checkResponse = await fetch(API_CONFIG.buildUrl('/api/fcp-skeletons'));
-          if (checkResponse.ok) {
-            const existingSkeletons = await checkResponse.json();
-            const existingSkeleton = existingSkeletons.find(s => 
-              (s.name === skeletonData.name) || (s.play === skeletonData.name)
-            );
-            if (existingSkeleton && existingSkeleton._id) {
-              playState.skeletonId = existingSkeleton._id;
-              skeletonData._id = existingSkeleton._id;
-              console.log(`✅ Found existing skeleton with name "${skeletonData.name}", using _id: ${existingSkeleton._id}`);
-            }
-          }
-        } catch (error) {
-          console.warn('Could not check for existing skeletons:', error);
-        }
-      }
-      
-      // If editing existing skeleton, include _id
-      if (playState.skeletonId) {
-        skeletonData._id = playState.skeletonId;
-      }
+      // ✅ Name-based matching: Backend handles matching by name (no _id needed)
+      // Removed ID lookup logic - backend uses upsert pattern like offensive plays
 
       try {
         const response = await fetch(API_CONFIG.buildUrl('/api/fcp-skeletons'), {
@@ -3976,9 +3956,9 @@
           const variant = skeletonData.variants[v];
           return variant.versions && variant.versions.some(ver => ver.steps && ver.steps.length > 0);
         }).length;
-        alert(`✅ Saved to database!\n\nFCP Skeleton\nVariants with steps: ${variantsWithSteps}/6`);
+        alert(`✅ Saved to database!\n\nFCP Skeleton: ${skeletonData.name}\nVariants with steps: ${variantsWithSteps}/2`);
         
-        // Update skeletonId if this was a new skeleton
+        // Update skeletonId for reference (though not needed for saves anymore)
         if (result.skeleton && result.skeleton._id) {
           playState.skeletonId = result.skeleton._id;
         }
@@ -3987,8 +3967,8 @@
         loadAvailablePlays();
         
       } catch (error) {
-        console.error('Error saving play:', error);
-        alert('Failed to save play to database. Please check console for details.');
+        console.error('Error saving skeleton:', error);
+        alert('Failed to save skeleton to database. Please check console for details.');
       }
     }
 

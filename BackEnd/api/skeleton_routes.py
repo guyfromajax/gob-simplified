@@ -7,7 +7,6 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Dict, List, Any, Optional
 from BackEnd.db import fcp_skeletons_collection, hct_skeletons_collection, client, DB_NAME
-from bson import ObjectId
 from pathlib import Path
 import os
 
@@ -49,7 +48,6 @@ def serve_hct_skeletons_builder():
 class SkeletonCreate(BaseModel):
     variants: Dict[str, Any]
     name: Optional[str] = None
-    _id: Optional[str] = None
 
 
 @router.post("/api/fcp-skeletons")
@@ -58,6 +56,9 @@ async def create_fcp_skeleton(skeleton_data: SkeletonCreate):
     Create or update an FCP skeleton in MongoDB.
     
     ✅ SAFETY: Always saves to gob-staging database for testing before production migration.
+    
+    DEVELOPMENT MODE: If a skeleton with the same name exists, it will be overwritten.
+    This allows iterating on skeletons during development.
     
     Args:
         skeleton_data: FCP skeleton data from builder
@@ -68,36 +69,31 @@ async def create_fcp_skeleton(skeleton_data: SkeletonCreate):
     # Always use staging collection for safety
     staging_collection = get_staging_collection("fcp_skeletons")
     
+    # Convert to dict
     skeleton_dict = skeleton_data.dict(exclude_none=True)
     
-    # Remove _id from dict if present (will handle separately)
-    skeleton_id = skeleton_dict.pop("_id", None)
+    # Ensure name is provided
+    if not skeleton_dict.get("name"):
+        raise HTTPException(status_code=400, detail="Skeleton name is required")
     
-    if skeleton_id:
-        # Update existing skeleton
-        try:
-            result = staging_collection.update_one(
-                {"_id": ObjectId(skeleton_id)},
-                {"$set": skeleton_dict}
-            )
-            if result.matched_count == 0:
-                raise HTTPException(status_code=404, detail="FCP skeleton not found")
-            saved_skeleton = staging_collection.find_one({"_id": ObjectId(skeleton_id)})
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Error updating skeleton: {str(e)}")
-    else:
-        # Insert new skeleton
-        result = staging_collection.insert_one(skeleton_dict)
-        saved_skeleton = staging_collection.find_one({"_id": result.inserted_id})
+    # UPSERT: Update if exists (by name), insert if new
+    # This allows overwriting skeletons during development
+    result = staging_collection.update_one(
+        {"name": skeleton_dict["name"]},  # Find by name
+        {"$set": skeleton_dict},           # Update all fields
+        upsert=True                        # Insert if doesn't exist
+    )
     
+    # Get the document (either newly inserted or existing one)
+    saved_skeleton = staging_collection.find_one({"name": skeleton_dict["name"]})
     saved_skeleton["_id"] = str(saved_skeleton["_id"])
     
-    action = "updated" if skeleton_id else "created"
+    action = "updated" if result.matched_count > 0 else "created"
     
     return {
         "message": f"FCP skeleton {action} successfully to gob-staging",
         "skeleton": saved_skeleton,
-        "was_update": skeleton_id is not None
+        "was_update": result.matched_count > 0
     }
 
 
@@ -132,6 +128,9 @@ async def create_hct_skeleton(skeleton_data: SkeletonCreate):
     
     ✅ SAFETY: Always saves to gob-staging database for testing before production migration.
     
+    DEVELOPMENT MODE: If a skeleton with the same name exists, it will be overwritten.
+    This allows iterating on skeletons during development.
+    
     Args:
         skeleton_data: HCT skeleton data from builder
         
@@ -141,36 +140,31 @@ async def create_hct_skeleton(skeleton_data: SkeletonCreate):
     # Always use staging collection for safety
     staging_collection = get_staging_collection("hct_skeletons")
     
+    # Convert to dict
     skeleton_dict = skeleton_data.dict(exclude_none=True)
     
-    # Remove _id from dict if present (will handle separately)
-    skeleton_id = skeleton_dict.pop("_id", None)
+    # Ensure name is provided
+    if not skeleton_dict.get("name"):
+        raise HTTPException(status_code=400, detail="Skeleton name is required")
     
-    if skeleton_id:
-        # Update existing skeleton
-        try:
-            result = staging_collection.update_one(
-                {"_id": ObjectId(skeleton_id)},
-                {"$set": skeleton_dict}
-            )
-            if result.matched_count == 0:
-                raise HTTPException(status_code=404, detail="HCT skeleton not found")
-            saved_skeleton = staging_collection.find_one({"_id": ObjectId(skeleton_id)})
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Error updating skeleton: {str(e)}")
-    else:
-        # Insert new skeleton
-        result = staging_collection.insert_one(skeleton_dict)
-        saved_skeleton = staging_collection.find_one({"_id": result.inserted_id})
+    # UPSERT: Update if exists (by name), insert if new
+    # This allows overwriting skeletons during development
+    result = staging_collection.update_one(
+        {"name": skeleton_dict["name"]},  # Find by name
+        {"$set": skeleton_dict},           # Update all fields
+        upsert=True                        # Insert if doesn't exist
+    )
     
+    # Get the document (either newly inserted or existing one)
+    saved_skeleton = staging_collection.find_one({"name": skeleton_dict["name"]})
     saved_skeleton["_id"] = str(saved_skeleton["_id"])
     
-    action = "updated" if skeleton_id else "created"
+    action = "updated" if result.matched_count > 0 else "created"
     
     return {
         "message": f"HCT skeleton {action} successfully to gob-staging",
         "skeleton": saved_skeleton,
-        "was_update": skeleton_id is not None
+        "was_update": result.matched_count > 0
     }
 
 
