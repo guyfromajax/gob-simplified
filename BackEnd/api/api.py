@@ -1881,11 +1881,14 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # This ensures consistent logic for both settings types (extract from DB, override with request if valid)
                         from BackEnd.utils.team_settings_manager import load_and_apply_team_settings_to_gamemanager
                         
+                        # ✅ SS&S: Use request.mode (supports single, franchise, tournament)
+                        mode = request.mode or "single"
+                        
                         home_strategy, away_strategy, home_playbook_settings, away_playbook_settings = load_and_apply_team_settings_to_gamemanager(
                             saved_doc=saved,
                             home_team_name=home,
                             away_team_name=away,
-                            mode="single",
+                            mode=mode,
                             request_strategy_settings=request.strategy_settings,
                             request_playbook_settings=request.playbook_settings,
                             user_team_side=request.user_team_side,
