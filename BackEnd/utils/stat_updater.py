@@ -179,8 +179,9 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
             raw_pid = player_data.get("playerId")
             if not raw_pid:
                 continue
-            query_pid = ObjectId(raw_pid) if ObjectId.is_valid(raw_pid) else raw_pid
-            pid_str = str(query_pid)
+            # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
+            # ObjectId.is_valid() will return False for UUIDs, so just use raw_pid
+            pid_str = str(raw_pid)
             
             # Skip if already processed (avoid double-counting if same player appears multiple times)
             if pid_str in processed_player_ids:
