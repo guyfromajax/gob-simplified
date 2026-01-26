@@ -216,6 +216,7 @@ class QuarterSimulationRequest(BaseModel):
     # Game plan settings (for user's team in single game mode)
     user_team_side: str | None = None  # "home" or "away"
     strategy_settings: dict[str, int] | None = None
+    playbook_settings: dict | None = None  # Playbook settings (motion, set plays, slot_assignments, etc.)
     # Starting possession control for quarters after Q1
     start_with_inbound: bool | None = None
     starting_possession: str | None = None  # "home" or "away"
@@ -1863,65 +1864,9 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         away_attrs = away_team_data.get("attributes")
                         home_scouting = home_team_data.get("scouting")
                         away_scouting = away_team_data.get("scouting")
-                        home_strategy = home_team_data.get("strategy_settings")
-                        away_strategy = away_team_data.get("strategy_settings")  # Fixed: was reading from home_team_data
-                        
-                        # ✅ LOGGING: Trace strategy_settings extraction
-                        logging.info(f"🔍 [STRATEGY SETTINGS LOAD] Extracted from DB: home={bool(home_strategy)}, away={bool(away_strategy)}")
-                        if home_strategy:
-                            logging.info(f"🔍 [STRATEGY SETTINGS LOAD] Home settings sample: tempo={home_strategy.get('tempo', 'MISSING')}, hc_trap={home_strategy.get('hc_trap', 'MISSING')}")
-                        if away_strategy:
-                            logging.info(f"🔍 [STRATEGY SETTINGS LOAD] Away settings sample: tempo={away_strategy.get('tempo', 'MISSING')}, hc_trap={away_strategy.get('hc_trap', 'MISSING')}")
                         # ✅ SS&S: Restore strategy_calls (playcall overrides) from database
                         home_strategy_calls = home_team_data.get("strategy_calls")
                         away_strategy_calls = away_team_data.get("strategy_calls")
-                        # ✅ UNIFIED: Extract playbook_settings using unified extract function
-                        # This ensures consistent team_id resolution (same logic as save_playbooks)
-                        from BackEnd.utils.team_settings_manager import extract_team_settings
-                        
-                        # 🔍 DEBUG: Log before extraction
-                        logging.warning(f"🔍 [TIMEOUT-RESUME] Starting playbook_settings extraction:")
-                        logging.warning(f"🔍 [TIMEOUT-RESUME]   home team name = '{home}'")
-                        logging.warning(f"🔍 [TIMEOUT-RESUME]   away team name = '{away}'")
-                        logging.warning(f"🔍 [TIMEOUT-RESUME]   saved_doc teams keys: {list(saved.get('teams', {}).keys())}")
-                        
-                        # Extract using team names (will be resolved to canonical team_id internally)
-                        home_playbook_settings = extract_team_settings(
-                            saved_doc=saved,
-                            team_identifier=home,  # Team name
-                            settings_type="playbook_settings",
-                            mode="single",
-                            game_doc=saved  # Pass saved doc for team_id resolution
-                        ) or {}
-                        
-                        away_playbook_settings = extract_team_settings(
-                            saved_doc=saved,
-                            team_identifier=away,  # Team name
-                            settings_type="playbook_settings",
-                            mode="single",
-                            game_doc=saved  # Pass saved doc for team_id resolution
-                        ) or {}
-                        
-                        # ✅ DEBUG: Log playbook_settings extraction result
-                        logging.warning(f"🔍 [TIMEOUT-RESUME] Extraction complete:")
-                        logging.warning(f"🔍 [TIMEOUT-RESUME]   home_playbook_settings found: {bool(home_playbook_settings)}")
-                        logging.warning(f"🔍 [TIMEOUT-RESUME]   away_playbook_settings found: {bool(away_playbook_settings)}")
-                        if home_playbook_settings:
-                            slot_count = len(home_playbook_settings.get("slot_assignments", {}))
-                            logging.warning(f"🔍 [TIMEOUT-RESUME]   home slot_assignments count: {slot_count}")
-                            logging.warning(f"🔍 [TIMEOUT-RESUME]   home settings keys: {list(home_playbook_settings.keys())[:5]}")
-                        if away_playbook_settings:
-                            slot_count = len(away_playbook_settings.get("slot_assignments", {}))
-                            logging.warning(f"🔍 [TIMEOUT-RESUME]   away slot_assignments count: {slot_count}")
-                            logging.warning(f"🔍 [TIMEOUT-RESUME]   away settings keys: {list(away_playbook_settings.keys())[:5]}")
-                        if not home_playbook_settings and not away_playbook_settings:
-                            logging.warning(f"⚠️ [TIMEOUT-RESUME] ❌ NO playbook_settings extracted for either team!")
-                            logging.warning(f"⚠️ [TIMEOUT-RESUME]   This indicates a team_id key mismatch between save and extract")
-                        
-                        # ✅ CRITICAL FIX: Restore playbook_settings to game document after GameManager creation
-                        # This ensures playbook_settings persist when navigating to Playbooks page during timeout
-                        # Note: playbook_settings are stored in game document (not TeamManager objects)
-                        # They'll be saved back to DB by summarize_game_state() on next save
                         
                         # Fallback to old flat structure if teams object doesn't exist (backwards compatibility)
                         if not home_plays and not teams_obj:
@@ -1932,52 +1877,20 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             home_scouting = saved.get("scouting", {}).get(home)
                             away_scouting = saved.get("scouting", {}).get(away)
                         
-                        # ✅ CRITICAL FIX: Only use request.strategy_settings if it's valid and user visited Game Plan page
-                        # If request.strategy_settings is missing/invalid, use DB settings (preserves settings from before timeout)
-                        # This ensures settings persist through timeout even if user doesn't visit Game Plan page
-                        if request.strategy_settings and request.user_team_side:
-                            try:
-                                # Ensure strategy_settings is a dict and has required keys (not empty/stale)
-                                if not isinstance(request.strategy_settings, dict):
-                                    logging.warning(f"⚠️ [STRATEGY SETTINGS] request.strategy_settings is not a dict: {type(request.strategy_settings)}, using DB settings")
-                                else:
-                                    # Check if request has valid settings (has required keys)
-                                    required_keys = ['offense', 'inside', 'attack', 'outside', 'tempo', 'defense', 'aggression', 'hc_trap', 'fc_press', 'rebounding']
-                                    has_valid_request_settings = all(key in request.strategy_settings for key in required_keys)
-                                    
-                                    if has_valid_request_settings:
-                                        # Request has valid settings - user visited Game Plan page and settings are current
-                                        if request.user_team_side == "home":
-                                            old_hct = home_strategy.get('hc_trap', 'MISSING') if home_strategy else 'MISSING'
-                                            old_fcp = home_strategy.get('fc_press', 'MISSING') if home_strategy else 'MISSING'
-                                            if home_strategy is None:
-                                                home_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
-                                                logging.info(f"✅ [STRATEGY SETTINGS] Using request.strategy_settings for home team (DB had None)")
-                                            else:
-                                                # DB has settings, but request is valid - user visited Game Plan, use request
-                                                home_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
-                                                logging.info(f"✅ [STRATEGY SETTINGS] Using request.strategy_settings for home team (user visited Game Plan)")
-                                            new_hct = request.strategy_settings.get('hc_trap', 'MISSING')
-                                            new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
-                                            logging.info(f"   - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
-                                        elif request.user_team_side == "away":
-                                            old_hct = away_strategy.get('hc_trap', 'MISSING') if away_strategy else 'MISSING'
-                                            old_fcp = away_strategy.get('fc_press', 'MISSING') if away_strategy else 'MISSING'
-                                            if away_strategy is None:
-                                                away_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
-                                                logging.info(f"✅ [STRATEGY SETTINGS] Using request.strategy_settings for away team (DB had None)")
-                                            else:
-                                                # DB has settings, but request is valid - user visited Game Plan, use request
-                                                away_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
-                                                logging.info(f"✅ [STRATEGY SETTINGS] Using request.strategy_settings for away team (user visited Game Plan)")
-                                            new_hct = request.strategy_settings.get('hc_trap', 'MISSING')
-                                            new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
-                                            logging.info(f"   - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
-                                        else:
-                                            # Request settings are invalid/missing - user didn't visit Game Plan, preserve DB settings
-                                            logging.info(f"✅ [STRATEGY SETTINGS] request.strategy_settings invalid/missing (user didn't visit Game Plan), preserving DB settings: home={bool(home_strategy)}, away={bool(away_strategy)}")
-                            except Exception as e:
-                                logging.error(f"❌ [STRATEGY SETTINGS] Error processing strategy_settings from request: {e}, using DB settings", exc_info=True)
+                        # ✅ UNIFIED: Load both strategy_settings and playbook_settings using unified function
+                        # This ensures consistent logic for both settings types (extract from DB, override with request if valid)
+                        from BackEnd.utils.team_settings_manager import load_and_apply_team_settings_to_gamemanager
+                        
+                        home_strategy, away_strategy, home_playbook_settings, away_playbook_settings = load_and_apply_team_settings_to_gamemanager(
+                            saved_doc=saved,
+                            home_team_name=home,
+                            away_team_name=away,
+                            mode="single",
+                            request_strategy_settings=request.strategy_settings,
+                            request_playbook_settings=request.playbook_settings,
+                            user_team_side=request.user_team_side,
+                            gm=None  # Will apply after GameManager creation
+                        )
                         
                         # Debug logging removed - was cluttering logs
                         # logging.debug(f"🔧 LOADING FROM DB - home_strategy={home_strategy}, away_strategy={away_strategy}")
@@ -2003,21 +1916,61 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             user_team_side=request.user_team_side  # ✅ SS&S: Set is_user_team flags
                         )
                         
-                        # ✅ CRITICAL FIX: Apply DB strategy_settings to GameManager objects if request was invalid/missing
-                        # This ensures DB settings are actually used when request.strategy_settings is invalid
-                        # Must be done AFTER GameManager creation so we can update the objects
-                        if not (request.strategy_settings and request.user_team_side and isinstance(request.strategy_settings, dict) and all(key in request.strategy_settings for key in ['offense', 'inside', 'attack', 'outside', 'tempo', 'defense', 'aggression', 'hc_trap', 'fc_press', 'rebounding'])):
-                            # Request is invalid - apply DB settings to GameManager objects
-                            if home_strategy:
-                                gm.home_team.strategy_settings = dict(home_strategy)
-                                logging.warning(f"✅ [STRATEGY SETTINGS] Applied DB home_strategy to GameManager (request was invalid): tempo={home_strategy.get('tempo', 'MISSING')}")
-                            if away_strategy:
-                                gm.away_team.strategy_settings = dict(away_strategy)
-                                logging.warning(f"✅ [STRATEGY SETTINGS] Applied DB away_strategy to GameManager (request was invalid): tempo={away_strategy.get('tempo', 'MISSING')}"                        )
+                        # ✅ UNIFIED: Apply both strategy_settings and playbook_settings to GameManager
+                        # This ensures both settings are loaded into GameManager when game starts (not just after timeout resume)
+                        # The unified function already extracted from DB and handled request overrides
+                        if home_strategy:
+                            gm.home_team.strategy_settings = dict(home_strategy)
+                        if away_strategy:
+                            gm.away_team.strategy_settings = dict(away_strategy)
+                        if home_playbook_settings:
+                            gm.home_team.playbook_settings = dict(home_playbook_settings)
+                            slot_count = len(home_playbook_settings.get("slot_assignments", {}))
+                            logging.warning(f"✅ [UNIFIED-SETTINGS] Applied home playbook_settings to GameManager: slot_assignments={slot_count}")
+                        if away_playbook_settings:
+                            gm.away_team.playbook_settings = dict(away_playbook_settings)
+                            slot_count = len(away_playbook_settings.get("slot_assignments", {}))
+                            logging.warning(f"✅ [UNIFIED-SETTINGS] Applied away playbook_settings to GameManager: slot_assignments={slot_count}")
                         
-                        # ✅ VERIFY: Log strategy_settings after GameManager creation to confirm they were applied
+                        # ✅ VERIFY: Log settings after GameManager creation to confirm they were applied
                         if home_strategy or away_strategy:
-                            logging.info(f"✅ [STRATEGY SETTINGS] GameManager created with strategy_settings: home={bool(home_strategy)} (tempo={gm.home_team.strategy_settings.get('tempo', 'MISSING') if home_strategy else 'N/A'}), away={bool(away_strategy)} (tempo={gm.away_team.strategy_settings.get('tempo', 'MISSING') if away_strategy else 'N/A'})")
+                            logging.info(f"✅ [UNIFIED-SETTINGS] GameManager created with strategy_settings: home={bool(home_strategy)} (tempo={gm.home_team.strategy_settings.get('tempo', 'MISSING') if home_strategy else 'N/A'}), away={bool(away_strategy)} (tempo={gm.away_team.strategy_settings.get('tempo', 'MISSING') if away_strategy else 'N/A'})")
+                        if home_playbook_settings or away_playbook_settings:
+                            home_slots = len(home_playbook_settings.get("slot_assignments", {})) if home_playbook_settings else 0
+                            away_slots = len(away_playbook_settings.get("slot_assignments", {})) if away_playbook_settings else 0
+                            logging.info(f"✅ [UNIFIED-SETTINGS] GameManager created with playbook_settings: home={bool(home_playbook_settings)} (slot_assignments={home_slots}), away={bool(away_playbook_settings)} (slot_assignments={away_slots})")
+                        
+                        # ✅ UNIFIED: Restore playbook_settings to game document after GameManager creation
+                        # This ensures playbook_settings persist when navigating to Playbooks page
+                        # Use canonical team_id keys (same as summarize_game_state uses)
+                        if home_playbook_settings or away_playbook_settings:
+                            try:
+                                from BackEnd.utils.team_id_resolver import resolve_team_id_to_canonical
+                                
+                                # Resolve to canonical team_id (same logic as summarize_game_state)
+                                home_canonical_key = resolve_team_id_to_canonical(
+                                    team_identifier=home,
+                                    mode="single",
+                                    doc=saved
+                                ) if saved else gm.home_team.team_id
+                                
+                                away_canonical_key = resolve_team_id_to_canonical(
+                                    team_identifier=away,
+                                    mode="single",
+                                    doc=saved
+                                ) if saved else gm.away_team.team_id
+                                
+                                update_data = {}
+                                if home_playbook_settings:
+                                    update_data[f"teams.{home_canonical_key}.playbook_settings"] = home_playbook_settings
+                                if away_playbook_settings:
+                                    update_data[f"teams.{away_canonical_key}.playbook_settings"] = away_playbook_settings
+                                
+                                if update_data:
+                                    games_collection.update_one({"_id": game_id}, {"$set": update_data})
+                                    logging.info(f"✅ [UNIFIED-SETTINGS] Restored playbook_settings to game document: home={bool(home_playbook_settings)} (key={home_canonical_key}), away={bool(away_playbook_settings)} (key={away_canonical_key})")
+                            except Exception as e:
+                                logging.warning(f"⚠️ [UNIFIED-SETTINGS] Could not restore playbook_settings to game document: {e}", exc_info=True)
                         
                         # Debug logging removed - was cluttering logs
                         # logging.debug(f"🔧 AFTER GAMEMANAGER - home.strategy_settings={gm.home_team.strategy_settings.get('tempo', 'MISSING')}, away.strategy_settings={gm.away_team.strategy_settings.get('tempo', 'MISSING')}")
@@ -2203,76 +2156,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             gm.home_team.timeouts = 4  # New game starts with 4 timeouts
                             gm.away_team.timeouts = 4  # New game starts with 4 timeouts
                         
-                        # ✅ CRITICAL FIX: Restore playbook_settings to game document after GameManager creation
-                        # This ensures playbook_settings persist when navigating to Playbooks page during timeout
-                        # playbook_settings are stored in game document, not on TeamManager objects
-                        # Use the same team_id key resolution logic as summarize_game_state() to ensure consistency
-                        if home_playbook_settings or away_playbook_settings:
-                            try:
-                                # ✅ CRITICAL: Resolve team_id keys using same logic as summarize_game_state()
-                                # This ensures we use the same keys that were used when saving
-                                restore_home_key = None
-                                restore_away_key = None
-                                
-                                # Try to find team_id keys by matching team names (same as summarize_game_state())
-                                if teams_obj:
-                                    from BackEnd.db import db
-                                    from bson import ObjectId
-                                    
-                                    for tid in teams_obj.keys():
-                                        team_data = teams_obj.get(tid, {})
-                                        # Try to get team name from teams collection
-                                        team_name = None
-                                        try:
-                                            team_doc = db.teams.find_one({"_id": ObjectId(tid)})
-                                            if not team_doc:
-                                                team_doc = db.teams.find_one({"team_id": tid})
-                                            if team_doc:
-                                                team_name = team_doc.get("name")
-                                        except:
-                                            pass
-                                        
-                                        # Match by team name
-                                        if team_name == gm.home_team.name:
-                                            restore_home_key = tid
-                                        if team_name == gm.away_team.name:
-                                            restore_away_key = tid
-                                    
-                                    # Fallback: try direct lookup with team_id
-                                    if not restore_home_key and gm.home_team.team_id in teams_obj:
-                                        restore_home_key = gm.home_team.team_id
-                                    if not restore_away_key and gm.away_team.team_id in teams_obj:
-                                        restore_away_key = gm.away_team.team_id
-                                
-                                # Final fallback: use home_team_id/away_team_id from saved document, or team_id from GameManager
-                                home_key = restore_home_key if restore_home_key else (home_team_id if home_team_id else gm.home_team.team_id)
-                                away_key = restore_away_key if restore_away_key else (away_team_id if away_team_id else gm.away_team.team_id)
-                                
-                                # ✅ LOGGING: Trace playbook_settings restore
-                                logging.info(f"🔍 [PLAYBOOK SETTINGS RESTORE] Resolved keys: home_key={home_key} (from={restore_home_key or home_team_id or 'team_id'}), away_key={away_key} (from={restore_away_key or away_team_id or 'team_id'})")
-                                logging.info(f"🔍 [PLAYBOOK SETTINGS RESTORE] Settings found: home={bool(home_playbook_settings)}, away={bool(away_playbook_settings)}")
-                                
-                                update_data = {}
-                                if home_playbook_settings:
-                                    update_data[f"teams.{home_key}.playbook_settings"] = home_playbook_settings
-                                if away_playbook_settings:
-                                    update_data[f"teams.{away_key}.playbook_settings"] = away_playbook_settings
-                                
-                                if update_data:
-                                    games_collection.update_one({"_id": game_id}, {"$set": update_data})
-                                    logging.info(f"✅ [PLAYBOOK SETTINGS RESTORE] Restored playbook_settings to game document: home={bool(home_playbook_settings)} (key={home_key}), away={bool(away_playbook_settings)} (key={away_key})")
-                                
-                                # ✅ CRITICAL FIX: Apply playbook_settings to GameManager team objects (not just database)
-                                # This ensures playbook_settings are available during gameplay after timeout resume
-                                # Mirrors how strategy_settings are applied (lines 1985-1989)
-                                if home_playbook_settings:
-                                    gm.home_team.playbook_settings = dict(home_playbook_settings)
-                                    logging.info(f"✅ [PLAYBOOK SETTINGS RESTORE] Applied home_playbook_settings to GameManager: slot_assignments={len(home_playbook_settings.get('slot_assignments', {}))}")
-                                if away_playbook_settings:
-                                    gm.away_team.playbook_settings = dict(away_playbook_settings)
-                                    logging.info(f"✅ [PLAYBOOK SETTINGS RESTORE] Applied away_playbook_settings to GameManager: slot_assignments={len(away_playbook_settings.get('slot_assignments', {}))}")
-                            except Exception as e:
-                                logging.warning(f"⚠️ [PLAYBOOK SETTINGS RESTORE] Could not restore playbook_settings to game document: {e}", exc_info=True)
+                        # ✅ UNIFIED: Playbook_settings restore is now handled by unified function (lines 1943-1965)
+                        # Removed duplicate code - unified function handles both extraction and restore
                         
                         # ✅ TIMEOUT RESUME: Apply unified timeout state restoration (if resuming from timeout)
                         # This uses the state we loaded earlier from DB (single source of truth)
