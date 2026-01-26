@@ -59,16 +59,26 @@ def save_team_settings(
             collection = games_collection
             doc_id = game_id
             update_path = f"teams.{actual_team_id}.{settings_type}"
-        elif mode == "franchise" and franchise_id:
-            from BackEnd.db import franchises_collection
-            collection = franchises_collection
-            doc_id = franchise_id
-            update_path = f"franchise_teams.{actual_team_id}.{settings_type}"
-        elif mode == "tournament" and tournament_id:
-            from BackEnd.db import tournaments_collection
-            collection = tournaments_collection
-            doc_id = tournament_id
-            update_path = f"teams.{actual_team_id}.{settings_type}"
+        elif mode in ["franchise", "tournament"]:
+            # ✅ PHASE 5.7: Use get_save_location_for_franchise_tournament to determine save location
+            # This checks if game is active and saves to game doc, otherwise saves to master doc
+            from BackEnd.api.gameplan_routes import get_save_location_for_franchise_tournament
+            collection, doc_id, is_game_doc = get_save_location_for_franchise_tournament(
+                mode=mode,
+                game_id=game_id,
+                franchise_id=franchise_id,
+                tournament_id=tournament_id
+            )
+            
+            if is_game_doc:
+                # Saving to game doc (uses "teams" structure like single mode)
+                update_path = f"teams.{actual_team_id}.{settings_type}"
+            else:
+                # Saving to master doc (uses "franchise_teams" for franchise, "teams" for tournament)
+                if mode == "franchise":
+                    update_path = f"franchise_teams.{actual_team_id}.{settings_type}"
+                else:  # tournament
+                    update_path = f"teams.{actual_team_id}.{settings_type}"
         else:
             logger.error(f"❌ [SAVE-TEAM-SETTINGS] Invalid mode/ID combination: mode={mode}, game_id={game_id}, franchise_id={franchise_id}, tournament_id={tournament_id}")
             return False, None, None
