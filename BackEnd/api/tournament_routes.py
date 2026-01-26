@@ -1132,7 +1132,8 @@ def run_tournament_training(req: TournamentTrainingRequest):
         })
         if not core_player:
             try:
-                core_player = players_collection.find_one({"_id": ObjectId(pid)}, {
+                # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
+                core_player = players_collection.find_one({"_id": pid}, {
                     "first_name": 1, "last_name": 1, "height": 1, "year": 1, "attributes": 1
                 })
             except:
@@ -1263,7 +1264,8 @@ def run_tournament_training(req: TournamentTrainingRequest):
         core_player = players_collection.find_one({"_id": pid}, {"height": 1})
         if not core_player:
             try:
-                core_player = players_collection.find_one({"_id": ObjectId(pid)}, {"height": 1})
+                # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
+                core_player = players_collection.find_one({"_id": pid}, {"height": 1})
             except:
                 pass
         height = core_player.get("height") if core_player else None
