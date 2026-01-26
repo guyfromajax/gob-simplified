@@ -2770,8 +2770,12 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             players = []
             franchise_players = doc.get("players", {})
             
-            # ✅ SS&S: Use team_doc.player_ids (canonical list) instead of iterating all players and matching
-            # This is more efficient and reliable than team_id matching
+            # ✅ SS&S: Load team_doc from teams collection to get player_ids (canonical list)
+            # This is more efficient and reliable than iterating all players and matching by team_id
+            team_doc = db.teams.find_one({"_id": ObjectId(authoritative_team_id)})
+            if not team_doc:
+                raise HTTPException(status_code=404, detail=f"Team not found: {authoritative_team_id}")
+            
             team_player_ids = team_doc.get("player_ids", [])
             logger.info(f"🔍 [TRAINING REPORT] Using team_doc.player_ids: {len(team_player_ids)} players")
             logger.info(f"🔍 [TRAINING REPORT] Total franchise players: {len(franchise_players)}")
