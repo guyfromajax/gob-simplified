@@ -2737,6 +2737,7 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             
             # Use franchise document's user_team_object_id as authoritative team_id
             authoritative_team_id = user_team_object_id
+            team_id_str = str(authoritative_team_id)  # Convert to string for logging and dict lookups
             
             # Log if URL team_id doesn't match (for debugging)
             if team_id and team_id != authoritative_team_id:
