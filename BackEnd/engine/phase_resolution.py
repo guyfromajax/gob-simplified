@@ -4426,17 +4426,51 @@ def resolve_full_court_press_logic(game: "GameManager"):
     offenseScore *= random.randint(1, 6)
     defenseScore *= random.randint(1, 6)
     turnover_type = random.choices(["TRAVEL", "DOUBLE DRIBBLE", "BAD PASS"], weights=[0.6, 0.3, 0.1])[0]
-    # print("Inside resolve_full_court_press_logic")
-    # print(f"offenseScore: {offenseScore}")
-    # print(f"defenseScore: {defenseScore}")
-
-    # Real FCP result calculation
-    if (offenseScore + 500) > defenseScore:
-        if offenseScore - defenseScore > 1000:
+    
+    # Get team attributes for BSM and DST calculations
+    off_attrs = off_team.team_attributes
+    def_attrs = def_team.team_attributes
+    
+    off_chemistry = off_attrs.get("team_chemistry", 10)
+    def_chemistry = def_attrs.get("team_chemistry", 10)
+    off_fight = off_attrs.get("fight", 0)
+    def_discipline = def_attrs.get("discipline", 0)
+    
+    # Calculate BSM (Base Success Modifier) = 500 for FCP
+    BSM = 500
+    
+    # Offense contribution to BSM
+    if off_fight > 0:
+        BSM += random.randint(1, off_chemistry) * off_fight
+    else:
+        BSM += random.randint(1, off_chemistry)
+    
+    # Defense reduction to BSM
+    if def_discipline > 0:
+        BSM -= random.randint(1, def_chemistry) * def_discipline
+    else:
+        BSM -= random.randint(1, def_chemistry)
+    
+    # Calculate DST (Defense Safety Threshold) = 600 for FCP
+    DST = 600
+    
+    # Defense contribution to DST
+    if def_discipline > 0:
+        DST += random.randint(1, def_chemistry) * def_discipline
+    else:
+        DST += random.randint(1, def_chemistry)
+    
+    # Real FCP result calculation using BSM and DST
+    if (offenseScore + BSM) > defenseScore:
+        # Success
+        if offenseScore - defenseScore > DST:
+            # Dominant success - weighted random
             result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.3, 0.5, 0.2])[0]
         else:
+            # Regular success - just break through
             result_type = "HCO"
     else:
+        # Failure - weighted random
         result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.2, 0.5, 0.3])[0]
     
     result_text_dict = {
@@ -5522,17 +5556,51 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     
     offenseScore *= random.randint(1, 6)
     defenseScore *= random.randint(1, 6)
-    # print("Inside resolve_half_court_trap_logic")
-    # print(f"offenseScore: {offenseScore}")
-    # print(f"defenseScore: {defenseScore}")
-
-    # Real HCT result calculation
-    if (offenseScore + 300) > defenseScore:
-        if offenseScore - defenseScore > 1000:
+    
+    # Get team attributes for BSM and DST calculations
+    off_attrs = off_team.team_attributes
+    def_attrs = def_team.team_attributes
+    
+    off_chemistry = off_attrs.get("team_chemistry", 10)
+    def_chemistry = def_attrs.get("team_chemistry", 10)
+    off_fight = off_attrs.get("fight", 0)
+    def_discipline = def_attrs.get("discipline", 0)
+    
+    # Calculate BSM (Base Success Modifier) = 300 for HCT
+    BSM = 300
+    
+    # Offense contribution to BSM
+    if off_fight > 0:
+        BSM += random.randint(1, off_chemistry) * off_fight
+    else:
+        BSM += random.randint(1, off_chemistry)
+    
+    # Defense reduction to BSM
+    if def_discipline > 0:
+        BSM -= random.randint(1, def_chemistry) * def_discipline
+    else:
+        BSM -= random.randint(1, def_chemistry)
+    
+    # Calculate DST (Defense Safety Threshold) = 800 for HCT
+    DST = 800
+    
+    # Defense contribution to DST
+    if def_discipline > 0:
+        DST += random.randint(1, def_chemistry) * def_discipline
+    else:
+        DST += random.randint(1, def_chemistry)
+    
+    # Real HCT result calculation using BSM and DST
+    if (offenseScore + BSM) > defenseScore:
+        # Success
+        if offenseScore - defenseScore > DST:
+            # Dominant success - weighted random
             result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.3, 0.5, 0.2])[0]
         else:
+            # Regular success - just break through
             result_type = "HCO"
     else:
+        # Failure - weighted random
         result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.2, 0.5, 0.3])[0]
     
     # ✅ REMOVED: Test code that forced all HCT turns to be steals
