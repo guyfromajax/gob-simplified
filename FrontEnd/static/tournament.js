@@ -1722,11 +1722,8 @@ async function initializeTournament() {
   
   // ✅ MIGRATION: Use command center data to populate top bar and resolve team IDs
   if (commandCenterData) {
-    // Populate top bar using structured data (aligns with Franchise)
-    populateTop(commandCenterData);
-    
     // ✅ FIX: Always prioritize commandCenterData.team_id over localStorage (fixes stale userTeamId bug)
-    // Update userTeamId and userTeamName from command center data
+    // Update userTeamId and userTeamName from command center data FIRST (needed for team-data fetch)
     if (commandCenterData.team) {
       userTeamName = commandCenterData.team; // Team name for bracket comparisons
     }
@@ -1738,6 +1735,27 @@ async function initializeTournament() {
     } else {
       console.warn('⚠️ [TOURNAMENT INIT] commandCenterData.team_id not found - using existing userTeamId:', userTeamId);
     }
+    
+    // ✅ FIX: Use EXACT same source as Team tab - fetch team_chemistry from /tournament/team-data
+    // This ensures 100% consistency between header and Team tab (matches FCC pattern)
+    if (tournament && tournament._id && userTeamId) {
+      try {
+        const teamDataResponse = await fetch(`${API_CONFIG.buildUrl('/tournament/team-data')}?tournament_id=${encodeURIComponent(tournament._id)}&team_id=${encodeURIComponent(userTeamId)}`);
+        if (teamDataResponse.ok) {
+          const teamData = await teamDataResponse.json();
+          // Override team_chemistry with value from team-data endpoint (same as Team tab uses)
+          if (teamData && teamData.team_attributes && teamData.team_attributes.team_chemistry !== undefined) {
+            commandCenterData.team_chemistry = teamData.team_attributes.team_chemistry;
+            console.log('📊 [TEAM CHEMISTRY] Top bar value (from team-data):', commandCenterData.team_chemistry);
+          }
+        }
+      } catch (error) {
+        console.warn('Could not fetch team_chemistry from team-data endpoint:', error);
+      }
+    }
+    
+    // Populate top bar using structured data (aligns with Franchise)
+    populateTop(commandCenterData);
     
     // ✅ FIX: Store user team name for leaderboard highlighting (matches Franchise pattern)
     if (commandCenterData.team) {
