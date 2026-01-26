@@ -868,9 +868,9 @@ def get_tournament_roster(tournament_id: str, team_id: str = None, team_name: st
     
     # ✅ PERFORMANCE: Batch player lookups to fix N+1 query pattern
     # Instead of 12 individual queries, do 1 batch query with $in operator
-    player_ids_obj = [ObjectId(pid) for pid in team_player_ids]
+    # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
     core_players_dict = {str(p["_id"]): p for p in players_collection.find(
-        {"_id": {"$in": player_ids_obj}},
+        {"_id": {"$in": team_player_ids}},
         {"position_ratings": 1, "height": 1, "weight": 1, "jersey": 1, "year": 1, "attributes": 1,
          "first_name": 1, "last_name": 1}
     )}

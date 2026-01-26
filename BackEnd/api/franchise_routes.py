@@ -2022,9 +2022,9 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
     # ✅ PERFORMANCE: Batch player lookups to fix N+1 query pattern
     # Instead of 12 individual queries, do 1 batch query with $in operator
     batch_query_start = time.time()
-    player_ids_obj = [ObjectId(pid) for pid in team_player_ids]
+    # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
     core_players_dict = {str(p["_id"]): p for p in db.players.find(
-        {"_id": {"$in": player_ids_obj}},
+        {"_id": {"$in": team_player_ids}},
         {"position_ratings": 1, "height": 1, "weight": 1, "jersey": 1, "year": 1, "attributes": 1}
     )}
     batch_query_time = time.time() - batch_query_start
@@ -2923,7 +2923,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 if not has_all_attrs:
                     # Merge with core collection for backward compatibility
                     from BackEnd.db import players_collection
-                    core_player = players_collection.find_one({"_id": ObjectId(pid_str)}, {"attributes": 1})
+                    # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
+                    core_player = players_collection.find_one({"_id": pid_str}, {"attributes": 1})
                     if core_player:
                         core_attributes = core_player.get("attributes", {})
                         attrs = {**core_attributes, **attrs}  # Tournament attributes override core
