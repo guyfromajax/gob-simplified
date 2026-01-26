@@ -28,45 +28,54 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                 if franchise_doc:
                     franchise_players = franchise_doc.get("players", {})
                     logger.warning(f"🔍 [ROSTER LOADER DEBUG] Found {len(franchise_players)} players in franchise document")
-                    # Get team_id from team_doc to filter players
-                    team_id = team_doc.get("team_id")
-                    logger.warning(f"🔍 [ROSTER LOADER DEBUG] Looking for team_id={team_id} (team_name={team_name})")
-                    if team_id:
-                        # Build players list from franchise.players, matching team_id
+                    
+                    # ✅ SS&S: Use team_doc.player_ids (canonical list) instead of iterating all players and matching
+                    team_player_ids = team_doc.get("player_ids", [])
+                    logger.warning(f"🔍 [ROSTER LOADER DEBUG] team_player_ids count: {len(team_player_ids)}")
+                    
+                    if team_player_ids:
+                        # Build players list from franchise.players using team's player_ids
                         players = []
-                        for player_id_str, franchise_player_data in franchise_players.items():
+                        for pid in team_player_ids:
+                            pid_str = str(pid)
+                            franchise_player_data = franchise_players.get(pid_str, {})
+                            
+                            if not franchise_player_data:
+                                logger.warning(f"🔍 [ROSTER LOADER DEBUG] Player {pid_str} not found in franchise.players, skipping")
+                                continue
+                            
+                            # Get base player data from universal collection (for bio data: height, weight, jersey, year)
+                            base_player = players_collection.find_one({"_id": ObjectId(pid_str)})
+                            if not base_player:
+                                logger.warning(f"🔍 [ROSTER LOADER DEBUG] Player {pid_str} not found in universal collection, skipping")
+                                continue
+                            
+                            # Merge franchise-specific attributes into base player
+                            base_player = dict(base_player)  # Convert to dict for modification
+                            franchise_attrs = franchise_player_data.get("attributes", {})
+                            
+                            # ✅ DEBUG: Log attribute values for Kevin Nelson or first player
                             meta = franchise_player_data.get("meta", {})
-                            player_team_id = meta.get("team_id")
                             player_name = f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip()
-                            # Match by team_id (ObjectId string)
-                            if str(player_team_id) == str(team_id) or meta.get("team") == team_name:
-                                # Get base player data from universal collection
-                                # ✅ FIX: ObjectId already imported at function level
-                                base_player = players_collection.find_one({"_id": ObjectId(player_id_str)})
-                                if base_player:
-                                    # Merge franchise-specific attributes into base player
-                                    base_player = dict(base_player)  # Convert to dict for modification
-                                    franchise_attrs = franchise_player_data.get("attributes", {})
-                                    
-                                    # ✅ DEBUG: Log attribute values
-                                    universal_sh = base_player.get("attributes", {}).get("SH", "MISSING")
-                                    franchise_sh = franchise_attrs.get("SH", "MISSING") if franchise_attrs else "MISSING"
-                                    if "Nelson" in player_name or len(players) == 0:
-                                        logger.warning(f"🔍 [ROSTER LOADER DEBUG] {player_name} ({player_id_str}): universal SH={universal_sh}, franchise SH={franchise_sh}")
-                                    
-                                    if franchise_attrs:
-                                        base_player["attributes"] = franchise_attrs
-                                        # ✅ DEBUG: Log after overwrite
-                                        if "Nelson" in player_name or len(players) == 0:
-                                            after_sh = base_player.get("attributes", {}).get("SH", "MISSING")
-                                            logger.warning(f"🔍 [ROSTER LOADER DEBUG] {player_name} AFTER overwrite: SH={after_sh}")
-                                    else:
-                                        logger.warning(f"🔍 [ROSTER LOADER DEBUG] {player_name}: franchise_attrs is empty or missing!")
-                                    
-                                    franchise_position_ratings = franchise_player_data.get("position_ratings", {})
-                                    if franchise_position_ratings:
-                                        base_player["position_ratings"] = franchise_position_ratings
-                                    players.append(base_player)
+                            universal_sh = base_player.get("attributes", {}).get("SH", "MISSING")
+                            franchise_sh = franchise_attrs.get("SH", "MISSING") if franchise_attrs else "MISSING"
+                            if "Nelson" in player_name or len(players) == 0:
+                                logger.warning(f"🔍 [ROSTER LOADER DEBUG] {player_name} ({pid_str}): universal SH={universal_sh}, franchise SH={franchise_sh}")
+                            
+                            if franchise_attrs:
+                                base_player["attributes"] = franchise_attrs
+                                # ✅ DEBUG: Log after overwrite
+                                if "Nelson" in player_name or len(players) == 0:
+                                    after_sh = base_player.get("attributes", {}).get("SH", "MISSING")
+                                    logger.warning(f"🔍 [ROSTER LOADER DEBUG] {player_name} AFTER overwrite: SH={after_sh}")
+                            else:
+                                logger.warning(f"🔍 [ROSTER LOADER DEBUG] {player_name}: franchise_attrs is empty or missing!")
+                            
+                            franchise_position_ratings = franchise_player_data.get("position_ratings", {})
+                            if franchise_position_ratings:
+                                base_player["position_ratings"] = franchise_position_ratings
+                            players.append(base_player)
+                        
                         logger.warning(f"🔍 [ROSTER LOADER DEBUG] Returning {len(players)} players from franchise.players")
                         if players:
                             return team_doc, players
