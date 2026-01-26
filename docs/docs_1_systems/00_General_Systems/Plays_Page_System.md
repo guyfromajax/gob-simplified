@@ -217,3 +217,69 @@ params.set('backTo', 'franchise-command-center.html');
 - `FrontEnd/static/play-details.html` - `goBack()` function (lines 402-459)
 - `FrontEnd/static/playbooks.js` - `navigateToPlayDetails()` function (sets `backTo` parameter)
 
+### FCP/HCT Skeleton Builders ✅ **IMPLEMENTED** (January 2025)
+
+**Purpose:**
+Frontend builder tools for creating and managing Full Court Press (FCP) and Half Court Trap (HCT) animation skeletons. These builders allow administrators to create animation sequences that are used during FCP/HCT gameplay scenarios.
+
+**Location:**
+- **FCP Builder:** `FrontEnd/static/fcp-skeletons.html`
+- **HCT Builder:** `FrontEnd/static/hct-skeletons.html`
+- **Access:** Available via Netlify at `/fcp-skeletons.html` and `/hct-skeletons.html`
+
+**Data Storage:**
+- **Database:** `gob-staging` (for safe testing before production migration)
+- **Collections:** `fcp_skeletons`, `hct_skeletons`
+- **Safety:** All new skeletons save to staging first, then can be manually migrated to `gob` production database
+
+**Skeleton Variants:**
+- **Base Variant:** Used for non-shot outcomes (HCO, fouls, turnovers, steals)
+  - Backend uses stopper system to truncate and append final action
+  - Previously called "HCO" variant (renamed for clarity)
+- **Shot Variant:** Used when FCP/HCT results in a shot attempt
+  - Full skeleton animation plays through to shot action
+
+**Builder Features:**
+
+1. **Variant Management:**
+   - Two variant buttons: "Base" and "Shot"
+   - Each variant can have multiple versions (v1, v2, v3, etc.)
+   - Engine randomly selects from available versions for each variant
+   - Legacy variants removed (o_foul, d_foul, dead_ball_turnover, steal) - now handled by stopper system
+
+2. **Skeleton Creation:**
+   - Step-by-step animation builder
+   - Court visualization with player positioning
+   - Ball handler and action assignment per step
+   - Animation preview functionality
+   - Save/load existing skeletons
+
+3. **Version Support:**
+   - Each variant supports multiple versions
+   - Structure: `variants.base.versions[v1, v2, ...]` or `variants.shot.versions[v1, v2, ...]`
+   - Backend randomly selects from available versions during gameplay
+
+4. **Backward Compatibility:**
+   - Load function maps old variant names (hco, o_foul, d_foul, etc.) to `base` variant
+   - Ensures old skeletons continue to work after refactor
+
+**API Endpoints:**
+- `GET /fcp-skeletons.html` - Serves FCP builder page
+- `GET /hct-skeletons.html` - Serves HCT builder page
+- `GET /api/fcp-skeletons` - Fetch all FCP skeletons from staging
+- `POST /api/fcp-skeletons` - Create/update FCP skeleton in staging
+- `GET /api/hct-skeletons` - Fetch all HCT skeletons from staging
+- `POST /api/hct-skeletons` - Create/update HCT skeleton in staging
+
+**Integration with Gameplay:**
+- Backend retrieves skeletons via `get_fcp_skeleton()` and `get_hct_skeleton()` in `phase_resolution.py`
+- Skeleton selection based on result type (base for non-shot, shot for shot attempts)
+- Stopper system truncates base skeletons at strategic points for fouls/turnovers/steals
+- See `FCP_HCT_System.md` for full resolution logic
+
+**Key Files:**
+- `FrontEnd/static/fcp-skeletons.html` - FCP skeleton builder UI and logic
+- `FrontEnd/static/hct-skeletons.html` - HCT skeleton builder UI and logic
+- `BackEnd/api/skeleton_routes.py` - API routes for FCP/HCT skeleton management
+- `BackEnd/engine/phase_resolution.py` - Skeleton retrieval and stopper system logic
+
