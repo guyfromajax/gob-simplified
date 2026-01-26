@@ -185,9 +185,11 @@ function createPlayerRow(player, teamType, position, currentMatchups, guardingUs
         : (guardingUserPos ? POSITION_COLORS[guardingUserPos] : '#c0c0c0');
     
     // Build stat strip - single integer values (divide by 10, floor) like lineup screen
+    // ✅ ANCHOR VALUES: Display anchor attributes (base values, independent of NG effects) to match Lineup Screen
     let statStrip = '';
     if (isUserTeam) {
         // User team: ID, OD, AG, ST, ND, IQ, NG, DEF%
+        // Backend now sends anchor values, but we'll use them directly (already anchor values)
         const attrs = player.attributes;
         statStrip = `
             <div class="stat-strip">
@@ -203,6 +205,7 @@ function createPlayerRow(player, teamType, position, currentMatchups, guardingUs
         `;
     } else {
         // Computer team: SC, SH, AG, ST, ND, IQ, NG, PTS
+        // Backend now sends anchor values in stats object, but we'll use them directly (already anchor values)
         const stats = player.stats;
         statStrip = `
             <div class="stat-strip">

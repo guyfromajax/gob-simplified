@@ -3800,33 +3800,35 @@ def get_lineup_for_matchups(game_id: str):
         def_s = stats.get("DEF_S", 0)
         def_pct = round((def_s / def_a * 100)) if def_a > 0 else 0
         
-        # Get NG as percentage
+        # Get NG as percentage (always use current NG, not anchor)
         ng = attrs.get("NG", 1.0)
         ng_percent = round(ng * 100)
         
+        # ✅ ANCHOR VALUES: Use anchor_ prefixed attributes (base values, independent of NG effects)
+        # Fallback to current values if anchor not available
         return {
             "player_id": player.player_id,
             "position": position,
             "name": player.name,
             "headshot_url": f"/images/players/{player.player_id}.png",
             "attributes": {
-                "ID": attrs.get("ID", 0),
-                "OD": attrs.get("OD", 0),
-                "AG": attrs.get("AG", 0),
-                "ST": attrs.get("ST", 0),
-                "ND": attrs.get("ND", 0),
-                "IQ": attrs.get("IQ", 0),
-                "NG": ng_percent,
+                "ID": attrs.get("anchor_ID", attrs.get("ID", 0)),
+                "OD": attrs.get("anchor_OD", attrs.get("OD", 0)),
+                "AG": attrs.get("anchor_AG", attrs.get("AG", 0)),
+                "ST": attrs.get("anchor_ST", attrs.get("ST", 0)),
+                "ND": attrs.get("anchor_ND", attrs.get("ND", 0)),
+                "IQ": attrs.get("anchor_IQ", attrs.get("IQ", 0)),
+                "NG": ng_percent,  # NG is always current (energy level)
                 "DEF%": def_pct  # User team only
             },
             "stats": {
-                "SC": attrs.get("SC", 0),  # Computer team only
-                "SH": attrs.get("SH", 0),  # Computer team only
-                "AG": attrs.get("AG", 0),
-                "ST": attrs.get("ST", 0),
-                "ND": attrs.get("ND", 0),
-                "IQ": attrs.get("IQ", 0),
-                "NG": ng_percent,
+                "SC": attrs.get("anchor_SC", attrs.get("SC", 0)),  # Computer team only
+                "SH": attrs.get("anchor_SH", attrs.get("SH", 0)),  # Computer team only
+                "AG": attrs.get("anchor_AG", attrs.get("AG", 0)),
+                "ST": attrs.get("anchor_ST", attrs.get("ST", 0)),
+                "ND": attrs.get("anchor_ND", attrs.get("ND", 0)),
+                "IQ": attrs.get("anchor_IQ", attrs.get("IQ", 0)),
+                "NG": ng_percent,  # NG is always current (energy level)
                 "PTS": stats.get("PTS", 0)  # Computer team only
             }
         }
