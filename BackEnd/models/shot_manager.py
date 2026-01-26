@@ -400,7 +400,7 @@ class ShotManager:
         # Higher momentum = easier three-pointers
         if is_three:
             momentum = off_team.team_attributes.get("momentum", 0)
-            three_point_modifier = 100 - (random.randint(1, 5) * momentum)
+            three_point_modifier = 40 - (random.randint(1, 5) * momentum) 
             shot_threshold += three_point_modifier
         if playcall == "Set":
             playcall = "Attack"
@@ -1267,22 +1267,23 @@ class ShotManager:
             return False, None
 
         defense_team = self.game.defense_team
-        fight = defense_team.team_attributes.get("fight", 0)
+        discipline = defense_team.team_attributes.get("discipline", 0)
 
         # Base thresholds by shot_type
         if shot_type == "inside":
             base_hard = 50
             base_soft = 110
         elif shot_type == "attack":
-            base_hard = 70
-            base_soft = 130
+            base_hard = 85  # ✅ Updated from 70
+            base_soft = 145  # ✅ Updated from 130
         else:  # outside
             base_hard = 30
             base_soft = 90
 
-        # Calculate thresholds with fight adjustment
-        hard_threshold = base_hard + fight
-        soft_threshold = base_soft + fight
+        # Calculate thresholds with discipline adjustment
+        # Higher discipline = less likely to foul (subtract from threshold, making it harder to foul)
+        hard_threshold = base_hard - discipline
+        soft_threshold = base_soft - discipline
 
         # 🔍 DEBUG: Shooting Foul Calculation
         from BackEnd.utils.shared import get_name_safe
@@ -1294,11 +1295,11 @@ class ShotManager:
         logging.debug(f"   Shot type: {shot_type}")
         logging.debug(f"   Defender: {get_name_safe(defender)}")
         logging.debug(f"   Defense score: {defense_score}")
-        logging.debug(f"   Defense team fight: {fight}")
+        logging.debug(f"   Defense team discipline: {discipline}")
         logging.debug(f"   Base HARD threshold: {base_hard}")
         logging.debug(f"   Base SOFT threshold: {base_soft}")
-        logging.debug(f"   Calibrated HARD threshold: {base_hard} + {fight} = {hard_threshold}")
-        logging.debug(f"   Calibrated SOFT threshold: {base_soft} + {fight} = {soft_threshold}")
+        logging.debug(f"   Calibrated HARD threshold: {base_hard} - {discipline} = {hard_threshold}")
+        logging.debug(f"   Calibrated SOFT threshold: {base_soft} - {discipline} = {soft_threshold}")
 
         # Determine if foul occurs
         if defense_score < hard_threshold:

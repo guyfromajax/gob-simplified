@@ -40,7 +40,7 @@
    - Otherwise use `off_team.team_attributes["shot_threshold"]`
 
 4. Apply Three-Point Modifier
-   - if is_three: shot_threshold += (100 - (random.randint(1, 5) * momentum))
+   - if is_three: shot_threshold += (40 - (random.randint(1, 5) * momentum))
      - Higher momentum = easier three-pointers (lower threshold modifier)
 
 5. Apply Variant Modifier
