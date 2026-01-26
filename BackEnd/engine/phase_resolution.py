@@ -4440,21 +4440,22 @@ def resolve_full_court_press_logic(game: "GameManager"):
     
     off_chemistry = off_attrs.get("team_chemistry", 10)
     def_chemistry = def_attrs.get("team_chemistry", 10)
-    off_fight = off_attrs.get("fight", 0)
+    off_pt_opp_modifier = off_attrs.get("pt_opp_modifier", 0)
+    def_pt_efficiency = def_attrs.get("pt_efficiency", 0)
     def_discipline = def_attrs.get("discipline", 0)
     
     # Calculate BSM (Base Success Modifier) = 500 for FCP
     BSM = 500
     
-    # Offense contribution to BSM
-    if off_fight > 0:
-        BSM += random.randint(1, off_chemistry) * off_fight
+    # Offense contribution to BSM (using pt_opp_modifier)
+    if off_pt_opp_modifier > 0:
+        BSM += random.randint(1, off_chemistry) * off_pt_opp_modifier
     else:
         BSM += random.randint(1, off_chemistry)
     
-    # Defense reduction to BSM
-    if def_discipline > 0:
-        BSM -= random.randint(1, def_chemistry) * def_discipline
+    # Defense reduction to BSM (using pt_efficiency)
+    if def_pt_efficiency > 0:
+        BSM -= random.randint(1, def_chemistry) * def_pt_efficiency
     else:
         BSM -= random.randint(1, def_chemistry)
     
@@ -5578,21 +5579,22 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     
     off_chemistry = off_attrs.get("team_chemistry", 10)
     def_chemistry = def_attrs.get("team_chemistry", 10)
-    off_fight = off_attrs.get("fight", 0)
+    off_pt_opp_modifier = off_attrs.get("pt_opp_modifier", 0)
+    def_pt_efficiency = def_attrs.get("pt_efficiency", 0)
     def_discipline = def_attrs.get("discipline", 0)
     
     # Calculate BSM (Base Success Modifier) = 300 for HCT
     BSM = 300
     
-    # Offense contribution to BSM
-    if off_fight > 0:
-        BSM += random.randint(1, off_chemistry) * off_fight
+    # Offense contribution to BSM (using pt_opp_modifier)
+    if off_pt_opp_modifier > 0:
+        BSM += random.randint(1, off_chemistry) * off_pt_opp_modifier
     else:
         BSM += random.randint(1, off_chemistry)
     
-    # Defense reduction to BSM
-    if def_discipline > 0:
-        BSM -= random.randint(1, def_chemistry) * def_discipline
+    # Defense reduction to BSM (using pt_efficiency)
+    if def_pt_efficiency > 0:
+        BSM -= random.randint(1, def_chemistry) * def_pt_efficiency
     else:
         BSM -= random.randint(1, def_chemistry)
     
