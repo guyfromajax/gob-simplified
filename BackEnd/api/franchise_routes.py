@@ -2785,6 +2785,9 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                     logger.warning(f"🔍 [TRAINING REPORT] Player {pid_str} not found in franchise.players")
                     continue
                 
+                # Get meta for player name
+                meta = player_data.get("meta", {})
+                
                 # Get attributes (after training)
                 attrs = player_data.get("attributes", {})
                 
