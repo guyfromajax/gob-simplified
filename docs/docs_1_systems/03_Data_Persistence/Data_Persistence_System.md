@@ -108,17 +108,14 @@ This system documents data persistence across all three game modes when users ar
 - `fb_opp_modifier`: -3 to +3
 - `pt_opp_modifier`: -3 to +3
 
-**Strategy Settings** (user-configurable, persist across all instances):
-- `strategy_settings`: `{offense, inside, attack, outside, tempo, defense, aggression, hc_trap, fc_press, rebounding}` (all 0-4)
+**Strategy Settings & Playbook Settings:**
+- See "Game Plan & Playbook Settings Persistence" section below for complete documentation
 
 **Plays Data** (updated by training):
 - `plays`: Object with play data including `effectiveness`, `momentum`, `cloaking` (0-100, 0-10, 0-10), `game_stats`, `season_stats`
 
 **Scouting Data** (updated by training):
 - `scouting_data`: Defense structures (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone, vs_Fast_Break, FCP, HCT) with `effectiveness`, `momentum`, `cloaking`, `game_stats`, `season_stats`
-
-**Playbook Settings** (user-configurable, persist across all instances):
-- `playbook_settings`: `{motion, set_play_inside, set_play_attack, set_play_outside, zone_defense, man_defense, slot_assignments, motion_dropdowns, position_filters}`
 
 **Legacy playcall_settings** (still present for backward compatibility)
 
@@ -222,17 +219,14 @@ This system documents data persistence across all three game modes when users ar
 - `fb_opp_modifier`: -10 to +10
 - `pt_opp_modifier`: -10 to +10
 
-**Strategy Settings** (user-configurable, persist across all instances):
-- `strategy_settings`: `{offense, inside, attack, outside, tempo, defense, aggression, hc_trap, fc_press, rebounding}` (all 0-4)
+**Strategy Settings & Playbook Settings:**
+- See "Game Plan & Playbook Settings Persistence" section below for complete documentation
 
 **Plays Data** (updated by training):
 - `plays`: Object with play data including `effectiveness`, `momentum`, `cloaking` (0-80 randomized on init, 0-10, 0-10), `game_stats`, `season_stats`
 
 **Scouting Data** (updated by training):
 - `scouting_data`: Defense structures (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone, vs_Fast_Break, FCP, HCT) with `effectiveness`, `momentum`, `cloaking` (0-80 randomized on init, 0-10, 0-10), `game_stats`, `season_stats`
-
-**Playbook Settings** (user-configurable, persist across all instances):
-- `playbook_settings`: `{motion, set_play_inside, set_play_attack, set_play_outside, zone_defense, man_defense, slot_assignments, motion_dropdowns, position_filters}`
 
 **Initialization:** Team objects are created for all 8 teams when tournament is created via `TournamentManager.create_tournament()` or lazily via `ensure_team_objects_exist()` when accessing Game Plan/Playbooks.
 
@@ -299,17 +293,14 @@ This system documents data persistence across all three game modes when users ar
 - `fb_opp_modifier`: -10 to +10
 - `pt_opp_modifier`: -10 to +10
 
-**Strategy Settings** (user-configurable, persist during game):
-- `strategy_settings`: `{offense, inside, attack, outside, tempo, defense, aggression, hc_trap, fc_press, rebounding}` (all 0-4)
+**Strategy Settings & Playbook Settings:**
+- See "Game Plan & Playbook Settings Persistence" section below for complete documentation
 
 **Plays Data** (loaded from universal collection, NOT updated):
 - `plays`: Object with play data from universal `plays` collection
 
 **Scouting Data** (loaded from universal collection, NOT updated):
 - `scouting_data`: Defense structures from universal collection
-
-**Playbook Settings** (user-configurable, persist during game):
-- `playbook_settings`: `{motion, set_play_inside, set_play_attack, set_play_outside, zone_defense, man_defense, slot_assignments, motion_dropdowns, position_filters}`
 
 **Legacy playcall_settings** (still present for backward compatibility)
 
@@ -503,6 +494,221 @@ This system documents data persistence across all three game modes when users ar
 **Future Enhancement:**
 - Consider using `play_id` (database ID) instead of play names for more robust matching
 - This would prevent issues if play names change in database
+
+---
+
+## Game Plan & Playbook Settings Persistence ✅ **COMPLETE** (January 2026)
+
+### Overview
+
+Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use a unified persistence system that ensures consistent save/load behavior across all game modes and contexts. The system distinguishes between pre-game settings (saved to master documents) and in-game settings (saved to game documents).
+
+### Unified Functions
+
+**Core Functions (`BackEnd/utils/team_settings_manager.py`):**
+
+1. **`save_team_settings()`** - Unified save function for both settings types
+   - Handles team ID resolution to canonical format
+   - Determines save location (game doc vs master doc) using Phase 5.7 logic
+   - Updates database with correct team_id keys
+   - Optionally applies settings to cached GameManager instance
+
+2. **`extract_team_settings()`** - Unified extract function for both settings types
+   - Resolves team identifier to correct format for lookup
+   - Extracts settings from saved document using consistent key matching
+   - Handles both ObjectId keys (master docs) and canonical keys (game docs)
+
+3. **`load_and_apply_team_settings_to_gamemanager()`** - Unified load and apply function
+   - Loads both settings from DB/request
+   - Applies to GameManager consistently
+   - Handles request overrides (if user visited respective page)
+
+### Save Location Logic (Phase 5.7)
+
+**Determined by `get_save_location_for_franchise_tournament()`:**
+
+**Pre-Game (FCC/TCC):**
+- No `game_id` provided OR game not active (quarter = 0)
+- **Save to:** Master franchise/tournament document
+  - Franchise: `franchise_teams.{team_id}.{settings_type}`
+  - Tournament: `teams.{team_id}.{settings_type}`
+- **Team ID Format:** ObjectId string (e.g., `"68c98b08674d3f9b04546b2f"`)
+  - Master docs use ObjectId strings as keys (from `user_team_object_id`)
+  - Settings persist across all games in the franchise/tournament
+
+**During Active Gameplay:**
+- `game_id` provided AND game is active (quarter > 0)
+- **Save to:** Game document only
+  - All modes: `teams.{team_id}.{settings_type}`
+- **Team ID Format:** Canonical format (e.g., `"FOUR_CORNERS"`)
+  - Game docs use canonical team_id strings as keys
+  - Settings are game-specific and do not modify master doc
+  - Master doc settings are preserved for future games
+
+**Single Game Mode:**
+- Always saves to game document (no master doc)
+- Uses canonical team_id format
+
+### Team ID Resolution
+
+**Critical Rule:** Different document types use different team_id formats:
+
+1. **Master Documents (Franchise/Tournament):**
+   - Keys: ObjectId strings (e.g., `"68c98b08674d3f9b04546b2f"`)
+   - Source: `user_team_object_id` from franchise/tournament document
+   - **Save:** Use ObjectId string directly (no normalization)
+   - **Load:** Use ObjectId string directly for lookup
+
+2. **Game Documents (All Modes):**
+   - Keys: Canonical format (e.g., `"FOUR_CORNERS"`, `"MORRISTOWN"`)
+   - Source: Resolved from team names or ObjectIds via `normalize_team_id_to_canonical()`
+   - **Save:** Normalize to canonical format
+   - **Load:** Resolve to canonical format for lookup
+
+**Why This Matters:**
+- Mismatched keys cause settings to be saved to one key but loaded from another
+- This was the root cause of persistence bugs in TCC/FCC
+- Unified functions ensure consistent key resolution
+
+### Complete Flow
+
+#### 1. Pre-Game (FCC/TCC)
+
+**User Flow:**
+1. User accesses Game Plan/Playbooks from FCC or TCC
+2. User changes settings and clicks "Save"
+3. Settings saved to master document (franchise/tournament doc)
+4. User navigates away and returns
+5. Settings loaded from master document (persist correctly)
+
+**Backend Flow:**
+- `save_team_settings()` called with `game_id=None` or game not active
+- `get_save_location_for_franchise_tournament()` returns master doc
+- Team ID used as ObjectId string (no normalization)
+- Settings saved to `franchise_teams.{ObjectId}.strategy_settings` or `teams.{ObjectId}.playbook_settings`
+- `extract_team_settings()` uses ObjectId string for lookup
+
+#### 2. Game Start
+
+**User Flow:**
+1. User starts new game in franchise/tournament mode
+2. Settings copied from master doc to game doc during `init-game`
+3. Game begins with master settings as starting point
+
+**Backend Flow:**
+- `init-game` endpoint copies settings from master doc to game doc
+- Settings converted from ObjectId keys to canonical keys
+- Game document now has settings for active gameplay
+
+#### 3. During Active Gameplay
+
+**User Flow:**
+1. User changes settings during game (via timeout navigation)
+2. Settings saved to game document only
+3. Master document settings remain unchanged
+4. Settings persist through timeout/quarter breaks
+
+**Backend Flow:**
+- `save_team_settings()` called with `game_id` and `quarter > 0`
+- `get_save_location_for_franchise_tournament()` returns game doc
+- Team ID normalized to canonical format
+- Settings saved to `teams.{canonical_team_id}.{settings_type}` in game doc
+- Master doc is never modified during active gameplay
+
+#### 4. Timeout Resume
+
+**User Flow:**
+1. User calls timeout during game
+2. User navigates to Game Plan/Playbooks
+3. Settings loaded from game document (current game state)
+4. User makes changes (or keeps current)
+5. Settings saved to game document (if changed)
+6. User returns to game
+7. Settings persist correctly
+
+**Backend Flow:**
+- `summarize_game_state()` preserves settings from game document during timeout save
+- `load_and_apply_team_settings_to_gamemanager()` loads settings from saved game document
+- If user visits Game Plan/Playbooks, request settings override DB settings
+- Settings applied to GameManager for continued gameplay
+- Settings persist through timeout navigation
+
+### Key Implementation Details
+
+**Unified Save Function:**
+```python
+# Determines save location based on game state
+if mode in ["franchise", "tournament"]:
+    collection, doc_id, is_game_doc = get_save_location_for_franchise_tournament(...)
+    
+    if is_game_doc:
+        # Game doc - normalize to canonical
+        actual_team_id = normalize_team_id_to_canonical(team_id, mode, None)
+    else:
+        # Master doc - use ObjectId string directly
+        actual_team_id = team_id  # Don't normalize
+```
+
+**Unified Extract Function:**
+```python
+# Handles both ObjectId and canonical keys
+if mode == "franchise":
+    teams_obj = saved_doc.get("franchise_teams", {})
+elif mode == "tournament":
+    teams_obj = saved_doc.get("teams", {})
+else:
+    teams_obj = saved_doc.get("teams", {})
+
+# Resolves team_identifier to correct format for lookup
+# Tries direct lookup, then name matching
+```
+
+**Unified Load Function:**
+```python
+# Loads both settings from DB/request
+home_strategy_db = extract_team_settings(saved_doc, home_team_name, "strategy_settings", mode, game_doc)
+home_playbook_db = extract_team_settings(saved_doc, home_team_name, "playbook_settings", mode, game_doc)
+
+# Override with request if valid (user visited page)
+if request_strategy_settings and is_valid(request_strategy_settings):
+    home_strategy = request_strategy_settings
+else:
+    home_strategy = home_strategy_db
+
+# Apply to GameManager
+if gm:
+    gm.home_team.strategy_settings = home_strategy
+    gm.home_team.playbook_settings = home_playbook
+```
+
+### Benefits
+
+1. **Consistency:** Same save/load logic across all modes and contexts
+2. **Correct Key Resolution:** Handles ObjectId vs canonical format correctly
+3. **Game-Scoped Saves:** In-game changes don't modify master settings
+4. **Master Settings Preserved:** Pre-game settings persist for future games
+5. **Timeout Persistence:** Settings persist through timeout navigation
+6. **Single Source of Truth:** Unified functions ensure consistent behavior
+
+### Key Files
+
+**Backend:**
+- `BackEnd/utils/team_settings_manager.py`: Unified save/extract/load functions
+- `BackEnd/api/gameplan_routes.py`: `get_save_location_for_franchise_tournament()`, `normalize_team_id_to_canonical()`
+- `BackEnd/api/gameplan_routes.py`: `save_playbooks()`, `update_gameplan()` endpoints (use unified functions)
+- `BackEnd/api/api.py`: `simulate_quarter_endpoint()` (uses unified load function)
+- `BackEnd/api/api.py`: `load_team_settings_from_doc()` (uses unified extract function)
+
+**Frontend:**
+- `FrontEnd/static/game-plan.js`: Sends settings in save request
+- `FrontEnd/static/playbooks.js`: Sends settings in save request
+- `FrontEnd/static/js/phaser/bootGame.js`: Loads settings before game start
+- `FrontEnd/static/js/phaser/gameScene.js`: Sends settings in simulate-quarter request
+
+### Related Documentation
+
+- `docs/docs_1_systems/05_GP_Supporting_Systems/Timeout_System.md` - Timeout settings persistence
+- `docs/docs_1_systems/03_Data_Persistence/Unified_State_Persistence_Work_Plan.md` - Complete implementation history
 
 ---
 
