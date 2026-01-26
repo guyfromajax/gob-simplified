@@ -12,7 +12,7 @@
 **Collections:**
 - `franchises` - Franchise mode documents
 - `tournaments` - Tournament mode documents
-- `games` - Single Game mode documents
+- `games` - Single Game mode documents, game documents in franchise or tournament mode
 - `teams` - Universal team collection (source of truth for initial values)
 - `players` - Universal player collection (baseline attributes)
 
@@ -129,6 +129,8 @@ This system documents data persistence across all three game modes when users ar
 - **Evolved Attributes** (`attributes`: all 30+ attributes with `anchor_` prefixed versions, updated by training)
 - **Evolved Position Ratings** (`position_ratings`: PG, SG, SF, PF, C ratings, updated by training)
 - **Statistics** (`season`: season stats, `career`: career stats)
+
+**Note:** Player attributes from training are loaded during game initialization. See `Franchise_Mode_Systems.md` section "3.5. Player Attribute Loading During Game Initialization" for complete details.
 
 #### D. Additional Collections (Not in Franchise Document)
 

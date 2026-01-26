@@ -554,6 +554,8 @@ In Franchise mode, when the user submits training for their team, all computer t
 - Plays data: `franchise_teams.{team_id}.plays` (if initialized)
 - Scouting data: `franchise_teams.{team_id}.scouting_data` (if initialized)
 
+**Note:** Player attributes saved by training are automatically loaded during game initialization. See `Franchise_Mode_Systems.md` section "3.5. Player Attribute Loading During Game Initialization" for complete details on how trained attributes are loaded into gameplay.
+
 ### Data Storage
 
 **Franchise Document:**

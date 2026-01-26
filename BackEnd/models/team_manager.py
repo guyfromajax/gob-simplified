@@ -175,13 +175,14 @@ def _get_cached_play_names():
     return _plays_names_cache
 
 class TeamManager:
-    def __init__(self, name: str, is_home_team=False, strategy_settings=None, team_attributes=None, scouting_data=None, plays_data=None, strategy_calls=None, mode="single", is_user_team=False):
+    def __init__(self, name: str, is_home_team=False, strategy_settings=None, team_attributes=None, scouting_data=None, plays_data=None, strategy_calls=None, mode="single", is_user_team=False, franchise_id=None):
         import time
         import logging
         self.name = name
         self.is_home_team = is_home_team
         self.is_user_team = is_user_team  # ✅ SS&S: Track if this is the user's team for override logic
         self.mode = mode  # Store mode for use in _init_scouting_data() and other methods
+        self.franchise_id = franchise_id  # ✅ FRANCHISE MODE: Store franchise_id for loading trained attributes
         
         roster_start = time.time()
         self.players = self._load_roster()
@@ -283,7 +284,7 @@ class TeamManager:
             self.team_attributes = self._init_team_attributes(mode)
 
     def _load_roster(self):
-        _, players = load_roster(self.name)
+        _, players = load_roster(self.name, franchise_id=self.franchise_id)
         roster = {}
         for pdata in players:
             player = Player(pdata)

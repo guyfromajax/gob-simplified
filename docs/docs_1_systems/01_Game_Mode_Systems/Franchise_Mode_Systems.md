@@ -261,6 +261,54 @@ After completing the regular season (week 14), the top 8 teams advance to a sing
   4. Defaults team attributes to 0 if not present
 - **Pattern**: Matches the successful pattern used by `/franchise/roster` - server-side team name resolution
 
+#### 3.5. Player Attribute Loading During Game Initialization ✅ **FIXED** (January 2026)
+
+**Problem:** Player attributes from training were not being loaded during game initialization. Training saves attributes to `franchise.players.{player_id}.attributes`, but game initialization was loading from the universal `players` collection, ignoring trained attributes.
+
+**Root Cause:**
+- `TeamManager._load_roster()` called `load_roster()` which always loaded from the universal `players` collection
+- No `franchise_id` was passed to `load_roster()`, so it couldn't check `franchise.players`
+- This meant trained attributes (including NG reductions from training) were ignored during gameplay
+
+**Solution:**
+1. **Modified `roster_loader.py`**: Added `franchise_id` parameter to `load_roster()` and `_load_from_db()`
+   - When `franchise_id` is provided, checks `franchise.players` first
+   - Merges franchise-specific attributes (from `franchise.players.{player_id}.attributes`) into base player data
+   - Falls back to universal `players` collection if franchise data not found
+2. **Modified `TeamManager`**: Added `franchise_id` parameter to `__init__()` and `_load_roster()`
+   - Stores `franchise_id` on TeamManager instance
+   - Passes `franchise_id` to `load_roster()` when loading roster
+3. **Modified `GameManager`**: Added `franchise_id` parameter to `__init__()`
+   - Passes `franchise_id` to both home and away TeamManager instances
+4. **Modified `simulate_quarter_endpoint()`**: Passes `franchise_id` when creating GameManager
+   - Extracts `franchise_id` from request or saved game document
+   - Only passes `franchise_id` when `mode == "franchise"`
+
+**Data Flow:**
+1. Training saves attributes to `franchise.players.{player_id}.attributes.{attr}` (e.g., SC, SH, ID, OD, NG)
+2. When game initializes, `GameManager` is created with `franchise_id`
+3. `TeamManager._load_roster()` calls `load_roster(team_name, franchise_id=franchise_id)`
+4. `load_roster()` checks `franchise.players` for each player on the team
+5. Franchise-specific attributes are merged into base player data
+6. `Player` objects are created with trained attributes
+7. Gameplay uses trained attributes throughout the game
+
+**Key Files:**
+- `BackEnd/utils/roster_loader.py` - `load_roster()`, `_load_from_db()` (franchise player loading)
+- `BackEnd/models/team_manager.py` - `TeamManager.__init__()`, `_load_roster()` (franchise_id parameter)
+- `BackEnd/models/game_manager.py` - `GameManager.__init__()` (franchise_id parameter)
+- `BackEnd/api/api.py` - `simulate_quarter_endpoint()`, `init_game()` (pass franchise_id to GameManager)
+
+**Benefits:**
+- ✅ Trained player attributes are now used during gameplay
+- ✅ NG reductions from training (scrimmages/conditioning) persist to next game
+- ✅ All attribute improvements from training are reflected in gameplay
+- ✅ Consistent with FCC Roster tab (which already loads from `franchise.players`)
+
+**Related Documentation:**
+- See `Training_System.md` for details on how training saves attributes
+- See `Data_Persistence_System.md` for franchise player data structure
+
 #### 4. Team Object Updates
 
 **Playbook Settings:**
