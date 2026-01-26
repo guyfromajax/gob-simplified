@@ -66,7 +66,8 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                                     continue
                                 
                                 # Get base player data from universal collection (for bio data: height, weight, jersey, year)
-                                base_player = players_collection.find_one({"_id": ObjectId(pid_str)})
+                                # ✅ FIX: Players collection uses UUID strings as _id, not ObjectId - use pid_str directly
+                                base_player = players_collection.find_one({"_id": pid_str})
                                 if not base_player:
                                     logger.error(f"❌ [ROSTER LOADER] Player {pid_str} not found in universal collection")
                                     continue
