@@ -3953,17 +3953,6 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
 
     team = team_doc or {"name": match}
 
-    # ✅ UNIFIED: Load franchise-specific attributes if franchise_id is provided
-    franchise_players = {}
-    if franchise_id:
-        try:
-            fid = ObjectId(franchise_id)
-            franchise_doc = franchises_collection.find_one({"_id": fid}, {"players": 1, "_id": 1})
-            if franchise_doc:
-                franchise_players = franchise_doc.get("players", {})
-        except Exception as e:
-            logging.warning(f"⚠️ Error loading franchise document {franchise_id}: {e}")
-
     display_attributes = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "NG"]
 
     process_start = time.time()
@@ -3971,30 +3960,17 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
     for p in player_objects:
         player_id_str = str(p.get("_id"))
         
-        # ✅ SS&S: For franchise mode, use franchise.players as single source of truth (no merging)
-        if franchise_id and player_id_str in franchise_players:
-            franchise_player_data = franchise_players[player_id_str]
-            merged_attributes = franchise_player_data.get("attributes", {}).copy()
-            # Ensure anchor_ versions exist (they should after initialization, but be safe)
-            for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
-                if attr_key in merged_attributes and f"anchor_{attr_key}" not in merged_attributes:
-                    merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
-        else:
-            # Base mode or tournament mode - use universal collection attributes
-            core_attributes = p.get("attributes", {})
-            merged_attributes = core_attributes.copy()
-        # Create anchor_ prefixed attributes (like Player class does)
+        # ✅ SS&S: Trust load_roster() - it already loaded franchise attributes if franchise_id was provided
+        # No need to re-check or re-merge - load_roster() handles franchise mode correctly
+        merged_attributes = p.get("attributes", {}).copy()
+        
+        # Ensure anchor_ versions exist (they should after initialization, but be safe)
         for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
-            if attr_key in merged_attributes:
+            if attr_key in merged_attributes and f"anchor_{attr_key}" not in merged_attributes:
                 merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
         
-        # ✅ SS&S: For franchise mode, use franchise.players as single source of truth for position_ratings
-        if franchise_id and player_id_str in franchise_players:
-            franchise_player_data = franchise_players[player_id_str]
-            position_ratings = franchise_player_data.get("position_ratings", {})
-        else:
-            # Base mode or tournament mode - use universal collection position_ratings
-            position_ratings = p.get("position_ratings", {})
+        # Use position_ratings from player_objects (already loaded from franchise if franchise_id provided)
+        position_ratings = p.get("position_ratings", {})
         
         players.append({
             "_id": player_id_str,
