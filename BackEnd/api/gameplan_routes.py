@@ -1324,7 +1324,21 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
             settings = load_team_settings_from_doc(mode, doc_id, team_id, team_id)
             strategy_settings = settings.get("strategy_settings") or team_obj.get("strategy_settings", defaults["strategy_settings"])
         else:
-            strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
+            # ✅ UNIFIED: For tournament/franchise modes, use unified extract function for consistent team_id resolution
+            from BackEnd.utils.team_settings_manager import extract_team_settings
+            team_identifier = team_id or (team_obj.get("name") if team_obj else None)
+            if team_identifier:
+                strategy_settings = extract_team_settings(
+                    saved_doc=doc,
+                    team_identifier=team_identifier,
+                    settings_type="strategy_settings",
+                    mode=mode,
+                    game_doc=None
+                )
+                if not strategy_settings:
+                    strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
+            else:
+                strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
         
         
         # ✅ FIX: Normalize legacy keys and ensure all required fields exist
@@ -1858,7 +1872,21 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 # Only fallback to team_obj if load_team_settings_from_doc() returned None (not empty dict)
                 playbook_settings = team_obj.get("playbook_settings", {})
         else:
-            playbook_settings = team_obj.get("playbook_settings", {})
+            # ✅ UNIFIED: For tournament/franchise modes, use unified extract function for consistent team_id resolution
+            from BackEnd.utils.team_settings_manager import extract_team_settings
+            team_identifier = team_id or (team_obj.get("name") if team_obj else None)
+            if team_identifier and doc:
+                playbook_settings = extract_team_settings(
+                    saved_doc=doc,
+                    team_identifier=team_identifier,
+                    settings_type="playbook_settings",
+                    mode=mode,
+                    game_doc=None
+                )
+                if not playbook_settings:
+                    playbook_settings = team_obj.get("playbook_settings", {})
+            else:
+                playbook_settings = team_obj.get("playbook_settings", {})
         
         slot_assignments = playbook_settings.get("slot_assignments", {}) if playbook_settings else {}
         motion_dropdowns = playbook_settings.get("motion_dropdowns", {}) if playbook_settings else {}
