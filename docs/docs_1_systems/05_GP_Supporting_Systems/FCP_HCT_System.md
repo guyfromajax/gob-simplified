@@ -27,10 +27,10 @@
    - Sum all player contributions, then multiply total by `random.randint(1, 6)`
    - **Note**: Scores are attribute-based (not purely random), with a random multiplier applied
 
-5. Determine Outcome Type
+5. Determine Outcome Type #
    - BSM (Base Success Modifier) = 500 for FCP, 300 for HCT
-      - BSM += random.randint(1, offense team chemistry) * offense team fight if offense team fight > 0, else += random.randint(1, offense team chemistry)
-      - BSM -= random.randint(1, defenese team chemistry) * defense team discipline if defense team discipline > 0 else -= random.randint(1, defense team chemistry)
+      - BSM += random.randint(1, offense team chemistry) * offense pt_opp_modifier if offense team pt_opp_modifier > 0, else += random.randint(1, offense team chemistry)
+      - BSM -= random.randint(1, defense team chemistry) * defense team pt_efficiency if defense team pt_efficiency > 0 else -= random.randint(1, defense team chemistry)
     - DST (Defense Safety Threshold) = 600 for FCP, 800 for HCT
       - DST += random.randint(1, defense team chemistry) * defense team discipline if defense team discipline > 0 else += random.randint(1, defense team chemistry)
    - **FCP Success**: `if (offenseScore + BSM) > defenseScore`
