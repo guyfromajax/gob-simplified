@@ -2821,7 +2821,7 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 
                 if player_name:  # Only add if we have a name
                     players.append({
-                        "id": player_id,
+                        "id": pid_str,
                         "name": player_name,
                         "attributes": player_attrs
                     })
