@@ -3899,11 +3899,93 @@
       await savePlayToDatabase();
     }
 
+    // Positions that should NOT be inverted (stay the same)
+    const UNCHANGED_POSITIONS = new Set([
+      "key", "deep key", "topLane", "midLane", "basketSpot",
+      "opp key", "opp deep key", "opp topLane", "opp midLane", "opp basketSpot",
+      "inbound_left", "inbound_right"
+    ]);
+
+    function flipLocation(location) {
+      /**
+       * Flip upper/lower in a location string, keeping opp prefix if present.
+       * 
+       * Examples:
+       * - "upper midWing" → "lower midWing"
+       * - "opp lower midCorner" → "opp upper midCorner"
+       * - "key" → "key" (unchanged)
+       */
+      if (!location || typeof location !== 'string') {
+        return location;
+      }
+
+      // Check if this position should remain unchanged
+      if (UNCHANGED_POSITIONS.has(location)) {
+        return location;
+      }
+
+      // Handle opp prefix
+      const hasOpp = location.startsWith("opp ");
+      const baseLocation = hasOpp ? location.substring(4) : location;
+
+      // Check if base location should remain unchanged
+      if (UNCHANGED_POSITIONS.has(baseLocation)) {
+        return location;
+      }
+
+      // Flip upper to lower
+      if (baseLocation.toLowerCase().includes("upper")) {
+        const flipped = baseLocation.replace(/upper/gi, (match) => {
+          return match === "upper" ? "lower" : 
+                 match === "Upper" ? "Lower" : 
+                 match === "UPPER" ? "LOWER" : match;
+        });
+        return hasOpp ? `opp ${flipped}` : flipped;
+      }
+
+      // Flip lower to upper
+      if (baseLocation.toLowerCase().includes("lower")) {
+        const flipped = baseLocation.replace(/lower/gi, (match) => {
+          return match === "lower" ? "upper" : 
+                 match === "Lower" ? "Upper" : 
+                 match === "LOWER" ? "UPPER" : match;
+        });
+        return hasOpp ? `opp ${flipped}` : flipped;
+      }
+
+      // No upper/lower found, return unchanged
+      return location;
+    }
+
+    function createOppositeSteps(steps) {
+      /**
+       * Create opposite version of steps by flipping upper/lower in locations.
+       * Keeps all actions, events, and opp boolean fields unchanged.
+       */
+      return steps.map(step => {
+        const oppositeStep = JSON.parse(JSON.stringify(step)); // Deep copy
+        
+        // Flip locations in pos_actions
+        if (oppositeStep.pos_actions) {
+          for (const position in oppositeStep.pos_actions) {
+            const actionInfo = oppositeStep.pos_actions[position];
+            if (actionInfo && actionInfo.location) {
+              actionInfo.location = flipLocation(actionInfo.location);
+              // Keep opp boolean field unchanged
+            }
+          }
+        }
+        
+        return oppositeStep;
+      });
+    }
+
     function buildVariantVersions(variantName) {
       /**
        * Build versions array for a variant.
        * Versions are already stored as an array in playState.
        * Adds version field (v1, v2, etc.) to match offensive plays structure.
+       * Automatically creates inverse versions for each non-empty version.
        */
       const variant = playState.variants[variantName];
       if (!variant || !variant.versions || !Array.isArray(variant.versions)) {
@@ -3912,11 +3994,32 @@
       
       // Build array from versions array (already in correct order)
       // Add version field to match offensive plays structure
-      const versionsArray = variant.versions.map((versionData, index) => ({
-        version: `v${index + 1}`,  // v1, v2, v3, etc.
-        steps: versionData.steps || [],
-        complete: versionData.complete || false
-      }));
+      const versionsArray = [];
+      let versionIndex = 1;
+      
+      for (const versionData of variant.versions) {
+        const steps = versionData.steps || [];
+        
+        // Only process non-empty versions
+        if (steps.length > 0) {
+          // Add original version
+          versionsArray.push({
+            version: `v${versionIndex}`,
+            steps: steps,
+            complete: versionData.complete || false
+          });
+          versionIndex++;
+          
+          // Automatically create inverse version
+          const inverseSteps = createOppositeSteps(steps);
+          versionsArray.push({
+            version: `v${versionIndex}`,
+            steps: inverseSteps,
+            complete: versionData.complete || false
+          });
+          versionIndex++;
+        }
+      }
       
       return { versions: versionsArray };
     }
