@@ -1407,14 +1407,32 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                 
                 # ✅ SS&S: Build box_score from nested structure using team_id keys (not team names)
                 box_score = saved.get("box_score", {})
+                logging.warning(f"🔍 [BOX-SCORE DEBUG] /api/game/{game_id} - Top-level box_score keys: {list(box_score.keys()) if box_score else 'EMPTY'}")
                 if not box_score:
                     # Build from unified teams structure (use team_id keys)
                     home_team_id = saved.get("home_team_id")
                     away_team_id = saved.get("away_team_id")
+                    logging.warning(f"🔍 [BOX-SCORE DEBUG] /api/game/{game_id} - Building box_score from teams structure. home_team_id={home_team_id}, away_team_id={away_team_id}")
                     if home_team_id and "box_score" in home_team_data:
-                        box_score[home_team_id] = home_team_data.get("box_score", {})
+                        home_box = home_team_data.get("box_score", {})
+                        box_score[home_team_id] = home_box
+                        logging.warning(f"🔍 [BOX-SCORE DEBUG] /api/game/{game_id} - Added home box_score with {len(home_box)} players (keys: {list(home_box.keys())[:5]})")
                     if away_team_id and "box_score" in away_team_data:
-                        box_score[away_team_id] = away_team_data.get("box_score", {})
+                        away_box = away_team_data.get("box_score", {})
+                        box_score[away_team_id] = away_box
+                        logging.warning(f"🔍 [BOX-SCORE DEBUG] /api/game/{game_id} - Added away box_score with {len(away_box)} players (keys: {list(away_box.keys())[:5]})")
+                
+                # Log final box_score structure
+                if box_score:
+                    for team_key, team_box in box_score.items():
+                        if isinstance(team_box, dict):
+                            player_count = len(team_box)
+                            sample_players = list(team_box.items())[:3]
+                            logging.warning(f"🔍 [BOX-SCORE DEBUG] /api/game/{game_id} - Final box_score[{team_key}]: {player_count} players. Sample: {[(pos, {'playerId': p.get('playerId'), 'name': p.get('name'), 'PTS': p.get('PTS', 0)}) for pos, p in sample_players if isinstance(p, dict)]}")
+                        else:
+                            logging.warning(f"🔍 [BOX-SCORE DEBUG] /api/game/{game_id} - box_score[{team_key}] is not a dict: {type(team_box)}")
+                else:
+                    logging.error(f"❌ [BOX-SCORE DEBUG] /api/game/{game_id} - box_score is EMPTY after building!")
                 
                 # ✅ UNIFIED STRUCTURE: Return unified teams object structure
                 # Frontend should read from teams[home_team_id]/teams[away_team_id]
@@ -3943,7 +3961,7 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
 
     load_start = time.time()
     # ✅ DEBUG: Log franchise_id being passed to load_roster()
-    logging.warning(f"🔍 [ROSTER DEBUG] /roster/{team_identifier} - franchise_id={franchise_id}, team_name={match}")
+    logging.warning(f"🔍 [BOX-SCORE ROSTER DEBUG] /roster/{team_identifier} - franchise_id={franchise_id}, team_name={match}, mode=franchise")
     # ✅ FIX: Pass franchise_id to load_roster() so it loads trained attributes from franchise.players
     # This ensures Roster tab displays trained values (e.g., SH in 90s) instead of universal collection values (e.g., SH in 80s)
     team_doc, player_objects = load_roster(match, franchise_id=franchise_id)
@@ -3954,9 +3972,10 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
         sample_attrs = sample_player.get("attributes", {})
         sample_sh = sample_attrs.get("SH", "MISSING")
         sample_anchor_sh = sample_attrs.get("anchor_SH", "MISSING")
-        logging.warning(f"🔍 [ROSTER DEBUG] load_roster() returned {len(player_objects)} players. Sample player SH={sample_sh}, anchor_SH={sample_anchor_sh}")
+        sample_id = str(sample_player.get("_id", "NO_ID"))
+        logging.warning(f"🔍 [BOX-SCORE ROSTER DEBUG] load_roster() returned {len(player_objects)} players. Sample player: _id={sample_id}, SH={sample_sh}, anchor_SH={sample_anchor_sh}")
     else:
-        logging.warning(f"🔍 [ROSTER DEBUG] load_roster() returned NO players!")
+        logging.error(f"❌ [BOX-SCORE ROSTER DEBUG] load_roster() returned NO players for team={match}, franchise_id={franchise_id}!")
 
     if not player_objects:
         print(f"❌ No players found for {match}")
@@ -4016,6 +4035,11 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
         "team_name": team.get("name", match if match else team_identifier),
         "players": players
     }
+    
+    # ✅ DEBUG: Log response details for box score debugging
+    if franchise_id:
+        sample_player_ids = [str(p.get("_id", "NO_ID")) for p in players[:3]]
+        logging.warning(f"🔍 [BOX-SCORE ROSTER DEBUG] /roster/{team_identifier} response: {len(players)} players. Sample IDs: {sample_player_ids}")
     
     # Measure response size
     response_size = len(json.dumps(response_data))
