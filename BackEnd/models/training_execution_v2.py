@@ -268,9 +268,36 @@ def apply_training_points(
             "strength": ["ST"],    # Strength Training: ST
             "agility": ["AG"]      # Agility Training: AG
         },
-        "conditioning": ["ND", "CH"],  # Conditioning: ND, CH (0.5 multiplier)
-        "free_throws": ["FT"],     # Free Throws: FT
-        "film_study": ["IQ", "CH"],  # Film Study: IQ, CH (0.5 multiplier)
+        "conditioning": ["ND", "CH"],  # Conditioning: ND, CH, (Fight, 0.5x multiplier)
+        "free_throws": ["FT"],     # Free Throws: FT, (Team Chemistry, 0.25x multiplier)
+        "film_study": ["IQ", "CH"],  # Film Study: IQ, CH, (Team Chemistry, 0.25x multiplier)
+    }
+    
+    # Map drills to team attribute multipliers
+    # Format: {category: {subtype: [(team_attr, multiplier)], or for single-value categories: [(team_attr, multiplier)]}
+    team_attr_multipliers = {
+        "defensive_drills": {
+            "inside": [("discipline", 0.25)],   # Inside Defense → Discipline 0.25x
+            "outside": [("discipline", 0.25)]   # Outside Defense → Discipline 0.25x
+        },
+        "technical_drills": {
+            "passing": [("discipline", 0.25)],  # Passing → Discipline 0.25x
+            "ball_handling": [("discipline", 0.25)]  # Ball Handling → Discipline 0.25x
+        },
+        "weight_room": {
+            "strength": [("fight", 0.5)]  # Strength Training → Fight 0.5x
+        },
+        "conditioning": [("fight", 0.5)],  # Conditioning → Fight 0.5x
+        "free_throws": [("team_chemistry", 0.25)],  # Free Throws → Team Chemistry 0.25x
+        "film_study": [("team_chemistry", 0.25)],  # Film Study → Team Chemistry 0.25x
+        "scrimmages": [("team_chemistry", 0.5)]  # Scrimmages → Team Chemistry 0.5x
+    }
+    
+    # Track team attribute contributions from multipliers (will sum and apply later)
+    team_attr_contributions = {
+        "discipline": 0.0,
+        "fight": 0.0,
+        "team_chemistry": 0.0
     }
     
     # Map team drill categories to team attributes (from training_execution.md)
@@ -312,6 +339,13 @@ def apply_training_points(
                             _apply_player_training_points(
                                 player, attr, points, archetype, sub_option, multiplier
                             )
+                
+                # Track team attribute contributions from multipliers
+                if category in team_attr_multipliers:
+                    multiplier_list = team_attr_multipliers[category]
+                    if isinstance(multiplier_list, dict) and subtype in multiplier_list:
+                        for team_attr, mult in multiplier_list[subtype]:
+                            team_attr_contributions[team_attr] += points * mult
         elif isinstance(allocation_data, int):
             # Category with single value (e.g., conditioning: 3)
             if isinstance(attr_mapping, list):
@@ -323,6 +357,13 @@ def apply_training_points(
                         _apply_player_training_points(
                             player, attr, allocation_data, archetype, sub_option, multiplier
                         )
+            
+            # Track team attribute contributions from multipliers (single-value categories)
+            if category in team_attr_multipliers:
+                multiplier_list = team_attr_multipliers[category]
+                if isinstance(multiplier_list, list):
+                    for team_attr, mult in multiplier_list:
+                        team_attr_contributions[team_attr] += allocation_data * mult
     
     # Handle special focus effects that apply to all players
     if sub_option == "culture-builder-inspire":
@@ -368,25 +409,38 @@ def apply_training_points(
             _apply_rebound_modifier_training(team, rebounding_points, archetype, sub_option, source="technical_drills")
     
     # Handle scrimmages (if scrimmages category exists in allocations)
-    # Scrimmages: Team Chemistry, Shot Threshold, Rebounding
+    # Scrimmages: Team Chemistry (0.5x multiplier), Shot Threshold (decreases), Rebounding
     # Note: Scrimmages category may not be in the frontend structure yet
     if "scrimmages" in normalized_allocations:
         scrimmage_points = normalized_allocations["scrimmages"]
         if isinstance(scrimmage_points, int) and scrimmage_points > 0:
-            # Apply to Team Chemistry
-            _apply_team_training_points(team, "team_chemistry", scrimmage_points, archetype, sub_option)
+            # Track Team Chemistry contribution (0.5x multiplier) - will be applied with other contributions
+            if "scrimmages" in team_attr_multipliers:
+                for team_attr, mult in team_attr_multipliers["scrimmages"]:
+                    team_attr_contributions[team_attr] += scrimmage_points * mult
             # Apply to Shot Threshold (decreases)
             _apply_shot_threshold_training(team, scrimmage_points, archetype, sub_option)
             # Apply to Rebounding (rebound_modifier)
             _apply_rebound_modifier_training(team, scrimmage_points, archetype, sub_option, source="scrimmages")
     
+    # Apply team attribute contributions from multipliers
+    # Sum all contributions, round (0.5 rounds up, <0.5 rounds down), then apply
+    # This must happen BEFORE breaks effect so breaks can multiply these gains
+    for team_attr, total_points in team_attr_contributions.items():
+        if total_points > 0:
+            # Round: 0.5 rounds up, <0.5 rounds down
+            rounded_points = int(total_points + 0.5) if total_points >= 0.5 else int(total_points)
+            if rounded_points > 0:
+                _apply_team_training_points(team, team_attr, rounded_points, archetype, sub_option)
+    
     # Momentum score (amplifier only, from coaching focus)
     # Amplifier: += random.randint(1,5)
     # TODO: Apply when direction is provided on how momentum_score training points are allocated
     
-    # Apply breaks effect (multiplies all positive increments)
-    if "general" in normalized_allocations:
-        breaks_points = normalized_allocations["general"].get("breaks", 0)
+    # Apply breaks effect (multiplies all positive increments, adds Team Chemistry at 4-5 points)
+    # This is applied after multiplier contributions so breaks can multiply those gains too
+    if "breaks" in normalized_allocations:
+        breaks_points = normalized_allocations["breaks"]
         if breaks_points is not None and breaks_points > 0:
             _apply_breaks_effect(players, team, breaks_points, player_baselines, team_baseline)
     
@@ -515,11 +569,17 @@ def _apply_player_training_points(
     Focus amplifier: Applied based on sub_option selection
     Multiplier: For attributes like CH that get 0.5 multiplier
     """
-    if points == 0:
-        return
-    
     attrs = player.get("attributes", {})
     anchor_key = f"anchor_{attr}"
+    
+    # Handle 0 points: negative change
+    if points == 0:
+        decrease = random.randint(-3, -1)
+        current_val = attrs.get(anchor_key, 0)
+        new_val = max(PLAYER_ATTR_CLAMP[0], current_val + decrease)
+        attrs[anchor_key] = new_val
+        attrs[attr] = new_val
+        return
     
     # Get player year and calculate year adjustments
     year = player.get("year", "").lower() if player.get("year") else ""
@@ -691,14 +751,25 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
     Apply training points to a team attribute.
     
     Logic for all team attributes (excluding shot_threshold, rebound_modifier, momentum_score):
+    - 0 points: += random.randint(-3, -1)
     - 1 point: += random.randint(1, 2)
     - 2 points: += random.randint(2, 3)
-    - 3 points: += random.randint(3, 5)
-    - 4 points: += random.randint(3, 6)
-    - 5 points: += random.randint(3, 7)
+    - 3 points: += random.randint(2, 5)
+    - 4 points: += random.randint(2, 6)
+    - 5 points: += random.randint(2, 7)
     - Amplifier: += incremental random.randint(1, 3)
     """
-    if points == 0 or team_attr not in TEAM_ATTR_CLAMPS:
+    if team_attr not in TEAM_ATTR_CLAMPS:
+        return
+    
+    # Handle 0 points: negative change
+    if points == 0:
+        decrease = random.randint(-3, -1)
+        current_val = team.get(team_attr, 0)
+        team[team_attr] = current_val + decrease
+        # Clamp
+        lower, upper = TEAM_ATTR_CLAMPS[team_attr]
+        team[team_attr] = max(lower, min(upper, team[team_attr]))
         return
     
     # Get base increase
@@ -707,13 +778,13 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
     elif points == 2:
         increase = random.randint(2, 3)
     elif points == 3:
-        increase = random.randint(3, 5)
+        increase = random.randint(2, 5)
     elif points == 4:
-        increase = random.randint(3, 6)
+        increase = random.randint(2, 6)
     elif points == 5:
-        increase = random.randint(3, 7)
+        increase = random.randint(2, 7)
     else:
-        increase = random.randint(3, 7)
+        increase = random.randint(2, 7)
     
     # Apply amplifier (incremental add)
     amplifier = random.randint(1, 3)
@@ -759,10 +830,12 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
     
     # Get base increase based on source and points
     if source == "technical_drills":
-        if points == 1:
-            increase = random.randint(1, 6) / 100.0  # 0.01 to 0.06
+        if points == 0:
+            increase = -random.randint(3, 9) / 100.0  # -0.09 to -0.03
+        elif points == 1:
+            increase = random.randint(-3, 3) / 100.0  # -0.03 to 0.03
         elif points == 2:
-            increase = random.randint(3, 8) / 100.0  # 0.03 to 0.08
+            increase = random.randint(3, 7) / 100.0  # 0.03 to 0.07
         elif points == 3:
             increase = random.randint(4, 10) / 100.0  # 0.04 to 0.10
         elif points == 4:
@@ -772,18 +845,20 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
         else:
             increase = random.randint(4, 14) / 100.0  # Default to 5-point range
     else:  # scrimmages
-        if points == 1:
-            increase = random.randint(1, 3) / 100.0  # 0.01 to 0.03
+        if points == 0:
+            increase = -random.randint(3, 9) / 100.0  # -0.09 to -0.03
+        elif points == 1:
+            increase = random.randint(-3, 3) / 100.0  # -0.03 to 0.03
         elif points == 2:
             increase = random.randint(2, 5) / 100.0  # 0.02 to 0.05
         elif points == 3:
-            increase = random.randint(3, 8) / 100.0  # 0.03 to 0.08
+            increase = random.randint(3, 7) / 100.0  # 0.03 to 0.07
         elif points == 4:
-            increase = random.randint(3, 9) / 100.0  # 0.03 to 0.09
+            increase = random.randint(3, 8) / 100.0  # 0.03 to 0.08
         elif points == 5:
-            increase = random.randint(3, 10) / 100.0  # 0.03 to 0.10
+            increase = random.randint(3, 9) / 100.0  # 0.03 to 0.09
         else:
-            increase = random.randint(3, 10) / 100.0  # Default to 5-point range
+            increase = random.randint(3, 9) / 100.0  # Default to 5-point range
     
     final_increase = increase
     
@@ -815,7 +890,14 @@ def _apply_shot_threshold_training(team: dict, points: int, archetype: Optional[
     - 5 points: -= random.randint(10, 40)
     - Amplifier: *= random.choice([1.3, 1.4, 1.5, 1.6]) (only if "authoritarian-discipline" or "culture-builder-confidence" focus is selected)
     """
+    # Handle 0 points: positive increase (makes threshold higher, worse for offense)
     if points == 0:
+        increase = random.randint(5, 15)
+        current_val = team.get("shot_threshold", 0)
+        team["shot_threshold"] = current_val + increase
+        # Clamp
+        lower, upper = TEAM_ATTR_CLAMPS["shot_threshold"]
+        team["shot_threshold"] = max(lower, min(upper, team["shot_threshold"]))
         return
     
     # Get base decrease

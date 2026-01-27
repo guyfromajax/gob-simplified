@@ -152,10 +152,7 @@ The training execution system applies pre-training conditions, allocates trainin
 1. **Pre-Training Conditions** (`apply_pre_training_conditions`)
    - Applies random decreases to player attributes (excluding EM, MO, NG)
    - Player attributes: `+= random.randint(-4, -1)` per attribute
-   - Team attributes: Random decreases based on attribute type
-   - Rebound modifier: `+= random.uniform(-0.1, 0)` (pre-training, range from -0.1 to 0)
-   - Shot threshold: `+= random.randint(5, 20)`
-   - Other team attributes: `+= random.choice([-2, -1, 0])`
+   - Team attributes are no longer decayed in training. They are updated at the end of each game based on performance (see End_Of_Game_System.md).
    - **Skipped for training camp in franchise mode** - determined by `week == 1 and not results.get("1")`, no depreciation occurs before first games
 
 2. **Training Point Application** (`apply_training_points`)
@@ -182,18 +179,18 @@ The training execution system applies pre-training conditions, allocates trainin
 #### Drill-to-Attribute Mapping
 
 **Player Drills:**
-- Inside Offense → SC (Shooting Close)
-- Outside Offense → SH (Shooting)
-- Inside Defense → ID (Inside Defense)
-- Outside Defense → OD (Outside Defense)
-- Ball Handling → BH
-- Passing → PS
+- Inside Offense → SC 
+- Outside Offense → SH 
+- Inside Defense → ID, (Discipline, 0.25x multiplier) #change here
+- Outside Defense → OD, (Discipline, 0.25x multiplier) #change here
+- Ball Handling → BH, (Discipline, 0.25x multiplier) #change here
+- Passing → PS, (Discipline, 0.25x multiplier) #change here
 - Rebounding → RB
-- Strength Training → ST
+- Strength Training → ST, (Fight, 0.5x multiplier)#change here
 - Agility Training → AG
-- Free Throws → FT
-- Conditioning → ND (Endurance), CH (Chemistry, 0.5x multiplier)
-- Film Study → IQ, CH (Chemistry, 0.5x multiplier)
+- Free Throws → FT, (Team Chemistry, 0.25x multiplier) #change here
+- Conditioning → ND (Endurance), CH, (Fight, 0.5x multiplier)#change here
+- Film Study → IQ, CH, (Team Chemistry, 0.25x multiplier) #change here
 
 **Team Drills:**
 - Offense Install → `offensive_efficiency`
@@ -202,11 +199,12 @@ The training execution system applies pre-training conditions, allocates trainin
 - Fast Break Defense Install → `fb_opp_modifier`
 - P/T Defense Install → `pt_efficiency`
 - P/T Offense Install → `pt_opp_modifier`
-- Scrimmages → Team Chemistry, Shot Threshold (decreases), Rebound Modifier, NG Reduction (if 3-5 points)
+- Scrimmages → (Team Chemistry, 0.5x multiplier), Shot Threshold (decreases), Rebound Modifier, NG Reduction (if 3-5 points) #change here, added Team Chemistry back with 0.5 multiplier
 
 #### Training Point Ranges
 
 **Player Attributes (Base Ranges):**
+- 0 points: `+= random.randint(-3, -1)` #change here
 - 1 point: `+= random.randint(1, 3)`
 - 2 points: `+= random.randint(2, 4)`
 - 3 points: `+= random.randint(3, 6)`
@@ -220,27 +218,31 @@ The training execution system applies pre-training conditions, allocates trainin
 - **Senior**: -1 to max only (e.g., 1 point: `random.randint(1, 2)`)
 
 **Team Attributes (standard):**
+- 0 points: `+= random.randint(-3, -1)` #change here
 - 1 point: `+= random.randint(1, 2)`
 - 2 points: `+= random.randint(2, 3)`
-- 3 points: `+= random.randint(3, 5)`
-- 4 points: `+= random.randint(3, 6)`
-- 5 points: `+= random.randint(3, 7)`
+- 3 points: `+= random.randint(2, 5)` #change here
+- 4 points: `+= random.randint(2, 6)` #change here
+- 5 points: `+= random.randint(2, 7)` #change here
 
 **Rebound Modifier (Technical Drills - in 0.01 increments):**
-- 1 point: `+= random.randint(1, 6) / 100.0` (0.01 to 0.06)
-- 2 points: `+= random.randint(3, 8) / 100.0` (0.03 to 0.08)
-- 3 points: `+= random.randint(4, 10) / 100.0` (0.04 to 0.10)
-- 4 points: `+= random.randint(4, 12) / 100.0` (0.04 to 0.12)
-- 5 points: `+= random.randint(4, 14) / 100.0` (0.04 to 0.14)
+- 0 points: `-= random.randint(3, 9) / 100.0` (-0.09 to -0.03) #change here
+- 1 point: `+= random.randint(-3, 3) / 100.0` (-0.03 to 0.03) #change here
+- 2 points: `+= random.randint(3, 7) / 100.0` (0.03 to 0.07) #change here
+- 3 points: `+= random.randint(4, 10) / 100.0` (0.04 to 0.10) #change here
+- 4 points: `+= random.randint(4, 12) / 100.0` (0.04 to 0.12) #change here
+- 5 points: `+= random.randint(4, 14) / 100.0` (0.04 to 0.14) #change here
 
 **Rebound Modifier (Scrimmages - in 0.01 increments):**
-- 1 point: `+= random.randint(1, 3) / 100.0` (0.01 to 0.03)
-- 2 points: `+= random.randint(2, 5) / 100.0` (0.02 to 0.05)
-- 3 points: `+= random.randint(3, 8) / 100.0` (0.03 to 0.08)
-- 4 points: `+= random.randint(3, 9) / 100.0` (0.03 to 0.09)
-- 5 points: `+= random.randint(3, 10) / 100.0` (0.03 to 0.10)
+- 0 points: `-= random.randint(3, 9) / 100.0` (-0.09 to -0.03) #change here
+- 1 point: `+= random.randint(-3, 3) / 100.0` (-0.03 to 0.03) #change here
+- 2 points: `+= random.randint(2, 5) / 100.0` (0.02 to 0.05) #change here
+- 3 points: `+= random.randint(3, 7) / 100.0` (0.03 to 0.07) #change here
+- 4 points: `+= random.randint(3, 8) / 100.0` (0.03 to 0.08) #change here
+- 5 points: `+= random.randint(3, 9) / 100.0` (0.03 to 0.09) #change here
 
 **Shot Threshold:**
+- 0 points: `+= random.randint(5, 15)` #change here
 - 1 point: `-= random.randint(5, 15)`
 - 2 points: `-= random.randint(10, 20)`
 - 3 points: `-= random.randint(10, 30)`
@@ -373,7 +375,7 @@ After training is submitted, users are automatically redirected to the training 
 **Team Report Section:**
 - Header: "Team Report"
 - Displays all team attributes with visualizations:
-  - **Red/Green Pills:** Most attributes (Shooting, Rebounding, Offense, Defense, Fast Breaks, Press/Trap, Aggression, Discipline, Momentum)
+  - **Red/Green Pills:** Most attributes (Shooting, Rebounding, Offense, Defense, Fast Breaks, Press/Trap, Fight, Discipline, Momentum)
     - Yellow center line
     - Green fill to the right for positive values
     - Red fill to the left for negative values
