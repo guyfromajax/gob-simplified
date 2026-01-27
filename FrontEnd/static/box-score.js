@@ -185,15 +185,15 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournam
     fetchRoster(awayTeamName),
   ]);
 
-  // ✅ SS&S: Get team_id values for box_score lookup
-  const homeTeamId = gameData.home_team_id;
-  const awayTeamId = gameData.away_team_id;
+  // ✅ SS&S: Get team_id values for box_score lookup (use parameters if provided, otherwise get from gameData)
+  const finalHomeTeamId = homeTeamId || gameData?.home_team_id;
+  const finalAwayTeamId = awayTeamId || gameData?.away_team_id;
   
   console.log('🔍 [BOX-SCORE DEBUG] After roster fetch:', {
     homeRosterCount: homeRoster.length,
     awayRosterCount: awayRoster.length,
-    homeTeamId,
-    awayTeamId,
+    homeTeamId: finalHomeTeamId,
+    awayTeamId: finalAwayTeamId,
     boxScoreKeys: gameData?.box_score ? Object.keys(gameData.box_score) : []
   });
   
@@ -298,8 +298,8 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournam
     return (a.jersey || 0) - (b.jersey || 0);
   });
   
-  const homeMapped = sortByRT(mapPlayers(homeRoster, 'home', homeTeamName, homeTeamId));
-  const awayMapped = sortByRT(mapPlayers(awayRoster, 'away', awayTeamName, awayTeamId));
+  const homeMapped = sortByRT(mapPlayers(homeRoster, 'home', homeTeamName, finalHomeTeamId));
+  const awayMapped = sortByRT(mapPlayers(awayRoster, 'away', awayTeamName, finalAwayTeamId));
   
   gameData.players = [...homeMapped, ...awayMapped];
   
