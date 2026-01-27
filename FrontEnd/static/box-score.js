@@ -59,7 +59,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Fetch game data from API and merge with full rosters
 async function loadGameData(gameId) {
+  const urlParams = new URLSearchParams(window.location.search);
   console.log('📥 Loading game data for gameId:', gameId);
+  console.log('🔍 [BOX-SCORE] loadGameData - URL params:', Object.fromEntries(urlParams.entries()));
   const response = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`));
   if (!response.ok) {
     console.error('❌ Failed to fetch game data:', response.status, response.statusText);
@@ -75,10 +77,18 @@ async function loadGameData(gameId) {
     playerCount: gameData.players ? gameData.players.length : 0,
     score: gameData.score,
     quarter: gameData.quarter,
+    hasTeamAttributeChanges: !!(gameData.team_attribute_changes),
+    teamAttributeChanges: gameData.team_attribute_changes || null,
+    teamAttributeChangesKeys: gameData.team_attribute_changes ? Object.keys(gameData.team_attribute_changes) : [],
+    home_team_id: gameData.home_team_id,
+    away_team_id: gameData.away_team_id,
     home_team_id: gameData.home_team_id,
     away_team_id: gameData.away_team_id,
     hasTeams: !!gameData.teams,
-    teamsKeys: gameData.teams ? Object.keys(gameData.teams) : []
+    teamsKeys: gameData.teams ? Object.keys(gameData.teams) : [],
+    hasTeamAttributeChanges: !!(gameData.team_attribute_changes),
+    teamAttributeChanges: gameData.team_attribute_changes || null,
+    teamAttributeChangesKeys: gameData.team_attribute_changes ? Object.keys(gameData.team_attribute_changes) : []
   });
   
   // ✅ DEBUG: Log box_score structure in detail
@@ -319,14 +329,20 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournam
 
 // Render all box score sections
 function renderBoxScore() {
-  if (!gameData) return;
+  console.log('🔍 [BOX-SCORE] renderBoxScore() called, hasGameData:', !!gameData);
+  if (!gameData) {
+    console.log('🔍 [BOX-SCORE] renderBoxScore() EARLY RETURN - no gameData');
+    return;
+  }
 
   renderHeader();
   renderQuarterScoring();
   renderPlayerStats();
   renderTeamStats();
   renderScoutingNotes();
+  console.log('🔍 [BOX-SCORE] renderBoxScore() calling renderTeamAttributeChanges()');
   renderTeamAttributeChanges();
+  console.log('🔍 [BOX-SCORE] renderBoxScore() completed');
 }
 
 // Build zeroed box score data from rosters when viewing pre-game
@@ -819,18 +835,45 @@ function renderSpecialStats(team, totals, teamName) {
 
 // Render team attribute changes (franchise mode only, user's team)
 function renderTeamAttributeChanges() {
+  console.log('🔍 [BOX-SCORE] renderTeamAttributeChanges() CALLED');
+  
   // Only show for franchise mode and user's team
   const urlParams = new URLSearchParams(window.location.search);
   const mode = urlParams.get('mode');
   const teamId = urlParams.get('team_id');
   
+  console.log('🔍 [BOX-SCORE] renderTeamAttributeChanges - Initial check:', {
+    mode,
+    teamId,
+    hasGameData: !!gameData,
+    gameDataKeys: gameData ? Object.keys(gameData) : [],
+    allUrlParams: Object.fromEntries(urlParams.entries())
+  });
+  
   if (mode !== 'franchise' || !teamId || !gameData) {
+    console.log('🔍 [BOX-SCORE] renderTeamAttributeChanges EARLY RETURN:', {
+      mode,
+      teamId,
+      hasGameData: !!gameData,
+      reason: !mode ? 'no mode' : (!teamId ? 'no teamId' : 'no gameData'),
+      modeCheck: mode !== 'franchise',
+      teamIdCheck: !teamId,
+      gameDataCheck: !gameData
+    });
     return; // Only show in franchise mode for user's team
   }
   
   // Get attribute changes from game document
   const attributeChanges = gameData.team_attribute_changes || {};
+  console.log('🔍 [BOX-SCORE] Attribute changes from gameData:', {
+    hasAttributeChanges: !!gameData.team_attribute_changes,
+    attributeChangesKeys: Object.keys(attributeChanges),
+    attributeChanges: attributeChanges,
+    attributeChangesStringified: JSON.stringify(attributeChanges)
+  });
+  
   if (!attributeChanges || Object.keys(attributeChanges).length === 0) {
+    console.log('🔍 [BOX-SCORE] EARLY RETURN - No attribute changes to display');
     return; // No changes to display
   }
   
@@ -839,20 +882,72 @@ function renderTeamAttributeChanges() {
   const awayTeamId = gameData.away_team_id;
   const userTeamId = teamId;
   
-  // Find user's team changes
+  console.log('🔍 [BOX-SCORE] Team ID matching analysis:', {
+    homeTeamId,
+    awayTeamId,
+    userTeamId,
+    homeTeamIdType: typeof homeTeamId,
+    awayTeamIdType: typeof awayTeamId,
+    userTeamIdType: typeof userTeamId,
+    homeTeamIdValue: homeTeamId,
+    awayTeamIdValue: awayTeamId,
+    userTeamIdValue: userTeamId,
+    homeMatch: userTeamId === homeTeamId,
+    awayMatch: userTeamId === awayTeamId,
+    homeMatchStrict: String(userTeamId) === String(homeTeamId),
+    awayMatchStrict: String(userTeamId) === String(awayTeamId),
+    attributeChangesKeys: Object.keys(attributeChanges),
+    homeTeamIdInKeys: homeTeamId in attributeChanges,
+    awayTeamIdInKeys: awayTeamId in attributeChanges,
+    userTeamIdInKeys: userTeamId in attributeChanges
+  });
+  
+  // Find user's team changes - try multiple matching strategies
   let userTeamChanges = null;
   
+  // Strategy 1: Direct match
   if (userTeamId === homeTeamId) {
     userTeamChanges = attributeChanges[homeTeamId] || {};
+    console.log('🔍 [BOX-SCORE] Matched home team (direct), changes:', userTeamChanges);
   } else if (userTeamId === awayTeamId) {
     userTeamChanges = attributeChanges[awayTeamId] || {};
-  } else {
-    return; // User's team not in this game
+    console.log('🔍 [BOX-SCORE] Matched away team (direct), changes:', userTeamChanges);
+  }
+  
+  // Strategy 2: String comparison
+  if (!userTeamChanges && (String(userTeamId) === String(homeTeamId))) {
+    userTeamChanges = attributeChanges[homeTeamId] || attributeChanges[String(homeTeamId)] || {};
+    console.log('🔍 [BOX-SCORE] Matched home team (string), changes:', userTeamChanges);
+  } else if (!userTeamChanges && (String(userTeamId) === String(awayTeamId))) {
+    userTeamChanges = attributeChanges[awayTeamId] || attributeChanges[String(awayTeamId)] || {};
+    console.log('🔍 [BOX-SCORE] Matched away team (string), changes:', userTeamChanges);
+  }
+  
+  // Strategy 3: Try all keys in attributeChanges
+  if (!userTeamChanges) {
+    console.log('🔍 [BOX-SCORE] Trying to match against all attributeChanges keys:', Object.keys(attributeChanges));
+    for (const key of Object.keys(attributeChanges)) {
+      if (String(key) === String(userTeamId) || String(key) === String(homeTeamId) || String(key) === String(awayTeamId)) {
+        userTeamChanges = attributeChanges[key] || {};
+        console.log('🔍 [BOX-SCORE] Matched via key iteration:', { key, changes: userTeamChanges });
+        break;
+      }
+    }
   }
   
   if (!userTeamChanges || Object.keys(userTeamChanges).length === 0) {
+    console.log('🔍 [BOX-SCORE] EARLY RETURN - No changes found for user team after all matching strategies');
+    console.log('🔍 [BOX-SCORE] Final state:', {
+      userTeamId,
+      homeTeamId,
+      awayTeamId,
+      attributeChangesKeys: Object.keys(attributeChanges),
+      userTeamChanges
+    });
     return; // No changes for user's team
   }
+  
+  console.log('🔍 [BOX-SCORE] SUCCESS - Rendering team attribute changes:', userTeamChanges);
   
   // Show the section
   const section = document.getElementById('team-attribute-changes-section');

@@ -289,6 +289,9 @@ def update_team_attributes_after_game(
     home_is_winner = (home_team_id == winner_id)
     away_is_winner = (away_team_id == winner_id)
     
+    logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Calculating changes - home_team_id={home_team_id} (type: {type(home_team_id)}), away_team_id={away_team_id} (type: {type(away_team_id)})")
+    logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Winner info - winner_id={winner_id}, home_is_winner={home_is_winner}, away_is_winner={away_is_winner}")
+    
     home_changes = calculate_attr_changes(
         home_team_id, home_is_winner, home_totals, away_totals,
         home_scouting, away_scouting
@@ -298,10 +301,18 @@ def update_team_attributes_after_game(
         away_scouting, home_scouting
     )
     
-    return {
+    logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Calculated changes - home_changes keys: {list(home_changes.keys())}, away_changes keys: {list(away_changes.keys())}")
+    logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Home changes sample: {dict(list(home_changes.items())[:3]) if home_changes else 'None'}")
+    logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Away changes sample: {dict(list(away_changes.items())[:3]) if away_changes else 'None'}")
+    
+    result = {
         home_team_id: home_changes,
         away_team_id: away_changes
     }
+    
+    logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Returning result with keys: {list(result.keys())}")
+    
+    return result
 
 
 def get_user_team_from_franchise(franchise_doc: dict) -> tuple[str | None, str | None]:
@@ -865,6 +876,7 @@ def save_result(req: FranchiseResultRequest):
     
     # ✅ NEW: Update team attributes based on game performance
     # This replaces the team attribute decay that was in the training system
+    logger.info(f"🔍 [SAVE-RESULT] Starting team attribute update - game_id={game_id}, home_id={home_id}, away_id={away_id}, winner_id={winner_id}, winner_score={winner_score}, loser_score={loser_score}")
     try:
         attribute_changes = update_team_attributes_after_game(
             game_id=game_id,
@@ -877,6 +889,9 @@ def save_result(req: FranchiseResultRequest):
             loser_score=loser_score
         )
         
+        logger.info(f"🔍 [SAVE-RESULT] update_team_attributes_after_game returned: {attribute_changes}")
+        logger.info(f"🔍 [SAVE-RESULT] Attribute changes keys: {list(attribute_changes.keys()) if attribute_changes else 'None'}")
+        
         # Store attribute changes in game document for box score display
         if attribute_changes:
             db.games.update_one(
@@ -884,6 +899,9 @@ def save_result(req: FranchiseResultRequest):
                 {"$set": {"team_attribute_changes": attribute_changes}}
             )
             logger.info(f"✅ [SAVE-RESULT] Team attributes updated and changes stored in game document")
+            logger.info(f"🔍 [SAVE-RESULT] Stored attribute_changes structure: {attribute_changes}")
+        else:
+            logger.warning(f"⚠️ [SAVE-RESULT] update_team_attributes_after_game returned empty dict - no changes to store")
     except Exception as e:
         logger.error(f"❌ [SAVE-RESULT] Error updating team attributes: {e}")
         import traceback
