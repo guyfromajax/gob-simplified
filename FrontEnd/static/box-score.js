@@ -205,12 +205,24 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournam
       boxScoreKeys: gameData?.box_score ? Object.keys(gameData.box_score) : []
     });
     
-    // ✅ SS&S: box_score uses team_id keys, fallback to team_name for backward compatibility
-    const boxScore = (teamId && gameData.box_score?.[teamId]) || gameData.box_score?.[teamName] || {};
+    // ✅ FIX: Normalize team name to canonical format (uppercase with underscores) for box_score lookup
+    // Box score keys are in canonical format (e.g., "BENTLEY_TRUMAN") but team names are "Bentley-Truman"
+    const normalizeToCanonical = (name) => {
+      if (!name) return null;
+      return name.replace(/-/g, '_').replace(/\s+/g, '_').toUpperCase();
+    };
+    const canonicalTeamName = normalizeToCanonical(teamName);
+    
+    // ✅ SS&S: box_score uses team_id keys (canonical format), fallback to normalized team_name
+    const boxScore = (teamId && gameData.box_score?.[teamId]) || 
+                     (canonicalTeamName && gameData.box_score?.[canonicalTeamName]) || 
+                     gameData.box_score?.[teamName] || {};
     console.log(`🔍 [BOX-SCORE DEBUG] Box score lookup for ${teamKey}:`, {
       teamId,
       teamName,
+      canonicalTeamName,
       usingTeamId: !!(teamId && gameData.box_score?.[teamId]),
+      usingCanonicalName: !!(canonicalTeamName && gameData.box_score?.[canonicalTeamName]),
       usingTeamName: !!gameData.box_score?.[teamName],
       boxScoreKeys: Object.keys(boxScore),
       boxScorePlayerCount: Object.keys(boxScore).length
