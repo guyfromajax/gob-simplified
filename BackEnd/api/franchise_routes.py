@@ -24,11 +24,284 @@ from BackEnd.tournament.eos_tournament import (
 )
 from BackEnd.utils.db_utils import build_lineup_from_mongo
 from BackEnd.utils.game_id_utils import generate_game_id
+from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
+
+
+def update_team_attributes_after_game(
+    game_id: ObjectId,
+    franchise_id: ObjectId,
+    home_team_id: str,
+    away_team_id: str,
+    winner_id: str,
+    loser_id: str,
+    winner_score: int,
+    loser_score: int
+) -> dict:
+    """
+    Update team attributes based on game performance.
+    Replaces the team attribute decay that was in the training system.
+    
+    Returns:
+        dict: Attribute changes for each team, e.g.:
+        {
+            home_team_id: {"shot_threshold": +5, "discipline": -1, ...},
+            away_team_id: {"shot_threshold": +12, "discipline": -2, ...}
+        }
+    """
+    import random
+    
+    # Load game document to get stats
+    game_doc = db.games.find_one({"_id": game_id})
+    if not game_doc:
+        logger.error(f"❌ [UPDATE-TEAM-ATTRS] Game {game_id} not found")
+        return {}
+    
+    # Get box_score and teams object
+    box_score = game_doc.get("box_score", {})
+    teams_obj = game_doc.get("teams", {})
+    
+    # Try to get team objects - teams object uses team_id strings (like "XAVIEN") as keys
+    # But home_team_id/away_team_id might be ObjectId strings, so we need to resolve
+    home_team_obj = {}
+    away_team_obj = {}
+    
+    # Try direct lookup first (if home_team_id is already a team_id string)
+    if home_team_id:
+        home_team_obj = teams_obj.get(home_team_id, {})
+        # If not found, try looking up by ObjectId to get team_id string
+        if not home_team_obj and home_team_id:
+            try:
+                team_doc = db.teams.find_one({"_id": ObjectId(home_team_id)}, {"team_id": 1})
+                if team_doc and team_doc.get("team_id"):
+                    home_team_obj = teams_obj.get(team_doc["team_id"], {})
+            except Exception:
+                pass
+    
+    if away_team_id:
+        away_team_obj = teams_obj.get(away_team_id, {})
+        # If not found, try looking up by ObjectId to get team_id string
+        if not away_team_obj and away_team_id:
+            try:
+                team_doc = db.teams.find_one({"_id": ObjectId(away_team_id)}, {"team_id": 1})
+                if team_doc and team_doc.get("team_id"):
+                    away_team_obj = teams_obj.get(team_doc["team_id"], {})
+            except Exception:
+                pass
+    
+    # Calculate team totals from box_score
+    def calculate_team_totals(team_box_score):
+        """Sum all player stats from box_score to get team totals."""
+        totals = {
+            "FGM": 0, "FGA": 0, "TO": 0, "STL": 0,
+            "DREB": 0, "OREB": 0
+        }
+        if isinstance(team_box_score, dict):
+            for player_stats in team_box_score.values():
+                if isinstance(player_stats, dict):
+                    totals["FGM"] += player_stats.get("FGM", 0)
+                    totals["FGA"] += player_stats.get("FGA", 0)
+                    totals["TO"] += player_stats.get("TO", 0)
+                    totals["STL"] += player_stats.get("STL", 0)
+                    totals["DREB"] += player_stats.get("DREB", 0)
+                    totals["OREB"] += player_stats.get("OREB", 0)
+        return totals
+    
+    # Get team totals - try team_id keys first, then team name keys
+    home_totals = calculate_team_totals(box_score.get(home_team_id, {}))
+    if not home_totals.get("FGA"):
+        home_team_name = home_team_obj.get("name") or game_doc.get("home_team", {}).get("name") if isinstance(game_doc.get("home_team"), dict) else game_doc.get("home_team")
+        if home_team_name:
+            home_totals = calculate_team_totals(box_score.get(home_team_name, {}))
+    
+    away_totals = calculate_team_totals(box_score.get(away_team_id, {}))
+    if not away_totals.get("FGA"):
+        away_team_name = away_team_obj.get("name") or game_doc.get("away_team", {}).get("name") if isinstance(game_doc.get("away_team"), dict) else game_doc.get("away_team")
+        if away_team_name:
+            away_totals = calculate_team_totals(box_score.get(away_team_name, {}))
+    
+    # Get scouting data for FB/HCT/FCP success rates
+    def get_scouting_data(team_obj):
+        """Extract scouting data from team object."""
+        offense = team_obj.get("scouting", {}).get("offense", {})
+        defense = team_obj.get("scouting", {}).get("defense", {})
+        
+        # Fast Break
+        fb_entries = offense.get("Fast_Break_Entries", 0)
+        fb_success = offense.get("Fast_Break_Success", 0)
+        fb_rate = (fb_success / fb_entries * 100) if fb_entries > 0 else 0
+        
+        # HC Trap
+        hct = defense.get("HCT", {})
+        hct_used = hct.get("used", 0)
+        hct_success = hct.get("success", 0)
+        hct_rate = (hct_success / hct_used * 100) if hct_used > 0 else 0
+        
+        # FC Press
+        fcp = defense.get("FCP", {})
+        fcp_used = fcp.get("used", 0)
+        fcp_success = fcp.get("success", 0)
+        fcp_rate = (fcp_success / fcp_used * 100) if fcp_used > 0 else 0
+        
+        # Combined Press/Trap rate
+        pt_total_attempts = hct_used + fcp_used
+        pt_total_successes = hct_success + fcp_success
+        pt_combined_rate = (pt_total_successes / pt_total_attempts * 100) if pt_total_attempts > 0 else 0
+        
+        return {
+            "fb_rate": fb_rate,
+            "hct_rate": hct_rate,
+            "fcp_rate": fcp_rate,
+            "pt_combined_rate": pt_combined_rate
+        }
+    
+    home_scouting = get_scouting_data(home_team_obj)
+    away_scouting = get_scouting_data(away_team_obj)
+    
+    # Calculate attribute changes for each team
+    def calculate_attr_changes(team_id, is_winner, team_totals, opponent_totals, team_scouting, opponent_scouting):
+        """Calculate attribute changes for a team."""
+        changes = {}
+        
+        # Calculate FG%
+        fgm = team_totals.get("FGM", 0)
+        fga = team_totals.get("FGA", 0)
+        fg_pct = (fgm / fga * 100) if fga > 0 else 0
+        
+        # Calculate TREB
+        treb = team_totals.get("DREB", 0) + team_totals.get("OREB", 0)
+        opp_treb = opponent_totals.get("DREB", 0) + opponent_totals.get("OREB", 0)
+        
+        # Get current team attributes from franchise document
+        franchise_doc = db.franchises.find_one({"_id": franchise_id})
+        if not franchise_doc:
+            logger.error(f"❌ [UPDATE-TEAM-ATTRS] Franchise {franchise_id} not found")
+            return {}
+        
+        franchise_teams = franchise_doc.get("franchise_teams", {})
+        team_attrs = franchise_teams.get(team_id, {})
+        
+        # shot_threshold
+        if is_winner:
+            if fg_pct > 50:
+                changes["shot_threshold"] = random.randint(0, 15)
+            elif fg_pct > 42.5:
+                changes["shot_threshold"] = random.randint(5, 20)
+            else:
+                changes["shot_threshold"] = random.randint(10, 25)
+        else:
+            changes["shot_threshold"] = random.randint(10, 25)
+        
+        # discipline
+        to = team_totals.get("TO", 0)
+        stl = team_totals.get("STL", 0)
+        if to > (2 * stl):
+            changes["discipline"] = random.randint(-3, -1)
+        else:
+            changes["discipline"] = random.randint(-1, 0)
+        
+        # fight
+        if is_winner:
+            changes["fight"] = random.randint(0, 1)
+        else:
+            changes["fight"] = random.randint(-3, -1)
+        
+        # rebound_modifier
+        if treb > (opp_treb + 5):
+            changes["rebound_modifier"] = random.uniform(0, 0.05)
+        else:
+            changes["rebound_modifier"] = random.uniform(-0.05, 0)
+        
+        # offensive_efficiency
+        changes["offensive_efficiency"] = random.randint(-2, 0)
+        
+        # defensive_efficiency
+        changes["defensive_efficiency"] = random.randint(-2, 0)
+        
+        # fb_efficiency
+        if team_scouting["fb_rate"] > 50:
+            changes["fb_efficiency"] = random.randint(0, 1)
+        else:
+            changes["fb_efficiency"] = random.randint(-2, -1)
+        
+        # fb_opp_modifier
+        if opponent_scouting["fb_rate"] < 40:
+            changes["fb_opp_modifier"] = random.randint(0, 1)
+        else:
+            changes["fb_opp_modifier"] = random.randint(-2, -1)
+        
+        # pt_efficiency
+        if team_scouting["pt_combined_rate"] > 50:
+            changes["pt_efficiency"] = random.randint(0, 1)
+        else:
+            changes["pt_efficiency"] = random.randint(-2, -1)
+        
+        # pt_opp_modifier
+        if opponent_scouting["pt_combined_rate"] < 40:
+            changes["pt_opp_modifier"] = random.randint(0, 1)
+        else:
+            changes["pt_opp_modifier"] = random.randint(-2, -1)
+        
+        # team_chemistry
+        score_delta = winner_score - loser_score
+        if is_winner:
+            if score_delta < 4:
+                changes["team_chemistry"] = random.randint(0, 1)
+            elif score_delta < 7:
+                changes["team_chemistry"] = random.randint(0, 1)
+            else:
+                changes["team_chemistry"] = random.randint(1, 2)
+        else:
+            if score_delta < 4:
+                changes["team_chemistry"] = random.randint(-1, 0)
+            elif score_delta < 7:
+                changes["team_chemistry"] = random.randint(-2, -1)
+            else:
+                changes["team_chemistry"] = random.randint(-4, -1)
+        
+        # Apply changes and clamp to valid ranges
+        update_doc = {}
+        for attr_name, change in changes.items():
+            if attr_name in TEAM_ATTR_CLAMPS:
+                current_val = team_attrs.get(attr_name, 0)
+                new_val = current_val + change
+                lower, upper = TEAM_ATTR_CLAMPS[attr_name]
+                clamped_val = max(lower, min(upper, new_val))
+                update_doc[f"franchise_teams.{team_id}.{attr_name}"] = clamped_val
+                # Store the actual change (may be different if clamped)
+                changes[attr_name] = clamped_val - current_val
+        
+        # Update franchise document
+        if update_doc:
+            db.franchises.update_one(
+                {"_id": franchise_id},
+                {"$set": update_doc}
+            )
+            logger.info(f"✅ [UPDATE-TEAM-ATTRS] Updated {len(update_doc)} attributes for team {team_id}")
+        
+        return changes
+    
+    # Calculate changes for both teams
+    home_is_winner = (home_team_id == winner_id)
+    away_is_winner = (away_team_id == winner_id)
+    
+    home_changes = calculate_attr_changes(
+        home_team_id, home_is_winner, home_totals, away_totals,
+        home_scouting, away_scouting
+    )
+    away_changes = calculate_attr_changes(
+        away_team_id, away_is_winner, away_totals, home_totals,
+        away_scouting, home_scouting
+    )
+    
+    return {
+        home_team_id: home_changes,
+        away_team_id: away_changes
+    }
 
 
 def get_user_team_from_franchise(franchise_doc: dict) -> tuple[str | None, str | None]:
@@ -589,6 +862,32 @@ def save_result(req: FranchiseResultRequest):
     stat_updater.finalize_game(
         req.game_id, mode="franchise", franchise_id=req.franchise_id
     )
+    
+    # ✅ NEW: Update team attributes based on game performance
+    # This replaces the team attribute decay that was in the training system
+    try:
+        attribute_changes = update_team_attributes_after_game(
+            game_id=game_id,
+            franchise_id=franchise_id,
+            home_team_id=home_id,
+            away_team_id=away_id,
+            winner_id=winner_id,
+            loser_id=loser_id,
+            winner_score=winner_score,
+            loser_score=loser_score
+        )
+        
+        # Store attribute changes in game document for box score display
+        if attribute_changes:
+            db.games.update_one(
+                {"_id": game_id},
+                {"$set": {"team_attribute_changes": attribute_changes}}
+            )
+            logger.info(f"✅ [SAVE-RESULT] Team attributes updated and changes stored in game document")
+    except Exception as e:
+        logger.error(f"❌ [SAVE-RESULT] Error updating team attributes: {e}")
+        import traceback
+        logger.error(f"❌ [SAVE-RESULT] Traceback: {traceback.format_exc()}")
 
     return {"status": "success"}
 

@@ -163,21 +163,20 @@ PLAYER_ATTR_CLAMP = (1, None)  # Min 1, no max
 
 def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List[dict], dict]:
     """
-    Apply pre-training conditions to players and team.
+    Apply pre-training conditions to players only.
+    
+    Note: Team attribute decay has been removed. Team attributes are now updated
+    at the end of each game via update_team_attributes_after_game() in franchise_routes.py.
     
     Pre-training conditions:
     - Player attributes (excluding EM, MO, NG): += randint(-4, -1) for each player/attribute
-    - Rebound modifier: += random between -0.1 to 0 in 0.01 increments
-    - Shot threshold: += random.randint(5, 20)
-    - Team chemistry: N/A (no change)
-    - All other team attributes: += random choice [-2, -1, 0]
     
     Args:
         players: List of player dicts with attributes
-        team: Team dict with team attributes
+        team: Team dict with team attributes (unchanged, kept for API compatibility)
     
     Returns:
-        Tuple of (updated_players, updated_team)
+        Tuple of (updated_players, unchanged_team)
     """
     # Apply to each player
     for player in players:
@@ -191,38 +190,9 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
                 # Also update base attribute
                 attrs[attr] = attrs[anchor_key]
     
-    # Apply to team attributes
-    # Rebound modifier: random decrease between -0.1 to 0 in 0.01 increments
-    if "rebound_modifier" in team:
-        decrease = random.randint(-10, 0) / 100.0  # -0.1 to 0 in 0.01 increments
-        team["rebound_modifier"] += decrease  # decrease is already negative or zero
-        # Clamp to [0.0, 0.4]
-        team["rebound_modifier"] = max(
-            TEAM_ATTR_CLAMPS["rebound_modifier"][0],
-            min(TEAM_ATTR_CLAMPS["rebound_modifier"][1], team["rebound_modifier"])
-        )
-    
-    # Shot threshold: += random.randint(5, 20)
-    if "shot_threshold" in team:
-        team["shot_threshold"] += random.randint(5, 20)
-        # Clamp
-        team["shot_threshold"] = max(
-            TEAM_ATTR_CLAMPS["shot_threshold"][0],
-            min(TEAM_ATTR_CLAMPS["shot_threshold"][1], team["shot_threshold"])
-        )
-    
-    # All other team attributes (excluding shot_threshold, rebound_modifier, team_chemistry)
-    exclude_attrs = ["shot_threshold", "rebound_modifier", "team_chemistry"]
-    for attr_name, (lower, upper) in TEAM_ATTR_CLAMPS.items():
-        if attr_name in exclude_attrs:
-            continue
-        if attr_name in team:
-            # Apply random decrease: random choice [-2, -1, 0]
-            decrease = random.choice([-2, -1, 0])
-            team[attr_name] += decrease
-            # Clamp
-            team[attr_name] = max(lower, min(upper, team[attr_name]))
-    
+    # Team attributes are no longer decayed here - they are updated at end of game
+    # via update_team_attributes_after_game() in franchise_routes.py
+    # Return team unchanged
     return players, team
 
 
