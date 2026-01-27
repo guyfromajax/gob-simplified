@@ -59,9 +59,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Fetch game data from API and merge with full rosters
 async function loadGameData(gameId) {
-  const urlParams = new URLSearchParams(window.location.search);
   console.log('📥 Loading game data for gameId:', gameId);
-  console.log('🔍 [BOX-SCORE] loadGameData - URL params:', Object.fromEntries(urlParams.entries()));
   const response = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`));
   if (!response.ok) {
     console.error('❌ Failed to fetch game data:', response.status, response.statusText);
@@ -77,11 +75,6 @@ async function loadGameData(gameId) {
     playerCount: gameData.players ? gameData.players.length : 0,
     score: gameData.score,
     quarter: gameData.quarter,
-    hasTeamAttributeChanges: !!(gameData.team_attribute_changes),
-    teamAttributeChanges: gameData.team_attribute_changes || null,
-    teamAttributeChangesKeys: gameData.team_attribute_changes ? Object.keys(gameData.team_attribute_changes) : [],
-    home_team_id: gameData.home_team_id,
-    away_team_id: gameData.away_team_id,
     home_team_id: gameData.home_team_id,
     away_team_id: gameData.away_team_id,
     hasTeams: !!gameData.teams,
@@ -116,6 +109,7 @@ async function loadGameData(gameId) {
   
   // Fetch full rosters to ensure all 12 players are shown
   const urlParams = new URLSearchParams(window.location.search);
+  console.log('🔍 [BOX-SCORE] loadGameData - URL params:', Object.fromEntries(urlParams.entries()));
   // ✅ UNIFIED STRUCTURE: Extract team names from unified teams object, fallback to old structure
   const homeTeamId = gameData.home_team_id;
   const awayTeamId = gameData.away_team_id;
