@@ -3960,8 +3960,14 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
         raise HTTPException(status_code=404, detail=f"Team document missing name field for '{lookup_value}'")
 
     load_start = time.time()
+    # ✅ DEBUG: Determine mode from query parameters
+    actual_mode = "single"
+    if franchise_id:
+        actual_mode = "franchise"
+    elif tournament_id:
+        actual_mode = "tournament"
     # ✅ DEBUG: Log franchise_id being passed to load_roster()
-    logging.warning(f"🔍 [BOX-SCORE ROSTER DEBUG] /roster/{team_identifier} - franchise_id={franchise_id}, team_name={match}, mode=franchise")
+    logging.warning(f"🔍 [BOX-SCORE ROSTER DEBUG] /roster/{team_identifier} - franchise_id={franchise_id}, tournament_id={tournament_id}, team_name={match}, mode={actual_mode}")
     # ✅ FIX: Pass franchise_id to load_roster() so it loads trained attributes from franchise.players
     # This ensures Roster tab displays trained values (e.g., SH in 90s) instead of universal collection values (e.g., SH in 80s)
     team_doc, player_objects = load_roster(match, franchise_id=franchise_id)
