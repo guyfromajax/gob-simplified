@@ -327,6 +327,44 @@ h2 {
 }
 
 /* Scouting Notes */
+/* Team Attribute Changes Section */
+.attribute-changes-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.attribute-changes-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.attribute-change-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.attribute-change-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.attribute-change-value {
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+}
+
 .scouting-content {
   padding: 20px;
   background: #f9f9f9;

@@ -326,6 +326,7 @@ function renderBoxScore() {
   renderPlayerStats();
   renderTeamStats();
   renderScoutingNotes();
+  renderTeamAttributeChanges();
 }
 
 // Build zeroed box score data from rosters when viewing pre-game
@@ -814,6 +815,130 @@ function renderSpecialStats(team, totals, teamName) {
   document.getElementById(`${team}-fb-points`).textContent = totals.FB_PTS || 0;
   document.getElementById(`${team}-pip`).textContent = totals.PIP || 0;
   document.getElementById(`${team}-pot`).textContent = totals.POT || 0;
+}
+
+// Render team attribute changes (franchise mode only, user's team)
+function renderTeamAttributeChanges() {
+  // Only show for franchise mode and user's team
+  const urlParams = new URLSearchParams(window.location.search);
+  const mode = urlParams.get('mode');
+  const teamId = urlParams.get('team_id');
+  
+  if (mode !== 'franchise' || !teamId || !gameData) {
+    return; // Only show in franchise mode for user's team
+  }
+  
+  // Get attribute changes from game document
+  const attributeChanges = gameData.team_attribute_changes || {};
+  if (!attributeChanges || Object.keys(attributeChanges).length === 0) {
+    return; // No changes to display
+  }
+  
+  // Determine which team is the user's team
+  const homeTeamId = gameData.home_team_id;
+  const awayTeamId = gameData.away_team_id;
+  const userTeamId = teamId;
+  
+  // Find user's team changes
+  let userTeamChanges = null;
+  
+  if (userTeamId === homeTeamId) {
+    userTeamChanges = attributeChanges[homeTeamId] || {};
+  } else if (userTeamId === awayTeamId) {
+    userTeamChanges = attributeChanges[awayTeamId] || {};
+  } else {
+    return; // User's team not in this game
+  }
+  
+  if (!userTeamChanges || Object.keys(userTeamChanges).length === 0) {
+    return; // No changes for user's team
+  }
+  
+  // Show the section
+  const section = document.getElementById('team-attribute-changes-section');
+  if (section) {
+    section.style.display = 'block';
+  }
+  
+  // Display names
+  const attrNames = {
+    'shot_threshold': 'Shot Threshold',
+    'rebound_modifier': 'Rebound',
+    'offensive_efficiency': 'Offense',
+    'defensive_efficiency': 'Defense',
+    'fb_efficiency': 'Fast Break',
+    'pt_efficiency': 'Press/Trap',
+    'fight': 'Fight',
+    'discipline': 'Discipline',
+    'momentum_score': 'Momentum',
+    'team_chemistry': 'Chemistry',
+    'fb_opp_modifier': 'FB Defense',
+    'pt_opp_modifier': 'P/T Breaks'
+  };
+  
+  // Format change value
+  const formatChange = (change) => {
+    if (change === 0) return { text: '0', color: 'black' };
+    if (change > 0) return { text: `+${change}`, color: 'green' };
+    return { text: `${change}`, color: 'red' };
+  };
+  
+  // Create the display grid (3 rows, 4 columns)
+  const container = document.getElementById('team-attribute-changes-content');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  // Row 1: Shot threshold, rebound, offense, defense
+  const row1 = document.createElement('div');
+  row1.className = 'attribute-changes-row';
+  const row1Attrs = ['shot_threshold', 'rebound_modifier', 'offensive_efficiency', 'defensive_efficiency'];
+  row1Attrs.forEach(attrKey => {
+    const change = userTeamChanges[attrKey] || 0;
+    const formatted = formatChange(change);
+    const cell = document.createElement('div');
+    cell.className = 'attribute-change-cell';
+    cell.innerHTML = `
+      <div class="attribute-change-label">${attrNames[attrKey]}</div>
+      <div class="attribute-change-value" style="color: ${formatted.color}">${formatted.text}</div>
+    `;
+    row1.appendChild(cell);
+  });
+  container.appendChild(row1);
+  
+  // Row 2: Fast Break, Press/Trap, Fight, Discipline
+  const row2 = document.createElement('div');
+  row2.className = 'attribute-changes-row';
+  const row2Attrs = ['fb_efficiency', 'pt_efficiency', 'fight', 'discipline'];
+  row2Attrs.forEach(attrKey => {
+    const change = userTeamChanges[attrKey] || 0;
+    const formatted = formatChange(change);
+    const cell = document.createElement('div');
+    cell.className = 'attribute-change-cell';
+    cell.innerHTML = `
+      <div class="attribute-change-label">${attrNames[attrKey]}</div>
+      <div class="attribute-change-value" style="color: ${formatted.color}">${formatted.text}</div>
+    `;
+    row2.appendChild(cell);
+  });
+  container.appendChild(row2);
+  
+  // Row 3: Momentum, Chemistry, FB Defense, P/T Breaks
+  const row3 = document.createElement('div');
+  row3.className = 'attribute-changes-row';
+  const row3Attrs = ['momentum_score', 'team_chemistry', 'fb_opp_modifier', 'pt_opp_modifier'];
+  row3Attrs.forEach(attrKey => {
+    const change = userTeamChanges[attrKey] || 0;
+    const formatted = formatChange(change);
+    const cell = document.createElement('div');
+    cell.className = 'attribute-change-cell';
+    cell.innerHTML = `
+      <div class="attribute-change-label">${attrNames[attrKey]}</div>
+      <div class="attribute-change-value" style="color: ${formatted.color}">${formatted.text}</div>
+    `;
+    row3.appendChild(cell);
+  });
+  container.appendChild(row3);
 }
 
 // Render scouting notes
