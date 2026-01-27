@@ -34,6 +34,68 @@
 5. **Box Score Navigation**: User can navigate to Box Score page with all context parameters preserved (box score reflects updated team attributes)
 6. **Command Center Navigation**: User can navigate to appropriate Command Center (Tournament, Franchise, or Mode Select) with complete navigation context
 
+**Team Attributes Update System**
+Team attributes will adjust at the end of game based on the notes below. Note this will replace the team attribute decay we had coded into the Training System.
+- Values will be capped to normal ranges:
+  - `shot_threshold`: -10 to 190
+  - `rebound_modifier`: 0 to 0.4
+  - `team_chemistry`: 7 to 25
+  - all others: -10 to 10
+- End of game attribute adjustments (applies to each team, all stat conditions for the game just run):
+  - `shot_threshold`
+    - winning team: 
+      - If game FG% > 50%: += random.randint(0,15)
+      - elif game FG% > 42.5%: += random.randint(5,20)
+      - else: += random.randint(10,25) 
+    - losing team: += random.randint(10,25)
+  - `discipline` (winning and losing team have same criteria)
+    - if team TO > (2 * team STL): += random.randint(-3, -1)
+    - else: += random.randint(-1,0)
+  - `fight` 
+    - winning team: += random.randint(0,1)
+    - losing team: += random.randint(-3,-1)
+  - `rebound_modifier` (winning and losing team have same criteria)
+    - if team TREB for the game > opponents TREB for the game + 5: += random.uniform(0, 0.05)
+    - else: += random.uniform(-0.05, 0)
+  - `offensive_efficiency` (winning and losing team have same criteria)
+    - += random.randint(-2,0)
+  - `defensive_efficiency` (winning and losing team have same criteria)
+    - += random.randint(-2,0)
+  - `fb_efficiency`
+    - if fast break success rate > 50%: += random.randint(0,1)
+    - else: += random.randint(-2,-1)
+  - `fb_opp_modifier` - Fast break opponent modifier
+    - if opponents fast break success rate < 40%: += random.randint(0,1)
+    - else: += random.randint(-2,-1)
+  - `pt_efficiency` - Press/Trap efficiency rating
+    - if (fc press success rate + hc trap success rate) combined > 50%: += random.randint(0,1)
+    - else: += random.randint(-2,-1)
+    - Note: Combined rate = (FC Press successes + HC Trap successes) / (FC Press attempts + HC Trap attempts)
+  - `pt_opp_modifier` - Press/Trap opponent modifier
+    - if opponents (press success rate + trap success rate) combined < 40%: += random.randint(0,1)
+    - else: += random.randint(-2,-1)
+    - Note: Combined rate = (FC Press successes + HC Trap successes) / (FC Press attempts + HC Trap attempts)
+  - `team_chemistry` - Team chemistry rating
+    - score delta = winning team final score - losing team final score
+    - if score_delta < 4:
+      - winning team += random.randint(0,1)
+      - losing team += random.randint(-1,0)
+    - elif score_delta < 7:
+      - winning team += random.randint(0,1)
+      - losing team += random.randint(-2,-1)
+    - else:
+      - winning team += random.randint(1,2)
+      - losing team += random.randint(-4,-1)
+- **Data Sources:**
+  - Team statistics (TO, STL, TREB, FG%) come from the current game's box score
+  - Fast Break, HC Trap, and FC Press success rates come from the box score's "Special Situations" section
+  - Success rates are calculated as: (successes / attempts) * 100%
+  - [FOR REFERENCE ONLY]: Previous deprication rates when run in traning:
+    - Rebound modifier: `+= random.uniform(-0.1, 0)` (pre-training, range from -0.1 to 0)
+    - Shot threshold: `+= random.randint(5, 20)`
+    - Other team attributes: `+= random.choice([-2, -1, 0])`
+
+
 **Long Form Documentation**
 
 ### Overview
