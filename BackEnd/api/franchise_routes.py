@@ -53,9 +53,14 @@ def update_team_attributes_after_game(
             away_team_id: {"shot_threshold": +12, "discipline": -2, ...}
         }
     """
+    logger.info(f"🔍 [UPDATE-TEAM-ATTRS] FUNCTION CALLED")
+    logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Input parameters - game_id={game_id}, franchise_id={franchise_id}")
+    logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Team IDs - home_team_id={home_team_id} (type: {type(home_team_id)}), away_team_id={away_team_id} (type: {type(away_team_id)})")
+    logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Winner/Loser - winner_id={winner_id} (type: {type(winner_id)}), loser_id={loser_id} (type: {type(loser_id)})")
     import random
     
     # Load game document to get stats
+    logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Loading game document")
     game_doc = db.games.find_one({"_id": game_id})
     if not game_doc:
         logger.error(f"❌ [UPDATE-TEAM-ATTRS] Game {game_id} not found")
@@ -311,6 +316,8 @@ def update_team_attributes_after_game(
     }
     
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Returning result with keys: {list(result.keys())}")
+    logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Result key types - home_team_id key type: {type(list(result.keys())[0]) if result.keys() else 'None'}")
+    logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Result structure: {result}")
     
     return result
 
@@ -773,26 +780,37 @@ def play_next_game(req: PlayGameRequest):
 
 @router.post("/franchise/save-result")
 def save_result(req: FranchiseResultRequest):
+    logger.info(f"🔍 [SAVE-RESULT] ENDPOINT CALLED - franchise_id={req.franchise_id}, game_id={req.game_id}")
+    logger.info(f"🔍 [SAVE-RESULT] Request object: {req}")
     try:
         franchise_id = ObjectId(req.franchise_id)
         game_id = ObjectId(req.game_id)
-    except Exception:
+        logger.info(f"🔍 [SAVE-RESULT] IDs converted successfully - franchise_id={franchise_id}, game_id={game_id}")
+    except Exception as e:
+        logger.error(f"❌ [SAVE-RESULT] ID conversion failed: {e}")
         raise HTTPException(status_code=400, detail="Invalid ID format")
 
+    logger.info(f"🔍 [SAVE-RESULT] Looking up franchise and game documents")
     franchise_doc = db.franchises.find_one({"_id": franchise_id})
     if not franchise_doc:
+        logger.error(f"❌ [SAVE-RESULT] Franchise not found: {franchise_id}")
         raise HTTPException(status_code=404, detail="Franchise not found")
 
     game_doc = db.games.find_one({"_id": game_id})
     if not game_doc:
+        logger.error(f"❌ [SAVE-RESULT] Game not found: {game_id}")
         raise HTTPException(status_code=404, detail="Game not found")
 
+    logger.info(f"🔍 [SAVE-RESULT] Documents found, extracting team info")
     home = game_doc.get("homeTeam", {}) or {}
     away = game_doc.get("awayTeam", {}) or {}
     home_name = home.get("name") or game_doc.get("home_team")
     away_name = away.get("name") or game_doc.get("away_team")
     home_id = home.get("team_id") or game_doc.get("home_team_id")
     away_id = away.get("team_id") or game_doc.get("away_team_id")
+    
+    logger.info(f"🔍 [SAVE-RESULT] Team IDs extracted - home_id={home_id} (type: {type(home_id)}), away_id={away_id} (type: {type(away_id)})")
+    logger.info(f"🔍 [SAVE-RESULT] Team names - home_name={home_name}, away_name={away_name}")
     score_map = game_doc.get("score") or game_doc.get("final_score") or {}
     home_score = home.get("score", score_map.get(home_name, 0))
     away_score = away.get("score", score_map.get(away_name, 0))
@@ -870,13 +888,18 @@ def save_result(req: FranchiseResultRequest):
         else:
             logger.error(f"❌ [SAVE-RESULT] No box_score found in game document (game_id={game_id}). finalize_game() may fail or produce incomplete stats.")
     
+    logger.info(f"🔍 [SAVE-RESULT] Calling finalize_game()")
+    logger.info(f"🔍 [SAVE-RESULT] Calling finalize_game()")
     stat_updater.finalize_game(
         req.game_id, mode="franchise", franchise_id=req.franchise_id
     )
+    logger.info(f"🔍 [SAVE-RESULT] finalize_game() completed")
     
     # ✅ NEW: Update team attributes based on game performance
     # This replaces the team attribute decay that was in the training system
-    logger.info(f"🔍 [SAVE-RESULT] Starting team attribute update - game_id={game_id}, home_id={home_id}, away_id={away_id}, winner_id={winner_id}, winner_score={winner_score}, loser_score={loser_score}")
+    logger.info(f"🔍 [SAVE-RESULT] About to call update_team_attributes_after_game()")
+    logger.info(f"🔍 [SAVE-RESULT] Parameters - game_id={game_id}, franchise_id={franchise_id}, home_id={home_id}, away_id={away_id}, winner_id={winner_id}, loser_id={loser_id}, winner_score={winner_score}, loser_score={loser_score}")
+    logger.info(f"🔍 [SAVE-RESULT] Team ID types - home_id type: {type(home_id)}, away_id type: {type(away_id)}, winner_id type: {type(winner_id)}")
     try:
         attribute_changes = update_team_attributes_after_game(
             game_id=game_id,
