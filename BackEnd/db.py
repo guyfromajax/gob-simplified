@@ -87,6 +87,7 @@ if client:
     training_log_collection = db["training_sessions"]
     franchise_state_collection = db["franchise_state"]
     franchises_collection = db["franchises"]
+    franchise_team_data_collection = db["franchise_team_data"]
     plays_collection = db["plays"]
     defenses_collection = db["defenses"]
     fcp_skeletons_collection = db["fcp_skeletons"]
@@ -104,6 +105,7 @@ else:
     training_log_collection = db["training_sessions"]
     franchise_state_collection = db["franchise_state"]
     franchises_collection = db["franchises"]
+    franchise_team_data_collection = db["franchise_team_data"]
     plays_collection = db["plays"]
     defenses_collection = db["defenses"]
     fcp_skeletons_collection = db["fcp_skeletons"]
@@ -113,3 +115,19 @@ else:
 print("🔵 [DEBUG] db.py: Module initialization complete", file=sys.stderr, flush=True)
 
 
+def ensure_ftd_index():
+    """
+    Ensure unique compound index on franchise_team_data (franchise_id, team_id).
+    Idempotent; safe to call on startup or before FTD writes.
+    Skips when using mongomock (no real MongoDB).
+    """
+    if not client:
+        return
+    try:
+        franchise_team_data_collection.create_index(
+            [("franchise_id", 1), ("team_id", 1)],
+            unique=True,
+            name="franchise_team_unique",
+        )
+    except Exception as e:
+        print(f"⚠️ [DB] ensure_ftd_index: {e}", file=sys.stderr, flush=True)

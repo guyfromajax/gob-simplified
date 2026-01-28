@@ -824,8 +824,9 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
     home_team_id_key = game.get("home_team_id")  # e.g., "LITTLE_YORK"
     away_team_id_key = game.get("away_team_id")  # e.g., "FOUR_CORNERS"
     
-    # Build update operations for all teams
-    all_inc_doc: Dict[str, Any] = {}
+    # ✅ FTD: For franchise mode, collect FTD updates per team; for tournament, collect doc updates
+    ftd_updates: Dict[str, Dict[str, Any]] = {}  # {team_object_id: {inc_doc, set_doc}}
+    all_inc_doc: Dict[str, Any] = {}  # For tournament mode
     all_set_doc: Dict[str, Any] = {}
     
     for game_team_key, team_data in teams_obj.items():
@@ -840,29 +841,40 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
         # Game document keys are team_id strings (like "LITTLE_YORK") or team names
         # We need to map to the ObjectId string used in franchise_teams
         actual_team_id = game_team_key  # Default to game key (works for tournament mode)
+        team_object_id = None  # For FTD updates
+        
         if mode == "franchise":
             # Try multiple matching strategies
             if game_team_key in game_key_to_franchise_id:
                 # Direct match: game_team_key is a team_id string (e.g., "LITTLE_YORK")
                 actual_team_id = game_key_to_franchise_id[game_team_key]
+                team_object_id = ObjectId(actual_team_id)
                 logger.info(f"🔍 [UPDATE_PLAY_STATS] Mapped team_id '{game_team_key}' → franchise_id={actual_team_id}")
             elif game_team_key == home_team_id_key and home_team_name and home_team_name in team_name_to_franchise_id:
                 # Match via home team name
                 actual_team_id = team_name_to_franchise_id[home_team_name]
+                team_object_id = ObjectId(actual_team_id)
                 logger.info(f"🔍 [UPDATE_PLAY_STATS] Mapped home team '{home_team_name}' (key={game_team_key}) → franchise_id={actual_team_id}")
             elif game_team_key == away_team_id_key and away_team_name and away_team_name in team_name_to_franchise_id:
                 # Match via away team name
                 actual_team_id = team_name_to_franchise_id[away_team_name]
+                team_object_id = ObjectId(actual_team_id)
                 logger.info(f"🔍 [UPDATE_PLAY_STATS] Mapped away team '{away_team_name}' (key={game_team_key}) → franchise_id={actual_team_id}")
             elif game_team_key in team_name_to_franchise_id:
                 # Direct match: game_team_key is a team name
                 actual_team_id = team_name_to_franchise_id[game_team_key]
+                team_object_id = ObjectId(actual_team_id)
                 logger.info(f"🔍 [UPDATE_PLAY_STATS] Mapped team name '{game_team_key}' → franchise_id={actual_team_id}")
             else:
-                logger.warning(f"⚠️ [UPDATE_PLAY_STATS] Could not map team '{game_team_key}' to franchise_id, using game_key as-is (update will likely fail)")
-                actual_team_id = game_team_key
+                logger.warning(f"⚠️ [UPDATE_PLAY_STATS] Could not map team '{game_team_key}' to franchise_id, skipping FTD update")
+                continue
         
         plays_with_stats = 0
+        
+        # Initialize FTD update dict for this team if franchise mode
+        if mode == "franchise" and team_object_id:
+            if str(team_object_id) not in ftd_updates:
+                ftd_updates[str(team_object_id)] = {"inc": {}, "set": {}}
         
         for play_name, play_data in plays.items():
             game_stats = play_data.get("game_stats", {})
@@ -877,37 +889,76 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
                 plays_with_stats += 1
                 logger.info(f"🔍 [UPDATE_PLAY_STATS] Play '{play_name}' (team={actual_team_id}): times_run={times_run}, successes={successes}, player_points={len(player_points)} players")
             
-            # Base path for this play in the document (use actual_team_id, not game_team_key)
-            if mode == "franchise":
-                base_path = f"franchise_teams.{actual_team_id}.plays.{play_name}.season_stats"
+            # Build update paths
+            if mode == "franchise" and team_object_id:
+                # ✅ FTD: Update FTD collection
+                base_path = f"plays.{play_name}.season_stats"
+                ftd_team_updates = ftd_updates[str(team_object_id)]
+                
+                # Increment times_run and successes
+                if "times_run" in game_stats and game_stats["times_run"] > 0:
+                    ftd_team_updates["inc"][f"{base_path}.times_run"] = game_stats["times_run"]
+                if "successes" in game_stats and game_stats["successes"] > 0:
+                    ftd_team_updates["inc"][f"{base_path}.successes"] = game_stats["successes"]
+                
+                # Merge player_points dict (increment each player's points)
+                if player_points:
+                    for player_id, points in player_points.items():
+                        if points > 0:
+                            ftd_team_updates["inc"][f"{base_path}.player_points.{player_id}"] = points
             else:  # tournament
                 base_path = f"teams.{actual_team_id}.plays.{play_name}.season_stats"
-            
-            # Increment times_run and successes
-            if "times_run" in game_stats and game_stats["times_run"] > 0:
-                all_inc_doc[f"{base_path}.times_run"] = game_stats["times_run"]
-            if "successes" in game_stats and game_stats["successes"] > 0:
-                all_inc_doc[f"{base_path}.successes"] = game_stats["successes"]
-            
-            # Merge player_points dict (increment each player's points)
-            if player_points:
-                for player_id, points in player_points.items():
-                    if points > 0:
-                        all_inc_doc[f"{base_path}.player_points.{player_id}"] = points
+                
+                # Increment times_run and successes
+                if "times_run" in game_stats and game_stats["times_run"] > 0:
+                    all_inc_doc[f"{base_path}.times_run"] = game_stats["times_run"]
+                if "successes" in game_stats and game_stats["successes"] > 0:
+                    all_inc_doc[f"{base_path}.successes"] = game_stats["successes"]
+                
+                # Merge player_points dict (increment each player's points)
+                if player_points:
+                    for player_id, points in player_points.items():
+                        if points > 0:
+                            all_inc_doc[f"{base_path}.player_points.{player_id}"] = points
         
         logger.info(f"🔍 [UPDATE_PLAY_STATS] Team {actual_team_id}: {plays_with_stats} plays with stats")
     
-    logger.info(f"🔍 [UPDATE_PLAY_STATS] Total: {len(all_inc_doc)} update operations across all teams")
+    # ✅ FTD: Update FTD collection for franchise mode
+    if mode == "franchise" and ftd_updates:
+        try:
+            doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
+            from BackEnd.db import franchise_team_data_collection
+            
+            for team_object_id_str, team_updates in ftd_updates.items():
+                team_object_id = ObjectId(team_object_id_str)
+                inc_doc = team_updates.get("inc", {})
+                set_doc = team_updates.get("set", {})
+                
+                if inc_doc or set_doc:
+                    update_doc: Dict[str, Any] = {}
+                    if inc_doc:
+                        update_doc["$inc"] = inc_doc
+                    if set_doc:
+                        update_doc["$set"] = set_doc
+                    
+                    logger.info(f"🔍 [UPDATE_PLAY_STATS] Updating FTD for team {team_object_id_str} with {len(inc_doc)} increments")
+                    result = franchise_team_data_collection.update_one(
+                        {"franchise_id": doc_obj_id, "team_id": team_object_id},
+                        update_doc
+                    )
+                    logger.info(f"✅ [UPDATE_PLAY_STATS] FTD update result: matched={result.matched_count}, modified={result.modified_count}")
+        except Exception as e:
+            logger.error(f"❌ [UPDATE_PLAY_STATS] Error updating FTD: {e}")
+            import traceback
+            traceback.print_exc()
     
-    # Update the document if we have any stats to increment
-    if all_inc_doc or all_set_doc:
+    # Update tournament document if we have any stats to increment
+    if mode == "tournament" and (all_inc_doc or all_set_doc):
         try:
             doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
         except Exception as e:
             logger.error(f"❌ [UPDATE_PLAY_STATS] Invalid doc_id format: {doc_id}, error: {e}")
             return
-        
-        collection = franchises_collection if mode == "franchise" else tournaments_collection
         
         update_doc: Dict[str, Any] = {}
         if all_inc_doc:
@@ -916,30 +967,68 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
             update_doc["$set"] = all_set_doc
         
         if update_doc:
-            logger.info(f"🔍 [UPDATE_PLAY_STATS] Updating {mode} document {doc_obj_id} with {len(all_inc_doc)} increments")
-            result = collection.update_one(
+            logger.info(f"🔍 [UPDATE_PLAY_STATS] Updating tournament document {doc_obj_id} with {len(all_inc_doc)} increments")
+            result = tournaments_collection.update_one(
                 {"_id": doc_obj_id},
                 update_doc
             )
             logger.info(f"✅ [UPDATE_PLAY_STATS] Update result: matched={result.matched_count}, modified={result.modified_count}")
         else:
             logger.warning(f"⚠️ [UPDATE_PLAY_STATS] No update operations to perform (inc_doc and set_doc both empty)")
-    else:
-        logger.warning(f"⚠️ [UPDATE_PLAY_STATS] No stats to increment (all_inc_doc and all_set_doc both empty)")
+    elif mode == "franchise" and not ftd_updates:
+        logger.warning(f"⚠️ [UPDATE_PLAY_STATS] No FTD updates to perform (no teams mapped)")
 
 
-def _update_defensive_playcall_season_stats(game: Dict[str, Any]) -> None:
+def _update_defensive_playcall_season_stats(game: Dict[str, Any], mode: str = None, doc_id: str | ObjectId = None) -> None:
     """Update defensive playcall season_stats from game_stats for both teams.
     
     Extracts scouting data from the game document and copies all game_stats
     values to season_stats for each defensive playcall (Man, 2-3 Zone, etc.).
     This is called at the end of games in tournament and franchise modes.
+    
+    Args:
+        game: Game document from games collection
+        mode: "tournament" or "franchise" (optional, inferred from game doc if not provided)
+        doc_id: Tournament or franchise document ID (required for franchise mode)
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Infer mode from game document if not provided
+    if not mode:
+        mode = game.get("mode", "single")
+    
     teams_obj = game.get("teams", {})
     if not teams_obj:
+        logger.warning(f"⚠️ [UPDATE_DEFENSE_STATS] No teams object in game document")
         return
     
-    for team_id, team_data in teams_obj.items():
+    # ✅ FTD: For franchise mode, need to map team_id keys to ObjectId team_ids
+    team_id_to_object_id: Dict[str, ObjectId] = {}
+    if mode == "franchise" and doc_id:
+        try:
+            from BackEnd.db import franchises_collection, teams_collection
+            doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
+            franchise_doc = franchises_collection.find_one({"_id": doc_obj_id}, {"franchise_teams": 1})
+            if franchise_doc:
+                franchise_teams = franchise_doc.get("franchise_teams", {})
+                for team_id_str, team_data in franchise_teams.items():
+                    try:
+                        team_obj_id = ObjectId(team_id_str)
+                        team_doc = teams_collection.find_one({"_id": team_obj_id}, {"name": 1, "team_id": 1})
+                        if team_doc:
+                            team_id_field = team_doc.get("team_id")  # e.g., "LITTLE_YORK"
+                            team_name = team_doc.get("name")
+                            if team_id_field:
+                                team_id_to_object_id[team_id_field] = team_obj_id
+                            if team_name:
+                                team_id_to_object_id[team_name] = team_obj_id
+                    except Exception:
+                        continue
+        except Exception as e:
+            logger.error(f"❌ [UPDATE_DEFENSE_STATS] Error building team_id map: {e}")
+    
+    for team_id_key, team_data in teams_obj.items():
         scouting = team_data.get("scouting", {})
         defense_data = scouting.get("defense", {})
         
@@ -979,36 +1068,80 @@ def _update_defensive_playcall_season_stats(game: Dict[str, Any]) -> None:
                     if "success" in combo_data:
                         inc_doc[f"scouting_data.defense.{playcall_name}.season_stats.{combo_key}.success"] = combo_data["success"]
         
-        # Update the team document if we have any stats to increment
+        # Update the appropriate document if we have any stats to increment
         if inc_doc:
-            # Find team by team_id (which is stored in the teams object key)
-            # team_id is typically a string matching the team_id field in teams collection
-            result = teams_collection.update_one(
-                {"team_id": team_id},
-                {"$inc": inc_doc}
-            )
-            
-            # If team_id lookup failed, try finding by name as fallback
-            if result.matched_count == 0:
-                # Get team name from game document
-                home_team_id = game.get("home_team_id")
-                away_team_id = game.get("away_team_id")
-                home_team_data = game.get("home_team", {})
-                away_team_data = game.get("away_team", {})
-                home_team_name = home_team_data.get("name") if isinstance(home_team_data, dict) else game.get("home_team", "")
-                away_team_name = away_team_data.get("name") if isinstance(away_team_data, dict) else game.get("away_team", "")
-                
-                team_name = None
-                if team_id == home_team_id:
-                    team_name = home_team_name
-                elif team_id == away_team_id:
-                    team_name = away_team_name
-                
-                if team_name:
-                    teams_collection.update_one(
-                        {"name": team_name},
+            if mode == "franchise" and doc_id:
+                # ✅ FTD: Update FTD collection instead of teams_collection
+                try:
+                    from BackEnd.db import franchise_team_data_collection
+                    doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
+                    
+                    # Resolve team_id_key to ObjectId
+                    team_object_id = team_id_to_object_id.get(team_id_key)
+                    if not team_object_id:
+                        logger.warning(f"⚠️ [UPDATE_DEFENSE_STATS] Could not resolve team_id_key '{team_id_key}' to ObjectId, skipping FTD update")
+                        continue
+                    
+                    logger.info(f"🔍 [UPDATE_DEFENSE_STATS] Updating FTD for team {team_object_id} with {len(inc_doc)} increments")
+                    result = franchise_team_data_collection.update_one(
+                        {"franchise_id": doc_obj_id, "team_id": team_object_id},
                         {"$inc": inc_doc}
                     )
+                    logger.info(f"✅ [UPDATE_DEFENSE_STATS] FTD update result: matched={result.matched_count}, modified={result.modified_count}")
+                except Exception as e:
+                    logger.error(f"❌ [UPDATE_DEFENSE_STATS] Error updating FTD: {e}")
+                    import traceback
+                    traceback.print_exc()
+            elif mode == "tournament" and doc_id:
+                # Tournament mode: update tournament document
+                try:
+                    from BackEnd.db import tournaments_collection
+                    doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
+                    base_path = f"teams.{team_id_key}.scouting_data.defense"
+                    
+                    # Build tournament update doc with proper paths
+                    tournament_inc_doc = {}
+                    for key, value in inc_doc.items():
+                        tournament_inc_doc[f"{base_path}.{key.split('.', 2)[2]}"] = value  # Remove "scouting_data.defense." prefix
+                    
+                    result = tournaments_collection.update_one(
+                        {"_id": doc_obj_id},
+                        {"$inc": tournament_inc_doc}
+                    )
+                    logger.info(f"✅ [UPDATE_DEFENSE_STATS] Tournament update result: matched={result.matched_count}, modified={result.modified_count}")
+                except Exception as e:
+                    logger.error(f"❌ [UPDATE_DEFENSE_STATS] Error updating tournament: {e}")
+                    import traceback
+                    traceback.print_exc()
+            else:
+                # Legacy: Update teams_collection (should not happen for franchise/tournament, but keep for backward compat)
+                logger.warning(f"⚠️ [UPDATE_DEFENSE_STATS] Updating teams_collection (legacy path) for team_id={team_id_key}")
+                result = teams_collection.update_one(
+                    {"team_id": team_id_key},
+                    {"$inc": inc_doc}
+                )
+                
+                # If team_id lookup failed, try finding by name as fallback
+                if result.matched_count == 0:
+                    # Get team name from game document
+                    home_team_id = game.get("home_team_id")
+                    away_team_id = game.get("away_team_id")
+                    home_team_data = game.get("home_team", {})
+                    away_team_data = game.get("away_team", {})
+                    home_team_name = home_team_data.get("name") if isinstance(home_team_data, dict) else game.get("home_team", "")
+                    away_team_name = away_team_data.get("name") if isinstance(away_team_data, dict) else game.get("away_team", "")
+                    
+                    team_name = None
+                    if team_id_key == home_team_id:
+                        team_name = home_team_name
+                    elif team_id_key == away_team_id:
+                        team_name = away_team_name
+                    
+                    if team_name:
+                        teams_collection.update_one(
+                            {"name": team_name},
+                            {"$inc": inc_doc}
+                        )
 
 
 def backfill_franchise_player_stats(franchise_id: str | ObjectId) -> None:
@@ -1426,7 +1559,7 @@ def finalize_game(
         logger.info(f"✅ [FINALIZE_GAME] recompute_tournament_leaders completed")
         
         # Update defensive playcall season_stats from game_stats
-        _update_defensive_playcall_season_stats(game)
+        _update_defensive_playcall_season_stats(game, "tournament", tid)
         
         # Update offensive play season_stats from game_stats
         _update_offensive_play_season_stats(game, "tournament", tid)
@@ -1985,7 +2118,7 @@ def finalize_game(
         # This matches tournament mode pattern: process all players from box_score, not from players array
         
         # Update defensive playcall season_stats from game_stats
-        _update_defensive_playcall_season_stats(game)
+        _update_defensive_playcall_season_stats(game, "franchise", fid)
         
         # Update offensive play season_stats from game_stats
         _update_offensive_play_season_stats(game, "franchise", fid)

@@ -11,7 +11,7 @@ from typing import Any, Optional
 from datetime import datetime
 from BackEnd.main import run_simulation
 
-from BackEnd.db import db, franchise_state_collection
+from BackEnd.db import db, franchise_state_collection, franchise_team_data_collection
 from BackEnd.utils.shared import summarize_game_state
 from BackEnd.utils import stat_updater
 from BackEnd.utils.team_stats_aggregator import aggregate_team_stats_from_players
@@ -181,14 +181,22 @@ def update_team_attributes_after_game(
         treb = team_totals.get("DREB", 0) + team_totals.get("OREB", 0)
         opp_treb = opponent_totals.get("DREB", 0) + opponent_totals.get("OREB", 0)
         
-        # Get current team attributes from franchise document
-        franchise_doc = db.franchises.find_one({"_id": franchise_id})
-        if not franchise_doc:
-            logger.error(f"❌ [UPDATE-TEAM-ATTRS] Franchise {franchise_id} not found")
+        # ✅ FTD: Get current team attributes from FTD collection
+        try:
+            team_object_id = ObjectId(team_id)
+        except:
+            logger.error(f"❌ [UPDATE-TEAM-ATTRS] Invalid team_id format: {team_id}")
             return {}
         
-        franchise_teams = franchise_doc.get("franchise_teams", {})
-        team_attrs = franchise_teams.get(team_id, {})
+        ftd_doc = franchise_team_data_collection.find_one(
+            {"franchise_id": franchise_id, "team_id": team_object_id},
+            {"team_attributes": 1}
+        )
+        if not ftd_doc:
+            logger.error(f"❌ [UPDATE-TEAM-ATTRS] FTD not found for franchise={franchise_id}, team={team_id}")
+            return {}
+        
+        team_attrs = ftd_doc.get("team_attributes", {})
         
         # shot_threshold
         if is_winner:
@@ -269,24 +277,24 @@ def update_team_attributes_after_game(
                 changes["team_chemistry"] = random.randint(-4, -1)
         
         # Apply changes and clamp to valid ranges
-        update_doc = {}
+        ftd_update = {}
         for attr_name, change in changes.items():
             if attr_name in TEAM_ATTR_CLAMPS:
                 current_val = team_attrs.get(attr_name, 0)
                 new_val = current_val + change
                 lower, upper = TEAM_ATTR_CLAMPS[attr_name]
                 clamped_val = max(lower, min(upper, new_val))
-                update_doc[f"franchise_teams.{team_id}.{attr_name}"] = clamped_val
+                ftd_update[f"team_attributes.{attr_name}"] = clamped_val
                 # Store the actual change (may be different if clamped)
                 changes[attr_name] = clamped_val - current_val
         
-        # Update franchise document
-        if update_doc:
-            db.franchises.update_one(
-                {"_id": franchise_id},
-                {"$set": update_doc}
+        # ✅ FTD: Update FTD collection instead of franchise document
+        if ftd_update:
+            franchise_team_data_collection.update_one(
+                {"franchise_id": franchise_id, "team_id": team_object_id},
+                {"$set": ftd_update}
             )
-            logger.info(f"✅ [UPDATE-TEAM-ATTRS] Updated {len(update_doc)} attributes for team {team_id}")
+            logger.info(f"✅ [UPDATE-TEAM-ATTRS] Updated {len(ftd_update)} attributes for team {team_id} in FTD")
         
         return changes
     
@@ -2346,35 +2354,36 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
             raise HTTPException(status_code=404, detail="Team not found")
         actual_team_id = str(team_doc["_id"])
     
-    # ✅ PERFORMANCE: Load franchise_doc with projection if not already loaded
-    if not franchise_doc:
-        franchise_doc = db.franchises.find_one(
-            {"_id": fid},
-            {"franchise_teams": 1, "_id": 1}
-        )
-    if not franchise_doc:
-        raise HTTPException(status_code=404, detail="Franchise not found")
+    # ✅ FTD: Load team data from FTD collection instead of franchise doc
+    from BackEnd.db import franchise_team_data_collection
     
-    # Get team object from franchise_teams
-    franchise_teams = franchise_doc.get("franchise_teams", {})
-    team_obj = franchise_teams.get(actual_team_id, {})
+    try:
+        team_object_id = ObjectId(actual_team_id)
+    except:
+        raise HTTPException(status_code=400, detail=f"Invalid team_id format: {actual_team_id}")
     
-    if not team_obj:
-        raise HTTPException(status_code=404, detail=f"Team data not found in franchise for team_id: {actual_team_id}")
+    ftd_query_start = time.time()
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": fid, "team_id": team_object_id}
+    )
+    ftd_query_time = time.time() - ftd_query_start
+    logger.info(f"⏱️ [PERF] /franchise/team-data FTD query: {ftd_query_time:.3f}s")
     
-    # Extract team attributes
-    team_attributes = {}
+    if not ftd_doc:
+        raise HTTPException(status_code=404, detail=f"Team data not found in FTD for team_id: {actual_team_id}")
+    
+    # Extract team attributes from FTD
+    team_attributes = ftd_doc.get("team_attributes", {})
+    # Ensure all expected keys exist (with defaults if missing)
     attr_keys = ['shot_threshold', 'discipline', 'fight', 'rebound_modifier', 
                  'momentum_score', 'offensive_efficiency', 'team_chemistry', 'defensive_efficiency',
                  'fb_efficiency', 'pt_efficiency', 'fb_opp_modifier', 'pt_opp_modifier']
     for key in attr_keys:
-        if key in team_obj:
-            team_attributes[key] = team_obj[key]
-        else:
+        if key not in team_attributes:
             team_attributes[key] = 0  # Default to 0 if not present
     
-    # Get plays data
-    plays_data = team_obj.get("plays", {})
+    # Get plays data from FTD
+    plays_data = ftd_doc.get("plays", {})
     
     # 🔍 DEBUG: Log plays with season_stats
     plays_with_season_stats = {name: play for name, play in plays_data.items() if play.get("season_stats", {}).get("times_run", 0) > 0}
@@ -2395,8 +2404,8 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
             else:
                 logger.warning(f"⚠️ [TEAM_DATA API] Sample play '{sample_play_name}' has NO season_stats key!")
     
-    # Get scouting data - initialize defense structure if missing
-    scouting_data = team_obj.get("scouting_data", {})
+    # Get scouting data from FTD - initialize defense structure if missing
+    scouting_data = ftd_doc.get("scouting_data", {})
     if not scouting_data.get("defense"):
         scouting_data["defense"] = {
             "Man": {"effectiveness": 0, "momentum": 0, "cloaking": 0},
@@ -2558,15 +2567,22 @@ def get_scouting_report(franchise_id: str, team_name: str):
     if not team_doc:
         raise HTTPException(status_code=404, detail="Team not found")
     
-    team_object_id = str(team_doc["_id"])
+    team_object_id = team_doc["_id"]  # Keep as ObjectId for FTD query
     
     # Get team_id field for querying games (e.g., "XAVIEN")
     team_id_field = team_doc.get("team_id")
     
-    # Get team attributes from franchise document
-    franchise_teams = franchise_doc.get("franchise_teams", {})
-    team_obj = franchise_teams.get(team_object_id, {})
-    team_attributes = team_obj.get("attributes", {})
+    # ✅ FTD: Get team attributes from FTD collection instead of franchise doc
+    from BackEnd.db import franchise_team_data_collection
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": fid, "team_id": team_object_id},
+        {"team_attributes": 1}
+    )
+    
+    if not ftd_doc:
+        raise HTTPException(status_code=404, detail=f"Team data not found in FTD for team_id: {team_object_id}")
+    
+    team_attributes = ftd_doc.get("team_attributes", {})
     
     # Find last completed game for this team
     # Match against home_team_id and away_team_id (which are team_id strings like "XAVIEN")
@@ -2586,7 +2602,7 @@ def get_scouting_report(franchise_id: str, team_name: str):
     plays_data = extract_plays_from_game_document(
         last_game,
         team_name,
-        team_object_id,
+        str(team_object_id),  # Convert to string for utility function
         team_id_field
     )
     
@@ -2778,21 +2794,33 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     if not players_for_training:
         raise HTTPException(status_code=404, detail="No players found for training")
 
-    # Get franchise-specific team stats
-    franchise_teams = franchise_doc.get("franchise_teams", {})
-    team_data = franchise_teams.get(team_id, {})
-    team_stats = team_data.copy()
-
+    # ✅ FTD: Load team data from FTD collection instead of franchise doc
+    from BackEnd.db import franchise_team_data_collection
+    try:
+        team_object_id = ObjectId(team_id)
+    except:
+        raise HTTPException(status_code=400, detail=f"Invalid team_id format: {team_id}")
+    
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": franchise_id, "team_id": team_object_id}
+    )
+    
+    if not ftd_doc:
+        raise HTTPException(status_code=404, detail=f"Team data not found in FTD for team_id: {team_id}")
+    
+    # Get team stats (team_attributes) from FTD
+    team_stats = ftd_doc.get("team_attributes", {}).copy()
+    
     # Extract training data
     training_data = req.training_data
     
-    # ✅ Get plays, game plan settings, and playbook settings for training
+    # ✅ FTD: Get plays, game plan settings, and playbook settings from FTD
     # These are the LATEST settings saved from Game Plan and Playbooks screens
     # When playbook_training_mode == "current-playbooks", these settings will be used
-    plays_data = team_data.get("plays", {})
-    strategy_settings = team_data.get("strategy_settings", {})
-    playbook_settings = team_data.get("playbook_settings", {})
-    scouting_data = team_data.get("scouting_data", {})
+    plays_data = ftd_doc.get("plays", {})
+    strategy_settings = ftd_doc.get("strategy_settings", {})
+    playbook_settings = ftd_doc.get("playbook_settings", {})
+    scouting_data = ftd_doc.get("scouting_data", {})
     
     # 🔍 DEBUG: Log settings loaded for training
     logger.warning(f"🔍 [TRAINING DEBUG] team_id used: {team_id}")
@@ -2806,16 +2834,16 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         logger.warning(f"🔍 [TRAINING DEBUG] playbook_settings['set_play_attack'] keys: {list(playbook_settings.get('set_play_attack', {}).keys())}")
     logger.warning(f"🔍 [TRAINING DEBUG] playbook_training_mode: {training_data.get('playbook_training_mode', 'not provided')}")
     
-    # ✅ FIX: Initialize plays_data if empty (first time training for this team)
+    # ✅ FTD: Initialize plays_data if empty (first time training for this team)
     # This ensures plays structure exists before training, preventing plays from being lost
     if not plays_data:
         logger.warning(f"📚 [API] plays_data is empty, populating from universal plays collection")
         from BackEnd.api.gameplan_routes import populate_team_plays
         plays_data = populate_team_plays(mode="franchise")
-        # Save to database immediately to ensure structure exists
-        db.franchises.update_one(
-            {"_id": franchise_id},
-            {"$set": {f"franchise_teams.{team_id}.plays": plays_data}}
+        # ✅ FTD: Save to FTD collection
+        franchise_team_data_collection.update_one(
+            {"franchise_id": franchise_id, "team_id": team_object_id},
+            {"$set": {"plays": plays_data}}
         )
         logger.info(f"✅ [API] Initialized {len(plays_data)} plays for team {team_id}")
     else:
@@ -2828,10 +2856,10 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         # Create a temporary TeamManager to use its initialization method
         temp_team = TeamManager(name=team_name or team_id, mode="franchise")
         scouting_data = temp_team.scouting_data
-        # Save to database
-        db.franchises.update_one(
-            {"_id": franchise_id},
-            {"$set": {f"franchise_teams.{team_id}.scouting_data": scouting_data}}
+        # ✅ FTD: Save to FTD collection
+        franchise_team_data_collection.update_one(
+            {"franchise_id": franchise_id, "team_id": team_object_id},
+            {"$set": {"scouting_data": scouting_data}}
         )
     
     logger.warning(f"📚 [API] Loading plays_data: {len(plays_data)} plays")
@@ -2935,29 +2963,32 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         if pid in position_ratings_updates:
             franchise_update[f"players.{pid}.position_ratings"] = position_ratings_updates[pid]
 
-    # Update franchise team stats
+    # ✅ FTD: Build FTD update document
+    ftd_update = {}
+    
+    # Update team attributes (team_stats)
     for field, value in team_stats.items():
         # Skip non-numeric fields
         if isinstance(value, dict):
             continue
-        franchise_update[f"franchise_teams.{team_id}.{field}"] = value
+        ftd_update[f"team_attributes.{field}"] = value
     
-    # ✅ FIX: Always save plays data (even if empty) to preserve structure after training
+    # ✅ FTD: Always save plays data (even if empty) to preserve structure after training
     # This ensures plays are not lost when playbooks page reloads
     if updated_plays is not None:
-        franchise_update[f"franchise_teams.{team_id}.plays"] = updated_plays
-        logger.info(f"✅ [TRAINING] Saving {len(updated_plays)} plays to database")
+        ftd_update["plays"] = updated_plays
+        logger.info(f"✅ [TRAINING] Saving {len(updated_plays)} plays to FTD")
     else:
         logger.warning(f"⚠️ [TRAINING] updated_plays is None, preserving existing plays data")
     
-    # ✅ FIX: Always save scouting_data (even if empty) to preserve structure after training
+    # ✅ FTD: Always save scouting_data (even if empty) to preserve structure after training
     if updated_scouting_data is not None:
-        franchise_update[f"franchise_teams.{team_id}.scouting_data"] = updated_scouting_data
-        logger.info(f"✅ [TRAINING] Saving scouting_data to database")
+        ftd_update["scouting_data"] = updated_scouting_data
+        logger.info(f"✅ [TRAINING] Saving scouting_data to FTD")
     else:
         logger.warning(f"⚠️ [TRAINING] updated_scouting_data is None, preserving existing scouting_data")
 
-    # Mark training as completed and update status
+    # Mark training as completed and update status (still in franchise doc)
     session_type = training_status.get("session_type", "in-season")
     franchise_update["training_status.training_completed"] = True
     franchise_update["training_status.week"] = week
@@ -2978,18 +3009,28 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         "date": datetime.now().strftime("%Y-%m-%d")
     }
     
-    # Store training report in franchise_teams.{team_id}.training_reports
-    franchise_update[f"franchise_teams.{team_id}.training_reports.{week}"] = training_report_data
+    # ✅ FTD: Store training report in FTD collection
+    ftd_update[f"training_reports.{week}"] = training_report_data
     
-    # Also save latest training for quick access
+    # Also save latest training for quick access (still in franchise doc for backward compatibility)
     franchise_update["latest_training"] = training_report_data
+    
+    # ✅ FTD: Update FTD collection with all changes
+    if ftd_update:
+        franchise_team_data_collection.update_one(
+            {"franchise_id": franchise_id, "team_id": team_object_id},
+            {"$set": ftd_update}
+        )
 
     # ✅ Run training for all computer teams (in unison with user team training)
     # Each computer team gets random allocations and random coaching focus
     # Each team gets separate randomizations for pre-training decay and training
-    computer_teams_update = {}
     
-    for computer_team_id, computer_team_data in franchise_teams.items():
+    # ✅ FTD: Get all FTD documents for this franchise (computer teams)
+    all_ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id}))
+    ftd_by_team_id = {str(doc["team_id"]): doc for doc in all_ftd_docs}
+    
+    for computer_team_id in ftd_by_team_id.keys():
         # Skip user's team (already processed above)
         if str(computer_team_id) == str(team_id):
             continue
@@ -3030,27 +3071,26 @@ def run_franchise_training(req: FranchiseTrainingRequest):
                 logger.warning(f"⚠️ [COMPUTER TRAINING] No players found for training for team_id: {computer_team_id}")
                 continue
             
-            # Get franchise-specific team stats
-            computer_team_stats = computer_team_data.copy()
+            # ✅ FTD: Get team data from FTD
+            computer_ftd_doc = ftd_by_team_id.get(str(computer_team_id), {})
+            computer_team_stats = computer_ftd_doc.get("team_attributes", {}).copy()
             
-            # Get plays, game plan settings, and playbook settings for computer team
-            computer_plays_data = computer_team_data.get("plays", {})
-            computer_strategy_settings = computer_team_data.get("strategy_settings", {})
-            computer_playbook_settings = computer_team_data.get("playbook_settings", {})
-            computer_scouting_data = computer_team_data.get("scouting_data", {})
+            # Get plays, game plan settings, and playbook settings from FTD
+            computer_plays_data = computer_ftd_doc.get("plays", {})
+            computer_strategy_settings = computer_ftd_doc.get("strategy_settings", {})
+            computer_playbook_settings = computer_ftd_doc.get("playbook_settings", {})
+            computer_scouting_data = computer_ftd_doc.get("scouting_data", {})
             
             # Initialize plays_data if empty
             if not computer_plays_data:
                 from BackEnd.api.gameplan_routes import populate_team_plays
                 computer_plays_data = populate_team_plays(mode="franchise")
-                computer_teams_update[f"franchise_teams.{computer_team_id}.plays"] = computer_plays_data
             
             # Initialize scouting_data if empty or missing defense structure
             if not computer_scouting_data or "defense" not in computer_scouting_data:
                 from BackEnd.models.team_manager import TeamManager
                 temp_team = TeamManager(name=computer_team_name or computer_team_id, mode="franchise")
                 computer_scouting_data = temp_team.scouting_data
-                computer_teams_update[f"franchise_teams.{computer_team_id}.scouting_data"] = computer_scouting_data
             
             # Generate random training allocations and coaching focus
             computer_allocations = generate_random_training_allocations(expected_points)
@@ -3072,6 +3112,9 @@ def run_franchise_training(req: FranchiseTrainingRequest):
                 skip_pre_training_depreciation=is_first_training  # Skip depreciation for first training (training camp)
             )
             
+            # ✅ FTD: Build computer team FTD update
+            computer_ftd_update = {}
+            
             # Recalculate position ratings for each computer player after training
             for player in updated_computer_players:
                 pid = player["_id"]
@@ -3091,9 +3134,9 @@ def run_franchise_training(req: FranchiseTrainingRequest):
                 }
                 
                 new_ratings = compute_position_ratings(player_for_ratings)
-                computer_teams_update[f"players.{pid}.position_ratings"] = new_ratings
+                franchise_update[f"players.{pid}.position_ratings"] = new_ratings
             
-            # Update computer team players' attributes
+            # Update computer team players' attributes (in franchise doc, not FTD)
             for player in updated_computer_players:
                 pid = player["_id"]
                 attrs = player.get("attributes", {})
@@ -3102,35 +3145,39 @@ def run_franchise_training(req: FranchiseTrainingRequest):
                 for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO"]:
                     anchor_key = f"anchor_{attr}"
                     if anchor_key in attrs:
-                        computer_teams_update[f"players.{pid}.attributes.{anchor_key}"] = attrs[anchor_key]
-                        computer_teams_update[f"players.{pid}.attributes.{attr}"] = attrs[attr]
+                        franchise_update[f"players.{pid}.attributes.{anchor_key}"] = attrs[anchor_key]
+                        franchise_update[f"players.{pid}.attributes.{attr}"] = attrs[attr]
                 
                 # NG doesn't have an anchor_key, save it directly if it exists
                 if "NG" in attrs:
-                    computer_teams_update[f"players.{pid}.attributes.NG"] = attrs["NG"]
+                    franchise_update[f"players.{pid}.attributes.NG"] = attrs["NG"]
             
-            # Update computer team stats
+            # Update computer team stats (team_attributes) in FTD
             for field, value in updated_computer_team.items():
                 # Skip non-numeric fields
                 if isinstance(value, dict):
                     continue
-                computer_teams_update[f"franchise_teams.{computer_team_id}.{field}"] = value
+                computer_ftd_update[f"team_attributes.{field}"] = value
             
-            # Update computer team plays and scouting data
+            # Update computer team plays and scouting data in FTD
             if updated_computer_plays:
-                computer_teams_update[f"franchise_teams.{computer_team_id}.plays"] = updated_computer_plays
+                computer_ftd_update["plays"] = updated_computer_plays
             
             if updated_computer_scouting_data:
-                computer_teams_update[f"franchise_teams.{computer_team_id}.scouting_data"] = updated_computer_scouting_data
+                computer_ftd_update["scouting_data"] = updated_computer_scouting_data
+            
+            # ✅ FTD: Write computer team updates to FTD collection
+            if computer_ftd_update:
+                franchise_team_data_collection.update_one(
+                    {"franchise_id": franchise_id, "team_id": ObjectId(computer_team_id)},
+                    {"$set": computer_ftd_update}
+                )
             
             logger.info(f"✅ [COMPUTER TRAINING] Completed training for computer team: {computer_team_name} ({computer_team_id})")
         
         except Exception as e:
             logger.error(f"❌ [COMPUTER TRAINING] Error training computer team {computer_team_id}: {str(e)}")
             continue
-    
-    # Merge computer teams updates with user team updates
-    franchise_update.update(computer_teams_update)
     
     # Save to franchise document (includes both user team and computer teams)
     db_update_start = time.time()
@@ -3232,13 +3279,23 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             if team_id and team_id != authoritative_team_id:
                 logger.warning(f"⚠️ [TRAINING REPORT] URL team_id ({team_id}) doesn't match franchise document user_team_object_id ({authoritative_team_id}). Using franchise document value.")
             
-            # Get team data from franchise_teams using authoritative team_id
-            franchise_teams = doc.get("franchise_teams", {})
-            team_data = franchise_teams.get(authoritative_team_id, {})
+            # ✅ FTD: Get training report from FTD collection
+            try:
+                team_object_id = ObjectId(authoritative_team_id)
+            except:
+                raise HTTPException(status_code=400, detail=f"Invalid team_id format: {authoritative_team_id}")
             
-            # Get training report for this week
-            training_reports = team_data.get("training_reports", {})
-            report_data = training_reports.get(str(week)) or doc.get("latest_training", {})
+            ftd_doc = franchise_team_data_collection.find_one(
+                {"franchise_id": doc_id_obj, "team_id": team_object_id},
+                {"training_reports": 1}
+            )
+            
+            if ftd_doc:
+                training_reports = ftd_doc.get("training_reports", {})
+                report_data = training_reports.get(str(week)) or doc.get("latest_training", {})
+            else:
+                # FTD doesn't exist - fallback to latest_training in franchise doc
+                report_data = doc.get("latest_training", {})
             
             # Get schedule to find upcoming opponent
             schedule = doc.get("schedule", [])
