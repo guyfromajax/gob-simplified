@@ -6,10 +6,11 @@ from pathlib import Path
 import logging
 from typing import Optional
 
-from BackEnd.db import db, games_collection
+from BackEnd.db import db, games_collection, franchise_team_data_collection
 from BackEnd.api.franchise_routes import get_user_team_from_franchise
 from BackEnd.api.tournament_routes import get_user_team_from_tournament
 from BackEnd.utils.team_id_resolver import resolve_team_id_to_canonical as unified_resolve_team_id_to_canonical
+from datetime import datetime
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -816,19 +817,60 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
     if not doc:
         raise HTTPException(status_code=404, detail=f"{mode.capitalize()} not found")
     
-    # ✅ PERFORMANCE: For franchise mode, only check/update the requested team (not all 8 teams)
+    # ✅ FTD: For franchise mode, check/update FTD collection instead of franchise_teams
     if mode == "franchise":
-        franchise_teams = doc.get("franchise_teams", {})
-        # ✅ PERFORMANCE: Only check the requested team_id, not all teams
-        if team_id not in franchise_teams:
-            # Team object doesn't exist, create it
+        # ✅ FTD: Check if FTD entry exists for this team
+        try:
+            team_object_id = ObjectId(team_id)
+        except:
+            logger.error(f"❌ [ENSURE-TEAM-OBJECTS] Invalid team_id format: {team_id}")
+            raise HTTPException(status_code=400, detail=f"Invalid team_id format: {team_id}")
+        
+        ftd_doc = franchise_team_data_collection.find_one(
+            {"franchise_id": ObjectId(doc_id), "team_id": team_object_id}
+        )
+        
+        if not ftd_doc:
+            # FTD entry doesn't exist, create it
             defaults = _get_cached_default_settings()
             populated_plays = _get_cached_populated_plays(mode="franchise")
             playbook_settings = _get_cached_playbook_settings()
+            scouting_data = populate_scouting_data(mode="franchise")
             
             from BackEnd.models.team_manager import TeamManager
             team_attrs = TeamManager.init_team_attributes(mode="franchise")
-            franchise_teams[team_id] = {
+            
+            ftd_entry = {
+                "franchise_id": ObjectId(doc_id),
+                "team_id": team_object_id,
+                "team_attributes": {
+                    "shot_threshold": team_attrs["shot_threshold"],
+                    "rebound_modifier": team_attrs["rebound_modifier"],
+                    "team_chemistry": team_attrs["team_chemistry"],
+                    "momentum_score": 0,
+                    "offensive_efficiency": team_attrs["offensive_efficiency"],
+                    "defensive_efficiency": team_attrs["defensive_efficiency"],
+                    "discipline": team_attrs["discipline"],
+                    "fight": team_attrs["fight"],
+                    "pt_opp_modifier": team_attrs["pt_opp_modifier"],
+                    "fb_opp_modifier": team_attrs["fb_opp_modifier"],
+                    "fb_efficiency": team_attrs["fb_efficiency"],
+                    "pt_efficiency": team_attrs["pt_efficiency"],
+                },
+                "strategy_settings": defaults["strategy_settings"].copy(),
+                "playbook_settings": playbook_settings.copy(),
+                "plays": populated_plays.copy(),
+                "scouting_data": scouting_data,
+                "training_reports": {},
+                "created_at": datetime.now(),
+                "updated_at": datetime.now()
+            }
+            
+            franchise_team_data_collection.insert_one(ftd_entry)
+            logger.info(f"✅ [ENSURE-TEAM-OBJECTS] Created FTD entry for team {team_id}")
+            
+            # Return the team data in expected format
+            return {team_id: {
                 "team_chemistry": team_attrs["team_chemistry"],
                 "offensive_efficiency": team_attrs["offensive_efficiency"],
                 "shot_threshold": team_attrs["shot_threshold"],
@@ -843,37 +885,45 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
                 "strategy_settings": defaults["strategy_settings"].copy(),
                 "plays": populated_plays.copy(),
                 "playbook_settings": playbook_settings.copy()
-            }
-            # Update only this team in the database
-            collection.update_one(
-                {"_id": ObjectId(doc_id)},
-                {"$set": {f"franchise_teams.{team_id}": franchise_teams[team_id]}}
-            )
+            }}
         else:
-            # Team object exists, check if it has all required fields
-            team_obj = franchise_teams[team_id]
-            updates = {}
+            # FTD entry exists, check if it has all required fields
+            ftd_update = {}
             defaults = _get_cached_default_settings()
             
-            if "strategy_settings" not in team_obj:
-                updates[f"franchise_teams.{team_id}.strategy_settings"] = defaults["strategy_settings"].copy()
-            if not team_obj.get("plays"):
-                updates[f"franchise_teams.{team_id}.plays"] = _get_cached_populated_plays(mode="franchise").copy()
-            if "playbook_settings" not in team_obj:
-                updates[f"franchise_teams.{team_id}.playbook_settings"] = _get_cached_playbook_settings().copy()
+            if "strategy_settings" not in ftd_doc or not ftd_doc.get("strategy_settings"):
+                ftd_update["strategy_settings"] = defaults["strategy_settings"].copy()
+            if not ftd_doc.get("plays"):
+                ftd_update["plays"] = _get_cached_populated_plays(mode="franchise").copy()
+            if "playbook_settings" not in ftd_doc or not ftd_doc.get("playbook_settings"):
+                ftd_update["playbook_settings"] = _get_cached_playbook_settings().copy()
             
-            if updates:
-                collection.update_one(
-                    {"_id": ObjectId(doc_id)},
-                    {"$set": updates}
+            if ftd_update:
+                franchise_team_data_collection.update_one(
+                    {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
+                    {"$set": ftd_update}
                 )
-                # Update local copy for return value
-                for key, value in updates.items():
-                    # Extract field name from key (e.g., "franchise_teams.{team_id}.strategy_settings" -> "strategy_settings")
-                    field_name = key.split(".")[-1]
-                    franchise_teams[team_id][field_name] = value
-        
-        return franchise_teams
+                # Update local copy
+                for key, value in ftd_update.items():
+                    ftd_doc[key] = value
+            
+            # Return the team data in expected format
+            return {team_id: {
+                "team_chemistry": ftd_doc.get("team_attributes", {}).get("team_chemistry", 0),
+                "offensive_efficiency": ftd_doc.get("team_attributes", {}).get("offensive_efficiency", 0),
+                "shot_threshold": ftd_doc.get("team_attributes", {}).get("shot_threshold", 100),
+                "discipline": ftd_doc.get("team_attributes", {}).get("discipline", 0),
+                "fight": ftd_doc.get("team_attributes", {}).get("fight", 0),
+                "rebound_modifier": ftd_doc.get("team_attributes", {}).get("rebound_modifier", 1.0),
+                "defensive_efficiency": ftd_doc.get("team_attributes", {}).get("defensive_efficiency", 0),
+                "fb_efficiency": ftd_doc.get("team_attributes", {}).get("fb_efficiency", 0),
+                "pt_efficiency": ftd_doc.get("team_attributes", {}).get("pt_efficiency", 0),
+                "fb_opp_modifier": ftd_doc.get("team_attributes", {}).get("fb_opp_modifier", 0),
+                "pt_opp_modifier": ftd_doc.get("team_attributes", {}).get("pt_opp_modifier", 0),
+                "strategy_settings": ftd_doc.get("strategy_settings", {}),
+                "plays": ftd_doc.get("plays", {}),
+                "playbook_settings": ftd_doc.get("playbook_settings", {})
+            }}
     
     # ✅ PERFORMANCE: For tournament and single game modes, only check/update the requested team
     else:
@@ -1195,12 +1245,12 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
             # ✅ SS&S: Use document's user_team_object_id as authoritative source (aligns with Franchise pattern)
             # ✅ PERFORMANCE: Load document with projection (only needed fields) - reduces from 402KB to ~10KB (98% reduction)
             if mode == "franchise":
+                # ✅ FTD: For franchise mode, only need user_team info (strategy_settings comes from FTD)
                 doc = collection.find_one(
                     {"_id": ObjectId(doc_id)},
                     {
                         "user_team_id": 1,
                         "user_team_object_id": 1,
-                        "franchise_teams": 1,
                         "_id": 1
                     }
                 )
@@ -1241,10 +1291,29 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
             if team_id and team_id != authoritative_team_id:
                 logger.warning(f"⚠️ [GET GAMEPLAN] URL team_id ({team_id}) doesn't match franchise document user_team_object_id ({authoritative_team_id}). Using franchise document value.")
             
-            # ✅ PERFORMANCE: Ensure team objects exist (only checks/creates the requested team, not all 8)
-            # ✅ PHASE 5.3: Use returned teams dict directly - ensure_team_objects_exist() already reloads internally
-            franchise_teams = ensure_team_objects_exist(mode, doc_id, authoritative_team_id, franchise_doc=doc)
-            team_obj = franchise_teams.get(authoritative_team_id, {}) if isinstance(franchise_teams, dict) else {}
+            # ✅ FTD: Load strategy_settings from FTD collection instead of franchise doc
+            try:
+                team_object_id = ObjectId(authoritative_team_id)
+            except:
+                raise HTTPException(status_code=400, detail=f"Invalid team_id format: {authoritative_team_id}")
+            
+            ftd_doc = franchise_team_data_collection.find_one(
+                {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
+                {"strategy_settings": 1}
+            )
+            
+            if ftd_doc:
+                team_obj = {
+                    "strategy_settings": ftd_doc.get("strategy_settings", {})
+                }
+            else:
+                # FTD doesn't exist - initialize with defaults
+                defaults = get_default_settings()
+                team_obj = {
+                    "strategy_settings": defaults["strategy_settings"].copy()
+                }
+                # Create FTD entry (will be created by initialize_season, but handle missing case)
+                logger.warning(f"⚠️ [GET GAMEPLAN] FTD not found for team {team_object_id}, using defaults")
         elif mode == "tournament":
             # ✅ MIGRATION: Use tournament document's user_team_object_id as source of truth
             user_team_id_name, user_team_object_id = get_user_team_from_tournament(doc)
@@ -1325,20 +1394,25 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
             strategy_settings = settings.get("strategy_settings") or team_obj.get("strategy_settings", defaults["strategy_settings"])
         else:
             # ✅ UNIFIED: For tournament/franchise modes, use unified extract function for consistent team_id resolution
-            from BackEnd.utils.team_settings_manager import extract_team_settings
-            team_identifier = team_id or (team_obj.get("name") if team_obj else None)
-            if team_identifier:
-                strategy_settings = extract_team_settings(
-                    saved_doc=doc,
-                    team_identifier=team_identifier,
-                    settings_type="strategy_settings",
-                    mode=mode,
-                    game_doc=None
-                )
-                if not strategy_settings:
-                    strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
-            else:
+            if mode == "franchise":
+                # ✅ FTD: Strategy settings already loaded from FTD above
                 strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
+            else:
+                # Tournament mode - use existing extract logic
+                from BackEnd.utils.team_settings_manager import extract_team_settings
+                team_identifier = team_id or (team_obj.get("name") if team_obj else None)
+                if team_identifier:
+                    strategy_settings = extract_team_settings(
+                        saved_doc=doc,
+                        team_identifier=team_identifier,
+                        settings_type="strategy_settings",
+                        mode=mode,
+                        game_doc=None
+                    )
+                    if not strategy_settings:
+                        strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
+                else:
+                    strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
         
         
         # ✅ FIX: Normalize legacy keys and ensure all required fields exist
@@ -1540,9 +1614,10 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             else:
                 # ✅ PERFORMANCE: Use projection for franchise/tournament modes
                 if mode == "franchise":
+                    # ✅ FTD: For franchise mode, only need user_team info (playbook_settings comes from FTD)
                     doc = collection.find_one(
                         {"_id": ObjectId(doc_id)},
-                        {"franchise_teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+                        {"user_team_id": 1, "user_team_object_id": 1, "_id": 1}
                     )
                 elif mode == "tournament":
                     doc = collection.find_one(
@@ -1593,53 +1668,114 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             authoritative_team_id = team_id
         
         # ✅ PHASE 5.7: If loading from game doc, skip ensure_team_objects_exist (team objects already exist)
-        # Otherwise, ensure team objects exist in master doc
+        # Otherwise, load from FTD (franchise) or ensure team objects exist (tournament/single)
         if load_from_game_doc:
             # Loading from game doc - team objects already exist from init_game
             teams = doc.get("teams", {})
             team_obj = teams.get(authoritative_team_id, {})
             actual_team_id = authoritative_team_id
+        elif mode == "franchise":
+            # ✅ FTD: Load playbook_settings from FTD collection instead of franchise doc
+            from BackEnd.db import franchise_team_data_collection
+            try:
+                team_object_id = ObjectId(authoritative_team_id)
+            except:
+                raise HTTPException(status_code=400, detail=f"Invalid team_id format: {authoritative_team_id}")
+            
+            ftd_doc = franchise_team_data_collection.find_one(
+                {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
+                {"playbook_settings": 1, "plays": 1}
+            )
+            
+            if ftd_doc:
+                # Load playbook_settings from FTD
+                team_obj = {
+                    "playbook_settings": ftd_doc.get("playbook_settings", {}),
+                    "plays": ftd_doc.get("plays", {})
+                }
+            else:
+                # FTD doesn't exist yet - initialize playbook_settings and create FTD entry
+                playbook_settings = initialize_playbook_settings()
+                populated_plays = _get_cached_populated_plays(mode="franchise")
+                
+                # Create FTD entry with default playbook_settings
+                from BackEnd.models.team_manager import TeamManager
+                team_attrs = TeamManager.init_team_attributes(mode="franchise")
+                scouting_data = populate_scouting_data(mode="franchise")
+                
+                ftd_entry = {
+                    "franchise_id": ObjectId(doc_id),
+                    "team_id": team_object_id,
+                    "team_attributes": {
+                        "shot_threshold": team_attrs["shot_threshold"],
+                        "rebound_modifier": team_attrs["rebound_modifier"],
+                        "team_chemistry": team_attrs["team_chemistry"],
+                        "momentum_score": 0,
+                        "offensive_efficiency": team_attrs["offensive_efficiency"],
+                        "defensive_efficiency": team_attrs["defensive_efficiency"],
+                        "discipline": team_attrs["discipline"],
+                        "fight": team_attrs["fight"],
+                        "pt_opp_modifier": team_attrs["pt_opp_modifier"],
+                        "fb_opp_modifier": team_attrs["fb_opp_modifier"],
+                        "fb_efficiency": team_attrs["fb_efficiency"],
+                        "pt_efficiency": team_attrs["pt_efficiency"],
+                    },
+                    "strategy_settings": {
+                        "offense": 2, "inside": 2, "attack": 2, "outside": 2,
+                        "tempo": 2, "defense": 2, "aggression": 2,
+                        "hc_trap": 2, "fc_press": 2, "rebounding": 2
+                    },
+                    "playbook_settings": playbook_settings,
+                    "plays": populated_plays,
+                    "scouting_data": scouting_data,
+                    "training_reports": {},
+                    "created_at": datetime.now(),
+                    "updated_at": datetime.now()
+                }
+                
+                franchise_team_data_collection.update_one(
+                    {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
+                    {"$set": ftd_entry},
+                    upsert=True
+                )
+                
+                team_obj = {
+                    "playbook_settings": playbook_settings,
+                    "plays": populated_plays
+                }
+            
+            actual_team_id = authoritative_team_id
         else:
-            # ✅ PERFORMANCE: Ensure team objects exist, passing pre-loaded doc to avoid double-load
-            # The function returns the teams dict and updates the database if needed
+            # Tournament or single mode - use existing logic
             teams_dict = ensure_team_objects_exist(
                 mode, doc_id, authoritative_team_id,
-                franchise_doc=doc if mode == "franchise" else None,
+                franchise_doc=None,
                 tournament_doc=doc if mode == "tournament" else None
             )
             
-            # ✅ DEBUG: Log if plays were populated by ensure_team_objects_exist
-            if mode == "franchise" and isinstance(teams_dict, dict):
-                team_obj_check = teams_dict.get(authoritative_team_id, {})
-                plays_count = len(team_obj_check.get("plays", {})) if team_obj_check else 0
-                # ✅ PERFORMANCE: Removed debug logging
-            
-            # ✅ PHASE 5.3: Use returned teams dict from ensure_team_objects_exist() directly
-            # This avoids unnecessary document reloads - ensure_team_objects_exist() already reloads internally
-            if mode == "franchise":
-                franchise_teams = teams_dict if isinstance(teams_dict, dict) else doc.get("franchise_teams", {})
-                team_obj = franchise_teams.get(authoritative_team_id, {})
-                actual_team_id = authoritative_team_id
-            elif mode == "tournament":
+            if mode == "tournament":
                 teams = teams_dict if isinstance(teams_dict, dict) else doc.get("teams", {})
                 team_obj = teams.get(authoritative_team_id, {})
                 actual_team_id = authoritative_team_id
             else:
                 # ✅ PHASE 5.1: Use normalization helper for single mode
-                # This centralizes team_id resolution logic and ensures consistent format
                 actual_team_id = normalize_team_id_to_canonical(team_id, mode, doc)
-                
-                # Get team_obj using returned teams dict or doc
                 teams = teams_dict if isinstance(teams_dict, dict) else doc.get("teams", {})
                 team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
-        # ✅ PERFORMANCE: Removed debug logging
-        # Ensure playbook_settings exists (even if ensure_team_objects_exist missed it)
-        # Check if team_obj exists and playbook_settings is missing or falsy (None, empty dict, etc.)
-        # Note: Key might exist but value could be None or empty dict
-        if actual_team_id and (not team_obj or not team_obj.get("playbook_settings")):
+        # ✅ FTD: For franchise mode, ensure playbook_settings exists in FTD (not franchise doc)
+        if mode == "franchise" and not load_from_game_doc:
+            if not team_obj or not team_obj.get("playbook_settings"):
+                playbook_settings = initialize_playbook_settings()
+                # Update FTD
+                franchise_team_data_collection.update_one(
+                    {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
+                    {"$set": {"playbook_settings": playbook_settings}}
+                )
+                team_obj["playbook_settings"] = playbook_settings
+        elif actual_team_id and (not team_obj or not team_obj.get("playbook_settings")):
+            # Tournament/single mode - existing logic
             playbook_settings = initialize_playbook_settings()
-            # ✅ PHASE 5.5: Use helper to get update path (same logic for all modes)
             team_key = get_team_settings_path(mode, actual_team_id)
             
             if mode == "single":
@@ -1647,21 +1783,16 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                     {"_id": doc_id},
                     {"$set": {f"{team_key}.playbook_settings": playbook_settings}}
                 )
+                doc = collection.find_one({"_id": doc_id})
             else:
                 collection.update_one(
                     {"_id": ObjectId(doc_id)},
                     {"$set": {f"{team_key}.playbook_settings": playbook_settings}}
                 )
-            # Reload document to get updated playbook_settings
-            if mode == "single":
-                doc = collection.find_one({"_id": doc_id})
-            else:
                 doc = collection.find_one({"_id": ObjectId(doc_id)})
-            # ✅ FIX: Reload team_obj from correct location based on mode
-            if mode == "franchise":
-                franchise_teams = doc.get("franchise_teams", {})
-                team_obj = franchise_teams.get(actual_team_id, {}) if actual_team_id else {}
-            elif mode == "tournament":
+            
+            # Reload team_obj
+            if mode == "tournament":
                 teams = doc.get("teams", {})
                 team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
             else:
@@ -1689,35 +1820,36 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 existing_playbook_settings["position_filters"] = new_playbook_settings["position_filters"]
                 
                 # Update the database
-                if mode == "franchise":
-                    team_key = f"franchise_teams.{actual_team_id}"
-                else:
-                    team_key = f"teams.{actual_team_id}"
-                
-                if mode == "single":
-                    result = collection.update_one(
-                        {"_id": doc_id},
-                        {"$set": {f"{team_key}.playbook_settings": existing_playbook_settings}}
+                if mode == "franchise" and not load_from_game_doc:
+                    # ✅ FTD: Update FTD collection
+                    franchise_team_data_collection.update_one(
+                        {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
+                        {"$set": {"playbook_settings": existing_playbook_settings}}
                     )
+                    team_obj["playbook_settings"] = existing_playbook_settings
                 else:
-                    result = collection.update_one(
-                        {"_id": ObjectId(doc_id)},
-                        {"$set": {f"{team_key}.playbook_settings": existing_playbook_settings}}
-                    )
-                
-                # Reload document again to get the updated position filters
-                if mode == "single":
-                    doc = collection.find_one({"_id": doc_id})
-                else:
-                    doc = collection.find_one({"_id": ObjectId(doc_id)})
-                
-                # Reload team_obj with updated position filters
-                if mode == "franchise":
-                    team_obj = doc.get("franchise_teams", {}).get(actual_team_id, {})
-                elif mode == "tournament":
-                    team_obj = doc.get("teams", {}).get(actual_team_id, {})
-                else:
-                    team_obj = doc.get("teams", {}).get(actual_team_id, {})
+                    team_key = f"teams.{actual_team_id}" if mode != "franchise" else f"franchise_teams.{actual_team_id}"
+                    
+                    if mode == "single":
+                        result = collection.update_one(
+                            {"_id": doc_id},
+                            {"$set": {f"{team_key}.playbook_settings": existing_playbook_settings}}
+                        )
+                        doc = collection.find_one({"_id": doc_id})
+                    else:
+                        result = collection.update_one(
+                            {"_id": ObjectId(doc_id)},
+                            {"$set": {f"{team_key}.playbook_settings": existing_playbook_settings}}
+                        )
+                        doc = collection.find_one({"_id": ObjectId(doc_id)})
+                    
+                    # Reload team_obj with updated position filters
+                    if mode == "franchise":
+                        team_obj = doc.get("franchise_teams", {}).get(actual_team_id, {})
+                    elif mode == "tournament":
+                        team_obj = doc.get("teams", {}).get(actual_team_id, {})
+                    else:
+                        team_obj = doc.get("teams", {}).get(actual_team_id, {})
         
         # ✅ CRITICAL FIX: Ensure plays exist before reading them
         # This ensures plays are always available, even if ensure_team_objects_exist didn't populate them
@@ -1726,36 +1858,39 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             populated_plays = _get_cached_populated_plays(mode=mode)
             
             # Update the database
-            if mode == "franchise":
-                team_key = f"franchise_teams.{actual_team_id}"
-            else:
-                team_key = f"teams.{actual_team_id}"
-            
-            if mode == "single":
-                collection.update_one(
-                    {"_id": doc_id},
-                    {"$set": {f"{team_key}.plays": populated_plays}}
+            if mode == "franchise" and not load_from_game_doc:
+                # ✅ FTD: Update FTD collection
+                franchise_team_data_collection.update_one(
+                    {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
+                    {"$set": {"plays": populated_plays}}
                 )
-                # Reload document
-                doc = collection.find_one({"_id": doc_id})
+                team_obj["plays"] = populated_plays
             else:
-                collection.update_one(
-                    {"_id": ObjectId(doc_id)},
-                    {"$set": {f"{team_key}.plays": populated_plays}}
-                )
-                # Reload document
-                doc = collection.find_one({"_id": ObjectId(doc_id)})
-            
-            # Reload team_obj with populated plays
-            if mode == "franchise":
-                franchise_teams = doc.get("franchise_teams", {})
-                team_obj = franchise_teams.get(actual_team_id, {}) if actual_team_id else {}
-            elif mode == "tournament":
-                teams = doc.get("teams", {})
-                team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
-            else:
-                teams = doc.get("teams", {})
-                team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
+                team_key = f"teams.{actual_team_id}" if mode != "franchise" else f"franchise_teams.{actual_team_id}"
+                
+                if mode == "single":
+                    collection.update_one(
+                        {"_id": doc_id},
+                        {"$set": {f"{team_key}.plays": populated_plays}}
+                    )
+                    doc = collection.find_one({"_id": doc_id})
+                else:
+                    collection.update_one(
+                        {"_id": ObjectId(doc_id)},
+                        {"$set": {f"{team_key}.plays": populated_plays}}
+                    )
+                    doc = collection.find_one({"_id": ObjectId(doc_id)})
+                
+                # Reload team_obj with populated plays
+                if mode == "franchise":
+                    franchise_teams = doc.get("franchise_teams", {})
+                    team_obj = franchise_teams.get(actual_team_id, {}) if actual_team_id else {}
+                elif mode == "tournament":
+                    teams = doc.get("teams", {})
+                    team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
+                else:
+                    teams = doc.get("teams", {})
+                    team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
             
             logger.warning(f"✅ [GET PLAYBOOKS] plays populated, reloaded team_obj has {len(team_obj.get('plays', {}))} plays")
         

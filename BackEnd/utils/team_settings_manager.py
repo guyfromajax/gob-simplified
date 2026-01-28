@@ -47,6 +47,7 @@ def save_team_settings(
         Tuple of (success, actual_team_id, collection_name)
     """
     from BackEnd.api.gameplan_routes import normalize_team_id_to_canonical
+    from bson import ObjectId
     
     try:
         # Determine collection and document ID first
@@ -57,9 +58,29 @@ def save_team_settings(
             collection = games_collection
             doc_id = game_id
             update_path = f"teams.{actual_team_id}.{settings_type}"
-        elif mode in ["franchise", "tournament"]:
+            
+            # Validate if validation function provided
+            if validate_fn:
+                try:
+                    validate_fn(settings_data)
+                except Exception as e:
+                    logger.error(f"❌ [SAVE-TEAM-SETTINGS] Validation failed: {e}")
+                    return False, None, None
+            
+            # Update database
+            try:
+                doc_id_obj = ObjectId(doc_id)
+            except:
+                doc_id_obj = doc_id
+            
+            collection.update_one(
+                {"_id": doc_id_obj},
+                {"$set": {update_path: settings_data}}
+            )
+            
+        elif mode == "franchise":
             # ✅ PHASE 5.7: Use get_save_location_for_franchise_tournament to determine save location
-            # This checks if game is active and saves to game doc, otherwise saves to master doc
+            # This checks if game is active and saves to game doc, otherwise saves to FTD
             from BackEnd.api.gameplan_routes import get_save_location_for_franchise_tournament
             collection, doc_id, is_game_doc = get_save_location_for_franchise_tournament(
                 mode=mode,
@@ -68,42 +89,87 @@ def save_team_settings(
                 tournament_id=tournament_id
             )
             
+            # Validate if validation function provided
+            if validate_fn:
+                try:
+                    validate_fn(settings_data)
+                except Exception as e:
+                    logger.error(f"❌ [SAVE-TEAM-SETTINGS] Validation failed: {e}")
+                    return False, None, None
+            
+            if is_game_doc:
+                # Saving to game doc - resolve to canonical format (game docs use canonical keys)
+                actual_team_id = normalize_team_id_to_canonical(team_id, mode, None)
+                update_path = f"teams.{actual_team_id}.{settings_type}"
+                
+                try:
+                    doc_id_obj = ObjectId(doc_id)
+                except:
+                    doc_id_obj = doc_id
+                
+                collection.update_one(
+                    {"_id": doc_id_obj},
+                    {"$set": {update_path: settings_data}}
+                )
+            else:
+                # ✅ FTD: Saving to FTD collection instead of franchise doc
+                # team_id should be ObjectId string
+                actual_team_id = team_id  # Use ObjectId string directly
+                
+                from BackEnd.db import franchise_team_data_collection
+                try:
+                    franchise_id_obj = ObjectId(franchise_id)
+                    team_id_obj = ObjectId(team_id)
+                except Exception as e:
+                    logger.error(f"❌ [SAVE-TEAM-SETTINGS] Invalid ID format: franchise_id={franchise_id}, team_id={team_id}")
+                    return False, None, None
+                
+                franchise_team_data_collection.update_one(
+                    {"franchise_id": franchise_id_obj, "team_id": team_id_obj},
+                    {"$set": {settings_type: settings_data}}
+                )
+                logger.info(f"✅ [SAVE-TEAM-SETTINGS] Saved {settings_type} to FTD for team {team_id}")
+                return True, actual_team_id, "franchise_team_data"
+                
+        elif mode == "tournament":
+            # ✅ PHASE 5.7: Use get_save_location_for_franchise_tournament to determine save location
+            from BackEnd.api.gameplan_routes import get_save_location_for_franchise_tournament
+            collection, doc_id, is_game_doc = get_save_location_for_franchise_tournament(
+                mode=mode,
+                game_id=game_id,
+                franchise_id=franchise_id,
+                tournament_id=tournament_id
+            )
+            
+            # Validate if validation function provided
+            if validate_fn:
+                try:
+                    validate_fn(settings_data)
+                except Exception as e:
+                    logger.error(f"❌ [SAVE-TEAM-SETTINGS] Validation failed: {e}")
+                    return False, None, None
+            
             if is_game_doc:
                 # Saving to game doc - resolve to canonical format (game docs use canonical keys)
                 actual_team_id = normalize_team_id_to_canonical(team_id, mode, None)
                 update_path = f"teams.{actual_team_id}.{settings_type}"
             else:
-                # ✅ FIX: Saving to master doc - use ObjectId string directly (master docs use ObjectId keys)
-                # Tournament/franchise master docs store teams with ObjectId strings as keys
-                # (from user_team_object_id), not canonical format
-                actual_team_id = team_id  # Use ObjectId string directly, don't normalize
-                if mode == "franchise":
-                    update_path = f"franchise_teams.{actual_team_id}.{settings_type}"
-                else:  # tournament
-                    update_path = f"teams.{actual_team_id}.{settings_type}"
+                # Saving to tournament master doc - use ObjectId string directly
+                actual_team_id = team_id
+                update_path = f"teams.{actual_team_id}.{settings_type}"
+            
+            try:
+                doc_id_obj = ObjectId(doc_id)
+            except:
+                doc_id_obj = doc_id
+            
+            collection.update_one(
+                {"_id": doc_id_obj},
+                {"$set": {update_path: settings_data}}
+            )
         else:
             logger.error(f"❌ [SAVE-TEAM-SETTINGS] Invalid mode/ID combination: mode={mode}, game_id={game_id}, franchise_id={franchise_id}, tournament_id={tournament_id}")
             return False, None, None
-        
-        # Validate if validation function provided
-        if validate_fn:
-            try:
-                validate_fn(settings_data)
-            except Exception as e:
-                logger.error(f"❌ [SAVE-TEAM-SETTINGS] Validation failed: {e}")
-                return False, None, None
-        
-        # Update database
-        from bson import ObjectId
-        try:
-            doc_id_obj = ObjectId(doc_id)
-        except:
-            doc_id_obj = doc_id
-        
-        collection.update_one(
-            {"_id": doc_id_obj},
-            {"$set": {update_path: settings_data}}
-        )
         
         # Optionally apply to GameManager
         if apply_to_gamemanager and game_id:
@@ -121,7 +187,7 @@ def save_team_settings(
                     elif gm.away_team.team_id == actual_team_id or gm.away_team.name == team_id:
                         gm.away_team.playbook_settings = dict(settings_data)
         
-        return True, actual_team_id, collection.name
+        return True, actual_team_id, collection.name if hasattr(collection, 'name') else "unknown"
     
     except Exception as e:
         logger.error(f"❌ [SAVE-TEAM-SETTINGS] Error saving {settings_type}: {e}", exc_info=True)
