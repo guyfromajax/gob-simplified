@@ -1238,94 +1238,53 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
     game_id = normalize_game_id(game_id)
     game_id_type = type(game_id).__name__
     try:
-        # ✅ HYBRID APPROACH: If source=db, skip cache and always read from database
-        # This ensures lineup screen always gets fresh data (only ~13 reads per game: timeouts + quarter breaks)
-        # During active gameplay, source is not specified, so we use cache for performance
-        force_db_read = source == "db"
-        
-        # Check ongoing games first (unless forcing DB read)
-        gm = None
-        cache_hit = False
-        if not force_db_read:
-            gm = ongoing_games.get(game_id)
-            if gm:
-                cache_hit = True
-        
-        if gm:
-            # ✅ PERFORMANCE: Measure processing time (only log if slow)
-            process_start = time.time()
-            # Get players with current energy levels, stats, and attributes
-            # Include ALL players (not just lineup) so roster merge works correctly
-            players = []
-            for team in [gm.home_team, gm.away_team]:
-                # Get all players (lineup + bench) so all roster players can be matched
-                for player in team.get_all_players():
-                    players.append({
-                        "_id": player.player_id,
-                        "name": player.name,
-                        "NG": player.attributes.get("NG", 1.0),
-                        "team": team.name,
-                        "stats": player.stats.get("game", {}),  # ✅ Add game stats
-                        "attributes": {  # ✅ Add attributes (EM, MO, CH, NG)
-                            "EM": player.attributes.get("EM", 50),
-                            "MO": player.attributes.get("MO", 0),
-                            "CH": player.attributes.get("CH", 50),
-                            "NG": player.attributes.get("NG", 1.0)
-                        }
-                    })
-            
-            # Build team_stats structure (for S2 tab - playcall stats)
-            team_stats = {
-                gm.home_team.name: {
-                    "offense": gm.home_team.scouting_data.get("offense", {}),
-                    "defense": gm.home_team.scouting_data.get("defense", {})
-                },
-                gm.away_team.name: {
-                    "offense": gm.away_team.scouting_data.get("offense", {}),
-                    "defense": gm.away_team.scouting_data.get("defense", {})
-                }
-            }
-            
-            # ✅ REMOVED: Verbose PERF log - only log if slow (>50ms)
-            process_time = (time.time() - process_start) * 1000  # Convert to ms
-            if process_time > 50:
-                logging.warning(f"⚠️ [PERF] Slow in-memory processing: /api/game/{game_id} - {process_time:.2f}ms")
-            
-            response_data = {
-                "game_id": game_id,
-                "score": gm.score,
-                "box_score": gm.get_box_score(),
-                "quarter": gm.quarter,
-                "clock": gm.game_state.get("clock", "8:00"),
-                "players": players,
-                # ✅ FOUL OUT FIX: Include ineligible_players (fouled-out players) in response
-                "ineligible_players": gm.game_state.get("ineligible_players", []),
-                # Team-level stats (for S1/S2/S3 tabs and scoreboard)
-                "team_totals": gm.team_totals,
-                "team_stats": team_stats,  # Playcall stats for S2 tab
-                "points_by_quarter": gm.game_state.get("points_by_quarter", {}),
-                "home_team": {
-                    "name": gm.home_team.name,
-                    "team_fouls": gm.home_team.team_fouls,
-                    "timeouts": getattr(gm.home_team, 'timeouts', 4),
-                    "attributes": gm.home_team.team_attributes  # Team attributes for S3 tab
-                },
-                "away_team": {
-                    "name": gm.away_team.name,
-                    "team_fouls": gm.away_team.team_fouls,
-                    "timeouts": getattr(gm.away_team, 'timeouts', 4),
-                    "attributes": gm.away_team.team_attributes  # Team attributes for S3 tab
-                }
-            }
-            response_size = len(json.dumps(response_data))
-            total_time = (time.time() - endpoint_start) * 1000
-            logging.warning(
-                "🔍 [ATTR-CHANGES] /api/game CACHE path: returning in-memory game (no team_attribute_changes, no home_team_id/away_team_id)"
-            )
-            if total_time > 100:
-                logging.warning(f"⚠️ [PERF] Slow in-memory path: /api/game/{game_id} - {total_time:.2f}ms")
-            return response_data
-        
+        # ---------- CACHE PATH (commented out): always use DB for SS&S team_attribute_changes, home_team_id, away_team_id ----------
+        # force_db_read = source == "db"
+        # gm = None
+        # cache_hit = False
+        # if not force_db_read:
+        #     gm = ongoing_games.get(game_id)
+        #     if gm:
+        #         cache_hit = True
+        # if gm:
+        #     process_start = time.time()
+        #     players = []
+        #     for team in [gm.home_team, gm.away_team]:
+        #         for player in team.get_all_players():
+        #             players.append({
+        #                 "_id": player.player_id,
+        #                 "name": player.name,
+        #                 "NG": player.attributes.get("NG", 1.0),
+        #                 "team": team.name,
+        #                 "stats": player.stats.get("game", {}),
+        #                 "attributes": {
+        #                     "EM": player.attributes.get("EM", 50),
+        #                     "MO": player.attributes.get("MO", 0),
+        #                     "CH": player.attributes.get("CH", 50),
+        #                     "NG": player.attributes.get("NG", 1.0)
+        #                 }
+        #             })
+        #     team_stats = {
+        #         gm.home_team.name: {"offense": gm.home_team.scouting_data.get("offense", {}), "defense": gm.home_team.scouting_data.get("defense", {})},
+        #         gm.away_team.name: {"offense": gm.away_team.scouting_data.get("offense", {}), "defense": gm.away_team.scouting_data.get("defense", {})}
+        #     }
+        #     response_data = {
+        #         "game_id": game_id,
+        #         "score": gm.score,
+        #         "box_score": gm.get_box_score(),
+        #         "quarter": gm.quarter,
+        #         "clock": gm.game_state.get("clock", "8:00"),
+        #         "players": players,
+        #         "ineligible_players": gm.game_state.get("ineligible_players", []),
+        #         "team_totals": gm.team_totals,
+        #         "team_stats": team_stats,
+        #         "points_by_quarter": gm.game_state.get("points_by_quarter", {}),
+        #         "home_team": {"name": gm.home_team.name, "team_fouls": gm.home_team.team_fouls, "timeouts": getattr(gm.home_team, 'timeouts', 4), "attributes": gm.home_team.team_attributes},
+        #         "away_team": {"name": gm.away_team.name, "team_fouls": gm.away_team.team_fouls, "timeouts": getattr(gm.away_team, 'timeouts', 4), "attributes": gm.away_team.team_attributes}
+        #     }
+        #     return response_data
+        # --------------------------------------------------------------------------------------------------------------------------
+
         # Check database
         if games_collection is not None:
             # ✅ REMOVED: Verbose debug logs - only log on errors
