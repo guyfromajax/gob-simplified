@@ -55,6 +55,38 @@ def _resolve_team_id_to_object_id(team_id: str):
     )
     return doc["_id"] if doc else None
 
+def _normalize_team_id_to_string(team_id):
+    """Normalize team_id (ObjectId, ObjectId string, or team_id string) to canonical team_id string (e.g. 'LANCASTER').
+    Returns None if team not found. Used to ensure team_attribute_changes keys match box score expectations."""
+    if not team_id:
+        return None
+    # If already a team_id string (like "LANCASTER"), return as-is
+    doc = db.teams.find_one({"team_id": team_id}, {"team_id": 1})
+    if doc:
+        return doc["team_id"]
+    # Try as ObjectId (or ObjectId string)
+    try:
+        oid = ObjectId(team_id) if not isinstance(team_id, ObjectId) else team_id
+        doc = db.teams.find_one({"_id": oid}, {"team_id": 1})
+        if doc:
+            return doc["team_id"]
+    except Exception:
+        pass
+    # Try as name or code
+    doc = db.teams.find_one(
+        {"$or": [{"name": team_id}, {"code": team_id}]},
+        {"team_id": 1}
+    )
+    if doc:
+        return doc["team_id"]
+    # Case-insensitive name match
+    import re
+    doc = db.teams.find_one(
+        {"name": {"$regex": f"^{re.escape(str(team_id))}$", "$options": "i"}},
+        {"team_id": 1}
+    )
+    return doc["team_id"] if doc else None
+
 
 def update_team_attributes_after_game(
     game_id: ObjectId,
@@ -850,10 +882,20 @@ def save_result(req: FranchiseResultRequest):
     away = game_doc.get("awayTeam", {}) or {}
     home_name = home.get("name") or game_doc.get("home_team")
     away_name = away.get("name") or game_doc.get("away_team")
-    home_id = home.get("team_id") or game_doc.get("home_team_id")
-    away_id = away.get("team_id") or game_doc.get("away_team_id")
+    home_id_raw = home.get("team_id") or game_doc.get("home_team_id")
+    away_id_raw = away.get("team_id") or game_doc.get("away_team_id")
     
-    logger.info(f"🔍 [SAVE-RESULT] Team IDs extracted - home_id={home_id} (type: {type(home_id)}), away_id={away_id} (type: {type(away_id)})")
+    # ✅ NORMALIZE: Convert ObjectIds/ObjectId strings to team_id strings (e.g. "LANCASTER") for SS&S
+    # This ensures team_attribute_changes keys match box score expectations (home_team_id/away_team_id are team_id strings)
+    home_id = _normalize_team_id_to_string(home_id_raw)
+    away_id = _normalize_team_id_to_string(away_id_raw)
+    
+    if not home_id:
+        logger.error(f"❌ [SAVE-RESULT] Could not normalize home_id: {home_id_raw} (type: {type(home_id_raw)})")
+    if not away_id:
+        logger.error(f"❌ [SAVE-RESULT] Could not normalize away_id: {away_id_raw} (type: {type(away_id_raw)})")
+    
+    logger.info(f"🔍 [SAVE-RESULT] Team IDs extracted and normalized - home_id={home_id} (was {home_id_raw}, type: {type(home_id)}), away_id={away_id} (was {away_id_raw}, type: {type(away_id)})")
     logger.info(f"🔍 [SAVE-RESULT] Team names - home_name={home_name}, away_name={away_name}")
     score_map = game_doc.get("score") or game_doc.get("final_score") or {}
     home_score = home.get("score", score_map.get(home_name, 0))
