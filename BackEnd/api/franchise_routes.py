@@ -1366,12 +1366,10 @@ def command_center_data(franchise_id: str = None):
         try:
             fid = ObjectId(franchise_id)
             db_query_start = time.time()
-            # ✅ PERFORMANCE: Load once with projection (only needed fields) - reduces from 402KB to ~10KB (98% reduction)
-            # Projection includes: franchise_teams, training_status, week, eos_tournament, user_team fields
+            # Projection: training_status, week, eos_tournament, user_team; team data from FTD
             franchise_doc = db.franchises.find_one(
                 {"_id": fid},
                 {
-                    "franchise_teams": 1,
                     "training_status": 1,
                     "week": 1,
                     "eos_tournament": 1,
@@ -1384,33 +1382,22 @@ def command_center_data(franchise_id: str = None):
             db_query_time = time.time() - db_query_start
             logger.info(f"⏱️ [PERF] /franchise/command-center/data DB query: {db_query_time:.3f}s")
             if franchise_doc:
-                # Get user team identifiers from franchise document
                 team_name, team_id = get_user_team_from_franchise(franchise_doc)
                 
-                # Get training status
                 training_status = franchise_doc.get("training_status", {})
                 training_completed = training_status.get("training_completed", False)
                 session_type = training_status.get("session_type", "in-season")
                 
-                # Get franchise-specific team stats if available
                 if team_id:
-                    franchise_teams = franchise_doc.get("franchise_teams", {})
-                    # ✅ SS&S: Use EXACT same logic as /franchise/team-data endpoint (Team tab line 1483-1484)
-                    # This ensures 100% consistency between top bar and Team tab displays
-                    team_obj = franchise_teams.get(team_id, {})
-                    
-                    if team_obj and isinstance(team_obj, dict) and len(team_obj) > 0:
-                        team_doc = team_obj.copy()  # Use franchise-specific stats
+                    team_doc = db.teams.find_one({"_id": ObjectId(team_id)}) or {}
+                    ftd = franchise_team_data_collection.find_one(
+                        {"franchise_id": fid, "team_id": ObjectId(team_id)},
+                        {"team_attributes": 1}
+                    )
+                    if ftd:
+                        attrs = ftd.get("team_attributes", {})
+                        team_doc["team_chemistry"] = attrs.get("team_chemistry", 0)
                     else:
-                        # Fallback to universal team doc (but we'll override team_chemistry below)
-                        team_doc = db.teams.find_one({"_id": ObjectId(team_id)}) or {}
-                    
-                    # ✅ SS&S: Get team_chemistry EXACTLY like Team tab does (lines 1494-1498 in get_franchise_team_data)
-                    # Same logic: if key in team_obj, use it; otherwise default to 0
-                    if team_obj and isinstance(team_obj, dict) and "team_chemistry" in team_obj:
-                        team_doc["team_chemistry"] = team_obj["team_chemistry"]
-                    else:
-                        # Default to 0 if not present (same as Team tab line 1498)
                         team_doc["team_chemistry"] = 0
                 else:
                     team_doc = {}
@@ -1486,18 +1473,23 @@ def command_center_data(franchise_id: str = None):
     return response
 
 
+def _ftd_team_list_for_franchise(franchise_id) -> dict:
+    """Return {team_id_str: {}} for all teams in FTD. Used as team list by standings, stats, traits."""
+    fid = ObjectId(franchise_id) if isinstance(franchise_id, str) else franchise_id
+    docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1}))
+    return {str(d["team_id"]): {} for d in docs}
+
+
 @router.get("/franchise/standings")
 def standings(franchise_id: str):
     import time
     start_time = time.time()
     logger.info(f"⏱️ [PERF] /franchise/standings START - franchise_id={franchise_id}")
     
-    # ✅ PERFORMANCE: Only fetch needed fields (reduces from 402KB to ~20KB, 95% reduction)
-    # ✅ FIX: Also fetch franchise_teams to get list of teams for standings calculation
     db_query_start = time.time()
     franchise_doc = db.franchises.find_one(
         {"_id": ObjectId(franchise_id)},
-        {"schedule": 1, "week": 1, "eos_tournament": 1, "eos_tournament_active": 1, "results": 1, "franchise_teams": 1, "_id": 1}
+        {"schedule": 1, "week": 1, "eos_tournament": 1, "eos_tournament_active": 1, "results": 1, "_id": 1}
     )
     db_query_time = time.time() - db_query_start
     logger.info(f"⏱️ [PERF] /franchise/standings DB query: {db_query_time:.3f}s")
@@ -1513,18 +1505,15 @@ def standings(franchise_id: str):
 
     matchup_map = {}
     
-    # ✅ EOS TOURNAMENT: Check if tournament is active (weeks 15-17)
     eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
     eos_tournament = franchise_doc.get("eos_tournament", {})
     
     if eos_tournament_active and eos_tournament and week >= 15:
-        # ✅ SS&S: Reuse Tournament mode's bracket lookup pattern
         current_round = eos_tournament.get("current_round", 1)
         round_name = get_round_name(current_round)
         bracket = eos_tournament.get("bracket", {})
         matchups = bracket.get(round_name, [])
         
-        # Build matchup_map from tournament bracket
         for matchup_data in matchups:
             home_id_str = matchup_data.get("home_team")
             away_id_str = matchup_data.get("away_team")
@@ -1535,14 +1524,11 @@ def standings(franchise_id: str):
                     away_id = ObjectId(away_id_str)
                     home_name = id_to_name.get(home_id, "")
                     away_name = id_to_name.get(away_id, "")
-                    
                     matchup_map[str(away_id)] = f"at {home_name}"
                     matchup_map[str(home_id)] = f"vs {away_name}"
                 except Exception:
-                    # Skip invalid ObjectIds
                     continue
     else:
-        # Regular season (weeks 1-14)
         next_games = schedule[week - 1] if week - 1 < len(schedule) else []
         for away_id, home_id in next_games:
             home_name = id_to_name.get(home_id, "")
@@ -1550,19 +1536,14 @@ def standings(franchise_id: str):
             matchup_map[str(away_id)] = f"at {home_name}"
             matchup_map[str(home_id)] = f"vs {away_name}"
 
-    # ✅ SS&S: Calculate W/L and PF/PA from franchise.results (franchise-specific) instead of global teams collection
-    # This ensures standings match team-stats endpoint and are isolated from other game modes
     from BackEnd.utils.franchise_standings import calculate_franchise_standings
     
     franchise_results = franchise_doc.get("results", {})
-    franchise_teams = franchise_doc.get("franchise_teams", {})
+    team_list = _ftd_team_list_for_franchise(franchise_id)
     
-    # Calculate standings from franchise.results
-    standings_data = calculate_franchise_standings(franchise_results, franchise_teams)
+    standings_data = calculate_franchise_standings(franchise_results, team_list)
     
-    # Get team names and build output
-    # ✅ FIX: Only query teams that are in franchise_teams (not all teams)
-    team_ids_list = [ObjectId(tid) for tid in franchise_teams.keys()]
+    team_ids_list = [ObjectId(tid) for tid in team_list.keys()]
     teams = list(db.teams.find({"_id": {"$in": team_ids_list}}, {"name": 1, "_id": 1}))
 
     output = []
@@ -1611,7 +1592,6 @@ def season_schedule(franchise_id: str):
         {
             "schedule": 1,
             "results": 1,
-            "franchise_teams": 1,
             "eos_tournament": 1,
             "eos_tournament_active": 1,
             "user_team_id": 1,
@@ -1646,12 +1626,18 @@ def season_schedule(franchise_id: str):
         team_id = user_team_object_id
         team_name = user_team_id
     
-    # Get training reports for user's team
-    franchise_teams = franchise_doc.get("franchise_teams", {})
+    # Get training reports for user's team from FTD
     training_reports = {}
     if team_id:
-        team_data = franchise_teams.get(team_id, {})
-        training_reports = team_data.get("training_reports", {})
+        try:
+            ftd = franchise_team_data_collection.find_one(
+                {"franchise_id": ObjectId(franchise_id), "team_id": ObjectId(team_id)},
+                {"training_reports": 1}
+            )
+            if ftd:
+                training_reports = ftd.get("training_reports", {})
+        except Exception:
+            pass
 
     weeks = []
     results_by_week = franchise_doc.get("results", {})
@@ -1940,7 +1926,7 @@ def team_stats(franchise_id: str):
         raise HTTPException(status_code=400, detail="Invalid franchise_id")
     
     db_query_start = time.time()
-    franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 1, "franchise_teams": 1, "results": 1})
+    franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 1, "results": 1})
     db_query_time = time.time() - db_query_start
     logger.info(f"⏱️ [PERF] /franchise/team-stats DB query: {db_query_time:.3f}s")
     
@@ -1948,17 +1934,15 @@ def team_stats(franchise_id: str):
         raise HTTPException(status_code=404, detail="Franchise not found")
     
     players = franchise_doc.get("players", {})
-    franchise_teams = franchise_doc.get("franchise_teams", {})
-    franchise_results = franchise_doc.get("results", {})  # ✅ FIX: Get franchise.results for W/L and PF/PA calculation
+    franchise_results = franchise_doc.get("results", {})
+    team_list = _ftd_team_list_for_franchise(fid)
     
-    logger.info(f"⏱️ [PERF] /franchise/team-stats Found {len(players)} players, {len(franchise_teams)} teams, {len(franchise_results)} weeks of results")
+    logger.info(f"⏱️ [PERF] /franchise/team-stats Found {len(players)} players, {len(team_list)} teams, {len(franchise_results)} weeks of results")
     
-    # ✅ SS&S: Use shared aggregator utility
-    # ✅ FIX: Pass franchise_results to calculate W/L and PF/PA from franchise-specific results, not universal teams collection
     aggregation_start = time.time()
     output = aggregate_team_stats_from_players(
         players=players,
-        team_ids=franchise_teams,
+        team_ids=team_list,
         teams_collection=db.teams,
         collection_type='franchise',
         logger=logger,
@@ -1989,7 +1973,7 @@ def team_traits(franchise_id: str):
         raise HTTPException(status_code=400, detail="Invalid franchise_id")
     
     db_query_start = time.time()
-    franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 1, "franchise_teams": 1})
+    franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 1})
     db_query_time = time.time() - db_query_start
     logger.info(f"⏱️ [PERF] /franchise/team-traits DB query: {db_query_time:.3f}s")
     
@@ -1997,19 +1981,15 @@ def team_traits(franchise_id: str):
         raise HTTPException(status_code=404, detail="Franchise not found")
     
     players = franchise_doc.get("players", {})
-    franchise_teams = franchise_doc.get("franchise_teams", {})
+    team_list = _ftd_team_list_for_franchise(fid)
     
-    logger.info(f"⏱️ [PERF] /franchise/team-traits Found {len(players)} players, {len(franchise_teams)} teams")
+    logger.info(f"⏱️ [PERF] /franchise/team-traits Found {len(players)} players, {len(team_list)} teams")
     
-    # Attribute list to analyze
     attributes = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]
-    
-    # Initialize team totals map
     team_totals = {}
-    team_names = {}  # Map team_id to team name
+    team_names = {}
     
-    # Get team names from teams collection
-    for team_id_str in franchise_teams.keys():
+    for team_id_str in team_list.keys():
         try:
             team_doc = db.teams.find_one({"_id": ObjectId(team_id_str)}, {"name": 1, "primary_color": 1})
             if team_doc:
@@ -2299,12 +2279,8 @@ def get_franchise_state(franchise_id: str):
 @router.get("/franchise/team-data")
 def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: str = None):
     """
-    Get team data (attributes, plays, scouting_data) from franchise_teams.
-    
-    ✅ SS&S: Prefers team_id (ObjectId) for consistent navigation.
-    Falls back to team_name resolution for backward compatibility.
-    
-    ✅ PERFORMANCE: Only fetches franchise_teams field (reduces from 402KB to ~15KB, 96% reduction).
+    Get team data (attributes, plays, scouting_data) from FTD.
+    Prefers team_id (ObjectId); falls back to team_name resolution.
     """
     import time
     start_time = time.time()
@@ -2340,7 +2316,7 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
         # ✅ PERFORMANCE: Load once with projection (only needed fields)
         franchise_doc = db.franchises.find_one(
             {"_id": ObjectId(franchise_id)},
-            {"franchise_teams": 1, "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+            {"user_team_id": 1, "user_team_object_id": 1, "_id": 1}
         )
         if not franchise_doc:
             raise HTTPException(status_code=404, detail="Franchise not found")
