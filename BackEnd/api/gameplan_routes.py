@@ -1142,6 +1142,7 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                 If None or "cache", checks cache first for performance during active gameplay, but DB is always available as fallback.
     """
     try:
+        logger.warning(f"🔍 [GET GAMEPLAN] query: mode={mode!r}, team_id={team_id!r}, franchise_id={franchise_id!r}, tournament_id={tournament_id!r}, game_id={game_id!r}")
         # ✅ PHASE 5.5: Use helper to get collection and doc_id (simplifies mode handling)
         collection, doc_id = get_collection_and_doc_id(mode, franchise_id, tournament_id, game_id)
         
@@ -1297,14 +1298,17 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
             except:
                 raise HTTPException(status_code=400, detail=f"Invalid team_id format: {authoritative_team_id}")
             
+            logger.warning(f"🔍 [GET GAMEPLAN] franchise FTD lookup: doc_id={doc_id!r}, authoritative_team_id={authoritative_team_id!r}, team_object_id={team_object_id}")
             ftd_doc = franchise_team_data_collection.find_one(
                 {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
                 {"strategy_settings": 1}
             )
             
             if ftd_doc:
+                ss = ftd_doc.get("strategy_settings", {})
+                logger.warning(f"🔍 [GET GAMEPLAN] FTD found: strategy_settings keys={list(ss.keys()) if ss else []}")
                 team_obj = {
-                    "strategy_settings": ftd_doc.get("strategy_settings", {})
+                    "strategy_settings": ss
                 }
             else:
                 # FTD doesn't exist - initialize with defaults
@@ -1312,8 +1316,7 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                 team_obj = {
                     "strategy_settings": defaults["strategy_settings"].copy()
                 }
-                # Create FTD entry (will be created by initialize_season, but handle missing case)
-                logger.warning(f"⚠️ [GET GAMEPLAN] FTD not found for team {team_object_id}, using defaults")
+                logger.warning(f"⚠️ [GET GAMEPLAN] FTD not found for franchise_id={doc_id!r} team_id={authoritative_team_id!r}, using defaults")
         elif mode == "tournament":
             # ✅ MIGRATION: Use tournament document's user_team_object_id as source of truth
             user_team_id_name, user_team_object_id = get_user_team_from_tournament(doc)
@@ -1445,6 +1448,10 @@ def update_gameplan(request: GamePlanUpdateRequest):
     """Update game plan settings for a team in the specified mode."""
     from BackEnd.utils.team_settings_manager import save_team_settings
     
+    logger.warning(
+        f"🔍 [UPDATE GAMEPLAN] request: mode={request.mode!r}, team_id={request.team_id!r}, "
+        f"franchise_id={request.franchise_id!r}, tournament_id={request.tournament_id!r}, game_id={request.game_id!r}"
+    )
     try:
         # ✅ UNIFIED: Use unified save function for consistent team_id resolution
         # Note: validate_settings raises HTTPException on failure, so we validate first
@@ -1487,7 +1494,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
     endpoint_start = time.time()
     
     try:
-        # ✅ PERFORMANCE: Removed debug logging - only log errors and critical events
+        logger.warning(f"🔍 [GET PLAYBOOKS] query: mode={mode!r}, team_id={team_id!r}, franchise_id={franchise_id!r}, tournament_id={tournament_id!r}, game_id={game_id!r}")
         # ✅ PHASE 5.5: Use helper to get collection and doc_id (simplifies mode handling)
         collection, doc_id = get_collection_and_doc_id(mode, franchise_id, tournament_id, game_id)
         
@@ -1682,18 +1689,22 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             except:
                 raise HTTPException(status_code=400, detail=f"Invalid team_id format: {authoritative_team_id}")
             
+            logger.warning(f"🔍 [GET PLAYBOOKS] franchise FTD lookup: doc_id={doc_id!r}, authoritative_team_id={authoritative_team_id!r}, team_object_id={team_object_id}")
             ftd_doc = franchise_team_data_collection.find_one(
                 {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
                 {"playbook_settings": 1, "plays": 1}
             )
             
             if ftd_doc:
-                # Load playbook_settings from FTD
+                pb = ftd_doc.get("playbook_settings", {})
+                pl = ftd_doc.get("plays", {})
+                logger.warning(f"🔍 [GET PLAYBOOKS] FTD found: playbook_settings keys={list(pb.keys())[:12] if pb else []}, plays count={len(pl)}")
                 team_obj = {
-                    "playbook_settings": ftd_doc.get("playbook_settings", {}),
-                    "plays": ftd_doc.get("plays", {})
+                    "playbook_settings": pb,
+                    "plays": pl
                 }
             else:
+                logger.warning(f"🔍 [GET PLAYBOOKS] FTD not found for franchise_id={doc_id!r} team_id={authoritative_team_id!r}, creating new FTD entry")
                 # FTD doesn't exist yet - initialize playbook_settings and create FTD entry
                 playbook_settings = initialize_playbook_settings()
                 populated_plays = _get_cached_populated_plays(mode="franchise")
@@ -2110,6 +2121,11 @@ def save_playbooks(request: PlaybookSettingsRequest):
     """
     from BackEnd.utils.team_settings_manager import save_team_settings
     
+    logger.warning(
+        f"🔍 [SAVE PLAYBOOKS] request: mode={request.mode!r}, team_id={request.team_id!r}, "
+        f"franchise_id={request.franchise_id!r}, tournament_id={request.tournament_id!r}, game_id={request.game_id!r}, "
+        f"playbook_keys={list((request.playbook_settings or {}).keys())[:12]}"
+    )
     try:
         # ✅ UNIFIED: Use unified save function for consistent team_id resolution
         success, actual_team_id, collection_name = save_team_settings(
