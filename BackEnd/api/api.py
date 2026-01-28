@@ -575,25 +575,35 @@ def load_team_settings_from_doc(mode: str, doc_id: str, team_id: str, team_name:
         
         if mode == "franchise":
             # ✅ FTD: Load strategy_settings and playbook_settings from FTD (franchise_teams is empty)
+            logging.warning(f"🔍 [LOAD-TEAM-SETTINGS] franchise master load: doc_id={doc_id!r}, team_id={team_id!r}, team_name={team_name!r}, game_id={game_id!r}")
             try:
                 franchise_doc = franchises_collection.find_one(
                     {"_id": ObjectId(doc_id)},
                     {"user_team_id": 1, "user_team_object_id": 1, "_id": 1}
                 )
-                if franchise_doc:
+                if not franchise_doc:
+                    logging.warning(f"🔍 [LOAD-TEAM-SETTINGS] franchise doc not found for _id={doc_id!r}")
+                else:
                     _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
-                    if user_team_object_id:
-                        ftd_doc = franchise_team_data_collection.find_one(
-                            {"franchise_id": ObjectId(doc_id), "team_id": ObjectId(user_team_object_id)},
-                            {"strategy_settings": 1, "playbook_settings": 1}
-                        )
-                        if ftd_doc:
+                    logging.warning(f"🔍 [LOAD-TEAM-SETTINGS] get_user_team_from_franchise -> user_team_object_id={user_team_object_id!r}")
+                    if not user_team_object_id:
+                        logging.warning(f"🔍 [LOAD-TEAM-SETTINGS] user_team_object_id missing in franchise doc")
+                    else:
+                        ftd_filter = {"franchise_id": ObjectId(doc_id), "team_id": ObjectId(user_team_object_id)}
+                        ftd_doc = franchise_team_data_collection.find_one(ftd_filter, {"strategy_settings": 1, "playbook_settings": 1})
+                        if not ftd_doc:
+                            logging.warning(f"🔍 [LOAD-TEAM-SETTINGS] FTD doc not found for franchise_id={doc_id!r}, team_id={user_team_object_id!r}")
+                        else:
                             strategy_settings = ftd_doc.get("strategy_settings")
                             playbook_settings = ftd_doc.get("playbook_settings")
+                            logging.warning(
+                                f"🔍 [LOAD-TEAM-SETTINGS] FTD found: strategy_settings={bool(strategy_settings)} keys={list(strategy_settings.keys()) if strategy_settings else []}, "
+                                f"playbook_settings={bool(playbook_settings)} keys={list(playbook_settings.keys())[:10] if playbook_settings else []}"
+                            )
                             if strategy_settings or playbook_settings:
                                 logging.warning(f"✅ [LOAD-TEAM-SETTINGS] Loaded from FTD for franchise {doc_id}, team {user_team_object_id}")
             except Exception as e:
-                logging.warning(f"⚠️ Error loading franchise master settings from FTD: {e}")
+                logging.warning(f"⚠️ Error loading franchise master settings from FTD: {e}", exc_info=True)
         else:
             # Tournament: load master doc and extract from teams
             master_doc = None

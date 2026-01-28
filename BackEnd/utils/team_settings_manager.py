@@ -88,6 +88,8 @@ def save_team_settings(
                 franchise_id=franchise_id,
                 tournament_id=tournament_id
             )
+            logger.warning(f"🔍 [SAVE-TEAM-SETTINGS] franchise mode: game_id={game_id!r}, franchise_id={franchise_id!r}, team_id={team_id!r}, "
+                f"settings_type={settings_type}, is_game_doc={is_game_doc}")
             
             # Validate if validation function provided
             if validate_fn:
@@ -112,24 +114,55 @@ def save_team_settings(
                     {"$set": {update_path: settings_data}}
                 )
             else:
-                # ✅ FTD: Saving to FTD collection instead of franchise doc
-                # team_id should be ObjectId string
-                actual_team_id = team_id  # Use ObjectId string directly
-                
-                from BackEnd.db import franchise_team_data_collection
+                # ✅ FTD: Saving to FTD collection (FCC / pre-game). Always use authoritative user_team_object_id
+                # from franchise doc so save and load use the same FTD doc (request team_id can differ).
+                from BackEnd.db import franchise_team_data_collection, franchises_collection
+                from BackEnd.api.franchise_routes import get_user_team_from_franchise
                 try:
                     franchise_id_obj = ObjectId(franchise_id)
-                    team_id_obj = ObjectId(team_id)
                 except Exception as e:
-                    logger.error(f"❌ [SAVE-TEAM-SETTINGS] Invalid ID format: franchise_id={franchise_id}, team_id={team_id}")
+                    logger.error(f"❌ [SAVE-TEAM-SETTINGS] Invalid franchise_id: {franchise_id}: {e}")
                     return False, None, None
-                
-                franchise_team_data_collection.update_one(
+                franchise_doc = franchises_collection.find_one(
+                    {"_id": franchise_id_obj},
+                    {"user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+                )
+                if not franchise_doc:
+                    logger.error(f"❌ [SAVE-TEAM-SETTINGS] Franchise not found: {franchise_id}")
+                    return False, None, None
+                _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+                if not user_team_object_id:
+                    logger.error(f"❌ [SAVE-TEAM-SETTINGS] user_team_object_id missing in franchise {franchise_id}")
+                    return False, None, None
+                try:
+                    team_id_obj = ObjectId(user_team_object_id)
+                except Exception as e:
+                    logger.error(f"❌ [SAVE-TEAM-SETTINGS] Invalid user_team_object_id: {user_team_object_id}: {e}")
+                    return False, None, None
+                actual_team_id = user_team_object_id
+                logger.warning(
+                    f"🔍 [SAVE-TEAM-SETTINGS] FCC/master save: using authoritative user_team_object_id={actual_team_id!r} "
+                    f"(request team_id={team_id!r} ignored)"
+                )
+                pre = franchise_team_data_collection.count_documents(
+                    {"franchise_id": franchise_id_obj, "team_id": team_id_obj}
+                )
+                result = franchise_team_data_collection.update_one(
                     {"franchise_id": franchise_id_obj, "team_id": team_id_obj},
                     {"$set": {settings_type: settings_data}},
                     upsert=True
                 )
-                logger.info(f"✅ [SAVE-TEAM-SETTINGS] Saved {settings_type} to FTD for team {team_id}")
+                logger.warning(
+                    f"🔍 [SAVE-TEAM-SETTINGS] FTD update_one: franchise_id={franchise_id!r}, team_id={actual_team_id!r}, "
+                    f"settings_type={settings_type}, matched={result.matched_count}, modified={result.modified_count}, "
+                    f"upserted_id={result.upserted_id}, FTD_existed_before={pre}"
+                )
+                if settings_type == "strategy_settings":
+                    logger.warning(f"🔍 [SAVE-TEAM-SETTINGS] strategy_settings keys: {list(settings_data.keys())}")
+                else:
+                    logger.warning(f"🔍 [SAVE-TEAM-SETTINGS] playbook_settings keys: {list(settings_data.keys())}, "
+                        f"slot_assignments count={len(settings_data.get('slot_assignments') or {})}")
+                logger.info(f"✅ [SAVE-TEAM-SETTINGS] Saved {settings_type} to FTD for team {actual_team_id}")
                 return True, actual_team_id, "franchise_team_data"
                 
         elif mode == "tournament":
