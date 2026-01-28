@@ -568,42 +568,58 @@ def load_team_settings_from_doc(mode: str, doc_id: str, team_id: str, team_name:
         except Exception as e:
             logging.warning(f"⚠️ [PHASE 5.7] Error loading from game doc, falling back to master: {e}")
     
-    # If settings not loaded from game doc, load from master doc using unified function
+    # If settings not loaded from game doc, load from master doc (FTD for franchise, extract for tournament)
     if strategy_settings is None and playbook_settings is None:
         from BackEnd.utils.team_settings_manager import extract_team_settings
+        from BackEnd.db import franchise_team_data_collection
         
-        # Load master document
-        master_doc = None
-        if mode == "tournament":
+        if mode == "franchise":
+            # ✅ FTD: Load strategy_settings and playbook_settings from FTD (franchise_teams is empty)
             try:
-                master_doc = tournaments_collection.find_one({"_id": ObjectId(doc_id)})
-            except Exception as e:
-                logging.warning(f"⚠️ Error loading tournament doc: {e}")
-        elif mode == "franchise":
-            try:
-                # ✅ PERFORMANCE: Only fetch franchise_teams field (reduces from 402KB to ~50KB, 87% reduction)
-                master_doc = franchises_collection.find_one({"_id": ObjectId(doc_id)}, {"franchise_teams": 1})
-            except Exception as e:
-                logging.warning(f"⚠️ Error loading franchise doc: {e}")
-        
-        # Use unified function to extract settings (handles team_id resolution correctly)
-        if master_doc:
-            team_identifier = team_name or team_id
-            if team_identifier:
-                strategy_settings = extract_team_settings(
-                    saved_doc=master_doc,
-                    team_identifier=team_identifier,
-                    settings_type="strategy_settings",
-                    mode=mode,
-                    game_doc=None
+                franchise_doc = franchises_collection.find_one(
+                    {"_id": ObjectId(doc_id)},
+                    {"user_team_id": 1, "user_team_object_id": 1, "_id": 1}
                 )
-                playbook_settings = extract_team_settings(
-                    saved_doc=master_doc,
-                    team_identifier=team_identifier,
-                    settings_type="playbook_settings",
-                    mode=mode,
-                    game_doc=None
-                )
+                if franchise_doc:
+                    _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+                    if user_team_object_id:
+                        ftd_doc = franchise_team_data_collection.find_one(
+                            {"franchise_id": ObjectId(doc_id), "team_id": ObjectId(user_team_object_id)},
+                            {"strategy_settings": 1, "playbook_settings": 1}
+                        )
+                        if ftd_doc:
+                            strategy_settings = ftd_doc.get("strategy_settings")
+                            playbook_settings = ftd_doc.get("playbook_settings")
+                            if strategy_settings or playbook_settings:
+                                logging.warning(f"✅ [LOAD-TEAM-SETTINGS] Loaded from FTD for franchise {doc_id}, team {user_team_object_id}")
+            except Exception as e:
+                logging.warning(f"⚠️ Error loading franchise master settings from FTD: {e}")
+        else:
+            # Tournament: load master doc and extract from teams
+            master_doc = None
+            if mode == "tournament":
+                try:
+                    master_doc = tournaments_collection.find_one({"_id": ObjectId(doc_id)})
+                except Exception as e:
+                    logging.warning(f"⚠️ Error loading tournament doc: {e}")
+            
+            if master_doc:
+                team_identifier = team_name or team_id
+                if team_identifier:
+                    strategy_settings = extract_team_settings(
+                        saved_doc=master_doc,
+                        team_identifier=team_identifier,
+                        settings_type="strategy_settings",
+                        mode=mode,
+                        game_doc=None
+                    )
+                    playbook_settings = extract_team_settings(
+                        saved_doc=master_doc,
+                        team_identifier=team_identifier,
+                        settings_type="playbook_settings",
+                        mode=mode,
+                        game_doc=None
+                    )
     elif mode == "single":
         try:
             # For single game mode, try both UUID string and ObjectId formats

@@ -126,7 +126,8 @@ def save_team_settings(
                 
                 franchise_team_data_collection.update_one(
                     {"franchise_id": franchise_id_obj, "team_id": team_id_obj},
-                    {"$set": {settings_type: settings_data}}
+                    {"$set": {settings_type: settings_data}},
+                    upsert=True
                 )
                 logger.info(f"✅ [SAVE-TEAM-SETTINGS] Saved {settings_type} to FTD for team {team_id}")
                 return True, actual_team_id, "franchise_team_data"
