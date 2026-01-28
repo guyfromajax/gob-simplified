@@ -79,6 +79,9 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
       week = parseInt(simData.week, 10);
     }
   }
+  if ((!week || Number.isNaN(week)) && simData?.final_game_document?.week != null) {
+    week = parseInt(simData.final_game_document.week, 10);
+  }
 
   // POST to /tournament/save-result if needed
   console.log('🔍 [FINALIZE_GAME] Checking tournamentId:', {
@@ -207,7 +210,16 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   }
 
   // POST to /franchise/complete-week if needed (only if NOT in tournament mode)
-  if (franchiseId && !tournamentId && Number.isInteger(week) && week >= 1) {
+  const canCompleteWeek = franchiseId && !tournamentId && Number.isInteger(week) && week >= 1;
+  if (!canCompleteWeek && franchiseId && !tournamentId) {
+    console.warn('⚠️ [FINALIZE_GAME] Skipping complete-week: missing or invalid week', {
+      week,
+      fromUrl: params.get('week'),
+      fromSimData: simData?.week,
+      fromFinalDoc: simData?.final_game_document?.week,
+    });
+  }
+  if (canCompleteWeek) {
     try {
       const team1Id =
         awayIdParam ||
