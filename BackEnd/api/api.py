@@ -1843,11 +1843,14 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     "🔍 simulate_quarter_endpoint skipping DB lookup for game_id=%s; no collection",
                     game_id,
                 )
+            db_lookup_start = time.time()
             saved = (
                 games_collection.find_one({"_id": game_id})
                 if games_collection is not None
                 else None
             )
+            db_lookup_time = (time.time() - db_lookup_start) * 1000
+            logging.warning(f"⏱️ [DB TIMING] simulate_quarter: games_collection.find_one(game_id={game_id}): {db_lookup_time:.2f}ms, found={saved is not None}")
             if saved:
                 try:
                     # ✅ UNIFIED STRUCTURE: Get team IDs from top level (unified structure)
@@ -1937,6 +1940,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         saved_mode = saved.get("mode", "single")
                         franchise_id_for_roster = saved_franchise_id if saved_mode == "franchise" else None
                         
+                        gm_create_start = time.time()
                         gm = GameManager(
                             home, 
                             away,
@@ -1954,6 +1958,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             user_team_side=request.user_team_side,  # ✅ SS&S: Set is_user_team flags
                             franchise_id=franchise_id_for_roster  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
                         )
+                        gm_create_time = (time.time() - gm_create_start) * 1000
+                        logging.warning(f"⏱️ [DB TIMING] simulate_quarter: GameManager created from DB: {gm_create_time:.2f}ms")
                         
                         # ✅ UNIFIED: Apply both strategy_settings and playbook_settings to GameManager
                         # This ensures both settings are loaded into GameManager when game starts (not just after timeout resume)
