@@ -1978,6 +1978,7 @@ async function handleButtonClick(animate) {
  * Used by both handleSimQuarter and handleSimFullGame to avoid code duplication
  */
 async function handleGameCompletion({ gameId, lastSummary, tournamentId, franchiseId, teamId, homeTeam, awayTeam }) {
+  console.warn('[COMPLETE-WEEK TRACE] handleGameCompletion ENTRY', { gameId, franchiseId, tournamentId });
   console.log('✅ Game complete - finalizing game');
   
   // ✅ SS&S FIX: Use lastSummary directly as single source of truth (has correct final scores)
@@ -2019,7 +2020,9 @@ async function handleGameCompletion({ gameId, lastSummary, tournamentId, franchi
   }
 
   // Finalize the game and show completion popup
+  console.warn('[COMPLETE-WEEK TRACE] About to call finalizeGame', { gameId, franchiseId, tournamentId });
   const finalScore = await finalizeGame({ simData: finalGameData, tournamentId, franchiseId });
+  console.warn('[COMPLETE-WEEK TRACE] finalizeGame returned');
   console.log('🏆 Final score object:', finalScore);
   
   const { showGameCompletionPopup } = await import('./utils/gameCompletionPopup.js');
