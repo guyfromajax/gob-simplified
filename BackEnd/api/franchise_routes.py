@@ -1141,12 +1141,15 @@ def complete_week(req: CompleteWeekRequest):
                 logger.error(f"❌ [COMPLETE_WEEK] Game document not found in games_collection after all attempts. game_id: {user_game_id}, gid: {gid}")
                 logger.error(f"❌ [COMPLETE_WEEK] This likely means the game document was never saved to the database.")
                 logger.error(f"❌ [COMPLETE_WEEK] Check if simulate_quarter_endpoint successfully saved the game document.")
-                return  # Exit early if document not found
+                raise HTTPException(status_code=404, detail="User game not found in database")
         
         # ✅ SS&S: Call finalize_game() directly (matches Tournament mode pattern)
-        # Use game_id from summary or request
-        if summary and summary.get("_id"):
-            user_game_id_final = str(summary.get("_id"))
+        # Use game_id from request when we have game_document (avoids _id JSON serialization:
+        # game_document._id can be {"$oid":"..."}; str() → invalid id → ObjectId() throws → we never $set)
+        if req.game_document:
+            user_game_id_final = user_game_id
+        elif summary and summary.get("_id"):
+            user_game_id_final = str(summary["_id"])  # From DB lookup; _id is ObjectId
         else:
             user_game_id_final = user_game_id
         
@@ -1206,7 +1209,7 @@ def complete_week(req: CompleteWeekRequest):
                 {"_id": ObjectId(user_game_id_final)},
                 {"$set": {"team_attribute_changes": tac}}
             )
-            logger.info(f"✅ [COMPLETE_WEEK] team_attribute_changes $set on game_id={user_game_id_final} (keys={list(tac.keys())})")
+            logger.warning(f"✅ [COMPLETE_WEEK] team_attribute_changes $set on game_id={user_game_id_final} (keys={list(tac.keys())})")
         except Exception as e:
             logger.error(f"❌ [COMPLETE_WEEK] Error updating team attributes: {e}")
             import traceback
@@ -1269,7 +1272,7 @@ def complete_week(req: CompleteWeekRequest):
                         {"_id": ObjectId(user_game_id)},
                         {"$set": {"team_attribute_changes": tac}}
                     )
-                    logger.info(f"✅ [COMPLETE_WEEK] team_attribute_changes $set (legacy) game_id={user_game_id} (keys={list(tac.keys())})")
+                    logger.warning(f"✅ [COMPLETE_WEEK] team_attribute_changes $set (legacy) game_id={user_game_id} (keys={list(tac.keys())})")
                 except Exception as e:
                     logger.error(f"❌ [COMPLETE_WEEK] Error updating team attributes (legacy path): {e}")
                     import traceback
