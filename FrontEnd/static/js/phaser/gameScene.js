@@ -1483,8 +1483,9 @@ export function createGameScene(Phaser) {
         this.finalScore = finalScore;
         this.finalized = true;
         
-        // Show game completion popup
-        const { showGameCompletionPopup } = await import('./utils/gameCompletionPopup.js');
+        // Show game completion popup (absolute path for Netlify/module resolution)
+        const base = (typeof window !== 'undefined' && window.API_CONFIG) ? window.API_CONFIG.getStaticPath() : '';
+        const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
         const mode = this.tournamentId ? 'tournament' : (this.franchiseId ? 'franchise' : 'single');
         showGameCompletionPopup({
           gameId: this.gameId || simData.game_id,
@@ -2410,8 +2411,9 @@ export function createGameScene(Phaser) {
           this.finalScore = finalScore;
           this.finalized = true;
           
-          // Show game completion popup
-          const { showGameCompletionPopup } = await import('./utils/gameCompletionPopup.js');
+          // Show game completion popup (absolute path for Netlify/module resolution)
+          const base = (typeof window !== 'undefined' && window.API_CONFIG) ? window.API_CONFIG.getStaticPath() : '';
+          const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
           const mode = this.tournamentId ? 'tournament' : (this.franchiseId ? 'franchise' : 'single');
           showGameCompletionPopup({
             gameId: gameId,
