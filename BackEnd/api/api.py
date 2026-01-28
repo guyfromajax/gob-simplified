@@ -1319,7 +1319,9 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
             }
             response_size = len(json.dumps(response_data))
             total_time = (time.time() - endpoint_start) * 1000
-            # ✅ REMOVED: Verbose PERF log - only log if slow (>100ms)
+            logging.warning(
+                "🔍 [ATTR-CHANGES] /api/game CACHE path: returning in-memory game (no team_attribute_changes, no home_team_id/away_team_id)"
+            )
             if total_time > 100:
                 logging.warning(f"⚠️ [PERF] Slow in-memory path: /api/game/{game_id} - {total_time:.2f}ms")
             return response_data
@@ -1343,6 +1345,7 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                 "away_team_id": 1,         # For unified teams structure
                 "teams": 1,                # Teams object (will project nested fields if needed)
                 "points_by_quarter": 1,    # Points by quarter (may be in teams object, but include for backward compatibility)
+                "team_attribute_changes": 1,  # Franchise post-game attribute deltas (box score)
                 "_id": 1
             }
             
@@ -1614,8 +1617,14 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
                         "points_by_quarter": away_team_data.get("points_by_quarter", [0, 0, 0, 0]),
                         "box_score": away_team_data.get("box_score", {}),
                         "totals": away_team_data.get("totals", {})
-                    }
+                    },
+                    "team_attribute_changes": saved.get("team_attribute_changes") or {}
                 }
+                tac = response_data.get("team_attribute_changes") or {}
+                logging.warning(
+                    "🔍 [ATTR-CHANGES] /api/game DB path: team_attribute_changes keys=%s, home_team_id=%s, away_team_id=%s",
+                    list(tac.keys()), home_team_id, away_team_id
+                )
                 response_size = len(json.dumps(response_data))
                 total_time = (time.time() - endpoint_start) * 1000
                 # ✅ REMOVED: Verbose PERF log - only log if slow (>100ms)

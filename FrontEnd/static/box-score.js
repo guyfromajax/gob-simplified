@@ -66,23 +66,22 @@ async function loadGameData(gameId) {
     throw new Error(`Failed to fetch game data: ${response.statusText}`);
   }
   gameData = await response.json();
+  const tac = gameData.team_attribute_changes || {};
+  const tacKeys = Object.keys(tac);
   console.log('✅ Game data loaded:', {
     gameId,
     hasBoxScore: !!gameData.box_score,
     boxScoreKeys: gameData.box_score ? Object.keys(gameData.box_score) : [],
-    boxScoreStructure: gameData.box_score,
     hasPlayers: !!gameData.players,
-    playerCount: gameData.players ? gameData.players.length : 0,
     score: gameData.score,
     quarter: gameData.quarter,
     home_team_id: gameData.home_team_id,
     away_team_id: gameData.away_team_id,
     hasTeams: !!gameData.teams,
-    teamsKeys: gameData.teams ? Object.keys(gameData.teams) : [],
-    hasTeamAttributeChanges: !!(gameData.team_attribute_changes),
-    teamAttributeChanges: gameData.team_attribute_changes || null,
-    teamAttributeChangesKeys: gameData.team_attribute_changes ? Object.keys(gameData.team_attribute_changes) : []
+    hasTeamAttributeChanges: tacKeys.length > 0,
+    teamAttributeChangesKeys: tacKeys
   });
+  console.log('🔍 [ATTR-CHANGES] loadGameData: team_attribute_changes keys=', tacKeys, 'key types=', tacKeys.map(k => typeof k), 'raw=', tac);
   
   // ✅ DEBUG: Log box_score structure in detail
   if (gameData.box_score) {
@@ -323,20 +322,15 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournam
 
 // Render all box score sections
 function renderBoxScore() {
-  console.log('🔍 [BOX-SCORE] renderBoxScore() called, hasGameData:', !!gameData);
-  if (!gameData) {
-    console.log('🔍 [BOX-SCORE] renderBoxScore() EARLY RETURN - no gameData');
-    return;
-  }
+  if (!gameData) return;
 
   renderHeader();
   renderQuarterScoring();
   renderPlayerStats();
   renderTeamStats();
   renderScoutingNotes();
-  console.log('🔍 [BOX-SCORE] renderBoxScore() calling renderTeamAttributeChanges()');
-  renderTeamAttributeChanges();
-  console.log('🔍 [BOX-SCORE] renderBoxScore() completed');
+  renderTeamAttributeChangesForTab('home');
+  renderTeamAttributeChangesForTab('away');
 }
 
 // Build zeroed box score data from rosters when viewing pre-game
@@ -827,207 +821,106 @@ function renderSpecialStats(team, totals, teamName) {
   document.getElementById(`${team}-pot`).textContent = totals.POT || 0;
 }
 
-// Render team attribute changes (franchise mode only, user's team)
-function renderTeamAttributeChanges() {
-  console.log('🔍 [BOX-SCORE] renderTeamAttributeChanges() CALLED');
-  
-  // Only show for franchise mode and user's team
-  const urlParams = new URLSearchParams(window.location.search);
-  const mode = urlParams.get('mode');
-  const teamId = urlParams.get('team_id');
-  
-  console.log('🔍 [BOX-SCORE] renderTeamAttributeChanges - Initial check:', {
-    mode,
-    teamId,
-    hasGameData: !!gameData,
-    gameDataKeys: gameData ? Object.keys(gameData) : [],
-    allUrlParams: Object.fromEntries(urlParams.entries())
-  });
-  
-  if (mode !== 'franchise' || !teamId || !gameData) {
-    console.log('🔍 [BOX-SCORE] renderTeamAttributeChanges EARLY RETURN:', {
-      mode,
-      teamId,
-      hasGameData: !!gameData,
-      reason: !mode ? 'no mode' : (!teamId ? 'no teamId' : 'no gameData'),
-      modeCheck: mode !== 'franchise',
-      teamIdCheck: !teamId,
-      gameDataCheck: !gameData
-    });
-    return; // Only show in franchise mode for user's team
+// Resolve attribute changes for a team from team_attribute_changes (SS&S: home_team_id / away_team_id).
+function resolveChangesForTeamId(attributeChanges, teamId) {
+  if (!attributeChanges || !teamId) {
+    console.log('🔍 [ATTR-CHANGES] resolveChangesForTeamId: early return', { hasChanges: !!attributeChanges, teamId });
+    return null;
   }
-  
-  // Get attribute changes from game document
-  const attributeChanges = gameData.team_attribute_changes || {};
-  console.log('🔍 [BOX-SCORE] Attribute changes from gameData:', {
-    hasAttributeChanges: !!gameData.team_attribute_changes,
-    attributeChangesKeys: Object.keys(attributeChanges),
-    attributeChanges: attributeChanges,
-    attributeChangesStringified: JSON.stringify(attributeChanges)
-  });
-  
-  if (!attributeChanges || Object.keys(attributeChanges).length === 0) {
-    console.log('🔍 [BOX-SCORE] EARLY RETURN - No attribute changes to display');
-    return; // No changes to display
+  let out = attributeChanges[teamId] || attributeChanges[String(teamId)] || null;
+  if (out && typeof out === 'object' && Object.keys(out).length > 0) {
+    console.log('🔍 [ATTR-CHANGES] resolveChangesForTeamId: matched direct', { teamId, keyUsed: attributeChanges[teamId] !== undefined ? 'teamId' : 'String(teamId)' });
+    return out;
   }
-  
-  // Determine which team is the user's team
-  const homeTeamId = gameData.home_team_id;
-  const awayTeamId = gameData.away_team_id;
-  const userTeamId = teamId;
-  
-  console.log('🔍 [BOX-SCORE] Team ID matching analysis:', {
-    homeTeamId,
-    awayTeamId,
-    userTeamId,
-    homeTeamIdType: typeof homeTeamId,
-    awayTeamIdType: typeof awayTeamId,
-    userTeamIdType: typeof userTeamId,
-    homeTeamIdValue: homeTeamId,
-    awayTeamIdValue: awayTeamId,
-    userTeamIdValue: userTeamId,
-    homeMatch: userTeamId === homeTeamId,
-    awayMatch: userTeamId === awayTeamId,
-    homeMatchStrict: String(userTeamId) === String(homeTeamId),
-    awayMatchStrict: String(userTeamId) === String(awayTeamId),
-    attributeChangesKeys: Object.keys(attributeChanges),
-    homeTeamIdInKeys: homeTeamId in attributeChanges,
-    awayTeamIdInKeys: awayTeamId in attributeChanges,
-    userTeamIdInKeys: userTeamId in attributeChanges
-  });
-  
-  // Find user's team changes - try multiple matching strategies
-  let userTeamChanges = null;
-  
-  // Strategy 1: Direct match
-  if (userTeamId === homeTeamId) {
-    userTeamChanges = attributeChanges[homeTeamId] || {};
-    console.log('🔍 [BOX-SCORE] Matched home team (direct), changes:', userTeamChanges);
-  } else if (userTeamId === awayTeamId) {
-    userTeamChanges = attributeChanges[awayTeamId] || {};
-    console.log('🔍 [BOX-SCORE] Matched away team (direct), changes:', userTeamChanges);
-  }
-  
-  // Strategy 2: String comparison
-  if (!userTeamChanges && (String(userTeamId) === String(homeTeamId))) {
-    userTeamChanges = attributeChanges[homeTeamId] || attributeChanges[String(homeTeamId)] || {};
-    console.log('🔍 [BOX-SCORE] Matched home team (string), changes:', userTeamChanges);
-  } else if (!userTeamChanges && (String(userTeamId) === String(awayTeamId))) {
-    userTeamChanges = attributeChanges[awayTeamId] || attributeChanges[String(awayTeamId)] || {};
-    console.log('🔍 [BOX-SCORE] Matched away team (string), changes:', userTeamChanges);
-  }
-  
-  // Strategy 3: Try all keys in attributeChanges
-  if (!userTeamChanges) {
-    console.log('🔍 [BOX-SCORE] Trying to match against all attributeChanges keys:', Object.keys(attributeChanges));
-    for (const key of Object.keys(attributeChanges)) {
-      if (String(key) === String(userTeamId) || String(key) === String(homeTeamId) || String(key) === String(awayTeamId)) {
-        userTeamChanges = attributeChanges[key] || {};
-        console.log('🔍 [BOX-SCORE] Matched via key iteration:', { key, changes: userTeamChanges });
-        break;
-      }
+  for (const key of Object.keys(attributeChanges)) {
+    if (String(key) === String(teamId)) {
+      console.log('🔍 [ATTR-CHANGES] resolveChangesForTeamId: matched via iteration', { teamId, key });
+      return attributeChanges[key] || null;
     }
   }
-  
-  if (!userTeamChanges || Object.keys(userTeamChanges).length === 0) {
-    console.log('🔍 [BOX-SCORE] EARLY RETURN - No changes found for user team after all matching strategies');
-    console.log('🔍 [BOX-SCORE] Final state:', {
-      userTeamId,
-      homeTeamId,
-      awayTeamId,
-      attributeChangesKeys: Object.keys(attributeChanges),
-      userTeamChanges
-    });
-    return; // No changes for user's team
+  console.log('🔍 [ATTR-CHANGES] resolveChangesForTeamId: no match', { teamId, teamIdType: typeof teamId, keys: Object.keys(attributeChanges) });
+  return null;
+}
+
+// Render Attribute Changes for one tab (home or away). Franchise only; uses gameData only.
+function renderTeamAttributeChangesForTab(team) {
+  const urlParams = new URLSearchParams(window.location.search);
+  const mode = urlParams.get('mode');
+  console.log('🔍 [ATTR-CHANGES] renderTeamAttributeChangesForTab', { team, mode, hasGameData: !!gameData, urlParams: Object.fromEntries(urlParams.entries()) });
+  if (mode !== 'franchise' || !gameData) {
+    console.log('🔍 [ATTR-CHANGES] renderTeamAttributeChangesForTab: early return (not franchise or no gameData)');
+    return;
   }
-  
-  console.log('🔍 [BOX-SCORE] SUCCESS - Rendering team attribute changes:', userTeamChanges);
-  
-  // Show the section
-  const section = document.getElementById('team-attribute-changes-section');
-  if (section) {
-    section.style.display = 'block';
+
+  const homeTeamId = gameData.home_team_id;
+  const awayTeamId = gameData.away_team_id;
+  const teamId = team === 'home' ? homeTeamId : awayTeamId;
+  const attributeChanges = gameData.team_attribute_changes || {};
+  const changes = resolveChangesForTeamId(attributeChanges, teamId);
+
+  const section = document.getElementById(`${team}-attribute-changes-section`);
+  const container = document.getElementById(`${team}-attribute-changes-content`);
+  console.log('🔍 [ATTR-CHANGES] renderTeamAttributeChangesForTab', { team, homeTeamId, awayTeamId, teamId, tacKeys: Object.keys(attributeChanges), hasChanges: !!(changes && Object.keys(changes).length), section: !!section, container: !!container });
+  if (!section || !container) {
+    console.log('🔍 [ATTR-CHANGES] renderTeamAttributeChangesForTab: missing section or container', { team });
+    return;
   }
-  
-  // Display names
+
+  if (!changes || Object.keys(changes).length === 0) {
+    console.log('🔍 [ATTR-CHANGES] renderTeamAttributeChangesForTab: hiding section (no changes)', { team });
+    section.style.display = 'none';
+    return;
+  }
+
+  console.log('🔍 [ATTR-CHANGES] renderTeamAttributeChangesForTab: showing section', { team, changeKeys: Object.keys(changes) });
+  section.style.display = 'block';
+
   const attrNames = {
-    'shot_threshold': 'Shot Threshold',
-    'rebound_modifier': 'Rebound',
-    'offensive_efficiency': 'Offense',
-    'defensive_efficiency': 'Defense',
-    'fb_efficiency': 'Fast Break',
-    'pt_efficiency': 'Press/Trap',
-    'fight': 'Fight',
-    'discipline': 'Discipline',
-    'momentum_score': 'Momentum',
-    'team_chemistry': 'Chemistry',
-    'fb_opp_modifier': 'FB Defense',
-    'pt_opp_modifier': 'P/T Breaks'
+    shot_threshold: 'Shot Threshold',
+    rebound_modifier: 'Rebound',
+    offensive_efficiency: 'Offense',
+    defensive_efficiency: 'Defense',
+    fb_efficiency: 'Fast Break',
+    pt_efficiency: 'Press/Trap',
+    fight: 'Fight',
+    discipline: 'Discipline',
+    momentum_score: 'Momentum',
+    team_chemistry: 'Chemistry',
+    fb_opp_modifier: 'FB Defense',
+    pt_opp_modifier: 'P/T Breaks'
   };
-  
-  // Format change value
-  const formatChange = (change) => {
-    if (change === 0) return { text: '0', color: 'black' };
-    if (change > 0) return { text: `+${change}`, color: 'green' };
-    return { text: `${change}`, color: 'red' };
-  };
-  
-  // Create the display grid (3 rows, 4 columns)
-  const container = document.getElementById('team-attribute-changes-content');
-  if (!container) return;
-  
+
+  function formatChange(change, attrKey) {
+    const n = Number(change);
+    const isRebound = attrKey === 'rebound_modifier';
+    const text = isRebound ? (n === 0 ? '0.00' : (n > 0 ? `+${n.toFixed(2)}` : `${n.toFixed(2)}`)) : (n === 0 ? '0' : (n > 0 ? `+${n}` : `${n}`));
+    const color = n > 0 ? 'green' : n < 0 ? 'red' : 'black';
+    return { text, color };
+  }
+
+  const rowDefs = [
+    ['shot_threshold', 'rebound_modifier', 'offensive_efficiency', 'defensive_efficiency'],
+    ['fb_efficiency', 'pt_efficiency', 'fight', 'discipline'],
+    ['momentum_score', 'team_chemistry', 'fb_opp_modifier', 'pt_opp_modifier']
+  ];
+
   container.innerHTML = '';
-  
-  // Row 1: Shot threshold, rebound, offense, defense
-  const row1 = document.createElement('div');
-  row1.className = 'attribute-changes-row';
-  const row1Attrs = ['shot_threshold', 'rebound_modifier', 'offensive_efficiency', 'defensive_efficiency'];
-  row1Attrs.forEach(attrKey => {
-    const change = userTeamChanges[attrKey] || 0;
-    const formatted = formatChange(change);
-    const cell = document.createElement('div');
-    cell.className = 'attribute-change-cell';
-    cell.innerHTML = `
-      <div class="attribute-change-label">${attrNames[attrKey]}</div>
-      <div class="attribute-change-value" style="color: ${formatted.color}">${formatted.text}</div>
-    `;
-    row1.appendChild(cell);
-  });
-  container.appendChild(row1);
-  
-  // Row 2: Fast Break, Press/Trap, Fight, Discipline
-  const row2 = document.createElement('div');
-  row2.className = 'attribute-changes-row';
-  const row2Attrs = ['fb_efficiency', 'pt_efficiency', 'fight', 'discipline'];
-  row2Attrs.forEach(attrKey => {
-    const change = userTeamChanges[attrKey] || 0;
-    const formatted = formatChange(change);
-    const cell = document.createElement('div');
-    cell.className = 'attribute-change-cell';
-    cell.innerHTML = `
-      <div class="attribute-change-label">${attrNames[attrKey]}</div>
-      <div class="attribute-change-value" style="color: ${formatted.color}">${formatted.text}</div>
-    `;
-    row2.appendChild(cell);
-  });
-  container.appendChild(row2);
-  
-  // Row 3: Momentum, Chemistry, FB Defense, P/T Breaks
-  const row3 = document.createElement('div');
-  row3.className = 'attribute-changes-row';
-  const row3Attrs = ['momentum_score', 'team_chemistry', 'fb_opp_modifier', 'pt_opp_modifier'];
-  row3Attrs.forEach(attrKey => {
-    const change = userTeamChanges[attrKey] || 0;
-    const formatted = formatChange(change);
-    const cell = document.createElement('div');
-    cell.className = 'attribute-change-cell';
-    cell.innerHTML = `
-      <div class="attribute-change-label">${attrNames[attrKey]}</div>
-      <div class="attribute-change-value" style="color: ${formatted.color}">${formatted.text}</div>
-    `;
-    row3.appendChild(cell);
-  });
-  container.appendChild(row3);
+  for (const attrs of rowDefs) {
+    const row = document.createElement('div');
+    row.className = 'attribute-changes-row';
+    for (const attrKey of attrs) {
+      const change = changes[attrKey] ?? 0;
+      const { text, color } = formatChange(change, attrKey);
+      const cell = document.createElement('div');
+      cell.className = 'attribute-change-cell';
+      cell.innerHTML = `
+        <div class="attribute-change-label">${attrNames[attrKey]}</div>
+        <div class="attribute-change-value" style="color: ${color}">${text}</div>
+      `;
+      row.appendChild(cell);
+    }
+    container.appendChild(row);
+  }
 }
 
 // Render scouting notes
