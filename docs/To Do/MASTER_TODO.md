@@ -25,6 +25,22 @@
 
 ---
 
+### 2. FCC Stats Grid – Aggregated Team Stats Zero (To Address Later)
+**Status:** 📋 TO ADDRESS LATER  
+**Priority:** 🟡 MEDIUM  
+
+**Problem:** In the FCC Stats tab, after running games, only W, L, PF, and PA populate. All stats that rely on aggregating player stats (FGM, FGA, 3PTM, REB, AST, etc.) are zero. Individual player stats appear correctly in Top 10, so player data reaches the FCC.
+
+**Root cause:** The team-stats aggregator (`aggregate_team_stats_from_players`) only adds a player’s season stats to a team when it can assign the player via `meta.team_id`. If `meta.team_id` is missing or doesn’t resolve to a team in the map (ObjectId strings from FTD), that player is skipped. W/L, PF, PA come from standings (or fallback to universal teams), not from aggregation, so they still populate.
+
+**Why `meta.team_id` is missing or wrong:** (1) **Init** (`init_franchise_player_stats`): set only when roster includes `team_id` per player; roster loader may not provide it. (2) **Finalize** (`finalize_game`): we only set `meta.team_id` when we resolve the game’s team info to an ObjectId; if that resolution fails, we still `$inc` season stats but never set `meta.team_id`. Top 10 works because it only uses `season.{stat}`, not `meta.team_id`.
+
+**Fix direction:** Ensure `meta.team_id` is set reliably (init and/or finalize) and that the aggregator resolves it to the same team keys used for the Stats grid (FTD ObjectId strings). Align results/standings key format (ObjectId vs team_id strings) if franchise W/L, PF, PA are coming from fallback instead of franchise results.
+
+**Files:** `BackEnd/utils/team_stats_aggregator.py`, `BackEnd/utils/stat_updater.py` (finalize_game, init_franchise_player_stats), `BackEnd/api/franchise_routes.py` (team-stats endpoint), `BackEnd/utils/roster_loader.py`, `BackEnd/utils/franchise_standings.py`
+
+---
+
 ## ⚠️ In Progress / Needs Verification
 
 ### 1. Sunset Use of Team Name Keys

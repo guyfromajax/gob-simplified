@@ -1002,15 +1002,13 @@ def save_result(req: FranchiseResultRequest):
         logger.info(f"🔍 [SAVE-RESULT] Attribute changes keys: {list(attribute_changes.keys()) if attribute_changes else 'None'}")
         
         # Store attribute changes in game document for box score display
-        if attribute_changes:
-            db.games.update_one(
-                {"_id": game_id},
-                {"$set": {"team_attribute_changes": attribute_changes}}
-            )
-            logger.info(f"✅ [SAVE-RESULT] Team attributes updated and changes stored in game document")
-            logger.info(f"🔍 [SAVE-RESULT] Stored attribute_changes structure: {attribute_changes}")
-        else:
-            logger.warning(f"⚠️ [SAVE-RESULT] update_team_attributes_after_game returned empty dict - no changes to store")
+        # ✅ FIX: Always $set (even when empty) so field exists for box score
+        tac = attribute_changes if attribute_changes else {}
+        db.games.update_one(
+            {"_id": game_id},
+            {"$set": {"team_attribute_changes": tac}}
+        )
+        logger.info(f"✅ [SAVE-RESULT] team_attribute_changes $set on game_id={game_id} (keys={list(tac.keys())})")
     except Exception as e:
         logger.error(f"❌ [SAVE-RESULT] Error updating team attributes: {e}")
         import traceback
@@ -1202,15 +1200,13 @@ def complete_week(req: CompleteWeekRequest):
             logger.info(f"🔍 [COMPLETE_WEEK] Attribute changes keys: {list(attribute_changes.keys()) if attribute_changes else 'None'}")
             
             # Store attribute changes in game document for box score display
-            if attribute_changes:
-                db.games.update_one(
-                    {"_id": ObjectId(user_game_id_final)},
-                    {"$set": {"team_attribute_changes": attribute_changes}}
-                )
-                logger.info(f"✅ [COMPLETE_WEEK] Team attributes updated and changes stored in game document")
-                logger.info(f"🔍 [COMPLETE_WEEK] Stored attribute_changes structure: {attribute_changes}")
-            else:
-                logger.warning(f"⚠️ [COMPLETE_WEEK] update_team_attributes_after_game returned empty dict - no changes to store")
+            # ✅ FIX: Always $set (even when empty) so field exists for box score; hide section in UI when empty
+            tac = attribute_changes if attribute_changes else {}
+            db.games.update_one(
+                {"_id": ObjectId(user_game_id_final)},
+                {"$set": {"team_attribute_changes": tac}}
+            )
+            logger.info(f"✅ [COMPLETE_WEEK] team_attribute_changes $set on game_id={user_game_id_final} (keys={list(tac.keys())})")
         except Exception as e:
             logger.error(f"❌ [COMPLETE_WEEK] Error updating team attributes: {e}")
             import traceback
@@ -1268,13 +1264,12 @@ def complete_week(req: CompleteWeekRequest):
                         winner_score=winner_score,
                         loser_score=loser_score
                     )
-                    
-                    if attribute_changes:
-                        db.games.update_one(
-                            {"_id": ObjectId(user_game_id)},
-                            {"$set": {"team_attribute_changes": attribute_changes}}
-                        )
-                        logger.info(f"✅ [COMPLETE_WEEK] Team attributes updated (legacy path)")
+                    tac = attribute_changes if attribute_changes else {}
+                    db.games.update_one(
+                        {"_id": ObjectId(user_game_id)},
+                        {"$set": {"team_attribute_changes": tac}}
+                    )
+                    logger.info(f"✅ [COMPLETE_WEEK] team_attribute_changes $set (legacy) game_id={user_game_id} (keys={list(tac.keys())})")
                 except Exception as e:
                     logger.error(f"❌ [COMPLETE_WEEK] Error updating team attributes (legacy path): {e}")
                     import traceback
