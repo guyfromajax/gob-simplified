@@ -893,8 +893,28 @@ function renderTeamAttributeChangesForTab(team) {
   function formatChange(change, attrKey) {
     const n = Number(change);
     const isRebound = attrKey === 'rebound_modifier';
-    const text = isRebound ? (n === 0 ? '0.00' : (n > 0 ? `+${n.toFixed(2)}` : `${n.toFixed(2)}`)) : (n === 0 ? '0' : (n > 0 ? `+${n}` : `${n}`));
-    const color = n > 0 ? 'green' : n < 0 ? 'red' : 'black';
+    const isShotThreshold = attrKey === 'shot_threshold';
+    
+    let displayValue = n;
+    let text = '';
+    let color = 'black';
+    
+    if (isShotThreshold) {
+      // ✅ INVERT SIGN: Positive changes display as negative (red), negative changes display as positive (green)
+      displayValue = -n;
+      text = displayValue === 0 ? '0' : (displayValue > 0 ? `+${displayValue}` : `${displayValue}`);
+      color = displayValue > 0 ? 'green' : displayValue < 0 ? 'red' : 'black';
+    } else if (isRebound) {
+      // ✅ ROUND TO 2 DECIMALS: Round mathematically (e.g., -0.02634... → -0.03, -0.02499... → -0.02)
+      const rounded = Math.round(n * 100) / 100; // Round to 2 decimal places
+      text = rounded === 0 ? '0.00' : (rounded > 0 ? `+${rounded.toFixed(2)}` : `${rounded.toFixed(2)}`);
+      color = rounded > 0 ? 'green' : rounded < 0 ? 'red' : 'black';
+    } else {
+      // Other attributes: integer display
+      text = n === 0 ? '0' : (n > 0 ? `+${n}` : `${n}`);
+      color = n > 0 ? 'green' : n < 0 ? 'red' : 'black';
+    }
+    
     return { text, color };
   }
 
