@@ -629,13 +629,18 @@ async def select_team_options():
 @router.post("/franchise/select-team")
 def select_team(selection: TeamSelection):
     import sys
+    import time
+    endpoint_start = time.time()
     print(f"🔵 [DEBUG] select_team: POST /franchise/select-team called with team: {selection.team_name}", file=sys.stderr, flush=True)
     try:
         # Resolve team name to ObjectId - try multiple strategies for matching
         print(f"🔵 [DEBUG] select_team: Looking up team in database: {selection.team_name}", file=sys.stderr, flush=True)
         
         # Strategy 1: Exact match
+        team_query_start = time.time()
         team_doc = db.teams.find_one({"name": selection.team_name})
+        team_query_time = (time.time() - team_query_start) * 1000
+        logger.warning(f"⏱️ [DB TIMING] select-team: teams.find_one(name={selection.team_name}): {team_query_time:.2f}ms")
         
         # Strategy 2: Case-insensitive regex match
         if not team_doc:
@@ -673,8 +678,15 @@ def select_team(selection: TeamSelection):
         # Old franchises may still have data in franchise_state, but new ones won't create it
         
         print(f"🔵 [DEBUG] select_team: Initializing FranchiseManager...", file=sys.stderr, flush=True)
+        franchise_init_start = time.time()
         manager = FranchiseManager(db)
         manager.initialize_season(user_team_id=user_team_id, user_team_object_id=user_team_object_id)
+        franchise_init_time = (time.time() - franchise_init_start) * 1000
+        logger.warning(f"⏱️ [DB TIMING] select-team: FranchiseManager.initialize_season(): {franchise_init_time:.2f}ms")
+        
+        total_time = (time.time() - endpoint_start) * 1000
+        logger.warning(f"⏱️ [DB TIMING] select-team TOTAL: {total_time:.2f}ms")
+        
         print(f"✅ [DEBUG] select_team: Franchise initialized successfully, franchise_id: {manager.franchise_id}", file=sys.stderr, flush=True)
         result = {"status": "ok", "franchise_id": str(manager.franchise_id)}
         print(f"🔵 [DEBUG] select_team: Returning response: {result}", file=sys.stderr, flush=True)
@@ -2596,12 +2608,19 @@ def get_training_points(franchise_id: str):
     Get the number of training points available for a franchise.
     Returns 30 for first training (before first game), 24 otherwise.
     """
+    import time
+    endpoint_start = time.time()
+    
     try:
         franchise_id_obj = ObjectId(franchise_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid franchise ID format")
 
+    franchise_query_start = time.time()
     franchise_doc = db.franchises.find_one({"_id": franchise_id_obj})
+    franchise_query_time = (time.time() - franchise_query_start) * 1000
+    logger.warning(f"⏱️ [DB TIMING] get_training_points: franchises.find_one(franchise_id={franchise_id}): {franchise_query_time:.2f}ms")
+    
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
 
@@ -2612,6 +2631,9 @@ def get_training_points(franchise_id: str):
     
     # First training (training camp) gets 30 points, otherwise 24
     training_points = 30 if is_first_training else 24
+    
+    total_time = (time.time() - endpoint_start) * 1000
+    logger.warning(f"⏱️ [DB TIMING] get_training_points TOTAL: {total_time:.2f}ms, training_points={training_points}, is_first_training={is_first_training}")
     
     return {
         "training_points": training_points,
@@ -2625,13 +2647,20 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     Run training for a franchise team using franchise-specific player/team attributes.
     Updates only the franchise document, not the core collections.
     """
+    import time
+    endpoint_start = time.time()
+    
     try:
         franchise_id = ObjectId(req.franchise_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid franchise ID format")
 
     # Load franchise document
+    franchise_query_start = time.time()
     franchise_doc = db.franchises.find_one({"_id": franchise_id})
+    franchise_query_time = (time.time() - franchise_query_start) * 1000
+    logger.warning(f"⏱️ [DB TIMING] run_franchise_training: franchises.find_one(franchise_id={req.franchise_id}): {franchise_query_time:.2f}ms")
+    
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
 
@@ -2714,6 +2743,7 @@ def run_franchise_training(req: FranchiseTrainingRequest):
             raise HTTPException(status_code=404, detail=f"Team not found and no player_ids available for team_id: {team_id}")
     
     # Build player list with franchise-specific attributes
+    players_load_start = time.time()
     players_for_training = []
     for pid in team_player_ids:
         pid_str = str(pid)
@@ -2722,7 +2752,11 @@ def run_franchise_training(req: FranchiseTrainingRequest):
             continue
         
         # Get year from core player data
+        player_query_start = time.time()
         core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
+        player_query_time = (time.time() - player_query_start) * 1000
+        if player_query_time > 100:  # Only log slow queries (>100ms)
+            logger.warning(f"⏱️ [DB TIMING] run_franchise_training: players.find_one(_id={pid_str}): {player_query_time:.2f}ms")
         if not core_player:
             try:
                 # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
@@ -2822,8 +2856,12 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     # This applies pre-training conditions, then training points, and returns training report
     from BackEnd.models.training_execution_v2 import execute_training
     
+    players_load_time = (time.time() - players_load_start) * 1000
+    logger.warning(f"⏱️ [DB TIMING] run_franchise_training: Loading {len(players_for_training)} players: {players_load_time:.2f}ms")
+    
     # Execute training (applies pre-training conditions, then training points)
     # Skip pre-training depreciation for first training (training camp) - week 1 before games
+    training_exec_start = time.time()
     updated_players, updated_team, updated_plays, updated_scouting_data, training_report = execute_training(
         players_for_training,
         team_stats,
@@ -2836,6 +2874,8 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         playbook_training_mode=training_data.get("playbook_training_mode", "current-playbooks"),
         skip_pre_training_depreciation=is_first_training
     )
+    training_exec_time = (time.time() - training_exec_start) * 1000
+    logger.warning(f"⏱️ [DB TIMING] run_franchise_training: execute_training(): {training_exec_time:.2f}ms")
     
     # Update players_for_training and team_stats with results
     players_for_training = updated_players
@@ -3093,7 +3133,13 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     franchise_update.update(computer_teams_update)
     
     # Save to franchise document (includes both user team and computer teams)
+    db_update_start = time.time()
     db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update})
+    db_update_time = (time.time() - db_update_start) * 1000
+    logger.warning(f"⏱️ [DB TIMING] run_franchise_training: franchises.update_one(): {db_update_time:.2f}ms")
+    
+    total_time = (time.time() - endpoint_start) * 1000
+    logger.warning(f"⏱️ [DB TIMING] run_franchise_training TOTAL: {total_time:.2f}ms")
     
     return {
         "status": "success",

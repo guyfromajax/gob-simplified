@@ -129,7 +129,14 @@ def get_tournament_leaders(tournament_id: str, recompute: bool = False):
 
 @router.post("/start-tournament")
 def start_tournament(request: StartTournamentRequest):
+    import time
+    endpoint_start = time.time()
+    
+    team_query_start = time.time()
     team_docs = list(teams_collection.find({}, {"name": 1}))
+    team_query_time = (time.time() - team_query_start) * 1000
+    logger.warning(f"⏱️ [DB TIMING] start-tournament: teams_collection.find(): {team_query_time:.2f}ms, found {len(team_docs)} teams")
+    
     team_ids = [team["name"] for team in team_docs]
 
     if request.user_team_id not in team_ids:
@@ -138,6 +145,8 @@ def start_tournament(request: StartTournamentRequest):
     # Reset all player stats for teams in this tournament
     zero_stats = {key: 0 for key in BOX_SCORE_KEYS}
     zero_stats["Outlet_Score_List"] = []  # Outlet_Score_List is an array, not an integer
+    
+    player_reset_start = time.time()
     for tid in team_ids:
         players_collection.update_many(
             {"team": tid},
@@ -150,13 +159,22 @@ def start_tournament(request: StartTournamentRequest):
                 }
             },
         )
+    player_reset_time = (time.time() - player_reset_start) * 1000
+    logger.warning(f"⏱️ [DB TIMING] start-tournament: players_collection.update_many() (reset stats): {player_reset_time:.2f}ms")
 
+    tournament_create_start = time.time()
     manager = TournamentManager(
         user_team_id=request.user_team_id,
         tournaments_collection=tournaments_collection,
         team_ids=team_ids,
     )
     tournament = manager.create_tournament()
+    tournament_create_time = (time.time() - tournament_create_start) * 1000
+    logger.warning(f"⏱️ [DB TIMING] start-tournament: TournamentManager.create_tournament(): {tournament_create_time:.2f}ms")
+    
+    total_time = (time.time() - endpoint_start) * 1000
+    logger.warning(f"⏱️ [DB TIMING] start-tournament TOTAL: {total_time:.2f}ms")
+    
     tournament["_id"] = str(tournament["_id"])
     return tournament
 
