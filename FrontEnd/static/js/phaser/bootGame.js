@@ -1898,8 +1898,9 @@ async function showPopup(score) {
     console.error('❌ [BOOTGAME] game_id should be in URL or module variable at this point');
   }
 
-  // Use the new game completion popup
-  const { showGameCompletionPopup } = await import('./utils/gameCompletionPopup.js');
+  // Use the new game completion popup (absolute path for Netlify/module resolution)
+  const base = (typeof window !== 'undefined' && window.API_CONFIG) ? window.API_CONFIG.getStaticPath() : '';
+  const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
   showGameCompletionPopup({
     gameId: popupGameId || '',
     mode: mode || 'single',
@@ -2025,7 +2026,8 @@ async function handleGameCompletion({ gameId, lastSummary, tournamentId, franchi
   console.warn('[COMPLETE-WEEK TRACE] finalizeGame returned');
   console.log('🏆 Final score object:', finalScore);
   
-  const { showGameCompletionPopup } = await import('./utils/gameCompletionPopup.js');
+  const base = (typeof window !== 'undefined' && window.API_CONFIG) ? window.API_CONFIG.getStaticPath() : '';
+  const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
   const popupMode = tournamentId ? 'tournament' : (franchiseId ? 'franchise' : 'single');
   showGameCompletionPopup({
     gameId: gameId,
