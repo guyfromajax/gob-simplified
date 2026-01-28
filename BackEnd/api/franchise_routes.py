@@ -32,6 +32,30 @@ logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 
 
+def _resolve_team_id_to_object_id(team_id: str):
+    """Resolve team_id (canonical string e.g. MORRISTOWN, or ObjectId string) to ObjectId for FTD lookup. Returns None if not found."""
+    import re
+    if not team_id:
+        return None
+    try:
+        oid = ObjectId(team_id)
+        if db.teams.find_one({"_id": oid}, {"_id": 1}):
+            return oid
+    except Exception:
+        pass
+    doc = db.teams.find_one(
+        {"$or": [{"team_id": team_id}, {"name": team_id}, {"code": team_id}]},
+        {"_id": 1}
+    )
+    if doc:
+        return doc["_id"]
+    doc = db.teams.find_one(
+        {"name": {"$regex": f"^{re.escape(team_id)}$", "$options": "i"}},
+        {"_id": 1}
+    )
+    return doc["_id"] if doc else None
+
+
 def update_team_attributes_after_game(
     game_id: ObjectId,
     franchise_id: ObjectId,
@@ -167,8 +191,8 @@ def update_team_attributes_after_game(
     home_scouting = get_scouting_data(home_team_obj)
     away_scouting = get_scouting_data(away_team_obj)
     
-    # Calculate attribute changes for each team
-    def calculate_attr_changes(team_id, is_winner, team_totals, opponent_totals, team_scouting, opponent_scouting):
+    # Calculate attribute changes for each team. team_object_id = ObjectId for FTD; team_id_label = string for logging.
+    def calculate_attr_changes(team_object_id, team_id_label, is_winner, team_totals, opponent_totals, team_scouting, opponent_scouting):
         """Calculate attribute changes for a team."""
         changes = {}
         
@@ -181,19 +205,13 @@ def update_team_attributes_after_game(
         treb = team_totals.get("DREB", 0) + team_totals.get("OREB", 0)
         opp_treb = opponent_totals.get("DREB", 0) + opponent_totals.get("OREB", 0)
         
-        # ✅ FTD: Get current team attributes from FTD collection
-        try:
-            team_object_id = ObjectId(team_id)
-        except:
-            logger.error(f"❌ [UPDATE-TEAM-ATTRS] Invalid team_id format: {team_id}")
-            return {}
-        
+        # ✅ FTD: Get current team attributes from FTD collection (keyed by ObjectId)
         ftd_doc = franchise_team_data_collection.find_one(
             {"franchise_id": franchise_id, "team_id": team_object_id},
             {"team_attributes": 1}
         )
         if not ftd_doc:
-            logger.error(f"❌ [UPDATE-TEAM-ATTRS] FTD not found for franchise={franchise_id}, team={team_id}")
+            logger.error(f"❌ [UPDATE-TEAM-ATTRS] FTD not found for franchise={franchise_id}, team={team_id_label}")
             return {}
         
         team_attrs = ftd_doc.get("team_attributes", {})
@@ -294,25 +312,31 @@ def update_team_attributes_after_game(
                 {"franchise_id": franchise_id, "team_id": team_object_id},
                 {"$set": ftd_update}
             )
-            logger.info(f"✅ [UPDATE-TEAM-ATTRS] Updated {len(ftd_update)} attributes for team {team_id} in FTD")
+            logger.info(f"✅ [UPDATE-TEAM-ATTRS] Updated {len(ftd_update)} attributes for team {team_id_label} in FTD")
         
         return changes
     
-    # Calculate changes for both teams
+    # Resolve team_id strings (e.g. MORRISTOWN, XAVIEN) to ObjectIds for FTD lookup. Keep original strings for result keys.
+    home_oid = _resolve_team_id_to_object_id(home_team_id)
+    away_oid = _resolve_team_id_to_object_id(away_team_id)
+    if not home_oid:
+        logger.error(f"❌ [UPDATE-TEAM-ATTRS] Could not resolve home_team_id to ObjectId: {home_team_id}")
+    if not away_oid:
+        logger.error(f"❌ [UPDATE-TEAM-ATTRS] Could not resolve away_team_id to ObjectId: {away_team_id}")
+    
     home_is_winner = (home_team_id == winner_id)
     away_is_winner = (away_team_id == winner_id)
     
-    logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Calculating changes - home_team_id={home_team_id} (type: {type(home_team_id)}), away_team_id={away_team_id} (type: {type(away_team_id)})")
-    logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Winner info - winner_id={winner_id}, home_is_winner={home_is_winner}, away_is_winner={away_is_winner}")
+    logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Calculating changes - home_team_id={home_team_id}, away_team_id={away_team_id}, winner_id={winner_id}")
     
     home_changes = calculate_attr_changes(
-        home_team_id, home_is_winner, home_totals, away_totals,
+        home_oid, home_team_id, home_is_winner, home_totals, away_totals,
         home_scouting, away_scouting
-    )
+    ) if home_oid else {}
     away_changes = calculate_attr_changes(
-        away_team_id, away_is_winner, away_totals, home_totals,
+        away_oid, away_team_id, away_is_winner, away_totals, home_totals,
         away_scouting, home_scouting
-    )
+    ) if away_oid else {}
     
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Calculated changes - home_changes keys: {list(home_changes.keys())}, away_changes keys: {list(away_changes.keys())}")
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Home changes sample: {dict(list(home_changes.items())[:3]) if home_changes else 'None'}")
