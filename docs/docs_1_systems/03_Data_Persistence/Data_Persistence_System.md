@@ -503,7 +503,9 @@ This system documents data persistence across all three game modes when users ar
 
 ### Overview
 
-Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use a unified persistence system that ensures consistent save/load behavior across all game modes and contexts. The system distinguishes between pre-game settings (saved to master documents) and in-game settings (saved to game documents).
+Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use a unified persistence system that ensures consistent save/load behavior across all game modes and contexts. The system distinguishes between pre-game settings (saved to master store) and in-game settings (saved to game documents).
+
+**Franchise FTD (January 2026):** Franchise master strategy/playbook settings are stored in the `franchise_team_data` (FTD) collection, not in `franchise_teams` on the franchise document. Save uses **upsert** so the first save from Game Plan or Playbooks creates the FTD doc if missing. Load (e.g. `load_team_settings_from_doc`, init-game, simulate-quarter) reads from FTD by `(franchise_id, user_team_object_id)`.
 
 ### Unified Functions
 
@@ -531,11 +533,11 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
 
 **Pre-Game (FCC/TCC):**
 - No `game_id` provided OR game not active (quarter = 0)
-- **Save to:** Master franchise/tournament document
-  - Franchise: `franchise_teams.{team_id}.{settings_type}`
-  - Tournament: `teams.{team_id}.{settings_type}`
+- **Save to:** Master store for franchise/tournament
+  - **Franchise:** `franchise_team_data` collection (FTD). One doc per `(franchise_id, team_id)`. Settings stored as `strategy_settings` / `playbook_settings` top-level fields. Save uses **upsert**: if no FTD doc exists, one is created on first save (fixes Game-Plan-first persistence).
+  - **Tournament:** `tournaments` document → `teams.{team_id}.{settings_type}`
 - **Team ID Format:** ObjectId string (e.g., `"68c98b08674d3f9b04546b2f"`)
-  - Master docs use ObjectId strings as keys (from `user_team_object_id`)
+  - Franchise FTD and tournament `teams` use ObjectId strings as keys (from `user_team_object_id`)
   - Settings persist across all games in the franchise/tournament
 
 **During Active Gameplay:**
@@ -555,11 +557,12 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
 
 **Critical Rule:** Different document types use different team_id formats:
 
-1. **Master Documents (Franchise/Tournament):**
-   - Keys: ObjectId strings (e.g., `"68c98b08674d3f9b04546b2f"`)
-   - Source: `user_team_object_id` from franchise/tournament document
-   - **Save:** Use ObjectId string directly (no normalization)
-   - **Load:** Use ObjectId string directly for lookup
+1. **Master store (Franchise / Tournament):**
+   - **Franchise:** FTD collection, keyed by `(franchise_id, team_id)` with ObjectIds. `team_id` = `user_team_object_id`.
+   - **Tournament:** `teams` on tournament document; keys = ObjectId strings (e.g. `"68c98b08674d3f9b04546b2f"`).
+   - Source: `user_team_object_id` from franchise/tournament document.
+   - **Save:** Use ObjectId string directly (no normalization). Franchise → FTD upsert; tournament → `teams.{team_id}`.
+   - **Load:** Franchise → FTD lookup by `(franchise_id, user_team_object_id)`; tournament → `extract_team_settings` on doc.
 
 2. **Game Documents (All Modes):**
    - Keys: Canonical format (e.g., `"FOUR_CORNERS"`, `"MORRISTOWN"`)
@@ -585,10 +588,11 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
 
 **Backend Flow:**
 - `save_team_settings()` called with `game_id=None` or game not active
-- `get_save_location_for_franchise_tournament()` returns master doc
+- `get_save_location_for_franchise_tournament()` returns master (franchise → FTD, tournament → tournament doc)
 - Team ID used as ObjectId string (no normalization)
-- Settings saved to `franchise_teams.{ObjectId}.strategy_settings` or `teams.{ObjectId}.playbook_settings`
-- `extract_team_settings()` uses ObjectId string for lookup
+- **Franchise:** Settings saved to `franchise_team_data` via `update_one(..., upsert=True)`. First save creates FTD doc if missing.
+- **Tournament:** Settings saved to `teams.{ObjectId}.{settings_type}` in tournament document.
+- **Load:** Franchise master settings loaded from FTD (`load_team_settings_from_doc()` queries FTD by `franchise_id` + `user_team_object_id`). Tournament uses `extract_team_settings()` on tournament doc.
 
 #### 2. Game Start
 
@@ -598,9 +602,9 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
 3. Game begins with master settings as starting point
 
 **Backend Flow:**
-- `init-game` endpoint copies settings from master doc to game doc
-- Settings converted from ObjectId keys to canonical keys
-- Game document now has settings for active gameplay
+- `init-game` endpoint copies settings from master to game doc. **Franchise:** master = FTD (`load_team_settings_from_doc` queries FTD). **Tournament:** master = tournament doc (`extract_team_settings` on `teams`).
+- Settings converted from ObjectId keys to canonical keys for game doc.
+- Game document now has settings for active gameplay.
 
 #### 3. During Active Gameplay
 
@@ -652,18 +656,8 @@ if mode in ["franchise", "tournament"]:
 ```
 
 **Unified Extract Function:**
-```python
-# Handles both ObjectId and canonical keys
-if mode == "franchise":
-    teams_obj = saved_doc.get("franchise_teams", {})
-elif mode == "tournament":
-    teams_obj = saved_doc.get("teams", {})
-else:
-    teams_obj = saved_doc.get("teams", {})
-
-# Resolves team_identifier to correct format for lookup
-# Tries direct lookup, then name matching
-```
+- **Tournament / game docs:** `extract_team_settings()` uses `teams` (or `franchise_teams` for legacy paths). Resolves team_identifier; tries direct lookup, then name matching.
+- **Franchise master (pre-game):** Settings are **not** read from `franchise_teams` (now empty post-FTD migration). `load_team_settings_from_doc()` loads directly from **FTD** by `(franchise_id, user_team_object_id)` and returns `strategy_settings` / `playbook_settings`. Used by init-game, simulate-quarter, and other master-doc load paths.
 
 **Unified Load Function:**
 ```python
@@ -695,11 +689,10 @@ if gm:
 ### Key Files
 
 **Backend:**
-- `BackEnd/utils/team_settings_manager.py`: Unified save/extract/load functions
+- `BackEnd/utils/team_settings_manager.py`: Unified save/extract/load. Franchise master save writes to FTD with **upsert**.
 - `BackEnd/api/gameplan_routes.py`: `get_save_location_for_franchise_tournament()`, `normalize_team_id_to_canonical()`
-- `BackEnd/api/gameplan_routes.py`: `save_playbooks()`, `update_gameplan()` endpoints (use unified functions)
-- `BackEnd/api/api.py`: `simulate_quarter_endpoint()` (uses unified load function)
-- `BackEnd/api/api.py`: `load_team_settings_from_doc()` (uses unified extract function)
+- `BackEnd/api/gameplan_routes.py`: `save_playbooks()`, `update_gameplan()` endpoints (use `save_team_settings`)
+- `BackEnd/api/api.py`: `simulate_quarter_endpoint()` (uses unified load), `load_team_settings_from_doc()` (franchise master → FTD, tournament → extract)
 
 **Frontend:**
 - `FrontEnd/static/game-plan.js`: Sends settings in save request
