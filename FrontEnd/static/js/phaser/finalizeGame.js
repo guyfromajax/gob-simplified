@@ -5,6 +5,7 @@ const DEBUG_GAME_ID = window.DEBUG_GAME_ID || false;
 import { showStatus, hideStatus } from './utils/statusDisplay.js';
 
 export async function finalizeGame({ simData, tournamentId, franchiseId, game }) {
+  console.warn('[COMPLETE-WEEK TRACE] finalizeGame ENTRY', { hasSimData: !!simData, franchiseId, tournamentId });
   // ✅ UNIFIED STRUCTURE: Extract team names with priority: unified structure > backward compatibility
   // Unified structure: simData.teams[home_team_id].name (preferred)
   // Backward compatibility: simData.home_team (object with name) or simData.home_team (string) or simData.homeTeam (object)
@@ -211,8 +212,10 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
 
   // POST to /franchise/complete-week if needed (only if NOT in tournament mode)
   const canCompleteWeek = franchiseId && !tournamentId && Number.isInteger(week) && week >= 1;
-  if (!canCompleteWeek && franchiseId && !tournamentId) {
-    console.warn('⚠️ [FINALIZE_GAME] Skipping complete-week: missing or invalid week', {
+  if (!franchiseId || tournamentId) {
+    console.warn('[COMPLETE-WEEK TRACE] Skipping complete-week: not franchise mode', { franchiseId, tournamentId });
+  } else if (!canCompleteWeek) {
+    console.warn('[COMPLETE-WEEK TRACE] Skipping complete-week: missing or invalid week', {
       week,
       fromUrl: params.get('week'),
       fromSimData: simData?.week,
@@ -268,6 +271,7 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
       // ✅ Show "Simulating Computer Games" when transitioning to computer games
       showStatus('Simulating Computer Games...');
       
+      console.warn('[COMPLETE-WEEK TRACE] POSTing /franchise/complete-week', { week, gameId, franchiseId });
       const res = await fetch(API_CONFIG.buildUrl("/franchise/complete-week"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
