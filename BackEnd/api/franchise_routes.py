@@ -3263,15 +3263,17 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             
             ftd_doc = franchise_team_data_collection.find_one(
                 {"franchise_id": doc_id_obj, "team_id": team_object_id},
-                {"training_reports": 1}
+                {"training_reports": 1, "team_attributes": 1}
             )
             
             if ftd_doc:
                 training_reports = ftd_doc.get("training_reports", {})
                 report_data = training_reports.get(str(week)) or doc.get("latest_training", {})
+                team_data = ftd_doc.get("team_attributes", {})
             else:
                 # FTD doesn't exist - fallback to latest_training in franchise doc
                 report_data = doc.get("latest_training", {})
+                team_data = {}
             
             # Get schedule to find upcoming opponent
             schedule = doc.get("schedule", [])
