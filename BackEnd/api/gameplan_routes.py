@@ -1948,8 +1948,12 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         set_plays_outside.sort(key=lambda x: x["name"])
         
         # ✅ FIX: Reload team_obj from latest doc to ensure we have fresh playbook_settings
-        # This ensures slot_assignments and other settings are current after all document reloads
-        if mode == "franchise":
+        # This ensures slot_assignments and other settings are current after all document reloads.
+        # ✅ FTD: Skip for franchise when not loading from game doc – team_obj already from FTD;
+        # franchise_teams is empty, so reload would overwrite with {} and break position_filters/plays.
+        if mode == "franchise" and not load_from_game_doc:
+            pass  # keep team_obj from FTD
+        elif mode == "franchise":
             doc = collection.find_one({"_id": ObjectId(doc_id)})
             franchise_teams = doc.get("franchise_teams", {})
             team_obj = franchise_teams.get(actual_team_id, {}) if actual_team_id else {}
@@ -2006,8 +2010,11 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             if not playbook_settings:
                 # Only fallback to team_obj if load_team_settings_from_doc() returned None (not empty dict)
                 playbook_settings = team_obj.get("playbook_settings", {})
+        elif mode == "franchise" and not load_from_game_doc:
+            # ✅ FTD: Playbook settings (incl. position_filters) come from FTD team_obj; skip extract (reads franchise_teams).
+            playbook_settings = (team_obj or {}).get("playbook_settings", {})
         else:
-            # ✅ UNIFIED: For tournament/franchise modes, use unified extract function for consistent team_id resolution
+            # ✅ UNIFIED: For tournament/franchise (game doc) modes, use unified extract for consistent team_id resolution
             from BackEnd.utils.team_settings_manager import extract_team_settings
             team_identifier = team_id or (team_obj.get("name") if team_obj else None)
             if team_identifier and doc:
