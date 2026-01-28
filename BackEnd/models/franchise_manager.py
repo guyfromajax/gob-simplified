@@ -172,72 +172,7 @@ class FranchiseManager:
         scouting_data = populate_scouting_data(mode="franchise")
         playbook_settings = initialize_playbook_settings()
         
-        # ✅ FTD: Create franchise_team_data documents for each team (instead of storing in franchise doc)
-        from BackEnd.db import franchise_team_data_collection, ensure_ftd_index
-        from bson import ObjectId
-        from datetime import datetime
-        
-        ensure_ftd_index()
-        
         franchise_teams = {}  # Keep empty for backward compatibility (or remove later)
-        
-        for team in self.teams:
-            team_id = str(team["_id"])
-            team_object_id = team["_id"]  # Keep as ObjectId for FTD
-            
-            # Use TeamManager static method to generate mode-specific team attributes
-            team_attrs = TeamManager.init_team_attributes(mode="franchise")
-            
-            # Build team_attributes dict (matching FTD schema)
-            team_attributes = {
-                "shot_threshold": team_attrs["shot_threshold"],
-                "rebound_modifier": team_attrs["rebound_modifier"],
-                "team_chemistry": team_attrs["team_chemistry"],
-                "momentum_score": 0,  # Not in init_team_attributes, default to 0
-                "offensive_efficiency": team_attrs["offensive_efficiency"],
-                "defensive_efficiency": team_attrs["defensive_efficiency"],
-                "discipline": team_attrs["discipline"],
-                "fight": team_attrs["fight"],
-                "pt_opp_modifier": team_attrs["pt_opp_modifier"],
-                "fb_opp_modifier": team_attrs["fb_opp_modifier"],
-                "fb_efficiency": team_attrs["fb_efficiency"],
-                "pt_efficiency": team_attrs["pt_efficiency"],
-            }
-            
-            # Strategy settings (all start at 2 = Normal)
-            strategy_settings = {
-                "offense": 2,  # Motion vs Set Play split (0=motion only, 4=set plays only)
-                "inside": 2,   # Inside focus preference
-                "attack": 2,   # Attack focus preference
-                "outside": 2,  # Outside focus preference
-                "tempo": 2,    # Tempo preference
-                "defense": 2,  # Man vs Zone defense preference
-                "aggression": 2,  # Defensive aggression level
-                "hc_trap": 2,  # Half court trap usage (matches frontend key)
-                "fc_press": 2, # Full court press usage (matches frontend key)
-                "rebounding": 2  # Crash boards vs get back preference
-            }
-            
-            # Create FTD document
-            ftd_doc = {
-                "franchise_id": self.franchise_id,
-                "team_id": team_object_id,
-                "team_attributes": team_attributes,
-                "strategy_settings": strategy_settings,
-                "playbook_settings": playbook_settings.copy(),
-                "plays": populated_plays.copy(),
-                "scouting_data": scouting_data.copy(),
-                "training_reports": {},
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow()
-            }
-            
-            # Insert or update FTD document
-            franchise_team_data_collection.update_one(
-                {"franchise_id": self.franchise_id, "team_id": team_object_id},
-                {"$set": ftd_doc},
-                upsert=True
-            )
 
         # Initialize training status - training camp happens at week 1 before games are played
         training_status = {
@@ -276,6 +211,51 @@ class FranchiseManager:
             extra_state["user_team_object_id"] = user_team_object_id
         
         self.save_season_state(extra_state=extra_state)
+
+        # ✅ FTD: Create franchise_team_data documents *after* franchise insert so we have franchise_id.
+        from BackEnd.db import franchise_team_data_collection, ensure_ftd_index
+        from datetime import datetime
+
+        ensure_ftd_index()
+        for team in self.teams:
+            team_object_id = team["_id"]
+            team_attrs = TeamManager.init_team_attributes(mode="franchise")
+            team_attributes = {
+                "shot_threshold": team_attrs["shot_threshold"],
+                "rebound_modifier": team_attrs["rebound_modifier"],
+                "team_chemistry": team_attrs["team_chemistry"],
+                "momentum_score": 0,
+                "offensive_efficiency": team_attrs["offensive_efficiency"],
+                "defensive_efficiency": team_attrs["defensive_efficiency"],
+                "discipline": team_attrs["discipline"],
+                "fight": team_attrs["fight"],
+                "pt_opp_modifier": team_attrs["pt_opp_modifier"],
+                "fb_opp_modifier": team_attrs["fb_opp_modifier"],
+                "fb_efficiency": team_attrs["fb_efficiency"],
+                "pt_efficiency": team_attrs["pt_efficiency"],
+            }
+            strategy_settings = {
+                "offense": 2, "inside": 2, "attack": 2, "outside": 2,
+                "tempo": 2, "defense": 2, "aggression": 2,
+                "hc_trap": 2, "fc_press": 2, "rebounding": 2,
+            }
+            ftd_doc = {
+                "franchise_id": self.franchise_id,
+                "team_id": team_object_id,
+                "team_attributes": team_attributes,
+                "strategy_settings": strategy_settings,
+                "playbook_settings": playbook_settings.copy(),
+                "plays": populated_plays.copy(),
+                "scouting_data": scouting_data.copy(),
+                "training_reports": {},
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+            }
+            franchise_team_data_collection.update_one(
+                {"franchise_id": self.franchise_id, "team_id": team_object_id},
+                {"$set": ftd_doc},
+                upsert=True,
+            )
 
     def reset_stats(self):
         for team in self.teams:
