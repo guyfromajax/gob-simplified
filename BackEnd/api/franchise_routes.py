@@ -1167,10 +1167,11 @@ def complete_week(req: CompleteWeekRequest):
         logger.info(f"🔍 [COMPLETE_WEEK] About to call update_team_attributes_after_game()")
         try:
             # Extract team IDs and scores from the request
-            # user.team1_id and user.team2_id are the normalized team IDs
-            # user.team1_score and user.team2_score are the scores
-            home_id = str(user_res["team2_id"])  # team2 is home
-            away_id = str(user_res["team1_id"])  # team1 is away
+            # user_res has ObjectIds; normalize to team_id strings (LANCASTER, etc.) so stored keys match box score
+            home_id_raw = user_res["team2_id"]  # team2 is home
+            away_id_raw = user_res["team1_id"]  # team1 is away
+            home_id = _normalize_team_id_to_string(home_id_raw) or str(home_id_raw)
+            away_id = _normalize_team_id_to_string(away_id_raw) or str(away_id_raw)
             home_score = user_res["team2_score"]
             away_score = user_res["team1_score"]
             
@@ -1238,8 +1239,10 @@ def complete_week(req: CompleteWeekRequest):
                 # ✅ NEW: Update team attributes based on game performance (legacy path)
                 logger.info(f"🔍 [COMPLETE_WEEK] About to call update_team_attributes_after_game() (legacy path)")
                 try:
-                    home_id = str(user_res["team2_id"])  # team2 is home
-                    away_id = str(user_res["team1_id"])  # team1 is away
+                    home_id_raw = user_res["team2_id"]
+                    away_id_raw = user_res["team1_id"]
+                    home_id = _normalize_team_id_to_string(home_id_raw) or str(home_id_raw)
+                    away_id = _normalize_team_id_to_string(away_id_raw) or str(away_id_raw)
                     home_score = user_res["team2_score"]
                     away_score = user_res["team1_score"]
                     
