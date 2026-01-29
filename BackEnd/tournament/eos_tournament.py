@@ -8,6 +8,8 @@ from bson import ObjectId
 import random
 import logging
 
+from BackEnd.utils.franchise_standings import calculate_franchise_standings
+
 logger = logging.getLogger(__name__)
 
 
@@ -19,29 +21,59 @@ def calculate_standings(
     """
     Calculate regular season standings for all teams in the franchise.
 
-    Args:
-        franchise_doc: Franchise document
-        teams_collection: MongoDB teams collection
-        team_ids: Optional list of team IDs (ObjectId or str). When provided (e.g. from FTD),
-                  used instead of franchise_teams. Required after FTD migration since
-                  franchise_teams is empty.
+    When team_ids is provided (franchise mode with FTD), uses franchise.results
+    as the source of truth (same as Franchise standings tab). Otherwise falls
+    back to teams collection (legacy).
 
     Returns:
         List of team standings sorted by: Wins (desc), PF-PA delta (desc), Random
     """
-    # Prefer explicit team_ids (from FTD) when provided; else fall back to franchise_teams
     if team_ids is not None:
+        # Franchise mode: standings from franchise.results (single source of truth)
         team_ids = [ObjectId(tid) if not isinstance(tid, ObjectId) else tid for tid in team_ids]
-    else:
-        franchise_teams = franchise_doc.get("franchise_teams", {})
-        team_ids = [ObjectId(tid) for tid in franchise_teams.keys()]
-    
-    # Get team records from teams collection
+        franchise_results = franchise_doc.get("results", {})
+        franchise_teams = {str(tid): {} for tid in team_ids}
+        standings_data = calculate_franchise_standings(franchise_results, franchise_teams)
+
+        # Fetch team names
+        teams = list(teams_collection.find(
+            {"_id": {"$in": team_ids}},
+            {"name": 1, "_id": 1}
+        ))
+        name_by_id = {str(t["_id"]): t.get("name", "") for t in teams}
+
+        standings = []
+        for tid in team_ids:
+            tid_str = str(tid)
+            data = standings_data.get(tid_str, {"W": 0, "L": 0, "PF": 0, "PA": 0})
+            wins = data.get("W", 0)
+            losses = data.get("L", 0)
+            pf = data.get("PF", 0)
+            pa = data.get("PA", 0)
+            differential = pf - pa
+            standings.append({
+                "team_id": tid_str,
+                "name": name_by_id.get(tid_str, ""),
+                "wins": wins,
+                "losses": losses,
+                "pf": pf,
+                "pa": pa,
+                "differential": differential,
+                "tiebreaker_random": random.random(),
+            })
+
+        standings.sort(key=lambda x: (x["wins"], x["differential"], x["tiebreaker_random"]), reverse=True)
+        return standings
+
+    # Legacy: franchise_teams from doc, records from teams collection
+    franchise_teams = franchise_doc.get("franchise_teams", {})
+    team_ids = [ObjectId(tid) for tid in franchise_teams.keys()]
+
     teams = list(teams_collection.find(
         {"_id": {"$in": team_ids}},
         {"name": 1, "record": 1, "PF": 1, "PA": 1, "_id": 1}
     ))
-    
+
     standings = []
     for team in teams:
         rec = team.get("record", {"W": 0, "L": 0})
@@ -50,7 +82,6 @@ def calculate_standings(
         pf = team.get("PF", 0)
         pa = team.get("PA", 0)
         differential = pf - pa
-        
         standings.append({
             "team_id": str(team["_id"]),
             "name": team.get("name", ""),
@@ -59,12 +90,10 @@ def calculate_standings(
             "pf": pf,
             "pa": pa,
             "differential": differential,
-            "tiebreaker_random": random.random()  # For final tiebreaker
+            "tiebreaker_random": random.random(),
         })
-    
-    # Sort by: Wins (desc), PF-PA delta (desc), Random
+
     standings.sort(key=lambda x: (x["wins"], x["differential"], x["tiebreaker_random"]), reverse=True)
-    
     return standings
 
 
