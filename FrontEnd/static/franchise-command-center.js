@@ -1064,43 +1064,40 @@ function updatePlayButton(data) {
   const playNowBtn = document.getElementById('play-now');
   if (!data) return;
   
-  // ✅ EOS TOURNAMENT: Check if tournament is active
   const eosTournamentActive = data.eos_tournament_active || false;
   const eosTournament = data.eos_tournament;
   const week = data.week || 1;
+  const trainingDisabledForEos = !!data.training_disabled_for_eos;
+  const userEliminated = data.user_eliminated != null ? !!data.user_eliminated : null;
+  const offerSimRest = data.offer_sim_rest != null ? !!data.offer_sim_rest : null;
   
-  // Check if user team is eliminated
+  // Fallback: infer eliminated from bracket when API doesn't return user_eliminated/offer_sim_rest
   let userTeamEliminated = false;
-  if (eosTournamentActive && eosTournament && userTeamId) {
+  if (eosTournamentActive && eosTournament && userTeamId && userEliminated == null) {
     const bracket = eosTournament.bracket || {};
-    const round1 = bracket.round1 || [];
-    const round2 = bracket.round2 || [];
-    const final = bracket.final || [];
-    
-    // Check if user team is in any active matchup
-    const allMatchups = [...round1, ...round2, ...final];
-    const userInMatchup = allMatchups.some(m => 
-      m.home_team === userTeamId || m.away_team === userTeamId
+    const allMatchups = [...(bracket.round1 || []), ...(bracket.round2 || []), ...(bracket.final || [])];
+    const userInMatchup = allMatchups.some(m =>
+      String(m.home_team) === String(userTeamId) || String(m.away_team) === String(userTeamId)
     );
     userTeamEliminated = !userInMatchup && week >= 15;
   }
   
-  // Check if tournament is complete
+  const eliminated = userEliminated != null ? userEliminated : userTeamEliminated;
+  const showSimRest = offerSimRest != null ? offerSimRest : (eliminated && eosTournamentActive && !eosTournament?.completed);
   const tournamentComplete = eosTournament?.completed || false;
   
   if (tournamentComplete && week >= 17) {
-    // Tournament complete - show Finish Season button
     playNowBtn.textContent = 'Finish Current Season';
     playNowBtn.dataset.mode = 'finish-season';
-  } else if (userTeamEliminated && eosTournamentActive) {
-    // User team eliminated - show Sim Rest of Tournament
-    playNowBtn.textContent = 'Sim Rest of Tournament';
+  } else if (showSimRest && eosTournamentActive) {
+    playNowBtn.textContent = 'Sim Rest Of Tournament';
     playNowBtn.dataset.mode = 'sim-rest-tournament';
+  } else if (trainingDisabledForEos || eliminated) {
+    playNowBtn.textContent = 'Finish Current Season';
+    playNowBtn.dataset.mode = 'finish-season';
   } else {
-    // Normal flow
     const trainingCompleted = data.training_completed || false;
     const sessionType = data.session_type || 'in-season';
-    
     if (!trainingCompleted) {
       playNowBtn.textContent = sessionType === 'preseason' ? 'Run Training Camp' : 'Run Training';
       playNowBtn.dataset.mode = 'training';
@@ -1117,10 +1114,11 @@ playNowBtn.addEventListener('click', async () => {
   const mode = playNowBtn.dataset.mode || 'play';
   
   if (mode === 'training') {
-    // Navigate to training page
     const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}`);
+    if (topData?.training_disabled_for_eos) {
+      return;
+    }
     const sessionType = topData?.session_type || 'in-season';
-    // ✅ SS&S: Include team_id (ObjectId) for consistent navigation
     const teamIdParam = userTeamId ? `&team_id=${encodeURIComponent(userTeamId)}` : '';
     window.location.href = `/training.html?franchise_id=${franchiseId}&mode=franchise&session_type=${sessionType}${teamIdParam}`;
     return;

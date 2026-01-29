@@ -1439,6 +1439,11 @@ def complete_week(req: CompleteWeekRequest):
             if matchup_index is not None and user_game_id:
                 # Determine winner
                 winner_id = team1_id if user.team1_score > user.team2_score else team2_id
+                _u_name, user_team_oid = get_user_team_from_franchise(franchise_doc)
+                user_lost = user_team_oid and str(winner_id) != str(user_team_oid)
+                if user_lost:
+                    update_fields["training_status.training_disabled_for_eos"] = True
+                    logger.info("✅ [EOS TOURNAMENT] User eliminated; training disabled for remaining EOS weeks")
                 
                 # Save tournament game result (mutates franchise_doc["eos_tournament"] in place)
                 save_tournament_game_result(
@@ -1598,6 +1603,15 @@ def command_center_data(franchise_id: str = None):
     if eos_tournament_active and eos_tournament:
         response["eos_tournament"] = eos_tournament
         response["eos_tournament_active"] = True
+    
+    # EOS user-eliminated: disable training, offer "Sim Rest Of Tournament" when rounds remain
+    training_disabled_for_eos = bool(franchise_doc.get("training_status", {}).get("training_disabled_for_eos", False)) if franchise_id and franchise_doc else False
+    response["training_disabled_for_eos"] = training_disabled_for_eos
+    user_eliminated = training_disabled_for_eos
+    tournament_complete = bool(eos_tournament.get("completed", False)) if eos_tournament else False
+    offer_sim_rest = user_eliminated and eos_tournament_active and not tournament_complete
+    response["user_eliminated"] = user_eliminated
+    response["offer_sim_rest"] = offer_sim_rest
     
     total_time = time.time() - start_time
     logger.info(f"⏱️ [PERF] /franchise/command-center/data COMPLETE: {total_time:.3f}s")
@@ -2798,6 +2812,12 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     training_status = franchise_doc.get("training_status", {})
     week = franchise_doc.get("week", 1)
     results = franchise_doc.get("results", {})
+    
+    if training_status.get("training_disabled_for_eos", False) and week >= 15:
+        raise HTTPException(
+            status_code=400,
+            detail="Training is disabled for remaining EOS weeks after elimination.",
+        )
     
     # Check if it's first training (training camp) - week 1 and no results yet
     is_first_training = (week == 1 and not results.get("1"))
