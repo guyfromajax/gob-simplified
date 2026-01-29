@@ -118,6 +118,16 @@ class FranchiseManager:
         self.db.games.delete_many({})
         self.schedule = self.schedule_manager.generate_schedule()
         self.week = 1
+        # Optional: start at a later week for testing (e.g. week 14→15 transition)
+        start_week_env = os.environ.get("FRANCHISE_START_WEEK")
+        if start_week_env:
+            try:
+                w = int(start_week_env)
+                if 1 <= w <= 14:
+                    self.week = w
+                    logger.info("FRANCHISE_START_WEEK=%s: starting franchise at week %s (testing)", start_week_env, self.week)
+            except ValueError:
+                pass
         self.reset_stats()
 
         zero_stats = {k: 0 for k in BOX_SCORE_KEYS}
