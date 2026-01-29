@@ -1067,8 +1067,16 @@ def complete_week(req: CompleteWeekRequest):
     eos_active = bool(
         franchise_doc.get("eos_tournament_active") and franchise_doc.get("eos_tournament")
     )
+    eos_current_round = None
     if req.week in (15, 16, 17) and eos_active:
-        week_games = []
+        eos = franchise_doc.get("eos_tournament", {})
+        eos_current_round = eos.get("current_round", 1)
+        rn = get_round_name(eos_current_round)
+        matchups = eos.get("bracket", {}).get(rn, [])
+        week_games = [
+            (ObjectId(m["away_team"]), ObjectId(m["home_team"]))
+            for m in matchups
+        ]
     else:
         if req.week < 1 or req.week > len(schedule):
             raise HTTPException(status_code=400, detail="Invalid week")
@@ -1317,7 +1325,7 @@ def complete_week(req: CompleteWeekRequest):
         else:
             logger.error(f"❌ [COMPLETE_WEEK] User's game not found in games collection. Query: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
 
-    for away_id, home_id in week_games:
+    for idx, (away_id, home_id) in enumerate(week_games):
         if {str(away_id), str(home_id)} == {str(team1_id), str(team2_id)}:
             continue
         existing = db.games.find_one({
@@ -1345,7 +1353,6 @@ def complete_week(req: CompleteWeekRequest):
             away_score = gm.score.get(away_name, 0)
             home_score = gm.score.get(home_name, 0)
             summary = summarize_game_state(gm)
-            # ✅ SS&S: Use ObjectId format for game_id (consistent with user games)
             from BackEnd.utils.game_id_utils import generate_game_id
             computer_game_id = generate_game_id()
             summary["_id"] = computer_game_id
@@ -1355,8 +1362,17 @@ def complete_week(req: CompleteWeekRequest):
             stat_updater.finalize_game(
                 computer_game_id, mode="franchise", franchise_id=req.franchise_id
             )
-            # ✅ SS&S: Pass computer_game_id to _save_game_result so schedule endpoint can find it
             sim_res = _save_game_result(away_id, home_id, away_score, home_score, req.week, franchise_id=req.franchise_id, game_id=computer_game_id)
+            if eos_current_round is not None:
+                winner_id = home_id if home_score > away_score else away_id
+                save_tournament_game_result(
+                    franchise_doc,
+                    eos_current_round,
+                    idx,
+                    str(computer_game_id),
+                    str(winner_id),
+                    {"home": home_score, "away": away_score},
+                )
         except Exception:
             away_score = random.randint(50, 90)
             home_score = random.randint(50, 90)
