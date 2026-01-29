@@ -1380,8 +1380,9 @@ def complete_week(req: CompleteWeekRequest):
     if req.week == 14:
         # Week 14 complete - initialize EOS Tournament
         # ✅ FTD: Get team IDs from franchise_team_data (franchise_teams is empty after migration)
+        # FTD stores franchise_id as ObjectId (from franchise_manager init); query with ObjectId, not string
         ftd_docs = list(franchise_team_data_collection.find(
-            {"franchise_id": str(franchise_id)},
+            {"franchise_id": franchise_id},
             {"team_id": 1}
         ))
         eos_team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id")]
