@@ -1064,10 +1064,15 @@ def complete_week(req: CompleteWeekRequest):
         raise HTTPException(status_code=404, detail="Franchise not found")
 
     schedule = franchise_doc.get("schedule", [])
-    if req.week < 1 or req.week > len(schedule):
-        raise HTTPException(status_code=400, detail="Invalid week")
-
-    week_games = schedule[req.week - 1]
+    eos_active = bool(
+        franchise_doc.get("eos_tournament_active") and franchise_doc.get("eos_tournament")
+    )
+    if req.week in (15, 16, 17) and eos_active:
+        week_games = []
+    else:
+        if req.week < 1 or req.week > len(schedule):
+            raise HTTPException(status_code=400, detail="Invalid week")
+        week_games = schedule[req.week - 1]
     results = []
 
     user = req.result
@@ -1419,7 +1424,7 @@ def complete_week(req: CompleteWeekRequest):
                 # Determine winner
                 winner_id = team1_id if user.team1_score > user.team2_score else team2_id
                 
-                # Save tournament game result
+                # Save tournament game result (mutates franchise_doc["eos_tournament"] in place)
                 save_tournament_game_result(
                     franchise_doc,
                     current_round,
@@ -1430,15 +1435,17 @@ def complete_week(req: CompleteWeekRequest):
                      "away": user.team2_score if str(team1_id) == str(matchup.get("home_team")) else user.team1_score}
                 )
                 
-                # Reload franchise doc to get updated tournament state
-                franchise_doc = db.franchises.find_one({"_id": franchise_id})
-                eos_tournament = franchise_doc.get("eos_tournament", {})
-                
-                # Advance round if all matchups complete
+                # Advance from in-memory state (no reload) so we see the saved result
                 eos_tournament = advance_tournament_round(franchise_doc, db.teams)
                 update_fields["eos_tournament"] = eos_tournament
-                
+                new_round = eos_tournament.get("current_round", current_round)
+                if new_round > current_round:
+                    update_fields["week"] = 14 + new_round
+                else:
+                    update_fields["week"] = req.week
                 logger.info(f"✅ [EOS TOURNAMENT] Saved tournament game result for Round {current_round}, Matchup {matchup_index}")
+            else:
+                update_fields["week"] = req.week
     
     db.franchises.update_one(
         {"_id": franchise_id},
@@ -3755,9 +3762,13 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
     # Advance round if all matchups complete
     franchise_doc = db.franchises.find_one({"_id": franchise_id})
     eos_tournament = advance_tournament_round(franchise_doc, db.teams)
+    new_round = eos_tournament.get("current_round", current_round)
+    payload = {"eos_tournament": eos_tournament}
+    if new_round > current_round:
+        payload["week"] = 14 + new_round
     db.franchises.update_one(
         {"_id": franchise_id},
-        {"$set": {"eos_tournament": eos_tournament}}
+        {"$set": payload}
     )
     
     return {"status": "success", "round": current_round}

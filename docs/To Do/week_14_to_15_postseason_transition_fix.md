@@ -53,12 +53,17 @@ Standings (and thus seeds) are computed from **`franchise.results`** (W/L, PF, P
 - If FTD returns fewer than 8 teams, a warning is logged and we still call `initialize_eos_tournament`. If seeds then have fewer than 8 teams, `generate_bracket` raises `ValueError` and the update is not applied (no partial/broken tournament saved).
 - Existing franchises that still had `franchise_teams` populated would continue to work via the fallback in `calculate_standings` when `team_ids` is not passed (e.g. if any other caller omits it). For `complete_week` we always pass `team_ids` from FTD for week 14.
 
+### 4. Weeks 15 → 16 → 17 transition
+
+- **`complete_week`** allows weeks 15–17 when `eos_tournament_active` and `eos_tournament` exist. No schedule lookup; `week_games = []`, user’s game only. Save result to bracket → advance from **in-memory** doc (no reload). When the round advances, set `franchise.week = 14 + new_round` (15→16 for semis, 16→17 for final); otherwise keep `week` unchanged.
+- **`/franchise/sim-rest-of-tournament`** sims incomplete matchups, saves to bracket, advances. When the round advances, it also sets `franchise.week = 14 + new_round` in the same `$set` as `eos_tournament`.
+
 ## Files Touched
 
 | File | Change |
 |------|--------|
 | `BackEnd/tournament/eos_tournament.py` | `calculate_standings(..., team_ids=None)`; `initialize_eos_tournament(..., team_ids=None)`; `generate_bracket` guard for `len(seeds) < 8` |
-| `BackEnd/api/franchise_routes.py` | When `req.week == 14`, load team IDs from FTD; set `franchise_doc["results"] = existing_results` before EOS init; call `initialize_eos_tournament(..., team_ids=eos_team_ids)` |
+| `BackEnd/api/franchise_routes.py` | Week 14: FTD team IDs, `franchise_doc["results"] = existing_results`, EOS init. Weeks 15–17: allow when EOS active, `week_games = []`; save result → advance (no reload), set `week` on advance; `sim-rest-of-tournament` sets `week` when advancing |
 
 ## Verification
 
