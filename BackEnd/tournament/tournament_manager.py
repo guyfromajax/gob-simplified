@@ -120,6 +120,7 @@ class TournamentManager:
             # Use TeamManager static method to generate mode-specific team attributes
             team_attrs = TeamManager.init_team_attributes(mode="tournament")
             teams_obj[team_id] = {
+                "name": team_name,
                 "team_chemistry": team_attrs["team_chemistry"],
                 "offensive_efficiency": team_attrs["offensive_efficiency"],
                 "shot_threshold": team_attrs["shot_threshold"],
