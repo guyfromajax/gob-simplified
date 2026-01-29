@@ -2,12 +2,17 @@
 End-of-Season (EOS) Tournament System for Franchise Mode.
 
 Handles seeding, bracket generation, and tournament progression for weeks 15-17.
+Uses shared bracket_engine for bracket init, advance, and save-result.
 """
-from typing import Dict, List, Tuple, Any, Optional
-from bson import ObjectId
-import random
-import logging
+from __future__ import annotations
 
+import logging
+import random
+from typing import Any, Dict, List, Optional
+
+from bson import ObjectId
+
+from BackEnd.tournament import bracket_engine
 from BackEnd.utils.franchise_standings import calculate_franchise_standings
 
 logger = logging.getLogger(__name__)
@@ -114,60 +119,6 @@ def generate_seeds(standings: List[Dict[str, Any]]) -> Dict[str, int]:
     return seeds
 
 
-def generate_bracket(seeds: Dict[str, int], teams_collection) -> Dict[str, List[Dict[str, Any]]]:
-    """
-    Generate tournament bracket structure for 8 teams.
-
-    Args:
-        seeds: Dictionary mapping team_id to seed (1-8)
-        teams_collection: MongoDB teams collection (for team names)
-
-    Returns:
-        Bracket structure: {round1: [...], round2: [], final: []}
-
-    Raises:
-        ValueError: If seeds has fewer than 8 teams (e.g. empty after FTD migration).
-    """
-    if len(seeds) < 8:
-        raise ValueError(
-            f"EOS bracket requires 8 teams; got {len(seeds)}. "
-            "Ensure team IDs are provided from FTD when franchise_teams is empty."
-        )
-    # Get team names for bracket display
-    team_ids = [ObjectId(tid) for tid in seeds.keys()]
-    teams = {str(t["_id"]): t.get("name", "") for t in teams_collection.find(
-        {"_id": {"$in": team_ids}},
-        {"name": 1, "_id": 1}
-    )}
-    
-    # Sort teams by seed
-    sorted_teams = sorted(seeds.items(), key=lambda x: x[1])
-    
-    # Round 1 matchups: 1v8, 4v5, 2v7, 3v6
-    matchups = [
-        (sorted_teams[0][0], sorted_teams[7][0]),  # Seed 1 vs Seed 8
-        (sorted_teams[3][0], sorted_teams[4][0]),  # Seed 4 vs Seed 5
-        (sorted_teams[1][0], sorted_teams[6][0]),  # Seed 2 vs Seed 7
-        (sorted_teams[2][0], sorted_teams[5][0]),  # Seed 3 vs Seed 6
-    ]
-    
-    round1 = []
-    for home_id, away_id in matchups:
-        round1.append({
-            "home_team": home_id,
-            "away_team": away_id,
-            "game_id": None,
-            "winner": None,
-            "score": {},
-        })
-    
-    return {
-        "round1": round1,
-        "round2": [],
-        "final": []
-    }
-
-
 def initialize_eos_tournament(
     franchise_doc: Dict[str, Any],
     teams_collection,
@@ -191,9 +142,13 @@ def initialize_eos_tournament(
     
     # Generate seeds (top 8 teams)
     seeds = generate_seeds(standings)
-    
-    # Generate bracket
-    bracket = generate_bracket(seeds, teams_collection)
+    if len(seeds) < 8:
+        raise ValueError(
+            f"EOS bracket requires 8 teams; got {len(seeds)}. "
+            "Ensure team IDs are provided from FTD when franchise_teams is empty."
+        )
+    seed_order = [tid for tid, _ in sorted(seeds.items(), key=lambda x: x[1])]
+    bracket = bracket_engine.generate_bracket(seed_order)
     
     # Create tournament state
     tournament_state = {
@@ -213,10 +168,11 @@ def initialize_eos_tournament(
 def advance_tournament_round(franchise_doc: Dict[str, Any], teams_collection) -> Dict[str, Any]:
     """
     Advance tournament to next round based on completed matchups.
+    Uses shared bracket_engine.advance_bracket (winners from matchups).
     
     Args:
         franchise_doc: Franchise document with eos_tournament
-        teams_collection: MongoDB teams collection
+        teams_collection: MongoDB teams collection (unused; kept for API compatibility)
         
     Returns:
         Updated tournament state
@@ -225,76 +181,22 @@ def advance_tournament_round(franchise_doc: Dict[str, Any], teams_collection) ->
     current_round = eos_tournament.get("current_round", 1)
     bracket = eos_tournament.get("bracket", {})
     
-    if current_round == 1:
-        # Check if all Round 1 games are complete
-        round1 = bracket.get("round1", [])
-        winners = [m.get("winner") for m in round1 if m.get("winner")]
-        
-        if len(winners) == 4:
-            # Advance to Round 2 (Semifinals)
-            round2 = [
-                {
-                    "home_team": winners[0],
-                    "away_team": winners[1],
-                    "game_id": None,
-                    "winner": None,
-                    "score": {},
-                },
-                {
-                    "home_team": winners[2],
-                    "away_team": winners[3],
-                    "game_id": None,
-                    "winner": None,
-                    "score": {},
-                },
-            ]
-            bracket["round2"] = round2
-            eos_tournament["current_round"] = 2
-            eos_tournament["bracket"] = bracket
-            logger.info(f"✅ [EOS TOURNAMENT] Advanced to Round 2 (Semifinals)")
-    
-    elif current_round == 2:
-        # Check if all Round 2 games are complete
-        round2 = bracket.get("round2", [])
-        winners = [m.get("winner") for m in round2 if m.get("winner")]
-        
-        if len(winners) == 2:
-            # Advance to Final
-            final = [
-                {
-                    "home_team": winners[0],
-                    "away_team": winners[1],
-                    "game_id": None,
-                    "winner": None,
-                    "score": {},
-                }
-            ]
-            bracket["final"] = final
-            eos_tournament["current_round"] = 3
-            eos_tournament["bracket"] = bracket
-            logger.info(f"✅ [EOS TOURNAMENT] Advanced to Final (Championship)")
-    
-    elif current_round == 3:
-        # Check if Final is complete
-        final = bracket.get("final", [])
-        if final and final[0].get("winner"):
-            eos_tournament["completed"] = True
-            eos_tournament["champion"] = final[0]["winner"]
-            logger.info(f"✅ [EOS TOURNAMENT] Tournament complete! Champion: {final[0]['winner']}")
+    updated, next_round, completed, champion = bracket_engine.advance_bracket(
+        bracket, current_round, winners_from_matchups=True
+    )
+    eos_tournament["bracket"] = updated
+    eos_tournament["current_round"] = next_round
+    if completed and champion is not None:
+        eos_tournament["completed"] = True
+        eos_tournament["champion"] = champion
+        logger.info("✅ [EOS TOURNAMENT] Tournament complete! Champion: %s", champion)
+    elif next_round > current_round:
+        if next_round == 2:
+            logger.info("✅ [EOS TOURNAMENT] Advanced to Round 2 (Semifinals)")
+        elif next_round == 3:
+            logger.info("✅ [EOS TOURNAMENT] Advanced to Final (Championship)")
     
     return eos_tournament
-
-
-def get_round_name(round_num: int) -> str:
-    """Get round name from round number."""
-    if round_num == 1:
-        return "round1"
-    elif round_num == 2:
-        return "round2"
-    elif round_num == 3:
-        return "final"
-    else:
-        return "round1"
 
 
 def save_tournament_game_result(
@@ -303,10 +205,11 @@ def save_tournament_game_result(
     matchup_index: int,
     game_id: str,
     winner_id: str,
-    score: Dict[str, int] | None = None
+    score: Dict[str, int] | None = None,
 ) -> None:
     """
     Save tournament game result to bracket.
+    Uses shared bracket_engine.save_game_result; also appends to eos_tournament.results.
     
     Args:
         franchise_doc: Franchise document
@@ -318,37 +221,19 @@ def save_tournament_game_result(
     """
     eos_tournament = franchise_doc.get("eos_tournament", {})
     bracket = eos_tournament.get("bracket", {})
-    round_name = get_round_name(round_num)
-    
-    if round_name not in bracket:
-        logger.error(f"❌ [EOS TOURNAMENT] Round {round_name} not found in bracket")
-        return
-    
-    matchups = bracket[round_name]
-    if matchup_index >= len(matchups):
-        logger.error(f"❌ [EOS TOURNAMENT] Matchup index {matchup_index} out of range for {round_name}")
-        return
-    
-    match = matchups[matchup_index]
-    match["game_id"] = game_id
-    match["winner"] = winner_id
-    if score:
-        match["score"] = score
-    
-    # Add to results array
+    bracket_engine.save_game_result(bracket, round_num, matchup_index, game_id, winner_id, score)
+
     result_entry = {
         "round": round_num,
         "match_index": matchup_index,
         "winner": winner_id,
         "game_id": game_id,
-        "score": score or {}
+        "score": score or {},
     }
-    
     results = eos_tournament.get("results", [])
-    # Remove existing result for this matchup if present
     results = [r for r in results if not (r.get("round") == round_num and r.get("match_index") == matchup_index)]
     results.append(result_entry)
     eos_tournament["results"] = results
-    
-    logger.info(f"✅ [EOS TOURNAMENT] Saved result: Round {round_num}, Matchup {matchup_index}, Winner: {winner_id}")
+
+    logger.info("✅ [EOS TOURNAMENT] Saved result: Round %s, Matchup %s, Winner: %s", round_num, matchup_index, winner_id)
 

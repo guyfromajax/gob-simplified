@@ -22,11 +22,11 @@ from BackEnd.utils.shared import summarize_game_state
 from BackEnd.utils import stat_updater
 from BackEnd.utils.team_stats_aggregator import aggregate_team_stats_from_players
 from BackEnd.models.franchise_manager import FranchiseManager
+from BackEnd.tournament.bracket_engine import get_round_name
 from BackEnd.tournament.eos_tournament import (
-    initialize_eos_tournament,
     advance_tournament_round,
+    initialize_eos_tournament,
     save_tournament_game_result,
-    get_round_name
 )
 from BackEnd.utils.db_utils import build_lineup_from_mongo
 from BackEnd.utils.game_id_utils import generate_game_id
