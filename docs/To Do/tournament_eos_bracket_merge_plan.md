@@ -1,7 +1,7 @@
 # Tournament vs Franchise EOS Bracket Merge Plan
 
 **Date:** January 2025  
-**Status:** ✅ Steps 1–3 done (bracket_engine, EOS refactor, Tournament refactor). Optional cleanup (Step 4) remaining.  
+**Status:** ✅ Steps 1–4 done (bracket_engine, EOS refactor, Tournament refactor, Step 4 cleanup).  
 **Goal:** Unify the two bespoke bracket/tournament engines (Tournament mode vs Franchise EOS) into a single shared implementation where possible.
 
 **Related:** `Tournament_Franchise_Unification_Plan.md` (broader mode unification). This doc focuses **only** on bracket init, advance, and save-result logic.
@@ -159,8 +159,8 @@ EOS already uses **ObjectId strings** for team IDs; no identifier migration. Ref
    - Swap in `bracket_engine` for bracket gen, advance, and matchup updates. Keep standings → seeds → init orchestration in `eos_tournament`. Test week 14 → 15 → 17 flow.
 3. **Refactor Tournament**  
    - Switch bracket/results/next-game to **ObjectId strings** (§8); add ObjectId ↔ name resolution at API/game boundaries. Use `bracket_engine` for round1 and advance. Keep `tournament.results` contract if desired. Test full tournament flow.
-4. **Optional cleanup**  
-   - Remove duplicated bracket wiring from `TournamentManager` and `eos_tournament` once both use the engine. Consolidate round-key logic.
+4. **Optional cleanup** ✅  
+   - Consolidated round-key logic: all `round_key` / `round_name` derivation now uses `bracket_engine.get_round_name(round_num)` in `tournament_routes` and `franchise_routes`. Removed inline `"final" if round == 3 else f"round{round}"` duplication.
 
 ---
 

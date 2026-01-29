@@ -3573,7 +3573,7 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             
             # Get upcoming opponent from bracket
             current_round = doc.get("current_round", 1)
-            round_key = "final" if current_round == 3 else f"round{current_round}"
+            round_key = get_round_name(current_round)
             matchups = doc.get("bracket", {}).get(round_key, [])
             upcoming_opponent = None
             

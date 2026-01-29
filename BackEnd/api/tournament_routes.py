@@ -12,6 +12,7 @@ from BackEnd.db import (
 from BackEnd.constants import BOX_SCORE_KEYS
 from BackEnd.tournament.tournament_manager import TournamentManager
 from BackEnd.tournament.bracket_logic import update_bracket_from_results
+from BackEnd.tournament.bracket_engine import get_round_name
 from BackEnd.main import run_simulation
 from BackEnd.utils.shared import summarize_game_state
 from BackEnd.utils import stat_updater
@@ -261,7 +262,7 @@ def simulate_round(request: SimulateRequest):
         if not tournament_doc:
             raise HTTPException(status_code=404, detail="Tournament not found")
 
-        round_name = f"round{tournament_doc['current_round']}" if tournament_doc['current_round'] != 3 else "final"
+        round_name = get_round_name(tournament_doc["current_round"])
         matchups = tournament_doc["bracket"].get(round_name, [])
 
         _, user_team_oid = get_user_team_from_tournament(tournament_doc)
@@ -321,7 +322,7 @@ def save_result(request: TournamentResultRequest):
         raise HTTPException(status_code=404, detail="Tournament not found")
 
     round_num = tournament["current_round"]
-    round_key = "final" if round_num == 3 else f"round{round_num}"
+    round_key = get_round_name(round_num)
 
     winner_oid = _resolve_winner_to_oid(request.winner)
     if not winner_oid:
@@ -1024,7 +1025,7 @@ def sim_remaining(request: SimulateRequest):
             break
 
         round_num = tournament.get("current_round", 1)
-        round_key = "final" if round_num == 3 else f"round{round_num}"
+        round_key = get_round_name(round_num)
         print(f"[sim_remaining] Processing round {round_num} ({round_key})")
         matchups = tournament.get("bracket", {}).get(round_key, [])
         manager.tournament = tournament
