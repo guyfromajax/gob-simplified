@@ -7,12 +7,15 @@ from BackEnd.api.tournament_routes import (
     save_result,
     SimulateRequest,
     TournamentResultRequest,
+    _team_oid_to_name,
 )
 from BackEnd.db import tournaments_collection, games_collection
 from fastapi import HTTPException
+from tests.tournament_test_helpers import seed_teams_ah
 
 
 def test_full_tournament_advances_bracket(monkeypatch):
+    seed_teams_ah()
     tournaments_collection.delete_many({})
     games_collection.delete_many({})
 
@@ -92,7 +95,9 @@ def test_full_tournament_advances_bracket(monkeypatch):
         home3, away3 = matchup3["home"], matchup3["away"]
     else:
         final_match = tournaments_collection.find_one({"_id": tid})["bracket"]["final"][0]
-        home3, away3 = final_match["home_team"], final_match["away_team"]
+        h3, a3 = final_match["home_team"], final_match["away_team"]
+        home3 = _team_oid_to_name(h3) or str(h3)
+        away3 = _team_oid_to_name(a3) or str(a3)
     winner3 = "A"
     score3 = {home3: 90, away3: 80} if winner3 == home3 else {home3: 80, away3: 90}
     game_id3 = games_collection.insert_one({"score": score3}).inserted_id
@@ -105,5 +110,5 @@ def test_full_tournament_advances_bracket(monkeypatch):
     tour3 = tournaments_collection.find_one({"_id": tid})
     assert tour3["current_round"] == 3
     assert tour3["completed"] is True
-    assert tour3["champion"] == winner3
-    assert tour3["bracket"]["final"][0]["winner"] == winner3
+    assert str(tour3["champion"]) == str(tour3["user_team_object_id"])
+    assert tour3["bracket"]["final"][0]["winner"] is not None

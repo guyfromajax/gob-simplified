@@ -2,12 +2,14 @@ import pytest
 from bson import ObjectId
 
 from BackEnd.tournament.tournament_manager import TournamentManager
-from BackEnd.api.tournament_routes import save_result, TournamentResultRequest
-from BackEnd.db import tournaments_collection, games_collection
+from BackEnd.api.tournament_routes import save_result, TournamentResultRequest, _team_oid_to_name
+from BackEnd.db import tournaments_collection, games_collection, teams_collection
 from BackEnd.tournament.bracket_logic import update_bracket_from_results
+from tests.tournament_test_helpers import seed_teams_ah as _seed_teams_ah
 
 
 def test_update_bracket_uses_saved_results(monkeypatch):
+    _seed_teams_ah()
     tournaments_collection.delete_many({})
     games_collection.delete_many({})
 
@@ -18,16 +20,21 @@ def test_update_bracket_uses_saved_results(monkeypatch):
     )
     tournament = manager.create_tournament()
     tid = ObjectId(tournament["_id"])
+    user_oid = tournament.get("user_team_object_id")
 
     round1 = tournament["bracket"]["round1"]
     for idx, match in enumerate(round1):
-        if "A" in (match["home_team"], match["away_team"]):
+        h, a = str(match["home_team"]), str(match["away_team"])
+        if user_oid and user_oid in (h, a):
             user_index = idx
-            home = match["home_team"]
-            away = match["away_team"]
+            home_oid, away_oid = h, a
+            home_name = _team_oid_to_name(h) or h
+            away_name = _team_oid_to_name(a) or a
             break
+    else:
+        pytest.fail("User matchup not found")
 
-    user_summary = {"score": {home: 100, away: 90}}
+    user_summary = {"score": {home_name: 100, away_name: 90}}
     game_id = games_collection.insert_one(user_summary).inserted_id
 
     def fake_run_simulation(h, a):
@@ -67,6 +74,7 @@ def test_update_bracket_uses_saved_results(monkeypatch):
 
 
 def test_update_bracket_uses_matchups_when_results_empty():
+    _seed_teams_ah()
     tournaments_collection.delete_many({})
     games_collection.delete_many({})
 
@@ -78,9 +86,8 @@ def test_update_bracket_uses_matchups_when_results_empty():
     tournament = manager.create_tournament()
     tid = ObjectId(tournament["_id"])
 
-    # Populate winners directly in the bracket without any saved results
     for idx, match in enumerate(tournament["bracket"]["round1"]):
-        manager.save_game_result("round1", idx, ObjectId(), match["home_team"])
+        manager.save_game_result(1, idx, ObjectId(), str(match["home_team"]), None)
 
     tournaments_collection.update_one({"_id": tid}, {"$set": {"results": []}})
 

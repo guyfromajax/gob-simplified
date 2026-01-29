@@ -1,7 +1,7 @@
 # Tournament vs Franchise EOS Bracket Merge Plan
 
 **Date:** January 2025  
-**Status:** 📋 Planning  
+**Status:** ✅ Steps 1–3 done (bracket_engine, EOS refactor, Tournament refactor). Optional cleanup (Step 4) remaining.  
 **Goal:** Unify the two bespoke bracket/tournament engines (Tournament mode vs Franchise EOS) into a single shared implementation where possible.
 
 **Related:** `Tournament_Franchise_Unification_Plan.md` (broader mode unification). This doc focuses **only** on bracket init, advance, and save-result logic.

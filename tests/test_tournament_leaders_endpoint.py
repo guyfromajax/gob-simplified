@@ -1,12 +1,13 @@
-from BackEnd.tournament.tournament_manager import TournamentManager
 from bson import ObjectId
 
-from BackEnd.api.tournament_routes import get_tournament_leaders
 from BackEnd.tournament.tournament_manager import TournamentManager
+from BackEnd.api.tournament_routes import get_tournament_leaders
 from BackEnd.db import tournaments_collection
+from tests.tournament_test_helpers import seed_teams_ah
 
 
 def setup_function(fn):
+    seed_teams_ah()
     tournaments_collection.delete_many({})
 
 

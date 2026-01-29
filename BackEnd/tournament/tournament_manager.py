@@ -9,41 +9,65 @@ from BackEnd.db import (
     teams_collection,
 )
 from BackEnd.constants import BOX_SCORE_KEYS
+from BackEnd.tournament.bracket_engine import generate_bracket, save_game_result as engine_save_game_result, get_round_name
 
 logger = logging.getLogger(__name__)
 
+
+def _default_team_docs():
+    """Default 8 teams when none provided (e.g. tests)."""
+    names = [
+        "Bentley-Truman", "Four Corners", "Lancaster", "Little York",
+        "Morristown", "Ocean City", "South Lancaster", "Xavien",
+    ]
+    out = []
+    for n in names:
+        t = teams_collection.find_one({"name": n}, {"name": 1, "_id": 1})
+        if t:
+            out.append({"name": t["name"], "_id": t["_id"]})
+    return out[:8]
+
+
 class TournamentManager:
-    """Manage tournament creation and progression."""
+    """Manage tournament creation and progression.
+
+    Bracket and results use ObjectId strings for team IDs. Name resolution
+    happens at API/game boundaries (see Tournament_Execution_System.md).
+    """
 
     def __init__(self, user_team_id: str | None = None, *,
-                 tournaments_collection=None, team_ids=None) -> None:
+                 tournaments_collection=None, team_ids=None, team_docs=None) -> None:
         self.user_team_id = user_team_id
         self.tournaments_collection = default_tournaments_collection if tournaments_collection is None else tournaments_collection
-
-        self.team_ids = team_ids or [
-            "Bentley-Truman",
-            "Four Corners",
-            "Lancaster",
-            "Little York",
-            "Morristown",
-            "Ocean City",
-            "South Lancaster",
-            "Xavien",
-        ]
+        self.team_ids = team_ids
+        if team_docs:
+            self.team_docs = team_docs
+        elif team_ids and len(team_ids) >= 8:
+            self.team_docs = []
+            for name in team_ids[:8]:
+                t = teams_collection.find_one({"name": name}, {"name": 1, "_id": 1})
+                if t:
+                    self.team_docs.append({"name": t["name"], "_id": t["_id"]})
+            self.team_docs = self.team_docs[:8]
+        else:
+            self.team_docs = _default_team_docs()
         self.tournament_id: ObjectId | None = None
         self.tournament: dict | None = None
 
     def create_tournament(self):
-        teams = self.team_ids[:]
-        random.shuffle(teams)
-        seeds = {team_id: i + 1 for i, team_id in enumerate(teams)}
-        round1 = self._generate_first_round(seeds)
+        docs = list(self.team_docs)
+        if len(docs) < 8:
+            raise ValueError(f"Tournament requires 8 teams; got {len(docs)}.")
+        random.shuffle(docs)
+        seed_order = [str(t["_id"]) for t in docs]
+        names = [t["name"] for t in docs]
+        bracket = generate_bracket(seed_order)
 
         zero_stats = {key: 0 for key in BOX_SCORE_KEYS}
         zero_stats["Outlet_Score_List"] = []  # Outlet_Score_List is an array, not an integer
-        players_dict: dict[str, dict] = {}  # ✅ MIGRATION: Changed from player_stats to players_dict
+        players_dict: dict[str, dict] = {}
         players = players_collection.find(
-            {"team": {"$in": teams}},
+            {"team": {"$in": names}},
             {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1},
         )
         for p in players:
@@ -59,8 +83,6 @@ class TournamentManager:
             if p.get("team_id"):
                 team_id = str(p.get("team_id"))
             else:
-                # Fallback: resolve team name to team_id
-                from BackEnd.db import teams_collection
                 team_doc = teams_collection.find_one({"name": p.get("team", "")})
                 if team_doc:
                     team_id = str(team_doc.get("_id", ""))
@@ -91,17 +113,10 @@ class TournamentManager:
         scouting_data = populate_scouting_data(mode="tournament")
         playbook_settings = initialize_playbook_settings()
         
-        # ✅ FIX: Only initialize the 8 teams in the tournament (matches Franchise pattern)
-        # Franchise mode initializes only the 8 teams in self.teams, not all teams from database
         teams_obj = {}
-        
-        for team_name in teams:  # teams is the list of 8 team names in the tournament
-            # Resolve team name to team document and ObjectId
-            team_doc = teams_collection.find_one({"name": team_name})
-            if not team_doc:
-                continue  # Skip if team not found
-            
-            team_id = str(team_doc["_id"])
+        for t in docs:
+            team_id = str(t["_id"])
+            team_name = t["name"]
             # Use TeamManager static method to generate mode-specific team attributes
             team_attrs = TeamManager.init_team_attributes(mode="tournament")
             teams_obj[team_id] = {
@@ -138,23 +153,24 @@ class TournamentManager:
         # This matches Franchise mode pattern for consistent team ID resolution
         user_team_object_id = None
         if self.user_team_id:
-            from BackEnd.db import teams_collection
-            team_doc = teams_collection.find_one({"name": self.user_team_id})
-            if team_doc:
-                user_team_object_id = str(team_doc["_id"])
-            else:
-                logger.warning(f"⚠️ [TOURNAMENT] Could not resolve user_team_id '{self.user_team_id}' to ObjectId")
+            for t in docs:
+                if t.get("name") == self.user_team_id:
+                    user_team_object_id = str(t["_id"])
+                    break
+            if not user_team_object_id:
+                team_doc = teams_collection.find_one({"name": self.user_team_id})
+                if team_doc:
+                    user_team_object_id = str(team_doc["_id"])
+                else:
+                    logger.warning(f"⚠️ [TOURNAMENT] Could not resolve user_team_id '{self.user_team_id}' to ObjectId")
         
         tournament_doc = {
             "user_team_id": self.user_team_id,
-            "user_team_object_id": user_team_object_id,  # ✅ MIGRATION: Store ObjectId for authoritative team resolution
+            "user_team_object_id": user_team_object_id,
             "created_at": datetime.utcnow(),
-            "bracket": {
-                "round1": round1,
-                "round2": [],
-                "final": []
-            },
+            "bracket": bracket,
             "current_round": 1,
+            "results": [],
             "stats": {
                 "top_10_points": [],
                 "top_10_rebounds": [],
@@ -162,97 +178,44 @@ class TournamentManager:
                 "top_10_blocks": [],
                 "top_10_steals": []
             },
-            "players": players_dict,  # ✅ MIGRATION: Changed from player_stats to players (aligns with Franchise)
-            "teams": teams_obj,  # Initialize all teams upfront
+            "players": players_dict,
+            "teams": teams_obj,
             "applied_games": [],
-            "completed": False
+            "completed": False,
         }
         self.tournament_id = self.tournaments_collection.insert_one(tournament_doc).inserted_id
         self.tournament = tournament_doc
         self.tournament["_id"] = str(self.tournament_id)  
         return self.tournament
 
-    def _generate_first_round(self, seeds):
-        sorted_teams = sorted(seeds.items(), key=lambda x: x[1])
-        matchups = [
-            (sorted_teams[0][0], sorted_teams[7][0]),
-            (sorted_teams[3][0], sorted_teams[4][0]),
-            (sorted_teams[1][0], sorted_teams[6][0]),
-            (sorted_teams[2][0], sorted_teams[5][0])
-        ]
-        return [
-            {
-                "home_team": home,
-                "away_team": away,
-                "game_id": None,
-                "winner": None,
-                "score": {},
-            }
-            for home, away in matchups
-        ]
-
-    def save_game_result(self, round_name, matchup_index, game_id, winner_id, score=None):
-        match = self.tournament["bracket"][round_name][matchup_index]
-        match["game_id"] = game_id
-        match["winner"] = winner_id
-        if score is not None:
-            match["score"] = score
+    def save_game_result(self, round_num: int, matchup_index: int, game_id, winner_id: str, score=None):
+        """Update bracket with game result. winner_id must be ObjectId string."""
+        bracket = self.tournament["bracket"]
+        engine_save_game_result(bracket, round_num, matchup_index, game_id, winner_id, score)
+        round_key = get_round_name(round_num)
         update_fields = {
-            f"bracket.{round_name}.{matchup_index}.game_id": game_id,
-            f"bracket.{round_name}.{matchup_index}.winner": winner_id,
+            f"bracket.{round_key}.{matchup_index}.game_id": game_id,
+            f"bracket.{round_key}.{matchup_index}.winner": winner_id,
         }
         if score is not None:
-            update_fields[f"bracket.{round_name}.{matchup_index}.score"] = score
+            update_fields[f"bracket.{round_key}.{matchup_index}.score"] = score
         self.tournaments_collection.update_one(
             {"_id": self.tournament_id},
             {"$set": update_fields},
         )
 
     def advance_round(self):
-        current_round = self.tournament["current_round"]
-        if current_round == 1:
-            r1_winners = [m["winner"] for m in self.tournament["bracket"]["round1"]]
-            r2 = [
-                {
-                    "home_team": r1_winners[0],
-                    "away_team": r1_winners[1],
-                    "game_id": None,
-                    "winner": None,
-                    "score": {},
-                },
-                {
-                    "home_team": r1_winners[2],
-                    "away_team": r1_winners[3],
-                    "game_id": None,
-                    "winner": None,
-                    "score": {},
-                },
-            ]
-            self.tournament["bracket"]["round2"] = r2
-            self.tournament["current_round"] = 2
-        elif current_round == 2:
-            r2_winners = [m["winner"] for m in self.tournament["bracket"]["round2"]]
-            final = [
-                {
-                    "home_team": r2_winners[0],
-                    "away_team": r2_winners[1],
-                    "game_id": None,
-                    "winner": None,
-                    "score": {},
-                }
-            ]
-            self.tournament["bracket"]["final"] = final
-            self.tournament["current_round"] = 3
-        elif current_round == 3:
+        """Advance bracket from current-round matchup winners. Uses bracket_engine. For unit tests / legacy callers."""
+        from BackEnd.tournament.bracket_engine import advance_bracket
+        cr = self.tournament.get("current_round", 1)
+        bracket = self.tournament["bracket"]
+        bracket, next_r, completed, champion = advance_bracket(bracket, cr, winners_from_matchups=True)
+        self.tournament["bracket"] = bracket
+        self.tournament["current_round"] = next_r
+        upd = {"bracket": bracket, "current_round": next_r}
+        if completed and champion is not None:
             self.tournament["completed"] = True
-
-        self.tournaments_collection.update_one(
-            {"_id": self.tournament_id},
-            {
-                "$set": {
-                    "bracket": self.tournament["bracket"],
-                    "current_round": self.tournament["current_round"],
-                    "completed": self.tournament["completed"],
-                }
-            },
-        )
+            self.tournament["champion"] = champion
+            upd["completed"] = True
+            upd["champion"] = champion
+        self.tournaments_collection.update_one({"_id": self.tournament_id}, {"$set": upd})
