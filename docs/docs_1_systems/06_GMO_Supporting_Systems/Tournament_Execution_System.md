@@ -71,6 +71,11 @@ The engine does not touch the DB. Callers read bracket/state → run engine → 
 3. **Advance:** After each result (or batch), call `advance_bracket(...)`. If the current round is complete, engine fills the next round and updates `current_round`. If final is complete, `completed=True`, `champion=winner`. Persist.
 4. **Next game:** Determine user’s matchup from bracket + `current_round`; return it for play. Repeat until `completed`.
 
+### EOS week transition (15 → 16 → 17)
+
+- **`complete_week`** allows weeks 15–17 when `eos_tournament_active` and `eos_tournament` exist. No schedule lookup; user’s game only. Save result → advance from **in-memory** bracket (no reload). When the round advances, set `franchise.week = 14 + new_round` (15→16 for semis, 16→17 for final); otherwise keep `week` unchanged.
+- **`/franchise/sim-rest-of-tournament`** sims incomplete matchups in the current round, saves results, then advances. When the round advances, it also sets `franchise.week = 14 + new_round` in the same `$set` as `eos_tournament`.
+
 ---
 
 ## Tests
