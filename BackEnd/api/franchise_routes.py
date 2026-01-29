@@ -1919,10 +1919,7 @@ def get_leaders(
 ):
     """Return the top players for a given stat within a franchise.
 
-    Players are sourced from the franchise document to avoid cross-collection
-    joins. For small rosters the sorting is performed in-memory. When the
-    number of players grows large an aggregation pipeline is used so MongoDB
-    can leverage indexes on the ``players`` subdocument.
+    ✅ FPD: Reads from franchise_players_data (season/career stats), not franchise.players.
     """
     import time
     start_time = time.time()
@@ -1932,39 +1929,30 @@ def get_leaders(
     except Exception:
         fid = franchise_id
 
-    # ✅ PERFORMANCE: Skip initial find_one for franchise mode - go straight to aggregation
-    # Franchise mode always has 96 players (12 per team × 8 teams), so we don't need to count first
-    # Aggregation pipeline is faster because MongoDB sorts internally and only projects needed fields
-    # This eliminates the wasteful ~1.5s load of the entire players object (300KB+) just to count
-    
-    # ✅ SS&S: Read stats directly from players.{pid}.season.{stat} (no totals wrapper)
-    # ✅ FIX: Map TPM to 3PTM for aggregation pipeline
+    # ✅ FIX: Map TPM to 3PTM for aggregation
     stat_field = stat
     if stat == "TPM":
         stat_field = "3PTM"
     elif stat == "TPA":
         stat_field = "3PTA"
-    
-    # ✅ PERFORMANCE: Use MongoDB aggregation pipeline for large datasets
+
+    # ✅ FPD: Aggregate from franchise_players_data (season/career live here)
     aggregation_start = time.time()
     pipeline = [
-        {"$match": {"_id": fid}},
-        {"$project": {"players": {"$objectToArray": "$players"}}},
-        {"$unwind": "$players"},
+        {"$match": {"franchise_id": str(franchise_id)}},
         {
             "$project": {
-                "player_id": "$players.k",
-                "meta": "$players.v.meta",
-                "value": f"$players.v.{scope}.{stat_field}",  # Direct stat access, no totals wrapper
+                "player_id": 1,
+                "meta": 1,
+                "value": {"$ifNull": [f"${scope}.{stat_field}", 0]},
             }
         },
         {"$sort": {"value": -1}},
         {"$limit": limit},
     ]
-
-    agg = list(db.franchises.aggregate(pipeline))
+    agg = list(franchise_players_data_collection.aggregate(pipeline))
     aggregation_time = time.time() - aggregation_start
-    logger.info(f"⏱️ [PERF] get_leaders('{stat}') Aggregation pipeline: {aggregation_time:.3f}s")
+    logger.info(f"⏱️ [PERF] get_leaders('{stat}') Aggregation pipeline (FPD): {aggregation_time:.3f}s")
     results: list[dict[str, Any]] = []
     for p in agg:
         meta = p.get("meta", {})
