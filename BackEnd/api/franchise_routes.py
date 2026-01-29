@@ -88,6 +88,33 @@ def _normalize_team_id_to_string(team_id):
     return doc["team_id"] if doc else None
 
 
+def _set_team_attribute_changes_on_game(game_id_str: str, tac: dict) -> bool:
+    """
+    $set team_attribute_changes on the game doc. Init-game stores _id as string;
+    simulate-quarter may use ObjectId. Try string first, then ObjectId. Return True if matched.
+    """
+    r = db.games.update_one(
+        {"_id": game_id_str},
+        {"$set": {"team_attribute_changes": tac}}
+    )
+    if r.matched_count > 0:
+        logger.warning(f"✅ [COMPLETE_WEEK] team_attribute_changes $set on game_id={game_id_str!r} (string _id) (keys={list(tac.keys())})")
+        return True
+    try:
+        oid = ObjectId(game_id_str)
+        r2 = db.games.update_one(
+            {"_id": oid},
+            {"$set": {"team_attribute_changes": tac}}
+        )
+        if r2.matched_count > 0:
+            logger.warning(f"✅ [COMPLETE_WEEK] team_attribute_changes $set on game_id={game_id_str!r} (ObjectId _id) (keys={list(tac.keys())})")
+            return True
+    except Exception:
+        pass
+    logger.error(f"❌ [COMPLETE_WEEK] team_attribute_changes $set matched 0 docs for game_id={game_id_str!r} (tried string and ObjectId)")
+    return False
+
+
 def update_team_attributes_after_game(
     game_id: ObjectId,
     franchise_id: ObjectId,
@@ -115,11 +142,13 @@ def update_team_attributes_after_game(
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Winner/Loser - winner_id={winner_id} (type: {type(winner_id)}), loser_id={loser_id} (type: {type(loser_id)})")
     import random
     
-    # Load game document to get stats
+    # Load game document to get stats. Init-game uses string _id; try both.
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Loading game document")
     game_doc = db.games.find_one({"_id": game_id})
+    if not game_doc and isinstance(game_id, ObjectId):
+        game_doc = db.games.find_one({"_id": str(game_id)})
     if not game_doc:
-        logger.error(f"❌ [UPDATE-TEAM-ATTRS] Game {game_id} not found")
+        logger.error(f"❌ [UPDATE-TEAM-ATTRS] Game {game_id} not found (tried ObjectId and string)")
         return {}
     
     # Get box_score and teams object
@@ -1204,13 +1233,9 @@ def complete_week(req: CompleteWeekRequest):
             logger.info(f"🔍 [COMPLETE_WEEK] Attribute changes keys: {list(attribute_changes.keys()) if attribute_changes else 'None'}")
             
             # Store attribute changes in game document for box score display
-            # ✅ FIX: Always $set (even when empty) so field exists for box score; hide section in UI when empty
+            # ✅ FIX: Always $set (even when empty). Init-game uses string _id; try string first, then ObjectId.
             tac = attribute_changes if attribute_changes else {}
-            db.games.update_one(
-                {"_id": ObjectId(user_game_id_final)},
-                {"$set": {"team_attribute_changes": tac}}
-            )
-            logger.warning(f"✅ [COMPLETE_WEEK] team_attribute_changes $set on game_id={user_game_id_final} (keys={list(tac.keys())})")
+            _set_team_attribute_changes_on_game(user_game_id_final, tac)
         except Exception as e:
             logger.error(f"❌ [COMPLETE_WEEK] Error updating team attributes: {e}")
             import traceback
@@ -1271,11 +1296,7 @@ def complete_week(req: CompleteWeekRequest):
                         loser_score=loser_score
                     )
                     tac = attribute_changes if attribute_changes else {}
-                    db.games.update_one(
-                        {"_id": ObjectId(user_game_id)},
-                        {"$set": {"team_attribute_changes": tac}}
-                    )
-                    logger.warning(f"✅ [COMPLETE_WEEK] team_attribute_changes $set (legacy) game_id={user_game_id} (keys={list(tac.keys())})")
+                    _set_team_attribute_changes_on_game(user_game_id, tac)
                 except Exception as e:
                     logger.error(f"❌ [COMPLETE_WEEK] Error updating team attributes (legacy path): {e}")
                     import traceback
