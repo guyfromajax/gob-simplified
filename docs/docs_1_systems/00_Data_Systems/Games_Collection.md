@@ -115,6 +115,11 @@
   )
   ```
 
+### Game document `_id` format and updates
+
+- **`_id` format:** Init-game creates game docs with `_id` as a **string** (24-char hex from `generate_game_id()`). Other flows (e.g. simulate-quarter, EOS) may use ObjectId. When **updating** a game doc, try **string first**, then **ObjectId** if the update matches 0 docs. Pattern: `_set_team_attribute_changes_on_game()` in `BackEnd/api/franchise_routes.py`.
+- **Team keys for match:** Any game-doc structure keyed by team (e.g. `team_attribute_changes`) must use **team_id strings** ("XAVIEN", "LANCASTER") so they match `home_team_id` / `away_team_id`. Do **not** use ObjectId strings as keys — consumers (e.g. box score) look up by team_id and will miss the data.
+
 ## System Flow
 
 1. **Game Initialization**: Game document created with `home_team_id` and `away_team_id` (team_id strings)

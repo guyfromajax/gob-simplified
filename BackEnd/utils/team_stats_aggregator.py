@@ -17,7 +17,8 @@ def aggregate_team_stats_from_players(
     collection_type: str = 'tournament',
     logger=None,
     tournament_bracket: Dict[str, Any] | None = None,  # ✅ FIX: Optional bracket for tournament-specific W/L and PF/PA
-    franchise_results: Dict[str, Any] | None = None  # ✅ FIX: Optional franchise results for franchise-specific W/L and PF/PA
+    franchise_results: Dict[str, Any] | None = None,  # ✅ FIX: Optional franchise results for franchise-specific W/L and PF/PA
+    franchise_team_rosters: Dict[str, List[str]] | None = None,  # team_id_str -> [player_id, ...]; when set, use instead of meta.team_id
 ) -> List[Dict[str, Any]]:
     """
     Aggregates player stats into team stats.
@@ -53,92 +54,98 @@ def aggregate_team_stats_from_players(
             "DEF_A": 0, "DEF_S": 0, "SCR_A": 0, "SCR_S": 0
         }
     
-    # Aggregate stats from players object
-    players_with_stats = 0
-    players_without_team_id = 0
-    players_without_stats = 0
-    players_with_empty_stats = 0
-    
-    for pid, pdata in players.items():
-        meta = pdata.get("meta", {})
-        team_id = meta.get("team_id")
-        if not team_id:
-            players_without_team_id += 1
-            if logger:
-                logger.warning(f"⚠️ [{collection_type.upper()}_TEAM_STATS] Player {pid} missing team_id in meta: {meta}")
-            continue
-        
-        team_id_str = str(team_id)
-        season_stats = pdata.get("season", {})
-        if not season_stats:
-            players_without_stats += 1
-            continue
-        
-        # Tournament mode: Include players with empty stats (zeros) - they still count for team aggregation
-        # Empty stats object means player hasn't played yet, but they're still on the roster
-        if collection_type == 'tournament' and len(season_stats) == 0:
-            players_with_empty_stats += 1
-            # Continue to next player - empty stats don't contribute to team totals
-            continue
-        
-        # ✅ SS&S: player meta.team_id should be ObjectId string (matches tournament.teams/franchise_teams keys)
-        # If it's not in the map, try to resolve it (might be team name or different format)
-        if team_id_str not in team_stats_map:
-            # Try to resolve team_id_str to ObjectId string
-            resolved_team_id = None
-            try:
-                # Try as ObjectId first
-                obj_id = ObjectId(team_id_str)
-                resolved_team_id = str(obj_id)
-            except Exception:
-                # Try as team name
-                team_doc = teams_collection.find_one({"name": team_id_str}, {"_id": 1})
-                if team_doc:
-                    resolved_team_id = str(team_doc["_id"])
-                else:
-                    # Try case-insensitive
-                    team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_id_str}$", "$options": "i"}}, {"_id": 1})
+    # Franchise mode: aggregate from FTD.players roster lists when provided
+    if collection_type == 'franchise' and franchise_team_rosters:
+        for team_id_str, pids in franchise_team_rosters.items():
+            if team_id_str not in team_stats_map:
+                continue
+            for pid in pids:
+                pid_str = str(pid)
+                pdata = players.get(pid_str)
+                if not pdata:
+                    continue
+                season_stats = pdata.get("season", {})
+                if not season_stats:
+                    continue
+                for stat, val in season_stats.items():
+                    if isinstance(val, (int, float)) and stat in team_stats_map[team_id_str]:
+                        team_stats_map[team_id_str][stat] += val
+    else:
+        # Aggregate stats from players object (by meta.team_id)
+        players_with_stats = 0
+        players_without_team_id = 0
+        players_without_stats = 0
+        players_with_empty_stats = 0
+
+        for pid, pdata in players.items():
+            meta = pdata.get("meta", {})
+            team_id = meta.get("team_id")
+            if not team_id:
+                players_without_team_id += 1
+                if logger:
+                    logger.warning(f"⚠️ [{collection_type.upper()}_TEAM_STATS] Player {pid} missing team_id in meta: {meta}")
+                continue
+
+            team_id_str = str(team_id)
+            season_stats = pdata.get("season", {})
+            if not season_stats:
+                players_without_stats += 1
+                continue
+
+            # Tournament mode: Include players with empty stats (zeros) - they still count for team aggregation
+            if collection_type == 'tournament' and len(season_stats) == 0:
+                players_with_empty_stats += 1
+                continue
+
+            # Resolve team_id_str to match team_stats_map keys if needed
+            if team_id_str not in team_stats_map:
+                resolved_team_id = None
+                try:
+                    obj_id = ObjectId(team_id_str)
+                    resolved_team_id = str(obj_id)
+                except Exception:
+                    team_doc = teams_collection.find_one({"name": team_id_str}, {"_id": 1})
                     if team_doc:
                         resolved_team_id = str(team_doc["_id"])
-            
-            if resolved_team_id and resolved_team_id in team_stats_map:
-                team_id_str = resolved_team_id
-            elif resolved_team_id:
-                # Team not in tournament/franchise, but player has stats - initialize it
-                team_stats_map[resolved_team_id] = {
+                    else:
+                        team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_id_str}$", "$options": "i"}}, {"_id": 1})
+                        if team_doc:
+                            resolved_team_id = str(team_doc["_id"])
+
+                if resolved_team_id and resolved_team_id in team_stats_map:
+                    team_id_str = resolved_team_id
+                elif resolved_team_id:
+                    team_stats_map[resolved_team_id] = {
+                        "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
+                        "FGM": 0, "FGA": 0, "3PTM": 0, "3PTA": 0, "FTM": 0, "FTA": 0,
+                        "DREB": 0, "OREB": 0, "TREB": 0,
+                        "TO": 0, "F": 0,
+                        "DEF_A": 0, "DEF_S": 0, "SCR_A": 0, "SCR_S": 0
+                    }
+                    team_id_str = resolved_team_id
+                else:
+                    if logger:
+                        log_func(f"⚠️ [{collection_type.upper()}_TEAM_STATS] Cannot resolve team_id '{team_id_str}' for player {pid}, skipping")
+                    continue
+
+            if team_id_str not in team_stats_map:
+                team_stats_map[team_id_str] = {
                     "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
                     "FGM": 0, "FGA": 0, "3PTM": 0, "3PTA": 0, "FTM": 0, "FTA": 0,
                     "DREB": 0, "OREB": 0, "TREB": 0,
                     "TO": 0, "F": 0,
                     "DEF_A": 0, "DEF_S": 0, "SCR_A": 0, "SCR_S": 0
                 }
-                team_id_str = resolved_team_id
-            else:
-                # Can't resolve, skip this player
-                if logger:
-                    log_func(f"⚠️ [{collection_type.upper()}_TEAM_STATS] Cannot resolve team_id '{team_id_str}' for player {pid}, skipping")
-                continue
-        
-        if team_id_str not in team_stats_map:
-            team_stats_map[team_id_str] = {
-                "PTS": 0, "REB": 0, "AST": 0, "STL": 0, "BLK": 0,
-                "FGM": 0, "FGA": 0, "3PTM": 0, "3PTA": 0, "FTM": 0, "FTA": 0,
-                "DREB": 0, "OREB": 0, "TREB": 0,
-                "TO": 0, "F": 0,
-                "DEF_A": 0, "DEF_S": 0, "SCR_A": 0, "SCR_S": 0
-            }
-        
-        players_with_stats += 1
-        # Sum all stats for this team (use 3PTM/3PTA directly, no mapping needed)
-        for stat, val in season_stats.items():
-            if isinstance(val, (int, float)):
-                if stat in team_stats_map[team_id_str]:
+
+            players_with_stats += 1
+            for stat, val in season_stats.items():
+                if isinstance(val, (int, float)) and stat in team_stats_map[team_id_str]:
                     team_stats_map[team_id_str][stat] += val
-    
-    if logger:
-        log_func(f"🔍 [{collection_type.upper()}_TEAM_STATS] Processed {players_with_stats} players with stats, "
-                f"{players_without_team_id} without team_id, {players_without_stats} without stats, "
-                f"{players_with_empty_stats} with empty stats")
+
+        if logger:
+            log_func(f"🔍 [{collection_type.upper()}_TEAM_STATS] Processed {players_with_stats} players with stats, "
+                    f"{players_without_team_id} without team_id, {players_without_stats} without stats, "
+                    f"{players_with_empty_stats} with empty stats")
     
     # ✅ FIX: Calculate W/L and PF/PA from tournament bracket (tournament-specific) instead of global teams collection
     # This prevents stats from accumulating across multiple tournaments
