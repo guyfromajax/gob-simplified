@@ -58,12 +58,16 @@ Standings (and thus seeds) are computed from **`franchise.results`** (W/L, PF, P
 - **`complete_week`** allows weeks 15–17 when `eos_tournament_active` and `eos_tournament` exist. “Week games” come from the **bracket** (current round), not the schedule. Same flow as regular season: user’s game first, then **sim the other matchups** in that round, save each to the bracket via `save_tournament_game_result`, then advance. When the round advances, set `franchise.week = 14 + new_round`; otherwise keep `week` unchanged.
 - **`/franchise/sim-rest-of-tournament`** sims incomplete matchups, saves to bracket, advances. When the round advances, it also sets `franchise.week = 14 + new_round` in the same `$set` as `eos_tournament`.
 
+### 5. User eliminated (EOS)
+
+When the user **loses** an EOS game, set `training_status.training_disabled_for_eos = true`. Training is disabled for all remaining EOS weeks; `run-training` returns 400 when that flag is set and `week >= 15`. The FCC shows **“Sim Rest Of Tournament”** when there are rounds remaining (same pattern as Tournament mode), or **“Finish Current Season”** when the tournament is complete. `command-center/data` returns `user_eliminated`, `offer_sim_rest`, and `training_disabled_for_eos`.
+
 ## Files Touched
 
 | File | Change |
 |------|--------|
 | `BackEnd/tournament/eos_tournament.py` | `calculate_standings(..., team_ids=None)`; `initialize_eos_tournament(..., team_ids=None)`; `generate_bracket` guard for `len(seeds) < 8` |
-| `BackEnd/api/franchise_routes.py` | Week 14: FTD team IDs, `franchise_doc["results"] = existing_results`, EOS init. Weeks 15–17: allow when EOS active, `week_games = []`; save result → advance (no reload), set `week` on advance; `sim-rest-of-tournament` sets `week` when advancing |
+| `BackEnd/api/franchise_routes.py` | Week 14: FTD team IDs, `franchise_doc["results"] = existing_results`, EOS init. Weeks 15–17: allow when EOS active, week_games from bracket; sim other matchups, save result → advance (no reload), set `week` on advance; on user loss set `training_disabled_for_eos`; `sim-rest-of-tournament` sets `week` when advancing. `command-center/data`: `user_eliminated`, `offer_sim_rest`, `training_disabled_for_eos`. `run-training`: 400 when `training_disabled_for_eos` and week ≥ 15. |
 
 ## Verification
 

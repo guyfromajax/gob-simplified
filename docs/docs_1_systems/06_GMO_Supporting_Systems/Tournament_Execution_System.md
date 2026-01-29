@@ -76,6 +76,16 @@ The engine does not touch the DB. Callers read bracket/state → run engine → 
 - **`complete_week`** allows weeks 15–17 when `eos_tournament_active` and `eos_tournament` exist. “Week games” come from the **bracket** (current round), not the schedule. Same flow as regular season: user’s game first, then **sim the other matchups** in that round, save each to the bracket via `save_tournament_game_result`, then advance. When the round advances, set `franchise.week = 14 + new_round`; otherwise keep `week` unchanged.
 - **`/franchise/sim-rest-of-tournament`** sims incomplete matchups in the current round, saves results, then advances. When the round advances, it also sets `franchise.week = 14 + new_round` in the same `$set` as `eos_tournament`.
 
+### User eliminated (EOS)
+
+When the user **loses** an EOS game (quarters, semis, or final):
+
+1. **Training disabled:** Set `training_status.training_disabled_for_eos = true` on the franchise. Training is disabled for all remaining EOS weeks. `POST /franchise/run-training` returns 400 when that flag is set and `week >= 15`. The FCC never shows “Run Training” when eliminated; it shows **“Sim Rest Of Tournament”** or **“Finish Current Season”**.
+2. **Sim Rest Of Tournament:** If there are rounds remaining (1 or 2), the UI shows a **“Sim Rest Of Tournament”** button (same pattern as Tournament mode “Sim Remaining”). Clicking it calls `POST /franchise/sim-rest-of-tournament` to sim remaining games and advance until the tournament is complete.
+3. **Finish Season:** When the tournament is complete (`eos_tournament.completed` and `week >= 17`), the UI shows **“Finish Current Season”** instead.
+
+`GET /franchise/command-center/data` returns `user_eliminated`, `offer_sim_rest`, and `training_disabled_for_eos` so the frontend can drive the Play button and hide training.
+
 ---
 
 ## Tests
