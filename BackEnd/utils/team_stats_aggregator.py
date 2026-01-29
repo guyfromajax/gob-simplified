@@ -314,9 +314,9 @@ def aggregate_team_stats_from_players(
         if logger:
             log_func(f"🔍 [{collection_type.upper()}_TEAM_STATS] Team {team_name}: "
                     f"PTS={stats.get('PTS')}, REB={stats.get('REB')}, AST={stats.get('AST')}")
-        
-        output.append({"team": team_name, "stats": stats})
-    
+
+        output.append({"team": team_name, "team_id": team_id_str, "stats": stats})
+
     return output
 
 

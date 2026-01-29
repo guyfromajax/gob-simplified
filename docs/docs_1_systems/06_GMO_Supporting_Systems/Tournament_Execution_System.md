@@ -103,3 +103,12 @@ When the user **loses** an EOS game (quarters, semis, or final):
 - **Merge plan:** `docs/To Do/tournament_eos_bracket_merge_plan.md` — full refactor plan (engine, EOS swap, Tournament ObjectIds).
 - **EOS:** `eos_tournament.initialize_eos_tournament` (standings → seeds → `bracket_engine.generate_bracket`), `save_tournament_game_result` → `bracket_engine.save_game_result` + results append, `advance_tournament_round` → `bracket_engine.advance_bracket` (winners from matchups). **Refactor complete.** Caller sets `franchise_doc["results"] = existing_results` (including week 14) before init so seeding uses full results.
 - **Tournament init:** `TournamentManager.create_tournament` uses `bracket_engine.generate_bracket(seed_order)` with ObjectId strings. `bracket_logic.update_bracket_from_results` uses `advance_bracket` (results or matchups). Save-result and sim-round resolve winner/team names ↔ ObjectIds at API edges; `_bracket_for_aggregator` converts bracket to name-based for team-stats aggregator.
+
+### Tournament display (frontend)
+
+Tournament UI follows the Franchise pattern: **IDs in API**, **client-side resolution** for display.
+
+- **`teamIdNameMap`:** Built from `/tournament/team-stats` (each team has `team_id`, `team`). Cleared and repopulated when team-stats load; used for schedule, bracket, and scouting.
+- **Schedule tab:** Resolve `home_team` / `away_team` (ObjectIds) → names via `teamIdNameMap` for labels and box-score params. Roster links use `team_id` + `team_name`.
+- **Bracket tab:** Same resolution for labels and `getLogo(teamName)`. Score lookup uses names (results store name-keyed scores).
+- **Play vs Sim Remaining:** User matchup detection uses `user_team_object_id` vs `match.home_team` / `match.away_team` (all IDs). Scouting upcoming-opponent logic uses `userTeamId` and resolves opponent ID → name for display and API `team_name`.
