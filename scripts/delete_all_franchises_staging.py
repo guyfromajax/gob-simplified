@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-Delete All Franchises from gob-staging
+Delete All Franchises and Franchise Team Data from gob-staging
 
-⚠️  WARNING: This will delete ALL franchise documents from the gob-staging database!
-This is a destructive operation and cannot be undone.
+⚠️  WARNING: This will delete ALL documents from:
+  - franchises
+  - franchise_team_data
+in the gob-staging database. This is a destructive operation and cannot be undone.
 
-Use this to start with a fresh slate before implementing FTD collection.
+Use this to start with a fresh slate (e.g. before re-running FTD migration).
 """
 
 import os
@@ -33,22 +35,30 @@ def delete_with_mongosh():
         # Remove credentials for security (mongosh will prompt if needed)
         connection_string = f"mongodb+srv://{cluster}/{db_name}"
         
-        # MongoDB shell command to delete all franchises
+        # MongoDB shell command to delete franchises and franchise_team_data
         js_command = f"""
         use('{db_name}');
-        const count = db.franchises.countDocuments({{}});
+        let count = db.franchises.countDocuments({{}});
         print('📈 Current franchises count: ' + count + ' documents');
         if (count > 0) {{
-            print('🗑️  Deleting all franchise documents...');
             const result = db.franchises.deleteMany({{}});
             print('✅ Deleted ' + result.deletedCount + ' franchise documents');
-            const remaining = db.franchises.countDocuments({{}});
-            print('📊 Final franchises count: ' + remaining + ' documents');
-            if (remaining === 0) {{
-                print('✅ Success! All franchise documents deleted from gob-staging');
-            }}
         }} else {{
-            print('✅ Franchises collection is already empty.');
+            print('✅ Franchises collection already empty.');
+        }}
+        count = db.franchise_team_data.countDocuments({{}});
+        print('📈 Current franchise_team_data count: ' + count + ' documents');
+        if (count > 0) {{
+            const result = db.franchise_team_data.deleteMany({{}});
+            print('✅ Deleted ' + result.deletedCount + ' franchise_team_data documents');
+        }} else {{
+            print('✅ franchise_team_data collection already empty.');
+        }}
+        const fRem = db.franchises.countDocuments({{}});
+        const ftdRem = db.franchise_team_data.countDocuments({{}});
+        print('📊 Final: franchises=' + fRem + ', franchise_team_data=' + ftdRem);
+        if (fRem === 0 && ftdRem === 0) {{
+            print('✅ Success! Both collections empty in gob-staging');
         }}
         """
         
@@ -73,7 +83,7 @@ def delete_with_mongosh():
 
 # Try Python approach first
 def delete_with_python():
-    """Use pymongo to delete all franchises."""
+    """Use pymongo to delete all franchises and all franchise_team_data."""
     try:
         # Add BackEnd to path so we can import db module
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -92,40 +102,47 @@ def delete_with_python():
         print()
         
         franchises_collection = db["franchises"]
+        ftd_collection = db["franchise_team_data"]
         
         # Count current documents
-        count = franchises_collection.count_documents({})
-        print(f"📈 Current franchises count: {count} documents")
+        franchises_count = franchises_collection.count_documents({})
+        ftd_count = ftd_collection.count_documents({})
+        print(f"📈 Current franchises count: {franchises_count} documents")
+        print(f"📈 Current franchise_team_data count: {ftd_count} documents")
         print()
         
-        if count == 0:
-            print("✅ Franchises collection is already empty. Nothing to delete.")
+        if franchises_count == 0 and ftd_count == 0:
+            print("✅ Both collections already empty. Nothing to delete.")
             return True
         
-        print(f"⚠️  WARNING: This will delete ALL {count} franchise documents from gob-staging!")
+        print("⚠️  WARNING: This will delete ALL documents from both collections in gob-staging!")
         print("   This operation cannot be undone.")
         print()
+        
+        # Delete franchises
         print("🗑️  Deleting all franchise documents...")
+        result_f = franchises_collection.delete_many({})
+        print(f"   ✅ Deleted {result_f.deleted_count} franchise documents")
         
-        # Delete all documents
-        result = franchises_collection.delete_many({})
-        deleted_count = result.deleted_count
-        
-        print(f"   ✅ Deleted {deleted_count} franchise documents")
+        # Delete franchise_team_data
+        print("🗑️  Deleting all franchise_team_data documents...")
+        result_ftd = ftd_collection.delete_many({})
+        print(f"   ✅ Deleted {result_ftd.deleted_count} franchise_team_data documents")
         print()
         
-        # Verify deletion
-        remaining_count = franchises_collection.count_documents({})
-        print(f"📊 Final franchises count: {remaining_count} documents")
+        # Verify
+        remaining_f = franchises_collection.count_documents({})
+        remaining_ftd = ftd_collection.count_documents({})
+        print(f"📊 Final: franchises={remaining_f}, franchise_team_data={remaining_ftd}")
         
-        if remaining_count == 0:
+        if remaining_f == 0 and remaining_ftd == 0:
             print()
-            print("✅ Success! All franchise documents deleted from gob-staging")
-            print("   Collection is now empty and ready for fresh data")
+            print("✅ Success! Both collections empty in gob-staging")
+            print("   Ready for fresh data")
             return True
         else:
             print()
-            print(f"⚠️  Warning: {remaining_count} documents still remain (unexpected)")
+            print(f"⚠️  Warning: franchises={remaining_f}, franchise_team_data={remaining_ftd} still remain (unexpected)")
             return False
         
     except ImportError:
@@ -173,5 +190,5 @@ if __name__ == "__main__":
         mongo_uri = os.getenv("MONGO_URI", "your-mongo-uri")
         print("\n❌ Both methods failed.")
         print("\nAlternative: Run this MongoDB shell command manually:")
-        print(f"  mongosh '{mongo_uri}' --eval \"use('gob-staging'); db.franchises.deleteMany({{}});\"")
+        print(f"  mongosh '{mongo_uri}' --eval \"use('gob-staging'); db.franchises.deleteMany({{}}); db.franchise_team_data.deleteMany({{}});\"")
         sys.exit(1)

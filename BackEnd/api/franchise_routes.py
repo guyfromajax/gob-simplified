@@ -2024,6 +2024,13 @@ def team_stats(franchise_id: str):
     players = franchise_doc.get("players", {})
     franchise_results = franchise_doc.get("results", {})
     team_list = _ftd_team_list_for_franchise(fid)
+    # Build team_id -> [player_id, ...] from FTD.players for aggregation (prefer over meta.team_id)
+    ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "players": 1}))
+    franchise_team_rosters = {}
+    for ftd in ftd_docs:
+        tid_str = str(ftd["team_id"])
+        roster = ftd.get("players") or []
+        franchise_team_rosters[tid_str] = [str(pid) for pid in roster]
     
     logger.info(f"⏱️ [PERF] /franchise/team-stats Found {len(players)} players, {len(team_list)} teams, {len(franchise_results)} weeks of results")
     
@@ -2034,7 +2041,8 @@ def team_stats(franchise_id: str):
         teams_collection=db.teams,
         collection_type='franchise',
         logger=logger,
-        franchise_results=franchise_results
+        franchise_results=franchise_results,
+        franchise_team_rosters=franchise_team_rosters if franchise_team_rosters else None,
     )
     aggregation_time = time.time() - aggregation_start
     logger.info(f"⏱️ [PERF] /franchise/team-stats Aggregation: {aggregation_time:.3f}s")
@@ -2166,9 +2174,8 @@ def get_team_player_stats(
 ):
     """Return players for ``team_id`` within ``franchise_id``.
 
-    Filters franchise ``players`` by ``meta.team_id`` and returns the requested
-    stat block (``season`` by default).  Results may be sorted and paginated for
-    UI consumption.
+    Prefer FTD.players (roster list) when present; else filter franchise.players by meta.team_id.
+    Results may be sorted and paginated for UI consumption.
     """
 
     try:
@@ -2177,10 +2184,46 @@ def get_team_player_stats(
         fid = franchise_id
 
     doc = db.franchises.find_one({"_id": fid}, {"players": 1}) or {}
-    players = doc.get("players", {})
+    franchise_players = doc.get("players", {})
     team_id_str = str(team_id)
     results: list[dict] = []
-    for pid, pdata in players.items():
+
+    # Prefer FTD.players (roster list) when present
+    try:
+        team_oid = ObjectId(team_id_str) if len(team_id_str) == 24 else None
+    except Exception:
+        team_oid = None
+    if team_oid is not None:
+        ftd = franchise_team_data_collection.find_one(
+            {"franchise_id": fid, "team_id": team_oid},
+            {"players": 1},
+        )
+        if ftd and ftd.get("players"):
+            for pid in ftd["players"]:
+                pid_str = str(pid)
+                pdata = franchise_players.get(pid_str)
+                if not pdata:
+                    continue
+                meta = pdata.get("meta", {})
+                block = pdata.get(scope, {})
+                results.append(
+                    {
+                        "player_id": pid_str,
+                        "first_name": meta.get("first_name", ""),
+                        "last_name": meta.get("last_name", ""),
+                        "stats": block,
+                    }
+                )
+            if sort:
+                reverse = direction.lower() != "asc"
+                results.sort(key=lambda x: x["stats"].get(sort, 0), reverse=reverse)
+            if limit:
+                start = max(page - 1, 0) * limit
+                results = results[start : start + limit]
+            return results
+
+    # Fallback: filter by meta.team_id (legacy / no FTD.players)
+    for pid, pdata in franchise_players.items():
         meta = pdata.get("meta", {})
         if str(meta.get("team_id")) != team_id_str:
             continue

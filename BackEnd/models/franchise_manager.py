@@ -239,9 +239,14 @@ class FranchiseManager:
                 "tempo": 2, "defense": 2, "aggression": 2,
                 "hc_trap": 2, "fc_press": 2, "rebounding": 2,
             }
+            # Roster for this team in this franchise (player _id UUID strings); used for roster/stats lookups
+            team_player_ids = team.get("player_ids", [])
+            players = [str(pid) for pid in team_player_ids]
+
             ftd_doc = {
                 "franchise_id": self.franchise_id,
                 "team_id": team_object_id,
+                "players": players,
                 "team_attributes": team_attributes,
                 "strategy_settings": strategy_settings,
                 "playbook_settings": playbook_settings.copy(),
