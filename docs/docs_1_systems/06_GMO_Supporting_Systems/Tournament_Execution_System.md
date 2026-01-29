@@ -49,6 +49,8 @@ The Tournament Execution System runs the bracket lifecycle: **init** → **save 
 
 Seeding is mode-specific; bracket generation from `seed_order` is shared.
 
+**EOS results must include week 14.** `initialize_eos_tournament` uses `franchise_doc.get("results", {})` to compute standings. When `complete_week` runs for week 14, it builds `existing_results` (weeks 1–13 + week 14) and sets `franchise_doc["results"] = existing_results` **before** calling `initialize_eos_tournament`, so seeding uses full regular-season results. Without that, EOS would seed from weeks 1–13 only.
+
 ---
 
 ## Persistence
@@ -83,5 +85,5 @@ The engine does not touch the DB. Callers read bracket/state → run engine → 
 ## Related
 
 - **Merge plan:** `docs/To Do/tournament_eos_bracket_merge_plan.md` — full refactor plan (engine, EOS swap, Tournament ObjectIds).
-- **EOS:** `eos_tournament.initialize_eos_tournament` (standings → seeds → `bracket_engine.generate_bracket`), `save_tournament_game_result` → `bracket_engine.save_game_result` + results append, `advance_tournament_round` → `bracket_engine.advance_bracket` (winners from matchups). **Refactor complete.**
+- **EOS:** `eos_tournament.initialize_eos_tournament` (standings → seeds → `bracket_engine.generate_bracket`), `save_tournament_game_result` → `bracket_engine.save_game_result` + results append, `advance_tournament_round` → `bracket_engine.advance_bracket` (winners from matchups). **Refactor complete.** Caller sets `franchise_doc["results"] = existing_results` (including week 14) before init so seeding uses full results.
 - **Tournament init:** `TournamentManager.create_tournament` (random shuffle → bracket). Will use ObjectId strings + `bracket_engine` once refactor is done.

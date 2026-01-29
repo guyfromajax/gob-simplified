@@ -1392,6 +1392,8 @@ def complete_week(req: CompleteWeekRequest):
                 "bracket may fail. Proceeding anyway."
             )
         logger.info(f"🎯 [EOS TOURNAMENT] Week 14 complete, initializing tournament (teams from FTD: {len(eos_team_ids)})")
+        # EOS seeds from franchise.results; ensure week 14 is included before init
+        franchise_doc["results"] = existing_results
         tournament_state = initialize_eos_tournament(franchise_doc, db.teams, team_ids=eos_team_ids)
         update_fields["eos_tournament"] = tournament_state
         update_fields["eos_tournament_active"] = True

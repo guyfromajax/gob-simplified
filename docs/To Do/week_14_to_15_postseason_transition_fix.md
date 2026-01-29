@@ -32,17 +32,19 @@ So when `complete_week` ran with `req.week == 14`:
 
 - **`BackEnd/api/franchise_routes.py`** (in `complete_week`, when `req.week == 14`)
   - Query **`franchise_team_data_collection`** for this franchise:  
-    `find({"franchise_id": str(franchise_id)}, {"team_id": 1})`.
+    `find({"franchise_id": franchise_id}, {"team_id": 1})` (use ObjectId for `franchise_id`).
   - Build `eos_team_ids` from the `team_id` field of each FTD doc.
+  - Set **`franchise_doc["results"] = existing_results`** so EOS sees results **including week 14** (standings/seeding use full regular season).
   - Call **`initialize_eos_tournament(franchise_doc, db.teams, team_ids=eos_team_ids)`**.
 
-Standings (and thus seeds) are still computed from the **universal `teams` collection** (record, PF, PA). Only the **list of team IDs** that belong to the franchise now comes from FTD instead of `franchise_teams`.
+Standings (and thus seeds) are computed from **`franchise.results`** (W/L, PF, PA via `calculate_franchise_standings`). The **list of team IDs** comes from FTD. EOS init must receive results through week 14; the caller assigns `existing_results` to `franchise_doc["results"]` before the call.
 
 ### 2. Behavior after fix
 
 - Completing week 14 triggers `complete_week` as before.
 - Team IDs for the franchise are loaded from FTD and passed into EOS init.
-- Standings are calculated for those 8 teams from `teams` (W/L, PF, PA), seeds 1–8 are generated, and the bracket is built.
+- `franchise_doc["results"]` is set to `existing_results` (weeks 1–14) so EOS seeds from full regular-season results.
+- Standings are calculated from `franchise.results` (W/L, PF, PA via `calculate_franchise_standings`), seeds 1–8 are generated, and the bracket is built.
 - Franchise doc is updated with `week: 15`, `eos_tournament`, and `eos_tournament_active: true`.
 - User returns to FCC in week 15 with the postseason bracket available.
 
@@ -56,7 +58,7 @@ Standings (and thus seeds) are still computed from the **universal `teams` colle
 | File | Change |
 |------|--------|
 | `BackEnd/tournament/eos_tournament.py` | `calculate_standings(..., team_ids=None)`; `initialize_eos_tournament(..., team_ids=None)`; `generate_bracket` guard for `len(seeds) < 8` |
-| `BackEnd/api/franchise_routes.py` | When `req.week == 14`, load team IDs from FTD and pass `team_ids=eos_team_ids` into `initialize_eos_tournament` |
+| `BackEnd/api/franchise_routes.py` | When `req.week == 14`, load team IDs from FTD; set `franchise_doc["results"] = existing_results` before EOS init; call `initialize_eos_tournament(..., team_ids=eos_team_ids)` |
 
 ## Verification
 
