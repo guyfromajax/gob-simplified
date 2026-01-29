@@ -73,7 +73,7 @@ The engine does not touch the DB. Callers read bracket/state → run engine → 
 
 ### EOS week transition (15 → 16 → 17)
 
-- **`complete_week`** allows weeks 15–17 when `eos_tournament_active` and `eos_tournament` exist. No schedule lookup; user’s game only. Save result → advance from **in-memory** bracket (no reload). When the round advances, set `franchise.week = 14 + new_round` (15→16 for semis, 16→17 for final); otherwise keep `week` unchanged.
+- **`complete_week`** allows weeks 15–17 when `eos_tournament_active` and `eos_tournament` exist. “Week games” come from the **bracket** (current round), not the schedule. Same flow as regular season: user’s game first, then **sim the other matchups** in that round, save each to the bracket via `save_tournament_game_result`, then advance. When the round advances, set `franchise.week = 14 + new_round`; otherwise keep `week` unchanged.
 - **`/franchise/sim-rest-of-tournament`** sims incomplete matchups in the current round, saves results, then advances. When the round advances, it also sets `franchise.week = 14 + new_round` in the same `$set` as `eos_tournament`.
 
 ---
