@@ -1,7 +1,7 @@
 # Tournament Execution System
 
 **Location:** `BackEnd/tournament/bracket_engine.py`, `eos_tournament.py`, `bracket_logic.py`, `tournament_manager.py`  
-**Status:** ✅ Bracket engine added; **EOS refactored** to use it. Tournament mode refactor (ObjectIds + engine) not yet done.  
+**Status:** ✅ Bracket engine added; **EOS** and **Tournament mode** both use it. ObjectId strings everywhere; name resolution at API edges.  
 **Scope:** 8-team single-elimination bracket flow for **Tournament mode** (standalone) and **Franchise EOS** (weeks 15–17).
 
 ---
@@ -94,6 +94,7 @@ When the user **loses** an EOS game (quarters, semis, or final):
 |------|----------|
 | `tests/test_bracket_engine.py` | `get_round_name`, `generate_bracket` (shape, 1v8/4v5/2v7/3v6), `save_game_result`, `advance_bracket` (round1→2→3→completed, champion). |
 | `tests/test_eos_bracket_engine_integration.py` | EOS init → save result → advance (round1→2→3→champion) using shared engine; mock teams, no DB. |
+| `tests/test_tournament_*` | Tournament init, save-result, simulate-round, sim-rest, bracket update; use `seed_teams_ah` and ObjectId-aware assertions. |
 
 ---
 
@@ -101,4 +102,4 @@ When the user **loses** an EOS game (quarters, semis, or final):
 
 - **Merge plan:** `docs/To Do/tournament_eos_bracket_merge_plan.md` — full refactor plan (engine, EOS swap, Tournament ObjectIds).
 - **EOS:** `eos_tournament.initialize_eos_tournament` (standings → seeds → `bracket_engine.generate_bracket`), `save_tournament_game_result` → `bracket_engine.save_game_result` + results append, `advance_tournament_round` → `bracket_engine.advance_bracket` (winners from matchups). **Refactor complete.** Caller sets `franchise_doc["results"] = existing_results` (including week 14) before init so seeding uses full results.
-- **Tournament init:** `TournamentManager.create_tournament` (random shuffle → bracket). Will use ObjectId strings + `bracket_engine` once refactor is done.
+- **Tournament init:** `TournamentManager.create_tournament` uses `bracket_engine.generate_bracket(seed_order)` with ObjectId strings. `bracket_logic.update_bracket_from_results` uses `advance_bracket` (results or matchups). Save-result and sim-round resolve winner/team names ↔ ObjectIds at API edges; `_bracket_for_aggregator` converts bracket to name-based for team-stats aggregator.

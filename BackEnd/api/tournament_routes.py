@@ -51,6 +51,66 @@ def get_user_team_from_tournament(tournament_doc: dict) -> tuple[str | None, str
     return (None, None)
 
 
+def _team_oid_to_name(oid: str) -> str | None:
+    """Resolve team ObjectId string to name. For bracket Oid↔name at API edges."""
+    if not oid:
+        return None
+    try:
+        d = teams_collection.find_one({"_id": ObjectId(oid)}, {"name": 1})
+        return d.get("name") if d else None
+    except Exception:
+        return None
+
+
+def _team_name_to_oid(name: str) -> str | None:
+    """Resolve team name to ObjectId string."""
+    if not name:
+        return None
+    d = teams_collection.find_one({"name": name}, {"_id": 1})
+    return str(d["_id"]) if d else None
+
+
+def _resolve_winner_to_oid(winner: str) -> str | None:
+    """Winner can be name or ObjectId string. Return ObjectId string."""
+    if not winner:
+        return None
+    if ObjectId.is_valid(winner) and len(winner) == 24:
+        return winner
+    return _team_name_to_oid(winner)
+
+
+def _bracket_for_aggregator(bracket: dict) -> dict:
+    """Convert bracket to name-based format for team_stats_aggregator. Supports both ObjectId and name keys."""
+    out = {}
+    for round_key, matchups in (bracket or {}).items():
+        if not isinstance(matchups, list):
+            continue
+        out[round_key] = []
+        for m in matchups:
+            home = m.get("home_team")
+            away = m.get("away_team")
+            winner = m.get("winner")
+            score = m.get("score") or {}
+            def _to_name(v):
+                if not v:
+                    return None
+                if isinstance(v, str) and ObjectId.is_valid(v) and len(v) == 24:
+                    return _team_oid_to_name(v)
+                return v  # already name
+            home_name = _to_name(home)
+            away_name = _to_name(away)
+            winner_name = _to_name(winner)
+            if not home_name or not away_name:
+                continue
+            out[round_key].append({
+                "home_team": home_name,
+                "away_team": away_name,
+                "winner": winner_name or (home_name if winner == home else away_name),
+                "score": score,
+            })
+    return out
+
+
 class StartTournamentRequest(BaseModel):
     """Payload for creating a new tournament."""
     user_team_id: str
@@ -91,15 +151,15 @@ def tournament_team_stats(tournament_id: str):
     tournament_teams = tournament_doc.get("teams", {})
     bracket = tournament_doc.get("bracket", {})
     
-    # ✅ SS&S: Use shared aggregator utility
-    # ✅ FIX: Pass bracket to calculate W/L and PF/PA from tournament results (not global teams collection)
+    # Pass name-based bracket for aggregator (bracket may use ObjectId strings)
+    bracket_for_agg = _bracket_for_aggregator(bracket)
     output = aggregate_team_stats_from_players(
         players=players,
         team_ids=tournament_teams,
         teams_collection=teams_collection,
         collection_type='tournament',
         logger=logger,
-        tournament_bracket=bracket  # ✅ FIX: Pass bracket to calculate tournament-specific W/L and PF/PA
+        tournament_bracket=bracket_for_agg if any(bracket_for_agg.values()) else bracket,
     )
     
     return {"teams": output}
@@ -133,21 +193,25 @@ def start_tournament(request: StartTournamentRequest):
     endpoint_start = time.time()
     
     team_query_start = time.time()
-    team_docs = list(teams_collection.find({}, {"name": 1}))
+    all_teams = list(teams_collection.find({}, {"name": 1, "_id": 1}))
     team_query_time = (time.time() - team_query_start) * 1000
-    logger.warning(f"⏱️ [DB TIMING] start-tournament: teams_collection.find(): {team_query_time:.2f}ms, found {len(team_docs)} teams")
+    logger.warning(f"⏱️ [DB TIMING] start-tournament: teams_collection.find(): {team_query_time:.2f}ms, found {len(all_teams)} teams")
     
-    team_ids = [team["name"] for team in team_docs]
-
-    if request.user_team_id not in team_ids:
+    team_names = [t["name"] for t in all_teams]
+    if request.user_team_id not in team_names:
         raise HTTPException(status_code=400, detail="Invalid user_team_id")
+
+    # Use first 8 teams for bracket (same pool as before when we had 8)
+    team_docs = [{"name": t["name"], "_id": t["_id"]} for t in (all_teams[:8] if len(all_teams) >= 8 else all_teams)]
+    if len(team_docs) < 8:
+        raise HTTPException(status_code=400, detail="Need at least 8 teams to start a tournament")
 
     # Reset all player stats for teams in this tournament
     zero_stats = {key: 0 for key in BOX_SCORE_KEYS}
     zero_stats["Outlet_Score_List"] = []  # Outlet_Score_List is an array, not an integer
-    
+    names_8 = [t["name"] for t in team_docs]
     player_reset_start = time.time()
-    for tid in team_ids:
+    for tid in names_8:
         players_collection.update_many(
             {"team": tid},
             {
@@ -166,7 +230,7 @@ def start_tournament(request: StartTournamentRequest):
     manager = TournamentManager(
         user_team_id=request.user_team_id,
         tournaments_collection=tournaments_collection,
-        team_ids=team_ids,
+        team_docs=team_docs,
     )
     tournament = manager.create_tournament()
     tournament_create_time = (time.time() - tournament_create_start) * 1000
@@ -200,21 +264,19 @@ def simulate_round(request: SimulateRequest):
         round_name = f"round{tournament_doc['current_round']}" if tournament_doc['current_round'] != 3 else "final"
         matchups = tournament_doc["bracket"].get(round_name, [])
 
-        user_team_id = tournament_doc.get("user_team_id")
+        _, user_team_oid = get_user_team_from_tournament(tournament_doc)
         user_matchup = None
         already_played = False
 
-        # ✅ TASK 1 FIX: Only find user's matchup, don't simulate computer games
-        # Computer games will be simulated AFTER user completes their game (in /tournament/save-result)
-        logger.info(f"🔍 [SIMULATE-ROUND] Finding user matchup (no computer games simulated - matches Franchise pattern)")
-        print(f"🔍 [SIMULATE-ROUND] Finding user matchup (no computer games simulated - matches Franchise pattern)")
-        
         for i, matchup in enumerate(matchups):
-            if user_team_id in [matchup["home_team"], matchup["away_team"]]:
-                user_matchup = {"home": matchup["home_team"], "away": matchup["away_team"]}
+            h, a = str(matchup.get("home_team", "")), str(matchup.get("away_team", ""))
+            if user_team_oid and user_team_oid in (h, a):
+                home_name = _team_oid_to_name(h) or h
+                away_name = _team_oid_to_name(a) or a
+                user_matchup = {"home": home_name, "away": away_name}
                 if matchup.get("game_id"):
                     already_played = True
-                break  # Found user matchup, no need to continue
+                break
 
         if already_played:
             return {"already_played": True}
@@ -261,6 +323,10 @@ def save_result(request: TournamentResultRequest):
     round_num = tournament["current_round"]
     round_key = "final" if round_num == 3 else f"round{round_num}"
 
+    winner_oid = _resolve_winner_to_oid(request.winner)
+    if not winner_oid:
+        raise HTTPException(status_code=400, detail="Could not resolve winner to team")
+
     manager = TournamentManager(tournaments_collection=tournaments_collection)
     manager.tournament = tournament
     manager.tournament_id = tournament_id
@@ -296,141 +362,114 @@ def save_result(request: TournamentResultRequest):
                 f"❌ Failed to save result for round {result_doc['round']} match {result_doc['match_index']}: {e}"
             )
 
-    # ✅ TASK 1: Re-order to match Franchise mode pattern
-    # Step 1: Find and finalize user's game FIRST (matches Franchise mode)
+    # Step 1: Find and finalize user's game first (matches Franchise mode)
     user_match_index = None
-    home_team = away_team = None
+    home_oid = away_oid = None
     user_game_id = None
-    
+
     for i, match in enumerate(tournament["bracket"][round_key]):
-        if request.winner in [match["home_team"], match["away_team"]]:
-            user_match_index = i
-            home_team = match["home_team"]
-            away_team = match["away_team"]
-            gid = (
-                ObjectId(request.game_id)
-                if ObjectId.is_valid(request.game_id)
-                else request.game_id
-            )
-            logger.info(f"🔍 [SAVE-RESULT] User game - game_id from request: {request.game_id} (type: {type(request.game_id)}), converted gid: {gid} (type: {type(gid)})")
-            
-            # ✅ SS&S: Use game_document from request if provided (matches Franchise mode pattern)
-            # This eliminates race condition where save-result is called before Q4 save completes
-            if request.game_document:
-                logger.info(f"✅ [SAVE-RESULT] Using game_document from request (no database lookup needed, matches Franchise pattern)")
-                print(f"✅ [SAVE-RESULT] Using game_document from request (no database lookup needed)")
-                summary = request.game_document
-                quarter = summary.get("quarter", "N/A")
-                is_final = summary.get("is_final", False)
-                logger.info(f"🔍 [SAVE-RESULT] game_document details: quarter={quarter}, is_final={is_final}, game_id={summary.get('_id') or summary.get('game_id')}")
-                print(f"🔍 [SAVE-RESULT] game_document details: quarter={quarter}, is_final={is_final}")
-                
-                # ✅ FIX: Save game_document to database to ensure finalize_game() gets complete data
-                # This ensures the database has the most up-to-date game document with complete box_score
-                try:
-                    game_doc_id = summary.get("_id") or summary.get("game_id")
-                    if game_doc_id:
-                        # Convert to ObjectId if needed
-                        try:
-                            game_doc_oid = ObjectId(game_doc_id) if not isinstance(game_doc_id, ObjectId) else game_doc_id
-                        except:
-                            game_doc_oid = game_doc_id
-                        
-                        # Ensure _id is set correctly
-                        if "_id" not in summary:
-                            summary["_id"] = game_doc_oid
-                        elif summary.get("_id") != game_doc_oid:
-                            summary["_id"] = game_doc_oid
-                        
-                        # Save/update the game document in database
-                        games_collection.replace_one(
-                            {"_id": game_doc_oid},
-                            summary,
-                            upsert=True
-                        )
-                        logger.info(f"✅ [SAVE-RESULT] Saved game_document to database: {game_doc_oid}")
-                        print(f"✅ [SAVE-RESULT] Saved game_document to database: {game_doc_oid}")
-                        gid = game_doc_oid
-                    else:
-                        logger.warning(f"⚠️ [SAVE-RESULT] game_document missing _id or game_id, cannot save to database")
-                except Exception as e:
-                    logger.error(f"❌ [SAVE-RESULT] Error saving game_document to database: {e}", exc_info=True)
-                    print(f"❌ [SAVE-RESULT] Error saving game_document to database: {e}")
-            else:
-                # Fallback: Look up from database (for backward compatibility)
-                logger.info(f"🔍 [SAVE-RESULT] game_document not provided, looking up from database...")
-                print(f"🔍 [SAVE-RESULT] game_document not provided, looking up from database...")
-                
-                # Try multiple formats to find the game document
-                summary = None
-                # First try: Use gid as-is (ObjectId if conversion succeeded, string otherwise)
-                summary = games_collection.find_one({"_id": gid}) or {}
-                if not summary or not summary.get("_id"):
-                    logger.warning(f"⚠️ [SAVE-RESULT] Game not found with gid={gid}, trying string format")
-                    # Second try: Use string format
+        h, a = str(match.get("home_team", "")), str(match.get("away_team", ""))
+        if winner_oid not in (h, a):
+            continue
+        user_match_index = i
+        home_oid = h
+        away_oid = a
+        gid = (
+            ObjectId(request.game_id)
+            if ObjectId.is_valid(request.game_id)
+            else request.game_id
+        )
+        logger.info(f"🔍 [SAVE-RESULT] User game - game_id from request: {request.game_id} (type: {type(request.game_id)}), converted gid: {gid} (type: {type(gid)})")
+        if request.game_document:
+            logger.info(f"✅ [SAVE-RESULT] Using game_document from request (no database lookup needed, matches Franchise pattern)")
+            print(f"✅ [SAVE-RESULT] Using game_document from request (no database lookup needed)")
+            summary = request.game_document
+            quarter = summary.get("quarter", "N/A")
+            is_final = summary.get("is_final", False)
+            logger.info(f"🔍 [SAVE-RESULT] game_document details: quarter={quarter}, is_final={is_final}, game_id={summary.get('_id') or summary.get('game_id')}")
+            print(f"🔍 [SAVE-RESULT] game_document details: quarter={quarter}, is_final={is_final}")
+            try:
+                game_doc_id = summary.get("_id") or summary.get("game_id")
+                if game_doc_id:
                     try:
-                        summary = games_collection.find_one({"_id": request.game_id}) or {}
+                        game_doc_oid = ObjectId(game_doc_id) if not isinstance(game_doc_id, ObjectId) else game_doc_id
                     except Exception:
-                        pass
-                if not summary or not summary.get("_id"):
-                    logger.warning(f"⚠️ [SAVE-RESULT] Game not found with string format, trying ObjectId conversion")
-                    # Third try: Convert string to ObjectId
-                    try:
-                        oid = ObjectId(request.game_id)
-                        summary = games_collection.find_one({"_id": oid}) or {}
-                        if summary and summary.get("_id"):
-                            gid = summary.get("_id")
-                            logger.info(f"✅ [SAVE-RESULT] Found game document using ObjectId conversion: {gid}")
-                    except Exception as e:
-                        logger.error(f"❌ [SAVE-RESULT] Error converting game_id to ObjectId: {e}")
-                
-                logger.info(f"🔍 [SAVE-RESULT] User game - Final lookup result: Found={bool(summary and summary.get('_id'))}, _id={summary.get('_id') if summary else None}")
-                print(f"🔍 [SAVE-RESULT] User game - Final lookup result: Found={bool(summary and summary.get('_id'))}, _id={summary.get('_id') if summary else None}")
-                
-                if not summary or not summary.get("_id"):
-                    logger.error(f"❌ [SAVE-RESULT] Game document not found in games_collection after all attempts. game_id: {request.game_id}, gid: {gid}")
-                    print(f"❌ [SAVE-RESULT] Game document not found in games_collection after all attempts. game_id: {request.game_id}, gid: {gid}")
-                    logger.error(f"❌ [SAVE-RESULT] This likely means the game document was never saved to the database.")
-                    logger.error(f"❌ [SAVE-RESULT] Check if simulate_quarter_endpoint successfully saved the game document.")
-            score_map = (
-                summary.get("score")
-                or summary.get("final_score")
-                or request.score
+                        game_doc_oid = game_doc_id
+                    if "_id" not in summary:
+                        summary["_id"] = game_doc_oid
+                    elif summary.get("_id") != game_doc_oid:
+                        summary["_id"] = game_doc_oid
+                    games_collection.replace_one(
+                        {"_id": game_doc_oid},
+                        summary,
+                        upsert=True
+                    )
+                    logger.info(f"✅ [SAVE-RESULT] Saved game_document to database: {game_doc_oid}")
+                    print(f"✅ [SAVE-RESULT] Saved game_document to database: {game_doc_oid}")
+                    gid = game_doc_oid
+                else:
+                    logger.warning(f"⚠️ [SAVE-RESULT] game_document missing _id or game_id, cannot save to database")
+            except Exception as e:
+                logger.error(f"❌ [SAVE-RESULT] Error saving game_document to database: {e}", exc_info=True)
+                print(f"❌ [SAVE-RESULT] Error saving game_document to database: {e}")
+        else:
+            logger.info(f"🔍 [SAVE-RESULT] game_document not provided, looking up from database...")
+            print(f"🔍 [SAVE-RESULT] game_document not provided, looking up from database...")
+            summary = None
+            summary = games_collection.find_one({"_id": gid}) or {}
+            if not summary or not summary.get("_id"):
+                logger.warning(f"⚠️ [SAVE-RESULT] Game not found with gid={gid}, trying string format")
+                try:
+                    summary = games_collection.find_one({"_id": request.game_id}) or {}
+                except Exception:
+                    pass
+            if not summary or not summary.get("_id"):
+                logger.warning(f"⚠️ [SAVE-RESULT] Game not found with string format, trying ObjectId conversion")
+                try:
+                    oid = ObjectId(request.game_id)
+                    summary = games_collection.find_one({"_id": oid}) or {}
+                    if summary and summary.get("_id"):
+                        gid = summary.get("_id")
+                        logger.info(f"✅ [SAVE-RESULT] Found game document using ObjectId conversion: {gid}")
+                except Exception as e:
+                    logger.error(f"❌ [SAVE-RESULT] Error converting game_id to ObjectId: {e}")
+            logger.info(f"🔍 [SAVE-RESULT] User game - Final lookup result: Found={bool(summary and summary.get('_id'))}, _id={summary.get('_id') if summary else None}")
+            print(f"🔍 [SAVE-RESULT] User game - Final lookup result: Found={bool(summary and summary.get('_id'))}, _id={summary.get('_id') if summary else None}")
+            if not summary or not summary.get("_id"):
+                logger.error(f"❌ [SAVE-RESULT] Game document not found in games_collection after all attempts. game_id: {request.game_id}, gid: {gid}")
+                print(f"❌ [SAVE-RESULT] Game document not found in games_collection after all attempts. game_id: {request.game_id}, gid: {gid}")
+        score_map = (
+            summary.get("score")
+            or summary.get("final_score")
+            or request.score
+        ) if (summary and isinstance(summary, dict)) else (request.score or {})
+        manager.save_game_result(
+            round_num, i, request.game_id, winner_oid, score_map
+        )
+        if summary and summary.get("_id"):
+            user_game_id = str(gid)
+            logger.info(f"🎯 [SAVE-RESULT] Finalizing user's game FIRST (matches Franchise pattern) - game_id: {user_game_id}")
+            print(f"🎯 [SAVE-RESULT] Finalizing user's game FIRST (matches Franchise pattern) - game_id: {user_game_id}")
+            stat_updater.finalize_game(
+                user_game_id,
+                mode="tournament",
+                tournament_id=request.tournament_id,
             )
-            manager.save_game_result(
-                round_key, i, request.game_id, request.winner, score_map
-            )
-            
-            # ✅ SS&S: W/L and PF/PA are now calculated from tournament bracket (not teams collection)
-            # This ensures tournament-specific stats don't accumulate across multiple tournaments
-            # See team_stats_aggregator.py for bracket-based calculation logic
-            
-            # ✅ FINALIZE USER'S GAME FIRST (matches Franchise mode pattern)
-            if summary and summary.get("_id"):
-                user_game_id = str(gid)
-                logger.info(f"🎯 [SAVE-RESULT] Finalizing user's game FIRST (matches Franchise pattern) - game_id: {user_game_id}")
-                print(f"🎯 [SAVE-RESULT] Finalizing user's game FIRST (matches Franchise pattern) - game_id: {user_game_id}")
-                stat_updater.finalize_game(
-                    user_game_id,
-                    mode="tournament",
-                    tournament_id=request.tournament_id,
-                )
-                logger.info(f"✅ [SAVE-RESULT] User game - finalize_game completed for game_id: {user_game_id}")
-                print(f"✅ [SAVE-RESULT] User game - finalize_game completed for game_id: {user_game_id}")
-            else:
-                logger.error(f"❌ [SAVE-RESULT] Skipping finalize_game - game document not found. Stats will not be applied.")
-                print(f"❌ [SAVE-RESULT] Skipping finalize_game - game document not found. Stats will not be applied.")
-            
-            user_result = {
-                "home_team": home_team,
-                "away_team": away_team,
-                "score": score_map or {},
-                "winner": request.winner,
-                "round": round_num,
-                "match_index": i,
-            }
-            _log_result(user_result)
-            break
+            logger.info(f"✅ [SAVE-RESULT] User game - finalize_game completed for game_id: {user_game_id}")
+            print(f"✅ [SAVE-RESULT] User game - finalize_game completed for game_id: {user_game_id}")
+        else:
+            logger.error(f"❌ [SAVE-RESULT] Skipping finalize_game - game document not found. Stats will not be applied.")
+            print(f"❌ [SAVE-RESULT] Skipping finalize_game - game document not found. Stats will not be applied.")
+        user_result = {
+            "home_team": home_oid,
+            "away_team": away_oid,
+            "score": score_map or {},
+            "winner": winner_oid,
+            "round": round_num,
+            "match_index": i,
+        }
+        _log_result(user_result)
+        break
 
     if user_match_index is None:
         raise HTTPException(status_code=400, detail="User matchup not found")
@@ -453,38 +492,36 @@ def save_result(request: TournamentResultRequest):
             summary = games_collection.find_one({"_id": gid}) or {}
             score_map = summary.get("score") or summary.get("final_score")
             
-            # Save result to bracket
+            wh = str(match.get("winner") or "")
             manager.save_game_result(
-                round_key,
+                round_num,
                 i,
                 match["game_id"],
-                match["winner"],
+                wh,
                 score_map,
             )
-            
-            # Finalize game (idempotency check will skip if already finalized)
             logger.info(f"🔍 [SAVE-RESULT] Finalizing existing computer game {i} - game_id: {str(gid)}")
             stat_updater.finalize_game(
                 str(gid),
                 mode="tournament",
                 tournament_id=request.tournament_id,
             )
-            
             result_doc = {
-                "home_team": match["home_team"],
-                "away_team": match["away_team"],
+                "home_team": str(match.get("home_team", "")),
+                "away_team": str(match.get("away_team", "")),
                 "score": score_map or {},
-                "winner": match["winner"],
+                "winner": wh,
                 "round": round_num,
                 "match_index": i,
             }
             _log_result(result_doc)
             continue
 
-        # Simulate new computer game
+        home_name = _team_oid_to_name(match.get("home_team")) or str(match.get("home_team", ""))
+        away_name = _team_oid_to_name(match.get("away_team")) or str(match.get("away_team", ""))
         try:
-            logger.info(f"🔍 [SAVE-RESULT] Simulating computer game {i} - {match['home_team']} vs {match['away_team']}")
-            game = run_simulation(match["home_team"], match["away_team"])
+            logger.info(f"🔍 [SAVE-RESULT] Simulating computer game {i} - {home_name} vs {away_name}")
+            game = run_simulation(home_name, away_name)
             summary = summarize_game_state(game)
             summary["tournament_id"] = str(request.tournament_id)
             summary["round"] = round_key
@@ -506,22 +543,17 @@ def save_result(request: TournamentResultRequest):
             )
             continue
 
-        # Save result to bracket
-        home = match["home_team"]
-        away = match["away_team"]
+        home_oid_s = str(match.get("home_team", ""))
+        away_oid_s = str(match.get("away_team", ""))
         score_map = summary.get("score") or summary.get("final_score")
-        winner = home if score_map[home] > score_map[away] else away
-        manager.save_game_result(round_key, i, str(game_id), winner, score_map)
-        
-        # ✅ SS&S: W/L and PF/PA are now calculated from tournament bracket (not teams collection)
-        # This ensures tournament-specific stats don't accumulate across multiple tournaments
-        # See team_stats_aggregator.py for bracket-based calculation logic
-
+        winner_name = home_name if (score_map.get(home_name) or 0) > (score_map.get(away_name) or 0) else away_name
+        winner_oid_s = home_oid_s if winner_name == home_name else away_oid_s
+        manager.save_game_result(round_num, i, str(game_id), winner_oid_s, score_map)
         result_doc = {
-            "home_team": home,
-            "away_team": away,
+            "home_team": home_oid_s,
+            "away_team": away_oid_s,
             "score": score_map or {},
-            "winner": winner,
+            "winner": winner_oid_s,
             "round": round_num,
             "match_index": i,
         }
@@ -1018,10 +1050,10 @@ def sim_remaining(request: SimulateRequest):
                     )
                     score_map = summary.get("score") or summary.get("final_score")
                     result_doc = {
-                        "home_team": match["home_team"],
-                        "away_team": match["away_team"],
+                        "home_team": str(match.get("home_team", "")),
+                        "away_team": str(match.get("away_team", "")),
                         "score": score_map or {},
-                        "winner": match.get("winner"),
+                        "winner": str(match.get("winner", "")),
                         "round": round_num,
                         "match_index": i,
                     }
@@ -1038,27 +1070,33 @@ def sim_remaining(request: SimulateRequest):
                 )
                 continue
 
+            home_name = _team_oid_to_name(match.get("home_team")) or str(match.get("home_team", ""))
+            away_name = _team_oid_to_name(match.get("away_team")) or str(match.get("away_team", ""))
             print(
-                f"[sim_remaining] Simulating matchup: {match['home_team']} vs {match['away_team']}"
+                f"[sim_remaining] Simulating matchup: {home_name} vs {away_name}"
             )
-            game = run_simulation(match["home_team"], match["away_team"])
+            game = run_simulation(home_name, away_name)
             summary = summarize_game_state(game)
+            summary["tournament_id"] = str(request.tournament_id)
+            summary["round"] = round_key
+            summary["match_index"] = i
             game_id = games_collection.insert_one(summary).inserted_id
             stat_updater.finalize_game(
                 str(game_id),
                 mode="tournament",
                 tournament_id=request.tournament_id,
             )
-            home = match["home_team"]
-            away = match["away_team"]
-            winner = home if summary["score"][home] > summary["score"][away] else away
+            home_oid_s = str(match.get("home_team", ""))
+            away_oid_s = str(match.get("away_team", ""))
             score_map = summary.get("score") or summary.get("final_score")
-            manager.save_game_result(round_key, i, str(game_id), winner, score_map)
+            winner_name = home_name if (score_map.get(home_name) or 0) > (score_map.get(away_name) or 0) else away_name
+            winner_oid_s = home_oid_s if winner_name == home_name else away_oid_s
+            manager.save_game_result(round_num, i, str(game_id), winner_oid_s, score_map)
             result_doc = {
-                "home_team": home,
-                "away_team": away,
+                "home_team": home_oid_s,
+                "away_team": away_oid_s,
                 "score": score_map or {},
-                "winner": winner,
+                "winner": winner_oid_s,
                 "round": round_num,
                 "match_index": i,
             }

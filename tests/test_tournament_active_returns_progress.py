@@ -1,12 +1,15 @@
 import pytest
 from bson import ObjectId
+
 from BackEnd.tournament.tournament_manager import TournamentManager
 from BackEnd.db import tournaments_collection, games_collection
-from BackEnd.api.tournament_routes import save_result, TournamentResultRequest
+from BackEnd.api.tournament_routes import save_result, TournamentResultRequest, _team_oid_to_name
 from BackEnd.api.api import get_active_tournament
+from tests.tournament_test_helpers import seed_teams_ah
 
 
 def test_active_tournament_returns_progress(monkeypatch):
+    seed_teams_ah()
     tournaments_collection.delete_many({})
     games_collection.delete_many({})
 
@@ -17,15 +20,19 @@ def test_active_tournament_returns_progress(monkeypatch):
     )
     tournament = manager.create_tournament()
     tid = ObjectId(tournament["_id"])
+    user_oid = tournament.get("user_team_object_id")
 
     round1 = tournament["bracket"]["round1"]
     for match in round1:
-        if "A" in (match["home_team"], match["away_team"]):
-            home = match["home_team"]
-            away = match["away_team"]
+        h, a = str(match["home_team"]), str(match["away_team"])
+        if user_oid and user_oid in (h, a):
+            home_name = _team_oid_to_name(h) or h
+            away_name = _team_oid_to_name(a) or a
             break
+    else:
+        raise AssertionError("User matchup not found")
 
-    user_summary = {"score": {home: 100, away: 90}}
+    user_summary = {"score": {home_name: 100, away_name: 90}}
     game_id = games_collection.insert_one(user_summary).inserted_id
 
     def fake_run_simulation(h, a):
