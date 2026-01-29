@@ -88,6 +88,8 @@ if client:
     franchise_state_collection = db["franchise_state"]
     franchises_collection = db["franchises"]
     franchise_team_data_collection = db["franchise_team_data"]
+    franchise_players_data_collection = db["franchise_players_data"]
+    franchise_recruits_data_collection = db["franchise_recruits_data"]
     plays_collection = db["plays"]
     defenses_collection = db["defenses"]
     fcp_skeletons_collection = db["fcp_skeletons"]
@@ -106,6 +108,8 @@ else:
     franchise_state_collection = db["franchise_state"]
     franchises_collection = db["franchises"]
     franchise_team_data_collection = db["franchise_team_data"]
+    franchise_players_data_collection = db["franchise_players_data"]
+    franchise_recruits_data_collection = db["franchise_recruits_data"]
     plays_collection = db["plays"]
     defenses_collection = db["defenses"]
     fcp_skeletons_collection = db["fcp_skeletons"]
@@ -131,3 +135,39 @@ def ensure_ftd_index():
         )
     except Exception as e:
         print(f"⚠️ [DB] ensure_ftd_index: {e}", file=sys.stderr, flush=True)
+
+
+def ensure_fpd_index():
+    """
+    Ensure unique compound index on franchise_players_data (franchise_id, player_id).
+    Idempotent; safe to call on startup or before FPD writes.
+    Skips when using mongomock (no real MongoDB).
+    """
+    if not client:
+        return
+    try:
+        franchise_players_data_collection.create_index(
+            [("franchise_id", 1), ("player_id", 1)],
+            unique=True,
+            name="franchise_player_unique",
+        )
+    except Exception as e:
+        print(f"⚠️ [DB] ensure_fpd_index: {e}", file=sys.stderr, flush=True)
+
+
+def ensure_frd_index():
+    """
+    Ensure unique compound index on franchise_recruits_data (franchise_id, recruit_id).
+    Idempotent; safe to call on startup or before FRD writes.
+    Skips when using mongomock (no real MongoDB).
+    """
+    if not client:
+        return
+    try:
+        franchise_recruits_data_collection.create_index(
+            [("franchise_id", 1), ("recruit_id", 1)],
+            unique=True,
+            name="franchise_recruit_unique",
+        )
+    except Exception as e:
+        print(f"⚠️ [DB] ensure_frd_index: {e}", file=sys.stderr, flush=True)

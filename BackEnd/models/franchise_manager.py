@@ -183,15 +183,14 @@ class FranchiseManager:
 
         # Generate initial recruits for the franchise
         recruits = self.recruit_manager.generate_recruits_list()
-        
-        # Store user team identifiers in franchise document
-        from datetime import datetime
+
+        # ✅ FPD/FRD: Store players and recruits in standalone collections; keep franchise doc lean
         extra_state = {
-            "players": players_map, 
+            "players": {},  # FPD holds player data; empty here for legacy safety
+            "recruits": [],  # FRD holds recruit data; empty here for legacy safety
             "applied_games": [],
             "franchise_teams": franchise_teams,
             "training_status": training_status,
-            "recruits": recruits,
             # Add missing document-level fields (matches Tournament pattern)
             "created_at": datetime.utcnow(),
             "current_season": 1,  # Start at season 1
@@ -212,11 +211,52 @@ class FranchiseManager:
         
         self.save_season_state(extra_state=extra_state)
 
-        # ✅ FTD: Create franchise_team_data documents *after* franchise insert so we have franchise_id.
-        from BackEnd.db import franchise_team_data_collection, ensure_ftd_index
-        from datetime import datetime
+        # ✅ FTD/FPD/FRD: Create franchise_team_data, franchise_players_data, franchise_recruits_data
+        # *after* franchise insert so we have franchise_id.
+        import uuid as uuid_module
+        from BackEnd.db import (
+            franchise_team_data_collection,
+            franchise_players_data_collection,
+            franchise_recruits_data_collection,
+            ensure_ftd_index,
+            ensure_fpd_index,
+            ensure_frd_index,
+        )
 
         ensure_ftd_index()
+        ensure_fpd_index()
+        ensure_frd_index()
+
+        # ✅ FPD: One doc per (franchise_id, player_id) with franchise-specific player data
+        for pid, data in players_map.items():
+            fpd_doc = {
+                "franchise_id": str(self.franchise_id),
+                "player_id": pid,
+                "meta": data["meta"],
+                "season": data["season"],
+                "career": data["career"],
+                "attributes": data["attributes"],
+                "position_ratings": data["position_ratings"],
+            }
+            franchise_players_data_collection.insert_one(fpd_doc)
+
+        # ✅ FRD: One doc per (franchise_id, recruit_id); assign recruit_id (UUID) per franchise
+        for recruit in recruits:
+            recruit_id = str(uuid_module.uuid4())
+            frd_doc = {
+                "franchise_id": str(self.franchise_id),
+                "recruit_id": recruit_id,
+                "name": recruit["name"],
+                "attributes": recruit["attributes"],
+                "position_ratings": recruit["position_ratings"],
+                "height": recruit["height"],
+                "weight": recruit["weight"],
+                "archetype": recruit["archetype"],
+                "year": recruit["year"],
+                "created_at": recruit["created_at"],
+            }
+            franchise_recruits_data_collection.insert_one(frd_doc)
+
         for team in self.teams:
             team_object_id = team["_id"]
             team_attrs = TeamManager.init_team_attributes(mode="franchise")

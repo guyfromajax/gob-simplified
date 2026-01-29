@@ -11,7 +11,13 @@ from typing import Any, Optional
 from datetime import datetime
 from BackEnd.main import run_simulation
 
-from BackEnd.db import db, franchise_state_collection, franchise_team_data_collection
+from BackEnd.db import (
+    db,
+    franchise_state_collection,
+    franchise_team_data_collection,
+    franchise_players_data_collection,
+    franchise_recruits_data_collection,
+)
 from BackEnd.utils.shared import summarize_game_state
 from BackEnd.utils import stat_updater
 from BackEnd.utils.team_stats_aggregator import aggregate_team_stats_from_players
@@ -1373,8 +1379,19 @@ def complete_week(req: CompleteWeekRequest):
     
     if req.week == 14:
         # Week 14 complete - initialize EOS Tournament
-        logger.info(f"🎯 [EOS TOURNAMENT] Week 14 complete, initializing tournament")
-        tournament_state = initialize_eos_tournament(franchise_doc, db.teams)
+        # ✅ FTD: Get team IDs from franchise_team_data (franchise_teams is empty after migration)
+        ftd_docs = list(franchise_team_data_collection.find(
+            {"franchise_id": str(franchise_id)},
+            {"team_id": 1}
+        ))
+        eos_team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id")]
+        if len(eos_team_ids) < 8:
+            logger.warning(
+                f"⚠️ [EOS TOURNAMENT] Fewer than 8 teams in FTD (got {len(eos_team_ids)}); "
+                "bracket may fail. Proceeding anyway."
+            )
+        logger.info(f"🎯 [EOS TOURNAMENT] Week 14 complete, initializing tournament (teams from FTD: {len(eos_team_ids)})")
+        tournament_state = initialize_eos_tournament(franchise_doc, db.teams, team_ids=eos_team_ids)
         update_fields["eos_tournament"] = tournament_state
         update_fields["eos_tournament_active"] = True
         logger.info(f"✅ [EOS TOURNAMENT] Tournament initialized, week set to 15")
@@ -2014,14 +2031,13 @@ def team_stats(franchise_id: str):
         raise HTTPException(status_code=400, detail="Invalid franchise_id")
     
     db_query_start = time.time()
-    franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 1, "results": 1})
+    franchise_doc = db.franchises.find_one({"_id": fid}, {"results": 1})
     db_query_time = time.time() - db_query_start
     logger.info(f"⏱️ [PERF] /franchise/team-stats DB query: {db_query_time:.3f}s")
-    
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
-    
-    players = franchise_doc.get("players", {})
+    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_id)}))
+    players = {d["player_id"]: d for d in fpd_docs}
     franchise_results = franchise_doc.get("results", {})
     team_list = _ftd_team_list_for_franchise(fid)
     # Build team_id -> [player_id, ...] from FTD.players for aggregation (prefer over meta.team_id)
@@ -2069,14 +2085,13 @@ def team_traits(franchise_id: str):
         raise HTTPException(status_code=400, detail="Invalid franchise_id")
     
     db_query_start = time.time()
-    franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 1})
+    franchise_doc = db.franchises.find_one({"_id": fid}, {"_id": 1})
     db_query_time = time.time() - db_query_start
     logger.info(f"⏱️ [PERF] /franchise/team-traits DB query: {db_query_time:.3f}s")
-    
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
-    
-    players = franchise_doc.get("players", {})
+    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_id)}))
+    players = {d["player_id"]: d for d in fpd_docs}
     team_list = _ftd_team_list_for_franchise(fid)
     
     logger.info(f"⏱️ [PERF] /franchise/team-traits Found {len(players)} players, {len(team_list)} teams")
@@ -2183,8 +2198,8 @@ def get_team_player_stats(
     except Exception:
         fid = franchise_id
 
-    doc = db.franchises.find_one({"_id": fid}, {"players": 1}) or {}
-    franchise_players = doc.get("players", {})
+    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_id) if isinstance(franchise_id, str) else str(fid)}))
+    franchise_players = {d["player_id"]: d for d in fpd_docs}
     team_id_str = str(team_id)
     results: list[dict] = []
 
@@ -2306,31 +2321,21 @@ def user_team_player_stats_endpoint(
 
 @router.get("/franchise/recruits")
 def recruits(franchise_id: str = Query(...)):
-    """Get recruits for a specific franchise."""
+    """Get recruits for a specific franchise. Reads from FRD (franchise_recruits_data)."""
     import time
-    from bson import ObjectId
-    
     start_time = time.time()
     logger.info(f"⏱️ [PERF] /franchise/recruits START - franchise_id={franchise_id}")
-    
-    # ✅ PERFORMANCE: Get recruits from franchise document with projection (only recruits field)
     db_query_start = time.time()
-    franchise = db.franchises.find_one(
-        {"_id": ObjectId(franchise_id)}, 
-        {"recruits": 1, "_id": 1}
-    )
+    # ✅ FPD/FRD: Get recruits from franchise_recruits_data (not franchise.recruits)
+    rec_docs = list(franchise_recruits_data_collection.find(
+        {"franchise_id": str(franchise_id)},
+        {"_id": 0, "franchise_id": 0}  # Exclude _id and franchise_id for response shape
+    ))
     db_query_time = time.time() - db_query_start
     logger.info(f"⏱️ [PERF] /franchise/recruits DB query: {db_query_time:.3f}s")
-    
-    if not franchise:
-        total_time = time.time() - start_time
-        logger.info(f"⏱️ [PERF] /franchise/recruits COMPLETE: {total_time:.3f}s (no franchise)")
-        return {"recruits": []}
-    
-    recs = franchise.get("recruits", [])
     total_time = time.time() - start_time
-    logger.info(f"⏱️ [PERF] /franchise/recruits COMPLETE: {total_time:.3f}s ({len(recs)} recruits)")
-    return {"recruits": recs}
+    logger.info(f"⏱️ [PERF] /franchise/recruits COMPLETE: {total_time:.3f}s ({len(rec_docs)} recruits)")
+    return {"recruits": rec_docs}
 
 
 @router.get("/franchise/debug-names")
@@ -2387,17 +2392,20 @@ def get_franchise_state(franchise_id: str):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid franchise ID")
     
-    # ✅ PERFORMANCE: Only fetch players object (frontend only uses franchiseDoc.players)
+    # ✅ FPD: Load franchise without players blob; build players from FPD for same response shape
     db_query_start = time.time()
-    franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 1, "_id": 1})
+    franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 0})  # Exclude players (stored in FPD)
     db_query_time = time.time() - db_query_start
     logger.info(f"⏱️ [PERF] /franchise/state DB query: {db_query_time:.3f}s")
-    
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
-    
-    players_count = len(franchise_doc.get("players", {}))
-    logger.info(f"⏱️ [PERF] /franchise/state Loaded {players_count} players")
+    fpd_docs = list(franchise_players_data_collection.find(
+        {"franchise_id": str(franchise_id)},
+        {"player_id": 1, "meta": 1, "season": 1, "career": 1, "attributes": 1, "position_ratings": 1}
+    ))
+    franchise_doc["players"] = {d["player_id"]: {k: d[k] for k in ["meta", "season", "career", "attributes", "position_ratings"] if k in d} for d in fpd_docs}
+    players_count = len(franchise_doc["players"])
+    logger.info(f"⏱️ [PERF] /franchise/state Loaded {players_count} players from FPD")
     
     # Convert ObjectId to string for JSON serialization
     franchise_doc["_id"] = str(franchise_doc["_id"])
@@ -2576,30 +2584,26 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
     if not team_doc:
         raise HTTPException(status_code=404, detail="Team not found")
     
-    # ✅ PERFORMANCE: Get franchise document with projection (only players field)
-    franchise_query_start = time.time()
-    franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 1, "_id": 1})
-    franchise_query_time = time.time() - franchise_query_start
-    logger.info(f"⏱️ [PERF] /franchise/roster DB query 2 (franchise players): {franchise_query_time:.3f}s")
-    if not franchise_doc:
-        raise HTTPException(status_code=404, detail="Franchise not found")
-    
-    franchise_players = franchise_doc.get("players", {})
+    # ✅ FPD: Get franchise player data from franchise_players_data (not franchise.players)
     team_player_ids = team_doc.get("player_ids", [])
-    
-    # ✅ PERFORMANCE: Batch player lookups to fix N+1 query pattern
-    # Instead of 12 individual queries, do 1 batch query with $in operator
+    pid_list = [str(pid) for pid in team_player_ids]
+    franchise_query_start = time.time()
+    fpd_docs = list(franchise_players_data_collection.find(
+        {"franchise_id": str(franchise_id), "player_id": {"$in": pid_list}},
+        {"player_id": 1, "meta": 1, "attributes": 1, "position_ratings": 1}
+    ))
+    franchise_query_time = time.time() - franchise_query_start
+    logger.info(f"⏱️ [PERF] /franchise/roster DB query 2 (FPD): {franchise_query_time:.3f}s")
+    franchise_players = {d["player_id"]: d for d in fpd_docs}
+
     batch_query_start = time.time()
-    # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
     core_players_dict = {str(p["_id"]): p for p in db.players.find(
         {"_id": {"$in": team_player_ids}},
         {"position_ratings": 1, "height": 1, "weight": 1, "jersey": 1, "year": 1, "attributes": 1}
     )}
     batch_query_time = time.time() - batch_query_start
     logger.info(f"⏱️ [PERF] /franchise/roster Batch player query ({len(team_player_ids)} players): {batch_query_time:.3f}s")
-    
-    # Build player list with franchise-specific attributes
-    # ✅ SS&S: Use franchise.players as single source of truth (no merging with universal collection)
+
     processing_start = time.time()
     players = []
     for pid in team_player_ids:
@@ -2607,31 +2611,20 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
         franchise_player_data = franchise_players.get(pid_str, {})
         if not franchise_player_data:
             continue
-        
         meta = franchise_player_data.get("meta", {})
-        
-        # ✅ SS&S: Get attributes directly from franchise.players (single source of truth)
         merged_attributes = franchise_player_data.get("attributes", {}).copy()
-        
-        # Ensure anchor_ versions exist (they should after initialization, but be safe)
         for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
             if attr_key in merged_attributes and f"anchor_{attr_key}" not in merged_attributes:
                 merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
-        
-        # ✅ SS&S: Get position ratings from franchise.players (single source of truth)
         position_ratings = franchise_player_data.get("position_ratings", {})
-        
-        # ✅ PERFORMANCE: Use cached result from batch query for height/weight/jersey/year only
         core_player = core_players_dict.get(pid_str)
-        
         first = meta.get("first_name", "")
         last = meta.get("last_name", "")
-        
         player = {
-            "_id": pid_str,  # Add _id for lineup tracking
+            "_id": pid_str,
             "first_name": first,
             "last_name": last,
-            "name": f"{first} {last}".strip(),  # Add combined name for display
+            "name": f"{first} {last}".strip(),
             "team": team_name,
             "attributes": merged_attributes,
             "position_ratings": position_ratings,
@@ -2849,9 +2842,10 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     if req.team_id and req.team_id != team_id:
         logger.warning(f"⚠️ [TRAINING] Request team_id ({req.team_id}) doesn't match franchise document user_team_object_id ({team_id}). Using franchise document value.")
 
-    # Get franchise-specific player data for the user's team
-    franchise_players = franchise_doc.get("players", {})
-    
+    # ✅ FPD: Load franchise player data from franchise_players_data (not franchise.players)
+    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(req.franchise_id)}))
+    franchise_players = {d["player_id"]: d for d in fpd_docs}
+
     # Get player_ids from team_doc if available, otherwise try to get from franchise_teams
     if team_doc:
         team_player_ids = team_doc.get("player_ids", [])
@@ -3049,26 +3043,26 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     player_logs = training_report.get("player_logs") or training_report.get("player_changes", {})
     team_log = training_report.get("team_log") or training_report.get("team_changes", {})
 
-    # Update franchise document with new attribute values and position ratings
+    # ✅ FPD: Update franchise_players_data with new attribute values and position ratings (not franchise.players)
     franchise_update = {}
     for player in players_for_training:
         pid = player["_id"]
         attrs = player.get("attributes", {})
-        
-        # Update all anchor attributes and base attributes
+        fpd_set = {}
         for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO"]:
             anchor_key = f"anchor_{attr}"
             if anchor_key in attrs:
-                franchise_update[f"players.{pid}.attributes.{anchor_key}"] = attrs[anchor_key]
-                franchise_update[f"players.{pid}.attributes.{attr}"] = attrs[attr]
-        
-        # NG doesn't have an anchor_key, save it directly if it exists
+                fpd_set[f"attributes.{anchor_key}"] = attrs[anchor_key]
+                fpd_set[f"attributes.{attr}"] = attrs[attr]
         if "NG" in attrs:
-            franchise_update[f"players.{pid}.attributes.NG"] = attrs["NG"]
-        
-        # Update position ratings for this player
+            fpd_set["attributes.NG"] = attrs["NG"]
         if pid in position_ratings_updates:
-            franchise_update[f"players.{pid}.position_ratings"] = position_ratings_updates[pid]
+            fpd_set["position_ratings"] = position_ratings_updates[pid]
+        if fpd_set:
+            franchise_players_data_collection.update_one(
+                {"franchise_id": str(req.franchise_id), "player_id": pid},
+                {"$set": fpd_set},
+            )
 
     # ✅ FTD: Build FTD update document
     ftd_update = {}
@@ -3241,24 +3235,29 @@ def run_franchise_training(req: FranchiseTrainingRequest):
                 }
                 
                 new_ratings = compute_position_ratings(player_for_ratings)
-                franchise_update[f"players.{pid}.position_ratings"] = new_ratings
-            
-            # Update computer team players' attributes (in franchise doc, not FTD)
+                franchise_players_data_collection.update_one(
+                    {"franchise_id": str(req.franchise_id), "player_id": pid},
+                    {"$set": {"position_ratings": new_ratings}},
+                )
+
+            # ✅ FPD: Update computer team players' attributes in franchise_players_data
             for player in updated_computer_players:
                 pid = player["_id"]
                 attrs = player.get("attributes", {})
-                
-                # Update all anchor attributes and base attributes
+                fpd_set = {}
                 for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO"]:
                     anchor_key = f"anchor_{attr}"
                     if anchor_key in attrs:
-                        franchise_update[f"players.{pid}.attributes.{anchor_key}"] = attrs[anchor_key]
-                        franchise_update[f"players.{pid}.attributes.{attr}"] = attrs[attr]
-                
-                # NG doesn't have an anchor_key, save it directly if it exists
+                        fpd_set[f"attributes.{anchor_key}"] = attrs[anchor_key]
+                        fpd_set[f"attributes.{attr}"] = attrs[attr]
                 if "NG" in attrs:
-                    franchise_update[f"players.{pid}.attributes.NG"] = attrs["NG"]
-            
+                    fpd_set["attributes.NG"] = attrs["NG"]
+                if fpd_set:
+                    franchise_players_data_collection.update_one(
+                        {"franchise_id": str(req.franchise_id), "player_id": pid},
+                        {"$set": fpd_set},
+                    )
+
             # Update computer team stats (team_attributes) in FTD
             for field, value in updated_computer_team.items():
                 # Skip non-numeric fields
@@ -3422,10 +3421,11 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                         break
             
             # Get current player attributes (after training)
-            # Players are stored at franchise level, not in franchise_teams
+            # ✅ FPD: Load franchise players from franchise_players_data (not franchise.players)
             players = []
-            franchise_players = doc.get("players", {})
-            
+            fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(doc_id)}))
+            franchise_players = {d["player_id"]: d for d in fpd_docs}
+
             # ✅ SS&S: Load team_doc from teams collection to get player_ids (canonical list)
             # This is more efficient and reliable than iterating all players and matching by team_id
             team_doc = db.teams.find_one({"_id": ObjectId(authoritative_team_id)})
@@ -3441,8 +3441,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 player_data = franchise_players.get(pid_str, {})
                 
                 if not player_data:
-                    # Player not in franchise.players (shouldn't happen, but handle gracefully)
-                    logger.warning(f"🔍 [TRAINING REPORT] Player {pid_str} not found in franchise.players")
+                    # Player not in FPD (shouldn't happen, but handle gracefully)
+                    logger.warning(f"🔍 [TRAINING REPORT] Player {pid_str} not found in FPD")
                     continue
                 
                 # Get meta for player name
