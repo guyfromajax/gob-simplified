@@ -31,8 +31,8 @@ def test_leaders_return_top_players_and_exclude_others():
                         "last_name": "Alpha",
                         "season": {
                             "PTS": 20,
-                            "TPM": 5,
-                            "TPA": 10,
+                            "3PTM": 5,
+                            "3PTA": 10,
                             "REB": 8,
                             "AST": 4,
                             "STL": 2,
@@ -46,8 +46,8 @@ def test_leaders_return_top_players_and_exclude_others():
                         "last_name": "Beta",
                         "season": {
                             "PTS": 15,
-                            "TPM": 5,
-                            "TPA": 8,
+                            "3PTM": 5,
+                            "3PTA": 8,
                             "REB": 7,
                             "AST": 5,
                             "STL": 1,
@@ -61,8 +61,8 @@ def test_leaders_return_top_players_and_exclude_others():
                         "last_name": "Excluded",
                         "season": {
                             "PTS": 100,
-                            "TPM": 20,
-                            "TPA": 30,
+                            "3PTM": 20,
+                            "3PTA": 30,
                             "REB": 10,
                             "AST": 10,
                             "STL": 10,
@@ -80,8 +80,8 @@ def test_leaders_return_top_players_and_exclude_others():
     assert leaders["PTS"][0]["player_id"] == "p1"
     assert leaders["PTS"][1]["player_id"] == "p2"
     assert all(entry["player_id"] != "p3" for entry in leaders["PTS"])
-    assert leaders["TPM"][0]["player_id"] == "p1"
-    assert leaders["TPM"][1]["player_id"] == "p2"
+    assert leaders["3PTM"][0]["player_id"] == "p1"
+    assert leaders["3PTM"][1]["player_id"] == "p2"
 
     # ensure leaderboards persisted to tournament document
     stored = tournaments_collection.find_one({"_id": tid})

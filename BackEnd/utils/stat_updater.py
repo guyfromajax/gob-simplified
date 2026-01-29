@@ -552,21 +552,19 @@ def recompute_tournament_leaders(tournament_id: str, limit: int = 10) -> Dict[st
     if not tourney:
         return {}
 
-    teams: set[str] = set()
-    for round_matches in tourney.get("bracket", {}).values():
-        for match in round_matches:
-            teams.add(match.get("home_team"))
-            teams.add(match.get("away_team"))
-    teams.discard(None)
+    teams_obj = tourney.get("teams") or {}
+    team_names: set[str] = (
+        {v["name"] for v in teams_obj.values() if isinstance(v, dict) and v.get("name")}
+        if isinstance(teams_obj, dict)
+        else set()
+    )
 
     players: list[Dict[str, Any]] = []
-    # ✅ MIGRATION: Use players key instead of player_stats (aligns with Franchise)
-    tournament_players = tourney.get("players", {}) or tourney.get("player_stats", {})  # Backward compatibility
+    tournament_players = tourney.get("players", {}) or tourney.get("player_stats", {})
     for pid, pdata in tournament_players.items():
-        # ✅ MIGRATION: Support both old (direct fields) and new (meta wrapper) structures
         meta = pdata.get("meta", {})
         team_name = meta.get("team") or pdata.get("team", "")
-        if team_name not in teams:
+        if team_name not in team_names:
             continue
         
         first_name = meta.get("first_name") or pdata.get("first_name", "")
