@@ -41,9 +41,8 @@ const teamMap = {
   "Xavien": "Xav",
 };
 
-function isUserTeam(teamName) {
-  // Compare with team name (bracket uses team names, not ObjectIds)
-  return teamName === userTeamName || teamName === userTeamId;
+function isUserTeam(teamNameOrId) {
+  return teamNameOrId === userTeamName || String(teamNameOrId) === String(userTeamId);
 }
 
 // Map full team names to bracket logo filenames
@@ -75,6 +74,9 @@ const leaderBoards = [
 ];
 
 let leaderData = {};
+
+/** ID -> name map for schedule/bracket display (Franchise pattern). Populated from team-stats. */
+const teamIdNameMap = {};
 
 console.log("✅ tournament.js loaded");
 
@@ -195,17 +197,21 @@ function renderBracket() {
     });
   }
 
-  function createTeamEntry(team, side, score, isWinner) {
+  function teamName(id) {
+    return (id != null && teamIdNameMap[String(id)]) || id;
+  }
+
+  function createTeamEntry(teamId, teamNameVal, side, score, isWinner) {
     const div = document.createElement("div");
     div.className = "team-entry";
     if (isWinner) div.classList.add("winner");
     const label = document.createElement("span");
     label.className = `seed-label ${side === "left" ? "seed-left" : "seed-right"}`;
-    label.textContent = seedMap[team] ? `#${seedMap[team]}` : "";
+    label.textContent = seedMap[teamId] ? `#${seedMap[teamId]}` : "";
     const img = document.createElement("img");
-    img.src = getLogo(team);
+    img.src = getLogo(teamNameVal);
     img.classList.add("team-logo", "bracket-logo");
-    if (isUserTeam(team)) img.classList.add("user-team");
+    if (isUserTeam(teamId) || isUserTeam(teamNameVal)) img.classList.add("user-team");
     const scoreSpan = document.createElement("span");
     scoreSpan.className = "score";
     scoreSpan.textContent = score !== undefined && score !== null ? score : "";
@@ -227,21 +233,21 @@ function renderBracket() {
     const matchup = document.createElement("div");
     matchup.className = "matchup";
 
-    // Always prefer results pulled from ``tournament.results`` so the
-    // bracket reflects finalized scores, even after the tournament is
-    // completed.  Fall back to any score/winner information stored
-    // directly on the matchup if results have not yet been recorded.
+    const homeId = m.home_team;
+    const awayId = m.away_team;
+    const homeName = teamName(homeId);
+    const awayName = teamName(awayId);
     const res = getResult(round, index);
-    const homeScore = res?.score?.[m.home_team] ?? m.score?.[m.home_team];
-    const awayScore = res?.score?.[m.away_team] ?? m.score?.[m.away_team];
+    const homeScore = res?.score?.[homeName] ?? m.score?.[homeName];
+    const awayScore = res?.score?.[awayName] ?? m.score?.[awayName];
     const winner = res?.winner ?? m.winner ?? null;
 
     if (side === "center") {
-      matchup.appendChild(createTeamEntry(m.home_team, "left", homeScore, winner === m.home_team));
-      matchup.appendChild(createTeamEntry(m.away_team, "right", awayScore, winner === m.away_team));
+      matchup.appendChild(createTeamEntry(homeId, homeName, "left", homeScore, winner === homeId || String(winner) === String(homeId)));
+      matchup.appendChild(createTeamEntry(awayId, awayName, "right", awayScore, winner === awayId || String(winner) === String(awayId)));
     } else {
-      matchup.appendChild(createTeamEntry(m.home_team, side, homeScore, winner === m.home_team));
-      matchup.appendChild(createTeamEntry(m.away_team, side, awayScore, winner === m.away_team));
+      matchup.appendChild(createTeamEntry(homeId, homeName, side, homeScore, winner === homeId || String(winner) === String(homeId)));
+      matchup.appendChild(createTeamEntry(awayId, awayName, side, awayScore, winner === awayId || String(winner) === String(awayId)));
     }
     wrap.appendChild(matchup);
     return wrap;
@@ -762,14 +768,26 @@ function renderTeamStats(data) {
   console.log('🔍 [DEBUG renderTeamStats] Data received:', {
     hasData: !!data,
     teamsCount: data?.teams?.length || 0,
-    teams: data?.teams?.map(t => ({ team: t.team, hasStats: !!t.stats })) || []
+    teams: data?.teams?.map(t => ({ team: t.team, team_id: t.team_id, hasStats: !!t.stats })) || []
   });
-  
+
   if (!data) {
     console.warn('⚠️ [DEBUG renderTeamStats] No data provided');
     return;
   }
   tournamentTeamsDataForSorting = JSON.parse(JSON.stringify(data.teams || [])); // Deep copy for sorting
+
+  for (const k of Object.keys(teamIdNameMap)) delete teamIdNameMap[k];
+  (data.teams || []).forEach(t => {
+    if (t.team_id != null && t.team != null) {
+      teamIdNameMap[String(t.team_id)] = t.team;
+    }
+  });
+  if (Object.keys(teamIdNameMap).length) {
+    renderBracket();
+    renderSchedule();
+  }
+
   console.log('🔍 [DEBUG renderTeamStats] Calling TeamStatsTable.renderTeamStatsTable() with', tournamentTeamsDataForSorting.length, 'teams');
   TeamStatsTable.renderTeamStatsTable(tournamentTeamsDataForSorting);
   console.log('✅ [DEBUG renderTeamStats] TeamStatsTable.renderTeamStatsTable() called');
@@ -823,6 +841,26 @@ function renderSchedule() {
     return results.find(r => r.round === round && r.match_index === index) || null;
   }
 
+  function teamName(id) {
+    return (id != null && teamIdNameMap[String(id)]) || id;
+  }
+
+  const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
+  const createTeamLink = (displayName, teamId, seed) => {
+    const link = document.createElement('a');
+    const q = new URLSearchParams({ mode: 'tournament', tournament_id: tournament._id, return_tab: 'schedule-tab', return_url: returnUrl });
+    if (teamId) q.set('team_id', teamId);
+    q.set('team_name', displayName);
+    link.href = `/team-roster-view.html?${q.toString()}`;
+    link.textContent = seed ? `Team ${seed} ${displayName}` : displayName;
+    link.style.color = '#4a90e2';
+    link.style.textDecoration = 'none';
+    link.style.cursor = 'pointer';
+    link.addEventListener('mouseenter', () => { link.style.textDecoration = 'underline'; });
+    link.addEventListener('mouseleave', () => { link.style.textDecoration = 'none'; });
+    return link;
+  };
+
   // First Round
   const firstRoundDiv = document.createElement('div');
   firstRoundDiv.className = 'schedule-round';
@@ -832,55 +870,32 @@ function renderSchedule() {
 
   round1.forEach((match, index) => {
     const res = getResult(1, index);
-    const homeScore = res?.score?.[match.home_team] ?? match.score?.[match.home_team];
-    const awayScore = res?.score?.[match.away_team] ?? match.score?.[match.away_team];
+    const homeName = teamName(match.home_team);
+    const awayName = teamName(match.away_team);
+    const homeScore = res?.score?.[homeName] ?? match.score?.[homeName];
+    const awayScore = res?.score?.[awayName] ?? match.score?.[awayName];
     const winner = res?.winner ?? match.winner ?? null;
 
     const gameDiv = document.createElement('div');
     gameDiv.className = 'schedule-game';
     const homeSeed = seedMap[match.home_team] || '';
     const awaySeed = seedMap[match.away_team] || '';
-    
-    // Create clickable team links
-    const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
-    const createTeamLink = (teamName, seed) => {
-      const link = document.createElement('a');
-      link.href = `/team-roster-view.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
-      link.textContent = seed ? `Team ${seed} ${teamName}` : teamName;
-      link.style.color = '#4a90e2';
-      link.style.textDecoration = 'none';
-      link.style.cursor = 'pointer';
-      link.addEventListener('mouseenter', () => {
-        link.style.textDecoration = 'underline';
-      });
-      link.addEventListener('mouseleave', () => {
-        link.style.textDecoration = 'none';
-      });
-      return link;
-    };
-    
-    const awayLink = createTeamLink(match.away_team, awaySeed);
-    const homeLink = createTeamLink(match.home_team, homeSeed);
+
+    const awayLink = createTeamLink(awayName, match.away_team, awaySeed);
+    const homeLink = createTeamLink(homeName, match.home_team, homeSeed);
     const atText = document.createTextNode(' @ ');
-    
+
     if (homeScore !== undefined && awayScore !== undefined) {
       const awayScoreText = document.createTextNode(` (${awayScore})`);
       const homeScoreText = document.createTextNode(` (${homeScore})`);
-      
       const awayContainer = document.createElement('span');
-      if (awayScore > homeScore) {
-        awayContainer.style.fontWeight = 'bold';
-      }
+      if (awayScore > homeScore) awayContainer.style.fontWeight = 'bold';
       awayContainer.appendChild(awayLink);
       awayContainer.appendChild(awayScoreText);
-      
       const homeContainer = document.createElement('span');
-      if (homeScore > awayScore) {
-        homeContainer.style.fontWeight = 'bold';
-      }
+      if (homeScore > awayScore) homeContainer.style.fontWeight = 'bold';
       homeContainer.appendChild(homeLink);
       homeContainer.appendChild(homeScoreText);
-      
       gameDiv.appendChild(awayContainer);
       gameDiv.appendChild(atText);
       gameDiv.appendChild(homeContainer);
@@ -889,8 +904,7 @@ function renderSchedule() {
       gameDiv.appendChild(atText);
       gameDiv.appendChild(homeLink);
     }
-    
-    // ✅ FIX: Add box score link for completed games (aligns with FCC)
+
     const gameId = res?.game_id || match.game_id;
     if (gameId && homeScore !== undefined && awayScore !== undefined) {
       const boxScoreLink = document.createElement('a');
@@ -898,9 +912,8 @@ function renderSchedule() {
       boxScoreParams.set('mode', 'tournament');
       boxScoreParams.set('tournament_id', tournament._id);
       boxScoreParams.set('game_id', gameId);
-      // ✅ Add team names for roster loading
-      if (match.home_team) boxScoreParams.set('home', match.home_team);
-      if (match.away_team) boxScoreParams.set('away', match.away_team);
+      if (homeName) boxScoreParams.set('home', homeName);
+      if (awayName) boxScoreParams.set('away', awayName);
       boxScoreLink.href = `/box-score.html?${boxScoreParams.toString()}`;
       boxScoreLink.textContent = ' [Box Score]';
       boxScoreLink.className = 'box-score-link';
@@ -910,9 +923,7 @@ function renderSchedule() {
       boxScoreLink.style.fontSize = 'calc(1em - 2px)';
       gameDiv.appendChild(boxScoreLink);
     }
-    
-    // ✅ REMOVED: Training Report links - Training is not used in Tournament mode
-    
+
     firstRoundDiv.appendChild(gameDiv);
   });
   container.appendChild(firstRoundDiv);
@@ -927,54 +938,31 @@ function renderSchedule() {
   for (let i = 0; i < 2; i++) {
     const gameDiv = document.createElement('div');
     gameDiv.className = 'schedule-game';
-    
+
     if (round2[i]) {
       const match = round2[i];
       const res = getResult(2, i);
-      const homeScore = res?.score?.[match.home_team] ?? match.score?.[match.home_team];
-      const awayScore = res?.score?.[match.away_team] ?? match.score?.[match.away_team];
+      const homeName = teamName(match.home_team);
+      const awayName = teamName(match.away_team);
+      const homeScore = res?.score?.[homeName] ?? match.score?.[homeName];
+      const awayScore = res?.score?.[awayName] ?? match.score?.[awayName];
       const winner = res?.winner ?? match.winner ?? null;
 
-      // Create clickable team links for semifinals
-      const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
-      const createTeamLink = (teamName) => {
-        const link = document.createElement('a');
-        link.href = `/team-roster-view.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
-        link.textContent = teamName;
-        link.style.color = '#4a90e2';
-        link.style.textDecoration = 'none';
-        link.style.cursor = 'pointer';
-        link.addEventListener('mouseenter', () => {
-          link.style.textDecoration = 'underline';
-        });
-        link.addEventListener('mouseleave', () => {
-          link.style.textDecoration = 'none';
-        });
-        return link;
-      };
-      
-      const awayLink = createTeamLink(match.away_team);
-      const homeLink = createTeamLink(match.home_team);
+      const awayLink = createTeamLink(awayName, match.away_team, '');
+      const homeLink = createTeamLink(homeName, match.home_team, '');
       const atText = document.createTextNode(' @ ');
-      
+
       if (homeScore !== undefined && awayScore !== undefined) {
         const awayScoreText = document.createTextNode(` (${awayScore})`);
         const homeScoreText = document.createTextNode(` (${homeScore})`);
-        
         const awayContainer = document.createElement('span');
-        if (awayScore > homeScore) {
-          awayContainer.style.fontWeight = 'bold';
-        }
+        if (awayScore > homeScore) awayContainer.style.fontWeight = 'bold';
         awayContainer.appendChild(awayLink);
         awayContainer.appendChild(awayScoreText);
-        
         const homeContainer = document.createElement('span');
-        if (homeScore > awayScore) {
-          homeContainer.style.fontWeight = 'bold';
-        }
+        if (homeScore > awayScore) homeContainer.style.fontWeight = 'bold';
         homeContainer.appendChild(homeLink);
         homeContainer.appendChild(homeScoreText);
-        
         gameDiv.appendChild(awayContainer);
         gameDiv.appendChild(atText);
         gameDiv.appendChild(homeContainer);
@@ -983,12 +971,17 @@ function renderSchedule() {
         gameDiv.appendChild(atText);
         gameDiv.appendChild(homeLink);
       }
-      
-      // ✅ FIX: Add box score link for completed games (aligns with FCC)
+
       const gameId = res?.game_id || match.game_id;
       if (gameId && homeScore !== undefined && awayScore !== undefined) {
         const boxScoreLink = document.createElement('a');
-        boxScoreLink.href = `/box-score.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&game_id=${encodeURIComponent(gameId)}`;
+        const boxScoreParams = new URLSearchParams();
+        boxScoreParams.set('mode', 'tournament');
+        boxScoreParams.set('tournament_id', tournament._id);
+        boxScoreParams.set('game_id', gameId);
+        if (homeName) boxScoreParams.set('home', homeName);
+        if (awayName) boxScoreParams.set('away', awayName);
+        boxScoreLink.href = `/box-score.html?${boxScoreParams.toString()}`;
         boxScoreLink.textContent = ' [Box Score]';
         boxScoreLink.className = 'box-score-link';
         boxScoreLink.style.color = '#4a90e2';
@@ -997,12 +990,10 @@ function renderSchedule() {
         boxScoreLink.style.fontSize = 'calc(1em - 2px)';
         gameDiv.appendChild(boxScoreLink);
       }
-      
-      // ✅ REMOVED: Training Report links - Training is not used in Tournament mode
     } else {
       gameDiv.innerHTML = 'TBD @ TBD';
     }
-    
+
     semiDiv.appendChild(gameDiv);
   }
   container.appendChild(semiDiv);
@@ -1020,50 +1011,27 @@ function renderSchedule() {
   if (finalRound[0]) {
     const match = finalRound[0];
     const res = getResult(3, 0);
-    const homeScore = res?.score?.[match.home_team] ?? match.score?.[match.home_team];
-    const awayScore = res?.score?.[match.away_team] ?? match.score?.[match.away_team];
+    const homeName = teamName(match.home_team);
+    const awayName = teamName(match.away_team);
+    const homeScore = res?.score?.[homeName] ?? match.score?.[homeName];
+    const awayScore = res?.score?.[awayName] ?? match.score?.[awayName];
     const winner = res?.winner ?? match.winner ?? null;
 
-    // Create clickable team links for championship
-    const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
-    const createTeamLink = (teamName) => {
-      const link = document.createElement('a');
-      link.href = `/team-roster-view.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
-      link.textContent = teamName;
-      link.style.color = '#4a90e2';
-      link.style.textDecoration = 'none';
-      link.style.cursor = 'pointer';
-      link.addEventListener('mouseenter', () => {
-        link.style.textDecoration = 'underline';
-      });
-      link.addEventListener('mouseleave', () => {
-        link.style.textDecoration = 'none';
-      });
-      return link;
-    };
-    
-    const awayLink = createTeamLink(match.away_team);
-    const homeLink = createTeamLink(match.home_team);
+    const awayLink = createTeamLink(awayName, match.away_team, '');
+    const homeLink = createTeamLink(homeName, match.home_team, '');
     const atText = document.createTextNode(' @ ');
-    
+
     if (homeScore !== undefined && awayScore !== undefined) {
       const awayScoreText = document.createTextNode(` (${awayScore})`);
       const homeScoreText = document.createTextNode(` (${homeScore})`);
-      
       const awayContainer = document.createElement('span');
-      if (awayScore > homeScore) {
-        awayContainer.style.fontWeight = 'bold';
-      }
+      if (awayScore > homeScore) awayContainer.style.fontWeight = 'bold';
       awayContainer.appendChild(awayLink);
       awayContainer.appendChild(awayScoreText);
-      
       const homeContainer = document.createElement('span');
-      if (homeScore > awayScore) {
-        homeContainer.style.fontWeight = 'bold';
-      }
+      if (homeScore > awayScore) homeContainer.style.fontWeight = 'bold';
       homeContainer.appendChild(homeLink);
       homeContainer.appendChild(homeScoreText);
-      
       champGameDiv.appendChild(awayContainer);
       champGameDiv.appendChild(atText);
       champGameDiv.appendChild(homeContainer);
@@ -1072,8 +1040,7 @@ function renderSchedule() {
       champGameDiv.appendChild(atText);
       champGameDiv.appendChild(homeLink);
     }
-    
-    // ✅ FIX: Add box score link for completed games (aligns with FCC)
+
     const gameId = res?.game_id || match.game_id;
     if (gameId && homeScore !== undefined && awayScore !== undefined) {
       const boxScoreLink = document.createElement('a');
@@ -1081,9 +1048,8 @@ function renderSchedule() {
       boxScoreParams.set('mode', 'tournament');
       boxScoreParams.set('tournament_id', tournament._id);
       boxScoreParams.set('game_id', gameId);
-      // ✅ Add team names for roster loading
-      if (match.home_team) boxScoreParams.set('home', match.home_team);
-      if (match.away_team) boxScoreParams.set('away', match.away_team);
+      if (homeName) boxScoreParams.set('home', homeName);
+      if (awayName) boxScoreParams.set('away', awayName);
       boxScoreLink.href = `/box-score.html?${boxScoreParams.toString()}`;
       boxScoreLink.textContent = ' [Box Score]';
       boxScoreLink.className = 'box-score-link';
@@ -1093,8 +1059,6 @@ function renderSchedule() {
       boxScoreLink.style.fontSize = 'calc(1em - 2px)';
       champGameDiv.appendChild(boxScoreLink);
     }
-    
-    // ✅ REMOVED: Training Report links - Training is not used in Tournament mode
   } else {
     champGameDiv.innerHTML = 'TBD @ TBD';
   }
@@ -1133,10 +1097,10 @@ function updateCTA(data) {
   if (tournament) {
     const roundKey = currentRound === 3 ? 'final' : `round${currentRound}`;
     const matchups = tournament.bracket?.[roundKey] || [];
-    // Compare with team name (bracket uses team names, not ObjectIds)
-    const userMatch = matchups.find(m => m.home_team === userTeamName || m.away_team === userTeamName);
+    const userMatch = matchups.find(m =>
+      String(m.home_team) === String(userTeamId) || String(m.away_team) === String(userTeamId)
+    );
 
-    // user is out of the tournament when no matchup exists or their matchup is finished
     const eliminated = !userMatch || !!userMatch.winner;
     if (eliminated) {
       playBtn.style.display = 'none';
@@ -2002,31 +1966,22 @@ function updateScoutingButton(data) {
   if (tournament) {
     const roundKey = currentRound === 3 ? 'final' : `round${currentRound}`;
     const matchups = tournament.bracket?.[roundKey] || [];
-    // Compare with team name (bracket uses team names, not ObjectIds)
-    const userMatch = matchups.find(m => m.home_team === userTeamName || m.away_team === userTeamName);
-    
-    // User is out of the tournament when no matchup exists or their matchup is finished
+    const userMatch = matchups.find(m =>
+      String(m.home_team) === String(userTeamId) || String(m.away_team) === String(userTeamId)
+    );
+
     const eliminated = !userMatch || !!userMatch.winner;
     if (eliminated) {
       scoutingBtn.style.display = 'none';
       return;
     }
-    
-    // Determine upcoming opponent from bracket
+
     if (userMatch) {
-      if (userTeamName === userMatch.home_team) {
-        upcomingOpponent = userMatch.away_team;
-        upcomingOpponentId = userMatch.away_team; // Use team name as ID for now
-      } else if (userTeamName === userMatch.away_team) {
-        upcomingOpponent = userMatch.home_team;
-        upcomingOpponentId = userMatch.home_team; // Use team name as ID for now
-      }
-      
-      if (upcomingOpponent) {
-        scoutingBtn.style.display = 'block';
-      } else {
-        scoutingBtn.style.display = 'none';
-      }
+      const isHome = String(userMatch.home_team) === String(userTeamId);
+      upcomingOpponentId = isHome ? userMatch.away_team : userMatch.home_team;
+      upcomingOpponent = (upcomingOpponentId != null && teamIdNameMap[String(upcomingOpponentId)]) || upcomingOpponentId;
+
+      scoutingBtn.style.display = upcomingOpponent ? 'block' : 'none';
     } else {
       scoutingBtn.style.display = 'none';
     }
