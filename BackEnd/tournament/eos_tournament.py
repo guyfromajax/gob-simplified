@@ -3,7 +3,7 @@ End-of-Season (EOS) Tournament System for Franchise Mode.
 
 Handles seeding, bracket generation, and tournament progression for weeks 15-17.
 """
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 from bson import ObjectId
 import random
 import logging
@@ -11,20 +11,30 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def calculate_standings(franchise_doc: Dict[str, Any], teams_collection) -> List[Dict[str, Any]]:
+def calculate_standings(
+    franchise_doc: Dict[str, Any],
+    teams_collection,
+    team_ids: Optional[List[Any]] = None,
+) -> List[Dict[str, Any]]:
     """
     Calculate regular season standings for all teams in the franchise.
-    
+
     Args:
         franchise_doc: Franchise document
         teams_collection: MongoDB teams collection
-        
+        team_ids: Optional list of team IDs (ObjectId or str). When provided (e.g. from FTD),
+                  used instead of franchise_teams. Required after FTD migration since
+                  franchise_teams is empty.
+
     Returns:
         List of team standings sorted by: Wins (desc), PF-PA delta (desc), Random
     """
-    # Get all team IDs from franchise_teams
-    franchise_teams = franchise_doc.get("franchise_teams", {})
-    team_ids = [ObjectId(tid) for tid in franchise_teams.keys()]
+    # Prefer explicit team_ids (from FTD) when provided; else fall back to franchise_teams
+    if team_ids is not None:
+        team_ids = [ObjectId(tid) if not isinstance(tid, ObjectId) else tid for tid in team_ids]
+    else:
+        franchise_teams = franchise_doc.get("franchise_teams", {})
+        team_ids = [ObjectId(tid) for tid in franchise_teams.keys()]
     
     # Get team records from teams collection
     teams = list(teams_collection.find(
@@ -78,14 +88,22 @@ def generate_seeds(standings: List[Dict[str, Any]]) -> Dict[str, int]:
 def generate_bracket(seeds: Dict[str, int], teams_collection) -> Dict[str, List[Dict[str, Any]]]:
     """
     Generate tournament bracket structure for 8 teams.
-    
+
     Args:
         seeds: Dictionary mapping team_id to seed (1-8)
         teams_collection: MongoDB teams collection (for team names)
-        
+
     Returns:
         Bracket structure: {round1: [...], round2: [], final: []}
+
+    Raises:
+        ValueError: If seeds has fewer than 8 teams (e.g. empty after FTD migration).
     """
+    if len(seeds) < 8:
+        raise ValueError(
+            f"EOS bracket requires 8 teams; got {len(seeds)}. "
+            "Ensure team IDs are provided from FTD when franchise_teams is empty."
+        )
     # Get team names for bracket display
     team_ids = [ObjectId(tid) for tid in seeds.keys()]
     teams = {str(t["_id"]): t.get("name", "") for t in teams_collection.find(
@@ -121,19 +139,26 @@ def generate_bracket(seeds: Dict[str, int], teams_collection) -> Dict[str, List[
     }
 
 
-def initialize_eos_tournament(franchise_doc: Dict[str, Any], teams_collection) -> Dict[str, Any]:
+def initialize_eos_tournament(
+    franchise_doc: Dict[str, Any],
+    teams_collection,
+    team_ids: Optional[List[Any]] = None,
+) -> Dict[str, Any]:
     """
     Initialize EOS Tournament after week 14 completion.
-    
+
     Args:
         franchise_doc: Franchise document
         teams_collection: MongoDB teams collection
-        
+        team_ids: Optional list of team IDs for standings (e.g. from franchise_team_data).
+                  When provided, used instead of franchise_doc.franchise_teams. Required
+                  after FTD migration since franchise_teams is empty.
+
     Returns:
         Tournament state dictionary to be saved to franchise document
     """
-    # Calculate standings
-    standings = calculate_standings(franchise_doc, teams_collection)
+    # Calculate standings (use team_ids from FTD when franchise_teams is empty)
+    standings = calculate_standings(franchise_doc, teams_collection, team_ids=team_ids)
     
     # Generate seeds (top 8 teams)
     seeds = generate_seeds(standings)

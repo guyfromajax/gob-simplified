@@ -5,7 +5,14 @@ from bson import ObjectId
 from pymongo import ReturnDocument
 
 from BackEnd.constants import BOX_SCORE_KEYS
-from BackEnd.db import db, players_collection, tournaments_collection, games_collection, teams_collection
+from BackEnd.db import (
+    db,
+    players_collection,
+    tournaments_collection,
+    games_collection,
+    teams_collection,
+    franchise_players_data_collection,
+)
 from BackEnd.utils.roster_loader import load_roster
 
 logger = logging.getLogger(__name__)
@@ -1983,9 +1990,7 @@ def finalize_game(
         if players_processed == 0:
             logger.error(f"❌ [FINALIZE_GAME] No players were processed! box_score structure: {box_score}")
 
-        # ✅ SS&S: Ensure all players are initialized before incrementing stats
-        # MongoDB's $inc will create fields if parent path exists, but won't create entire nested structure
-        # Use $setOnInsert to initialize player structure if it doesn't exist (similar to tournament mode)
+        # ✅ FPD: Ensure all players exist in franchise_players_data, then apply stats/meta to FPD
         # Build player-to-team mapping from box_score
         player_to_team: Dict[str, str] = {}
         for tname, tbox in box_score.items():
@@ -1994,25 +1999,18 @@ def finalize_game(
                     p_id = str(pdata.get("playerId", ""))
                     if p_id:
                         player_to_team[p_id] = tname
-        
-        # Check which players need initialization
-        franchise_check = db.franchises.find_one(
-            {"_id": fid},
-            {"players": 1}
-        )
-        existing_players = franchise_check.get("players", {}) if franchise_check else {}
-        logger.info(f"🔍 [FINALIZE_GAME] Found {len(existing_players)} existing players in franchise document")
+
+        existing_fpd_ids = {
+            d["player_id"] for d in franchise_players_data_collection.find(
+                {"franchise_id": str(fid)}, {"player_id": 1}
+            )
+        }
+        logger.info(f"🔍 [FINALIZE_GAME] Found {len(existing_fpd_ids)} existing players in FPD")
         logger.info(f"🔍 [FINALIZE_GAME] Need to process {len(processed_player_ids)} players from box_score")
-        
-        set_on_insert_doc: Dict[str, Any] = {}
-        players_to_initialize = 0
+
         for pid_str in processed_player_ids:
-            # Only initialize if player doesn't exist
-            if pid_str not in existing_players:
-                players_to_initialize += 1
-                # Get player metadata from players_collection
+            if pid_str not in existing_fpd_ids:
                 try:
-                    # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
                     player_doc = players_collection.find_one(
                         {"_id": pid_str},
                         {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1}
@@ -2025,92 +2023,68 @@ def finalize_game(
                             "last_name": player_doc.get("last_name", ""),
                             "team": player_doc.get("team", ""),
                         }
-                        # Use team_id from team_name_to_id map if available (more accurate for current game)
-                        if pid_str in player_to_team:
-                            team_name_for_player = player_to_team[pid_str]
-                            if team_name_for_player in team_name_to_id:
-                                meta["team_id"] = team_name_to_id[team_name_for_player]
-                            else:
-                                # Fallback to player_doc team_id
-                                tid = player_doc.get("team_id")
-                                if tid is not None:
-                                    meta["team_id"] = str(tid)
+                        if pid_str in player_to_team and player_to_team[pid_str] in team_name_to_id:
+                            meta["team_id"] = team_name_to_id[player_to_team[pid_str]]
                         else:
-                            # Fallback to player_doc team_id
                             tid = player_doc.get("team_id")
                             if tid is not None:
                                 meta["team_id"] = str(tid)
-                        
-                        set_on_insert_doc[f"players.{pid_str}"] = {
+                        franchise_players_data_collection.insert_one({
+                            "franchise_id": str(fid),
+                            "player_id": pid_str,
                             "meta": meta,
                             "season": zero_stats.copy(),
                             "career": zero_stats.copy(),
                             "attributes": player_doc.get("attributes", {}),
                             "position_ratings": player_doc.get("position_ratings", {}),
-                        }
-                        logger.debug(f"🔍 [FINALIZE_GAME] Will initialize player {pid_str} if not exists")
+                        })
+                        logger.debug(f"🔍 [FINALIZE_GAME] Inserted new FPD doc for player {pid_str}")
                 except Exception as e:
-                    logger.warning(f"⚠️ [FINALIZE_GAME] Could not load player metadata for {pid_str}: {e}")
+                    logger.warning(f"⚠️ [FINALIZE_GAME] Could not init FPD for {pid_str}: {e}")
 
-        update: Dict[str, Any] = {"$addToSet": {"applied_games": game_id}}
-        if inc_doc:
-            update["$inc"] = inc_doc
-            logger.info(f"🔍 [FINALIZE_GAME] Update doc has {len(inc_doc)} stat increments")
-        else:
-            logger.warning(f"⚠️ [FINALIZE_GAME] No stats to increment (inc_doc is empty)")
-        
-        # ✅ SS&S: Set meta fields (including team_id) if any
-        if set_doc:
-            update["$set"] = set_doc
-            logger.info(f"🔍 [FINALIZE_GAME] Update doc has {len(set_doc)} meta fields to set")
-        
-        # ✅ SS&S: Initialize players if they don't exist (using $setOnInsert)
-        if set_on_insert_doc:
-            update["$setOnInsert"] = set_on_insert_doc
-            logger.info(f"🔍 [FINALIZE_GAME] Update doc has {len(set_on_insert_doc)} players to initialize if not exists")
-        else:
-            logger.info(f"🔍 [FINALIZE_GAME] No players need initialization (all {len(processed_player_ids)} players already exist)")
-        
-        # ✅ DEBUG: Log final update document structure
-        logger.info(f"🔍 [FINALIZE_GAME] Final update document structure:")
-        logger.info(f"🔍 [FINALIZE_GAME]   - $addToSet applied_games: {game_id}")
-        logger.info(f"🔍 [FINALIZE_GAME]   - $inc operations: {len(inc_doc) if inc_doc else 0}")
-        logger.info(f"🔍 [FINALIZE_GAME]   - $set operations: {len(set_doc) if set_doc else 0}")
-        logger.info(f"🔍 [FINALIZE_GAME]   - $setOnInsert operations: {len(set_on_insert_doc) if set_on_insert_doc else 0}")
+        for pid_str in processed_player_ids:
+            fpd_inc = {k.replace(f"players.{pid_str}.", ""): v for k, v in inc_doc.items() if k.startswith(f"players.{pid_str}.")}
+            fpd_set = {k.replace(f"players.{pid_str}.", ""): v for k, v in set_doc.items() if k.startswith(f"players.{pid_str}.")}
+            if fpd_inc or fpd_set:
+                update_op: Dict[str, Any] = {}
+                if fpd_inc:
+                    update_op["$inc"] = fpd_inc
+                if fpd_set:
+                    update_op["$set"] = fpd_set
+                franchise_players_data_collection.update_one(
+                    {"franchise_id": str(fid), "player_id": pid_str},
+                    update_op,
+                )
 
-        # ✅ DEBUG: Check if game is already applied before attempting update
+        logger.info(f"🔍 [FINALIZE_GAME] Applied stats/meta to FPD for {len(processed_player_ids)} players")
+
         franchise_check_before = db.franchises.find_one({"_id": fid}, {"applied_games": 1})
         if franchise_check_before:
             applied_before = franchise_check_before.get("applied_games", [])
             if game_id in applied_before or str(game_id) in [str(g) for g in applied_before]:
                 logger.warning(f"⚠️ [FINALIZE_GAME] Game {game_id} already in applied_games: {applied_before}, skipping (idempotent)")
                 return
-        
-        logger.info(f"🔍 [FINALIZE_GAME] Executing MongoDB update_one with query: {{'_id': {fid}, 'applied_games': {{'$ne': {game_id}}}}}")
+
         result = db.franchises.update_one(
             {"_id": fid, "applied_games": {"$ne": game_id}},
-            update,
+            {"$addToSet": {"applied_games": game_id}},
         )
-        
-        logger.info(f"🔍 [FINALIZE_GAME] MongoDB update result: matched={result.matched_count}, modified={result.modified_count}, upserted_id={result.upserted_id}")
-        
+
+        logger.info(f"🔍 [FINALIZE_GAME] Franchise applied_games update: matched={result.matched_count}, modified={result.modified_count}")
+
         if result.modified_count == 0:
-            logger.warning(f"⚠️ [FINALIZE_GAME] Update had no effect (modified_count=0). matched_count={result.matched_count}")
-            # Check if game is already applied
             franchise_check = db.franchises.find_one({"_id": fid}, {"applied_games": 1})
             if franchise_check:
                 applied = franchise_check.get("applied_games", [])
                 if game_id in applied or str(game_id) in [str(g) for g in applied]:
                     logger.info(f"ℹ️ [FINALIZE_GAME] Game {game_id} already in applied_games, skipping (idempotent)")
                 else:
-                    logger.error(f"❌ [FINALIZE_GAME] Franchise found but update failed. applied_games={applied}, game_id={game_id} (type: {type(game_id).__name__})")
-                    logger.error(f"❌ [FINALIZE_GAME] This suggests the query filter didn't match. Check if franchise_id or game_id format is wrong.")
+                    logger.error(f"❌ [FINALIZE_GAME] Franchise found but applied_games update failed.")
             else:
                 logger.error(f"❌ [FINALIZE_GAME] Franchise document not found: {fid}")
             return
-        
-        print(f"✅ [FINALIZE_GAME] Successfully updated franchise document: modified_count={result.modified_count}")
-        logger.info(f"✅ [FINALIZE_GAME] Successfully updated franchise document: modified_count={result.modified_count}")
+
+        logger.info(f"✅ [FINALIZE_GAME] Successfully updated franchise applied_games and FPD stats")
         
         # ✅ FIX: Remove redundant apply_stats_from_summary() call
         # apply_stats_from_summary() only updates players_collection for franchise mode, not the franchise document
