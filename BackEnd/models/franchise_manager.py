@@ -128,6 +128,12 @@ class FranchiseManager:
                     logger.info("FRANCHISE_START_WEEK=%s: starting franchise at week %s (testing)", start_week_env, self.week)
             except ValueError:
                 pass
+        # Diagnostic: always log so Railway search for FRANCHISE_START_WEEK returns a hit (WARNING so it shows)
+        logger.warning(
+            "FRANCHISE_START_WEEK env=%s -> starting at week %s",
+            start_week_env if start_week_env is not None else "not set",
+            self.week,
+        )
         self.reset_stats()
 
         zero_stats = {k: 0 for k in BOX_SCORE_KEYS}
