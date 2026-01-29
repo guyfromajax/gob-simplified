@@ -4,10 +4,10 @@
 
 ## Overview
 
-Tournament Mode supports multi-game tournament brackets where team data persists across games within the tournament. Team attributes can be modified through training and persist throughout the tournament. The Tournament Command Center provides a comprehensive interface for managing tournament progression, viewing schedules, and running training sessions.
+Tournament Mode supports multi-game tournament brackets where team data persists across games within the tournament. The Tournament Command Center provides a comprehensive interface for managing tournament progression, viewing schedules, and bracket management. **Training is disabled** in Tournament mode; users go directly to gameplay.
 
 **Location:** `FrontEnd/static/tournament.html`, `FrontEnd/static/tournament.js`  
-**Status:** ✅ Fully implemented with Schedule tab, training integration, and bracket management
+**Status:** ✅ Fully implemented with Schedule tab and bracket management. Training disabled (see below).
 
 ## Base Constants
 
@@ -39,8 +39,7 @@ Tournament Mode supports multi-game tournament brackets where team data persists
 1. **Tournament Creation** - All 8 teams initialized upfront with mode-specific attributes
 2. **Team Object Storage** - Stored in `tournaments` collection under `teams.{team_id}`
 3. **Team Object Loading** - Loaded when creating new game instance within tournament
-4. **Training System** - Team and player attributes updated through training
-5. **Team Object Persistence** - Persists across all games in tournament, reset for new tournaments
+4. **Team Object Persistence** - Persists across all games in tournament, reset for new tournaments
 
 ## Long Form Documentation
 
@@ -48,7 +47,7 @@ Tournament Mode supports multi-game tournament brackets where team data persists
 
 **Initialization:**
 - **URL Parameter Support:** Reads `tournament_id` and `team_id` from URL parameters on page load
-  - Priority 1: URL parameters (when navigating from training report, etc.)
+  - Priority 1: URL parameters (when navigating from report pages, etc.)
   - Priority 2: localStorage (for returning to page)
   - Priority 3: Active tournament lookup by `user_team_id`
 - **Data Loading:** `loadTournament()` function prioritizes URL parameters over localStorage
@@ -110,9 +109,9 @@ Tournament Mode supports multi-game tournament brackets where team data persists
 **Header Controls:**
 - **Set Game Plan** - Navigate to Game Plan screen
 - **Playbooks** - Navigate to Playbooks page
-- **Run Training / Play Next Game** - Dynamic button that changes based on training status
-  - Shows "Run Training" if training has not been completed for the current round
-  - Shows "Play Next Game" if training has been completed for the current round
+- **Play Next Game / Sim Remaining Games** - Dynamic button based on user's matchup status
+  - Shows "Play Next Game" when the user has an upcoming game in the current round
+  - Shows "Sim Remaining Games" when the user is eliminated or has no game this round
   - Removes opponent name from button text (simplified display)
 
 ### Schedule Tab
@@ -134,81 +133,14 @@ Tournament Mode supports multi-game tournament brackets where team data persists
   - Dynamically filled based on Semifinals winners
   - Shows scores when game is completed
 
-**Training Report Links:**
-- Training report link appears to the right of the user's matchup after training is run
-- Link format: `[Training Report]`
-- Styled in blue, smaller font size
-- Links to `/static/training-report.html` with tournament context
+### Training (Disabled)
 
-### Training Flow
+Training is **not used** in Tournament mode. Users go directly to gameplay (Play Next Game / Sim Remaining). `POST /tournament/run-training` exists as a stub and returns **404** ("Training is not available in Tournament mode") for backward compatibility. No "Run Training" button or training flow in TCC.
 
-**Mandatory Training:**
-- User must run training before each game in the tournament
-- Training is required for each round (First Round, Semifinals, Championship)
-- Training status is tracked per round in `tournament.training_status`
-
-**Training Status Tracking:**
-- `training_status.training_completed` - Boolean flag
-- `training_status.round` - Current round number (1, 2, or 3)
-- `training_status.last_training_date` - Date of last training session
-
-**Button Behavior:**
-- If `training_status.training_completed === false` or `training_status.round !== current_round`:
-  - Button shows "Run Training"
-  - Clicking navigates to `/static/training.html` with tournament context
-- If `training_status.training_completed === true` and `training_status.round === current_round`:
-  - Button shows "Play Next Game"
-  - Clicking proceeds to game simulation and lineup selection
-
-**Training Endpoint:**
+**Training Endpoint (stub only):**
 - **Location:** `BackEnd/api/tournament_routes.py` - `run_tournament_training()`
 - **Endpoint:** `POST /tournament/run-training`
-- **Process:**
-  1. Loads tournament document
-  2. Checks for duplicate training submission (same round)
-  3. Loads tournament-specific player attributes from `player_stats`
-  4. **Backward Compatibility:** If tournament only has EM, CH, MO (old format), merges with core collection attributes
-  5. **Data Initialization (Auto-Population):**
-     - If `plays_data` is empty or missing, backend automatically populates it from the universal `plays` collection using `populate_team_plays()`
-     - If `scouting_data` is empty or missing the `defense` structure, backend automatically initializes it using `TeamManager._init_scouting_data()`
-     - Initialized data is saved to the database before training execution
-     - This ensures training works even if game plan or playbooks haven't been submitted yet
-  6. Executes training using `execute_training()` from `training_execution_v2.py`
-  7. **Saves ALL player attributes** to tournament document (not just modified ones) - unified with Franchise architecture
-  8. Marks training as completed for current round
-  9. **Training Report Storage (matches Franchise pattern):**
-     - Stores training report in `teams.{team_id}.training_reports.{round}` (per-round storage)
-     - Also stores in `latest_training` field (quick access)
-  10. **Redirects to Training Report page (SS&S approach):**
-     - URL: `/static/training-report.html?mode=tournament&tournament_id=...&team_id=...`
-     - **Note:** `round` parameter is NOT included in redirect URL
-     - Backend determines round from `training_status.round` or `latest_training.round` when loading report
-     - This follows SS&S pattern: use URL params for navigation, backend state for data resolution
-
-**Training Report:**
-- **Location:** `BackEnd/api/franchise_routes.py` - `get_training_report()` (supports tournament mode)
-- **Endpoint:** `GET /franchise/training-report?mode=tournament&tournament_id=...&team_id=...&round=...` (round is optional)
-- **SS&S Approach:**
-  - **Navigation params (required):** `tournament_id`, `team_id`, `mode`
-  - **Round determination:**
-    - If `round` parameter provided: use it (for historical reports from schedule links)
-    - If not provided: backend determines from `training_status.round` or `latest_training.round`
-    - This allows direct navigation after training without needing round in URL
-- **Data Source:** 
-  - Primary: `tournaments.{tournament_id}.teams.{team_id}.training_reports.{round}` (per-round storage)
-  - Fallback: `tournament.latest_training` field (if per-round not found and round matches)
-- **Attribute Extraction:**
-  - **Unified Architecture:** Tournament mode now uses the same attribute extraction pattern as Franchise mode
-  - All attributes are stored in `tournament.player_stats.{player_id}.attributes` (not just EM, CH, MO)
-  - Extraction reads directly from tournament document (no merging with core collection needed for new tournaments)
-  - **Backward Compatibility:** For old tournaments that only have EM, CH, MO, extraction merges with core collection automatically
-- **Displays:** Player attribute changes, team attribute changes, coaching focus, upcoming opponent, play effectiveness changes, defense effectiveness changes
-- **Pattern:** Matches Franchise mode pattern - per-round storage with `latest_training` fallback, unified attribute storage
-- **SS&S Benefits:** 
-  - Reduces URL parameter complexity
-  - Backend state is source of truth
-  - Historical reports can still use `round` parameter for specific round lookup
-  - Unified architecture simplifies code maintenance and reduces bugs
+- Always returns **404** with detail "Training is not available in Tournament mode". No training logic.
 
 ### Team Object Lifecycle
 
@@ -299,11 +231,9 @@ Tournament Mode supports multi-game tournament brackets where team data persists
 - Updated when user submits game plan changes
 
 **Team Attributes:**
-- Updated through training system
-- Training changes are stored in tournament document
-- **ALL player attributes** updated in `tournament.player_stats.{player_id}.attributes` (unified with Franchise architecture)
-- Team attributes can be updated (future: stored in tournament document)
-- Training reports stored in `tournament.latest_training` and `tournament.teams.{team_id}.training_reports.{round}`
+- Set at tournament creation; **training is disabled**, so no training updates
+- Player attributes in `tournament.players.{player_id}.attributes` (or `player_stats` for legacy)
+- Team attributes in `tournament.teams.{team_id}`; persist for duration of tournament
 
 #### 5. Team Object Persistence
 
@@ -318,7 +248,7 @@ Tournament Mode supports multi-game tournament brackets where team data persists
 - `BackEnd/api/api.py` - `load_team_attributes_from_doc()` (lines 196-244)
 - `BackEnd/api/api.py` - Game creation logic (lines 1246-1253, 1337-1344)
 - `BackEnd/api/tournament_routes.py` - `get_tournament_team_data()` - Team data endpoint
-- `BackEnd/api/tournament_routes.py` - `run_tournament_training()` - Training endpoint
+- `BackEnd/api/tournament_routes.py` - `run_tournament_training()` - Stub only (returns 404; training disabled)
 
 ## See Also
 

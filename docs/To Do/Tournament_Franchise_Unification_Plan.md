@@ -46,35 +46,16 @@
 
 ---
 
-## Phase 2: Tournament Training Code Removal
+## Phase 2: Tournament Training Code Removal ✅
 
-### Status: Already Disabled (Returns 404)
+### Status: Done (January 2025)
 
-**Files to Clean Up:**
+**Completed:**
+- **Backend:** Removed `TournamentTrainingRequest`; removed ~300 lines of dead code from `run_tournament_training()`. Kept minimal stub `POST /tournament/run-training` that raises 404 ("Training is not available in Tournament mode") for backward compatibility.
+- **Frontend:** Verified `tournament.js` does not call the training endpoint; `training.js` still POSTs to `/tournament/run-training` in tournament mode and handles non-OK (404) via catch + alert.
+- **Documentation:** Updated `Tournament_Mode_Systems.md` to state training is disabled, stub behavior, and removed lengthy training-flow description.
 
-#### Backend:
-- `BackEnd/api/tournament_routes.py`:
-  - Remove `TournamentTrainingRequest` model (lines ~67-70)
-  - Remove unreachable code block in `run_tournament_training()` (lines ~914-1198, wrapped in `if False:`)
-  - Keep minimal stub endpoint returning 404 for backward compatibility:
-    ```python
-    @router.post("/tournament/run-training")
-    def run_tournament_training(req: Any):
-        raise HTTPException(status_code=404, detail="Training is not available in Tournament mode")
-    ```
-
-#### Frontend:
-- `FrontEnd/static/tournament.js` - Verify no calls to training endpoint (should already be removed)
-- `FrontEnd/static/training.js` - Verify tournament mode handling (should already handle 404 gracefully)
-
-#### Documentation:
-- `docs/docs_1_systems/01_Game_Mode_Systems/Tournament_Mode_Systems.md` - Update to reflect training is disabled
-- Remove any references to tournament training functionality
-
-**Impact:**
-- Removes ~300 lines of dead code
-- Reduces confusion about tournament training capability
-- Cleaner codebase
+**Impact:** ~300 lines of dead code removed; clearer that Tournament mode has no training.
 
 ---
 
