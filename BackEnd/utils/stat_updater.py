@@ -80,7 +80,7 @@ def _build_franchise_team_maps_from_ftd(
     """Build team_name -> ObjectId str and team_id (canonical) -> ObjectId str maps from FTD.
 
     Used for finalize_game, play stats, and defense stats. Replaces former
-    franchise_teams-based mapping. Returns (team_name_to_id, team_id_to_object_id).
+    FTD-based mapping. Returns (team_name_to_id, team_id_to_object_id).
     """
     from BackEnd.db import franchise_team_data_collection, teams_collection
 

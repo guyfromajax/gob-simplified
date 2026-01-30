@@ -105,7 +105,7 @@ def test_tournament_gameplan():
     
     try:
         # Start a tournament
-        start_response = requests.post("http://localhost:8000/start-tournament", json={
+        start_response = requests.post("http://localhost:8000/tournament/start", json={
             "user_team_id": "Bentley-Truman"
         })
         

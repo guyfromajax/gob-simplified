@@ -1,7 +1,7 @@
 # Tournament vs Franchise EOS Bracket Merge Plan
 
 **Date:** January 2025  
-**Status:** ✅ Steps 1–4 done (bracket_engine, EOS refactor, Tournament refactor, Step 4 cleanup).  
+**Status:** ✅ Steps 1–4 done (bracket_engine, EOS refactor, Tournament refactor, Step 4 cleanup). ✅ §9 Frontend bracket unification done (shared bracket.js, FCC + TCC).  
 **Goal:** Unify the two bespoke bracket/tournament engines (Tournament mode vs Franchise EOS) into a single shared implementation where possible.
 
 **Related:** `Tournament_Franchise_Unification_Plan.md` (broader mode unification). This doc focuses **only** on bracket init, advance, and save-result logic.
@@ -197,6 +197,43 @@ EOS already uses **ObjectId strings** for team IDs; no identifier migration. Ref
 - **Team identifiers:** We **unify on ObjectId strings** (hex, e.g. `"68c98b08674d3f9b04546b2e"`) for team IDs in bracket, results, and "next game." Tournament mode is **refactored** to use them instead of team names; EOS already does. **ObjectId objects** are used **only at DB boundaries** (e.g. `teams.find({"_id": ObjectId(team_id)})`, FTD lookups). Everywhere else we store and pass strings.
 - **Tournament-mode refactor scope:** Unifying on ObjectIds implies a broader Tournament refactor: bracket, results, next-game logic all use ObjectId strings; **ObjectId ↔ name resolution** happens only at edges (display, game init, roster, API). This is called out in §3.2 and §5.
 - **Exact same flow, different DB sources:** After seeding (random vs standings), both modes use the **exact same** bracket init → save result → advance → "next game" flow. Only **load/save** targets differ (`tournaments` vs `franchise.eos_tournament`).
+
+---
+
+---
+
+## 9. Frontend Bracket Unification (Completed)
+
+**Status:** ✅ Done (January 2025)
+
+**Goal:** Use the same bracket UI and layout for both FCC (Franchise EOS Tournament tab) and TCC (Tournament Bracket tab), with a single source of truth for DOM rendering and mode-specific team name resolution.
+
+### 9.1 What Was Done
+
+| Item | Detail |
+|------|--------|
+| **Shared renderer** | `FrontEnd/static/bracket.js` exposes `renderBracketShared(container, bracketData, teamIdToNameMap, options)`. Pure DOM: no fetch, no localStorage. Builds the same 5-column grid (round1, round2, final, round4, round5) with matchup wrappers, team entries, logos, seeds, scores, winners. |
+| **Options** | `options.results` (TCC results list for score/winner lookup), `options.seeds` (FCC passes `eos_tournament.seeds`; TCC derives from round1 order), `options.getLogo(teamName)`, `options.isUserTeam(id)` for highlighting. |
+| **FCC** | `renderTournamentBracket()` in `franchise-command-center.js`: fetches `/franchise/command-center/data` and `/franchise/team-stats`; builds `teamIdToNameMap` from `data.teams` (team_id → team name); calls `renderBracketShared(container, eosTournament.bracket, teamIdToNameMap, { seeds, getLogo, isUserTeam })`. Container is `#tournament-bracket-container` with class **`bracket`** so `tournament.css` grid applies. |
+| **TCC** | `renderBracket()` in `tournament.js`: keeps applyResults, derive round2/final, localStorage, updateCTA; then calls `renderBracketShared(bracket, { round1, round2, final }, teamIdNameMap, { results, getLogo, isUserTeam })`. Container is `#bracket` with class **`bracket`**. `teamIdNameMap` is still populated from `/tournament/team-stats` (same pattern as FCC). |
+| **Layout** | Both use `tournament.css`: `.bracket` (grid, 5 columns), `.round-1` … `.round-5`, `.round`, `.matchup-wrapper`, `.team-entry`, `.bracket-logo`. FCC container has same padding/min-height via `franchise-command-center.css` for `#tournament-bracket-container.bracket`. FCC also uses the same overflow wrapper (`width: 100%; overflow-x: auto`) as TCC. |
+
+### 9.2 Files Touched
+
+| File | Change |
+|------|--------|
+| `FrontEnd/static/bracket.js` | **New.** Shared `renderBracketShared()`. |
+| `FrontEnd/static/franchise-command-center.js` | Replaced custom HTML bracket with fetch of `/franchise/team-stats` + `renderBracketShared`. |
+| `FrontEnd/static/tournament.js` | Replaced inline bracket DOM build with `renderBracketShared`; kept TCC-only logic (results, localStorage, updateCTA) before/after. |
+| `FrontEnd/static/franchise-command-center.html` | Wrapper + container class `bracket` for grid; added `<script src="/bracket.js">`. |
+| `FrontEnd/static/franchise-command-center.css` | Padding/min-height for `#tournament-bracket-container.bracket`. |
+| `FrontEnd/static/tournament.html` | Added `<script src="/bracket.js">`. |
+
+### 9.3 Outcome
+
+- **Single implementation** for bracket DOM; FCC and TCC differ only in where they get the id→name map and what options they pass.
+- **FCC Tournament tab** shows team names (from franchise/team-stats) and the same 5-column layout as TCC.
+- **TCC Bracket tab** behavior unchanged; same look and logic, now backed by shared code.
 
 ---
 

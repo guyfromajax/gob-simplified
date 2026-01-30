@@ -443,8 +443,10 @@ function renderTeam(data) {
     });
   });
   
-  // Also render player stats
-  renderRosterStats(data.players || []);
+  // Also render player stats (shared module Phase 4.2)
+  if (typeof RosterStatsRenderer !== 'undefined') {
+    RosterStatsRenderer.renderRosterStats(data.players || []);
+  }
 }
 
 // Store roster data for sorting
@@ -951,7 +953,6 @@ async function init() {
   updateScoutingButton(topData);
   
   if (topData && topData.team) {
-    // Use franchise-specific roster endpoint to get updated player attributes
     console.log('Loading franchise roster for team:', topData.team, 'franchiseId:', franchiseId);
     if (!franchiseId) {
       console.error('No franchiseId found - cannot load roster');
@@ -959,31 +960,12 @@ async function init() {
     }
     try {
       const rosterStartTime = performance.now();
-      // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint
-      const rosterData = await fetchJSON(`${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(topData.team)}`)}?franchise_id=${franchiseId}`);
+      const rosterUrl = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(topData.team)}`)}?franchise_id=${franchiseId}`;
+      const stateUrl = `${API_CONFIG.buildUrl('/franchise/state')}?franchise_id=${franchiseId}`;
+      const result = await RosterLoader.loadRosterWithStats(rosterUrl, stateUrl);
       const rosterEndTime = performance.now();
-      console.log(`⏱️ [PERF] /roster/${topData.team} (franchise): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
-      
-      // Load player stats separately from franchise document
-      const stateStartTime = performance.now();
-      const franchiseDoc = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/state')}?franchise_id=${franchiseId}`);
-      const stateEndTime = performance.now();
-      console.log(`⏱️ [PERF] /franchise/state: ${(stateEndTime - stateStartTime).toFixed(2)}ms`);
-      
-      if (franchiseDoc && franchiseDoc.players && rosterData.players) {
-        // Merge stats into player data
-        rosterData.players = rosterData.players.map(player => {
-          const playerId = player._id;
-          const franchisePlayer = franchiseDoc.players[playerId];
-          if (franchisePlayer && franchisePlayer.season) {
-            player.stats = { season: franchisePlayer.season };
-          } else {
-            player.stats = { season: {} };
-          }
-          return player;
-        });
-      }
-      renderTeam(rosterData);
+      console.log(`⏱️ [PERF] roster+state (franchise): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
+      renderTeam({ players: result.players });
     } catch (error) {
       console.error('Failed to load franchise roster:', error);
     }
@@ -1808,157 +1790,7 @@ function createMetricBar(title, value, maxValue, color, change) {
   return metricDiv;
 }
 
-// Store players data for sorting (roster stats)
-let rosterPlayersDataForSorting = [];
-
-// Update renderTeam to also render player stats
-function renderRosterStats(players) {
-  if (!players || players.length === 0) {
-    const tbody = document.getElementById('roster-stats-body');
-    if (tbody) tbody.innerHTML = '';
-    return;
-  }
-  
-  rosterPlayersDataForSorting = JSON.parse(JSON.stringify(players)); // Deep copy for sorting
-  renderRosterStatsTable(rosterPlayersDataForSorting);
-  
-  // Add click handlers to sortable headers (only once) - target only the stats table
-  const statsTable = document.querySelector('#roster-tab .stats-table');
-  if (statsTable) {
-    const sortableHeaders = statsTable.querySelectorAll('thead .sortable');
-    sortableHeaders.forEach(header => {
-      // Remove existing listeners to avoid duplicates
-      const newHeader = header.cloneNode(true);
-      header.parentNode.replaceChild(newHeader, header);
-      
-      newHeader.style.cursor = 'pointer';
-      newHeader.style.userSelect = 'none';
-      newHeader.addEventListener('click', () => {
-        const stat = newHeader.dataset.stat;
-        sortRosterStats(stat);
-      });
-    });
-  }
-}
-
-function renderRosterStatsTable(players) {
-  const tbody = document.getElementById('roster-stats-body');
-  if (!tbody) return;
-  
-  tbody.innerHTML = '';
-  
-  players.forEach(p => {
-    const stats = p.stats?.season || {};
-    // Use 3PTM/3PTA directly (standardized field names)
-    const tpm = stats['3PTM'] || 0;
-    const tpa = stats['3PTA'] || 0;
-    
-    // Calculate percentages
-    const fgPct = stats.FGA > 0 ? ((stats.FGM || 0) / stats.FGA * 100).toFixed(1) : '0.0';
-    const threePct = tpa > 0 ? (tpm / tpa * 100).toFixed(1) : '0.0';
-    const ftPct = stats.FTA > 0 ? ((stats.FTM || 0) / stats.FTA * 100).toFixed(1) : '0.0';
-    
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim()}</td>
-      <td>${stats.PTS || 0}</td>
-      <td>${stats.FGM || 0}</td>
-      <td>${stats.FGA || 0}</td>
-      <td>${fgPct}%</td>
-      <td>${tpm}</td>
-      <td>${tpa}</td>
-      <td>${threePct}%</td>
-      <td>${stats.FTM || 0}</td>
-      <td>${stats.FTA || 0}</td>
-      <td>${ftPct}%</td>
-      <td>${stats.DREB || 0}</td>
-      <td>${stats.OREB || 0}</td>
-      <td>${stats.TREB || (stats.DREB || 0) + (stats.OREB || 0)}</td>
-      <td>${stats.AST || 0}</td>
-      <td>${stats.STL || 0}</td>
-      <td>${stats.BLK || 0}</td>
-      <td>${stats.F || 0}</td>
-      <td>${stats.MIN || 0}</td>
-      <td>${stats.TO || 0}</td>`;
-    tbody.appendChild(tr);
-  });
-}
-
-function sortRosterStats(statKey) {
-  // Map display stat names to data stat keys
-  const statMap = {
-    'name': 'name',
-    'PTS': 'PTS',
-    'FGM': 'FGM',
-    'FGA': 'FGA',
-    'FG%': 'FG%',
-    '3PTM': '3PTM',
-    '3PTA': '3PTA',
-    '3PT%': '3PT%',
-    'FTM': 'FTM',
-    'FTA': 'FTA',
-    'FT%': 'FT%',
-    'DREB': 'DREB',
-    'OREB': 'OREB',
-    'TREB': 'TREB',
-    'AST': 'AST',
-    'STL': 'STL',
-    'BLK': 'BLK',
-    'F': 'F',
-    'MIN': 'MIN',
-    'TO': 'TO'
-  };
-  
-  const dataKey = statMap[statKey] || statKey;
-  
-  // Sort players by the selected stat (descending order)
-  rosterPlayersDataForSorting.sort((a, b) => {
-    let val1, val2;
-    
-    if (dataKey === 'name') {
-      const name1 = a.name || `${a.first_name || ''} ${a.last_name || ''}`.trim() || '';
-      const name2 = b.name || `${b.first_name || ''} ${b.last_name || ''}`.trim() || '';
-      return name2.localeCompare(name1); // Reverse for descending
-    } else {
-      const stats1 = a.stats?.season || {};
-      const stats2 = b.stats?.season || {};
-      
-      // Handle percentage calculations
-      if (dataKey === 'FG%') {
-        val1 = stats1.FGA > 0 ? (stats1.FGM || 0) / stats1.FGA : 0;
-        val2 = stats2.FGA > 0 ? (stats2.FGM || 0) / stats2.FGA : 0;
-      } else if (dataKey === '3PT%') {
-        const tpa1 = stats1['3PTA'] || stats1.TPA || 0;
-        const tpa2 = stats2['3PTA'] || stats2.TPA || 0;
-        const tpm1 = stats1['3PTM'] || stats1.TPM || 0;
-        const tpm2 = stats2['3PTM'] || stats2.TPM || 0;
-        val1 = tpa1 > 0 ? tpm1 / tpa1 : 0;
-        val2 = tpa2 > 0 ? tpm2 / tpa2 : 0;
-      } else if (dataKey === 'FT%') {
-        val1 = stats1.FTA > 0 ? (stats1.FTM || 0) / stats1.FTA : 0;
-        val2 = stats2.FTA > 0 ? (stats2.FTM || 0) / stats2.FTA : 0;
-      } else if (dataKey === 'TPM') {
-        val1 = stats1['3PTM'] || stats1.TPM || 0;
-        val2 = stats2['3PTM'] || stats2.TPM || 0;
-      } else if (dataKey === 'TPA') {
-        val1 = stats1['3PTA'] || stats1.TPA || 0;
-        val2 = stats2['3PTA'] || stats2.TPA || 0;
-      } else if (dataKey === 'TREB') {
-        // Calculate TREB from DREB + OREB if not directly available
-        val1 = stats1.TREB || (stats1.DREB || 0) + (stats1.OREB || 0);
-        val2 = stats2.TREB || (stats2.DREB || 0) + (stats2.OREB || 0);
-      } else {
-        val1 = stats1[dataKey] || 0;
-        val2 = stats2[dataKey] || 0;
-      }
-    }
-    
-    return val2 - val1; // Descending order
-  });
-  
-  // Re-render with sorted data
-  renderRosterStatsTable(rosterPlayersDataForSorting);
-}
+// ✅ Phase 4.2: Roster stats rendering delegated to RosterStatsRenderer (rosterStatsRenderer.js)
 
 // ✅ EOS TOURNAMENT: Render tournament bracket (shared with TCC via bracket.js)
 async function renderTournamentBracket() {

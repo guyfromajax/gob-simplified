@@ -25,7 +25,7 @@ def aggregate_team_stats_from_players(
     
     Args:
         players: Dictionary of {player_id: {meta: {...}, season: {...}}}
-        team_ids: Dictionary of team IDs (from tournament.teams or franchise.franchise_teams)
+        team_ids: Dictionary of team IDs (from tournament.teams or FTD team list for franchise)
         teams_collection: MongoDB collection for teams
         collection_type: 'tournament' or 'franchise' (for logging/debugging)
         logger: Optional logger instance
@@ -40,7 +40,7 @@ def aggregate_team_stats_from_players(
         log_func = logger.info if hasattr(logger, 'info') else logger
     
     # Initialize team stats map
-    # ✅ SS&S: Both tournament.teams and franchise_teams use ObjectId strings as keys
+    # ✅ SS&S: Both tournament.teams and FTD team list use ObjectId strings as keys
     team_stats_map: Dict[str, Dict[str, int]] = {}
     
     # Initialize team stats for all teams

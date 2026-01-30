@@ -10,27 +10,27 @@ from typing import Dict, Any
 
 def calculate_franchise_standings(
     franchise_results: Dict[str, Any],
-    franchise_teams: Dict[str, Any]
+    team_ids_map: Dict[str, Any],
 ) -> Dict[str, Dict[str, int]]:
     """
     Calculate W/L and PF/PA standings from franchise.results.
-    
+
     ✅ SS&S: This is the single source of truth for franchise standings calculation.
     All endpoints that need franchise W/L and PF/PA should use this function.
-    
+
     Args:
         franchise_results: Dictionary from franchise.results field
             Structure: {"1": [{"away_id": "...", "home_id": "...", "away_score": X, "home_score": Y}, ...], "2": [...], ...}
-        franchise_teams: Dictionary from franchise.franchise_teams field
-            Keys are team_id strings (ObjectId strings)
-    
+        team_ids_map: Dict whose keys are team_id strings (ObjectId strings). Only .keys() is used to initialize standings.
+            Callers pass e.g. {str(tid): {} for tid in team_ids} from FTD team list.
+
     Returns:
         Dictionary mapping team_id_str to {"W": int, "L": int, "PF": int, "PA": int}
     """
     standings_data: Dict[str, Dict[str, int]] = {}
-    
+
     # Initialize all teams with zeros
-    for team_id_str in franchise_teams.keys():
+    for team_id_str in team_ids_map.keys():
         standings_data[str(team_id_str)] = {"PF": 0, "PA": 0, "W": 0, "L": 0}
     
     # Process all weeks in results
@@ -53,7 +53,7 @@ def calculate_franchise_standings(
             away_id_str = str(away_id)
             home_id_str = str(home_id)
             
-            # Initialize if not present (in case team not in franchise_teams)
+            # Initialize if not present (in case team not in team_ids_map)
             if away_id_str not in standings_data:
                 standings_data[away_id_str] = {"PF": 0, "PA": 0, "W": 0, "L": 0}
             if home_id_str not in standings_data:

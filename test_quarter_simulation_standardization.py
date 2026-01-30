@@ -177,7 +177,7 @@ class QuarterSimulationTester:
                 "user_team_id": "Bentley-Truman"
             }
             
-            tournament_response = requests.post(f"{self.base_url}/start-tournament", json=tournament_data)
+            tournament_response = requests.post(f"{self.base_url}/tournament/start", json=tournament_data)
             if tournament_response.status_code != 200:
                 return {"success": False, "error": f"Failed to start tournament: {tournament_response.status_code}"}
             

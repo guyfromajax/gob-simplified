@@ -102,7 +102,7 @@ async def create_play(play_data: PlayCreate):
             play_dict["copy"] = {}  # Only set to empty if no existing copy
     
     # ✅ Universal plays collection should NOT have game_stats or season_stats
-    # Stats are only stored in team-specific play objects (franchise_teams.{team_id}.plays or teams.{team_id}.plays)
+    # Stats are only stored in team-specific play objects (teams.{team_id}.plays on game/tournament doc, or FTD for franchise)
     # Remove stats if they exist (they shouldn't be in universal collection)
     if "game_stats" in play_dict:
         del play_dict["game_stats"]

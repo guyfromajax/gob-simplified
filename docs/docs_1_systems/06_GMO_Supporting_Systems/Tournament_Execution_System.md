@@ -108,7 +108,9 @@ When the user **loses** an EOS game (quarters, semis, or final):
 
 Tournament UI follows the Franchise pattern: **IDs in API**, **client-side resolution** for display.
 
-- **`teamIdNameMap`:** Built from `/tournament/team-stats` (each team has `team_id`, `team`). Cleared and repopulated when team-stats load; used for schedule, bracket, and scouting.
-- **Schedule tab:** Resolve `home_team` / `away_team` (ObjectIds) → names via `teamIdNameMap` for labels and box-score params. Roster links use `team_id` + `team_name`.
-- **Bracket tab:** Same resolution for labels and `getLogo(teamName)`. Score lookup uses names (results store name-keyed scores).
+- **Shared bracket renderer:** FCC (Franchise EOS Tournament tab) and TCC (Tournament Bracket tab) both use **`FrontEnd/static/bracket.js`** — `renderBracketShared(container, bracketData, teamIdToNameMap, options)`. Same DOM (5-column grid, matchups, logos, seeds, scores) and same layout (`tournament.css` `.bracket` grid). Only the source of the id→name map and options differ.
+- **TCC Bracket tab:** `teamIdNameMap` built from `/tournament/team-stats` (each team has `team_id`, `team`). Cleared and repopulated when team-stats load; used for schedule, bracket, and scouting. Bracket tab calls `renderBracketShared` with that map and TCC options (results, getLogo, isUserTeam).
+- **FCC Tournament tab:** `teamIdToNameMap` built from `/franchise/team-stats` (one request; same `teams` shape: `team_id`, `team`). Container is `#tournament-bracket-container` with class `bracket` so it gets the same grid layout. Calls `renderBracketShared` with seeds from `eos_tournament.seeds`, getLogo, and isUserTeam.
+- **Schedule tab (TCC):** Resolve `home_team` / `away_team` (ObjectIds) → names via `teamIdNameMap` for labels and box-score params. Roster links use `team_id` + `team_name`.
+- **Score lookup:** TCC passes `results` into the shared renderer (name-keyed scores); FCC uses matchup.score/winner from bracket; shared renderer supports both.
 - **Play vs Sim Remaining:** User matchup detection uses `user_team_object_id` vs `match.home_team` / `match.away_team` (all IDs). Scouting upcoming-opponent logic uses `userTeamId` and resolves opponent ID → name for display and API `team_name`.

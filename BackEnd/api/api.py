@@ -574,7 +574,7 @@ def load_team_settings_from_doc(mode: str, doc_id: str, team_id: str, team_name:
         from BackEnd.db import franchise_team_data_collection
         
         if mode == "franchise":
-            # ✅ FTD: Load strategy_settings and playbook_settings from FTD (franchise_teams is empty)
+            # ✅ FTD: Load strategy_settings and playbook_settings from FTD
             logging.warning(f"🔍 [LOAD-TEAM-SETTINGS] franchise master load: doc_id={doc_id!r}, team_id={team_id!r}, team_name={team_name!r}, game_id={game_id!r}")
             try:
                 franchise_doc = franchises_collection.find_one(

@@ -39,8 +39,8 @@ def calculate_standings(
         )
     team_ids = [ObjectId(tid) if not isinstance(tid, ObjectId) else tid for tid in team_ids]
     franchise_results = franchise_doc.get("results", {})
-    franchise_teams = {str(tid): {} for tid in team_ids}
-    standings_data = calculate_franchise_standings(franchise_results, franchise_teams)
+    team_ids_map = {str(tid): {} for tid in team_ids}
+    standings_data = calculate_franchise_standings(franchise_results, team_ids_map)
 
     # Fetch team names
     teams = list(teams_collection.find(
