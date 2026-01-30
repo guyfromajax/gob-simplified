@@ -1400,7 +1400,7 @@ def complete_week(req: CompleteWeekRequest):
     
     if req.week == 14:
         # Week 14 complete - initialize EOS Tournament
-        # ✅ FTD: Get team IDs from franchise_team_data (franchise_teams is empty after migration)
+        # ✅ FTD: Get team IDs from franchise_team_data
         # FTD stores franchise_id as ObjectId (from franchise_manager init); query with ObjectId, not string
         ftd_docs = list(franchise_team_data_collection.find(
             {"franchise_id": franchise_id},
@@ -2163,7 +2163,7 @@ def team_traits(franchise_id: str):
                         if resolved_team_id in team_totals:
                             player_team_id = resolved_team_id
                         else:
-                            # Team not in franchise_teams, skip this player
+                            # Team not in franchise (team_totals), skip this player
                             continue
                     else:
                         # Can't resolve team, skip this player
@@ -2880,18 +2880,10 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(req.franchise_id)}))
     franchise_players = {d["player_id"]: d for d in fpd_docs}
 
-    # Get player_ids from team_doc if available, otherwise try to get from franchise_teams
-    if team_doc:
-        team_player_ids = team_doc.get("player_ids", [])
-    else:
-        # Fallback: try to get player_ids from franchise_teams structure
-        franchise_teams = franchise_doc.get("franchise_teams", {})
-        team_data = franchise_teams.get(team_id, {})
-        team_player_ids = team_data.get("player_ids", [])
-        
-        # If still no player_ids, raise an error
-        if not team_player_ids:
-            raise HTTPException(status_code=404, detail=f"Team not found and no player_ids available for team_id: {team_id}")
+    # Get player_ids from team document (team_doc already validated above)
+    team_player_ids = team_doc.get("player_ids", [])
+    if not team_player_ids:
+        raise HTTPException(status_code=404, detail=f"No player_ids on team for team_id: {team_id}")
     
     # Build player list with franchise-specific attributes
     players_load_start = time.time()

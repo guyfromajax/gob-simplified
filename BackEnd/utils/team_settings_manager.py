@@ -254,13 +254,8 @@ def extract_team_settings(
     from BackEnd.api.gameplan_routes import normalize_team_id_to_canonical
     
     try:
-        # Get teams object based on mode
-        if mode == "franchise":
-            teams_obj = saved_doc.get("franchise_teams", {})
-        elif mode == "tournament":
-            teams_obj = saved_doc.get("teams", {})
-        else:
-            teams_obj = saved_doc.get("teams", {})
+        # Get teams object: game doc uses "teams" for all modes (franchise_teams was legacy and is no longer used).
+        teams_obj = saved_doc.get("teams", {})
         
         # 🔍 DEBUG: Log available keys in teams object
         available_keys = list(teams_obj.keys()) if teams_obj else []

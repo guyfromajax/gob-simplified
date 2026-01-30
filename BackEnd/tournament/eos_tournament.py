@@ -26,70 +26,41 @@ def calculate_standings(
     """
     Calculate regular season standings for all teams in the franchise.
 
-    When team_ids is provided (franchise mode with FTD), uses franchise.results
-    as the source of truth (same as Franchise standings tab). Otherwise falls
-    back to teams collection (legacy).
+    Uses franchise.results as the source of truth (same as Franchise standings tab).
+    team_ids must be provided from franchise_team_data (FTD); franchise_teams is no longer used.
 
     Returns:
         List of team standings sorted by: Wins (desc), PF-PA delta (desc), Random
     """
-    if team_ids is not None:
-        # Franchise mode: standings from franchise.results (single source of truth)
-        team_ids = [ObjectId(tid) if not isinstance(tid, ObjectId) else tid for tid in team_ids]
-        franchise_results = franchise_doc.get("results", {})
-        franchise_teams = {str(tid): {} for tid in team_ids}
-        standings_data = calculate_franchise_standings(franchise_results, franchise_teams)
+    if team_ids is None:
+        raise ValueError(
+            "team_ids is required. Provide team IDs from franchise_team_data (FTD); "
+            "franchise_teams is no longer used."
+        )
+    team_ids = [ObjectId(tid) if not isinstance(tid, ObjectId) else tid for tid in team_ids]
+    franchise_results = franchise_doc.get("results", {})
+    franchise_teams = {str(tid): {} for tid in team_ids}
+    standings_data = calculate_franchise_standings(franchise_results, franchise_teams)
 
-        # Fetch team names
-        teams = list(teams_collection.find(
-            {"_id": {"$in": team_ids}},
-            {"name": 1, "_id": 1}
-        ))
-        name_by_id = {str(t["_id"]): t.get("name", "") for t in teams}
-
-        standings = []
-        for tid in team_ids:
-            tid_str = str(tid)
-            data = standings_data.get(tid_str, {"W": 0, "L": 0, "PF": 0, "PA": 0})
-            wins = data.get("W", 0)
-            losses = data.get("L", 0)
-            pf = data.get("PF", 0)
-            pa = data.get("PA", 0)
-            differential = pf - pa
-            standings.append({
-                "team_id": tid_str,
-                "name": name_by_id.get(tid_str, ""),
-                "wins": wins,
-                "losses": losses,
-                "pf": pf,
-                "pa": pa,
-                "differential": differential,
-                "tiebreaker_random": random.random(),
-            })
-
-        standings.sort(key=lambda x: (x["wins"], x["differential"], x["tiebreaker_random"]), reverse=True)
-        return standings
-
-    # Legacy: franchise_teams from doc, records from teams collection
-    franchise_teams = franchise_doc.get("franchise_teams", {})
-    team_ids = [ObjectId(tid) for tid in franchise_teams.keys()]
-
+    # Fetch team names
     teams = list(teams_collection.find(
         {"_id": {"$in": team_ids}},
-        {"name": 1, "record": 1, "PF": 1, "PA": 1, "_id": 1}
+        {"name": 1, "_id": 1}
     ))
+    name_by_id = {str(t["_id"]): t.get("name", "") for t in teams}
 
     standings = []
-    for team in teams:
-        rec = team.get("record", {"W": 0, "L": 0})
-        wins = rec.get("W", 0)
-        losses = rec.get("L", 0)
-        pf = team.get("PF", 0)
-        pa = team.get("PA", 0)
+    for tid in team_ids:
+        tid_str = str(tid)
+        data = standings_data.get(tid_str, {"W": 0, "L": 0, "PF": 0, "PA": 0})
+        wins = data.get("W", 0)
+        losses = data.get("L", 0)
+        pf = data.get("PF", 0)
+        pa = data.get("PA", 0)
         differential = pf - pa
         standings.append({
-            "team_id": str(team["_id"]),
-            "name": team.get("name", ""),
+            "team_id": tid_str,
+            "name": name_by_id.get(tid_str, ""),
             "wins": wins,
             "losses": losses,
             "pf": pf,
@@ -130,22 +101,19 @@ def initialize_eos_tournament(
     Args:
         franchise_doc: Franchise document
         teams_collection: MongoDB teams collection
-        team_ids: Optional list of team IDs for standings (e.g. from franchise_team_data).
-                  When provided, used instead of franchise_doc.franchise_teams. Required
-                  after FTD migration since franchise_teams is empty.
+        team_ids: List of team IDs for standings (from franchise_team_data). Required.
 
     Returns:
         Tournament state dictionary to be saved to franchise document
     """
-    # Calculate standings (use team_ids from FTD when franchise_teams is empty)
     standings = calculate_standings(franchise_doc, teams_collection, team_ids=team_ids)
-    
+
     # Generate seeds (top 8 teams)
     seeds = generate_seeds(standings)
     if len(seeds) < 8:
         raise ValueError(
             f"EOS bracket requires 8 teams; got {len(seeds)}. "
-            "Ensure team IDs are provided from FTD when franchise_teams is empty."
+            "Ensure team IDs are provided from franchise_team_data (FTD)."
         )
     seed_order = [tid for tid, _ in sorted(seeds.items(), key=lambda x: x[1])]
     bracket = bracket_engine.generate_bracket(seed_order)

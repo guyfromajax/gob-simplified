@@ -1327,13 +1327,15 @@ class TurnManager:
                             resolved_team_id = tid
                             logging.warning(f"⚠️ [LOAD PLAYBOOK] Resolved team_id from name: {team_id} → {resolved_team_id}")
                             break
-            
+
+            # WIRED: DB fallback used when GameManager doesn't have playbook_settings (e.g. edge cases during gameplay).
+            # Franchise: read from game doc's teams (in-game saves write here; franchise_teams was legacy and is no longer used).
+            lookup_doc = game_doc if mode == "franchise" else doc
+            teams_obj_lookup = lookup_doc.get("teams", {})
+
             # Get playbook settings for the appropriate team
             if is_offense_user:
-                if mode == "franchise":
-                    team_obj = doc.get("franchise_teams", {}).get(resolved_team_id, {})
-                else:
-                    team_obj = doc.get("teams", {}).get(resolved_team_id, {})
+                team_obj = teams_obj_lookup.get(resolved_team_id, {})
                 playbook_settings = team_obj.get("playbook_settings")
                 if playbook_settings:
                     logging.warning(f"✅ [LOAD PLAYBOOK] Loaded playbook_settings for offense team: team_id={resolved_team_id}")
@@ -1355,10 +1357,8 @@ class TurnManager:
                                 resolved_def_team_id = tid
                                 logging.warning(f"⚠️ [LOAD PLAYBOOK] Resolved defense team_id from name: {def_team_id} → {resolved_def_team_id}")
                                 break
-                if mode == "franchise":
-                    team_obj = doc.get("franchise_teams", {}).get(resolved_def_team_id, {})
-                else:
-                    team_obj = doc.get("teams", {}).get(resolved_def_team_id, {})
+                # Same lookup_doc/teams_obj_lookup as offense (franchise uses game_doc.teams)
+                team_obj = teams_obj_lookup.get(resolved_def_team_id, {})
                 playbook_settings = team_obj.get("playbook_settings")
                 if playbook_settings:
                     logging.warning(f"⚠️ [LOAD PLAYBOOK] Fallback to DB for defense team: team_id={resolved_def_team_id} (GameManager should have settings)")

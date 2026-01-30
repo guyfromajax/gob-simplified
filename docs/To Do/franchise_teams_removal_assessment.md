@@ -1,5 +1,7 @@
 # Assessment: Removing `franchise_teams` from Franchise Documents
 
+**Status:** Code removal complete. Application code no longer reads or writes `franchise_teams`; FTD is the source of truth. Optional: one-off DB `$unset` to remove the field from existing franchise docs.
+
 **Goal:** Remove the `franchise_teams` field from franchise docs and all code references, now that FTD (franchise_team_data) is the source of truth.
 
 **Scope:** Backend, tests, and docs. Frontend does not reference `franchise_teams`.
