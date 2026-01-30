@@ -187,8 +187,6 @@ class FranchiseManager:
         populated_plays = populate_team_plays(mode="franchise")
         scouting_data = populate_scouting_data(mode="franchise")
         playbook_settings = initialize_playbook_settings()
-        
-        franchise_teams = {}  # Keep empty for backward compatibility (or remove later)
 
         # Initialize training status - training camp happens at week 1 before games are played
         training_status = {
@@ -201,11 +199,11 @@ class FranchiseManager:
         recruits = self.recruit_manager.generate_recruits_list()
 
         # ✅ FPD/FRD: Store players and recruits in standalone collections; keep franchise doc lean
+        # Team data lives in FTD (franchise_team_data); we no longer write franchise_teams on the franchise doc.
         extra_state = {
             "players": {},  # FPD holds player data; empty here for legacy safety
             "recruits": [],  # FRD holds recruit data; empty here for legacy safety
             "applied_games": [],
-            "franchise_teams": franchise_teams,
             "training_status": training_status,
             # Add missing document-level fields (matches Tournament pattern)
             "created_at": datetime.utcnow(),
