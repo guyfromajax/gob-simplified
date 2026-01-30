@@ -183,7 +183,8 @@ def get_tournament_leaders(tournament_id: str, recompute: bool = False):
 
     return leaderboards
 
-@router.post("/start-tournament")
+@router.post("/tournament/start")
+@router.post("/start-tournament")  # Backward compatibility; prefer /tournament/start
 def start_tournament(request: StartTournamentRequest):
     import time
     endpoint_start = time.time()
@@ -238,7 +239,8 @@ def start_tournament(request: StartTournamentRequest):
     tournament["_id"] = str(tournament["_id"])
     return tournament
 
-@router.post("/simulate-tournament-round")
+@router.post("/tournament/simulate-round")
+@router.post("/simulate-tournament-round")  # Backward compatibility; prefer /tournament/simulate-round
 def simulate_round(request: SimulateRequest):
     """Return the user's matchup without simulating computer games.
     

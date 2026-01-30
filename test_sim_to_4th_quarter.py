@@ -20,7 +20,7 @@ def test_sim_to_4th_quarter_flow():
     
     # Step 1: Start a tournament
     print("\n1️⃣ Starting tournament...")
-    start_response = requests.post(f"{BASE_URL}/start-tournament", json={
+    start_response = requests.post(f"{BASE_URL}/tournament/start", json={
         "user_team": "Bentley-Truman"
     })
     
@@ -52,7 +52,7 @@ def test_sim_to_4th_quarter_flow():
     for round_num in range(current_round, 5):  # Go through all rounds
         print(f"   Simulating Round {round_num}...")
         
-        sim_response = requests.post(f"{BASE_URL}/simulate-tournament-round", json={
+        sim_response = requests.post(f"{BASE_URL}/tournament/simulate-round", json={
             "tournament_id": tournament_id
         })
         

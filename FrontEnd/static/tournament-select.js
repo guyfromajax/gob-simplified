@@ -23,7 +23,7 @@ function createButtons() {
 async function selectTeam(team) {
   try {
     // Use centralized API config for consistent backend URL
-    const res = await fetch(API_CONFIG.buildUrl('/start-tournament'), {
+    const res = await fetch(API_CONFIG.buildUrl('/tournament/start'), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_team_id: team })

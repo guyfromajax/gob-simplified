@@ -1,5 +1,19 @@
 # Tournament Command Center (TCC)
 
+## Bracket tab
+
+**Location:** `FrontEnd/static/tournament.js` — `renderBracket()`; shared UI in `FrontEnd/static/bracket.js`.
+
+**Functionality:**
+- Renders the 8-team single-elimination bracket (round1, round2, final) with the same layout as the FCC Tournament tab.
+- **Shared renderer:** `renderBracketShared(container, bracketData, teamIdToNameMap, options)` from `bracket.js` — single DOM implementation (5-column grid, matchups, logos, seeds, scores). TCC-specific logic (applyResults, derive round2/final from results, localStorage, updateCTA) runs before/after the call.
+- **Team names:** `teamIdNameMap` is populated from `/tournament/team-stats` (response `teams`: each has `team_id`, `team`). Used for schedule, bracket, and scouting. Bracket tab passes this map and options (results, getLogo, isUserTeam) into the shared renderer.
+- **Layout:** Container `#bracket` has class **`bracket`**; `tournament.css` provides grid (`.bracket`), round columns (`.round-1` … `.round-5`), matchup wrappers, team entries, logos.
+
+**Related:** `tournament_eos_bracket_merge_plan.md` §9; `Tournament_Execution_System.md` (Tournament display).
+
+---
+
 ## Scouting Report Button
 
 **Location:** `FrontEnd/static/tournament.js`

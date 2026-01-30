@@ -316,7 +316,7 @@ class GameplanTestSuite:
         
         try:
             # Start a tournament
-            start_response = requests.post(f"{self.base_url}/start-tournament", json={
+            start_response = requests.post(f"{self.base_url}/tournament/start", json={
                 "user_team": "Bentley-Truman"
             })
             
@@ -329,7 +329,7 @@ class GameplanTestSuite:
             
             # Simulate rounds until we get to user matchup
             for round_num in range(1, 4):
-                sim_response = requests.post(f"{self.base_url}/simulate-tournament-round", json={
+                sim_response = requests.post(f"{self.base_url}/tournament/simulate-round", json={
                     "tournament_id": tournament_id
                 })
                 
@@ -382,7 +382,7 @@ class GameplanTestSuite:
         
         try:
             # Start a tournament
-            start_response = requests.post(f"{self.base_url}/start-tournament", json={
+            start_response = requests.post(f"{self.base_url}/tournament/start", json={
                 "user_team": "Bentley-Truman"
             })
             
@@ -395,7 +395,7 @@ class GameplanTestSuite:
             
             # Simulate rounds until we get to user matchup
             for round_num in range(1, 4):
-                sim_response = requests.post(f"{self.base_url}/simulate-tournament-round", json={
+                sim_response = requests.post(f"{self.base_url}/tournament/simulate-round", json={
                     "tournament_id": tournament_id
                 })
                 

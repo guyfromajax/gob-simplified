@@ -344,17 +344,10 @@ function renderRoster() {
     });
   });
   
-  // ✅ SS&S: Also render player stats (matches Franchise renderTeam() pattern)
-  console.log('🔍 [DEBUG renderRoster] Calling renderRosterStats() with', (data.players || []).length, 'players');
-  console.log('🔍 [DEBUG renderRoster] Sample player data:', data.players?.[0] ? {
-    _id: data.players[0]._id,
-    name: data.players[0].name || `${data.players[0].first_name} ${data.players[0].last_name}`,
-    hasStats: !!data.players[0].stats,
-    hasSeason: !!(data.players[0].stats?.season),
-    seasonKeys: data.players[0].stats?.season ? Object.keys(data.players[0].stats.season) : []
-  } : null);
-  renderRosterStats(data.players || []);
-  console.log('✅ [DEBUG renderRoster] renderRosterStats() called');
+  // ✅ Phase 4.2: Roster stats rendering via shared RosterStatsRenderer
+  if (typeof RosterStatsRenderer !== 'undefined') {
+    RosterStatsRenderer.renderRosterStats(data.players || []);
+  }
 }
 
 function sortTournamentRoster(columnName, direction) {
@@ -1401,98 +1394,12 @@ async function loadRoster() {
       console.warn('⚠️ [DEBUG loadRoster] Could not reload tournament document, using cached:', error);
     }
     
-    // ✅ SS&S: Merge stats into roster data (exactly like Franchise)
-    let statsMergedCount = 0;
-    let statsEmptyCount = 0;
-    let playerIdMismatchCount = 0;
-    if (tournamentDoc && tournamentDoc.players && data.players) {
-      console.log('🔍 [DEBUG loadRoster] Merging stats into roster data...');
-      console.log('🔍 [DEBUG loadRoster] Tournament players keys:', Object.keys(tournamentDoc.players).slice(0, 5));
-      console.log('🔍 [DEBUG loadRoster] Roster player IDs:', data.players.slice(0, 5).map(p => p._id));
-      
-      data.players = data.players.map(player => {
-        const playerId = player._id;
-        const tournamentPlayer = tournamentDoc.players[playerId];
-        
-        // ✅ DEBUG: Check if player ID exists in tournament document
-        if (!tournamentPlayer) {
-          playerIdMismatchCount++;
-          if (playerIdMismatchCount <= 3) {
-            console.warn(`⚠️ [DEBUG loadRoster] Player ID ${playerId} (${player.name || `${player.first_name} ${player.last_name}`}) not found in tournament.players`);
-            console.warn(`   Available player IDs in tournament:`, Object.keys(tournamentDoc.players).slice(0, 10));
-          }
-          player.stats = { season: {} };
-          statsEmptyCount++;
-          return player;
-        }
-        
-        if (tournamentPlayer && tournamentPlayer.season) {
-          const seasonKeys = Object.keys(tournamentPlayer.season);
-          const hasNonZeroStats = seasonKeys.some(key => tournamentPlayer.season[key] !== 0);
-          
-          player.stats = { season: tournamentPlayer.season };
-          statsMergedCount++;
-          if (statsMergedCount === 1) {
-            console.log('🔍 [DEBUG loadRoster] Sample merged stats for player', playerId, ':', {
-              seasonKeys: seasonKeys.slice(0, 10),
-              hasNonZeroStats,
-              sampleStats: {
-                PTS: tournamentPlayer.season.PTS,
-                FGM: tournamentPlayer.season.FGM,
-                FGA: tournamentPlayer.season.FGA,
-                GP: tournamentPlayer.season.GP
-              }
-            });
-          }
-        } else {
-          player.stats = { season: {} };
-          statsEmptyCount++;
-          if (statsEmptyCount <= 3) {
-            console.warn(`⚠️ [DEBUG loadRoster] Player ${playerId} found in tournament but no season stats:`, {
-              hasTournamentPlayer: !!tournamentPlayer,
-              hasSeason: !!(tournamentPlayer && tournamentPlayer.season),
-              tournamentPlayerKeys: tournamentPlayer ? Object.keys(tournamentPlayer) : []
-            });
-          }
-        }
-        return player;
-      });
-      console.log('🔍 [DEBUG loadRoster] Stats merge complete:', {
-        statsMergedCount,
-        statsEmptyCount,
-        playerIdMismatchCount,
-        totalPlayers: data.players.length
-      });
-      
-      // ✅ DEBUG: Log first player's actual stats to verify they're not all zeros
-      if (data.players && data.players.length > 0) {
-        const firstPlayer = data.players[0];
-        const firstPlayerStats = firstPlayer.stats?.season || {};
-        const hasNonZeroStats = Object.keys(firstPlayerStats).some(key => firstPlayerStats[key] !== 0);
-        console.log('🔍 [DEBUG loadRoster] First player stats check:', {
-          playerId: firstPlayer._id,
-          playerName: firstPlayer.name || `${firstPlayer.first_name} ${firstPlayer.last_name}`,
-          hasNonZeroStats,
-          sampleStats: {
-            PTS: firstPlayerStats.PTS || 0,
-            FGM: firstPlayerStats.FGM || 0,
-            FGA: firstPlayerStats.FGA || 0,
-            GP: firstPlayerStats.GP || 0,
-            REB: firstPlayerStats.REB || 0
-          },
-          allStatsKeys: Object.keys(firstPlayerStats).slice(0, 10)
-        });
-      }
-    } else {
-      console.warn('⚠️ [DEBUG loadRoster] Cannot merge stats - missing data:', {
-        hasTournamentDoc: !!tournamentDoc,
-        hasTournamentPlayers: !!(tournamentDoc && tournamentDoc.players),
-        tournamentPlayersCount: tournamentDoc && tournamentDoc.players ? Object.keys(tournamentDoc.players).length : 0,
-        hasDataPlayers: !!data.players,
-        dataPlayersCount: data.players ? data.players.length : 0
-      });
+    // ✅ Phase 4.1: Merge stats via shared RosterLoader
+    if (typeof RosterLoader !== 'undefined' && tournamentDoc && data.players) {
+      const merged = RosterLoader.mergeRosterWithStateDoc(data, tournamentDoc);
+      data.players = merged.players;
     }
-    
+
     // ✅ SS&S: Store roster data with merged stats (matches Franchise pattern)
     tournamentRosterData = data;
     console.log('🔍 [DEBUG loadRoster] tournamentRosterData stored:', {
@@ -1710,7 +1617,7 @@ async function initializeTournament() {
       try {
         // ✅ REMOVED: Training is not used in Tournament mode - proceed directly to game
         const payload = { tournament_id: tournament._id };
-        const res = await fetch(API_CONFIG.buildUrl('/simulate-tournament-round'), {
+        const res = await fetch(API_CONFIG.buildUrl('/tournament/simulate-round'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -2211,238 +2118,7 @@ function createPill(originalValue, attrKey) {
   return pill;
 }
 
-// ✅ SS&S: Player stats rendering (matches Franchise pattern exactly)
-
-// Store roster stats data for sorting
-let rosterPlayersDataForSorting = [];
-
-// ✅ SS&S: Wrapper function to match Franchise renderRosterStats() pattern
-function renderRosterStats(players) {
-  console.log('🔍 [DEBUG renderRosterStats] Starting renderRosterStats()');
-  console.log('🔍 [DEBUG renderRosterStats] Players received:', {
-    playersCount: players?.length || 0,
-    hasPlayers: !!players,
-    firstPlayer: players?.[0] ? {
-      _id: players[0]._id,
-      name: players[0].name || `${players[0].first_name} ${players[0].last_name}`,
-      hasStats: !!players[0].stats,
-      hasSeason: !!(players[0].stats?.season),
-      hasPlayed: (players[0].stats?.season?.MIN || 0) > 0, // ✅ FIX: Check MIN > 0
-      MIN: players[0].stats?.season?.MIN || 0,
-      GP: players[0].stats?.season?.GP || 0,
-      seasonKeys: players[0].stats?.season ? Object.keys(players[0].stats.season) : []
-    } : null
-  });
-  
-  if (!players || players.length === 0) {
-    console.warn('⚠️ [DEBUG renderRosterStats] No players provided');
-    const tbody = document.getElementById('roster-stats-body');
-    if (tbody) {
-      tbody.innerHTML = '';
-      console.log('🔍 [DEBUG renderRosterStats] Cleared empty tbody');
-    } else {
-      console.error('❌ [DEBUG renderRosterStats] roster-stats-body element not found');
-    }
-    return;
-  }
-  
-  const tbody = document.getElementById('roster-stats-body');
-  if (!tbody) {
-    console.error('❌ [DEBUG renderRosterStats] roster-stats-body element not found in DOM');
-    return;
-  }
-  console.log('🔍 [DEBUG renderRosterStats] Found roster-stats-body element');
-  
-  rosterPlayersDataForSorting = JSON.parse(JSON.stringify(players)); // Deep copy for sorting
-  console.log('🔍 [DEBUG renderRosterStats] Calling renderRosterStatsTable() with', rosterPlayersDataForSorting.length, 'players');
-  renderRosterStatsTable(rosterPlayersDataForSorting);
-  
-  // Add click handlers to sortable headers (only once) - target only the stats table
-  const statsTable = document.querySelector('#roster-tab .stats-table');
-  if (statsTable) {
-    const sortableHeaders = statsTable.querySelectorAll('thead .sortable');
-    sortableHeaders.forEach(header => {
-      // Remove existing listeners to avoid duplicates
-      const newHeader = header.cloneNode(true);
-      header.parentNode.replaceChild(newHeader, header);
-      
-      newHeader.style.cursor = 'pointer';
-      newHeader.style.userSelect = 'none';
-      newHeader.addEventListener('click', () => {
-        const stat = newHeader.dataset.stat;
-        sortRosterStats(stat);
-      });
-    });
-  }
-}
-
-function renderRosterStatsTable(players) {
-  console.log('🔍 [DEBUG renderRosterStatsTable] Starting renderRosterStatsTable()');
-  const tbody = document.getElementById('roster-stats-body');
-  if (!tbody) {
-    console.error('❌ [DEBUG renderRosterStatsTable] roster-stats-body tbody element not found');
-    return;
-  }
-  console.log('🔍 [DEBUG renderRosterStatsTable] Found tbody, rendering', players.length, 'players');
-  
-  tbody.innerHTML = '';
-  rosterPlayersDataForSorting = JSON.parse(JSON.stringify(players)); // Deep copy for sorting
-  
-  let renderedCount = 0;
-  let playersWithZeroStats = 0;
-  let playersWithStats = 0;
-  
-  players.forEach((p, index) => {
-    const stats = p.stats?.season || {};
-    // ✅ FIX: hasStats should only be true if player has played (MIN > 0)
-    const hasNonZeroStats = (stats.MIN || 0) > 0;
-    
-    if (hasNonZeroStats) {
-      playersWithStats++;
-    } else {
-      playersWithZeroStats++;
-    }
-    
-    if (index === 0) {
-      console.log('🔍 [DEBUG renderRosterStatsTable] Sample player stats:', {
-        playerId: p._id,
-        playerName: p.name || `${p.first_name} ${p.last_name}`,
-        hasStats: !!p.stats,
-        hasSeason: !!p.stats?.season,
-        statsKeys: Object.keys(stats),
-        hasNonZeroStats,
-        sampleValues: {
-          PTS: stats.PTS || 0,
-          FGM: stats.FGM || 0,
-          FGA: stats.FGA || 0,
-          GP: stats.GP || 0
-        }
-      });
-    }
-    // Use 3PTM/3PTA directly (standardized field names)
-    const tpm = stats['3PTM'] || 0;
-    const tpa = stats['3PTA'] || 0;
-    
-    // Calculate percentages
-    const fgPct = stats.FGA > 0 ? ((stats.FGM || 0) / stats.FGA * 100).toFixed(1) : '0.0';
-    const threePct = tpa > 0 ? (tpm / tpa * 100).toFixed(1) : '0.0';
-    const ftPct = stats.FTA > 0 ? ((stats.FTM || 0) / stats.FTA * 100).toFixed(1) : '0.0';
-    
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim()}</td>
-      <td>${stats.PTS || 0}</td>
-      <td>${stats.FGM || 0}</td>
-      <td>${stats.FGA || 0}</td>
-      <td>${fgPct}%</td>
-      <td>${tpm}</td>
-      <td>${tpa}</td>
-      <td>${threePct}%</td>
-      <td>${stats.FTM || 0}</td>
-      <td>${stats.FTA || 0}</td>
-      <td>${ftPct}%</td>
-      <td>${stats.DREB || 0}</td>
-      <td>${stats.OREB || 0}</td>
-      <td>${stats.TREB || (stats.DREB || 0) + (stats.OREB || 0)}</td>
-      <td>${stats.AST || 0}</td>
-      <td>${stats.STL || 0}</td>
-      <td>${stats.BLK || 0}</td>
-      <td>${stats.F || 0}</td>
-      <td>${stats.MIN || 0}</td>
-      <td>${stats.TO || 0}</td>`;
-    tbody.appendChild(tr);
-    renderedCount++;
-  });
-  
-  console.log('✅ [DEBUG renderRosterStatsTable] Rendered', renderedCount, 'player stat rows:', {
-    totalPlayers: players.length,
-    playersWithStats,
-    playersWithZeroStats
-  });
-  
-  // ✅ DEBUG: If all stats are zero, log a sample to verify
-  if (playersWithStats === 0 && players.length > 0) {
-    const samplePlayer = players[0];
-    const sampleStats = samplePlayer.stats?.season || {};
-    console.warn('⚠️ [DEBUG renderRosterStatsTable] ALL PLAYERS HAVE ZERO STATS:', {
-      samplePlayerId: samplePlayer._id,
-      samplePlayerName: samplePlayer.name || `${samplePlayer.first_name} ${samplePlayer.last_name}`,
-      sampleStats: {
-        PTS: sampleStats.PTS || 0,
-        FGM: sampleStats.FGM || 0,
-        FGA: sampleStats.FGA || 0,
-        GP: sampleStats.GP || 0,
-        REB: sampleStats.REB || 0
-      },
-      hasStatsObject: !!samplePlayer.stats,
-      hasSeasonObject: !!samplePlayer.stats?.season,
-      seasonKeys: Object.keys(sampleStats)
-    });
-  }
-}
-
-function sortRosterStats(statKey) {
-  // Map display stat names to data stat keys
-  const statMap = {
-    'name': 'name',
-    'PTS': 'PTS',
-    'FGM': 'FGM',
-    'FGA': 'FGA',
-    'FG%': 'FG%',
-    '3PTM': '3PTM',
-    '3PTA': '3PTA',
-    '3PT%': '3PT%',
-    'FTM': 'FTM',
-    'FTA': 'FTA',
-    'FT%': 'FT%',
-    'DREB': 'DREB',
-    'OREB': 'OREB',
-    'TREB': 'TREB',
-    'AST': 'AST',
-    'STL': 'STL',
-    'BLK': 'BLK',
-    'F': 'F',
-    'MIN': 'MIN',
-    'TO': 'TO'
-  };
-  
-  const dataKey = statMap[statKey] || statKey;
-  
-  // Sort players by the selected stat (descending order)
-  rosterPlayersDataForSorting.sort((a, b) => {
-    let val1, val2;
-    const statsA = a.stats?.season || {};
-    const statsB = b.stats?.season || {};
-    
-    if (dataKey === 'name') {
-      val1 = a.name || '';
-      val2 = b.name || '';
-      return val2.localeCompare(val1); // Reverse for descending
-    } else if (dataKey === 'FG%') {
-      val1 = statsA.FGA > 0 ? (statsA.FGM || 0) / statsA.FGA : 0;
-      val2 = statsB.FGA > 0 ? (statsB.FGM || 0) / statsB.FGA : 0;
-    } else if (dataKey === '3PT%') {
-      const tpaA = statsA['3PTA'] || statsA.TPA || 0;
-      const tpaB = statsB['3PTA'] || statsB.TPA || 0;
-      val1 = tpaA > 0 ? ((statsA['3PTM'] || statsA.TPM || 0) / tpaA) : 0;
-      val2 = tpaB > 0 ? ((statsB['3PTM'] || statsB.TPM || 0) / tpaB) : 0;
-    } else if (dataKey === 'FT%') {
-      val1 = statsA.FTA > 0 ? (statsA.FTM || 0) / statsA.FTA : 0;
-      val2 = statsB.FTA > 0 ? (statsB.FTM || 0) / statsB.FTA : 0;
-    } else if (dataKey === 'TREB') {
-      val1 = statsA.TREB || (statsA.DREB || 0) + (statsA.OREB || 0);
-      val2 = statsB.TREB || (statsB.DREB || 0) + (statsB.OREB || 0);
-    } else {
-      val1 = statsA[dataKey] || 0;
-      val2 = statsB[dataKey] || 0;
-    }
-    
-    return val2 - val1; // Descending order
-  });
-  
-  // Re-render with sorted data
-  renderRosterStatsTable(rosterPlayersDataForSorting);
-}
+// ✅ Phase 4.2: Roster stats rendering delegated to RosterStatsRenderer (rosterStatsRenderer.js)
 
 function renderPlaybookSummary() {
   if (!teamData) return;

@@ -44,7 +44,7 @@ def test_start_tournament_resets_player_stats():
         }
     )
 
-    resp = client.post("/start-tournament", json={"user_team_id": "Lancaster"})
+    resp = client.post("/tournament/start", json={"user_team_id": "Lancaster"})
     assert resp.status_code == 200
 
     player = players_collection.find_one({"_id": "p1"})

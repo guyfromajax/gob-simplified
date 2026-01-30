@@ -1,7 +1,7 @@
 # Tournament & Franchise Mode Unification Plan
 
 **Date:** January 2025  
-**Status:** 📋 Planning  
+**Status:** 📋 Planning (Phase 1 ✅, Phase 2 ✅, Phase 2.5 Frontend bracket ✅, Phase 3.1 ✅, Phase 4.1 ✅, Phase 4.2 ✅)  
 **Goal:** Unify Tournament and Franchise modes to use identical code patterns, with only mode variable differences and intentional feature differences (training, recruits, career stats, bracket vs schedule)
 
 ---
@@ -15,34 +15,19 @@
 
 ---
 
-## Phase 1: Field Name Standardization
+## Phase 1: Field Name Standardization ✅
 
-### Change: `franchise_teams` → `teams`
+### Status: Done (January 2025)
 
-**Rationale:** Both modes store identical team object structures. Using different field names creates unnecessary branching and maintenance burden.
+**Approach taken:** `franchise_teams` was **removed** from the franchise document entirely (not renamed to `teams` on the franchise doc). Franchise team-level data lives in **FTD** (franchise_team_data collection); game and tournament docs use **`teams`** for in-game team data. No `teams` field on the franchise document (that would duplicate FTD).
 
-**Files to Update:**
+**Completed:**
+- **Backend:** All reads/writes of `franchise_teams` removed or replaced with FTD / game doc `teams`: stat_updater (FTD-based mapping), franchise_manager (no init of franchise_teams), gameplan_routes (path and projections), eos_tournament (team_ids from FTD), franchise_routes (FTD/team-stats), turn_manager (game_doc.teams), team_settings_manager (teams for all modes), team_stats_aggregator and franchise_standings (comments/param rename to `team_ids_map`), team_id_resolver and play_routes (comments), api (comment).
+- **Frontend:** FCC and TCC use `teams` / team-stats for bracket and display; no franchise_teams references.
+- **Parameter/doc cleanup:** `calculate_franchise_standings` second parameter renamed `franchise_teams` → `team_ids_map`; eos_tournament passes `team_ids_map`; docstrings and comments updated to say FTD / game doc `teams` (no franchise_teams).
+- **No backward-compatibility read fallback** (would re-introduce dependency on deprecated field). Optional DB `$unset` of franchise_teams from existing franchise docs can be run separately if desired.
 
-#### Backend:
-- `BackEnd/api/franchise_routes.py` - All references to `franchise_teams`
-- `BackEnd/api/gameplan_routes.py` - References in `ensure_team_objects_exist()`
-- `BackEnd/utils/stat_updater.py` - References in `finalize_game()` and `_update_offensive_play_season_stats()`
-- `BackEnd/models/franchise_manager.py` - Initialization code
-- `BackEnd/tournament/eos_tournament.py` - References (if any)
-- `BackEnd/utils/team_stats_aggregator.py` - Parameter name (already uses `team_ids` generically)
-
-#### Frontend:
-- `FrontEnd/static/franchise-command-center.js` - All references
-- `FrontEnd/static/tournament.js` - Verify consistency (already uses `teams`)
-
-#### Database Migration:
-- **Backward Compatibility**: Add read fallback to check both `franchise_teams` and `teams` during transition
-- **Migration Script**: Optional script to update existing franchise documents
-
-**Impact:**
-- Eliminates mode-specific branching in team data access
-- Reduces code duplication
-- Makes codebase more maintainable
+**Impact:** Franchise team data has a single source of truth (FTD); game/tournament docs use `teams` consistently; no mode-specific branching on franchise_teams; codebase aligned with removal.
 
 ---
 
@@ -59,31 +44,37 @@
 
 ---
 
+## Phase 2.5: Frontend Bracket Unification ✅
+
+**Status:** Done (January 2025)
+
+**Goal:** Same bracket UI and layout for FCC (Franchise EOS Tournament tab) and TCC (Tournament Bracket tab).
+
+**Completed:**
+- **Shared bracket renderer:** `FrontEnd/static/bracket.js` — `renderBracketShared(container, bracketData, teamIdToNameMap, options)`. Single DOM implementation (5-column grid, matchups, logos, seeds, scores).
+- **FCC Tournament tab:** Uses shared renderer; team names from `/franchise/team-stats` (one request); container uses class `bracket` + `tournament.css` for same layout as TCC.
+- **TCC Bracket tab:** Uses same shared renderer; `teamIdNameMap` from `/tournament/team-stats`; TCC-only logic (applyResults, localStorage, updateCTA) unchanged around the call.
+- **Layout:** Both use `tournament.css` (`.bracket` grid, `.round`, etc.); FCC container gets same padding/min-height via `franchise-command-center.css`.
+
+**Impact:** One code path for bracket display; FCC shows team names and correct layout; no duplicate bracket DOM logic.
+
+**Related:** `tournament_eos_bracket_merge_plan.md` §9 (Frontend Bracket Unification).
+
+---
+
 ## Phase 3: API Endpoint Consistency
 
-### 3.1 Prefix Standardization
+### 3.1 Prefix Standardization ✅
 
-**Issue:** Tournament has two endpoints without `/tournament/` prefix
+**Status:** Done (January 2025)
 
-**Changes Required:**
+**Completed:**
+- **`/tournament/start`** — New primary route; **`/start-tournament`** kept as backward-compat alias (same handler). Backend: `BackEnd/api/tournament_routes.py` registers both paths for `start_tournament`.
+- **`/tournament/simulate-round`** — New primary route; **`/simulate-tournament-round`** kept as backward-compat alias (same handler). Backend: both paths for `simulate_round`.
+- **Frontend:** `tournament-select.js` uses `/tournament/start`; `tournament.js` uses `/tournament/simulate-round`.
+- **Tests:** `tests/test_start_tournament_resets_stats.py`, `test_sim_to_4th_quarter.py`, `test_quarter_simulation_standardization.py`, `test_gameplan_simple.py`, `test_gameplan_scenarios.py`, `test_gameplan_functionality.py` updated to use new URLs.
 
-1. **`/start-tournament` → `/tournament/start`**
-   - Update endpoint: `BackEnd/api/tournament_routes.py` line ~126
-   - Update frontend calls:
-     - `FrontEnd/static/tournament-select.js` (if exists)
-     - `FrontEnd/static/mode-select.js` (if calls this)
-   - **Backward Compatibility**: Add redirect or keep old endpoint temporarily
-
-2. **`/simulate-tournament-round` → `/tournament/simulate-round`**
-   - Update endpoint: `BackEnd/api/tournament_routes.py` line ~159
-   - Update frontend calls:
-     - `FrontEnd/static/tournament.js`
-   - **Backward Compatibility**: Add redirect or keep old endpoint temporarily
-
-**Impact:**
-- Consistent API naming pattern
-- Easier to understand and maintain
-- Better developer experience
+**Impact:** Consistent `/tournament/` prefix for tournament endpoints; no breaking change (old URLs still work).
 
 ### 3.2 Missing Endpoint Equivalents (Analysis)
 
@@ -108,40 +99,29 @@
 
 ## Phase 4: Frontend Code Unification
 
-### 4.1 Roster Loading & Stats Merging
+### 4.1 Roster Loading & Stats Merging ✅
 
-**Current State:**
-- Franchise: `franchise-command-center.js` - `init()` function loads roster, merges stats
-- Tournament: `tournament.js` - `loadRoster()` function loads roster, merges stats
+**Status:** Done (January 2025)
 
-**Unification Opportunity:**
-- Extract shared function: `loadRosterWithStats(mode, docId, teamName)`
-- Returns: `{ players: [...], stats: {...} }`
-- Both modes call this function with different parameters
+**Completed:**
+- **Shared module:** `FrontEnd/static/js/shared/rosterLoader.js` — `loadRosterWithStats(rosterUrl, stateUrl)` fetches roster + state and returns `{ players }` with merged `stats.season`; `mergeRosterWithStateDoc(rosterData, stateDoc)` for merge-only (used by TCC to avoid double-fetch).
+- **FCC:** `init()` builds `rosterUrl` and `stateUrl`, calls `RosterLoader.loadRosterWithStats(rosterUrl, stateUrl)`, then `renderTeam({ players: result.players })`.
+- **TCC:** `loadRoster()` keeps 404 retry and fetches; after having `data` and `tournamentDoc`, calls `RosterLoader.mergeRosterWithStateDoc(data, tournamentDoc)` and assigns `data.players = merged.players`.
+- **Script:** `rosterLoader.js` included in both `franchise-command-center.html` and `tournament.html`.
 
-**Files to Create:**
-- `FrontEnd/static/js/shared/rosterLoader.js` - Shared roster loading logic
+**Impact:** Single place for roster+state fetch/merge (FCC) and merge logic (TCC); no duplicate merge code.
 
-**Files to Update:**
-- `FrontEnd/static/franchise-command-center.js` - Use shared function
-- `FrontEnd/static/tournament.js` - Use shared function
+### 4.2 Roster Stats Rendering ✅
 
-### 4.2 Roster Stats Rendering
+**Status:** Done (January 2025)
 
-**Current State:**
-- Both modes have `renderRosterStats()` and `renderRosterStatsTable()` functions
-- Tournament copied from Franchise, but may have diverged
+**Completed:**
+- **Shared module:** `FrontEnd/static/js/shared/rosterStatsRenderer.js` — `RosterStatsRenderer.renderRosterStats(players)`, `renderRosterStatsTable(players)`, `sortRosterStats(statKey)`; uses `#roster-stats-body` and `#roster-tab .stats-table` with `.sortable`/`data-stat`.
+- **FCC:** Removed local `renderRosterStats`, `renderRosterStatsTable`, `sortRosterStats`; `renderTeam()` calls `RosterStatsRenderer.renderRosterStats(data.players || [])`.
+- **TCC:** Removed local roster-stats block; `renderRoster()` calls `RosterStatsRenderer.renderRosterStats(data.players || [])`.
+- **Script:** `rosterStatsRenderer.js` included in both HTML files.
 
-**Unification Opportunity:**
-- Extract to shared module: `FrontEnd/static/js/shared/rosterStatsRenderer.js`
-- Both modes import and use same functions
-
-**Files to Create:**
-- `FrontEnd/static/js/shared/rosterStatsRenderer.js`
-
-**Files to Update:**
-- `FrontEnd/static/franchise-command-center.js` - Import shared functions
-- `FrontEnd/static/tournament.js` - Import shared functions
+**Impact:** One code path for roster stats table and sorting; FCC and TCC behave the same.
 
 ### 4.3 Team Stats Rendering
 

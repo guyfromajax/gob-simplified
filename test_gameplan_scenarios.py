@@ -247,7 +247,7 @@ def test_tournament_sim_to_4th_scenario() -> bool:
     # The issue was that team_id was null because home_id/away_id weren't passed
     
     # Start a tournament
-    start_response = requests.post(f"{BASE_URL}/start-tournament", json={
+    start_response = requests.post(f"{BASE_URL}/tournament/start", json={
         "user_team": "Bentley-Truman"
     })
     
@@ -261,7 +261,7 @@ def test_tournament_sim_to_4th_scenario() -> bool:
     
     # Simulate rounds until we get to user matchup
     for round_num in range(1, 4):
-        sim_response = requests.post(f"{BASE_URL}/simulate-tournament-round", json={
+        sim_response = requests.post(f"{BASE_URL}/tournament/simulate-round", json={
             "tournament_id": tournament_id
         })
         

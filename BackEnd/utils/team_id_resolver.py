@@ -294,7 +294,7 @@ def resolve_team_id_to_object_id(
     Resolves team identifier to ObjectId string (for database document keys).
     
     This is a convenience function for cases where you need ObjectId strings
-    (e.g., for tournament.teams[ObjectId] or franchise.franchise_teams[ObjectId] keys).
+    (e.g., for tournament.teams[ObjectId] or FTD team list keys).
     
     Args:
         team_identifier: Team identifier in any format
