@@ -152,7 +152,7 @@
 ### 1. Tournament & Franchise Unification
 **Status:** 📋 PLANNING  
 **Priority:** 🟡 MEDIUM  
-**Document:** `Tournament_Franchise_Unification_Plan.md`
+**Document:** `To Do/Archive/Tournament_Franchise_Unification_Plan.md` (plan complete; archived)
 
 **Goal:** Unify Tournament and Franchise modes to use identical code patterns, with only mode variable differences and intentional feature differences.
 

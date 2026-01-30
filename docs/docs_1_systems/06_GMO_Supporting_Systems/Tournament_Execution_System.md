@@ -100,7 +100,7 @@ When the user **loses** an EOS game (quarters, semis, or final):
 
 ## Related
 
-- **Merge plan:** `docs/To Do/tournament_eos_bracket_merge_plan.md` — full refactor plan (engine, EOS swap, Tournament ObjectIds).
+- **Merge plan:** `docs/To Do/Archive/tournament_eos_bracket_merge_plan.md` — full refactor plan (engine, EOS swap, Tournament ObjectIds).
 - **EOS:** `eos_tournament.initialize_eos_tournament` (standings → seeds → `bracket_engine.generate_bracket`), `save_tournament_game_result` → `bracket_engine.save_game_result` + results append, `advance_tournament_round` → `bracket_engine.advance_bracket` (winners from matchups). **Refactor complete.** Caller sets `franchise_doc["results"] = existing_results` (including week 14) before init so seeding uses full results.
 - **Tournament init:** `TournamentManager.create_tournament` uses `bracket_engine.generate_bracket(seed_order)` with ObjectId strings. `bracket_logic.update_bracket_from_results` uses `advance_bracket` (results or matchups). Save-result and sim-round resolve winner/team names ↔ ObjectIds at API edges; `_bracket_for_aggregator` converts bracket to name-based for team-stats aggregator.
 

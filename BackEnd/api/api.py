@@ -38,6 +38,7 @@ from .gameplan_routes import router as gameplan_router
 from .play_routes import router as play_router
 from .skeleton_routes import router as skeleton_router
 from .pointer_validation_routes import router as pointer_validation_router
+from .auth_routes import router as auth_router
 import traceback
 from unidecode import unidecode
 from typing import Optional
@@ -73,6 +74,28 @@ def health_check():
             status_code=500,
             content={"status": "unhealthy", "error": str(e)}
         )
+
+# ============================================================================
+# ALPHA CONFIGURATION
+# ============================================================================
+# IS_ALPHA controls alpha-specific behavior:
+# - When True: OTP required for signup, alpha badge shown, data disclaimers displayed
+# - When False: Normal public access, no alpha restrictions
+# Set IS_ALPHA=true in production for alpha launch, false for public launch
+IS_ALPHA = os.getenv("IS_ALPHA", "false").lower() == "true"
+print(f"🔶 [ALPHA] IS_ALPHA={IS_ALPHA}", file=sys.stderr, flush=True)
+
+@app.get("/app-config")
+def get_app_config():
+    """
+    Returns frontend configuration including alpha status.
+    Frontend uses this to conditionally show alpha badge, disclaimers, and OTP field.
+    """
+    return {
+        "isAlpha": IS_ALPHA,
+        "alphaDisclaimer": "This is an alpha release. Data may be wiped without notice. Gameplay balance and features may change." if IS_ALPHA else None,
+        "version": "alpha-1.0" if IS_ALPHA else "1.0"
+    }
 
 # CORS Configuration - Must match actual testing domains, not just final ideal
 # CRITICAL: Add CORS middleware BEFORE including routers to ensure it applies to all routes
@@ -125,6 +148,7 @@ app.include_router(gameplan_router)
 app.include_router(play_router)
 app.include_router(skeleton_router)
 app.include_router(pointer_validation_router)
+app.include_router(auth_router)
 
 templates = Jinja2Templates(directory="FrontEnd/static")
 

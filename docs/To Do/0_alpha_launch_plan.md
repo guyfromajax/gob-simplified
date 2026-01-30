@@ -326,9 +326,14 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 - [ ] Review Netlify bandwidth constraints
 
 ### 7.2 In-App Caps (Hard Stops)
-- [ ] Max games per user per day
-- [ ] Max tournaments per user
-- [ ] Max sim requests per minute
+- [ ] **One Franchise per user** - Each user can only have one active franchise instance
+- [ ] **One Tournament per user** - Each user can only have one active tournament instance
+- [ ] Max games per user per day (optional - evaluate need)
+- [ ] Max sim requests per minute (optional - evaluate need)
+
+> **Implementation Note:** When user starts a new franchise/tournament, check if they already have one. If so, either:
+> - Block creation with message: "You already have an active [mode]. Delete it first to start a new one."
+> - Or prompt: "Starting a new [mode] will replace your existing one. Continue?"
 
 ### 7.3 Verification
 - [ ] Confirm caps actually block usage
@@ -492,6 +497,7 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 5. **Security:** Essential items only (Steps 1, 5, 6). Advanced security post-launch.
 6. **Data Wipe:** Will wipe `games`, `tournaments`, `franchises`, `users` at launch. Preserve universal reference data (`teams`, `players`, `plays`, `fcp_skeletons`, `hct_skeletons`, `defenses`).
 7. **Alpha Access Control:** One-time passwords (OTPs) required for signup when `IS_ALPHA=true`. 50 OTPs generated (limits alpha to 25-50 users), each usable once by one email. Each OTP is permanently linked to the email that uses it (`used_by_email` field) for access tracking. OTP validation disabled when `IS_ALPHA=false`.
+8. **Instance Limits:** Each user limited to **one active Franchise** and **one active Tournament** at a time. Prevents runaway data growth and simplifies UX during alpha. Users must delete existing instance to start a new one.
 
 ### Testing Reference
 - See `Final_Testing_Checklist.md` for detailed test scenarios (Step 10 references this)

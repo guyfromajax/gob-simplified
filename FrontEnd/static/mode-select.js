@@ -138,7 +138,73 @@ async function checkForSavedGame() {
 }
 */
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  // ============================================================================
+  // ALPHA MODE CONFIGURATION
+  // ============================================================================
+  // Load app config and show alpha badge/disclaimer if in alpha mode
+  try {
+    const appConfig = await API_CONFIG.loadAppConfig();
+    if (appConfig.isAlpha) {
+      const alphaBadge = document.getElementById('alpha-badge');
+      const alphaDisclaimer = document.getElementById('alpha-disclaimer');
+      if (alphaBadge) alphaBadge.classList.add('visible');
+      if (alphaDisclaimer) alphaDisclaimer.classList.add('visible');
+      console.log('[ALPHA] Alpha mode enabled');
+    }
+  } catch (error) {
+    console.error('[ALPHA] Failed to load app config:', error);
+  }
+  
+  // ============================================================================
+  // AUTHENTICATION STATE
+  // ============================================================================
+  const authLoggedOut = document.getElementById('auth-logged-out');
+  const authLoggedIn = document.getElementById('auth-logged-in');
+  const authUserEmail = document.getElementById('auth-user-email');
+  const logoutBtn = document.getElementById('logout-btn');
+  
+  // Check if user is logged in
+  const authToken = localStorage.getItem('auth_token');
+  const authUser = localStorage.getItem('auth_user');
+  
+  if (authToken && authUser) {
+    try {
+      const user = JSON.parse(authUser);
+      // Show logged-in state
+      if (authLoggedOut) authLoggedOut.style.display = 'none';
+      if (authLoggedIn) authLoggedIn.style.display = 'flex';
+      if (authUserEmail) authUserEmail.textContent = user.email;
+      console.log('[AUTH] User logged in:', user.email);
+    } catch (e) {
+      console.error('[AUTH] Failed to parse user:', e);
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+    }
+  }
+  
+  // Handle logout
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        // Call logout endpoint (optional, since JWT is stateless)
+        await fetch(API_CONFIG.buildUrl('/api/auth/logout'), { method: 'POST' });
+      } catch (e) {
+        // Ignore errors - logout should work client-side regardless
+      }
+      
+      // Clear local storage
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      
+      // Update UI
+      if (authLoggedOut) authLoggedOut.style.display = 'flex';
+      if (authLoggedIn) authLoggedIn.style.display = 'none';
+      
+      console.log('[AUTH] User logged out');
+    });
+  }
+  
   // ⏸️ TABLED: Resume Last Game feature - Exact game state restoration
   // TODO: Revisit after Phase 1.3+ and site go-live priorities complete
   // See: docs/To Do/resume_last_game_exact_state.md

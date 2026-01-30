@@ -11,7 +11,7 @@
 - **Layout:** Container `#tournament-bracket-container` has class **`bracket`** so `tournament.css` applies (grid, rounds, matchup wrappers). Same padding/min-height as TCC via `franchise-command-center.css`. Wrapper has `overflow-x: auto` for horizontal scroll when needed.
 - **Options:** Passes `eos_tournament.seeds`, `getLogo` (using `formatTeamName`), and `isUserTeam(id)` (vs `userTeamId`) for user-team highlighting.
 
-**Related:** `tournament_eos_bracket_merge_plan.md` §9; `Tournament_Execution_System.md` (Tournament display).
+**Related:** `docs/To Do/Archive/tournament_eos_bracket_merge_plan.md` §9; `Tournament_Execution_System.md` (Tournament display).
 
 ---
 
