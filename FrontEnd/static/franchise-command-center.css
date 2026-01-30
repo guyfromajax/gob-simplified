@@ -128,3 +128,10 @@
   transform: translateY(0);
   box-shadow: 0 2px 6px rgba(255, 122, 0, 0.3);
 }
+
+/* FCC Tournament tab: same bracket layout as TCC (tournament.css .bracket grid) */
+#tournament-bracket-container.bracket {
+  padding-top: 32px;
+  padding-bottom: 32px;
+  min-height: 600px;
+}
