@@ -205,6 +205,47 @@
 - Shared features: Game Plan, Playbooks, Roster, Stats tabs
 - Navigation: All mode transitions
 
+### Final Smoke Test Checklist (Phases 4.1, 4.2, 4.4, 5.2, 5.3)
+
+Run after unification work to confirm shared modules and endpoints behave correctly.
+
+**Franchise Command Center (FCC)**
+
+| Check | What to verify |
+|-------|----------------|
+| Load FCC | Open `franchise-command-center.html?franchise_id=<valid_id>`. Page loads; top bar shows team name, chemistry, grades (offense/defense/athleticism), week. |
+| Command center data | Top bar and tabs reflect data from `/franchise/command-center/data` (team, chemistry, intangibles, prestige, rank, username, week, training status). |
+| Tabs + URL | Click Standings → Roster → Team → Stats → Schedule → Tournament → Recruits → Team Traits. URL gets `?tab=...`; correct tab content shows. |
+| Restore tab from URL | Reload with `?franchise_id=...&tab=team-tab`. Team tab is active and team report/playbook summary load. |
+| Roster tab | Roster table and **Stats** sub-table (PTS, FGM, FG%, etc.) render. Click a stat header; rows re-sort. |
+| Tournament tab (EOS) | If EOS tournament is active, Tournament tab shows bracket with team names (not IDs) and same layout as TCC. |
+| Roster backend | `GET /franchise/roster?franchise_id=...&team_name=...` returns `{ players: [...] }` with attributes/position_ratings. |
+
+**Tournament Command Center (TCC)**
+
+| Check | What to verify |
+|-------|----------------|
+| Load TCC | Open `tournament.html?tournament_id=<valid_id>`. Page loads; top bar shows team, chemistry, grades. |
+| Command center data | Top bar reflects `/tournament/command-center/data` (team, team_id, chemistry, offense/defense/athleticism, current_round, completed, bracket). |
+| Tabs + URL | Click Bracket → Roster → Team → Stats → Schedule. URL gets `?tab=...`; correct tab content shows. |
+| Restore tab from URL | Reload with `?tournament_id=...&tab=roster-tab`. Roster tab is active and roster + stats table load. |
+| Bracket tab | Bracket renders with team names and scores; layout matches FCC Tournament tab. |
+| Roster tab | Roster table and stats sub-table render; stat header click sorts. Player stats (season) show after games played. |
+| Roster backend | `GET /tournament/roster?tournament_id=...&team_id=...` (or team_name) returns `{ players: [...] }` with merged attributes. |
+
+**Shared / Deep links**
+
+| Check | What to verify |
+|-------|----------------|
+| Team roster view (franchise) | From FCC Standings or Schedule, open another team’s roster (`team-roster-view.html?mode=franchise&franchise_id=...&team_id=...`). Roster and stats load (franchise path). |
+| Team roster view (tournament) | From TCC Schedule, open another team’s roster (`team-roster-view.html?mode=tournament&tournament_id=...&team_id=...`). Roster and stats load (tournament state merge). |
+| App-level roster | Game/box-score flows that use `/roster/<team>?franchise_id=...` or `?tournament_id=...` still load roster correctly. |
+
+**Quick backend checks (optional)**
+
+- `GET /franchise/command-center/data?franchise_id=...` → JSON with `team`, `team_id`, `team_chemistry`, `offense`, `defense`, `athleticism`, plus franchise-only keys.
+- `GET /tournament/command-center/data?tournament_id=...` → JSON with same common keys plus `current_round`, `completed`, `bracket`.
+
 ---
 
 ## Rollout Plan
