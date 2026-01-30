@@ -1,4 +1,4 @@
 # Netlify redirects file
-# Redirect root to mode-select.html
-/  /mode-select.html  200!
+# Redirect root to homepage.html
+/  /homepage.html  200!
 
