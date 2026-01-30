@@ -486,19 +486,17 @@ class TestModeHandling:
         assert saved_settings.get("motion", {}).get("4-1 Motion") == 50
     
     def test_franchise_mode_uses_franchises_collection(self):
-        """Test: Franchise mode → Saves to `franchises` collection → `franchise_teams.{team_id}.playbook_settings`"""
+        """Test: Franchise mode → Saves to FTD (franchise_team_data); franchise doc no longer has franchise_teams."""
         # Create franchise (simplified - would normally use FranchiseManager)
-        # For testing, we'll create a minimal franchise document
         franchise_id = ObjectId()
+        user_team_object_id = ObjectId()
         franchises_collection.insert_one({
             "_id": franchise_id,
             "user_team_id": "South Lancaster",
-            "user_team_object_id": ObjectId(),
-            "franchise_teams": {}
+            "user_team_object_id": user_team_object_id,
         })
         
         try:
-            # Save settings (will create team object if needed)
             playbook_settings = {
                 "motion": {"4-1 Motion": 50},
                 "set_play_inside": {},
@@ -512,22 +510,25 @@ class TestModeHandling:
             
             save_response = client.post("/api/playbooks", json={
                 "mode": "franchise",
-                "team_id": str(franchise_id),  # Will be normalized by backend
+                "team_id": str(user_team_object_id),
                 "franchise_id": str(franchise_id),
                 "playbook_settings": playbook_settings
             })
             
-            # Note: This might fail if team_id resolution doesn't work for test franchise
-            # That's okay - the test validates the collection/path logic
             if save_response.status_code == 200:
-                # Verify saved to franchises collection
                 franchise_doc = franchises_collection.find_one({"_id": franchise_id})
                 assert franchise_doc is not None
-                # Settings should be in franchise_teams path
-                assert "franchise_teams" in franchise_doc
+                # Franchise master settings are in FTD, not franchise_teams on franchise doc
+                from BackEnd.db import franchise_team_data_collection
+                ftd = franchise_team_data_collection.find_one(
+                    {"franchise_id": franchise_id, "team_id": user_team_object_id}
+                )
+                assert ftd is not None
+                assert ftd.get("playbook_settings", {}).get("motion", {}).get("4-1 Motion") == 50
         finally:
-            # Cleanup
             franchises_collection.delete_one({"_id": franchise_id})
+            from BackEnd.db import franchise_team_data_collection
+            franchise_team_data_collection.delete_many({"franchise_id": franchise_id})
     
     def test_helper_functions_work_correctly(self):
         """Test: Helper functions (get_collection_and_doc_id, get_team_settings_path) work correctly"""
@@ -543,7 +544,7 @@ class TestModeHandling:
         assert path == "teams.MORRISTOWN"
         
         path = get_team_settings_path("franchise", "MORRISTOWN")
-        assert path == "franchise_teams.MORRISTOWN"
+        assert path == "teams.MORRISTOWN"  # Franchise master uses FTD; path used only for game/tournament doc
         
         path = get_team_settings_path("tournament", "MORRISTOWN")
         assert path == "teams.MORRISTOWN"

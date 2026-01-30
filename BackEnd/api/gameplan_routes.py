@@ -120,15 +120,9 @@ def get_collection_and_doc_id(mode: str, franchise_id: str = None, tournament_id
 def get_team_settings_path(mode: str, team_id: str) -> str:
     """
     ✅ PHASE 5.5: Helper to get the MongoDB update path for team settings.
-    
-    Returns:
-        str: Update path like "franchise_teams.{team_id}.playbook_settings" or "teams.{team_id}.playbook_settings"
+    Franchise master uses FTD (no doc path); when updating game/tournament docs we use "teams".
     """
-    if mode == "franchise":
-        return f"franchise_teams.{team_id}"
-    else:
-        # Tournament and single both use "teams"
-        return f"teams.{team_id}"
+    return f"teams.{team_id}"
 
 
 def get_save_location_for_franchise_tournament(mode: str, game_id: str = None, franchise_id: str = None, tournament_id: str = None):
@@ -805,10 +799,9 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
                 except:
                     pass
         else:
-            # ✅ PERFORMANCE: Load with projection (only franchise_teams/teams field) for franchise/tournament modes
-            # This reduces from 402KB to ~50KB (87% reduction) for franchise mode
+            # ✅ PERFORMANCE: Load with minimal projection. Franchise uses FTD only; we only need doc to exist.
             if mode == "franchise":
-                doc = collection.find_one({"_id": ObjectId(doc_id)}, {"franchise_teams": 1, "_id": 1})
+                doc = collection.find_one({"_id": ObjectId(doc_id)}, {"_id": 1})
             elif mode == "tournament":
                 doc = collection.find_one({"_id": ObjectId(doc_id)}, {"teams": 1, "_id": 1})
             else:
@@ -817,7 +810,7 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
     if not doc:
         raise HTTPException(status_code=404, detail=f"{mode.capitalize()} not found")
     
-    # ✅ FTD: For franchise mode, check/update FTD collection instead of franchise_teams
+    # FTD: For franchise mode, check/update FTD collection only
     if mode == "franchise":
         # ✅ FTD: Check if FTD entry exists for this team
         try:
@@ -1217,8 +1210,7 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                         # Get user team name from master doc to find matching team_id in game doc
                         master_doc = collection.find_one(
                             {"_id": ObjectId(doc_id)},
-                            {"franchise_teams": 1 if mode == "franchise" else None, 
-                             "teams": 1 if mode == "tournament" else None,
+                            {"teams": 1 if mode == "tournament" else None,
                              "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
                         )
                         if master_doc:
@@ -1574,8 +1566,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                         # Get user team name from master doc to find matching team_id in game doc
                         master_doc = collection.find_one(
                             {"_id": ObjectId(doc_id)},
-                            {"franchise_teams": 1 if mode == "franchise" else None, 
-                             "teams": 1 if mode == "tournament" else None,
+                            {"teams": 1 if mode == "tournament" else None,
                              "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
                         )
                         if master_doc:
@@ -1839,8 +1830,8 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                     )
                     team_obj["playbook_settings"] = existing_playbook_settings
                 else:
-                    team_key = f"teams.{actual_team_id}" if mode != "franchise" else f"franchise_teams.{actual_team_id}"
-                    
+                    # Else branch: updating game or tournament doc (both use "teams")
+                    team_key = f"teams.{actual_team_id}"
                     if mode == "single":
                         result = collection.update_one(
                             {"_id": doc_id},
@@ -1854,31 +1845,27 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                         )
                         doc = collection.find_one({"_id": ObjectId(doc_id)})
                     
-                    # Reload team_obj with updated position filters
+                    # Reload team_obj (game/tournament doc both have "teams")
                     if mode == "franchise":
-                        team_obj = doc.get("franchise_teams", {}).get(actual_team_id, {})
+                        team_obj = doc.get("teams", {}).get(actual_team_id, {})
                     elif mode == "tournament":
                         team_obj = doc.get("teams", {}).get(actual_team_id, {})
                     else:
                         team_obj = doc.get("teams", {}).get(actual_team_id, {})
         
-        # ✅ CRITICAL FIX: Ensure plays exist before reading them
-        # This ensures plays are always available, even if ensure_team_objects_exist didn't populate them
-        # or if they were lost during document reloads
+        # Ensure plays exist before reading them (FTD for franchise master; game/tournament doc for else)
         if actual_team_id and (not team_obj or not team_obj.get("plays") or len(team_obj.get("plays", {})) == 0):
             populated_plays = _get_cached_populated_plays(mode=mode)
             
-            # Update the database
             if mode == "franchise" and not load_from_game_doc:
-                # ✅ FTD: Update FTD collection
                 franchise_team_data_collection.update_one(
                     {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
                     {"$set": {"plays": populated_plays}}
                 )
                 team_obj["plays"] = populated_plays
             else:
-                team_key = f"teams.{actual_team_id}" if mode != "franchise" else f"franchise_teams.{actual_team_id}"
-                
+                # Else branch: updating game or tournament doc (both use "teams")
+                team_key = f"teams.{actual_team_id}"
                 if mode == "single":
                     collection.update_one(
                         {"_id": doc_id},
@@ -1892,10 +1879,9 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                     )
                     doc = collection.find_one({"_id": ObjectId(doc_id)})
                 
-                # Reload team_obj with populated plays
+                # Reload team_obj (game/tournament doc both have "teams")
                 if mode == "franchise":
-                    franchise_teams = doc.get("franchise_teams", {})
-                    team_obj = franchise_teams.get(actual_team_id, {}) if actual_team_id else {}
+                    team_obj = doc.get("teams", {}).get(actual_team_id, {}) if actual_team_id else {}
                 elif mode == "tournament":
                     teams = doc.get("teams", {})
                     team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
@@ -1958,16 +1944,13 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         set_plays_attack.sort(key=lambda x: x["name"])
         set_plays_outside.sort(key=lambda x: x["name"])
         
-        # ✅ FIX: Reload team_obj from latest doc to ensure we have fresh playbook_settings
-        # This ensures slot_assignments and other settings are current after all document reloads.
-        # ✅ FTD: Skip for franchise when not loading from game doc – team_obj already from FTD;
-        # franchise_teams is empty, so reload would overwrite with {} and break position_filters/plays.
+        # Reload team_obj from latest doc so playbook_settings/plays are current. Franchise master: keep FTD team_obj.
         if mode == "franchise" and not load_from_game_doc:
-            pass  # keep team_obj from FTD
+            pass  # team_obj already from FTD
         elif mode == "franchise":
+            # Franchise + load_from_game_doc: doc is game doc (has "teams")
             doc = collection.find_one({"_id": ObjectId(doc_id)})
-            franchise_teams = doc.get("franchise_teams", {})
-            team_obj = franchise_teams.get(actual_team_id, {}) if actual_team_id else {}
+            team_obj = (doc.get("teams", {}).get(actual_team_id, {}) if actual_team_id else {}) if doc else {}
         elif mode == "tournament":
             doc = collection.find_one({"_id": ObjectId(doc_id)})
             teams = doc.get("teams", {})
@@ -2022,7 +2005,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 # Only fallback to team_obj if load_team_settings_from_doc() returned None (not empty dict)
                 playbook_settings = team_obj.get("playbook_settings", {})
         elif mode == "franchise" and not load_from_game_doc:
-            # ✅ FTD: Playbook settings (incl. position_filters) come from FTD team_obj; skip extract (reads franchise_teams).
+            # FTD: Playbook settings come from FTD team_obj
             playbook_settings = (team_obj or {}).get("playbook_settings", {})
         else:
             # ✅ UNIFIED: For tournament/franchise (game doc) modes, use unified extract for consistent team_id resolution
