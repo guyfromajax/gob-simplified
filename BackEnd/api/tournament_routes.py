@@ -17,6 +17,8 @@ from BackEnd.main import run_simulation
 from BackEnd.utils.shared import summarize_game_state
 from BackEnd.utils import stat_updater
 from BackEnd.utils.team_stats_aggregator import aggregate_team_stats_from_players
+from BackEnd.utils.roster_builder import build_roster_players
+from BackEnd.utils.command_center_data import build_command_center_base
 from bson import ObjectId
 
 router = APIRouter()
@@ -593,32 +595,22 @@ def tournament_command_center_data(tournament_id: str = Query(...)):
     # Get team stats from tournament teams object or universal teams collection
     team_doc = {}
     if user_team_object_id:
-        # Try tournament-specific team object first
         tournament_teams = doc.get("teams", {})
         tournament_team_obj = tournament_teams.get(user_team_object_id, {})
         if tournament_team_obj:
             team_doc = tournament_team_obj.get("team_attributes", {})
         else:
-            # Fallback to universal team doc
             team_doc = teams_collection.find_one({"_id": ObjectId(user_team_object_id)}) or {}
     elif user_team_id_name:
-        # Fallback: resolve by team name
         team_doc = teams_collection.find_one({"name": user_team_id_name}) or {}
-    
-    response = {
-        "team": user_team_id_name,
-        "team_id": user_team_object_id,  # ✅ SS&S: Include ObjectId for consistent navigation
-        "team_chemistry": team_doc.get("team_chemistry", 0),
-        "offense": team_doc.get("offense", "-"),
-        "defense": team_doc.get("defense", "-"),
-        "athleticism": team_doc.get("athleticism", "-"),
-        "training_completed": training_completed,
-        "session_type": session_type,
-        "current_round": doc.get("current_round", 1),
-        "completed": doc.get("completed", False),
-        "bracket": doc.get("bracket", {}),
-    }
-    
+
+    # ✅ Phase 5.3: Common keys from shared builder; tournament-only keys merged below
+    response = build_command_center_base(user_team_id_name, user_team_object_id, team_doc)
+    response["training_completed"] = training_completed
+    response["session_type"] = session_type
+    response["current_round"] = doc.get("current_round", 1)
+    response["completed"] = doc.get("completed", False)
+    response["bracket"] = doc.get("bracket", {})
     return response
 
 
@@ -923,58 +915,31 @@ def get_tournament_roster(tournament_id: str, team_id: str = None, team_name: st
          "first_name": 1, "last_name": 1}
     )}
     
-    # ✅ FIX: Build player list with tournament-specific attributes (matches Franchise mode pattern)
-    # Return ALL players from team roster, even if not yet in tournament.players (for teams that haven't played yet)
-    players = []
-    for pid in team_player_ids:
+    # ✅ Phase 5.2: Build player list via shared roster_builder (same shape as franchise roster)
+    # Only include players that exist in core; build overrides from tournament.players
+    team_name = team_doc.get("name", team_name or "")
+    pids_with_core = [pid for pid in team_player_ids if str(pid) in core_players_dict]
+    mode_overrides = {}
+    for pid in pids_with_core:
         pid_str = str(pid)
+        core_player = core_players_dict[pid_str]
         tournament_player_data = tournament_players.get(pid_str, {})
-        
-        # ✅ PERFORMANCE: Use cached result from batch query instead of individual query
-        core_player = core_players_dict.get(pid_str)
-        
-        if not core_player:
-            continue
-        
-        # Get tournament-specific attributes (currently EM, CH, MO only)
-        # Future: will include all evolved attributes when training is added
+        meta = tournament_player_data.get("meta", {}) if tournament_player_data else {}
         tournament_attributes = tournament_player_data.get("attributes", {}) if tournament_player_data else {}
-        
-        # Get position ratings from tournament (with backward compatibility to core)
+        core_attributes = core_player.get("attributes", {}) or {}
+        merged_attributes = {**core_attributes, **tournament_attributes}
         position_ratings = tournament_player_data.get("position_ratings") if tournament_player_data else None
         if not position_ratings:
             position_ratings = core_player.get("position_ratings", {})
-        
-        # Merge core attributes with tournament attributes (tournament overrides core)
-        core_attributes = core_player.get("attributes", {}) if core_player else {}
-        merged_attributes = {**core_attributes, **tournament_attributes}
-        
-        # Create anchor_ prefixed attributes (like Player class does)
-        for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
-            if merged_attributes.get(attr_key) is not None:
-                merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
-        
-        # Use tournament player data for name (with meta wrapper), fallback to core
-        # Backward compatibility: check meta wrapper first, then root level, then core
-        meta = tournament_player_data.get("meta", {}) if tournament_player_data else {}
         first = meta.get("first_name") or (tournament_player_data.get("first_name") if tournament_player_data else None) or core_player.get("first_name", "")
         last = meta.get("last_name") or (tournament_player_data.get("last_name") if tournament_player_data else None) or core_player.get("last_name", "")
-        
-        player = {
-            "_id": pid_str,
+        mode_overrides[pid_str] = {
             "first_name": first,
             "last_name": last,
-            "name": f"{first} {last}".strip(),
-            "team": team_name,
             "attributes": merged_attributes,
             "position_ratings": position_ratings,
-            "height": core_player.get("height"),
-            "weight": core_player.get("weight"),
-            "jersey": core_player.get("jersey", 0),
-            "year": core_player.get("year")
         }
-        players.append(player)
-    
+    players = build_roster_players(pids_with_core, mode_overrides, core_players_dict, team_name)
     return {"players": players}
 
 

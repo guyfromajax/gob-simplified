@@ -2363,49 +2363,29 @@ function createMetricBar(title, value, maxValue, color, change) {
   return metricDiv;
 }
 
-// Listen for tab changes to load/render data when tabs are opened
+// ✅ Phase 4.4: Shared tab management (commandCenterTabs.js)
 document.addEventListener('DOMContentLoaded', () => {
-  const tabButtons = document.querySelectorAll('.tab-buttons button');
-  const tabContents = document.querySelectorAll('.tab-content');
-  
-  tabButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tabName = btn.dataset.tab;
-      
-      // Handle tab switching (show/hide content)
-      tabButtons.forEach(b => b.classList.remove('active'));
-      tabContents.forEach(c => c.classList.remove('active'));
-      btn.classList.add('active');
-      const target = document.getElementById(tabName);
-      if (target) target.classList.add('active');
-      
-      // Load/render data based on which tab was clicked
-      if (tabName === 'bracket-tab') {
-        renderBracket();
-      } else if (tabName === 'roster-tab') {
-        // Load roster data if not already loaded, then render
-        if (roster.length === 0) {
-          loadRoster().then(() => {
-            renderRoster(); // ✅ SS&S: renderRoster() now calls renderRosterStats() internally (matches Franchise)
-          });
-        } else {
-          renderRoster(); // ✅ SS&S: renderRoster() now calls renderRosterStats() internally (matches Franchise)
-        }
-      } else if (tabName === 'team-tab') {
-        // Load and render team data when Team tab is opened
-        if (!teamData) {
+  if (typeof CommandCenterTabs !== 'undefined') {
+    CommandCenterTabs.initCommandCenterTabs({
+      defaultTab: 'bracket-tab',
+      onTabShow: (tabName) => {
+        if (tabName === 'bracket-tab') {
+          renderBracket();
+        } else if (tabName === 'roster-tab') {
+          if (roster.length === 0) {
+            loadRoster().then(() => renderRoster());
+          } else {
+            renderRoster();
+          }
+        } else if (tabName === 'team-tab') {
           loadTeamData();
-        } else {
-          // ✅ FIX: Always reload to ensure fresh data (don't use stale teamData)
-          loadTeamData();
+        } else if (tabName === 'stats-tab') {
+          renderLeaderboards();
+          refreshTeamStats();
+        } else if (tabName === 'schedule-tab') {
+          renderSchedule();
         }
-      } else if (tabName === 'stats-tab') {
-        // Stats tab only shows Team Stats and Leaderboards (player stats are in Roster tab)
-            renderLeaderboards();
-            refreshTeamStats();
-      } else if (tabName === 'schedule-tab') {
-        renderSchedule();
       }
     });
-  });
+  }
 });

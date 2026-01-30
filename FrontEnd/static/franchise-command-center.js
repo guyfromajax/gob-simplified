@@ -1284,26 +1284,26 @@ window.addEventListener('DOMContentLoaded', () => {
     playNowBtn.disabled = false;
   }
   init();
-  
-  // Listen for tab changes to render Team Report when Team tab is opened
-  const tabButtons = document.querySelectorAll('.tab-buttons button');
-  tabButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      // ✅ EOS TOURNAMENT: Render bracket when Tournament tab is opened
-      if (btn.dataset.tab === 'tournament-tab') {
-        renderTournamentBracket();
-      }
-      if (btn.dataset.tab === 'team-tab') {
-        // Load and render team data when Team tab is opened
-        if (!teamData) {
-          loadTeamData();
-        } else {
-          renderTeamReport();
-          renderPlaybookSummary();
+
+  // ✅ Phase 4.4: Shared tab management (commandCenterTabs.js)
+  if (typeof CommandCenterTabs !== 'undefined') {
+    CommandCenterTabs.initCommandCenterTabs({
+      defaultTab: 'standings-tab',
+      onTabShow: (tabName) => {
+        if (tabName === 'tournament-tab') {
+          renderTournamentBracket();
+        }
+        if (tabName === 'team-tab') {
+          if (!teamData) {
+            loadTeamData();
+          } else {
+            renderTeamReport();
+            renderPlaybookSummary();
+          }
         }
       }
     });
-  });
+  }
 });
 
 // Team Report and Playbook Summary functions (adapted from training-report.js)
