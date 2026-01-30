@@ -1960,95 +1960,46 @@ function sortRosterStats(statKey) {
   renderRosterStatsTable(rosterPlayersDataForSorting);
 }
 
-// ✅ EOS TOURNAMENT: Render tournament bracket
+// ✅ EOS TOURNAMENT: Render tournament bracket (shared with TCC via bracket.js)
 async function renderTournamentBracket() {
   const container = document.getElementById('tournament-bracket-container');
   if (!container) return;
-  
+
   const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}`);
   const eosTournament = topData?.eos_tournament;
-  
+
   if (!eosTournament) {
     container.innerHTML = '<p>Tournament bracket not available.</p>';
     return;
   }
-  
-  const bracket = eosTournament.bracket || {};
-  const seeds = eosTournament.seeds || {};
-  const round1 = bracket.round1 || [];
-  const round2 = bracket.round2 || [];
-  const final = bracket.final || [];
-  const currentRound = eosTournament.current_round || 1;
-  
-  // Get team names
-  const teamNames = {};
-  for (const teamId in seeds) {
-        const teamRes = await fetchJSON(`/teams`);
-        if (teamRes) {
-          const team = teamRes.find(t => t._id === teamId || t.id === teamId);
-          if (team) teamNames[teamId] = team.name;
-        }
-  }
-  
-  let html = '<div class="tournament-bracket">';
-  
-  // Round 1 (Quarterfinals)
-  html += '<div class="bracket-round"><h4>Quarterfinals</h4>';
-  round1.forEach((matchup, i) => {
-    const homeName = teamNames[matchup.home_team] || matchup.home_team;
-    const awayName = teamNames[matchup.away_team] || matchup.away_team;
-    const homeSeed = seeds[matchup.home_team] || '';
-    const awaySeed = seeds[matchup.away_team] || '';
-    const winner = matchup.winner;
-    const score = matchup.score || {};
-    const isComplete = !!winner;
-    
-    html += `<div class="bracket-matchup ${isComplete ? 'complete' : ''}">`;
-    html += `<div class="team ${winner === matchup.home_team ? 'winner' : ''}">${homeSeed}. ${homeName} ${score.home || ''}</div>`;
-    html += `<div class="team ${winner === matchup.away_team ? 'winner' : ''}">${awaySeed}. ${awayName} ${score.away || ''}</div>`;
-    html += '</div>';
-  });
-  html += '</div>';
-  
-  // Round 2 (Semifinals)
-  if (round2.length > 0 || currentRound >= 2) {
-    html += '<div class="bracket-round"><h4>Semifinals</h4>';
-    (round2.length > 0 ? round2 : []).forEach((matchup, i) => {
-      const homeName = teamNames[matchup.home_team] || matchup.home_team;
-      const awayName = teamNames[matchup.away_team] || matchup.away_team;
-      const winner = matchup.winner;
-      const score = matchup.score || {};
-      const isComplete = !!winner;
-      
-      html += `<div class="bracket-matchup ${isComplete ? 'complete' : ''}">`;
-      html += `<div class="team ${winner === matchup.home_team ? 'winner' : ''}">${homeName} ${score.home || ''}</div>`;
-      html += `<div class="team ${winner === matchup.away_team ? 'winner' : ''}">${awayName} ${score.away || ''}</div>`;
-      html += '</div>';
+
+  // SS&S: Get team id→name map from franchise/team-stats (same pattern as TCC)
+  let teamIdToNameMap = {};
+  try {
+    const teamStatsRes = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/team-stats')}?franchise_id=${franchiseId}`);
+    const teams = teamStatsRes?.teams || [];
+    teams.forEach(function (t) {
+      if (t.team_id != null && t.team != null) {
+        teamIdToNameMap[String(t.team_id)] = t.team;
+      }
     });
-    html += '</div>';
+  } catch (e) {
+    console.warn('[FCC] Could not load team-stats for bracket names:', e);
   }
-  
-  // Final (Championship)
-  if (final.length > 0 || currentRound >= 3) {
-    html += '<div class="bracket-round"><h4>Championship</h4>';
-    if (final.length > 0) {
-      const matchup = final[0];
-      const homeName = teamNames[matchup.home_team] || matchup.home_team;
-      const awayName = teamNames[matchup.away_team] || matchup.away_team;
-      const winner = matchup.winner;
-      const score = matchup.score || {};
-      const isComplete = !!winner;
-      
-      html += `<div class="bracket-matchup final ${isComplete ? 'complete' : ''}">`;
-      html += `<div class="team ${winner === matchup.home_team ? 'winner' : ''}">${homeName} ${score.home || ''}</div>`;
-      html += `<div class="team ${winner === matchup.away_team ? 'winner' : ''}">${awayName} ${score.away || ''}</div>`;
-      html += '</div>';
-    }
-    html += '</div>';
+
+  if (typeof renderBracketShared === 'function') {
+    renderBracketShared(container, eosTournament.bracket || {}, teamIdToNameMap, {
+      seeds: eosTournament.seeds || {},
+      getLogo: function (name) {
+        return '/images/homepage-logos/' + (typeof formatTeamName === 'function' ? formatTeamName(name) : (name || '')) + '.png';
+      },
+      isUserTeam: function (id) {
+        return userTeamId != null && (String(id) === String(userTeamId));
+      },
+    });
+  } else {
+    container.innerHTML = '<p>Bracket renderer not loaded.</p>';
   }
-  
-  html += '</div>';
-  container.innerHTML = html;
 }
 
 // Scouting Report functionality

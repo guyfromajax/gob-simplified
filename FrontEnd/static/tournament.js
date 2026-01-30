@@ -197,119 +197,16 @@ function renderBracket() {
     });
   }
 
-  function teamName(id) {
-    return (id != null && teamIdNameMap[String(id)]) || id;
+  // ✅ Shared bracket renderer (bracket.js) – same DOM for TCC and FCC
+  if (typeof renderBracketShared === 'function') {
+    renderBracketShared(bracket, { round1, round2, final: finalRound }, teamIdNameMap, {
+      results,
+      getLogo,
+      isUserTeam,
+    });
+  } else {
+    console.warn('[TCC] renderBracketShared not found; bracket.js may not be loaded');
   }
-
-  function createTeamEntry(teamId, teamNameVal, side, score, isWinner) {
-    const div = document.createElement("div");
-    div.className = "team-entry";
-    if (isWinner) div.classList.add("winner");
-    const label = document.createElement("span");
-    label.className = `seed-label ${side === "left" ? "seed-left" : "seed-right"}`;
-    label.textContent = seedMap[teamId] ? `#${seedMap[teamId]}` : "";
-    const img = document.createElement("img");
-    img.src = getLogo(teamNameVal);
-    img.classList.add("team-logo", "bracket-logo");
-    if (isUserTeam(teamId) || isUserTeam(teamNameVal)) img.classList.add("user-team");
-    const scoreSpan = document.createElement("span");
-    scoreSpan.className = "score";
-    scoreSpan.textContent = score !== undefined && score !== null ? score : "";
-    if (side === "left") {
-      div.appendChild(label);
-      div.appendChild(img);
-      div.appendChild(scoreSpan);
-    } else {
-      div.appendChild(scoreSpan);
-      div.appendChild(img);
-      div.appendChild(label);
-    }
-    return div;
-  }
-
-  function createMatchup(m, side, round, index) {
-    const wrap = document.createElement("div");
-    wrap.className = "matchup-wrapper";
-    const matchup = document.createElement("div");
-    matchup.className = "matchup";
-
-    const homeId = m.home_team;
-    const awayId = m.away_team;
-    const homeName = teamName(homeId);
-    const awayName = teamName(awayId);
-    const res = getResult(round, index);
-    const homeScore = res?.score?.[homeName] ?? m.score?.[homeName];
-    const awayScore = res?.score?.[awayName] ?? m.score?.[awayName];
-    const winner = res?.winner ?? m.winner ?? null;
-
-    if (side === "center") {
-      matchup.appendChild(createTeamEntry(homeId, homeName, "left", homeScore, winner === homeId || String(winner) === String(homeId)));
-      matchup.appendChild(createTeamEntry(awayId, awayName, "right", awayScore, winner === awayId || String(winner) === String(awayId)));
-    } else {
-      matchup.appendChild(createTeamEntry(homeId, homeName, side, homeScore, winner === homeId || String(winner) === String(homeId)));
-      matchup.appendChild(createTeamEntry(awayId, awayName, side, awayScore, winner === awayId || String(winner) === String(awayId)));
-    }
-    wrap.appendChild(matchup);
-    return wrap;
-  }
-
-  function createPlaceholder() {
-    const wrap = document.createElement("div");
-    wrap.className = "matchup-wrapper";
-    const matchup = document.createElement("div");
-    matchup.className = "matchup";
-    const placeholder = document.createElement("div");
-    placeholder.className = "placeholder";
-    placeholder.textContent = "TBD";
-    matchup.appendChild(placeholder);
-    wrap.appendChild(matchup);
-    return wrap;
-  }
-
-  const leftR1 = document.createElement("div");
-  leftR1.className = "round round-1 quarterfinals";
-  if (round1[0]) leftR1.appendChild(createMatchup(round1[0], "left", 1, 0));
-
-  const leftSpacer = document.createElement("div");
-  leftSpacer.style.height = "40px";
-  leftSpacer.className = "bracket-spacer";
-  leftR1.appendChild(leftSpacer);
-
-  if (round1[1]) leftR1.appendChild(createMatchup(round1[1], "left", 1, 1));
-
-  const leftSemi = document.createElement("div");
-  leftSemi.className = "round round-2 semifinals";
-  if (round2[0]) leftSemi.appendChild(createMatchup(round2[0], "left", 2, 0));
-  else leftSemi.appendChild(createPlaceholder());
-
-  const final = document.createElement("div");
-  final.className = "round round-3 final";
-  if (finalRound[0]) final.appendChild(createMatchup(finalRound[0], "center", 3, 0));
-  else final.appendChild(createPlaceholder());
-
-  const rightSemi = document.createElement("div");
-  rightSemi.className = "round round-4 semifinals";
-  if (round2[1]) rightSemi.appendChild(createMatchup(round2[1], "right", 2, 1));
-  else rightSemi.appendChild(createPlaceholder());
-
-  const rightR1 = document.createElement("div");
-  rightR1.className = "round round-5 quarterfinals";
-  if (round1[2]) rightR1.appendChild(createMatchup(round1[2], "right", 1, 2));
-
-  const rightSpacer = document.createElement("div");
-  rightSpacer.style.height = "40px";
-  rightSpacer.className = "bracket-spacer";
-  rightR1.appendChild(rightSpacer);
-
-  if (round1[3]) rightR1.appendChild(createMatchup(round1[3], "right", 1, 3));
-
-  bracket.appendChild(leftR1);
-  bracket.appendChild(leftSemi);
-  bracket.appendChild(final);
-  bracket.appendChild(rightSemi);
-  bracket.appendChild(rightR1);
-
-  if (DEBUG_BRACKET) console.log("[DebugBracket] bracket render complete");
   // ensure CTA buttons reflect latest bracket state
   updateCTA();
 }
