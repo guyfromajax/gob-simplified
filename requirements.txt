@@ -10,6 +10,7 @@ mongomock
 httpx
 bcrypt
 PyJWT
+email-validator
 
 
 python-dotenv==1.1.0
