@@ -4,10 +4,10 @@
   publish = "FrontEnd/static"
   # No build command needed (static site)
 
-# Redirect root to mode-select.html for easier tournament/franchise mode testing
+# Redirect root to homepage.html
 [[redirects]]
   from = "/"
-  to = "/mode-select.html"
+  to = "/homepage.html"
   status = 200
   force = true
 

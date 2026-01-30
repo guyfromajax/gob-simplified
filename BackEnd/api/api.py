@@ -108,7 +108,10 @@ def get_cors_origins():
     origins = [
         "http://localhost:8000",  # Local development
         "http://localhost:3000",  # Alternative local port
-        "https://gob-test.netlify.app",  # ✅ Explicitly add staging Netlify domain
+        "https://gob-test.netlify.app",  # ✅ Staging Netlify domain
+        "https://gob-production.netlify.app",  # ✅ Production Netlify default domain
+        "https://www.geekedoutbasketball.com",  # ✅ Production custom domain
+        "https://geekedoutbasketball.com",  # ✅ Production custom domain (non-www)
     ]
     
     # Get custom origins from environment variable (comma-separated)

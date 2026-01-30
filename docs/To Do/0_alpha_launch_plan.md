@@ -155,6 +155,19 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
   - [ ] Same OTP cannot be used by different email
   - [ ] OTP field hidden when `IS_ALPHA=false`
 
+### 1.7 Username Feature (Post-Alpha Enhancement)
+> **Not required for alpha launch.** Email display works fine initially.
+
+- [ ] Add optional `username` field to user schema
+- [ ] Create "Set Username" UI (profile page or modal after signup)
+- [ ] Username validation rules:
+  - [ ] Unique (case-insensitive) — store lowercase version for uniqueness check
+  - [ ] No spaces allowed
+  - [ ] Length limits (e.g., 3-20 characters)
+  - [ ] Alphanumeric + underscores only (optional)
+- [ ] Display username (if set) instead of email in auth bar
+- [ ] Handle username changes (allow or disallow?)
+
 ---
 
 ## Step 2 — Custom Domains (Critical for Launch)
