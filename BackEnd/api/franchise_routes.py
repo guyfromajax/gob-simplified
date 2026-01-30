@@ -29,6 +29,8 @@ from BackEnd.tournament.eos_tournament import (
     save_tournament_game_result,
 )
 from BackEnd.utils.db_utils import build_lineup_from_mongo
+from BackEnd.utils.roster_builder import build_roster_players
+from BackEnd.utils.command_center_data import build_command_center_base
 from BackEnd.utils.game_id_utils import generate_game_id
 from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS
 
@@ -1578,26 +1580,20 @@ def command_center_data(franchise_id: str = None):
         except Exception:
             pass
     
-    response = {
-        "team": team_name,
-        "team_id": team_id,  # ✅ SS&S: Include ObjectId for consistent navigation
-        "username": state.get("username", "Coach"),
-        "seed": state.get("seed", 1),
-        "team_chemistry": team_doc.get("team_chemistry", 0),
-        "offense": team_doc.get("offense", "-"),
-        "defense": team_doc.get("defense", "-"),
-        "athleticism": team_doc.get("athleticism", "-"),
-        "intangibles": team_doc.get("intangibles", "-"),
-        "prestige": team_doc.get("prestige", "-"),
-        "rank": team_doc.get("rank", "-"),
-        "training_completed": training_completed,
-        "session_type": session_type,
-        "week": week if week is not None else 1,  # ✅ Always include week (defaults to 1)
-        "training_status": {
-            "training_completed": training_completed,
-            "session_type": session_type
-        } if franchise_id and franchise_doc else {}
-    }
+    # ✅ Phase 5.3: Common keys from shared builder; franchise-only keys merged below
+    response = build_command_center_base(team_name, team_id, team_doc)
+    response["intangibles"] = team_doc.get("intangibles", "-")
+    response["prestige"] = team_doc.get("prestige", "-")
+    response["rank"] = team_doc.get("rank", "-")
+    response["username"] = state.get("username", "Coach")
+    response["seed"] = state.get("seed", 1)
+    response["training_completed"] = training_completed
+    response["session_type"] = session_type
+    response["week"] = week if week is not None else 1  # ✅ Always include week (defaults to 1)
+    response["training_status"] = (
+        {"training_completed": training_completed, "session_type": session_type}
+        if franchise_id and franchise_doc else {}
+    )
     
     # Add tournament data if active
     if eos_tournament_active and eos_tournament:
@@ -2633,36 +2629,20 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
     logger.info(f"⏱️ [PERF] /franchise/roster Batch player query ({len(team_player_ids)} players): {batch_query_time:.3f}s")
 
     processing_start = time.time()
-    players = []
-    for pid in team_player_ids:
+    # Only include players that have FPD (franchise_players); build overrides for shared roster builder
+    pids_with_fpd = [pid for pid in team_player_ids if str(pid) in franchise_players]
+    mode_overrides = {}
+    for pid in pids_with_fpd:
         pid_str = str(pid)
-        franchise_player_data = franchise_players.get(pid_str, {})
-        if not franchise_player_data:
-            continue
-        meta = franchise_player_data.get("meta", {})
-        merged_attributes = franchise_player_data.get("attributes", {}).copy()
-        for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
-            if attr_key in merged_attributes and f"anchor_{attr_key}" not in merged_attributes:
-                merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
-        position_ratings = franchise_player_data.get("position_ratings", {})
-        core_player = core_players_dict.get(pid_str)
-        first = meta.get("first_name", "")
-        last = meta.get("last_name", "")
-        player = {
-            "_id": pid_str,
-            "first_name": first,
-            "last_name": last,
-            "name": f"{first} {last}".strip(),
-            "team": team_name,
-            "attributes": merged_attributes,
-            "position_ratings": position_ratings,
-            "height": core_player.get("height") if core_player else None,
-            "weight": core_player.get("weight") if core_player else None,
-            "jersey": core_player.get("jersey") if core_player else None,
-            "year": core_player.get("year") if core_player else None
+        fpd = franchise_players[pid_str]
+        meta = fpd.get("meta", {})
+        mode_overrides[pid_str] = {
+            "first_name": meta.get("first_name", ""),
+            "last_name": meta.get("last_name", ""),
+            "attributes": (fpd.get("attributes") or {}).copy(),
+            "position_ratings": fpd.get("position_ratings") or {},
         }
-        players.append(player)
-    
+    players = build_roster_players(pids_with_fpd, mode_overrides, core_players_dict, team_name)
     processing_time = time.time() - processing_start
     logger.info(f"⏱️ [PERF] /franchise/roster Processing ({len(players)} players): {processing_time:.3f}s")
     

@@ -1,7 +1,7 @@
 # Tournament & Franchise Mode Unification Plan
 
 **Date:** January 2025  
-**Status:** 📋 Planning (Phase 1 ✅, Phase 2 ✅, Phase 2.5 Frontend bracket ✅, Phase 3.1 ✅, Phase 4.1 ✅, Phase 4.2 ✅)  
+**Status:** 📋 Planning (Phase 1 ✅, Phase 2 ✅, Phase 2.5 Frontend bracket ✅, Phase 3.1 ✅, Phase 3.2 ✅, Phase 4.1 ✅, Phase 4.2 ✅, Phase 4.4 ✅, Phase 5.2 ✅, Phase 5.3 ✅)  
 **Goal:** Unify Tournament and Franchise modes to use identical code patterns, with only mode variable differences and intentional feature differences (training, recruits, career stats, bracket vs schedule)
 
 ---
@@ -76,24 +76,22 @@
 
 **Impact:** Consistent `/tournament/` prefix for tournament endpoints; no breaking change (old URLs still work).
 
-### 3.2 Missing Endpoint Equivalents (Analysis)
+### 3.2 Missing Endpoint Equivalents (Analysis) ✅
 
-**Intentional Differences (No Action Needed):**
-- `/franchise/standings` vs Tournament bracket (different data structure)
-- `/franchise/schedule` vs Tournament bracket (different data structure)
-- `/franchise/recruits` (Franchise-only feature)
-- `/franchise/complete-week` vs `/tournament/save-result` (different progression models)
+**Status:** Done (January 2025)
 
-**Potential Gaps (Investigate):**
-- `/franchise/team-player-stats/{team_id}` - Tournament equivalent may be needed
-- `/franchise/team-player-stats` - Tournament equivalent may be needed
-- `/franchise/latest-training` - Tournament equivalent not needed (training disabled)
-- `/franchise/training-points` - Tournament equivalent not needed (training disabled)
-- `/franchise/scouting-report` - Verify if Tournament needs this
+**Findings:**
 
-**Action Items:**
-- Review if Tournament mode needs team-player-stats endpoints
-- Verify scouting-report usage in Tournament mode
+- **Scouting report:** Tournament **already has** an equivalent. `BackEnd/api/tournament_routes.py` exposes `GET /tournament/scouting-report` (tournament_id, team_id/team_name). FCC calls `/franchise/scouting-report`; TCC calls `/tournament/scouting-report`. Both use shared `BackEnd/utils/scouting_utils.py::extract_plays_from_game_document()`. **No action needed.**
+
+- **Team-player-stats:** Franchise exposes `/franchise/team-player-stats/{team_id}` and `/franchise/team-player-stats` (user team). Used only by `team-roster-view.js` in **franchise** mode to load one team’s player stats. In **tournament** mode, `team-roster-view.js` does **not** call these; it calls `/tournament/state?tournament_id=...` and merges `data.players` with the roster client-side (same pattern as TCC roster tab). So Tournament does not need `/tournament/team-player-stats` or `/tournament/team-player-stats/{team_id}` for current behavior. **No action needed.** (Optional future: add a Tournament team-player-stats endpoint to simplify team-roster-view.js to one stats URL per mode.)
+
+- **Training endpoints:** `/franchise/latest-training`, `/franchise/training-points` — Tournament training is disabled; no Tournament equivalents needed. **No action needed.**
+
+**Intentional differences (unchanged):**
+- `/franchise/standings` vs Tournament bracket; `/franchise/schedule` vs bracket; `/franchise/recruits` (Franchise-only); `/franchise/complete-week` vs `/tournament/save-result`.
+
+**Conclusion:** Phase 3.2 is analysis-only; no code changes required. All potential gaps are either already covered (scouting-report) or not required for current behavior (team-player-stats).
 
 ---
 
@@ -131,23 +129,17 @@
 
 **Status:** ✅ Already unified
 
-### 4.4 Command Center Structure
+### 4.4 Command Center Structure ✅
 
-**Current State:**
-- Both have similar tab structures (Roster, Team, Stats, Schedule)
-- Similar initialization patterns
+**Status:** Done (January 2025)
 
-**Unification Opportunity:**
-- Extract shared tab management
-- Extract shared initialization patterns
-- Keep mode-specific content (bracket vs schedule, recruits tab)
+**Completed:**
+- **Shared module:** `FrontEnd/static/js/shared/commandCenterTabs.js` — `CommandCenterTabs.initCommandCenterTabs({ defaultTab, onTabShow })` handles: read tab from URL (fallback to defaultTab), set active on matching `.tab-buttons button` and `.tab-content`, add click listeners that switch active, update URL with pushState, and call `onTabShow(tabName)`. On init, calls `onTabShow(activeTab)` so the restored tab loads its data.
+- **FCC:** Inline tab script removed from `franchise-command-center.html`. In `franchise-command-center.js` DOMContentLoaded, after `init()`, calls `CommandCenterTabs.initCommandCenterTabs({ defaultTab: 'standings-tab', onTabShow: (tabName) => { tournament-tab → renderTournamentBracket(); team-tab → loadTeamData() / renderTeamReport + renderPlaybookSummary(); } })`.
+- **TCC:** Inline tab script removed from `tournament.html`. In `tournament.js` DOMContentLoaded, calls `CommandCenterTabs.initCommandCenterTabs({ defaultTab: 'bracket-tab', onTabShow: (tabName) => { bracket-tab → renderBracket(); roster-tab → loadRoster/renderRoster; team-tab → loadTeamData(); stats-tab → renderLeaderboards + refreshTeamStats; schedule-tab → renderSchedule(); } })`.
+- **Script:** `commandCenterTabs.js` included in both HTML files before the main app script.
 
-**Files to Create:**
-- `FrontEnd/static/js/shared/commandCenterTabs.js` - Shared tab management
-
-**Files to Update:**
-- `FrontEnd/static/franchise-command-center.js` - Use shared tab management
-- `FrontEnd/static/tournament.js` - Use shared tab management
+**Impact:** One code path for tab switch + URL; mode-specific “on tab show” logic stays in each app via callback. Initial tab from URL restores and loads data.
 
 ---
 
@@ -157,39 +149,27 @@
 
 **Status:** ✅ Already unified via `team_stats_aggregator.py`
 
-### 5.2 Roster Endpoints
+### 5.2 Roster Endpoints ✅
 
-**Current State:**
-- `/franchise/roster` - Returns roster with merged stats
-- `/tournament/roster` - Returns roster with merged stats
+**Status:** Done (January 2025)
 
-**Unification Opportunity:**
-- Extract shared roster building logic
-- Both endpoints call shared function with mode-specific parameters
+**Completed:**
+- **Shared module:** `BackEnd/utils/roster_builder.py` — `build_roster_players(team_player_ids, mode_overrides, core_players_dict, team_name)` builds the common player dict shape (`_id`, `first_name`, `last_name`, `name`, `team`, `attributes` with `anchor_*`, `position_ratings`, `height`, `weight`, `jersey`, `year`). No DB access; callers pass IDs, overrides, and core dict.
+- **Franchise:** `get_franchise_roster` keeps FPD + core queries; builds `mode_overrides` from FPD (meta, attributes, position_ratings), filters to `pids_with_fpd`, calls `build_roster_players(pids_with_fpd, mode_overrides, core_players_dict, team_name)`, returns `{"players": players}`.
+- **Tournament:** `get_tournament_roster` keeps tournament doc + core batch query; builds `mode_overrides` from tournament.players (merged attributes, position_ratings, name from meta/root/core), filters to `pids_with_core`, calls `build_roster_players(pids_with_core, mode_overrides, core_players_dict, team_name)`, returns `{"players": players}`.
 
-**Files to Create:**
-- `BackEnd/utils/roster_builder.py` - Shared roster building logic
+**Impact:** Single place for roster player dict construction; both modes return the same shape; no duplicate merge/anchor logic.
 
-**Files to Update:**
-- `BackEnd/api/franchise_routes.py` - Use shared function
-- `BackEnd/api/tournament_routes.py` - Use shared function
+### 5.3 Command Center Data Endpoints ✅
 
-### 5.3 Command Center Data Endpoints
+**Status:** Done (January 2025)
 
-**Current State:**
-- `/franchise/command-center/data` - Returns structured command center data
-- `/tournament/command-center/data` - Returns structured command center data
+**Completed:**
+- **Shared module:** `BackEnd/utils/command_center_data.py` — `build_command_center_base(team_name, team_id, team_attrs)` returns the common response keys: `team`, `team_id`, `team_chemistry`, `offense`, `defense`, `athleticism`, and optionally `intangibles`, `prestige`, `rank` when present in `team_attrs`. No DB access; callers pass resolved team name, team_id, and team attrs.
+- **Franchise:** `command_center_data` keeps franchise_doc/FTD/state queries; builds `team_doc` (with team_chemistry from FTD); calls `build_command_center_base(team_name, team_id, team_doc)`; merges franchise-only keys (`username`, `seed`, `intangibles`, `prestige`, `rank`, `week`, `training_status`, `eos_tournament*`, `training_disabled_for_eos`, `user_eliminated`, `offer_sim_rest`); returns response.
+- **Tournament:** `tournament_command_center_data` keeps tournament doc + team_doc resolution; calls `build_command_center_base(user_team_id_name, user_team_object_id, team_doc)`; merges tournament-only keys (`training_completed`, `session_type`, `current_round`, `completed`, `bracket`); returns response.
 
-**Unification Opportunity:**
-- Extract shared data building logic
-- Both endpoints call shared function with mode-specific parameters
-
-**Files to Create:**
-- `BackEnd/utils/command_center_data.py` - Shared command center data builder
-
-**Files to Update:**
-- `BackEnd/api/franchise_routes.py` - Use shared function
-- `BackEnd/api/tournament_routes.py` - Use shared function
+**Impact:** Single place for common command-center response keys; both modes return consistent team/chemistry/offense/defense/athleticism shape; mode-specific keys remain in routes.
 
 ---
 
@@ -292,13 +272,13 @@
 
 ## Open Questions
 
-1. **Team-Player-Stats Endpoints**: Do we need Tournament equivalents of `/franchise/team-player-stats`?
-2. **Scouting Report**: Is scouting report needed in Tournament mode?
+1. ~~**Team-Player-Stats Endpoints**~~ **Answered (Phase 3.2):** No. Tournament uses `/tournament/state` + client-side merge in team-roster-view; no dedicated team-player-stats endpoint needed.
+2. ~~**Scouting Report**~~ **Answered (Phase 3.2):** Tournament already has `/tournament/scouting-report`; no gap.
 3. **Migration Script**: Do we need a script to migrate `franchise_teams` → `teams` in existing documents?
 4. **API Versioning**: Should we version APIs to handle breaking changes more gracefully?
 
 ---
 
 **Last Updated:** January 2025  
-**Next Review:** After Phase 1 completion
+**Next Review:** After Phase 5.2 (Roster Endpoints Unification)
 
