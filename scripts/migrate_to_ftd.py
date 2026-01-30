@@ -5,6 +5,11 @@ Migrate Franchise Team Data to FTD Collection
 This script extracts `franchise_teams` data from franchise documents and creates
 separate `franchise_team_data` (FTD) documents for each team.
 
+**Deprecation:** `franchise_teams` on the franchise document is deprecated. Application
+code no longer reads or writes it; FTD is the source of truth for franchise team data.
+This script is for legacy franchises that still have `franchise_teams` populated
+(pre-migration). New franchises are created without `franchise_teams`.
+
 ⚠️  WARNING: This is a one-time migration script. Run only once per database.
 
 Usage:
@@ -60,12 +65,13 @@ if not client:
 def migrate_franchise_to_ftd(franchise_doc, db, dry_run=False):
     """
     Migrate a single franchise document's franchise_teams to FTD collection.
+    Only applies to legacy franchise docs that still have franchise_teams populated.
     
     Returns:
         tuple: (franchise_id, teams_migrated_count, errors)
     """
     franchise_id = franchise_doc.get("_id")
-    franchise_teams = franchise_doc.get("franchise_teams", {})
+    franchise_teams = franchise_doc.get("franchise_teams", {})  # Legacy field; app code uses FTD
     
     if not franchise_teams:
         return (franchise_id, 0, [])

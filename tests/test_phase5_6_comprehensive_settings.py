@@ -486,7 +486,7 @@ class TestModeHandling:
         assert saved_settings.get("motion", {}).get("4-1 Motion") == 50
     
     def test_franchise_mode_uses_franchises_collection(self):
-        """Test: Franchise mode → Saves to FTD (franchise_team_data); franchise doc no longer has franchise_teams."""
+        """Test: Franchise mode → Saves to FTD (franchise_team_data)."""
         # Create franchise (simplified - would normally use FranchiseManager)
         franchise_id = ObjectId()
         user_team_object_id = ObjectId()
@@ -518,7 +518,7 @@ class TestModeHandling:
             if save_response.status_code == 200:
                 franchise_doc = franchises_collection.find_one({"_id": franchise_id})
                 assert franchise_doc is not None
-                # Franchise master settings are in FTD, not franchise_teams on franchise doc
+                # Franchise master settings are in FTD
                 from BackEnd.db import franchise_team_data_collection
                 ftd = franchise_team_data_collection.find_one(
                     {"franchise_id": franchise_id, "team_id": user_team_object_id}

@@ -25,7 +25,7 @@
 
 ## System Flow
 
-1. **Franchise Mode**: Data stored in `franchises` collection → `franchise_teams.{team_id}` and `players.{player_id}`
+1. **Franchise Mode**: Team data stored in `franchise_team_data` (FTD) collection; player data in `franchise_players_data`. Franchise doc no longer uses `franchise_teams` (deprecated).
 2. **Tournament Mode**: Data stored in `tournaments` collection → `teams.{team_id}` and `player_stats.{player_id}`
 3. **Single Game Mode**: Data stored in `games` collection → `teams.{team_id}` (temporary, reset for each game)
 
@@ -91,9 +91,9 @@ This system documents data persistence across all three game modes when users ar
 **Recruiting:**
 - `recruits`: Array of recruit objects (franchise-specific pool)
 
-#### B. Team Objects (`franchise_teams.{team_id}`)
+#### B. Team Objects (FTD: `franchise_team_data` collection)
 
-**For each of the 8 teams in the franchise:**
+**For each of the 8 teams in the franchise**, team-level data (attributes, settings, plays, scouting) is stored in the `franchise_team_data` collection, keyed by `(franchise_id, team_id)`. The franchise document no longer stores `franchise_teams` (deprecated).
 
 **Team Attributes** (mode-specific, randomized on init, updated by training):
 - `team_chemistry`: 7-10 (franchise mode range)
