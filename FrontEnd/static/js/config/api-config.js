@@ -16,9 +16,16 @@
  * Custom Domains (after DNS configuration):
  * - Production API: api.geekedoutbasketball.com
  * - Staging API: api-staging.geekedoutbasketball.com
+ * 
+ * Alpha Mode:
+ * - Use API_CONFIG.isAlpha() to check if app is in alpha mode
+ * - Use API_CONFIG.loadAppConfig() to fetch and cache app configuration
  */
 
 const API_CONFIG = {
+  // Cached app config (loaded once from backend)
+  _appConfig: null,
+  _appConfigLoading: null,
   /**
    * Get the base URL for API requests based on current environment
    * @returns {string} Base URL for API requests (e.g., "https://api.geekedoutbasketball.com")
@@ -98,6 +105,69 @@ const API_CONFIG = {
     // Ensure path starts with /
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
     return `${this.getStaticPath()}${normalizedPath}`;
+  },
+  
+  /**
+   * Load app configuration from backend (cached after first call)
+   * @returns {Promise<Object>} App config object with isAlpha, alphaDisclaimer, version
+   */
+  async loadAppConfig() {
+    // Return cached config if available
+    if (this._appConfig) {
+      return this._appConfig;
+    }
+    
+    // If already loading, wait for that request
+    if (this._appConfigLoading) {
+      return this._appConfigLoading;
+    }
+    
+    // Fetch config from backend
+    this._appConfigLoading = (async () => {
+      try {
+        const response = await fetch(this.buildUrl('/app-config'));
+        if (!response.ok) {
+          console.error('[API_CONFIG] Failed to load app config:', response.status);
+          // Return safe defaults on error
+          return { isAlpha: false, alphaDisclaimer: null, version: '1.0' };
+        }
+        this._appConfig = await response.json();
+        return this._appConfig;
+      } catch (error) {
+        console.error('[API_CONFIG] Error loading app config:', error);
+        // Return safe defaults on error
+        return { isAlpha: false, alphaDisclaimer: null, version: '1.0' };
+      } finally {
+        this._appConfigLoading = null;
+      }
+    })();
+    
+    return this._appConfigLoading;
+  },
+  
+  /**
+   * Check if app is in alpha mode (synchronous - uses cached value)
+   * IMPORTANT: Call loadAppConfig() first on page load to populate cache
+   * @returns {boolean} True if in alpha mode
+   */
+  isAlpha() {
+    return this._appConfig?.isAlpha ?? false;
+  },
+  
+  /**
+   * Get alpha disclaimer text (synchronous - uses cached value)
+   * @returns {string|null} Disclaimer text or null if not in alpha
+   */
+  getAlphaDisclaimer() {
+    return this._appConfig?.alphaDisclaimer ?? null;
+  },
+  
+  /**
+   * Get app version (synchronous - uses cached value)
+   * @returns {string} Version string
+   */
+  getVersion() {
+    return this._appConfig?.version ?? '1.0';
   }
 };
 

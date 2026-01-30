@@ -1467,6 +1467,12 @@ window.handleTournamentUpdate = handleTournamentUpdate;
 
 async function initializeTournament() {
   console.log('🔍 [TOURNAMENT INIT] initializeTournament() called, readyState:', document.readyState);
+  
+  // ✅ ALPHA: Initialize alpha banner (shows badge if IS_ALPHA=true)
+  if (typeof AlphaBanner !== 'undefined') {
+    await AlphaBanner.init();
+  }
+  
   // ✅ MIGRATION (Task 6.1): Use command center data endpoint (aligns with Franchise pattern)
   let commandCenterData = null;
   try {

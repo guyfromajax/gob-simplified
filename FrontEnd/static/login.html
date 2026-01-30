@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log In - Geeked Out Basketball</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/auth.css">
+</head>
+<body>
+  <!-- Alpha Badge (shown when IS_ALPHA=true) -->
+  <div id="alpha-badge" class="alpha-badge">ALPHA</div>
+  
+  <div class="auth-container">
+    <h1 class="auth-title">WELCOME BACK</h1>
+    
+    <form id="login-form" class="auth-form">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required placeholder="you@example.com">
+      </div>
+      
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required placeholder="Your password">
+      </div>
+      
+      <div id="error-message" class="error-message"></div>
+      
+      <button type="submit" class="auth-button">
+        <span id="button-text">LOG IN</span>
+        <span id="button-loading" style="display: none;">Logging in...</span>
+      </button>
+    </form>
+    
+    <div class="auth-footer">
+      Don't have an account? <a href="/signup.html">Sign up</a>
+    </div>
+    
+    <a href="/mode-select.html" class="back-link">Back to Game</a>
+  </div>
+  
+  <script src="/js/config/api-config.js"></script>
+  <script>
+    // Check if alpha mode and show badge
+    async function initPage() {
+      try {
+        const config = await API_CONFIG.loadAppConfig();
+        
+        if (config.isAlpha) {
+          document.getElementById('alpha-badge').classList.add('visible');
+        }
+        
+        // Check if already logged in
+        const token = localStorage.getItem('auth_token');
+        if (token) {
+          // Verify token is still valid
+          try {
+            const response = await fetch(API_CONFIG.buildUrl('/api/auth/me'), {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+              // Already logged in, redirect to mode select
+              window.location.href = '/mode-select.html';
+              return;
+            }
+          } catch (e) {
+            // Token invalid, clear it
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_user');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load config:', error);
+      }
+    }
+    
+    // Handle form submission
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      
+      const errorEl = document.getElementById('error-message');
+      const buttonText = document.getElementById('button-text');
+      const buttonLoading = document.getElementById('button-loading');
+      const submitBtn = document.querySelector('button[type="submit"]');
+      
+      // Clear previous error
+      errorEl.textContent = '';
+      errorEl.style.display = 'none';
+      
+      // Show loading state
+      buttonText.style.display = 'none';
+      buttonLoading.style.display = 'inline';
+      submitBtn.disabled = true;
+      
+      try {
+        const response = await fetch(API_CONFIG.buildUrl('/api/auth/login'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.detail || 'Login failed');
+        }
+        
+        // Store token and user info
+        localStorage.setItem('auth_token', data.token);
+        localStorage.setItem('auth_user', JSON.stringify(data.user));
+        
+        // Check for redirect URL in query params
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirectUrl = urlParams.get('redirect') || '/mode-select.html';
+        
+        // Redirect
+        window.location.href = redirectUrl;
+        
+      } catch (error) {
+        errorEl.textContent = error.message;
+        errorEl.style.display = 'block';
+      } finally {
+        // Reset button state
+        buttonText.style.display = 'inline';
+        buttonLoading.style.display = 'none';
+        submitBtn.disabled = false;
+      }
+    });
+    
+    // Initialize page
+    initPage();
+  </script>
+</body>
+</html>

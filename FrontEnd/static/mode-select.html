@@ -8,7 +8,32 @@
   <link rel="stylesheet" href="/mode-select.css">
 </head>
 <body>
+  <!-- Auth Status Bar -->
+  <div id="auth-bar" class="auth-bar">
+    <div id="auth-logged-out" class="auth-status">
+      <a href="/login.html" class="auth-link">Log In</a>
+      <span class="auth-divider">|</span>
+      <a href="/signup.html" class="auth-link">Sign Up</a>
+    </div>
+    <div id="auth-logged-in" class="auth-status" style="display: none;">
+      <span id="auth-user-email" class="auth-email"></span>
+      <button id="logout-btn" class="auth-logout-btn">Log Out</button>
+    </div>
+  </div>
+  
+  <!-- Alpha Badge (shown when IS_ALPHA=true) -->
+  <div id="alpha-badge" class="alpha-badge">ALPHA</div>
+  
   <h1 id="page-title">CHOOSE YOUR GAME MODE</h1>
+  
+  <!-- Alpha Disclaimer (shown when IS_ALPHA=true) -->
+  <div id="alpha-disclaimer" class="alpha-disclaimer">
+    <div class="alpha-disclaimer-title">ALPHA RELEASE</div>
+    <p class="alpha-disclaimer-text">
+      <strong>Data may be wiped without notice.</strong> Gameplay balance and features may change.
+      Thank you for helping us test!
+    </p>
+  </div>
   <div class="mode-wrapper">
   <!-- ⏸️ TABLED: Resume Last Game Section - Exact game state restoration -->
   <!-- TODO: Revisit after Phase 1.3+ and site go-live priorities complete -->

@@ -892,6 +892,11 @@ function renderTeamTraitsTop10(teams) {
 }
 
 async function init() {
+  // ✅ ALPHA: Initialize alpha banner (shows badge if IS_ALPHA=true)
+  if (typeof AlphaBanner !== 'undefined') {
+    await AlphaBanner.init();
+  }
+  
   // ✅ SS&S: Check URL params first for team_id (ObjectId) - allows seamless navigation
   const urlParams = new URLSearchParams(window.location.search);
   const urlTeamId = urlParams.get('team_id');

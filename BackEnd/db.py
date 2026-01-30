@@ -94,6 +94,10 @@ if client:
     defenses_collection = db["defenses"]
     fcp_skeletons_collection = db["fcp_skeletons"]
     hct_skeletons_collection = db["hct_skeletons"]
+    # Alpha access control - OTP codes for gated signup
+    alpha_otps_collection = db["alpha_otps"]
+    # Users collection for authentication (Step 1)
+    users_collection = db["users"]
     print("🔵 [DEBUG] db.py: Collections initialized", file=sys.stderr, flush=True)
 else:
     print("🔵 [DEBUG] db.py: Using mongomock (no MongoDB connection)", file=sys.stderr, flush=True)
@@ -114,6 +118,10 @@ else:
     defenses_collection = db["defenses"]
     fcp_skeletons_collection = db["fcp_skeletons"]
     hct_skeletons_collection = db["hct_skeletons"]
+    # Alpha access control - OTP codes for gated signup
+    alpha_otps_collection = db["alpha_otps"]
+    # Users collection for authentication (Step 1)
+    users_collection = db["users"]
     print("🔵 [DEBUG] db.py: Mongomock collections initialized", file=sys.stderr, flush=True)
 
 print("🔵 [DEBUG] db.py: Module initialization complete", file=sys.stderr, flush=True)

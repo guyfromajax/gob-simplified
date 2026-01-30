@@ -3,6 +3,69 @@ body {
   background: #f5f5f5;
   margin: 0;
   padding: 20px;
+  padding-top: 50px; /* Space for auth bar */
+}
+
+/* ============================================================================
+   AUTH BAR
+   ============================================================================ */
+
+.auth-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #333;
+  padding: 8px 20px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  z-index: 9998;
+}
+
+.auth-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.auth-link {
+  color: #fff;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.auth-link:hover {
+  color: #ff9800;
+}
+
+.auth-divider {
+  color: #666;
+  font-size: 14px;
+}
+
+.auth-email {
+  color: #ccc;
+  font-size: 14px;
+  margin-right: 5px;
+}
+
+.auth-logout-btn {
+  background: transparent;
+  border: 1px solid #666;
+  color: #fff;
+  padding: 4px 12px;
+  font-size: 13px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.auth-logout-btn:hover {
+  background: #ff9800;
+  border-color: #ff9800;
 }
 
 #page-title {
@@ -177,4 +240,67 @@ body {
 
 .resume-button:hover {
   background: #e68900;
+}
+
+/* ============================================================================
+   ALPHA BADGE & DISCLAIMER STYLES
+   ============================================================================ */
+
+/* Alpha badge - fixed position in top-right corner */
+.alpha-badge {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background: linear-gradient(135deg, #ff6b35, #f7931e);
+  color: #fff;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 14px;
+  font-weight: bold;
+  padding: 6px 12px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.4);
+  z-index: 9999;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Alpha disclaimer banner - shown below title */
+.alpha-disclaimer {
+  background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+  border: 2px solid #ff9800;
+  border-radius: 8px;
+  padding: 15px 20px;
+  margin: 0 auto 25px;
+  max-width: 600px;
+  text-align: center;
+}
+
+.alpha-disclaimer-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  color: #e65100;
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+}
+
+.alpha-disclaimer-text {
+  font-size: 14px;
+  color: #5d4037;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.alpha-disclaimer-text strong {
+  color: #bf360c;
+}
+
+/* Hide alpha elements by default (shown via JS when in alpha mode) */
+.alpha-badge,
+.alpha-disclaimer {
+  display: none;
+}
+
+.alpha-badge.visible,
+.alpha-disclaimer.visible {
+  display: block;
 }
