@@ -48,6 +48,24 @@ body {
   height: 40px;
   width: auto;
 }
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+.nav-links {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+.nav-links a {
+  color: var(--color-text);
+  text-decoration: none;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+}
+.nav-links a:hover {
+  color: var(--color-accent);
+}
 .nav-icons {
   display: flex;
   gap: var(--spacing-sm);
