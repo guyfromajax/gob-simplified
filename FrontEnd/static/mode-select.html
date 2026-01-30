@@ -11,19 +11,20 @@
 <body>
   <!-- Auth Status Bar -->
   <div id="auth-bar" class="auth-bar">
-    <div id="auth-logged-out" class="auth-status">
-      <a href="/login.html" class="auth-link">Log In</a>
-      <span class="auth-divider">|</span>
-      <a href="/signup.html" class="auth-link">Sign Up</a>
-    </div>
-    <div id="auth-logged-in" class="auth-status" style="display: none;">
-      <span id="auth-user-email" class="auth-email"></span>
-      <button id="logout-btn" class="auth-logout-btn">Log Out</button>
+    <div class="auth-bar-spacer"></div>
+    <div id="alpha-badge" class="alpha-badge">ALPHA</div>
+    <div class="auth-bar-right">
+      <div id="auth-logged-out" class="auth-status">
+        <a href="/login.html" class="auth-link">Log In</a>
+        <span class="auth-divider">|</span>
+        <a href="/signup.html" class="auth-link">Sign Up</a>
+      </div>
+      <div id="auth-logged-in" class="auth-status" style="display: none;">
+        <span id="auth-user-email" class="auth-email"></span>
+        <button id="logout-btn" class="auth-logout-btn">Log Out</button>
+      </div>
     </div>
   </div>
-  
-  <!-- Alpha Badge (shown when IS_ALPHA=true) -->
-  <div id="alpha-badge" class="alpha-badge">ALPHA</div>
   
   <h1 id="page-title">CHOOSE YOUR GAME MODE</h1>
   
