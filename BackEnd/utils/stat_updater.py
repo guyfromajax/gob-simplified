@@ -74,6 +74,54 @@ def _pct_block(totals: Dict[str, Any]) -> Dict[str, float]:
     return {"FG%": fg_pct, "3PT%": fg3_pct, "FT%": ft_pct, "TS%": ts_pct, "eFG%": efg_pct}
 
 
+def _build_franchise_team_maps_from_ftd(
+    franchise_id: str | ObjectId,
+) -> tuple[Dict[str, str], Dict[str, str]]:
+    """Build team_name -> ObjectId str and team_id (canonical) -> ObjectId str maps from FTD.
+
+    Used for finalize_game, play stats, and defense stats. Replaces former
+    franchise_teams-based mapping. Returns (team_name_to_id, team_id_to_object_id).
+    """
+    from BackEnd.db import franchise_team_data_collection, teams_collection
+
+    doc_id = ObjectId(franchise_id) if isinstance(franchise_id, str) else franchise_id
+    team_name_to_id: Dict[str, str] = {}
+    team_id_to_object_id: Dict[str, str] = {}
+    try:
+        ftd_docs = list(
+            franchise_team_data_collection.find(
+                {"franchise_id": doc_id},
+                {"team_id": 1},
+            )
+        )
+    except Exception as e:
+        logger.warning(f"⚠️ [_build_franchise_team_maps_from_ftd] FTD query failed: {e}")
+        return team_name_to_id, team_id_to_object_id
+
+    for d in ftd_docs:
+        team_obj_id = d.get("team_id")
+        if not team_obj_id:
+            continue
+        try:
+            team_doc = teams_collection.find_one(
+                {"_id": team_obj_id},
+                {"name": 1, "team_id": 1},
+            )
+        except Exception:
+            continue
+        if not team_doc:
+            continue
+        team_id_str = str(team_obj_id)
+        name = team_doc.get("name")
+        canonical = team_doc.get("team_id")
+        if name:
+            team_name_to_id[name] = team_id_str
+        if canonical:
+            team_id_to_object_id[canonical] = team_id_str
+
+    return team_name_to_id, team_id_to_object_id
+
+
 def init_franchise_player_stats(franchise_id: str | ObjectId, roster: list[dict]) -> None:
     """Seed a franchise document with zeroed player stat containers.
 
@@ -789,37 +837,16 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
     logger.info(f"🔍 [UPDATE_PLAY_STATS] Processing {len(teams_obj)} teams, mode={mode}, doc_id={doc_id}")
     logger.info(f"🔍 [UPDATE_PLAY_STATS] Teams keys: {list(teams_obj.keys())}")
     
-    from BackEnd.db import tournaments_collection, franchises_collection, teams_collection
-    
-    # ✅ FIX: For franchise mode, build team_name -> ObjectId team_id map (same as finalize_game)
-    # Game document uses team_id strings (like "LITTLE_YORK") as keys, but franchise document
-    # uses ObjectId strings (like "68c98b09674d3f9b04546b35") as keys in franchise_teams
+    from BackEnd.db import tournaments_collection
+
+    # ✅ FTD: For franchise mode, build team_name -> ObjectId and team_id (canonical) -> ObjectId maps from FTD.
+    # Game document uses team_id strings (e.g. "LITTLE_YORK") or names as keys; we map to ObjectId for FTD updates.
     team_name_to_franchise_id: Dict[str, str] = {}
-    game_key_to_franchise_id: Dict[str, str] = {}  # Map game document keys to franchise ObjectIds
-    if mode == "franchise":
-        try:
-            doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
-            franchise_doc = franchises_collection.find_one({"_id": doc_obj_id}, {"franchise_teams": 1})
-            if franchise_doc:
-                franchise_teams = franchise_doc.get("franchise_teams", {})
-                for team_id_str, team_data in franchise_teams.items():
-                    # Look up team name from teams collection
-                    try:
-                        team_obj_id = ObjectId(team_id_str)
-                        team_doc = teams_collection.find_one({"_id": team_obj_id}, {"name": 1, "team_id": 1})
-                        if team_doc:
-                            team_name = team_doc.get("name")
-                            team_id_field = team_doc.get("team_id")  # e.g., "LITTLE_YORK"
-                            if team_name:
-                                team_name_to_franchise_id[team_name] = team_id_str
-                            if team_id_field:
-                                game_key_to_franchise_id[team_id_field] = team_id_str
-                    except Exception:
-                        continue
-                logger.info(f"🔍 [UPDATE_PLAY_STATS] Built team_name_to_franchise_id map: {team_name_to_franchise_id}")
-                logger.info(f"🔍 [UPDATE_PLAY_STATS] Built game_key_to_franchise_id map: {game_key_to_franchise_id}")
-        except Exception as e:
-            logger.error(f"❌ [UPDATE_PLAY_STATS] Error building team_name map: {e}")
+    game_key_to_franchise_id: Dict[str, str] = {}
+    if mode == "franchise" and doc_id:
+        team_name_to_franchise_id, game_key_to_franchise_id = _build_franchise_team_maps_from_ftd(doc_id)
+        logger.info(f"🔍 [UPDATE_PLAY_STATS] Built team_name_to_franchise_id map: {team_name_to_franchise_id}")
+        logger.info(f"🔍 [UPDATE_PLAY_STATS] Built game_key_to_franchise_id map: {game_key_to_franchise_id}")
     
     # Get team names from game document for matching
     home_team_data = game.get("home_team", {})
@@ -844,7 +871,7 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
         
         # ✅ FIX: Resolve actual franchise team_id (ObjectId string) from game team key
         # Game document keys are team_id strings (like "LITTLE_YORK") or team names
-        # We need to map to the ObjectId string used in franchise_teams
+        # We map to the ObjectId string used in FTD (from _build_franchise_team_maps_from_ftd)
         actual_team_id = game_team_key  # Default to game key (works for tournament mode)
         team_object_id = None  # For FTD updates
         
@@ -1008,30 +1035,13 @@ def _update_defensive_playcall_season_stats(game: Dict[str, Any], mode: str = No
         logger.warning(f"⚠️ [UPDATE_DEFENSE_STATS] No teams object in game document")
         return
     
-    # ✅ FTD: For franchise mode, need to map team_id keys to ObjectId team_ids
-    team_id_to_object_id: Dict[str, ObjectId] = {}
+    # ✅ FTD: For franchise mode, build team_id (canonical) / name -> ObjectId maps from FTD.
+    # Game teams_obj keys may be canonical or name; we map to ObjectId for FTD updates.
+    team_id_to_object_id: Dict[str, Any] = {}
     if mode == "franchise" and doc_id:
-        try:
-            from BackEnd.db import franchises_collection, teams_collection
-            doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
-            franchise_doc = franchises_collection.find_one({"_id": doc_obj_id}, {"franchise_teams": 1})
-            if franchise_doc:
-                franchise_teams = franchise_doc.get("franchise_teams", {})
-                for team_id_str, team_data in franchise_teams.items():
-                    try:
-                        team_obj_id = ObjectId(team_id_str)
-                        team_doc = teams_collection.find_one({"_id": team_obj_id}, {"name": 1, "team_id": 1})
-                        if team_doc:
-                            team_id_field = team_doc.get("team_id")  # e.g., "LITTLE_YORK"
-                            team_name = team_doc.get("name")
-                            if team_id_field:
-                                team_id_to_object_id[team_id_field] = team_obj_id
-                            if team_name:
-                                team_id_to_object_id[team_name] = team_obj_id
-                    except Exception:
-                        continue
-        except Exception as e:
-            logger.error(f"❌ [UPDATE_DEFENSE_STATS] Error building team_id map: {e}")
+        team_name_to_id, team_id_to_obj = _build_franchise_team_maps_from_ftd(doc_id)
+        # Merge so we can resolve by either canonical team_id or name (game keys vary).
+        team_id_to_object_id = {**team_id_to_obj, **team_name_to_id}
     
     for team_id_key, team_data in teams_obj.items():
         scouting = team_data.get("scouting", {})
@@ -1081,11 +1091,12 @@ def _update_defensive_playcall_season_stats(game: Dict[str, Any], mode: str = No
                     from BackEnd.db import franchise_team_data_collection
                     doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
                     
-                    # Resolve team_id_key to ObjectId
-                    team_object_id = team_id_to_object_id.get(team_id_key)
-                    if not team_object_id:
+                    # Resolve team_id_key to ObjectId (map stores ObjectId strings)
+                    team_id_str = team_id_to_object_id.get(team_id_key)
+                    if not team_id_str:
                         logger.warning(f"⚠️ [UPDATE_DEFENSE_STATS] Could not resolve team_id_key '{team_id_key}' to ObjectId, skipping FTD update")
                         continue
+                    team_object_id = ObjectId(team_id_str)
                     
                     logger.info(f"🔍 [UPDATE_DEFENSE_STATS] Updating FTD for team {team_object_id} with {len(inc_doc)} increments")
                     result = franchise_team_data_collection.update_one(
@@ -1402,7 +1413,7 @@ def finalize_game(
                 # Don't increment again - this is a bug if it happens
                 
                 # ✅ FIX: Set meta.team_id to ObjectId string (not team_id string) for aggregation compatibility
-                # tournament.teams and franchise.franchise_teams use ObjectId strings as keys
+                # tournament.teams and franchise (FTD) use ObjectId strings as keys
                 team_object_id = team_id_to_object_id.get(team_id_key)
                 if team_object_id:
                     set_doc[f"players.{pid_str}.meta.team_id"] = team_object_id
@@ -1831,27 +1842,8 @@ def finalize_game(
         else:
             logger.info(f"✅ [FINALIZE_GAME] away_team_name '{away_team_name}' found in box_score")
 
-        # ✅ SS&S: Build team_name -> ObjectId map from franchise_teams (for team_name lookup)
-        # Also build team_id -> ObjectId map (for direct team_id_key lookup)
-        franchise_doc = db.franchises.find_one({"_id": fid}, {"franchise_teams": 1})
-        franchise_teams = franchise_doc.get("franchise_teams", {}) if franchise_doc else {}
-        team_name_to_id: Dict[str, str] = {}
-        team_id_to_object_id: Dict[str, str] = {}  # ✅ FIX: Map team_id strings to ObjectId strings
-        for team_id_str, team_data in franchise_teams.items():
-            # Look up team name and team_id from teams collection
-            try:
-                team_obj_id = ObjectId(team_id_str)
-                team_doc = teams_collection.find_one({"_id": team_obj_id}, {"name": 1, "team_id": 1})
-                if team_doc:
-                    team_name = team_doc.get("name")
-                    team_id_field = team_doc.get("team_id")  # e.g., "MORRISTOWN"
-                    if team_name:
-                        team_name_to_id[team_name] = team_id_str  # ObjectId string
-                    if team_id_field:
-                        team_id_to_object_id[team_id_field] = team_id_str  # ✅ FIX: Map team_id string -> ObjectId string
-            except Exception:
-                continue
-        
+        # ✅ FTD: Build team_name -> ObjectId and team_id (canonical) -> ObjectId maps from FTD.
+        team_name_to_id, team_id_to_object_id = _build_franchise_team_maps_from_ftd(fid)
         logger.info(f"🔍 [FINALIZE_GAME] Built team_name_to_id map: {team_name_to_id}")
         logger.info(f"🔍 [FINALIZE_GAME] Built team_id_to_object_id map: {team_id_to_object_id}")
         if not team_name_to_id:
@@ -1893,7 +1885,7 @@ def finalize_game(
             current_team_name = home_team_name if team_id_key == home_team_id else away_team_name
             
             # ✅ FIX: Resolve team_id_key to ObjectId string for meta.team_id assignment
-            # team_id_key is a team_id string (e.g., "MORRISTOWN"), but franchise.franchise_teams uses ObjectId strings as keys
+            # team_id_key is canonical (e.g. "MORRISTOWN"); we map to ObjectId string via FTD-derived maps.
             team_object_id = team_id_to_object_id.get(team_id_key)
             if not team_object_id:
                 # Fallback: Try to resolve via team_name
@@ -1964,7 +1956,7 @@ def finalize_game(
                 ) + 1
                 
                 # ✅ FIX: Set meta.team_id to ObjectId string (not team_id string) for aggregation compatibility
-                # franchise.franchise_teams uses ObjectId strings as keys
+                # Franchise uses ObjectId strings (from FTD-derived maps).
                 if team_object_id:
                     set_doc[f"players.{pid_str}.meta.team_id"] = team_object_id
                     logger.debug(f"🔍 [FINALIZE_GAME] Setting meta.team_id for player {pid_str}: {team_object_id} (from team_id_key: {team_id_key})")
