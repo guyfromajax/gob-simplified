@@ -1923,6 +1923,14 @@ async function handleButtonClick(animate) {
   if (isSimulating) {
     return;
   }
+
+  // ✅ ANALYTICS: Quarter/game advance + game started events (pre-game = quarter 0)
+  if (window.GOB_Analytics) {
+    window.GOB_Analytics.quarterAdvance('play_quarter');
+    if (quarter === 0 && mode === 'single') window.GOB_Analytics.singleGameStarted();
+    if (quarter === 0 && mode === 'tournament') window.GOB_Analytics.tournamentGameStarted();
+    if (quarter === 0 && mode === 'franchise') window.GOB_Analytics.franchiseGameStarted();
+  }
   
   // ✅ PHASE 1.1: URL is source of truth - read from URL if module-level gameId is missing
   if (!gameId) {
@@ -2029,6 +2037,11 @@ async function handleGameCompletion({ gameId, lastSummary, tournamentId, franchi
   const base = (typeof window !== 'undefined' && window.API_CONFIG) ? window.API_CONFIG.getStaticPath() : '';
   const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
   const popupMode = tournamentId ? 'tournament' : (franchiseId ? 'franchise' : 'single');
+  if (window.GOB_Analytics) {
+    if (tournamentId) window.GOB_Analytics.tournamentGameCompleted();
+    else if (franchiseId) window.GOB_Analytics.franchiseGameCompleted();
+    else window.GOB_Analytics.singleGameCompleted();
+  }
   showGameCompletionPopup({
     gameId: gameId,
     mode: popupMode,
@@ -2073,6 +2086,14 @@ async function handleSimQuarter() {
   const simFullBtn = document.querySelector('.sim-full-game-button');
   const simQuarterBtn = document.querySelector('.sim-to-fourth-button');
   [playBtn, simFullBtn, simQuarterBtn].forEach(btn => { if (btn) btn.disabled = true; });
+
+  // ✅ ANALYTICS: Quarter/game advance + game started events (pre-game = quarter 0)
+  if (window.GOB_Analytics) {
+    window.GOB_Analytics.quarterAdvance('sim_quarter');
+    if (quarter === 0 && mode === 'single') window.GOB_Analytics.singleGameStarted();
+    if (quarter === 0 && mode === 'tournament') window.GOB_Analytics.tournamentGameStarted();
+    if (quarter === 0 && mode === 'franchise') window.GOB_Analytics.franchiseGameStarted();
+  }
 
   // Load game plan and playbook settings before simulating
   await loadGamePlanSettings();
@@ -2324,6 +2345,15 @@ async function handleSimFullGame() {
   const simFullBtn = document.querySelector('.sim-full-game-button');
   const sim4Btn = document.querySelector('.sim-to-fourth-button');
   [playBtn, simFullBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = true; });
+
+  // ✅ ANALYTICS: Quarter/game advance + game started events
+  if (window.GOB_Analytics) {
+    const currentQ = Math.max(0, quarter);
+    window.GOB_Analytics.quarterAdvance(currentQ >= 2 ? 'sim_rest_of_game' : 'sim_full_game');
+    if (quarter === 0 && mode === 'single') window.GOB_Analytics.singleGameStarted();
+    if (quarter === 0 && mode === 'tournament') window.GOB_Analytics.tournamentGameStarted();
+    if (quarter === 0 && mode === 'franchise') window.GOB_Analytics.franchiseGameStarted();
+  }
 
   // Load game plan and playbook settings before simulating
   await loadGamePlanSettings();

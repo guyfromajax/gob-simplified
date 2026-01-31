@@ -892,6 +892,7 @@ function renderTeamTraitsTop10(teams) {
 }
 
 async function init() {
+  if (window.GOB_Analytics) window.GOB_Analytics.franchiseEntered();
   // ✅ ALPHA: Initialize alpha banner (shows badge if IS_ALPHA=true)
   if (typeof AlphaBanner !== 'undefined') {
     await AlphaBanner.init();

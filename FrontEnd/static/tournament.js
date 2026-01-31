@@ -1559,6 +1559,8 @@ async function initializeTournament() {
     }
   }
   
+  if (window.GOB_Analytics) window.GOB_Analytics.tournamentEntered();
+
   // Ensure userTeamId is set before proceeding
   if (!userTeamId) {
     console.error("❌ userTeamId not found - cannot load roster");

@@ -1482,7 +1482,11 @@ export function createGameScene(Phaser) {
         });
         this.finalScore = finalScore;
         this.finalized = true;
-        
+        if (window.GOB_Analytics) {
+          if (this.tournamentId) window.GOB_Analytics.tournamentGameCompleted();
+          else if (this.franchiseId) window.GOB_Analytics.franchiseGameCompleted();
+          else window.GOB_Analytics.singleGameCompleted();
+        }
         // Show game completion popup (absolute path for Netlify/module resolution)
         const base = (typeof window !== 'undefined' && window.API_CONFIG) ? window.API_CONFIG.getStaticPath() : '';
         const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
@@ -2410,7 +2414,11 @@ export function createGameScene(Phaser) {
           });
           this.finalScore = finalScore;
           this.finalized = true;
-          
+          if (window.GOB_Analytics) {
+            if (this.tournamentId) window.GOB_Analytics.tournamentGameCompleted();
+            else if (this.franchiseId) window.GOB_Analytics.franchiseGameCompleted();
+            else window.GOB_Analytics.singleGameCompleted();
+          }
           // Show game completion popup (absolute path for Netlify/module resolution)
           const base = (typeof window !== 'undefined' && window.API_CONFIG) ? window.API_CONFIG.getStaticPath() : '';
           const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
