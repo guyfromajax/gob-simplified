@@ -19,14 +19,15 @@ body {
   position: fixed;
   top: 10px;
   right: 10px;
-  background: linear-gradient(135deg, #ff6b35, #f7931e);
-  color: #fff;
+  background: linear-gradient(135deg, #d4af37, #f4e4bc, #c9a227);
+  color: #000;
+  border: 2px solid #000;
   font-family: 'Bebas Neue', sans-serif;
   font-size: 14px;
   font-weight: bold;
   padding: 6px 12px;
   border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.4);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
   z-index: 9999;
   letter-spacing: 1px;
   text-transform: uppercase;
