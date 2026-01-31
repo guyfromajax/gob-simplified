@@ -138,7 +138,10 @@
         const data = await response.json();
         
         if (!response.ok) {
-          throw new Error(data.detail || 'Signup failed');
+          const msg = Array.isArray(data.detail)
+            ? (data.detail[0]?.msg || JSON.stringify(data.detail))
+            : (data.detail || 'Signup failed');
+          throw new Error(msg);
         }
         
         // Store token and user info
