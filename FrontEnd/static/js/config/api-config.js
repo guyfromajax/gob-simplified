@@ -37,7 +37,13 @@ const API_CONFIG = {
     }
     
     const hostname = window.location.hostname;
-    
+    // DEBUG: remove after troubleshooting
+    const baseUrl = this._resolveBaseUrl(hostname);
+    console.log('[API_CONFIG] hostname=', hostname, 'baseUrl=', baseUrl);
+    return baseUrl;
+  },
+
+  _resolveBaseUrl(hostname) {
     // Production (custom domain - www redirects to bare domain)
     if (hostname === 'www.geekedoutbasketball.com' || hostname === 'geekedoutbasketball.com') {
       return 'https://api.geekedoutbasketball.com';
@@ -124,18 +130,19 @@ const API_CONFIG = {
     
     // Fetch config from backend
     this._appConfigLoading = (async () => {
+      const url = this.buildUrl('/app-config');
+      console.log('[API_CONFIG] Fetching app-config from', url); // DEBUG: remove after troubleshooting
       try {
-        const response = await fetch(this.buildUrl('/app-config'));
+        const response = await fetch(url);
         if (!response.ok) {
-          console.error('[API_CONFIG] Failed to load app config:', response.status);
-          // Return safe defaults on error
+          console.error('[API_CONFIG] Failed to load app config:', response.status, response.statusText);
           return { isAlpha: false, alphaDisclaimer: null, version: '1.0' };
         }
         this._appConfig = await response.json();
+        console.log('[API_CONFIG] app-config loaded:', this._appConfig); // DEBUG: remove after troubleshooting
         return this._appConfig;
       } catch (error) {
-        console.error('[API_CONFIG] Error loading app config:', error);
-        // Return safe defaults on error
+        console.error('[API_CONFIG] Error loading app config:', error.message, error);
         return { isAlpha: false, alphaDisclaimer: null, version: '1.0' };
       } finally {
         this._appConfigLoading = null;
