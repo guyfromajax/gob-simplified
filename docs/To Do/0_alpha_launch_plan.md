@@ -15,7 +15,7 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 | **0** | **Lock Alpha Rules & Data Safety** | `IS_ALPHA=true` flag, alpha badge/disclaimers, OTP system setup, data wipe script |
 | **1** | **Authentication** | Signup/login pages, JWT auth, OTP validation (when `IS_ALPHA=true`), protected endpoints |
 | **2** | **Custom Domains** | `www.geekedoutbasketball.com` + `api.geekedoutbasketball.com`, DNS configured, CORS updated |
-| **3** | **Analytics & Marketing Pixels** | GA4 setup, core events tracked, Facebook/LinkedIn pixels (optional), GTM (optional) |
+| **3** | **Analytics & Marketing Pixels** | GA4 setup, core events tracked, GTM + pixels (Facebook/Meta, Instagram, X, TikTok) |
 | **4** | **Error Tracking** | Sentry (or similar) configured, backend + frontend error capture, user context attached |
 | **5** | **Security Hardening** | CORS review, env var security, input validation, password security, security headers |
 | **6** | **Rate Limiting** | Login/signup rate limits, simulation endpoint limits, 429 responses |
@@ -24,7 +24,7 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 | **9** | **Basic Monitoring** | Uptime monitoring (UptimeRobot), email alerts, performance monitoring (optional) |
 | **10** | **End-to-End Testing** | Full flow tests, failure scenarios, quality gate (no game-breaking bugs) |
 | **11** | **Minimal Email** | Email provider setup (SendGrid/Mailgun/Postmark), password reset flow only |
-| **12** | **Admin/Support Tools** | Admin role system, support email/feedback button, basic admin actions |
+| **12** | **Admin/Support Tools** | Admin role system, admin-only pages (play-builder, HCT/FCP builders), support email/feedback |
 
 **Launch Day:** Wipe dev data, verify all systems, launch announcement, monitor first hour
 
@@ -215,34 +215,48 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 ### 3.2 Track Core Events (Day 1)
 - [ ] Signup event
 - [ ] Login event
-- [ ] Game started event
-- [ ] Game completed event
-- [ ] Quarter completed event (optional)
+- [ ] Single game started event (one-off; no save/resume)
+- [ ] Single game completed event
+- [ ] Tournament entered event (fires each time user opens tournament — new or returning)
+- [ ] Tournament game started event
+- [ ] Tournament game completed event
+- [ ] Franchise entered event (fires each time user opens franchise — new or returning)
+- [ ] Franchise game started event
+- [ ] Franchise game completed event
+- [ ] Quarter/Game advance event — capture which button was used:
+  - [ ] Property: `action` = `play_quarter` | `sim_quarter` | `sim_full_game` (or `sim_rest_of_game`)
+  - [ ] Fires on each quarter advance or full-game sim
+
+**Implementation (Jan 2026):** GTM snippet added to all HTML pages. Analytics helper (`/js/shared/analytics.js`) pushes events to `dataLayer`. **GTM setup required:** Create GA4 Event tags in GTM that fire on Custom Event triggers for each event name (`signup`, `login`, `single_game_started`, etc.). For `quarter_advance`, add Event Parameter `action` (Data Layer Variable `action`).
 
 ### 3.3 Marketing Pixels (Enable Future Campaigns)
-- [ ] **Facebook Pixel** (if using Facebook Ads)
-  - [ ] Create Facebook Pixel
+- [ ] **Google Tag Manager (GTM)**
+  - [ ] Create GTM container
+  - [ ] Add GTM script to all pages
+  - [ ] Use GTM to manage all pixels (add/remove without code changes)
+
+- [ ] **Facebook Pixel** (Meta)
+  - [ ] Create Facebook Pixel in Meta Events Manager
   - [ ] Get Pixel ID
-  - [ ] Add pixel code to all pages (or via GTM)
+  - [ ] Add via GTM
   - [ ] Set up conversion events (signups, game completions)
   - [ ] Test pixel fires correctly
 
-- [ ] **LinkedIn Insight Tag** (if using LinkedIn Ads)
-  - [ ] Create LinkedIn Insight Tag
-  - [ ] Get Partner ID
-  - [ ] Add tag code to all pages (or via GTM)
-  - [ ] Test tag fires correctly
+- [ ] **Instagram**
+  - [ ] Uses same Meta Pixel as Facebook — no separate pixel. Facebook Pixel covers Instagram Ads.
 
-- [ ] **Twitter Pixel** (if using Twitter/X Ads) - Optional
-  - [ ] Create Twitter Pixel
+- [ ] **X Pixel** (formerly Twitter)
+  - [ ] Create X Pixel in X Ads Manager
   - [ ] Get Pixel ID
-  - [ ] Add pixel code to all pages (or via GTM)
+  - [ ] Add via GTM
   - [ ] Test pixel fires correctly
 
-- [ ] **Consider Google Tag Manager (GTM)**
-  - [ ] More flexible than adding pixels directly
-  - [ ] Easier to add/remove tags without code changes
-  - [ ] Recommended for managing multiple tracking pixels
+- [ ] **TikTok Pixel**
+  - [ ] Create TikTok Pixel in TikTok Events Manager
+  - [ ] Get Pixel ID
+  - [ ] Add via GTM
+  - [ ] Set up conversion events
+  - [ ] Test pixel fires correctly
 
 ---
 
@@ -475,6 +489,15 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
   - [ ] FAQ page
   - [ ] Tutorial/onboarding flow (can be post-launch)
 
+### 12.4 Admin-Only Pages (Production Only)
+> **Note:** Restrict these builder tools to admin users. Apply only in production; staging/develop remain open for testing.
+
+- [ ] **play-builder** — Admin-only (non-admins redirected or blocked)
+- [ ] **HCT skeleton builder** — Admin-only
+- [ ] **FCP skeleton builder** — Admin-only
+- [ ] Auth guard: check `role: "admin"` before allowing access (client + API)
+- [ ] Non-admins see 403 or redirect to mode-select (or homepage)
+
 ---
 
 # Launch Day Runbook (Final Sequence)
@@ -511,6 +534,7 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 6. **Data Wipe:** Will wipe `games`, `tournaments`, `franchises`, `users` at launch. Preserve universal reference data (`teams`, `players`, `plays`, `fcp_skeletons`, `hct_skeletons`, `defenses`).
 7. **Alpha Access Control:** One-time passwords (OTPs) required for signup when `IS_ALPHA=true`. 50 OTPs generated (limits alpha to 25-50 users), each usable once by one email. Each OTP is permanently linked to the email that uses it (`used_by_email` field) for access tracking. OTP validation disabled when `IS_ALPHA=false`.
 8. **Instance Limits:** Each user limited to **one active Franchise** and **one active Tournament** at a time. Prevents runaway data growth and simplifies UX during alpha. Users must delete existing instance to start a new one.
+9. **Admin-Only Pages:** play-builder, HCT skeleton builder, and FCP skeleton builder are restricted to admin users. Applied in **production only**; staging/develop remain open for testing.
 
 ### Testing Reference
 - See `Final_Testing_Checklist.md` for detailed test scenarios (Step 10 references this)
