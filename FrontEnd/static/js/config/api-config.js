@@ -38,8 +38,8 @@ const API_CONFIG = {
     
     const hostname = window.location.hostname;
     
-    // Production (custom domain)
-    if (hostname === 'www.geekedoutbasketball.com') {
+    // Production (custom domain - www redirects to bare domain)
+    if (hostname === 'www.geekedoutbasketball.com' || hostname === 'geekedoutbasketball.com') {
       return 'https://api.geekedoutbasketball.com';
     }
     
