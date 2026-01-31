@@ -11,8 +11,11 @@
   var publicPaths = [
     "/",
     "/homepage.html",
+    "/homepage",
     "/login.html",
-    "/signup.html"
+    "/login",
+    "/signup.html",
+    "/signup"
   ];
 
   var path = window.location.pathname;
