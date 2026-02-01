@@ -1,6 +1,19 @@
 # 1. Imports
 import sys
+import os
 # ✅ PERFORMANCE: Removed debug print statements - use logger instead
+
+# Sentry - init before FastAPI (captures unhandled exceptions)
+_sentry_dsn = os.getenv("SENTRY_DSN")
+if _sentry_dsn:
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        traces_sample_rate=0.1,
+        send_default_pii=True,
+        environment=os.getenv("RAILWAY_ENVIRONMENT", os.getenv("ENV", "development")),
+    )
+    print("🔶 [SENTRY] Backend error tracking enabled", file=sys.stderr, flush=True)
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -43,7 +56,6 @@ import traceback
 from unidecode import unidecode
 from typing import Optional
 import logging
-import os
 import json
 import time
 from datetime import datetime
@@ -94,7 +106,8 @@ def get_app_config():
     return {
         "isAlpha": IS_ALPHA,
         "alphaDisclaimer": "This is an alpha release. Data may be wiped without notice. Gameplay balance and features may change." if IS_ALPHA else None,
-        "version": "alpha-1.0" if IS_ALPHA else "1.0"
+        "version": "alpha-1.0" if IS_ALPHA else "1.0",
+        "sentryDsn": os.getenv("SENTRY_DSN_FRONTEND") or None,
     }
 
 # CORS Configuration - Must match actual testing domains, not just final ideal
