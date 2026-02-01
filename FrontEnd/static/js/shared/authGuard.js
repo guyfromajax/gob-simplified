@@ -36,4 +36,9 @@
     var redirectParam = encodeURIComponent(path + (window.location.search || ""));
     window.location.replace("/login.html?redirect=" + redirectParam);
   }
+
+  /* Load auth bar init - shows user email on all screens except court and lineup */
+  var s = document.createElement("script");
+  s.src = "/js/shared/authBarInit.js";
+  document.head.appendChild(s);
 })();
