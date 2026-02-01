@@ -51,6 +51,8 @@ class SignupRequest(BaseModel):
     def validate_password(cls, v):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters')
+        if len(v) > 128:
+            raise ValueError('Password must be at most 128 characters')
         if not re.search(r'[A-Za-z]', v):
             raise ValueError('Password must contain at least one letter')
         if not re.search(r'\d', v):
@@ -76,6 +78,7 @@ class UserResponse(BaseModel):
     user_id: str
     email: str
     role: str
+    username: Optional[str] = None
     created_at: Optional[str] = None
 
 
@@ -83,6 +86,25 @@ class AuthConfigResponse(BaseModel):
     """Auth configuration response."""
     is_alpha: bool
     otp_required: bool
+
+
+class SetUsernameRequest(BaseModel):
+    """Set username request body."""
+    username: str
+
+    @field_validator('username')
+    @classmethod
+    def validate_username(cls, v):
+        v = v.strip()
+        if " " in v:
+            raise ValueError("Username cannot contain spaces")
+        if len(v) < 3:
+            raise ValueError("Username must be at least 3 characters")
+        if len(v) > 24:
+            raise ValueError("Username must be at most 24 characters")
+        if not re.match(r"^[a-zA-Z0-9_]+$", v):
+            raise ValueError("Username can only contain letters, numbers, and underscores")
+        return v
 
 
 # ============================================================================
@@ -113,7 +135,7 @@ async def signup(request: SignupRequest):
     The OTP is permanently linked to the user's email for tracking.
     
     Password requirements:
-    - At least 8 characters
+    - 8–128 characters
     - At least one letter
     - At least one number
     """
@@ -175,7 +197,8 @@ async def signup(request: SignupRequest):
         user={
             "user_id": user_id,
             "email": email,
-            "role": "user"
+            "role": "user",
+            "username": None
         },
         message="Account created successfully"
     )
@@ -224,10 +247,41 @@ async def login(request: LoginRequest):
         user={
             "user_id": user_id,
             "email": email,
-            "role": user.get("role", "user")
+            "role": user.get("role", "user"),
+            "username": user.get("username")
         },
         message="Login successful"
     )
+
+
+@router.post("/set-username")
+async def set_username(
+    request: SetUsernameRequest,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Set the authenticated user's username.
+    Usernames are displayed case-sensitive, but uniqueness is case-insensitive.
+    If CoachJamie is taken, coachjamie, COACHJAMIE, etc. are all unavailable.
+    """
+    username = request.username.strip()
+    username_lower = username.lower()
+
+    # Check uniqueness (case-insensitive)
+    existing = users_collection.find_one({"username_lower": username_lower})
+    if existing and str(existing["_id"]) != user["user_id"]:
+        raise HTTPException(
+            status_code=400,
+            detail="This username is already taken"
+        )
+
+    # User updating their own username - allow
+    users_collection.update_one(
+        {"_id": ObjectId(user["user_id"])},
+        {"$set": {"username": username, "username_lower": username_lower, "updated_at": datetime.now(timezone.utc)}}
+    )
+
+    return {"username": username, "message": "Username set successfully"}
 
 
 @router.get("/me", response_model=UserResponse)
@@ -247,11 +301,14 @@ async def get_me(user: dict = Depends(get_current_user)):
     created_at = None
     if db_user and db_user.get("created_at"):
         created_at = db_user["created_at"].isoformat() if hasattr(db_user["created_at"], 'isoformat') else str(db_user["created_at"])
-    
+
+    username = db_user.get("username") if db_user else None
+
     return UserResponse(
         user_id=user["user_id"],
         email=user["email"],
         role=user.get("role", "user"),
+        username=username,
         created_at=created_at
     )
 

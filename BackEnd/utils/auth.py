@@ -45,8 +45,15 @@ from BackEnd.db import users_collection
 
 
 # JWT Configuration
-# In production, set JWT_SECRET_KEY as environment variable
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
+# In production, JWT_SECRET_KEY MUST be set - never use the dev default
+_dev_jwt_fallback = "dev-secret-key-change-in-production"
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", _dev_jwt_fallback)
+_env = (os.getenv("ENVIRONMENT") or os.getenv("ENV") or os.getenv("RAILWAY_ENVIRONMENT") or "").lower()
+if JWT_SECRET_KEY == _dev_jwt_fallback and _env == "production":
+    raise RuntimeError(
+        "JWT_SECRET_KEY must be set in production. "
+        "Set JWT_SECRET_KEY in Railway environment variables."
+    )
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
 

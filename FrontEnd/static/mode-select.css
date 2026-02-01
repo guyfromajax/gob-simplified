@@ -306,3 +306,89 @@ body {
 .alpha-disclaimer.visible {
   display: block;
 }
+
+/* Set Username Modal */
+.set-username-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.set-username-modal-content {
+  background: #fff;
+  padding: 32px;
+  border-radius: 8px;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.set-username-title {
+  font-family: 'Bebas Neue', cursive;
+  font-size: 28px;
+  margin: 0 0 12px;
+}
+
+.set-username-subtitle {
+  font-size: 16px;
+  color: #333;
+  margin: 0 0 20px;
+  line-height: 1.4;
+}
+
+.set-username-input {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+}
+
+.set-username-input:focus {
+  outline: none;
+  border-color: #ff9800;
+}
+
+.set-username-error {
+  color: #c00;
+  font-size: 14px;
+  margin-bottom: 12px;
+  min-height: 20px;
+}
+
+.set-username-submit {
+  background: #ff9800;
+  color: #fff;
+  border: none;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 4px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.set-username-submit:hover {
+  background: #e68900;
+}
+
+.set-username-submit:disabled {
+  background: #999;
+  cursor: not-allowed;
+}
+
+.set-username-hint {
+  font-size: 12px;
+  color: #666;
+  margin: 16px 0 0;
+}

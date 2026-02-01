@@ -179,3 +179,21 @@ def ensure_frd_index():
         )
     except Exception as e:
         print(f"⚠️ [DB] ensure_frd_index: {e}", file=sys.stderr, flush=True)
+
+
+def ensure_users_username_index():
+    """
+    Ensure unique index on users.username_lower for case-insensitive uniqueness.
+    Sparse=True so documents without username_lower (pre-migration) don't conflict.
+    """
+    if not client:
+        return
+    try:
+        users_collection.create_index(
+            [("username_lower", 1)],
+            unique=True,
+            sparse=True,
+            name="username_lower_unique",
+        )
+    except Exception as e:
+        print(f"⚠️ [DB] ensure_users_username_index: {e}", file=sys.stderr, flush=True)

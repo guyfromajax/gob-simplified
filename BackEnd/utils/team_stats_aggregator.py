@@ -5,6 +5,7 @@ Used by both Tournament and Franchise modes
 ✅ SS&S: Single source of truth for team stats aggregation logic
 """
 
+import re
 from typing import Dict, List, Any, Optional
 from bson import ObjectId
 from pymongo.collection import Collection
@@ -108,7 +109,7 @@ def aggregate_team_stats_from_players(
                     if team_doc:
                         resolved_team_id = str(team_doc["_id"])
                     else:
-                        team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_id_str}$", "$options": "i"}}, {"_id": 1})
+                        team_doc = teams_collection.find_one({"name": {"$regex": f"^{re.escape(team_id_str)}$", "$options": "i"}}, {"_id": 1})
                         if team_doc:
                             resolved_team_id = str(team_doc["_id"])
 
@@ -255,7 +256,7 @@ def aggregate_team_stats_from_players(
                     resolved_obj_id = team_doc["_id"]
                 else:
                     # Try case-insensitive
-                    team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_id_str}$", "$options": "i"}}, {"_id": 1})
+                    team_doc = teams_collection.find_one({"name": {"$regex": f"^{re.escape(team_id_str)}$", "$options": "i"}}, {"_id": 1})
                     if team_doc:
                         resolved_obj_id = team_doc["_id"]
             except Exception:
@@ -353,7 +354,7 @@ def resolve_team_name(team_id_str: str, teams_collection: Collection, collection
         if not team_name:
             # Strategy 3: Try case-insensitive search and normalize formats
             # Try uppercase version (e.g., "MORRISTOWN" -> "Morristown")
-            team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_id_str}$", "$options": "i"}}, {"name": 1})
+            team_doc = teams_collection.find_one({"name": {"$regex": f"^{re.escape(team_id_str)}$", "$options": "i"}}, {"name": 1})
             if team_doc:
                 team_name = team_doc.get("name")  # Use canonical name from database
             

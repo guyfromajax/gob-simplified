@@ -1,8 +1,9 @@
 """
-Tests for 5.2 User Data Exposure Prevention.
+Tests for 5.2 User Data Exposure Prevention and 5.4 Input Validation.
 
 - Unauthenticated requests to user-data endpoints must return 401.
 - Authenticated users must not access another user's franchise/tournament/game (403/404).
+- Invalid input (malformed IDs, bad JSON) must return 400/422.
 """
 import pytest
 from bson import ObjectId
@@ -84,5 +85,30 @@ def test_cross_user_franchise_access_blocked(monkeypatch):
         app.dependency_overrides[get_current_user] = _other_user
         resp = client.get(f"/franchise/command-center/data?franchise_id={fid}")
         assert resp.status_code in (403, 404), resp.text
+    finally:
+        app.dependency_overrides[get_current_user] = _test_user
+
+
+def test_invalid_franchise_id_returns_400(monkeypatch):
+    """Invalid franchise_id format must return 400, not 500."""
+    app.dependency_overrides[get_current_user] = _test_user
+    try:
+        resp = client.get("/franchise/command-center/data?franchise_id=not-a-valid-objectid")
+        assert resp.status_code == 400
+        assert "Invalid" in resp.json().get("detail", "")
+    finally:
+        app.dependency_overrides[get_current_user] = _test_user
+
+
+def test_invalid_json_returns_422():
+    """Malformed JSON body must return 422."""
+    app.dependency_overrides[get_current_user] = _test_user
+    try:
+        resp = client.post(
+            "/franchise/select-team",
+            content="{ invalid json }",
+            headers={"Content-Type": "application/json"},
+        )
+        assert resp.status_code == 422
     finally:
         app.dependency_overrides[get_current_user] = _test_user

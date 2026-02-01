@@ -319,28 +319,28 @@ Prevent user data leakage via broken authorization, misconfigured DB access, and
 - [x] **Minimal tests:** unauthenticated access blocked, cross-user access blocked (tests/test_user_data_exposure.py)
 
 ### 5.3 Environment Variables Security
-- [ ] Verify no secrets in code (check git history)
-- [ ] Verify all secrets in environment variables
-- [ ] Verify staging and production use different secrets
-- [ ] Document all required environment variables
+- [x] Verify no secrets in code (check git history)
+- [x] Verify all secrets in environment variables
+- [x] Verify staging and production use different secrets (JWT and DB confirmed)
+- [x] Document all required environment variables — see `docs/docs_1_systems/ENV_VARIABLES.md`
 
 ### 5.4 Input Validation Review
-- [ ] Audit all API endpoints for input validation
-- [ ] Verify Pydantic models validate all request data
-- [ ] Test invalid input handling (malformed JSON, wrong types, etc.)
-- [ ] Verify error messages don't leak sensitive info
-- [ ] Test NoSQL injection prevention (MongoDB query validation)
-- [ ] Test XSS prevention (if user-generated content exists)
+- [x] Audit all API endpoints for input validation
+- [x] Verify Pydantic models validate all request data (auth has validators; IDs validated via ObjectId in ownership)
+- [x] Test invalid input handling (malformed JSON, wrong types) — tests added
+- [x] Verify error messages don't leak sensitive info (500 responses use generic "Internal server error")
+- [x] Test NoSQL injection prevention — `re.escape()` on all user input in `$regex`; no `$where`
+- [x] XSS prevention — API returns JSON (escaped); auth bar uses `textContent` for email
 
 ### 5.5 Password Security
-- [ ] Use bcrypt or argon2 for password hashing (already in Step 1)
-- [ ] Implement minimum password requirements (8+ chars, complexity)
-- [ ] Consider account lockout after 5 failed login attempts (optional for alpha)
+- [x] Use bcrypt for password hashing (BackEnd.utils.auth)
+- [x] Minimum password requirements: 8–128 chars, letter, number
+- [ ] Account lockout after 5 failed logins — deferred to post-alpha (Step 6 rate limiting helps)
 
 ### 5.6 Security Headers (Basic)
-- [ ] Add security headers to responses (CSP, HSTS, X-Frame-Options)
-- [ ] Test headers are present in responses
-- [ ] Verify headers don't break functionality
+- [x] Add security headers: X-Frame-Options, X-Content-Type-Options, Referrer-Policy, HSTS
+- [ ] Test headers are present (curl -I or browser devtools)
+- [ ] CSP deferred — add after testing; inline scripts require careful policy
 
 ---
 
