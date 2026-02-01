@@ -260,7 +260,7 @@ body {
 /* Alpha badge - centered in nav bar */
 .alpha-badge {
   justify-self: center;
-  height: 32px;
+  height: 44px;
   width: auto;
   z-index: 9999;
   display: block;

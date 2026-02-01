@@ -35,7 +35,7 @@ const AlphaBanner = {
       position: fixed;
       top: 10px;
       right: 10px;
-      height: 32px;
+      height: 44px;
       width: auto;
       z-index: 9999;
       display: none;
