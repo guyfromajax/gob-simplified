@@ -66,7 +66,7 @@ const AlphaBanner = {
     const badge = document.createElement('img');
     badge.id = 'alpha-badge';
     badge.className = 'alpha-badge';
-    badge.src = '/images/alpha_badge_gold.jpg';
+    badge.src = '/images/alpha_badge_gold.png';
     badge.alt = 'Alpha';
     document.body.insertBefore(badge, document.body.firstChild);
   },
