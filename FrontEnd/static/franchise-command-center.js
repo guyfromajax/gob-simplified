@@ -924,6 +924,8 @@ async function init() {
   console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
   if (!topData) return; // Access denied or error - redirect already triggered for 401/403
 
+  if (typeof AccessDenied !== 'undefined' && AccessDenied.hideLoadingOverlay) AccessDenied.hideLoadingOverlay();
+
   // ✅ SS&S: Resolve team_id from command center data if not already set
   if (topData && topData.team_id && !userTeamId) {
     userTeamId = topData.team_id;

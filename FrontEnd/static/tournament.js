@@ -1489,7 +1489,9 @@ async function initializeTournament() {
     // Fallback to old method for backward compatibility
     await loadTournament();
   }
-  
+
+  if (typeof AccessDenied !== 'undefined' && AccessDenied.hideLoadingOverlay) AccessDenied.hideLoadingOverlay();
+
   // Ensure tournament loaded successfully before proceeding
   if (!tournament || !tournament._id) {
     console.error("❌ Tournament failed to load - cannot initialize page");
