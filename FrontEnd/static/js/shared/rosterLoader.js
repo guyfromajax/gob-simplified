@@ -29,7 +29,8 @@ function mergeRosterWithStateDoc(rosterData, stateDoc) {
  * @returns {Promise<{ players: Array }>}
  */
 function loadRosterWithStats(rosterUrl, stateUrl) {
-  return fetch(rosterUrl)
+  var headers = (typeof window !== 'undefined' && window.API_CONFIG && window.API_CONFIG.getAuthHeaders) ? window.API_CONFIG.getAuthHeaders() : {};
+  return fetch(rosterUrl, { headers: headers })
     .then(function (rosterRes) {
       if (!rosterRes.ok) {
         var err = new Error('Roster fetch failed: ' + rosterRes.status);
@@ -39,7 +40,7 @@ function loadRosterWithStats(rosterUrl, stateUrl) {
       return rosterRes.json();
     })
     .then(function (rosterData) {
-      return fetch(stateUrl)
+      return fetch(stateUrl, { headers: headers })
         .then(function (stateRes) {
           if (!stateRes.ok) {
             return { players: rosterData.players || [] };

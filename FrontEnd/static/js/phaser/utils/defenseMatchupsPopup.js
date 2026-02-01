@@ -53,7 +53,7 @@ export async function showDefenseMatchupsPopup(gameId, scene) {
                 return;
             }
             
-            fetch(API_CONFIG.buildUrl(`/api/game/${gameId}/lineup-for-matchups`))
+            fetch(API_CONFIG.buildUrl(`/api/game/${gameId}/lineup-for-matchups`), { headers: API_CONFIG.getAuthHeaders() })
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`Failed to fetch lineup data: ${response.statusText}`);

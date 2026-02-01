@@ -46,7 +46,7 @@ async function checkForSavedGame() {
   
   try {
     // Fetch game document to verify it exists and is active
-    const gameRes = await fetch(API_CONFIG.buildUrl(`/api/game/${lastGameId}`));
+    const gameRes = await fetch(API_CONFIG.buildUrl(`/api/game/${lastGameId}`), { headers: API_CONFIG.getAuthHeaders() });
     
     if (!gameRes.ok) {
       // Game not found or error - clear saved game_id and user_team_side

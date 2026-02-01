@@ -175,6 +175,16 @@ const API_CONFIG = {
    */
   getVersion() {
     return this._appConfig?.version ?? '1.0';
+  },
+
+  /**
+   * Get headers for authenticated API requests.
+   * Include in fetch() for endpoints that require auth (franchise, tournament, game).
+   * @returns {Object} Headers object, e.g. { Authorization: 'Bearer ...' } or {}
+   */
+  getAuthHeaders() {
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
   }
 };
 

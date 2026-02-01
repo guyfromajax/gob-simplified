@@ -297,7 +297,7 @@ async function loadRoster() {
       
       const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(initPayload)
       });
       if (initRes.ok) {
@@ -340,7 +340,7 @@ async function loadRoster() {
     console.log("Loading current player energy from game:", gameId);
     try {
         // ✅ HYBRID APPROACH: Use source=db to ensure fresh data from database
-        const gameRes = await fetch(`${API_CONFIG.buildUrl(`/api/game/${gameId}`)}?quarter=${quarter}&source=db`);
+        const gameRes = await fetch(`${API_CONFIG.buildUrl(`/api/game/${gameId}`)}?quarter=${quarter}&source=db`, { headers: API_CONFIG.getAuthHeaders() });
         if (gameRes.ok) {
           const gameData = await gameRes.json();
           const gamePlayers = gameData.players || [];
@@ -1057,7 +1057,7 @@ async function setHeader() {
       // ✅ HYBRID APPROACH: Use source=db to ensure fresh data from database
       // This is acceptable performance cost (~13 reads per game: timeouts + quarter breaks)
       // Pass actual quarter from URL params to ensure correct stats loading
-      const gameRes = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}?quarter=${quarter}&source=db`));
+      const gameRes = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}?quarter=${quarter}&source=db`), { headers: API_CONFIG.getAuthHeaders() });
       if (gameRes.ok) {
         const gameData = await gameRes.json();
         const score = gameData.score || {};
@@ -1320,7 +1320,7 @@ async function init() {
             if (myTeamSide) initPayload.user_team_side = myTeamSide;
             const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
               body: JSON.stringify(initPayload)
             });
             if (initRes.ok) {
@@ -1425,7 +1425,7 @@ async function init() {
           
           const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify(initPayload)
           });
           
@@ -1534,7 +1534,7 @@ async function init() {
           
           const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify(initPayload)
           });
           
