@@ -97,6 +97,12 @@ def health_check():
 IS_ALPHA = os.getenv("IS_ALPHA", "false").lower() == "true"
 print(f"🔶 [ALPHA] IS_ALPHA={IS_ALPHA}", file=sys.stderr, flush=True)
 
+@app.get("/sentry-debug")
+def sentry_debug():
+    """Test endpoint - raises error to verify backend Sentry capture. Remove before public launch."""
+    raise RuntimeError("Test Sentry backend capture")
+
+
 @app.get("/app-config")
 def get_app_config():
     """
