@@ -35,18 +35,9 @@ const AlphaBanner = {
       position: fixed;
       top: 10px;
       right: 10px;
-      background: linear-gradient(135deg, #d4af37, #f4e4bc, #c9a227);
-      color: #000;
-      border: 2px solid #000;
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 14px;
-      font-weight: bold;
-      padding: 6px 12px;
-      border-radius: 4px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      height: 32px;
+      width: auto;
       z-index: 9999;
-      letter-spacing: 1px;
-      text-transform: uppercase;
       display: none;
     }
     .alpha-badge.visible {
@@ -72,10 +63,11 @@ const AlphaBanner = {
   _injectBadge() {
     if (document.getElementById('alpha-badge')) return;
     
-    const badge = document.createElement('div');
+    const badge = document.createElement('img');
     badge.id = 'alpha-badge';
     badge.className = 'alpha-badge';
-    badge.textContent = 'ALPHA';
+    badge.src = '/images/alpha_badge_gold.jpg';
+    badge.alt = 'Alpha';
     document.body.insertBefore(badge, document.body.firstChild);
   },
   
