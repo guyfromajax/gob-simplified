@@ -1,0 +1,95 @@
+/**
+ * Shared Auth Bar - Top nav showing user email and logout.
+ * Used on all screens except court.html and set-lineup.html.
+ * Include this CSS on any page that shows the auth bar.
+ */
+body.has-auth-bar {
+  padding-top: 50px;
+}
+
+.auth-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #333;
+  padding: 8px 20px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  z-index: 9998;
+}
+
+.auth-bar-spacer {
+  /* Left column - balances the layout */
+}
+
+.auth-bar-right {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.auth-bar .auth-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.auth-bar .auth-link {
+  color: #fff;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.auth-bar .auth-link:hover {
+  color: #ff9800;
+}
+
+.auth-bar .auth-divider {
+  color: #666;
+  font-size: 14px;
+}
+
+.auth-bar .auth-email {
+  color: #ccc;
+  font-size: 14px;
+  margin-right: 5px;
+}
+
+.auth-bar .auth-logout-btn {
+  background: transparent;
+  border: 1px solid #666;
+  color: #fff;
+  padding: 4px 12px;
+  font-size: 13px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.auth-bar .auth-logout-btn:hover {
+  background: #ff9800;
+  border-color: #ff9800;
+}
+
+/* Alpha badge inside auth bar - override standalone fixed positioning */
+.auth-bar .alpha-badge {
+  justify-self: center;
+  height: 44px;
+  width: auto;
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+}
+
+.auth-bar .alpha-badge.visible {
+  display: block;
+}
+
+.auth-bar .alpha-badge:not(.visible) {
+  display: none;
+}
