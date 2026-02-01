@@ -2,6 +2,8 @@
 
 Add Facebook/Meta, X (Twitter), and TikTok pixels via Google Tag Manager. **No code changes required** — GTM is already on all pages.
 
+**Production-only:** GTM loads only when hostname is `www.geekedoutbasketball.com` or `geekedoutbasketball.com`. Dev/staging traffic (gob-test.netlify.app, localhost, etc.) does not send data to GA4 or pixels. See `/js/shared/gtm-loader.js`.
+
 ---
 
 ## Prerequisites
