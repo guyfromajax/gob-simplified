@@ -17,7 +17,7 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 | **2** | **Custom Domains** | `www.geekedoutbasketball.com` + `api.geekedoutbasketball.com`, DNS configured, CORS updated |
 | **3** | **Analytics & Marketing Pixels** | GA4 setup, core events tracked, GTM + pixels (Facebook/Meta, Instagram, X, TikTok) |
 | **4** | **Error Tracking** | Sentry (or similar) configured, backend + frontend error capture, user context attached |
-| **5** | **Security Hardening** | CORS review, env var security, input validation, password security, security headers |
+| **5** | **Security Hardening** | CORS, user data exposure prevention, env vars, input validation, passwords, security headers |
 | **6** | **Rate Limiting** | Login/signup rate limits, simulation endpoint limits, 429 responses |
 | **7** | **Cost Guardrails** | MongoDB/Railway alerts, in-app caps (max games/tournaments per user), backup verification |
 | **8** | **Legal & Compliance** | Terms of Service (`/terms.html`), Privacy Policy (`/privacy.html`), cookie consent (if needed) |
@@ -294,13 +294,37 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 - [ ] Confirm custom domains are in allowlist
 - [ ] Test CORS works correctly with all domains
 
-### 5.2 Environment Variables Security
+### 5.2 User Data Exposure Prevention (Priority)
+Prevent user data leakage via broken authorization, misconfigured DB access, and accidental logging.
+
+- [ ] **Map data and endpoints**
+  - [ ] Inventory: user data fields stored (email, etc.)
+  - [ ] Inventory: endpoints that read/write user-specific data
+  - [ ] Document: where auth is enforced (middleware/dependencies)
+- [ ] **Standardize auth checks**
+  - [ ] Every user-data endpoint requires authenticated user
+  - [ ] Reject unauthenticated requests
+  - [ ] Single reusable pattern (dependency/middleware) so endpoints can't forget
+- [ ] **Enforce ownership checks**
+  - [ ] For every endpoint referencing objects by id (game, save, franchise, etc.): verify object belongs to current user before return/update/delete
+  - [ ] Add tests: "try another user's id" → must return 403/404
+- [ ] **Logging redaction**
+  - [ ] Identify logging of request bodies, headers, exceptions, DB documents
+  - [ ] Redact: Authorization headers, tokens, emails, personal identifiers
+  - [ ] Ensure production logging level excludes debug dumps
+- [ ] **Database access hardening**
+  - [ ] Confirm DB not publicly reachable except from backend
+  - [ ] Confirm DB credentials server-side only, rotated if exposed
+- [ ] **Deliverable:** `SECURITY_BASELINE.md` documenting auth pattern, ownership pattern, logging rules, DB rules
+- [ ] **Minimal tests:** unauthenticated access blocked, cross-user access blocked
+
+### 5.3 Environment Variables Security
 - [ ] Verify no secrets in code (check git history)
 - [ ] Verify all secrets in environment variables
 - [ ] Verify staging and production use different secrets
 - [ ] Document all required environment variables
 
-### 5.3 Input Validation Review
+### 5.4 Input Validation Review
 - [ ] Audit all API endpoints for input validation
 - [ ] Verify Pydantic models validate all request data
 - [ ] Test invalid input handling (malformed JSON, wrong types, etc.)
@@ -308,12 +332,12 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 - [ ] Test NoSQL injection prevention (MongoDB query validation)
 - [ ] Test XSS prevention (if user-generated content exists)
 
-### 5.4 Password Security
+### 5.5 Password Security
 - [ ] Use bcrypt or argon2 for password hashing (already in Step 1)
 - [ ] Implement minimum password requirements (8+ chars, complexity)
 - [ ] Consider account lockout after 5 failed login attempts (optional for alpha)
 
-### 5.5 Security Headers (Basic)
+### 5.6 Security Headers (Basic)
 - [ ] Add security headers to responses (CSP, HSTS, X-Frame-Options)
 - [ ] Test headers are present in responses
 - [ ] Verify headers don't break functionality
