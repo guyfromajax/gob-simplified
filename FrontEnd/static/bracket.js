@@ -116,14 +116,14 @@
       return wrap;
     }
 
-    function createPlaceholder() {
+    function createPlaceholder(label) {
       var wrap = document.createElement('div');
       wrap.className = 'matchup-wrapper';
       var matchup = document.createElement('div');
       matchup.className = 'matchup';
       var placeholder = document.createElement('div');
       placeholder.className = 'placeholder';
-      placeholder.textContent = 'TBD';
+      placeholder.textContent = label || 'TBD';
       matchup.appendChild(placeholder);
       wrap.appendChild(matchup);
       return wrap;
@@ -141,17 +141,17 @@
     var leftSemi = document.createElement('div');
     leftSemi.className = 'round round-2 semifinals';
     if (round2[0]) leftSemi.appendChild(createMatchup(round2[0], 'left', 2, 0));
-    else leftSemi.appendChild(createPlaceholder());
+    else leftSemi.appendChild(createPlaceholder('Semifinals'));
 
     var finalEl = document.createElement('div');
     finalEl.className = 'round round-3 final';
     if (finalRound[0]) finalEl.appendChild(createMatchup(finalRound[0], 'center', 3, 0));
-    else finalEl.appendChild(createPlaceholder());
+    else finalEl.appendChild(createPlaceholder('Championship!'));
 
     var rightSemi = document.createElement('div');
     rightSemi.className = 'round round-4 semifinals';
     if (round2[1]) rightSemi.appendChild(createMatchup(round2[1], 'right', 2, 1));
-    else rightSemi.appendChild(createPlaceholder());
+    else rightSemi.appendChild(createPlaceholder('Semifinals'));
 
     var rightR1 = document.createElement('div');
     rightR1.className = 'round round-5 quarterfinals';
