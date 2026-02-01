@@ -268,29 +268,36 @@ h1, h2, h3, h4, h5, h6 {
 
 /* extra spacing so the top-most logo isn't clipped and all matchups fit */
 #bracket {
-  padding-top: 32px;
-  padding-bottom: 32px;
-  min-height: 600px;
+  padding-top: 8px;
+  padding-bottom: 16px;
+  min-height: 500px;
 }
 
 .round {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;       /* ✅ Align to top, not center - reduces gap above bracket */
   grid-row: 1 / -1;                  /* ✅ Force each .round to span the full grid row */
 }
 
 
+/* Semifinals: offset to align vertically between their two quarterfinal matchups */
+/* Quarterfinals have 40px spacer between them, so semis center = (100 + 40/2 + 100/2) ≈ 70px from top */
 .round.semifinals .matchup-wrapper {
-  margin-top: calc(var(--matchup-height) / 2 + var(--matchup-gap) / 2);
+  margin-top: 70px;
 }
 
+/* Final: offset to align vertically between the two semifinal matchups */
 .round.final {
-  min-height: 600px;  /* Matches other columns */
+  min-height: auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
+}
+
+.round.final .matchup-wrapper {
+  margin-top: 70px;
 }
 
 .round.final .spacer {
@@ -505,6 +512,12 @@ table.leaders-table tbody tr:nth-child(odd) {
   :root {
     --matchup-height: 80px;
     --matchup-gap: 10px;
+  }
+
+  /* Adjust bracket vertical offsets for smaller matchup height */
+  .round.semifinals .matchup-wrapper,
+  .round.final .matchup-wrapper {
+    margin-top: 55px;
   }
 
   #tournament-top {

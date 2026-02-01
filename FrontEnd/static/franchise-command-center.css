@@ -131,7 +131,7 @@
 
 /* FCC Tournament tab: same bracket layout as TCC (tournament.css .bracket grid) */
 #tournament-bracket-container.bracket {
-  padding-top: 32px;
-  padding-bottom: 32px;
-  min-height: 600px;
+  padding-top: 8px;
+  padding-bottom: 16px;
+  min-height: 500px;
 }
