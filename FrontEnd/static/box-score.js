@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Fetch game data from API and merge with full rosters
 async function loadGameData(gameId) {
   console.log('📥 Loading game data for gameId:', gameId);
-  const response = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`));
+  const response = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`), { headers: API_CONFIG.getAuthHeaders() });
   if (!response.ok) {
     console.error('❌ Failed to fetch game data:', response.status, response.statusText);
     throw new Error(`Failed to fetch game data: ${response.statusText}`);

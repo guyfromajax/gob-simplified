@@ -12,7 +12,7 @@ export async function fetchGameState(gameId) {
   if (!gameId) return null;
   
   try {
-    const res = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`));
+    const res = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`), { headers: API_CONFIG.getAuthHeaders() });
     if (!res.ok) {
       console.warn(`⚠️ Could not fetch game state for ${gameId}`);
       return null;

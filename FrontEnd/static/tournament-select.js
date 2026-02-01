@@ -22,9 +22,7 @@ function createButtons() {
 
 async function selectTeam(team) {
   try {
-    const token = localStorage.getItem("auth_token");
-    const headers = { "Content-Type": "application/json" };
-    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const headers = { ...API_CONFIG.getAuthHeaders(), "Content-Type": "application/json" };
     const res = await fetch(API_CONFIG.buildUrl('/tournament/start'), {
       method: "POST",
       headers,

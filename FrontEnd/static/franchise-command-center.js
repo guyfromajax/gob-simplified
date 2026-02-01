@@ -1,6 +1,6 @@
 async function fetchJSON(url) {
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { headers: API_CONFIG.getAuthHeaders() });
     if (!res.ok) throw new Error('Request failed');
     return await res.json();
   } catch (err) {
@@ -928,7 +928,7 @@ async function init() {
   if (franchiseId && userTeamId) {
     try {
       const teamDataStartTime = performance.now();
-      const teamDataResponse = await fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`);
+      const teamDataResponse = await fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`, { headers: API_CONFIG.getAuthHeaders() });
       const teamDataEndTime = performance.now();
       console.log(`⏱️ [PERF] /franchise/team-data: ${(teamDataEndTime - teamDataStartTime).toFixed(2)}ms`);
       if (teamDataResponse.ok) {
@@ -1120,8 +1120,8 @@ playNowBtn.addEventListener('click', async () => {
     
     try {
       const res = await fetch(API_CONFIG.buildUrl('/franchise/sim-rest-of-tournament'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ franchise_id: franchiseId })
       });
       if (!res.ok) throw new Error('Simulation failed');
@@ -1150,7 +1150,7 @@ playNowBtn.addEventListener('click', async () => {
           try {
             const champRes = await fetch(API_CONFIG.buildUrl('/franchise/sim-championship'), {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
               body: JSON.stringify({ franchise_id: franchiseId })
             });
             if (!champRes.ok) throw new Error('Championship simulation failed');
@@ -1189,7 +1189,7 @@ playNowBtn.addEventListener('click', async () => {
     try {
       const res = await fetch(API_CONFIG.buildUrl('/franchise/finish-season'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ franchise_id: franchiseId })
       });
       if (!res.ok) throw new Error('Finish season failed');
@@ -1218,7 +1218,7 @@ playNowBtn.addEventListener('click', async () => {
   try {
     const res = await fetch(API_CONFIG.buildUrl('/franchise/play-next-game'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ franchise_id: franchiseId })
     });
     if (!res.ok) throw new Error('Simulation failed');
@@ -1342,7 +1342,7 @@ async function loadTeamData() {
       // ✅ SS&S: Use ObjectId directly - backend accepts it
       const gameplanStartTime = performance.now();
       console.log('⏱️ [PERF] loadTeamData() calling /api/gameplan START');
-      await fetch(`${API_CONFIG.buildUrl('/api/gameplan')}?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`);
+      await fetch(`${API_CONFIG.buildUrl('/api/gameplan')}?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`, { headers: API_CONFIG.getAuthHeaders() });
       const gameplanEndTime = performance.now();
       console.log(`⏱️ [PERF] loadTeamData() /api/gameplan: ${(gameplanEndTime - gameplanStartTime).toFixed(2)}ms`);
     } catch (error) {
@@ -1352,7 +1352,7 @@ async function loadTeamData() {
     // ✅ SS&S: Use ObjectId directly - backend accepts team_id parameter
     const teamDataStartTime = performance.now();
     console.log('⏱️ [PERF] loadTeamData() calling /franchise/team-data START');
-    const response = await fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`);
+    const response = await fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`, { headers: API_CONFIG.getAuthHeaders() });
     const teamDataEndTime = performance.now();
     console.log(`⏱️ [PERF] loadTeamData() /franchise/team-data: ${(teamDataEndTime - teamDataStartTime).toFixed(2)}ms`);
     
@@ -1368,7 +1368,7 @@ async function loadTeamData() {
     try {
       const rosterStartTime = performance.now();
       // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint
-      const rosterResponse = await fetch(`${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(data.team_name || '')}`)}?franchise_id=${encodeURIComponent(franchiseId)}`);
+      const rosterResponse = await fetch(`${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(data.team_name || '')}`)}?franchise_id=${encodeURIComponent(franchiseId)}`, { headers: API_CONFIG.getAuthHeaders() });
       const rosterEndTime = performance.now();
       console.log(`⏱️ [PERF] loadTeamData() /roster/${data.team_name || ''} (franchise): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
       if (rosterResponse.ok) {
@@ -1873,7 +1873,7 @@ function updateScoutingButton(data) {
     // Get upcoming opponent from play-next-game endpoint (now handles both regular season and EOS Tournament)
     fetch(API_CONFIG.buildUrl('/franchise/play-next-game'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ franchise_id: franchiseId })
     })
     .then(res => res.json())
@@ -1924,9 +1924,10 @@ async function loadScoutingReport() {
   
   try {
     // Load opponent team data and last game play usage
+    const authHeaders = API_CONFIG.getAuthHeaders();
     const [teamDataRes, playUsageRes] = await Promise.all([
-      fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(upcomingOpponent)}`),
-      fetch(`${API_CONFIG.buildUrl('/franchise/scouting-report')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(upcomingOpponent)}`)
+      fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(upcomingOpponent)}`, { headers: authHeaders }),
+      fetch(`${API_CONFIG.buildUrl('/franchise/scouting-report')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(upcomingOpponent)}`, { headers: authHeaders })
     ]);
     
     if (!teamDataRes.ok) throw new Error('Failed to load team data');

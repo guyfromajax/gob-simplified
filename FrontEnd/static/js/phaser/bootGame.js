@@ -2007,7 +2007,7 @@ async function handleGameCompletion({ gameId, lastSummary, tournamentId, franchi
         hasPlayers,
         hasScore
       });
-      const gameResponse = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`));
+      const gameResponse = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`), { headers: API_CONFIG.getAuthHeaders() });
       if (gameResponse.ok) {
         const fetchedData = await gameResponse.json();
         // Merge fetched data with lastSummary (prefer lastSummary scores - they're authoritative)
