@@ -22,7 +22,7 @@
 
 **Expected:**
 - Auth guard redirects to `/login.html?redirect=...` before the page loads, **or**
-- Page loads but initial API call (`/franchise/command-center/data`) returns 401/403 → alert "You don't have access to this resource" and redirect to mode-select
+- Loading overlay shows, then 401 → "Please sign in. Redirecting..." → login; 403 → "Access denied. Redirecting..." → mode-select
 
 ---
 
@@ -39,8 +39,8 @@
    - Try to open: `franchise-command-center.html?franchise_id=<User A's franchise_id>`
 
 **Expected:**
-- Initial load of `/franchise/command-center/data` returns 403
-- Alert "You don't have access to this resource" and redirect to mode-select immediately (no franchise data displayed)
+- Loading overlay shows "Loading..." then switches to "Access denied. Redirecting..."
+- Redirect to mode-select after ~1.5s (no franchise data displayed)
 
 ---
 
