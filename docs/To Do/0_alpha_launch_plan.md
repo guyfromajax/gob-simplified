@@ -230,9 +230,12 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 **Implementation (Jan 2026):** GTM snippet added to all HTML pages. Analytics helper (`/js/shared/analytics.js`) pushes events to `dataLayer`. **GTM setup required:** Create GA4 Event tags in GTM that fire on Custom Event triggers for each event name (`signup`, `login`, `single_game_started`, etc.). For `quarter_advance`, add Event Parameter `action` (Data Layer Variable `action`).
 
 ### 3.3 Marketing Pixels (Enable Future Campaigns)
+
+> **Setup guide:** See `docs/To Do/marketing_pixels_setup.md` for step-by-step instructions.
+
 - [ ] **Google Tag Manager (GTM)**
-  - [ ] Create GTM container
-  - [ ] Add GTM script to all pages
+  - [x] Create GTM container
+  - [x] Add GTM script to all pages
   - [ ] Use GTM to manage all pixels (add/remove without code changes)
 
 - [ ] **Facebook Pixel** (Meta)
@@ -262,8 +265,10 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 
 ## Step 4 — Error Tracking (Visibility Before You Ship)
 
+> **Setup guide:** See `docs/To Do/sentry_setup.md` for Sentry configuration.
+
 ### 4.1 Choose a Tool
-- [ ] Pick error tracking service (Sentry recommended)
+- [x] Pick error tracking service (Sentry recommended)
 
 ### 4.2 Backend Error Tracking
 - [ ] Install SDK
