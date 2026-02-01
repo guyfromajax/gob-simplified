@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 import logging
+import re
 from typing import Optional
 from BackEnd.db import (
     tournaments_collection,
@@ -305,7 +306,7 @@ def simulate_round(request: SimulateRequest):
         print("🚨 Error in simulate_round:", str(e))
         print("🚨 Full traceback:")
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/tournament/save-result")
@@ -687,7 +688,7 @@ def get_tournament_team_data(tournament_id: str, team_id: str = None, team_name:
         
         # Strategy 2: If not found, try case-insensitive match
         if not team_doc:
-            team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_name}$", "$options": "i"}})
+            team_doc = teams_collection.find_one({"name": {"$regex": f"^{re.escape(team_name)}$", "$options": "i"}})
         
         # Strategy 3: If still not found, try normalized name (replace dashes with spaces, title case)
         if not team_doc:
@@ -800,7 +801,7 @@ def get_tournament_scouting_report(tournament_id: str, team_id: str = None, team
         team_doc = teams_collection.find_one({"name": team_name})
         if not team_doc:
             # Try case-insensitive match
-            team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_name}$", "$options": "i"}})
+            team_doc = teams_collection.find_one({"name": {"$regex": f"^{re.escape(team_name)}$", "$options": "i"}})
     
     if not team_doc:
         raise HTTPException(status_code=404, detail="Team not found")
@@ -889,7 +890,7 @@ def get_tournament_roster(tournament_id: str, team_id: str = None, team_name: st
             
             # Strategy 2: If not found, try case-insensitive match
             if not team_doc:
-                team_doc = teams_collection.find_one({"name": {"$regex": f"^{team_name}$", "$options": "i"}})
+                team_doc = teams_collection.find_one({"name": {"$regex": f"^{re.escape(team_name)}$", "$options": "i"}})
             
             # Strategy 3: If still not found, try normalized name (replace dashes with spaces, title case)
             if not team_doc:

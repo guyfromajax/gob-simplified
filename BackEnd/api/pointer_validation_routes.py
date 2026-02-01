@@ -46,6 +46,6 @@ def validate_pointer_endpoint(
         logger.error(f"❌ [VALIDATE-POINTER] Unexpected error validating {pointer_type}: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Internal error validating {pointer_type}: {str(e)}"
+            detail="Internal server error"
         )
 

@@ -751,13 +751,13 @@ def select_team(
         # Strategy 2: Case-insensitive regex match
         if not team_doc:
             print(f"🔵 [DEBUG] select_team: Exact match failed, trying case-insensitive search...", file=sys.stderr, flush=True)
-            team_doc = db.teams.find_one({"name": {"$regex": f"^{selection.team_name}$", "$options": "i"}})
+            team_doc = db.teams.find_one({"name": {"$regex": f"^{re.escape(selection.team_name)}$", "$options": "i"}})
         
         # Strategy 3: Try with hyphen/underscore normalization (e.g., "Bentley-Truman" -> "Bentley Truman")
         if not team_doc and ("-" in selection.team_name or "_" in selection.team_name):
             print(f"🔵 [DEBUG] select_team: Case-insensitive failed, trying normalized format...", file=sys.stderr, flush=True)
             normalized = selection.team_name.replace("_", " ").replace("-", " ")
-            team_doc = db.teams.find_one({"name": {"$regex": f"^{normalized}$", "$options": "i"}})
+            team_doc = db.teams.find_one({"name": {"$regex": f"^{re.escape(normalized)}$", "$options": "i"}})
         
         # Strategy 4: Search all teams and find case-insensitive match
         if not team_doc:
@@ -808,7 +808,7 @@ def select_team(
         print(f"❌ [ERROR] select_team: Unexpected exception: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
         import traceback
         traceback.print_exc(file=sys.stderr)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/franchise/command-center")
 def command_center():
@@ -3670,7 +3670,7 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
         raise
     except Exception as e:
         logger.error(f"Error fetching training report: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 class SimRestOfTournamentRequest(BaseModel):
@@ -3875,7 +3875,7 @@ def sim_championship(req: SimChampionshipRequest):
     
     except Exception as e:
         logger.error(f"❌ [EOS TOURNAMENT] Error simulating championship: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/franchise/finish-season")

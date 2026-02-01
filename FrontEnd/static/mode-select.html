@@ -111,6 +111,19 @@
     </button>
   </div>
   </div>
+
+  <!-- Set Username Modal (shown when logged-in user has no username) -->
+  <div id="set-username-modal" class="set-username-modal" style="display: none;">
+    <div class="set-username-modal-content">
+      <h2 class="set-username-title">Hey Coach!</h2>
+      <p class="set-username-subtitle">Create a username — this will be your unique identity in GOB.</p>
+      <input type="text" id="set-username-input" class="set-username-input" placeholder="Enter username" maxlength="24" autocomplete="username">
+      <div id="set-username-error" class="set-username-error"></div>
+      <button id="set-username-submit" class="set-username-submit">Submit</button>
+      <p class="set-username-hint">No spaces • Letters, numbers, underscores only • 3–24 characters</p>
+    </div>
+  </div>
+
   <script src="/js/config/api-config.js"></script>
   <script src="./mode-select.js"></script>
 </body>

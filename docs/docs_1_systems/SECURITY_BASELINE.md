@@ -3,6 +3,8 @@
 **Status:** Alpha launch baseline (January 2026)  
 **Related:** `docs/To Do/0_alpha_launch_plan.md` — Phase 5.2 User Data Exposure Prevention
 
+**Related:** `docs/docs_1_systems/ENV_VARIABLES.md` — environment variables documentation (Step 5.3)
+
 **Implementation status:**
 - ✅ Auth required on: `POST /franchise/select-team`, `POST /tournament/start`, `POST /franchise/play-next-game`, `GET /franchise/command-center/data`, `GET /tournament/command-center/data`, `GET /api/game/{game_id}`
 - ✅ `user_id` stored on new franchise and tournament documents
@@ -11,6 +13,11 @@
 - ✅ Frontend: 401/403 on command-center/data triggers immediate redirect (FCC and TCC)
 - ✅ Logging redaction: `BackEnd.utils.log_redact`
 - ⏳ TODO: Add auth + ownership to remaining franchise/tournament/game endpoints (see lists below)
+
+**Input validation (Step 5.4):**
+- ✅ `re.escape()` applied to all user input used in MongoDB `$regex` queries (NoSQL/ReDoS prevention)
+- ✅ 500 responses use generic "Internal server error" (no exception/traceback leakage)
+- ✅ Auth bar uses `textContent` for user email (XSS-safe)
 
 ---
 
@@ -138,9 +145,36 @@
 
 ---
 
-## 4. Database Access
+## 4. Input Validation (Step 5.4)
 
-### 4.1 Hardening
+### 4.1 Pydantic Models
+- Auth: `EmailStr`, password validator (8–128 chars, letter, number)
+- Request bodies use Pydantic; invalid types/format → 422
+- ID params (`franchise_id`, `tournament_id`, `game_id`) validated via `ObjectId()` in ownership helpers → 400 on invalid format
+
+### 4.2 NoSQL Injection / ReDoS Prevention
+- **$regex with user input:** Always use `re.escape()` before interpolating into MongoDB `$regex` patterns (team name lookups, etc.)
+- No `$where` usage (avoids code injection)
+- ObjectId lookups use `ObjectId(id)` — invalid format raises before query
+
+### 4.3 Error Message Safety
+- **500 responses:** Use generic `"Internal server error"` — never expose `str(exception)` to clients
+- 400/404: Generic messages only (e.g. "Invalid franchise_id", "Franchise not found")
+
+### 4.5 Security Headers (Step 5.6)
+- **Backend (api.py):** X-Frame-Options, X-Content-Type-Options, Referrer-Policy, HSTS (when HTTPS)
+- **Frontend (netlify.toml):** Same headers on all static assets
+- **CSP:** Deferred — add Content-Security-Policy after testing; app uses inline scripts
+
+### 4.6 XSS
+- API returns JSON; FastAPI escapes by default
+- User-generated content (username, email) displayed in frontend — ensure frontend escapes (e.g. `textContent`, not `innerHTML`)
+
+---
+
+## 5. Database Access
+
+### 5.1 Hardening
 
 - DB must not be publicly reachable; only backend application servers
 - DB credentials in server-side environment variables only (never in client code)
@@ -153,7 +187,7 @@
 
 ---
 
-## 5. Minimal Tests
+## 6. Minimal Tests
 
 | Test | Expected |
 |------|----------|
@@ -172,7 +206,7 @@
 - `tournaments.user_id` (string, optional) — set on creation when auth is present
 - `games` — ownership inferred via `franchise_id` or `tournament_id`; no direct `user_id` needed
 
-### 6.2 Migration
+### 7.2 Migration
 
 - New franchise/tournament documents include `user_id` when created by authenticated user
 - Existing documents without `user_id` remain accessible to any authenticated user (known gap; migrate when possible)

@@ -16,6 +16,7 @@ This resolver handles:
 """
 
 import logging
+import re
 from typing import Optional
 from bson import ObjectId
 
@@ -217,7 +218,7 @@ def _resolve_from_database(team_identifier: str, collection) -> Optional[str]:
         
         # Try as team name (case-insensitive)
         team_doc = collection.find_one(
-            {"name": {"$regex": f"^{team_identifier}$", "$options": "i"}},
+            {"name": {"$regex": f"^{re.escape(team_identifier)}$", "$options": "i"}},
             {"team_id": 1, "name": 1}
         )
         if team_doc:
@@ -229,7 +230,7 @@ def _resolve_from_database(team_identifier: str, collection) -> Optional[str]:
         if "_" in team_identifier:
             normalized_name = team_identifier.replace("_", " ").title()
             team_doc = collection.find_one(
-                {"name": {"$regex": f"^{normalized_name}$", "$options": "i"}},
+                {"name": {"$regex": f"^{re.escape(normalized_name)}$", "$options": "i"}},
                 {"team_id": 1, "name": 1}
             )
             if team_doc:
@@ -262,7 +263,7 @@ def _resolve_name_to_canonical(team_name: str, collection) -> Optional[str]:
     try:
         # Case-insensitive name lookup
         team_doc = collection.find_one(
-            {"name": {"$regex": f"^{team_name}$", "$options": "i"}},
+            {"name": {"$regex": f"^{re.escape(team_name)}$", "$options": "i"}},
             {"team_id": 1, "name": 1}
         )
         if team_doc:

@@ -118,7 +118,7 @@ async def get_all_fcp_skeletons():
             "count": len(skeletons)
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching FCP skeletons: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/api/hct-skeletons")
@@ -189,5 +189,5 @@ async def get_all_hct_skeletons():
             "count": len(skeletons)
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching HCT skeletons: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 

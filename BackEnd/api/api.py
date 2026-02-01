@@ -1,4 +1,5 @@
 # 1. Imports
+import re
 import sys
 import os
 # ✅ PERFORMANCE: Removed debug print statements - use logger instead
@@ -183,12 +184,18 @@ if environment == "development":
 
 # ✅ PERFORMANCE: Removed debug print statements
 
-# ✅ ERROR HANDLING: Add middleware to catch exceptions early (debug prints removed for performance)
+# ✅ ERROR HANDLING + Step 5.6 Security headers
 @app.middleware("http")
 async def cors_debug_middleware(request: Request, call_next):
-    """Middleware to catch exceptions early - debug prints removed"""
+    """Catch exceptions early; add security headers to all responses."""
     try:
         response = await call_next(request)
+        # Step 5.6: Security headers on all responses
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
         return response
     except Exception as e:
         logging.error(f"🔴 [ERROR] EXCEPTION on {request.method} {request.url.path}: {type(e).__name__}: {e}", exc_info=True)
@@ -207,6 +214,9 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"error": "Internal server error", "type": type(exc).__name__, "message": str(exc)}
     )
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     # CORS headers will be added by middleware, but explicitly set origin header for safety
     origin = request.headers.get("origin")
     if origin and (origin in cors_origins or any(origin.startswith(p) for p in ["https://", "http://localhost"])):
@@ -232,6 +242,13 @@ async def startup_event():
             route_paths.append(f"ANY {route.path}")
     print(f"🔵 [DEBUG] startup_event: Registered routes (first 20): {route_paths}", file=sys.stderr, flush=True)
     
+    # Ensure username uniqueness index (for set-username flow)
+    try:
+        from BackEnd.db import ensure_users_username_index
+        ensure_users_username_index()
+    except Exception as e:
+        print(f"⚠️ [WARNING] startup: ensure_users_username_index: {e}", file=sys.stderr, flush=True)
+
     # Check MongoDB connection status (non-blocking, don't crash if it fails)
     # MongoDB connections are lazy - this just verifies the client exists
     try:
@@ -1650,7 +1667,7 @@ def get_game_state(
             # Try to find any games with similar IDs for debugging
             if isinstance(game_id, str) and len(game_id) > 10:
                 # Try to find documents with similar string _id
-                similar_str = list(games_collection.find({"_id": {"$regex": game_id[:10]}}).limit(5))
+                similar_str = list(games_collection.find({"_id": {"$regex": re.escape(game_id[:10])}}).limit(5))
                 logger.warning(f"🔍 [DB LOOKUP DEBUG] Found {len(similar_str)} similar string IDs: {[str(g.get('_id')) + ' (type: ' + type(g.get('_id')).__name__ + ')' for g in similar_str]}")
                 # Also try ObjectId search
                 try:
@@ -1661,7 +1678,7 @@ def get_game_state(
         raise HTTPException(status_code=404, detail=f"Game {game_id} not found")
     except Exception as e:
         logging.exception(f"Error fetching game state for {game_id}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         # ✅ PERFORMANCE DIAGNOSTIC: Log total endpoint time (if not already logged)
         if 'endpoint_start' in locals() and 'response_size' not in locals():
@@ -3282,7 +3299,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             not request.full_sim,
         )
         logging.error(f"Full traceback:\n{error_trace}")
-        raise HTTPException(status_code=500, detail=f"{str(e)}\n\nFull traceback:\n{error_trace}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     # Create TWO summaries:
     # 1. WITH animations for frontend (exclude_animations=False)
@@ -3768,7 +3785,7 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
         error_trace = traceback.format_exc()
         logging.exception(f"Failed to simulate turn for game {game_id}")
         logging.error(f"Full traceback:\n{error_trace}")
-        raise HTTPException(status_code=500, detail=f"{str(e)}\n\nFull traceback:\n{error_trace}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.post("/api/set-playcall-override")
@@ -4543,7 +4560,7 @@ def get_player(player_id: str):
         raise
     except Exception as e:
         print(f"❌ Error in get_player: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # for route in app.routes:
@@ -4815,7 +4832,7 @@ def save_sim_quarter_diagnostics(request: SimQuarterDiagnosticRequest):
     
     except Exception as e:
         logger.error(f"❌ [DIAGNOSTIC] Failed to save diagnostic file: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to save diagnostic file: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 class FTFGDiagnosticRequest(BaseModel):
@@ -5185,4 +5202,4 @@ def save_ft_fg_diagnostics(request: FTFGDiagnosticRequest):
     
     except Exception as e:
         logger.error(f"❌ [FT/FG DIAGNOSTIC] Failed to save diagnostic file: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to save diagnostic file: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")

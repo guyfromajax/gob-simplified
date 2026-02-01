@@ -247,7 +247,7 @@ def normalize_team_id_to_canonical(team_id: str, mode: str, doc: dict = None) ->
         # Convert ValueError to HTTPException for API compatibility
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail="Invalid request"
         )
 
 
@@ -1432,7 +1432,7 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
         import traceback
         traceback.print_exc()
         logger.error(f"Error getting game plan: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.put("/api/gameplan")
@@ -1471,7 +1471,7 @@ def update_gameplan(request: GamePlanUpdateRequest):
         raise
     except Exception as e:
         logger.error(f"Error updating game plan: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/api/playbooks")
@@ -2078,7 +2078,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         raise
     except Exception as e:
         logger.error(f"Error loading playbooks: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         # ✅ PERFORMANCE DIAGNOSTIC: Log total endpoint time
         if 'endpoint_start' in locals():
@@ -2138,5 +2138,5 @@ def save_playbooks(request: PlaybookSettingsRequest):
         raise
     except Exception as e:
         logger.error(f"Error saving playbook settings: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 

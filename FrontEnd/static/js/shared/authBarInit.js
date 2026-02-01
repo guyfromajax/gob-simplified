@@ -79,7 +79,7 @@
         var user = JSON.parse(authUser);
         if (authLoggedOut) authLoggedOut.style.display = 'none';
         if (authLoggedIn) authLoggedIn.style.display = 'flex';
-        if (authUserEmail) authUserEmail.textContent = user.email;
+        if (authUserEmail) authUserEmail.textContent = user.username || user.email;
       } catch (e) {
         if (typeof localStorage !== 'undefined') {
           localStorage.removeItem('auth_token');
