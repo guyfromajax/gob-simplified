@@ -1152,6 +1152,12 @@ async function loadCommandCenterData() {
     // ✅ MIGRATION: Use command-center/data endpoint (aligns with Franchise pattern)
     const url = `${API_CONFIG.buildUrl('/tournament/command-center/data')}?tournament_id=${encodeURIComponent(tournamentId)}&_=${Date.now()}`;
     const res = await fetch(url, { cache: "no-store", headers: API_CONFIG.getAuthHeaders() });
+    if (res.status === 401 || res.status === 403) {
+      if (typeof AccessDenied !== 'undefined' && AccessDenied.checkAccessDenied) {
+        AccessDenied.checkAccessDenied(res);
+      }
+      return null;
+    }
     if (!res.ok) {
       throw new Error(`Failed to load command center data: ${res.status} ${res.statusText}`);
     }
@@ -1477,6 +1483,7 @@ async function initializeTournament() {
   let commandCenterData = null;
   try {
     commandCenterData = await loadCommandCenterData();
+    if (commandCenterData === null) return; // Access denied - redirect already triggered
   } catch (err) {
     console.error("❌ Failed to load command center data", err);
     // Fallback to old method for backward compatibility

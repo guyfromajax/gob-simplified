@@ -22,7 +22,7 @@
 
 **Expected:**
 - Auth guard redirects to `/login.html?redirect=...` before the page loads, **or**
-- Page loads but API calls return 401 and the UI shows an error / empty state (no franchise data displayed)
+- Page loads but initial API call (`/franchise/command-center/data`) returns 401/403 → alert "You don't have access to this resource" and redirect to mode-select
 
 ---
 
@@ -39,8 +39,8 @@
    - Try to open: `franchise-command-center.html?franchise_id=<User A's franchise_id>`
 
 **Expected:**
-- API returns 403 Forbidden or 404 Not Found
-- No franchise data is displayed; user sees an error or empty state
+- Initial load of `/franchise/command-center/data` returns 403
+- Alert "You don't have access to this resource" and redirect to mode-select immediately (no franchise data displayed)
 
 ---
 
@@ -48,6 +48,8 @@
 
 Repeat Test 1 and Test 2 using tournament URLs, e.g.:
 - `tournament.html?tournament_id=<id>`
+
+Same expected behavior: 401/403 on `/tournament/command-center/data` → alert and redirect.
 
 ---
 
@@ -67,3 +69,4 @@ Repeat Test 1 and Test 2 using tournament URLs, e.g.:
 
 - Auth guard runs in the browser; direct API calls (e.g. via curl) will bypass it and should return 401 from the backend
 - For local testing: ensure backend and frontend use the same base URL (e.g. both localhost or both staging)
+- **Migration:** Existing franchises/tournaments without `user_id` will return 403. Run `scripts/migrate_add_user_id_to_franchises_tournaments.py --use-first-user --execute` (with staging DB) to backfill

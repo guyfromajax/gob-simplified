@@ -33,7 +33,7 @@ def verify_franchise_owned_by_user(franchise_id: str, user_id: str) -> dict:
     Verify the franchise exists and belongs to the user.
     Returns the franchise document if owned; raises 403 or 404 otherwise.
 
-    Backward compatibility: If doc has no user_id (pre-migration), allow access.
+    Documents without user_id (pre-migration) are denied - run migration to add user_id.
     """
     try:
         oid = ObjectId(franchise_id)
@@ -43,7 +43,9 @@ def verify_franchise_owned_by_user(franchise_id: str, user_id: str) -> dict:
     if not doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
     doc_user_id = doc.get("user_id")
-    if doc_user_id is not None and str(doc_user_id) != str(user_id):
+    if doc_user_id is None:
+        raise HTTPException(status_code=403, detail="Access denied to this franchise")
+    if str(doc_user_id) != str(user_id):
         raise HTTPException(status_code=403, detail="Access denied to this franchise")
     return doc
 
@@ -53,7 +55,7 @@ def verify_tournament_owned_by_user(tournament_id: str, user_id: str) -> dict:
     Verify the tournament exists and belongs to the user.
     Returns the tournament document if owned; raises 403 or 404 otherwise.
 
-    Backward compatibility: If doc has no user_id (pre-migration), allow access.
+    Documents without user_id (pre-migration) are denied - run migration to add user_id.
     """
     try:
         oid = ObjectId(tournament_id)
@@ -63,7 +65,9 @@ def verify_tournament_owned_by_user(tournament_id: str, user_id: str) -> dict:
     if not doc:
         raise HTTPException(status_code=404, detail="Tournament not found")
     doc_user_id = doc.get("user_id")
-    if doc_user_id is not None and str(doc_user_id) != str(user_id):
+    if doc_user_id is None:
+        raise HTTPException(status_code=403, detail="Access denied to this tournament")
+    if str(doc_user_id) != str(user_id):
         raise HTTPException(status_code=403, detail="Access denied to this tournament")
     return doc
 

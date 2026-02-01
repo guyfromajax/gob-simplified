@@ -4,9 +4,11 @@
 **Related:** `docs/To Do/0_alpha_launch_plan.md` — Phase 5.2 User Data Exposure Prevention
 
 **Implementation status:**
-- ✅ Auth required on: `POST /franchise/select-team`, `POST /tournament/start`, `POST /franchise/play-next-game`, `GET /franchise/command-center/data`, `GET /api/game/{game_id}`
+- ✅ Auth required on: `POST /franchise/select-team`, `POST /tournament/start`, `POST /franchise/play-next-game`, `GET /franchise/command-center/data`, `GET /tournament/command-center/data`, `GET /api/game/{game_id}`
 - ✅ `user_id` stored on new franchise and tournament documents
 - ✅ Ownership helpers: `verify_franchise_owned_by_user`, `verify_tournament_owned_by_user`, `verify_game_owned_by_user`
+- ✅ **Strict ownership:** Documents without `user_id` are denied (403). Run `scripts/migrate_add_user_id_to_franchises_tournaments.py` to backfill.
+- ✅ Frontend: 401/403 on command-center/data triggers immediate redirect (FCC and TCC)
 - ✅ Logging redaction: `BackEnd.utils.log_redact`
 - ⏳ TODO: Add auth + ownership to remaining franchise/tournament/game endpoints (see lists below)
 

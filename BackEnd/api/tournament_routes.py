@@ -573,22 +573,19 @@ def save_result(request: TournamentResultRequest):
 
 
 @router.get("/tournament/command-center/data")
-def tournament_command_center_data(tournament_id: str = Query(...)):
+def tournament_command_center_data(
+    tournament_id: str = Query(...),
+    user: dict = Depends(get_current_user),
+):
     """
     Return structured command center data for a tournament.
     
     ✅ MIGRATION (Task 4.1): Aligned with Franchise mode pattern.
     Returns structured response matching /franchise/command-center/data format.
     """
-    try:
-        tid = ObjectId(tournament_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid tournament_id")
-    
-    doc = tournaments_collection.find_one({"_id": tid})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-    
+    doc = verify_tournament_owned_by_user(tournament_id, user["user_id"])
+    tid = doc["_id"]
+
     # Get user team identifiers from tournament document
     user_team_id_name, user_team_object_id = get_user_team_from_tournament(doc)
     
