@@ -1,6 +1,12 @@
 async function fetchJSON(url) {
   try {
     const res = await fetch(url, { headers: API_CONFIG.getAuthHeaders() });
+    if (res.status === 401 || res.status === 403) {
+      if (typeof AccessDenied !== 'undefined' && AccessDenied.checkAccessDenied) {
+        AccessDenied.checkAccessDenied(res);
+      }
+      return null;
+    }
     if (!res.ok) throw new Error('Request failed');
     return await res.json();
   } catch (err) {
@@ -916,7 +922,8 @@ async function init() {
   const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}`);
   const topDataEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
-  
+  if (!topData) return; // Access denied or error - redirect already triggered for 401/403
+
   // ✅ SS&S: Resolve team_id from command center data if not already set
   if (topData && topData.team_id && !userTeamId) {
     userTeamId = topData.team_id;
