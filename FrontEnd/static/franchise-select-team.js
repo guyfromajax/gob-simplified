@@ -22,10 +22,12 @@ function createButtons() {
 
 async function selectTeam(team) {
   try {
-    // Use centralized API config for consistent backend URL
+    const token = localStorage.getItem("auth_token");
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     const res = await fetch(API_CONFIG.buildUrl('/franchise/select-team'), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ team_name: team })
     });
     if (!res.ok) throw new Error("Failed to start franchise");
