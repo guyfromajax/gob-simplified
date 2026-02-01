@@ -106,13 +106,19 @@ class FranchiseManager:
     def load_teams(self):
         return list(self.db.teams.find())
 
-    def initialize_season(self, user_team_id: str | None = None, user_team_object_id: str | None = None):
+    def initialize_season(
+        self,
+        user_team_id: str | None = None,
+        user_team_object_id: str | None = None,
+        user_id: str | None = None,
+    ):
         """
         Initialize a new franchise season.
-        
+
         Args:
             user_team_id: Team name (e.g., "Morristown") - human-readable identifier
             user_team_object_id: Team ObjectId string (e.g., "507f1f77bcf86cd799439011") - database identifier
+            user_id: Optional user ID for ownership (set when authenticated)
         """
         # Clear any previous season game data to ensure a fresh start
         self.db.games.delete_many({})
@@ -222,7 +228,9 @@ class FranchiseManager:
             extra_state["user_team_id"] = user_team_id
         if user_team_object_id:
             extra_state["user_team_object_id"] = user_team_object_id
-        
+        if user_id:
+            extra_state["user_id"] = user_id
+
         self.save_season_state(extra_state=extra_state)
 
         # ✅ FTD/FPD/FRD: Create franchise_team_data, franchise_players_data, franchise_recruits_data

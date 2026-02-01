@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from starlette.responses import Response
 from fastapi.encoders import jsonable_encoder
@@ -33,6 +33,8 @@ from BackEnd.utils.roster_builder import build_roster_players
 from BackEnd.utils.command_center_data import build_command_center_base
 from BackEnd.utils.game_id_utils import generate_game_id
 from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS
+from BackEnd.utils.auth import get_current_user
+from BackEnd.utils.ownership import verify_franchise_owned_by_user
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -728,7 +730,10 @@ async def select_team_options():
     )
 
 @router.post("/franchise/select-team")
-def select_team(selection: TeamSelection):
+def select_team(
+    selection: TeamSelection,
+    user: dict = Depends(get_current_user),
+):
     import sys
     import time
     endpoint_start = time.time()
@@ -781,7 +786,11 @@ def select_team(selection: TeamSelection):
         print(f"🔵 [DEBUG] select_team: Initializing FranchiseManager...", file=sys.stderr, flush=True)
         franchise_init_start = time.time()
         manager = FranchiseManager(db)
-        manager.initialize_season(user_team_id=user_team_id, user_team_object_id=user_team_object_id)
+        manager.initialize_season(
+            user_team_id=user_team_id,
+            user_team_object_id=user_team_object_id,
+            user_id=user.get("user_id"),
+        )
         franchise_init_time = (time.time() - franchise_init_start) * 1000
         logger.warning(f"⏱️ [DB TIMING] select-team: FranchiseManager.initialize_season(): {franchise_init_time:.2f}ms")
         
@@ -812,11 +821,11 @@ def get_animation_page():
 
 
 @router.post("/franchise/play-next-game")
-def play_next_game(req: PlayGameRequest):
-    franchise_doc = db.franchises.find_one({"_id": ObjectId(req.franchise_id)})
-    if not franchise_doc:
-        raise HTTPException(status_code=404, detail="Franchise not found")
-    
+def play_next_game(
+    req: PlayGameRequest,
+    user: dict = Depends(get_current_user),
+):
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
     # Get user team info (with backward compatibility)
     user_team_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
     if not user_team_name or not user_team_object_id:
@@ -1489,7 +1498,10 @@ def complete_week(req: CompleteWeekRequest):
 
 
 @router.get("/franchise/command-center/data")
-def command_center_data(franchise_id: str = None):
+def command_center_data(
+    franchise_id: str = None,
+    user: dict = Depends(get_current_user),
+):
     import time
     start_time = time.time()
     logger.info(f"⏱️ [PERF] /franchise/command-center/data START - franchise_id={franchise_id}")
@@ -1502,21 +1514,9 @@ def command_center_data(franchise_id: str = None):
     
     if franchise_id:
         try:
-            fid = ObjectId(franchise_id)
+            franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+            fid = franchise_doc["_id"]
             db_query_start = time.time()
-            # Projection: training_status, week, eos_tournament, user_team; team data from FTD
-            franchise_doc = db.franchises.find_one(
-                {"_id": fid},
-                {
-                    "training_status": 1,
-                    "week": 1,
-                    "eos_tournament": 1,
-                    "eos_tournament_active": 1,
-                    "user_team_id": 1,
-                    "user_team_object_id": 1,
-                    "_id": 1
-                }
-            )
             db_query_time = time.time() - db_query_start
             logger.info(f"⏱️ [PERF] /franchise/command-center/data DB query: {db_query_time:.3f}s")
             if franchise_doc:
@@ -1539,6 +1539,8 @@ def command_center_data(franchise_id: str = None):
                         team_doc["team_chemistry"] = 0
                 else:
                     team_doc = {}
+        except HTTPException:
+            raise
         except Exception:
             team_doc = {}
     else:
