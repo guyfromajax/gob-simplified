@@ -54,7 +54,7 @@ class TournamentManager:
         self.tournament_id: ObjectId | None = None
         self.tournament: dict | None = None
 
-    def create_tournament(self):
+    def create_tournament(self, user_id: str | None = None):
         docs = list(self.team_docs)
         if len(docs) < 8:
             raise ValueError(f"Tournament requires 8 teams; got {len(docs)}.")
@@ -168,6 +168,7 @@ class TournamentManager:
         tournament_doc = {
             "user_team_id": self.user_team_id,
             "user_team_object_id": user_team_object_id,
+            "user_id": user_id,
             "created_at": datetime.utcnow(),
             "bracket": bracket,
             "current_round": 1,

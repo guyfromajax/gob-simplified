@@ -15,7 +15,7 @@ if _sentry_dsn:
     )
     print("🔶 [SENTRY] Backend error tracking enabled", file=sys.stderr, flush=True)
 
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -52,6 +52,8 @@ from .play_routes import router as play_router
 from .skeleton_routes import router as skeleton_router
 from .pointer_validation_routes import router as pointer_validation_router
 from .auth_routes import router as auth_router
+from BackEnd.utils.auth import get_current_user
+from BackEnd.utils.ownership import verify_game_owned_by_user
 import traceback
 from unidecode import unidecode
 from typing import Optional
@@ -143,13 +145,13 @@ def get_cors_origins():
 # Get CORS origins and configure middleware BEFORE including routers
 cors_origins = get_cors_origins()
 
-# ✅ CORS FIX: FastAPI's CORSMiddleware can use both allow_origins and allow_origin_regex
-# allow_origin_regex is checked if origin is not in allow_origins
-# This ensures gob-test.netlify.app is explicitly allowed AND any *.netlify.app domain works
+# CORS: Explicit allowlist only (no wildcards). Custom domains in allowlist.
+# Regex commented out per 5.1 - explicit list covers prod/staging; regex allowed any *.netlify.app
+# To re-enable deploy previews: allow_origin_regex=r"https://.*\.(railway|netlify)\.app"
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,  # Explicit origins (includes gob-test.netlify.app)
-    allow_origin_regex=r"https://.*\.(railway|netlify)\.app",  # Regex fallback for Railway/Netlify domains
+    allow_origins=cors_origins,
+    # allow_origin_regex=r"https://.*\.(railway|netlify)\.app",  # Disabled for security
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],  # Explicit methods
     allow_headers=["*"],
@@ -157,9 +159,7 @@ app.add_middleware(
     max_age=3600  # Cache preflight requests for 1 hour
 )
 
-# ✅ DEBUG: Log CORS origins for troubleshooting (use print for startup visibility)
 print(f"🌐 [CORS] Configured with origins: {cors_origins}")
-print(f"🌐 [CORS] Regex pattern: https://.*\\.(railway|netlify)\\.app")
 logging.info(f"🌐 CORS configured with origins: {cors_origins}")
 
 # Include routers AFTER CORS middleware is configured
@@ -1264,7 +1264,12 @@ def simulate_game(request: SimulationRequest):
 
 
 @app.get("/api/game/{game_id}")
-def get_game_state(game_id: str, quarter: int | None = None, source: str | None = None):
+def get_game_state(
+    game_id: str,
+    quarter: int | None = None,
+    source: str | None = None,
+    user: dict = Depends(get_current_user),
+):
     # Fetch current game state for displaying accumulated stats and player energy
     # PERFORMANCE DIAGNOSTIC: This endpoint is instrumented with timing logs.
     # Args:
@@ -1283,6 +1288,10 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
     original_game_id_type = type(original_game_id).__name__
     game_id = normalize_game_id(game_id)
     game_id_type = type(game_id).__name__
+
+    # ✅ 5.2 User Data Exposure: verify game belongs to user (raises 403/404 if not)
+    verify_game_owned_by_user(game_id, user["user_id"])
+
     try:
         # ---------- CACHE PATH (commented out): always use DB for SS&S team_attribute_changes, home_team_id, away_team_id ----------
         # force_db_read = source == "db"

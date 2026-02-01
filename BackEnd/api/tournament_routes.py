@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 import logging
@@ -20,6 +20,9 @@ from BackEnd.utils.team_stats_aggregator import aggregate_team_stats_from_player
 from BackEnd.utils.roster_builder import build_roster_players
 from BackEnd.utils.command_center_data import build_command_center_base
 from bson import ObjectId
+
+from BackEnd.utils.auth import get_current_user
+from BackEnd.utils.ownership import verify_tournament_owned_by_user
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -187,7 +190,10 @@ def get_tournament_leaders(tournament_id: str, recompute: bool = False):
 
 @router.post("/tournament/start")
 @router.post("/start-tournament")  # Backward compatibility; prefer /tournament/start
-def start_tournament(request: StartTournamentRequest):
+def start_tournament(
+    request: StartTournamentRequest,
+    user: dict = Depends(get_current_user),
+):
     import time
     endpoint_start = time.time()
     
@@ -231,7 +237,7 @@ def start_tournament(request: StartTournamentRequest):
         tournaments_collection=tournaments_collection,
         team_docs=team_docs,
     )
-    tournament = manager.create_tournament()
+    tournament = manager.create_tournament(user_id=user.get("user_id"))
     tournament_create_time = (time.time() - tournament_create_start) * 1000
     logger.warning(f"⏱️ [DB TIMING] start-tournament: TournamentManager.create_tournament(): {tournament_create_time:.2f}ms")
     
