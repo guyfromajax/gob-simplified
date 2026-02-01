@@ -271,19 +271,19 @@ Work top-to-bottom. Each step is ordered to minimize rework, reduce hotfix risk,
 - [x] Pick error tracking service (Sentry recommended)
 
 ### 4.2 Backend Error Tracking
-- [ ] Install SDK
-- [ ] Capture unhandled exceptions
-- [ ] Capture API errors (4xx/5xx where helpful)
-- [ ] Attach user context (`user_id`) to events
+- [x] Install SDK
+- [x] Capture unhandled exceptions
+- [x] Capture API errors (5xx via FastAPI integration)
+- [x] Attach user context (`send_default_pii=True`)
 
 ### 4.3 Frontend Error Tracking
-- [ ] Capture JS runtime errors
-- [ ] Capture unhandled promise rejections
-- [ ] Attach user context if available
+- [x] Capture JS runtime errors
+- [x] Capture unhandled promise rejections
+- [x] Attach user context if available (from `auth_user`)
 
 ### 4.4 Verification
-- [ ] Trigger intentional test errors (backend + frontend)
-- [ ] Confirm events appear with useful context
+- [x] Trigger intentional test errors (frontend verified with `Sentry.captureException`)
+- [x] Confirm events appear with useful context
 
 ---
 
