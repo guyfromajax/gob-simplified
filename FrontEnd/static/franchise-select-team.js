@@ -28,14 +28,21 @@ async function selectTeam(team) {
       headers,
       body: JSON.stringify({ team_name: team })
     });
-    if (!res.ok) throw new Error("Failed to start franchise");
+    if (!res.ok) {
+      let msg = "Unable to start franchise";
+      try {
+        const errBody = await res.json();
+        if (errBody.detail) msg = errBody.detail;
+      } catch (_) {}
+      throw new Error(msg);
+    }
     const data = await res.json();
     localStorage.setItem("franchiseId", data.franchise_id);
     localStorage.setItem("franchise_user_team", team);
     window.location.href = `./franchise-command-center.html?franchise_id=${encodeURIComponent(data.franchise_id)}`;
   } catch (err) {
     console.error(err);
-    alert("Unable to start franchise");
+    alert(err.message || "Unable to start franchise");
   }
 }
 

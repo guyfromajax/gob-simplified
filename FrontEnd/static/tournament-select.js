@@ -28,14 +28,21 @@ async function selectTeam(team) {
       headers,
       body: JSON.stringify({ user_team_id: team })
     });
-    if (!res.ok) throw new Error("Failed to start tournament");
+    if (!res.ok) {
+      let msg = "Unable to start tournament";
+      try {
+        const errBody = await res.json();
+        if (errBody.detail) msg = errBody.detail;
+      } catch (_) {}
+      throw new Error(msg);
+    }
     const tournament = await res.json();
     localStorage.setItem("activeTournament", JSON.stringify(tournament));
     localStorage.setItem("userTeamId", team);
     window.location.href = "./tournament.html";
   } catch (err) {
     console.error(err);
-    alert("Unable to start tournament");
+    alert(err.message || "Unable to start tournament");
   }
 }
 
