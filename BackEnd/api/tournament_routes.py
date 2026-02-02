@@ -189,6 +189,24 @@ def get_tournament_leaders(tournament_id: str, recompute: bool = False):
 
     return leaderboards
 
+@router.get("/tournament/current")
+def get_current_tournament(user: dict = Depends(get_current_user)):
+    """
+    Return the current user's tournament (active or most recent completed).
+    Used by mode-select to show instance and Play Now / New Tournament.
+    Returns 404 if the user has no tournament.
+    """
+    doc = tournaments_collection.find_one(
+        {"user_id": user.get("user_id")},
+        sort=[("created_at", -1)],
+        projection={"_id": 1, "user_team_id": 1, "current_round": 1, "completed": 1}
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="No tournament found")
+    doc["_id"] = str(doc["_id"])
+    return jsonable_encoder(doc, custom_encoder={ObjectId: str})
+
+
 @router.post("/tournament/start")
 @router.post("/start-tournament")  # Backward compatibility; prefer /tournament/start
 def start_tournament(
