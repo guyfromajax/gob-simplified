@@ -66,13 +66,31 @@
       <h2>Scrimmage</h2>
       <button id="scrimmage-btn" class="play-button">PLAY NOW</button>
     </div>
-    <div class="mode-card">
+    <div class="mode-card mode-card-tournament">
       <h2>Tournament</h2>
-      <button id="tournament-btn" class="play-button">PLAY NOW</button>
+      <!-- Current instance: team name (bold, primary colors) + round to play next (First Round / Semis / Championship / Complete) -->
+      <div id="tournament-instance" class="mode-instance" style="display: none;" data-instance-accent="">
+        <div id="tournament-instance-team" class="instance-team-name"></div>
+        <div id="tournament-instance-round" class="instance-round"></div>
+      </div>
+      <div id="tournament-no-instance" class="mode-no-instance">No active tournament</div>
+      <div class="mode-actions">
+        <button id="tournament-play-now-btn" class="play-now-btn" style="display: none;">Play Now</button>
+        <button id="tournament-new-btn" class="new-mode-btn">New Tournament</button>
+      </div>
     </div>
-    <div class="mode-card">
+    <div class="mode-card mode-card-franchise">
       <h2>Franchise</h2>
-      <button id="franchise-btn" class="play-button">PLAY NOW</button>
+      <!-- Current instance: team name (bold, primary colors) + week/phase (Week N, First Round/Semis/Championship, or Offseason) -->
+      <div id="franchise-instance" class="mode-instance" style="display: none;" data-instance-accent="">
+        <div id="franchise-instance-team" class="instance-team-name"></div>
+        <div id="franchise-instance-status" class="instance-round"></div>
+      </div>
+      <div id="franchise-no-instance" class="mode-no-instance">No active franchise</div>
+      <div class="mode-actions">
+        <button id="franchise-play-now-btn" class="play-now-btn" style="display: none;">Play Now</button>
+        <button id="franchise-new-btn" class="new-mode-btn">New Franchise</button>
+      </div>
     </div>
   </div>
   <h2 id="scout-title">SCOUT TEAMS</h2>
@@ -121,6 +139,38 @@
       <div id="set-username-error" class="set-username-error"></div>
       <button id="set-username-submit" class="set-username-submit">Submit</button>
       <p class="set-username-hint">No spaces • Letters, numbers, underscores only • 3–24 characters</p>
+    </div>
+  </div>
+
+  <!-- New Tournament confirmation (when user has existing tournament) -->
+  <div id="new-tournament-modal" class="confirm-modal" style="display: none;">
+    <div class="confirm-modal-content">
+      <h2 class="confirm-modal-title">New Tournament</h2>
+      <p class="confirm-modal-text">Creating a new tournament will delete your existing one. This cannot be undone.</p>
+      <label class="confirm-modal-checkbox">
+        <input type="checkbox" id="new-tournament-dont-show-again">
+        <span>Don't show this again</span>
+      </label>
+      <div class="confirm-modal-actions">
+        <button id="new-tournament-modal-cancel" class="confirm-modal-cancel">Cancel</button>
+        <button id="new-tournament-modal-confirm" class="confirm-modal-confirm">New Tournament</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Franchise confirmation (when user has existing franchise) -->
+  <div id="new-franchise-modal" class="confirm-modal" style="display: none;">
+    <div class="confirm-modal-content">
+      <h2 class="confirm-modal-title">New Franchise</h2>
+      <p class="confirm-modal-text">Creating a new franchise will delete your existing one. This cannot be undone.</p>
+      <label class="confirm-modal-checkbox">
+        <input type="checkbox" id="new-franchise-dont-show-again">
+        <span>Don't show this again</span>
+      </label>
+      <div class="confirm-modal-actions">
+        <button id="new-franchise-modal-cancel" class="confirm-modal-cancel">Cancel</button>
+        <button id="new-franchise-modal-confirm" class="confirm-modal-confirm">New Franchise</button>
+      </div>
     </div>
   </div>
 
