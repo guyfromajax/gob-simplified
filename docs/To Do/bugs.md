@@ -1,15 +1,15 @@
+1. Make end of season progression in franchise mode a true EOS (age players, recruiting process, manage player stats, manage user stats?)
+2. Get rid of double inbound pass on FCP and HCT steps
+3. Add glow effect to drag and drop on Lineup Selection screen when starting click on the player image
 
-
-
-3. Scouting Report button does not appear in the TCC
 4. rebound not resistering to player stats when he gets an OREB from a missed OREB putback attempt (note he made teh follow up shot)
-5. Playbook settings are not persisting through timeouts
+5. Gameplay Buttons Pop-up not appearing after "Play Quarter" (all modes) — User is not cued with the Gameplay Buttons Pop-up coming out of a quarter break if the previous quarter was played via "Play Quarter". The pop-up does appear correctly if the previous quarter was played via "Sim Quarter". Affects Single Game, Franchise, and Tournament modes.
 6. Some Fast Break made shots are skipping teh BIP step
 
-7. Elminate "Simulating Q5..."
+7. Add a "Super Fast" Speed button that is 2x Fast speed
+8. Playbooks and Game Plans not persisting (Franchise & Tournament modes) — User-configured playbooks and game plans are not saving/loading correctly. Changes made do not persist across sessions or game loads. Needs investigation to determine if this is a frontend storage issue, backend API issue, or regression from recent auth changes.
+
 10. User is still able to put fouled out players into the lineup on the Lineup Selection screen
-8. Ok quick side task. For the Game Plan screen, when the user presses Save Game Plan, the UI design is nice. The green button pop up appears right in the center of the screen. For the Playbooks page, when the user presses Save Playbooks, we get a subtle yellow confirmtion box in the lower right corner. Let's rework Playbooks confirmation to perfectly mirror Game Plan confirmation.
-9. Sim full game or rest of game, we need to bring back the "Simulatin Q" for that,  but stop at Q4 -- and say "simulating other games" after that.
 
 ## Future Cleanup (Non-Critical Warnings)
 

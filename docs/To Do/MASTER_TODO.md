@@ -147,6 +147,22 @@
 
 ---
 
+### 7. Simulate-Turn Rate Limit (300/min) – Pre-Launch Sanity Check
+**Status:** ⏳ PENDING  
+**Priority:** 🟡 MEDIUM – Ensure limit does not degrade UX  
+**Related:** Step 6 Rate Limiting, `0_alpha_launch_plan.md`
+
+**Context:** Simulate-turn is rate-limited at 300 requests per minute per IP to cap abuse while allowing normal play (one request per possession).
+
+**Action before go-live:**
+- [ ] Play at least one full quarter in turn-by-turn mode (Single Game or Tournament/Franchise) and confirm no 429s during normal use.
+- [ ] Optionally: run a burst of simulate-turn requests (e.g. script or rapid manual clicks) and confirm 429 is returned after 300/min and that the response is user-friendly (message + Retry-After).
+- [ ] If 300/min proves too low in practice (e.g. fast “next” clicking or future features), consider raising via env `RATE_LIMIT_SIM_TURN` or doc the decision to keep 300.
+
+**Purpose:** Sanity-check that the simulate-turn cap does not lead to suboptimal user experience before alpha launch.
+
+---
+
 ## 📋 Future Improvements & Enhancements
 
 ### 1. Tournament & Franchise Unification
