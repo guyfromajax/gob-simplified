@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, field_validator
 from bson import ObjectId
 
@@ -127,7 +128,7 @@ async def get_auth_config():
     )
 
 
-@router.post("/signup", response_model=AuthResponse)
+@router.post("/signup")
 @limiter.limit(AUTH_RATE_LIMIT)
 async def signup(request: Request, body: SignupRequest):
     """
@@ -196,7 +197,7 @@ async def signup(request: Request, body: SignupRequest):
         "role": "user"
     })
     
-    return AuthResponse(
+    payload = AuthResponse(
         token=token,
         user={
             "user_id": user_id,
@@ -205,10 +206,11 @@ async def signup(request: Request, body: SignupRequest):
             "username": None
         },
         message="Account created successfully"
-    )
+    ).model_dump()
+    return JSONResponse(content=payload, status_code=200)
 
 
-@router.post("/login", response_model=AuthResponse)
+@router.post("/login")
 @limiter.limit(AUTH_RATE_LIMIT)
 async def login(request: Request, body: LoginRequest):
     """
@@ -249,7 +251,7 @@ async def login(request: Request, body: LoginRequest):
         {"$set": {"last_login_at": datetime.now(timezone.utc)}}
     )
     
-    return AuthResponse(
+    payload = AuthResponse(
         token=token,
         user={
             "user_id": user_id,
@@ -258,7 +260,8 @@ async def login(request: Request, body: LoginRequest):
             "username": user.get("username")
         },
         message="Login successful"
-    )
+    ).model_dump()
+    return JSONResponse(content=payload, status_code=200)
 
 
 @router.post("/set-username")
