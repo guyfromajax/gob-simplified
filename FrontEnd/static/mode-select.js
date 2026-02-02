@@ -1,11 +1,34 @@
-// Set to true to show Tournament/Franchise instance boxes with placeholder data (design preview). Set to false when wiring from API.
-const DESIGN_PREVIEW = true;
-
 const scrimmageBtn = document.getElementById('scrimmage-btn');
 const tournamentPlayNowBtn = document.getElementById('tournament-play-now-btn');
 const tournamentNewBtn = document.getElementById('tournament-new-btn');
 const franchisePlayNowBtn = document.getElementById('franchise-play-now-btn');
 const franchiseNewBtn = document.getElementById('franchise-new-btn');
+
+// Current instance data (set after fetch in DOMContentLoaded)
+let currentTournament = null;
+let currentFranchise = null;
+
+function tournamentRoundLabel(roundNum, completed) {
+  if (completed) return 'Complete';
+  if (roundNum === 1) return 'First Round';
+  if (roundNum === 2) return 'Semis';
+  if (roundNum === 3) return 'Championship';
+  return 'First Round';
+}
+
+function franchiseStatusLabel(data) {
+  if (!data) return '--';
+  if (data.eos_tournament_active) {
+    if (data.eos_completed) return 'Offseason';
+    const r = data.eos_current_round || 1;
+    if (r === 1) return 'First Round';
+    if (r === 2) return 'Semis';
+    if (r === 3) return 'Championship';
+    return 'First Round';
+  }
+  const week = data.week != null ? data.week : 1;
+  return `Week ${week}`;
+}
 
 if (scrimmageBtn) {
   scrimmageBtn.addEventListener('click', () => {
@@ -13,10 +36,14 @@ if (scrimmageBtn) {
   });
 }
 
-// Tournament: Play Now goes to tournament (wired when we have instance)
+// Tournament: Play Now → TCC (or resolved TCC when completed; same URL)
 if (tournamentPlayNowBtn) {
   tournamentPlayNowBtn.addEventListener('click', () => {
-    window.location.href = './tournament-select.html';
+    if (currentTournament && currentTournament._id) {
+      window.location.href = `./tournament.html?tournament_id=${encodeURIComponent(currentTournament._id)}`;
+    } else {
+      window.location.href = './tournament-select.html';
+    }
   });
 }
 
@@ -40,8 +67,7 @@ function goToNewTournament() {
 if (tournamentNewBtn) {
   tournamentNewBtn.addEventListener('click', () => {
     const dontShow = typeof localStorage !== 'undefined' && localStorage.getItem(DONT_SHOW_NEW_TOURNAMENT_WARNING_KEY) === '1';
-    // When wiring: set from API (e.g. GET /api/tournament/current). In design preview, true so modal can be tested.
-    const hasExistingTournament = DESIGN_PREVIEW || false;
+    const hasExistingTournament = !!currentTournament;
     if (hasExistingTournament && !dontShow) {
       openNewTournamentModal();
     } else {
@@ -63,10 +89,14 @@ if (newTournamentModalConfirm) {
   });
 }
 
-// Franchise: Play Now goes to franchise (wired when we have instance)
+// Franchise: Play Now → FCC (or resolved FCC when in end state; same URL)
 if (franchisePlayNowBtn) {
   franchisePlayNowBtn.addEventListener('click', () => {
-    window.location.href = './franchise-select-team.html';
+    if (currentFranchise && currentFranchise.franchise_id) {
+      window.location.href = `./franchise-command-center.html?franchise_id=${encodeURIComponent(currentFranchise.franchise_id)}`;
+    } else {
+      window.location.href = './franchise-select-team.html';
+    }
   });
 }
 
@@ -90,8 +120,7 @@ function goToNewFranchise() {
 if (franchiseNewBtn) {
   franchiseNewBtn.addEventListener('click', () => {
     const dontShow = typeof localStorage !== 'undefined' && localStorage.getItem(DONT_SHOW_NEW_FRANCHISE_WARNING_KEY) === '1';
-    // When wiring: set from API (e.g. GET /api/franchise/current). In design preview, true so modal can be tested.
-    const hasExistingFranchise = DESIGN_PREVIEW || false;
+    const hasExistingFranchise = !!currentFranchise;
     if (hasExistingFranchise && !dontShow) {
       openNewFranchiseModal();
     } else {
@@ -424,6 +453,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   const fallbackColor = '#ccc';
+
+  // Fetch current tournament and franchise (auth required; 404 = none)
+  const headers = API_CONFIG.getAuthHeaders();
+  const [tournamentRes, franchiseRes] = await Promise.all([
+    fetch(API_CONFIG.buildUrl('/tournament/current'), { headers }).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetch(API_CONFIG.buildUrl('/franchise/current'), { headers }).then(r => r.ok ? r.json() : null).catch(() => null)
+  ]);
+  currentTournament = tournamentRes;
+  currentFranchise = franchiseRes;
+
   fetch(API_CONFIG.buildUrl('/teams'))
     .then(resp => resp.json())
     .then(teamData => {
@@ -448,36 +487,45 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log(`Tile ${team} bgColor: ${bgColor} borderColor: ${borderColor}`);
       });
 
-      // Design preview: show Tournament and Franchise instance boxes with placeholder data
-      if (DESIGN_PREVIEW && teamData.length) {
-        const tourneyTeam = teamData.find(t => t.name === 'Four Corners') || teamData[0];
-        const tEl = document.getElementById('tournament-instance');
-        const tTeamEl = document.getElementById('tournament-instance-team');
-        const tRoundEl = document.getElementById('tournament-instance-round');
-        const tNo = document.getElementById('tournament-no-instance');
-        const tPlay = document.getElementById('tournament-play-now-btn');
-        if (tEl && tTeamEl && tRoundEl && tNo && tPlay) {
-          tTeamEl.textContent = tourneyTeam.name;
-          tRoundEl.textContent = 'Semis';
-          tEl.style.setProperty('--instance-accent', tourneyTeam.primary_color || '#1a237e');
-          tEl.style.display = 'block';
-          tNo.style.display = 'none';
-          tPlay.style.display = 'block';
-        }
-        const francTeam = teamData.find(t => t.name === 'Lancaster') || teamData[0];
-        const fEl = document.getElementById('franchise-instance');
-        const fTeamEl = document.getElementById('franchise-instance-team');
-        const fStatusEl = document.getElementById('franchise-instance-status');
-        const fNo = document.getElementById('franchise-no-instance');
-        const fPlay = document.getElementById('franchise-play-now-btn');
-        if (fEl && fTeamEl && fStatusEl && fNo && fPlay) {
-          fTeamEl.textContent = francTeam.name;
-          fStatusEl.textContent = 'Week 12';
-          fEl.style.setProperty('--instance-accent', francTeam.primary_color || '#1a237e');
-          fEl.style.display = 'block';
-          fNo.style.display = 'none';
-          fPlay.style.display = 'block';
-        }
+      // Render Tournament and Franchise instance cards from API data
+      const tEl = document.getElementById('tournament-instance');
+      const tTeamEl = document.getElementById('tournament-instance-team');
+      const tRoundEl = document.getElementById('tournament-instance-round');
+      const tNo = document.getElementById('tournament-no-instance');
+      const tPlay = document.getElementById('tournament-play-now-btn');
+      if (currentTournament && tEl && tTeamEl && tRoundEl && tNo && tPlay) {
+        const teamName = currentTournament.user_team_id || 'Team';
+        tTeamEl.textContent = teamName;
+        tRoundEl.textContent = tournamentRoundLabel(currentTournament.current_round, currentTournament.completed);
+        const accent = (colorMap[teamName] && colorMap[teamName].primary) || '#1a237e';
+        tEl.style.setProperty('--instance-accent', accent);
+        tEl.style.display = 'block';
+        tNo.style.display = 'none';
+        tPlay.style.display = 'block';
+      } else if (tNo && tEl && tPlay) {
+        tEl.style.display = 'none';
+        tNo.style.display = 'block';
+        tPlay.style.display = 'none';
+      }
+
+      const fEl = document.getElementById('franchise-instance');
+      const fTeamEl = document.getElementById('franchise-instance-team');
+      const fStatusEl = document.getElementById('franchise-instance-status');
+      const fNo = document.getElementById('franchise-no-instance');
+      const fPlay = document.getElementById('franchise-play-now-btn');
+      if (currentFranchise && fEl && fTeamEl && fStatusEl && fNo && fPlay) {
+        const teamName = currentFranchise.user_team_id || 'Team';
+        fTeamEl.textContent = teamName;
+        fStatusEl.textContent = franchiseStatusLabel(currentFranchise);
+        const accent = (colorMap[teamName] && colorMap[teamName].primary) || '#1a237e';
+        fEl.style.setProperty('--instance-accent', accent);
+        fEl.style.display = 'block';
+        fNo.style.display = 'none';
+        fPlay.style.display = 'block';
+      } else if (fNo && fEl && fPlay) {
+        fEl.style.display = 'none';
+        fNo.style.display = 'block';
+        fPlay.style.display = 'none';
       }
     })
     .catch(() => {

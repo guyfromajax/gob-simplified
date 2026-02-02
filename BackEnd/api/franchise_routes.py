@@ -1505,6 +1505,33 @@ def complete_week(req: CompleteWeekRequest):
     return {"week": req.week, "results": scoreboard}
 
 
+@router.get("/franchise/current")
+def get_current_franchise(user: dict = Depends(get_current_user)):
+    """
+    Return the current user's franchise.
+    Used by mode-select to show instance and Play Now / New Franchise.
+    Returns 404 if the user has no franchise.
+    """
+    doc = db.franchises.find_one(
+        {"user_id": user.get("user_id")},
+        projection={
+            "_id": 1, "user_team_id": 1, "week": 1,
+            "eos_tournament": 1, "eos_tournament_active": 1
+        }
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="No franchise found")
+    eos = doc.get("eos_tournament") or {}
+    return {
+        "franchise_id": str(doc["_id"]),
+        "user_team_id": doc.get("user_team_id"),
+        "week": doc.get("week", 1),
+        "eos_tournament_active": doc.get("eos_tournament_active", False),
+        "eos_current_round": eos.get("current_round", 1),
+        "eos_completed": eos.get("completed", False),
+    }
+
+
 @router.get("/franchise/command-center/data")
 def command_center_data(
     franchise_id: str = None,
