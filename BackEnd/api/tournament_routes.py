@@ -207,6 +207,16 @@ def start_tournament(
     if request.user_team_id not in team_names:
         raise HTTPException(status_code=400, detail="Invalid user_team_id")
 
+    # Step 7.2: One tournament per user - block creation if user already has an active one
+    existing_tournaments = tournaments_collection.count_documents(
+        {"user_id": user.get("user_id"), "completed": False}
+    )
+    if existing_tournaments >= 1:
+        raise HTTPException(
+            status_code=400,
+            detail="You already have an active tournament. Delete it first to start a new one.",
+        )
+
     # Use first 8 teams for bracket (same pool as before when we had 8)
     team_docs = [{"name": t["name"], "_id": t["_id"]} for t in (all_teams[:8] if len(all_teams) >= 8 else all_teams)]
     if len(team_docs) < 8:

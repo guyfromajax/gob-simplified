@@ -739,6 +739,14 @@ def select_team(
     endpoint_start = time.time()
     print(f"🔵 [DEBUG] select_team: POST /franchise/select-team called with team: {selection.team_name}", file=sys.stderr, flush=True)
     try:
+        # Step 7.2: One franchise per user - block creation if user already has one
+        existing_franchises = db.franchises.count_documents({"user_id": user.get("user_id")})
+        if existing_franchises >= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="You already have an active franchise. Delete it first to start a new one.",
+            )
+
         # Resolve team name to ObjectId - try multiple strategies for matching
         print(f"🔵 [DEBUG] select_team: Looking up team in database: {selection.team_name}", file=sys.stderr, flush=True)
         

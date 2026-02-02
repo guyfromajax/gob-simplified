@@ -3,9 +3,16 @@
 .env
 .env.local
 .env.railway
+.env.backup
 
 # Example/template files (safe to commit)
 !.env.railway.example
+
+# MongoDB backup output (mongodump)
+dump/
+
+# Backup script log (launchd)
+backup-mongodb.log
 
 __pycache__/
 *.pyc
