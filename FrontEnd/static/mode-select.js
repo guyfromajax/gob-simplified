@@ -1,6 +1,11 @@
+// Set to true to show Tournament/Franchise instance boxes with placeholder data (design preview). Set to false when wiring from API.
+const DESIGN_PREVIEW = true;
+
 const scrimmageBtn = document.getElementById('scrimmage-btn');
-const tournamentBtn = document.getElementById('tournament-btn');
-const franchiseBtn = document.getElementById('franchise-btn');
+const tournamentPlayNowBtn = document.getElementById('tournament-play-now-btn');
+const tournamentNewBtn = document.getElementById('tournament-new-btn');
+const franchisePlayNowBtn = document.getElementById('franchise-play-now-btn');
+const franchiseNewBtn = document.getElementById('franchise-new-btn');
 
 if (scrimmageBtn) {
   scrimmageBtn.addEventListener('click', () => {
@@ -8,15 +13,103 @@ if (scrimmageBtn) {
   });
 }
 
-if (tournamentBtn) {
-  tournamentBtn.addEventListener('click', () => {
+// Tournament: Play Now goes to tournament (wired when we have instance)
+if (tournamentPlayNowBtn) {
+  tournamentPlayNowBtn.addEventListener('click', () => {
     window.location.href = './tournament-select.html';
   });
 }
 
-if (franchiseBtn) {
-  franchiseBtn.addEventListener('click', () => {
+// Tournament: New Tournament — show confirmation if user has existing tournament (functionality wired later)
+const newTournamentModal = document.getElementById('new-tournament-modal');
+const newTournamentDontShowAgain = document.getElementById('new-tournament-dont-show-again');
+const newTournamentModalCancel = document.getElementById('new-tournament-modal-cancel');
+const newTournamentModalConfirm = document.getElementById('new-tournament-modal-confirm');
+const DONT_SHOW_NEW_TOURNAMENT_WARNING_KEY = 'gob_dont_show_new_tournament_warning';
+
+function openNewTournamentModal() {
+  if (newTournamentModal) newTournamentModal.style.display = 'flex';
+}
+function closeNewTournamentModal() {
+  if (newTournamentModal) newTournamentModal.style.display = 'none';
+}
+function goToNewTournament() {
+  window.location.href = './tournament-select.html';
+}
+
+if (tournamentNewBtn) {
+  tournamentNewBtn.addEventListener('click', () => {
+    const dontShow = typeof localStorage !== 'undefined' && localStorage.getItem(DONT_SHOW_NEW_TOURNAMENT_WARNING_KEY) === '1';
+    // When wiring: set from API (e.g. GET /api/tournament/current). In design preview, true so modal can be tested.
+    const hasExistingTournament = DESIGN_PREVIEW || false;
+    if (hasExistingTournament && !dontShow) {
+      openNewTournamentModal();
+    } else {
+      goToNewTournament();
+    }
+  });
+}
+
+if (newTournamentModalCancel) {
+  newTournamentModalCancel.addEventListener('click', closeNewTournamentModal);
+}
+if (newTournamentModalConfirm) {
+  newTournamentModalConfirm.addEventListener('click', () => {
+    if (newTournamentDontShowAgain && newTournamentDontShowAgain.checked && typeof localStorage !== 'undefined') {
+      localStorage.setItem(DONT_SHOW_NEW_TOURNAMENT_WARNING_KEY, '1');
+    }
+    closeNewTournamentModal();
+    goToNewTournament();
+  });
+}
+
+// Franchise: Play Now goes to franchise (wired when we have instance)
+if (franchisePlayNowBtn) {
+  franchisePlayNowBtn.addEventListener('click', () => {
     window.location.href = './franchise-select-team.html';
+  });
+}
+
+// Franchise: New Franchise — show confirmation if user has existing franchise
+const newFranchiseModal = document.getElementById('new-franchise-modal');
+const newFranchiseDontShowAgain = document.getElementById('new-franchise-dont-show-again');
+const newFranchiseModalCancel = document.getElementById('new-franchise-modal-cancel');
+const newFranchiseModalConfirm = document.getElementById('new-franchise-modal-confirm');
+const DONT_SHOW_NEW_FRANCHISE_WARNING_KEY = 'gob_dont_show_new_franchise_warning';
+
+function openNewFranchiseModal() {
+  if (newFranchiseModal) newFranchiseModal.style.display = 'flex';
+}
+function closeNewFranchiseModal() {
+  if (newFranchiseModal) newFranchiseModal.style.display = 'none';
+}
+function goToNewFranchise() {
+  window.location.href = './franchise-select-team.html';
+}
+
+if (franchiseNewBtn) {
+  franchiseNewBtn.addEventListener('click', () => {
+    const dontShow = typeof localStorage !== 'undefined' && localStorage.getItem(DONT_SHOW_NEW_FRANCHISE_WARNING_KEY) === '1';
+    // When wiring: set from API (e.g. GET /api/franchise/current). In design preview, true so modal can be tested.
+    const hasExistingFranchise = DESIGN_PREVIEW || false;
+    if (hasExistingFranchise && !dontShow) {
+      openNewFranchiseModal();
+    } else {
+      goToNewFranchise();
+    }
+  });
+}
+
+if (newFranchiseModalCancel) {
+  newFranchiseModalCancel.addEventListener('click', closeNewFranchiseModal);
+}
+if (newFranchiseModalConfirm) {
+  newFranchiseModalConfirm.addEventListener('click', () => {
+    if (newFranchiseDontShowAgain && newFranchiseDontShowAgain.checked && typeof localStorage !== 'undefined') {
+      localStorage.setItem(DONT_SHOW_NEW_FRANCHISE_WARNING_KEY, '1');
+    }
+    closeNewFranchiseModal();
+    goToNewFranchise();
   });
 }
 
@@ -354,6 +447,38 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (taglineEl) taglineEl.style.color = taglineColor;
         console.log(`Tile ${team} bgColor: ${bgColor} borderColor: ${borderColor}`);
       });
+
+      // Design preview: show Tournament and Franchise instance boxes with placeholder data
+      if (DESIGN_PREVIEW && teamData.length) {
+        const tourneyTeam = teamData.find(t => t.name === 'Four Corners') || teamData[0];
+        const tEl = document.getElementById('tournament-instance');
+        const tTeamEl = document.getElementById('tournament-instance-team');
+        const tRoundEl = document.getElementById('tournament-instance-round');
+        const tNo = document.getElementById('tournament-no-instance');
+        const tPlay = document.getElementById('tournament-play-now-btn');
+        if (tEl && tTeamEl && tRoundEl && tNo && tPlay) {
+          tTeamEl.textContent = tourneyTeam.name;
+          tRoundEl.textContent = 'Semis';
+          tEl.style.setProperty('--instance-accent', tourneyTeam.primary_color || '#1a237e');
+          tEl.style.display = 'block';
+          tNo.style.display = 'none';
+          tPlay.style.display = 'block';
+        }
+        const francTeam = teamData.find(t => t.name === 'Lancaster') || teamData[0];
+        const fEl = document.getElementById('franchise-instance');
+        const fTeamEl = document.getElementById('franchise-instance-team');
+        const fStatusEl = document.getElementById('franchise-instance-status');
+        const fNo = document.getElementById('franchise-no-instance');
+        const fPlay = document.getElementById('franchise-play-now-btn');
+        if (fEl && fTeamEl && fStatusEl && fNo && fPlay) {
+          fTeamEl.textContent = francTeam.name;
+          fStatusEl.textContent = 'Week 12';
+          fEl.style.setProperty('--instance-accent', francTeam.primary_color || '#1a237e');
+          fEl.style.display = 'block';
+          fNo.style.display = 'none';
+          fPlay.style.display = 'block';
+        }
+      }
     })
     .catch(() => {
       teamButtons.forEach(btn => {
