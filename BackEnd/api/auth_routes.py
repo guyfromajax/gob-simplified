@@ -14,10 +14,11 @@ import re
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, EmailStr, field_validator
 from bson import ObjectId
 
+from BackEnd.utils.rate_limiter import limiter, AUTH_RATE_LIMIT
 from BackEnd.db import users_collection
 from BackEnd.utils.auth import (
     hash_password,
@@ -127,7 +128,8 @@ async def get_auth_config():
 
 
 @router.post("/signup", response_model=AuthResponse)
-async def signup(request: SignupRequest):
+@limiter.limit(AUTH_RATE_LIMIT)
+async def signup(request: Request, body: SignupRequest):
     """
     Create a new user account.
     
@@ -138,19 +140,21 @@ async def signup(request: SignupRequest):
     - 8–128 characters
     - At least one letter
     - At least one number
+    
+    Rate limited: 10/minute per IP (prevents brute force OTP guessing).
     """
-    email = request.email.lower().strip()
+    email = body.email.lower().strip()
     
     # Check if alpha mode requires OTP
     if is_alpha_mode():
-        if not request.otp_code:
+        if not body.otp_code:
             raise HTTPException(
                 status_code=400,
                 detail="Alpha access code is required for signup"
             )
         
         # Validate OTP
-        is_valid, error = validate_otp(request.otp_code)
+        is_valid, error = validate_otp(body.otp_code)
         if not is_valid:
             raise HTTPException(status_code=400, detail=error)
     
@@ -166,7 +170,7 @@ async def signup(request: SignupRequest):
     now = datetime.now(timezone.utc)
     user_doc = {
         "email": email,
-        "password_hash": hash_password(request.password),
+        "password_hash": hash_password(body.password),
         "role": "user",
         "created_at": now,
         "updated_at": now,
@@ -178,8 +182,8 @@ async def signup(request: SignupRequest):
     user_id = str(result.inserted_id)
     
     # Consume OTP (mark as used) after successful user creation
-    if is_alpha_mode() and request.otp_code:
-        success, error = consume_otp(request.otp_code, email)
+    if is_alpha_mode() and body.otp_code:
+        success, error = consume_otp(body.otp_code, email)
         if not success:
             # User was created but OTP consumption failed (race condition)
             # Log this but don't fail the signup
@@ -205,13 +209,16 @@ async def signup(request: SignupRequest):
 
 
 @router.post("/login", response_model=AuthResponse)
-async def login(request: LoginRequest):
+@limiter.limit(AUTH_RATE_LIMIT)
+async def login(request: Request, body: LoginRequest):
     """
     Login with email and password.
     
     Returns a JWT token for authenticated requests.
+    
+    Rate limited: 10/minute per IP (prevents brute force password guessing).
     """
-    email = request.email.lower().strip()
+    email = body.email.lower().strip()
     
     # Find user
     user = get_user_by_email(email)
@@ -222,7 +229,7 @@ async def login(request: LoginRequest):
         )
     
     # Verify password
-    if not verify_password(request.password, user.get("password_hash", "")):
+    if not verify_password(body.password, user.get("password_hash", "")):
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
