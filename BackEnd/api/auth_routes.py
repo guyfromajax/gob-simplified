@@ -373,18 +373,31 @@ async def password_reset_confirm(request: Request, body: ResetPasswordRequest):
 
     Token is invalidated after use. Returns 400 if token is invalid or expired.
     """
+    logger.warning("[RESET] reset-password received (token length=%s)", len(body.token) if body.token else 0)
     doc = password_reset_tokens_collection.find_one({"token": body.token})
     if not doc:
+        logger.warning("[RESET] reset-password: token not found or already used")
         raise HTTPException(status_code=400, detail="Invalid or expired reset link. Please request a new one.")
-    if doc["expires_at"] < datetime.now(timezone.utc):
+    expires_at = doc.get("expires_at")
+    if expires_at is None:
+        logger.warning("[RESET] reset-password: token missing expires_at")
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link. Please request a new one.")
+    now_utc = datetime.now(timezone.utc)
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < now_utc:
         password_reset_tokens_collection.delete_one({"_id": doc["_id"]})
+        logger.warning("[RESET] reset-password: token expired")
         raise HTTPException(status_code=400, detail="Reset link has expired. Please request a new one.")
     user_id = doc["user_id"]
+    if not isinstance(user_id, ObjectId):
+        user_id = ObjectId(user_id)
     users_collection.update_one(
         {"_id": user_id},
         {"$set": {"password_hash": hash_password(body.new_password), "updated_at": datetime.now(timezone.utc)}}
     )
     password_reset_tokens_collection.delete_many({"user_id": user_id})
+    logger.warning("[RESET] reset-password: password updated for user_id=%s", user_id)
     return JSONResponse(
         content={"message": "Password updated. You can now log in with your new password."},
         status_code=200,

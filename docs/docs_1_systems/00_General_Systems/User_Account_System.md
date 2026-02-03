@@ -13,7 +13,7 @@
 
 2. **Data**:
    - **Users collection**: `user_id` (ObjectId), `email`, `password_hash`, `role`, `username` (optional), `username_lower` (for uniqueness), `created_at`, `last_login_at`, `version`
-   - **role**: `"user"` (default) or `"admin"`. New signups get `role: "user"`. To set admin: run `python scripts/set_admin_user.py <email>` (Step 12.1).
+   - **role**: `"user"` (default) or `"admin"`. New signups get `role: "user"`. To set admin: run `python scripts/set_admin_user.py <email>` (or `set_admin_user_production.py` for production DB). Admin status is read from the DB when needed: `/api/auth/me` and builder API checks use the DB role so promoting a user to admin works without re-login.
    - **password_reset_tokens collection**: `token`, `user_id`, `expires_at`, `created_at` (tokens expire in 1 hour, deleted after use)
    - **JWT**: Stored client-side; sent in `Authorization: Bearer <token>` for protected endpoints
    - **Alpha OTP**: When `IS_ALPHA=true`, signup requires valid unused OTP from `alpha_otps` collection
@@ -55,6 +55,11 @@ The User Account System handles signup, login, JWT-based authentication, and opt
 - **Email:** SendGrid v3 API. If `SENDGRID_API_KEY` is not set, reset-request still returns 200 but no email is sent.
 - **Env vars:** `SENDGRID_API_KEY`, `RESET_EMAIL_FROM` (default `noreply@geekedoutbasketball.com`), `RESET_LINK_BASE_URL` (default `https://www.geekedoutbasketball.com`).
 - **Files:** `BackEnd/utils/email_sender.py`, `BackEnd/api/auth_routes.py`, `FrontEnd/static/reset-password.html`, `BackEnd/db.py` (`password_reset_tokens_collection`).
+
+### Admin role (live from DB)
+
+- **`/api/auth/me`** returns the user’s `role` from the database when the user doc is loaded, so the frontend admin guard sees up-to-date admin status.
+- **Builder API** (`require_admin_for_builder` in `BackEnd/utils/auth.py`): if the JWT does not contain `role: "admin"`, the backend checks the user document in the DB; if the DB has `role: "admin"`, the request is allowed. No re-login required after promoting a user to admin.
 
 ### Rate Limiting and Response Type Fix ✅ **FIX** (February 2025)
 
