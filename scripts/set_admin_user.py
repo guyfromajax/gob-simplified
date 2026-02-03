@@ -5,6 +5,7 @@ Set a user's role to 'admin' by email (Step 12.1).
 Run from repo root. Uses MONGO_URI from .env (or .env.local).
 Usage:
     python scripts/set_admin_user.py you@example.com
+    python scripts/set_admin_user.py you@example.com gob-staging   # specify database name
 """
 
 import os
@@ -46,12 +47,14 @@ if not db_name:
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python scripts/set_admin_user.py <email>")
+        print("Usage: python scripts/set_admin_user.py <email> [database_name]")
+        print("  e.g. python scripts/set_admin_user.py you@example.com gob-staging")
         sys.exit(1)
     email = sys.argv[1].strip().lower()
+    use_db = sys.argv[2].strip() if len(sys.argv) > 2 else db_name
     try:
         client = MongoClient(MONGO_URI)
-        db = client[db_name]
+        db = client[use_db]
         users = db["users"]
         result = users.update_one(
             {"email": email},
@@ -60,7 +63,7 @@ def main():
         if result.matched_count == 0:
             print(f"No user found with email: {email}")
             sys.exit(1)
-        print(f"Set role=admin for {email} (database: {db_name})")
+        print(f"Set role=admin for {email} (database: {use_db})")
     except OperationFailure as e:
         if "auth" in str(e).lower() or "8000" in str(e):
             print("MongoDB authentication failed. Check:")
