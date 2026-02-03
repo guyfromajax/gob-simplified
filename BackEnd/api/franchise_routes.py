@@ -1532,6 +1532,25 @@ def get_current_franchise(user: dict = Depends(get_current_user)):
     }
 
 
+@router.post("/franchise/delete-current")
+@router.delete("/franchise/current")
+def delete_current_franchise(user: dict = Depends(get_current_user)):
+    """
+    Delete the current user's franchise (and related FTD, FPD, FRD) so they can start a new one from mode-select.
+    Used when user confirms "New Franchise" in the confirmation modal.
+    Returns 200 with deleted=True if a franchise was deleted, deleted=False if none existed.
+    """
+    doc = db.franchises.find_one({"user_id": user.get("user_id")}, {"_id": 1})
+    if not doc:
+        return {"deleted": False, "count": 0}
+    fid = doc["_id"]
+    franchise_team_data_collection.delete_many({"franchise_id": fid})
+    franchise_players_data_collection.delete_many({"franchise_id": fid})
+    franchise_recruits_data_collection.delete_many({"franchise_id": fid})
+    db.franchises.delete_one({"_id": fid})
+    return {"deleted": True, "count": 1}
+
+
 @router.get("/franchise/command-center/data")
 def command_center_data(
     franchise_id: str = None,
