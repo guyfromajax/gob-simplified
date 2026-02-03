@@ -417,6 +417,7 @@ Prevent user data leakage via broken authorization, misconfigured DB access, and
 ## Step 9 — Basic Monitoring & Uptime Alerts
 
 > **Note:** Railway and Netlify provide basic logging. This step adds external uptime monitoring.
+> **Walkthrough:** See `step9_uptime_monitoring_walkthrough.md` for a concise first-time setup guide.
 
 ### 9.1 Choose Uptime Service
 - [ ] Pick service (UptimeRobot, Pingdom, Better Uptime, etc.)
