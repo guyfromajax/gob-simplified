@@ -23,11 +23,11 @@ Each team has 5 active players:
 
 | Position | Key | Description |
 |----------|-----|-------------|
-| Point Guard | `PG` | Primary ball handler |
-| Shooting Guard | `SG` | Secondary perimeter scorer |
-| Small Forward | `SF` | Wing scorer/defender |
-| Power Forward | `PF` | Screener and post passer |
-| Center | `C`  | Finisher and rebounder |
+| Point Guard | `PG` | 
+| Shooting Guard | `SG` |
+| Small Forward | `SF` | 
+| Power Forward | `PF` | 
+| Center | `C`  | 
 
 ---
 
