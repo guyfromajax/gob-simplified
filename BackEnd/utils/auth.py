@@ -253,7 +253,18 @@ async def require_admin_for_builder(
             headers={"WWW-Authenticate": "Bearer"},
         )
     payload = decode_token(credentials.credentials)
-    if not payload or payload.get("role") != "admin":
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    role = payload.get("role", "user")
+    # If JWT says user, check DB so admin status is live (no re-login needed)
+    if role != "admin":
+        db_user = get_user_by_id(payload.get("sub"))
+        if db_user and db_user.get("role") == "admin":
+            role = "admin"
+    if role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",
@@ -261,7 +272,7 @@ async def require_admin_for_builder(
     return {
         "user_id": payload.get("sub"),
         "email": payload.get("email"),
-        "role": payload.get("role", "user"),
+        "role": role,
     }
 
 
