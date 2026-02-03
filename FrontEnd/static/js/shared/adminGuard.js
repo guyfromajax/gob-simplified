@@ -29,6 +29,9 @@
     if (h.indexOf("netlify.app") !== -1 && h.indexOf("staging") !== -1) return "https://gob-simplified-staging.up.railway.app";
     return "http://localhost:8000";
   }
+  function redirectToModeSelect() {
+    window.location.replace("/mode-select.html");
+  }
   var url = getApiBase() + "/api/auth/me";
   fetch(url, { headers: { "Authorization": "Bearer " + token } })
     .then(function (r) {
@@ -36,9 +39,11 @@
       return r.json();
     })
     .then(function (me) {
-      if (me && me.role !== "admin") {
-        window.location.replace("/mode-select.html");
+      if (!me || me.role !== "admin") {
+        redirectToModeSelect();
       }
     })
-    .catch(function () {});
+    .catch(function () {
+      redirectToModeSelect();
+    });
 })();
