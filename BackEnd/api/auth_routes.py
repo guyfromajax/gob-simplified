@@ -10,8 +10,10 @@ ENDPOINTS:
     GET  /api/auth/config  - Get auth configuration (IS_ALPHA status)
 """
 
+import os
 import re
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, Request
@@ -20,7 +22,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 from bson import ObjectId
 
 from BackEnd.utils.rate_limiter import limiter, AUTH_RATE_LIMIT
-from BackEnd.db import users_collection
+from BackEnd.db import users_collection, password_reset_tokens_collection
 from BackEnd.utils.auth import (
     hash_password,
     verify_password,
@@ -33,6 +35,10 @@ from BackEnd.utils.otp_validator import (
     validate_otp,
     consume_otp
 )
+from BackEnd.utils.email_sender import send_password_reset_email
+
+RESET_LINK_BASE_URL = os.getenv("RESET_LINK_BASE_URL", "https://www.geekedoutbasketball.com")
+RESET_TOKEN_EXPIRY_HOURS = 1
 
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -51,15 +57,7 @@ class SignupRequest(BaseModel):
     @field_validator('password')
     @classmethod
     def validate_password(cls, v):
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters')
-        if len(v) > 128:
-            raise ValueError('Password must be at most 128 characters')
-        if not re.search(r'[A-Za-z]', v):
-            raise ValueError('Password must contain at least one letter')
-        if not re.search(r'\d', v):
-            raise ValueError('Password must contain at least one number')
-        return v
+        return _validate_password(v)
 
 
 class LoginRequest(BaseModel):
@@ -88,6 +86,35 @@ class AuthConfigResponse(BaseModel):
     """Auth configuration response."""
     is_alpha: bool
     otp_required: bool
+
+
+class ResetRequest(BaseModel):
+    """Password reset request - send reset link to email."""
+    email: EmailStr
+
+
+def _validate_password(v: str) -> str:
+    """Shared password rules (signup and reset)."""
+    if len(v) < 8:
+        raise ValueError("Password must be at least 8 characters")
+    if len(v) > 128:
+        raise ValueError("Password must be at most 128 characters")
+    if not re.search(r"[A-Za-z]", v):
+        raise ValueError("Password must contain at least one letter")
+    if not re.search(r"\d", v):
+        raise ValueError("Password must contain at least one number")
+    return v
+
+
+class ResetPasswordRequest(BaseModel):
+    """Set new password using reset token."""
+    token: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v):
+        return _validate_password(v)
 
 
 class SetUsernameRequest(BaseModel):
@@ -292,6 +319,60 @@ async def set_username(
     )
 
     return {"username": username, "message": "Username set successfully"}
+
+
+@router.post("/reset-request")
+@limiter.limit(AUTH_RATE_LIMIT)
+async def password_reset_request(request: Request, body: ResetRequest):
+    """
+    Request a password reset email.
+
+    If the email is registered, a reset link is sent (when email is configured).
+    Always returns 200 with a generic message to avoid leaking whether the email exists.
+    """
+    email = body.email.lower().strip()
+    user = get_user_by_email(email)
+    if user:
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=RESET_TOKEN_EXPIRY_HOURS)
+        password_reset_tokens_collection.insert_one({
+            "token": token,
+            "user_id": user["_id"],
+            "expires_at": expires_at,
+            "created_at": datetime.now(timezone.utc),
+        })
+        reset_link = f"{RESET_LINK_BASE_URL.rstrip('/')}/reset-password.html?token={token}"
+        send_password_reset_email(email, reset_link)
+    return JSONResponse(
+        content={"message": "If an account exists with that email, you will receive a reset link shortly."},
+        status_code=200,
+    )
+
+
+@router.post("/reset-password")
+@limiter.limit(AUTH_RATE_LIMIT)
+async def password_reset_confirm(request: Request, body: ResetPasswordRequest):
+    """
+    Set a new password using the token from the reset email.
+
+    Token is invalidated after use. Returns 400 if token is invalid or expired.
+    """
+    doc = password_reset_tokens_collection.find_one({"token": body.token})
+    if not doc:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link. Please request a new one.")
+    if doc["expires_at"] < datetime.now(timezone.utc):
+        password_reset_tokens_collection.delete_one({"_id": doc["_id"]})
+        raise HTTPException(status_code=400, detail="Reset link has expired. Please request a new one.")
+    user_id = doc["user_id"]
+    users_collection.update_one(
+        {"_id": user_id},
+        {"$set": {"password_hash": hash_password(body.new_password), "updated_at": datetime.now(timezone.utc)}}
+    )
+    password_reset_tokens_collection.delete_many({"user_id": user_id})
+    return JSONResponse(
+        content={"message": "Password updated. You can now log in with your new password."},
+        status_code=200,
+    )
 
 
 @router.get("/me", response_model=UserResponse)
