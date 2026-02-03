@@ -548,3 +548,23 @@ body {
 .confirm-modal-confirm:hover {
   background: #1565c0;
 }
+
+/* Step 12.3: Support & Feedback footer */
+.app-footer {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  text-align: center;
+  font-size: 14px;
+  color: #666;
+}
+.app-footer a {
+  color: #666;
+  text-decoration: none;
+}
+.app-footer a:hover {
+  color: #ff9800;
+  text-decoration: underline;
+}
+.app-footer-divider {
+  margin: 0 0.5rem;
+}

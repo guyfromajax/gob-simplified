@@ -231,6 +231,40 @@ async def get_admin_user(user: dict = Depends(get_current_user)) -> dict:
     return user
 
 
+def _is_production() -> bool:
+    """True when running in production (builder pages and APIs restricted to admin)."""
+    env = (os.getenv("ENVIRONMENT") or os.getenv("ENV") or os.getenv("RAILWAY_ENVIRONMENT") or "").lower()
+    return env == "production"
+
+
+async def require_admin_for_builder(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> Optional[dict]:
+    """
+    Step 12.4: In production, require admin role for builder endpoints.
+    In staging/develop, allow (no auth required) for testing.
+    """
+    if not _is_production():
+        return None
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    payload = decode_token(credentials.credentials)
+    if not payload or payload.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return {
+        "user_id": payload.get("sub"),
+        "email": payload.get("email"),
+        "role": payload.get("role", "user"),
+    }
+
+
 def get_user_by_email(email: str) -> Optional[dict]:
     """
     Get a user document by email.

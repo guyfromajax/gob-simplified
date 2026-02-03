@@ -2,11 +2,12 @@
 API routes for managing FCP and HCT skeletons.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Dict, List, Any, Optional
 from BackEnd.db import fcp_skeletons_collection, hct_skeletons_collection, client, DB_NAME
+from BackEnd.utils.auth import require_admin_for_builder
 from pathlib import Path
 import os
 
@@ -51,7 +52,7 @@ class SkeletonCreate(BaseModel):
 
 
 @router.post("/api/fcp-skeletons")
-async def create_fcp_skeleton(skeleton_data: SkeletonCreate):
+async def create_fcp_skeleton(skeleton_data: SkeletonCreate, _user=Depends(require_admin_for_builder)):
     """
     Create or update an FCP skeleton in MongoDB.
     
@@ -122,7 +123,7 @@ async def get_all_fcp_skeletons():
 
 
 @router.post("/api/hct-skeletons")
-async def create_hct_skeleton(skeleton_data: SkeletonCreate):
+async def create_hct_skeleton(skeleton_data: SkeletonCreate, _user=Depends(require_admin_for_builder)):
     """
     Create or update an HCT skeleton in MongoDB.
     
