@@ -3915,7 +3915,7 @@ async def set_playcall_override_endpoint(raw_request: Request):
         user_team.strategy_calls["tempo_override"] = request.tempo_override
         logging.info(f"🎮 [PLAYCALL OVERRIDE] Set tempo override for {user_team.name}: {request.tempo_override}")
     
-    return {
+    response_data = {
         "status": "success",
         "overrides": {
             "offense": user_team.strategy_calls.get("offense_call"),
@@ -3924,6 +3924,7 @@ async def set_playcall_override_endpoint(raw_request: Request):
             "tempo": user_team.strategy_calls.get("tempo_override")
         }
     }
+    return JSONResponse(content=response_data, status_code=200)
 
 
 @app.post("/api/call-timeout")
@@ -3932,8 +3933,8 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
     # Creates a TIMEOUT turn and saves game state before navigating to lineup screen.
     # ✅ PHASE 1.1: Normalize game_id at entry point (standardize to ObjectId format)
     from BackEnd.utils.game_id_utils import normalize_game_id
-    original_game_id = body.game_id
-    game_id = normalize_game_id(body.game_id) if body.game_id else None
+    original_game_id = request.game_id
+    game_id = normalize_game_id(request.game_id) if request.game_id else None
     if original_game_id != game_id:
         logger.warning(f"🔍 [NORMALIZE] POST /api/call-timeout - Normalized game_id from '{original_game_id}' to '{game_id}'")
     
