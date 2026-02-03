@@ -145,11 +145,23 @@ if (newFranchiseModalCancel) {
   newFranchiseModalCancel.addEventListener('click', closeNewFranchiseModal);
 }
 if (newFranchiseModalConfirm) {
-  newFranchiseModalConfirm.addEventListener('click', () => {
+  newFranchiseModalConfirm.addEventListener('click', async () => {
     if (newFranchiseDontShowAgain && newFranchiseDontShowAgain.checked && typeof localStorage !== 'undefined') {
       localStorage.setItem(DONT_SHOW_NEW_FRANCHISE_WARNING_KEY, '1');
     }
     closeNewFranchiseModal();
+    // Delete current user's franchise so they can start a new one (same pattern as New Tournament)
+    try {
+      const res = await fetch(API_CONFIG.buildUrl('/franchise/delete-current'), {
+        method: 'POST',
+        headers: API_CONFIG.getAuthHeaders(),
+      });
+      if (!res.ok) {
+        console.warn('[mode-select] delete-current franchise failed:', res.status);
+      }
+    } catch (e) {
+      console.warn('[mode-select] delete-current franchise error:', e);
+    }
     goToNewFranchise();
   });
 }
