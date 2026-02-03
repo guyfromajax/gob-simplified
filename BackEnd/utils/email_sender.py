@@ -30,9 +30,12 @@ def send_password_reset_email(to_email: str, reset_link: str) -> bool:
         True if sent successfully, False if not configured or send failed.
     """
     if not SENDGRID_API_KEY:
-        logger.warning("SENDGRID_API_KEY not set - skipping password reset email")
+        logger.warning("[RESET] SENDGRID_API_KEY not set - skipping password reset email")
         return False
 
+    to_redacted = (to_email[:2] + "***@" + to_email.split("@")[-1]) if "@" in to_email else "***"
+    from_redacted = "***@" + RESET_EMAIL_FROM.split("@")[-1] if "@" in RESET_EMAIL_FROM else "***"
+    logger.warning("[RESET] SendGrid: from=%s to=%s", from_redacted, to_redacted)
     payload = {
         "personalizations": [{"to": [{"email": to_email}]}],
         "from": {"email": RESET_EMAIL_FROM, "name": "Geeked Out Basketball"},
@@ -61,9 +64,10 @@ def send_password_reset_email(to_email: str, reset_link: str) -> bool:
                 json=payload,
             )
         if resp.status_code >= 200 and resp.status_code < 300:
+            logger.warning("[RESET] SendGrid mail/send succeeded (status=%s)", resp.status_code)
             return True
-        logger.warning("SendGrid returned %s: %s", resp.status_code, resp.text[:200])
+        logger.warning("[RESET] SendGrid returned %s: %s", resp.status_code, resp.text[:300])
         return False
     except Exception as e:
-        logger.exception("Failed to send password reset email: %s", e)
+        logger.exception("[RESET] SendGrid request failed: %s", e)
         return False
