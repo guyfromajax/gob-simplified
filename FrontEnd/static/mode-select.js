@@ -80,11 +80,23 @@ if (newTournamentModalCancel) {
   newTournamentModalCancel.addEventListener('click', closeNewTournamentModal);
 }
 if (newTournamentModalConfirm) {
-  newTournamentModalConfirm.addEventListener('click', () => {
+  newTournamentModalConfirm.addEventListener('click', async () => {
     if (newTournamentDontShowAgain && newTournamentDontShowAgain.checked && typeof localStorage !== 'undefined') {
       localStorage.setItem(DONT_SHOW_NEW_TOURNAMENT_WARNING_KEY, '1');
     }
     closeNewTournamentModal();
+    // Delete current user's tournament so they can start a new one
+    try {
+      const res = await fetch(API_CONFIG.buildUrl('/tournament/delete-current'), {
+        method: 'POST',
+        headers: API_CONFIG.getAuthHeaders(),
+      });
+      if (!res.ok) {
+        console.warn('[mode-select] delete-current tournament failed:', res.status);
+      }
+    } catch (e) {
+      console.warn('[mode-select] delete-current tournament error:', e);
+    }
     goToNewTournament();
   });
 }

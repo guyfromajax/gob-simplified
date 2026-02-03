@@ -1794,20 +1794,20 @@ async def simulate_quarter_options():
 
 @app.post("/api/simulate-quarter")
 @limiter.limit(SIM_RATE_LIMIT)
-def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationRequest, debug: bool = False):
+def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, debug: bool = False):
     """Rate limited: 30/minute per IP."""
     import time
     start_time = time.time()
-    game_id = request.game_id
+    game_id = body.game_id
     # ✅ PERFORMANCE: Removed debug logging - only log errors and critical events
     if debug:
         logging.debug(
             "simulate_quarter_endpoint request detail: %s",
             {
                 "game_id": game_id,
-                "home_team": request.home_team,
-                "away_team": request.away_team,
-                "quarter": request.quarter,
+                "home_team": body.home_team,
+                "away_team": body.away_team,
+                "quarter": body.quarter,
             },
         )
     source = "resume"
@@ -2090,9 +2090,9 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                             home_team_name=home,
                             away_team_name=away,
                             mode=mode,
-                            request_strategy_settings=request.strategy_settings,
-                            request_playbook_settings=request.playbook_settings,
-                            user_team_side=request.user_team_side,
+                            request_strategy_settings=body.strategy_settings,
+                            request_playbook_settings=body.playbook_settings,
+                            user_team_side=body.user_team_side,
                             gm=None  # Will apply after GameManager creation
                         )
                         
@@ -2123,7 +2123,7 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                             home_strategy_calls=home_strategy_calls,  # ✅ SS&S: Restore playcall overrides
                             away_strategy_calls=away_strategy_calls,  # ✅ SS&S: Restore playcall overrides
                             mode=saved_mode,  # Use saved mode (could be franchise/tournament)
-                            user_team_side=request.user_team_side,  # ✅ SS&S: Set is_user_team flags
+                            user_team_side=body.user_team_side,  # ✅ SS&S: Set is_user_team flags
                             franchise_id=franchise_id_for_roster  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
                         )
                         gm_create_time = (time.time() - gm_create_start) * 1000
@@ -2194,9 +2194,9 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                         saved_quarter = saved.get("quarter", 1)
                         gm.quarter = saved_quarter
                         # 🔍 DEBUG: Log quarter mismatch
-                        logging.warning(f"🔍 [QUARTER_DEBUG] Loaded from DB: saved_quarter={saved_quarter}, request.quarter={request.quarter}, gm.quarter set to={gm.quarter}")
-                        if saved_quarter != request.quarter:
-                            logging.warning(f"🔍 [QUARTER_DEBUG] ⚠️ QUARTER MISMATCH: saved_quarter ({saved_quarter}) != request.quarter ({request.quarter})")
+                        logging.warning(f"🔍 [QUARTER_DEBUG] Loaded from DB: saved_quarter={saved_quarter}, body.quarter={body.quarter}, gm.quarter set to={gm.quarter}")
+                        if saved_quarter != body.quarter:
+                            logging.warning(f"🔍 [QUARTER_DEBUG] ⚠️ QUARTER MISMATCH: saved_quarter ({saved_quarter}) != body.quarter ({body.quarter})")
                         
                         # ✅ SS&S: Restore user_team_side to game_state (persists override checking across game loads)
                         # Priority: 1) Saved document, 2) Preserved from in-memory, 3) Request, 4) Warn
@@ -2206,9 +2206,9 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                         elif preserved_user_team_side:
                             gm.game_state["user_team_side"] = preserved_user_team_side
                             logging.warning(f"✅ Restored user_team_side from preserved in-memory value: {preserved_user_team_side}")
-                        elif request.user_team_side:
-                            gm.game_state["user_team_side"] = request.user_team_side
-                            logging.warning(f"✅ Set user_team_side from request: {request.user_team_side}")
+                        elif body.user_team_side:
+                            gm.game_state["user_team_side"] = body.user_team_side
+                            logging.warning(f"✅ Set user_team_side from request: {body.user_team_side}")
                         else:
                             logging.warning(f"⚠️ No user_team_side found in DB, preserved memory, or request - override checking will not work!")
                         
@@ -2223,41 +2223,41 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                         # This ensures scores/fouls are restored when resuming from timeout
                         # Check if timeout state exists in saved document (regardless of URL parameter)
                         has_timeout_state = "timeout_next_play_type" in saved and saved.get("timeout_next_play_type") is not None
-                        if has_timeout_state and saved_quarter == request.quarter:
+                        if has_timeout_state and saved_quarter == body.quarter:
                             # Timeout state found - ensure resume_from_timeout is set
-                            if not request.resume_from_timeout:
-                                request.resume_from_timeout = True
+                            if not body.resume_from_timeout:
+                                body.resume_from_timeout = True
                                 # ✅ PERFORMANCE: Removed debug logging
                         
                         # ✅ TIMEOUT RESUME: Check for timeout state in saved document BEFORE calculating should_restore_stats
                         # This ensures scores/fouls are restored when resuming from timeout
                         # Check if timeout state exists in saved document (regardless of URL parameter or timeout_saved_state)
                         has_timeout_state = "timeout_next_play_type" in saved and saved.get("timeout_next_play_type") is not None
-                        if has_timeout_state and saved_quarter == request.quarter:
+                        if has_timeout_state and saved_quarter == body.quarter:
                             # Timeout state found in saved document - ensure resume_from_timeout is set
-                            if not request.resume_from_timeout:
-                                request.resume_from_timeout = True
+                            if not body.resume_from_timeout:
+                                body.resume_from_timeout = True
                                 # ✅ PERFORMANCE: Removed debug logging
                         
                         # Simple check: If requesting Q1 but saved game is at a later quarter, start fresh (new game)
                         # ✅ TIMEOUT: If resuming from timeout, always restore stats (we're continuing an existing game)
-                        is_new_game = (request.quarter == 1 and saved_quarter > 1) and not request.resume_from_timeout
-                        should_restore_stats = not is_new_game or request.resume_from_timeout
+                        is_new_game = (body.quarter == 1 and saved_quarter > 1) and not body.resume_from_timeout
+                        should_restore_stats = not is_new_game or body.resume_from_timeout
                         
                         # CRITICAL: Build lineups BEFORE restoring player stats
                         # Player stat restoration (below) looks up players in team.lineup, so lineups must exist
                         # If request has lineups, use them; otherwise build from MongoDB
-                        if request.home_lineup:
+                        if body.home_lineup:
                             from BackEnd.utils.db_utils import assign_lineup_from_ids
-                            gm.home_team.lineup = assign_lineup_from_ids(gm.home_team, request.home_lineup)
+                            gm.home_team.lineup = assign_lineup_from_ids(gm.home_team, body.home_lineup)
                             # ✅ PERFORMANCE: Removed debug logging
                         elif not gm.home_team.lineup:
                             from BackEnd.utils.db_utils import build_lineup_from_mongo
                             gm.home_team.lineup = build_lineup_from_mongo(gm.home_team, gm.game_state)
                         
-                        if request.away_lineup:
+                        if body.away_lineup:
                             from BackEnd.utils.db_utils import assign_lineup_from_ids
-                            gm.away_team.lineup = assign_lineup_from_ids(gm.away_team, request.away_lineup)
+                            gm.away_team.lineup = assign_lineup_from_ids(gm.away_team, body.away_lineup)
                         elif not gm.away_team.lineup:
                             from BackEnd.utils.db_utils import build_lineup_from_mongo
                             gm.away_team.lineup = build_lineup_from_mongo(gm.away_team, gm.game_state)
@@ -2379,16 +2379,16 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                             # Validate that this is actually a timeout resume (not stale data from previous game)
                             # Check that timeout_next_play_type exists and quarter matches
                             saved_quarter = saved.get("quarter", 0)
-                            if timeout_saved_state.get("timeout_next_play_type") and saved_quarter == request.quarter:
+                            if timeout_saved_state.get("timeout_next_play_type") and saved_quarter == body.quarter:
                                 # ✅ CRITICAL FIX: Apply timeout state from the FULL saved document, not just timeout_saved_state
                                 # This ensures we restore ALL game state (scores, clock, etc.) from the latest DB save
                                 # Use 'saved' (the full document) instead of 'timeout_saved_state' (which might be partial)
                                 apply_timeout_resume_state_to_gm(gm, saved)  # Use full saved document
-                                # Override request.resume_from_timeout to ensure simulate_quarter() handles timeout resume
-                                request.resume_from_timeout = True
+                                # Override body.resume_from_timeout to ensure simulate_quarter() handles timeout resume
+                                body.resume_from_timeout = True
                                 logging.info(f"✅ TIMEOUT RESUME: Applied timeout state from full saved document (quarter matches), setting resume_from_timeout=True for simulate_quarter()")
                             else:
-                                logging.warning(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={request.quarter})")
+                                logging.warning(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={body.quarter})")
                                 timeout_saved_state = None  # Clear invalid timeout state
                         else:
                             # ✅ FIX: Don't restore time_remaining when starting a new quarter
@@ -2396,9 +2396,9 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                             # Only restore clock/time_remaining when resuming mid-quarter (timeout resume)
                             # For new quarter starts, let simulate_quarter() reset them
                             saved_quarter = saved.get("quarter", 0)
-                            if saved_quarter != request.quarter:
+                            if saved_quarter != body.quarter:
                                 # Quarter mismatch - this shouldn't happen, but if it does, don't restore time
-                                logging.warning(f"⚠️ Quarter mismatch: saved={saved_quarter}, requested={request.quarter} - not restoring time_remaining")
+                                logging.warning(f"⚠️ Quarter mismatch: saved={saved_quarter}, requested={body.quarter} - not restoring time_remaining")
                             # Don't restore time_remaining here - simulate_quarter() will reset it for the new quarter
                         
                         # Restore opening_tip_winner for Q2-Q4 possession logic
@@ -2419,9 +2419,9 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                         
                         # 🔍 DEBUG: Log time_remaining before calling simulate_quarter()
                         time_before_sim = gm.game_state.get("time_remaining", "NOT_SET")
-                        logging.warning(f"🔍 [Q4 DEBUG] BEFORE simulate_quarter() call: quarter={request.quarter}, resume_from_timeout={request.resume_from_timeout}, time_remaining={time_before_sim}, saved_time_remaining={saved.get('time_remaining', 'NOT_SET') if saved else 'NO_SAVED_DOC'}")
+                        logging.warning(f"🔍 [Q4 DEBUG] BEFORE simulate_quarter() call: quarter={body.quarter}, resume_from_timeout={body.resume_from_timeout}, time_remaining={time_before_sim}, saved_time_remaining={saved.get('time_remaining', 'NOT_SET') if saved else 'NO_SAVED_DOC'}")
                         # 🔍 DEBUG: Log quarter and score state before simulate_quarter()
-                        logging.warning(f"🔍 [BEFORE_SIM_DEBUG] gm.quarter={gm.quarter}, request.quarter={request.quarter}, gm.score={gm.score}")
+                        logging.warning(f"🔍 [BEFORE_SIM_DEBUG] gm.quarter={gm.quarter}, body.quarter={body.quarter}, gm.score={gm.score}")
                         
                         ongoing_games[game_id] = gm
                         # ✅ DEBUG: Track when game is added to ongoing_games
@@ -2436,40 +2436,40 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                     logging.exception("Failed to load game state for %s", game_id)
                     logging.error(f"❌ Exception loading game: {type(e).__name__}: {str(e)}")
             if gm is None:
-                if request.quarter == 1:
+                if body.quarter == 1:
                     # Determine which team gets the user's settings
                     home_strategy = None
                     away_strategy = None
                     
-                    if request.user_team_side == "home" and request.strategy_settings:
+                    if body.user_team_side == "home" and body.strategy_settings:
                         try:
-                            if isinstance(request.strategy_settings, dict):
-                                home_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
+                            if isinstance(body.strategy_settings, dict):
+                                home_strategy = dict(body.strategy_settings)  # Use dict() constructor for safety
                                 # Only apply user's settings to their team, not the CPU team
                                 away_strategy = None  # CPU team will use random defaults
                                 logging.warning(f"🔧 [STRATEGY SETTINGS] CREATING NEW GAME - user_team_side=home")
-                                logging.warning(f"   - Applied to HOME team only: HCT={request.strategy_settings.get('hc_trap')}, FCP={request.strategy_settings.get('fc_press')}")
+                                logging.warning(f"   - Applied to HOME team only: HCT={body.strategy_settings.get('hc_trap')}, FCP={body.strategy_settings.get('fc_press')}")
                                 logging.warning(f"   - AWAY team will use random defaults")
                             else:
-                                logging.error(f"⚠️ [STRATEGY SETTINGS] request.strategy_settings is not a dict: {type(request.strategy_settings)}")
+                                logging.error(f"⚠️ [STRATEGY SETTINGS] body.strategy_settings is not a dict: {type(body.strategy_settings)}")
                         except Exception as e:
                             logging.error(f"❌ [STRATEGY SETTINGS] Error processing strategy_settings for new game: {e}", exc_info=True)
-                    elif request.user_team_side == "away" and request.strategy_settings:
+                    elif body.user_team_side == "away" and body.strategy_settings:
                         try:
-                            if isinstance(request.strategy_settings, dict):
-                                away_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
+                            if isinstance(body.strategy_settings, dict):
+                                away_strategy = dict(body.strategy_settings)  # Use dict() constructor for safety
                                 # Only apply user's settings to their team, not the CPU team
                                 home_strategy = None  # CPU team will use random defaults
                                 logging.warning(f"🔧 [STRATEGY SETTINGS] CREATING NEW GAME - user_team_side=away")
-                                logging.warning(f"   - Applied to AWAY team only: HCT={request.strategy_settings.get('hc_trap')}, FCP={request.strategy_settings.get('fc_press')}")
+                                logging.warning(f"   - Applied to AWAY team only: HCT={body.strategy_settings.get('hc_trap')}, FCP={body.strategy_settings.get('fc_press')}")
                                 logging.warning(f"   - HOME team will use random defaults")
                             else:
-                                logging.error(f"⚠️ [STRATEGY SETTINGS] request.strategy_settings is not a dict: {type(request.strategy_settings)}")
+                                logging.error(f"⚠️ [STRATEGY SETTINGS] body.strategy_settings is not a dict: {type(body.strategy_settings)}")
                         except Exception as e:
                             logging.error(f"❌ [STRATEGY SETTINGS] Error processing strategy_settings for new game: {e}", exc_info=True)
                     else:
                         logging.warning(f"⚠️ [STRATEGY SETTINGS] CREATING NEW GAME - No strategy_settings provided!")
-                        logging.warning(f"   - user_team_side={request.user_team_side}, has_strategy_settings={bool(request.strategy_settings)}")
+                        logging.warning(f"   - user_team_side={body.user_team_side}, has_strategy_settings={bool(body.strategy_settings)}")
                     
                     # Get mode from request (default to "single")
                     mode = request.mode or "single"
@@ -2488,31 +2488,31 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                             mode, 
                             request.tournament_id, 
                             None,  # team_id will be resolved inside the function
-                            request.home_team
+                            body.home_team
                         )
                         away_attrs = load_team_attributes_from_doc(
                             mode,
                             request.tournament_id,
                             None,
-                            request.away_team
+                            body.away_team
                         )
                         if home_attrs:
                             home_team_attributes = home_attrs
                         if away_attrs:
                             away_team_attributes = away_attrs
-                    elif mode == "single" and request.game_id:
+                    elif mode == "single" and body.game_id:
                         # Load team attributes from game document
                         home_attrs = load_team_attributes_from_doc(
                             mode, 
-                            request.game_id, 
+                            body.game_id, 
                             None,  # team_id will be resolved inside the function
-                            request.home_team
+                            body.home_team
                         )
                         away_attrs = load_team_attributes_from_doc(
                             mode,
-                            request.game_id,
+                            body.game_id,
                             None,
-                            request.away_team
+                            body.away_team
                         )
                         if home_attrs:
                             home_team_attributes = home_attrs
@@ -2523,12 +2523,12 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                         home_ftd = load_ftd_data_for_team(
                             request.franchise_id,
                             None,  # team_id will be resolved from team_name
-                            request.home_team
+                            body.home_team
                         )
                         away_ftd = load_ftd_data_for_team(
                             request.franchise_id,
                             None,  # team_id will be resolved from team_name
-                            request.away_team
+                            body.away_team
                         )
                         
                         # Extract team_attributes, plays, and scouting_data from FTD
@@ -2640,8 +2640,8 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                                         }
                     
                     gm = GameManager(
-                        request.home_team, 
-                        request.away_team,
+                        body.home_team, 
+                        body.away_team,
                         home_strategy_settings=home_strategy,
                         away_strategy_settings=away_strategy,
                         home_team_attributes=home_team_attributes,
@@ -2651,42 +2651,42 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                         home_plays_data=home_plays_data if mode == "franchise" and request.franchise_id and home_ftd else None,
                         away_plays_data=away_plays_data if mode == "franchise" and request.franchise_id and away_ftd else None,
                         mode=mode,  # Pass mode so teams can initialize plays with correct stats structure
-                        user_team_side=request.user_team_side,  # ✅ SS&S: Set is_user_team flags
+                        user_team_side=body.user_team_side,  # ✅ SS&S: Set is_user_team flags
                         franchise_id=request.franchise_id if mode == "franchise" else None  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
                     )
                     
                     # ✅ SS&S: Ensure user_team_side is set in game_state (GameManager should set it, but double-check)
-                    if request.user_team_side and not gm.game_state.get("user_team_side"):
-                        gm.game_state["user_team_side"] = request.user_team_side
-                        logging.warning(f"✅ [NEW GAME] Set user_team_side in game_state: {request.user_team_side}")
+                    if body.user_team_side and not gm.game_state.get("user_team_side"):
+                        gm.game_state["user_team_side"] = body.user_team_side
+                        logging.warning(f"✅ [NEW GAME] Set user_team_side in game_state: {body.user_team_side}")
                     elif gm.game_state.get("user_team_side"):
                         logging.warning(f"✅ [NEW GAME] user_team_side already set in game_state: {gm.game_state.get('user_team_side')}")
                     else:
-                        logging.warning(f"⚠️ [NEW GAME] No user_team_side set! request.user_team_side={request.user_team_side}")
+                        logging.warning(f"⚠️ [NEW GAME] No user_team_side set! body.user_team_side={body.user_team_side}")
                     
                     logging.warning(f"🔧 [STRATEGY SETTINGS] AFTER GAMEMANAGER (NEW)")
                     logging.warning(f"   - Home: HCT={gm.home_team.strategy_settings.get('hc_trap', 'MISSING')}, FCP={gm.home_team.strategy_settings.get('fc_press', 'MISSING')}")
                     logging.warning(f"   - Away: HCT={gm.away_team.strategy_settings.get('hc_trap', 'MISSING')}, FCP={gm.away_team.strategy_settings.get('fc_press', 'MISSING')}")
                     # ✅ SS&S: Require game_id - game document must be created via init-game endpoint
                     # Never create game document in simulate-quarter - this causes settings to be lost
-                    if not request.game_id:
+                    if not body.game_id:
                         raise HTTPException(
                             status_code=400,
                             detail=f"game_id required for Q1. Game document must be created via /api/init-game before simulating Q1. This ensures playbook and game plan settings persist."
                         )
                     # Verify game document exists in database
-                    saved = games_collection.find_one({"_id": request.game_id}) if games_collection else None
+                    saved = games_collection.find_one({"_id": body.game_id}) if games_collection else None
                     if not saved:
                         try:
-                            saved = games_collection.find_one({"_id": ObjectId(request.game_id)}) if games_collection else None
+                            saved = games_collection.find_one({"_id": ObjectId(body.game_id)}) if games_collection else None
                         except:
                             pass
                     if not saved:
                         raise HTTPException(
                             status_code=404,
-                            detail=f"Game document {request.game_id} not found. Game document must be created via /api/init-game before simulating Q1. This ensures playbook and game plan settings persist."
+                            detail=f"Game document {body.game_id} not found. Game document must be created via /api/init-game before simulating Q1. This ensures playbook and game plan settings persist."
                         )
-                        game_id = request.game_id
+                        game_id = body.game_id
                     gm.game_id = game_id  # Store game_id on the GameManager object
                     ongoing_games[game_id] = gm
                     # ✅ REMOVED: Verbose debug log
@@ -2722,15 +2722,15 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                                 mode,
                                 request.tournament_id,
                                 None,
-                                request.home_team,
-                                game_id=request.game_id
+                                body.home_team,
+                                game_id=body.game_id
                             )
                             away_settings = load_team_settings_from_doc(
                                 mode,
                                 request.tournament_id,
                                 None,
-                                request.away_team,
-                                game_id=request.game_id
+                                body.away_team,
+                                game_id=body.game_id
                             )
                             if home_settings:
                                 home_playbook_settings = home_settings.get("playbook_settings", {})
@@ -2791,19 +2791,19 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
         home_strategy = None
         away_strategy = None
         
-        if request.user_team_side == "home" and request.strategy_settings:
-            home_strategy = request.strategy_settings
+        if body.user_team_side == "home" and body.strategy_settings:
+            home_strategy = body.strategy_settings
             # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
-            away_strategy = request.strategy_settings
-        elif request.user_team_side == "away" and request.strategy_settings:
-            away_strategy = request.strategy_settings
+            away_strategy = body.strategy_settings
+        elif body.user_team_side == "away" and body.strategy_settings:
+            away_strategy = body.strategy_settings
             # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
-            home_strategy = request.strategy_settings
+            home_strategy = body.strategy_settings
         
         # Get mode from request (default to "single")
         mode = request.mode or "single"
         # ✅ Ensure trace_id always defined (used in GAMEMANAGER INIT logs regardless of mode/path)
-        trace_id = f"sim_q{request.quarter}_{request.game_id or 'no_id'}"
+        trace_id = f"sim_q{body.quarter}_{body.game_id or 'no_id'}"
         
         # Load team attributes from tournament/franchise/single game documents if available
         home_team_attributes = None
@@ -2820,13 +2820,13 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                 mode, 
                 request.tournament_id, 
                 None,  # team_id will be resolved inside the function
-                request.home_team
+                body.home_team
             )
             away_attrs = load_team_attributes_from_doc(
                 mode,
                 request.tournament_id,
                 None,
-                request.away_team
+                body.away_team
             )
             if home_attrs:
                 home_team_attributes = home_attrs
@@ -2838,32 +2838,32 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                     mode,
                     request.tournament_id,
                     None,
-                    request.home_team
+                    body.home_team
                 )
                 away_settings = load_team_settings_from_doc(
                     mode,
                     request.tournament_id,
                     None,
-                    request.away_team
+                    body.away_team
                 )
                 # Override strategy_settings if loaded from tournament (unless request has them)
                 if home_settings.get("strategy_settings") and not home_strategy:
                     home_strategy = home_settings.get("strategy_settings")
                 if away_settings.get("strategy_settings") and not away_strategy:
                     away_strategy = away_settings.get("strategy_settings")
-        elif mode == "single" and request.game_id:
+        elif mode == "single" and body.game_id:
             # Load team attributes from game document
             home_attrs = load_team_attributes_from_doc(
                 mode, 
-                request.game_id, 
+                body.game_id, 
                 None,  # team_id will be resolved inside the function
-                request.home_team
+                body.home_team
             )
             away_attrs = load_team_attributes_from_doc(
                 mode,
-                request.game_id,
+                body.game_id,
                 None,
-                request.away_team
+                body.away_team
             )
             if home_attrs:
                 home_team_attributes = home_attrs
@@ -2871,19 +2871,19 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                 away_team_attributes = away_attrs
             
             # Load strategy_settings and playbook_settings from game document
-            trace_id = f"sim_q{request.quarter}_{request.game_id}"
-            logging.warning(f"🟢 [TRACE-LOAD] {trace_id} | LOADING FROM DB | game_id={request.game_id}")
+            trace_id = f"sim_q{body.quarter}_{body.game_id}"
+            logging.warning(f"🟢 [TRACE-LOAD] {trace_id} | LOADING FROM DB | game_id={body.game_id}")
             home_settings = load_team_settings_from_doc(
                 mode,
-                request.game_id,
+                body.game_id,
                 None,
-                request.home_team
+                body.home_team
             )
             away_settings = load_team_settings_from_doc(
                 mode,
-                request.game_id,
+                body.game_id,
                 None,
-                request.away_team
+                body.away_team
             )
             # ✅ TRACE: Log what we loaded
             home_db_inside = home_settings.get("strategy_settings", {}).get("inside", "MISSING") if home_settings.get("strategy_settings") else "NO_DB_SETTINGS"
@@ -2990,7 +2990,7 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                     gm.home_team.strategy_settings = {**default_settings, **home_strategy}
                     logging.warning(f"✅ [SIMULATE-QUARTER] Applied DB home strategy_settings to cached GameManager")
             elif home_settings.get("strategy_settings") and home_strategy:
-                logging.warning(f"⚠️ [SIMULATE-QUARTER] Skipped DB home strategy_settings (request.strategy_settings takes precedence)")
+                logging.warning(f"⚠️ [SIMULATE-QUARTER] Skipped DB home strategy_settings (body.strategy_settings takes precedence)")
             if away_settings.get("strategy_settings") and not away_strategy:
                 away_strategy = away_settings.get("strategy_settings")
                 logging.warning(f"✅ [SIMULATE-QUARTER] Applied away strategy_settings from DB")
@@ -3000,20 +3000,20 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                     gm.away_team.strategy_settings = {**default_settings, **away_strategy}
                     logging.warning(f"✅ [SIMULATE-QUARTER] Applied DB away strategy_settings to cached GameManager")
             elif away_settings.get("strategy_settings") and away_strategy:
-                logging.warning(f"⚠️ [SIMULATE-QUARTER] Skipped DB away strategy_settings (request.strategy_settings takes precedence)")
+                logging.warning(f"⚠️ [SIMULATE-QUARTER] Skipped DB away strategy_settings (body.strategy_settings takes precedence)")
         elif mode == "franchise" and request.franchise_id:
             # Load team attributes from franchise document
             home_attrs = load_team_attributes_from_doc(
                 mode,
                 request.franchise_id,
                 None,
-                request.home_team
+                body.home_team
             )
             away_attrs = load_team_attributes_from_doc(
                 mode,
                 request.franchise_id,
                 None,
-                request.away_team
+                body.away_team
             )
             if home_attrs:
                 home_team_attributes = home_attrs
@@ -3026,15 +3026,15 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                 mode,
                 request.franchise_id,
                 None,
-                request.home_team,
-                game_id=request.game_id
+                body.home_team,
+                game_id=body.game_id
             )
             away_settings = load_team_settings_from_doc(
                 mode,
                 request.franchise_id,
                 None,
-                request.away_team,
-                game_id=request.game_id
+                body.away_team,
+                game_id=body.game_id
             )
             # Override strategy_settings if loaded from franchise (unless request has them)
             if home_settings.get("strategy_settings") and not home_strategy:
@@ -3045,17 +3045,17 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
         # ✅ TRACE: Log what we're passing to GameManager
         home_init_inside = home_strategy.get("inside", "MISSING") if home_strategy and isinstance(home_strategy, dict) else "NO_SETTINGS"
         away_init_inside = away_strategy.get("inside", "MISSING") if away_strategy and isinstance(away_strategy, dict) else "NO_SETTINGS"
-        logging.warning(f"🟡 [TRACE-APPLY] {trace_id} | GAMEMANAGER INIT | home_strategy_inside={home_init_inside}, away_strategy_inside={away_init_inside}, user_team_side={request.user_team_side}")
+        logging.warning(f"🟡 [TRACE-APPLY] {trace_id} | GAMEMANAGER INIT | home_strategy_inside={home_init_inside}, away_strategy_inside={away_init_inside}, user_team_side={body.user_team_side}")
         
         gm = GameManager(
-            request.home_team, 
-            request.away_team,
+            body.home_team, 
+            body.away_team,
             home_strategy_settings=home_strategy,
             away_strategy_settings=away_strategy,
             home_team_attributes=home_team_attributes,
             away_team_attributes=away_team_attributes,
             mode=mode,  # Pass mode so teams can initialize plays with correct stats structure
-            user_team_side=request.user_team_side,  # ✅ SS&S: Pass user_team_side to set is_user_team flags
+            user_team_side=body.user_team_side,  # ✅ SS&S: Pass user_team_side to set is_user_team flags
             franchise_id=request.franchise_id if mode == "franchise" else None  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
         )
         
@@ -3065,15 +3065,15 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
         logging.warning(f"🟡 [TRACE-APPLY] {trace_id} | GAMEMANAGER AFTER INIT | home_inside={home_after_init}, away_inside={away_after_init}")
         # ✅ SS&S: Require game_id for Q2-Q4 - cannot start mid-game without existing game document
         # Game document must be created via init-game endpoint before Q1
-        if not request.game_id:
+        if not body.game_id:
             raise HTTPException(
                 status_code=400,
-                detail=f"game_id required for Q{request.quarter}. Game document must be created via /api/init-game before Q1. Cannot start Q{request.quarter} without existing game document."
+                detail=f"game_id required for Q{body.quarter}. Game document must be created via /api/init-game before Q1. Cannot start Q{body.quarter} without existing game document."
             )
         # ✅ PHASE 1.1: Normalize game_id at entry point (standardize to ObjectId format)
         from BackEnd.utils.game_id_utils import normalize_game_id
-        original_game_id = request.game_id
-        game_id = normalize_game_id(request.game_id)
+        original_game_id = body.game_id
+        game_id = normalize_game_id(body.game_id)
         if original_game_id != game_id:
             logger.warning(f"🔍 [NORMALIZE] POST /api/simulate-quarter - Normalized game_id from '{original_game_id}' to '{game_id}'")
         saved = games_collection.find_one({"_id": game_id}) if games_collection else None
@@ -3085,7 +3085,7 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
         if not saved:
             raise HTTPException(
                 status_code=404,
-                detail=f"Game document {game_id} not found for Q{request.quarter}. Game document must be created via /api/init-game before Q1. Cannot resume Q{request.quarter} without existing game document."
+                detail=f"Game document {game_id} not found for Q{body.quarter}. Game document must be created via /api/init-game before Q1. Cannot resume Q{body.quarter} without existing game document."
             )
         gm.game_id = game_id  # Store game_id on the GameManager object
         ongoing_games[game_id] = gm
@@ -3113,15 +3113,15 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                     mode,
                     request.tournament_id,
                     None,
-                    request.home_team,
-                    game_id=request.game_id
+                    body.home_team,
+                    game_id=body.game_id
                 )
                 away_settings = load_team_settings_from_doc(
                     mode,
                     request.tournament_id,
                     None,
-                    request.away_team,
-                    game_id=request.game_id
+                    body.away_team,
+                    game_id=body.game_id
                 )
                 if home_settings:
                     home_playbook_settings = home_settings.get("playbook_settings", {})
@@ -3132,13 +3132,13 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
                     mode,
                     request.franchise_id,
                     None,
-                    request.home_team
+                    body.home_team
                 )
                 away_settings = load_team_settings_from_doc(
                     mode,
                     request.franchise_id,
                     None,
-                    request.away_team
+                    body.away_team
                 )
                 if home_settings:
                     home_playbook_settings = home_settings.get("playbook_settings", {})
@@ -3209,15 +3209,15 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
         {
             "event": "simulate-quarter:start",
             "game_id": game_id,
-            "home_team": request.home_team,
-            "away_team": request.away_team,
-            "quarter": request.quarter,
+            "home_team": body.home_team,
+            "away_team": body.away_team,
+            "quarter": body.quarter,
             "source": source,
         }
     )
 
     # If the requested quarter has already been simulated, return the existing state
-    if request.quarter < gm.quarter:
+    if body.quarter < gm.quarter:
         summary = summarize_game_state(gm)
         summary["start_box_score"] = gm.game_state.get("start_box_score")
         is_final = (
@@ -3235,69 +3235,69 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
         return summary
 
     # Allow quarter progression: only prevent going backwards or skipping too far ahead
-    if request.quarter < gm.quarter:
+    if body.quarter < gm.quarter:
         if debug:
             logging.debug(
                 "simulate_quarter_endpoint quarter regression: game_id=%s current=%s requested=%s",
                 game_id,
                 gm.quarter,
-                request.quarter,
+                body.quarter,
             )
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot simulate previous quarter. Current quarter is {gm.quarter}, requested {request.quarter}",
+            detail=f"Cannot simulate previous quarter. Current quarter is {gm.quarter}, requested {body.quarter}",
         )
-    elif request.quarter > gm.quarter + 1:
+    elif body.quarter > gm.quarter + 1:
         if debug:
             logging.debug(
                 "simulate_quarter_endpoint quarter skip: game_id=%s current=%s requested=%s",
                 game_id,
                 gm.quarter,
-                request.quarter,
+                body.quarter,
             )
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot skip quarters. Current quarter is {gm.quarter}, requested {request.quarter}",
+            detail=f"Cannot skip quarters. Current quarter is {gm.quarter}, requested {body.quarter}",
         )
 
     try:
         # ✅ FIX: Use full_sim parameter to determine turn_by_turn_mode
         # When full_sim=True (simming), fully simulate the quarter instantly (no animation)
         # When full_sim=False (playing), use turn-by-turn mode (for animation)
-        turn_by_turn_mode = not request.full_sim
-        logging.warning(f"🔍 [FULL_SIM DEBUG] simulate_quarter_endpoint START: full_sim={request.full_sim}, turn_by_turn_mode={turn_by_turn_mode}, quarter={request.quarter}, game_id={game_id}")
+        turn_by_turn_mode = not body.full_sim
+        logging.warning(f"🔍 [FULL_SIM DEBUG] simulate_quarter_endpoint START: full_sim={body.full_sim}, turn_by_turn_mode={turn_by_turn_mode}, quarter={body.quarter}, game_id={game_id}")
         if gm:
             current_flag = gm.game_state.get("_is_full_simulation", False)
             logging.warning(f"🔍 [FULL_SIM DEBUG] Game in memory - current _is_full_simulation={current_flag}")
         else:
             logging.warning(f"🔍 [FULL_SIM DEBUG] Game NOT in memory - will load from DB")
-        logging.info(f"🎮 simulate_quarter_endpoint: full_sim={request.full_sim}, turn_by_turn_mode={turn_by_turn_mode}, quarter={request.quarter}, resume_from_timeout={request.resume_from_timeout}")
+        logging.info(f"🎮 simulate_quarter_endpoint: full_sim={body.full_sim}, turn_by_turn_mode={turn_by_turn_mode}, quarter={body.quarter}, resume_from_timeout={body.resume_from_timeout}")
         
         # ⏱️ PERFORMANCE: Time the quarter simulation
         sim_start = time.time()
         simulate_quarter(
             gm,
-            request.home_lineup,
-            request.away_lineup,
+            body.home_lineup,
+            body.away_lineup,
             game_id,
             request.start_with_inbound,
             request.starting_possession,
             turn_by_turn_mode=turn_by_turn_mode,
-            resume_from_timeout=request.resume_from_timeout,
+            resume_from_timeout=body.resume_from_timeout,
         )
         sim_time = (time.time() - sim_start) * 1000
         
         # 🔍 DEBUG: Log time_remaining after simulate_quarter() returns
         time_after_sim = gm.game_state.get("time_remaining", "NOT_SET")
-        logging.warning(f"🔍 [Q4 DEBUG] AFTER simulate_quarter() returns: quarter={gm.quarter}, time_remaining={time_after_sim}, resume_from_timeout={request.resume_from_timeout}")
+        logging.warning(f"🔍 [Q4 DEBUG] AFTER simulate_quarter() returns: quarter={gm.quarter}, time_remaining={time_after_sim}, resume_from_timeout={body.resume_from_timeout}")
         
     except ValueError as e:
         logging.error(
             "simulate_quarter lineup error for game_id=%s, home_team=%s, away_team=%s, quarter=%s: %s",
             game_id,
-            request.home_team,
-            request.away_team,
-            request.quarter,
+            body.home_team,
+            body.away_team,
+            body.quarter,
             e,
         )
         raise HTTPException(status_code=400, detail=str(e))
@@ -3307,13 +3307,13 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
         logging.error(
             "simulate_quarter failed for game_id=%s, home_team=%s, away_team=%s, quarter=%s, home_lineup_keys=%s, away_lineup_keys=%s, full_sim=%s, turn_by_turn_mode=%s",
             game_id,
-            request.home_team,
-            request.away_team,
-            request.quarter,
-            list((request.home_lineup or {}).keys()),
-            list((request.away_lineup or {}).keys()),
-            request.full_sim,
-            not request.full_sim,
+            body.home_team,
+            body.away_team,
+            body.quarter,
+            list((body.home_lineup or {}).keys()),
+            list((body.away_lineup or {}).keys()),
+            body.full_sim,
+            not body.full_sim,
         )
         logging.error(f"Full traceback:\n{error_trace}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -3335,7 +3335,7 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
     gm_after_sim = ongoing_games.get(game_id)
     # ✅ REMOVED: Verbose debug logs - only log if game is unexpectedly missing
     gm_after_sim = ongoing_games.get(game_id)
-    if not gm_after_sim and not request.full_sim:
+    if not gm_after_sim and not body.full_sim:
         logging.warning(f"⚠️ [ONGOING_GAMES] Game NOT in ongoing_games after simulate_quarter! Available games: {list(ongoing_games.keys())}")
     
     # Save to database (WITHOUT animations to reduce document size)
@@ -3423,7 +3423,7 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
     # ✅ TIMEOUT: Return the SIP turn that was created in simulate_quarter() (same pattern as quarter breaks)
     # simulate_quarter() already created the SIP turn and added it to gm.turns when resume_from_timeout=True
     # We should return it just like we return BIP turns for quarter breaks
-    if request.resume_from_timeout:
+    if body.resume_from_timeout:
         logging.info(f"✅ TIMEOUT RESUME: Returning turns from simulate_quarter() (turns count: {len(turns)})")
         if turns:
             first_turn = turns[0]
@@ -3473,18 +3473,18 @@ def simulate_quarter_endpoint(http_request: Request, request: QuarterSimulationR
     total_time = (time.time() - start_time) * 1000
     response_size = len(str(frontend_summary).encode('utf-8'))
     logging.warning(
-        f"⏱️ [PERF] /api/simulate-quarter - quarter={request.quarter}, "
+        f"⏱️ [PERF] /api/simulate-quarter - quarter={body.quarter}, "
         f"simulation: {sim_time:.2f}ms, summary: {summary_time:.2f}ms, "
         f"db_save: {db_save_time:.2f}ms, response_size: {response_size} bytes, "
-        f"total: {total_time:.2f}ms, full_sim={request.full_sim}"
+        f"total: {total_time:.2f}ms, full_sim={body.full_sim}"
     )
     
-    return frontend_summary
+    return JSONResponse(content=frontend_summary, status_code=200)
 
 
 @app.post("/api/simulate-turn")
 @limiter.limit(SIM_TURN_RATE_LIMIT)
-def simulate_turn_endpoint(http_request: Request, request: TurnSimulationRequest):
+def simulate_turn_endpoint(request: Request, body: TurnSimulationRequest):
     import time
     start_time = time.time()
     # Simulate a single turn for turn-by-turn gameplay.
@@ -3494,7 +3494,7 @@ def simulate_turn_endpoint(http_request: Request, request: TurnSimulationRequest
     # 3. Simulates ONE turn (one call to gm.simulate_macro_turn())
     # 4. Returns the turn data + game state metadata
     # 5. Saves game state periodically
-    game_id = request.game_id
+    game_id = body.game_id
     
     # Get the GameManager from memory
     gm = ongoing_games.get(game_id)
@@ -3508,13 +3508,13 @@ def simulate_turn_endpoint(http_request: Request, request: TurnSimulationRequest
     logging.info(f"🏀 simulate-turn: Retrieved game from ongoing_games, home_lineup_keys={list(gm.home_team.lineup.keys()) if gm.home_team.lineup else 'EMPTY'}, away_lineup_keys={list(gm.away_team.lineup.keys()) if gm.away_team.lineup else 'EMPTY'}")
     
     # Apply user overrides for THIS turn only
-    if request.offense_override:
-        gm.game_state["user_offense_override"] = request.offense_override
-        logging.info(f"🎮 User offense override: {request.offense_override}")
+    if body.offense_override:
+        gm.game_state["user_offense_override"] = body.offense_override
+        logging.info(f"🎮 User offense override: {body.offense_override}")
     
-    if request.defense_override:
-        gm.game_state["user_defense_override"] = request.defense_override
-        logging.info(f"🎮 User defense override: {request.defense_override}")
+    if body.defense_override:
+        gm.game_state["user_defense_override"] = body.defense_override
+        logging.info(f"🎮 User defense override: {body.defense_override}")
     
     # Check if quarter is already over
     if gm.game_state["time_remaining"] <= 0:
@@ -3820,7 +3820,7 @@ async def set_playcall_override_endpoint(raw_request: Request):
     # Validate using Pydantic model
     request = PlaycallOverrideRequest(**body)
     
-    game_id = request.game_id
+    game_id = body.game_id
     gm = ongoing_games.get(game_id)
     
     # ✅ DEBUG: Track ongoing_games state for playcall override issue
@@ -3835,12 +3835,12 @@ async def set_playcall_override_endpoint(raw_request: Request):
         )
     
     # Determine user team
-    user_team = gm.home_team if request.user_team_side == "home" else gm.away_team
+    user_team = gm.home_team if body.user_team_side == "home" else gm.away_team
     
     # ✅ DEBUG: Log team info with object IDs for tracking
     user_team_id = id(user_team)  # Python object ID to verify same object
     logging.warning(f"🎮 [PLAYCALL SET] API: Setting override on team object")
-    logging.warning(f"   - user_team_side={request.user_team_side}, user_team={user_team.name}")
+    logging.warning(f"   - user_team_side={body.user_team_side}, user_team={user_team.name}")
     logging.warning(f"   - team_id={user_team.team_id}, object_id={user_team_id}")
     logging.warning(f"   - Current strategy_calls: {user_team.strategy_calls}")
     logging.warning(f"   - game_id={game_id}, game_object_id={id(gm)}")
@@ -3852,9 +3852,9 @@ async def set_playcall_override_endpoint(raw_request: Request):
     # - If a field is provided and None → clear it (explicit clear via red X)
     
     if "offense_override" in provided_fields:
-        if request.offense_override is not None:
-            user_team.strategy_calls["offense_call"] = request.offense_override
-            logging.warning(f"🎮 [PLAYCALL SET] ✅ Offense override SET: '{request.offense_override}'")
+        if body.offense_override is not None:
+            user_team.strategy_calls["offense_call"] = body.offense_override
+            logging.warning(f"🎮 [PLAYCALL SET] ✅ Offense override SET: '{body.offense_override}'")
             logging.warning(f"   - Team: {user_team.name} (team_id: {user_team.team_id}, object_id: {id(user_team)})")
             logging.warning(f"   - After setting, strategy_calls['offense_call'] = {user_team.strategy_calls.get('offense_call')}")
         else:
@@ -3868,9 +3868,9 @@ async def set_playcall_override_endpoint(raw_request: Request):
             logging.warning(f"🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
     
     if "defense_override" in provided_fields:
-        if request.defense_override is not None:
-            user_team.strategy_calls["defense_call"] = request.defense_override
-            logging.warning(f"🎮 [PLAYCALL SET] ✅ Defense override SET: '{request.defense_override}'")
+        if body.defense_override is not None:
+            user_team.strategy_calls["defense_call"] = body.defense_override
+            logging.warning(f"🎮 [PLAYCALL SET] ✅ Defense override SET: '{body.defense_override}'")
             logging.warning(f"   - Team: {user_team.name} (team_id: {user_team.team_id}, object_id: {id(user_team)})")
             logging.warning(f"   - After setting, strategy_calls['defense_call'] = {user_team.strategy_calls.get('defense_call')}")
         else:
@@ -3919,8 +3919,8 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
     # Creates a TIMEOUT turn and saves game state before navigating to lineup screen.
     # ✅ PHASE 1.1: Normalize game_id at entry point (standardize to ObjectId format)
     from BackEnd.utils.game_id_utils import normalize_game_id
-    original_game_id = request.game_id
-    game_id = normalize_game_id(request.game_id) if request.game_id else None
+    original_game_id = body.game_id
+    game_id = normalize_game_id(body.game_id) if body.game_id else None
     if original_game_id != game_id:
         logger.warning(f"🔍 [NORMALIZE] POST /api/call-timeout - Normalized game_id from '{original_game_id}' to '{game_id}'")
     
@@ -4005,7 +4005,7 @@ def save_man_defense_matchups(request: SaveManDefenseMatchupsRequest):
     from BackEnd.utils.game_id_utils import normalize_game_id
     from BackEnd.utils.man_defense_matchups import validate_man_defense_matchups
     
-    game_id = normalize_game_id(request.game_id) if request.game_id else None
+    game_id = normalize_game_id(body.game_id) if body.game_id else None
     if not game_id:
         raise HTTPException(status_code=400, detail="game_id is required")
     
@@ -4746,7 +4746,7 @@ def save_sim_quarter_diagnostics(request: SimQuarterDiagnosticRequest):
 
 **Generated:** {request.timestamp}  
 **Game ID:** {request.gameId}  
-**Quarter:** {request.quarter}  
+**Quarter:** {body.quarter}  
 **Teams:** {request.homeTeam} vs {request.awayTeam}
 
 ## Summary
@@ -4905,7 +4905,7 @@ def save_ft_fg_diagnostics(request: FTFGDiagnosticRequest):
 
 **Generated:** {request.timestamp}  
 **Game ID:** {request.gameId}  
-**Quarter:** {request.quarter}  
+**Quarter:** {body.quarter}  
 **Teams:** {request.homeTeam} vs {request.awayTeam}
 
 ## Summary
