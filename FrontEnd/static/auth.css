@@ -48,6 +48,14 @@ body {
   letter-spacing: 1px;
 }
 
+.auth-subtitle {
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+  margin: 0 0 20px 0;
+  line-height: 1.4;
+}
+
 /* Alpha disclaimer */
 .alpha-disclaimer {
   background: linear-gradient(135deg, #fff3e0, #ffe0b2);
@@ -198,6 +206,16 @@ body {
 }
 
 .auth-footer a:hover {
+  text-decoration: underline;
+}
+
+.forgot-password-link {
+  color: #666;
+  font-size: 14px;
+  text-decoration: none;
+}
+.forgot-password-link:hover {
+  color: #ff9800;
   text-decoration: underline;
 }
 
