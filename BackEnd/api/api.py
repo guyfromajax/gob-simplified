@@ -3416,8 +3416,9 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
             logging.error(f"❌ [SAVE] Failed to verify saved document: game_id={game_id} (ObjectId: {game_id_oid})")
         db_save_time = (time.time() - db_save_start) * 1000
     except Exception as e:
+        import traceback as _tb
         print("🚨 Mongo upsert failed:", e)
-        traceback.print_exc()
+        _tb.print_exc()
         db_save_time = (time.time() - db_save_start) * 1000
 
     if is_final and game_id:
