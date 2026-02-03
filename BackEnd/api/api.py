@@ -53,6 +53,7 @@ from .play_routes import router as play_router
 from .skeleton_routes import router as skeleton_router
 from .pointer_validation_routes import router as pointer_validation_router
 from .auth_routes import router as auth_router
+from .admin_routes import router as admin_router
 from BackEnd.utils.auth import get_current_user
 from BackEnd.utils.ownership import verify_game_owned_by_user
 import traceback
@@ -191,6 +192,7 @@ app.include_router(play_router)
 app.include_router(skeleton_router)
 app.include_router(pointer_validation_router)
 app.include_router(auth_router)
+app.include_router(admin_router)
 
 templates = Jinja2Templates(directory="FrontEnd/static")
 

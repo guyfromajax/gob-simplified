@@ -2,11 +2,12 @@
 API routes for managing plays (offensive play skeletons).
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Dict, List, Any, Optional
 from BackEnd.db import plays_collection, client
+from BackEnd.utils.auth import require_admin_for_builder
 from bson import ObjectId
 from pathlib import Path
 
@@ -56,7 +57,7 @@ class PlayCreate(BaseModel):
 
 
 @router.post("/api/plays")
-async def create_play(play_data: PlayCreate):
+async def create_play(play_data: PlayCreate, _user=Depends(require_admin_for_builder)):
     """
     Create or update a play in MongoDB.
     
@@ -205,7 +206,7 @@ async def get_play(play_id: str):
 
 
 @router.delete("/api/plays/{play_id}")
-async def delete_play(play_id: str):
+async def delete_play(play_id: str, _user=Depends(require_admin_for_builder)):
     """
     Delete a play by ID.
     

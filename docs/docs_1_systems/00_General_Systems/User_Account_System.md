@@ -13,6 +13,7 @@
 
 2. **Data**:
    - **Users collection**: `user_id` (ObjectId), `email`, `password_hash`, `role`, `username` (optional), `username_lower` (for uniqueness), `created_at`, `last_login_at`, `version`
+   - **role**: `"user"` (default) or `"admin"`. New signups get `role: "user"`. To set admin: run `python scripts/set_admin_user.py <email>` (Step 12.1).
    - **password_reset_tokens collection**: `token`, `user_id`, `expires_at`, `created_at` (tokens expire in 1 hour, deleted after use)
    - **JWT**: Stored client-side; sent in `Authorization: Bearer <token>` for protected endpoints
    - **Alpha OTP**: When `IS_ALPHA=true`, signup requires valid unused OTP from `alpha_otps` collection
