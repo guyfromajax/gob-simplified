@@ -8,7 +8,7 @@
 8. Playbooks and Game Plans not persisting (Franchise & Tournament modes) — User-configured playbooks and game plans are not saving/loading correctly. Changes made do not persist across sessions or game loads. Needs investigation to determine if this is a frontend storage issue, backend API issue, or regression from recent auth changes.
 9.Pre-populate Playbooks with submittable values
 10. User is still able to put fouled out players into the lineup on the Lineup Selection screen
-11. ~~Playcall Center calls are not taking hold~~ **Fixed (Feb 2025)** — Same pattern as call-timeout/simulate-turn: `POST /api/set-playcall-override` was returning a raw dict instead of `JSONResponse`; updated to `return JSONResponse(content=response_data, status_code=200)`. Playcall-related routes audited: `update_gameplan` / `save_playbooks` use `request` (Pydantic) correctly and are not rate-limited; only set-playcall-override needed the return-type fix.
+11. Flip flop side of defender stopping fast break when the away team is on offense
 
 ## Future Cleanup (Non-Critical Warnings)
 

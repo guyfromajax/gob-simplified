@@ -2090,8 +2090,8 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                         # This ensures consistent logic for both settings types (extract from DB, override with request if valid)
                         from BackEnd.utils.team_settings_manager import load_and_apply_team_settings_to_gamemanager
                         
-                        # ✅ SS&S: Use request.mode (supports single, franchise, tournament)
-                        mode = request.mode or "single"
+                        # ✅ SS&S: Use body.mode (supports single, franchise, tournament)
+                        mode = body.mode or "single"
                         
                         home_strategy, away_strategy, home_playbook_settings, away_playbook_settings = load_and_apply_team_settings_to_gamemanager(
                             saved_doc=saved,
@@ -2479,8 +2479,8 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                         logging.warning(f"⚠️ [STRATEGY SETTINGS] CREATING NEW GAME - No strategy_settings provided!")
                         logging.warning(f"   - user_team_side={body.user_team_side}, has_strategy_settings={bool(body.strategy_settings)}")
                     
-                    # Get mode from request (default to "single")
-                    mode = request.mode or "single"
+                    # Get mode from body (default to "single")
+                    mode = body.mode or "single"
                     
                     # Load team attributes from tournament/franchise/single game documents if available
                     home_team_attributes = None
@@ -2490,17 +2490,17 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                     home_scouting_data = None
                     away_scouting_data = None
                     
-                    if mode == "tournament" and request.tournament_id:
+                    if mode == "tournament" and body.tournament_id:
                         # Load team attributes from tournament document
                         home_attrs = load_team_attributes_from_doc(
                             mode, 
-                            request.tournament_id, 
+                            body.tournament_id, 
                             None,  # team_id will be resolved inside the function
                             body.home_team
                         )
                         away_attrs = load_team_attributes_from_doc(
                             mode,
-                            request.tournament_id,
+                            body.tournament_id,
                             None,
                             body.away_team
                         )
@@ -2526,15 +2526,15 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                             home_team_attributes = home_attrs
                         if away_attrs:
                             away_team_attributes = away_attrs
-                    elif mode == "franchise" and request.franchise_id:
+                    elif mode == "franchise" and body.franchise_id:
                         # ✅ FTD: Load team data from FTD collection instead of franchise doc
                         home_ftd = load_ftd_data_for_team(
-                            request.franchise_id,
+                            body.franchise_id,
                             None,  # team_id will be resolved from team_name
                             body.home_team
                         )
                         away_ftd = load_ftd_data_for_team(
-                            request.franchise_id,
+                            body.franchise_id,
                             None,  # team_id will be resolved from team_name
                             body.away_team
                         )
@@ -2654,13 +2654,13 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                         away_strategy_settings=away_strategy,
                         home_team_attributes=home_team_attributes,
                         away_team_attributes=away_team_attributes,
-                        home_scouting_data=home_scouting_data if mode == "franchise" and request.franchise_id and home_ftd else None,
-                        away_scouting_data=away_scouting_data if mode == "franchise" and request.franchise_id and away_ftd else None,
-                        home_plays_data=home_plays_data if mode == "franchise" and request.franchise_id and home_ftd else None,
-                        away_plays_data=away_plays_data if mode == "franchise" and request.franchise_id and away_ftd else None,
+                        home_scouting_data=home_scouting_data if mode == "franchise" and body.franchise_id and home_ftd else None,
+                        away_scouting_data=away_scouting_data if mode == "franchise" and body.franchise_id and away_ftd else None,
+                        home_plays_data=home_plays_data if mode == "franchise" and body.franchise_id and home_ftd else None,
+                        away_plays_data=away_plays_data if mode == "franchise" and body.franchise_id and away_ftd else None,
                         mode=mode,  # Pass mode so teams can initialize plays with correct stats structure
                         user_team_side=body.user_team_side,  # ✅ SS&S: Set is_user_team flags
-                        franchise_id=request.franchise_id if mode == "franchise" else None  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
+                        franchise_id=body.franchise_id if mode == "franchise" else None  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
                     )
                     
                     # ✅ SS&S: Ensure user_team_side is set in game_state (GameManager should set it, but double-check)
@@ -2704,12 +2704,12 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                     try:
                         from BackEnd.api.gameplan_routes import populate_team_plays
                         
-                        # Get mode from request (default to "single")
-                        mode = request.mode or "single"
+                        # Get mode from body (default to "single")
+                        mode = body.mode or "single"
                         
                         # ✅ FTD: For franchise mode, use plays_data loaded from FTD (already initialized with game_stats)
                         # For other modes, use populate_team_plays
-                        if mode == "franchise" and request.franchise_id and home_plays_data and away_plays_data:
+                        if mode == "franchise" and body.franchise_id and home_plays_data and away_plays_data:
                             # Use plays_data from FTD (already initialized with game_stats = 0)
                             home_plays_for_game = home_plays_data
                             away_plays_for_game = away_plays_data
@@ -2724,18 +2724,18 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                         home_playbook_settings = {}
                         away_playbook_settings = {}
                         
-                        if mode == "tournament" and request.tournament_id:
+                        if mode == "tournament" and body.tournament_id:
                             # ✅ PHASE 5.7: Try game doc first, fallback to master doc
                             home_settings = load_team_settings_from_doc(
                                 mode,
-                                request.tournament_id,
+                                body.tournament_id,
                                 None,
                                 body.home_team,
                                 game_id=body.game_id
                             )
                             away_settings = load_team_settings_from_doc(
                                 mode,
-                                request.tournament_id,
+                                body.tournament_id,
                                 None,
                                 body.away_team,
                                 game_id=body.game_id
@@ -2744,7 +2744,7 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                                 home_playbook_settings = home_settings.get("playbook_settings", {})
                             if away_settings:
                                 away_playbook_settings = away_settings.get("playbook_settings", {})
-                        elif mode == "franchise" and request.franchise_id:
+                        elif mode == "franchise" and body.franchise_id:
                             # ✅ FTD: Load playbook_settings from FTD
                             if home_ftd:
                                 home_playbook_settings = home_ftd.get("playbook_settings", {})
@@ -2808,8 +2808,8 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
             # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
             home_strategy = body.strategy_settings
         
-        # Get mode from request (default to "single")
-        mode = request.mode or "single"
+        # Get mode from body (default to "single")
+        mode = body.mode or "single"
         # ✅ Ensure trace_id always defined (used in GAMEMANAGER INIT logs regardless of mode/path)
         trace_id = f"sim_q{body.quarter}_{body.game_id or 'no_id'}"
         
@@ -2822,17 +2822,17 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
         home_settings = None
         away_settings = None
         
-        if mode == "tournament" and request.tournament_id:
+        if mode == "tournament" and body.tournament_id:
             # Load team attributes from tournament document
             home_attrs = load_team_attributes_from_doc(
                 mode, 
-                request.tournament_id, 
+                body.tournament_id, 
                 None,  # team_id will be resolved inside the function
                 body.home_team
             )
             away_attrs = load_team_attributes_from_doc(
                 mode,
-                request.tournament_id,
+                body.tournament_id,
                 None,
                 body.away_team
             )
@@ -2844,13 +2844,13 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
             # Load strategy_settings and playbook_settings from tournament document
                 home_settings = load_team_settings_from_doc(
                     mode,
-                    request.tournament_id,
+                    body.tournament_id,
                     None,
                     body.home_team
                 )
                 away_settings = load_team_settings_from_doc(
                     mode,
-                    request.tournament_id,
+                    body.tournament_id,
                     None,
                     body.away_team
                 )
@@ -3009,17 +3009,17 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                     logging.warning(f"✅ [SIMULATE-QUARTER] Applied DB away strategy_settings to cached GameManager")
             elif away_settings.get("strategy_settings") and away_strategy:
                 logging.warning(f"⚠️ [SIMULATE-QUARTER] Skipped DB away strategy_settings (body.strategy_settings takes precedence)")
-        elif mode == "franchise" and request.franchise_id:
+        elif mode == "franchise" and body.franchise_id:
             # Load team attributes from franchise document
             home_attrs = load_team_attributes_from_doc(
                 mode,
-                request.franchise_id,
+                body.franchise_id,
                 None,
                 body.home_team
             )
             away_attrs = load_team_attributes_from_doc(
                 mode,
-                request.franchise_id,
+                body.franchise_id,
                 None,
                 body.away_team
             )
@@ -3032,14 +3032,14 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
             # Try game doc first, fallback to master doc
             home_settings = load_team_settings_from_doc(
                 mode,
-                request.franchise_id,
+                body.franchise_id,
                 None,
                 body.home_team,
                 game_id=body.game_id
             )
             away_settings = load_team_settings_from_doc(
                 mode,
-                request.franchise_id,
+                body.franchise_id,
                 None,
                 body.away_team,
                 game_id=body.game_id
@@ -3064,7 +3064,7 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
             away_team_attributes=away_team_attributes,
             mode=mode,  # Pass mode so teams can initialize plays with correct stats structure
             user_team_side=body.user_team_side,  # ✅ SS&S: Pass user_team_side to set is_user_team flags
-            franchise_id=request.franchise_id if mode == "franchise" else None  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
+            franchise_id=body.franchise_id if mode == "franchise" else None  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
         )
         
         # ✅ TRACE: Log what GameManager actually has after initialization
@@ -3104,8 +3104,8 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
         try:
             from BackEnd.api.gameplan_routes import populate_team_plays
             
-            # Get mode from request (default to "single")
-            mode = request.mode or "single"
+            # Get mode from body (default to "single")
+            mode = body.mode or "single"
             
             # Get populated plays for team objects (with game_stats and optionally season_stats)
             populated_plays = populate_team_plays(mode=mode)
@@ -3115,18 +3115,18 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
             home_playbook_settings = {}
             away_playbook_settings = {}
             
-            if mode == "tournament" and request.tournament_id:
+            if mode == "tournament" and body.tournament_id:
                 # ✅ PHASE 5.7: Try game doc first, fallback to master doc
                 home_settings = load_team_settings_from_doc(
                     mode,
-                    request.tournament_id,
+                    body.tournament_id,
                     None,
                     body.home_team,
                     game_id=body.game_id
                 )
                 away_settings = load_team_settings_from_doc(
                     mode,
-                    request.tournament_id,
+                    body.tournament_id,
                     None,
                     body.away_team,
                     game_id=body.game_id
@@ -3135,16 +3135,16 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                     home_playbook_settings = home_settings.get("playbook_settings", {})
                 if away_settings:
                     away_playbook_settings = away_settings.get("playbook_settings", {})
-            elif mode == "franchise" and request.franchise_id:
+            elif mode == "franchise" and body.franchise_id:
                 home_settings = load_team_settings_from_doc(
                     mode,
-                    request.franchise_id,
+                    body.franchise_id,
                     None,
                     body.home_team
                 )
                 away_settings = load_team_settings_from_doc(
                     mode,
-                    request.franchise_id,
+                    body.franchise_id,
                     None,
                     body.away_team
                 )
@@ -3354,15 +3354,15 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
         logging.info(f"💾 Saving game state: game_id={game_id}, quarter={db_summary.get('quarter')}, gm.quarter={gm.quarter}")
         
         # ✅ TOURNAMENT MODE: Add mode and tournament_id to game document for consistency with Franchise mode
-        # ✅ FIX: Prefer explicit mode from request over inferring from IDs
+        # ✅ FIX: Prefer explicit mode from body over inferring from IDs
         # This prevents Single Game mode from being incorrectly set to "franchise" when franchise_id leaks from localStorage
-        mode = request.mode
+        mode = body.mode
         if not mode:
             # Only infer mode if it's truly not set
             # Default to "single" if mode is not explicitly provided (even if IDs are present)
-            if request.tournament_id:
+            if body.tournament_id:
                 mode = "tournament"
-            elif request.franchise_id:
+            elif body.franchise_id:
                 mode = "franchise"
             else:
                 mode = "single"
@@ -3372,8 +3372,8 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
             db_summary["mode"] = mode
         
         # Add tournament_id to game document when in tournament mode (matches Franchise mode pattern)
-        if mode == "tournament" and request.tournament_id:
-            db_summary["tournament_id"] = str(request.tournament_id)
+        if mode == "tournament" and body.tournament_id:
+            db_summary["tournament_id"] = str(body.tournament_id)
         
         # ✅ FIX: Ensure game_id is converted to ObjectId for consistent database storage
         # This ensures the _id format matches when we try to find it later
