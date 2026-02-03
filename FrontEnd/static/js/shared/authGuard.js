@@ -15,7 +15,9 @@
     "/login.html",
     "/login",
     "/signup.html",
-    "/signup"
+    "/signup",
+    "/reset-password.html",
+    "/reset-password"
   ];
 
   var path = window.location.pathname;
