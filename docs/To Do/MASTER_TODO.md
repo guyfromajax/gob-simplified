@@ -3,6 +3,8 @@
 **Last Updated:** January 2026  
 **Purpose:** Consolidated list of active tasks, bugs, and future improvements
 
+1. Wire the site to be organically optimized for SEO/SEM
+
 ---
 
 ## 🔴 Active Bugs & Critical Issues
