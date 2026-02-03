@@ -10,6 +10,7 @@ ENDPOINTS:
     GET  /api/auth/config  - Get auth configuration (IS_ALPHA status)
 """
 
+import logging
 import os
 import re
 import secrets
@@ -42,6 +43,7 @@ RESET_TOKEN_EXPIRY_HOURS = 1
 
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -321,6 +323,14 @@ async def set_username(
     return {"username": username, "message": "Username set successfully"}
 
 
+def _redact_email(email: str) -> str:
+    """Redact email for logging: a***@domain.com"""
+    if "@" in email:
+        local, domain = email.split("@", 1)
+        return f"{local[:1]}***@{domain}" if len(local) > 1 else f"***@{domain}"
+    return "***"
+
+
 @router.post("/reset-request")
 @limiter.limit(AUTH_RATE_LIMIT)
 async def password_reset_request(request: Request, body: ResetRequest):
@@ -331,8 +341,11 @@ async def password_reset_request(request: Request, body: ResetRequest):
     Always returns 200 with a generic message to avoid leaking whether the email exists.
     """
     email = body.email.lower().strip()
+    # Use WARNING so logs appear even when app log level is WARNING
+    logger.warning("[RESET] reset-request received for %s", _redact_email(email))
     user = get_user_by_email(email)
     if user:
+        logger.warning("[RESET] user found, creating token and sending email")
         token = secrets.token_urlsafe(32)
         expires_at = datetime.now(timezone.utc) + timedelta(hours=RESET_TOKEN_EXPIRY_HOURS)
         password_reset_tokens_collection.insert_one({
@@ -342,7 +355,10 @@ async def password_reset_request(request: Request, body: ResetRequest):
             "created_at": datetime.now(timezone.utc),
         })
         reset_link = f"{RESET_LINK_BASE_URL.rstrip('/')}/reset-password.html?token={token}"
-        send_password_reset_email(email, reset_link)
+        sent = send_password_reset_email(email, reset_link)
+        logger.warning("[RESET] send_password_reset_email returned %s", sent)
+    else:
+        logger.warning("[RESET] user not found (no email sent)")
     return JSONResponse(
         content={"message": "If an account exists with that email, you will receive a reset link shortly."},
         status_code=200,
