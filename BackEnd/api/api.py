@@ -1300,7 +1300,7 @@ def simulate_game(request: Request, body: SimulationRequest):
     
     print("Inside simulate_game()\nReturning summary keys:", summary.keys())
 
-    return summary
+    return JSONResponse(content=summary, status_code=200)
 
 
 @app.get("/api/game/{game_id}")
@@ -3542,7 +3542,7 @@ def simulate_turn_endpoint(request: Request, body: TurnSimulationRequest):
             f"⏱️ [PERF] /api/simulate-turn - EARLY RETURN (quarter complete), "
             f"quarter={gm.quarter}, total: {total_time:.2f}ms"
         )
-        return early_return
+        return JSONResponse(content=early_return, status_code=200)
     
     # ✅ TIMEOUT: Check if last turn is a TIMEOUT turn (user-initiated or foul out)
     # If so, return it immediately without simulating a new turn
@@ -3551,30 +3551,33 @@ def simulate_turn_endpoint(request: Request, body: TurnSimulationRequest):
         logging.info(f"⏸️ TIMEOUT: Returning existing TIMEOUT turn (reason: {timeout_turn.get('timeout_reason')})")
         # Remove the TIMEOUT turn from turns so next API call can simulate the actual next turn
         gm.turns.pop()
-        return {
-            "turn": timeout_turn,
-            "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
-            "time_remaining": gm.game_state["time_remaining"],
-            "clock": gm.game_state.get("clock", "8:00"),
-            "quarter_complete": False,
-            "quarter": gm.quarter,
-            "is_final": False,
-            "home_score": gm.score.get(gm.home_team.name, 0),
-            "away_score": gm.score.get(gm.away_team.name, 0),
-            "home_team_fouls": gm.home_team.team_fouls,
-            "away_team_fouls": gm.away_team.team_fouls,
-            "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
-            "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
-            "offense_team": gm.offense_team.name,
-            "defense_team": gm.defense_team.name,
-            "game_id": game_id,
-            "ineligible_players": gm.game_state.get("ineligible_players", []),
-            "box_score": gm.get_box_score(),
-            "team_totals": {
-                gm.home_team.name: gm.home_team.get_team_game_stats(),
-                gm.away_team.name: gm.away_team.get_team_game_stats()
-            }
-        }
+        return JSONResponse(
+            content={
+                "turn": timeout_turn,
+                "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
+                "time_remaining": gm.game_state["time_remaining"],
+                "clock": gm.game_state.get("clock", "8:00"),
+                "quarter_complete": False,
+                "quarter": gm.quarter,
+                "is_final": False,
+                "home_score": gm.score.get(gm.home_team.name, 0),
+                "away_score": gm.score.get(gm.away_team.name, 0),
+                "home_team_fouls": gm.home_team.team_fouls,
+                "away_team_fouls": gm.away_team.team_fouls,
+                "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
+                "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
+                "offense_team": gm.offense_team.name,
+                "defense_team": gm.defense_team.name,
+                "game_id": game_id,
+                "ineligible_players": gm.game_state.get("ineligible_players", []),
+                "box_score": gm.get_box_score(),
+                "team_totals": {
+                    gm.home_team.name: gm.home_team.get_team_game_stats(),
+                    gm.away_team.name: gm.away_team.get_team_game_stats()
+                }
+            },
+            status_code=200,
+        )
     
     # Simulate ONE turn
     try:
@@ -3625,20 +3628,21 @@ def simulate_turn_endpoint(request: Request, body: TurnSimulationRequest):
                         f"⏱️ [PERF] /api/simulate-turn - TIMEOUT PATH, quarter={gm.quarter}, "
                         f"response_size: {response_size} bytes, total: {total_time:.2f}ms"
                     )
-                    return timeout_response
+                    return JSONResponse(content=timeout_response, status_code=200)
                 except Exception as e:
                     logging.error(f"🚨 COMPUTER TIMEOUT: Failed to save game state: {e}")
                     # Don't fail the timeout return if save fails - game is still in memory
                     # Return timeout turn without save (fallback)
                     timeout_turn = gm.turns.pop() if gm.turns else None
                     if timeout_turn:
-                        return {
-                    "turn": timeout_turn,
+                        fallback = {
+                            "turn": timeout_turn,
                             "time_remaining": gm.game_state.get("time_remaining", 480),
-                    "clock": gm.game_state.get("clock", "8:00"),
-                    "quarter_complete": False,
-                            "quarter": gm.quarter
-                }
+                            "clock": gm.game_state.get("clock", "8:00"),
+                            "quarter_complete": False,
+                            "quarter": gm.quarter,
+                        }
+                        return JSONResponse(content=fallback, status_code=200)
                 # ⏱️ PERFORMANCE: Log timeout return path
                 total_time = (time.time() - start_time) * 1000
                 response_size = len(str(timeout_response).encode('utf-8'))
@@ -3646,7 +3650,7 @@ def simulate_turn_endpoint(request: Request, body: TurnSimulationRequest):
                     f"⏱️ [PERF] /api/simulate-turn - TIMEOUT PATH, quarter={gm.quarter}, "
                     f"response_size: {response_size} bytes, total: {total_time:.2f}ms"
                 )
-                return timeout_response
+                return JSONResponse(content=timeout_response, status_code=200)
         
         # Track how many turns existed before this call (after deferred timeout check)
         turns_before = len(gm.turns)
@@ -3805,7 +3809,7 @@ def simulate_turn_endpoint(request: Request, body: TurnSimulationRequest):
             f"quarter_complete={quarter_complete}"
         )
         
-        return response_data
+        return JSONResponse(content=response_data, status_code=200)
         
     except Exception as e:
         import traceback
@@ -4014,7 +4018,7 @@ def save_man_defense_matchups(request: SaveManDefenseMatchupsRequest):
     from BackEnd.utils.game_id_utils import normalize_game_id
     from BackEnd.utils.man_defense_matchups import validate_man_defense_matchups
     
-    game_id = normalize_game_id(body.game_id) if body.game_id else None
+    game_id = normalize_game_id(request.game_id) if request.game_id else None
     if not game_id:
         raise HTTPException(status_code=400, detail="game_id is required")
     
@@ -4051,10 +4055,13 @@ def save_man_defense_matchups(request: SaveManDefenseMatchupsRequest):
             logging.error(f"⚠️ Failed to save matchups to DB: {e}")
             # Don't fail the request if DB save fails - matchups are in memory
     
-    return {
-        "message": "Man defense matchups saved successfully",
-        "matchups": request.matchups
-    }
+    return JSONResponse(
+        content={
+            "message": "Man defense matchups saved successfully",
+            "matchups": request.matchups,
+        },
+        status_code=200,
+    )
 
 
 @app.get("/api/game/{game_id}/lineup-for-matchups")
