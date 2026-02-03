@@ -22,9 +22,12 @@ This is **not** automated testing - you'll manually click through and play the g
 ## Pre-Testing Setup
 
 - [ ] Confirm staging environment is accessible
+- [ ] Log in (or ensure valid session) so you can reach mode-select and game flows
 - [ ] Clear browser cache or use incognito/private window
 - [ ] Open browser console to monitor for errors
 - [ ] Have Railway logs open for backend monitoring
+
+**Auth (alpha):** When `IS_ALPHA=true`, signup requires an OTP. Optionally verify: signup with OTP, login, and "Forgot password?" / password reset flow.
 
 ---
 
