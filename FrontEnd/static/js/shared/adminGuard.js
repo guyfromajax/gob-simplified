@@ -16,10 +16,12 @@
   });
   var host = window.location.hostname;
   var isProduction = host === "www.geekedoutbasketball.com" || host === "geekedoutbasketball.com";
+  console.log("[adminGuard] path=" + path + " host=" + host + " isBuilderPage=" + isBuilderPage + " isProduction=" + isProduction);
   if (!isBuilderPage || !isProduction) return;
 
   var token = typeof localStorage !== "undefined" ? localStorage.getItem("auth_token") : null;
   if (!token) return; // Auth guard will have redirected to login
+  console.log("[adminGuard] token present, fetching /api/auth/me");
 
   function getApiBase() {
     if (window.API_BASE_URL) return window.API_BASE_URL;
@@ -39,11 +41,16 @@
       return r.json();
     })
     .then(function (me) {
+      console.log("[adminGuard] me=" + (me ? JSON.stringify(me) : "null") + " role=" + (me ? me.role : "N/A"));
       if (!me || me.role !== "admin") {
+        console.log("[adminGuard] redirecting to mode-select");
         redirectToModeSelect();
+      } else {
+        console.log("[adminGuard] admin OK, not redirecting");
       }
     })
-    .catch(function () {
+    .catch(function (err) {
+      console.log("[adminGuard] fetch error", err);
       redirectToModeSelect();
     });
 })();
