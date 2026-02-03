@@ -410,11 +410,13 @@ async def get_me(user: dict = Depends(get_current_user)):
         created_at = db_user["created_at"].isoformat() if hasattr(db_user["created_at"], 'isoformat') else str(db_user["created_at"])
 
     username = db_user.get("username") if db_user else None
+    # Use role from DB when available so admin status is live (no re-login needed)
+    role = db_user.get("role", user.get("role", "user")) if db_user else user.get("role", "user")
 
     return UserResponse(
         user_id=user["user_id"],
         email=user["email"],
-        role=user.get("role", "user"),
+        role=role,
         username=username,
         created_at=created_at
     )
