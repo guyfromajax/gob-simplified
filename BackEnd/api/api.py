@@ -90,6 +90,12 @@ def health_check():
             content={"status": "unhealthy", "error": str(e)}
         )
 
+
+@app.head("/health")
+def health_check_head():
+    """Allow HEAD for uptime monitors (e.g. UptimeRobot) that use HEAD by default."""
+    return Response(status_code=200)
+
 # ============================================================================
 # ALPHA CONFIGURATION
 # ============================================================================
