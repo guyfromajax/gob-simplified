@@ -207,6 +207,19 @@ def get_current_tournament(user: dict = Depends(get_current_user)):
     return jsonable_encoder(doc, custom_encoder={ObjectId: str})
 
 
+@router.post("/tournament/delete-current")
+@router.delete("/tournament/current")
+def delete_current_tournament(user: dict = Depends(get_current_user)):
+    """
+    Delete the current user's tournament (so they can start a new one from mode-select).
+    Used when user confirms "New Tournament" in the confirmation modal.
+    Returns 200 with deleted=True if a tournament was deleted, deleted=False if none existed.
+    """
+    result = tournaments_collection.delete_many({"user_id": user.get("user_id")})
+    deleted = result.deleted_count > 0
+    return {"deleted": deleted, "count": result.deleted_count}
+
+
 @router.post("/tournament/start")
 @router.post("/start-tournament")  # Backward compatibility; prefer /tournament/start
 def start_tournament(
