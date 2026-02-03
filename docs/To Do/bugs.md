@@ -1,15 +1,14 @@
 1. Make end of season progression in franchise mode a true EOS (age players, recruiting process, manage player stats, manage user stats?)
 2. Get rid of double inbound pass on FCP and HCT steps
 3. Add glow effect to drag and drop on Lineup Selection screen when starting click on the player image
-
 4. rebound not resistering to player stats when he gets an OREB from a missed OREB putback attempt (note he made teh follow up shot)
 5. Gameplay Buttons Pop-up not appearing after "Play Quarter" (all modes) — User is not cued with the Gameplay Buttons Pop-up coming out of a quarter break if the previous quarter was played via "Play Quarter". The pop-up does appear correctly if the previous quarter was played via "Sim Quarter". Affects Single Game, Franchise, and Tournament modes.
-6. Some Fast Break made shots are skipping teh BIP step
-
+6. Decouple computer team defense matchups from user's settings
 7. Add a "Super Fast" Speed button that is 2x Fast speed
 8. Playbooks and Game Plans not persisting (Franchise & Tournament modes) — User-configured playbooks and game plans are not saving/loading correctly. Changes made do not persist across sessions or game loads. Needs investigation to determine if this is a frontend storage issue, backend API issue, or regression from recent auth changes.
-
+9.Pre-populate Playbooks with submittable values
 10. User is still able to put fouled out players into the lineup on the Lineup Selection screen
+11. ~~Playcall Center calls are not taking hold~~ **Fixed (Feb 2025)** — Same pattern as call-timeout/simulate-turn: `POST /api/set-playcall-override` was returning a raw dict instead of `JSONResponse`; updated to `return JSONResponse(content=response_data, status_code=200)`. Playcall-related routes audited: `update_gameplan` / `save_playbooks` use `request` (Pydantic) correctly and are not rate-limited; only set-playcall-override needed the return-type fix.
 
 ## Future Cleanup (Non-Critical Warnings)
 
