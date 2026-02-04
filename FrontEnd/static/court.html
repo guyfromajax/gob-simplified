@@ -1896,6 +1896,25 @@
       font-weight: bold;
     }
 
+    .speed-option.speed-option-superfast {
+      background: linear-gradient(180deg, #e8e8e8 0%, #b0b0b0 50%, #909090 100%);
+      color: #000;
+      border: 1px solid #000;
+    }
+
+    .speed-option.speed-option-superfast:hover {
+      background: linear-gradient(180deg, #f0f0f0 0%, #c0c0c0 50%, #a0a0a0 100%);
+      border-color: #000;
+      color: #000;
+    }
+
+    .speed-option.speed-option-superfast.active {
+      background: linear-gradient(180deg, #e8e8e8 0%, #b0b0b0 50%, #909090 100%);
+      border-color: #000;
+      color: #000;
+      font-weight: bold;
+    }
+
     /* ==================== PLAYER TOOLTIP ==================== */
     #player-tooltip {
       position: fixed;
@@ -2404,6 +2423,7 @@
         <button class="speed-option" data-speed="350">Slow</button>
         <button class="speed-option" data-speed="450">Normal</button>
         <button class="speed-option" data-speed="550">Fast</button>
+        <button class="speed-option speed-option-superfast" data-speed="1000">Super Fast</button>
       </div>
     </div>
 

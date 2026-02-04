@@ -151,7 +151,7 @@ The training execution system applies pre-training conditions, allocates trainin
 
 1. **Pre-Training Conditions** (`apply_pre_training_conditions`)
    - Applies random decreases to player attributes (excluding EM, MO, NG)
-   - Player attributes: `+= random.randint(-4, -1)` per attribute
+   - Player attributes: see pre-training decay section below
    - Team attributes are no longer decayed in training. They are updated at the end of each game based on performance (see End_Of_Game_System.md).
    - **Skipped for training camp in franchise mode** - determined by `week == 1 and not results.get("1")`, no depreciation occurs before first games
 
@@ -212,10 +212,16 @@ The training execution system applies pre-training conditions, allocates trainin
 - 5 points: `+= random.randint(4, 9)`
 
 **Year-Based Adjustments:**
-- **Freshman**: +1 to min, +4 to max (e.g., 1 point: `random.randint(2, 7)`)
-- **Sophomore**: +1 to min, +2 to max (e.g., 1 point: `random.randint(2, 5)`)
-- **Junior**: No change (uses base ranges)
-- **Senior**: -1 to max only (e.g., 1 point: `random.randint(1, 2)`)
+- **Freshman**: 2 to min, 7 to max (e.g., 1 point: `random.randint(2, 7)`)
+- **Sophomore**: 2 to min, 5 to max (e.g., 1 point: `random.randint(2, 5)`)
+- **Junior**: 1 to min, 3 to max (base; no change)
+- **Senior**: 1 to min, 2 to max (e.g., 1 point: `random.randint(1, 2)`)
+
+**Year-Based Pre-Training Decay**
+- **Freshman**: -6 to min, -1 to max 
+- **Sophomore**: -4 to min, -1 to max 
+- **Junior**: -3 to min to 0 to max
+- **Senior**: -2 to min to 0 to max
 
 **Team Attributes (standard):**
 - 0 points: `+= random.randint(-3, -1)` #change here
