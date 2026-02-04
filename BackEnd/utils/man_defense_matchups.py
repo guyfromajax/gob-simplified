@@ -2,8 +2,10 @@
 Man Defense Matchups Utility
 
 Handles custom defensive matchup assignments for man-to-man defense.
-Matchups reset to defaults (position-on-position) at the start of each break
-(timeout, quarter break, foul out).
+- User team matchups: set via Defense Matchups popup, stored in man_defense_matchups.
+- Computer team matchups: separate key (man_defense_matchups_computer); default position-on-position
+  for now; future logic may set them.
+Matchups reset to defaults at the start of each break (timeout, quarter break, foul out).
 """
 
 from typing import Dict, Tuple, Optional
@@ -16,6 +18,10 @@ DEFAULT_MATCHUPS = {
     "PF": "PF",
     "C": "C"
 }
+
+# Game state keys (user = when user team is on defense; computer = when computer team is on defense)
+USER_MATCHUPS_KEY = "man_defense_matchups"
+COMPUTER_MATCHUPS_KEY = "man_defense_matchups_computer"
 
 POSITIONS = ["PG", "SG", "SF", "PF", "C"]
 
@@ -32,13 +38,14 @@ def get_default_matchups() -> Dict[str, str]:
 
 def reset_matchups_to_defaults(game_state: Dict) -> None:
     """
-    Resets man defense matchups to defaults in game_state.
+    Resets both user and computer man defense matchups to defaults in game_state.
     Called at the start of each break (timeout, quarter break, foul out).
     
     Args:
         game_state: Game state dictionary to update
     """
-    game_state["man_defense_matchups"] = get_default_matchups()
+    game_state[USER_MATCHUPS_KEY] = get_default_matchups()
+    game_state[COMPUTER_MATCHUPS_KEY] = get_default_matchups()
 
 
 def validate_man_defense_matchups(matchups: Dict[str, str]) -> Tuple[bool, Optional[str]]:
@@ -94,45 +101,53 @@ def validate_man_defense_matchups(matchups: Dict[str, str]) -> Tuple[bool, Optio
     return True, None
 
 
+def get_matchups_for_defending_team(game_state: Dict, defending_team_is_user: bool) -> Dict[str, str]:
+    """
+    Returns the matchup dict to use based on who is on defense.
+    User team on defense → man_defense_matchups; computer on defense → man_defense_matchups_computer (default if missing).
+    """
+    if defending_team_is_user:
+        return game_state.get(USER_MATCHUPS_KEY, {}) or get_default_matchups()
+    return game_state.get(COMPUTER_MATCHUPS_KEY) or get_default_matchups()
+
+
 def get_defender_position_for_man_defense(
     offensive_pos: str,
     game_state: Dict,
-    fallback_to_default: bool = True
+    fallback_to_default: bool = True,
+    defending_team_is_user: Optional[bool] = None,
 ) -> str:
     """
     Returns the defensive position that should guard the given offensive position
-    in man-to-man defense, checking custom matchups first.
+    in man-to-man defense, using the correct matchup dict for the defending team.
     
     Args:
         offensive_pos: Offensive player's position (PG, SG, SF, PF, C)
-        game_state: Game state dictionary containing man_defense_matchups
+        game_state: Game state dictionary containing man_defense_matchups and optionally man_defense_matchups_computer
         fallback_to_default: If True, falls back to position-on-position if no custom matchup
+        defending_team_is_user: True if user team is on defense, False if computer. If None, uses
+            man_defense_matchups only (backward compat when caller doesn't pass it).
     
     Returns:
         Defensive position (PG, SG, SF, PF, C) that should guard the offensive position
     
     Example:
-        If matchups = {"PG": "SG", "SG": "PG", ...}:
-        - get_defender_position_for_man_defense("SG", game_state) returns "PG"
-        - get_defender_position_for_man_defense("PG", game_state) returns "SG"
+        If user matchups = {"PG": "SG", "SG": "PG", ...} and user is on defense:
+        - get_defender_position_for_man_defense("SG", game_state, defending_team_is_user=True) returns "PG"
     """
     if not offensive_pos or offensive_pos not in POSITIONS:
-        # Invalid position, fallback to same position
         return offensive_pos if offensive_pos in POSITIONS else "PG"
     
-    # Get custom matchups from game state
-    matchups = game_state.get("man_defense_matchups", {})
+    if defending_team_is_user is None:
+        matchups = game_state.get(USER_MATCHUPS_KEY, {})
+    else:
+        matchups = get_matchups_for_defending_team(game_state, defending_team_is_user)
     
-    # Find which defensive position guards this offensive position
-    # We need to reverse lookup: find defensive_pos where matchups[defensive_pos] == offensive_pos
     for defensive_pos, guarded_offensive_pos in matchups.items():
         if guarded_offensive_pos == offensive_pos:
             return defensive_pos
     
-    # No custom matchup found - fallback to default (position-on-position)
     if fallback_to_default:
         return offensive_pos
-    
-    # Shouldn't happen if matchups are validated, but defensive fallback
     return offensive_pos
 

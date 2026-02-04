@@ -3058,9 +3058,12 @@ class TurnManager:
                     # Final fallback: random defender
                     defender_pos = random.choice(list(def_lineup))
         else:
-            # Man-to-man: check custom matchups first, fallback to position-on-position
+            # Man-to-man: use matchups for the defending team (user vs computer)
             from BackEnd.utils.man_defense_matchups import get_defender_position_for_man_defense
-            defender_pos = get_defender_position_for_man_defense(shooter_pos, self.game.game_state)
+            defending_team_is_user = getattr(self.game.defense_team, "is_user_team", False)
+            defender_pos = get_defender_position_for_man_defense(
+                shooter_pos, self.game.game_state, defending_team_is_user=defending_team_is_user
+            )
 
         # --- Step 5: Lookup player objects
         shooter = off_lineup.get(shooter_pos) if shooter_pos else off_lineup["PG"]  # Fallback to PG
