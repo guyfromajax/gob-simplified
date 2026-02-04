@@ -3481,10 +3481,10 @@
         });
       });
       
-      // Clear offense override
+      // Clear offense override (query live DOM like defense/aggression Red X)
       if (clearOffenseBtn) {
         clearOffenseBtn.addEventListener('click', async () => {
-          playOptions.forEach(opt => opt.classList.remove('selected'));
+          document.querySelectorAll('#offense-play-scroller .play-option').forEach(opt => opt.classList.remove('selected'));
           await setPlaycallOverride('offense', null); // null clears the override
         });
       }
