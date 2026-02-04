@@ -1617,15 +1617,40 @@ export function createGameScene(Phaser) {
             await finalize();
           } else {
             console.log('✅ Quarter complete - showing locker room popup');
-            
-            // Show "Go To Locker Room" popup
             const nextQ = this.quarter + 1;
-            const params = new URLSearchParams(window.location.search);
-            params.set('game_id', this.gameId);
-            params.set('quarter', nextQ);
-            params.set('period', `Q${nextQ}`);
-            // ✅ PHASE 1.2: Removed automatic localStorage write - only save for explicit "Resume Last Game" feature
-            
+
+            // ✅ SS&S: Use TimeoutNavigationHelper (same as Sim Quarter and other quarter-break paths)
+            // Ensures resume_from_timeout=false so next court load shows Gameplay Buttons popup
+            const helper = window.TimeoutNavigationHelper;
+            let params;
+            if (!helper) {
+              const fallback = new URLSearchParams(window.location.search);
+              fallback.set('game_id', this.gameId);
+              fallback.set('quarter', nextQ);
+              fallback.set('period', `Q${nextQ}`);
+              fallback.set('resume_from_timeout', 'false');
+              params = fallback;
+            } else {
+              const teams = gameStore.getTeams();
+              const sourceParams = new URLSearchParams(window.location.search);
+              params = helper.buildGameNavigationParams({
+                sourceParams: sourceParams,
+                targetQuarter: nextQ,
+                gameId: this.gameId,
+                resumeFromTimeout: false, // Quarter break, not timeout resume
+                lineup: {},
+                myTeamSide: this.userTeamSide || 'home',
+                overrides: {
+                  home: teams.home,
+                  away: teams.away,
+                  mode: this.mode,
+                  tournament_id: this.tournamentId,
+                  franchise_id: this.franchiseId,
+                  team_id: this.teamId
+                }
+              });
+            }
+
             // Create locker room popup
             const popup = document.createElement('div');
             popup.className = 'locker-room-popup';
@@ -1636,13 +1661,12 @@ export function createGameScene(Phaser) {
               </div>
             `;
             document.body.appendChild(popup);
-            
-            // Wire up button
+
             const button = popup.querySelector('.locker-room-button');
             button.addEventListener('click', () => {
               window.location.href = `/set-lineup.html?${params.toString()}`;
             });
-            
+
             return;
           }
       };

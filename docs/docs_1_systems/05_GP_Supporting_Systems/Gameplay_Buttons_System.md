@@ -47,6 +47,11 @@
 - Uses `ongoing_games` cache during gameplay
 - Lineup screen reads from DB (`source=db`)
 
+**Pre-game container lifecycle:**
+- On court load, `court.html` includes `.pre-game-container` in the DOM. `initGame()` either shows it (quarter break) or hides it and auto-starts (timeout resume).
+- Play Quarter **removes** the container from the DOM for that page; the buttons are gone until the next full load (e.g. after "Go To Locker Room" and return to court).
+- Sim Quarter **hides** the container (`classList.add('hidden')`) then navigates away; the next court load is a new page, so the container is present again and `initGame()` controls visibility.
+
 ---
 
 ### Sim Quarter Button
@@ -99,6 +104,17 @@
 **Backend**: Same as Sim Quarter (calls `/api/simulate-quarter` multiple times)
 
 **Data Persistence**: Same as Sim Quarter (saves after each quarter)
+
+---
+
+## Quarter Break vs Timeout Resume (SS&S)
+
+**Rule:** Every time the user finishes a quarter (Play Quarter or Sim Quarter), the next time they land on the court should show the **Gameplay Buttons popup** (Play Quarter, Sim Quarter, Sim Rest of Game). The only time the popup is hidden and the game auto-starts is when they are **resuming from a timeout or foul-out** (same quarter).
+
+- **Quarter break:** User completed a quarter → "Go To Locker Room" (Play Quarter) or redirect (Sim Quarter) → lineup → court for next quarter. URL to lineup must have `resume_from_timeout=false` so the next court load does not auto-start. All such navigations use `TimeoutNavigationHelper.buildGameNavigationParams` with `resumeFromTimeout: false` (in `bootGame.js` for Sim Quarter, in `gameScene.js` for both "Go To Locker Room" paths: animation-complete and no-animation/skip).
+- **Timeout resume:** User called a timeout mid-quarter → navigates to lineup → clicks back to court. That lineup → court URL is built with `resumeFromTimeout: true` (e.g. in timeout button manager). Court then auto-starts and skips the Gameplay Buttons popup (intended).
+
+**Key files:** `gameScene.js` (animation-complete "Go To Locker Room" block, and no-animation quarter-advance block), `bootGame.js` (`handleSimQuarter` redirect, `initGame()` auto-start when `resume_from_timeout=true`), `FrontEnd/static/js/shared/timeoutNavigationHelper.js`.
 
 ---
 
@@ -206,12 +222,17 @@
    - Check: `ongoing_games` cache state (might be stale)
    - Fix: Lineup screen should use `source=db` parameter
 
-4. **Button Not Appearing/Enabled**
+4. **Gameplay Buttons Popup Not Holding After Play Quarter**
+   - **Intended:** After Play Quarter or Sim Quarter, the next quarter should show the Gameplay Buttons popup (Play Quarter, Sim Quarter, Sim Rest of Game) and hold until the user chooses.
+   - **Cause if broken:** The "Go To Locker Room" URL (when the quarter ends after Play Quarter) must set `resume_from_timeout=false` so the next court load is treated as a quarter break, not a timeout resume. Otherwise `bootGame.js` `initGame()` auto-starts (hides buttons, shows Defense Matchups).
+   - **Fix:** All quarter-break navigations (court → lineup after quarter ends) use `TimeoutNavigationHelper.buildGameNavigationParams` with `resumeFromTimeout: false`. In `gameScene.js` this applies to both the animation-complete "Go To Locker Room" path and the no-animation/skip path. Timeout flow is unchanged (lineup → court with `resume_from_timeout=true` is built when returning from timeout).
+
+5. **Button Not Appearing/Enabled**
    - Check: `initGame()` function sets button state based on `quarter`
    - Check: `resumeFromTimeout` flag (hides buttons on timeout resume)
    - Check: Game completion status (disables Sim Quarter after Q4)
 
-5. **Sim Quarter Shows Wrong Quarter**
+6. **Sim Quarter Shows Wrong Quarter**
    - Note: Backend returns `quarter` as NEXT quarter (already incremented)
    - Frontend should use `lastSummary.quarter` directly, not `quarter + 1`
 
@@ -224,8 +245,12 @@
   - `handleButtonClick()` - Play Quarter handler
   - `handleSimQuarter()` - Sim Quarter handler
   - `handleSimFullGame()` - Sim Rest/Full Game handler
-  - `initGame()` - Button initialization and state
+  - `initGame()` - Button initialization and state (shows Gameplay Buttons unless `resume_from_timeout=true`)
   - `showSimQuarterResults()` - Display simulation results
+- `FrontEnd/static/js/phaser/gameScene.js`:
+  - Animation-complete "Go To Locker Room" block - builds lineup URL via `TimeoutNavigationHelper` with `resumeFromTimeout: false` (quarter break)
+  - No-animation quarter-advance block - same pattern for skip/instant path
+- `FrontEnd/static/js/shared/timeoutNavigationHelper.js` - Single source for building lineup/court URLs with correct `resume_from_timeout`
 
 **Backend**:
 - `BackEnd/api/api.py`:
@@ -240,7 +265,7 @@
 
 ## Critical Code Sections
 
-### Button State Logic (`bootGame.js` line 2460-2494)
+### Button State Logic (`bootGame.js` – `initGame()` ~2600-2633)
 
 ```javascript
 // Sim Full Game button
@@ -260,18 +285,20 @@ if (currentQuarter > 4) {
 }
 ```
 
-### Full Sim Flag (`bootGame.js` line 2054)
+### Full Sim Flag (`bootGame.js` – `handleSimQuarter()` ~2177-2178, `handleSimFullGame()` ~2447-2448)
 
 ```javascript
-// Sim Quarter always sets full_sim=true
+// Sim Quarter / Sim Full Game set full_sim=true
 payload.full_sim = true;
 ```
 
-### Turn-by-Turn Mode (`api.py` line 2374)
+### Turn-by-Turn Mode (`api.py` – `simulate_quarter_endpoint` ~3282-3285)
+
+Backend receives the request body as a Pydantic model (`body`); use `body.full_sim`, not `request.full_sim`.
 
 ```python
 # full_sim parameter determines animation mode
-turn_by_turn_mode = not request.full_sim
+turn_by_turn_mode = not body.full_sim
 # true = Play Quarter (animation), false = Sim Quarter (instant)
 ```
 
@@ -287,4 +314,6 @@ turn_by_turn_mode = not request.full_sim
 6. **Response Returned** → Frontend receives `lastSummary` with results
 7. **UI Updated** → Popup shown (Sim Quarter) or game started (Play Quarter)
 8. **Navigation** → Lineup screen (Sim Quarter) or next turn (Play Quarter)
+
+**Play Quarter navigation (quarter break):** When the quarter ends after Play Quarter, the user sees "Go To Locker Room". That link is built with `resume_from_timeout=false` (via `TimeoutNavigationHelper` in `gameScene.js`). They go to lineup → game-plan → court; the next court load therefore gets `resume_from_timeout=false`, so `initGame()` shows the Gameplay Buttons popup again instead of auto-starting.
 
