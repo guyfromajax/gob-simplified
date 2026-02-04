@@ -644,9 +644,9 @@ body {
   font-weight: bold;
 }
 
-/* ✅ UNIFIED: Same colors and thresholds as Player Grid and Player Box Score */
+/* ✅ UNIFIED: Same colors and thresholds as Player Grid (green from 90%, yellow 80-89%) */
 .player-energy.high {
-  color: #00aa00; /* Green: 89-100% */
+  color: #00aa00; /* Green: 90-100% */
 }
 
 .player-energy.medium {
