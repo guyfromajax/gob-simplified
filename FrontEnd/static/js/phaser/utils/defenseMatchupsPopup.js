@@ -231,7 +231,10 @@ function createPlayerRow(player, teamType, position, currentMatchups, guardingUs
                 ${position}
             </div>
             <img class="player-headshot" src="${player.headshot_url}" alt="${player.name}" onerror="this.style.display='none';">
-            <div class="player-name">${formatPlayerName(player.name)}</div>
+            <div class="player-info">
+                <div class="player-name">${formatPlayerName(player.name)}</div>
+                <div class="player-height-weight">${player.height || '--'} · ${player.weight || '--'} lbs</div>
+            </div>
             ${statStrip}
         </div>
     `;
@@ -640,13 +643,28 @@ function addPopupStyles() {
             flex-shrink: 0;
         }
 
+        .player-info {
+            min-width: 90px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
         .player-name {
             font-size: 14px;
             font-weight: 600;
             color: #1a1a1a;
-            min-width: 90px;
-            flex-shrink: 0;
             font-family: 'Inter', sans-serif;
+            line-height: 1.2;
+        }
+
+        .player-height-weight {
+            font-size: 11px;
+            color: #888;
+            font-weight: 400;
+            font-family: 'Inter', sans-serif;
+            line-height: 1.2;
         }
 
         .stat-strip {
