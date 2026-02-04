@@ -4147,10 +4147,13 @@ def get_lineup_for_matchups(game_id: str):
         
         # ✅ ANCHOR VALUES: Use anchor_ prefixed attributes (base values, independent of NG effects)
         # Fallback to current values if anchor not available
+        from BackEnd.utils.shared import format_height
         return {
             "player_id": player.player_id,
             "position": position,
             "name": player.name,
+            "height": format_height(getattr(player, "height", None)),
+            "weight": getattr(player, "weight", None) or "--",
             "headshot_url": f"/images/players/{player.player_id}.png",
             "attributes": {
                 "ID": attrs.get("anchor_ID", attrs.get("ID", 0)),

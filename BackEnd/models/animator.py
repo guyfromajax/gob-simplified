@@ -217,17 +217,14 @@ class Animator:
                 bh_stop_x = fb_roles.get("_bh_final_x", HOME_TOP_KEY["x"])
                 bh_stop_y = fb_roles.get("_bh_final_y", HOME_TOP_KEY["y"])
                 
-                # Stopper positioned 1-3 x coords ahead of ball handler, same y
-                # Note: bh_stop_x is in HOME orientation, build_movement will flip for away offense
+                # Stopper positioned 1-3 x coords ahead of ball handler, same y (between BH and basket)
+                # All coords in HOME orientation (x=9 away basket, x=91 home basket)
                 stopper_offset = random.randint(STOPPER_OFFSET_MIN, STOPPER_OFFSET_MAX)
                 if is_away_offense:
-                    # Away offense: ahead means smaller x in AWAY orientation (toward basket at x=10)
-                    # In HOME orientation: smaller x in away = larger x in home
-                    # Example: ball handler at x=45 (HOME) = x=55 (away), stopper should be x=53 (away) = x=47 (HOME)
-                    # So we ADD offset in HOME orientation
-                    stopper_x = min(97, bh_stop_x + stopper_offset)
+                    # Away offense: ahead = toward away basket (x=9) = smaller x in home orientation
+                    stopper_x = max(4, bh_stop_x - stopper_offset)
                 else:
-                    # Home offense: ahead means larger x (toward basket at x=90)
+                    # Home offense: ahead = toward home basket (x=91) = larger x
                     stopper_x = min(97, bh_stop_x + stopper_offset)
                 
                 end = {
