@@ -3830,10 +3830,10 @@ async def set_playcall_override_endpoint(raw_request: Request):
     body = await raw_request.json()
     provided_fields = set(body.keys())
     
-    # Validate using Pydantic model
-    request = PlaycallOverrideRequest(**body)
+    # Validate using Pydantic model (use req for all body fields; body is a dict)
+    req = PlaycallOverrideRequest(**body)
     
-    game_id = body.game_id
+    game_id = req.game_id
     gm = ongoing_games.get(game_id)
     
     # ✅ DEBUG: Track ongoing_games state for playcall override issue
@@ -3848,12 +3848,12 @@ async def set_playcall_override_endpoint(raw_request: Request):
         )
     
     # Determine user team
-    user_team = gm.home_team if body.user_team_side == "home" else gm.away_team
+    user_team = gm.home_team if req.user_team_side == "home" else gm.away_team
     
     # ✅ DEBUG: Log team info with object IDs for tracking
     user_team_id = id(user_team)  # Python object ID to verify same object
     logging.warning(f"🎮 [PLAYCALL SET] API: Setting override on team object")
-    logging.warning(f"   - user_team_side={body.user_team_side}, user_team={user_team.name}")
+    logging.warning(f"   - user_team_side={req.user_team_side}, user_team={user_team.name}")
     logging.warning(f"   - team_id={user_team.team_id}, object_id={user_team_id}")
     logging.warning(f"   - Current strategy_calls: {user_team.strategy_calls}")
     logging.warning(f"   - game_id={game_id}, game_object_id={id(gm)}")
@@ -3865,9 +3865,9 @@ async def set_playcall_override_endpoint(raw_request: Request):
     # - If a field is provided and None → clear it (explicit clear via red X)
     
     if "offense_override" in provided_fields:
-        if body.offense_override is not None:
-            user_team.strategy_calls["offense_call"] = body.offense_override
-            logging.warning(f"🎮 [PLAYCALL SET] ✅ Offense override SET: '{body.offense_override}'")
+        if req.offense_override is not None:
+            user_team.strategy_calls["offense_call"] = req.offense_override
+            logging.warning(f"🎮 [PLAYCALL SET] ✅ Offense override SET: '{req.offense_override}'")
             logging.warning(f"   - Team: {user_team.name} (team_id: {user_team.team_id}, object_id: {id(user_team)})")
             logging.warning(f"   - After setting, strategy_calls['offense_call'] = {user_team.strategy_calls.get('offense_call')}")
         else:
@@ -3881,9 +3881,9 @@ async def set_playcall_override_endpoint(raw_request: Request):
             logging.warning(f"🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
     
     if "defense_override" in provided_fields:
-        if body.defense_override is not None:
-            user_team.strategy_calls["defense_call"] = body.defense_override
-            logging.warning(f"🎮 [PLAYCALL SET] ✅ Defense override SET: '{body.defense_override}'")
+        if req.defense_override is not None:
+            user_team.strategy_calls["defense_call"] = req.defense_override
+            logging.warning(f"🎮 [PLAYCALL SET] ✅ Defense override SET: '{req.defense_override}'")
             logging.warning(f"   - Team: {user_team.name} (team_id: {user_team.team_id}, object_id: {id(user_team)})")
             logging.warning(f"   - After setting, strategy_calls['defense_call'] = {user_team.strategy_calls.get('defense_call')}")
         else:
@@ -3897,9 +3897,9 @@ async def set_playcall_override_endpoint(raw_request: Request):
             logging.warning(f"🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
     
     if "aggression_override" in provided_fields:
-        if request.aggression_override is not None:
-            user_team.strategy_calls["aggression_override"] = request.aggression_override
-            logging.warning(f"🎮 [PLAYCALL SET] ✅ Aggression override SET: '{request.aggression_override}'")
+        if req.aggression_override is not None:
+            user_team.strategy_calls["aggression_override"] = req.aggression_override
+            logging.warning(f"🎮 [PLAYCALL SET] ✅ Aggression override SET: '{req.aggression_override}'")
             logging.warning(f"   - Team: {user_team.name} (team_id: {user_team.team_id}, object_id: {id(user_team)})")
         else:
             # Explicitly clearing (None was passed and this is the only field or all fields are None)
@@ -3911,9 +3911,9 @@ async def set_playcall_override_endpoint(raw_request: Request):
             logging.warning(f"🔴   Override that was cleared: '{old_override}'")
             logging.warning(f"🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
     
-    if "tempo_override" in provided_fields and request.tempo_override is not None:
-        user_team.strategy_calls["tempo_override"] = request.tempo_override
-        logging.info(f"🎮 [PLAYCALL OVERRIDE] Set tempo override for {user_team.name}: {request.tempo_override}")
+    if "tempo_override" in provided_fields and req.tempo_override is not None:
+        user_team.strategy_calls["tempo_override"] = req.tempo_override
+        logging.info(f"🎮 [PLAYCALL OVERRIDE] Set tempo override for {user_team.name}: {req.tempo_override}")
     
     response_data = {
         "status": "success",
