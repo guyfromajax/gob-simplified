@@ -9,6 +9,8 @@
 9.Pre-populate Playbooks with submittable values
 10. User is still able to put fouled out players into the lineup on the Lineup Selection screen
 11. Flip flop side of defender stopping fast break when the away team is on offense
+12. Adjust pre-training decay by Year
+13. Timeout navigation: lineup page can fail to load (ERR_TIMED_OUT) — When user calls a timeout, the timeout flow runs and navigation to the lineup/court URL occurs, but requests to Netlify (gtm-loader.js, authGuard.js, api-config.js, analytics.js, CSS, etc.) can ERR_TIMED_OUT so the destination page never initializes and appears frozen or blank. Likely network/hosting under load; mitigation may include retries or critical-script loading strategy. Reproducibility TBD.
 
 ## Future Cleanup (Non-Critical Warnings)
 
