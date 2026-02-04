@@ -34,7 +34,7 @@ The Defense Matchups popup appears **after** the Gameplay Buttons popup (Play Qu
 Each row includes:
 - **Position square:** Colored fill (user team = position color, computer team = guarding user position color)
 - **Player headshot**
-- **Player name:** Formatted as "F. Lastname"
+- **Player name:** Formatted as "F. Lastname"; height and weight in smaller grey text below
 - **Stat strip:** 
   - User team: ID, OD, AG, ST, ND, IQ, NG, DEF%
   - Computer team: SC, SH, AG, ST, ND, IQ, NG, PTS
