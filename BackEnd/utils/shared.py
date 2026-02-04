@@ -715,6 +715,53 @@ def unpack_game_context(game):
         game.defense_team.lineup,
     )
 
+
+def serialize_computer_timeouts(data):
+    """
+    Serialize game_state['computer_timeouts'] for DB persistence.
+    Converts checked_conditions sets to lists (JSON-safe).
+    Returns None if data is falsy.
+    """
+    if not data or not isinstance(data, dict):
+        return None
+    out = {}
+    for team_name, quarters in data.items():
+        if not isinstance(quarters, dict):
+            continue
+        out[team_name] = {}
+        for quarter, qdata in quarters.items():
+            if not isinstance(qdata, dict):
+                continue
+            out[team_name][str(quarter)] = {
+                "count": qdata.get("count", 0),
+                "checked_conditions": list(qdata.get("checked_conditions", set())),
+            }
+    return out if out else None
+
+
+def deserialize_computer_timeouts(data):
+    """
+    Deserialize computer_timeouts from saved document into game_state shape.
+    Converts checked_conditions lists back to sets. Returns {} if data is falsy.
+    """
+    if not data or not isinstance(data, dict):
+        return {}
+    out = {}
+    for team_name, quarters in data.items():
+        if not isinstance(quarters, dict):
+            continue
+        out[team_name] = {}
+        for quarter, qdata in quarters.items():
+            if not isinstance(qdata, dict):
+                continue
+            checked = qdata.get("checked_conditions", [])
+            out[team_name][int(quarter) if str(quarter).isdigit() else quarter] = {
+                "count": qdata.get("count", 0),
+                "checked_conditions": set(checked) if isinstance(checked, list) else set(),
+            }
+    return out
+
+
 def summarize_game_state(game, exclude_animations=True):
     """
     Summarize game state for persistence/API responses.
@@ -1208,6 +1255,7 @@ def summarize_game_state(game, exclude_animations=True):
         "time_remaining": game.game_state.get("time_remaining", 480),  # ✅ TIMEOUT: Save time_remaining for resume (same as quarter breaks)
         "ineligible_players": game.game_state.get("ineligible_players", []),  # ✅ FOUL OUT: Save fouled-out players for lineup removal
         "man_defense_matchups": game.game_state.get("man_defense_matchups", {}),  # ✅ MAN DEFENSE MATCHUPS: Save custom matchups for persistence
+        "computer_timeouts": serialize_computer_timeouts(game.game_state.get("computer_timeouts")),  # ✅ COMPUTER TIMEOUT: Per-quarter count + checked_conditions (enforces max 1 per quarter Q1–Q3 after DB load)
         
         # Top-level team IDs for team lookup (required for accessing teams object)
         "home_team_id": home_key,

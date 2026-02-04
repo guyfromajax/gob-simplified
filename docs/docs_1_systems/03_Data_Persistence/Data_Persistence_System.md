@@ -870,6 +870,25 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 **Files Changed:**
 - `BackEnd/api/api.py` - `simulate_quarter_endpoint()` (lines 1573-1611): Validate request.strategy_settings before use
 
+### Computer Timeout Per-Quarter Tracking Persistence ✅ **COMPLETE** (February 2025)
+
+**Purpose:** Enforce "max 1 computer timeout per quarter" in Q1–Q3 after any load from DB (e.g. returning from timeout or lineup screen). Without persistence, the per-quarter count lived only in memory and was lost on reload, allowing the computer to call multiple timeouts in the same quarter.
+
+**Solution:**
+- `computer_timeouts` (per-team, per-quarter `count` and `checked_conditions`) is persisted to the game document on every save via `summarize_game_state()`. `checked_conditions` sets are serialized to lists for JSON/DB.
+- Restored when loading from DB in `apply_timeout_resume_state_to_gm()` (timeout resume path) and in the simulate-quarter load path so the limit is enforced after any DB load.
+- Source of truth for persisted values is the database; in-memory `game_state["computer_timeouts"]` is repopulated from the saved document on load.
+
+**Key Points:**
+- Serialize/deserialize helpers live in `BackEnd/utils/shared.py` (`serialize_computer_timeouts`, `deserialize_computer_timeouts`).
+- Team-level "timeouts remaining" (TOL on scoreboard) was already persisted in the teams structure; this addition persists only the **per-quarter usage** used to enforce the max-per-quarter rule.
+
+**Files:**
+- `BackEnd/utils/shared.py` - `serialize_computer_timeouts()`, `deserialize_computer_timeouts()`, and `summarize_game_state()` (persists `computer_timeouts`)
+- `BackEnd/api/api.py` - `apply_timeout_resume_state_to_gm()` and simulate-quarter load path (restore `computer_timeouts` from saved doc)
+
+**Full system (limits, conditions, flow):** `docs/docs_1_systems/05_GP_Supporting_Systems/Computer_Timeout_System.md`
+
 ### Key Files
 
 **Backend:**
@@ -879,7 +898,8 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
   - `call_timeout_endpoint()` (lines 2825-2891): User timeout save + cache refresh
   - `simulate_turn_endpoint()` (lines 2390-2600): Computer timeout save + cache refresh
 - `BackEnd/utils/shared.py`:
-  - `summarize_game_state()` (lines 745-768): Saves all players (lineup + bench) with real-time NG values
+  - `summarize_game_state()` (lines 745-768): Saves all players (lineup + bench) with real-time NG values; persists `computer_timeouts` (per-quarter count + checked_conditions) for computer timeout limit enforcement
+  - `serialize_computer_timeouts()` / `deserialize_computer_timeouts()`: DB-safe serialization for `computer_timeouts`
 
 **Frontend:**
 - `FrontEnd/static/set-lineup.js`:

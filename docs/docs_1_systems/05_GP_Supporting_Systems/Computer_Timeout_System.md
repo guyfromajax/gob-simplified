@@ -12,7 +12,8 @@
 6. **Key Files**:
    - `BackEnd/models/turn_manager.py`: `should_computer_call_timeout()` method
    - `BackEnd/models/game_manager.py`: Integrates computer timeout check into BIP/SIP turn creation
-   - `BackEnd/api/api.py`: `/api/simulate-turn` endpoint checks for pending timeout
+   - `BackEnd/api/api.py`: `/api/simulate-turn` endpoint checks for pending timeout; restores `computer_timeouts` when loading from DB (timeout resume + simulate-quarter load path)
+   - `BackEnd/utils/shared.py`: `serialize_computer_timeouts()` / `deserialize_computer_timeouts()` for DB persistence (checked_conditions set ↔ list)
 
 **System Flow (8 Steps)**
 
@@ -100,6 +101,7 @@ Computer evaluates timeout conditions in order. Each condition only checks once 
 - Computer timeout count per quarter stored in `game_state["computer_timeouts"][team_name][quarter]["count"]`
 - Checked conditions tracked in `game_state["computer_timeouts"][team_name][quarter]["checked_conditions"]` set
 - Prevents duplicate condition checks within the same quarter
+- **Persistence (source of truth: database):** `computer_timeouts` is persisted to the game document on every save via `summarize_game_state()` (shared.py). `checked_conditions` sets are serialized to lists for JSON/DB. Restored when loading from DB in `apply_timeout_resume_state_to_gm()` (timeout resume) and in the simulate-quarter load path so the "max 1 per quarter Q1–Q3" limit is enforced after returning from timeout or any other DB load.
 - **Pending Timeout:** When computer timeout is detected, `game_state["pending_computer_timeout"]` is set with:
   - `calling_team`: TeamManager instance for the team calling timeout
   - `turn_type`: "BASELINE_INBOUND" or "SIDE_INBOUND"

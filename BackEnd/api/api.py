@@ -35,7 +35,7 @@ from BackEnd.db import (
 )
 from BackEnd.utils.roster_loader import load_roster
 from BackEnd.utils.game_summary_builder import build_game_summary
-from BackEnd.utils.shared import clean_mongo_ids, summarize_game_state, format_height
+from BackEnd.utils.shared import clean_mongo_ids, summarize_game_state, format_height, deserialize_computer_timeouts
 from BackEnd.utils import stat_updater
 from pydantic import BaseModel
 from fastapi import HTTPException
@@ -1161,6 +1161,11 @@ def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
         gm.game_state["time_remaining"] = saved["time_remaining"]
         logging.info(f"🔄 TIMEOUT RESUME: Restored time_remaining={saved['time_remaining']} from saved document")
     
+    # ✅ COMPUTER TIMEOUT: Restore per-quarter count and checked_conditions (enforces max 1 per quarter Q1–Q3 after DB load)
+    if "computer_timeouts" in saved and saved["computer_timeouts"]:
+        gm.game_state["computer_timeouts"] = deserialize_computer_timeouts(saved["computer_timeouts"])
+        logging.info(f"🔄 TIMEOUT RESUME: Restored computer_timeouts from saved document")
+    
     # ✅ CRITICAL FIX: Restore scores from saved document (overwrites stale in-memory scores)
     if "score" in saved and isinstance(saved["score"], dict):
         # Restore scores for both teams
@@ -2226,6 +2231,11 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                             logging.warning(f"🔍 [GAME LOAD DEBUG] Restored offense_play_type from DB: '{saved['offense_play_type']}'")
                         else:
                             logging.warning(f"🔍 [GAME LOAD DEBUG] offense_play_type NOT in saved state (will be set by set_playcalls())")
+                        
+                        # ✅ COMPUTER TIMEOUT: Restore per-quarter count and checked_conditions when loading from DB
+                        if "computer_timeouts" in saved and saved["computer_timeouts"]:
+                            gm.game_state["computer_timeouts"] = deserialize_computer_timeouts(saved["computer_timeouts"])
+                            logging.warning(f"✅ Restored computer_timeouts from DB (enforces max 1 per quarter Q1–Q3)")
                         
                         # ✅ TIMEOUT RESUME: Check for timeout state BEFORE calculating should_restore_stats
                         # This ensures scores/fouls are restored when resuming from timeout
