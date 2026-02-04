@@ -168,7 +168,14 @@ class GameManager:
             "last_stealer": None,
             "last_turnover_player": None,
             "ineligible_players": [],  # Track players with 5+ fouls (fouled out)
-            "man_defense_matchups": {  # Custom defensive matchups for man defense (resets at each break)
+            "man_defense_matchups": {  # User team matchups when user is on defense (set via popup; resets at each break)
+                "PG": "PG",
+                "SG": "SG",
+                "SF": "SF",
+                "PF": "PF",
+                "C": "C"
+            },
+            "man_defense_matchups_computer": {  # Computer team matchups when computer is on defense (default for now; future logic may set)
                 "PG": "PG",
                 "SG": "SG",
                 "SF": "SF",

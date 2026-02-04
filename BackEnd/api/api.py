@@ -1165,6 +1165,14 @@ def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
     if "computer_timeouts" in saved and saved["computer_timeouts"]:
         gm.game_state["computer_timeouts"] = deserialize_computer_timeouts(saved["computer_timeouts"])
         logging.info(f"🔄 TIMEOUT RESUME: Restored computer_timeouts from saved document")
+    # ✅ MAN DEFENSE MATCHUPS: Restore user and computer matchups (computer defaults if missing)
+    from BackEnd.utils.man_defense_matchups import get_default_matchups, USER_MATCHUPS_KEY, COMPUTER_MATCHUPS_KEY
+    if USER_MATCHUPS_KEY in saved:
+        gm.game_state[USER_MATCHUPS_KEY] = saved.get(USER_MATCHUPS_KEY) or get_default_matchups()
+    if COMPUTER_MATCHUPS_KEY in saved:
+        gm.game_state[COMPUTER_MATCHUPS_KEY] = saved.get(COMPUTER_MATCHUPS_KEY) or get_default_matchups()
+    elif not gm.game_state.get(COMPUTER_MATCHUPS_KEY):
+        gm.game_state[COMPUTER_MATCHUPS_KEY] = get_default_matchups()
     
     # ✅ CRITICAL FIX: Restore scores from saved document (overwrites stale in-memory scores)
     if "score" in saved and isinstance(saved["score"], dict):
@@ -2236,6 +2244,14 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                         if "computer_timeouts" in saved and saved["computer_timeouts"]:
                             gm.game_state["computer_timeouts"] = deserialize_computer_timeouts(saved["computer_timeouts"])
                             logging.warning(f"✅ Restored computer_timeouts from DB (enforces max 1 per quarter Q1–Q3)")
+                        # ✅ MAN DEFENSE MATCHUPS: Restore user and computer matchups (computer defaults if missing for old saves)
+                        from BackEnd.utils.man_defense_matchups import get_default_matchups, USER_MATCHUPS_KEY, COMPUTER_MATCHUPS_KEY
+                        if USER_MATCHUPS_KEY in saved:
+                            gm.game_state[USER_MATCHUPS_KEY] = saved.get(USER_MATCHUPS_KEY) or get_default_matchups()
+                        if COMPUTER_MATCHUPS_KEY in saved:
+                            gm.game_state[COMPUTER_MATCHUPS_KEY] = saved.get(COMPUTER_MATCHUPS_KEY) or get_default_matchups()
+                        elif not gm.game_state.get(COMPUTER_MATCHUPS_KEY):
+                            gm.game_state[COMPUTER_MATCHUPS_KEY] = get_default_matchups()
                         
                         # ✅ TIMEOUT RESUME: Check for timeout state BEFORE calculating should_restore_stats
                         # This ensures scores/fouls are restored when resuming from timeout

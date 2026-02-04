@@ -1854,9 +1854,12 @@ def _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_
                             # Fallback: use ball handler's position
                             defender = def_lineup.get(ball_handler_pos)
                     else:
-                        # Man defense: check custom matchups first, fallback to position-on-position
+                        # Man defense: use matchups for the defending team (user vs computer)
                         from BackEnd.utils.man_defense_matchups import get_defender_position_for_man_defense
-                        defender_pos = get_defender_position_for_man_defense(ball_handler_pos, game.game_state)
+                        defending_team_is_user = getattr(game.defense_team, "is_user_team", False)
+                        defender_pos = get_defender_position_for_man_defense(
+                            ball_handler_pos, game.game_state, defending_team_is_user=defending_team_is_user
+                        )
                         defender = def_lineup.get(defender_pos)
                     
                     if defender:
@@ -2031,9 +2034,12 @@ def _check_dead_ball_turnover(game, skeleton, calibrated_dead_ball_to):
                             # Fallback: use ball handler's position
                             defender = def_lineup.get(ball_handler_pos)
                     else:
-                        # Man defense: check custom matchups first, fallback to position-on-position
+                        # Man defense: use matchups for the defending team (user vs computer)
                         from BackEnd.utils.man_defense_matchups import get_defender_position_for_man_defense
-                        defender_pos = get_defender_position_for_man_defense(ball_handler_pos, game.game_state)
+                        defending_team_is_user = getattr(game.defense_team, "is_user_team", False)
+                        defender_pos = get_defender_position_for_man_defense(
+                            ball_handler_pos, game.game_state, defending_team_is_user=defending_team_is_user
+                        )
                         defender = def_lineup.get(defender_pos)
                     
                     if defender:
@@ -3551,9 +3557,12 @@ def resolve_half_court_offense_logic(game):
                 
                 defender = def_lineup.get(defender_pos) if defender_pos else def_lineup.get("PG")
             else:
-                # Man-to-man: check custom matchups first, fallback to position-on-position
+                # Man-to-man: use matchups for the defending team (user vs computer)
                 from BackEnd.utils.man_defense_matchups import get_defender_position_for_man_defense
-                defender_pos = get_defender_position_for_man_defense(ball_handler_pos, game.game_state) if ball_handler_pos else "PG"
+                defending_team_is_user = getattr(game.defense_team, "is_user_team", False)
+                defender_pos = get_defender_position_for_man_defense(
+                    ball_handler_pos, game.game_state, defending_team_is_user=defending_team_is_user
+                ) if ball_handler_pos else "PG"
                 defender = def_lineup.get(defender_pos) if defender_pos else def_lineup.get("PG")
             
             if defender:
