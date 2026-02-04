@@ -10,7 +10,7 @@ Failed to load game state for 698287728651e0cfb5a55be7
 
 ## Metadata
 
-```
+```json
 {
   "filename": "BackEnd/api/api.py",
   "function": "simulate_quarter_endpoint",

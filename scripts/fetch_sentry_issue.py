@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
 """
 Fetch a Sentry issue and its latest event, write to a Markdown file.
+
 Usage: python scripts/fetch_sentry_issue.py <issue_id> [output.md]
-Requires: SENTRY_AUTH_TOKEN in env (or .env). Optional: SENTRY_ORG (default: geeked-out-games).
+  issue_id   Sentry issue ID (e.g. from the issue URL).
+  output.md  Optional. Default: docs/Sentry_Bug_Reports/Bug1.md under repo root.
+
+Requires: SENTRY_AUTH_TOKEN in .env or environment.
+Optional: SENTRY_ORG (default: geeked-out-games).
+
+If the file appears empty in your editor after a successful run, close and reopen
+the tab or use File → Revert File so the editor reloads from disk.
 """
 import os
 import sys
@@ -23,20 +31,40 @@ def main():
         print("Usage: python scripts/fetch_sentry_issue.py <issue_id> [output.md]", file=sys.stderr)
         sys.exit(1)
     issue_id = sys.argv[1].strip()
-    out_path = sys.argv[2] if len(sys.argv) > 2 else "docs/Sentry_Bug_Reports/Bug1.md"
+    # Default path: always under repo root (parent of scripts/) — use abspath so we always write to the same place
+    _repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _default_path = os.path.abspath(os.path.join(_repo_root, "docs", "Sentry_Bug_Reports", "Bug1.md"))
+    out_path = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else _default_path
     org = os.environ.get("SENTRY_ORG", "geeked-out-games")
 
     token = os.environ.get("SENTRY_AUTH_TOKEN")
     if not token:
         print("Set SENTRY_AUTH_TOKEN in .env or environment.", file=sys.stderr)
+        _out_dir = os.path.dirname(out_path)
+        if _out_dir:
+            os.makedirs(_out_dir, exist_ok=True)
+        with open(out_path, "w") as f:
+            f.write(f"# Sentry issue `{issue_id}`\n\n**Error:** SENTRY_AUTH_TOKEN not set. Set it in .env or environment and re-run.\n")
         sys.exit(1)
 
     headers = {"Authorization": f"Bearer {token}"}
 
     # Get issue (org-scoped; required for many Sentry setups)
+    _out_dir = os.path.dirname(out_path)
+    if _out_dir:
+        os.makedirs(_out_dir, exist_ok=True)
+
+    def _write_minimal(reason: str) -> None:
+        minimal = f"# Sentry issue `{issue_id}`\n\n**Could not fetch:** {reason}\n\nCheck SENTRY_AUTH_TOKEN, SENTRY_ORG (current: {org}), and issue ID."
+        with open(out_path, "w") as f:
+            f.write(minimal)
+        print(f"Wrote error note ({len(minimal)} chars) to: {out_path}", file=sys.stderr)
+
     r = requests.get(f"{BASE}/organizations/{org}/issues/{issue_id}/", headers=headers, timeout=15)
     if not r.ok:
-        print(f"Issue fetch failed: {r.status_code} {r.text[:200]}", file=sys.stderr)
+        msg = f"{r.status_code} {r.text[:200]}"
+        print(f"Issue fetch failed: {msg}", file=sys.stderr)
+        _write_minimal(msg)
         sys.exit(1)
     issue = r.json()
 
@@ -106,10 +134,25 @@ def main():
     body = "\n".join(md)
     if not body.strip():
         body = f"# {title}\n\nNo event details returned. Check SENTRY_ORG (current: {org}) and issue ID."
-    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    # Ensure we never write an empty file
+    body = body or f"# Sentry issue {issue_id}\n\n(No content generated; check script or API.)"
+    out_dir = os.path.dirname(out_path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
     with open(out_path, "w") as f:
         f.write(body)
-    print(f"Wrote {out_path}")
+        f.flush()
+    # Verify write (catches e.g. wrong path or permission issues)
+    with open(out_path) as f:
+        written = f.read()
+    if not written.strip():
+        fallback = f"# Sentry issue {issue_id}\n\nWrite verification failed: file was still empty. Path used: {out_path}"
+        with open(out_path, "w") as f:
+            f.write(fallback)
+        print(f"WARNING: Initial write was empty; wrote fallback. Path: {out_path}", file=sys.stderr)
+    else:
+        print(f"Wrote {len(body)} chars to: {out_path}")
+        print("(If the file looks empty in your editor, close/reopen the tab or Revert File.)")
 
 
 if __name__ == "__main__":
