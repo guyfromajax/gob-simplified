@@ -8,6 +8,27 @@ const franchiseNewBtn = document.getElementById('franchise-new-btn');
 let currentTournament = null;
 let currentFranchise = null;
 
+// Team name → square logo filename prefix (from images/square-logos/{code}_square.png)
+const TEAM_LOGO_CODE = {
+  'Bentley-Truman': 'bt',
+  'Four Corners': 'fc',
+  'Four-Corners': 'fc',
+  'Lancaster': 'lan',
+  'Little York': 'ly',
+  'Little-York': 'ly',
+  'Morristown': 'mor',
+  'Ocean City': 'oc',
+  'Ocean-City': 'oc',
+  'South Lancaster': 'sl',
+  'South-Lancaster': 'sl',
+  'Xavien': 'xav'
+};
+
+function getSquareLogoPath(teamName) {
+  const code = TEAM_LOGO_CODE[teamName];
+  return code ? `/images/square-logos/${code}_square.png` : null;
+}
+
 function tournamentRoundLabel(roundNum, completed) {
   if (completed) return 'Complete';
   if (roundNum === 1) return 'First Round';
@@ -515,6 +536,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const tEl = document.getElementById('tournament-instance');
       const tTeamEl = document.getElementById('tournament-instance-team');
       const tRoundEl = document.getElementById('tournament-instance-round');
+      const tLogo = document.getElementById('tournament-instance-logo');
       const tNo = document.getElementById('tournament-no-instance');
       const tPlay = document.getElementById('tournament-play-now-btn');
       if (currentTournament && tEl && tTeamEl && tRoundEl && tNo && tPlay) {
@@ -523,9 +545,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         tRoundEl.textContent = tournamentRoundLabel(currentTournament.current_round, currentTournament.completed);
         const accent = (colorMap[teamName] && colorMap[teamName].primary) || '#1a237e';
         tEl.style.setProperty('--instance-accent', accent);
-        tEl.style.display = 'block';
+        tEl.style.display = 'flex';
         tNo.style.display = 'none';
         tPlay.style.display = 'block';
+        if (tLogo) {
+          const logoPath = getSquareLogoPath(teamName);
+          if (logoPath) {
+            tLogo.src = logoPath;
+            tLogo.alt = teamName;
+            tLogo.style.display = '';
+          } else {
+            tLogo.removeAttribute('src');
+            tLogo.alt = '';
+            tLogo.style.display = 'none';
+          }
+        }
       } else if (tNo && tEl && tPlay) {
         tEl.style.display = 'none';
         tNo.style.display = 'block';
@@ -535,6 +569,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const fEl = document.getElementById('franchise-instance');
       const fTeamEl = document.getElementById('franchise-instance-team');
       const fStatusEl = document.getElementById('franchise-instance-status');
+      const fLogo = document.getElementById('franchise-instance-logo');
       const fNo = document.getElementById('franchise-no-instance');
       const fPlay = document.getElementById('franchise-play-now-btn');
       if (currentFranchise && fEl && fTeamEl && fStatusEl && fNo && fPlay) {
@@ -543,9 +578,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         fStatusEl.textContent = franchiseStatusLabel(currentFranchise);
         const accent = (colorMap[teamName] && colorMap[teamName].primary) || '#1a237e';
         fEl.style.setProperty('--instance-accent', accent);
-        fEl.style.display = 'block';
+        fEl.style.display = 'flex';
         fNo.style.display = 'none';
         fPlay.style.display = 'block';
+        if (fLogo) {
+          const logoPath = getSquareLogoPath(teamName);
+          if (logoPath) {
+            fLogo.src = logoPath;
+            fLogo.alt = teamName;
+            fLogo.style.display = '';
+          } else {
+            fLogo.removeAttribute('src');
+            fLogo.alt = '';
+            fLogo.style.display = 'none';
+          }
+        }
       } else if (fNo && fEl && fPlay) {
         fEl.style.display = 'none';
         fNo.style.display = 'block';
