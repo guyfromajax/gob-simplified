@@ -1785,12 +1785,17 @@
       margin-left: auto; /* Push to right */
     }
 
-    #skip-btn:hover {
+    #skip-btn:hover:not(:disabled) {
       background-color: #0056b3;
     }
 
+    /* Skip To End is not yet implemented; keep it clearly disabled until post-alpha */
+    #skip-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
     #pause-btn:disabled,
-    #skip-btn:disabled,
     #game-speed-btn:disabled,
     #timeout-btn:disabled {
       opacity: 0.5;
@@ -2390,7 +2395,7 @@
       <div class="game-controls">
         <button id="game-speed-btn">Game Speed</button>
         <button id="pause-btn">Pause</button>
-        <button id="skip-btn">Skip To End</button>
+        <button id="skip-btn" disabled title="Coming in a future update">Skip To End</button>
         <button id="timeout-btn">Timeout</button>
       </div>
       
