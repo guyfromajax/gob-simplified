@@ -161,6 +161,21 @@ TEAM_ATTR_CLAMPS = {
 PLAYER_ATTR_CLAMP = (1, None)  # Min 1, no max
 
 
+# Year-based pre-training decay (min, max) for random decrease per attribute. See Training_System.md.
+PRE_TRAINING_DECAY_BY_YEAR = {
+    "freshman": (-6, -1),
+    "sophomore": (-4, -1),
+    "junior": (-3, 0),
+    "senior": (-2, 0),
+}
+
+
+def _pre_training_decay_range_for_year(year: str) -> Tuple[int, int]:
+    """Return (min, max) for pre-training decay based on player year. Default: junior."""
+    key = (year or "").strip().lower()
+    return PRE_TRAINING_DECAY_BY_YEAR.get(key, (-3, 0))
+
+
 def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List[dict], dict]:
     """
     Apply pre-training conditions to players only.
@@ -169,7 +184,8 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
     at the end of each game via update_team_attributes_after_game() in franchise_routes.py.
     
     Pre-training conditions:
-    - Player attributes (excluding EM, MO, NG): += randint(-4, -1) for each player/attribute
+    - Player attributes (excluding EM, MO, NG): += randint(min, max) per player/attribute,
+      where (min, max) is year-based: Freshman (-6,-1), Sophomore (-4,-1), Junior (-3,0), Senior (-2,0).
     
     Args:
         players: List of player dicts with attributes
@@ -178,21 +194,17 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
     Returns:
         Tuple of (updated_players, unchanged_team)
     """
-    # Apply to each player
     for player in players:
         attrs = player.get("attributes", {})
+        year = player.get("year", "")
+        decay_min, decay_max = _pre_training_decay_range_for_year(year)
         for attr in TRAINABLE_PLAYER_ATTRS:
             anchor_key = f"anchor_{attr}"
             if anchor_key in attrs:
-                # Apply random decrease: randint(-4, -1) inclusive
-                decrease = random.randint(-4, -1)
+                decrease = random.randint(decay_min, decay_max)
                 attrs[anchor_key] = max(PLAYER_ATTR_CLAMP[0], attrs[anchor_key] + decrease)
-                # Also update base attribute
                 attrs[attr] = attrs[anchor_key]
     
-    # Team attributes are no longer decayed here - they are updated at end of game
-    # via update_team_attributes_after_game() in franchise_routes.py
-    # Return team unchanged
     return players, team
 
 
