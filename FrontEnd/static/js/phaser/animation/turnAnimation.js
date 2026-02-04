@@ -1846,6 +1846,26 @@ async function runInboundSetup({
   
   // ✅ TIMEOUT: Removed markInboundPassStarted - button is always live now
 
+  // ✅ BIP → FCP/HCT: Skip inbound pass here; skeleton will animate it (avoids double inbound).
+  // SIP (side inbound) always uses runSideInboundSetup() and never calls this function, so SIP is unaffected.
+  if (pressureType === "FCP" || pressureType === "HCT") {
+    if (scene.stateMachine?.is(States.Inbound)) {
+      safeTransition(
+        scene.stateMachine,
+        States.HalfCourt,
+        {
+          stepIndex: 0,
+          currentOwnerId: getCurrentOwner(scene),
+          pendingOwnerId: getPendingOwner(scene),
+        },
+        ["stepIndex"]
+      );
+    }
+    scene.isInboundSetup = false;
+    scene.passInFlight = false;
+    return;
+  }
+
   if (scene.tweens) {
     scene.tweens.killTweensOf(ballSprite);
     scene.tweens.killTweensOf(pgSprite);
