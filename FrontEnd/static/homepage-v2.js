@@ -11,6 +11,7 @@
     if (!slides.length) return;
 
     let currentIndex = 0;
+    let intervalId;
 
     function goTo(index) {
       currentIndex = (index + slides.length) % slides.length;
@@ -24,15 +25,42 @@
       goTo(currentIndex + 1);
     }
 
-    goTo(0);
-    let intervalId = setInterval(next, CAROUSEL_INTERVAL_MS);
+    function prev() {
+      goTo(currentIndex - 1);
+    }
 
-    // Pause on visibility change (tab switch) to avoid advancing while user is away
+    function startInterval() {
+      intervalId = setInterval(next, CAROUSEL_INTERVAL_MS);
+    }
+
+    function resetInterval() {
+      clearInterval(intervalId);
+      startInterval();
+    }
+
+    goTo(0);
+    startInterval();
+
+    var prevBtn = document.querySelector('.carousel-arrow-prev');
+    var nextBtn = document.querySelector('.carousel-arrow-next');
+    if (prevBtn) {
+      prevBtn.addEventListener('click', function () {
+        prev();
+        resetInterval();
+      });
+    }
+    if (nextBtn) {
+      nextBtn.addEventListener('click', function () {
+        next();
+        resetInterval();
+      });
+    }
+
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) {
         clearInterval(intervalId);
       } else {
-        intervalId = setInterval(next, CAROUSEL_INTERVAL_MS);
+        startInterval();
       }
     });
   }
