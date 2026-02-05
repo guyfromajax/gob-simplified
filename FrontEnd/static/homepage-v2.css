@@ -35,7 +35,47 @@ body.homepage-v2.has-auth-bar {
   padding-top: 0;
 }
 
-/* Homepage v2: nav uses shared auth-bar.css; only override body padding so hero fills viewport */
+/* Homepage only: dark nav bar with high-contrast elements */
+.auth-bar.homepage-v2-nav {
+  background: #121417;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.auth-bar.homepage-v2-nav .logo-link img {
+  filter: brightness(0) invert(1);
+}
+.auth-bar.homepage-v2-nav .nav-icon {
+  color: rgba(255, 255, 255, 0.9);
+}
+.auth-bar.homepage-v2-nav .nav-icon:hover {
+  color: var(--color-accent);
+}
+.auth-bar.homepage-v2-nav .auth-link {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.auth-bar.homepage-v2-nav .auth-link:hover {
+  color: var(--color-accent);
+}
+.auth-bar.homepage-v2-nav .auth-divider {
+  color: rgba(255, 255, 255, 0.5);
+}
+.auth-bar.homepage-v2-nav .auth-email {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-weight: 500;
+}
+.auth-bar.homepage-v2-nav .auth-logout-btn {
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+  font-weight: 500;
+}
+.auth-bar.homepage-v2-nav .auth-logout-btn:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
 
 /* Carousel hero – full viewport above the fold */
 .carousel-hero {
