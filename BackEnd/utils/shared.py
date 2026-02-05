@@ -1400,3 +1400,13 @@ def serialize_lineup(lineup_dict):
     }
 
 
+def calculate_charge():
+    """
+    Calculate whether a charge or blocking foul occurs on a drive.
+    
+    Returns:
+        str: Either "CHARGE" (foul on offense) or "BLOCKING_FOUL" (foul on defense)
+    """
+    return random.choice(["CHARGE", "BLOCKING_FOUL"])
+
+

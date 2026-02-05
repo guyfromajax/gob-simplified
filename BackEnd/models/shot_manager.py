@@ -26,6 +26,7 @@ from BackEnd.utils.shared import (
     calculate_defender_pressure_score,
     calculate_bounce_spot,
     determine_rebounder,
+    calculate_charge,
 )
 from BackEnd.constants.fast_break_constants import DEFENSIVE_STOP_Y_RANGE
 
@@ -342,6 +343,7 @@ class ShotManager:
         # Determine shot_type (inside/attack/outside) for shot score calculation
         # Motion offense already has shot_type in roles, Set plays use location-based logic (same as Motion)
         shot_type = roles.get("shot_type")  # From Motion offense
+        logging.warning(f"🟡🟡🟡🟡🟡🟡🟡🟡🟡🟡[CHARGE]: shot_type={shot_type}")
         if not shot_type:
             # For Set plays, determine shot_type from skeleton analysis (location + drive detection)
             # Same logic as Motion plays: check shooter location and whether there was a drive action
@@ -439,6 +441,108 @@ class ShotManager:
             # Clear penalty after use
             game_state.pop("motion_attack_penalty", None)
 
+        # ✅ CHARGE/BLOCKING FOUL CHECK: Check for charge or blocking foul on attack shots
+        charge_result = None
+        if shot_type == "attack":
+            charge_result = calculate_charge()
+            logging.warning(
+                "CHARGE_DEBUG 🟡🟡🟡🟡🟡 resolve_shot: Charge check | shot_type=attack | result=%s | shooter=%s | defender=%s",
+                charge_result,
+                get_name_safe(shooter),
+                get_name_safe(defender) if defender else "None",
+            )
+            
+            # Handle CHARGE: Return early with possession flip, no shot attempt
+            if charge_result == "CHARGE":
+                shooter_pos = get_player_position(off_lineup, shooter)
+                tempo = off_team.strategy_calls.get("tempo_call", "normal")
+                time_elapsed = get_time_elapsed(tempo)
+                
+                # Record foul on shooter (offensive foul)
+                shooter.record_stat("F")
+                off_team.team_fouls += 1
+                
+                # Set game state
+                self.game_state["foul_team"] = "OFFENSE"
+                self.game_state["offensive_state"] = "HCO"  # Next team will be on offense
+                
+                # Build result dict with all necessary fields (SS&S)
+                result = {
+                    "result_type": "CHARGE",
+                    "ball_handler": shooter,
+                    "shooter": shooter,
+                    "shooter_id": shooter.player_id,
+                    "shooter_pos": shooter_pos,
+                    "screener": screener,
+                    "passer": passer,
+                    "defender": defender,
+                    "text": "Charge!",
+                    "possession_flips": True,  # Offense loses possession
+                    "time_elapsed": time_elapsed,
+                    "events": [],
+                    "foul_player_id": shooter.player_id,
+                    "foul_team": "OFFENSE",
+                    "next_play_type": "SIP",
+                    "offense_team_id": off_team.team_id,
+                    "defense_team_id": def_team.team_id,
+                }
+                
+                logging.warning(
+                    "CHARGE_DEBUG 🟡🟡🟡🟡🟡 resolve_shot: Returning CHARGE | possession_flips=True | next_play_type=SIP"
+                )
+                return result
+            
+            # Handle BLOCKING_FOUL: Reuse non-shooting defensive foul logic
+            elif charge_result == "BLOCKING_FOUL":
+                if defender:
+                    # Record foul on defender
+                    defender.record_stat("F")
+                    def_team.team_fouls += 1
+                    
+                    # Set foul team
+                    self.game_state["foul_team"] = "DEFENSE"
+                    
+                    # Check if player fouled out (5th foul)
+                    from BackEnd.engine.phase_resolution import check_and_handle_foul_out
+                    blocking_foul_out_info = check_and_handle_foul_out(defender, self.game_state, def_team)
+                    # Store for later use in result dict
+                    self._blocking_foul_out_info = blocking_foul_out_info
+                    
+                    # Check bonus status (reuse logic from resolve_non_shooting_foul)
+                    if def_team.team_fouls >= 10:
+                        # Double bonus (10+ fouls): 2 free throws
+                        self.game_state["offensive_state"] = "FREE_THROW"
+                        self.game_state["free_throws"] = 2
+                        self.game_state["free_throws_remaining"] = 2
+                        self.game_state["one_and_one"] = False
+                        self.game_state["last_ball_handler"] = shooter
+                        self.game_state["shooter"] = shooter
+                        next_play_type = "FREE_THROW"
+                    elif def_team.team_fouls >= 5:
+                        # Bonus (5-9 fouls): 1 & 1 free throws
+                        self.game_state["offensive_state"] = "FREE_THROW"
+                        self.game_state["free_throws"] = 2  # Maximum possible
+                        self.game_state["free_throws_remaining"] = 1  # Start with 1 (front end)
+                        self.game_state["one_and_one"] = True
+                        self.game_state["last_ball_handler"] = shooter
+                        self.game_state["shooter"] = shooter
+                        next_play_type = "FREE_THROW"
+                    else:
+                        # Less than 5 fouls: side inbound, no free throws
+                        self.game_state["offensive_state"] = "HCO"
+                        self.game_state["free_throws"] = 0
+                        self.game_state["free_throws_remaining"] = 0
+                        next_play_type = "SIP"
+                    
+                    logging.warning(
+                        "CHARGE_DEBUG 🟡🟡🟡🟡🟡 resolve_shot: BLOCKING_FOUL detected | def_team_fouls=%s | next_play_type=%s",
+                        def_team.team_fouls,
+                        next_play_type,
+                    )
+                    # Store blocking foul info for later use in result dict
+                    # Continue with shot - blocking foul doesn't prevent shot attempt
+                    # The result dict will be updated later with foul info
+        
         made = shot_score >= shot_threshold
 
         # ✅ SHOOTING FOUL CALIBRATION: If there's a shooting foul, check if it forces a miss
@@ -638,6 +742,9 @@ class ShotManager:
                 # ✅ FIX: Set next_play_type for AND-1 situations
                 result["next_play_type"] = "FREE_THROW"
                 text = f"{get_name_safe(shooter)} makes the shot. {get_name_safe(foul_player)} fouls him! AND-1 opportunity!"
+            elif charge_result == "BLOCKING_FOUL":
+                # Blocking foul on made shot - add blocking foul text
+                text = f"{get_name_safe(shooter)} makes the shot. {get_name_safe(defender)} commits a blocking foul!"
                 
                 # Add foul out info to result if applicable
                 if foul_out_info["fouled_out"]:
@@ -741,6 +848,9 @@ class ShotManager:
                 result["next_play_type"] = "FREE_THROW"
                 text = f"{get_name_safe(foul_player)} fouls {get_name_safe(shooter)} on the shot."
                 possession_flips = False
+            elif charge_result == "BLOCKING_FOUL":
+                # Blocking foul on missed shot - add blocking foul text
+                text = f"{get_name_safe(shooter)} misses the {'3' if is_three else 'shot'}. {get_name_safe(defender)} commits a blocking foul!"
                 
                 # Add foul out info to result if applicable
                 if foul_out_info["fouled_out"]:
@@ -1068,6 +1178,20 @@ class ShotManager:
         intended_shooter = off_lineup.get(intended_shooter_pos) if intended_shooter_pos else None
         intended_shooter_id = intended_shooter.player_id if intended_shooter else None
 
+        # ✅ BLOCKING_FOUL: Add blocking foul info to result if applicable
+        blocking_foul_next_play_type = None
+        blocking_foul_out_info = None
+        if charge_result == "BLOCKING_FOUL" and defender:
+            # Get next_play_type that was set during blocking foul handling
+            if def_team.team_fouls >= 10:
+                blocking_foul_next_play_type = "FREE_THROW"
+            elif def_team.team_fouls >= 5:
+                blocking_foul_next_play_type = "FREE_THROW"
+            else:
+                blocking_foul_next_play_type = "SIP"
+            # Get foul out info (was set during blocking foul handling)
+            blocking_foul_out_info = getattr(self, "_blocking_foul_out_info", None) if hasattr(self, "_blocking_foul_out_info") else None
+        
         result.update({
             "result_type": "MAKE" if made else "MISS",
             "ball_handler": shooter,
@@ -1083,9 +1207,29 @@ class ShotManager:
             "possession_flips": possession_flips,
             "time_elapsed": time_elapsed,
             "events": events,
-            "foul_player_id": getattr(foul_player, "player_id", None) if d_foul and foul_player else None,
-            "foul_team": self.game_state.get("foul_team") if d_foul else None,
+            "foul_player_id": getattr(foul_player, "player_id", None) if d_foul and foul_player else (defender.player_id if charge_result == "BLOCKING_FOUL" and defender else None),
+            "foul_team": self.game_state.get("foul_team") if (d_foul or charge_result == "BLOCKING_FOUL") else None,
         })
+        
+        # Add blocking foul next_play_type if applicable
+        if blocking_foul_next_play_type:
+            result["next_play_type"] = blocking_foul_next_play_type
+            # Add free throw info if going to free throws
+            if blocking_foul_next_play_type == "FREE_THROW":
+                result["free_throws_remaining"] = self.game_state.get("free_throws_remaining", 0)
+                if self.game_state.get("one_and_one"):
+                    result["one_and_one"] = True
+        
+        # Add blocking foul foul out info if applicable
+        if blocking_foul_out_info and blocking_foul_out_info.get("fouled_out"):
+            result["fouled_out"] = True
+            result["foul_out_player"] = {
+                "player_id": blocking_foul_out_info["foul_player_id"],
+                "name": blocking_foul_out_info["foul_player_name"],
+                "photo": blocking_foul_out_info["foul_player_photo"],
+                "team": blocking_foul_out_info["foul_player_team"]
+            }
+            result["foul_count"] = blocking_foul_out_info["foul_count"]
 
         if made:
             result["points"] = points

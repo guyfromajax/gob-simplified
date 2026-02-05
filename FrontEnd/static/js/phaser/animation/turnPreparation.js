@@ -233,7 +233,12 @@ export async function finalizeTurnAfterAnimation({
   const homeTeamId = scene.simData?.home_team_id;
   
   // Route to appropriate announcement based on result_type
-  if (turn.result_type === 'FOUL') {
+  if (turn.result_type === 'CHARGE') {
+    // Charge: offensive foul on drive
+    announceGameEvent('CHARGE', turn, scene, { 
+      foulerId: turn.foul_player_id || turn.shooter_id 
+    });
+  } else if (turn.result_type === 'FOUL') {
     // ✅ FIX: Skip shooting fouls - they're already announced in ballManager.js
     // Shooting fouls result in free throws, so check for FREE_THROW next_play_type or free_throws_remaining
     // This is more reliable than text parsing which can fail
@@ -249,6 +254,14 @@ export async function finalizeTurnAfterAnimation({
     }
     // Note: Shooting fouls on misses are announced in ballManager.js with "Shooting Foul!"
     // AND-1 situations (result_type === "MAKE" with defensive foul) never reach this block
+  } else if ((turn.result_type === 'MAKE' || turn.result_type === 'MISS') && 
+             turn.foul_team === 'DEFENSE' && 
+             turn.foul_player_id &&
+             turn.text?.toLowerCase().includes('blocking foul')) {
+    // Blocking foul: defensive foul on drive (detected by text containing "blocking foul")
+    announceGameEvent('BLOCKING_FOUL', turn, scene, { 
+      foulerId: turn.foul_player_id || turn.defenderId 
+    });
   } else if (turn.result_type === 'STEAL') {
     announceGameEvent('STEAL', turn, scene, { 
       stealerId: turn.stealer_id || turn.defender_id,
