@@ -70,6 +70,14 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       handleDefensiveFoulAnnouncement(turnData, scene, context, offenseTeam);
       break;
 
+    case 'CHARGE':
+      handleChargeAnnouncement(turnData, scene, context, defenseTeam);
+      break;
+
+    case 'BLOCKING_FOUL':
+      handleBlockingFoulAnnouncement(turnData, scene, context, offenseTeam);
+      break;
+
     // ========== TURNOVERS ==========
     case 'STEAL':
       handleStealAnnouncement(turnData, scene, context, defenseTeam);
@@ -270,6 +278,52 @@ function handleDefensiveFoulAnnouncement(turnData, scene, context, offenseTeam) 
   }
 
   showAnnouncement("DEFENSIVE FOUL!", offenseTeam, playerData);
+
+  // Trigger visual effect
+  if (scene && foulerId) {
+    triggerFoulEffect(scene, foulerId);
+  }
+}
+
+function handleChargeAnnouncement(turnData, scene, context, defenseTeam) {
+  const foulerId = context.foulerId || turnData.foul_player_id || turnData.shooter_id;
+  let playerData = null;
+
+  if (scene && foulerId) {
+    const foulerSprite = scene.playerSprites?.[foulerId];
+    if (foulerSprite) {
+      playerData = {
+        playerId: foulerId,
+        photo: foulerSprite.photo || null,
+        teamName: foulerSprite.team_id
+      };
+    }
+  }
+
+  showAnnouncement("CHARGE!", defenseTeam, playerData);
+
+  // Trigger visual effect
+  if (scene && foulerId) {
+    triggerFoulEffect(scene, foulerId);
+  }
+}
+
+function handleBlockingFoulAnnouncement(turnData, scene, context, offenseTeam) {
+  const foulerId = context.foulerId || turnData.foul_player_id || turnData.defenderId;
+  let playerData = null;
+
+  if (scene && foulerId) {
+    const foulerSprite = scene.playerSprites?.[foulerId];
+    if (foulerSprite) {
+      playerData = {
+        playerId: foulerId,
+        photo: foulerSprite.photo || null,
+        teamName: foulerSprite.team_id
+      };
+    }
+  }
+
+  showAnnouncement("BLOCKING FOUL!", offenseTeam, playerData);
 
   // Trigger visual effect
   if (scene && foulerId) {
