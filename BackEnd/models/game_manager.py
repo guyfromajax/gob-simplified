@@ -448,12 +448,13 @@ class GameManager:
                     logging.error(f"🚨 FOUL OUT TIMEOUT: Failed to save game state: {e}")
                     # Don't fail the foul out if save fails - game continues normally
 
-        # If the turn ended with a dead-ball turnover or a non-shooting foul
-        # that does not result in free throws, prepare a sideline inbound
-        # sequence and append its payload so the front end can animate it.
+        # If the turn ended with a dead-ball turnover, a non-shooting foul
+        # that does not result in free throws, or a charge (offensive foul),
+        # prepare a sideline inbound and append its payload so the front end can animate it.
         if (
             (result.get("result_type") == "FOUL" and self.game_state.get("free_throws_remaining", 0) == 0)
             or result.get("result_type") == "DEAD BALL"
+            or result.get("result_type") == "CHARGE"
         ):
             # ✅ FIX: Flip possession BEFORE setup_side_inbound so correct team inbounds
             # Dead ball turnovers and offensive fouls always flip possession
