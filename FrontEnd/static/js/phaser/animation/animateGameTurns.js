@@ -595,6 +595,13 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
+    // ✅ CHARGE: Route through AnimationRouter so finalizeTurnAfterAnimation announces "Charge!" (not "Offensive Foul!")
+    if (turn.result_type === "CHARGE") {
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      continue;
+    }
+
     if (turn.result_type === "FOUL") {
       // ✅ DEBUG: Log FOUL routing decision
       console.log('🔍 [FOUL ROUTING]', {
