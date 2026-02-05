@@ -56,6 +56,7 @@ export class AnimationEngine {
     this.animationHandlers.set('PASS', this.handlePass.bind(this));
     this.animationHandlers.set('HCO', this.handleDefault.bind(this)); // ✅ HCO with animations uses skeleton
     this.animationHandlers.set('FOUL', this.handleDefault.bind(this)); // ✅ FOUL with animations uses skeleton
+    this.animationHandlers.set('CHARGE', this.handleDefault.bind(this)); // ✅ CHARGE (offensive foul) same as FOUL → skeleton animation, no shot
     this.animationHandlers.set('DEAD_BALL', this.handleDefault.bind(this)); // ✅ DEAD_BALL with animations uses skeleton
     this.animationHandlers.set('DEAD BALL', this.handleDefault.bind(this)); // ✅ FIX: Backend sends "DEAD BALL" with space, not underscore
     this.animationHandlers.set('STEAL', this.handleSteal.bind(this)); // ✅ STEAL uses hybrid handler (skeleton + steal action)
