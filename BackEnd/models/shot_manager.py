@@ -343,7 +343,6 @@ class ShotManager:
         # Determine shot_type (inside/attack/outside) for shot score calculation
         # Motion offense already has shot_type in roles, Set plays use location-based logic (same as Motion)
         shot_type = roles.get("shot_type")  # From Motion offense
-        logging.warning(f"🟡🟡🟡🟡🟡🟡🟡🟡🟡🟡[CHARGE]: shot_type={shot_type}")
         if not shot_type:
             # For Set plays, determine shot_type from skeleton analysis (location + drive detection)
             # Same logic as Motion plays: check shooter location and whether there was a drive action
@@ -387,6 +386,9 @@ class ShotManager:
                     shot_type = "attack"
                 else:
                     shot_type = "outside"
+        
+        # Log final shot_type (used for charge check and shot score)
+        logging.warning(f"🟡🟡🟡🟡🟡🟡🟡🟡🟡🟡[CHARGE]: shot_type={shot_type}")
         
         # ✅ BALANCING SYSTEM: Check for balancing override first
         # Balancing override is set when score difference exceeds threshold based on quarter and team attributes
