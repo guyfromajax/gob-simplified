@@ -92,6 +92,24 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
     // ✅ FIX: Don't announce Fast Break if this turn is a steal OR if it came from a steal (steal announcement takes priority)
     // Check: 1) Not a STEAL turn itself, 2) Text doesn't mention steal, 3) Not a steal-initiated Fast Break (is_steal_entry flag)
     const isStealInitiatedFastBreak = turn.roles?.is_steal_entry;
+    // 🔍 ANNOUNCEMENT DIAGNOSTIC: Log Fast Break decision so we can pinpoint why "Fast Break!" may not show
+    const isMakeOrMiss = turn.result_type === 'MAKE' || turn.result_type === 'MISS';
+    if (turn.fast_break || (isMakeOrMiss && turn.roles)) {
+      console.log('📢 [ANNOUNCEMENT DIAGNOSTIC] prepareTurnForAnimation – Fast Break context', {
+        result_type: turn.result_type,
+        fast_break: turn.fast_break,
+        fast_break_type: typeof turn.fast_break,
+        has_roles: !!turn.roles,
+        is_steal_entry: isStealInitiatedFastBreak,
+        _contextAnnouncementsShown: turn._contextAnnouncementsShown,
+        text_has_steal: turn.text?.toLowerCase().includes('steal'),
+        will_call_FAST_BREAK:
+          turn.fast_break &&
+          turn.result_type !== 'STEAL' &&
+          !turn.text?.toLowerCase().includes('steal') &&
+          !isStealInitiatedFastBreak,
+      });
+    }
     if (turn.fast_break && turn.result_type !== 'STEAL' && !turn.text?.toLowerCase().includes('steal') && !isStealInitiatedFastBreak) {
       announceGameEvent('FAST_BREAK', turn, scene);
     }

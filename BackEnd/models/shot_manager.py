@@ -452,9 +452,14 @@ class ShotManager:
             game_state.pop("motion_attack_penalty", None)
 
         # ✅ CHARGE/BLOCKING FOUL CHECK: Check for charge or blocking foul on attack shots
+        # Fast Break: only allow charge/block when there is a shot defender defending the attempt (defender_count >= 1)
         charge_result = None
         if shot_type == "attack":
-            charge_result = calculate_charge(shooter, defender, off_team, def_team)
+            run_charge_check = True
+            if roles.get("is_fast_break"):
+                run_charge_check = bool(defender) and (roles.get("defender_count", 0) >= 1)
+            if run_charge_check:
+                charge_result = calculate_charge(shooter, defender, off_team, def_team)
             logging.warning(
                 "CHARGE_DEBUG 🟡🟡🟡🟡🟡 resolve_shot: Charge check | shot_type=attack | result=%s | shooter=%s | defender=%s",
                 charge_result,
