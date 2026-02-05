@@ -1336,13 +1336,17 @@ def resolve_fast_break_logic(game: "GameManager"):
             "defender_count": defender_count,
         }
 
-        # Fast Break shot threshold: 0 def = 1, 1 def = base, 2+ def = base + 100 + def_chem - (off_fight*2)
+        # Fast Break shot threshold: use effective defender count (reduce by 1 if defender attempted stop and failed)
+        # Stats/animation still use actual defender_count; only threshold uses effective count
+        effective_defender_count = defender_count
+        if fb_roles.get("ball_handler_beats_defender"):
+            effective_defender_count = max(0, defender_count - 1)
         base_threshold = off_team.team_attributes["shot_threshold"]
         def_chemistry = int((def_team.team_attributes.get("team_chemistry") or 0))
         off_fight = int((off_team.team_attributes.get("fight") or 0) * 2)
-        if defender_count == 0:
+        if effective_defender_count == 0:
             shot_threshold = 1
-        elif defender_count >= 2:
+        elif effective_defender_count >= 2:
             shot_threshold = base_threshold + 100 + def_chemistry - off_fight
         else:
             shot_threshold = base_threshold

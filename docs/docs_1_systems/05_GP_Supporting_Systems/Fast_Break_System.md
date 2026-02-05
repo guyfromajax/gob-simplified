@@ -75,12 +75,14 @@
      - If shooter is outlet receiver: passer = outlet passer (rebounder)
      - Else if shooter != ball_handler: passer = ball_handler
      - Else: passer = None
+   - **Shot threshold**: Uses effective defender count. If a defender attempted a stop and failed (`ball_handler_beats_defender`), effective count = defender_count − 1 (min 0). Threshold: 0 def → 1; 1 def → base; 2+ def → base + 100 + def_chem − off_fight. Stats and animation still use actual defender_count.
    - **Special Case - Ball Handler Beats Defender**:
      - If `ball_handler_beats_defender = True` (from Step 6 skill check):
        - Defender still animates to stopper position (1-3 spots in front of ball handler's starting position)
        - Ball handler animates past stopper to shot spot (shows offensive success)
        - Use `animateFastBreakShotWithStopper()` animation path
-   - Call `shot_manager.resolve_fast_break_shot()` for full shot resolution
+   - **Charge/Blocking Foul**: Only checked when there is a shot defender (defender present and defender_count ≥ 1). If 0 defenders back, no charge/block check; shot proceeds normally. When applicable, uses same attack-shot logic as half-court (`calculate_charge()`); CHARGE → possession to defense, BLOCKING_FOUL → foul on defender (SIP or free throws if bonus). Shooter and defender are animated to the shot spot; no shot-to-rim.
+   - Call `shot_manager.resolve_shot()` (attack adapter) for shot resolution
    - Build animation packet (outlet pass + shot attempt)
    - Track Fast Break stats and team stats
    - If MISS → DREB: Route to `runDefensiveReboundSetup()` with current Fast Break turn data
@@ -126,6 +128,19 @@ Fast breaks can result in:
    - Ball handler moves 5-10 spots toward basket, ±3 Y (clamped)
    - Closest defender overall (by Euclidean distance) follows and is positioned 6 x-coords behind ball handler
    - Routes to: Standard shot resolution flow (MAKE/MISS)
+
+### Charge and Blocking Foul (Fast Break Shot Only)
+
+- **When checked**: Only when there is a shot defender defending the attempt: defender is assigned and `defender_count ≥ 1`. If **0 defenders back**, the charge/block check is **skipped** and the shot is resolved normally (make/miss).
+- **How**: Same as attack shots in half-court. Before make/miss, `calculate_charge(shooter, defender, off_team, def_team)` runs. It uses shooter/defender attributes and team chemistry/discipline; thresholds determine the call.
+- **CHARGE** (foul on offense): Possession flips to defense; next play is side inbound. No shot attempt.
+- **BLOCKING_FOUL** (foul on defense): Foul recorded on defender; next play is SIP or FREE_THROW if bonus. No shot attempt.
+- **Animation**: For either call, shooter and defender are animated to the shot spot near the basket; no ball-to-rim. Announcement ("Charge!" / "Blocking foul on X!") runs in finalizeTurnAfterAnimation.
+
+### Shot Threshold When Defender Attempts Stop and Fails
+
+- For **shot difficulty only**, defender count is reduced by 1 when a defender **attempted a stop and failed** (`ball_handler_beats_defender = True`). Effective count = max(0, defender_count − 1).
+- **Example**: 1 defender back, they attempt stop and lose → effective count = 0 → shot threshold = 1 (same as no defenders). Stats and animation still use actual defender_count = 1.
 
 ### Coordinate System and Player Positioning
 
