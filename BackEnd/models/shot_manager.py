@@ -341,8 +341,9 @@ class ShotManager:
         is_paint = self.is_paint_shot(shooter, roles)
         
         # Determine shot_type (inside/attack/outside) for shot score calculation
-        # Motion offense already has shot_type in roles, Set plays use location-based logic (same as Motion)
-        shot_type = roles.get("shot_type")  # From Motion offense
+        # Motion offense: use randomly chosen type from resolve_motion_offense_shot (motion_shot_type)
+        # Set plays: infer from skeleton (location + handle_ball/drive detection)
+        shot_type = roles.get("shot_type") or roles.get("motion_shot_type")
         if not shot_type:
             # For Set plays, determine shot_type from skeleton analysis (location + attack detection)
             # Attack = paint shot where shooter had "handle_ball" in previous step and moved to shoot spot
