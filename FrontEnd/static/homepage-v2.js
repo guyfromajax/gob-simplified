@@ -4,7 +4,7 @@
  */
 
 (function () {
-  const CAROUSEL_INTERVAL_MS = 6000;
+  const CAROUSEL_INTERVAL_MS = 7500;
   var carouselInitialized = false;
 
   function initCarousel() {
