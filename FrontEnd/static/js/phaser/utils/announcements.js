@@ -341,6 +341,32 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     // Announcements at turn end (after animation)
     // Note: "It's Good!" and "Rebound!" are now handled directly in ballManager.js
     // for precise timing when ball reaches rim/rebounder
+
+    // Charge: offensive foul on drive - announce "Charge!" (not "Offensive Foul!")
+    if (turnData.result_type === 'CHARGE') {
+      const foulerId = turnData.foul_player_id || turnData.shooter_id;
+      let playerData = null;
+      if (scene && foulerId) {
+        const foulPlayerSprite = scene.playerSprites?.[foulerId];
+        if (foulPlayerSprite) {
+          const homeTeamField = scene.simData?.home_team;
+          const awayTeamField = scene.simData?.away_team;
+          const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+          const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+          const foulPlayerTeamName = foulPlayerSprite.team_id === scene.homeTeamId ? homeTeamName : awayTeamName;
+          playerData = {
+            playerId: foulerId,
+            photo: foulPlayerSprite?.photo || null,
+            teamName: foulPlayerTeamName
+          };
+        }
+      }
+      showAnnouncement("CHARGE!", defenseTeam, playerData);
+      if (scene && foulerId && typeof triggerVisualEffect === 'function') {
+        triggerVisualEffect(scene, foulerId, 'foul');
+      }
+      return;
+    }
     
     if (turnData.result_type === 'FOUL') {
       // ✅ FIX: Skip shooting fouls - they're already announced in ballManager.js
