@@ -65,6 +65,7 @@ PAINT_SPOTS = {
     "upper lowpost",
     "upper midpost",
     "midlane",
+    "basketspot",
 }
 
 BLOCK_PROBABILITY = {
