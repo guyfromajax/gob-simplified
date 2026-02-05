@@ -446,7 +446,7 @@ class ShotManager:
         # ✅ CHARGE/BLOCKING FOUL CHECK: Check for charge or blocking foul on attack shots
         charge_result = None
         if shot_type == "attack":
-            charge_result = calculate_charge()
+            charge_result = calculate_charge(shooter, defender, off_team, def_team)
             logging.warning(
                 "CHARGE_DEBUG 🟡🟡🟡🟡🟡 resolve_shot: Charge check | shot_type=attack | result=%s | shooter=%s | defender=%s",
                 charge_result,

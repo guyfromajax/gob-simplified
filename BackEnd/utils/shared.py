@@ -1400,13 +1400,63 @@ def serialize_lineup(lineup_dict):
     }
 
 
-def calculate_charge():
+def calculate_charge(shooter, defender, off_team, def_team):
     """
     Calculate whether a charge or blocking foul occurs on a drive.
-    
+
+    Uses shooter/defender attributes, team chemistry, and discipline to compute
+    offense/defense scores and a reconciliation value; thresholds determine the call.
+
     Returns:
-        str: Either "CHARGE" (foul on offense) or "BLOCKING_FOUL" (foul on defense)
+        str | None: "CHARGE" (foul on offense), "BLOCKING_FOUL" (foul on defense),
+            or None (no call, continue with shot).
     """
-    return random.choice(["CHARGE", "BLOCKING_FOUL"])
+    if not shooter or not defender:
+        return None
+    attrs_shooter = getattr(shooter, "attributes", None) or {}
+    attrs_defender = getattr(defender, "attributes", None) or {}
+    if not attrs_shooter or not attrs_defender:
+        return None
+
+    # Offense score = shooter (AG*0.6 + IQ*0.2 + CH*0.2) * random(1, 6)
+    off_base = (
+        attrs_shooter.get("AG", 0) * 0.6
+        + attrs_shooter.get("IQ", 0) * 0.2
+        + attrs_shooter.get("CH", 0) * 0.2
+    )
+    offense_score = off_base * random.randint(1, 6)
+
+    # Defense score = defender (AG*0.5 + OD*0.3 + IQ*0.1 + CH*0.1) * random(1, 6)
+    def_base = (
+        attrs_defender.get("AG", 0) * 0.5
+        + attrs_defender.get("OD", 0) * 0.3
+        + attrs_defender.get("IQ", 0) * 0.1
+        + attrs_defender.get("CH", 0) * 0.1
+    )
+    defense_score = def_base * random.randint(1, 6)
+
+    # Chemistry factor per team = int(team_chemistry / 4)
+    off_chemistry = int((off_team.team_attributes.get("team_chemistry", 0) or 0) / 4)
+    def_chemistry = int((def_team.team_attributes.get("team_chemistry", 0) or 0) / 4)
+
+    def _discipline_factor(team, chemistry_factor):
+        discipline = team.team_attributes.get("discipline", 0) or 0
+        if discipline >= 0:
+            return discipline * random.randint(0, max(0, chemistry_factor))
+        # Invert chemistry factor on 1–6 scale: 1->6, 2->5, 3->4, 4->3, 5->2, 6->1
+        cf = min(max(chemistry_factor, 1), 6)
+        inverted = 7 - cf
+        return discipline * random.randint(0, inverted)
+
+    offense_score += _discipline_factor(off_team, off_chemistry)
+    defense_score += _discipline_factor(def_team, def_chemistry)
+
+    reconciliation = offense_score - defense_score
+
+    if reconciliation < -210:
+        return "CHARGE"
+    if reconciliation > 180:
+        return "BLOCKING_FOUL"
+    return None
 
 
