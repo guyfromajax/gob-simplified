@@ -155,6 +155,12 @@ SOFT_FOUL = 100
 STEAL_ATTEMPT = 20
 DEAD_BALL_TURNOVER = 7
 
+# Charge/Blocking Foul (drive reconciliation thresholds)
+# reconciliation = offense_score - defense_score
+# < CHARGE_THRESHOLD → charge (offensive foul); > BLOCKING_FOUL_THRESHOLD → blocking foul (defensive foul)
+CHARGE_THRESHOLD = -240
+BLOCKING_FOUL_THRESHOLD = 220
+
 HCO_STRING_SPOTS = {
     "key": {"x": 64, "y": 25},
     "upper midWing": {"x": 68, "y": 36}, 
