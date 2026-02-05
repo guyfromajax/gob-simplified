@@ -23,8 +23,8 @@
 2. Determine Shot Type
    - is_three = `is_three_point_shot(shooter, roles)` (checks shooter spot against THREE_POINT_SPOTS)
    - is_paint = `is_paint_shot(shooter, roles)` (checks shooter spot against PAINT_SPOTS)
-   - shot_type = `roles.get("shot_type")` (from Motion offense) OR determined from skeleton analysis (for Set plays)
-     - Motion offense: shot_type already determined (inside/attack/outside)
+   - shot_type = `roles.get("shot_type")` or `roles.get("motion_shot_type")` (Motion uses motion_shot_type) OR skeleton analysis (Set plays)
+     - Motion offense: use randomly chosen type from resolve_motion_offense_shot (motion_shot_type)
      - Set plays: shot_type determined from location + attack detection (see Attack detection below)
        - If location in PAINT_SPOTS and has_drive (attack) → "attack"
        - If location in PAINT_SPOTS and no attack → "inside"
@@ -127,6 +127,10 @@
     - Determine defense release players (based on fast_breaks strategy setting)
     - Calculate coordinates for animation
 
+**Charge and Blocking Foul (attack shots only)**
+- Before make/miss: if shot_type is attack, run charge/block check (`calculate_charge()`). If **CHARGE**: return early with result_type "CHARGE", possession_flips True, next_play_type SIP; no shot attempted. If **BLOCKING_FOUL**: return early with result_type "FOUL", text "Blocking foul on X!", next_play_type SIP or FREE_THROW (if bonus); no shot attempted.
+- Backend: game_manager treats CHARGE like FOUL for transition—flips possession and appends SIDE_INBOUND when result_type is CHARGE or FOUL (non–free-throw).
+- Frontend: CHARGE and FOUL (blocking) both route to handleDefault → playTurnAnimation (skeleton/drive animates; no ball to basket). Announcements: "Charge!" for CHARGE, "BLOCKING FOUL!" for blocking foul.
 
 **Long Form Documentation**
 
@@ -155,7 +159,7 @@ Shot resolution uses the following base constants:
 - **is_three**: Check shooter spot against THREE_POINT_SPOTS
 - **is_paint**: Check shooter spot against PAINT_SPOTS
 - **shot_type**: 
-  - Motion: `roles.get("shot_type")` (already determined)
+  - Motion: `roles.get("shot_type")` or `roles.get("motion_shot_type")` (from resolve_motion_offense_shot)
   - Set: Analyze skeleton (location + attack detection)
     - Paint spot + attack (has_drive) → "attack"
     - Paint spot + no attack → "inside"

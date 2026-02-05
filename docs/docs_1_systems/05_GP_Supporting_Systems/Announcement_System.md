@@ -29,7 +29,9 @@
    - **"STEAL!"** - Steal occurred (takes priority over Fast Break announcement)
    - **"Travel!" / "Double Dribble!"** - Dead ball turnovers (randomly chosen 50/50)
    - **"OUT OF BOUNDS!" / "BAD PASS!"** - Other turnover types
-   - **"OFFENSIVE FOUL!" / "DEFENSIVE FOUL!"** - Non-shooting fouls (with fouling player headshot)
+   - **"Charge!"** - Offensive foul on drive (result_type === 'CHARGE')
+   - **"BLOCKING FOUL!"** - Defensive blocking foul on drive (result_type === 'FOUL', foul_team DEFENSE, text contains "blocking foul")
+   - **"OFFENSIVE FOUL!" / "DEFENSIVE FOUL!"** - Other non-shooting fouls (with fouling player headshot)
    - **"Rebound!"** - Defensive rebound (ballManager.js, when ball reaches rebounder)
 
 **Long Form Documentation**
@@ -78,10 +80,10 @@ The Announcement System provides visual feedback for game events using timing-ba
 - Shows victim's headshot in offense team color
 
 **Foul Announcements:**
-- **"OFFENSIVE FOUL!"** - Triggered when `result_type === 'FOUL'` and `foul_team === 'OFFENSE'`
-- **"DEFENSIVE FOUL!"** - Triggered when `result_type === 'FOUL'` and `foul_team === 'DEFENSE'`
-- Shows fouling player's headshot
-- Skips if shooting foul (already handled in shot result announcements)
+- **"Charge!"** - Triggered when `result_type === 'CHARGE'` (offensive foul on drive). Routed via gameAnnouncements.js; AnimationEngine routes CHARGE to handleDefault (skeleton animation, then announcement).
+- **"BLOCKING FOUL!"** - Triggered when `result_type === 'FOUL'`, `foul_team === 'DEFENSE'`, and text contains "blocking foul" (non-shooting defensive foul on drive).
+- **"OFFENSIVE FOUL!"** / **"DEFENSIVE FOUL!"** - Other non-shooting fouls (foul_team OFFENSE or DEFENSE, not blocking).
+- Shows fouling player's headshot. Skips if shooting foul (already handled in shot result announcements).
 
 **Rebound Announcements:**
 - **"Rebound!"** - Handled in `ballManager.js` when ball reaches rebounder (line 839)
