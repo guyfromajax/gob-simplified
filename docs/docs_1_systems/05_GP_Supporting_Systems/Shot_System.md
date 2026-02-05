@@ -25,12 +25,14 @@
    - is_paint = `is_paint_shot(shooter, roles)` (checks shooter spot against PAINT_SPOTS)
    - shot_type = `roles.get("shot_type")` (from Motion offense) OR determined from skeleton analysis (for Set plays)
      - Motion offense: shot_type already determined (inside/attack/outside)
-     - Set plays: shot_type determined from location + drive detection (same logic as Motion plays)
-       - Find shooter's location in final shoot step
-       - Check if there was a "drive" action before the shoot action
-       - If location in PAINT_SPOTS and has_drive → "attack"
-       - If location in PAINT_SPOTS and no drive → "inside"
+     - Set plays: shot_type determined from location + attack detection (see Attack detection below)
+       - If location in PAINT_SPOTS and has_drive (attack) → "attack"
+       - If location in PAINT_SPOTS and no attack → "inside"
        - Otherwise → "outside"
+   - **Attack detection (Set plays, HCO):** has_drive is True only when:
+     - Shoot step = last step in skeleton; shooter has action "shoot" there.
+     - Shoot location (from that step) is one of: upper lowPost, lower lowPost, upper midPost, lower midPost, midLane (PAINT_SPOTS).
+     - Step immediately before: shooter has action "handle_ball" and his location is not equal to his shoot location (i.e. he moved into the shot).
 
 3. Get Shot Threshold
    - Check for `game_state["balancing_shot_threshold_override"]` (one-time override)
@@ -154,10 +156,14 @@ Shot resolution uses the following base constants:
 - **is_paint**: Check shooter spot against PAINT_SPOTS
 - **shot_type**: 
   - Motion: `roles.get("shot_type")` (already determined)
-  - Set: Analyze skeleton (location + drive detection)
-    - Paint spot + drive → "attack"
-    - Paint spot + no drive → "inside"
+  - Set: Analyze skeleton (location + attack detection)
+    - Paint spot + attack (has_drive) → "attack"
+    - Paint spot + no attack → "inside"
     - Otherwise → "outside"
+- **Attack detection (Set plays):** has_drive is set to True only when:
+  1. Shoot step is the last step; shooter has action `"shoot"` there.
+  2. Shoot location (from that step) is in PAINT_SPOTS: upper lowPost, lower lowPost, upper midPost, lower midPost, midLane.
+  3. In the step immediately before the shoot step: the shooter has action `"handle_ball"` and his location is not equal to his shoot location (he moved into the shot). Locations compared case-insensitively.
 
 #### Step 3: Get Shot Threshold
 - **Balancing Override**: `game_state["balancing_shot_threshold_override"]` (if score diff exceeds quarter-based threshold)
@@ -237,8 +243,8 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 1. **Shot Type vs Playcall**: Shot score calculation uses `shot_type` (inside/attack/outside) instead of `playcall` for attribute weights
 2. **Motion vs Set Plays**: Both Motion and Set plays use location-based logic to determine `shot_type`:
    - **Motion offense**: Determines `shot_type` during shot resolution (checks possibilities, builds weighted list, selects)
-   - **Set plays**: Determines `shot_type` from skeleton analysis (checks shooter location and drive action history)
-   - Both use the same logic: paint spot + drive = attack, paint spot + no drive = inside, otherwise = outside
+   - **Set plays**: Determines `shot_type` from skeleton analysis (shooter location + attack detection)
+   - Attack detection (Set): shoot step = last step; shoot location in PAINT_SPOTS; step before has shooter with action `"handle_ball"` and different location → has_drive = True. Paint + has_drive = attack; paint + no has_drive = inside; else = outside.
 3. **Three-Point Momentum**: Three-point threshold modifier uses momentum: `100 - (random(1-5) * momentum)` (higher momentum = easier threes)
 4. **Foul Thresholds by Shot Type**: Different hard/soft thresholds for inside (50/110), attack (70/130), and outside (30/90) shots
 5. **Defense Scheme Multiplier**: Only Zone vs 3pt gets 1.1x multiplier (makes shot more likely to be successful)
