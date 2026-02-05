@@ -1320,8 +1320,46 @@ def resolve_fast_break_logic(game: "GameManager"):
     # print(f"Roles: {fb_roles}")
     
     if event_type == "SHOT":
-        shot_manager = ShotManager(game)
-        turn_result = shot_manager.resolve_fast_break_shot(fb_roles)
+        # Route Fast Break shot through attack shot execution (resolve_shot) via adapter
+        shooter = fb_roles["shooter"]
+        defender = fb_roles.get("defender")
+        defender_count = fb_roles.get("defender_count", len(fb_roles.get("defense", [])))
+
+        roles = {
+            "shooter": shooter,
+            "passer": fb_roles.get("passer"),
+            "screener": None,
+            "defender": defender,
+            "shot_type": "attack",
+            "is_fast_break": True,
+            "motion_playcall": "Attack",
+        }
+
+        # Fast Break shot threshold: 0 def = int(off_chemistry/4), 1 def = base, 2+ def = base + 100 + def_chem - (off_fight*2)
+        base_threshold = off_team.team_attributes["shot_threshold"]
+        off_chemistry = int((off_team.team_attributes.get("team_chemistry") or 0) / 4)
+        def_chemistry = int((def_team.team_attributes.get("team_chemistry") or 0))
+        off_fight = int((off_team.team_attributes.get("fight") or 0) * 2)
+        if defender_count == 0:
+            shot_threshold = max(1, off_chemistry)
+        elif defender_count >= 2:
+            shot_threshold = base_threshold + 100 + def_chemistry - off_fight
+        else:
+            shot_threshold = base_threshold
+        game_state["fast_break_shot_threshold_override"] = shot_threshold
+
+        turn_result = game.shot_manager.resolve_shot(roles)
+        game_state.pop("fast_break_shot_threshold_override", None)
+
+        turn_result["defender_count"] = defender_count
+        turn_result["outlet_passer_id"] = fb_roles.get("outlet_passer")
+
+        if turn_result.get("result_type") == "MAKE":
+            points = turn_result.get("points", 2)
+            shooter.record_stat("FB_PTS", amount=points)
+            if fb_roles.get("is_steal_entry"):
+                pot_points = 3 if fb_roles.get("is_three_point_shot") else points
+                shooter.record_stat("POT", amount=pot_points)
 
     elif event_type == "TURNOVER":
         turnover_type = random.choice(["STEAL", "DEAD BALL"])
