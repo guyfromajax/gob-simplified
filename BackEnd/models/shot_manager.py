@@ -493,7 +493,7 @@ class ShotManager:
                 )
                 return result
             
-            # Handle BLOCKING_FOUL: Reuse non-shooting defensive foul logic
+            # Handle BLOCKING_FOUL: Return early, nullify shot attempt (same as CHARGE)
             elif charge_result == "BLOCKING_FOUL":
                 if defender:
                     # Record foul on defender
@@ -506,8 +506,6 @@ class ShotManager:
                     # Check if player fouled out (5th foul)
                     from BackEnd.engine.phase_resolution import check_and_handle_foul_out
                     blocking_foul_out_info = check_and_handle_foul_out(defender, self.game_state, def_team)
-                    # Store for later use in result dict
-                    self._blocking_foul_out_info = blocking_foul_out_info
                     
                     # Check bonus status (reuse logic from resolve_non_shooting_foul)
                     if def_team.team_fouls >= 10:
@@ -540,9 +538,55 @@ class ShotManager:
                         def_team.team_fouls,
                         next_play_type,
                     )
-                    # Store blocking foul info for later use in result dict
-                    # Continue with shot - blocking foul doesn't prevent shot attempt
-                    # The result dict will be updated later with foul info
+                    
+                    # Early return: nullify shot attempt, return result for next turn
+                    shooter_pos = get_player_position(off_lineup, shooter)
+                    tempo = off_team.strategy_calls.get("tempo_call", "normal")
+                    time_elapsed = get_time_elapsed(tempo)
+                    intended_shooter_pos = roles.get("intended_shooter_pos")
+                    intended_shooter = off_lineup.get(intended_shooter_pos) if intended_shooter_pos else None
+                    intended_shooter_id = intended_shooter.player_id if intended_shooter else None
+                    
+                    result = {
+                        "result_type": "FOUL",
+                        "ball_handler": shooter,
+                        "shooter": shooter,
+                        "shooter_id": shooter.player_id,
+                        "shooter_pos": shooter_pos,
+                        "intended_shooter_pos": intended_shooter_pos,
+                        "intended_shooter_id": intended_shooter_id,
+                        "screener": screener,
+                        "passer": passer,
+                        "defender": defender,
+                        "text": f"Blocking foul on {get_name_safe(defender)}!",
+                        "possession_flips": False,
+                        "time_elapsed": time_elapsed,
+                        "events": [],
+                        "foul_player_id": defender.player_id,
+                        "foul_team": "DEFENSE",
+                        "next_play_type": next_play_type,
+                        "offense_team_id": off_team.team_id,
+                        "defense_team_id": def_team.team_id,
+                    }
+                    if next_play_type == "FREE_THROW":
+                        result["free_throws_remaining"] = self.game_state.get("free_throws_remaining", 0)
+                        if self.game_state.get("one_and_one"):
+                            result["one_and_one"] = True
+                    if blocking_foul_out_info and blocking_foul_out_info.get("fouled_out"):
+                        result["fouled_out"] = True
+                        result["foul_out_player"] = {
+                            "player_id": blocking_foul_out_info["foul_player_id"],
+                            "name": blocking_foul_out_info["foul_player_name"],
+                            "photo": blocking_foul_out_info["foul_player_photo"],
+                            "team": blocking_foul_out_info["foul_player_team"],
+                        }
+                        result["foul_count"] = blocking_foul_out_info["foul_count"]
+                    
+                    logging.warning(
+                        "CHARGE_DEBUG 🟡🟡🟡🟡🟡 resolve_shot: Returning BLOCKING_FOUL | next_play_type=%s",
+                        next_play_type,
+                    )
+                    return result
         
         made = shot_score >= shot_threshold
 
