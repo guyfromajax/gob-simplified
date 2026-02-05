@@ -606,8 +606,7 @@ class ShotManager:
         offense_reb_value = off_team.strategy_settings.get("rebounding", 2)  # Crash boards vs get back
         defense_fast_breaks_value = def_team.strategy_settings.get("fast_breaks", 2)  # Stay vs release for FB
         
-        # Import for debug logging (logging already imported at top of file)
-        from BackEnd.utils.shared import get_name_safe
+        # get_name_safe already imported at top of file
         shooter_name = get_name_safe(shooter)
         
         # Determine defensive players releasing for fast break
@@ -1430,8 +1429,7 @@ class ShotManager:
         hard_threshold = base_hard - discipline
         soft_threshold = base_soft - discipline
 
-        # 🔍 DEBUG: Shooting Foul Calculation
-        from BackEnd.utils.shared import get_name_safe
+        # 🔍 DEBUG: Shooting Foul Calculation (get_name_safe already imported at top of file)
         logging.debug(f"🔍 [SHOOTING FOUL] Calculation:")
         shooter_name = get_name_safe(shooter) if shooter else "Unknown"
         shooter_loc_str = shooter_location if shooter_location else "unknown"
