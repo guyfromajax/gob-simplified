@@ -1,6 +1,12 @@
 import random
 import logging
-from BackEnd.constants import TURNOVER_CALC_DICT, POSITION_LIST, HCO_STRING_SPOTS
+from BackEnd.constants import (
+    TURNOVER_CALC_DICT,
+    POSITION_LIST,
+    HCO_STRING_SPOTS,
+    CHARGE_THRESHOLD,
+    BLOCKING_FOUL_THRESHOLD,
+)
 
 
 def format_height(value) -> str:
@@ -1453,9 +1459,9 @@ def calculate_charge(shooter, defender, off_team, def_team):
 
     reconciliation = offense_score - defense_score
 
-    if reconciliation < -210:
+    if reconciliation < CHARGE_THRESHOLD:
         return "CHARGE"
-    if reconciliation > 180:
+    if reconciliation > BLOCKING_FOUL_THRESHOLD:
         return "BLOCKING_FOUL"
     return None
 
