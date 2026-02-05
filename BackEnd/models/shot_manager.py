@@ -344,30 +344,29 @@ class ShotManager:
         # Motion offense already has shot_type in roles, Set plays use location-based logic (same as Motion)
         shot_type = roles.get("shot_type")  # From Motion offense
         if not shot_type:
-            # For Set plays, determine shot_type from skeleton analysis (location + drive detection)
-            # Same logic as Motion plays: check shooter location and whether there was a drive action
+            # For Set plays, determine shot_type from skeleton analysis (location + attack detection)
+            # Attack = paint shot where shooter had "handle_ball" in previous step and moved to shoot spot
             shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
             steps = roles.get("steps", [])
             
-            # Check if there was a drive action before the shoot action
+            # Attack detection: shoot step is last step; if shoot location is paint, check step before for handle_ball + different location
             has_drive = False
-            if steps and shooter_pos:
-                # Find the shoot step and check previous steps for drive action
-                for step_idx in range(len(steps) - 1, -1, -1):
-                    step = steps[step_idx]
-                    pos_actions = step.get("pos_actions", {})
-                    shooter_action = pos_actions.get(shooter_pos, {})
-                    
-                    if shooter_action.get("action") == "shoot":
-                        # Check previous steps for drive action by same player
-                        for prev_idx in range(step_idx - 1, -1, -1):
-                            prev_step = steps[prev_idx]
-                            prev_pos_actions = prev_step.get("pos_actions", {})
-                            prev_action = prev_pos_actions.get(shooter_pos, {})
-                            if prev_action.get("action") == "drive":
+            if steps and shooter_pos and len(steps) >= 2:
+                shoot_step = steps[-1]
+                pos_actions = shoot_step.get("pos_actions", {})
+                shooter_action = pos_actions.get(shooter_pos, {})
+                if shooter_action.get("action") == "shoot":
+                    shoot_location_key = shooter_action.get("location") or shooter_action.get("spot", "")
+                    shoot_location_lower = shoot_location_key.lower() if shoot_location_key else ""
+                    if shoot_location_lower in PAINT_SPOTS:
+                        prev_step = steps[-2]
+                        prev_pos_actions = prev_step.get("pos_actions", {})
+                        prev_action = prev_pos_actions.get(shooter_pos, {})
+                        if prev_action.get("action") == "handle_ball":
+                            prev_location_key = prev_action.get("location") or prev_action.get("spot", "")
+                            prev_location_lower = prev_location_key.lower() if prev_location_key else ""
+                            if prev_location_lower != shoot_location_lower:
                                 has_drive = True
-                                break
-                        break
             
             # Determine shot_type based on location and drive (same logic as Motion plays)
             if shooter_location:
