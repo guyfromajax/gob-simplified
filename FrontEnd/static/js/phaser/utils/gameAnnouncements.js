@@ -98,6 +98,11 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
 
     // ========== FAST BREAK ==========
     case 'FAST_BREAK':
+      // 🔍 ANNOUNCEMENT DIAGNOSTIC: Confirm we reached the actual "Fast Break!" announcement
+      console.log('📢 [ANNOUNCEMENT DIAGNOSTIC] announceGameEvent("FAST_BREAK") – about to showAnnouncement', {
+        offenseTeam,
+        result_type: turnData?.result_type,
+      });
       showAnnouncement("Fast Break!", offenseTeam);
       break;
 

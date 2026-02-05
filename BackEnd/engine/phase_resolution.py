@@ -1333,15 +1333,15 @@ def resolve_fast_break_logic(game: "GameManager"):
             "shot_type": "attack",
             "is_fast_break": True,
             "motion_playcall": "Attack",
+            "defender_count": defender_count,
         }
 
-        # Fast Break shot threshold: 0 def = int(off_chemistry/4), 1 def = base, 2+ def = base + 100 + def_chem - (off_fight*2)
+        # Fast Break shot threshold: 0 def = 1, 1 def = base, 2+ def = base + 100 + def_chem - (off_fight*2)
         base_threshold = off_team.team_attributes["shot_threshold"]
-        off_chemistry = int((off_team.team_attributes.get("team_chemistry") or 0) / 4)
         def_chemistry = int((def_team.team_attributes.get("team_chemistry") or 0))
         off_fight = int((off_team.team_attributes.get("fight") or 0) * 2)
         if defender_count == 0:
-            shot_threshold = max(1, off_chemistry)
+            shot_threshold = 1
         elif defender_count >= 2:
             shot_threshold = base_threshold + 100 + def_chemistry - off_fight
         else:
@@ -1406,6 +1406,14 @@ def resolve_fast_break_logic(game: "GameManager"):
         "animation_count": len(turn_result.get("animations", []))
     }
     logging.debug(f"🏀 [FAST BREAK DEBUG] {turn_result.get('result_type')} result created: {json.dumps(debug_data, default=str)}")
+    # 🔍 ANNOUNCEMENT DIAGNOSTIC: Confirm payload sent to frontend has fast_break (so announcements can run)
+    logging.warning(
+        "📢 [ANNOUNCEMENT DIAGNOSTIC] resolve_fast_break_logic returning turn: result_type=%s fast_break=%s (type=%s) has_roles=%s",
+        turn_result.get("result_type"),
+        turn_result.get("fast_break"),
+        type(turn_result.get("fast_break")).__name__,
+        "roles" in turn_result,
+    )
     if hold_up:
         turn_result["hold_up"] = True
         turn_result["stopper_id"] = stopper_id

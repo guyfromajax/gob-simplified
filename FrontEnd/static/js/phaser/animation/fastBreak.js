@@ -106,7 +106,8 @@ export async function runFastBreakSequence({
   // PHASE 2: FAST BREAK RESOLUTION - Check result BEFORE moving toward basket
   // ============================================================================
   const result = turnData.result_type;
-  
+  const isBlockingFoul = result === "FOUL" && turnData.foul_team === "DEFENSE" && turnData.text?.toLowerCase().includes("blocking foul");
+
   if (result === "MAKE" || result === "MISS") {
     // Shot attempt scenario
     // Check if ball handler beat the defender (skill check won)
@@ -117,8 +118,11 @@ export async function runFastBreakSequence({
       // Normal shot attempt (no stopper or stopper not in position)
       await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
     }
+  } else if (result === "CHARGE" || isBlockingFoul) {
+    // Charge or blocking foul: animate to shot spot (same as MAKE/MISS) then stop; no shot animation. Announcement runs in finalizeTurnAfterAnimation.
+    await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height, { foulOnly: true });
   } else {
-    // Defensive stop, foul, turnover, or steal - position for defensive stop (outlet receiver hasn't moved too far)
+    // Defensive stop, other foul, turnover, or steal - position for defensive stop (outlet receiver hasn't moved too far)
     await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
   }
   
@@ -715,7 +719,7 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
   }
 }
 
-async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height) {
+async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height, options = {}) {
   const shooterId = turnData.roles?.shooter?.player_id || turnData.shooter_id || getCurrentOwner(scene);
   const shooterSprite = playerSprites[shooterId];
   
@@ -827,6 +831,12 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     height,
     promises
   );
+
+  // Charge / blocking foul: animate to shot spot only, then return. No shot; announcement in finalizeTurnAfterAnimation.
+  if (options.foulOnly) {
+    await Promise.all(promises);
+    return;
+  }
   
   // ✅ Wait only for shooter to reach basket - shoot immediately when he arrives
   // Defender and rebounders continue animating in parallel
