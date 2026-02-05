@@ -5,10 +5,13 @@
 
 (function () {
   const CAROUSEL_INTERVAL_MS = 6000;
+  var carouselInitialized = false;
 
   function initCarousel() {
+    if (carouselInitialized) return;
     const slides = document.querySelectorAll('.carousel-slide');
     if (!slides.length) return;
+    carouselInitialized = true;
 
     let currentIndex = 0;
     let intervalId;
@@ -30,6 +33,7 @@
     }
 
     function startInterval() {
+      clearInterval(intervalId);
       intervalId = setInterval(next, CAROUSEL_INTERVAL_MS);
     }
 
