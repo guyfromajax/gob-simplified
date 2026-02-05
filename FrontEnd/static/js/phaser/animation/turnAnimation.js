@@ -2378,7 +2378,12 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       }
 
       if (nextStep.action === "shoot") {
-        shotInfo = { step: nextStep, playerId: anim.playerId, stepIndex };
+        // Option A: Don't animate shot attempt for Charge or Blocking Foul — keep ball on ball handler
+        const isChargeOrBlockingFoul = turnData.result_type === 'CHARGE' ||
+          (turnData.result_type === 'FOUL' && turnData.text?.toLowerCase().includes('blocking foul'));
+        if (!isChargeOrBlockingFoul) {
+          shotInfo = { step: nextStep, playerId: anim.playerId, stepIndex };
+        }
       }
 
       const promise = animateStep({
