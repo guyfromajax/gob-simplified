@@ -1004,7 +1004,7 @@
     /* ==================== PLAYCALL CENTER - UNIFIED TACTICAL HUB ==================== */
     #playcall-center {
       width: 100%;
-      height: 100%;
+      /* height removed - controlled by fixed positioning rule below */
       overflow-y: auto;  /* Scroll if content exceeds available space */
       background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 1));
       border-top: 2px solid var(--home-vibrant-color);
@@ -1016,15 +1016,17 @@
       gap: 8px;  /* CHANGE: reduced gap */
     }
 
-    /* FIXED POSITIONING - Bypass grid collapse */
+    /* FIXED POSITIONING - Dynamically positioned below canvas, constrained height */
     #playcall-center {
       position: fixed !important;
-      top: calc(var(--scoreboard-height) + 600px) !important;  /* Below court (adjust as needed) */
+      /* top set dynamically via JS based on canvas bottom */
       bottom: 0 !important;
       left: calc(280px + var(--side-padding)) !important;  /* After left panel */
       right: calc(280px + var(--side-padding)) !important;  /* Before right panel */
       width: auto !important;
-      height: auto !important;
+      /* Height constrained: min 160px, preferred 22vh, max 260px */
+      max-height: clamp(160px, 22vh, 260px) !important;
+      min-height: 160px !important;
       overflow-y: auto !important;
       z-index: 900 !important;
     }
@@ -1064,10 +1066,9 @@
     /* Main Row: 3-Column Layout */
     #playcall-main-row {
       display: flex;
-      align-items: stretch;
+      align-items: center;  /* CHANGE: center instead of stretch to prevent vertical stretching */
       justify-content: space-between;
       gap: 16px;  /* CHANGE: reduced gap */
-      flex: 1;  /* CHANGE: fill available space */
       min-height: 0;  /* CHANGE: allow shrinking */
     }
 
@@ -1195,8 +1196,8 @@
 
     .play-headshot {
       width: auto;  /* Proportional to height */
-      height: 100%;  /* Fill container height */
-      max-height: 70px;  /* Match play-option min-height (increased) */
+      height: 70px;  /* CHANGE: fixed height instead of 100% to prevent stretching */
+      max-height: 70px;  /* Match play-option min-height */
       border-radius: 4px;  /* Rectangular with slight rounding */
       border: 2px solid rgba(255, 255, 255, 0.3);
       object-fit: cover;
@@ -1341,8 +1342,9 @@
 
     #lean-meter {
       width: 64px;  /* CHANGE: 20% thinner (was 80px) */
-      height: 100%;
+      height: 120px;  /* CHANGE: fixed height instead of 100% to prevent stretching */
       min-height: 120px;
+      max-height: 120px;  /* Prevent stretching beyond intended size */
       background: rgba(255, 255, 255, 0.1);
       border: 3px solid rgba(255, 215, 0, 0.4);
       border-radius: 20px;
@@ -3966,36 +3968,42 @@
 
   <!-- Dynamic Playcall Center Positioning (Grok's solution) -->
   <script>
-    // Dynamically position Playcall Center to hug canvas bottom exactly and fill to viewport bottom
+    // Dynamically position Playcall Center below canvas bottom (prevents court coverage on large screens)
     function updatePlaycallPosition() {
       const canvas = document.querySelector('#phaser-container canvas');
-      if (!canvas) return;  // Wait for Phaser to create canvas
+      const playcall = document.getElementById('playcall-center');
+      if (!canvas || !playcall) return;  // Wait for Phaser to create canvas
 
-      // DISABLED: Legacy absolute positioning - now using Flexbox + Grid hybrid
-      // const canvasRect = canvas.getBoundingClientRect();
-      // const playcallTop = canvasRect.bottom - 2;  // Overlap 2px for seamless (eliminates subpixel gap)
-      // const playcall = document.getElementById('playcall-center');
-      // if (playcall) {
-      //   playcall.style.top = `${playcallTop}px`;
-      //   playcall.style.height = `${window.innerHeight - playcallTop}px`;
-      // }
+      const canvasRect = canvas.getBoundingClientRect();
+      const scoreboardHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--scoreboard-height')) || 100;
+      // Position Playcall Center just below canvas bottom (2px gap for seamless visual)
+      const playcallTop = canvasRect.bottom + 2;
+      playcall.style.top = `${playcallTop}px`;
+      
       // Trigger repaint post-Phaser resize
       requestAnimationFrame(() => {
         if (canvas) canvas.style.display = 'block';
       });
     }
 
-    // DISABLED: Legacy positioning event listeners - now using CSS Grid/Flexbox
-    // window.addEventListener('resize', updatePlaycallPosition);
-    // if (window.game) {  // If game is already created
-    //   window.game.scale.on('resize', updatePlaycallPosition);
-    // }
+    // Re-enable positioning: update on window resize and Phaser canvas resize
+    window.addEventListener('resize', updatePlaycallPosition);
+    if (window.game) {  // If game is already created
+      window.game.scale.on('resize', updatePlaycallPosition);
+    }
     
-    // DISABLED: Legacy initial positioning calls
-    // setTimeout(updatePlaycallPosition, 100);
-    // setTimeout(updatePlaycallPosition, 500);
-
-    // Diagnostics removed - issue resolved with position: fixed
+    // Initial positioning calls (with delays to catch Phaser initialization)
+    setTimeout(updatePlaycallPosition, 100);
+    setTimeout(updatePlaycallPosition, 500);
+    
+    // Also use ResizeObserver for canvas container as more reliable fallback
+    const phaserContainer = document.getElementById('phaser-container');
+    if (phaserContainer && typeof ResizeObserver !== 'undefined') {
+      const resizeObserver = new ResizeObserver(() => {
+        updatePlaycallPosition();
+      });
+      resizeObserver.observe(phaserContainer);
+    }
 
     // ==================== SLOT-BASED PLAY NAVIGATION ====================
     let currentPlayIndex = 0;
