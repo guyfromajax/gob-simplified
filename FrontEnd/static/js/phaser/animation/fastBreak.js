@@ -727,19 +727,24 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   
   const isHomeOffense = shooterSprite.team === "home";
   const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-  
-  // Ball handler moves to shot spot near rim
-  const shotSpot = {
-    x: isHomeOffense
-      ? basket.x - Phaser.Math.Between(2, 6)  // Home: basket - 2-6
-      : basket.x + Phaser.Math.Between(2, 6), // Away: basket + 2-6
-    y: basket.y + Phaser.Math.Between(-6, 6)  // ±6 from basket Y
-  };
-  
-  // Clamp to bounds
-  shotSpot.x = Phaser.Math.Clamp(shotSpot.x, 4, 97);
-  shotSpot.y = Phaser.Math.Clamp(shotSpot.y, 1, 49);
-  
+
+  // ✅ SS&S: Backend is single source of truth for shot spot (and defender spot)
+  // Use turnData.shot_spot when present (grid coords, HOME orientation); else fallback to local random
+  let shotSpot;
+  if (turnData.shot_spot && typeof turnData.shot_spot.x === "number" && typeof turnData.shot_spot.y === "number") {
+    shotSpot = {
+      x: Phaser.Math.Clamp(turnData.shot_spot.x, 4, 97),
+      y: Phaser.Math.Clamp(turnData.shot_spot.y, 1, 49)
+    };
+  } else {
+    shotSpot = {
+      x: isHomeOffense ? basket.x - Phaser.Math.Between(2, 6) : basket.x + Phaser.Math.Between(2, 6),
+      y: basket.y + Phaser.Math.Between(-6, 6)
+    };
+    shotSpot.x = Phaser.Math.Clamp(shotSpot.x, 4, 97);
+    shotSpot.y = Phaser.Math.Clamp(shotSpot.y, 1, 49);
+  }
+
   const shotPx = gridToPixels(shotSpot.x, shotSpot.y, width, height);
   
   const promises = [];
@@ -755,66 +760,47 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   });
   promises.push(shooterPromise);
   
-  // Move primary defender
-  // Check top-level defender field first (from shot_manager), then roles.defense array
-  // Use defenderId directly if available, otherwise try to extract from defender object/string
-  let defenderId = turnData.defenderId;
-  
+  // ✅ SS&S: Defender id from backend (defender_id or defenderId), then fallback to roles
+  let defenderId = turnData.defender_id ?? turnData.defenderId;
   if (!defenderId) {
-    let defenderData = turnData.defender || (turnData.roles?.defense && turnData.roles.defense[0]);
+    const defenderData = turnData.defender || (turnData.roles?.defense && turnData.roles.defense[0]);
     if (defenderData) {
-      if (typeof defenderData === 'string') {
-        defenderId = defenderData;
-      } else if (defenderData.player_id) {
-        defenderId = defenderData.player_id;
-      } else if (defenderData.playerId) {
-        defenderId = defenderData.playerId;
-      }
+      if (typeof defenderData === "string") defenderId = defenderData;
+      else defenderId = defenderData.player_id ?? defenderData.playerId;
     }
   }
-  
+
   const defenderSprite = defenderId ? playerSprites[defenderId] : null;
-  
-  // console.log("🏀 FB Shot - Defender lookup:", {
-  //   defenderId,
-  //   hasSprite: !!defenderSprite,
-  //   turnDataDefenderId: turnData.defenderId,
-  //   turnDataDefender: turnData.defender
-  // });
-  
+
   if (defenderSprite) {
-    // Defender position: 3 spots closer to basket, ±2 Y from shooter
-    const defenderSpot = {
-      x: isHomeOffense
-        ? shotSpot.x + 3  // Home attacking right (X=91): defender is +3 (toward basket)
-        : shotSpot.x - 3, // Away attacking left (X=9): defender is -3 (toward basket)
-      y: shotSpot.y + Phaser.Math.Between(-2, 2)  // ±2 Y range from shooter
-    };
-    defenderSpot.x = Phaser.Math.Clamp(defenderSpot.x, 4, 97);
-    defenderSpot.y = Phaser.Math.Clamp(defenderSpot.y, 1, 49);
-    
-    // console.log("🏀 FB Shot - Defender position:", {
-    //   defenderId,
-    //   shotSpot,
-    //   defenderSpot,
-    //   isHomeOffense
-    // });
-    
+    // ✅ SS&S: Use backend defender_spot when present (grid coords, HOME orientation); else fallback to spot between shooter and basket
+    let defenderSpot;
+    if (turnData.defender_spot && typeof turnData.defender_spot.x === "number" && typeof turnData.defender_spot.y === "number") {
+      defenderSpot = {
+        x: Phaser.Math.Clamp(turnData.defender_spot.x, 4, 97),
+        y: Phaser.Math.Clamp(turnData.defender_spot.y, 1, 49)
+      };
+    } else {
+      defenderSpot = {
+        x: isHomeOffense ? shotSpot.x + 3 : shotSpot.x - 3,
+        y: shotSpot.y + Phaser.Math.Between(-2, 2)
+      };
+      defenderSpot.x = Phaser.Math.Clamp(defenderSpot.x, 4, 97);
+      defenderSpot.y = Phaser.Math.Clamp(defenderSpot.y, 1, 49);
+    }
+
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
-    // Use distance-based duration for consistent speed
     const defenderDuration = getPlayerDuration(defenderSprite, defenderPx.x, defenderPx.y);
-    // ✅ Defender animates in parallel - we don't wait for it before shooting
     promises.push(
       tweenPlayerTo(scene, defenderSprite, defenderPx, {
         duration: defenderDuration,
-        easing: "Linear" // Match HCO step movements
+        easing: "Linear"
       })
     );
-  } else {
+  } else if (defenderId) {
     console.warn("🏀 FB Shot - No defender sprite found!", {
       defenderId,
-      turnDataDefenderId: turnData.defenderId,
-      turnDataDefender: turnData.defender,
+      turnDataDefenderId: turnData.defender_id ?? turnData.defenderId,
       availableSprites: Object.keys(playerSprites)
     });
   }

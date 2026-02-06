@@ -1401,7 +1401,21 @@ def resolve_fast_break_logic(game: "GameManager"):
     )
     turn_result["roles"] = fb_roles
     turn_result["fast_break"] = True  # ✅ Add fast_break flag for frontend routing
-    
+
+    # ✅ SS&S: Backend is single source of truth for shot spot and defender placement on Fast Break shots
+    # Expose so frontend uses these instead of recomputing (avoids mismatch and missing defender)
+    if not hold_up and fb_roles.get("_bh_final_x") is not None and fb_roles.get("_bh_final_y") is not None:
+        turn_result["shot_spot"] = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
+    shot_def = fb_roles.get("defender")
+    defender_id = getattr(shot_def, "player_id", None) if shot_def else None
+    if defender_id:
+        turn_result["defender_id"] = defender_id
+        # Defender spot is in the animation entry for this player
+        for anim in (turn_result.get("animations") or []):
+            if anim.get("playerId") == defender_id and "end" in anim:
+                turn_result["defender_spot"] = anim["end"]
+                break
+
     # ==================== FAST BREAK STAT TRACKING ====================
     # Record Fast Break stats for release player (offensive) and get-back players (defensive)
     _record_fast_break_stats(fb_roles, turn_result, game)
