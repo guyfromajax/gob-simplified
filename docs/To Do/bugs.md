@@ -1,16 +1,27 @@
 1. Make end of season progression in franchise mode a true EOS (age players, recruiting process, manage player stats, manage user stats?)
-2. Get rid of double inbound pass on FCP and HCT steps
+2. Add blocks 
 3. Add glow effect to drag and drop on Lineup Selection screen when starting click on the player image
 4. rebound not resistering to player stats when he gets an OREB from a missed OREB putback attempt (note he made teh follow up shot)
-5. Gameplay Buttons Pop-up not appearing after "Play Quarter" (all modes) — User is not cued with the Gameplay Buttons Pop-up coming out of a quarter break if the previous quarter was played via "Play Quarter". The pop-up does appear correctly if the previous quarter was played via "Sim Quarter". Affects Single Game, Franchise, and Tournament modes.
-6. Decouple computer team defense matchups from user's settings
-7. Add a "Super Fast" Speed button that is 2x Fast speed
-8. Playbooks and Game Plans not persisting (Franchise & Tournament modes) — User-configured playbooks and game plans are not saving/loading correctly. Changes made do not persist across sessions or game loads. Needs investigation to determine if this is a frontend storage issue, backend API issue, or regression from recent auth changes.
+5. Single Game mode-- player NG are not persisting to the lineup screen on timeouts.
 9.Pre-populate Playbooks with submittable values
 10. User is still able to put fouled out players into the lineup on the Lineup Selection screen
-11. Flip flop side of defender stopping fast break when the away team is on offense
-12. Adjust pre-training decay by Year
-13. Timeout navigation: lineup page can fail to load (ERR_TIMED_OUT) — When user calls a timeout, the timeout flow runs and navigation to the lineup/court URL occurs, but requests to Netlify (gtm-loader.js, authGuard.js, api-config.js, analytics.js, CSS, etc.) can ERR_TIMED_OUT so the destination page never initializes and appears frozen or blank. Likely network/hosting under load; mitigation may include retries or critical-script loading strategy. Reproducibility TBD.
+11. Blocking Foul on Fast Break shots are broken -- I got a blocking foul on an instance with no defender animated to a position to defend the shot. Also we did not trnasition to SIP, we transitioned to HCO isntead.
+12. Not announcign shooting fouls on Fast Break shots
+13 Need to perfect Fast Break shot animatoin executoin
+
+
+17 Create "DEFENSE" SFX
+18. Defense Matchups pop up -- DEFENSE when appearing, whistle when exiting
+19. Formalize bug reporting process
+20. We need to clean up user Timeout implementation cadence
+21. Airhorn is not sounding on pop up when Computer calls timeout
+22. Rebound position, clamp players from going out of bounds
+23. Touranment mode in-game adjustments to game plan and playbooks are not persisting in game
+
+24. Align on Production Update process once Alpha is live
+
+27. Getting some (approx 2) instances per quarter when, when pressing Sim Quarter and the game progresses, teh game temporarily reverts the scoreboard to a previous state. Note is does revert back to the correct score, so this is clearly an edge case tha tis accessing a past game state for a finite amount of time
+
 
 ## Future Cleanup (Non-Critical Warnings)
 

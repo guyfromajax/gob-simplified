@@ -16,6 +16,11 @@ BALL_HANDLER_MOVE_Y_RANGE = 3  # ±3 y-coords
 STOPPER_OFFSET_MIN = 1
 STOPPER_OFFSET_MAX = 3
 
+# Shot Spot (when ball handler beats defender: shoot from near rim, not confrontation spot)
+FB_SHOT_SPOT_X_MIN = 2  # Min x-distance from rim (spots)
+FB_SHOT_SPOT_X_MAX = 6  # Max x-distance from rim (spots)
+FB_SHOT_SPOT_Y_RANGE = 6  # ±y from rim center
+
 # Defender Positioning (Shot Attempt)
 # Defender 1 x-coord toward basket from shooter: home offense +1, away offense -1. Y: ±2 from shooter
 SHOT_DEFENDER_X_OFFSET = 1  # Defender x = shooter x + 1 (home) or shooter x - 1 (away)
