@@ -16,8 +16,7 @@ from BackEnd.constants.fast_break_constants import (
     BALL_HANDLER_MOVE_Y_RANGE,
     STOPPER_OFFSET_MIN,
     STOPPER_OFFSET_MAX,
-    SHOT_DEFENDER_X_OFFSET_MIN,
-    SHOT_DEFENDER_X_OFFSET_MAX,
+    SHOT_DEFENDER_X_OFFSET,
     SHOT_DEFENDER_Y_RANGE,
     REBOUNDER_X_MIN,
     REBOUNDER_X_MAX,
@@ -249,19 +248,18 @@ class Animator:
                     build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
                     animated_player_ids.add(player_id)
         else:
-            # ✅ Shot attempt: defender between basket and shooter, within ±2 y of shooter
+            # ✅ Shot attempt: defender 1 x toward basket from shooter (home: +1, away: -1), y ±2
             shot_defender = fb_roles.get("defender")
             if shot_defender:
                 bh_shot_x = fb_roles.get("_bh_final_x", bh_end["x"])
                 bh_shot_y = fb_roles.get("_bh_final_y", bh_end["y"])
-                rim_x = AWAY_RIM_COORDS["x"] if is_away_offense else HOME_RIM_COORDS["x"]
-                offset_toward_basket = random.randint(SHOT_DEFENDER_X_OFFSET_MIN, SHOT_DEFENDER_X_OFFSET_MAX)
                 if is_away_offense:
-                    # Away offense: basket at smaller x; defender between shooter and basket = smaller x
-                    defender_x = max(rim_x, bh_shot_x - offset_toward_basket)
+                    # Away offense: defender x = shooter x - 1 (toward basket at smaller x)
+                    defender_x = bh_shot_x - SHOT_DEFENDER_X_OFFSET
                 else:
-                    # Home offense: basket at larger x; defender between shooter and basket = larger x
-                    defender_x = min(rim_x, bh_shot_x + offset_toward_basket)
+                    # Home offense: defender x = shooter x + 1 (toward basket at larger x)
+                    defender_x = bh_shot_x + SHOT_DEFENDER_X_OFFSET
+                defender_x = max(4, min(97, defender_x))  # Clamp to court
                 defender_y_offset = random.randint(-SHOT_DEFENDER_Y_RANGE, SHOT_DEFENDER_Y_RANGE)
                 defender_y = max(1, min(49, bh_shot_y + defender_y_offset))
                 defender_end = {"x": defender_x, "y": defender_y}

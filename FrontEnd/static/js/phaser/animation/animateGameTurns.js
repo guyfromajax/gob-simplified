@@ -672,24 +672,10 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "SIDE_INBOUND") {
-      // ✅ PHASE 2.6: Route SIDE_INBOUND through AnimationRouter
-      // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
-      // Handler will check FastBreak state internally
-      if (!scene.stateMachine?.is(States.FastBreak)) {
-        turn.index = i;
-        await animationRouter.processTurn(turn);
-        // Note: onUpdate and updateDebugScore handled by AnimationRouter
-      } else {
-        // FastBreak state - skip animation but still do announcements/updates
-        if (onUpdate) {
-          try {
-            onUpdate(turn);
-          } catch (err) {
-            console.error('Scoreboard update failed:', err);
-          }
-        }
-        updateDebugScore(turn, { turnIndex: i, possessionId });
-      }
+      // ✅ PHASE 2.6: Route SIDE_INBOUND through AnimationRouter (always run full SIP)
+      // Fix: Run SIP even when in FastBreak (e.g. BATCH [CHARGE, SIDE_INBOUND] or [FOUL, SIDE_INBOUND])
+      turn.index = i;
+      await animationRouter.processTurn(turn);
       continue;
     }
 

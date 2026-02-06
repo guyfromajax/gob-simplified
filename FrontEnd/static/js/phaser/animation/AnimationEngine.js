@@ -274,15 +274,6 @@ export class AnimationEngine {
   }
 
   async handleSideInbound(turnData, context) {
-    // Side inbound handler (log removed)
-    
-    // ✅ PHASE 2.6: Check FastBreak state (matches original logic in animateGameTurns.js)
-    const { States } = await import('../state/gameStateMachine.js');
-    if (this.scene.stateMachine?.is(States.FastBreak)) {
-      console.log('AnimationEngine: Skipping SIDE_INBOUND animation - state is FastBreak');
-      return;
-    }
-    
     if (this.passSystem) {
       await this.passSystem.processPass(turnData, context);
       console.log('AnimationEngine: PassAnimationSystem completed for SIDE_INBOUND');
