@@ -17,7 +17,10 @@ STOPPER_OFFSET_MIN = 1
 STOPPER_OFFSET_MAX = 3
 
 # Defender Positioning (Shot Attempt)
-DEFENDER_X_OFFSET = 6  # Defender positioned 6 x-coords behind ball handler
+# Defender between basket and shooter: 1-3 x-coords toward basket from shooter, ±2 y from shooter
+SHOT_DEFENDER_X_OFFSET_MIN = 1  # Min x-coords toward basket from shooter
+SHOT_DEFENDER_X_OFFSET_MAX = 3  # Max x-coords toward basket from shooter
+SHOT_DEFENDER_Y_RANGE = 2  # Defender y within ±2 of shooter y
 
 # Rebounder Positioning
 REBOUNDER_X_MIN = 40
