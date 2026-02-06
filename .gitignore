@@ -17,3 +17,10 @@ backup-mongodb.log
 
 __pycache__/
 *.pyc
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+node_modules/
+package-lock.json

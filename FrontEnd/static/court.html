@@ -14,6 +14,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="command-center-team-styles.css" />
   <style>
+    /*
+     * LAYOUT INVARIANTS (Frontend Layout Refactor Plan §4.10)
+     * - Single layout system: CSS Grid defines major regions (scoreboard, court, stats, playcall).
+     * - position:fixed only for overlays (tooltips, modals, HUD). Layout elements use grid-area.
+     * - No JS for layout: do not set top/left/width/height on layout-critical elements.
+     */
     :root {
       --scoreboard-height: 100px;
       --player-stats-width: 280px;
@@ -38,6 +44,59 @@
       background-color: #000;
       font-family: 'Bebas Neue', sans-serif;
       color: #fff;
+    }
+
+    /* ==================== APP GRID (Single source of truth for layout) ==================== */
+    #app-grid {
+      display: grid;
+      grid-template-rows:
+        var(--scoreboard-height)
+        1fr
+        clamp(160px, 25vh, 300px);
+      grid-template-columns:
+        var(--player-stats-width)
+        1fr
+        var(--player-stats-width);
+      grid-template-areas:
+        "scoreboard scoreboard scoreboard"
+        "left-stats court right-stats"
+        "playcall playcall playcall";
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+    }
+
+    #app-grid #scoreboard {
+      grid-area: scoreboard;
+      position: relative; /* Grid controls position; no fixed */
+    }
+    #app-grid .player-stats-panel.away { grid-area: left-stats; min-height: 0; min-width: 0; }
+    #app-grid #phaser-container {
+      grid-area: court;
+      min-height: 0;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    #app-grid #phaser-container canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      /* Canvas fills grid-allocated container; Phaser must match container dimensions */
+    }
+    #app-grid .player-stats-panel.home { grid-area: right-stats; min-height: 0; min-width: 0; }
+    #app-grid #playcall-center {
+      grid-area: playcall;
+      position: relative; /* Grid controls position; no fixed */
+      left: auto !important;
+      right: auto !important;
+      bottom: auto !important;
+      width: 100% !important;
+      max-height: none;
+      min-height: 0;
+      overflow-y: auto;
     }
 
     /* ==================== SCOREBOARD TOP BAR ==================== */
@@ -431,19 +490,19 @@
       background: #000 !important;
     }
 
-    /* NEW: Court row wrapper */
+    /* Court row wrapper (used only when not inside #app-grid) */
     .court-row {
       display: grid;
-      grid-template-columns: 280px 1fr 280px;
+      grid-template-columns: var(--player-stats-width) 1fr var(--player-stats-width);
       width: 100%;
       flex-shrink: 0;  /* Don't compress court */
       gap: 0;
     }
 
-    /* NEW: Playcall row wrapper */
+    /* Playcall row wrapper (used only when not inside #app-grid) */
     .playcall-row {
       display: grid;
-      grid-template-columns: 280px 1fr 280px;
+      grid-template-columns: var(--player-stats-width) 1fr var(--player-stats-width);
       width: 100%;
       flex: 1;  /* Fill remaining space */
       min-height: 250px;  /* CHANGE: ensure minimum visibility instead of 0 */
@@ -452,7 +511,7 @@
 
     /* ==================== PLAYER STATS PANELS (LEFT & RIGHT) ==================== */
     .player-stats-panel {
-      width: 280px;
+      width: var(--player-stats-width);
       background: #1a1a1a;
       display: flex;
       flex-direction: column;
@@ -1021,8 +1080,8 @@
       position: fixed !important;
       /* top set dynamically via JS based on canvas bottom */
       bottom: 0 !important;
-      left: calc(280px + var(--side-padding)) !important;  /* After left panel */
-      right: calc(280px + var(--side-padding)) !important;  /* Before right panel */
+      left: calc(var(--player-stats-width) + var(--side-padding)) !important;  /* After left panel */
+      right: calc(var(--player-stats-width) + var(--side-padding)) !important;  /* Before right panel */
       width: auto !important;
       /* Height constrained: min 160px, preferred 22vh, max 260px */
       max-height: clamp(160px, 22vh, 260px) !important;
@@ -2172,6 +2231,8 @@
     </div>
   </div>
 
+  <!-- ==================== APP GRID (layout root: scoreboard | left-stats court right-stats | playcall) ==================== -->
+  <div id="app-grid">
   <!-- ==================== SCOREBOARD TOP BAR ==================== -->
   <div id="scoreboard">
     <!-- Away Logo - Grid column 2 -->
@@ -2299,12 +2360,8 @@
     </div>
   </div>
 
-  <!-- ==================== MAIN CONTAINER ==================== -->
-  <div id="main-container">
-    <!-- COURT ROW -->
-    <div class="court-row">
-    <!-- AWAY PLAYER STATS PANEL (LEFT) -->
-    <div class="player-stats-panel away">
+  <!-- AWAY PLAYER STATS PANEL (LEFT) - grid-area: left-stats -->
+  <div class="player-stats-panel away">
       <div class="player-box-score">
         <div class="stats-header">
           <h3 id="away-players-header">Away Players</h3>
@@ -2392,8 +2449,8 @@
       </div>
     </div>
 
-    <!-- COURT CONTAINER (CENTER) -->
-    <div id="phaser-container">
+  <!-- COURT CONTAINER (CENTER) - grid-area: court -->
+  <div id="phaser-container">
       <div class="pre-game-container">
         <button class="play-button">Play Quarter</button>
         <button class="sim-full-game-button">Sim Full Game</button>
@@ -2516,13 +2573,9 @@
         </div>
       </div>
     </div>
-    </div>  <!-- Close .court-row -->
 
-    <!-- PLAYCALL ROW -->
-    <div class="playcall-row">
-      <div></div>  <!-- Empty left column -->
-      <!-- ==================== PLAYCALL CENTER (BOTTOM) - UNIFIED TACTICAL HUB ==================== -->
-      <div id="playcall-center">
+  <!-- ==================== PLAYCALL CENTER (BOTTOM) - UNIFIED TACTICAL HUB - grid-area: playcall ==================== -->
+  <div id="playcall-center">
     
     <!-- Top Row: Current Playcall Display -->
     <div id="playcall-status-row">
@@ -2625,9 +2678,7 @@
       
     </div>  <!-- Close #playcall-main-row -->
   </div>  <!-- Close #playcall-center -->
-  <div></div>  <!-- Empty right column -->
-  </div>  <!-- Close .playcall-row -->
-</div>  <!-- Close #main-container -->
+  </div>  <!-- Close #app-grid -->
 
   <!-- ==================== PLAYCALL REVEAL HUD ==================== -->
   <div id="playcall-hud">
@@ -3968,35 +4019,28 @@
 
   <!-- Dynamic Playcall Center Positioning (Grok's solution) -->
   <script>
-    // Dynamically position Playcall Center below canvas bottom (prevents court coverage on large screens)
+    // Playcall positioning: only run when NOT using #app-grid (legacy fallback)
     function updatePlaycallPosition() {
+      if (document.getElementById('app-grid')) return; // Grid controls layout; no JS positioning
       const canvas = document.querySelector('#phaser-container canvas');
       const playcall = document.getElementById('playcall-center');
-      if (!canvas || !playcall) return;  // Wait for Phaser to create canvas
+      if (!canvas || !playcall) return;
 
       const canvasRect = canvas.getBoundingClientRect();
-      const scoreboardHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--scoreboard-height')) || 100;
-      // Position Playcall Center just below canvas bottom (2px gap for seamless visual)
       const playcallTop = canvasRect.bottom + 2;
       playcall.style.top = `${playcallTop}px`;
-      
-      // Trigger repaint post-Phaser resize
       requestAnimationFrame(() => {
         if (canvas) canvas.style.display = 'block';
       });
     }
 
-    // Re-enable positioning: update on window resize and Phaser canvas resize
     window.addEventListener('resize', updatePlaycallPosition);
-    if (window.game) {  // If game is already created
+    if (window.game) {
       window.game.scale.on('resize', updatePlaycallPosition);
     }
-    
-    // Initial positioning calls (with delays to catch Phaser initialization)
     setTimeout(updatePlaycallPosition, 100);
     setTimeout(updatePlaycallPosition, 500);
-    
-    // Also use ResizeObserver for canvas container as more reliable fallback
+
     const phaserContainer = document.getElementById('phaser-container');
     if (phaserContainer && typeof ResizeObserver !== 'undefined') {
       const resizeObserver = new ResizeObserver(() => {

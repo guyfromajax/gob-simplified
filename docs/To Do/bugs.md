@@ -21,6 +21,8 @@
 24. Align on Production Update process once Alpha is live
 
 27. Getting some (approx 2) instances per quarter when, when pressing Sim Quarter and the game progresses, teh game temporarily reverts the scoreboard to a previous state. Note is does revert back to the correct score, so this is clearly an edge case tha tis accessing a past game state for a finite amount of time
+28. "Play Quarter" button requires two clicks to start game on first page load - first click does nothing because click handler isn't attached yet
+29. Stale data on initial page load - TOL shows 5, scores incorrect, player NG shows 100% until first turn processes
 
 
 ## Future Cleanup (Non-Critical Warnings)
@@ -179,6 +181,67 @@
   2. Hide image element on error instead of trying non-existent fallback
   3. Optionally disable tooltips when game is paused
   4. Ensure tooltip image only loads once per tooltip show, not on every mousemove
+
+### 🔍 Investigating: Stale Data on Initial Page Load (Race Condition)
+- **Issue**: When landing on `court.html`, the page initially displays stale/inaccurate data:
+  - Team TOL (timeouts) shows as 5 (hardcoded HTML default)
+  - Team scores may be incorrect (defaults to 0)
+  - All players in box score show 100% NG (energy)
+  - After a few seconds or after first turn processes, data calibrates to correct values
+- **Location**: 
+  - `FrontEnd/static/court.html` - Hardcoded HTML defaults (lines 2187, 2289: `TOL: 5`)
+  - `FrontEnd/static/js/phaser/utils/loadGameStats.js` - `initializeGameStats()` function
+- **Root Cause**: 
+  1. **HTML Defaults**: `court.html` has hardcoded defaults (`TOL: 5`, scores `0`) that render immediately
+  2. **Race Condition**: `initializeGameStats()` runs asynchronously, so page renders with defaults before API call completes
+  3. **Incomplete Data Loading**: `displayAccumulatedScores()` only updates scores, NOT timeouts (missing timeout update)
+  4. **Missing gameId**: If URL lacks `game_id`, `initializeGameStats()` returns early and defaults persist
+  5. **Player Energy Not Updated**: `displayAccumulatedPlayerStats()` doesn't show/update NG (energy) in box score
+- **Why It "Calibrates" After Turn**: 
+  - When first turn processes, `gameScene.js` `updateScoreboard()` receives real turn data
+  - Updates scores, fouls, AND timeouts from turn data, overwriting stale defaults
+- **Impact**:
+  - Poor user experience - users see incorrect data on page load
+  - Confusing behavior - data "magically" updates after a few seconds or first turn
+  - May cause users to make decisions based on stale data
+- **Expected Behavior**: 
+  - Page should show correct data immediately on load (or show loading state until data is ready)
+  - Timeouts should be updated from game state, not hardcoded defaults
+  - Player energy should reflect actual values from game state
+- **Fix Required**: 
+  1. **Update `displayAccumulatedScores()`** to also update timeouts:
+     - Read from `gameData.teams[team_id].timeouts` (unified structure) or fallback to `gameData.timeouts.home/away`
+     - Update `#home-tol` and `#away-tol` elements with correct values
+  2. **Ensure `initializeGameStats()` completes before page is "ready"**:
+     - Show loading state until data is loaded, OR
+     - Wait for `initializeGameStats()` to complete before rendering scoreboard
+  3. **Update player energy display** if shown in stats panel (may require separate function)
+  4. **Handle missing `gameId` gracefully**:
+     - If `gameId` missing, either fetch from another source or show appropriate defaults
+     - Don't silently fail and leave stale defaults
+- **Priority**: Medium-High (affects user experience and data accuracy)
+
+### 🔍 Investigating: "Play Quarter" Button Requires Two Clicks (Initialization Timing Bug)
+- **Issue**: On first page load, users must click "Play Quarter" button twice to start the game. First click does nothing, second click works. When returning to the page (e.g., after navigating away and back), first click works correctly.
+- **Location**: `FrontEnd/static/js/phaser/bootGame.js` - `initGame()` function
+- **Root Cause**: 
+  - The "Play Quarter" button is visible and clickable immediately when the page loads
+  - `bootGame.js` runs asynchronously and attaches the click event listener in `initGame()` function
+  - If user clicks before `initGame()` finishes attaching the handler, the click does nothing
+  - On subsequent visits, the handler is already attached (or page loads faster), so first click works
+- **Impact**:
+  - Poor user experience - users must click twice on first load
+  - Confusing behavior - button appears clickable but doesn't respond
+  - Test reliability issues - tests need workarounds to handle this timing issue
+- **Expected Behavior**: 
+  - Button should be disabled/hidden until initialization completes, OR
+  - Handler should be attached synchronously before button is shown, OR
+  - Show loading state until ready
+- **Fix Required**: 
+  1. Disable button initially, enable after `initGame()` completes
+  2. OR attach handlers before showing button
+  3. OR show loading state until initialization is complete
+- **Priority**: Medium (affects user experience and test reliability)
 
 ### 🔍 Investigating: Slow Lineup Screen Load in Single Game Mode
 - **Issue**: Lineup screen takes 5-10 seconds to load player data when starting a Single Game, despite network request completing in only 294ms (49.4 kB response). The delay occurs after the network response is received, indicating a frontend processing bottleneck.
