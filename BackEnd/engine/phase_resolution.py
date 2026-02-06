@@ -1264,20 +1264,18 @@ def resolve_fast_break_logic(game: "GameManager"):
             "fast_break": True,  # Legacy flag for backwards compatibility
         }
         
-        # ✅ DEBUG: Log fast break defensive stop result to verify data is being set correctly
-        import json
-        debug_data = {
-            "result_type": result.get("result_type"),
-            "fast_break": result.get("fast_break"),
-            "has_roles": "roles" in result,
-            "outlet_passer": fb_roles.get("outlet_passer"),
-            "outlet_receiver": fb_roles.get("outlet_receiver"),
-            "ball_handler_id": getattr(ball_handler, "player_id", None) if ball_handler else None,
-            "has_animations": len(animations) > 0 if animations else False,
-            "animation_count": len(animations) if animations else 0
-        }
-        logging.debug(f"🏀 [FAST BREAK DEBUG] DEFENSIVE_STOP result created: {json.dumps(debug_data, default=str)}")
-        
+        # 🏀 [FAST BREAK RESULT] One-line debug for animation tuning (ball_handler end = where they are when turn ends)
+        bh = result.get("roles", {}).get("ball_handler")
+        bh_id = getattr(bh, "player_id", None) if bh else None
+        bh_end = None
+        for a in (result.get("animations") or []):
+            if a.get("playerId") == bh_id and "end" in a:
+                bh_end = a["end"]
+                break
+        if bh_end is not None:
+            logging.debug("🏀 [FAST BREAK RESULT] Defensive Stop (ball_handler_end: x=%s, y=%s)", bh_end.get("x"), bh_end.get("y"))
+        else:
+            logging.debug("🏀 [FAST BREAK RESULT] Defensive Stop (ball_handler_end: n/a)")
         if hold_up:
             result["hold_up"] = True
             result["stopper_id"] = stopper_id
@@ -1420,20 +1418,34 @@ def resolve_fast_break_logic(game: "GameManager"):
     # Record Fast Break stats for release player (offensive) and get-back players (defensive)
     _record_fast_break_stats(fb_roles, turn_result, game)
     # ==================== END FAST BREAK STAT TRACKING ====================
-    
-    # ✅ DEBUG: Log fast break result (MAKE/MISS/TURNOVER/FOUL) to verify data is being set correctly
-    import json
-    debug_data = {
-        "result_type": turn_result.get("result_type"),
-        "fast_break": turn_result.get("fast_break"),
-        "has_roles": "roles" in turn_result,
-        "outlet_passer": fb_roles.get("outlet_passer"),
-        "outlet_receiver": fb_roles.get("outlet_receiver"),
-        "ball_handler_id": getattr(fb_roles.get("ball_handler"), "player_id", None) if fb_roles.get("ball_handler") else None,
-        "has_animations": len(turn_result.get("animations", [])) > 0,
-        "animation_count": len(turn_result.get("animations", []))
-    }
-    logging.debug(f"🏀 [FAST BREAK DEBUG] {turn_result.get('result_type')} result created: {json.dumps(debug_data, default=str)}")
+
+    # 🏀 [FAST BREAK RESULT] One-line debug for animation tuning (ball_handler end = where shooter/BH is when turn ends)
+    rt = turn_result.get("result_type")
+    if rt == "MAKE":
+        label = "Make (and-1)" if turn_result.get("next_play_type") == "FREE_THROW" and game_state.get("foul_team") == "DEFENSE" else "Make"
+    elif rt == "MISS":
+        reb = turn_result.get("rebound_type", "?")
+        label = f"Miss ({reb})"
+    elif rt == "CHARGE":
+        label = "Charge"
+    elif rt == "FOUL":
+        label = "Foul (blocking)"
+    elif rt == "TURNOVER":
+        label = turn_result.get("text", "Turnover")[:40]  # STEAL or DEAD BALL style
+    else:
+        label = str(rt)
+    bh_end = turn_result.get("shot_spot")  # Set for shot attempts from _bh_final_x/y
+    if bh_end is None:
+        bh = turn_result.get("roles", {}).get("ball_handler")
+        bh_id = getattr(bh, "player_id", None) if bh else None
+        for a in (turn_result.get("animations") or []):
+            if a.get("playerId") == bh_id and "end" in a:
+                bh_end = a["end"]
+                break
+    if bh_end is not None:
+        logging.debug("🏀 [FAST BREAK RESULT] %s (ball_handler_end: x=%s, y=%s)", label, bh_end.get("x"), bh_end.get("y"))
+    else:
+        logging.debug("🏀 [FAST BREAK RESULT] %s (ball_handler_end: n/a)", label)
     # 🔍 ANNOUNCEMENT DIAGNOSTIC: Confirm payload sent to frontend has fast_break (so announcements can run)
     logging.warning(
         "📢 [ANNOUNCEMENT DIAGNOSTIC] resolve_fast_break_logic returning turn: result_type=%s fast_break=%s (type=%s) has_roles=%s",
