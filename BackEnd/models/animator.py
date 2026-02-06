@@ -16,7 +16,9 @@ from BackEnd.constants.fast_break_constants import (
     BALL_HANDLER_MOVE_Y_RANGE,
     STOPPER_OFFSET_MIN,
     STOPPER_OFFSET_MAX,
-    DEFENDER_X_OFFSET,
+    SHOT_DEFENDER_X_OFFSET_MIN,
+    SHOT_DEFENDER_X_OFFSET_MAX,
+    SHOT_DEFENDER_Y_RANGE,
     REBOUNDER_X_MIN,
     REBOUNDER_X_MAX,
     REBOUNDER_Y_RANGE,
@@ -247,35 +249,21 @@ class Animator:
                     build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
                     animated_player_ids.add(player_id)
         else:
-            # ✅ NEW LOGIC: Shot attempt - defender positioned based on ball handler movement
+            # ✅ Shot attempt: defender between basket and shooter, within ±2 y of shooter
             shot_defender = fb_roles.get("defender")
             if shot_defender:
-                # Get ball handler's final position and movement distance
                 bh_shot_x = fb_roles.get("_bh_final_x", bh_end["x"])
-                additional_move_x = fb_roles.get("_bh_additional_move_x", 7)
-                
-                # Defender X: 6 less than ball handler's additional move distance (home) or 6 more (away)
-                # The defender is positioned relative to the ball handler's final position
-                defender_x_offset = DEFENDER_X_OFFSET
-                
+                bh_shot_y = fb_roles.get("_bh_final_y", bh_end["y"])
+                rim_x = AWAY_RIM_COORDS["x"] if is_away_offense else HOME_RIM_COORDS["x"]
+                offset_toward_basket = random.randint(SHOT_DEFENDER_X_OFFSET_MIN, SHOT_DEFENDER_X_OFFSET_MAX)
                 if is_away_offense:
-                    # Away offense: defender at x = ball handler x + 6 (further from basket)
-                    defender_x = min(97, bh_shot_x + defender_x_offset)
+                    # Away offense: basket at smaller x; defender between shooter and basket = smaller x
+                    defender_x = max(rim_x, bh_shot_x - offset_toward_basket)
                 else:
-                    # Home offense: defender at x = ball handler x - 6 (further from basket)
-                    defender_x = max(4, bh_shot_x - defender_x_offset)
-                
-                # Defender Y: based on starting y position (from outlet pass)
-                defender_start_y = getattr(shot_defender, "outlet_coords", {}).get("y", 25)
-                if defender_start_y > 25:
-                    # Starting y > 25: reduce by 1-6
-                    defender_y_adjust = -random.randint(1, 6)
-                else:
-                    # Starting y <= 25: increase by 1-6
-                    defender_y_adjust = random.randint(1, 6)
-                
-                defender_y = max(1, min(49, defender_start_y + defender_y_adjust))
-                
+                    # Home offense: basket at larger x; defender between shooter and basket = larger x
+                    defender_x = min(rim_x, bh_shot_x + offset_toward_basket)
+                defender_y_offset = random.randint(-SHOT_DEFENDER_Y_RANGE, SHOT_DEFENDER_Y_RANGE)
+                defender_y = max(1, min(49, bh_shot_y + defender_y_offset))
                 defender_end = {"x": defender_x, "y": defender_y}
                 build_movement(shot_defender, defender_end, action=ACTIONS["GUARD_BALL"])
                 animated_player_ids.add(getattr(shot_defender, "player_id", None))
