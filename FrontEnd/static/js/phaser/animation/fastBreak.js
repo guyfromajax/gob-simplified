@@ -905,12 +905,10 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       ballController.onShotEnd();
     }
     
-    // ✅ FIX: Don't call runInboundSetup() here if next_play_type === "BASELINE_INBOUND"
-    // The BASELINE_INBOUND turn will handle the inbound setup via AnimationEngine.handleBaselineInbound()
-    // Calling it here causes double inbound passes and double setup animations
-    if (turnData.next_play_type === "BASELINE_INBOUND") {
-      // ✅ REMOVED: runInboundSetup() call - BASELINE_INBOUND turn handles it
-      // This prevents double inbound passes and double setup animations
+    // ✅ FIX: Don't call runInboundSetup() here if next play is BASELINE_INBOUND or FREE_THROW
+    // BASELINE_INBOUND: the next turn will handle the inbound via AnimationEngine.handleBaselineInbound()
+    // FREE_THROW (AND-1): no inbound — same team shoots the free throw; FREE_THROW turn handles transition
+    if (turnData.next_play_type === "BASELINE_INBOUND" || turnData.next_play_type === "FREE_THROW") {
       return;
     }
     
