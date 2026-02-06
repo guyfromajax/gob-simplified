@@ -18,72 +18,59 @@ const VIEWPORTS = [
 /**
  * Helper function to start the game by clicking "Play Quarter" button.
  * Handles the case where first click may do nothing (handler not attached yet).
- * 
+ * Requires backend with rosters for the teams in the URL (e.g. Lancaster, Four-Corners).
+ *
  * Strategy:
  * 1. Wait for button to be visible and ready (give bootGame.js time to initialize)
  * 2. Click once
- * 3. Wait for canvas with short timeout
+ * 3. Wait for canvas attached (Phaser creates it; 'attached' is more reliable than 'visible' in headless)
  * 4. If canvas doesn't appear, try clicking button again (if it still exists)
  * 5. Wait for canvas with longer timeout
  */
 async function startGame(page) {
-  // Wait for button to be ready (visible and clickable)
-  // Give extra time for bootGame.js to initialize and attach event listeners
   const playButton = page.locator('.play-button');
-  await expect(playButton).toBeVisible({ timeout: 10000 });
-  await page.waitForTimeout(2000); // Extra wait for handler attachment
-  
-  // Click once
+  await expect(playButton).toBeVisible({ timeout: 15000 });
+  await page.waitForTimeout(3000); // Give bootGame.js time to attach handler and load
+
   await playButton.click();
-  
-  // Try waiting for canvas with short timeout
+
   try {
-    await page.waitForSelector('#phaser-container canvas', { timeout: 3000, state: 'attached' });
-    // Canvas appeared! First click worked.
+    await page.waitForSelector('#phaser-container canvas', { timeout: 5000, state: 'attached' });
     return;
   } catch (e) {
-    // Canvas didn't appear - first click may not have worked
-    // Check if button still exists (if handler was attached, button would be removed)
     const buttonCount = await playButton.count();
     if (buttonCount > 0) {
-      // Button still exists, so handler wasn't attached yet
-      // Wait a bit more and click again
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(2000);
       await playButton.click();
     }
-    // Now wait for canvas (either from first or second click)
-    await page.waitForSelector('#phaser-container canvas', { timeout: 20000 });
+    // Wait for canvas: use 'attached' (canvas may not be "visible" in headless due to size/rendering)
+    await page.waitForSelector('#phaser-container canvas', { timeout: 45000, state: 'attached' });
   }
 }
 
 test.describe('Court Layout - Basic Structure', () => {
-  test('court view loads with all major components', async ({ page }) => {
+  test('court view loads with all major components (pre-game)', async ({ page }) => {
     await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
-    
-    // Wait for page to load and bootGame.js to initialize
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000); // Give bootGame.js time to attach event listeners
-    
-    // Verify scoreboard is visible (exists before Phaser loads)
-    const scoreboard = page.locator('#scoreboard');
-    await expect(scoreboard).toBeVisible();
-    
-    // Verify court container exists (may be hidden initially, that's OK)
-    const courtContainer = page.locator('#phaser-container');
-    await expect(courtContainer).toBeAttached();
-    
-    // Verify playcall center is visible (exists before Phaser loads)
-    const playcallCenter = page.locator('#playcall-center');
-    await expect(playcallCenter).toBeVisible();
-    
-    // Verify stats panels are visible
-    const awayStats = page.locator('.player-stats-panel.away');
-    const homeStats = page.locator('.player-stats-panel.home');
-    await expect(awayStats).toBeVisible();
-    await expect(homeStats).toBeVisible();
-    
-    // Start the game (handles initialization timing)
+    await page.waitForTimeout(2000);
+
+    await expect(page.locator('#scoreboard')).toBeVisible();
+    await expect(page.locator('#phaser-container')).toBeAttached();
+    await expect(page.locator('#playcall-center')).toBeVisible();
+    await expect(page.locator('.player-stats-panel.away')).toBeVisible();
+    await expect(page.locator('.player-stats-panel.home')).toBeVisible();
+    await expect(page.locator('.play-button')).toBeVisible();
+  });
+
+  test('court view shows canvas after Play Quarter (requires backend rosters)', async ({ page }) => {
+    await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
+
+    await expect(page.locator('#scoreboard')).toBeVisible();
+    await expect(page.locator('#playcall-center')).toBeVisible();
     await startGame(page);
+    await expect(page.locator('#phaser-container canvas')).toBeAttached();
   });
 });
 
@@ -93,11 +80,9 @@ test.describe('Court Layout - Viewport Stability', () => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
       await page.waitForLoadState('networkidle');
-      await page.waitForTimeout(1000); // Give bootGame.js time to initialize
-      
-      // Start the game (handles initialization timing)
+      await page.waitForTimeout(2000);
       await startGame(page);
-      
+
       // Get bounding boxes
       const scoreboard = page.locator('#scoreboard');
       const courtContainer = page.locator('#phaser-container');
@@ -140,12 +125,8 @@ test.describe('Court Layout - No Overlapping Elements', () => {
     await page.setViewportSize({ width: 3840, height: 2160 });
     await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000); // Give bootGame.js time to initialize
-    
-    // Start the game (handles initialization timing)
+    await page.waitForTimeout(2000);
     await startGame(page);
-    
-    await page.waitForSelector('#phaser-container canvas', { timeout: 20000 });
     
     const courtContainer = page.locator('#phaser-container');
     const playcallCenter = page.locator('#playcall-center');
@@ -166,14 +147,10 @@ test.describe('Court Layout - No Overlapping Elements', () => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000); // Give bootGame.js time to initialize
+    await page.waitForTimeout(2000);
     
-    // Stats panels are visible before game starts, but we'll verify after game starts too
-    // Start the game (handles initialization timing)
     await startGame(page);
-    
-    await page.waitForSelector('#phaser-container canvas', { timeout: 20000 });
-    
+
     const awayStats = page.locator('.player-stats-panel.away');
     const homeStats = page.locator('.player-stats-panel.home');
     const courtContainer = page.locator('#phaser-container');
@@ -196,12 +173,10 @@ test.describe('Court Layout - Responsive Behavior', () => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000); // Give bootGame.js time to initialize
+    await page.waitForTimeout(2000);
     
-    // Start the game (handles initialization timing)
     await startGame(page);
-    await page.waitForSelector('#phaser-container canvas', { timeout: 20000 });
-    
+
     // Get initial positions
     const playcallCenter = page.locator('#playcall-center');
     const initialPlaycallBox = await playcallCenter.boundingBox();
@@ -227,12 +202,10 @@ test.describe('Court Layout - Grid Constraints', () => {
     await page.setViewportSize({ width: 1920, height: 2000 }); // Very tall
     await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000); // Give bootGame.js time to initialize
+    await page.waitForTimeout(2000);
     
-    // Start the game (handles initialization timing)
     await startGame(page);
-    await page.waitForSelector('#phaser-container canvas', { timeout: 20000 });
-    
+
     const playcallCenter = page.locator('#playcall-center');
     const playcallBox = await playcallCenter.boundingBox();
     

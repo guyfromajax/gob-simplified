@@ -14,6 +14,11 @@ These Playwright tests verify the Grid-based layout refactor works correctly acr
    npx playwright install
    ```
 
+## Requirements
+
+- **Pre-game test** passes without starting the game (scoreboard, playcall center, stats panels, Play button visible).
+- **Layout/viewport tests** that start the game require the backend to have **rosters** for the teams in the URL (e.g. `Lancaster`, `Four-Corners`). If `/roster/Lancaster` or `/roster/Four-Corners` fails, the canvas never appears and those tests will timeout. Ensure your local DB has those teams (or change the test URL to use teams you have).
+
 ## Running Tests
 
 ### Run all tests
@@ -56,10 +61,12 @@ Tests run at these viewport sizes (matching refactor plan exit criteria):
 ## Configuration
 
 Tests are configured in `playwright.config.js`:
-- Base URL: `http://localhost:5000` (or `BASE_URL` env var)
-- Auto-starts dev server: `python dev.py`
+- Base URL: `http://localhost:8000` (or `BASE_URL` env var)
+- **webServer**: Playwright auto-starts the dev server (`python dev.py`) before tests and waits for it at port 8000. If a server is already running on 8000, it is reused (`reuseExistingServer: true` when not in CI).
 - Screenshots on failure
 - Trace collection on retry
+
+**Manual option:** You can instead start the server yourself in another terminal (`python dev.py`) and run tests; Playwright will reuse the existing server.
 
 ## CI/CD Integration
 
