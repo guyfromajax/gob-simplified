@@ -835,8 +835,8 @@ class TurnManager:
         
         logging.debug(f"🎮 [PLAYCALL CHECK] Checking for overrides in set_playcalls()")
         logging.debug(f"   - Offense team: {self.game.offense_team.name} (team_id: {self.game.offense_team.team_id}, object_id: {id(self.game.offense_team)}, is_home_team: {self.game.offense_team.is_home_team})")
-        logging.debug(f"   - Home team: {self.game.home_team.name} (team_id: {self.game.home_team.team_id}, object_id: {id(self.game.home_team)})")
-        logging.debug(f"   - Away team: {self.game.away_team.name} (team_id: {self.game.away_team.team_id}, object_id: {id(self.game.away_team)})")
+        # logging.debug(f"   - Home team: {self.game.home_team.name} (team_id: {self.game.home_team.team_id}, object_id: {id(self.game.home_team)})")
+        # logging.debug(f"   - Away team: {self.game.away_team.name} (team_id: {self.game.away_team.team_id}, object_id: {id(self.game.away_team)})")
         logging.debug(f"   - user_team_side={user_team_side}, is_offense_user={is_offense_user}")
         logging.debug(f"   - game_object_id: {id(self.game)}")
         if is_offense_user:

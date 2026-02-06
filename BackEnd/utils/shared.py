@@ -995,8 +995,8 @@ def summarize_game_state(game, exclude_animations=True):
                 
                 # ✅ TRACE: Log available team keys for debugging
                 available_team_keys = list(teams.keys())
-                logging.warning(f"🔍 [SUMMARIZE] Available team keys in DB: {available_team_keys}")
-                logging.warning(f"🔍 [SUMMARIZE] Looking for home_team_id={game.home_team.team_id}, away_team_id={game.away_team.team_id}")
+                # logging.warning(f"🔍 [SUMMARIZE] Available team keys in DB: {available_team_keys}")
+                # logging.warning(f"🔍 [SUMMARIZE] Looking for home_team_id={game.home_team.team_id}, away_team_id={game.away_team.team_id}")
                 
                 # ✅ SS&S: Use unified resolver to get canonical team_id (same logic as extract_team_settings)
                 # This ensures we use the same canonical format for both save and extract
@@ -1007,9 +1007,9 @@ def summarize_game_state(game, exclude_animations=True):
                         mode="single",
                         doc=saved_game  # Pass game document for validation
                     )
-                    logging.warning(f"✅ [SUMMARIZE] Resolved home_team_id to canonical: '{game.home_team.team_id}' → '{home_canonical_team_id}'")
+                    # logging.warning(f"✅ [SUMMARIZE] Resolved home_team_id to canonical: '{game.home_team.team_id}' → '{home_canonical_team_id}'")
                 except (ValueError, Exception) as e:
-                    logging.warning(f"⚠️ [SUMMARIZE] Could not resolve home_team_id to canonical: {e}")
+                    # logging.warning(f"⚠️ [SUMMARIZE] Could not resolve home_team_id to canonical: {e}")
                     # Fallback: try direct lookup in teams object
                     if game.home_team.team_id in teams:
                         home_canonical_team_id = game.home_team.team_id
@@ -1026,9 +1026,9 @@ def summarize_game_state(game, exclude_animations=True):
                         mode="single",
                         doc=saved_game  # Pass game document for validation
                     )
-                    logging.warning(f"✅ [SUMMARIZE] Resolved away_team_id to canonical: '{game.away_team.team_id}' → '{away_canonical_team_id}'")
+                    # logging.warning(f"✅ [SUMMARIZE] Resolved away_team_id to canonical: '{game.away_team.team_id}' → '{away_canonical_team_id}'")
                 except (ValueError, Exception) as e:
-                    logging.warning(f"⚠️ [SUMMARIZE] Could not resolve away_team_id to canonical: {e}")
+                    # logging.warning(f"⚠️ [SUMMARIZE] Could not resolve away_team_id to canonical: {e}")
                     # Fallback: try direct lookup in teams object
                     if game.away_team.team_id in teams:
                         away_canonical_team_id = game.away_team.team_id
@@ -1050,7 +1050,7 @@ def summarize_game_state(game, exclude_animations=True):
                     gm_slots = len(game.home_team.playbook_settings.get("slot_assignments", {}))
                     if gm_slots > 0 or any(game.home_team.playbook_settings.get(key, {}) for key in ["motion", "set_play_inside", "set_play_attack", "set_play_outside"]):
                         home_playbook_settings = game.home_team.playbook_settings
-                        logging.warning(f"✅ [SUMMARIZE] Using GameManager home playbook_settings (active gameplay): slot_assignments={gm_slots}")
+                        # logging.warning(f"✅ [SUMMARIZE] Using GameManager home playbook_settings (active gameplay): slot_assignments={gm_slots}")
                     else:
                         # GameManager has empty settings, try DB
                         if home_canonical_team_id:
@@ -1059,13 +1059,13 @@ def summarize_game_state(game, exclude_animations=True):
                             if db_settings:
                                 home_playbook_settings = db_settings
                                 slot_count = len(db_settings.get("slot_assignments", {}))
-                                logging.warning(f"✅ [SUMMARIZE] GameManager empty, using DB home playbook_settings: slot_assignments={slot_count}")
+                                # logging.warning(f"✅ [SUMMARIZE] GameManager empty, using DB home playbook_settings: slot_assignments={slot_count}")
                             else:
                                 home_playbook_settings = {}  # No settings anywhere
-                                logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings found for home team (GameManager empty, DB empty)")
+                                # logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings found for home team (GameManager empty, DB empty)")
                         else:
                             home_playbook_settings = {}  # Can't resolve team_id
-                            logging.warning(f"⚠️ [SUMMARIZE] Could not resolve home_canonical_team_id, GameManager empty")
+                            # logging.warning(f"⚠️ [SUMMARIZE] Could not resolve home_canonical_team_id, GameManager empty")
                 else:
                     # GameManager doesn't have playbook_settings, try DB
                     if home_canonical_team_id:
@@ -1073,12 +1073,12 @@ def summarize_game_state(game, exclude_animations=True):
                         home_playbook_settings = home_team_data.get("playbook_settings", {})
                         if home_playbook_settings:
                             slot_count = len(home_playbook_settings.get("slot_assignments", {}))
-                            logging.warning(f"✅ [SUMMARIZE] GameManager missing, using DB home playbook_settings: slot_assignments={slot_count}")
+                            # logging.warning(f"✅ [SUMMARIZE] GameManager missing, using DB home playbook_settings: slot_assignments={slot_count}")
                         else:
-                            logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings found for home team (GameManager missing, DB empty)")
+                            # logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings found for home team (GameManager missing, DB empty)")
                     else:
                         home_playbook_settings = {}  # Can't resolve team_id
-                        logging.warning(f"⚠️ [SUMMARIZE] Could not resolve home_canonical_team_id, GameManager missing")
+                        # logging.warning(f"⚠️ [SUMMARIZE] Could not resolve home_canonical_team_id, GameManager missing")
                 
                 # Away team: Check GameManager first (active gameplay source of truth)
                 if hasattr(game.away_team, 'playbook_settings') and game.away_team.playbook_settings:
@@ -1086,7 +1086,7 @@ def summarize_game_state(game, exclude_animations=True):
                     gm_slots = len(game.away_team.playbook_settings.get("slot_assignments", {}))
                     if gm_slots > 0 or any(game.away_team.playbook_settings.get(key, {}) for key in ["motion", "set_play_inside", "set_play_attack", "set_play_outside"]):
                         away_playbook_settings = game.away_team.playbook_settings
-                        logging.warning(f"✅ [SUMMARIZE] Using GameManager away playbook_settings (active gameplay): slot_assignments={gm_slots}")
+                        # logging.warning(f"✅ [SUMMARIZE] Using GameManager away playbook_settings (active gameplay): slot_assignments={gm_slots}")
                     else:
                         # GameManager has empty settings, try DB
                         if away_canonical_team_id:
@@ -1095,13 +1095,13 @@ def summarize_game_state(game, exclude_animations=True):
                             if db_settings:
                                 away_playbook_settings = db_settings
                                 slot_count = len(db_settings.get("slot_assignments", {}))
-                                logging.warning(f"✅ [SUMMARIZE] GameManager empty, using DB away playbook_settings: slot_assignments={slot_count}")
+                                # logging.warning(f"✅ [SUMMARIZE] GameManager empty, using DB away playbook_settings: slot_assignments={slot_count}")
                             else:
                                 away_playbook_settings = {}  # No settings anywhere
-                                logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings found for away team (GameManager empty, DB empty)")
+                                # logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings found for away team (GameManager empty, DB empty)")
                         else:
                             away_playbook_settings = {}  # Can't resolve team_id
-                            logging.warning(f"⚠️ [SUMMARIZE] Could not resolve away_canonical_team_id, GameManager empty")
+                            # logging.warning(f"⚠️ [SUMMARIZE] Could not resolve away_canonical_team_id, GameManager empty")
                 else:
                     # GameManager doesn't have playbook_settings, try DB
                     if away_canonical_team_id:
@@ -1109,12 +1109,12 @@ def summarize_game_state(game, exclude_animations=True):
                         away_playbook_settings = away_team_data.get("playbook_settings", {})
                         if away_playbook_settings:
                             slot_count = len(away_playbook_settings.get("slot_assignments", {}))
-                            logging.warning(f"✅ [SUMMARIZE] GameManager missing, using DB away playbook_settings: slot_assignments={slot_count}")
+                            # logging.warning(f"✅ [SUMMARIZE] GameManager missing, using DB away playbook_settings: slot_assignments={slot_count}")
                         else:
-                            logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings found for away team (GameManager missing, DB empty)")
+                            # logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings found for away team (GameManager missing, DB empty)")
                     else:
                         away_playbook_settings = {}  # Can't resolve team_id
-                        logging.warning(f"⚠️ [SUMMARIZE] Could not resolve away_canonical_team_id, GameManager missing")
+                        # logging.warning(f"⚠️ [SUMMARIZE] Could not resolve away_canonical_team_id, GameManager missing")
                 
                 # ✅ REMOVED: Verbose success/failure logs - only log if settings are missing when expected
         except Exception as e:
@@ -1124,22 +1124,22 @@ def summarize_game_state(game, exclude_animations=True):
             if not home_playbook_settings and hasattr(game.home_team, 'playbook_settings') and game.home_team.playbook_settings:
                 home_playbook_settings = game.home_team.playbook_settings
                 slot_count = len(home_playbook_settings.get("slot_assignments", {}))
-                logging.warning(f"✅ [SUMMARIZE] DB load failed, using GameManager fallback for home: slot_assignments={slot_count}")
+                # logging.warning(f"✅ [SUMMARIZE] DB load failed, using GameManager fallback for home: slot_assignments={slot_count}")
             if not away_playbook_settings and hasattr(game.away_team, 'playbook_settings') and game.away_team.playbook_settings:
                 away_playbook_settings = game.away_team.playbook_settings
                 slot_count = len(away_playbook_settings.get("slot_assignments", {}))
-                logging.warning(f"✅ [SUMMARIZE] DB load failed, using GameManager fallback for away: slot_assignments={slot_count}")
+                # logging.warning(f"✅ [SUMMARIZE] DB load failed, using GameManager fallback for away: slot_assignments={slot_count}")
     
     # ✅ FINAL FALLBACK: If DB loading didn't run (no game_id) or didn't find settings, check GameManager
     # This ensures settings are available even when DB loading fails
     if not home_playbook_settings and hasattr(game.home_team, 'playbook_settings') and game.home_team.playbook_settings:
         home_playbook_settings = game.home_team.playbook_settings
         slot_count = len(home_playbook_settings.get("slot_assignments", {}))
-        logging.warning(f"✅ [SUMMARIZE] Using GameManager for home (no DB load): slot_assignments={slot_count}")
+        # logging.warning(f"✅ [SUMMARIZE] Using GameManager for home (no DB load): slot_assignments={slot_count}")
     if not away_playbook_settings and hasattr(game.away_team, 'playbook_settings') and game.away_team.playbook_settings:
         away_playbook_settings = game.away_team.playbook_settings
         slot_count = len(away_playbook_settings.get("slot_assignments", {}))
-        logging.warning(f"✅ [SUMMARIZE] Using GameManager for away (no DB load): slot_assignments={slot_count}")
+        # logging.warning(f"✅ [SUMMARIZE] Using GameManager for away (no DB load): slot_assignments={slot_count}")
     
     # ✅ UNIFIED TEAM STRUCTURE: Create single teams object with ALL team data
     # ✅ SS&S: Use canonical team_id keys (same format as extract_team_settings uses)
@@ -1151,15 +1151,15 @@ def summarize_game_state(game, exclude_animations=True):
     away_key = away_canonical_team_id if away_canonical_team_id else game.away_team.team_id
     
     # 🔍 DEBUG: Log team_id keys used for saving playbook_settings during timeout
-    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE] Team ID keys for playbook_settings save:")
-    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   game.home_team.team_id = '{game.home_team.team_id}'")
-    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   game.away_team.team_id = '{game.away_team.team_id}'")
-    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   home_canonical_team_id = '{home_canonical_team_id}'")
-    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   away_canonical_team_id = '{away_canonical_team_id}'")
-    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   FINAL home_key = '{home_key}' (canonical)")
-    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   FINAL away_key = '{away_key}' (canonical)")
-    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   home_playbook_settings has slot_assignments: {len(home_playbook_settings.get('slot_assignments', {})) if home_playbook_settings else 0}")
-    logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   away_playbook_settings has slot_assignments: {len(away_playbook_settings.get('slot_assignments', {})) if away_playbook_settings else 0}")
+    # logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE] Team ID keys for playbook_settings save:")
+    # logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   game.home_team.team_id = '{game.home_team.team_id}'")
+    # logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   game.away_team.team_id = '{game.away_team.team_id}'")
+    # logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   home_canonical_team_id = '{home_canonical_team_id}'")
+    # logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   away_canonical_team_id = '{away_canonical_team_id}'")
+    # logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   FINAL home_key = '{home_key}' (canonical)")
+    # logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   FINAL away_key = '{away_key}' (canonical)")
+    # logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   home_playbook_settings has slot_assignments: {len(home_playbook_settings.get('slot_assignments', {})) if home_playbook_settings else 0}")
+    # logging.warning(f"🔍 [SUMMARIZE-TIMEOUT-SAVE]   away_playbook_settings has slot_assignments: {len(away_playbook_settings.get('slot_assignments', {})) if away_playbook_settings else 0}")
     
     # Process turns: exclude animations for database persistence, keep for real-time frontend
     from copy import deepcopy
@@ -1181,13 +1181,13 @@ def summarize_game_state(game, exclude_animations=True):
     # ✅ REMOVED: Verbose PERSIST-SETTINGS logs - redundant with trace logs (keep only warnings)
     # Only log warnings if settings are missing (these indicate problems)
     if not home_strategy or not isinstance(home_strategy, dict) or len(home_strategy) == 0:
-        logging.warning(f"⚠️ [PERSIST-SETTINGS] Home strategy_settings is empty or missing!")
+        # logging.warning(f"⚠️ [PERSIST-SETTINGS] Home strategy_settings is empty or missing!")
     if not away_strategy or not isinstance(away_strategy, dict) or len(away_strategy) == 0:
-        logging.warning(f"⚠️ [PERSIST-SETTINGS] Away strategy_settings is empty or missing!")
+        # logging.warning(f"⚠️ [PERSIST-SETTINGS] Away strategy_settings is empty or missing!")
     if not home_playbook_settings or not isinstance(home_playbook_settings, dict):
-        logging.warning(f"⚠️ [PERSIST-SETTINGS] Home playbook_settings is empty or missing!")
+        # logging.warning(f"⚠️ [PERSIST-SETTINGS] Home playbook_settings is empty or missing!")
     if not away_playbook_settings or not isinstance(away_playbook_settings, dict):
-        logging.warning(f"⚠️ [PERSIST-SETTINGS] Away playbook_settings is empty or missing!")
+        # logging.warning(f"⚠️ [PERSIST-SETTINGS] Away playbook_settings is empty or missing!")
     
     # ✅ UNIFIED STRUCTURE: All team data in one place (eliminates home_team/away_team duplication)
     teams_obj = {
