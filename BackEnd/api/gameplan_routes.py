@@ -1627,7 +1627,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         
         query_time = (time.time() - query_start) * 1000  # Convert to ms
         doc_size = len(str(doc)) if doc else 0
-        logger.warning(f"⏱️ [PERF] /api/playbooks - DB query: {query_time:.2f}ms, doc_size: {doc_size} bytes, mode: {mode}, load_from_game_doc={load_from_game_doc}")
+        # logger.warning(f"⏱️ [PERF] /api/playbooks - DB query: {query_time:.2f}ms, doc_size: {doc_size} bytes, mode: {mode}, load_from_game_doc={load_from_game_doc}")
         
         if not doc:
             raise HTTPException(status_code=404, detail=f"{mode.capitalize()} document not found")
@@ -2084,7 +2084,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         if 'endpoint_start' in locals():
             total_time = (time.time() - endpoint_start) * 1000  # Convert to ms
             process_time = (time.time() - process_start) * 1000 if 'process_start' in locals() else 0
-            logger.warning(f"⏱️ [PERF] /api/playbooks - Processing: {process_time:.2f}ms, Total: {total_time:.2f}ms, mode: {mode}")
+            # logger.warning(f"⏱️ [PERF] /api/playbooks - Processing: {process_time:.2f}ms, Total: {total_time:.2f}ms, mode: {mode}")
 
 
 class PlaybookSettingsRequest(BaseModel):

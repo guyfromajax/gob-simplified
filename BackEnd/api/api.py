@@ -1433,7 +1433,7 @@ def get_game_state(
             # ✅ REMOVED: Verbose PERF and DEBUG logs - only log on errors or slow queries (>100ms)
             if query_time > 100:
                 doc_size = len(str(saved)) if saved else 0
-                logging.warning(f"⚠️ [PERF] Slow DB query: /api/game/{game_id} - {query_time:.2f}ms, doc_size: {doc_size} bytes")
+                # logging.warning(f"⚠️ [PERF] Slow DB query: /api/game/{game_id} - {query_time:.2f}ms, doc_size: {doc_size} bytes")
             
             if saved:
                 # ✅ REMOVED: Verbose debug logs
@@ -1504,7 +1504,7 @@ def get_game_state(
                     }
                     response_size = len(json.dumps(response_data))
                     total_time = (time.time() - endpoint_start) * 1000
-                    logging.warning(f"⏱️ [PERF] /api/game/{game_id} - New game path: response_size: {response_size} bytes, total: {total_time:.2f}ms")
+                    # logging.warning(f"⏱️ [PERF] /api/game/{game_id} - New game path: response_size: {response_size} bytes, total: {total_time:.2f}ms")
                     return response_data
                 
                 # Extract player energy, stats, and attributes from saved game doc
@@ -1696,7 +1696,7 @@ def get_game_state(
                 total_time = (time.time() - endpoint_start) * 1000
                 # ✅ REMOVED: Verbose PERF log - only log if slow (>100ms)
                 if total_time > 100:
-                    logging.warning(f"⚠️ [PERF] Slow DB path: /api/game/{game_id} - {total_time:.2f}ms")
+                    # logging.warning(f"⚠️ [PERF] Slow DB path: /api/game/{game_id} - {total_time:.2f}ms")
                 return response_data
         
             logging.error(f"❌ [BOX_SCORE] Game not found in database: game_id={game_id} (type: {type(game_id).__name__})")
@@ -1721,7 +1721,7 @@ def get_game_state(
             total_time = (time.time() - endpoint_start) * 1000  # Convert to ms
             # ✅ REMOVED: Verbose PERF log - only log if slow (>100ms)
             if total_time > 100:
-                logging.warning(f"⚠️ [PERF] Slow endpoint: /api/game/{game_id} - {total_time:.2f}ms")
+                # logging.warning(f"⚠️ [PERF] Slow endpoint: /api/game/{game_id} - {total_time:.2f}ms")
 
 @app.get("/api/game/{game_id}/playbook-settings")
 def get_game_playbook_settings(game_id: str, team_id: str):
@@ -2039,7 +2039,7 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                 else None
             )
             db_lookup_time = (time.time() - db_lookup_start) * 1000
-            logging.warning(f"⏱️ [DB TIMING] simulate_quarter: games_collection.find_one(game_id={game_id}): {db_lookup_time:.2f}ms, found={saved is not None}")
+            # logging.warning(f"⏱️ [DB TIMING] simulate_quarter: games_collection.find_one(game_id={game_id}): {db_lookup_time:.2f}ms, found={saved is not None}")
             if saved:
                 try:
                     # ✅ UNIFIED STRUCTURE: Get team IDs from top level (unified structure)
@@ -2148,7 +2148,7 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                             franchise_id=franchise_id_for_roster  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
                         )
                         gm_create_time = (time.time() - gm_create_start) * 1000
-                        logging.warning(f"⏱️ [DB TIMING] simulate_quarter: GameManager created from DB: {gm_create_time:.2f}ms")
+                        # logging.warning(f"⏱️ [DB TIMING] simulate_quarter: GameManager created from DB: {gm_create_time:.2f}ms")
                         
                         # ✅ UNIFIED: Apply both strategy_settings and playbook_settings to GameManager
                         # This ensures both settings are loaded into GameManager when game starts (not just after timeout resume)
@@ -2160,19 +2160,19 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                         if home_playbook_settings:
                             gm.home_team.playbook_settings = dict(home_playbook_settings)
                             slot_count = len(home_playbook_settings.get("slot_assignments", {}))
-                            logging.warning(f"✅ [UNIFIED-SETTINGS] Applied home playbook_settings to GameManager: slot_assignments={slot_count}")
+                            # logging.warning(f"✅ [UNIFIED-SETTINGS] Applied home playbook_settings to GameManager: slot_assignments={slot_count}")
                         if away_playbook_settings:
                             gm.away_team.playbook_settings = dict(away_playbook_settings)
                             slot_count = len(away_playbook_settings.get("slot_assignments", {}))
-                            logging.warning(f"✅ [UNIFIED-SETTINGS] Applied away playbook_settings to GameManager: slot_assignments={slot_count}")
+                            # logging.warning(f"✅ [UNIFIED-SETTINGS] Applied away playbook_settings to GameManager: slot_assignments={slot_count}")
                         
                         # ✅ VERIFY: Log settings after GameManager creation to confirm they were applied
                         if home_strategy or away_strategy:
-                            logging.info(f"✅ [UNIFIED-SETTINGS] GameManager created with strategy_settings: home={bool(home_strategy)} (tempo={gm.home_team.strategy_settings.get('tempo', 'MISSING') if home_strategy else 'N/A'}), away={bool(away_strategy)} (tempo={gm.away_team.strategy_settings.get('tempo', 'MISSING') if away_strategy else 'N/A'})")
+                            # logging.info(f"✅ [UNIFIED-SETTINGS] GameManager created with strategy_settings: home={bool(home_strategy)} (tempo={gm.home_team.strategy_settings.get('tempo', 'MISSING') if home_strategy else 'N/A'}), away={bool(away_strategy)} (tempo={gm.away_team.strategy_settings.get('tempo', 'MISSING') if away_strategy else 'N/A'})")
                         if home_playbook_settings or away_playbook_settings:
                             home_slots = len(home_playbook_settings.get("slot_assignments", {})) if home_playbook_settings else 0
                             away_slots = len(away_playbook_settings.get("slot_assignments", {})) if away_playbook_settings else 0
-                            logging.info(f"✅ [UNIFIED-SETTINGS] GameManager created with playbook_settings: home={bool(home_playbook_settings)} (slot_assignments={home_slots}), away={bool(away_playbook_settings)} (slot_assignments={away_slots})")
+                            # logging.info(f"✅ [UNIFIED-SETTINGS] GameManager created with playbook_settings: home={bool(home_playbook_settings)} (slot_assignments={home_slots}), away={bool(away_playbook_settings)} (slot_assignments={away_slots})")
                         
                         # ✅ UNIFIED: Restore playbook_settings to game document after GameManager creation
                         # This ensures playbook_settings persist when navigating to Playbooks page
@@ -2202,9 +2202,9 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                                 
                                 if update_data:
                                     games_collection.update_one({"_id": game_id}, {"$set": update_data})
-                                    logging.info(f"✅ [UNIFIED-SETTINGS] Restored playbook_settings to game document: home={bool(home_playbook_settings)} (key={home_canonical_key}), away={bool(away_playbook_settings)} (key={away_canonical_key})")
+                                    # logging.info(f"✅ [UNIFIED-SETTINGS] Restored playbook_settings to game document: home={bool(home_playbook_settings)} (key={home_canonical_key}), away={bool(away_playbook_settings)} (key={away_canonical_key})")
                             except Exception as e:
-                                logging.warning(f"⚠️ [UNIFIED-SETTINGS] Could not restore playbook_settings to game document: {e}", exc_info=True)
+                                # logging.warning(f"⚠️ [UNIFIED-SETTINGS] Could not restore playbook_settings to game document: {e}", exc_info=True)
                         
                         # Debug logging removed - was cluttering logs
                         # logging.debug(f"🔧 AFTER GAMEMANAGER - home.strategy_settings={gm.home_team.strategy_settings.get('tempo', 'MISSING')}, away.strategy_settings={gm.away_team.strategy_settings.get('tempo', 'MISSING')}")
@@ -2215,9 +2215,9 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                         saved_quarter = saved.get("quarter", 1)
                         gm.quarter = saved_quarter
                         # 🔍 DEBUG: Log quarter mismatch
-                        logging.warning(f"🔍 [QUARTER_DEBUG] Loaded from DB: saved_quarter={saved_quarter}, body.quarter={body.quarter}, gm.quarter set to={gm.quarter}")
+                        # logging.warning(f"🔍 [QUARTER_DEBUG] Loaded from DB: saved_quarter={saved_quarter}, body.quarter={body.quarter}, gm.quarter set to={gm.quarter}")
                         if saved_quarter != body.quarter:
-                            logging.warning(f"🔍 [QUARTER_DEBUG] ⚠️ QUARTER MISMATCH: saved_quarter ({saved_quarter}) != body.quarter ({body.quarter})")
+                            # logging.warning(f"🔍 [QUARTER_DEBUG] ⚠️ QUARTER MISMATCH: saved_quarter ({saved_quarter}) != body.quarter ({body.quarter})")
                         
                         # ✅ SS&S: Restore user_team_side to game_state (persists override checking across game loads)
                         # Priority: 1) Saved document, 2) Preserved from in-memory, 3) Request, 4) Warn
@@ -3507,12 +3507,12 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
     # ⏱️ PERFORMANCE: Log total endpoint time
     total_time = (time.time() - start_time) * 1000
     response_size = len(str(frontend_summary).encode('utf-8'))
-    logging.warning(
-        f"⏱️ [PERF] /api/simulate-quarter - quarter={body.quarter}, "
-        f"simulation: {sim_time:.2f}ms, summary: {summary_time:.2f}ms, "
-        f"db_save: {db_save_time:.2f}ms, response_size: {response_size} bytes, "
-        f"total: {total_time:.2f}ms, full_sim={body.full_sim}"
-    )
+    # logging.warning(
+    #     f"⏱️ [PERF] /api/simulate-quarter - quarter={body.quarter}, "
+    #     f"simulation: {sim_time:.2f}ms, summary: {summary_time:.2f}ms, "
+    #     f"db_save: {db_save_time:.2f}ms, response_size: {response_size} bytes, "
+    #     f"total: {total_time:.2f}ms, full_sim={body.full_sim}"
+    # )
     
     return JSONResponse(content=frontend_summary, status_code=200)
 
@@ -3564,10 +3564,10 @@ def simulate_turn_endpoint(request: Request, body: TurnSimulationRequest):
         }
         # ⏱️ PERFORMANCE: Log early return path
         total_time = (time.time() - start_time) * 1000
-        logging.warning(
-            f"⏱️ [PERF] /api/simulate-turn - EARLY RETURN (quarter complete), "
-            f"quarter={gm.quarter}, total: {total_time:.2f}ms"
-        )
+        # logging.warning(
+        #     f"⏱️ [PERF] /api/simulate-turn - EARLY RETURN (quarter complete), "
+        #     f"quarter={gm.quarter}, total: {total_time:.2f}ms"
+        # )
         return JSONResponse(content=early_return, status_code=200)
     
     # ✅ TIMEOUT: Check if last turn is a TIMEOUT turn (user-initiated or foul out)
@@ -3650,10 +3650,10 @@ def simulate_turn_endpoint(request: Request, body: TurnSimulationRequest):
                     # ⏱️ PERFORMANCE: Log timeout return path
                     total_time = (time.time() - start_time) * 1000
                     response_size = len(str(timeout_response).encode('utf-8'))
-                    logging.warning(
-                        f"⏱️ [PERF] /api/simulate-turn - TIMEOUT PATH, quarter={gm.quarter}, "
-                        f"response_size: {response_size} bytes, total: {total_time:.2f}ms"
-                    )
+                    # logging.warning(
+                    #     f"⏱️ [PERF] /api/simulate-turn - TIMEOUT PATH, quarter={gm.quarter}, "
+                    #     f"response_size: {response_size} bytes, total: {total_time:.2f}ms"
+                    # )
                     return JSONResponse(content=timeout_response, status_code=200)
                 except Exception as e:
                     logging.error(f"🚨 COMPUTER TIMEOUT: Failed to save game state: {e}")
@@ -3672,10 +3672,10 @@ def simulate_turn_endpoint(request: Request, body: TurnSimulationRequest):
                 # ⏱️ PERFORMANCE: Log timeout return path
                 total_time = (time.time() - start_time) * 1000
                 response_size = len(str(timeout_response).encode('utf-8'))
-                logging.warning(
-                    f"⏱️ [PERF] /api/simulate-turn - TIMEOUT PATH, quarter={gm.quarter}, "
-                    f"response_size: {response_size} bytes, total: {total_time:.2f}ms"
-                )
+                # logging.warning(
+                #     f"⏱️ [PERF] /api/simulate-turn - TIMEOUT PATH, quarter={gm.quarter}, "
+                #     f"response_size: {response_size} bytes, total: {total_time:.2f}ms"
+                # )
                 return JSONResponse(content=timeout_response, status_code=200)
         
         # Track how many turns existed before this call (after deferred timeout check)
@@ -3828,12 +3828,12 @@ def simulate_turn_endpoint(request: Request, body: TurnSimulationRequest):
         total_time = (time.time() - start_time) * 1000
         response_size = len(str(response_data).encode('utf-8'))
         turn_number = len(gm.turns)
-        logging.warning(
-            f"⏱️ [PERF] /api/simulate-turn - turn={turn_number}, quarter={gm.quarter}, "
-            f"simulation: {turn_sim_time:.2f}ms, db_save: {db_save_time:.2f}ms, "
-            f"response_size: {response_size} bytes, total: {total_time:.2f}ms, "
-            f"quarter_complete={quarter_complete}"
-        )
+        # logging.warning(
+        #     f"⏱️ [PERF] /api/simulate-turn - turn={turn_number}, quarter={gm.quarter}, "
+        #     f"simulation: {turn_sim_time:.2f}ms, db_save: {db_save_time:.2f}ms, "
+        #     f"response_size: {response_size} bytes, total: {total_time:.2f}ms, "
+        #     f"quarter_complete={quarter_complete}"
+        # )
         
         return JSONResponse(content=response_data, status_code=200)
         
@@ -4293,7 +4293,7 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
     elif tournament_id:
         actual_mode = "tournament"
     # ✅ DEBUG: Log franchise_id being passed to load_roster()
-    logging.warning(f"🔍 [BOX-SCORE ROSTER DEBUG] /roster/{team_identifier} - franchise_id={franchise_id}, tournament_id={tournament_id}, team_name={match}, mode={actual_mode}")
+    # logging.warning(f"🔍 [BOX-SCORE ROSTER DEBUG] /roster/{team_identifier} - franchise_id={franchise_id}, tournament_id={tournament_id}, team_name={match}, mode={actual_mode}")
     # ✅ FIX: Pass franchise_id to load_roster() so it loads trained attributes from franchise.players
     # This ensures Roster tab displays trained values (e.g., SH in 90s) instead of universal collection values (e.g., SH in 80s)
     team_doc, player_objects = load_roster(match, franchise_id=franchise_id)
@@ -4305,9 +4305,9 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
         sample_sh = sample_attrs.get("SH", "MISSING")
         sample_anchor_sh = sample_attrs.get("anchor_SH", "MISSING")
         sample_id = str(sample_player.get("_id", "NO_ID"))
-        logging.warning(f"🔍 [BOX-SCORE ROSTER DEBUG] load_roster() returned {len(player_objects)} players. Sample player: _id={sample_id}, SH={sample_sh}, anchor_SH={sample_anchor_sh}")
+        # logging.warning(f"🔍 [BOX-SCORE ROSTER DEBUG] load_roster() returned {len(player_objects)} players. Sample player: _id={sample_id}, SH={sample_sh}, anchor_SH={sample_anchor_sh}")
     else:
-        logging.error(f"❌ [BOX-SCORE ROSTER DEBUG] load_roster() returned NO players for team={match}, franchise_id={franchise_id}!")
+        # logging.error(f"❌ [BOX-SCORE ROSTER DEBUG] load_roster() returned NO players for team={match}, franchise_id={franchise_id}!")
 
     if not player_objects:
         print(f"❌ No players found for {match}")
@@ -4331,7 +4331,7 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
         if len(players) == 0 or "Nelson" in player_name:
             sh_val = merged_attributes.get("SH", "MISSING")
             anchor_sh_val = merged_attributes.get("anchor_SH", "MISSING")
-            logging.warning(f"🔍 [ROSTER DEBUG] Processing player {player_name} ({player_id_str}): SH={sh_val}, anchor_SH={anchor_sh_val}")
+            # logging.warning(f"🔍 [ROSTER DEBUG] Processing player {player_name} ({player_id_str}): SH={sh_val}, anchor_SH={anchor_sh_val}")
         
         # Ensure anchor_ versions exist (they should after initialization, but be safe)
         for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
@@ -4359,7 +4359,7 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
         if len(players) == 1 or "Nelson" in player_name:
             final_sh = final_attrs.get("SH", "MISSING")
             final_anchor_sh = final_attrs.get("anchor_SH", "MISSING")
-            logging.warning(f"🔍 [ROSTER DEBUG] Final response for {player_name}: SH={final_sh}, anchor_SH={final_anchor_sh}")
+            # logging.warning(f"🔍 [ROSTER DEBUG] Final response for {player_name}: SH={final_sh}, anchor_SH={final_anchor_sh}")
     process_time = (time.time() - process_start) * 1000
 
     response_data = {
@@ -4371,12 +4371,12 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
     # ✅ DEBUG: Log response details for box score debugging
     if franchise_id:
         sample_player_ids = [str(p.get("_id", "NO_ID")) for p in players[:3]]
-        logging.warning(f"🔍 [BOX-SCORE ROSTER DEBUG] /roster/{team_identifier} response: {len(players)} players. Sample IDs: {sample_player_ids}")
+        # logging.warning(f"🔍 [BOX-SCORE ROSTER DEBUG] /roster/{team_identifier} response: {len(players)} players. Sample IDs: {sample_player_ids}")
     
     # Measure response size
     response_size = len(json.dumps(response_data))
     total_time = (time.time() - endpoint_start) * 1000
-    logging.warning(f"⏱️ [PERF] /roster/{team_identifier} - DB query: {query_time:.2f}ms, load_roster: {load_time:.2f}ms, processing: {process_time:.2f}ms, response_size: {response_size} bytes, total: {total_time:.2f}ms")
+    # logging.warning(f"⏱️ [PERF] /roster/{team_identifier} - DB query: {query_time:.2f}ms, load_roster: {load_time:.2f}ms, processing: {process_time:.2f}ms, response_size: {response_size} bytes, total: {total_time:.2f}ms")
     
     return response_data
 
@@ -4420,12 +4420,12 @@ def init_game(request: dict):
     
     # Create GameManager (this initializes teams and players)
     gm_start = time.time()
-    logging.warning(f"⏱️ [PERF] /api/init-game - Starting GameManager creation")
+    # logging.warning(f"⏱️ [PERF] /api/init-game - Starting GameManager creation")
     gm = GameManager(home_team, away_team, mode=mode, user_team_side=user_team_side, franchise_id=franchise_id if mode == "franchise" else None)  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
     # ✅ CRITICAL: Set game_id on GameManager immediately after creation
     gm.game_id = game_id
     gm_create_time = (time.time() - gm_start) * 1000
-    logging.warning(f"⏱️ [PERF] /api/init-game - GameManager created: {gm_create_time:.2f}ms")
+    # logging.warning(f"⏱️ [PERF] /api/init-game - GameManager created: {gm_create_time:.2f}ms")
     
     # ✅ CRITICAL: Store user_team_side in game_state for persistence
     # This ensures is_user_team flags persist across game loads
@@ -4439,7 +4439,7 @@ def init_game(request: dict):
     stats_start = time.time()
     _initialize_game_stats(gm, game_id=None)  # None = new game, will randomize
     stats_time = (time.time() - stats_start) * 1000
-    logging.warning(f"⏱️ [PERF] /api/init-game - Game stats initialized: {stats_time:.2f}ms")
+    # logging.warning(f"⏱️ [PERF] /api/init-game - Game stats initialized: {stats_time:.2f}ms")
     gm_time = (time.time() - gm_start) * 1000
     
     # Create minimal game document with players
@@ -4586,7 +4586,7 @@ def init_game(request: dict):
     response_data = {"game_id": game_id}
     response_size = len(json.dumps(response_data))
     total_time = (time.time() - endpoint_start) * 1000
-    logging.warning(f"⏱️ [PERF] /api/init-game - settings: {settings_time:.2f}ms, GameManager: {gm_time:.2f}ms, summary: {summary_time:.2f}ms, DB save: {db_time:.2f}ms, response_size: {response_size} bytes, total: {total_time:.2f}ms")
+    # logging.warning(f"⏱️ [PERF] /api/init-game - settings: {settings_time:.2f}ms, GameManager: {gm_time:.2f}ms, summary: {summary_time:.2f}ms, DB save: {db_time:.2f}ms, response_size: {response_size} bytes, total: {total_time:.2f}ms")
     
     return response_data
 

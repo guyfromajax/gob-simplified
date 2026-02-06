@@ -754,7 +754,7 @@ def select_team(
         team_query_start = time.time()
         team_doc = db.teams.find_one({"name": selection.team_name})
         team_query_time = (time.time() - team_query_start) * 1000
-        logger.warning(f"⏱️ [DB TIMING] select-team: teams.find_one(name={selection.team_name}): {team_query_time:.2f}ms")
+        # logger.warning(f"⏱️ [DB TIMING] select-team: teams.find_one(name={selection.team_name}): {team_query_time:.2f}ms")
         
         # Strategy 2: Case-insensitive regex match
         if not team_doc:
@@ -800,10 +800,10 @@ def select_team(
             user_id=user.get("user_id"),
         )
         franchise_init_time = (time.time() - franchise_init_start) * 1000
-        logger.warning(f"⏱️ [DB TIMING] select-team: FranchiseManager.initialize_season(): {franchise_init_time:.2f}ms")
+        # logger.warning(f"⏱️ [DB TIMING] select-team: FranchiseManager.initialize_season(): {franchise_init_time:.2f}ms")
         
         total_time = (time.time() - endpoint_start) * 1000
-        logger.warning(f"⏱️ [DB TIMING] select-team TOTAL: {total_time:.2f}ms")
+        # logger.warning(f"⏱️ [DB TIMING] select-team TOTAL: {total_time:.2f}ms")
         
         print(f"✅ [DEBUG] select_team: Franchise initialized successfully, franchise_id: {manager.franchise_id}", file=sys.stderr, flush=True)
         result = {"status": "ok", "franchise_id": str(manager.franchise_id)}
@@ -1558,7 +1558,7 @@ def command_center_data(
 ):
     import time
     start_time = time.time()
-    logger.info(f"⏱️ [PERF] /franchise/command-center/data START - franchise_id={franchise_id}")
+    # logger.info(f"⏱️ [PERF] /franchise/command-center/data START - franchise_id={franchise_id}")
     
     # Get user team info from franchise document (with backward compatibility)
     team_name = None
@@ -1572,7 +1572,7 @@ def command_center_data(
             fid = franchise_doc["_id"]
             db_query_start = time.time()
             db_query_time = time.time() - db_query_start
-            logger.info(f"⏱️ [PERF] /franchise/command-center/data DB query: {db_query_time:.3f}s")
+            # logger.info(f"⏱️ [PERF] /franchise/command-center/data DB query: {db_query_time:.3f}s")
             if franchise_doc:
                 team_name, team_id = get_user_team_from_franchise(franchise_doc)
                 
@@ -1666,7 +1666,7 @@ def command_center_data(
     response["offer_sim_rest"] = offer_sim_rest
     
     total_time = time.time() - start_time
-    logger.info(f"⏱️ [PERF] /franchise/command-center/data COMPLETE: {total_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/command-center/data COMPLETE: {total_time:.3f}s")
     return response
 
 
@@ -1681,7 +1681,7 @@ def _ftd_team_list_for_franchise(franchise_id) -> dict:
 def standings(franchise_id: str):
     import time
     start_time = time.time()
-    logger.info(f"⏱️ [PERF] /franchise/standings START - franchise_id={franchise_id}")
+    # logger.info(f"⏱️ [PERF] /franchise/standings START - franchise_id={franchise_id}")
     
     db_query_start = time.time()
     franchise_doc = db.franchises.find_one(
@@ -1689,7 +1689,7 @@ def standings(franchise_id: str):
         {"schedule": 1, "week": 1, "eos_tournament": 1, "eos_tournament_active": 1, "results": 1, "_id": 1}
     )
     db_query_time = time.time() - db_query_start
-    logger.info(f"⏱️ [PERF] /franchise/standings DB query: {db_query_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/standings DB query: {db_query_time:.3f}s")
     
     found = franchise_doc is not None
     logger.info("standings franchise_id=%s found=%s", franchise_id, found)
@@ -1772,7 +1772,7 @@ def standings(franchise_id: str):
     logger.info("standings returning franchise_id=%s found=%s", franchise_id, found)
     
     total_time = time.time() - start_time
-    logger.info(f"⏱️ [PERF] /franchise/standings COMPLETE: {total_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/standings COMPLETE: {total_time:.3f}s")
     return {"standings": output}
 
 
@@ -1780,7 +1780,7 @@ def standings(franchise_id: str):
 def season_schedule(franchise_id: str):
     import time
     start_time = time.time()
-    logger.info(f"⏱️ [PERF] /franchise/schedule START - franchise_id={franchise_id}")
+    # logger.info(f"⏱️ [PERF] /franchise/schedule START - franchise_id={franchise_id}")
     
     # ✅ PERFORMANCE: Only fetch needed fields (reduces from 402KB to ~30KB, 92% reduction)
     db_query_start = time.time()
@@ -1797,7 +1797,7 @@ def season_schedule(franchise_id: str):
         }
     )
     db_query_time = time.time() - db_query_start
-    logger.info(f"⏱️ [PERF] /franchise/schedule DB query: {db_query_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/schedule DB query: {db_query_time:.3f}s")
     
     found = franchise_doc is not None
     logger.info("season_schedule franchise_id=%s found=%s", franchise_id, found)
@@ -2044,7 +2044,7 @@ def get_leaders(
     ]
     agg = list(franchise_players_data_collection.aggregate(pipeline))
     aggregation_time = time.time() - aggregation_start
-    logger.info(f"⏱️ [PERF] get_leaders('{stat}') Aggregation pipeline (FPD): {aggregation_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] get_leaders('{stat}') Aggregation pipeline (FPD): {aggregation_time:.3f}s")
     results: list[dict[str, Any]] = []
     for p in agg:
         meta = p.get("meta", {})
@@ -2058,7 +2058,7 @@ def get_leaders(
             }
         )
     total_time = time.time() - start_time
-    logger.info(f"⏱️ [PERF] get_leaders('{stat}') COMPLETE (aggregation): {total_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] get_leaders('{stat}') COMPLETE (aggregation): {total_time:.3f}s")
     return results
 
 
@@ -2070,7 +2070,7 @@ def leaders(
 ):
     import time
     start_time = time.time()
-    logger.info(f"⏱️ [PERF] /franchise/leaders START - franchise_id={franchise_id}, scope={scope}")
+    # logger.info(f"⏱️ [PERF] /franchise/leaders START - franchise_id={franchise_id}, scope={scope}")
     
     categories = ["PTS", "AST", "3PTM", "REB", "BLK", "STL"]  # ✅ SS&S: Use standardized field name "3PTM" instead of "TPM"
     result: dict[str, list[dict[str, Any]]] = {}
@@ -2078,7 +2078,7 @@ def leaders(
         cat_start = time.time()
         top = get_leaders(franchise_id, scope=scope, stat=cat, limit=limit)
         cat_time = time.time() - cat_start
-        logger.info(f"⏱️ [PERF] /franchise/leaders get_leaders('{cat}'): {cat_time:.3f}s")
+        # logger.info(f"⏱️ [PERF] /franchise/leaders get_leaders('{cat}'): {cat_time:.3f}s")
         result[cat] = [
             {
                 "player_id": p.get("player_id"),
@@ -2090,7 +2090,7 @@ def leaders(
         ]
     
     total_time = time.time() - start_time
-    logger.info(f"⏱️ [PERF] /franchise/leaders COMPLETE: {total_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/leaders COMPLETE: {total_time:.3f}s")
     return result
 
 
@@ -2103,7 +2103,7 @@ def team_stats(franchise_id: str):
     """
     import time
     start_time = time.time()
-    logger.info(f"⏱️ [PERF] /franchise/team-stats START - franchise_id={franchise_id}")
+    # logger.info(f"⏱️ [PERF] /franchise/team-stats START - franchise_id={franchise_id}")
     
     try:
         fid = ObjectId(franchise_id)
@@ -2113,7 +2113,7 @@ def team_stats(franchise_id: str):
     db_query_start = time.time()
     franchise_doc = db.franchises.find_one({"_id": fid}, {"results": 1})
     db_query_time = time.time() - db_query_start
-    logger.info(f"⏱️ [PERF] /franchise/team-stats DB query: {db_query_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/team-stats DB query: {db_query_time:.3f}s")
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
     fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_id)}))
@@ -2128,7 +2128,7 @@ def team_stats(franchise_id: str):
         roster = ftd.get("players") or []
         franchise_team_rosters[tid_str] = [str(pid) for pid in roster]
     
-    logger.info(f"⏱️ [PERF] /franchise/team-stats Found {len(players)} players, {len(team_list)} teams, {len(franchise_results)} weeks of results")
+    # logger.info(f"⏱️ [PERF] /franchise/team-stats Found {len(players)} players, {len(team_list)} teams, {len(franchise_results)} weeks of results")
     
     aggregation_start = time.time()
     output = aggregate_team_stats_from_players(
@@ -2141,10 +2141,10 @@ def team_stats(franchise_id: str):
         franchise_team_rosters=franchise_team_rosters if franchise_team_rosters else None,
     )
     aggregation_time = time.time() - aggregation_start
-    logger.info(f"⏱️ [PERF] /franchise/team-stats Aggregation: {aggregation_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/team-stats Aggregation: {aggregation_time:.3f}s")
     
     total_time = time.time() - start_time
-    logger.info(f"⏱️ [PERF] /franchise/team-stats COMPLETE: {total_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/team-stats COMPLETE: {total_time:.3f}s")
     return {"teams": output}
 
 
@@ -2157,7 +2157,7 @@ def team_traits(franchise_id: str):
     """
     import time
     start_time = time.time()
-    logger.info(f"⏱️ [PERF] /franchise/team-traits START - franchise_id={franchise_id}")
+    # logger.info(f"⏱️ [PERF] /franchise/team-traits START - franchise_id={franchise_id}")
     
     try:
         fid = ObjectId(franchise_id)
@@ -2167,14 +2167,14 @@ def team_traits(franchise_id: str):
     db_query_start = time.time()
     franchise_doc = db.franchises.find_one({"_id": fid}, {"_id": 1})
     db_query_time = time.time() - db_query_start
-    logger.info(f"⏱️ [PERF] /franchise/team-traits DB query: {db_query_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/team-traits DB query: {db_query_time:.3f}s")
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
     fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_id)}))
     players = {d["player_id"]: d for d in fpd_docs}
     team_list = _ftd_team_list_for_franchise(fid)
     
-    logger.info(f"⏱️ [PERF] /franchise/team-traits Found {len(players)} players, {len(team_list)} teams")
+    # logger.info(f"⏱️ [PERF] /franchise/team-traits Found {len(players)} players, {len(team_list)} teams")
     
     attributes = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]
     team_totals = {}
@@ -2253,7 +2253,7 @@ def team_traits(franchise_id: str):
         })
     
     total_time = time.time() - start_time
-    logger.info(f"⏱️ [PERF] /franchise/team-traits COMPLETE: {total_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/team-traits COMPLETE: {total_time:.3f}s")
     return {"teams": result}
 
 
@@ -2404,7 +2404,7 @@ def recruits(franchise_id: str = Query(...)):
     """Get recruits for a specific franchise. Reads from FRD (franchise_recruits_data)."""
     import time
     start_time = time.time()
-    logger.info(f"⏱️ [PERF] /franchise/recruits START - franchise_id={franchise_id}")
+    # logger.info(f"⏱️ [PERF] /franchise/recruits START - franchise_id={franchise_id}")
     db_query_start = time.time()
     # ✅ FPD/FRD: Get recruits from franchise_recruits_data (not franchise.recruits)
     rec_docs = list(franchise_recruits_data_collection.find(
@@ -2412,9 +2412,9 @@ def recruits(franchise_id: str = Query(...)):
         {"_id": 0, "franchise_id": 0}  # Exclude _id and franchise_id for response shape
     ))
     db_query_time = time.time() - db_query_start
-    logger.info(f"⏱️ [PERF] /franchise/recruits DB query: {db_query_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/recruits DB query: {db_query_time:.3f}s")
     total_time = time.time() - start_time
-    logger.info(f"⏱️ [PERF] /franchise/recruits COMPLETE: {total_time:.3f}s ({len(rec_docs)} recruits)")
+    # logger.info(f"⏱️ [PERF] /franchise/recruits COMPLETE: {total_time:.3f}s ({len(rec_docs)} recruits)")
     return {"recruits": rec_docs}
 
 
@@ -2465,7 +2465,7 @@ def get_franchise_state(franchise_id: str):
     """
     import time
     start_time = time.time()
-    logger.info(f"⏱️ [PERF] /franchise/state START - franchise_id={franchise_id}")
+    # logger.info(f"⏱️ [PERF] /franchise/state START - franchise_id={franchise_id}")
     
     try:
         fid = ObjectId(franchise_id)
@@ -2476,7 +2476,7 @@ def get_franchise_state(franchise_id: str):
     db_query_start = time.time()
     franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 0})  # Exclude players (stored in FPD)
     db_query_time = time.time() - db_query_start
-    logger.info(f"⏱️ [PERF] /franchise/state DB query: {db_query_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/state DB query: {db_query_time:.3f}s")
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
     fpd_docs = list(franchise_players_data_collection.find(
@@ -2485,13 +2485,13 @@ def get_franchise_state(franchise_id: str):
     ))
     franchise_doc["players"] = {d["player_id"]: {k: d[k] for k in ["meta", "season", "career", "attributes", "position_ratings"] if k in d} for d in fpd_docs}
     players_count = len(franchise_doc["players"])
-    logger.info(f"⏱️ [PERF] /franchise/state Loaded {players_count} players from FPD")
+    # logger.info(f"⏱️ [PERF] /franchise/state Loaded {players_count} players from FPD")
     
     # Convert ObjectId to string for JSON serialization
     franchise_doc["_id"] = str(franchise_doc["_id"])
     
     total_time = time.time() - start_time
-    logger.info(f"⏱️ [PERF] /franchise/state COMPLETE: {total_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/state COMPLETE: {total_time:.3f}s")
     return jsonable_encoder(franchise_doc, custom_encoder={ObjectId: str})
 
 
@@ -2503,7 +2503,7 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
     """
     import time
     start_time = time.time()
-    logger.info(f"⏱️ [PERF] /franchise/team-data START - franchise_id={franchise_id}, team_id={team_id}, team_name={team_name}")
+    # logger.info(f"⏱️ [PERF] /franchise/team-data START - franchise_id={franchise_id}, team_id={team_id}, team_name={team_name}")
     
     try:
         fid = ObjectId(franchise_id)
@@ -2562,7 +2562,7 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
         {"franchise_id": fid, "team_id": team_object_id}
     )
     ftd_query_time = time.time() - ftd_query_start
-    logger.info(f"⏱️ [PERF] /franchise/team-data FTD query: {ftd_query_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/team-data FTD query: {ftd_query_time:.3f}s")
     
     if not ftd_doc:
         raise HTTPException(status_code=404, detail=f"Team data not found in FTD for team_id: {actual_team_id}")
@@ -2618,7 +2618,7 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
                 scouting_data["defense"][def_name]["effectiveness"] = 0
     
     total_time = time.time() - start_time
-    logger.info(f"⏱️ [PERF] /franchise/team-data COMPLETE: {total_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/team-data COMPLETE: {total_time:.3f}s")
     return {
         "team_attributes": team_attributes,
         "plays_data": plays_data,
@@ -2633,7 +2633,7 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
     """
     import time
     start_time = time.time()
-    logger.info(f"⏱️ [PERF] /franchise/roster START - franchise_id={franchise_id}, team_name={team_name}")
+    # logger.info(f"⏱️ [PERF] /franchise/roster START - franchise_id={franchise_id}, team_name={team_name}")
     
     try:
         fid = ObjectId(franchise_id)
@@ -2648,7 +2648,7 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
             {"user_team_id": 1, "user_team_object_id": 1, "_id": 1}
         )
         db_query_time = time.time() - db_query_start
-        logger.info(f"⏱️ [PERF] /franchise/roster DB query 1 (get team name): {db_query_time:.3f}s")
+        # logger.info(f"⏱️ [PERF] /franchise/roster DB query 1 (get team name): {db_query_time:.3f}s")
         if franchise_doc:
             user_team_id, _ = get_user_team_from_franchise(franchise_doc)
             team_name = user_team_id
@@ -2660,7 +2660,7 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
     team_query_start = time.time()
     team_doc = db.teams.find_one({"name": team_name})
     team_query_time = time.time() - team_query_start
-    logger.info(f"⏱️ [PERF] /franchise/roster DB query (team doc): {team_query_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/roster DB query (team doc): {team_query_time:.3f}s")
     if not team_doc:
         raise HTTPException(status_code=404, detail="Team not found")
     
@@ -2673,7 +2673,7 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
         {"player_id": 1, "meta": 1, "attributes": 1, "position_ratings": 1}
     ))
     franchise_query_time = time.time() - franchise_query_start
-    logger.info(f"⏱️ [PERF] /franchise/roster DB query 2 (FPD): {franchise_query_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/roster DB query 2 (FPD): {franchise_query_time:.3f}s")
     franchise_players = {d["player_id"]: d for d in fpd_docs}
 
     batch_query_start = time.time()
@@ -2682,7 +2682,7 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
         {"position_ratings": 1, "height": 1, "weight": 1, "jersey": 1, "year": 1, "attributes": 1}
     )}
     batch_query_time = time.time() - batch_query_start
-    logger.info(f"⏱️ [PERF] /franchise/roster Batch player query ({len(team_player_ids)} players): {batch_query_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/roster Batch player query ({len(team_player_ids)} players): {batch_query_time:.3f}s")
 
     processing_start = time.time()
     # Only include players that have FPD (franchise_players); build overrides for shared roster builder
@@ -2700,10 +2700,10 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
         }
     players = build_roster_players(pids_with_fpd, mode_overrides, core_players_dict, team_name)
     processing_time = time.time() - processing_start
-    logger.info(f"⏱️ [PERF] /franchise/roster Processing ({len(players)} players): {processing_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/roster Processing ({len(players)} players): {processing_time:.3f}s")
     
     total_time = time.time() - start_time
-    logger.info(f"⏱️ [PERF] /franchise/roster COMPLETE: {total_time:.3f}s")
+    # logger.info(f"⏱️ [PERF] /franchise/roster COMPLETE: {total_time:.3f}s")
     return {"players": players}
 
 
@@ -2799,7 +2799,7 @@ def get_training_points(franchise_id: str):
     franchise_query_start = time.time()
     franchise_doc = db.franchises.find_one({"_id": franchise_id_obj})
     franchise_query_time = (time.time() - franchise_query_start) * 1000
-    logger.warning(f"⏱️ [DB TIMING] get_training_points: franchises.find_one(franchise_id={franchise_id}): {franchise_query_time:.2f}ms")
+    # logger.warning(f"⏱️ [DB TIMING] get_training_points: franchises.find_one(franchise_id={franchise_id}): {franchise_query_time:.2f}ms")
     
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
@@ -2813,7 +2813,7 @@ def get_training_points(franchise_id: str):
     training_points = 30 if is_first_training else 24
     
     total_time = (time.time() - endpoint_start) * 1000
-    logger.warning(f"⏱️ [DB TIMING] get_training_points TOTAL: {total_time:.2f}ms, training_points={training_points}, is_first_training={is_first_training}")
+    # logger.warning(f"⏱️ [DB TIMING] get_training_points TOTAL: {total_time:.2f}ms, training_points={training_points}, is_first_training={is_first_training}")
     
     return {
         "training_points": training_points,
@@ -2839,7 +2839,7 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     franchise_query_start = time.time()
     franchise_doc = db.franchises.find_one({"_id": franchise_id})
     franchise_query_time = (time.time() - franchise_query_start) * 1000
-    logger.warning(f"⏱️ [DB TIMING] run_franchise_training: franchises.find_one(franchise_id={req.franchise_id}): {franchise_query_time:.2f}ms")
+    # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: franchises.find_one(franchise_id={req.franchise_id}): {franchise_query_time:.2f}ms")
     
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
@@ -2935,7 +2935,7 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
         player_query_time = (time.time() - player_query_start) * 1000
         if player_query_time > 100:  # Only log slow queries (>100ms)
-            logger.warning(f"⏱️ [DB TIMING] run_franchise_training: players.find_one(_id={pid_str}): {player_query_time:.2f}ms")
+            # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: players.find_one(_id={pid_str}): {player_query_time:.2f}ms")
         if not core_player:
             try:
                 # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
@@ -3048,7 +3048,7 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     from BackEnd.models.training_execution_v2 import execute_training
     
     players_load_time = (time.time() - players_load_start) * 1000
-    logger.warning(f"⏱️ [DB TIMING] run_franchise_training: Loading {len(players_for_training)} players: {players_load_time:.2f}ms")
+    # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: Loading {len(players_for_training)} players: {players_load_time:.2f}ms")
     
     # Execute training (applies pre-training conditions, then training points)
     # Skip pre-training depreciation for first training (training camp) - week 1 before games
@@ -3066,7 +3066,7 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         skip_pre_training_depreciation=is_first_training
     )
     training_exec_time = (time.time() - training_exec_start) * 1000
-    logger.warning(f"⏱️ [DB TIMING] run_franchise_training: execute_training(): {training_exec_time:.2f}ms")
+    # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: execute_training(): {training_exec_time:.2f}ms")
     
     # Update players_for_training and team_stats with results
     players_for_training = updated_players
@@ -3351,10 +3351,10 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     db_update_start = time.time()
     db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update})
     db_update_time = (time.time() - db_update_start) * 1000
-    logger.warning(f"⏱️ [DB TIMING] run_franchise_training: franchises.update_one(): {db_update_time:.2f}ms")
+    # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: franchises.update_one(): {db_update_time:.2f}ms")
     
     total_time = (time.time() - endpoint_start) * 1000
-    logger.warning(f"⏱️ [DB TIMING] run_franchise_training TOTAL: {total_time:.2f}ms")
+    # logger.warning(f"⏱️ [DB TIMING] run_franchise_training TOTAL: {total_time:.2f}ms")
     
     return {
         "status": "success",

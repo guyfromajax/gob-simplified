@@ -232,7 +232,7 @@ def start_tournament(
     team_query_start = time.time()
     all_teams = list(teams_collection.find({}, {"name": 1, "_id": 1}))
     team_query_time = (time.time() - team_query_start) * 1000
-    logger.warning(f"⏱️ [DB TIMING] start-tournament: teams_collection.find(): {team_query_time:.2f}ms, found {len(all_teams)} teams")
+    # logger.warning(f"⏱️ [DB TIMING] start-tournament: teams_collection.find(): {team_query_time:.2f}ms, found {len(all_teams)} teams")
     
     team_names = [t["name"] for t in all_teams]
     if request.user_team_id not in team_names:
@@ -271,7 +271,7 @@ def start_tournament(
             },
         )
     player_reset_time = (time.time() - player_reset_start) * 1000
-    logger.warning(f"⏱️ [DB TIMING] start-tournament: players_collection.update_many() (reset stats): {player_reset_time:.2f}ms")
+    # logger.warning(f"⏱️ [DB TIMING] start-tournament: players_collection.update_many() (reset stats): {player_reset_time:.2f}ms")
 
     tournament_create_start = time.time()
     manager = TournamentManager(
@@ -281,10 +281,10 @@ def start_tournament(
     )
     tournament = manager.create_tournament(user_id=user.get("user_id"))
     tournament_create_time = (time.time() - tournament_create_start) * 1000
-    logger.warning(f"⏱️ [DB TIMING] start-tournament: TournamentManager.create_tournament(): {tournament_create_time:.2f}ms")
+    # logger.warning(f"⏱️ [DB TIMING] start-tournament: TournamentManager.create_tournament(): {tournament_create_time:.2f}ms")
     
     total_time = (time.time() - endpoint_start) * 1000
-    logger.warning(f"⏱️ [DB TIMING] start-tournament TOTAL: {total_time:.2f}ms")
+    # logger.warning(f"⏱️ [DB TIMING] start-tournament TOTAL: {total_time:.2f}ms")
     
     tournament["_id"] = str(tournament["_id"])
     return tournament

@@ -25,7 +25,7 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
         team_query_start = time.time()
         team_doc = teams_collection.find_one({"name": team_name})
         team_query_time = (time.time() - team_query_start) * 1000
-        logger.warning(f"⏱️ [DB TIMING] teams_collection.find_one(name={team_name}): {team_query_time:.2f}ms")
+        # logger.warning(f"⏱️ [DB TIMING] teams_collection.find_one(name={team_name}): {team_query_time:.2f}ms")
         
         # print(f"🔍 Team doc: {team_doc}")
         if not team_doc:
@@ -50,7 +50,7 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                         {"player_id": 1, "meta": 1, "attributes": 1, "position_ratings": 1}
                     ))
                     franchise_query_time = (time.time() - franchise_query_start) * 1000
-                    logger.warning(f"⏱️ [DB TIMING] franchise_players_data find (franchise_id={franchise_id}): {franchise_query_time:.2f}ms, found {len(fpd_docs)} FPD docs")
+                    # logger.warning(f"⏱️ [DB TIMING] franchise_players_data find (franchise_id={franchise_id}): {franchise_query_time:.2f}ms, found {len(fpd_docs)} FPD docs")
                     franchise_players = {d["player_id"]: d for d in fpd_docs}
                     logger.warning(f"🔍 [ROSTER LOADER DEBUG] Found {len(franchise_players)} players in FPD")
                     logger.warning(f"🔍 [ROSTER LOADER DEBUG] team_player_ids count: {len(team_player_ids)}")
@@ -76,7 +76,7 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                             player_query_start = time.time()
                             base_player = players_collection.find_one({"_id": pid_str})
                             player_query_time = (time.time() - player_query_start) * 1000
-                            logger.warning(f"⏱️ [DB TIMING] players_collection.find_one(_id={pid_str}): {player_query_time:.2f}ms")
+                            # logger.warning(f"⏱️ [DB TIMING] players_collection.find_one(_id={pid_str}): {player_query_time:.2f}ms")
                             if not base_player:
                                 logger.error(f"❌ [ROSTER LOADER] Player {pid_str} not found in universal collection")
                                 continue
@@ -110,7 +110,7 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                     logger.warning(f"🔍 [ROSTER LOADER DEBUG] Loop completed. Returning {len(players)} players from FPD")
                     if players:
                         total_time = (time.time() - total_start) * 1000
-                        logger.warning(f"⏱️ [DB TIMING] _load_from_db TOTAL for {team_name} (franchise path): {total_time:.2f}ms")
+                        # logger.warning(f"⏱️ [DB TIMING] _load_from_db TOTAL for {team_name} (franchise path): {total_time:.2f}ms")
                         logger.warning(f"🔍 [ROSTER LOADER DEBUG] ✅ SUCCESS: Returning {len(players)} franchise players")
                         return team_doc, players
                     else:
@@ -126,12 +126,12 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
         fallback_query_start = time.time()
         players = list(players_collection.find({"team": team_name}))
         fallback_query_time = (time.time() - fallback_query_start) * 1000
-        logger.warning(f"⏱️ [DB TIMING] players_collection.find(team={team_name}) FALLBACK: {fallback_query_time:.2f}ms, found {len(players)} players")
+        # logger.warning(f"⏱️ [DB TIMING] players_collection.find(team={team_name}) FALLBACK: {fallback_query_time:.2f}ms, found {len(players)} players")
         # print(f"✅ Loaded {len(players)} players for {team_name} from DB")
         # print(f"🔍 Players: {players}")
 
         total_time = (time.time() - total_start) * 1000
-        logger.warning(f"⏱️ [DB TIMING] _load_from_db TOTAL for {team_name}: {total_time:.2f}ms")
+        # logger.warning(f"⏱️ [DB TIMING] _load_from_db TOTAL for {team_name}: {total_time:.2f}ms")
         return team_doc, players
 
     except PyMongoError as e:
