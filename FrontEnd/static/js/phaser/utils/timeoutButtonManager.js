@@ -765,6 +765,9 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
     
     // Fallback: Get from URL params if scene doesn't have it
     const urlParams = new URLSearchParams(window.location.search);
+    // ✅ SINGLE GAME FIX: Ensure game_id is available for lineup URL (NG/stats load).
+    // In Single Game, scene.gameId can be unset if gameStore wasn't set; court URL still has game_id.
+    const gameIdToUse = gameId || urlParams.get('game_id') || null;
     const homeTeamFallback = urlParams.get('home');
     const awayTeamFallback = urlParams.get('away');
     const myTeamSideFallback = urlParams.get('my_team');
@@ -836,15 +839,15 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
     console.log('⏸️ COMPUTER TIMEOUT: Building navigation params', {
       computerTimeout: computerTimeout,
       computerTeamName: computerTeamName,
-      gameId: gameId,
+      gameId: gameIdToUse,
       currentQuarter: currentQuarter
     });
     
-    // ✅ SS&S: Use unified helper to build params
+    // ✅ SS&S: Use unified helper to build params (gameIdToUse includes URL fallback for Single Game)
     const params = helper.buildGameNavigationParams({
         sourceParams: urlParams,
         targetQuarter: currentQuarter,
-        gameId: gameId,
+        gameId: gameIdToUse,
         resumeFromTimeout: true, // ✅ TIMEOUT: Always resuming from timeout (any quarter)
         lineup: lineup,
         myTeamSide: myTeamSide || myTeamSideFallback || 'home',
