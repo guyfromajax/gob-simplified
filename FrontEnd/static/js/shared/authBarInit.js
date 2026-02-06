@@ -84,14 +84,51 @@
     if (authToken && authUser) {
       try {
         var user = JSON.parse(authUser);
-        if (authLoggedOut) authLoggedOut.style.display = 'none';
-        if (authLoggedIn) authLoggedIn.style.display = 'flex';
-        if (authUserEmail) authUserEmail.textContent = user.username || user.email;
+        // Validate token before showing logged-in state
+        if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.buildUrl === 'function' && typeof API_CONFIG.getAuthHeaders === 'function') {
+          fetch(API_CONFIG.buildUrl('/api/auth/me'), { headers: API_CONFIG.getAuthHeaders() })
+            .then(function (res) {
+              if (res.ok) {
+                // Token valid - show logged-in state
+                if (authLoggedOut) authLoggedOut.style.display = 'none';
+                if (authLoggedIn) authLoggedIn.style.display = 'flex';
+                res.json().then(function (meData) {
+                  if (authUserEmail) authUserEmail.textContent = meData.username || meData.email || user.email;
+                }).catch(function () {
+                  if (authUserEmail) authUserEmail.textContent = user.username || user.email;
+                });
+              } else {
+                // Token invalid - clear and show logged-out state
+                if (typeof localStorage !== 'undefined') {
+                  localStorage.removeItem('auth_token');
+                  localStorage.removeItem('auth_user');
+                }
+                if (authLoggedOut) authLoggedOut.style.display = 'flex';
+                if (authLoggedIn) authLoggedIn.style.display = 'none';
+              }
+            })
+            .catch(function () {
+              // Network error - clear token to be safe
+              if (typeof localStorage !== 'undefined') {
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('auth_user');
+              }
+              if (authLoggedOut) authLoggedOut.style.display = 'flex';
+              if (authLoggedIn) authLoggedIn.style.display = 'none';
+            });
+        } else {
+          // API_CONFIG not available - show from localStorage but don't validate
+          if (authLoggedOut) authLoggedOut.style.display = 'none';
+          if (authLoggedIn) authLoggedIn.style.display = 'flex';
+          if (authUserEmail) authUserEmail.textContent = user.username || user.email;
+        }
       } catch (e) {
         if (typeof localStorage !== 'undefined') {
           localStorage.removeItem('auth_token');
           localStorage.removeItem('auth_user');
         }
+        if (authLoggedOut) authLoggedOut.style.display = 'flex';
+        if (authLoggedIn) authLoggedIn.style.display = 'none';
       }
     }
 

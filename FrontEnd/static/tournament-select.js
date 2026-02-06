@@ -29,6 +29,13 @@ async function selectTeam(team) {
       body: JSON.stringify({ user_team_id: team })
     });
     if (!res.ok) {
+      if (res.status === 401) {
+        // Token invalid/expired - clear and redirect to login
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        window.location.href = '/login.html?redirect=' + encodeURIComponent(window.location.pathname);
+        return;
+      }
       let msg = "Unable to start tournament";
       try {
         const errBody = await res.json();
