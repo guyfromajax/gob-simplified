@@ -944,9 +944,6 @@ def summarize_game_state(game, exclude_animations=True):
     #     for play_name, play_data in list(away_plays_with_stats.items())[:3]:  # Log first 3
     #         game_stats = play_data.get("game_stats", {})
     #         logging.warning(f"🔍 [SUMMARIZE_GAME_STATE] Away play '{play_name}': times_run={game_stats.get('times_run', 0)}, successes={game_stats.get('successes', 0)}, player_points={len(game_stats.get('player_points', {}))} players")
-    if not home_plays_with_stats and not away_plays_with_stats:
-        logging.warning(f"⚠️ [SUMMARIZE_GAME_STATE] No plays with game_stats found! home_plays count: {len(home_plays)}, away_plays count: {len(away_plays)}")
-    
     # If teams don't have plays loaded, fallback to database (shouldn't happen in normal flow)
     if not home_plays and not away_plays:
         try:
@@ -954,7 +951,6 @@ def summarize_game_state(game, exclude_animations=True):
             populated_plays = populate_team_plays()
             home_plays = populated_plays.copy()
             away_plays = populated_plays.copy()
-            logging.warning(f"⚠️ [SUMMARIZE_GAME_STATE] Fallback to populate_team_plays() - no in-memory plays found")
         except Exception as e:
             print(f"🚨 Error in populate_team_plays: {e}")
             home_plays = {}

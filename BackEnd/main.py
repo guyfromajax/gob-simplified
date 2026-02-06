@@ -285,21 +285,8 @@ def simulate_quarter(
         _initialize_game_stats(gm, game_id)
         gm.game_state["game_stats_initialized"] = True
     
-    # 🔍 DEBUG: Log score state before setting start_box_score
-    logging.warning(f"🔍 [START_BOX_SCORE DEBUG] Setting start_box_score: gm.quarter={gm.quarter}, gm.score={gm.score}, home_team.name={gm.home_team.name}, away_team.name={gm.away_team.name}")
     box_score_result = gm.get_box_score()
-    logging.warning(f"🔍 [START_BOX_SCORE DEBUG] get_box_score() returned keys: {list(box_score_result.keys()) if isinstance(box_score_result, dict) else 'NOT_A_DICT'}")
     gm.game_state["start_box_score"] = box_score_result
-    # 🔍 DEBUG: Log what was actually stored
-    stored_start_box = gm.game_state.get("start_box_score")
-    if isinstance(stored_start_box, dict):
-        logging.warning(f"🔍 [START_BOX_SCORE DEBUG] Stored start_box_score structure: keys={list(stored_start_box.keys())}, has home_score={'home_score' in stored_start_box}, has away_score={'away_score' in stored_start_box}")
-        # Check if it has team names as keys (box score structure)
-        for team_name in [gm.home_team.name, gm.away_team.name]:
-            if team_name in stored_start_box:
-                logging.warning(f"🔍 [START_BOX_SCORE DEBUG] start_box_score[{team_name}] exists (box score structure)")
-    else:
-        logging.warning(f"🔍 [START_BOX_SCORE DEBUG] start_box_score is not a dict: {type(stored_start_box)}")
 
     # Ensure the turn manager is aware of any lineup changes
     gm.turn_manager = TurnManager(gm)
@@ -313,10 +300,6 @@ def simulate_quarter(
     q = gm.quarter
     gm.game_state["quarter"] = q
 
-    # 🔍 DEBUG: Log time_remaining BEFORE reset logic
-    time_before = gm.game_state.get("time_remaining", "NOT_SET")
-    logging.warning(f"🔍 [Q4 DEBUG] simulate_quarter() START: quarter={q}, resume_from_timeout={resume_from_timeout}, time_remaining BEFORE reset={time_before}, turn_by_turn_mode={turn_by_turn_mode}")
-
     # ✅ FIX: ALWAYS reset time_remaining for new quarters (not timeout resumes)
     # This ensures time_remaining starts at 480 (Q1-Q4) or 240 (OT) when starting a new quarter
     # Critical for "Play Quarter" after "Sim Quarter" - prevents 0:00 time from previous quarter
@@ -326,9 +309,6 @@ def simulate_quarter(
         new_clock = "8:00" if q <= 4 else "4:00"
         gm.game_state["time_remaining"] = new_time
         gm.game_state["clock"] = new_clock
-        logging.warning(f"✅ [Q4 DEBUG] NEW QUARTER RESET: Set time_remaining={new_time}s, clock={new_clock} for Q{q} (was {time_before})")
-    else:
-        logging.warning(f"🔍 [Q4 DEBUG] TIMEOUT RESUME: NOT resetting time_remaining (resume_from_timeout=True), keeping {time_before}")
 
     # ✅ TIMEOUT: If resuming from timeout, skip all quarter initialization
     # Reuse the same pattern as quarter breaks - preserve all game state
@@ -607,7 +587,6 @@ def simulate_quarter(
     if not turn_by_turn_mode:
         # Set flag to indicate we're in full simulation mode (for immediate timeout handling)
         gm.game_state["_is_full_simulation"] = True
-        logging.warning(f"🔍 [FULL_SIM DEBUG] SET _is_full_simulation=True (turn_by_turn_mode=False, quarter={gm.quarter})")
         
         # Safety guard: prevent infinite loops
         max_turns = 200  # Reasonable limit for a quarter (480 seconds / ~2-3 seconds per turn)
@@ -646,9 +625,7 @@ def simulate_quarter(
                 pass  # Don't break here, might be legitimate (e.g., fouls, timeouts)
         
         # Clear full simulation flag after loop completes
-        was_set = "_is_full_simulation" in gm.game_state
         gm.game_state.pop("_is_full_simulation", None)
-        logging.warning(f"🔍 [FULL_SIM DEBUG] CLEARED _is_full_simulation after full sim loop (was_set={was_set}, quarter={gm.quarter})")
         
         # ✅ FIX: Clear stale timeout state after quarter completes (when simmed)
         # timeout_next_play_type should only exist during active timeout pauses, not after quarters finish
@@ -662,11 +639,7 @@ def simulate_quarter(
         gm.quarter += 1
     else:
         # ✅ DEBUG: Explicitly clear flag for turn-by-turn mode (Play Quarter)
-        # This ensures flag is cleared even if game was previously in full sim mode
-        if "_is_full_simulation" in gm.game_state:
-            logging.warning(f"🔍 [FULL_SIM DEBUG] Found stale _is_full_simulation flag in turn-by-turn mode! Clearing it. (quarter={gm.quarter})")
         gm.game_state.pop("_is_full_simulation", None)
-        logging.warning(f"🔍 [FULL_SIM DEBUG] Ensured _is_full_simulation is cleared for turn-by-turn mode (quarter={gm.quarter})")
         # Turn-by-turn mode: Quarter is initialized, ready for turn-by-turn sim
         pass
 

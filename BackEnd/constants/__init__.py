@@ -152,7 +152,7 @@ HARD_STEAL = -200
 SOFT_STEAL = -100
 HARD_FOUL = 200
 SOFT_FOUL = 100
-STEAL_ATTEMPT = 20
+STEAL_ATTEMPT = 25
 DEAD_BALL_TURNOVER = 7
 
 # Charge/Blocking Foul (drive reconciliation thresholds)

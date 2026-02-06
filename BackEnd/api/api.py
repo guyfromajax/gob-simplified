@@ -247,21 +247,6 @@ try:
     # ✅ Add startup event to verify app is ready
     @app.on_event("startup")
     async def startup_event():
-        print("🔵 [DEBUG] startup_event: FastAPI app is ready!", file=sys.stderr, flush=True)
-        print(f"🔵 [DEBUG] startup_event: PORT env var: {os.getenv('PORT', 'NOT SET')}", file=sys.stderr, flush=True)
-        print(f"🔵 [DEBUG] startup_event: App instance: {app}", file=sys.stderr, flush=True)
-        print(f"🔵 [DEBUG] startup_event: Number of routes: {len(app.routes)}", file=sys.stderr, flush=True)
-        
-        # Log all route paths to verify routes are registered
-        route_paths = []
-        for route in app.routes[:20]:  # First 20 routes
-            if hasattr(route, 'methods'):
-                methods = list(route.methods) if route.methods else ['ANY']
-                route_paths.append(f"{methods[0] if methods else 'ANY'} {route.path}")
-            else:
-                route_paths.append(f"ANY {route.path}")
-        print(f"🔵 [DEBUG] startup_event: Registered routes (first 20): {route_paths}", file=sys.stderr, flush=True)
-        
         # Ensure username uniqueness index (for set-username flow)
         try:
             from BackEnd.db import ensure_users_username_index
@@ -1587,32 +1572,18 @@ try:
                     
                     # ✅ SS&S: Build box_score from nested structure using team_id keys (not team names)
                     box_score = saved.get("box_score", {})
-                    logging.warning(f"🔍 [BOX-SCORE DEBUG] /api/game/{game_id} - Top-level box_score keys: {list(box_score.keys()) if box_score else 'EMPTY'}")
                     if not box_score:
                         # Build from unified teams structure (use team_id keys)
                         home_team_id = saved.get("home_team_id")
                         away_team_id = saved.get("away_team_id")
-                        logging.warning(f"🔍 [BOX-SCORE DEBUG] /api/game/{game_id} - Building box_score from teams structure. home_team_id={home_team_id}, away_team_id={away_team_id}")
                         if home_team_id and "box_score" in home_team_data:
                             home_box = home_team_data.get("box_score", {})
                             box_score[home_team_id] = home_box
-                            logging.warning(f"🔍 [BOX-SCORE DEBUG] /api/game/{game_id} - Added home box_score with {len(home_box)} players (keys: {list(home_box.keys())[:5]})")
                         if away_team_id and "box_score" in away_team_data:
                             away_box = away_team_data.get("box_score", {})
                             box_score[away_team_id] = away_box
-                            logging.warning(f"🔍 [BOX-SCORE DEBUG] /api/game/{game_id} - Added away box_score with {len(away_box)} players (keys: {list(away_box.keys())[:5]})")
-                    
-                    # Log final box_score structure
-                    if box_score:
-                        for team_key, team_box in box_score.items():
-                            if isinstance(team_box, dict):
-                                player_count = len(team_box)
-                                sample_players = list(team_box.items())[:3]
-                                logging.warning(f"🔍 [BOX-SCORE DEBUG] /api/game/{game_id} - Final box_score[{team_key}]: {player_count} players. Sample: {[(pos, {'playerId': p.get('playerId'), 'name': p.get('name'), 'PTS': p.get('PTS', 0)}) for pos, p in sample_players if isinstance(p, dict)]}")
-                            else:
-                                logging.warning(f"🔍 [BOX-SCORE DEBUG] /api/game/{game_id} - box_score[{team_key}] is not a dict: {type(team_box)}")
-                    else:
-                        logging.error(f"❌ [BOX-SCORE DEBUG] /api/game/{game_id} - box_score is EMPTY after building!")
+                    if not box_score:
+                        logging.error(f"❌ [BOX-SCORE] /api/game/{game_id} - box_score is EMPTY after building!")
                     
                     # ✅ UNIFIED STRUCTURE: Return unified teams object structure
                     # Frontend should read from teams[home_team_id]/teams[away_team_id]
@@ -1843,7 +1814,6 @@ try:
             # Preserve user_team_side from in-memory game
             if gm and gm.game_state.get("user_team_side"):
                 preserved_user_team_side = gm.game_state.get("user_team_side")
-                logging.warning(f"✅ [USER_TEAM_SIDE] Preserved from in-memory game: {preserved_user_team_side}")
             if gm is not None and (
                 body.home_team != gm.home_team.name
                 or body.away_team != gm.away_team.name
@@ -1875,12 +1845,8 @@ try:
             if gm is not None and not gm.game_state.get("user_team_side"):
                 if body.user_team_side:
                     gm.game_state["user_team_side"] = body.user_team_side
-                    logging.warning(f"✅ [USER_TEAM_SIDE] Set in in-memory game from request: {body.user_team_side}")
                 elif preserved_user_team_side:
                     gm.game_state["user_team_side"] = preserved_user_team_side
-                    logging.warning(f"✅ [USER_TEAM_SIDE] Set in in-memory game from preserved value: {preserved_user_team_side}")
-                else:
-                    logging.warning(f"⚠️ [USER_TEAM_SIDE] In-memory game missing user_team_side and no request/preserved value - override checking will not work!")
             
             # ✅ CRITICAL FIX: If game is already in memory, update strategy_settings if request has them
             # This ensures user's updated Game Plan settings are applied even if game is already loaded
@@ -2454,12 +2420,6 @@ try:
                                     del gm.game_state["opening_tip_winner"]
                                 # Clear any old turns from previous game - opening tip will be added in simulate_quarter
                                 gm.turns = []
-                            
-                            # 🔍 DEBUG: Log time_remaining before calling simulate_quarter()
-                            time_before_sim = gm.game_state.get("time_remaining", "NOT_SET")
-                            logging.warning(f"🔍 [Q4 DEBUG] BEFORE simulate_quarter() call: quarter={body.quarter}, resume_from_timeout={body.resume_from_timeout}, time_remaining={time_before_sim}, saved_time_remaining={saved.get('time_remaining', 'NOT_SET') if saved else 'NO_SAVED_DOC'}")
-                            # 🔍 DEBUG: Log quarter and score state before simulate_quarter()
-                            logging.warning(f"🔍 [BEFORE_SIM_DEBUG] gm.quarter={gm.quarter}, body.quarter={body.quarter}, gm.score={gm.score}")
                             
                             ongoing_games[game_id] = gm
                             # ✅ DEBUG: Track when game is added to ongoing_games
@@ -3201,16 +3161,8 @@ try:
                 # print(f"🔍 DEBUG: Home team plays: {len(teams_obj[gm.home_team.team_id]['plays'])}")
                 # print(f"🔍 DEBUG: Away team plays: {len(teams_obj[gm.away_team.team_id]['plays'])}")
                 
-                # 🔍 DEBUG: Log time_remaining before summarizing
-                time_before_summarize = gm.game_state.get("time_remaining", "NOT_SET")
-                logging.warning(f"🔍 [Q4 DEBUG] BEFORE summarize_game_state(): time_remaining={time_before_summarize}, quarter={gm.quarter}")
-                
                 # Create a summary with new nested team structure
                 summary = summarize_game_state(gm)
-                
-                # 🔍 DEBUG: Log time_remaining in summary
-                time_in_summary = summary.get("time_remaining", "NOT_SET")
-                logging.warning(f"🔍 [Q4 DEBUG] AFTER summarize_game_state(): time_remaining in summary={time_in_summary}, quarter={summary.get('quarter', 'NOT_SET')}")
                 
                 # ✅ FIX: Merge playbook_settings from teams_obj into summary before saving
                 # This ensures playbook_settings loaded from tournament/franchise document are preserved
@@ -3222,14 +3174,8 @@ try:
                             if "playbook_settings" in team_data and team_data["playbook_settings"]:
                                 summary["teams"][team_id]["playbook_settings"] = team_data["playbook_settings"]
                 
-                # 🔍 DEBUG: Log time_remaining before saving
-                time_being_saved = summary.get("time_remaining", "NOT_SET")
-                logging.warning(f"🔍 [Q4 DEBUG] BEFORE saving to DB: time_remaining={time_being_saved}, quarter={summary.get('quarter', 'NOT_SET')}, game_id={game_id}")
-                
                 # Save to database
                 games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
-                logging.warning(f"🔍 [Q4 DEBUG] SAVED to DB: time_remaining={time_being_saved}, quarter={summary.get('quarter', 'NOT_SET')}, game_id={game_id}")
-                # print(f"🔍 DEBUG: Saved teams object to database with game_id: {game_id}")
                 
             except Exception as e:
                 print(f"🚨 Failed to save teams object in simulate_quarter_endpoint (no game_id): {e}")
@@ -3303,12 +3249,6 @@ try:
             # When full_sim=True (simming), fully simulate the quarter instantly (no animation)
             # When full_sim=False (playing), use turn-by-turn mode (for animation)
             turn_by_turn_mode = not body.full_sim
-            logging.warning(f"🔍 [FULL_SIM DEBUG] simulate_quarter_endpoint START: full_sim={body.full_sim}, turn_by_turn_mode={turn_by_turn_mode}, quarter={body.quarter}, game_id={game_id}")
-            if gm:
-                current_flag = gm.game_state.get("_is_full_simulation", False)
-                logging.warning(f"🔍 [FULL_SIM DEBUG] Game in memory - current _is_full_simulation={current_flag}")
-            else:
-                logging.warning(f"🔍 [FULL_SIM DEBUG] Game NOT in memory - will load from DB")
             logging.info(f"🎮 simulate_quarter_endpoint: full_sim={body.full_sim}, turn_by_turn_mode={turn_by_turn_mode}, quarter={body.quarter}, resume_from_timeout={body.resume_from_timeout}")
             
             # ⏱️ PERFORMANCE: Time the quarter simulation
@@ -3324,10 +3264,6 @@ try:
                 resume_from_timeout=body.resume_from_timeout,
             )
             sim_time = (time.time() - sim_start) * 1000
-            
-            # 🔍 DEBUG: Log time_remaining after simulate_quarter() returns
-            time_after_sim = gm.game_state.get("time_remaining", "NOT_SET")
-            logging.warning(f"🔍 [Q4 DEBUG] AFTER simulate_quarter() returns: quarter={gm.quarter}, time_remaining={time_after_sim}, resume_from_timeout={body.resume_from_timeout}")
             
         except ValueError as e:
             logging.error(
