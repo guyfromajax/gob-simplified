@@ -16,6 +16,9 @@ from BackEnd.constants.fast_break_constants import (
     BALL_HANDLER_MOVE_Y_RANGE,
     STOPPER_OFFSET_MIN,
     STOPPER_OFFSET_MAX,
+    FB_SHOT_SPOT_X_MIN,
+    FB_SHOT_SPOT_X_MAX,
+    FB_SHOT_SPOT_Y_RANGE,
     SHOT_DEFENDER_X_OFFSET,
     SHOT_DEFENDER_Y_RANGE,
     REBOUNDER_X_MIN,
@@ -173,14 +176,24 @@ class Animator:
         additional_move_y = random.randint(-BALL_HANDLER_MOVE_Y_RANGE, BALL_HANDLER_MOVE_Y_RANGE)
         
         # Calculate ball handler's final position (coordinates already in correct orientation)
-        if ball_handler_outlet_x is not None and ball_handler_outlet_y is not None:
-            # Use outlet position as starting point
+        # When ball handler beats defender (hold_up but shot attempt), use shot spot near rim
+        # so the shooter doesn't take the shot from the confrontation/stop spot.
+        ball_handler_beats_defender = hold_up and fb_roles.get("ball_handler_beats_defender")
+        if ball_handler_beats_defender:
+            rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
+            shot_distance = random.randint(FB_SHOT_SPOT_X_MIN, FB_SHOT_SPOT_X_MAX)
+            if is_away_offense:
+                bh_end_x = min(97, rim["x"] + shot_distance)
+            else:
+                bh_end_x = max(4, rim["x"] - shot_distance)
+            bh_end_y = max(1, min(49, rim["y"] + random.randint(-FB_SHOT_SPOT_Y_RANGE, FB_SHOT_SPOT_Y_RANGE)))
+            bh_end = {"x": bh_end_x, "y": bh_end_y}
+        elif ball_handler_outlet_x is not None and ball_handler_outlet_y is not None:
+            # Use outlet position as starting point (defensive stop or normal shot)
             # Multiply direction by move_distance to get signed movement
             bh_end_x = max(4, min(97, ball_handler_outlet_x + additional_move_x))
             bh_end_y = max(1, min(49, ball_handler_outlet_y + additional_move_y))
             bh_end = {"x": bh_end_x, "y": bh_end_y}
-            
-            # Debug logs removed to declutter output
         else:
             # Fallback: use old logic
             if hold_up:

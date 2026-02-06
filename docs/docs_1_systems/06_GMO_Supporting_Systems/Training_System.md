@@ -214,7 +214,7 @@ The training execution system applies pre-training conditions, allocates trainin
 **Year-Based Adjustments:**
 - **Freshman**: 2 to min, 7 to max (e.g., 1 point: `random.randint(2, 7)`)
 - **Sophomore**: 2 to min, 5 to max (e.g., 1 point: `random.randint(2, 5)`)
-- **Junior**: 1 to min, 3 to max (base; no change)
+- **Junior**: 1 to min, 3 to max (base; no change: `random.randint(1, 3)`)
 - **Senior**: 1 to min, 2 to max (e.g., 1 point: `random.randint(1, 2)`)
 
 **Year-Based Pre-Training Decay**
