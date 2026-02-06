@@ -2936,6 +2936,7 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         player_query_time = (time.time() - player_query_start) * 1000
         if player_query_time > 100:  # Only log slow queries (>100ms)
             # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: players.find_one(_id={pid_str}): {player_query_time:.2f}ms")
+            pass
         if not core_player:
             try:
                 # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly

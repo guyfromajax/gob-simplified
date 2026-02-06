@@ -1434,7 +1434,7 @@ def get_game_state(
             if query_time > 100:
                 doc_size = len(str(saved)) if saved else 0
                 # logging.warning(f"⚠️ [PERF] Slow DB query: /api/game/{game_id} - {query_time:.2f}ms, doc_size: {doc_size} bytes")
-            
+                pass
             if saved:
                 # ✅ REMOVED: Verbose debug logs
                 
@@ -1697,6 +1697,7 @@ def get_game_state(
                 # ✅ REMOVED: Verbose PERF log - only log if slow (>100ms)
                 if total_time > 100:
                     # logging.warning(f"⚠️ [PERF] Slow DB path: /api/game/{game_id} - {total_time:.2f}ms")
+                    pass
                 return response_data
         
             logging.error(f"❌ [BOX_SCORE] Game not found in database: game_id={game_id} (type: {type(game_id).__name__})")
@@ -1722,6 +1723,7 @@ def get_game_state(
             # ✅ REMOVED: Verbose PERF log - only log if slow (>100ms)
             if total_time > 100:
                 # logging.warning(f"⚠️ [PERF] Slow endpoint: /api/game/{game_id} - {total_time:.2f}ms")
+                pass
 
 @app.get("/api/game/{game_id}/playbook-settings")
 def get_game_playbook_settings(game_id: str, team_id: str):
@@ -2169,6 +2171,7 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                         # ✅ VERIFY: Log settings after GameManager creation to confirm they were applied
                         if home_strategy or away_strategy:
                             # logging.info(f"✅ [UNIFIED-SETTINGS] GameManager created with strategy_settings: home={bool(home_strategy)} (tempo={gm.home_team.strategy_settings.get('tempo', 'MISSING') if home_strategy else 'N/A'}), away={bool(away_strategy)} (tempo={gm.away_team.strategy_settings.get('tempo', 'MISSING') if away_strategy else 'N/A'})")
+                            pass
                         if home_playbook_settings or away_playbook_settings:
                             home_slots = len(home_playbook_settings.get("slot_assignments", {})) if home_playbook_settings else 0
                             away_slots = len(away_playbook_settings.get("slot_assignments", {})) if away_playbook_settings else 0
@@ -2205,6 +2208,7 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                                     # logging.info(f"✅ [UNIFIED-SETTINGS] Restored playbook_settings to game document: home={bool(home_playbook_settings)} (key={home_canonical_key}), away={bool(away_playbook_settings)} (key={away_canonical_key})")
                             except Exception as e:
                                 # logging.warning(f"⚠️ [UNIFIED-SETTINGS] Could not restore playbook_settings to game document: {e}", exc_info=True)
+                                pass
                         
                         # Debug logging removed - was cluttering logs
                         # logging.debug(f"🔧 AFTER GAMEMANAGER - home.strategy_settings={gm.home_team.strategy_settings.get('tempo', 'MISSING')}, away.strategy_settings={gm.away_team.strategy_settings.get('tempo', 'MISSING')}")
@@ -2218,6 +2222,7 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
                         # logging.warning(f"🔍 [QUARTER_DEBUG] Loaded from DB: saved_quarter={saved_quarter}, body.quarter={body.quarter}, gm.quarter set to={gm.quarter}")
                         if saved_quarter != body.quarter:
                             # logging.warning(f"🔍 [QUARTER_DEBUG] ⚠️ QUARTER MISMATCH: saved_quarter ({saved_quarter}) != body.quarter ({body.quarter})")
+                            pass
                         
                         # ✅ SS&S: Restore user_team_side to game_state (persists override checking across game loads)
                         # Priority: 1) Saved document, 2) Preserved from in-memory, 3) Request, 4) Warn
@@ -4308,6 +4313,7 @@ def get_team_roster(team_identifier: str, team_id: str | None = None, tournament
         # logging.warning(f"🔍 [BOX-SCORE ROSTER DEBUG] load_roster() returned {len(player_objects)} players. Sample player: _id={sample_id}, SH={sample_sh}, anchor_SH={sample_anchor_sh}")
     else:
         # logging.error(f"❌ [BOX-SCORE ROSTER DEBUG] load_roster() returned NO players for team={match}, franchise_id={franchise_id}!")
+        pass
 
     if not player_objects:
         print(f"❌ No players found for {match}")

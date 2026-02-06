@@ -1076,6 +1076,7 @@ def summarize_game_state(game, exclude_animations=True):
                             # logging.warning(f"✅ [SUMMARIZE] GameManager missing, using DB home playbook_settings: slot_assignments={slot_count}")
                         else:
                             # logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings found for home team (GameManager missing, DB empty)")
+                            pass
                     else:
                         home_playbook_settings = {}  # Can't resolve team_id
                         # logging.warning(f"⚠️ [SUMMARIZE] Could not resolve home_canonical_team_id, GameManager missing")
@@ -1112,6 +1113,7 @@ def summarize_game_state(game, exclude_animations=True):
                             # logging.warning(f"✅ [SUMMARIZE] GameManager missing, using DB away playbook_settings: slot_assignments={slot_count}")
                         else:
                             # logging.warning(f"⚠️ [SUMMARIZE] No playbook_settings found for away team (GameManager missing, DB empty)")
+                            pass
                     else:
                         away_playbook_settings = {}  # Can't resolve team_id
                         # logging.warning(f"⚠️ [SUMMARIZE] Could not resolve away_canonical_team_id, GameManager missing")
@@ -1182,12 +1184,16 @@ def summarize_game_state(game, exclude_animations=True):
     # Only log warnings if settings are missing (these indicate problems)
     if not home_strategy or not isinstance(home_strategy, dict) or len(home_strategy) == 0:
         # logging.warning(f"⚠️ [PERSIST-SETTINGS] Home strategy_settings is empty or missing!")
+        pass
     if not away_strategy or not isinstance(away_strategy, dict) or len(away_strategy) == 0:
         # logging.warning(f"⚠️ [PERSIST-SETTINGS] Away strategy_settings is empty or missing!")
+        pass
     if not home_playbook_settings or not isinstance(home_playbook_settings, dict):
         # logging.warning(f"⚠️ [PERSIST-SETTINGS] Home playbook_settings is empty or missing!")
+        pass
     if not away_playbook_settings or not isinstance(away_playbook_settings, dict):
         # logging.warning(f"⚠️ [PERSIST-SETTINGS] Away playbook_settings is empty or missing!")
+        pass
     
     # ✅ UNIFIED STRUCTURE: All team data in one place (eliminates home_team/away_team duplication)
     teams_obj = {
