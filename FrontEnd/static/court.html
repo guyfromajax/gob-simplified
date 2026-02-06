@@ -75,10 +75,13 @@
       grid-area: court;
       min-height: 0;
       min-width: 0;
+      width: 100%;
+      height: 100%;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      position: relative; /* for absolute child .pre-game-container */
     }
     #app-grid #phaser-container canvas {
       display: block;
@@ -2234,7 +2237,7 @@
   <!-- ==================== APP GRID (layout root: scoreboard | left-stats court right-stats | playcall) ==================== -->
   <div id="app-grid">
   <!-- ==================== SCOREBOARD TOP BAR ==================== -->
-  <div id="scoreboard">
+  <div id="scoreboard" style="grid-area: scoreboard;">
     <!-- Away Logo - Grid column 2 -->
     <div id="away-logo-container">
       <img id="away-logo" class="team-logo" alt="away logo" />
@@ -2361,7 +2364,7 @@
   </div>
 
   <!-- AWAY PLAYER STATS PANEL (LEFT) - grid-area: left-stats -->
-  <div class="player-stats-panel away">
+  <div class="player-stats-panel away" style="grid-area: left-stats;">
       <div class="player-box-score">
         <div class="stats-header">
           <h3 id="away-players-header">Away Players</h3>
@@ -2450,7 +2453,7 @@
     </div>
 
   <!-- COURT CONTAINER (CENTER) - grid-area: court -->
-  <div id="phaser-container">
+  <div id="phaser-container" style="grid-area: court;">
       <div class="pre-game-container">
         <button class="play-button">Play Quarter</button>
         <button class="sim-full-game-button">Sim Full Game</button>
@@ -2485,8 +2488,8 @@
       </div>
     </div>
 
-    <!-- HOME PLAYER STATS PANEL (RIGHT) -->
-    <div class="player-stats-panel home">
+    <!-- HOME PLAYER STATS PANEL (RIGHT) - grid-area: right-stats -->
+    <div class="player-stats-panel home" style="grid-area: right-stats;">
       <div class="player-box-score">
         <div class="stats-header">
           <h3 id="home-players-header">Home Players</h3>
@@ -2575,7 +2578,7 @@
     </div>
 
   <!-- ==================== PLAYCALL CENTER (BOTTOM) - UNIFIED TACTICAL HUB - grid-area: playcall ==================== -->
-  <div id="playcall-center">
+  <div id="playcall-center" style="grid-area: playcall;">
     
     <!-- Top Row: Current Playcall Display -->
     <div id="playcall-status-row">
