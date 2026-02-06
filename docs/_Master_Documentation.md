@@ -2148,7 +2148,6 @@ The following settings use a weighted random distribution that favors balanced p
 - `tempo` - Pace of play preference
 - `defense` - Man vs Zone defense preference (0=man only, 4=zone only)
 - `aggression` - Defensive aggression level
-- `rebounding` - Crash boards vs get back preference
 
 **Weighted Distribution Probabilities (Most Settings):**
 - **5% chance** for value **0** (extreme low)
@@ -2156,6 +2155,10 @@ The following settings use a weighted random distribution that favors balanced p
 - **60% chance** for value **2** (normal/balanced) ⭐
 - **15% chance** for value **3** (high)
 - **5% chance** for value **4** (extreme high)
+
+**Weighted Distribution (Rebounding Only):**
+- `rebounding` - Crash boards vs get back preference (0=crash, 4=get back)
+- **5%** for 0, **10%** for 1, **15%** for 2, **30%** for 3, **40%** for 4
 
 **Weighted Distribution (hc_trap, fc_press):**
 The following settings use a different weighted distribution that favors lower values:
@@ -2183,12 +2186,13 @@ The following settings use uniform random distribution (1-4, never zero):
 
 **Code Pattern:**
 ```python
-# Weighted distribution for most settings (offense, defense, aggression, rebounding)
+# Weighted distribution for most settings (offense, defense, aggression)
 weighted_choice = random.choices(
     [0, 1, 2, 3, 4],
     weights=[5, 15, 60, 15, 5],  # 5%, 15%, 60%, 15%, 5%
     k=1
 )[0]
+# Rebounding uses its own distribution: weights=[5, 10, 15, 30, 40]
 
 # Special weighted distribution for hc_trap and fc_press
 trap_press_choice = random.choices(
@@ -2222,13 +2226,7 @@ inside = random.randint(1, 4)  # Never zero
 | `aggression` | Weighted | 0-4 | 60% chance of 2 (balanced) |
 | `hc_trap` | Weighted | 0-4 | 40% chance of 1, 35% chance of 2 (favors lower usage) |
 | `fc_press` | Weighted | 0-4 | 40% chance of 1, 35% chance of 2 (favors lower usage) |
-| `rebounding` | Weighted | 0-4 | 60% chance of 2 (balanced) |
-| `tempo` | Weighted | 0-4 | 60% chance of 2 (balanced) |
-| `defense` | Weighted | 0-4 | 60% chance of 2 (balanced) |
-| `aggression` | Weighted | 0-4 | 60% chance of 2 (balanced) |
-| `hc_trap` | Weighted | 0-4 | 60% chance of 2 (balanced) |
-| `fc_press` | Weighted | 0-4 | 60% chance of 2 (balanced) |
-| `rebounding` | Weighted | 0-4 | 60% chance of 2 (balanced) |
+| `rebounding` | Weighted | 0-4 | 5%/10%/15%/30%/40% (favors get back) |
 
 ---
 

@@ -1086,8 +1086,9 @@ def resolve_fast_break_logic(game: "GameManager"):
         y_distance = abs(defender_outlet_y - ball_handler_outlet_y)
         total_distance = (x_distance ** 2 + y_distance ** 2) ** 0.5  # Euclidean distance
         
-        # Track closest defender overall (for shot attempts)
-        if total_distance < closest_distance_overall:
+        # Track closest defender overall (for shot attempts) - ONLY among get-back players
+        # Shot defender exists only when there are 1 or 2 get-back players (set after loop)
+        if defender_id and defender_id in getback_player_ids and total_distance < closest_distance_overall:
             closest_distance_overall = total_distance
             closest_defender_overall = defender
         
@@ -1127,16 +1128,14 @@ def resolve_fast_break_logic(game: "GameManager"):
         fb_roles["defense"].append(closest_stopping_defender)
         # logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] Added stopping defender to fb_roles['defense']: {get_name_safe(closest_stopping_defender)} (was not in initial list)")
     
-    # ✅ For shot attempts, store closest defender overall as shot defender
-    if closest_defender_overall:
+    # ✅ For shot attempts: shot defender only when 1 or 2 get-back players (get-back only)
+    num_getback = len(getback_player_ids)
+    if num_getback in (1, 2) and closest_defender_overall:
         fb_roles["shot_defender"] = closest_defender_overall
-        # logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] Closest defender overall (for shot attempts): {get_name_safe(closest_defender_overall)}, distance: {closest_distance_overall:.2f}")
+        # logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] Closest defender overall (get-back only): {get_name_safe(closest_defender_overall)}, distance: {closest_distance_overall:.2f}")
     
     # Determine event type based on defender positions
     d_count = len(fb_roles["defense"])
-    
-    # Store defender count for shot resolution logic
-    fb_roles["defender_count"] = d_count
     
     # ==================== STAT TRACKING ====================
     # Track Fast Break defender count for offense team (team running the break)
@@ -1163,6 +1162,13 @@ def resolve_fast_break_logic(game: "GameManager"):
         # 0 defenders: Always shot
         event_type = "SHOT"
         logging.debug(f"  ✅ Decision: SHOT (0 defenders)")
+        # Shot defender only when 1 or 2 get-back players (get-back pool only)
+        if num_getback in (1, 2) and closest_defender_overall:
+            fb_roles["defender"] = closest_defender_overall
+            fb_roles["defender_count"] = num_getback
+        else:
+            fb_roles["defender"] = None
+            fb_roles["defender_count"] = 0
     elif defender_ahead and closest_stopping_defender:
         # ✅ Geography check passed: Defender ahead AND within ±6 y-coords
         # Now do skill check: Can ball handler beat the defender?
@@ -1190,27 +1196,31 @@ def resolve_fast_break_logic(game: "GameManager"):
             # Store stopper info in fb_roles so frontend can animate defender to stopper position
             fb_roles["stopper_id"] = stopper_id
             fb_roles["ball_handler_beats_defender"] = True  # Flag for frontend animation
-            # Also set shot defender (closest overall) for shot resolution
-            if closest_defender_overall:
-                fb_roles["defender"] = closest_defender_overall
-            else:
-                # Fallback: use stopper as shot defender
-                fb_roles["defender"] = closest_stopping_defender
+            # Shot defender = closest get-back EXCLUDING the failed stopper (they cannot be shot defender)
+            shot_def = None
+            shot_dist = float('inf')
+            for d in def_lineup.values():
+                did = getattr(d, "player_id", None)
+                if not did or did not in getback_player_ids or did == stopper_id:
+                    continue
+                ox = getattr(d, "outlet_coords", {}).get("x", 50)
+                oy = getattr(d, "outlet_coords", {}).get("y", 25)
+                td = ((ox - ball_handler_outlet_x) ** 2 + (oy - ball_handler_outlet_y) ** 2) ** 0.5
+                if td < shot_dist:
+                    shot_dist = td
+                    shot_def = d
+            fb_roles["defender"] = shot_def
+            fb_roles["defender_count"] = 1 if shot_def else 0  # 0 if only get-back was the stopper
     else:
         # No defender ahead AND within y-range: shot attempt (no skill check needed)
-        # Use closest defender overall as shot defender
+        # Shot defender only when 1 or 2 get-back players (closest among get-back only)
         event_type = "SHOT"
-        if closest_defender_overall:
-            # logging.debug(f"  ✅ Decision: SHOT (no defender ahead within y-range)")
-            # logging.debug(f"  closest_defender_overall (shot defender): {get_name_safe(closest_defender_overall)}")
-            # logging.debug(f"  closest_distance_overall: {closest_distance_overall:.2f}")
-            # Store closest defender overall as shot defender for animation
+        if num_getback in (1, 2) and closest_defender_overall:
             fb_roles["defender"] = closest_defender_overall
+            fb_roles["defender_count"] = num_getback
         else:
-            # logging.debug(f"  ✅ Decision: SHOT (no defender ahead)")
-            # Fallback: use first defender in list if available
-            if fb_roles["defense"] and len(fb_roles["defense"]) > 0:
-                fb_roles["defender"] = fb_roles["defense"][0]
+            fb_roles["defender"] = None
+            fb_roles["defender_count"] = 0
 
     # ==================== OUTLET PASS STAT TRACKING ====================
     # Record outlet pass stats if outlet pass occurred
