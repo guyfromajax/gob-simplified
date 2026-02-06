@@ -827,21 +827,20 @@
       pointer-events: none !important;
     }
 
-    /* Sim Quarter Scrolling Text Popup */
+    /* Sim Quarter Scrolling Text Popup - centered in court container, 25% smaller height */
     .sim-quarter-popup {
       position: absolute;
-      top: var(--scoreboard-height);
       left: 50%;
-      transform: translateX(-50%);
+      top: 50%;
+      transform: translate(-50%, -50%);
       background: #c8cdd4;
       border: 1px solid #6b7280;
       border-radius: 12px;
       padding: 20px 50px;
       width: 600px;
       max-width: 90%;
-      height: calc((100vh - var(--scoreboard-height) - 40px) * 0.8);
-      margin-top: 20px;
-      margin-bottom: 0;
+      height: 60%;
+      max-height: 60%;
       z-index: 200;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
       display: flex;
