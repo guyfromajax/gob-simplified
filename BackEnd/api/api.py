@@ -175,12 +175,34 @@ logging.info(f"🌐 CORS configured with origins: {cors_origins}")
 # ============================================================================
 # Protects against brute force, DoS, and resource exhaustion
 # Limits: auth=10/min, simulation=30/min, general=100/min (per IP)
-from slowapi.errors import RateLimitExceeded
-from BackEnd.utils.rate_limiter import limiter, rate_limit_exceeded_handler, SIM_RATE_LIMIT, SIM_TURN_RATE_LIMIT
+# Optional: if slowapi/rate_limiter fails to import, app still starts (deploy resilience)
+limiter = None
+SIM_RATE_LIMIT = "30/minute"
+SIM_TURN_RATE_LIMIT = "300/minute"
+try:
+    from slowapi.errors import RateLimitExceeded
+    from BackEnd.utils.rate_limiter import (
+        limiter as _limiter,
+        rate_limit_exceeded_handler,
+        SIM_RATE_LIMIT as _SIM_RATE_LIMIT,
+        SIM_TURN_RATE_LIMIT as _SIM_TURN_RATE_LIMIT,
+    )
+    limiter = _limiter
+    SIM_RATE_LIMIT = _SIM_RATE_LIMIT
+    SIM_TURN_RATE_LIMIT = _SIM_TURN_RATE_LIMIT
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+    print("🛡️ [RATE LIMIT] Rate limiting enabled", file=sys.stderr, flush=True)
+except Exception as e:
+    print(f"⚠️ [RATE LIMIT] Failed to enable rate limiting: {e}", file=sys.stderr, flush=True)
+    import traceback
+    traceback.print_exc(file=sys.stderr)
 
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
-print("🛡️ [RATE LIMIT] Rate limiting enabled", file=sys.stderr, flush=True)
+def _no_limit(f):
+    """No-op when rate limiter is disabled."""
+    return f
+_rate_limit_sim = limiter.limit(SIM_RATE_LIMIT) if limiter else _no_limit
+_rate_limit_turn = limiter.limit(SIM_TURN_RATE_LIMIT) if limiter else _no_limit
 
 # Include routers AFTER CORS middleware is configured
 app.include_router(tournament_router)
@@ -1245,7 +1267,7 @@ def get_team_names():
 
 @app.post("/api/simulate")
 @app.post("/simulate")
-@limiter.limit(SIM_RATE_LIMIT)
+@_rate_limit_sim
 def simulate_game(request: Request, body: SimulationRequest):
     """Rate limited: 30/minute per IP."""
     home_team = body.home_team
@@ -1815,7 +1837,7 @@ async def simulate_quarter_options():
     )
 
 @app.post("/api/simulate-quarter")
-@limiter.limit(SIM_RATE_LIMIT)
+@_rate_limit_sim
 def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, debug: bool = False):
     """Rate limited: 30/minute per IP."""
     import time
@@ -3522,7 +3544,7 @@ def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, 
 
 
 @app.post("/api/simulate-turn")
-@limiter.limit(SIM_TURN_RATE_LIMIT)
+@_rate_limit_turn
 def simulate_turn_endpoint(request: Request, body: TurnSimulationRequest):
     import time
     start_time = time.time()

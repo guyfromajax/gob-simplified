@@ -22,7 +22,12 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, field_validator
 from bson import ObjectId
 
-from BackEnd.utils.rate_limiter import limiter, AUTH_RATE_LIMIT
+try:
+    from BackEnd.utils.rate_limiter import limiter as _limiter, AUTH_RATE_LIMIT
+    _auth_rate_limit = _limiter.limit(AUTH_RATE_LIMIT)
+except Exception:
+    def _auth_rate_limit(f):
+        return f
 from BackEnd.db import users_collection, password_reset_tokens_collection
 from BackEnd.utils.auth import (
     hash_password,
@@ -158,7 +163,7 @@ async def get_auth_config():
 
 
 @router.post("/signup")
-@limiter.limit(AUTH_RATE_LIMIT)
+@_auth_rate_limit
 async def signup(request: Request, body: SignupRequest):
     """
     Create a new user account.
@@ -240,7 +245,7 @@ async def signup(request: Request, body: SignupRequest):
 
 
 @router.post("/login")
-@limiter.limit(AUTH_RATE_LIMIT)
+@_auth_rate_limit
 async def login(request: Request, body: LoginRequest):
     """
     Login with email and password.
@@ -332,7 +337,7 @@ def _redact_email(email: str) -> str:
 
 
 @router.post("/reset-request")
-@limiter.limit(AUTH_RATE_LIMIT)
+@_auth_rate_limit
 async def password_reset_request(request: Request, body: ResetRequest):
     """
     Request a password reset email.
@@ -366,7 +371,7 @@ async def password_reset_request(request: Request, body: ResetRequest):
 
 
 @router.post("/reset-password")
-@limiter.limit(AUTH_RATE_LIMIT)
+@_auth_rate_limit
 async def password_reset_confirm(request: Request, body: ResetPasswordRequest):
     """
     Set a new password using the token from the reset email.
