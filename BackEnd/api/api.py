@@ -175,7 +175,6 @@ logging.info(f"🌐 CORS configured with origins: {cors_origins}")
 # ============================================================================
 # Protects against brute force, DoS, and resource exhaustion
 # Limits: auth=10/min, simulation=30/min, general=100/min (per IP)
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from BackEnd.utils.rate_limiter import limiter, rate_limit_exceeded_handler, SIM_RATE_LIMIT, SIM_TURN_RATE_LIMIT
 
