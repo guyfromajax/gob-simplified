@@ -1,0 +1,36 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <style>
+    @keyframes spinBounce {
+      0%, 100% {
+        transform: translateY(-25%);
+        animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+      }
+
+      50% {
+        transform: translateY(25%);
+        animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+      }
+    }
+  </style>
+  
+  <!-- Define the radial gradient -->
+  <radialGradient id="a11" cx=".1" fx=".1" cy=".3" fy=".3" gradientTransform="scale(1.5)">
+    <stop offset="0" stop-color="#F79420"></stop>
+    <stop offset=".3" stop-color="#F79420" stop-opacity=".9"></stop>
+    <stop offset=".6" stop-color="#F79420" stop-opacity=".8"></stop>
+    <stop offset=".8" stop-color="#F79420" stop-opacity=".7"></stop>
+    <stop offset="1" stop-color="#F79420" stop-opacity="0"></stop>
+  </radialGradient>
+  
+  <!-- Outer animated circle with pattern fill -->
+  <circle transform-origin="center" fill="none" stroke="url(#a11)" stroke-width="15" stroke-linecap="round" stroke-dasharray="250 1000" stroke-dashoffset="0" cx="100" cy="100" r="70">
+    <animateTransform attributeName="transform" attributeType="XML" type="rotate" values="0;360" calcMode="spline" keyTimes="0;1" keySplines="0 0 1 1" dur="2s" repeatCount="indefinite"></animateTransform>
+  </circle>
+  
+  <!-- Inner static circle -->
+  <circle transform-origin="center" fill="url(#pattern)" opacity=".2" stroke="#F79420" stroke-width="15" stroke-linecap="round" cx="100" cy="100" r="70"></circle>
+  
+ 
+  
+</svg>

@@ -1,0 +1,14 @@
+{
+  "name": "gob-simplified",
+  "version": "1.0.0",
+  "description": "Geeked-Out Basketball - Frontend Layout Tests",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}
