@@ -92,12 +92,12 @@
     #app-grid .player-stats-panel.home { grid-area: right-stats; min-height: 0; min-width: 0; }
     #app-grid #playcall-center {
       grid-area: playcall;
-      position: relative; /* Grid controls position; no fixed */
+      position: relative !important; /* Override base rule's position:fixed !important so it stays in grid */
       left: auto !important;
       right: auto !important;
       bottom: auto !important;
       width: 100% !important;
-      max-height: none;
+      max-height: none !important;
       min-height: 0;
       overflow-y: auto;
     }
