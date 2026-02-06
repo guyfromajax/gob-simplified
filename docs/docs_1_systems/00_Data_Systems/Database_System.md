@@ -288,7 +288,7 @@ Initialized via `TeamManager._init_strategy_settings()` with weighted randomizat
 - `aggression` - Weighted: 5% for 0/4, 15% for 1/3, 60% for 2
 - `hc_trap` - Special weighted: 10% for 0, 40% for 1, 35% for 2, 10% for 3, 5% for 4
 - `fc_press` - Special weighted: 10% for 0, 40% for 1, 35% for 2, 10% for 3, 5% for 4
-- `rebounding` - Weighted: 5% for 0/4, 15% for 1/3, 60% for 2
+- `rebounding` - Weighted (computer only): 5% for 0, 10% for 1, 15% for 2, 30% for 3, 40% for 4
 
 **Strategy Calls (User Overrides):**
 - `offense_call` (str or None) - Play name string or None (user override persists until used)

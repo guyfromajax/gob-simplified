@@ -318,12 +318,15 @@ class TeamManager:
         Initialize strategy settings with weighted randomization for CPU teams (0-4 scale).
         If team document has strategy_settings, those will be used instead via constructor.
         
-        Weighted Distribution (for offense, fast_breaks, defense, aggression, rebounding):
+        Weighted Distribution (for offense, fast_breaks, defense, aggression):
         - 5% chance for 0
         - 15% chance for 1
         - 60% chance for 2 (normal/balanced)
         - 15% chance for 3
         - 5% chance for 4
+
+        Weighted Distribution (for rebounding only):
+        - 5% chance for 0, 10% for 1, 15% for 2, 30% for 3, 40% for 4
         
         Weighted Distribution (for hc_trap, fc_press):
         - 34% chance for 0
@@ -362,7 +365,7 @@ class TeamManager:
             "aggression": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
             "hc_trap": trap_press_choice,
             "fc_press": trap_press_choice,
-            "rebounding": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
+            "rebounding": random.choices([0, 1, 2, 3, 4], weights=[5, 10, 15, 30, 40], k=1)[0],
             # tempo is initialized per game, not per team
             "tempo": TeamManager.init_tempo_random()
         }

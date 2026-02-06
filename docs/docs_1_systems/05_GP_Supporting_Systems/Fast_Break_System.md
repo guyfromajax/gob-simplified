@@ -47,7 +47,7 @@
        - Home offense: `defender_x >= ball_handler_x` (basket at x=90)
        - Away offense: `defender_x <= ball_handler_x` (basket at x=10)
      - **Y-Coordinate Check (Within Range)**: `|defender_y - ball_handler_y| <= 6`
-   - Track closest stopping defender (x-distance only) and closest defender overall (Euclidean distance)
+   - Track closest stopping defender (x-distance only) and **closest defender overall among get-back players only** (Euclidean distance; only defenders in `offense_getback` from most recent shot are eligible for shot defender)
 
 6. **Determine Event Type**
    - **0 Defenders**: Always `SHOT`
@@ -60,7 +60,8 @@
        - If `break_score > stop_score` → `SHOT` (ball handler wins, beats defender)
          - Defender still animates to stopper position (shows the attempt)
          - Ball handler animates past stopper to shot spot (shows offensive success)
-   - **Otherwise**: `SHOT` (closest defender overall becomes shot defender)
+         - **Shot defender**: Closest get-back (by distance) **excluding the failed stopper**; if no other get-back, no shot defender (defender_count = 0)
+   - **Otherwise**: `SHOT`. **Shot defender only when 1 or 2 get-back players**: closest get-back by Euclidean distance; if 0 or 3+ get-back, no shot defender (defender_count = 0)
 
 7. **Handle DEFENSIVE_STOP Result**
    - Set `offensive_state = "HCO"`
@@ -76,11 +77,13 @@
      - Else if shooter != ball_handler: passer = ball_handler
      - Else: passer = None
    - **Shot threshold**: Uses effective defender count. If a defender attempted a stop and failed (`ball_handler_beats_defender`), effective count = defender_count − 1 (min 0). Threshold: 0 def → 1; 1 def → base; 2+ def → base + 100 + def_chem − off_fight. Stats and animation still use actual defender_count.
+   - **Shot defender pool**: Only **get-back players** (from `offense_getback` on the most recent shot) are eligible. **Only when there are 1 or 2 get-back players** is a shot defender assigned; 0 or 3+ get-back → no shot defender (defender_count = 0). If a get-back defender attempted a stop and failed (`ball_handler_beats_defender`), that defender is **excluded** from being the shot defender (closest remaining get-back is used, or none if he was the only get-back).
    - **Special Case - Ball Handler Beats Defender**:
      - If `ball_handler_beats_defender = True` (from Step 6 skill check):
        - Defender still animates to stopper position (1-3 spots in front of ball handler's starting position)
        - Ball handler animates past stopper to shot spot (shows offensive success)
        - Use `animateFastBreakShotWithStopper()` animation path
+       - Shot defender = closest get-back **excluding the failed stopper** (or none if no other get-back)
    - **Charge/Blocking Foul**: Only checked when there is a shot defender (defender present and defender_count ≥ 1). If 0 defenders back, no charge/block check; shot proceeds normally. When applicable, uses same attack-shot logic as half-court (`calculate_charge()`); CHARGE → possession to defense, BLOCKING_FOUL → foul on defender (SIP or free throws if bonus). Shooter and defender are animated to the shot spot; no shot-to-rim.
    - Call `shot_manager.resolve_shot()` (attack adapter) for shot resolution
    - Build animation packet (outlet pass + shot attempt)
@@ -126,7 +129,7 @@ Fast breaks can result in:
 2. **Shot Attempt (SHOT)**
    - No defender ahead of ball handler after outlet pass OR defender not within ±6 y-coords
    - Ball handler moves 5-10 spots toward basket, ±3 Y (clamped)
-   - Closest defender overall (by Euclidean distance) follows and is positioned 1 x-coord toward basket from shooter (home: +1, away: −1), ±2 y from shooter
+   - **Shot defender (if any)**: Only when there are **1 or 2 get-back players**; pool is **get-back players only**. Closest get-back by Euclidean distance becomes shot defender (or, if ball handler beat a stopper, closest get-back **excluding that stopper**). If 0 or 3+ get-back, or only get-back was the failed stopper, no shot defender. When present, defender is positioned 1 x-coord toward basket from shooter (home: +1, away: −1), ±2 y from shooter.
    - Routes to: Standard shot resolution flow (MAKE/MISS)
 
 ### Charge and Blocking Foul (Fast Break Shot Only)
@@ -195,12 +198,13 @@ Result: DEFENSIVE_STOP (defender at x=57 is ahead AND within y-range, distance: 
 
 **Multiple Get-Back Players:**
 - If multiple get-back players meet both conditions (ahead AND within y-range), the closest one (by x-distance) forces the defensive stop
-- If neither get-back player meets both conditions, the closest defender overall (by Euclidean distance) becomes the shot defender
+- If neither get-back player meets both conditions, and there are **1 or 2 get-back players**, the closest get-back (by Euclidean distance from outlet receiver) becomes the shot defender
 
-**Shot Defender Selection:**
-- If no defender meets both conditions (ahead AND within y-range), it's a shot attempt
-- The closest defender overall (by Euclidean distance from outlet receiver) becomes the shot defender
-- This ensures there's always a defender to animate during shot attempts
+**Shot Defender Selection (Get-Back Only, 1 or 2):**
+- There is a **potential shot defender only when there are 1 or 2 get-back players** on the defensive team (from `offense_getback` on the most recent shot).
+- **Pool**: Only get-back players are eligible. The closest get-back by Euclidean distance from outlet receiver becomes the shot defender.
+- **0 or 3+ get-back**: No shot defender is assigned (defender_count = 0); charge/block check is skipped; shot proceeds as uncontested (threshold logic still uses effective count).
+- **Ball handler beats defender**: The get-back defender who attempted the stop and lost is **excluded** from being the shot defender. The closest **remaining** get-back (by distance) becomes the shot defender; if there is no other get-back, no shot defender (defender_count = 0).
 
 **Skill Check Implementation:**
 - **Two-Step Process**: Geography determines if a stop attempt is possible, then skill check determines the outcome.
@@ -215,12 +219,12 @@ Result: DEFENSIVE_STOP (defender at x=57 is ahead AND within y-range, distance: 
   - Ball handler animates past the stopper to shot spot near rim
   - This visually shows the offensive player's success in beating the defender
   - Flag `ball_handler_beats_defender = True` is set in `fb_roles` to trigger special animation path
+  - **Shot defender**: The failed stopper is excluded; the closest **other** get-back (by distance) becomes the shot defender, or none if he was the only get-back
 
-**Critical Implementation Detail - Defender Assignment Consistency:**
-- **Backend Calculation**: In `phase_resolution.py`, `fb_roles["defender"]` is set to `closest_defender_overall` for shot attempts (line 1183)
-- **Shot Resolution**: `resolve_fast_break_shot()` in `shot_manager.py` now **respects** the already-set `fb_roles["defender"]` instead of randomly reassigning it
-- **Why This Matters**: The defender used in shot resolution must match the defender used in animation to prevent animation freezes or mismatches
-- **Implementation**: `resolve_fast_break_shot()` checks if `fb_roles["defender"]` is already set; if so, uses it. Only falls back to random assignment if not set (for edge cases)
+**Critical Implementation Detail - Defender Assignment (Get-Back Only, 1 or 2):**
+- **Backend Calculation**: In `phase_resolution.py`, `closest_defender_overall` is tracked **only among defenders in `getback_player_ids`** (get-back players from the most recent shot). A shot defender is assigned only when `len(getback_player_ids) in (1, 2)`; otherwise `fb_roles["defender"] = None` and `fb_roles["defender_count"] = 0`. When `ball_handler_beats_defender` is True, the stopper is excluded and the closest remaining get-back is chosen (or none).
+- **Shot Resolution**: `resolve_shot()` in `shot_manager.py` **respects** the already-set `fb_roles["defender"]` from phase resolution.
+- **Why This Matters**: Only get-back players can contest the shot; the failed stopper cannot also be the shot defender; 0 or 3+ get-back means no charge/block and no shot defender for animation.
 
 **Critical Implementation Detail:**
 - **All defenders checked**: The system checks **all defenders in `def_lineup`**, not just those initially in `fb_roles["defense"]`
@@ -231,57 +235,52 @@ Result: DEFENSIVE_STOP (defender at x=57 is ahead AND within y-range, distance: 
 
 **Implementation:**
 ```python
-# ✅ Check ALL defenders in def_lineup, not just fb_roles["defense"]
-# This ensures get-back players are checked even if they weren't initially included
+# getback_player_ids = from most_recent_shot_turn.get("offense_getback", [])
+# ✅ Check ALL defenders in def_lineup for stop/shot geography; shot defender pool = get-back only
 closest_stopping_defender = None  # Defender who is ahead AND within ±6 y-coords
-closest_defender_overall = None   # Closest defender overall (for shot attempts)
+closest_defender_overall = None   # Closest defender among GET-BACK PLAYERS ONLY (for shot attempts)
+closest_distance_overall = float('inf')
 
 for defender in def_lineup.values():
-    # Get defender coordinates (get-back coords if available, else defender.coords)
+    defender_id = defender.player_id
     defender_outlet_x = get_defender_coords_x(defender, most_recent_shot_turn)
     defender_outlet_y = get_defender_coords_y(defender, most_recent_shot_turn)
     
-    # Calculate Euclidean distance for closest defender overall
     x_distance = abs(defender_outlet_x - ball_handler_outlet_x)
     y_distance = abs(defender_outlet_y - ball_handler_outlet_y)
     total_distance = (x_distance ** 2 + y_distance ** 2) ** 0.5
     
-    # Track closest defender overall (for shot attempts)
-    if total_distance < closest_distance_overall:
+    # Track closest defender overall ONLY among get-back players
+    if defender_id in getback_player_ids and total_distance < closest_distance_overall:
         closest_distance_overall = total_distance
         closest_defender_overall = defender
     
-    # Check if defender is ahead (x-coordinate check)
-    if is_away_offense:
-        is_ahead = defender_outlet_x <= ball_handler_outlet_x
-    else:
-        is_ahead = defender_outlet_x >= ball_handler_outlet_x
-    
-    # ✅ NEW: Check if defender is within ±6 y-coords of outlet receiver
-    y_diff = abs(defender_outlet_y - ball_handler_outlet_y)
-    is_within_y_range = y_diff <= 6
-    
-    # Defender can force defensive stop if: ahead AND within y-range
+    # Check if defender is ahead (x-coordinate check) and within ±6 y
+    is_ahead = (defender_outlet_x <= ball_handler_outlet_x) if is_away_offense else (defender_outlet_x >= ball_handler_outlet_x)
+    is_within_y_range = abs(defender_outlet_y - ball_handler_outlet_y) <= 6
     if is_ahead and is_within_y_range:
         defender_ahead = True
-        # Track closest stopping defender (x-distance only)
         x_distance_only = abs(defender_outlet_x - ball_handler_outlet_x)
         if x_distance_only < closest_stopping_distance:
             closest_stopping_distance = x_distance_only
             closest_stopping_defender = defender
 
-# If closest stopping defender wasn't in fb_roles["defense"], add them for animation
-if closest_stopping_defender and closest_stopping_defender not in fb_roles["defense"]:
-    fb_roles["defense"].append(closest_stopping_defender)
-
+num_getback = len(getback_player_ids)
+# Shot defender only when 1 or 2 get-back; when ball handler beats defender, exclude stopper from pool
 if defender_ahead and closest_stopping_defender:
-    event_type = "DEFENSIVE_STOP"
-    stopper_id = closest_stopping_defender.player_id
+    # skill check...
+    if ball_handler_wins:
+        # Shot defender = closest get-back by distance EXCLUDING stopper_id (loop def_lineup, filter getback_player_ids and id != stopper_id)
+        fb_roles["defender"] = shot_def  # or None if no other get-back
+        fb_roles["defender_count"] = 1 if fb_roles["defender"] else 0
 else:
     event_type = "SHOT"
-    # Use closest defender overall as shot defender
-    if closest_defender_overall:
+    if num_getback in (1, 2) and closest_defender_overall:
         fb_roles["defender"] = closest_defender_overall
+        fb_roles["defender_count"] = num_getback
+    else:
+        fb_roles["defender"] = None
+        fb_roles["defender_count"] = 0
 ```
 
 ### Animation Sequence

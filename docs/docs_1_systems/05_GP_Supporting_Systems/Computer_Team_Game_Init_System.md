@@ -42,7 +42,7 @@ When computer teams are initialized (for all game modes: Single Game, Tournament
 
 #### 1. Weighted Distribution (Most Settings)
 
-**Settings:** `offense`, `fast_breaks`, `play_calling`, `defense`, `aggression`, `rebounding`
+**Settings:** `offense`, `fast_breaks`, `play_calling`, `defense`, `aggression` (rebounding uses its own distribution; see below)
 
 **Distribution:** Weighted random that favors balanced play (value = 2)
 
@@ -58,7 +58,25 @@ When computer teams are initialized (for all game modes: Single Game, Tournament
 weighted_choice = random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0]
 ```
 
-#### 2. Weighted Distribution (Pressure Defense Settings)
+#### 2. Weighted Distribution (Rebounding Only)
+
+**Settings:** `rebounding`
+
+**Distribution:** Weighted random that favors higher values (more "get back on D" bias)
+
+**Probabilities:**
+- **5%** chance for value **0** (100% crash the boards)
+- **10%** chance for value **1**
+- **15%** chance for value **2** (50/50)
+- **30%** chance for value **3**
+- **40%** chance for value **4** (100% get back on D)
+
+**Implementation:**
+```python
+random.choices([0, 1, 2, 3, 4], weights=[5, 10, 15, 30, 40], k=1)[0]
+```
+
+#### 3. Weighted Distribution (Pressure Defense Settings)
 
 **Settings:** `hc_trap`, `fc_press`
 
@@ -78,7 +96,7 @@ trap_press_choice = random.choices([0, 1, 2, 3, 4], weights=[34, 40, 20, 5, 1], 
 
 **Note:** Both `hc_trap` and `fc_press` use the same random value (shared choice).
 
-#### 3. Uniform Distribution (Shot Focus Settings)
+#### 4. Uniform Distribution (Shot Focus Settings)
 
 **Settings:** `inside`, `attack`, `outside`
 
@@ -93,7 +111,7 @@ trap_press_choice = random.choices([0, 1, 2, 3, 4], weights=[34, 40, 20, 5, 1], 
 random.randint(1, 4)  # Uniform 1-4 (never zero)
 ```
 
-#### 4. Tempo Setting
+#### 5. Tempo Setting
 
 **Setting:** `tempo`
 
