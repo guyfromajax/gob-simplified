@@ -357,11 +357,19 @@ document.addEventListener('DOMContentLoaded', async () => {
           stored.username = meData.username;
           localStorage.setItem('auth_user', JSON.stringify(stored));
         }
+      } else if (meRes.status === 401) {
+        // Token invalid/expired - clear and show logged-out state
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        if (authLoggedOut) authLoggedOut.style.display = 'flex';
+        if (authLoggedIn) authLoggedIn.style.display = 'none';
       }
     } catch (e) {
       console.error('[AUTH] Failed to parse user:', e);
       localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
+      if (authLoggedOut) authLoggedOut.style.display = 'flex';
+      if (authLoggedIn) authLoggedIn.style.display = 'none';
     }
   }
 

@@ -84,6 +84,26 @@ Auth endpoints use **SlowAPI** for rate limiting (`@limiter.limit(AUTH_RATE_LIMI
 - `BackEnd/api/auth_routes.py` – login/signup return `JSONResponse(content=AuthResponse(...).model_dump(), status_code=200)`
 - `BackEnd/utils/rate_limiter.py` – `AUTH_RATE_LIMIT` (10/minute per IP)
 
+### Token Validation on Page Load ✅ **FIX** (February 2025)
+
+**Issue:**  
+Stale/invalid tokens in `localStorage` caused UI to show "logged in" state even when token was expired. User would see username on homepage/mode-select, but API calls (e.g., `/tournament/start`) would fail with 401 "Invalid or expired token", leaving user stuck.
+
+**Root cause:**  
+- `authBarInit.js` showed logged-in state based on localStorage presence without validating token
+- `mode-select.js` called `/api/auth/me` but didn't handle 401 responses
+- No token cleanup on page load
+
+**Fix:**  
+- **`authBarInit.js`**: Validates token via `/api/auth/me` before showing logged-in state. On 401, clears localStorage and shows "Log In"
+- **`mode-select.js`**: Handles 401 from `/api/auth/me` and clears localStorage/updates UI
+- **`tournament-select.js`**: Handles 401 from `/tournament/start` and redirects to login with redirect param
+
+**Key files:**
+- `FrontEnd/static/js/shared/authBarInit.js` – validates token on init
+- `FrontEnd/static/mode-select.js` – handles 401 from `/api/auth/me`
+- `FrontEnd/static/tournament-select.js` – handles 401 and redirects to login
+
 ### Key Files
 
 - **BackEnd/api/auth_routes.py** – All auth endpoints (signup, login, me, config, set-username)
