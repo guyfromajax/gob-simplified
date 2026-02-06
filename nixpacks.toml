@@ -1,0 +1,15 @@
+# Force Python + Node build so uvicorn is installed (Nixpacks was detecting only Node from package.json).
+# See: https://nixpacks.com/docs/guides/configuring-builds
+
+[phases.setup]
+nixPkgs = ["python311", "nodejs_18", "npm"]
+
+[phases.install]
+cmds = [
+  "python -m venv /opt/venv",
+  "/opt/venv/bin/pip install --upgrade pip && /opt/venv/bin/pip install -r requirements.txt",
+  "npm i"
+]
+
+[start]
+cmd = "/opt/venv/bin/uvicorn BackEnd.api.api:app --host 0.0.0.0 --port ${PORT:-8000}"
