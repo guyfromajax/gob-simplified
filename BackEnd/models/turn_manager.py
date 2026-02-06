@@ -315,7 +315,6 @@ class TurnManager:
         
         # ✅ SS&S: Use game_state["user_team_side"] instead of is_user_team flag (more reliable, persists to DB)
         user_team_side = self.game.game_state.get("user_team_side")
-        logging.warning(f"🔍 [PLAYCALL OVERRIDE CHECK] user_team_side={user_team_side}, is_full_simulation={is_full_simulation}, quarter={self.game.quarter}")
         user_team = None
         if user_team_side == "home":
             user_team = self.game.home_team
@@ -324,7 +323,6 @@ class TurnManager:
         
         # Only check Playcall Center overrides if not in full simulation mode
         if user_team and not is_full_simulation:
-            logging.warning(f"🔍 [PLAYCALL OVERRIDE CHECK] ✅ Checking overrides (user_team={user_team.name}, is_full_simulation=False)")
             offense_override = user_team.strategy_calls.get("offense_call")
             defense_override = user_team.strategy_calls.get("defense_call")
             aggression_override = user_team.strategy_calls.get("aggression_override")
@@ -332,11 +330,7 @@ class TurnManager:
             offense_source = "PLAYCALL CENTER" if offense_override else "STANDARD LOGIC"
             defense_source = "PLAYCALL CENTER" if defense_override else "STANDARD LOGIC"
             aggression_source = "PLAYCALL CENTER" if aggression_override else "STANDARD LOGIC"
-            
-            logging.warning(f"🔍 [PLAYCALL OVERRIDE CHECK] ✅ Overrides found - Offense: {offense_source} ({offense_override or 'N/A'}), Defense: {defense_source} ({defense_override or 'N/A'}), Aggression: {aggression_source} ({aggression_override or 'N/A'})")
-        else:
-            reason = "is_full_simulation=True" if is_full_simulation else f"no user_team (user_team_side={user_team_side})"
-            logging.warning(f"🔍 [PLAYCALL OVERRIDE CHECK] ❌ Skipping override check - {reason} - all playcalls using STANDARD LOGIC")
+        # else: skip override check (full sim or no user_team)
 
         # ✅ DEBUG: Log offensive_state transition (previous turn → current turn)
         # This is the critical transition point where offensive_state determines routing

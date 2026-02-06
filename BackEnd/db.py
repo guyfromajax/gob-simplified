@@ -54,12 +54,10 @@ def _init_client(uri: str | None):
         print("⚠️ [DB] MONGO_URI not set - will use mongomock", file=sys.stderr, flush=True)
         return None
     try:
-        print(f"🔵 [DB] Attempting to connect to MongoDB...", file=sys.stderr, flush=True)
         # ✅ CRITICAL: Use connect=False to avoid blocking during import
         # This creates the client without actually connecting, allowing the app to start
         # The connection will be established lazily on first use
         client = MongoClient(uri, serverSelectionTimeoutMS=5000, connect=False)
-        print(f"✅ [DB] MongoDB client created successfully (lazy connection)", file=sys.stderr, flush=True)
         return client
     except Exception as e:  # Catch ALL exceptions, not just PyMongoError
         print(f"⚠️ [DB] Failed to initialize MongoDB client: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
@@ -69,16 +67,10 @@ def _init_client(uri: str | None):
         return None
 
 # Get database name (configurable for staging/production separation)
-print("🔵 [DEBUG] db.py: About to get database name", file=sys.stderr, flush=True)
 DB_NAME = _get_database_name(MONGO_URI)
-print(f"📊 [DB CONFIG] Using database: {DB_NAME}", file=sys.stderr, flush=True)
-
-print("🔵 [DEBUG] db.py: About to initialize MongoDB client", file=sys.stderr, flush=True)
 client = _init_client(MONGO_URI)
-print(f"🔵 [DEBUG] db.py: MongoDB client initialized: {client is not None}", file=sys.stderr, flush=True)
 
 if client:
-    print(f"🔵 [DEBUG] db.py: Using real MongoDB client, database: {DB_NAME}", file=sys.stderr, flush=True)
     db = client[DB_NAME]
     players_collection = db["players"]
     teams_collection = db["teams"]
