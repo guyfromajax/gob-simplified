@@ -92,14 +92,17 @@
     #app-grid .player-stats-panel.home { grid-area: right-stats; min-height: 0; min-width: 0; }
     #app-grid #playcall-center {
       grid-area: playcall;
+      grid-column: 2; /* Force center column only so container does not cover side panels */
       position: relative !important; /* Override base rule's position:fixed !important so it stays in grid */
       left: auto !important;
       right: auto !important;
       bottom: auto !important;
       width: 100% !important;
+      max-width: 100%; /* Constrain to grid cell */
       max-height: none !important;
       min-height: 0;
       overflow-y: auto;
+      box-sizing: border-box;
     }
 
     /* ==================== SCOREBOARD TOP BAR ==================== */
@@ -1920,11 +1923,12 @@
     /* Progress bar removed - no longer needed */
 
     /* ==================== GAME SPEED DROPDOWN ==================== */
+    /* Align with Game Speed button (left edge of .game-controls, which is 500px wide and centered) */
     .speed-dropdown {
       position: absolute;
       bottom: 52px; /* Just above .game-controls (12px + button height) */
-      left: 50%;
-      transform: translateX(-50%);
+      left: calc(50% - 250px); /* Same left edge as .game-controls so dropdown is over Game Speed button */
+      transform: none;
       background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
       border: 2px solid #9c27b0;
       border-radius: 8px;
