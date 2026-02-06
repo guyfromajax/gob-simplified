@@ -20,13 +20,13 @@ const teamCodeMap = {
 
 const teams = [
   'Bentley-Truman',
-  'Four Corners',
   'Lancaster',
-  'Little York',
-  'Morristown',
+  'Four Corners',
   'Ocean City',
-  'South Lancaster',
-  'Xavien'
+  'Morristown',
+  'Little York',
+  'Xavien',
+  'South Lancaster'
 ];
 
 function createLogoButtons() {

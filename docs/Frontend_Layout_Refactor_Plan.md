@@ -1,16 +1,39 @@
  # Frontend Layout Architecture Refactor Plan
 
+## Refactor status (as of completion)
+
+| Phase | Status | Notes |
+|-------|--------|--------|
+| **Phase 1: Preparation** | ✅ Complete | Audit of position:fixed (overlay vs layout), CSS variables extracted, backup/rollback available. |
+| **Phase 2: Grid container** | ✅ Complete | `#app-grid` wraps layout; grid CSS applied; scoreboard and playcall use grid (override fixed when inside `#app-grid`). |
+| **Phase 3: Component migration** | ✅ Complete | Scoreboard, stats panels, court, playcall in grid areas. Row 3 = `left-stats playcall right-stats` (side panels extend to bottom). |
+| **Phase 4: JavaScript cleanup** | ✅ Complete | `updatePlaycallPosition()` no-ops when `#app-grid` exists; no JS sets layout position for layout-critical elements. ResizeObserver for Phaser remains for canvas sizing. |
+| **Phase 5: Responsive testing** | ✅ Complete | Manual testing at desktop viewports; layout stable. Playwright e2e: one pre-game test passes; game-start tests require backend rosters (env setup). |
+| **Phase 6: Documentation** | ✅ Complete | `docs/docs_1_systems/00_General_Systems/Front_End_Architecture.md` created; this plan retained as history and reference. |
+
+**Outstanding (non-blocking for alpha):**
+
+- **Tablet/mobile breakpoints** (e.g. §4.5.2, §4.5.3): Not implemented. To be revisited after alpha launch and user feedback.
+- **Optional playcall width hardening:** See `docs/To Do/playcall_center_width_constraint.md` if the playcall bar ever appears full-width in some environments.
+- **Code comments:** Layout invariants are noted in `court.html` style block; further inline comments optional.
+
+After alpha launch and user feedback, overall frontend improvements will be revisited to tighten the front-end architecture.
+
+---
+
 ## Executive Summary
 
 This document outlines a comprehensive refactor plan for the frontend responsive layout architecture of the game simulation application. The current architecture suffers from conflicting CSS layout systems and uncoordinated space allocation, leading to fragile layouts that break when fixes are applied. This plan proposes a transition to a **Pure CSS Grid with `grid-template-areas`** approach, establishing a single source of truth for space allocation and eliminating positioning conflicts.
 
 ---
 
-## 1. Current Architecture Summary
+## 1. Current Architecture Summary (pre-refactor state)
+
+*The following sections 1–3 describe the state **before** the refactor. As-built layout is in `docs/docs_1_systems/00_General_Systems/Front_End_Architecture.md`.*
 
 ### 1.1 Overall Structure
 
-The application uses a **hybrid layout system** combining multiple CSS layout technologies:
+The application used a **hybrid layout system** combining multiple CSS layout technologies:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -711,13 +734,13 @@ These rules are **non-negotiable** and must be enforced to maintain SS&S (Simple
 
 ---
 
-## 7. Next Steps
+## 7. Next Steps (historical; refactor complete)
 
-1. **Review this plan** with frontend architecture expert
-2. **Validate approach** against current codebase constraints
-3. **Create feature branch** for refactor
-4. **Begin Phase 1** (Preparation)
-5. **Iterate** through phases with testing at each step
+1. ~~Review this plan~~ — Done.
+2. ~~Validate approach~~ — Done; grid implemented in `court.html`.
+3. ~~Create feature branch / iterate through phases~~ — Phases 1–6 complete.
+4. **Canonical architecture doc:** See `docs/docs_1_systems/00_General_Systems/Front_End_Architecture.md`.
+5. **Post-alpha:** Revisit tablet/mobile breakpoints and overall frontend tightening per user feedback.
 
 ---
 
@@ -793,7 +816,7 @@ function updatePlaycallPosition() {
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: February 2, 2026  
+**Document Version**: 1.1  
+**Last Updated**: February 2026  
 **Author**: AI Assistant (Auto)  
-**Status**: Draft - Awaiting Review
+**Status**: Refactor complete. Plan retained as history and reference; current architecture documented in `docs/docs_1_systems/00_General_Systems/Front_End_Architecture.md`.

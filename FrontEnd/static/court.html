@@ -2382,7 +2382,7 @@
         <table>
           <thead id="away-stats-header">
             <tr>
-              <th>Name</th>
+              <th>Player</th>
               <th>PTS</th>
               <th>REB</th>
               <th>AST</th>
@@ -2507,7 +2507,7 @@
         <table>
           <thead id="home-stats-header">
             <tr>
-              <th>Name</th>
+              <th>Player</th>
               <th>PTS</th>
               <th>REB</th>
               <th>AST</th>
@@ -2742,8 +2742,8 @@
     function updateStatsDisplay(team, statType) {
       // Get stat configuration
       const statConfigs = {
-        S1: { headers: ['Name', 'PTS', 'REB', 'AST', 'F'], stats: ['name', 'PTS', 'REB', 'AST', 'F'] },
-        S2: { headers: ['Name', 'STL', 'BLK', 'TO'], stats: ['name', 'STL', 'BLK', 'TO'] },
+        S1: { headers: ['Player', 'PTS', 'REB', 'AST', 'F'], stats: ['name', 'PTS', 'REB', 'AST', 'F'] },
+        S2: { headers: ['Player', 'STL', 'BLK', 'TO'], stats: ['name', 'STL', 'BLK', 'TO'] },
         S3: { headers: ['Defense', 'ATT', 'Win %'], stats: ['name', 'DEF_A', 'DEF_PCT'] }
       };
       
