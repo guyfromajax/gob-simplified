@@ -5,7 +5,7 @@
 1. **Defensive Stop Y-Range**: `DEFENSIVE_STOP_Y_RANGE = 6` (defender must be within ±6 y-coords of outlet receiver to force stop)
 2. **Ball Handler Movement (Defensive Stop/Shot)**: X: 5-10 spots toward basket, Y: ±3 spots
 3. **Stopper Positioning**: 1-3 spots in front of ball handler (defensive stop)
-4. **Defender Positioning (Shot)**: Defender between basket and shooter; X: 1–3 coords toward basket from shooter; Y: ±2 of shooter
+4. **Defender Positioning (Shot)**: Defender 1 x-coord toward basket from shooter (home offense: shooter x + 1; away offense: shooter x − 1); Y: ±2 of shooter
 5. **Steal Entry Movement**: X: 5-10 spots toward basket, Y: ±4 spots (clamped 3-47)
 6. **Outlet Pass Score Formula**: `(PS * 0.6 + ST * 0.2 + IQ * 0.2) * random(1-6)`, scaled to 1-100 range
 7. **Defense Release Chances**: Based on `fast_breaks` setting (0-4): `{0: 0.0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0}`
@@ -126,7 +126,7 @@ Fast breaks can result in:
 2. **Shot Attempt (SHOT)**
    - No defender ahead of ball handler after outlet pass OR defender not within ±6 y-coords
    - Ball handler moves 5-10 spots toward basket, ±3 Y (clamped)
-   - Closest defender overall (by Euclidean distance) follows and is positioned between basket and shooter (1–3 x-coords toward basket from shooter, ±2 y from shooter)
+   - Closest defender overall (by Euclidean distance) follows and is positioned 1 x-coord toward basket from shooter (home: +1, away: −1), ±2 y from shooter
    - Routes to: Standard shot resolution flow (MAKE/MISS)
 
 ### Charge and Blocking Foul (Fast Break Shot Only)
@@ -303,7 +303,7 @@ else:
 
 **Shot Attempt:**
 - Ball handler (shooter) moves to spot near rim (basket ± 2-6, ±6 Y)
-- Defender follows to position between basket and shooter (1–3 x toward basket from shooter, ±2 y from shooter)
+- Defender follows to position 1 x-coord toward basket from shooter (home: +1, away: −1), ±2 y from shooter
 - Get-back defenders chase toward basket
 - Rebounders move to random x=5-20 spots from basket, y=rim_y ± 10 (clamped)
 - **Early Termination**: 

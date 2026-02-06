@@ -4,7 +4,6 @@
  */
 
 const SPEED_PRESETS = {
-  SLOW: 350,
   NORMAL: 450,
   FAST: 550,
   SUPER_FAST: 1000
@@ -93,10 +92,9 @@ function updateAnimationSpeeds(speed) {
 /**
  * Get speed preset name from speed value
  * @param {number} speed - Speed in pixels per second
- * @returns {string} Preset name ('Slow', 'Normal', 'Fast', 'Super Fast') or 'Custom'
+ * @returns {string} Preset name ('Normal', 'Fast', 'Super Fast') or 'Custom'
  */
 export function getSpeedPresetName(speed) {
-  if (speed === SPEED_PRESETS.SLOW) return 'Slow';
   if (speed === SPEED_PRESETS.NORMAL) return 'Normal';
   if (speed === SPEED_PRESETS.FAST) return 'Fast';
   if (speed === SPEED_PRESETS.SUPER_FAST) return 'Super Fast';

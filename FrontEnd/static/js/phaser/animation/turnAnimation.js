@@ -388,7 +388,7 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
 
 // Setup sideline inbound play
 async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData }) {
-  if (!turnData || scene?.skipToEnd || scene?.stateMachine?.is(States.FreeThrow) || scene?.stateMachine?.is(States.FastBreak)) return;
+  if (!turnData || scene?.skipToEnd || scene?.stateMachine?.is(States.FreeThrow)) return;
 
   scene.isInboundSetup = true;
   
