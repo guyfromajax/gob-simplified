@@ -338,12 +338,14 @@ All layout space is allocated by a single CSS Grid container using named `grid-t
   grid-template-areas:
     "scoreboard scoreboard scoreboard"
     "left-stats court right-stats"
-    "playcall playcall playcall";
+    ".         playcall .";
   height: 100vh;
   width: 100vw;
   overflow: hidden;
 }
 ```
+
+**Playcall width**: Row 3 uses `. playcall .` so the Playcall Center occupies only the center column (same width as the court). The left and right cells (`.`) are empty; the stats panels are in row 2 only, so the playcall bar does not cover them.
 
 **Note**: The playcall row uses `clamp()` directly as the grid row size to enforce constraints at the grid level, preventing unpredictable expansion. This addresses the architectural risk of `auto` rows causing fragility across different viewport sizes. Using `clamp()` directly (rather than nesting it inside `minmax()`) ensures cross-browser compatibility and reliable parsing.
 
@@ -412,6 +414,7 @@ All layout space is allocated by a single CSS Grid container using named `grid-t
 **Why This Matters**: `<canvas>` elements don't behave like `<img>` with `object-fit`. Canvas rendering depends on both CSS size and internal resolution. Mixing DOM-controlled sizing with Phaser-controlled scaling leads to unpredictable behavior across different screen sizes.
 
 #### 4.4.4 Playcall Row
+- **Width**: Playcall occupies only the center column (same as court); grid areas row 3 is `. playcall .` so it does not cover the team stats panels.
 - **Height**: `clamp(160px, 25vh, 300px)` (constrained at grid level)
 - **Constraints**: Applied at grid row level, not just element level
   ```css
@@ -758,7 +761,7 @@ function updatePlaycallPosition() {
   grid-template-areas:
     "scoreboard scoreboard scoreboard"
     "left-stats court right-stats"
-    "playcall playcall playcall";
+    ".         playcall .";
   height: 100vh;
   width: 100vw;
   overflow: hidden;
@@ -768,7 +771,7 @@ function updatePlaycallPosition() {
   grid-area: playcall;
   overflow-y: auto; /* Allow scrolling if content exceeds max height */
   /* No position: fixed, no JavaScript needed */
-  /* Constraint is at grid row level, not element level */
+  /* Width matches court: center column only (row 3 = . playcall .) */
 }
 
 #phaser-container {
