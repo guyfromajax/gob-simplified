@@ -3204,6 +3204,36 @@ def _apply_attack_penalty(shot_location, is_away_offense):
     return penalty
 
 
+def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
+    """
+    Set roles["shooter"].coords from the last step of the skeleton when that step
+    has a shoot action for the shooter. Used for HCO, FCP, and HCT so block
+    reconciliation uses the correct shot location. Fast Break does not use this.
+    """
+    if not skeleton or not roles:
+        return
+    steps = skeleton.get("steps") or []
+    if not steps:
+        return
+    shooter = roles.get("shooter")
+    shooter_pos = roles.get("shooter_pos")
+    if shooter is None or shooter_pos is None:
+        return
+    last_step = steps[-1]
+    pos_actions = last_step.get("pos_actions") or {}
+    pa = pos_actions.get(shooter_pos)
+    if not pa or pa.get("action") != "shoot":
+        return
+    from BackEnd.constants import HCO_STRING_SPOTS
+    from BackEnd.utils.shared import get_away_player_coords
+    location = pa.get("location", "key")
+    coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
+    is_away_offense = game.offense_team.team_id == game.away_team.team_id
+    if is_away_offense:
+        coords = get_away_player_coords(coords)
+    shooter.coords = coords
+
+
 def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup):
     """
     Resolve Motion offense shot attempt.
@@ -4131,6 +4161,7 @@ def resolve_half_court_offense_logic(game):
                 game_state["motion_attack_penalty"] = motion_shot_info["attack_penalty"]
     
     # Resolve shot (standard logic for Set Plays, Motion-specific logic applied above)
+    set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)
     update_player_coords_from_animations(game, animations)
     shot_result = game.shot_manager.resolve_shot(roles)
     
@@ -4689,6 +4720,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         }
         
         # Use shot manager to resolve the shot
+        set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)
         update_player_coords_from_animations(game, animations)
         shot_result = game.shot_manager.resolve_shot(shot_roles)
         
@@ -5845,6 +5877,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         }
         
         # Use shot manager to resolve the shot
+        set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)
         update_player_coords_from_animations(game, animations)
         shot_result = game.shot_manager.resolve_shot(shot_roles)
         
