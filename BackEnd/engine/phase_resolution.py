@@ -4814,6 +4814,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
     }
     
     # Handle foul results - use standard foul types for frontend
+    # ✅ FOUL OUT FIX: Initialize so result always has foul_out fields; capture when D_FOUL/O_FOUL
+    foul_out_info = {"fouled_out": False, "foul_count": 0}
     if result_type == "D_FOUL":
         game_state["foul_team"] = "DEFENSE"
         # ✅ Use dynamically determined ball handler and defender
@@ -4822,8 +4824,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
         foul_player.record_stat("F")
         def_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
-        # Check for foul out
-        check_and_handle_foul_out(foul_player, game_state, def_team)
+        # Check for foul out and capture for result (so game_manager creates timeout + frontend shows popup)
+        foul_out_info = check_and_handle_foul_out(foul_player, game_state, def_team)
         result_type = "FOUL"
         # ✅ FIX: Check bonus status for defensive fouls in FCP (per game_flows.md)
         # Defensive fouls should route to FREE_THROW if in bonus, otherwise HCO
@@ -4857,8 +4859,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
         foul_player.record_stat("F")
         off_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
-        # Check for foul out
-        check_and_handle_foul_out(foul_player, game_state, off_team)
+        # Check for foul out and capture for result (so game_manager creates timeout + frontend shows popup)
+        foul_out_info = check_and_handle_foul_out(foul_player, game_state, off_team)
         result_type = "FOUL"
         # text = "PRESS! Offensive foul"
         # Track FCP success: offensive foul = defensive success
@@ -5015,9 +5017,29 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "foul_team": game_state.get("foul_team"),  # Include foul_team for frontend announcement
         "foul_player_id": getattr(roles.get("foul_player"), "player_id", None) if roles.get("foul_player") else None,  # For foul announcements
         "victim_id": getattr(roles["ball_handler"], "player_id", None),  # For turnover announcements
-        "defender_id": getattr(roles["defender"], "player_id", None) if roles["defender"] else None  # For steal announcements
+        "defender_id": getattr(roles["defender"], "player_id", None) if roles["defender"] else None,  # For steal announcements
+        "fouled_out": foul_out_info["fouled_out"],
+        "foul_count": foul_out_info["foul_count"],
     }
-    
+    # ✅ FOUL OUT FIX: Add foul_out_player and context so game_manager creates timeout + frontend shows popup
+    if foul_out_info["fouled_out"]:
+        result["foul_out_player"] = {
+            "player_id": foul_out_info["foul_player_id"],
+            "name": foul_out_info["foul_player_name"],
+            "photo": foul_out_info["foul_player_photo"],
+            "team": foul_out_info["foul_player_team"],
+        }
+        is_bonus = def_team.team_fouls >= 5 if game_state.get("foul_team") == "DEFENSE" else False
+        next_pt = "FREE_THROW" if game_state.get("offensive_state") == "FREE_THROW" else "SIDE_INBOUND"
+        game_state["foul_out_context"] = {
+            "foul_type": "OFFENSIVE" if game_state.get("foul_team") == "OFFENSE" else "DEFENSIVE",
+            "is_shooting_foul": False,
+            "is_bonus": is_bonus,
+            "next_play_type": next_pt,
+            "shooter": ball_handler if game_state.get("offensive_state") == "FREE_THROW" else None,
+        }
+        logging.info(f"✅ FOUL OUT (FCP): Stored foul context - type={game_state['foul_out_context']['foul_type']}, next={next_pt}")
+
     return result
 
 
@@ -5941,6 +5963,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         animator = Animator(game)
     
     # Handle foul results - use standard foul types for frontend (same as FCP)
+    # ✅ FOUL OUT FIX: Initialize so result always has foul_out fields; capture when D_FOUL/O_FOUL
+    foul_out_info = {"fouled_out": False, "foul_count": 0}
     if result_type == "D_FOUL":
         game_state["foul_team"] = "DEFENSE"
         # ✅ Use dynamically determined ball handler and defender
@@ -5949,8 +5973,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         foul_player.record_stat("F")
         def_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
-        # Check for foul out
-        check_and_handle_foul_out(foul_player, game_state, def_team)
+        # Check for foul out and capture for result (so game_manager creates timeout + frontend shows popup)
+        foul_out_info = check_and_handle_foul_out(foul_player, game_state, def_team)
         result_type = "FOUL"
         # ✅ FIX: Check bonus status for defensive fouls in HCT (per game_flows.md)
         # Defensive fouls should route to FREE_THROW if in bonus, otherwise HCO
@@ -5983,8 +6007,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         foul_player.record_stat("F")
         off_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
-        # Check for foul out
-        check_and_handle_foul_out(foul_player, game_state, off_team)
+        # Check for foul out and capture for result (so game_manager creates timeout + frontend shows popup)
+        foul_out_info = check_and_handle_foul_out(foul_player, game_state, off_team)
         result_type = "FOUL"
         # Track HCT success: offensive foul = defensive success
         def_scouting["defense"]["HCT"]["success"] += 1
@@ -6130,8 +6154,28 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "foul_team": game_state.get("foul_team"),  # Include foul_team for frontend announcement
         "foul_player_id": getattr(roles.get("foul_player"), "player_id", None) if roles.get("foul_player") else None,  # For foul announcements
         "victim_id": getattr(roles["ball_handler"], "player_id", None),  # For turnover announcements
-        "defender_id": getattr(roles["defender"], "player_id", None) if roles["defender"] else None  # For steal announcements
+        "defender_id": getattr(roles["defender"], "player_id", None) if roles["defender"] else None,  # For steal announcements
+        "fouled_out": foul_out_info["fouled_out"],
+        "foul_count": foul_out_info["foul_count"],
     }
-    
+    # ✅ FOUL OUT FIX: Add foul_out_player and context so game_manager creates timeout + frontend shows popup
+    if foul_out_info["fouled_out"]:
+        result["foul_out_player"] = {
+            "player_id": foul_out_info["foul_player_id"],
+            "name": foul_out_info["foul_player_name"],
+            "photo": foul_out_info["foul_player_photo"],
+            "team": foul_out_info["foul_player_team"],
+        }
+        is_bonus = def_team.team_fouls >= 5 if game_state.get("foul_team") == "DEFENSE" else False
+        next_pt = "FREE_THROW" if game_state.get("offensive_state") == "FREE_THROW" else "SIDE_INBOUND"
+        game_state["foul_out_context"] = {
+            "foul_type": "OFFENSIVE" if game_state.get("foul_team") == "OFFENSE" else "DEFENSIVE",
+            "is_shooting_foul": False,
+            "is_bonus": is_bonus,
+            "next_play_type": next_pt,
+            "shooter": ball_handler if game_state.get("offensive_state") == "FREE_THROW" else None,
+        }
+        logging.info(f"✅ FOUL OUT (HCT): Stored foul context - type={game_state['foul_out_context']['foul_type']}, next={next_pt}")
+
     # logging.warning(f"✅ [HCT] Returning result with {len(animations)} animations, result_type={result_type}")
     return result
