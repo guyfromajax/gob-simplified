@@ -474,6 +474,10 @@ class ShotManager:
                     def_scaled_height * 0.4 + def_attrs.get("ID", 0) * 0.4 + def_attrs.get("IQ", 0) * 0.2
                 ) * random.randint(1, 6)
                 diff = shot_score_pre_defense - defense_block_score
+                # TEMPORARY DEBUG: Force all block reconciliation to result in block (remove after debugging)
+                FORCE_BLOCK_RECONCILIATION_TO_BLOCK = True
+                if FORCE_BLOCK_RECONCILIATION_TO_BLOCK:
+                    diff = -abs(BLOCK_RECONCILIATION_BLOCK_THRESHOLD) - 1
                 if diff > BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD:
                     # Shooting foul from block: shooter_finish_score vs 250
                     # Outcome: AND-1 on make (1 FT), or 2 FTs on miss (shooting foul = 2 FTs on miss).
