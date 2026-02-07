@@ -167,7 +167,6 @@ class GameManager:
             "last_rebound": None,
             "last_stealer": None,
             "last_turnover_player": None,
-            "ineligible_players": [],  # Track players with 5+ fouls (fouled out)
             "man_defense_matchups": {  # User team matchups when user is on defense (set via popup; resets at each break)
                 "PG": "PG",
                 "SG": "SG",

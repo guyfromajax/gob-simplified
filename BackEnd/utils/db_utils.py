@@ -24,35 +24,28 @@ def get_player_rating(player, traits: List[str]) -> float:
 def is_player_eligible_for_lineup(player, game_state=None, ineligible_player_ids=None) -> bool:
     """
     Check if a player is eligible for lineup based on energy and foul restrictions.
-    
+    Fouled-out (5+ fouls) is derived from player.get_stat("F", "game"), not a persisted list.
+
     Args:
         player: Player object to check
-        game_state: Optional game state dict with quarter, time_remaining, ineligible_players
-        ineligible_player_ids: Optional set of ineligible player IDs (fouled out)
-    
+        game_state: Optional game state dict with quarter, time_remaining (for energy/foul restrictions)
+        ineligible_player_ids: Deprecated, ignored. Kept for backward compatibility.
+
     Returns:
         True if player is eligible, False otherwise
     """
-    # Always exclude fouled-out players (5+ fouls)
-    if ineligible_player_ids and player.player_id in ineligible_player_ids:
-        return False
-    
+    # Exclude fouled-out players (5+ fouls) from game stats
     foul_count = player.get_stat("F", "game")
-    if foul_count >= 5:
+    if foul_count is not None and foul_count >= 5:
         return False
-    
-    # If no game_state provided, only check for fouled-out players
+
+    # If no game_state provided, only check for fouled-out
     if not game_state:
         return True
-    
+
     quarter = game_state.get("quarter", 1)
     time_remaining = game_state.get("time_remaining", 480)  # Default to 8:00 (480 seconds)
-    ineligible_players = game_state.get("ineligible_players", [])
-    
-    # Check if player is in ineligible list (fouled out)
-    if player.player_id in ineligible_players:
-        return False
-    
+
     # Energy (NG) filtering
     ng = player.attributes.get("NG", 1.0)
     
@@ -94,8 +87,8 @@ def build_lineup_from_mongo(team: Union[str, TeamManager], game_state=None) -> D
     
     Args:
         team: Team name or TeamManager instance
-        game_state: Optional game state dict with quarter, time_remaining, ineligible_players
-                   Used to filter players based on energy and foul restrictions
+        game_state: Optional game state dict with quarter, time_remaining
+                   Used to filter players based on energy and foul restrictions (fouled-out from F >= 5)
     """
 
     if isinstance(team, TeamManager):
@@ -106,15 +99,10 @@ def build_lineup_from_mongo(team: Union[str, TeamManager], game_state=None) -> D
         players_cursor = players_collection.find({"team": team_name})
         players = [Player(p) for p in players_cursor]
 
-    # Get ineligible player IDs (fouled out)
-    ineligible_player_ids = set()
-    if game_state:
-        ineligible_player_ids = set(game_state.get("ineligible_players", []))
-    
-    # Filter players based on energy and foul restrictions
+    # Filter players based on energy and foul restrictions (fouled-out from F >= 5)
     eligible_players = [
         p for p in players
-        if is_player_eligible_for_lineup(p, game_state, ineligible_player_ids)
+        if is_player_eligible_for_lineup(p, game_state)
     ]
     
     if len(eligible_players) < 5:

@@ -1000,7 +1000,6 @@ try:
             "offense_team": gm.offense_team.name,
             "defense_team": gm.defense_team.name,
             "game_id": game_id,
-            "ineligible_players": gm.game_state.get("ineligible_players", []),
             "box_score": gm.get_box_score(),
             "team_totals": {
                 gm.home_team.name: gm.home_team.get_team_game_stats(),
@@ -1381,13 +1380,12 @@ try:
             if games_collection is not None:
                 # ✅ REMOVED: Verbose debug logs - only log on errors
                 # ✅ PERFORMANCE: Use projection to only load needed fields (80-95% reduction in data transfer)
-                # Fields needed: players (energy/stats), ineligible_players, score, box_score, quarter, clock,
+                # Fields needed: players (energy/stats), score, box_score, quarter, clock,
                 # teams (name, team_id, box_score, totals, scouting, attributes, colors, score, timeouts, team_fouls, points_by_quarter),
                 # home_team_id, away_team_id, team_totals, team_stats, points_by_quarter
                 # NOT needed: turns (already empty), text_log, teams[].plays, teams[].strategy_settings, teams[].playbook_settings
                 projection = {
-                    "players": 1,              # Player energy, stats, attributes
-                    "ineligible_players": 1,   # Fouled out players
+                    "players": 1,              # Player energy, stats, attributes (F for foul count)
                     "score": 1,                # Current score
                     "box_score": 1,            # Box score (may be in teams object, but include for backward compatibility)
                     "quarter": 1,              # Current quarter
@@ -1461,8 +1459,6 @@ try:
                             "quarter": 1,
                             "clock": "12:00",
                             "players": players_with_energy,
-                            # ✅ FOUL OUT FIX: Include ineligible_players (empty for new game)
-                            "ineligible_players": [],
                             "team_totals": {
                                 home_team_data.get("name", ""): {},
                                 away_team_data.get("name", ""): {}
@@ -1613,9 +1609,7 @@ try:
                         "box_score": box_score,
                         "quarter": saved.get("quarter", 1),
                         "clock": saved.get("clock", "8:00"),
-                        "players": players_with_energy,  # ✅ Includes stats (flat dict) and attributes (EM, MO, NG)
-                        # ✅ FOUL OUT FIX: Include ineligible_players (fouled-out players) from saved document
-                        "ineligible_players": saved.get("ineligible_players", []),
+                        "players": players_with_energy,  # ✅ Includes stats (flat dict, F=fouls) and attributes (EM, MO, NG)
                         # Team IDs for unified structure access
                         "home_team_id": home_team_id,
                         "away_team_id": away_team_id,
@@ -3535,7 +3529,6 @@ try:
                     "offense_team": gm.offense_team.name,
                     "defense_team": gm.defense_team.name,
                     "game_id": game_id,
-                    "ineligible_players": gm.game_state.get("ineligible_players", []),
                     "box_score": gm.get_box_score(),
                     "team_totals": {
                         gm.home_team.name: gm.home_team.get_team_game_stats(),
@@ -3751,8 +3744,7 @@ try:
                 "offense_team": gm.offense_team.name,
                 "defense_team": gm.defense_team.name,
                 "game_id": game_id,
-                "ineligible_players": gm.game_state.get("ineligible_players", []),  # Players with 5+ fouls
-                # Box score for real-time updates
+                # Box score for real-time updates (fouled-out derived from player stats F >= 5)
                 "box_score": gm.get_box_score(),
                 "team_totals": {
                     gm.home_team.name: gm.home_team.get_team_game_stats(),
