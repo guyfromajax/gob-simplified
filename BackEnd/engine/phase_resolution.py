@@ -1361,7 +1361,9 @@ def resolve_fast_break_logic(game: "GameManager"):
         animator = Animator(game)
         fb_animations = animator.capture_fast_break_animation(fb_roles, hold_up, stopper_id)
         if fb_roles.get("_bh_final_x") is not None and fb_roles.get("_bh_final_y") is not None:
-            shooter.coords = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
+            shot_spot = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
+            shooter.coords = shot_spot
+            roles["shot_spot"] = shot_spot  # Same data for block reconciliation (explicit = animation location)
 
         update_player_coords_from_animations(game, [])
         turn_result = game.shot_manager.resolve_shot(roles)
@@ -3248,6 +3250,7 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
     if is_away_offense:
         coords = get_away_player_coords(coords)
     shooter.coords = coords
+    roles["shot_spot"] = coords  # Same data for block reconciliation (explicit shot location = animation location)
 
 
 def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup):
