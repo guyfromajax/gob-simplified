@@ -610,7 +610,6 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     const previousTurn = scene.simData?.turns?.[currentIndex - 1];
     if ((previousTurn?.result_type === "MISS" || previousTurn?.result_type === "BLOCK") && previousTurn.offense_getback) {
       missTurnForGetback = previousTurn;
-      console.log('🏀 [DREB SETUP] Using previous MISS/BLOCK turn for offense_getback (Fast Break case)');
     } else if (!missTurnForGetback) {
       // Fallback: try current turn
       const currentTurn = scene.simData?.turns?.[currentIndex];
@@ -641,10 +640,6 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   const isPutbackInProgress = ballController && (ballController.reason === 'putback_shot' || ballController.state === 'PUTBACK_ATTEMPT');
   if (!isPutbackInProgress && ballSprite) {
     attachBallToPlayer(scene, ballSprite, rebounderSprite);
-  } else if (isPutbackInProgress) {
-    console.log('🔍 [PUTBACK DEBUG] runDefensiveReboundSetup: Skipping ball attachment - putback in progress', {
-      rebounderId
-    });
   }
 
   if (scene.stateMachine?.is(States.Rebound)) {
@@ -851,15 +846,6 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       isGetBackPlayer: 0
     };
     
-    console.log('🏀 [OUTLET STEP DEBUG] Starting DREB outlet animation - player check', {
-      totalPlayers: Object.keys(playerSprites).length,
-      getBackListCount: getBackList.length,
-      getBackList,
-      rebounderId,
-      outletReceiverId,
-      nextPlayType
-    });
-    
     for (const [id, sprite] of Object.entries(playerSprites)) {
       const info = scene.playerInfo?.[id];
       const isGetBackPlayer = getBackList.includes(id);
@@ -945,15 +931,6 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     }
     animationDebugLog(`Total players moved for HCO: ${playersMoved}`);
   } else {
-    console.warn(`🏀 [OUTLET STEP DEBUG] ⚠️ Outlet step animation SKIPPED - nextPlayType is "${nextPlayType}" (expected "HCO" or "FAST_BREAK")`, {
-      nextPlayType,
-      nextPlayTypeType: typeof nextPlayType,
-      nextPlayTypeIsHCO: nextPlayType === "HCO",
-      nextPlayTypeIsFastBreak: nextPlayType === "FAST_BREAK",
-      nextPlayTypeValue: JSON.stringify(nextPlayType),
-      rebounderId,
-      note: 'This is why no players animated during outlet step! Only HCO and FAST_BREAK scenarios animate players during outlet step.'
-    });
     animationDebugLog('Not HCO or FAST_BREAK scenario, nextPlayType:', nextPlayType);
   }
 
@@ -2066,15 +2043,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         // ✅ PHASE 4: Check BallController state instead of old _shotInProgress flag
         const { getBallController } = await import('./BallControllerAdapter.js');
         const ballController = getBallController();
-        const isShotInProgress = ballController && ballController.isInFlight && (ballController.reason === 'shot' || ballController.reason === 'putback_shot');
-        console.log('🔍 [PUTBACK DEBUG] playTurnAnimation: Step 0 ball attachment attempt for putback turn - BLOCKING', {
-          step0OwnerId,
-          result_type: turnData.result_type,
-          turnDataRebounderId: turnData.rebounderId,
-          shotInProgress: isShotInProgress,
-          sceneRebounderId: scene.rebounderId,
-          note: 'Putback turns are handled by handleOrebTurn - skipping step 0 attachment'
-        });
         // CRITICAL: Don't attach ball for putback turns - handleOrebTurn handles it
         // This prevents the brief attachment flash before the putback shot
       } else {
@@ -2588,17 +2556,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       );
       
       if (turnData.result_type === "MAKE") {
-        // ✅ VERY LOUD LOG: Impossible to miss when a shot is made
-        const shooterSprite = playerSprites[turnData.shooter_id];
-        const shooterName = shooterSprite?.name || turnData.shooter_id || 'unknown';
-        console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
-        console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
-        console.log(`🎯🎯🎯🎯🎯 SHOT MADE BY: ${shooterName.toUpperCase()} 🎯🎯🎯🎯🎯`);
-        console.log(`🎯🎯🎯🎯🎯 RESULT: ${turnData.result_type} 🎯🎯🎯🎯🎯`);
-        console.log(`🎯🎯🎯🎯🎯 SHOOTER ID: ${turnData.shooter_id} 🎯🎯🎯🎯🎯`);
-        console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
-        console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
-        
         // Visual effects for AND-1 now handled in ballManager.js when "And 1!" is announced
         
         // ✅ OPTION 1 FIX: Ensure onShotEnd() is called before transitioning to next operation
@@ -2628,6 +2585,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         // ✅ REMOVED: Special FCP/HCT handling - FCP/HCT now routes through AnimationRouter (same as HCO)
         // AnimationRouter handles announcements and updates via finalizeTurnAfterAnimation
       } else if (ballSpot) {
+        if (turnData.result_type === 'BLOCK' || turnData.rebound_type === 'OREB') {
+          console.log('🟡🟡🟡 [BLOCK/OREB BALL] playTurnAnimation calling animateRebound', {
+            result_type: turnData.result_type,
+            rebound_type: turnData.rebound_type,
+            ballSpot,
+          });
+        }
         const rebounderId =
           turnData.rebounder_player_id ||
           turnData.rebounderId ||
@@ -2821,13 +2785,19 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                     const reboundData = evt.rebound;
                     const rebounderId =
                       reboundData.rebounder_player_id || reboundData.rebounderId;
+                    const putbackMissBallSpot = putbackResult?.grid || reboundData.ballSpot;
+                    console.log('🟡🟡🟡 [BLOCK/OREB BALL] putback-miss path calling animateRebound', {
+                      ballSpot: putbackMissBallSpot,
+                      from_putbackResult: !!putbackResult?.grid,
+                      from_reboundData: !!reboundData.ballSpot,
+                    });
                     await animateRebound({
                       scene,
                       ballSprite,
                       playerSprites,
                       animations: reboundData.animations || turnData.animations,
                       rebounderId,
-                      ballSpot: putbackResult?.grid || reboundData.ballSpot,
+                      ballSpot: putbackMissBallSpot,
                       shooterId: evt.shooterId,
                       turnData: turnData // Pass turnData so get-back players can be excluded
                     });

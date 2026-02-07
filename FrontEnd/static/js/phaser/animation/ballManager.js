@@ -743,6 +743,13 @@ export function animateRebound({
   const shooterTeamId = shooterSprite?.team_id;
   const isOREB = rebounderTeamId === shooterTeamId;
   const reboundType = isOREB ? 'OREB' : 'DREB';
+
+  console.log('🟡🟡🟡 [BLOCK/OREB BALL] animateRebound entry', {
+    ballSpot,
+    preserveBallPosition,
+    rebounderId,
+    reboundType,
+  });
   
   scene.rebounderId = rebounderId;
   const rebCfg = animationConfig.rebound;
@@ -761,6 +768,7 @@ export function animateRebound({
   // Do NOT reposition the ball - it will cause it to snap to rim/rebounder position
   // Only set position if preserveBallPosition is false (for regular rebounds)
   if (!preserveBallPosition) {
+    console.log('🟡🟡🟡 [BLOCK/OREB BALL] animateRebound setting ball position', { ballSpot, spotPx: { x: spotPx.x, y: spotPx.y } });
     ballSprite.setPosition(spotPx.x, spotPx.y);
   }
   ballSprite.setVisible(true);

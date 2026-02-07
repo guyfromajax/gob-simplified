@@ -396,9 +396,6 @@ class ShotManager:
                 else:
                     shot_type = "outside"
         
-        # Log final shot_type (used for charge check and shot score)
-        logging.warning(f"🟡🟡🟡🟡🟡🟡🟡🟡🟡🟡[CHARGE]: shot_type={shot_type}")
-        
         # ✅ BALANCING SYSTEM: Check for balancing override first
         # Balancing override is set when score difference exceeds threshold based on quarter and team attributes
         # Trailing team gets -10 (easier shots), leading team gets 190 (harder shots)
@@ -567,12 +564,6 @@ class ShotManager:
                 run_charge_check = bool(defender) and (roles.get("defender_count", 0) >= 1)
             if run_charge_check:
                 charge_result = calculate_charge(shooter, defender, off_team, def_team)
-            logging.warning(
-                "CHARGE_DEBUG 🟡🟡🟡🟡🟡 resolve_shot: Charge check | shot_type=attack | result=%s | shooter=%s | defender=%s",
-                charge_result,
-                get_name_safe(shooter),
-                get_name_safe(defender) if defender else "None",
-            )
             
             # Handle CHARGE: Return early with possession flip, no shot attempt
             if charge_result == "CHARGE":
@@ -608,10 +599,6 @@ class ShotManager:
                     "offense_team_id": off_team.team_id,
                     "defense_team_id": def_team.team_id,
                 }
-                
-                logging.warning(
-                    "CHARGE_DEBUG 🟡🟡🟡🟡🟡 resolve_shot: Returning CHARGE | possession_flips=True | next_play_type=SIP"
-                )
                 return result
             
             # Handle BLOCKING_FOUL: Return early, nullify shot attempt (same as CHARGE)
@@ -653,12 +640,6 @@ class ShotManager:
                         self.game_state["free_throws"] = 0
                         self.game_state["free_throws_remaining"] = 0
                         next_play_type = "SIP"
-                    
-                    logging.warning(
-                        "CHARGE_DEBUG 🟡🟡🟡🟡🟡 resolve_shot: BLOCKING_FOUL detected | def_team_fouls=%s | next_play_type=%s",
-                        def_team.team_fouls,
-                        next_play_type,
-                    )
                     
                     # Early return: nullify shot attempt, return result for next turn
                     shooter_pos = get_player_position(off_lineup, shooter)
@@ -702,11 +683,6 @@ class ShotManager:
                             "team": blocking_foul_out_info["foul_player_team"],
                         }
                         result["foul_count"] = blocking_foul_out_info["foul_count"]
-                    
-                    logging.warning(
-                        "CHARGE_DEBUG 🟡🟡🟡🟡🟡 resolve_shot: Returning BLOCKING_FOUL | next_play_type=%s",
-                        next_play_type,
-                    )
                     return result
         
         made = shot_score >= shot_threshold

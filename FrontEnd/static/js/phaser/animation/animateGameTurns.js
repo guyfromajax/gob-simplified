@@ -131,6 +131,11 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
     
     // Position ball sprite at rebounder's location (but don't attach - shootBall will handle it)
     if (ballSprite) {
+      console.log('🟡🟡🟡 [BLOCK/OREB BALL] handleOrebTurn setting ball to rebounder position', {
+        rebounderId,
+        rebounder_x: rebounderSprite.x,
+        rebounder_y: rebounderSprite.y,
+      });
       ballSprite.setPosition(rebounderSprite.x, rebounderSprite.y);
       ballSprite.setVisible(true);
     }

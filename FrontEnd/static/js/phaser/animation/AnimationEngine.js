@@ -123,21 +123,6 @@ export class AnimationEngine {
     const isFastBreak = turnData.fast_break === true || 
                         turnData.fast_break === "true" ||
                         turnData.result_type === "FAST_BREAK";
-    // 🔍 ANNOUNCEMENT DIAGNOSTIC: Log routing for MAKE/MISS so we can see if Fast Break handler is chosen
-    const isMakeOrMiss = turnData.result_type === 'MAKE' || turnData.result_type === 'MISS' || turnData.result_type === 'BLOCK';
-    if (isMakeOrMiss || turnData.fast_break != null) {
-      const hasFastBreakKey = Object.prototype.hasOwnProperty.call(turnData, 'fast_break');
-      const hasFastBreakCamel = Object.prototype.hasOwnProperty.call(turnData, 'fastBreak');
-      console.log('📢 [ANNOUNCEMENT DIAGNOSTIC] determineHandler – Fast Break routing', {
-        result_type: turnData.result_type,
-        fast_break: turnData.fast_break,
-        fast_break_type: typeof turnData.fast_break,
-        has_key_fast_break: hasFastBreakKey,
-        has_key_fastBreak: hasFastBreakCamel,
-        isFastBreak,
-        handler: isFastBreak ? 'FAST_BREAK' : '(other)',
-      });
-    }
     if (isFastBreak) {
       return this.animationHandlers.get('FAST_BREAK');
     }
@@ -588,8 +573,6 @@ export class AnimationEngine {
   }
 
   async handleDefensiveStop(turnData, context) {
-    // ✅ DEBUG: Log full turnData to verify fast_break flag is present
-    console.log('🛑 [DEFENSIVE_STOP DEBUG] Full turnData received:', JSON.stringify(turnData, null, 2));
     console.log('AnimationEngine: Handling defensive stop', {
       result_type: turnData.result_type,
       fast_break: turnData.fast_break,
