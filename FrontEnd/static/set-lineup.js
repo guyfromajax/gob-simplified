@@ -344,31 +344,6 @@ async function loadRoster() {
         if (gameRes.ok) {
           const gameData = await gameRes.json();
           const gamePlayers = gameData.players || [];
-          const ineligiblePlayers = gameData.ineligible_players || [];
-          
-          // ✅ FOUL OUT FIX: Mark ineligible players in roster
-          if (ineligiblePlayers.length > 0) {
-            console.log(`✅ [FOUL-OUT] Found ${ineligiblePlayers.length} ineligible players (fouled out) from API:`, ineligiblePlayers);
-            roster.forEach(player => {
-              const playerId = player._id || player.playerId || player.player_id;
-              if (playerId && ineligiblePlayers.includes(String(playerId))) {
-                player.ineligible = true;
-                player.fouled_out = true;
-                console.log(`✅ [FOUL-OUT] Marked ${player.name} (ID: ${playerId}) as ineligible (fouled out)`);
-                
-                // Note: Lineup removal will happen in removeIneligiblePlayersFromLineup()
-                // which is called after restoreLineupFromUrl() to ensure proper order
-              }
-            });
-            // Re-render views to show visual indicators
-            if (currentView === 'grid') {
-              renderRoster();
-            } else if (currentView === 'player') {
-              renderPlayerView();
-            }
-          } else {
-            console.log(`✅ [FOUL-OUT] No ineligible players found in API response`);
-          }
           
           console.log(`Found ${gamePlayers.length} players with energy data from game`);
           
@@ -428,6 +403,13 @@ async function loadRoster() {
             // Stats: Use EXACT same approach as box-score.js (line 203)
             // Flatten stats to player.stats (not nested under .game)
             rosterPlayer.stats = gp.stats?.game || gp.stats || {};
+            
+            // Ineligible (fouled out): derive from game foul count each visit – no persisted list
+            const fouls = Number(rosterPlayer.stats.F) || 0;
+            if (fouls >= 5) {
+              rosterPlayer.ineligible = true;
+              rosterPlayer.fouled_out = true;
+            }
             
             // Attributes: EM and MO
             if (gp.attributes) {
