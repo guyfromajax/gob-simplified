@@ -284,9 +284,7 @@ class GameManager:
                 if hasattr(player, "recharge_energy"):
                     player.recharge_energy(recharge_amount)
         
-        # Append timeout turn to turns list
-        self.turns.append(timeout_turn)
-        self.text_log.append(timeout_turn["text"])
+        self._append_turn(timeout_turn)
         
         # Set timeout_called flag (for simulation loop stopping)
         self.game_state["timeout_called"] = True
@@ -305,6 +303,8 @@ class GameManager:
         never miss a player fouling out (e.g. from a code path that didn't call check_and_handle_foul_out).
         """
         if result.get("fouled_out"):
+            return
+        if result.get("timeout_reason"):
             return
         from BackEnd.engine.phase_resolution import check_and_handle_foul_out
         for team in [self.home_team, self.away_team]:
@@ -337,6 +337,74 @@ class GameManager:
                     )
                     return
 
+    def _append_turn(self, turn_result, text=None):
+        """
+        Single funnel for appending any turn. Appends to turns + text_log, then runs
+        the universal foul-out check. If the check finds a player with >= 5 fouls,
+        creates and appends the foul-out timeout turn. Ensures we check after every
+        turn (main result, OREB, SIP, BIP, timeouts).
+        """
+        self.turns.append(turn_result)
+        self.text_log.append(text if text is not None else turn_result.get("text", ""))
+        self._check_lineups_for_foul_out(turn_result)
+        if turn_result.get("fouled_out"):
+            self._handle_foul_out_timeout(turn_result)
+
+    def _handle_foul_out_timeout(self, result):
+        """Create and append foul-out timeout turn, then save game state to DB."""
+        from BackEnd.utils.man_defense_matchups import reset_matchups_to_defaults
+        reset_matchups_to_defaults(self.game_state)
+        logging.info("✅ FOUL OUT: Reset man defense matchups to defaults")
+
+        foul_out_player_data = result.get("foul_out_player", {})
+        foul_out_player = None
+        foul_out_player_id = foul_out_player_data.get("player_id") if isinstance(foul_out_player_data, dict) else None
+        if foul_out_player_id:
+            for team in [self.home_team, self.away_team]:
+                players = team.get_all_players() if hasattr(team, "get_all_players") else []
+                for player in players:
+                    if hasattr(player, "player_id") and player.player_id == foul_out_player_id:
+                        foul_out_player = player
+                        break
+                if foul_out_player:
+                    break
+                if not foul_out_player:
+                    for player in (team.lineup or {}).values():
+                        if player and hasattr(player, "player_id") and player.player_id == foul_out_player_id:
+                            foul_out_player = player
+                            break
+                if foul_out_player:
+                    break
+
+        self.game_state["timeout_offense_team_id"] = self.offense_team.team_id
+        logging.info(f"✅ FOUL OUT: Current offense team '{self.offense_team.name}' (team_id: {self.offense_team.team_id})")
+        foul_out_context = self.game_state.get("foul_out_context", {})
+        if foul_out_context:
+            logging.info(f"✅ FOUL OUT: Using foul context - type={foul_out_context.get('foul_type')}, next={foul_out_context.get('next_play_type')}")
+
+        timeout_turn = self.turn_manager.setup_timeout_turn(
+            timeout_reason="FOUL_OUT",
+            calling_team=None,
+            foul_out_player=foul_out_player,
+            foul_out_context=foul_out_context,
+        )
+        self._append_turn(timeout_turn)
+        logging.info(f"⏸️ TIMEOUT: Created timeout turn for foul out - {foul_out_player_data.get('name', 'Unknown')}")
+
+        if self.game_id:
+            try:
+                from BackEnd.utils.shared import summarize_game_state
+                from BackEnd.db import games_collection
+                db_summary = summarize_game_state(self, exclude_animations=True)
+                games_collection.update_one({"_id": self.game_id}, {"$set": db_summary}, upsert=True)
+                logging.info(
+                    f"💾 FOUL OUT TIMEOUT: Saved game state immediately: "
+                    f"game_id={self.game_id}, quarter={db_summary.get('quarter')}, "
+                    f"clock={db_summary.get('clock')}, next_play_type={timeout_turn.get('next_play_type')}"
+                )
+            except Exception as e:
+                logging.error(f"🚨 FOUL OUT TIMEOUT: Failed to save game state: {e}")
+
     def simulate_macro_turn(self): #run_simulation
         # Clear timeout flag at start of each turn (will be set if timeout is called)
         self.game_state["timeout_called"] = False
@@ -358,8 +426,7 @@ class GameManager:
         # This ensures ALL turns have accurate next_turn (no None values)
         result["next_turn"] = self.determine_next_turn(result)
         
-        self.turns.append(result)
-        self.text_log.append(result["text"])
+        self._append_turn(result)
 
         # If the turn ended with an offensive rebound, create a separate OREB turn
         # Process ALL consecutive OREBs in this same call (for batch efficiency)
@@ -373,8 +440,7 @@ class GameManager:
                 # ✅ SS&S: Set next_turn for OREB turns (same centralized logic)
                 oreb_turn["next_turn"] = self.determine_next_turn(oreb_turn)
                 
-                self.turns.append(oreb_turn)
-                self.text_log.append(oreb_turn["text"])
+                self._append_turn(oreb_turn)
                 
                 # Handle possession flip for OREB turn (doesn't go through run_micro_turn)
                 if oreb_turn.get("possession_flips"):
@@ -418,76 +484,7 @@ class GameManager:
             result["offense_team_id"] = self.offense_team.team_id
             logging.debug(f"🔄 [DREB→FB] Flipped possession before Fast Break: {old_offense} → {self.offense_team.name}, updated offense_team_id={result['offense_team_id']}")
 
-        # ✅ SS&S: End-of-turn foul-out check – catch any active player with >= 5 fouls missed by per-path logic
-        self._check_lineups_for_foul_out(result)
-
-        # ✅ TIMEOUT: Check for foul out and create timeout turn
-        if result.get("fouled_out"):
-            # ✅ MAN DEFENSE MATCHUPS: Reset to defaults at start of foul out break
-            from BackEnd.utils.man_defense_matchups import reset_matchups_to_defaults
-            reset_matchups_to_defaults(self.game_state)
-            logging.info("✅ FOUL OUT: Reset man defense matchups to defaults")
-            
-            foul_out_player_data = result.get("foul_out_player", {})
-            # Find the actual player object
-            foul_out_player = None
-            foul_out_player_id = foul_out_player_data.get("player_id") if isinstance(foul_out_player_data, dict) else None
-            if foul_out_player_id:
-                for team in [self.home_team, self.away_team]:
-                    # Try get_all_players() first (returns all roster players)
-                    players = team.get_all_players() if hasattr(team, 'get_all_players') else []
-                    for player in players:
-                        if hasattr(player, 'player_id') and player.player_id == foul_out_player_id:
-                            foul_out_player = player
-                            break
-                    if foul_out_player:
-                        break
-                    # Fallback: check lineup players
-                    if not foul_out_player:
-                        for player in team.lineup.values():
-                            if player and hasattr(player, 'player_id') and player.player_id == foul_out_player_id:
-                                foul_out_player = player
-                                break
-                    if foul_out_player:
-                        break
-            
-            # ✅ FOUL OUT: Store offense team for debugging (game.offense_team is source of truth)
-            # Possession has already been flipped by foul resolution if needed (offensive fouls)
-            self.game_state["timeout_offense_team_id"] = self.offense_team.team_id
-            logging.info(f"✅ FOUL OUT: Current offense team '{self.offense_team.name}' (team_id: {self.offense_team.team_id})")
-            
-            # Get foul context if available (set by foul resolution)
-            foul_out_context = self.game_state.get("foul_out_context", {})
-            if foul_out_context:
-                logging.info(f"✅ FOUL OUT: Using foul context - type={foul_out_context.get('foul_type')}, next={foul_out_context.get('next_play_type')}")
-            
-            # Create timeout turn
-            timeout_turn = self.turn_manager.setup_timeout_turn(
-                timeout_reason="FOUL_OUT",
-                calling_team=None,
-                foul_out_player=foul_out_player,
-                foul_out_context=foul_out_context  # ✅ NEW: Pass foul context
-            )
-            self.turns.append(timeout_turn)
-            self.text_log.append(timeout_turn["text"])
-            logging.info(f"⏸️ TIMEOUT: Created timeout turn for foul out - {foul_out_player_data.get('name', 'Unknown')}")
-            
-            # ✅ FOUL OUT TIMEOUT: Save game state to database immediately (same pattern as user-initiated timeout)
-            # This ensures timeout state persists even if user navigates away before simulate-turn saves
-            if self.game_id:
-                try:
-                    from BackEnd.utils.shared import summarize_game_state
-                    from BackEnd.db import games_collection
-                    db_summary = summarize_game_state(self, exclude_animations=True)
-                    games_collection.update_one({"_id": self.game_id}, {"$set": db_summary}, upsert=True)
-                    logging.info(
-                        f"💾 FOUL OUT TIMEOUT: Saved game state immediately: "
-                        f"game_id={self.game_id}, quarter={db_summary.get('quarter')}, "
-                        f"clock={db_summary.get('clock')}, next_play_type={timeout_turn.get('next_play_type')}"
-                    )
-                except Exception as e:
-                    logging.error(f"🚨 FOUL OUT TIMEOUT: Failed to save game state: {e}")
-                    # Don't fail the foul out if save fails - game continues normally
+        # (Foul-out check and timeout creation now run inside _append_turn for the main result)
 
         # If the turn ended with a dead-ball turnover, a non-shooting foul
         # that does not result in free throws, or a charge (offensive foul),
@@ -572,8 +569,7 @@ class GameManager:
                     # Don't append SIP turn - timeout will replace it on next API call
                     return
             else:
-                # No computer timeout - proceed with SIP
-                self.turns.append(inbound_payload)
+                self._append_turn(inbound_payload)
             
             # Reset offensive state to HCO after side inbound (FCP/HCT only apply after made shots)
             self.game_state["offensive_state"] = "HCO"
@@ -664,14 +660,11 @@ class GameManager:
                     # Don't append BIP turn - timeout will replace it on next API call
                     return
             else:
-                # No computer timeout - proceed with BIP
-                self.turns.append(inbound_payload)
-                self.text_log.append("Baseline inbound after made shot")
+                self._append_turn(inbound_payload, text="Baseline inbound after made shot")
             
             # Preserve offensive_state for next API call
             if next_defensive_setup:
                 self.game_state["offensive_state"] = next_defensive_setup
-            self.text_log.append("Baseline inbound after made shot")
             
             # ✅ CRITICAL: Preserve offensive_state for the next API call
             # After BASELINE_INBOUND, preserve offensive_state for all pressure types (FCP, HCT, or HCO)
