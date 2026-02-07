@@ -6,6 +6,8 @@ from BackEnd.constants import (
     PAINT_SPOTS,
     PLAYCALL_ATTRIBUTE_WEIGHTS, 
     BLOCK_PROBABILITY,
+    BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD,
+    BLOCK_RECONCILIATION_BLOCK_THRESHOLD,
     AGGRESSION_FOUL_MULTIPLIER,
     HARD_SHOOTING_FOUL_THRESHOLD,
     SOFT_SHOOTING_FOUL_THRESHOLD,
@@ -27,6 +29,8 @@ from BackEnd.utils.shared import (
     calculate_bounce_spot,
     determine_rebounder,
     calculate_charge,
+    height_to_block_score,
+    calculate_block_spot,
 )
 from BackEnd.constants.fast_break_constants import DEFENSIVE_STOP_Y_RANGE
 
@@ -438,9 +442,9 @@ class ShotManager:
         shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
         shooter_location_str = shooter_location if shooter_location else "unknown"
         
-        # ✅ New: returns shot_score, help defender (always None), and foul info
+        # ✅ New: returns shot_score (post-defense), pre_defense_shot_score, and foul info
         # Use shot_type instead of playcall for shot score calculation
-        shot_score, _, d_foul, foul_player = self.calculate_shot_score(
+        shot_score, shot_score_pre_defense, d_foul, foul_player = self.calculate_shot_score(
             shooter, passer, screener, defender, shot_type, defense_call, is_three, is_paint, second_defender, shooter_location_str
         )
         
@@ -450,6 +454,77 @@ class ShotManager:
             shot_score -= motion_attack_penalty
             # Clear penalty after use
             game_state.pop("motion_attack_penalty", None)
+
+        # ✅ BLOCK ATTEMPT (inside/attack only): before charge check, run block reconciliation when y < x
+        block_spot = None
+        block_defender_used = None
+        if shot_type in ("inside", "attack") and defender:
+            x = def_team.strategy_settings.get("aggression", 2)
+            y = random.randint(0, 10)
+            if y < x:
+                # Block reconciliation: use shot_score_pre_defense vs defense_block_score
+                def_height_inches = getattr(defender, "height", None) or defender.attributes.get("height") or 76
+                def_h = height_to_block_score(def_height_inches)
+                def_scaled_height = (def_h * 10) + random.randint(-9, 9)
+                def_attrs = defender.attributes
+                defense_block_score = (
+                    def_scaled_height * 0.4 + def_attrs.get("ID", 0) * 0.4 + def_attrs.get("IQ", 0) * 0.2
+                ) * random.randint(1, 6)
+                diff = shot_score_pre_defense - defense_block_score
+                if diff > BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD:
+                    # Shooting foul from block: shooter_finish_score vs 250
+                    shoot_h = height_to_block_score(getattr(shooter, "height", None) or shooter.attributes.get("height") or 76)
+                    shoot_scaled = (shoot_h * 10) + random.randint(-9, 9)
+                    shoot_attrs = shooter.attributes
+                    shooter_finish_score = (
+                        shoot_attrs.get("ST", 0) * 0.4 + shoot_attrs.get("SC", 0) * 0.3
+                        + shoot_scaled * 0.2 + shoot_attrs.get("IQ", 0) * 0.1
+                    ) * random.randint(1, 6)
+                    made_from_foul = shooter_finish_score > 250
+                    # Reuse existing shooting-foul flow: set game_state, record foul, build result
+                    defender.record_stat("F")
+                    def_team.team_fouls += 1
+                    self.game_state["foul_team"] = "DEFENSE"
+                    self.game_state["shooter"] = shooter
+                    self.game_state["offensive_state"] = "FREE_THROW"
+                    self.game_state["free_throws"] = 1
+                    self.game_state["free_throws_remaining"] = 1
+                    from BackEnd.engine.phase_resolution import check_and_handle_foul_out
+                    check_and_handle_foul_out(defender, self.game_state, def_team)
+                    shooter.record_stat("FGA")
+                    if is_three:
+                        shooter.record_stat("3PTA")
+                    if made_from_foul:
+                        apply_scoring(self.game, off_team, shooter, 3 if is_three else 2, ["FGM", "3PTM"] if is_three else ["FGM"])
+                        if is_paint:
+                            shooter.record_stat("PIP", amount=3 if is_three else 2)
+                        text = f"{get_name_safe(shooter)} makes the shot. {get_name_safe(defender)} fouls him! AND-1 opportunity!"
+                    else:
+                        text = f"{get_name_safe(shooter)} misses. {get_name_safe(defender)} fouls him!"
+                    shooter_pos = get_player_position(off_lineup, shooter)
+                    tempo = off_team.strategy_calls.get("tempo_call", "normal")
+                    time_elapsed_ft = get_time_elapsed(tempo)
+                    result = {
+                        "result_type": "MAKE" if made_from_foul else "MISS",
+                        "ball_handler": shooter, "shooter": shooter, "shooter_id": shooter.player_id,
+                        "shooter_pos": shooter_pos, "screener": screener, "passer": passer, "defender": defender,
+                        "text": text, "possession_flips": False, "time_elapsed": time_elapsed_ft, "events": [],
+                        "foul_player_id": defender.player_id, "foul_team": "DEFENSE",
+                        "next_play_type": "FREE_THROW", "free_throws_remaining": 1,
+                        "offense_team_id": off_team.team_id, "defense_team_id": def_team.team_id,
+                    }
+                    return result
+                elif diff < -BLOCK_RECONCILIATION_BLOCK_THRESHOLD:
+                    # Block: set flags and fall through to miss path (FGA/3PTA recorded in normal path)
+                    defender.record_stat("BLK")
+                    off_team.team_attributes["momentum"] = max(0, off_team.team_attributes.get("momentum", 0) - 1)
+                    def_team.team_attributes["momentum"] = min(10, def_team.team_attributes.get("momentum", 0) + 1)
+                    is_away_offense = off_team.team_id == self.game.away_team.team_id
+                    shooter_coords = getattr(shooter, "coords", {"x": 50, "y": 25})
+                    sx = shooter_coords.get("x", 50)
+                    sy = shooter_coords.get("y", 25)
+                    self._block_spot = calculate_block_spot(sx, sy, is_away_offense)
+                    self._block_defender = defender
 
         # ✅ CHARGE/BLOCKING FOUL CHECK: Check for charge or blocking foul on attack shots
         # Fast Break: only allow charge/block when there is a shot defender defending the attempt (defender_count >= 1)
@@ -603,6 +678,8 @@ class ShotManager:
                     return result
         
         made = shot_score >= shot_threshold
+        if getattr(self, "_block_spot", None):
+            made = False  # Block reconciliation decided block; use miss path with block spot
 
         # ✅ SHOOTING FOUL CALIBRATION: If there's a shooting foul, check if it forces a miss
         # Fouls are significant outliers that can force missed shots
@@ -978,22 +1055,24 @@ class ShotManager:
                         release_player.coords = coords.copy()
                 result["defense_release_coords"] = defense_release_coords
             else:
-                # Regular miss → rebound logic
-                defense_attrs = defender.attributes if defender else {"ID": 0}
-                base_block_prob = BLOCK_PROBABILITY.get(playcall, 0.0)
-                block_skill = defense_attrs["ID"] / 100
-                final_block_chance = base_block_prob * (0.5 + block_skill)
-                is_block = random.random() < final_block_chance
-                if is_block:
-                    text += f" {get_name_safe(defender)} blocks the shot! Great block!"
-                    defender.record_stat("BLK")
+                # Regular miss → rebound logic (or block outcome using block spot)
+                block_spot_used = getattr(self, "_block_spot", None)
+                if not block_spot_used:
+                    defense_attrs = defender.attributes if defender else {"ID": 0}
+                    base_block_prob = BLOCK_PROBABILITY.get(playcall, 0.0)
+                    block_skill = defense_attrs["ID"] / 100
+                    final_block_chance = base_block_prob * (0.5 + block_skill)
+                    is_block = random.random() < final_block_chance
+                    if is_block:
+                        text += f" {get_name_safe(defender)} blocks the shot! Great block!"
+                        defender.record_stat("BLK")
 
                 if is_fast_break:
                     # ==================== FAST BREAK REBOUND (x-eligibility) ====================
                     # Eligibility: home offense → x >= 50; away offense → x <= 50. Then standard rebound logic.
                     is_away_offense = off_team.team_id == self.game.away_team.team_id
                     basket_x = 9 if is_away_offense else 91
-                    bounce_spot = calculate_bounce_spot(self.game, basket_x=basket_x, basket_y=25)
+                    bounce_spot = block_spot_used or calculate_bounce_spot(self.game, basket_x=basket_x, basket_y=25)
 
                     def _eligible_fb_lineup(lineup_dict):
                         eligible = {}
@@ -1096,9 +1175,12 @@ class ShotManager:
                             rebounder_player.coords = rebounder_coords.copy()
                 else:
                     # ==================== UNIFIED GEOGRAPHY-BASED REBOUND SYSTEM (HCO) ====================
-                    # Step 1: Calculate bounce spot (with distance-based variance)
-                    shooter_pos, shooter_spot = self._get_shooter_position_and_spot(shooter, roles)
-                    bounce_spot = calculate_bounce_spot(self.game, shooter_spot=shooter_spot)
+                    # Step 1: Calculate bounce spot (with distance-based variance) or use block spot
+                    if block_spot_used:
+                        bounce_spot = block_spot_used
+                    else:
+                        shooter_pos, shooter_spot = self._get_shooter_position_and_spot(shooter, roles)
+                        bounce_spot = calculate_bounce_spot(self.game, shooter_spot=shooter_spot)
                     
                     # Step 2: Filter lineups to only eligible rebounders (those crashing boards)
                     # Build filtered lineups containing only players in offense_rebounders/defense_rebounders
@@ -1357,8 +1439,9 @@ class ShotManager:
             # Get foul out info (was set during blocking foul handling)
             blocking_foul_out_info = getattr(self, "_blocking_foul_out_info", None) if hasattr(self, "_blocking_foul_out_info") else None
         
+        is_block_outcome = getattr(self, "_block_spot", None) is not None
         result.update({
-            "result_type": "MAKE" if made else "MISS",
+            "result_type": "MAKE" if made else ("BLOCK" if is_block_outcome else "MISS"),
             "ball_handler": shooter,
             "shooter": shooter,
             "shooter_id": shooter.player_id,
@@ -1375,7 +1458,12 @@ class ShotManager:
             "foul_player_id": getattr(foul_player, "player_id", None) if d_foul and foul_player else (defender.player_id if charge_result == "BLOCKING_FOUL" and defender else None),
             "foul_team": self.game_state.get("foul_team") if (d_foul or charge_result == "BLOCKING_FOUL") else None,
         })
-        
+        if is_block_outcome:
+            result["blocker_id"] = getattr(self._block_defender, "player_id", None) if getattr(self, "_block_defender", None) else None
+            if hasattr(self, "_block_spot"):
+                del self._block_spot
+            if hasattr(self, "_block_defender"):
+                del self._block_defender
         # Add blocking foul next_play_type if applicable
         if blocking_foul_next_play_type:
             result["next_play_type"] = blocking_foul_next_play_type
@@ -1441,6 +1529,9 @@ class ShotManager:
         else:
             dribble_score = (attrs["AG"] * 0.8 + attrs["IQ"] * 0.2) * random.randint(1, 6)
             shot_score += dribble_score * 0.2
+
+        # Pre-defense shot score (for block reconciliation: offensive component only)
+        pre_defense_shot_score = shot_score
 
         # Defensive impact - varies by shot type
         # Calculate defense score for primary defender
@@ -1563,7 +1654,7 @@ class ShotManager:
         # print(f"shot score = {round(shot_score, 2)} | (defense penalty: {round(defense_score * 0.2, 2)})")
 
         # help_defender is always None now (help defense removed)
-        return shot_score, None, d_foul, foul_player
+        return shot_score, pre_defense_shot_score, d_foul, foul_player
 
     
     def check_defensive_foul_on_shot(self, defender, defense_score, shot_type, shooter=None, shooter_location=None):

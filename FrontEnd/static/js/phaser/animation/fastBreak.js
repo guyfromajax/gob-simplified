@@ -164,9 +164,9 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
   const previousTurn = scene.simData?.turns?.[currentIndex - 1];
   const currentTurn = scene.simData?.turns?.[currentIndex];
   
-  if (previousTurn?.result_type === "MISS") {
+  if (previousTurn?.result_type === "MISS" || previousTurn?.result_type === "BLOCK") {
     missTurn = previousTurn;
-  } else if (currentTurn?.result_type === "MISS") {
+  } else if (currentTurn?.result_type === "MISS" || currentTurn?.result_type === "BLOCK") {
     missTurn = currentTurn;
   }
   
@@ -619,8 +619,8 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
       };
       showAnnouncement("Fast Break Score!", shooterTeamId === scene.homeTeamId ? "home" : "away", shooterPlayerData);
     }
-  } else if (turnData.result_type === "MISS") {
-    // Handle MISS → DREB transition
+  } else if (turnData.result_type === "MISS" || turnData.result_type === "BLOCK") {
+    // Handle MISS/BLOCK → DREB transition
     // ✅ FIX: Check all possible field names (matching animateFastBreakShot pattern)
     const rebounderId = turnData.rebounderId || turnData.rebounder_id || turnData.rebounder_player_id || turnData.roles?.rebounder?.player_id;
     
@@ -935,7 +935,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     // The previous HCO MISS turn is needed for offense_getback list
     // runDefensiveReboundSetup will use turnData for animations, and can find offense_getback
     // from the previous turn if needed
-    const missTurnForGetback = previousTurn?.result_type === "MISS" ? previousTurn : null;
+    const missTurnForGetback = (previousTurn?.result_type === "MISS" || previousTurn?.result_type === "BLOCK") ? previousTurn : null;
     
     // ✅ Get rebounderId - must be present for rebound animation
     // Check all possible field names: rebounderId (camelCase), rebounder_id (underscore), rebounder_player_id
@@ -1574,10 +1574,10 @@ async function moveOtherPlayersToStandardPositions(
   const previousTurn = scene.simData?.turns?.[currentIndex - 1];
   const currentTurn = scene.simData?.turns?.[currentIndex];
   
-  if (previousTurn?.result_type === "MISS" || previousTurn?.result_type === "MAKE") {
+  if (previousTurn?.result_type === "MISS" || previousTurn?.result_type === "BLOCK" || previousTurn?.result_type === "MAKE") {
     getbackPlayerIds = previousTurn?.offense_getback || [];
     releasePlayerIds = previousTurn?.defense_release || [];
-  } else if (currentTurn?.result_type === "MISS" || currentTurn?.result_type === "MAKE") {
+  } else if (currentTurn?.result_type === "MISS" || currentTurn?.result_type === "BLOCK" || currentTurn?.result_type === "MAKE") {
     getbackPlayerIds = currentTurn?.offense_getback || [];
     releasePlayerIds = currentTurn?.defense_release || [];
   }

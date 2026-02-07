@@ -475,7 +475,7 @@ export class PassAnimationSystem {
 
   validatePassData(turnData) {
     // For regular passes (MAKE/MISS), check for passer and receiver
-    if (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS') {
+    if (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS' || turnData.result_type === 'BLOCK') {
       const isValid = turnData && 
              (turnData.passer_id || turnData.player_id) &&
              turnData.receiver_id;

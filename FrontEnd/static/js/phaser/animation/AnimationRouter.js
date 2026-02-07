@@ -97,7 +97,7 @@ export class AnimationRouter {
 
     // Check if this is a standard HCO turn (shot that's not a fast break)
     // Defined outside try block so it's accessible in finally block
-    const isHCO = !turnData.fast_break && (turnData.result_type === "MAKE" || turnData.result_type === "MISS");
+    const isHCO = !turnData.fast_break && (turnData.result_type === "MAKE" || turnData.result_type === "MISS" || turnData.result_type === "BLOCK");
 
     try {
       // ✅ PHASE 2.3: Call prepareTurnForAnimation at the start
@@ -321,7 +321,7 @@ export class AnimationRouter {
   isHCOWithPositioning(turnData) {
     // HCO turns are shot attempts (MAKE/MISS) with next_play_type: "HCO"
     // that follow a defensive rebound
-    return (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS') &&
+    return (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS' || turnData.result_type === 'BLOCK') &&
            turnData.next_play_type === 'HCO' &&
            this.followsDefensiveRebound(turnData);
   }

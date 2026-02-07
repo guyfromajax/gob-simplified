@@ -608,13 +608,13 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     // Try previous turn if current turn doesn't have offense_getback (Fast Break case)
     const currentIndex = scene.currentTurn || 0;
     const previousTurn = scene.simData?.turns?.[currentIndex - 1];
-    if (previousTurn?.result_type === "MISS" && previousTurn.offense_getback) {
+    if ((previousTurn?.result_type === "MISS" || previousTurn?.result_type === "BLOCK") && previousTurn.offense_getback) {
       missTurnForGetback = previousTurn;
-      console.log('🏀 [DREB SETUP] Using previous MISS turn for offense_getback (Fast Break case)');
+      console.log('🏀 [DREB SETUP] Using previous MISS/BLOCK turn for offense_getback (Fast Break case)');
     } else if (!missTurnForGetback) {
       // Fallback: try current turn
       const currentTurn = scene.simData?.turns?.[currentIndex];
-      if (currentTurn?.result_type === "MISS") {
+      if (currentTurn?.result_type === "MISS" || currentTurn?.result_type === "BLOCK") {
         missTurnForGetback = currentTurn;
       }
     }
@@ -2001,7 +2001,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // ✅ Allow HCO turns even if state is FastBreak (can happen after defensive stop transition fails)
   // Check if this is an HCO turn (not fast_break and has animations) - if so, allow it
   const isHCOAfterFastBreak = !turnData.fast_break && 
-                               (turnData.result_type === "MAKE" || turnData.result_type === "MISS") &&
+                               (turnData.result_type === "MAKE" || turnData.result_type === "MISS" || turnData.result_type === "BLOCK") &&
                                turnData.animations?.length > 0 &&
                                scene.stateMachine?.is(States.FastBreak);
   
@@ -2654,19 +2654,20 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
             : rebounderSprite?.team_id !== turnData.offense_team_id;
           // ✅ Skip DREB setup if next play is Fast Break - player advancement happens in outlet phase
           if (isDreb && !turnData.fast_break && turnData.next_play_type !== "FAST_BREAK") {
-            // Find the MISS turn that led to this DREB
-            // In playTurnAnimation, turnData should be the MISS turn itself
-            // Check if this turnData is a MISS turn first, otherwise look for it
-            let missTurn = turnData?.result_type === "MISS" ? turnData : null;
+            // Find the MISS/BLOCK turn that led to this DREB
+            // In playTurnAnimation, turnData should be the MISS/BLOCK turn itself
+            // Check if this turnData is a MISS or BLOCK turn first, otherwise look for it
+            const isMissOrBlock = turnData?.result_type === "MISS" || turnData?.result_type === "BLOCK";
+            let missTurn = isMissOrBlock ? turnData : null;
             if (!missTurn) {
               // If not, look for it in previous turn or current turn
               const currentIndex = scene.currentTurn || 0;
               const previousTurn = scene.simData?.turns?.[currentIndex - 1];
               const currentTurn = scene.simData?.turns?.[currentIndex];
               
-              if (previousTurn?.result_type === "MISS") {
+              if (previousTurn?.result_type === "MISS" || previousTurn?.result_type === "BLOCK") {
                 missTurn = previousTurn;
-              } else if (currentTurn?.result_type === "MISS") {
+              } else if (currentTurn?.result_type === "MISS" || currentTurn?.result_type === "BLOCK") {
                 missTurn = currentTurn;
               }
               
@@ -2730,9 +2731,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                       reboundData.rebound_type === "DREB" &&
                       !turnData.fast_break
                     ) {
-                      // For putback events, find the MISS turn with offense_getback
-                      // This is the turn containing this event (putback after original MISS)
-                      let missTurn = turnData?.result_type === "MISS" ? turnData : null;
+                      // For putback events, find the MISS/BLOCK turn with offense_getback
+                      const isMissOrBlockEvt = turnData?.result_type === "MISS" || turnData?.result_type === "BLOCK";
+                      let missTurn = isMissOrBlockEvt ? turnData : null;
                       if (!missTurn) {
                         const currentIndex = scene.currentTurn || 0;
                         missTurn = scene.simData?.turns?.[currentIndex - 1];
@@ -2834,8 +2835,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                       reboundData.rebound_type === "DREB" &&
                       !turnData.fast_break
                     ) {
-                      // For putback events, find the MISS turn with offense_getback
-                      let missTurn = turnData?.result_type === "MISS" ? turnData : null;
+                      // For putback events, find the MISS/BLOCK turn with offense_getback
+                      const isMissOrBlockPutback = turnData?.result_type === "MISS" || turnData?.result_type === "BLOCK";
+                      let missTurn = isMissOrBlockPutback ? turnData : null;
                       if (!missTurn) {
                         const currentIndex = scene.currentTurn || 0;
                         missTurn = scene.simData?.turns?.[currentIndex - 1];

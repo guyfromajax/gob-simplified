@@ -209,7 +209,7 @@ export function checkTimeoutEligibility(scene, turnData) {
     // Note: DREB is not a turn type - it's a property of a MISS turn (rebound_type: "DREB")
     // ✅ EXCLUDE: MISS/DREB turns themselves are NOT eligible (even if current_turn is HCO)
     // We want to wait for the NEXT HCO turn after DREB animation completes
-    if (turnData?.result_type === 'MISS' && turnData?.rebound_type === 'DREB') {
+    if ((turnData?.result_type === 'MISS' || turnData?.result_type === 'BLOCK') && turnData?.rebound_type === 'DREB') {
         console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - Current turn is MISS/DREB (not eligible, wait for next HCO turn)');
         return false;
     }

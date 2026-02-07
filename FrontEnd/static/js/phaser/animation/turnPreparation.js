@@ -93,7 +93,7 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
     // Check: 1) Not a STEAL turn itself, 2) Text doesn't mention steal, 3) Not a steal-initiated Fast Break (is_steal_entry flag)
     const isStealInitiatedFastBreak = turn.roles?.is_steal_entry;
     // 🔍 ANNOUNCEMENT DIAGNOSTIC: Log Fast Break decision so we can pinpoint why "Fast Break!" may not show
-    const isMakeOrMiss = turn.result_type === 'MAKE' || turn.result_type === 'MISS';
+    const isMakeOrMiss = turn.result_type === 'MAKE' || turn.result_type === 'MISS' || turn.result_type === 'BLOCK';
     if (turn.fast_break || (isMakeOrMiss && turn.roles)) {
       console.log('📢 [ANNOUNCEMENT DIAGNOSTIC] prepareTurnForAnimation – Fast Break context', {
         result_type: turn.result_type,
@@ -233,12 +233,12 @@ export async function finalizeTurnAfterAnimation({
   if (false) console.log('[Finalizing]', {
     turnIndex: turnIndex ?? turn.index,
     result_type: turn.result_type,
-    willSetPreviousTurnWasShot: turn.result_type === "MAKE" || turn.result_type === "MISS",
+    willSetPreviousTurnWasShot: turn.result_type === "MAKE" || turn.result_type === "MISS" || turn.result_type === "BLOCK",
     hasOnUpdate: !!onUpdate
   });
   
   // Set flag if this was a shot turn (MAKE or MISS) so the next turn knows to skip step 0 ball attachment
-  if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
+  if (turn.result_type === "MAKE" || turn.result_type === "MISS" || turn.result_type === "BLOCK") {
     scene._previousTurnWasShot = true;
     if (false) console.log('[Previous Turn Shot]', {
       turnIndex: turnIndex ?? turn.index,
@@ -276,6 +276,9 @@ export async function finalizeTurnAfterAnimation({
       }
     }
     // Note: Shooting fouls on misses are announced in ballManager.js with "Shooting Foul!"
+  } else if (turn.result_type === 'BLOCK') {
+    // Block: announce "BLOCK!" with blocker image
+    announceGameEvent('BLOCK', turn, scene, { blockerId: turn.blocker_id || turn.defenderId });
   } else if ((turn.result_type === 'MAKE' || turn.result_type === 'MISS') && 
              turn.foul_team === 'DEFENSE' && 
              turn.foul_player_id &&

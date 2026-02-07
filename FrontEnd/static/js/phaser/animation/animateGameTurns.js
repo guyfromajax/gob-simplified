@@ -243,10 +243,10 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
         const currentIndex = scene.currentTurn || 0;
         // Check if previous turn is a MISS (original shot attempt)
         const previousTurn = scene.simData?.turns?.[currentIndex - 1];
-        if (previousTurn?.result_type === "MISS") {
+        if (previousTurn?.result_type === "MISS" || previousTurn?.result_type === "BLOCK") {
           missTurn = previousTurn;
         } else {
-          // Otherwise, check current turn (might be a MISS with putback)
+          // Otherwise, check current turn (might be a MISS/BLOCK with putback)
           missTurn = scene.simData?.turns?.[currentIndex];
         }
         
@@ -518,7 +518,7 @@ export async function animateGameTurns({ //hasBallAtStep
     const turn = turns[i];
     
     // ✅ DEBUG: Log state at start of each turn (to trace state persistence)
-    if (i > 0 && (turn.result_type === "MAKE" || turn.result_type === "MISS")) {
+    if (i > 0 && (turn.result_type === "MAKE" || turn.result_type === "MISS" || turn.result_type === "BLOCK")) {
       console.log('🔍 [TURN START - STATE CHECK]', {
         turn_index: i,
         result_type: turn.result_type,
@@ -767,7 +767,7 @@ export async function animateGameTurns({ //hasBallAtStep
     // be detected as FCP/HCT just because pressureSequenceActive is true
     // Only detect as FCP/HCT if: explicit flags OR press break outcome (HCO/TURNOVER)
     const isPressBreakShotAttempt = scene.pressureSequenceActive && 
-                                     (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
+                                     (turn.result_type === "MAKE" || turn.result_type === "MISS" || turn.result_type === "BLOCK") &&
                                      (turn.fcp_shot === true || turn.hct_shot === true); // Require explicit flags
     
     const isFCPHCT = hasExplicitFCPHCTFlags || isPressBreakOutcome || isPressBreakShotAttempt;
@@ -783,7 +783,7 @@ export async function animateGameTurns({ //hasBallAtStep
     // ✅ FIX: Skip FCP/HCT check for MAKE/MISS turns that don't have explicit fcp_shot/hct_shot flags
     // These should be routed as regular HCO shots, not FCP/HCT shots. The pressureSequenceActive state
     // is for tracking the sequence, not for routing individual shot attempts.
-    const isMakeMissWithoutExplicitFlags = (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
+    const isMakeMissWithoutExplicitFlags = (turn.result_type === "MAKE" || turn.result_type === "MISS" || turn.result_type === "BLOCK") &&
                                             !turn.fcp_shot && !turn.hct_shot;
     
     if (isFCPHCT && !isFCPHCTFoulAlreadyHandled && !isMakeMissWithoutExplicitFlags) {
@@ -800,7 +800,7 @@ export async function animateGameTurns({ //hasBallAtStep
       // Since SHOT was removed from FCP/HCT outcomes in the backend, only detect shot attempts
       // as FCP/HCT if they have explicit fcp_shot/hct_shot flags
       // Regular shots during an active pressure sequence should NOT be detected as FCP/HCT
-      const isFCPHCTShotAttempt = (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
+      const isFCPHCTShotAttempt = (turn.result_type === "MAKE" || turn.result_type === "MISS" || turn.result_type === "BLOCK") &&
                                    (turn.fcp_shot === true || turn.hct_shot === true);
       
       
@@ -884,10 +884,10 @@ export async function animateGameTurns({ //hasBallAtStep
       // Clear state when: shot attempt completes (and next turn isn't FCP/HCT), foul occurs, turnover occurs, OR transition to HCO (next turn isn't FCP/HCT)
       // ✅ CRITICAL FIX: Don't clear state on MADE/MISS if turn has next_defensive_setup === "FCP"/"HCT"
       // This means the made shot is setting up the next FCP/HCT turn (via runInboundSetup), so keep state active
-      const isSettingUpNextFCPHCT = (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
+      const isSettingUpNextFCPHCT = (turn.result_type === "MAKE" || turn.result_type === "MISS" || turn.result_type === "BLOCK") &&
                                      (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT");
       const shouldClearPressureState = 
-        ((turn.result_type === "MAKE" || turn.result_type === "MISS") && !nextTurnIsFCPHCT && !isSettingUpNextFCPHCT) || // Shot attempt completed, but next turn isn't FCP/HCT AND not setting up next FCP/HCT
+        ((turn.result_type === "MAKE" || turn.result_type === "MISS" || turn.result_type === "BLOCK") && !nextTurnIsFCPHCT && !isSettingUpNextFCPHCT) || // Shot attempt completed, but next turn isn't FCP/HCT AND not setting up next FCP/HCT
         (turn.result_type === "HCO" && !nextTurnIsFCPHCT) || // Pressure broken, transition to HCO (next turn isn't FCP/HCT)
         turn.fcp_foul === true || turn.hct_foul === true || // Foul occurred
         turn.result_type === "TURNOVER"; // Turnover occurred
@@ -972,7 +972,7 @@ export async function animateGameTurns({ //hasBallAtStep
     // This check is kept here for explicit fast break turns (result_type === "FAST_BREAK")
     // ✅ FIX: Only check fast_break flag for current turn - next_play_type indicates what comes NEXT, not what this turn is
     if (turn.result_type === "FAST_BREAK" || 
-        (turn.result_type === "MAKE" || turn.result_type === "MISS") && turn.fast_break === true) {
+        (turn.result_type === "MAKE" || turn.result_type === "MISS" || turn.result_type === "BLOCK") && turn.fast_break === true) {
       console.log('⚡ [FAST BREAK ROUTING] Routing to AnimationRouter', {
         turn_index: i,
         result_type: turn.result_type,
@@ -1039,7 +1039,7 @@ export async function animateGameTurns({ //hasBallAtStep
       // ✅ FIX: Exclude Fast Break from HCO routing - only check fast_break flag for current turn
       // next_play_type indicates what comes NEXT, not what this turn is (e.g., HCO miss → fast break)
       const isFastBreak = turn.fast_break === true;
-      const isHCO = !isFastBreak && (turn.result_type === "MAKE" || turn.result_type === "MISS");
+      const isHCO = !isFastBreak && (turn.result_type === "MAKE" || turn.result_type === "MISS" || turn.result_type === "BLOCK");
       
       // ✅ DEBUG: Log when entering shot instance (HCO or FCP/HCT)
       if (isHCO) {
@@ -1074,7 +1074,7 @@ export async function animateGameTurns({ //hasBallAtStep
           current_turn_offensive_state: turn.offensive_state,
           isHCO_criteria: {
             not_fast_break: !turn.fast_break,
-            is_shot: turn.result_type === "MAKE" || turn.result_type === "MISS",
+            is_shot: turn.result_type === "MAKE" || turn.result_type === "MISS" || turn.result_type === "BLOCK",
             matches_criteria: isHCO
           },
           current_state: scene.stateMachine?.state,

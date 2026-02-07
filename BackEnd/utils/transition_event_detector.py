@@ -46,7 +46,7 @@ def detect_instigating_event(
     # ============================================
     # SHOT-RELATED EVENTS
     # ============================================
-    if result_type in ["MAKE", "MISS"]:
+    if result_type in ["MAKE", "MISS", "BLOCK"]:
         made = result_type == "MAKE"
         has_foul = result.get("free_throws_remaining", 0) > 0 or result.get("has_and_one", False)
         is_pressure_shot = result.get("fcp_shot") or result.get("hct_shot")

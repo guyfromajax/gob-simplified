@@ -101,7 +101,7 @@ export class ShotAnimationSystem {
           shooter: turnData.shooter,
           ball_handler: turnData.ball_handler,
           hasResultType: !!turnData.result_type,
-          isMakeOrMiss: turnData.result_type === 'MAKE' || turnData.result_type === 'MISS',
+          isMakeOrMiss: turnData.result_type === 'MAKE' || turnData.result_type === 'MISS' || turnData.result_type === 'BLOCK',
           hasShooter: !!(turnData.shooter || turnData.ball_handler)
         });
         throw new Error('Invalid shot data');
@@ -219,13 +219,11 @@ export class ShotAnimationSystem {
     // 3. Animate step-by-step player movement
     await this.animatePlayerMovement(turnData, ballSprite, currentBallOwnerRef, maxSteps);
     
-    // 4. Handle shot outcome
+    // 4. Handle shot outcome (BLOCK treated like MISS for handling)
     const isMake = turnData.result_type === 'MAKE';
     const rimCoords = this.getRimCoordinates(turnData);
     
-    // Handle shot result
-    
-    // Execute make or miss handling
+    // Execute make or miss handling (BLOCK goes to handleMissedShot)
     if (isMake) {
       await this.handleMadeShot(rimCoords, turnData);
     } else {
@@ -635,7 +633,11 @@ export class ShotAnimationSystem {
    */
   async handleShotAtStep(shotInfo, turnData) {
     const shooterSprite = this.playerSprites[shotInfo.playerId];
-    const rimCoords = this.getRimCoordinates(turnData);
+    // BLOCK: animate ball to block spot instead of rim
+    const isBlock = turnData.result_type === 'BLOCK';
+    const rimCoords = (isBlock && turnData.ball_bounce_x != null && turnData.ball_bounce_y != null)
+      ? gridToPixels(turnData.ball_bounce_x, turnData.ball_bounce_y, this.scene.game.config.width, this.scene.game.config.height)
+      : this.getRimCoordinates(turnData);
     const isMake = turnData.result_type === 'MAKE';
     
     // ✅ COMMENTED OUT: Verbose shot handling logs (cluttering console)
@@ -1860,7 +1862,7 @@ export class ShotAnimationSystem {
   validateShotData(turnData) {
     return turnData && 
            turnData.result_type && 
-           (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS') &&
+           (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS' || turnData.result_type === 'BLOCK') &&
            (turnData.shooter || turnData.ball_handler || turnData.shooter_id);
   }
 

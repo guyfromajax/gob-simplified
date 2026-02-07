@@ -22,6 +22,7 @@ from BackEnd.utils.transition_registry import (
 RESULT_TYPE_TO_TURN_TYPE: Dict[str, TurnType] = {
     "MAKE": None,  # MAKE doesn't map to a turn type - it's a result
     "MISS": None,  # MISS doesn't map to a turn type - it's a result
+    "BLOCK": None,  # BLOCK treated like MISS (result, not a turn type)
     "PUTBACK_MAKE": None,  # PUTBACK_MAKE doesn't map to a turn type
     "PUTBACK_MISS": None,  # PUTBACK_MISS doesn't map to a turn type
     "FREE_THROW": TurnType.FREE_THROW,
