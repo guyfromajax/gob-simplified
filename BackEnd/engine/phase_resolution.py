@@ -4068,6 +4068,18 @@ def resolve_half_court_offense_logic(game):
             return foul_result
 
     # 3. Shot Result
+    # For SHOT path, animations was never set (it's only set inside event_type != "SHOT").
+    # Build animations from skeleton so update_player_coords_from_animations can sync coords before resolve_shot.
+    animations = []
+    if skeleton and "steps" in skeleton:
+        animator = Animator(game)
+        animations = animator.skeleton_to_animations(
+            skeleton,
+            off_lineup,
+            def_lineup,
+            add_defenders=True
+        )
+
     # ✅ MOTION OFFENSE: Check if this is a Motion play and route to Motion shot logic
     offense_play_type = game_state.get("offense_play_type", "")
     is_motion_play = offense_play_type == "motion"
