@@ -32,7 +32,8 @@
    - **"Charge!"** - Offensive foul on drive (result_type === 'CHARGE')
    - **"BLOCKING FOUL!"** - Defensive blocking foul on drive (result_type === 'FOUL', foul_team DEFENSE, text contains "blocking foul")
    - **"OFFENSIVE FOUL!" / "DEFENSIVE FOUL!"** - Other non-shooting fouls (with fouling player headshot)
-   - **"Rebound!"** - Defensive rebound (ballManager.js, when ball reaches rebounder)
+   - **"BLOCK!"** - Block on shot attempt (ShotAnimationSystem when ball reaches block spot, before rebound; blocker's image)
+   - **"Rebound!"** - Defensive rebound (ballManager.js / ShotAnimationSystem when ball reaches rebounder)
 
 **Long Form Documentation**
 
@@ -85,8 +86,11 @@ The Announcement System provides visual feedback for game events using timing-ba
 - **"OFFENSIVE FOUL!"** / **"DEFENSIVE FOUL!"** - Other non-shooting fouls (foul_team OFFENSE or DEFENSE, not blocking).
 - Shows fouling player's headshot. Skips if shooting foul (already handled in shot result announcements).
 
+**Block Announcements:**
+- **"BLOCK!"** - Announced in `ShotAnimationSystem.handleMissedShot` when `result_type === 'BLOCK'` (when ball has reached block spot), **before** the rebound is announced, so order is always Block → Rebound. Shows blocker's headshot. Routed via `announceGameEvent('BLOCK', ...)` in `gameAnnouncements.js`. Fallback: `finalizeTurnAfterAnimation` announces BLOCK only if `!turn._blockAnnounced`.
+
 **Rebound Announcements:**
-- **"Rebound!"** - Handled in `ballManager.js` when ball reaches rebounder (line 839)
+- **"Rebound!"** - Handled in `ballManager.js` / `ShotAnimationSystem.handleEmbeddedRebound` when ball reaches rebounder
 - Shows rebounder's headshot in rebounder's team color
 
 ### Idempotent Design
@@ -146,6 +150,9 @@ When a steal leads to a fast break:
 - `FrontEnd/static/js/phaser/animation/ballManager.js`
   - Shot result announcements when ball reaches rim (lines 476-598)
   - Rebound announcements when ball reaches rebounder (lines 822-839)
+- `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js`
+  - BLOCK announcement at start of `handleMissedShot` when `result_type === 'BLOCK'` (before bounce/rebound)
+  - Rebound announcement in `handleEmbeddedRebound` (e.g. before outlet setup)
 
 **Backend:**
 - `BackEnd/engine/phase_resolution.py` - Sets `is_steal_entry` flag for steal-initiated Fast Breaks
