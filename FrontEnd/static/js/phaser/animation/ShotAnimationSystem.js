@@ -1087,10 +1087,15 @@ export class ShotAnimationSystem {
       turnData._blockAnnounced = true;
       const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
       announceGameEvent('BLOCK', turnData, this.scene, { blockerId: turnData.blocker_id || turnData.defenderId });
+      console.log('🟡🟡🟡 [BLOCK/OREB BALL] handleMissedShot BLOCK | rimCoords (bounce target)', { rimCoords });
     }
 
     // Animate ball bounce from rim (or block spot when BLOCK - rimCoords set in executeCompleteShotSequence)
     await this.animateBallBounce(rimCoords, turnData);
+    if (turnData.result_type === 'BLOCK' && this.ballController?.ballSprite) {
+      const b = this.ballController.ballSprite;
+      console.log('🟡🟡🟡 [BLOCK/OREB BALL] handleMissedShot after bounce | ball_bounce_x, ball_bounce_y', { ball_bounce_x: b.x, ball_bounce_y: b.y });
+    }
     
     // ✅ FIX: Check for shooting foul on missed shot and show announcement (matches ballManager.js pattern)
     const hasFreeThrowsRemaining = (turnData?.free_throws_remaining ?? 0) > 0;
@@ -1168,6 +1173,14 @@ export class ShotAnimationSystem {
    * Handle rebound that's embedded within a shot turn
    */
   async handleEmbeddedRebound(turnData) {
+    const ballSprite = this.ballController?.ballSprite;
+    console.log('🟡🟡🟡 [BLOCK/OREB BALL] handleEmbeddedRebound entry', {
+      result_type: turnData.result_type,
+      rebound_type: turnData.rebound_type,
+      rebounderId: turnData.rebounderId,
+      ballSprite_x: ballSprite?.x,
+      ballSprite_y: ballSprite?.y,
+    });
 
     // Get the rebounder sprite
     const rebounderSprite = this.playerSprites[turnData.rebounderId];
@@ -1177,7 +1190,6 @@ export class ShotAnimationSystem {
     }
 
     // Get the ball's current position (where it bounced)
-    const ballSprite = this.ballController.ballSprite;
     let ballBounceX = 0;
     let ballBounceY = 0;
     
@@ -1524,6 +1536,10 @@ export class ShotAnimationSystem {
    * Handle offensive rebound
    */
   async handleOffensiveRebound(rebounderSprite, turnData) {
+    console.log('🟡🟡🟡 [BLOCK/OREB BALL] handleOffensiveRebound entry (OREB path)', {
+      rebound_type: turnData.rebound_type,
+      rebounderId: turnData.rebounderId,
+    });
     // ✅ DEBUG: Check what turns are coming next
     const currentTurnIndex = this.scene.currentTurn || 0;
     const nextTurn = this.scene.simData?.turns?.[currentTurnIndex + 1];
@@ -1571,8 +1587,12 @@ export class ShotAnimationSystem {
    * Execute putback attempt using standard shot animation
    */
   async executePutbackAttempt(rebounderSprite, turnData) {
-    // ✅ REMOVED: Putback attempt logging (cluttering console)
-    
+    const ballSp = this.ballController?.ballSprite;
+    console.log('🟡🟡🟡 [BLOCK/OREB BALL] executePutbackAttempt entry', {
+      ball_x: ballSp?.x,
+      ball_y: ballSp?.y,
+      rebounderId: turnData.rebounderId,
+    });
     // SIMPLE APPROACH: Use the old system that already works for regular shots
     const { playTurnAnimation } = await import('./turnAnimation.js');
     
