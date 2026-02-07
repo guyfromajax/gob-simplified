@@ -503,7 +503,7 @@ class ShotManager:
                         self.game_state["free_throws_remaining"] = 2
                         self.game_state["one_and_one"] = False
                     from BackEnd.engine.phase_resolution import check_and_handle_foul_out
-                    check_and_handle_foul_out(defender, self.game_state, def_team)
+                    block_recon_foul_out_info = check_and_handle_foul_out(defender, self.game_state, def_team)
                     shooter.record_stat("FGA")
                     if is_three:
                         shooter.record_stat("3PTA")
@@ -529,6 +529,22 @@ class ShotManager:
                         "has_and_one": made_from_foul,
                         "one_and_one": False,
                     }
+                    if block_recon_foul_out_info and block_recon_foul_out_info.get("fouled_out"):
+                        result["fouled_out"] = True
+                        result["foul_out_player"] = {
+                            "player_id": block_recon_foul_out_info["foul_player_id"],
+                            "name": block_recon_foul_out_info["foul_player_name"],
+                            "photo": block_recon_foul_out_info["foul_player_photo"],
+                            "team": block_recon_foul_out_info["foul_player_team"],
+                        }
+                        result["foul_count"] = block_recon_foul_out_info["foul_count"]
+                        self.game_state["foul_out_context"] = {
+                            "foul_type": "DEFENSIVE",
+                            "is_shooting_foul": True,
+                            "is_bonus": False,
+                            "next_play_type": "FREE_THROW",
+                            "shooter": shooter,
+                        }
                     return result
                 elif diff < -BLOCK_RECONCILIATION_BLOCK_THRESHOLD:
                     # Block: set flags and fall through to miss path (FGA/3PTA recorded in normal path)
@@ -845,6 +861,7 @@ class ShotManager:
         # 🎯 Shot is Made
         # ------------------------
         if made:
+            foul_out_info = {"fouled_out": False}  # default so elif BLOCKING_FOUL can safely read it
             # Debug logging for assist tracking
             if passer:
                 passer.record_stat("AST")
@@ -893,6 +910,22 @@ class ShotManager:
                 # ✅ FIX: Set next_play_type for AND-1 situations
                 result["next_play_type"] = "FREE_THROW"
                 text = f"{get_name_safe(shooter)} makes the shot. {get_name_safe(foul_player)} fouls him! AND-1 opportunity!"
+                if foul_out_info["fouled_out"]:
+                    result["fouled_out"] = True
+                    result["foul_out_player"] = {
+                        "player_id": foul_out_info["foul_player_id"],
+                        "name": foul_out_info["foul_player_name"],
+                        "photo": foul_out_info["foul_player_photo"],
+                        "team": foul_out_info["foul_player_team"],
+                    }
+                    result["foul_count"] = foul_out_info["foul_count"]
+                    self.game_state["foul_out_context"] = {
+                        "foul_type": "DEFENSIVE",
+                        "is_shooting_foul": True,
+                        "is_bonus": False,
+                        "next_play_type": "FREE_THROW",
+                        "shooter": shooter,
+                    }
             elif charge_result == "BLOCKING_FOUL":
                 # Blocking foul on made shot - add blocking foul text
                 text = f"{get_name_safe(shooter)} makes the shot. {get_name_safe(defender)} commits a blocking foul!"
