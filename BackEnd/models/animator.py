@@ -180,6 +180,7 @@ class Animator:
         # so the shooter doesn't take the shot from the confrontation/stop spot.
         ball_handler_beats_defender = hold_up and fb_roles.get("ball_handler_beats_defender")
         if ball_handler_beats_defender:
+            # Ball handler beat defender: shot spot near rim (same as no defensive stop attempt)
             rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
             shot_distance = random.randint(FB_SHOT_SPOT_X_MIN, FB_SHOT_SPOT_X_MAX)
             if is_away_offense:
@@ -188,11 +189,20 @@ class Animator:
                 bh_end_x = max(4, rim["x"] - shot_distance)
             bh_end_y = max(1, min(49, rim["y"] + random.randint(-FB_SHOT_SPOT_Y_RANGE, FB_SHOT_SPOT_Y_RANGE)))
             bh_end = {"x": bh_end_x, "y": bh_end_y}
-        elif ball_handler_outlet_x is not None and ball_handler_outlet_y is not None:
-            # Use outlet position as starting point (defensive stop or normal shot)
-            # Multiply direction by move_distance to get signed movement
+        elif hold_up and ball_handler_outlet_x is not None and ball_handler_outlet_y is not None:
+            # Defensive stop: ball handler ends at confrontation spot (outlet + short run)
             bh_end_x = max(4, min(97, ball_handler_outlet_x + additional_move_x))
             bh_end_y = max(1, min(49, ball_handler_outlet_y + additional_move_y))
+            bh_end = {"x": bh_end_x, "y": bh_end_y}
+        elif not hold_up and ball_handler_outlet_x is not None and ball_handler_outlet_y is not None:
+            # Shot attempt with outlet (no defensive stop): shot spot near rim, same as beats_defender
+            rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
+            shot_distance = random.randint(FB_SHOT_SPOT_X_MIN, FB_SHOT_SPOT_X_MAX)
+            if is_away_offense:
+                bh_end_x = min(97, rim["x"] + shot_distance)
+            else:
+                bh_end_x = max(4, rim["x"] - shot_distance)
+            bh_end_y = max(1, min(49, rim["y"] + random.randint(-FB_SHOT_SPOT_Y_RANGE, FB_SHOT_SPOT_Y_RANGE)))
             bh_end = {"x": bh_end_x, "y": bh_end_y}
         else:
             # Fallback: use old logic

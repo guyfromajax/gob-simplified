@@ -301,13 +301,24 @@ else:
 - **Early Termination**: Rebounder animations stop when ball handler and stopper both reach their spots
 
 **Shot Attempt:**
-- Ball handler (shooter) moves to spot near rim (basket ± 2-6, ±6 Y)
+- Ball handler (shooter) moves to **shot spot near rim** (basket ± 2-6, ±6 Y). The backend always sets this spot for shot attempts (see "Shot spot (ball handler end position) – backend" below).
 - Defender follows to position 1 x-coord toward basket from shooter (home: +1, away: −1), ±2 y from shooter
 - Get-back defenders chase toward basket
 - Rebounders move to random x=5-20 spots from basket, y=rim_y ± 10 (clamped)
 - **Early Termination**: 
   - Made shot: Rebounder animations stop when ball hits rim
   - Missed shot: Rebounder animations stop when rebounder grabs ball
+
+**Shot spot (ball handler end position) – backend**
+
+In `capture_fast_break_animation()` (BackEnd/models/animator.py), the ball handler's end position determines where the shot is taken and is exposed as `turn_result["shot_spot"]` for the frontend. It is set as follows:
+
+1. **Ball handler beats defender** (`hold_up` and `ball_handler_beats_defender`): Shot spot **near the rim** (same as below). Frontend uses `animateFastBreakShotWithStopper()` and may use local shot spot; backend still provides rim spot for consistency.
+2. **Defensive stop** (`hold_up` True, outlet set): Ball handler ends at **confrontation spot** (outlet position + 5–10 x toward basket, ±3 y). No shot; this is the stop position.
+3. **Shot attempt with outlet, no defensive stop** (`hold_up` False, outlet set): Shot spot **near the rim** (same logic as case 1). Previously this used "outlet + 5–10", which caused the shot to animate from the top-of-key area; the fix ensures all shot attempts get a rim shot spot so the animation shows the shot from near the basket.
+4. **Fallback** (no outlet): Defensive stop → top of key; shot attempt → near rim.
+
+The frontend uses `turnData.shot_spot` when present (FAST_BREAK handler) so the shot animates from the correct position.
 
 ### Fast Break MISS → DREB Transition
 
@@ -458,7 +469,7 @@ The outlet passer tracks:
 - `BackEnd/models/animator.py`
   - `capture_fast_break_animation()` - Builds animation packet
   - Uses `fb_roles` for ball handler outlet position and `is_away_offense`
-  - Handles coordinate flipping for away team display
+  - **Ball handler end position (shot spot)**: Defensive stop → confrontation spot (outlet + 5–10); shot attempt (with or without outlet) → shot spot near rim (so the shot always animates from near the basket, not from top-of-key). Exposed as `turn_result["shot_spot"]` in phase_resolution for frontend use.
 - `FrontEnd/static/js/phaser/animation/fastBreak.js`
   - `runFastBreakSequence()` - Orchestrates fast break animation
   - `animateOutletPhase()` - Handles outlet pass (no player movement)
