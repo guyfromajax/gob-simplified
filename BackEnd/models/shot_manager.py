@@ -460,7 +460,7 @@ class ShotManager:
         block_defender_used = None
         if shot_type in ("inside", "attack") and defender:
             x = def_team.strategy_settings.get("aggression", 2)
-            y = random.randint(0, 10)
+            y = -1  # TEMPORARY: always attempt block for prototype (restore: random.randint(0, 10))
             if y < x:
                 # Block reconciliation: use shot_score_pre_defense vs defense_block_score
                 def_height_inches = getattr(defender, "height", None) or defender.attributes.get("height") or 76
