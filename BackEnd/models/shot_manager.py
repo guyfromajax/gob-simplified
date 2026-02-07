@@ -457,7 +457,7 @@ class ShotManager:
         block_defender_used = None
         if shot_type in ("inside", "attack") and defender:
             x = def_team.strategy_settings.get("aggression", 2)
-            y = -1  # TEMPORARY: always attempt block for prototype (restore: random.randint(0, 10))
+            y = random.randint(0, 10)
             if y < x:
                 # Block reconciliation: use shot_score_pre_defense vs defense_block_score
                 shooter_coords_recon = getattr(shooter, "coords", {"x": 50, "y": 25})
@@ -466,19 +466,14 @@ class ShotManager:
                     shooter_coords_recon.get("x"), shooter_coords_recon.get("y"),
                     getattr(shooter, "player_id", None),
                 )
-                # TEMPORARY DEBUG: Don't calculate scores – use 0/0 so only force-block path runs (no defensive fouls from diff)
-                # def_height_inches = getattr(defender, "height", None) or defender.attributes.get("height") or 76
-                # def_h = height_to_block_score(def_height_inches)
-                # def_scaled_height = (def_h * 10) + random.randint(-9, 9)
-                # def_attrs = defender.attributes
-                # defense_block_score = (...)
-                defense_block_score = 0
-                _shot_score_for_block_recon = 0  # normally shot_score_pre_defense
-                diff = _shot_score_for_block_recon - defense_block_score  # 0 - 0
-                # TEMPORARY DEBUG: Force all block reconciliation to result in block (remove after debugging)
-                FORCE_BLOCK_RECONCILIATION_TO_BLOCK = True
-                if FORCE_BLOCK_RECONCILIATION_TO_BLOCK:
-                    diff = -abs(BLOCK_RECONCILIATION_BLOCK_THRESHOLD) - 1
+                def_height_inches = getattr(defender, "height", None) or defender.attributes.get("height") or 76
+                def_h = height_to_block_score(def_height_inches)
+                def_scaled_height = (def_h * 10) + random.randint(-9, 9)
+                def_attrs = defender.attributes
+                defense_block_score = (
+                    def_scaled_height * 0.4 + def_attrs.get("ID", 0) * 0.4 + def_attrs.get("IQ", 0) * 0.2
+                ) * random.randint(1, 6)
+                diff = shot_score_pre_defense - defense_block_score
                 if diff > BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD:
                     # Shooting foul from block: shooter_finish_score vs 250
                     # Outcome: AND-1 on make (1 FT), or 2 FTs on miss (shooting foul = 2 FTs on miss).
