@@ -3226,8 +3226,14 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
         return
     from BackEnd.constants import HCO_STRING_SPOTS
     from BackEnd.utils.shared import get_away_player_coords
-    location = pa.get("location", "key")
+    location = (pa.get("location") or "key").strip()
+    # Case-insensitive lookup (skeleton may use "upper midwing" vs constant "upper midWing")
     coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
+    if coords == {"x": 50, "y": 25} and location.lower() != "key":
+        for k, v in HCO_STRING_SPOTS.items():
+            if k.lower() == location.lower():
+                coords = v
+                break
     is_away_offense = game.offense_team.team_id == game.away_team.team_id
     if is_away_offense:
         coords = get_away_player_coords(coords)
@@ -4161,8 +4167,8 @@ def resolve_half_court_offense_logic(game):
                 game_state["motion_attack_penalty"] = motion_shot_info["attack_penalty"]
     
     # Resolve shot (standard logic for Set Plays, Motion-specific logic applied above)
-    set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)
     update_player_coords_from_animations(game, animations)
+    set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)  # After so block spot uses shot location, not animation coords
     shot_result = game.shot_manager.resolve_shot(roles)
     
     # Add playcall and variant debug info to the text
@@ -4720,8 +4726,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
         }
         
         # Use shot manager to resolve the shot
-        set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)
         update_player_coords_from_animations(game, animations)
+        set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)  # After so block spot uses shot location
         shot_result = game.shot_manager.resolve_shot(shot_roles)
         
         # ✅ Handle AND-1 situations (MAKE with shooting foul)
@@ -5877,8 +5883,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         }
         
         # Use shot manager to resolve the shot
-        set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)
         update_player_coords_from_animations(game, animations)
+        set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)  # After so block spot uses shot location
         shot_result = game.shot_manager.resolve_shot(shot_roles)
         
         # ✅ Handle AND-1 situations (MAKE with shooting foul)
