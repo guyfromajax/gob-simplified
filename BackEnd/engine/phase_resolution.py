@@ -831,9 +831,9 @@ def resolve_fast_break_logic(game: "GameManager"):
 
     hold_up = False
     stopper_id = None
-    if best_defender and best_stop_score >= break_score:
-        hold_up = True
-        stopper_id = best_defender.player_id
+    # ✅ Only set hold_up when a defender meets geography (ahead + within y); set in defender_ahead branch below.
+    # Do NOT set here from the early skill check — that uses stale coords and can leave hold_up True when
+    # no defender is actually ahead, causing the animator to use the confrontation spot instead of the rim.
 
     # ✅ NEW LOGIC: Determine event type based on defender positions relative to ball handler
     # Note: This will override hold_up/stopper_id if a defender is ahead after outlet pass
