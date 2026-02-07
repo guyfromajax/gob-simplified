@@ -78,8 +78,9 @@ BLOCK_PROBABILITY = {
 
 # Block reconciliation (blocks on shot attempts): thresholds for shot_score - defense_block_score
 # If diff > SHOOTING_FOUL_THRESHOLD → shooting foul; if diff < -BLOCK_THRESHOLD → block; else → standard shot
-BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD = 200
-BLOCK_RECONCILIATION_BLOCK_THRESHOLD = 200
+# TEMPORARY: -1 and 1 to force block/shooting foul in prototype (restore to 200, 200 for production)
+BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD = -1
+BLOCK_RECONCILIATION_BLOCK_THRESHOLD = 1
 
 MALLEABLE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT"]
 

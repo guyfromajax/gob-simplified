@@ -473,6 +473,7 @@ class ShotManager:
                 diff = shot_score_pre_defense - defense_block_score
                 if diff > BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD:
                     # Shooting foul from block: shooter_finish_score vs 250
+                    # Outcome: AND-1 on make (1 FT), or 2 FTs on miss (shooting foul = 2 FTs on miss).
                     shoot_h = height_to_block_score(getattr(shooter, "height", None) or shooter.attributes.get("height") or 76)
                     shoot_scaled = (shoot_h * 10) + random.randint(-9, 9)
                     shoot_attrs = shooter.attributes
@@ -487,8 +488,14 @@ class ShotManager:
                     self.game_state["foul_team"] = "DEFENSE"
                     self.game_state["shooter"] = shooter
                     self.game_state["offensive_state"] = "FREE_THROW"
-                    self.game_state["free_throws"] = 1
-                    self.game_state["free_throws_remaining"] = 1
+                    if made_from_foul:
+                        self.game_state["free_throws"] = 1
+                        self.game_state["free_throws_remaining"] = 1
+                        self.game_state["one_and_one"] = False
+                    else:
+                        self.game_state["free_throws"] = 2
+                        self.game_state["free_throws_remaining"] = 2
+                        self.game_state["one_and_one"] = False
                     from BackEnd.engine.phase_resolution import check_and_handle_foul_out
                     check_and_handle_foul_out(defender, self.game_state, def_team)
                     shooter.record_stat("FGA")
@@ -504,14 +511,17 @@ class ShotManager:
                     shooter_pos = get_player_position(off_lineup, shooter)
                     tempo = off_team.strategy_calls.get("tempo_call", "normal")
                     time_elapsed_ft = get_time_elapsed(tempo)
+                    ft_remaining = 1 if made_from_foul else 2
                     result = {
                         "result_type": "MAKE" if made_from_foul else "MISS",
                         "ball_handler": shooter, "shooter": shooter, "shooter_id": shooter.player_id,
                         "shooter_pos": shooter_pos, "screener": screener, "passer": passer, "defender": defender,
                         "text": text, "possession_flips": False, "time_elapsed": time_elapsed_ft, "events": [],
                         "foul_player_id": defender.player_id, "foul_team": "DEFENSE",
-                        "next_play_type": "FREE_THROW", "free_throws_remaining": 1,
+                        "next_play_type": "FREE_THROW", "free_throws_remaining": ft_remaining,
                         "offense_team_id": off_team.team_id, "defense_team_id": def_team.team_id,
+                        "has_and_one": made_from_foul,
+                        "one_and_one": False,
                     }
                     return result
                 elif diff < -BLOCK_RECONCILIATION_BLOCK_THRESHOLD:
