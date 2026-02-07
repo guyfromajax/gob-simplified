@@ -130,13 +130,7 @@ def check_and_handle_foul_out(foul_player, game_state, foul_team):
     fouled_out = foul_count >= 5
     
     if fouled_out:
-        # Add to ineligible players list if not already there
-        if "ineligible_players" not in game_state:
-            game_state["ineligible_players"] = []
-        if foul_player.player_id not in game_state["ineligible_players"]:
-            game_state["ineligible_players"].append(foul_player.player_id)
-        
-        # Remove from lineup if currently in lineup
+        # Remove from lineup if currently in lineup (eligibility is derived from F >= 5 elsewhere)
         for pos, player in list(foul_team.lineup.items()):
             if player and hasattr(player, "player_id") and player.player_id == foul_player.player_id:
                 foul_team.lineup[pos] = None

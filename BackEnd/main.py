@@ -138,42 +138,38 @@ def _ensure_complete_lineup(team, game_state=None) -> None:
         game_state: Optional game state dict to check for ineligible players
     """
 
-    # Get ineligible players (fouled-out) if game_state is available
-    ineligible_player_ids = set()
-    if game_state:
-        ineligible_player_ids = set(game_state.get("ineligible_players", []))
-    
-    # First, remove any ineligible players from the lineup
+    # First, remove any fouled-out players (5+ fouls) from the lineup
     for pos, player in list(team.lineup.items()):
-        if player and hasattr(player, "player_id") and player.player_id in ineligible_player_ids:
-            # logging.warning(f"⚠️ Removing ineligible player {player.player_id} from {team.name} {pos} position")
-            team.lineup[pos] = None
-    
+        if player and hasattr(player, "get_stat"):
+            foul_count = player.get_stat("F", "game")
+            if foul_count is not None and foul_count >= 5:
+                team.lineup[pos] = None
+
     # Now find missing positions (including those we just cleared)
     missing = [pos for pos in POSITION_LIST if not team.lineup.get(pos)]
     if not missing:
         return
-    
+
     # Get currently assigned player IDs (to avoid duplicates)
     current_player_ids = set()
     for pos, player in team.lineup.items():
         if player and hasattr(player, "player_id"):
             current_player_ids.add(player.player_id)
 
-    # Filter available players: exclude ineligible, already-assigned, and players failing energy/foul restrictions
+    # Filter available players: exclude fouled-out (F>=5), already-assigned, and players failing energy/foul restrictions
     from BackEnd.utils.db_utils import is_player_eligible_for_lineup
     available_players = [
         p for p in team.get_all_players()
-        if p.player_id not in ineligible_player_ids 
-        and p.player_id not in current_player_ids
-        and is_player_eligible_for_lineup(p, game_state, ineligible_player_ids)
+        if p.player_id not in current_player_ids
+        and is_player_eligible_for_lineup(p, game_state)
     ]
-    
+    fouled_out_count = sum(1 for p in team.get_all_players() if getattr(p, "get_stat", None) and (p.get_stat("F", "game") or 0) >= 5)
+
     if len(available_players) < len(missing):
         raise ValueError(
             f"Team '{team.name}' lineup missing positions {missing}: "
             f"Only {len(available_players)} eligible players available "
-            f"(need {len(missing)}, excluding {len(ineligible_player_ids)} ineligible)"
+            f"(need {len(missing)}, {fouled_out_count} fouled out)"
         )
     
     # Fill missing positions with available players

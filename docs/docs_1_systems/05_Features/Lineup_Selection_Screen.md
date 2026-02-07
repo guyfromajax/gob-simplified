@@ -35,10 +35,10 @@ The Lineup Selection Screen allows users to set their starting lineup before eac
 
 **Backend:**
 - **Roster API**: ✅ UNIFIED endpoint `/roster/{team_name}` with query parameters (`?franchise_id={id}` or `?tournament_id={id}`) for all modes
-- **Game API** (`/api/game/{gameId}`): Returns player stats, attributes (EM, MO, CH, NG), ineligible players
+- **Game API** (`/api/game/{gameId}`): Returns player stats (including F = fouls), attributes (EM, MO, CH, NG)
 
 **Frontend:**
-- `loadRoster()`: Loads roster, merges game data if `gameId` exists
+- `loadRoster()`: Loads roster, merges game data if `gameId` exists; derives fouled-out status from game stats (F ≥ 5) on each visit
 - `updateSlotDisplay()`: Displays stats/attributes for lineup players
 
 ### Player Stats and Attributes Display
@@ -66,11 +66,13 @@ The Lineup Selection Screen allows users to set their starting lineup before eac
 
 **Fix:** Changed to `team.get_all_players()` to return all players, ensuring all roster players get EM/MO attributes.
 
-### Player Eligibility Filtering
+### Player Eligibility Filtering (Fouled Out)
 
-**Manual Selection:** Only fouled-out players (5+ fouls) are excluded from selection.
+**How it works:** Each time the user enters the lineup screen (pre-game, after a timeout, after a quarter break), the screen fetches game data when `gameId` is present. When merging that game data into the roster, any player whose **game foul count (F) is ≥ 5** is marked ineligible (fouled out). No separate ineligible list is persisted or passed from the backend for this screen—eligibility is derived from current game stats on every visit.
 
-**Visual Indicators:** Reduced opacity, "FOULED OUT" label, disabled interactions for fouled-out players.
+**Manual selection:** Fouled-out players (5+ fouls) cannot be added to the lineup. They are greyed out and non-draggable in both grid view and player (card) view.
+
+**Visual indicators:** Reduced opacity, grey styling, disabled drag-and-drop and click-to-fill for fouled-out players in grid and player views. Fouled-out players already in the lineup are removed when the lineup is restored/applied (e.g. from URL or after merge).
 
 **Note:** Energy and foul count filtering (NG thresholds, quarter-specific restrictions) are only applied in the Auto-Set Lineup feature, not for manual selection.
 

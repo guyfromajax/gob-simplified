@@ -297,11 +297,7 @@ class TestFoulOutCheck:
         result = check_and_handle_foul_out(player, game.game_state, game.home_team)
         assert result["fouled_out"] == True
         assert result["foul_count"] == 5
-        # Note: MockPlayer may not have player_id, so check ineligible_players differently
-        if hasattr(player, "player_id") and player.player_id:
-            assert player.player_id in game.game_state.get("ineligible_players", [])
-        # Lineup removal happens in check_and_handle_foul_out, but MockPlayer may auto-replace
-        # The important thing is that foul out is detected
+        # Lineup removal and sub happen in check_and_handle_foul_out; eligibility is F >= 5 elsewhere
 
 
 class TestGameStatePreservation:
@@ -357,59 +353,49 @@ class TestGameStatePreservation:
         # PTS is auto-calculated from FGM (2 FGM = 4 PTS), so verify it's at least 4
 
 
-class TestIneligiblePlayersAPI:
-    """Test that API returns ineligible_players in response."""
-    
-    def test_api_returns_ineligible_players_in_memory(self):
-        """Test that /api/game/{game_id} returns ineligible_players when game is in memory."""
-        # Use build_mock_game() to create a properly initialized game
+class TestFouledOutEligibility:
+    """Test that fouled-out (5+ fouls) is derived from game stats; no ineligible_players list."""
+
+    def test_fouled_out_player_ineligible_for_lineup(self):
+        """Player with 5+ fouls is ineligible; eligibility derived from F stat."""
+        from BackEnd.utils.db_utils import is_player_eligible_for_lineup
+
         game = build_mock_game()
         game.game_id = "test_game_123"
-        
-        # Trigger foul out
+
         player = game.home_team.lineup["PG"]
         for _ in range(5):
             player.record_stat("F")
-        
+
         from BackEnd.engine.phase_resolution import check_and_handle_foul_out
         check_and_handle_foul_out(player, game.game_state, game.home_team)
-        
-        # Verify ineligible_players is in game_state
-        assert player.player_id in game.game_state.get("ineligible_players", [])
-        
-        # Mock the API endpoint (simplified - actual endpoint requires more setup)
-        # The key test is that ineligible_players is in game_state, which the API reads from
-        ineligible_players = game.game_state.get("ineligible_players", [])
-        assert len(ineligible_players) > 0
-        assert player.player_id in ineligible_players
-    
-    def test_ineligible_players_persists_in_game_state(self):
-        """Test that ineligible_players is saved to and loaded from database correctly."""
+
+        # Eligibility derived from foul count, not a list
+        assert player.get_stat("F", "game") >= 5
+        assert is_player_eligible_for_lineup(player, game.game_state) is False
+
+    def test_foul_count_persists_in_game_summary(self):
+        """Player stats (including F) are in summarize_game_state so eligibility can be derived on load."""
         from BackEnd.utils.shared import summarize_game_state
         from BackEnd.engine.phase_resolution import check_and_handle_foul_out
-        
-        # Use build_mock_game() to create a properly initialized game
+
         game = build_mock_game()
         game.game_id = "test_game_456"
-        
-        # Trigger foul out
+
         player = game.home_team.lineup["PG"]
         for _ in range(5):
             player.record_stat("F")
-        
+
         check_and_handle_foul_out(player, game.game_state, game.home_team)
-        
-        # Verify ineligible_players is in game_state
-        assert player.player_id in game.game_state.get("ineligible_players", [])
-        
-        # Simulate save to database
+
         db_summary = summarize_game_state(game, exclude_animations=True)
-        assert "ineligible_players" in db_summary
-        assert player.player_id in db_summary["ineligible_players"]
-        
-        # Simulate load from database
-        loaded_ineligible_players = db_summary.get("ineligible_players", [])
-        assert player.player_id in loaded_ineligible_players
+        # Player stats (with F) are in summary; eligibility derived from F on load
+        assert "players" in db_summary
+        players = db_summary["players"]
+        found = next((p for p in players if (p.get("playerId") or p.get("player_id")) == player.player_id), None)
+        assert found is not None
+        stats = found.get("stats", {})
+        assert stats.get("F", 0) >= 5
 
 
 if __name__ == "__main__":
