@@ -31,9 +31,12 @@ let dontShowAgainThisGame = false; // Track "Don't show again" checkbox state
  * @param {Object} scene - Game scene object
  * @returns {Promise} - Resolves when user submits matchups (or closes popup)
  */
+const SESSION_STORAGE_KEY_PREFIX = 'defenseMatchupsDontShow_';
+
 export async function showDefenseMatchupsPopup(gameId, scene) {
-    // Check if user has checked "Don't show again this game"
-    if (dontShowAgainThisGame) {
+    // Check if user has checked "Don't show again this game" (in-memory or persisted across page reloads)
+    const persisted = typeof sessionStorage !== 'undefined' && gameId && sessionStorage.getItem(SESSION_STORAGE_KEY_PREFIX + gameId) === '1';
+    if (dontShowAgainThisGame || persisted) {
         return Promise.resolve();
     }
     
@@ -357,10 +360,18 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
         }
     });
     
-    // Checkbox handler
+    // Checkbox handler: persist so "don't show again" survives navigation (e.g. lineup -> court full page load)
     const checkbox = popup.querySelector('#dont-show-again-checkbox');
     checkbox.addEventListener('change', (e) => {
-        dontShowAgainThisGame = e.target.checked;
+        const checked = e.target.checked;
+        dontShowAgainThisGame = checked;
+        if (typeof sessionStorage !== 'undefined' && gameId) {
+            if (checked) {
+                sessionStorage.setItem(SESSION_STORAGE_KEY_PREFIX + gameId, '1');
+            } else {
+                sessionStorage.removeItem(SESSION_STORAGE_KEY_PREFIX + gameId);
+            }
+        }
     });
 }
 
@@ -507,6 +518,13 @@ async function handleSubmit(popup, gameId) {
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.detail || 'Failed to save matchups');
+        }
+        
+        // Persist "don't show again" on submit so it survives page reload (e.g. lineup -> court)
+        const checkbox = popup.querySelector('#dont-show-again-checkbox');
+        if (checkbox && checkbox.checked && typeof sessionStorage !== 'undefined' && gameId) {
+            dontShowAgainThisGame = true;
+            sessionStorage.setItem(SESSION_STORAGE_KEY_PREFIX + gameId, '1');
         }
         
         // Close popup
@@ -748,7 +766,14 @@ function addPopupStyles() {
 /**
  * Reset the "Don't show again" flag (called at game start)
  */
-export function resetDontShowAgainFlag() {
+/**
+ * Reset "don't show again" for a new game so the popup can show at Q1 start.
+ * @param {string} [gameId] - If provided, clears persisted preference for this game (e.g. when starting new game).
+ */
+export function resetDontShowAgainFlag(gameId) {
     dontShowAgainThisGame = false;
+    if (typeof sessionStorage !== 'undefined' && gameId) {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY_PREFIX + gameId);
+    }
 }
 

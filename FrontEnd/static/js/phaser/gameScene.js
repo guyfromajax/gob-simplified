@@ -1546,7 +1546,7 @@ export function createGameScene(Phaser) {
               const isQ1Start = this.quarter === 1 && !resumeFromTimeout && !fromLineup;
               
               if (isQ1Start) {
-                resetDontShowAgainFlag();
+                resetDontShowAgainFlag(this.gameId);
               }
               
               // Show popup and wait for user to submit before starting animation
