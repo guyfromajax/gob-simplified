@@ -1,6 +1,6 @@
 # Block System (Blocks on Shot Attempts)
 
-**Status:** Planning — no code until aligned  
+**Status:** Implemented  
 **Depends on:** Shot System, Rebound System, Animation System, Data Persistence
 
 ---
@@ -67,8 +67,8 @@ From here, existing shooting-foul and free-throw flows (stats, next_play_type, g
 ### 1.6 Animation: Block vs Shot
 
 - When the outcome is a **block** (not a shooting foul, not “else” to standard shot):
-  - Do **not** animate a shot (no ball to rim).
-  - Animate a **block**: use a **block spot** (see below), then treat as a missed shot for rebound animation and run **standard rebound logic** (existing `determine_rebounder`, etc.).
+  - Animate the ball to the **block spot** (not the rim), then run the same miss path (bounce, rebound). The block spot is used as the reference for both the ball flight target and the bounce/rebound so the ball does not snap to the opposite side of the court.
+  - **Frontend:** In `ShotAnimationSystem`, (1) ball flight uses `ball_bounce_x`/`ball_bounce_y` as the target when `result_type === 'BLOCK'`; (2) in the miss path, `rimCoords` for BLOCK is also set from the block spot (not `getRimCoordinates`) so the bounce and rebound logic use the block spot as the reference.
 - When outcome is shooting foul or “else” to standard shot, keep current shot (and optional foul) animation behavior.
 
 **Result_type BLOCK (dedicated, both backend and frontend):**
@@ -97,6 +97,7 @@ From here, existing shooting-foul and free-throw flows (stats, next_play_type, g
 ### 1.10 Block Announcement
 
 - When a block occurs, use the **Announcement System** to announce **"BLOCK!"** and show the **blocker’s image** (same pattern as other player-centric announcements, e.g. rebound or steal).
+- **Timing:** "BLOCK!" is announced **when the ball reaches the block spot** (at the start of the miss path in `ShotAnimationSystem.handleMissedShot`), **before** the rebound is announced, so the order is always Block → Rebound.
 
 ### 1.9 Stats and Fouls
 
@@ -176,4 +177,6 @@ From here, existing shooting-foul and free-throw flows (stats, next_play_type, g
 - **Announcement:** On block, Announcement System announces "BLOCK!" and shows blocker's image.
 - **Reuse:** Same shot_type, pre-penalty shot_score from calculate_shot_score (block uses it before penalty), aggression 0–4, rebound flow, result shape, persistence, foul/FT handling.
 
-No code has been written; this doc is the shared understanding and plan until you say otherwise.
+**Implementation notes (post-implementation):**
+- Block announcement order: "BLOCK!" is fired from `ShotAnimationSystem.handleMissedShot` when `result_type === 'BLOCK'` (turnData._blockAnnounced set); `finalizeTurnAfterAnimation` only announces BLOCK if `!turn._blockAnnounced` (fallback).
+- Ball snap fix: `executeCompleteShotSequence` uses block spot (`ball_bounce_x`/`ball_bounce_y`) as `rimCoords` for BLOCK so the miss path (bounce, rebound) never references the rim for blocks.

@@ -221,7 +221,11 @@ export class ShotAnimationSystem {
     
     // 4. Handle shot outcome (BLOCK treated like MISS for handling)
     const isMake = turnData.result_type === 'MAKE';
-    const rimCoords = this.getRimCoordinates(turnData);
+    // BLOCK: use block spot as reference for miss path so bounce/rebound stay on correct side (no snap to rim)
+    const isBlock = turnData.result_type === 'BLOCK';
+    const rimCoords = (isBlock && turnData.ball_bounce_x != null && turnData.ball_bounce_y != null)
+      ? gridToPixels(turnData.ball_bounce_x, turnData.ball_bounce_y, this.scene.game.config.width, this.scene.game.config.height)
+      : this.getRimCoordinates(turnData);
     
     // Execute make or miss handling (BLOCK goes to handleMissedShot)
     if (isMake) {
@@ -1078,9 +1082,14 @@ export class ShotAnimationSystem {
    * Handle missed shot
    */
   async handleMissedShot(rimCoords, turnData) {
-    // ✅ REMOVED: Missed shot logging (cluttering console)
+    // ✅ BLOCK: Announce "BLOCK!" when ball has reached block spot (before rebound) so order is Block → Rebound
+    if (turnData.result_type === 'BLOCK') {
+      turnData._blockAnnounced = true;
+      const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+      announceGameEvent('BLOCK', turnData, this.scene, { blockerId: turnData.blocker_id || turnData.defenderId });
+    }
 
-    // Animate ball bounce from rim
+    // Animate ball bounce from rim (or block spot when BLOCK - rimCoords set in executeCompleteShotSequence)
     await this.animateBallBounce(rimCoords, turnData);
     
     // ✅ FIX: Check for shooting foul on missed shot and show announcement (matches ballManager.js pattern)

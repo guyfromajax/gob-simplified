@@ -276,8 +276,8 @@ export async function finalizeTurnAfterAnimation({
       }
     }
     // Note: Shooting fouls on misses are announced in ballManager.js with "Shooting Foul!"
-  } else if (turn.result_type === 'BLOCK') {
-    // Block: announce "BLOCK!" with blocker image
+  } else if (turn.result_type === 'BLOCK' && !turn._blockAnnounced) {
+    // Block: announce "BLOCK!" with blocker image (only if not already announced in ShotAnimationSystem)
     announceGameEvent('BLOCK', turn, scene, { blockerId: turn.blocker_id || turn.defenderId });
   } else if ((turn.result_type === 'MAKE' || turn.result_type === 'MISS') && 
              turn.foul_team === 'DEFENSE' && 
