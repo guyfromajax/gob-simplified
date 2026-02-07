@@ -78,6 +78,10 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       handleBlockingFoulAnnouncement(turnData, scene, context, offenseTeam);
       break;
 
+    case 'BLOCK':
+      handleBlockAnnouncement(turnData, scene, context);
+      break;
+
     // ========== TURNOVERS ==========
     case 'STEAL':
       handleStealAnnouncement(turnData, scene, context, defenseTeam);
@@ -224,6 +228,23 @@ function handleReboundAnnouncement(turnData, scene, context) {
   };
 
   showAnnouncement("Rebound!", rebounderTeam, playerData);
+}
+
+function handleBlockAnnouncement(turnData, scene, context) {
+  const blockerId = context.blockerId || turnData.blocker_id;
+  if (!blockerId || !scene) return;
+
+  const blockerSprite = scene.playerSprites?.[blockerId];
+  if (!blockerSprite) return;
+
+  const blockerTeam = blockerSprite.team;
+  const playerData = {
+    playerId: blockerId,
+    photo: blockerSprite.photo || null,
+    teamName: blockerSprite.team_id
+  };
+
+  showAnnouncement("BLOCK!", blockerTeam, playerData);
 }
 
 function handleShootingFoulAnnouncement(turnData, scene, context) {

@@ -287,6 +287,42 @@ def calculate_screen_score(screen_attrs):
     )
     return base_score * random.randint(1, 6)
 
+
+def height_to_block_score(height_inches):
+    """
+    Map player height (inches) to 0-10 for block reconciliation.
+    >=82 -> 10, 81 -> 9, ... 73 -> 1, <=72 -> 0.
+    """
+    if height_inches is None:
+        return 0
+    try:
+        h = int(height_inches)
+    except (TypeError, ValueError):
+        return 0
+    if h >= 82:
+        return 10
+    if h <= 72:
+        return 0
+    return 82 - h  # 81->9, 80->8, ..., 73->1
+
+
+def calculate_block_spot(shooter_x, shooter_y, is_away_offense):
+    """
+    Block spot: 2-15 back from shooter's x (toward offense's basket), y ± 6.
+    Home on offense: x back = -15 to -2. Away on offense: x back = 2 to 15.
+    Returns dict {"x", "y"} clamped to court.
+    """
+    x_back = random.randint(2, 15)
+    if is_away_offense:
+        block_x = shooter_x + x_back
+    else:
+        block_x = shooter_x - x_back
+    block_y = shooter_y + random.randint(-6, 6)
+    block_x = max(0, min(100, block_x))
+    block_y = max(0, min(50, block_y))
+    return {"x": block_x, "y": block_y}
+
+
 def calculate_bounce_spot(game, basket_x=None, basket_y=25, shooter_spot=None):
     """
     Calculate the bounce spot coordinates for a missed shot.

@@ -168,7 +168,7 @@ def _find_most_recent_shot_turn(game, max_turns=10):
         return None
     
     for turn in reversed(game.turns[-max_turns:]):
-        if turn.get("result_type") in ["MISS", "MAKE"]:
+        if turn.get("result_type") in ["MISS", "MAKE", "BLOCK"]:
             return turn
     
     return None
@@ -489,7 +489,7 @@ def _record_fast_break_stats(fb_roles, turn_result, game):
         result_type == "FOUL" and game.game_state.get("foul_team") == "OFFENSE"
     )
     is_fb_s_defense = result_type == "DEFENSIVE_STOP"
-    is_fb_f_defense = result_type in ["MAKE", "MISS"] or (
+    is_fb_f_defense = result_type in ["MAKE", "MISS", "BLOCK"] or (
         result_type == "FOUL" and game.game_state.get("foul_team") == "DEFENSE"
     )
     
@@ -626,7 +626,7 @@ def _record_fcp_stats(fcp_roles, turn_result, game, off_lineup, def_lineup):
     is_fcp_s_offense = result_type in ["MAKE", "HCO"] or (
         result_type == "FOUL" and game.game_state.get("foul_team") == "DEFENSE"
     )
-    is_fcp_s_defense = result_type in ["MISS", "TURNOVER", "STEAL", "DEAD BALL"] or (
+    is_fcp_s_defense = result_type in ["MISS", "BLOCK", "TURNOVER", "STEAL", "DEAD BALL"] or (
         result_type == "FOUL" and game.game_state.get("foul_team") == "OFFENSE"
     )
     
@@ -666,7 +666,7 @@ def _record_hct_stats(hct_roles, turn_result, game, off_lineup, def_lineup):
     is_hct_s_offense = result_type in ["MAKE", "HCO"] or (
         result_type == "FOUL" and game.game_state.get("foul_team") == "DEFENSE"
     )
-    is_hct_s_defense = result_type in ["MISS", "TURNOVER", "STEAL", "DEAD BALL"] or (
+    is_hct_s_defense = result_type in ["MISS", "BLOCK", "TURNOVER", "STEAL", "DEAD BALL"] or (
         result_type == "FOUL" and game.game_state.get("foul_team") == "OFFENSE"
     )
     
@@ -1388,7 +1388,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         elif game_state.get("foul_team") == "OFFENSE":
             def_scouting["defense"]["vs_Fast_Break"]["success"] += 1
 
-    elif turn_result["result_type"] in ["MISS", "TURNOVER"]:
+    elif turn_result["result_type"] in ["MISS", "BLOCK", "TURNOVER"]:
         def_scouting["defense"]["vs_Fast_Break"]["success"] += 1
 
 
@@ -4698,7 +4698,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
             else:
                 # Regular make → route to BASELINE_INBOUND (pressure may apply again)
                 game_state["offensive_state"] = "HCO"  # Will be set to BASELINE_INBOUND by transition system
-        elif shot_result.get("result_type") == "MISS":
+        elif shot_result.get("result_type") in ["MISS", "BLOCK"]:
             if free_throws_remaining > 0:
                 # Shooting foul on miss → preserve FREE_THROW state
                 game_state["offensive_state"] = "FREE_THROW"
@@ -4707,9 +4707,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
                 shot_result["free_throws_remaining"] = free_throws_remaining
                 logging.warning(f"✅ [FCP SHOT] MISS with shooting foul → FREE_THROW (free_throws_remaining: {free_throws_remaining})")
             else:
-                # Regular miss → reset to HCO
+                # Regular miss or block → reset to HCO
                 game_state["offensive_state"] = "HCO"
-                # Track MISS as defensive success for team
+                # Track MISS/BLOCK as defensive success for team
                 def_scouting["defense"]["FCP"]["success"] += 1
         
         # Track FCP player stats for SHOT results
@@ -5831,7 +5831,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
             else:
                 # Regular make → route to BASELINE_INBOUND (pressure may apply again)
                 game_state["offensive_state"] = "HCO"  # Will be set to BASELINE_INBOUND by transition system
-        elif shot_result.get("result_type") == "MISS":
+        elif shot_result.get("result_type") in ["MISS", "BLOCK"]:
             if free_throws_remaining > 0:
                 # Shooting foul on miss → preserve FREE_THROW state
                 game_state["offensive_state"] = "FREE_THROW"
@@ -5840,9 +5840,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
                 shot_result["free_throws_remaining"] = free_throws_remaining
                 logging.warning(f"✅ [HCT SHOT] MISS with shooting foul → FREE_THROW (free_throws_remaining: {free_throws_remaining})")
             else:
-                # Regular miss → reset to HCO
+                # Regular miss or block → reset to HCO
                 game_state["offensive_state"] = "HCO"
-                # Track MISS as defensive success for team
+                # Track MISS/BLOCK as defensive success for team
                 def_scouting["defense"]["HCT"]["success"] += 1
         
         # Track HCT player stats for SHOT results

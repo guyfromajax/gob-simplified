@@ -305,7 +305,7 @@ class Animator:
         release_player_ids = set()
         if self.game.turns and len(self.game.turns) > 0:
             for turn in reversed(self.game.turns[-10:]):
-                if turn.get("result_type") in ["MISS", "MAKE"]:
+                if turn.get("result_type") in ["MISS", "MAKE", "BLOCK"]:
                     release_coords = turn.get("defense_release_coords", {})
                     if release_coords:
                         release_player_ids = set(release_coords.keys())

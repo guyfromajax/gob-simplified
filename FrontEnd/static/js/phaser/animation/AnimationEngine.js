@@ -124,7 +124,7 @@ export class AnimationEngine {
                         turnData.fast_break === "true" ||
                         turnData.result_type === "FAST_BREAK";
     // 🔍 ANNOUNCEMENT DIAGNOSTIC: Log routing for MAKE/MISS so we can see if Fast Break handler is chosen
-    const isMakeOrMiss = turnData.result_type === 'MAKE' || turnData.result_type === 'MISS';
+    const isMakeOrMiss = turnData.result_type === 'MAKE' || turnData.result_type === 'MISS' || turnData.result_type === 'BLOCK';
     if (isMakeOrMiss || turnData.fast_break != null) {
       const hasFastBreakKey = Object.prototype.hasOwnProperty.call(turnData, 'fast_break');
       const hasFastBreakCamel = Object.prototype.hasOwnProperty.call(turnData, 'fastBreak');
@@ -209,6 +209,7 @@ export class AnimationEngine {
   isShotAttempt(turnData) {
     return turnData.result_type === "MAKE" || 
            turnData.result_type === "MISS" ||
+           turnData.result_type === "BLOCK" ||
            turnData.shooter ||
            turnData.shot_score !== undefined;
   }
@@ -432,7 +433,7 @@ export class AnimationEngine {
     });
     
     // ✅ PHASE 2.6: Set flag if this was a shot turn (moved from animateGameTurns.js)
-    if (turnData.result_type === "MAKE" || turnData.result_type === "MISS") {
+    if (turnData.result_type === "MAKE" || turnData.result_type === "MISS" || turnData.result_type === "BLOCK") {
       this.scene._previousTurnWasShot = true;
     }
     

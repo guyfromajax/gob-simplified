@@ -912,9 +912,9 @@ export function animateRebound({
     const previousTurn = scene.simData?.turns?.[currentIndex - 1];
     
     // Check current turn first (if this turn is the rebound turn after a MISS)
-    if (currentTurn?.result_type === "MISS" && currentTurn?.offense_getback) {
+    if ((currentTurn?.result_type === "MISS" || currentTurn?.result_type === "BLOCK") && currentTurn?.offense_getback) {
       offenseGetBackList = currentTurn.offense_getback;
-    } else if (previousTurn?.result_type === "MISS" && previousTurn?.offense_getback) {
+    } else if ((previousTurn?.result_type === "MISS" || previousTurn?.result_type === "BLOCK") && previousTurn?.offense_getback) {
       // Otherwise, check previous turn
       offenseGetBackList = previousTurn.offense_getback;
     }

@@ -76,6 +76,11 @@ BLOCK_PROBABILITY = {
     # All others default to 0.0
 }
 
+# Block reconciliation (blocks on shot attempts): thresholds for shot_score - defense_block_score
+# If diff > SHOOTING_FOUL_THRESHOLD → shooting foul; if diff < -BLOCK_THRESHOLD → block; else → standard shot
+BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD = 200
+BLOCK_RECONCILIATION_BLOCK_THRESHOLD = 200
+
 MALLEABLE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT"]
 
 PLAYCALLS = ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"]
