@@ -298,6 +298,45 @@ class GameManager:
         # logging.warning(f"⏸️ TIMEOUT: {calling_team.name} called timeout (reason: {timeout_reason}, turn {len(self.turns)})")
         return timeout_turn
 
+    def _check_lineups_for_foul_out(self, result):
+        """
+        SS&S: After every turn, check both teams' active lineups for any player with >= 5 fouls.
+        If found and this turn did not already trigger foul-out, run the foul-out process so we
+        never miss a player fouling out (e.g. from a code path that didn't call check_and_handle_foul_out).
+        """
+        if result.get("fouled_out"):
+            return
+        from BackEnd.engine.phase_resolution import check_and_handle_foul_out
+        for team in [self.home_team, self.away_team]:
+            for player in (team.lineup or {}).values():
+                if not player:
+                    continue
+                foul_count = (player.get_stat("F", "game") or 0) if hasattr(player, "get_stat") else 0
+                if foul_count >= 5:
+                    foul_out_info = check_and_handle_foul_out(player, self.game_state, team)
+                    result["fouled_out"] = True
+                    result["foul_out_player"] = {
+                        "player_id": foul_out_info.get("foul_player_id"),
+                        "name": foul_out_info.get("foul_player_name"),
+                        "photo": foul_out_info.get("foul_player_photo"),
+                        "team": foul_out_info.get("foul_player_team"),
+                    }
+                    result["foul_count"] = foul_out_info.get("foul_count", foul_count)
+                    next_play_type = result.get("next_play_type", "SIDE_INBOUND")
+                    is_defensive = team == self.defense_team
+                    self.game_state["foul_out_context"] = {
+                        "foul_type": "DEFENSIVE" if is_defensive else "OFFENSIVE",
+                        "is_shooting_foul": False,
+                        "is_bonus": team.team_fouls >= 5 if is_defensive else False,
+                        "next_play_type": next_play_type,
+                        "shooter": result.get("shooter") if next_play_type == "FREE_THROW" else None,
+                    }
+                    logging.info(
+                        f"✅ FOUL OUT (end-of-turn check): {foul_out_info.get('foul_player_name', 'Unknown')} "
+                        f"has 5 fouls; instigating Player Foul Out process"
+                    )
+                    return
+
     def simulate_macro_turn(self): #run_simulation
         # Clear timeout flag at start of each turn (will be set if timeout is called)
         self.game_state["timeout_called"] = False
@@ -378,6 +417,9 @@ class GameManager:
             # ✅ CRITICAL FIX: Update offense_team_id AFTER flip (was set to old team in turn_manager)
             result["offense_team_id"] = self.offense_team.team_id
             logging.debug(f"🔄 [DREB→FB] Flipped possession before Fast Break: {old_offense} → {self.offense_team.name}, updated offense_team_id={result['offense_team_id']}")
+
+        # ✅ SS&S: End-of-turn foul-out check – catch any active player with >= 5 fouls missed by per-path logic
+        self._check_lineups_for_foul_out(result)
 
         # ✅ TIMEOUT: Check for foul out and create timeout turn
         if result.get("fouled_out"):

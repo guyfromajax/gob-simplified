@@ -108,8 +108,8 @@ export async function runFastBreakSequence({
   const result = turnData.result_type;
   const isBlockingFoul = result === "FOUL" && turnData.foul_team === "DEFENSE" && turnData.text?.toLowerCase().includes("blocking foul");
 
-  if (result === "MAKE" || result === "MISS") {
-    // Shot attempt scenario
+  if (result === "MAKE" || result === "MISS" || result === "BLOCK") {
+    // Shot attempt scenario (BLOCK = shot attempt that gets blocked)
     // Check if ball handler beat the defender (skill check won)
     if (turnData.roles?.ball_handler_beats_defender && turnData.stopper_id) {
       // Ball handler won skill check - animate past stopper to shot spot
@@ -574,12 +574,19 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
   // Shoot the ball
   safeTransition(scene.stateMachine, States.ShotAttempt);
   
-  const adjustedBasket = { ...basket };
-  if (turnData.result_type === "MAKE") {
-    adjustedBasket.x = isHomeOffense ? basket.x - 1 : basket.x + 1;
+  const isBlockWithStopper = turnData.result_type === "BLOCK";
+  const hasBlockSpotWithStopper = isBlockWithStopper && typeof turnData.ball_bounce_x === "number" && typeof turnData.ball_bounce_y === "number";
+  let shotTargetPxWithStopper;
+  if (hasBlockSpotWithStopper) {
+    shotTargetPxWithStopper = gridToPixels(turnData.ball_bounce_x, turnData.ball_bounce_y, width, height);
+  } else {
+    const adjustedBasket = { ...basket };
+    if (turnData.result_type === "MAKE") {
+      adjustedBasket.x = isHomeOffense ? basket.x - 1 : basket.x + 1;
+    }
+    shotTargetPxWithStopper = gridToPixels(adjustedBasket.x, adjustedBasket.y, width, height);
   }
-  const rimPx = gridToPixels(adjustedBasket.x, adjustedBasket.y, width, height);
-  await animateShotToRim(scene, rimPx, {
+  await animateShotToRim(scene, shotTargetPxWithStopper, {
     duration: 400,
     easing: "Sine.easeInOut",
     arc: { height: 50 }
@@ -620,7 +627,15 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
       showAnnouncement("Fast Break Score!", shooterTeamId === scene.homeTeamId ? "home" : "away", shooterPlayerData);
     }
   } else if (turnData.result_type === "MISS" || turnData.result_type === "BLOCK") {
-    // Handle MISS/BLOCK → DREB transition
+    // Handle MISS/BLOCK → rebound transition
+    if (turnData.result_type === "BLOCK") {
+      const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+      const blockerId = turnData.blocker_id ?? turnData.defenderId ?? turnData.defender_id ?? stopperId;
+      announceGameEvent('BLOCK', turnData, scene, { blockerId });
+      appendToTextScroll("Blocked!");
+    } else {
+      appendToTextScroll("Missed!");
+    }
     // ✅ FIX: Check all possible field names (matching animateFastBreakShot pattern)
     const rebounderId = turnData.rebounderId || turnData.rebounder_id || turnData.rebounder_player_id || turnData.roles?.rebounder?.player_id;
     
@@ -649,11 +664,13 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
     }
     
     // ✅ FIX: Use same rebound animation pattern as animateFastBreakShot
-    appendToTextScroll("Missed!");
     safeTransition(scene.stateMachine, States.Rebound);
     
     const { bounceFromRim, animateRebound } = await import('./ballManager.js');
-    const miss = await bounceFromRim(scene, ballSprite, basket, isHomeOffense, 300);
+    const bounceOriginGrid = (turnData.result_type === "BLOCK" && hasBlockSpotWithStopper)
+      ? { x: turnData.ball_bounce_x, y: turnData.ball_bounce_y }
+      : basket;
+    const miss = await bounceFromRim(scene, ballSprite, bounceOriginGrid, isHomeOffense, 300);
     
     // ✅ Stop rebounder animations when rebounder grabs ball (missed shot)
     // Monitor rebounder position and stop tweens when rebounder gets close to ball bounce spot
@@ -831,19 +848,23 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   // Shoot the ball
   safeTransition(scene.stateMachine, States.ShotAttempt);
   
-  // ✅ FIX: Adjust rim position for made shots (1 grid unit closer to shooter)
-  // This matches the adjustment in ballManager.js and ShotAnimationSystem.js
-  // Home team (shoots at x=91): reduce by 1 → 90
-  // Away team (shoots at x=9): increase by 1 → 10
-  const adjustedBasket = { ...basket };
-  if (turnData.result_type === "MAKE") {
-    adjustedBasket.x = isHomeOffense ? basket.x - 1 : basket.x + 1;
+  // ✅ BLOCK: Use block spot as shot target when result is BLOCK (ball gets blocked before rim)
+  const isBlock = turnData.result_type === "BLOCK";
+  const hasBlockSpot = isBlock && typeof turnData.ball_bounce_x === "number" && typeof turnData.ball_bounce_y === "number";
+  let shotTargetPx;
+  if (hasBlockSpot) {
+    const blockSpotGrid = { x: turnData.ball_bounce_x, y: turnData.ball_bounce_y };
+    shotTargetPx = gridToPixels(blockSpotGrid.x, blockSpotGrid.y, width, height);
+  } else {
+    // ✅ FIX: Adjust rim position for made shots (1 grid unit closer to shooter)
+    const adjustedBasket = { ...basket };
+    if (turnData.result_type === "MAKE") {
+      adjustedBasket.x = isHomeOffense ? basket.x - 1 : basket.x + 1;
+    }
+    shotTargetPx = gridToPixels(adjustedBasket.x, adjustedBasket.y, width, height);
   }
-  const rimPx = gridToPixels(adjustedBasket.x, adjustedBasket.y, width, height);
   // ✅ STEP 3 MIGRATION: Use new animateShotToRim() helper instead of manual detach + animate
-  // animateShotToRim() handles ball detachment and shot animation in one call
-  // Arc support added for fast break shots
-  await animateShotToRim(scene, rimPx, {
+  await animateShotToRim(scene, shotTargetPx, {
     duration: 400,
     easing: "Sine.easeInOut",
     arc: { height: 50 }
@@ -917,6 +938,71 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       skipRetreat,
       pressureType
     });
+  } else if (turnData.result_type === "BLOCK") {
+    // Block - announce, bounce from block spot, then same rebound flow as miss
+    const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+    const blockerId = turnData.blocker_id ?? turnData.defenderId ?? defenderId;
+    announceGameEvent('BLOCK', turnData, scene, { blockerId });
+    appendToTextScroll("Blocked!");
+    safeTransition(scene.stateMachine, States.Rebound);
+
+    const { bounceFromRim, animateRebound } = await import('./ballManager.js');
+    const blockSpotGrid = hasBlockSpot
+      ? { x: turnData.ball_bounce_x, y: turnData.ball_bounce_y }
+      : basket;
+    const miss = await bounceFromRim(scene, ballSprite, blockSpotGrid, isHomeOffense, 300);
+
+    // Reuse same rebound / DREB setup as MISS (below)
+    const currentIndex = scene.currentTurn || 0;
+    const previousTurn = scene.simData?.turns?.[currentIndex - 1];
+    const currentTurn = scene.simData?.turns?.[currentIndex];
+    const missTurnForGetback = (previousTurn?.result_type === "MISS" || previousTurn?.result_type === "BLOCK") ? previousTurn : null;
+    const rebounderId = turnData.rebounderId || turnData.rebounder_id || turnData.rebounder_player_id || turnData.roles?.rebounder?.player_id;
+
+    if (rebounderId) {
+      const rebounderSprite = playerSprites[rebounderId];
+      if (rebounderSprite) {
+        if (rebounderTweens.length > 0) {
+          let monitoringActive = true;
+          const ballBouncePx = gridToPixels(miss.grid.x, miss.grid.y, width, height);
+          const checkRebounderReached = () => {
+            if (!monitoringActive) return;
+            const distanceToBall = Math.hypot(rebounderSprite.x - ballBouncePx.x, rebounderSprite.y - ballBouncePx.y);
+            if (distanceToBall < 30) {
+              monitoringActive = false;
+              rebounderTweens.forEach(tween => {
+                if (tween && tween.isPlaying && scene.tweens) scene.tweens.killTweensOf(tween.targets);
+              });
+              return;
+            }
+            if (monitoringActive && rebounderTweens.some(t => t && t.isPlaying)) scene.time.delayedCall(50, checkRebounderReached);
+            else monitoringActive = false;
+          };
+          scene.time.delayedCall(100, checkRebounderReached);
+        }
+        await animateRebound({
+          scene,
+          ballSprite,
+          playerSprites,
+          animations: [],
+          rebounderId,
+          ballSpot: miss.grid,
+          shooterId,
+          turnData: missTurnForGetback
+        });
+        if (turnData.rebound_type === "DREB") {
+          const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
+          await runDefensiveReboundSetup({
+            scene,
+            ballSprite,
+            playerSprites,
+            rebounderId,
+            nextPlayType: turnData.next_play_type || "HCO",
+            turnData
+          });
+        }
+      }
+    }
   } else {
     // Miss - handle rebound
     appendToTextScroll("Missed!");

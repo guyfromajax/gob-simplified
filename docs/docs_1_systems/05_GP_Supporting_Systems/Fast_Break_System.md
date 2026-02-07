@@ -130,15 +130,31 @@ Fast breaks can result in:
    - No defender ahead of ball handler after outlet pass OR defender not within ±6 y-coords
    - Ball handler moves 5-10 spots toward basket, ±3 Y (clamped)
    - **Shot defender (if any)**: Only when there are **1 or 2 get-back players**; pool is **get-back players only**. Closest get-back by Euclidean distance becomes shot defender (or, if ball handler beat a stopper, closest get-back **excluding that stopper**). If 0 or 3+ get-back, or only get-back was the failed stopper, no shot defender. When present, defender is positioned 1 x-coord toward basket from shooter (home: +1, away: −1), ±2 y from shooter.
-   - Routes to: Standard shot resolution flow (MAKE/MISS)
+   - Routes to: Standard shot resolution flow (MAKE, MISS, or **BLOCK** — block reconciliation can run on attack shots; see Block System)
 
 ### Charge and Blocking Foul (Fast Break Shot Only)
 
-- **When checked**: Only when there is a shot defender defending the attempt: defender is assigned and `defender_count ≥ 1`. If **0 defenders back**, the charge/block check is **skipped** and the shot is resolved normally (make/miss).
+- **When checked**: Only when there is a shot defender defending the attempt: defender is assigned and `defender_count ≥ 1`. If **0 defenders back**, the charge/block check is **skipped** and the shot is resolved normally (make/miss/block).
 - **How**: Same as attack shots in half-court. Before make/miss, `calculate_charge(shooter, defender, off_team, def_team)` runs. It uses shooter/defender attributes and team chemistry/discipline; thresholds determine the call.
 - **CHARGE** (foul on offense): Possession flips to defense; next play is side inbound. No shot attempt.
 - **BLOCKING_FOUL** (foul on defense): Foul recorded on defender; next play is SIP or FREE_THROW if bonus. No shot attempt.
 - **Animation**: For either call, shooter and defender are animated to the shot spot near the basket; no ball-to-rim. Announcement ("Charge!" / "Blocking foul on X!") runs in finalizeTurnAfterAnimation.
+
+### Blocks on Fast Break Shots
+
+When a Fast Break shot is **blocked** (block reconciliation in `shot_manager.resolve_shot()` returns BLOCK), the turn has `result_type === "BLOCK"` and is treated as a **shot attempt** for animation, not a defensive stop.
+
+**Routing (frontend):**
+- In `runFastBreakSequence()` (fastBreak.js), Phase 2 branches on `result_type`. BLOCK is grouped with MAKE and MISS: `if (result === "MAKE" || result === "MISS" || result === "BLOCK")` → shot path (`animateFastBreakShot` or `animateFastBreakShotWithStopper`). Previously BLOCK fell through to the `else` and ran `animateDefensiveStop()`, so the fast break shot (run to rim + shot) never played.
+- **Fix**: BLOCK now follows the same shot-attempt flow as MAKE/MISS so the run to the basket and shot motion always animate; then outcome handling runs for block (bounce from block spot, block announcement, rebound).
+
+**Animation (shot target and outcome):**
+- **Shot target**: When `result_type === "BLOCK"` and the backend provides `ball_bounce_x` / `ball_bounce_y` (block spot in grid), the ball is animated to that block spot instead of the rim. Otherwise the rim is used.
+- **After the shot**: Block announcement (`announceGameEvent('BLOCK', ...)`), transition to Rebound, then `bounceFromRim(scene, ballSprite, blockSpotGrid, ...)` using the block spot (or basket if block spot missing). Rebound and DREB setup then match the MISS path (`animateRebound`, `runDefensiveReboundSetup` when `rebound_type === "DREB"`).
+- **With-stopper path**: `animateFastBreakShotWithStopper()` uses the same logic: block spot as shot target when present, block announcement and bounce from block spot, then same rebound/DREB handling.
+
+**Backend:**
+- Block reconciliation runs for inside/attack shots (see Block System). On BLOCK, the turn result includes `result_type: "BLOCK"`, `ball_bounce_x` / `ball_bounce_y` (from the block spot), `rebounderId`, `rebound_type`, and other rebound fields. The frontend uses `ball_bounce_x`/`ball_bounce_y` for both the shot target and the bounce origin so the ball does not snap to the wrong side.
 
 ### Shot Threshold When Defender Attempts Stop and Fails
 
@@ -305,9 +321,10 @@ else:
 - Defender follows to position 1 x-coord toward basket from shooter (home: +1, away: −1), ±2 y from shooter
 - Get-back defenders chase toward basket
 - Rebounders move to random x=5-20 spots from basket, y=rim_y ± 10 (clamped)
+- **Ball flight**: MAKE/MISS → ball to rim (or adjusted rim for make). **BLOCK** → ball to **block spot** when `ball_bounce_x`/`ball_bounce_y` are present; then bounce from that spot, "Block!" announcement, and rebound/DREB same as miss.
 - **Early Termination**: 
   - Made shot: Rebounder animations stop when ball hits rim
-  - Missed shot: Rebounder animations stop when rebounder grabs ball
+  - Missed or blocked shot: Rebounder animations stop when rebounder grabs ball
 
 **Shot spot (ball handler end position) – backend**
 
@@ -471,10 +488,11 @@ The outlet passer tracks:
   - Uses `fb_roles` for ball handler outlet position and `is_away_offense`
   - **Ball handler end position (shot spot)**: Defensive stop → confrontation spot (outlet + 5–10); shot attempt (with or without outlet) → shot spot near rim (so the shot always animates from near the basket, not from top-of-key). Exposed as `turn_result["shot_spot"]` in phase_resolution for frontend use.
 - `FrontEnd/static/js/phaser/animation/fastBreak.js`
-  - `runFastBreakSequence()` - Orchestrates fast break animation
+  - `runFastBreakSequence()` - Orchestrates fast break animation; routes MAKE, MISS, and **BLOCK** to shot path (not defensive stop)
   - `animateOutletPhase()` - Handles outlet pass (no player movement)
   - `animateDefensiveStop()` - Handles defensive stop animation
-  - `animateFastBreakShot()` - Handles shot attempt animation and MISS → DREB transition
+  - `animateFastBreakShot()` - Handles shot attempt (MAKE/MISS/BLOCK): shot spot move, ball to rim or block spot, then make/miss/block outcome (BLOCK: block announcement, bounce from block spot, rebound/DREB)
+  - `animateFastBreakShotWithStopper()` - Same outcome handling for BLOCK (block spot target, block announcement, bounce from block spot, rebound/DREB)
   - `moveOtherPlayersToStandardPositions()` - Positions outlet passer and get-back defenders
   - `animateRebounders()` - Handles rebounder animation (extracted for maintainability)
     - Defensive Stop: x=40-60, y=starting_y ± 6 (clamped 1-49)
