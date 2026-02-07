@@ -1322,6 +1322,8 @@ def resolve_fast_break_logic(game: "GameManager"):
     # print(f"Event type: {event_type}")
     # print(f"Roles: {fb_roles}")
     
+    fb_animations = None  # Set in SHOT branch when we capture before resolve_shot (for block reconciliation shot spot)
+    
     if event_type == "SHOT":
         # Route Fast Break shot through attack shot execution (resolve_shot) via adapter
         shooter = fb_roles["shooter"]
@@ -1354,6 +1356,12 @@ def resolve_fast_break_logic(game: "GameManager"):
         else:
             shot_threshold = base_threshold
         game_state["fast_break_shot_threshold_override"] = shot_threshold
+
+        # Capture Fast Break animation first so fb_roles gets _bh_final_x/y (shot spot); set shooter coords for block reconciliation
+        animator = Animator(game)
+        fb_animations = animator.capture_fast_break_animation(fb_roles, hold_up, stopper_id)
+        if fb_roles.get("_bh_final_x") is not None and fb_roles.get("_bh_final_y") is not None:
+            shooter.coords = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
 
         update_player_coords_from_animations(game, [])
         turn_result = game.shot_manager.resolve_shot(roles)
@@ -1388,11 +1396,13 @@ def resolve_fast_break_logic(game: "GameManager"):
         def_scouting["defense"]["vs_Fast_Break"]["success"] += 1
 
 
-    # Build animation packet for the fast break play
-    animator = Animator(game)
-    turn_result["animations"] = animator.capture_fast_break_animation(
-        fb_roles, hold_up, stopper_id
-    )
+    # Build animation packet for the fast break play (reuse fb_animations if we already captured for SHOT)
+    if fb_animations is not None:
+        turn_result["animations"] = fb_animations
+    else:
+        turn_result["animations"] = Animator(game).capture_fast_break_animation(
+            fb_roles, hold_up, stopper_id
+        )
     turn_result["roles"] = fb_roles
     turn_result["fast_break"] = True  # ✅ Add fast_break flag for frontend routing
 
