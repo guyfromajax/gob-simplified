@@ -463,6 +463,12 @@ class ShotManager:
             y = -1  # TEMPORARY: always attempt block for prototype (restore: random.randint(0, 10))
             if y < x:
                 # Block reconciliation: use shot_score_pre_defense vs defense_block_score
+                shooter_coords_recon = getattr(shooter, "coords", {"x": 50, "y": 25})
+                logging.debug(
+                    "BLOCK_RECONCILIATION shooter coords: x=%s, y=%s (shooter_id=%s)",
+                    shooter_coords_recon.get("x"), shooter_coords_recon.get("y"),
+                    getattr(shooter, "player_id", None),
+                )
                 def_height_inches = getattr(defender, "height", None) or defender.attributes.get("height") or 76
                 def_h = height_to_block_score(def_height_inches)
                 def_scaled_height = (def_h * 10) + random.randint(-9, 9)
