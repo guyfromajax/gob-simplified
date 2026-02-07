@@ -2259,6 +2259,7 @@ class TurnManager:
         
         rebounder = pending_oreb.get("rebounder")
         rebounder_id = pending_oreb.get("rebounder_id")
+        from_block = pending_oreb.get("from_block", False)
         rebounder_name = get_name_safe(rebounder) if rebounder else "UNKNOWN"
         logging.warning(f"🔍 [RESOLVE_OREB_TURN] Processing OREB for: {rebounder_name} (ID: {rebounder_id}), Object ID: {id(rebounder) if rebounder else 'N/A'}")
         
@@ -2274,6 +2275,68 @@ class TurnManager:
         
         rebounder = pending_oreb["rebounder"]
         game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(self.game)
+        
+        # OREB after block: go straight to HCO, no putback attempt (SS&S: one place to enforce)
+        if from_block:
+            game_state["offensive_state"] = "HCO"
+            pg = off_team.lineup.get("PG")
+            deltas = {}
+            for team in (self.game.home_team, self.game.away_team):
+                for player in team.get_all_players():
+                    prev = pre_stats.get(player.player_id, {})
+                    diff = {}
+                    for stat in player.stats["game"]:
+                        if stat == "REB" or stat == "Outlet_Score_List":
+                            continue
+                        current_val = player.stats["game"].get(stat, 0)
+                        prev_val = prev.get(stat, 0)
+                        delta = current_val - prev_val
+                        if delta != 0:
+                            diff[stat] = delta
+                    if diff:
+                        deltas[player.player_id] = {"team": team.name, "stats": diff}
+            player_energy = {}
+            for team in (self.game.home_team, self.game.away_team):
+                for pos, player in team.lineup.items():
+                    player_energy[player.player_id] = {
+                        "NG": player.attributes.get("NG", 1.0),
+                        "team": team.name
+                    }
+            self.game.update_team_stats()
+            return {
+                "result_type": "OREB_KICKOUT",
+                "ball_handler": getattr(rebounder, "player_id", None),
+                "text": f"{rebounder_name} secures the rebound after the block. Reset to half-court.",
+                "possession_flips": False,
+                "time_elapsed": 2,
+                "offense_team_id": self.game.offense_team.team_id,
+                "current_turn": "OREB",
+                "next_play_type": "HCO",
+                "next_turn": "HCO",
+                "animations": [],
+                "rebounderId": getattr(rebounder, "player_id", None),
+                "pgId": getattr(pg, "player_id", None) if pg else None,
+                "quarter": self.game.quarter,
+                "deltas": deltas,
+                "player_energy": player_energy,
+                "score": dict(self.game.score),
+                "home_lineup": serialize_lineup(self.game.home_team.lineup),
+                "away_lineup": serialize_lineup(self.game.away_team.lineup),
+                "team_totals": {
+                    self.game.home_team.name: self.game.home_team.get_team_game_stats(),
+                    self.game.away_team.name: self.game.away_team.get_team_game_stats()
+                },
+                "team_stats": {
+                    self.game.home_team.name: {
+                        "offense": self.game.home_team.scouting_data.get("offense", {}),
+                        "defense": self.game.home_team.scouting_data.get("defense", {}),
+                    },
+                    self.game.away_team.name: {
+                        "offense": self.game.away_team.scouting_data.get("offense", {}),
+                        "defense": self.game.away_team.scouting_data.get("defense", {}),
+                    }
+                },
+            }
         
         # Resolve what happens with the offensive rebound
         oreb_event = resolve_offensive_rebound(self.game, rebounder)

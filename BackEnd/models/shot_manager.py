@@ -554,9 +554,15 @@ class ShotManager:
                     off_team.team_attributes["momentum"] = max(0, off_team.team_attributes.get("momentum", 0) - 1)
                     def_team.team_attributes["momentum"] = min(10, def_team.team_attributes.get("momentum", 0) + 1)
                     is_away_offense = off_team.team_id == self.game.away_team.team_id
-                    shooter_coords = getattr(shooter, "coords", {"x": 50, "y": 25})
-                    sx = shooter_coords.get("x", 50)
-                    sy = shooter_coords.get("y", 25)
+                    # Use explicit shot_spot from caller when present (same data as animation); else fall back to shooter.coords
+                    shot_spot = roles.get("shot_spot")
+                    if isinstance(shot_spot, dict) and "x" in shot_spot and "y" in shot_spot:
+                        sx = shot_spot["x"]
+                        sy = shot_spot["y"]
+                    else:
+                        shooter_coords = getattr(shooter, "coords", {"x": 50, "y": 25})
+                        sx = shooter_coords.get("x", 50)
+                        sy = shooter_coords.get("y", 25)
                     self._block_spot = calculate_block_spot(sx, sy, is_away_offense)
                     self._block_defender = defender
 
@@ -1180,6 +1186,7 @@ class ShotManager:
                         self.game_state["pending_oreb"] = {
                             "rebounder": rebounder,
                             "rebounder_id": getattr(rebounder, "player_id", None),
+                            "from_block": getattr(self, "_block_spot", None) is not None,
                         }
                         result["next_play_type"] = "OREB"
                     else:
@@ -1386,6 +1393,7 @@ class ShotManager:
                     self.game_state["pending_oreb"] = {
                         "rebounder": rebounder,
                         "rebounder_id": getattr(rebounder, "player_id", None),
+                        "from_block": getattr(self, "_block_spot", None) is not None,
                     }
                     # OREB will be handled as a separate turn
                     # Don't process putback here - let next turn handle it
@@ -1956,6 +1964,7 @@ class ShotManager:
                     self.game_state["pending_oreb"] = {
                         "rebounder": rebounder,
                         "rebounder_id": getattr(rebounder, "player_id", None),
+                        "from_block": getattr(self, "_block_spot", None) is not None,
                     }
                 else:
                     # DREB: Transition to HCO with outlet step
