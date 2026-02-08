@@ -192,6 +192,19 @@ try:
     app.include_router(pointer_validation_router)
     app.include_router(auth_router)
     app.include_router(admin_router)
+
+    @app.get("/debug/server-state")
+    def debug_server_state():
+        """
+        Return in-memory and disk state for performance debugging (e.g. on Railway).
+        No auth; restrict in production if desired (e.g. by IP or remove).
+        """
+        from BackEnd.utils.config_overrides import OVERRIDES_PATH
+        return {
+            "ongoing_games_count": len(ongoing_games),
+            "config_overrides_path": str(OVERRIDES_PATH),
+            "config_overrides_file_exists": OVERRIDES_PATH.exists(),
+        }
     
     templates = Jinja2Templates(directory="FrontEnd/static")
     
