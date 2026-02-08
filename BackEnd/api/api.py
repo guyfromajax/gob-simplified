@@ -1806,8 +1806,13 @@ try:
     
     @app.post("/api/simulate-quarter")
     @_rate_limit_sim
-    def simulate_quarter_endpoint(request: Request, body: QuarterSimulationRequest, debug: bool = False):
-        """Rate limited: 30/minute per IP."""
+    def simulate_quarter_endpoint(
+        request: Request,
+        body: QuarterSimulationRequest,
+        debug: bool = False,
+        quiet_sim: bool = False,
+    ):
+        """Rate limited: 30/minute per IP. quiet_sim=True sets log level to ERROR during sim (sanity check for logging cost)."""
         import time
         start_time = time.time()
         game_id = body.game_id
@@ -3253,19 +3258,37 @@ try:
             turn_by_turn_mode = not body.full_sim
             logging.info(f"🎮 simulate_quarter_endpoint: full_sim={body.full_sim}, turn_by_turn_mode={turn_by_turn_mode}, quarter={body.quarter}, resume_from_timeout={body.resume_from_timeout}")
             
-            # ⏱️ PERFORMANCE: Time the quarter simulation
-            sim_start = time.time()
-            simulate_quarter(
-                gm,
-                body.home_lineup,
-                body.away_lineup,
-                game_id,
-                body.start_with_inbound,
-                body.starting_possession,
-                turn_by_turn_mode=turn_by_turn_mode,
-                resume_from_timeout=body.resume_from_timeout,
-            )
-            sim_time = (time.time() - sim_start) * 1000
+            # Sanity check: quiet_sim=True suppresses INFO/WARNING during sim to measure logging cost
+            saved_log_levels = None
+            if quiet_sim:
+                root = logging.getLogger()
+                loggers_to_quiet = [
+                    root,
+                    logging.getLogger("BackEnd.main"),
+                    logging.getLogger("BackEnd.models.turn_manager"),
+                    logging.getLogger("BackEnd.models.game_manager"),
+                ]
+                saved_log_levels = {log: log.level for log in loggers_to_quiet}
+                for log in loggers_to_quiet:
+                    log.setLevel(logging.ERROR)
+            try:
+                # ⏱️ PERFORMANCE: Time the quarter simulation
+                sim_start = time.time()
+                simulate_quarter(
+                    gm,
+                    body.home_lineup,
+                    body.away_lineup,
+                    game_id,
+                    body.start_with_inbound,
+                    body.starting_possession,
+                    turn_by_turn_mode=turn_by_turn_mode,
+                    resume_from_timeout=body.resume_from_timeout,
+                )
+                sim_time = (time.time() - sim_start) * 1000
+            finally:
+                if saved_log_levels is not None:
+                    for log, level in saved_log_levels.items():
+                        log.setLevel(level)
             
         except ValueError as e:
             logging.error(
@@ -3450,7 +3473,7 @@ try:
         total_time = (time.time() - start_time) * 1000
         _src = sim_quarter_load_source if sim_quarter_load_source else "?"
         logging.warning(
-            f"⏱️ [PERF] simulate-quarter total={total_time/1000:.2f}s sim={sim_time/1000:.1f}s summary={summary_time:.0f}ms db_save={db_save_time:.0f}ms source={_src} q={body.quarter} full_sim={body.full_sim}"
+            f"⏱️ [PERF] simulate-quarter total={total_time/1000:.2f}s sim={sim_time/1000:.1f}s summary={summary_time:.0f}ms db_save={db_save_time:.0f}ms source={_src} q={body.quarter} full_sim={body.full_sim} quiet_sim={quiet_sim}"
         )
         return JSONResponse(content=frontend_summary, status_code=200)
     
