@@ -1,5 +1,5 @@
 (function () {
-  var API_BASE = "/api/admin";
+  function configUrl() { return window.API_CONFIG ? window.API_CONFIG.buildUrl("/api/admin/config") : "/api/admin/config"; }
   var currentValues = {}; // Snapshot at page load; used only for "Current Value: XX" (static until next visit)
 
   var sections = [
@@ -151,11 +151,13 @@
     denied.style.display = "none";
     content.style.display = "none";
 
-    var token = getToken();
     var headers = { "Content-Type": "application/json" };
-    if (token) headers["Authorization"] = "Bearer " + token;
+    if (window.API_CONFIG && window.API_CONFIG.getAuthHeaders) {
+      var auth = window.API_CONFIG.getAuthHeaders();
+      if (auth.Authorization) headers["Authorization"] = auth.Authorization;
+    } else if (getToken()) headers["Authorization"] = "Bearer " + getToken();
 
-    fetch(API_BASE + "/config", { method: "GET", credentials: "include", headers: headers })
+    fetch(configUrl(), { method: "GET", credentials: "include", headers: headers })
       .then(function (res) {
         if (res.status === 403) {
           loading.style.display = "none";
@@ -198,11 +200,13 @@
       showMessage("No changes to save.", true);
       return;
     }
-    var token = getToken();
     var headers = { "Content-Type": "application/json" };
-    if (token) headers["Authorization"] = "Bearer " + token;
+    if (window.API_CONFIG && window.API_CONFIG.getAuthHeaders) {
+      var auth = window.API_CONFIG.getAuthHeaders();
+      if (auth.Authorization) headers["Authorization"] = auth.Authorization;
+    } else if (getToken()) headers["Authorization"] = "Bearer " + getToken();
 
-    fetch(API_BASE + "/config", {
+    fetch(configUrl(), {
       method: "PATCH",
       credentials: "include",
       headers: headers,
