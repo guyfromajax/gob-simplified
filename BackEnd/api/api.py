@@ -260,13 +260,25 @@ try:
     # ✅ Add startup event to verify app is ready
     @app.on_event("startup")
     async def startup_event():
-        # Ensure username uniqueness index (for set-username flow)
+        # Ensure indexes exist (idempotent; safe on every deploy)
         try:
-            from BackEnd.db import ensure_users_username_index
+            from BackEnd.db import (
+                ensure_users_username_index,
+                ensure_ftd_index,
+                ensure_fpd_index,
+                ensure_frd_index,
+                ensure_games_franchise_index,
+                ensure_franchises_user_id_index,
+            )
             ensure_users_username_index()
+            ensure_ftd_index()
+            ensure_fpd_index()
+            ensure_frd_index()
+            ensure_games_franchise_index()
+            ensure_franchises_user_id_index()
         except Exception as e:
-            print(f"⚠️ [WARNING] startup: ensure_users_username_index: {e}", file=sys.stderr, flush=True)
-    
+            print(f"⚠️ [WARNING] startup: ensure indexes: {e}", file=sys.stderr, flush=True)
+
         # Check MongoDB connection status (non-blocking, don't crash if it fails)
         # MongoDB connections are lazy - this just verifies the client exists
         try:
@@ -1811,11 +1823,14 @@ try:
                 },
             )
         source = "resume"
+        sim_quarter_load_source = None  # "cache" | "db" | "new" for PERF logging
         # ✅ SS&S: Preserve user_team_side from in-memory game BEFORE any DB operations
         # This ensures user_team_side persists even if it's not in the saved document or request
         preserved_user_team_side = None
         if game_id:
             gm = ongoing_games.get(game_id)
+            if gm is not None:
+                sim_quarter_load_source = "cache"
             # ✅ DEBUG: Track ongoing_games state at start of simulate_quarter_endpoint
             # ✅ REMOVED: Verbose ONGOING_GAMES DEBUG logs - only log errors
             # Preserve user_team_side from in-memory game
@@ -1846,6 +1861,7 @@ try:
                 )
                 del ongoing_games[game_id]
                 gm = None  # Force reload from DB where new game detection will run
+                sim_quarter_load_source = None
             
             # ✅ SS&S: Ensure user_team_side is set in in-memory game if missing
             # This fixes the case where user_team_side was never set or was lost
@@ -2427,6 +2443,7 @@ try:
                                 gm.turns = []
                             
                             ongoing_games[game_id] = gm
+                            sim_quarter_load_source = "db"
                             # ✅ DEBUG: Track when game is added to ongoing_games
                             # ✅ REMOVED: Verbose debug log
                             if debug:
@@ -2694,6 +2711,7 @@ try:
                         ongoing_games[game_id] = gm
                         # ✅ REMOVED: Verbose debug log
                         source = "new"
+                        sim_quarter_load_source = "new"
                         
                         # Save teams object to database for skeleton lookup during simulation
                         try:
@@ -3428,16 +3446,12 @@ try:
             turns[0] if turns else None,
         )
         
-        # ⏱️ PERFORMANCE: Log total endpoint time
+        # ⏱️ PERFORMANCE: Log total endpoint time and load source (cache vs DB)
         total_time = (time.time() - start_time) * 1000
-        response_size = len(str(frontend_summary).encode('utf-8'))
-        # logging.warning(
-        #     f"⏱️ [PERF] /api/simulate-quarter - quarter={body.quarter}, "
-        #     f"simulation: {sim_time:.2f}ms, summary: {summary_time:.2f}ms, "
-        #     f"db_save: {db_save_time:.2f}ms, response_size: {response_size} bytes, "
-        #     f"total: {total_time:.2f}ms, full_sim={body.full_sim}"
-        # )
-        
+        _src = sim_quarter_load_source if sim_quarter_load_source else "?"
+        logging.warning(
+            f"⏱️ [PERF] simulate-quarter total={total_time/1000:.2f}s source={_src} quarter={body.quarter} full_sim={body.full_sim}"
+        )
         return JSONResponse(content=frontend_summary, status_code=200)
     
     
@@ -4497,10 +4511,10 @@ try:
         # ✅ REMOVED: Verbose debug log
         
         response_data = {"game_id": game_id}
-        response_size = len(json.dumps(response_data))
         total_time = (time.time() - endpoint_start) * 1000
-        # logging.warning(f"⏱️ [PERF] /api/init-game - settings: {settings_time:.2f}ms, GameManager: {gm_time:.2f}ms, summary: {summary_time:.2f}ms, DB save: {db_time:.2f}ms, response_size: {response_size} bytes, total: {total_time:.2f}ms")
-        
+        logging.warning(
+            f"⏱️ [PERF] init-game total={total_time/1000:.2f}s gm_create={gm_create_time:.0f}ms summary={summary_time:.0f}ms db_save={db_time:.0f}ms"
+        )
         return response_data
     
     

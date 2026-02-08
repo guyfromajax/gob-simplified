@@ -836,11 +836,11 @@ def select_team(
             user_id=user.get("user_id"),
         )
         franchise_init_time = (time.time() - franchise_init_start) * 1000
-        # logger.warning(f"⏱️ [DB TIMING] select-team: FranchiseManager.initialize_season(): {franchise_init_time:.2f}ms")
-        
         total_time = (time.time() - endpoint_start) * 1000
-        # logger.warning(f"⏱️ [DB TIMING] select-team TOTAL: {total_time:.2f}ms")
-        
+        logger.warning(
+            f"⏱️ [PERF] select-team total={total_time/1000:.2f}s init_season={franchise_init_time/1000:.2f}s"
+        )
+
         print(f"✅ [DEBUG] select_team: Franchise initialized successfully, franchise_id: {manager.franchise_id}", file=sys.stderr, flush=True)
         result = {"status": "ok", "franchise_id": str(manager.franchise_id)}
         print(f"🔵 [DEBUG] select_team: Returning response: {result}", file=sys.stderr, flush=True)
