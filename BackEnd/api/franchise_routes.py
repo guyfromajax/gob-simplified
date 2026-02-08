@@ -290,11 +290,11 @@ def update_team_attributes_after_game(
         # shot_threshold
         if is_winner:
             if fg_pct > 50:
-                changes["shot_threshold"] = random.randint(0, 15)
+                changes["shot_threshold"] = random.randint(5, 15)
             elif fg_pct > 42.5:
-                changes["shot_threshold"] = random.randint(5, 20)
+                changes["shot_threshold"] = random.randint(15, 25)
             else:
-                changes["shot_threshold"] = random.randint(10, 25)
+                changes["shot_threshold"] = random.randint(25, 35)
         else:
             changes["shot_threshold"] = random.randint(10, 25)
         
@@ -310,7 +310,7 @@ def update_team_attributes_after_game(
         if is_winner:
             changes["fight"] = random.randint(0, 1)
         else:
-            changes["fight"] = random.randint(-3, -1)
+            changes["fight"] = random.randint(-4, -2)
         
         # rebound_modifier
         if treb > (opp_treb + 5):
@@ -359,11 +359,11 @@ def update_team_attributes_after_game(
                 changes["team_chemistry"] = random.randint(1, 2)
         else:
             if score_delta < 4:
-                changes["team_chemistry"] = random.randint(-1, 0)
-            elif score_delta < 7:
                 changes["team_chemistry"] = random.randint(-2, -1)
+            elif score_delta < 7:
+                changes["team_chemistry"] = random.randint(-4, -2)
             else:
-                changes["team_chemistry"] = random.randint(-4, -1)
+                changes["team_chemistry"] = random.randint(-6, -4)
         
         # Apply changes and clamp to valid ranges
         ftd_update = {}

@@ -571,12 +571,13 @@ def _apply_player_training_points(
     """
     Apply training points to a single player attribute.
     
-    Base ranges:
-    - 1 point: += random.randint(1, 3)
-    - 2 points: += random.randint(2, 4)
-    - 3 points: += random.randint(3, 6)
-    - 4 points: += random.randint(4, 7)
-    - 5 points: += random.randint(4, 9)
+    Base ranges (Player Attributes):
+    - 0 points: += random.randint(-5, -3)
+    - 1 point: += random.randint(-1, 1)
+    - 2 points: += random.randint(0, 2)
+    - 3 points: += random.randint(1, 4)
+    - 4 points: += random.randint(2, 5)
+    - 5 points: += random.randint(2, 7)
     
     Year-based adjustments:
     - Freshman: +1 to min, +4 to max
@@ -590,9 +591,9 @@ def _apply_player_training_points(
     attrs = player.get("attributes", {})
     anchor_key = f"anchor_{attr}"
     
-    # Handle 0 points: negative change
+    # Handle 0 points: negative change (base range -5 to -3)
     if points == 0:
-        decrease = random.randint(-3, -1)
+        decrease = random.randint(-5, -3)
         current_val = attrs.get(anchor_key, 0)
         new_val = max(PLAYER_ATTR_CLAMP[0], current_val + decrease)
         attrs[anchor_key] = new_val
@@ -616,20 +617,19 @@ def _apply_player_training_points(
         min_adjustment = 0
         max_adjustment = -1
     
-    # Get base increase based on points, with year adjustments to min and max
+    # Get base range based on points (doc: 1→(-1,1), 2→(0,2), 3→(1,4), 4→(2,5), 5→(2,7)), then year adjustments
     if points == 1:
-        base_min, base_max = 1, 3
+        base_min, base_max = -1, 1
     elif points == 2:
-        base_min, base_max = 2, 4
+        base_min, base_max = 0, 2
     elif points == 3:
-        base_min, base_max = 3, 6
+        base_min, base_max = 1, 4
     elif points == 4:
-        base_min, base_max = 4, 7
+        base_min, base_max = 2, 5
     elif points == 5:
-        base_min, base_max = 4, 9
+        base_min, base_max = 2, 7
     else:
-        # For points > 5, use same logic as 5 points
-        base_min, base_max = 3, 9
+        base_min, base_max = 2, 7
     
     adjusted_min = base_min + min_adjustment
     adjusted_max = max(adjusted_min, base_max + max_adjustment)  # Ensure max >= min
@@ -768,21 +768,20 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
     """
     Apply training points to a team attribute.
     
-    Logic for all team attributes (excluding shot_threshold, rebound_modifier, momentum_score):
-    - 0 points: += random.randint(-3, -1)
-    - 1 point: += random.randint(1, 2)
-    - 2 points: += random.randint(2, 3)
-    - 3 points: += random.randint(2, 5)
-    - 4 points: += random.randint(2, 6)
-    - 5 points: += random.randint(2, 7)
-    - Amplifier: += incremental random.randint(1, 3)
+    Team attributes (standard) doc ranges:
+    - 0 points: += random.randint(-4, -2)
+    - 1 point: += random.randint(-1, 1)
+    - 2 points: += random.randint(0, 2)
+    - 3 points: += random.randint(1, 4)
+    - 4 points: += random.randint(1, 5)
+    - 5 points: += random.randint(1, 6)
     """
     if team_attr not in TEAM_ATTR_CLAMPS:
         return
     
     # Handle 0 points: negative change
     if points == 0:
-        decrease = random.randint(-3, -1)
+        decrease = random.randint(-4, -2)
         current_val = team.get(team_attr, 0)
         team[team_attr] = current_val + decrease
         # Clamp
@@ -790,32 +789,28 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
         team[team_attr] = max(lower, min(upper, team[team_attr]))
         return
     
-    # Get base increase
+    # Get base delta from doc ranges
     if points == 1:
-        increase = random.randint(1, 2)
+        delta = random.randint(-1, 1)
     elif points == 2:
-        increase = random.randint(2, 3)
+        delta = random.randint(0, 2)
     elif points == 3:
-        increase = random.randint(2, 5)
+        delta = random.randint(1, 4)
     elif points == 4:
-        increase = random.randint(2, 6)
+        delta = random.randint(1, 5)
     elif points == 5:
-        increase = random.randint(2, 7)
+        delta = random.randint(1, 6)
     else:
-        increase = random.randint(2, 7)
-    
-    # Apply amplifier (incremental add)
-    amplifier = random.randint(1, 3)
-    final_increase = increase + amplifier
+        delta = random.randint(1, 6)
     
     # Apply focus amplifier if this attribute is amplified by the selected focus
     if _should_amplify_team_attr(team_attr, archetype, sub_option):
         focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
-        final_increase = int(final_increase * focus_multiplier)
+        delta = int(delta * focus_multiplier)
     
     # Apply to team
     current_val = team.get(team_attr, 0)
-    team[team_attr] = current_val + final_increase
+    team[team_attr] = current_val + delta
 
 
 def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optional[str] = None, sub_option: Optional[str] = None, source: str = "technical_drills"):
@@ -898,49 +893,40 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
 
 def _apply_shot_threshold_training(team: dict, points: int, archetype: Optional[str] = None, sub_option: Optional[str] = None):
     """
-    Apply training points to shot_threshold (decreases threshold, lower is better).
+    Apply training points to shot_threshold (doc ranges).
     
-    Logic:
-    - 1 point: -= random.randint(5, 15)
-    - 2 points: -= random.randint(10, 20)
-    - 3 points: -= random.randint(10, 30)
-    - 4 points: -= random.randint(10, 35)
-    - 5 points: -= random.randint(10, 40)
-    - Amplifier: *= random.choice([1.3, 1.4, 1.5, 1.6]) (only if "authoritarian-discipline" or "culture-builder-confidence" focus is selected)
+    - 0 points: += random.randint(10, 20)
+    - 1 point: -= random.randint(-5, 5)  (i.e. add -5 to 5)
+    - 2 points: -= random.randint(5, 15)
+    - 3 points: -= random.randint(5, 25)
+    - 4 points: -= random.randint(10, 25)
+    - 5 points: -= random.randint(10, 30)
     """
-    # Handle 0 points: positive increase (makes threshold higher, worse for offense)
-    if points == 0:
-        increase = random.randint(5, 15)
-        current_val = team.get("shot_threshold", 0)
-        team["shot_threshold"] = current_val + increase
-        # Clamp
-        lower, upper = TEAM_ATTR_CLAMPS["shot_threshold"]
-        team["shot_threshold"] = max(lower, min(upper, team["shot_threshold"]))
-        return
-    
-    # Get base decrease
-    if points == 1:
-        decrease = random.randint(5, 15)
-    elif points == 2:
-        decrease = random.randint(10, 20)
-    elif points == 3:
-        decrease = random.randint(10, 30)
-    elif points == 4:
-        decrease = random.randint(10, 35)
-    elif points == 5:
-        decrease = random.randint(10, 40)
-    else:
-        decrease = random.randint(10, 40)
-    
-    # Apply amplifier (multiply) - only if specific coaching focus is selected
-    final_decrease = decrease
-    if sub_option in ["authoritarian-discipline", "culture-builder-confidence"]:
-        amplifier = random.choice([1.3, 1.4, 1.5, 1.6])
-        final_decrease = int(decrease * amplifier)
-    
-    # Apply to team (subtract, lower is better)
     current_val = team.get("shot_threshold", 0)
-    team["shot_threshold"] = current_val - final_decrease
+    lower, upper = TEAM_ATTR_CLAMPS["shot_threshold"]
+
+    if points == 0:
+        increase = random.randint(10, 20)
+        team["shot_threshold"] = max(lower, min(upper, current_val + increase))
+        return
+
+    if points == 1:
+        delta = random.randint(-5, 5)
+        team["shot_threshold"] = max(lower, min(upper, current_val + delta))
+        return
+
+    # 2–5: decrease threshold
+    if points == 2:
+        decrease = random.randint(5, 15)
+    elif points == 3:
+        decrease = random.randint(5, 25)
+    elif points == 4:
+        decrease = random.randint(10, 25)
+    elif points == 5:
+        decrease = random.randint(10, 30)
+    else:
+        decrease = random.randint(10, 30)
+    team["shot_threshold"] = max(lower, min(upper, current_val - decrease))
 
 
 def _should_amplify_player_attr(attr: str, archetype: Optional[str], sub_option: Optional[str]) -> bool:

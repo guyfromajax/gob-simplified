@@ -156,20 +156,24 @@ def _ensure_complete_lineup(team, game_state=None) -> None:
         if player and hasattr(player, "player_id"):
             current_player_ids.add(player.player_id)
 
-    # Filter available players: exclude fouled-out (F>=5), already-assigned, and players failing energy/foul restrictions
-    from BackEnd.utils.db_utils import is_player_eligible_for_lineup
-    available_players = [
-        p for p in team.get_all_players()
-        if p.player_id not in current_player_ids
-        and is_player_eligible_for_lineup(p, game_state)
-    ]
-    fouled_out_count = sum(1 for p in team.get_all_players() if getattr(p, "get_stat", None) and (p.get_stat("F", "game") or 0) >= 5)
+    # Filter available players; use waterfall (relax NG then fouls) if not enough eligible
+    from BackEnd.utils.db_utils import _get_eligible_players, _waterfall_eligibility
+    available_players = None
+    for ng_min, foul_limits_by_quarter in _waterfall_eligibility(game_state):
+        available_players = _get_eligible_players(
+            team, game_state,
+            ng_min=ng_min, foul_limits_by_quarter=foul_limits_by_quarter,
+            exclude_player_ids=current_player_ids,
+        )
+        if len(available_players) >= len(missing):
+            break
 
-    if len(available_players) < len(missing):
+    if available_players is None or len(available_players) < len(missing):
+        fouled_out_count = sum(1 for p in team.get_all_players() if getattr(p, "get_stat", None) and (p.get_stat("F", "game") or 0) >= 5)
         raise ValueError(
             f"Team '{team.name}' lineup missing positions {missing}: "
-            f"Only {len(available_players)} eligible players available "
-            f"(need {len(missing)}, {fouled_out_count} fouled out)"
+            f"Only {len(available_players) if available_players else 0} eligible players available "
+            f"(need {len(missing)}, {fouled_out_count} fouled out) even after relaxing NG and foul limits"
         )
     
     # Fill missing positions with available players

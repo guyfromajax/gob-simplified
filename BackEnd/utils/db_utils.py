@@ -1,6 +1,6 @@
 import logging
 import random
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Optional
 
 from BackEnd.db import players_collection
 from BackEnd.models.player import Player
@@ -15,13 +15,24 @@ POSITION_TRAITS = {
     "C":  ["SC", "ID", "ST", "RB"]
 }
 
+# Default max fouls allowed by quarter for lineup eligibility (5 fouls = fouled out, never eligible)
+# Q4: applied only when time_remaining > 240 (late Q4 / OT have no extra foul limit).
+DEFAULT_FOUL_LIMITS_BY_QUARTER = {1: 1, 2: 2, 3: 3, 4: 3}
+
 def get_player_rating(player, traits: List[str]) -> float:
     total = 0
     for trait in traits:
         total += player.attributes.get(trait, 0)
     return total / len(traits)
 
-def is_player_eligible_for_lineup(player, game_state=None, ineligible_player_ids=None) -> bool:
+def is_player_eligible_for_lineup(
+    player,
+    game_state=None,
+    ineligible_player_ids=None,
+    *,
+    ng_min: Optional[float] = None,
+    foul_limits_by_quarter: Optional[Dict[int, int]] = None,
+) -> bool:
     """
     Check if a player is eligible for lineup based on energy and foul restrictions.
     Fouled-out (5+ fouls) is derived from player.get_stat("F", "game"), not a persisted list.
@@ -30,55 +41,107 @@ def is_player_eligible_for_lineup(player, game_state=None, ineligible_player_ids
         player: Player object to check
         game_state: Optional game state dict with quarter, time_remaining (for energy/foul restrictions)
         ineligible_player_ids: Deprecated, ignored. Kept for backward compatibility.
+        ng_min: If set, use this as the minimum NG (energy) threshold; 0 or None (when game_state
+                is set) means no NG check. If None and game_state is set, use default (0.8 or 0.64).
+        foul_limits_by_quarter: If set, dict quarter (1-4) -> max fouls allowed. Used for waterfall
+                relaxation. OT always uses only 5-foul check.
 
     Returns:
         True if player is eligible, False otherwise
     """
-    # Exclude fouled-out players (5+ fouls) from game stats
     foul_count = player.get_stat("F", "game")
     if foul_count is not None and foul_count >= 5:
         return False
 
-    # If no game_state provided, only check for fouled-out
     if not game_state:
         return True
 
     quarter = game_state.get("quarter", 1)
-    time_remaining = game_state.get("time_remaining", 480)  # Default to 8:00 (480 seconds)
+    time_remaining = game_state.get("time_remaining", 480)
 
     # Energy (NG) filtering
-    ng = player.attributes.get("NG", 1.0)
-    
-    # Determine energy threshold based on quarter and time
-    is_late_q4_or_ot = (quarter == 4 and time_remaining < 240) or quarter > 4
-    energy_threshold = 0.64 if is_late_q4_or_ot else 0.8
-    
-    if ng < energy_threshold:
+    if ng_min is not None:
+        if ng_min > 0:
+            ng = player.attributes.get("NG", 1.0)
+            if ng < ng_min:
+                return False
+    else:
+        ng = player.attributes.get("NG", 1.0)
+        is_late_q4_or_ot = (quarter == 4 and time_remaining < 240) or quarter > 4
+        energy_threshold = 0.64 if is_late_q4_or_ot else 0.8
+        if ng < energy_threshold:
+            return False
+
+    # Foul filtering by quarter (OT has no extra limit; late Q4 has no per-quarter limit)
+    if quarter > 4:
+        return True
+    if quarter == 4 and time_remaining <= 240:
+        return True
+    limits = foul_limits_by_quarter if foul_limits_by_quarter is not None else DEFAULT_FOUL_LIMITS_BY_QUARTER
+    max_fouls = limits.get(quarter, 99)
+    if (foul_count or 0) > max_fouls:
         return False
-    
-    # Foul filtering by quarter
-    if quarter == 1:
-        if foul_count > 1:
-            return False
-    elif quarter == 2:
-        if foul_count > 2:
-            return False
-    elif quarter == 3:
-        if foul_count > 3:
-            return False
-    elif quarter == 4:
-        # Q4: exclude if fouls > 3 AND more than 4 minutes remaining
-        if foul_count > 3 and time_remaining > 240:
-            return False
-    elif quarter > 4:  # Overtime
-        # OT: no foul exclusion for active players (already checked for 5+ fouls above)
-        pass
-    
     return True
+
+
+def _get_eligible_players(
+    team: Union[str, TeamManager],
+    game_state=None,
+    *,
+    ng_min: Optional[float] = None,
+    foul_limits_by_quarter: Optional[Dict[int, int]] = None,
+    exclude_player_ids: Optional[set] = None,
+) -> List[Player]:
+    """Return list of players eligible for lineup under given rules. Exclude fouled-out and optional IDs."""
+    if isinstance(team, TeamManager):
+        players = list(team.get_all_players())
+    else:
+        players_cursor = players_collection.find({"team": team})
+        players = [Player(p) for p in players_cursor]
+    exclude = set(exclude_player_ids) if exclude_player_ids else set()
+    return [
+        p for p in players
+        if p.player_id not in exclude
+        and is_player_eligible_for_lineup(
+            p, game_state, ng_min=ng_min, foul_limits_by_quarter=foul_limits_by_quarter
+        )
+    ]
+
+
+def _waterfall_eligibility(game_state=None):
+    """
+    Yield (ng_min, foul_limits_by_quarter) in waterfall order: first relax NG by 0.2 each step,
+    then relax foul limits by 1 per quarter each step. Used to find a legal lineup when default
+    rules leave too few eligible players.
+    """
+    quarter = game_state.get("quarter", 1) if game_state else 1
+    time_remaining = game_state.get("time_remaining", 480) if game_state else 480
+    is_late_q4_or_ot = (quarter == 4 and time_remaining < 240) or quarter > 4
+    default_ng = 0.64 if is_late_q4_or_ot else 0.8
+
+    # NG waterfall: default, then drop by 0.2 until 0 (no NG check)
+    ng = default_ng
+    while True:
+        yield (ng, None)
+        if ng <= 0:
+            break
+        ng = round(ng - 0.2, 2)
+        if ng < 0:
+            ng = 0
+
+    # Foul waterfall: allow one more foul per quarter each step, cap at 4 (5 = fouled out)
+    base = dict(DEFAULT_FOUL_LIMITS_BY_QUARTER)
+    for step in range(1, 5):
+        relaxed = {q: min(base[q] + step, 4) for q in (1, 2, 3, 4)}
+        yield (0, relaxed)
 
 def build_lineup_from_mongo(team: Union[str, TeamManager], game_state=None) -> Dict[str, Player]:
     """Build a starting lineup using existing player objects when available.
 
+    Uses a waterfall of relaxed eligibility rules if needed: first relax NG (energy)
+    threshold by 0.2 each step, then relax foul limits by quarter, until at least 5
+    eligible players are found (or raise if still impossible).
+    
     ``team`` may be either a team name or an actual :class:`TeamManager`
     instance.  When a ``TeamManager`` is supplied the players from its roster
     are reused so their in-memory ``stats['game']`` containers are preserved.
@@ -90,25 +153,36 @@ def build_lineup_from_mongo(team: Union[str, TeamManager], game_state=None) -> D
         game_state: Optional game state dict with quarter, time_remaining
                    Used to filter players based on energy and foul restrictions (fouled-out from F >= 5)
     """
-
     if isinstance(team, TeamManager):
         team_name = team.name
-        players = list(team.get_all_players())
     else:
         team_name = team
-        players_cursor = players_collection.find({"team": team_name})
-        players = [Player(p) for p in players_cursor]
 
-    # Filter players based on energy and foul restrictions (fouled-out from F >= 5)
-    eligible_players = [
-        p for p in players
-        if is_player_eligible_for_lineup(p, game_state)
-    ]
-    
-    if len(eligible_players) < 5:
+    eligible_players = None
+    used_ng_min = None
+    used_foul_limits = None
+    step = 0
+    for ng_min, foul_limits_by_quarter in _waterfall_eligibility(game_state):
+        eligible_players = _get_eligible_players(
+            team, game_state, ng_min=ng_min, foul_limits_by_quarter=foul_limits_by_quarter
+        )
+        if len(eligible_players) >= 5:
+            used_ng_min = ng_min
+            used_foul_limits = foul_limits_by_quarter
+            break
+        step += 1
+
+    if eligible_players is None or len(eligible_players) < 5:
+        total = len(list(team.get_all_players())) if isinstance(team, TeamManager) else players_collection.count_documents({"team": team_name})
         raise ValueError(
-            f"Team '{team_name}' has fewer than 5 eligible players. "
-            f"Total players: {len(players)}, Eligible: {len(eligible_players)}"
+            f"Team '{team_name}' has fewer than 5 eligible players even after relaxing NG and foul limits. "
+            f"Total roster: {total}, last eligible: {len(eligible_players) if eligible_players else 0}"
+        )
+
+    if step > 0:
+        logging.info(
+            "Lineup waterfall: built lineup for %s with relaxed eligibility (step %s) ng_min=%s foul_limits=%s",
+            team_name, step, used_ng_min, used_foul_limits,
         )
 
     position_order = ["PG", "SG", "SF", "PF", "C"]
@@ -122,17 +196,13 @@ def build_lineup_from_mongo(team: Union[str, TeamManager], game_state=None) -> D
         rated = [(p, get_player_rating(p, traits)) for p in available_players]
         rated.sort(key=lambda tup: tup[1], reverse=True)
 
-        # First 4 positions: choose from top 2 candidates
-        # 5th position: choose from top 3 candidates
-        if idx < 4:  # First 4 positions
+        if idx < 4:
             top_candidates = rated[:2] if len(rated) >= 2 else rated
-        else:  # 5th position
+        else:
             top_candidates = rated[:3] if len(rated) >= 3 else rated
         
         chosen_player = random.choice(top_candidates)[0]
-
         lineup[pos] = chosen_player
-        # print(f"Chose {chosen_player.first_name} {chosen_player.last_name} for {pos}")
         available_players.remove(chosen_player)
 
     return lineup

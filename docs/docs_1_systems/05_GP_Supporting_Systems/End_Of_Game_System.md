@@ -44,9 +44,9 @@ Team attributes will adjust at the end of game based on the notes below. Note th
 - End of game attribute adjustments (applies to each team, all stat conditions for the game just run):
   - `shot_threshold`
     - winning team: 
-      - If game FG% > 50%: += random.randint(0,15)
-      - elif game FG% > 42.5%: += random.randint(5,20)
-      - else: += random.randint(10,25) 
+      - If game FG% > 50%: += random.randint(5,15)
+      - elif game FG% > 42.5%: += random.randint(15,25)
+      - else: += random.randint(25,35) 
     - losing team: += random.randint(10,25)
   - `discipline` (winning and losing team have same criteria)
     - if team TO > (2 * team STL): += random.randint(-3, -1)
@@ -79,13 +79,13 @@ Team attributes will adjust at the end of game based on the notes below. Note th
     - score delta = winning team final score - losing team final score
     - if score_delta < 4:
       - winning team += random.randint(0,1)
-      - losing team += random.randint(-1,0)
+      - losing team += random.randint(-2,-1)
     - elif score_delta < 7:
       - winning team += random.randint(0,1)
-      - losing team += random.randint(-2,-1)
+      - losing team += random.randint(-4,-2)
     - else:
       - winning team += random.randint(1,2)
-      - losing team += random.randint(-4,-1)
+      - losing team += random.randint(-8,-4)
 - **Data Sources:**
   - Team statistics (TO, STL, TREB, FG%) come from the current game's box score
   - Fast Break, HC Trap, and FC Press success rates come from the box score's "Special Situations" section
