@@ -3446,11 +3446,11 @@ try:
             turns[0] if turns else None,
         )
         
-        # ⏱️ PERFORMANCE: Log total endpoint time and load source (cache vs DB)
+        # ⏱️ PERFORMANCE: Log total + breakdown (sim = turn loop, summary = build response, db_save = persist)
         total_time = (time.time() - start_time) * 1000
         _src = sim_quarter_load_source if sim_quarter_load_source else "?"
         logging.warning(
-            f"⏱️ [PERF] simulate-quarter total={total_time/1000:.2f}s source={_src} quarter={body.quarter} full_sim={body.full_sim}"
+            f"⏱️ [PERF] simulate-quarter total={total_time/1000:.2f}s sim={sim_time/1000:.1f}s summary={summary_time:.0f}ms db_save={db_save_time:.0f}ms source={_src} q={body.quarter} full_sim={body.full_sim}"
         )
         return JSONResponse(content=frontend_summary, status_code=200)
     

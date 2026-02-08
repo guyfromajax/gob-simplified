@@ -52,56 +52,41 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                     franchise_query_time = (time.time() - franchise_query_start) * 1000
                     # logger.warning(f"⏱️ [DB TIMING] franchise_players_data find (franchise_id={franchise_id}): {franchise_query_time:.2f}ms, found {len(fpd_docs)} FPD docs")
                     franchise_players = {d["player_id"]: d for d in fpd_docs}
-                    logger.warning(f"🔍 [ROSTER LOADER DEBUG] Found {len(franchise_players)} players in FPD")
-                    logger.warning(f"🔍 [ROSTER LOADER DEBUG] team_player_ids count: {len(team_player_ids)}")
+                    # ✅ PERFORMANCE: One batch find for universal player bios instead of find_one per player
+                    oids = []
+                    for pid in team_player_ids:
+                        try:
+                            oids.append(ObjectId(pid) if isinstance(pid, str) else pid)
+                        except Exception:
+                            oids.append(pid)
+                    base_docs = list(players_collection.find({"_id": {"$in": oids}}))
+                    base_by_id = {str(d["_id"]): dict(d) for d in base_docs}
 
                     players = []
-                    logger.warning(f"🔍 [ROSTER LOADER DEBUG] Starting loop over {len(team_player_ids)} player IDs")
                     for idx, pid in enumerate(team_player_ids):
                         try:
-                            # ✅ LOG: Immediately inside loop (no conditions) to confirm it runs
-                            logger.warning(f"🔍 [ROSTER LOADER DEBUG] Loop iteration {idx+1}/{len(team_player_ids)}: pid={pid}, type={type(pid)}")
                             pid_str = str(pid)
-                            # ✅ VALIDATION: Check if player exists in FPD
                             franchise_player_data = franchise_players.get(pid_str, {})
                             if not franchise_player_data:
                                 logger.error(f"❌ [ROSTER LOADER] Player {pid_str} not found in FPD. Available keys (first 5): {list(franchise_players.keys())[:5]}")
                                 continue
-                            # ✅ VALIDATION: Check if attributes exist
                             franchise_attrs = franchise_player_data.get("attributes", {})
                             if not franchise_attrs:
                                 logger.error(f"❌ [ROSTER LOADER] Player {pid_str} has no attributes in FPD! Keys: {list(franchise_player_data.keys())}")
                                 continue
-                            # Get base player data from universal collection (for bio data: height, weight, jersey, year)
-                            player_query_start = time.time()
-                            base_player = players_collection.find_one({"_id": pid_str})
-                            player_query_time = (time.time() - player_query_start) * 1000
-                            # logger.warning(f"⏱️ [DB TIMING] players_collection.find_one(_id={pid_str}): {player_query_time:.2f}ms")
+                            base_player = base_by_id.get(pid_str)
                             if not base_player:
                                 logger.error(f"❌ [ROSTER LOADER] Player {pid_str} not found in universal collection")
                                 continue
-                            base_player = dict(base_player)
                             if not isinstance(franchise_attrs, dict):
                                 logger.error(f"❌ [ROSTER LOADER] franchise_attrs is not a dict! Type: {type(franchise_attrs)}, Value: {franchise_attrs}")
                                 continue
-                            meta = franchise_player_data.get("meta", {})
-                            player_name = f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip()
-                            universal_sh = base_player.get("attributes", {}).get("SH", "MISSING")
-                            franchise_sh = franchise_attrs.get("SH", "MISSING")
-                            logger.warning(f"🔍 [ROSTER LOADER DEBUG] {player_name} ({pid_str}): universal SH={universal_sh}, franchise SH={franchise_sh}")
-                            if "SH" not in franchise_attrs:
-                                logger.error(f"❌ [ROSTER LOADER] SH attribute missing in franchise_attrs for {player_name}! Available attrs: {list(franchise_attrs.keys())[:10]}")
                             base_player["attributes"] = franchise_attrs
-                            after_sh = base_player.get("attributes", {}).get("SH", "MISSING")
-                            logger.warning(f"🔍 [ROSTER LOADER DEBUG] {player_name} AFTER overwrite: SH={after_sh}")
                             franchise_position_ratings = franchise_player_data.get("position_ratings", {})
                             if franchise_position_ratings:
                                 base_player["position_ratings"] = franchise_position_ratings
                             players.append(base_player)
-                            logger.warning(f"🔍 [ROSTER LOADER DEBUG] Successfully added {player_name} to players list (total: {len(players)})")
-                                
                         except Exception as e:
-                            # ✅ EXCEPTION HANDLING: Detailed error messages
                             logger.error(f"❌ [ROSTER LOADER] Exception processing player {pid} (idx {idx}): {type(e).__name__}: {str(e)}")
                             import traceback
                             logger.error(f"❌ [ROSTER LOADER] Traceback: {traceback.format_exc()}")

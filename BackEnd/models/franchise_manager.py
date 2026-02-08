@@ -120,8 +120,7 @@ class FranchiseManager:
             user_team_object_id: Team ObjectId string (e.g., "507f1f77bcf86cd799439011") - database identifier
             user_id: Optional user ID for ownership (set when authenticated)
         """
-        # Clear any previous season game data to ensure a fresh start
-        self.db.games.delete_many({})
+        # ✅ Do not delete all games: multi-tenant DB; franchise games are deleted when franchise is deleted.
         self.schedule = self.schedule_manager.generate_schedule()
         self.week = 1
         # Optional: start at a later week for testing (e.g. week 14→15 transition)
@@ -140,7 +139,7 @@ class FranchiseManager:
             start_week_env if start_week_env is not None else "not set",
             self.week,
         )
-        self.reset_stats()
+        # ✅ Do not reset_stats(): that updates universal players/teams; franchise uses FPD/FTD only.
 
         zero_stats = {k: 0 for k in BOX_SCORE_KEYS}
         zero_stats["Outlet_Score_List"] = []  # Outlet_Score_List is an array, not an integer
@@ -249,9 +248,9 @@ class FranchiseManager:
         ensure_fpd_index()
         ensure_frd_index()
 
-        # ✅ FPD: One doc per (franchise_id, player_id) with franchise-specific player data
-        for pid, data in players_map.items():
-            fpd_doc = {
+        # ✅ FPD: Batch insert (one round-trip instead of N)
+        fpd_docs = [
+            {
                 "franchise_id": str(self.franchise_id),
                 "player_id": pid,
                 "meta": data["meta"],
@@ -260,14 +259,16 @@ class FranchiseManager:
                 "attributes": data["attributes"],
                 "position_ratings": data["position_ratings"],
             }
-            franchise_players_data_collection.insert_one(fpd_doc)
+            for pid, data in players_map.items()
+        ]
+        if fpd_docs:
+            franchise_players_data_collection.insert_many(fpd_docs)
 
-        # ✅ FRD: One doc per (franchise_id, recruit_id); assign recruit_id (UUID) per franchise
-        for recruit in recruits:
-            recruit_id = str(uuid_module.uuid4())
-            frd_doc = {
+        # ✅ FRD: Batch insert (one round-trip instead of N)
+        frd_docs = [
+            {
                 "franchise_id": str(self.franchise_id),
-                "recruit_id": recruit_id,
+                "recruit_id": str(uuid_module.uuid4()),
                 "name": recruit["name"],
                 "attributes": recruit["attributes"],
                 "position_ratings": recruit["position_ratings"],
@@ -277,7 +278,10 @@ class FranchiseManager:
                 "year": recruit["year"],
                 "created_at": recruit["created_at"],
             }
-            franchise_recruits_data_collection.insert_one(frd_doc)
+            for recruit in recruits
+        ]
+        if frd_docs:
+            franchise_recruits_data_collection.insert_many(frd_docs)
 
         for team in self.teams:
             team_object_id = team["_id"]

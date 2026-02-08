@@ -591,7 +591,9 @@ def simulate_quarter(
         # Safety guard: prevent infinite loops
         max_turns = 200  # Reasonable limit for a quarter (480 seconds / ~2-3 seconds per turn)
         turn_count = 0
-        
+        import time as _time
+        _loop_start = _time.time()
+
         logging.info(f"🏀 Starting full simulation of Q{gm.quarter}, initial time_remaining={gm.game_state['time_remaining']}")
         
         while gm.game_state["time_remaining"] > 0:
@@ -635,6 +637,8 @@ def simulate_quarter(
             gm.game_state.pop("timeout_next_play_type", None)
             gm.game_state.pop("timeout_offense_team_id", None)
         
+        _loop_sec = _time.time() - _loop_start
+        logging.warning(f"⏱️ [PERF] full_sim loop: Q{gm.quarter} turns={turn_count} loop_time={_loop_sec:.2f}s ({1000*_loop_sec/max(turn_count,1):.0f}ms/turn)")
         logging.info(f"✅ Full simulation complete: Q{gm.quarter} finished after {turn_count} turns, final time_remaining={gm.game_state['time_remaining']}")
         gm.quarter += 1
     else:
