@@ -7,6 +7,11 @@ import json
 import logging
 from BackEnd.db import players_collection, teams_collection, plays_collection
 from BackEnd.models.player import Player, player_to_dict
+
+# ✅ PERFORMANCE: Cache plays by (play_type, play_focus) so we don't hit DB every turn (~200+ turns/quarter)
+_plays_by_type_focus_cache: dict[tuple[str, str | None], list] = {}
+# Cache play doc by name (for override lookup and HCO logic) to avoid repeated find_one
+_play_doc_by_name_cache: dict[str, dict | None] = {}
 from collections import defaultdict
 from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
 from BackEnd.constants import ACTIONS
@@ -911,8 +916,10 @@ class TurnManager:
                 offense_override_cleared = True
             self.game.game_state["user_offense_override"] = None  # Legacy clear
             
-            # Lookup play details from database to get play_type and play_focus
-            play_doc = plays_collection.find_one({"name": chosen_playcall})
+            # Lookup play details from database to get play_type and play_focus (cached by name)
+            if chosen_playcall not in _play_doc_by_name_cache:
+                _play_doc_by_name_cache[chosen_playcall] = plays_collection.find_one({"name": chosen_playcall})
+            play_doc = _play_doc_by_name_cache[chosen_playcall]
             
             # 🔍 DEBUG: Log play document lookup for override
             logging.warning(f"🔍 [PLAYCALL OVERRIDE DEBUG] Looking up play: '{chosen_playcall}'")
@@ -1078,20 +1085,16 @@ class TurnManager:
             else:
                 chosen_focus = "outside"
         
-        # Query plays collection for matching play
+        # Query plays collection for matching play (cached per game process to avoid 200+ DB round-trips per quarter)
         # ✅ FIX: Motion plays don't filter by play_focus (focus is only for tracking/influence)
-        # Set plays filter by both play_type and play_focus
-        if chosen_play_type == "motion":
-            query = {
-                "play_type": chosen_play_type
-            }
-        else:
-            query = {
-                "play_type": chosen_play_type,
-                "play_focus": chosen_focus
-            }
-        
-        matching_plays = list(plays_collection.find(query))
+        cache_key = (chosen_play_type, chosen_focus if chosen_play_type != "motion" else None)
+        if cache_key not in _plays_by_type_focus_cache:
+            if chosen_play_type == "motion":
+                query = {"play_type": chosen_play_type}
+            else:
+                query = {"play_type": chosen_play_type, "play_focus": chosen_focus}
+            _plays_by_type_focus_cache[cache_key] = list(plays_collection.find(query))
+        matching_plays = _plays_by_type_focus_cache[cache_key]
         
         if not matching_plays:
             # Fallback: if no plays match, log warning and use a default
@@ -1577,8 +1580,10 @@ class TurnManager:
         from BackEnd.constants import HCO_STRING_SPOTS
         from BackEnd.utils.shared import get_away_player_coords
         
-        # Step 1: Get play type and focus from playcall
-        play_doc = plays_collection.find_one({"name": offensive_playcall})
+        # Step 1: Get play type and focus from playcall (cached by name)
+        if offensive_playcall not in _play_doc_by_name_cache:
+            _play_doc_by_name_cache[offensive_playcall] = plays_collection.find_one({"name": offensive_playcall})
+        play_doc = _play_doc_by_name_cache[offensive_playcall]
         if not play_doc:
             return 0.0
         

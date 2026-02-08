@@ -67,43 +67,34 @@ class GameManager:
 
     def _update_position_ratings(self):
         """Recalculate position ratings for all players based on current attributes.
-        
-        Uses bulk write operations to batch all database updates into a single call,
-        reducing network overhead by ~90% for games with 10+ players.
+        In-memory player.ratings are always updated. DB write only in single/tournament
+        (franchise uses FPD; do not write to universal players_collection).
         """
         from BackEnd.utils.position_ratings import compute_position_ratings
-        from BackEnd.db import players_collection
         from pymongo.operations import UpdateOne
-        
-        # Collect all updates first
+
+        is_franchise = getattr(self.home_team, "franchise_id", None) or getattr(self.away_team, "franchise_id", None)
         bulk_operations = []
-        
+
         for team in [self.home_team, self.away_team]:
             for player in team.get_all_players():
-                # Convert player object to dict for rating calculation
                 player_dict = {
                     "attributes": player.attributes,
                     "height": player.height,
                     "name": player.name
                 }
-                
-                # Recalculate ratings
                 new_ratings = compute_position_ratings(player_dict)
-                
-                # Update player object
                 player.ratings = new_ratings
-                
-                # Queue database update for bulk operation
-                if hasattr(player, 'player_id') and player.player_id:
+                if not is_franchise and hasattr(player, "player_id") and player.player_id:
                     bulk_operations.append(
                         UpdateOne(
                             {"_id": player.player_id},
                             {"$set": {"position_ratings": new_ratings}}
                         )
                     )
-        
-        # Execute all updates in a single bulk write operation
+
         if bulk_operations:
+            from BackEnd.db import players_collection
             players_collection.bulk_write(bulk_operations, ordered=False)
     
     def setup_opening_tip(self):
