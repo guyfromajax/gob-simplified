@@ -1,4 +1,5 @@
 import random
+import time
 from datetime import datetime
 from itertools import combinations, permutations
 from pathlib import Path
@@ -120,9 +121,14 @@ class FranchiseManager:
             user_team_object_id: Team ObjectId string (e.g., "507f1f77bcf86cd799439011") - database identifier
             user_id: Optional user ID for ownership (set when authenticated)
         """
+        # ⏱️ Coarse timers: log step times at end to pinpoint init_season cost
+        _perf = {}
+
+        _t0 = time.time()
         # ✅ Do not delete all games: multi-tenant DB; franchise games are deleted when franchise is deleted.
         self.schedule = self.schedule_manager.generate_schedule()
         self.week = 1
+        _perf["generate_schedule"] = (time.time() - _t0) * 1000
         # Optional: start at a later week for testing (e.g. week 14→15 transition)
         start_week_env = os.environ.get("FRANCHISE_START_WEEK")
         if start_week_env:
@@ -143,6 +149,7 @@ class FranchiseManager:
 
         zero_stats = {k: 0 for k in BOX_SCORE_KEYS}
         zero_stats["Outlet_Score_List"] = []  # Outlet_Score_List is an array, not an integer
+        _t0 = time.time()
         existing = {}
         if self.franchise_id:
             existing = (
@@ -151,9 +158,11 @@ class FranchiseManager:
                 )
                 or {}
             )
+        _perf["find_franchise"] = (time.time() - _t0) * 1000
         prev_stats = existing.get("players", {})
         players_map: dict[str, dict] = {}
-        
+
+        _t0 = time.time()
         # Load all players with their full attributes for franchise-specific storage
         players = self.db.players.find(
             {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1}
@@ -183,15 +192,18 @@ class FranchiseManager:
                 "attributes": attrs,  # Franchise-specific attributes with randomized EM/CH/MO
                 "position_ratings": p.get("position_ratings", {}).copy(),  # Clone position ratings for this franchise
             }
+        _perf["players_find_and_loop"] = (time.time() - _t0) * 1000
 
         # Initialize franchise-specific team stats using mode initialization system
         from BackEnd.models.team_manager import TeamManager
         from BackEnd.api.gameplan_routes import populate_team_plays, populate_scouting_data, initialize_playbook_settings
-        
+
+        _t0 = time.time()
         # Get populated plays and scouting data for all teams (franchise mode)
         populated_plays = populate_team_plays(mode="franchise")
         scouting_data = populate_scouting_data(mode="franchise")
         playbook_settings = initialize_playbook_settings()
+        _perf["populate_plays_scouting_playbook"] = (time.time() - _t0) * 1000
 
         # Initialize training status - training camp happens at week 1 before games are played
         training_status = {
@@ -200,8 +212,10 @@ class FranchiseManager:
             "last_training_date": None  # No training completed yet
         }
 
+        _t0 = time.time()
         # Generate initial recruits for the franchise
         recruits = self.recruit_manager.generate_recruits_list()
+        _perf["generate_recruits"] = (time.time() - _t0) * 1000
 
         # ✅ FPD/FRD: Store players and recruits in standalone collections; keep franchise doc lean
         # Team data lives in FTD (franchise_team_data); we no longer write franchise_teams on the franchise doc.
@@ -230,7 +244,9 @@ class FranchiseManager:
         if user_id:
             extra_state["user_id"] = user_id
 
+        _t0 = time.time()
         self.save_season_state(extra_state=extra_state)
+        _perf["save_season_state"] = (time.time() - _t0) * 1000
 
         # ✅ FTD/FPD/FRD: Create franchise_team_data, franchise_players_data, franchise_recruits_data
         # *after* franchise insert so we have franchise_id.
@@ -261,8 +277,10 @@ class FranchiseManager:
             }
             for pid, data in players_map.items()
         ]
+        _t0 = time.time()
         if fpd_docs:
             franchise_players_data_collection.insert_many(fpd_docs)
+        _perf["fpd_insert_many"] = (time.time() - _t0) * 1000
 
         # ✅ FRD: Batch insert (one round-trip instead of N)
         frd_docs = [
@@ -280,9 +298,12 @@ class FranchiseManager:
             }
             for recruit in recruits
         ]
+        _t0 = time.time()
         if frd_docs:
             franchise_recruits_data_collection.insert_many(frd_docs)
+        _perf["frd_insert_many"] = (time.time() - _t0) * 1000
 
+        _t0 = time.time()
         for team in self.teams:
             team_object_id = team["_id"]
             team_attrs = TeamManager.init_team_attributes(mode="franchise")
@@ -327,6 +348,12 @@ class FranchiseManager:
                 {"$set": ftd_doc},
                 upsert=True,
             )
+        _perf["ftd_update_one_loop"] = (time.time() - _t0) * 1000
+
+        logger.warning(
+            "⏱️ [PERF] init_season breakdown: %s",
+            " ".join(f"{k}={v:.0f}ms" for k, v in _perf.items()),
+        )
 
     def reset_stats(self):
         for team in self.teams:
