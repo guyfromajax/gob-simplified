@@ -1,0 +1,12 @@
+week,phase,team,total_player_attributes,shot_threshold,discipline,fight,rebound_modifier,momentum_score,offensive_efficiency,team_chemistry,defensive_efficiency,fb_efficiency,pt_efficiency,fb_opp_modifier,pt_opp_modifier,total_team_attrs
+14,after_training,Bentley-Truman,9643,200,4,10,0,0,-5,25,-10,10,4,3,10,251
+14,after_training,Four Corners,9072,200,4,10,0,0,2,23,-5,1,-6,2,8,239
+14,after_training,Lancaster,8869,192,2,-2,0,0,-3,8,-4,8,7,4,-2,210
+14,after_training,Little York,8362,200,0,2,0,0,2,7,-5,-3,-10,-1,-1,191
+14,after_training,Morristown,8526,67,8,8,0.10000000000000002,0,9,17,7,4,4,4,10,138.1
+14,after_training,Ocean City,8463,200,4,-9,0,0,0,7,-10,-5,-9,-2,1,177
+14,after_training,South Lancaster,7884,196,0,-10,0,0,3,8,-10,-10,-3,-9,-4,161
+14,after_training,Xavien,7936,200,0,-10,0,0,-2,7,-2,-10,-6,-8,-2,167
+
+SUMMARY: Delta (Week 14 − Week 1) for 12 team attributes
+team,shot_threshold,discipline,fight,rebound_modifier,momentum_score,offensive_efficiency,team_chemistry,defensive_efficiency,fb_efficiency,pt_efficiency,fb_opp_modifier,pt_opp_modifier

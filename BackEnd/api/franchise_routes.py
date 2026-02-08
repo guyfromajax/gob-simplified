@@ -1544,9 +1544,11 @@ def delete_current_franchise(user: dict = Depends(get_current_user)):
     if not doc:
         return {"deleted": False, "count": 0}
     fid = doc["_id"]
+    # FTD stores franchise_id as ObjectId; FPD/FRD store as string; games store franchise_id as string
     franchise_team_data_collection.delete_many({"franchise_id": fid})
-    franchise_players_data_collection.delete_many({"franchise_id": fid})
-    franchise_recruits_data_collection.delete_many({"franchise_id": fid})
+    franchise_players_data_collection.delete_many({"franchise_id": str(fid)})
+    franchise_recruits_data_collection.delete_many({"franchise_id": str(fid)})
+    db.games.delete_many({"franchise_id": str(fid)})
     db.franchises.delete_one({"_id": fid})
     return {"deleted": True, "count": 1}
 
