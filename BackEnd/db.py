@@ -177,6 +177,38 @@ def ensure_frd_index():
         print(f"⚠️ [DB] ensure_frd_index: {e}", file=sys.stderr, flush=True)
 
 
+def ensure_games_franchise_index():
+    """
+    Index on games.franchise_id for franchise delete and any queries by franchise.
+    Idempotent; safe to call on startup.
+    """
+    if not client:
+        return
+    try:
+        games_collection.create_index(
+            [("franchise_id", 1)],
+            name="franchise_id_1",
+        )
+    except Exception as e:
+        print(f"⚠️ [DB] ensure_games_franchise_index: {e}", file=sys.stderr, flush=True)
+
+
+def ensure_franchises_user_id_index():
+    """
+    Index on franchises.user_id for delete-current and admin lookups.
+    Idempotent; safe to call on startup.
+    """
+    if not client:
+        return
+    try:
+        franchises_collection.create_index(
+            [("user_id", 1)],
+            name="user_id_1",
+        )
+    except Exception as e:
+        print(f"⚠️ [DB] ensure_franchises_user_id_index: {e}", file=sys.stderr, flush=True)
+
+
 def ensure_users_username_index():
     """
     Ensure unique index on users.username_lower for case-insensitive uniqueness.
