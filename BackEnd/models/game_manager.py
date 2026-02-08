@@ -16,13 +16,18 @@ import logging
 class GameManager:
     def __init__(self, home_team_name, away_team_name, home_strategy_settings=None, away_strategy_settings=None, home_team_attributes=None, away_team_attributes=None, home_scouting_data=None, away_scouting_data=None, home_plays_data=None, away_plays_data=None, home_strategy_calls=None, away_strategy_calls=None, mode="single", user_team_side=None, franchise_id=None):
         import time
+        # ⏱️ Coarse timers for gm_create breakdown
+        _t0 = time.time()
         # ✅ SS&S: Set is_user_team flag based on user_team_side
         is_home_user = user_team_side == "home"
         is_away_user = user_team_side == "away"
-        
-        self.home_team = TeamManager(home_team_name, is_home_team=True, strategy_settings=home_strategy_settings, team_attributes=home_team_attributes, scouting_data=home_scouting_data, plays_data=home_plays_data, strategy_calls=home_strategy_calls, mode=mode, is_user_team=is_home_user, franchise_id=franchise_id)
-        self.away_team = TeamManager(away_team_name, is_home_team=False, strategy_settings=away_strategy_settings, team_attributes=away_team_attributes, scouting_data=away_scouting_data, plays_data=away_plays_data, strategy_calls=away_strategy_calls, mode=mode, is_user_team=is_away_user, franchise_id=franchise_id)
 
+        self.home_team = TeamManager(home_team_name, is_home_team=True, strategy_settings=home_strategy_settings, team_attributes=home_team_attributes, scouting_data=home_scouting_data, plays_data=home_plays_data, strategy_calls=home_strategy_calls, mode=mode, is_user_team=is_home_user, franchise_id=franchise_id)
+        _home_ms = (time.time() - _t0) * 1000
+        _t0 = time.time()
+        self.away_team = TeamManager(away_team_name, is_home_team=False, strategy_settings=away_strategy_settings, team_attributes=away_team_attributes, scouting_data=away_scouting_data, plays_data=away_plays_data, strategy_calls=away_strategy_calls, mode=mode, is_user_team=is_away_user, franchise_id=franchise_id)
+        _away_ms = (time.time() - _t0) * 1000
+        _t0 = time.time()
         # ✅ Initialize tempo randomly per game (not per team)
         # Tempo is used for time_elapsed calculations, not fast break logic
         tempo_value = TeamManager.init_tempo_random()
@@ -33,6 +38,11 @@ class GameManager:
 
         # Recalculate position ratings for all players (attributes may have changed)
         self._update_position_ratings()
+        _ratings_ms = (time.time() - _t0) * 1000
+        logging.warning(
+            "⏱️ [PERF] gm_create breakdown: home_team=%.0fms away_team=%.0fms update_position_ratings=%.0fms",
+            _home_ms, _away_ms, _ratings_ms,
+        )
 
         self.score = {home_team_name: 0, away_team_name: 0}
         self.quarter = 1

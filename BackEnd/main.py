@@ -603,14 +603,20 @@ def simulate_quarter(
                 raise RuntimeError(f"Simulation exceeded {max_turns} turns. Possible infinite loop. time_remaining={gm.game_state['time_remaining']}")
             
             previous_time = gm.game_state["time_remaining"]
-            
+
+            # ⏱️ Coarse timer: sample every 10th turn and turn 1 to see macro_turn cost
+            _turn_start = _time.time()
             # ✅ FULL SIMULATION: Timeouts are just turns - continue simulation
             # Timeout turns are created and lineups are rebuilt, but simulation continues
             # until time_remaining <= 0. The break logic only applies to turn-by-turn mode
             # where the user needs to interact with the timeout.
-            
+
             gm.simulate_macro_turn()
-            
+
+            if turn_count == 1 or turn_count % 10 == 0:
+                _turn_ms = (_time.time() - _turn_start) * 1000
+                logging.warning(f"⏱️ [PERF] full_sim turn {turn_count} macro_turn={_turn_ms:.0f}ms")
+
             gm.game_state["team_fouls"] = {
                 gm.home_team.name: gm.home_team.team_fouls,
                 gm.away_team.name: gm.away_team.team_fouls,
