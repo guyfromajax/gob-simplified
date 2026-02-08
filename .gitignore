@@ -24,3 +24,6 @@ __pycache__/
 /playwright/.cache/
 node_modules/
 package-lock.json
+
+# God mode config overrides (per-environment, not committed)
+config_overrides.json

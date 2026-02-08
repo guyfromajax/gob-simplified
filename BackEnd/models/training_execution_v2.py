@@ -141,7 +141,7 @@ def execute_training(
 # Player attributes excluding EM, MO, NG
 TRAINABLE_PLAYER_ATTRS = [attr for attr in ALL_ATTRS if attr not in ["EM", "MO", "NG"]]
 
-# Team attribute clamps (lower, upper)
+# Team attribute clamps (lower, upper). shot_threshold and rebound_modifier can be overridden via config_overrides.
 TEAM_ATTR_CLAMPS = {
     "shot_threshold": (-10, 190),
     "discipline": (-10, 10),
@@ -156,6 +156,12 @@ TEAM_ATTR_CLAMPS = {
     "fb_opp_modifier": (-10, 10),
     "pt_opp_modifier": (-10, 10),
 }
+try:
+    from BackEnd.utils.config_overrides import get_team_attr_range
+    TEAM_ATTR_CLAMPS["shot_threshold"] = get_team_attr_range("shot_threshold")
+    TEAM_ATTR_CLAMPS["rebound_modifier"] = get_team_attr_range("rebound_modifier")
+except Exception:
+    pass
 
 # Player attribute clamps (lower, upper)
 PLAYER_ATTR_CLAMP = (1, None)  # Min 1, no max

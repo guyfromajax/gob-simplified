@@ -112,14 +112,11 @@ def get_fast_break_chance(game):
     return [0.0, 0.25, 0.5, 0.75, 1.0][level]
 
 def get_time_elapsed(tempo_call):
-    if tempo_call == "slow":
-        return int(max(5, min(35, random.gauss(24, 6))))
-    elif tempo_call == "normal":
-        return int(max(5, min(35, random.gauss(18, 6))))
-    elif tempo_call == "fast":
-        return int(max(4, min(15, random.gauss(12, 4))))
-    else:
-        return int(max(5, min(35, random.gauss(18, 6))))  # Fallback
+    from BackEnd.utils.config_overrides import get_tempo_params
+    if tempo_call not in ("slow", "normal", "fast"):
+        tempo_call = "normal"
+    p = get_tempo_params(tempo_call)
+    return int(max(p["min"], min(p["max"], random.gauss(p["mean"], p["std"]))))
 
 def oreb_shot_attempt(player_attrs):
     """

@@ -80,6 +80,9 @@ BLOCK_PROBABILITY = {
 # If diff > SHOOTING_FOUL_THRESHOLD → shooting foul; if diff < -BLOCK_THRESHOLD → block; else → standard shot
 BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD = 200
 BLOCK_RECONCILIATION_BLOCK_THRESHOLD = 200
+# Block attempt roll: y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX); attempt when y < aggression
+BLOCK_Y_ROLL_MIN = 1
+BLOCK_Y_ROLL_MAX = 6
 
 MALLEABLE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT"]
 
@@ -146,6 +149,8 @@ SOFT_PROB = 0.16
 # Shooting Foul Calibration constants (chance that a defensive shooting foul forces a miss)
 THREE_POINTER_FOUL_MISS_CHANCE = 0.4  # 40% chance foul forces miss on 3-pointers
 TWO_POINTER_FOUL_MISS_CHANCE = 0.2    # 20% chance foul forces miss on 2-pointers
+# Three-point shot threshold modifier: shot_threshold += (THREE_POINT_SHOT_THRESHOLD_INCREASE - (random(1,5)*momentum))
+THREE_POINT_SHOT_THRESHOLD_INCREASE = 40
 
 # HCO Resolution System constants
 # Target averages per game:
@@ -321,3 +326,47 @@ from BackEnd.constants.fast_break_constants import (
     STEAL_HCO_SETUP_OTHER_PLAYERS_MOVE_X_MAX,
 )
 
+# Keys that can be overridden by config_overrides.json (God mode / jamies-cc)
+_OVERRIDABLE_CONST_KEYS = (
+    "STANDARD_D_FOUL", "STANDARD_O_FOUL", "HARD_STEAL", "SOFT_STEAL",
+    "HARD_FOUL", "SOFT_FOUL", "STEAL_ATTEMPT", "DEAD_BALL_TURNOVER",
+    "CHARGE_THRESHOLD", "BLOCKING_FOUL_THRESHOLD",
+    "BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD", "BLOCK_RECONCILIATION_BLOCK_THRESHOLD",
+    "BLOCK_Y_ROLL_MIN", "BLOCK_Y_ROLL_MAX",
+    "HARD_SHOOTING_FOUL_THRESHOLD", "SOFT_SHOOTING_FOUL_THRESHOLD", "SOFT_PROB",
+    "THREE_POINTER_FOUL_MISS_CHANCE", "TWO_POINTER_FOUL_MISS_CHANCE",
+    "THREE_POINT_SHOT_THRESHOLD_INCREASE",
+)
+
+
+def _apply_config_overrides():
+    try:
+        from BackEnd.utils.config_overrides import get_overrides
+        ov = get_overrides()
+        for k in _OVERRIDABLE_CONST_KEYS:
+            if k in ov:
+                globals()[k] = ov[k]
+        globals()["AGGRESSION_FOUL_MULTIPLIER"] = {
+            0: ov.get("aggression_foul_1", 0.8),
+            1: ov.get("aggression_foul_2", 0.9),
+            2: ov.get("aggression_foul_3", 1.0),
+            3: ov.get("aggression_foul_4", 1.1),
+            4: ov.get("aggression_foul_5", 1.2),
+        }
+    except Exception:
+        pass
+
+
+def reload_overrides():
+    """Re-read config_overrides.json and re-apply to this module's globals. Call after saving from God mode."""
+    _apply_config_overrides()
+    try:
+        from BackEnd.utils.config_overrides import get_team_attr_range
+        from BackEnd.models import training_execution_v2
+        training_execution_v2.TEAM_ATTR_CLAMPS["shot_threshold"] = get_team_attr_range("shot_threshold")
+        training_execution_v2.TEAM_ATTR_CLAMPS["rebound_modifier"] = get_team_attr_range("rebound_modifier")
+    except Exception:
+        pass
+
+
+_apply_config_overrides()
