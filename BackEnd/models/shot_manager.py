@@ -8,6 +8,9 @@ from BackEnd.constants import (
     BLOCK_PROBABILITY,
     BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD,
     BLOCK_RECONCILIATION_BLOCK_THRESHOLD,
+    BLOCK_Y_ROLL_MIN,
+    BLOCK_Y_ROLL_MAX,
+    THREE_POINT_SHOT_THRESHOLD_INCREASE,
     AGGRESSION_FOUL_MULTIPLIER,
     HARD_SHOOTING_FOUL_THRESHOLD,
     SOFT_SHOOTING_FOUL_THRESHOLD,
@@ -413,7 +416,7 @@ class ShotManager:
         # Higher momentum = easier three-pointers
         if is_three:
             momentum = off_team.team_attributes.get("momentum", 0)
-            three_point_modifier = 40 - (random.randint(1, 5) * momentum) 
+            three_point_modifier = THREE_POINT_SHOT_THRESHOLD_INCREASE - (random.randint(1, 5) * momentum) 
             shot_threshold += three_point_modifier
         if playcall == "Set":
             playcall = "Attack"
@@ -457,7 +460,7 @@ class ShotManager:
         block_defender_used = None
         if shot_type in ("inside", "attack") and defender:
             x = def_team.strategy_settings.get("aggression", 2)
-            y = random.randint(0, 10)
+            y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX)
             if y < x:
                 # Block reconciliation: use shot_score_pre_defense vs defense_block_score
                 shooter_coords_recon = getattr(shooter, "coords", {"x": 50, "y": 25})

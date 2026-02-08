@@ -4,7 +4,11 @@ Admin API (Step 12.2).
 All endpoints require role=admin (get_admin_user).
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from pathlib import Path
+from typing import Any
+
+from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from BackEnd.db import (
@@ -17,6 +21,8 @@ from BackEnd.db import (
 from BackEnd.utils.auth import get_admin_user
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 
 
 class ResetUserStateRequest(BaseModel):
@@ -57,3 +63,26 @@ def reset_user_state(
         "tournaments_deleted": tournaments_deleted,
         "franchises_deleted": franchises_deleted,
     }
+
+
+# ---------- God mode (jamies-cc) config overrides ----------
+
+
+@router.get("/config")
+def get_config(admin: dict = Depends(get_admin_user)) -> dict[str, Any]:
+    """Return current effective config (defaults + overrides) for the God mode page. Admin only."""
+    from BackEnd.utils.config_overrides import get_overrides
+    return get_overrides()
+
+
+@router.patch("/config")
+def patch_config(
+    admin: dict = Depends(get_admin_user),
+    body: dict[str, Any] = Body(...),
+) -> dict[str, Any]:
+    """Update config overrides and re-apply. Admin only. Returns full effective config after save."""
+    from BackEnd.utils.config_overrides import set_overrides, get_overrides
+    from BackEnd import constants
+    set_overrides(body)
+    constants.reload_overrides()
+    return get_overrides()
