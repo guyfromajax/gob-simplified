@@ -47,9 +47,9 @@
 **Comparison:**
 
 - Use **shot_score before defense penalty** (the offensive component only). In block reconciliation, **defense_block_score is the defense component**; we do not apply the normal shot defense penalty here.
-- **Constants** (in `BackEnd/constants/__init__.py`): `BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD`, `BLOCK_RECONCILIATION_BLOCK_THRESHOLD` (defaults 200 each) so you can adjust easily.
-- If **shot_score − defense_block_score > BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD** → **shooting foul** (see below).
-- Elif **shot_score − defense_block_score < −BLOCK_RECONCILIATION_BLOCK_THRESHOLD** → **block** (no basket; rebound).
+- **Constants** (in `BackEnd/constants/__init__.py`): `BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD` (default 200), `BLOCK_RECONCILIATION_BLOCK_THRESHOLD` (default -200). They are **independent**: adjust one without affecting the other.
+- If **diff > BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD** → **shooting foul** (see below).
+- Elif **diff < BLOCK_RECONCILIATION_BLOCK_THRESHOLD** → **block** (no basket; rebound).
 - Else → **no block, no shooting foul** → proceed with **standard shot logic** (make/miss using existing threshold and shot_score, including normal defense penalty).
 
 ### 1.5 Shooting Foul in Block Reconciliation
@@ -128,7 +128,7 @@ From here, existing shooting-foul and free-throw flows (stats, next_play_type, g
 
 2. **Backend: block attempt and reconciliation**
    - Add **block attempt** step in `resolve_shot()`: after `shot_type` and **pre–defense-penalty** shot_score (and motion attack penalty) are available. If `shot_type` in (`"inside"`, `"attack"`): x = `def_team.strategy_settings["aggression"]` (0–4), y = `random.randint(0, 10)`, if y < x run block reconciliation.
-   - **Block reconciliation:** Use **shot_score before defense penalty**. Inputs = that shot_score, shooter, defender, roles. Compute defender scaled height term, defense_block_score; compare shot_score − defense_block_score using **`BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD`** and **`BLOCK_RECONCILIATION_BLOCK_THRESHOLD`** from `BackEnd/constants/__init__.py`. If diff > shooting-foul threshold: shooting foul; if diff < −block threshold: block; else: fall back to standard shot (with normal defense penalty and threshold).
+   - **Block reconciliation:** Use **shot_score before defense penalty**. Inputs = that shot_score, shooter, defender, roles. Compute defender scaled height term, defense_block_score; **diff** = shot_score − defense_block_score. Compare using **`BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD`** and **`BLOCK_RECONCILIATION_BLOCK_THRESHOLD`** from `BackEnd/constants/__init__.py`. If **diff > shooting-foul threshold**: shooting foul; if **diff < block threshold**: block; else: fall back to standard shot (with normal defense penalty and threshold). Thresholds are independent (e.g. block threshold default -200).
    - **Height score:** One shared helper for “height inches → 0–10”; use `(height_score * 10) + random.randint(-9, 9)` for defender block score (and shooter_finish if confirmed).
    - **Block outcome:** Set result_type or flag so frontend does block animation (no shot arc). Compute block spot; call existing rebound flow with that spot; record BLK; FGA (and 3PTA if applicable) for shooter; no FGM; no points; momentum defense +1 / offense −1. **Possession flips only on DREB** (OREB does not flip possession). Reuse result shape (`ball_bounce_x`/`ball_bounce_y`, `rebounder_id`, `rebound_type`, etc.).
    - **Shooting foul from block:** Reuse existing shooting-foul and free-throw handling (game_state, next_play_type, stats, foul recording). Only the trigger is “block reconciliation said shooting foul”; the rest is existing paths.

@@ -546,7 +546,7 @@ class ShotManager:
                             "shooter": shooter,
                         }
                     return result
-                elif diff < -BLOCK_RECONCILIATION_BLOCK_THRESHOLD:
+                elif diff < BLOCK_RECONCILIATION_BLOCK_THRESHOLD:
                     # Block: set flags and fall through to miss path (FGA/3PTA recorded in normal path)
                     defender.record_stat("BLK")
                     off_team.team_attributes["momentum"] = max(0, off_team.team_attributes.get("momentum", 0) - 1)
