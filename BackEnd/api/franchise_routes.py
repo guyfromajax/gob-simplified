@@ -125,6 +125,42 @@ def _set_team_attribute_changes_on_game(game_id_str: str, tac: dict) -> bool:
     return False
 
 
+def _finalize_team_attributes_for_game(
+    game_id,
+    franchise_id: ObjectId,
+    home_team_id: str,
+    away_team_id: str,
+    winner_id: str,
+    loser_id: str,
+    winner_score: int,
+    loser_score: int,
+) -> None:
+    """
+    Run update_team_attributes_after_game once for this game and persist
+    team_attribute_changes on the game doc so the box score can display them.
+    game_id: string or ObjectId (game doc _id).
+    """
+    try:
+        gid = ObjectId(game_id) if isinstance(game_id, str) and ObjectId.is_valid(game_id) else game_id
+        attribute_changes = update_team_attributes_after_game(
+            game_id=gid,
+            franchise_id=franchise_id,
+            home_team_id=home_team_id,
+            away_team_id=away_team_id,
+            winner_id=winner_id,
+            loser_id=loser_id,
+            winner_score=winner_score,
+            loser_score=loser_score,
+        )
+        tac = attribute_changes if attribute_changes else {}
+        game_id_str = str(game_id) if not isinstance(game_id, str) else game_id
+        _set_team_attribute_changes_on_game(game_id_str, tac)
+    except Exception as e:
+        logger.error(f"❌ [FINALIZE-TEAM-ATTRS] Error for game_id={game_id}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+
+
 def update_team_attributes_after_game(
     game_id: ObjectId,
     franchise_id: ObjectId,
@@ -1029,44 +1065,22 @@ def save_result(req: FranchiseResultRequest):
             logger.error(f"❌ [SAVE-RESULT] No box_score found in game document (game_id={game_id}). finalize_game() may fail or produce incomplete stats.")
     
     logger.info(f"🔍 [SAVE-RESULT] Calling finalize_game()")
-    logger.info(f"🔍 [SAVE-RESULT] Calling finalize_game()")
     stat_updater.finalize_game(
         req.game_id, mode="franchise", franchise_id=req.franchise_id
     )
     logger.info(f"🔍 [SAVE-RESULT] finalize_game() completed")
-    
-    # ✅ NEW: Update team attributes based on game performance
-    # This replaces the team attribute decay that was in the training system
-    logger.info(f"🔍 [SAVE-RESULT] About to call update_team_attributes_after_game()")
-    logger.info(f"🔍 [SAVE-RESULT] Parameters - game_id={game_id}, franchise_id={franchise_id}, home_id={home_id}, away_id={away_id}, winner_id={winner_id}, loser_id={loser_id}, winner_score={winner_score}, loser_score={loser_score}")
-    logger.info(f"🔍 [SAVE-RESULT] Team ID types - home_id type: {type(home_id)}, away_id type: {type(away_id)}, winner_id type: {type(winner_id)}")
-    try:
-        attribute_changes = update_team_attributes_after_game(
-            game_id=game_id,
-            franchise_id=franchise_id,
-            home_team_id=home_id,
-            away_team_id=away_id,
-            winner_id=winner_id,
-            loser_id=loser_id,
-            winner_score=winner_score,
-            loser_score=loser_score
-        )
-        
-        logger.info(f"🔍 [SAVE-RESULT] update_team_attributes_after_game returned: {attribute_changes}")
-        logger.info(f"🔍 [SAVE-RESULT] Attribute changes keys: {list(attribute_changes.keys()) if attribute_changes else 'None'}")
-        
-        # Store attribute changes in game document for box score display
-        # ✅ FIX: Always $set (even when empty) so field exists for box score
-        tac = attribute_changes if attribute_changes else {}
-        db.games.update_one(
-            {"_id": game_id},
-            {"$set": {"team_attribute_changes": tac}}
-        )
-        logger.info(f"✅ [SAVE-RESULT] team_attribute_changes $set on game_id={game_id} (keys={list(tac.keys())})")
-    except Exception as e:
-        logger.error(f"❌ [SAVE-RESULT] Error updating team attributes: {e}")
-        import traceback
-        logger.error(f"❌ [SAVE-RESULT] Traceback: {traceback.format_exc()}")
+
+    # Run team attribute update once and set team_attribute_changes on game doc for box score display
+    _finalize_team_attributes_for_game(
+        game_id=game_id,
+        franchise_id=franchise_id,
+        home_team_id=home_id,
+        away_team_id=away_id,
+        winner_id=winner_id,
+        loser_id=loser_id,
+        winner_score=winner_score,
+        loser_score=loser_score,
+    )
 
     return {"status": "success"}
 
@@ -1228,56 +1242,34 @@ def complete_week(req: CompleteWeekRequest):
             franchise_id=req.franchise_id,
         )
         logger.info(f"✅ [COMPLETE_WEEK] User game - finalize_game completed for game_id: {user_game_id_final}")
-        
-        # ✅ NEW: Update team attributes based on game performance
-        # This replaces the team attribute decay that was in the training system
-        logger.info(f"🔍 [COMPLETE_WEEK] About to call update_team_attributes_after_game()")
-        try:
-            # Extract team IDs and scores from the request
-            # user_res has ObjectIds; normalize to team_id strings (LANCASTER, etc.) so stored keys match box score
-            home_id_raw = user_res["team2_id"]  # team2 is home
-            away_id_raw = user_res["team1_id"]  # team1 is away
+
+        # Run team attribute update once for user's game (skip if already set by save_result)
+        user_game_after = db.games.find_one({"_id": user_game_id_final}, {"team_attribute_changes": 1})
+        if not user_game_after and isinstance(user_game_id_final, str) and ObjectId.is_valid(user_game_id_final):
+            user_game_after = db.games.find_one({"_id": ObjectId(user_game_id_final)}, {"team_attribute_changes": 1})
+        if not (user_game_after and user_game_after.get("team_attribute_changes")):
+            home_id_raw = user_res["team2_id"]
+            away_id_raw = user_res["team1_id"]
             home_id = _normalize_team_id_to_string(home_id_raw) or str(home_id_raw)
             away_id = _normalize_team_id_to_string(away_id_raw) or str(away_id_raw)
             home_score = user_res["team2_score"]
             away_score = user_res["team1_score"]
-            
-            # Determine winner/loser
             if home_score > away_score:
-                winner_id = home_id
-                loser_id = away_id
-                winner_score = home_score
-                loser_score = away_score
+                winner_id, loser_id = home_id, away_id
+                winner_score, loser_score = home_score, away_score
             else:
-                winner_id = away_id
-                loser_id = home_id
-                winner_score = away_score
-                loser_score = home_score
-            
-            logger.info(f"🔍 [COMPLETE_WEEK] Team attribute update params - home_id={home_id}, away_id={away_id}, winner_id={winner_id}, winner_score={winner_score}, loser_score={loser_score}")
-            
-            attribute_changes = update_team_attributes_after_game(
-                game_id=ObjectId(user_game_id_final),
+                winner_id, loser_id = away_id, home_id
+                winner_score, loser_score = away_score, home_score
+            _finalize_team_attributes_for_game(
+                game_id=user_game_id_final,
                 franchise_id=franchise_id,
                 home_team_id=home_id,
                 away_team_id=away_id,
                 winner_id=winner_id,
                 loser_id=loser_id,
                 winner_score=winner_score,
-                loser_score=loser_score
+                loser_score=loser_score,
             )
-            
-            logger.info(f"🔍 [COMPLETE_WEEK] update_team_attributes_after_game returned: {attribute_changes}")
-            logger.info(f"🔍 [COMPLETE_WEEK] Attribute changes keys: {list(attribute_changes.keys()) if attribute_changes else 'None'}")
-            
-            # Store attribute changes in game document for box score display
-            # ✅ FIX: Always $set (even when empty). Init-game uses string _id; try string first, then ObjectId.
-            tac = attribute_changes if attribute_changes else {}
-            _set_team_attribute_changes_on_game(user_game_id_final, tac)
-        except Exception as e:
-            logger.error(f"❌ [COMPLETE_WEEK] Error updating team attributes: {e}")
-            import traceback
-            logger.error(f"❌ [COMPLETE_WEEK] Traceback: {traceback.format_exc()}")
     else:
         # Fallback: Try to find game by week + team IDs (legacy behavior)
         logger.warning(f"⚠️ [COMPLETE_WEEK] No game_id provided, attempting legacy lookup: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
@@ -1298,47 +1290,33 @@ def complete_week(req: CompleteWeekRequest):
                     user_game_id, mode="franchise", franchise_id=req.franchise_id
                 )
                 logger.info(f"✅ [COMPLETE_WEEK] User game - finalize_game completed for game_id: {user_game_id}")
-                
-                # ✅ NEW: Update team attributes based on game performance (legacy path)
-                logger.info(f"🔍 [COMPLETE_WEEK] About to call update_team_attributes_after_game() (legacy path)")
-                try:
+                # Run team attribute update once (skip if already set)
+                leg_doc = db.games.find_one({"_id": user_game_id}, {"team_attribute_changes": 1}) or (
+                    db.games.find_one({"_id": ObjectId(user_game_id)}, {"team_attribute_changes": 1}) if isinstance(user_game_id, str) and ObjectId.is_valid(user_game_id) else None
+                )
+                if not (leg_doc and leg_doc.get("team_attribute_changes")):
                     home_id_raw = user_res["team2_id"]
                     away_id_raw = user_res["team1_id"]
                     home_id = _normalize_team_id_to_string(home_id_raw) or str(home_id_raw)
                     away_id = _normalize_team_id_to_string(away_id_raw) or str(away_id_raw)
                     home_score = user_res["team2_score"]
                     away_score = user_res["team1_score"]
-                    
-                    # Determine winner/loser
                     if home_score > away_score:
-                        winner_id = home_id
-                        loser_id = away_id
-                        winner_score = home_score
-                        loser_score = away_score
+                        winner_id, loser_id = home_id, away_id
+                        winner_score, loser_score = home_score, away_score
                     else:
-                        winner_id = away_id
-                        loser_id = home_id
-                        winner_score = away_score
-                        loser_score = home_score
-                    
-                    logger.info(f"🔍 [COMPLETE_WEEK] Team attribute update params (legacy) - home_id={home_id}, away_id={away_id}, winner_id={winner_id}")
-                    
-                    attribute_changes = update_team_attributes_after_game(
-                        game_id=ObjectId(user_game_id),
+                        winner_id, loser_id = away_id, home_id
+                        winner_score, loser_score = away_score, home_score
+                    _finalize_team_attributes_for_game(
+                        game_id=user_game_id,
                         franchise_id=franchise_id,
                         home_team_id=home_id,
                         away_team_id=away_id,
                         winner_id=winner_id,
                         loser_id=loser_id,
                         winner_score=winner_score,
-                        loser_score=loser_score
+                        loser_score=loser_score,
                     )
-                    tac = attribute_changes if attribute_changes else {}
-                    _set_team_attribute_changes_on_game(user_game_id, tac)
-                except Exception as e:
-                    logger.error(f"❌ [COMPLETE_WEEK] Error updating team attributes (legacy path): {e}")
-                    import traceback
-                    logger.error(f"❌ [COMPLETE_WEEK] Traceback: {traceback.format_exc()}")
             else:
                 logger.error(f"❌ [COMPLETE_WEEK] User game found but _id is empty: {user_game}")
         else:
@@ -1382,6 +1360,25 @@ def complete_week(req: CompleteWeekRequest):
                 computer_game_id, mode="franchise", franchise_id=req.franchise_id
             )
             sim_res = _save_game_result(away_id, home_id, away_score, home_score, req.week, franchise_id=req.franchise_id, game_id=computer_game_id)
+            # Run team attribute update once for this computer game and set on doc for box score display
+            home_id_str = _normalize_team_id_to_string(home_id) or str(home_id)
+            away_id_str = _normalize_team_id_to_string(away_id) or str(away_id)
+            if home_score > away_score:
+                winner_id_str, loser_id_str = home_id_str, away_id_str
+                ws, ls = home_score, away_score
+            else:
+                winner_id_str, loser_id_str = away_id_str, home_id_str
+                ws, ls = away_score, home_score
+            _finalize_team_attributes_for_game(
+                game_id=computer_game_id,
+                franchise_id=franchise_id,
+                home_team_id=home_id_str,
+                away_team_id=away_id_str,
+                winner_id=winner_id_str,
+                loser_id=loser_id_str,
+                winner_score=ws,
+                loser_score=ls,
+            )
             if eos_current_round is not None:
                 winner_id = home_id if home_score > away_score else away_id
                 save_tournament_game_result(
