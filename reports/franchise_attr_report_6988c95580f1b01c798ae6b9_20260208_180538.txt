@@ -1,0 +1,39 @@
+================================================================================
+FRANCHISE ATTRIBUTE TRACKER REPORT — franchise_id=6988c95580f1b01c798ae6b9
+Generated: 2026-02-08T18:05:38.770002Z
+================================================================================
+
+--- SNAPSHOTS (by week & phase) ---
+
+Week 14 — after_training
+  Bentley-Truman: total_player_attrs=9643 | 12 team attrs sum=251
+    shot_threshold	discipline	fight	rebound_modifier	momentum_score	offensive_efficiency	team_chemistry	defensive_efficiency	fb_efficiency	pt_efficiency	fb_opp_modifier	pt_opp_modifier
+    200	4	10	0	0	-5	25	-10	10	4	3	10
+  Four Corners: total_player_attrs=9072 | 12 team attrs sum=239
+    shot_threshold	discipline	fight	rebound_modifier	momentum_score	offensive_efficiency	team_chemistry	defensive_efficiency	fb_efficiency	pt_efficiency	fb_opp_modifier	pt_opp_modifier
+    200	4	10	0	0	2	23	-5	1	-6	2	8
+  Lancaster: total_player_attrs=8869 | 12 team attrs sum=210
+    shot_threshold	discipline	fight	rebound_modifier	momentum_score	offensive_efficiency	team_chemistry	defensive_efficiency	fb_efficiency	pt_efficiency	fb_opp_modifier	pt_opp_modifier
+    192	2	-2	0	0	-3	8	-4	8	7	4	-2
+  Little York: total_player_attrs=8362 | 12 team attrs sum=191
+    shot_threshold	discipline	fight	rebound_modifier	momentum_score	offensive_efficiency	team_chemistry	defensive_efficiency	fb_efficiency	pt_efficiency	fb_opp_modifier	pt_opp_modifier
+    200	0	2	0	0	2	7	-5	-3	-10	-1	-1
+  Morristown: total_player_attrs=8526 | 12 team attrs sum=138.1
+    shot_threshold	discipline	fight	rebound_modifier	momentum_score	offensive_efficiency	team_chemistry	defensive_efficiency	fb_efficiency	pt_efficiency	fb_opp_modifier	pt_opp_modifier
+    67	8	8	0.10000000000000002	0	9	17	7	4	4	4	10
+  Ocean City: total_player_attrs=8463 | 12 team attrs sum=177
+    shot_threshold	discipline	fight	rebound_modifier	momentum_score	offensive_efficiency	team_chemistry	defensive_efficiency	fb_efficiency	pt_efficiency	fb_opp_modifier	pt_opp_modifier
+    200	4	-9	0	0	0	7	-10	-5	-9	-2	1
+  South Lancaster: total_player_attrs=7884 | 12 team attrs sum=161
+    shot_threshold	discipline	fight	rebound_modifier	momentum_score	offensive_efficiency	team_chemistry	defensive_efficiency	fb_efficiency	pt_efficiency	fb_opp_modifier	pt_opp_modifier
+    196	0	-10	0	0	3	8	-10	-10	-3	-9	-4
+  Xavien: total_player_attrs=7936 | 12 team attrs sum=167
+    shot_threshold	discipline	fight	rebound_modifier	momentum_score	offensive_efficiency	team_chemistry	defensive_efficiency	fb_efficiency	pt_efficiency	fb_opp_modifier	pt_opp_modifier
+    200	0	-10	0	0	-2	7	-2	-10	-6	-8	-2
+
+================================================================================
+SUMMARY: Delta (Week 14 − Week 1) for each of the 12 team attributes
+(Uses Week 14 after_training vs Week 1 after_training or after_complete_week)
+================================================================================
+
+(Could not compute deltas: missing week 1 or week 14 after_training snapshot.)

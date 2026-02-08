@@ -33,6 +33,11 @@ async function selectTeam(team) {
       try {
         const errBody = await res.json();
         if (errBody.detail) msg = errBody.detail;
+        if (res.status === 400 && typeof msg === 'string' && msg.includes('already have an active franchise')) {
+          alert(msg + "\n\nGo to the main menu and click \"New Franchise\" to delete your current one and start fresh.");
+          window.location.href = '/mode-select.html';
+          return;
+        }
       } catch (_) {}
       throw new Error(msg);
     }

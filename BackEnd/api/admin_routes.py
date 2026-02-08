@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from BackEnd.db import (
+    db,
     tournaments_collection,
     franchises_collection,
     franchise_team_data_collection,
@@ -37,7 +38,7 @@ def reset_user_state(
 ):
     """
     Admin only. Deletes the target user's tournament and franchise(s) plus related data
-    (FTD, FPD, FRD) so they can start fresh. Use to unstick broken state.
+    (FTD, FPD, FRD, and games for each franchise) so they can start fresh. Use to unstick broken state.
     """
     user_id = body.user_id.strip()
     if not user_id:
@@ -52,9 +53,11 @@ def reset_user_state(
     franchises_deleted = 0
     for doc in franchise_docs:
         fid = doc["_id"]
+        # FTD uses ObjectId; FPD/FRD use string franchise_id
         franchise_team_data_collection.delete_many({"franchise_id": fid})
-        franchise_players_data_collection.delete_many({"franchise_id": fid})
-        franchise_recruits_data_collection.delete_many({"franchise_id": fid})
+        franchise_players_data_collection.delete_many({"franchise_id": str(fid)})
+        franchise_recruits_data_collection.delete_many({"franchise_id": str(fid)})
+        db.games.delete_many({"franchise_id": str(fid)})
         franchises_collection.delete_one({"_id": fid})
         franchises_deleted += 1
 

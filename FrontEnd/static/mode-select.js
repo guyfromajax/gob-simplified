@@ -37,6 +37,55 @@ function tournamentRoundLabel(roundNum, completed) {
   return 'First Round';
 }
 
+/**
+ * One-time cleanup: see docs/To Do/local_storage_cleanup.md for a Console snippet to clear existing cruft.
+ */
+
+/**
+ * Clear franchise-related keys from localStorage (one franchise per user).
+ * Call after successful franchise delete so orphaned data does not accumulate.
+ */
+function clearFranchiseLocalStorage() {
+  if (typeof localStorage === 'undefined') return;
+  const toRemove = [
+    'franchiseId',
+    'franchise_id',
+    'franchise_week',
+    'franchise_user_team',
+    'franchise_user_team_id',
+  ];
+  toRemove.forEach((k) => localStorage.removeItem(k));
+  Object.keys(localStorage).forEach((k) => {
+    if (k.startsWith('playbooks_position_filters_franchise_')) localStorage.removeItem(k);
+  });
+  // Clear last-game state that may belong to the deleted franchise
+  localStorage.removeItem('last_game_id');
+  localStorage.removeItem('last_box_score_gameId');
+  localStorage.removeItem('last_box_score_url');
+  localStorage.removeItem('last_game_user_team_side');
+  localStorage.removeItem('game_home');
+  localStorage.removeItem('game_away');
+}
+
+/**
+ * Clear tournament-related keys from localStorage.
+ * Call after successful tournament delete so orphaned data does not accumulate.
+ */
+function clearTournamentLocalStorage() {
+  if (typeof localStorage === 'undefined') return;
+  const toRemove = ['activeTournament', 'userTeamId'];
+  toRemove.forEach((k) => localStorage.removeItem(k));
+  Object.keys(localStorage).forEach((k) => {
+    if (k.startsWith('playbooks_position_filters_tournament_')) localStorage.removeItem(k);
+  });
+  localStorage.removeItem('last_game_id');
+  localStorage.removeItem('last_box_score_gameId');
+  localStorage.removeItem('last_box_score_url');
+  localStorage.removeItem('last_game_user_team_side');
+  localStorage.removeItem('game_home');
+  localStorage.removeItem('game_away');
+}
+
 function franchiseStatusLabel(data) {
   if (!data) return '--';
   if (data.eos_tournament_active) {
@@ -114,6 +163,8 @@ if (newTournamentModalConfirm) {
       });
       if (!res.ok) {
         console.warn('[mode-select] delete-current tournament failed:', res.status);
+      } else {
+        clearTournamentLocalStorage();
       }
     } catch (e) {
       console.warn('[mode-select] delete-current tournament error:', e);
@@ -151,14 +202,26 @@ function goToNewFranchise() {
 }
 
 if (franchiseNewBtn) {
-  franchiseNewBtn.addEventListener('click', () => {
+  franchiseNewBtn.addEventListener('click', async () => {
     const dontShow = typeof localStorage !== 'undefined' && localStorage.getItem(DONT_SHOW_NEW_FRANCHISE_WARNING_KEY) === '1';
     const hasExistingFranchise = !!currentFranchise;
     if (hasExistingFranchise && !dontShow) {
       openNewFranchiseModal();
-    } else {
-      goToNewFranchise();
+      return;
     }
+    if (hasExistingFranchise && dontShow) {
+      // User previously chose "don't show again" - still delete before redirecting
+      try {
+        const res = await fetch(API_CONFIG.buildUrl('/franchise/delete-current'), {
+          method: 'POST',
+          headers: API_CONFIG.getAuthHeaders(),
+        });
+        if (res.ok) clearFranchiseLocalStorage();
+      } catch (e) {
+        console.warn('[mode-select] delete-current franchise (dontShow path):', e);
+      }
+    }
+    goToNewFranchise();
   });
 }
 
@@ -179,6 +242,8 @@ if (newFranchiseModalConfirm) {
       });
       if (!res.ok) {
         console.warn('[mode-select] delete-current franchise failed:', res.status);
+      } else {
+        clearFranchiseLocalStorage();
       }
     } catch (e) {
       console.warn('[mode-select] delete-current franchise error:', e);
