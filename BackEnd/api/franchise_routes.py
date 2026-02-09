@@ -769,6 +769,7 @@ async def select_team_options():
 def select_team(
     selection: TeamSelection,
     user: dict = Depends(get_current_user),
+    profile: bool = False,
 ):
     import sys
     import time
@@ -829,12 +830,29 @@ def select_team(
         
         print(f"🔵 [DEBUG] select_team: Initializing FranchiseManager...", file=sys.stderr, flush=True)
         franchise_init_start = time.time()
-        manager = FranchiseManager(db)
-        manager.initialize_season(
-            user_team_id=user_team_id,
-            user_team_object_id=user_team_object_id,
-            user_id=user.get("user_id"),
-        )
+        if profile:
+            from BackEnd.utils.profiling import run_profiled
+            def _init():
+                m = FranchiseManager(db)
+                m.initialize_season(
+                    user_team_id=user_team_id,
+                    user_team_object_id=user_team_object_id,
+                    user_id=user.get("user_id"),
+                )
+                return m
+            # run_profiled takes a no-arg callable; we need to pass manager out
+            _manager_ref = [None]
+            def _wrapped():
+                _manager_ref[0] = _init()
+            profile_summary = run_profiled(_wrapped)
+            manager = _manager_ref[0]
+        else:
+            manager = FranchiseManager(db)
+            manager.initialize_season(
+                user_team_id=user_team_id,
+                user_team_object_id=user_team_object_id,
+                user_id=user.get("user_id"),
+            )
         franchise_init_time = (time.time() - franchise_init_start) * 1000
         total_time = (time.time() - endpoint_start) * 1000
         logger.warning(
@@ -843,6 +861,8 @@ def select_team(
 
         print(f"✅ [DEBUG] select_team: Franchise initialized successfully, franchise_id: {manager.franchise_id}", file=sys.stderr, flush=True)
         result = {"status": "ok", "franchise_id": str(manager.franchise_id)}
+        if profile:
+            result["profile_summary"] = profile_summary
         print(f"🔵 [DEBUG] select_team: Returning response: {result}", file=sys.stderr, flush=True)
         return result
     except HTTPException as e:

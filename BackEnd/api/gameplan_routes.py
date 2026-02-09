@@ -31,11 +31,6 @@ def serve_playbooks_html():
     """Return the playbooks page so query params work in production."""
     return FileResponse(STATIC_DIR / "playbooks.html")
 
-@router.get("/jamies-cc.html")
-def serve_jamies_cc_html():
-    """God mode config page (admin-only API protects data)."""
-    return FileResponse(STATIC_DIR / "jamies-cc.html")
-
 class GamePlanSettings(BaseModel):
     strategy_settings: dict[str, int]
 

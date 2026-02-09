@@ -388,11 +388,11 @@ class TeamManager:
         Returns:
             dict: Team attributes with mode-specific randomization
         """
-        # Common attributes for all modes (ranges from config_overrides when set)
-        from BackEnd.utils.config_overrides import get_team_attr_range
-        st_lo, st_hi = get_team_attr_range("shot_threshold")
+        # Common attributes for all modes (ranges from constants)
+        from BackEnd.constants import TEAM_ATTR_RANGES
+        st_lo, st_hi = TEAM_ATTR_RANGES["shot_threshold"]
         shot_threshold = random.randint(int(st_lo), int(st_hi))
-        rm_lo, rm_hi = get_team_attr_range("rebound_modifier")
+        rm_lo, rm_hi = TEAM_ATTR_RANGES["rebound_modifier"]
         # Mode-specific ranges
         if mode == "franchise":
             # Franchise mode: tighter ranges for more controlled progression
@@ -404,7 +404,7 @@ class TeamManager:
             # Single Game & Tournament mode: wider ranges
             attr_range = (-10, 10)
             team_chemistry = random.randint(7, 25)
-            # Single/Tournament: Random value in [rm_lo, rm_hi] from config_overrides
+            # Single/Tournament: Random value in [rm_lo, rm_hi] from constants
             rebound_modifier = round(rm_lo + random.random() * (rm_hi - rm_lo), 2)
         
         return {

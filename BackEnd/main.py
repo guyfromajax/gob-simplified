@@ -661,9 +661,9 @@ def initialize_team_attributes():
     settings = {}
     for team in ["Lancaster", "Bentley-Truman"]:
         # Initialize dictionary for each team
-        from BackEnd.utils.config_overrides import get_team_attr_range
-        st_lo, st_hi = get_team_attr_range("shot_threshold")
-        rm_lo, rm_hi = get_team_attr_range("rebound_modifier")
+        from BackEnd.constants import TEAM_ATTR_RANGES
+        st_lo, st_hi = TEAM_ATTR_RANGES["shot_threshold"]
+        rm_lo, rm_hi = TEAM_ATTR_RANGES["rebound_modifier"]
         team_settings = {
             "shot_threshold": random.randint(int(st_lo), int(st_hi)),
             "discipline": random.randint(-250, -150),

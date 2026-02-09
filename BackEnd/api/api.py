@@ -199,11 +199,8 @@ try:
         Return in-memory and disk state for performance debugging (e.g. on Railway).
         No auth; restrict in production if desired (e.g. by IP or remove).
         """
-        from BackEnd.utils.config_overrides import OVERRIDES_PATH
         return {
             "ongoing_games_count": len(ongoing_games),
-            "config_overrides_path": str(OVERRIDES_PATH),
-            "config_overrides_file_exists": OVERRIDES_PATH.exists(),
         }
     
     templates = Jinja2Templates(directory="FrontEnd/static")
@@ -1811,6 +1808,7 @@ try:
         body: QuarterSimulationRequest,
         debug: bool = False,
         quiet_sim: bool = False,
+        profile: bool = False,
     ):
         """Rate limited: 30/minute per IP. quiet_sim=True sets log level to ERROR during sim (sanity check for logging cost)."""
         import time
@@ -3252,6 +3250,7 @@ try:
             )
     
         try:
+            profile_summary_sim = None
             # ✅ FIX: Use full_sim parameter to determine turn_by_turn_mode
             # When full_sim=True (simming), fully simulate the quarter instantly (no animation)
             # When full_sim=False (playing), use turn-by-turn mode (for animation)
@@ -3274,17 +3273,33 @@ try:
             try:
                 # ⏱️ PERFORMANCE: Time the quarter simulation
                 sim_start = time.time()
-                simulate_quarter(
-                    gm,
-                    body.home_lineup,
-                    body.away_lineup,
-                    game_id,
-                    body.start_with_inbound,
-                    body.starting_possession,
-                    turn_by_turn_mode=turn_by_turn_mode,
-                    resume_from_timeout=body.resume_from_timeout,
-                )
-                sim_time = (time.time() - sim_start) * 1000
+                if profile:
+                    from BackEnd.utils.profiling import run_profiled
+                    def _sim():
+                        simulate_quarter(
+                            gm,
+                            body.home_lineup,
+                            body.away_lineup,
+                            game_id,
+                            body.start_with_inbound,
+                            body.starting_possession,
+                            turn_by_turn_mode=turn_by_turn_mode,
+                            resume_from_timeout=body.resume_from_timeout,
+                        )
+                    profile_summary_sim = run_profiled(_sim, top_n=80)
+                    sim_time = (time.time() - sim_start) * 1000
+                else:
+                    simulate_quarter(
+                        gm,
+                        body.home_lineup,
+                        body.away_lineup,
+                        game_id,
+                        body.start_with_inbound,
+                        body.starting_possession,
+                        turn_by_turn_mode=turn_by_turn_mode,
+                        resume_from_timeout=body.resume_from_timeout,
+                    )
+                    sim_time = (time.time() - sim_start) * 1000
             finally:
                 if saved_log_levels is not None:
                     for log, level in saved_log_levels.items():
@@ -3475,6 +3490,8 @@ try:
         logging.warning(
             f"⏱️ [PERF] simulate-quarter total={total_time/1000:.2f}s sim={sim_time/1000:.1f}s summary={summary_time:.0f}ms db_save={db_save_time:.0f}ms source={_src} q={body.quarter} full_sim={body.full_sim} quiet_sim={quiet_sim}"
         )
+        if profile_summary_sim is not None:
+            frontend_summary["profile_summary"] = profile_summary_sim
         return JSONResponse(content=frontend_summary, status_code=200)
     
     
@@ -4332,7 +4349,7 @@ try:
     
     
     @app.post("/api/init-game")
-    def init_game(request: dict):
+    def init_game(request: dict, profile: bool = False):
         endpoint_start = time.time()
         # Initialize a game document with players (Emotion, Momentum) before first quarter starts
         from BackEnd.models.game_manager import GameManager
@@ -4370,12 +4387,22 @@ try:
         
         # Create GameManager (this initializes teams and players)
         gm_start = time.time()
-        # logging.warning(f"⏱️ [PERF] /api/init-game - Starting GameManager creation")
-        gm = GameManager(home_team, away_team, mode=mode, user_team_side=user_team_side, franchise_id=franchise_id if mode == "franchise" else None)  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
+        profile_summary = None
+        if profile:
+            from BackEnd.utils.profiling import run_profiled
+            _gm_ref = [None]
+            def _create_gm():
+                _gm_ref[0] = GameManager(
+                    home_team, away_team, mode=mode, user_team_side=user_team_side,
+                    franchise_id=franchise_id if mode == "franchise" else None,
+                )
+            profile_summary = run_profiled(_create_gm)
+            gm = _gm_ref[0]
+        else:
+            gm = GameManager(home_team, away_team, mode=mode, user_team_side=user_team_side, franchise_id=franchise_id if mode == "franchise" else None)  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
         # ✅ CRITICAL: Set game_id on GameManager immediately after creation
         gm.game_id = game_id
         gm_create_time = (time.time() - gm_start) * 1000
-        # logging.warning(f"⏱️ [PERF] /api/init-game - GameManager created: {gm_create_time:.2f}ms")
         
         # ✅ CRITICAL: Store user_team_side in game_state for persistence
         # This ensures is_user_team flags persist across game loads
@@ -4534,6 +4561,8 @@ try:
         # ✅ REMOVED: Verbose debug log
         
         response_data = {"game_id": game_id}
+        if profile_summary is not None:
+            response_data["profile_summary"] = profile_summary
         total_time = (time.time() - endpoint_start) * 1000
         logging.warning(
             f"⏱️ [PERF] init-game total={total_time/1000:.2f}s gm_create={gm_create_time:.0f}ms summary={summary_time:.0f}ms db_save={db_time:.0f}ms"
