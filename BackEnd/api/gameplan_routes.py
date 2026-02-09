@@ -324,29 +324,47 @@ def populate_team_plays(mode="single"):
         return {}
 
 
-def get_play_ids_by_names(play_names):
+def get_play_ids_by_names(play_names, plays_map=None):
     """
     Get play_id (ObjectId strings) for a list of play names.
     
+    ✅ PERFORMANCE: Uses batch query or pre-loaded map to avoid N+1 queries.
+    
     Args:
         play_names: List of play name strings
+        plays_map: Optional dict mapping play_name -> play dict (to avoid DB query)
         
     Returns:
         List of play_id strings (ObjectId as string), or empty list if play not found
     """
     try:
-        from BackEnd.db import plays_collection
-        
         logger.info(f"🔍 [POSITION FILTERS] Looking up {len(play_names)} play names: {play_names}")
         play_ids = []
-        for play_name in play_names:
-            play = plays_collection.find_one({"name": play_name})
-            if play and play.get("_id"):
-                play_id_str = str(play["_id"])
-                play_ids.append(play_id_str)
-                logger.info(f"✅ [POSITION FILTERS] Found play '{play_name}' → play_id: {play_id_str}")
-            else:
-                logger.warning(f"⚠️ [POSITION FILTERS] Play '{play_name}' not found in database")
+        
+        # ✅ PERFORMANCE: Use pre-loaded map if provided (avoids DB query entirely)
+        if plays_map:
+            for play_name in play_names:
+                play = plays_map.get(play_name)
+                if play and play.get("_id"):
+                    play_id_str = str(play["_id"])
+                    play_ids.append(play_id_str)
+                    logger.info(f"✅ [POSITION FILTERS] Found play '{play_name}' → play_id: {play_id_str}")
+                else:
+                    logger.warning(f"⚠️ [POSITION FILTERS] Play '{play_name}' not found in plays_map")
+        else:
+            # ✅ PERFORMANCE: Batch query instead of N+1 individual queries
+            from BackEnd.db import plays_collection
+            plays = list(plays_collection.find({"name": {"$in": play_names}}))
+            plays_by_name = {play["name"]: play for play in plays}
+            
+            for play_name in play_names:
+                play = plays_by_name.get(play_name)
+                if play and play.get("_id"):
+                    play_id_str = str(play["_id"])
+                    play_ids.append(play_id_str)
+                    logger.info(f"✅ [POSITION FILTERS] Found play '{play_name}' → play_id: {play_id_str}")
+                else:
+                    logger.warning(f"⚠️ [POSITION FILTERS] Play '{play_name}' not found in database")
         
         logger.info(f"🔍 [POSITION FILTERS] Resolved {len(play_ids)}/{len(play_names)} plays to play_ids: {play_ids}")
         return play_ids
@@ -379,6 +397,9 @@ def initialize_playbook_settings():
         
         # Get all plays from universal collection
         all_plays = list(plays_collection.find({}))
+        
+        # ✅ PERFORMANCE: Build name -> play map for efficient lookup (avoids redundant DB queries)
+        plays_by_name = {play.get("name", ""): play for play in all_plays}
         
         # Initialize structure
         playbook_settings = {
@@ -493,6 +514,7 @@ def initialize_playbook_settings():
         # Initialize position filters with play assignments
         logger.info("🔍 [INITIALIZE PLAYBOOK] Starting position filter population...")
         
+        # ✅ PERFORMANCE: Pass plays_map to avoid redundant DB queries
         # Standard: All basic plays
         standard_plays = [
             # Motion
@@ -506,7 +528,7 @@ def initialize_playbook_settings():
             # Set Play Outside
             "Double Screen For SG"
         ]
-        standard_play_ids = get_play_ids_by_names(standard_plays)
+        standard_play_ids = get_play_ids_by_names(standard_plays, plays_map=plays_by_name)
         playbook_settings["position_filters"]["standard"] = standard_play_ids
         logger.info(f"✅ [INITIALIZE PLAYBOOK] Standard position filter populated with {len(standard_play_ids)} play_ids")
         
@@ -522,7 +544,7 @@ def initialize_playbook_settings():
             "PF Corner Shot",
             "PF Quick Jumper"
         ]
-        pf_play_ids = get_play_ids_by_names(pf_plays)
+        pf_play_ids = get_play_ids_by_names(pf_plays, plays_map=plays_by_name)
         playbook_settings["position_filters"]["PF"] = pf_play_ids
         logger.info(f"✅ [INITIALIZE PLAYBOOK] PF position filter populated with {len(pf_play_ids)} play_ids")
         
@@ -535,7 +557,7 @@ def initialize_playbook_settings():
             # Set Play Outside
             "PG Wing Three"
         ]
-        pg_play_ids = get_play_ids_by_names(pg_plays)
+        pg_play_ids = get_play_ids_by_names(pg_plays, plays_map=plays_by_name)
         playbook_settings["position_filters"]["PG"] = pg_play_ids
         logger.info(f"✅ [INITIALIZE PLAYBOOK] PG position filter populated with {len(pg_play_ids)} play_ids")
         
@@ -548,7 +570,7 @@ def initialize_playbook_settings():
             # Set Play Outside
             "SG Wheel Three"
         ]
-        sg_play_ids = get_play_ids_by_names(sg_plays)
+        sg_play_ids = get_play_ids_by_names(sg_plays, plays_map=plays_by_name)
         playbook_settings["position_filters"]["SG"] = sg_play_ids
         logger.info(f"✅ [INITIALIZE PLAYBOOK] SG position filter populated with {len(sg_play_ids)} play_ids")
         
@@ -561,7 +583,7 @@ def initialize_playbook_settings():
             # Set Play Outside
             "SF Misdirection Three"
         ]
-        sf_play_ids = get_play_ids_by_names(sf_plays)
+        sf_play_ids = get_play_ids_by_names(sf_plays, plays_map=plays_by_name)
         playbook_settings["position_filters"]["SF"] = sf_play_ids
         logger.info(f"✅ [INITIALIZE PLAYBOOK] SF position filter populated with {len(sf_play_ids)} play_ids")
         
@@ -574,7 +596,7 @@ def initialize_playbook_settings():
             # Set Play Outside
             "C Screen & Three"
         ]
-        c_play_ids = get_play_ids_by_names(c_plays)
+        c_play_ids = get_play_ids_by_names(c_plays, plays_map=plays_by_name)
         playbook_settings["position_filters"]["C"] = c_play_ids
         logger.info(f"✅ [INITIALIZE PLAYBOOK] C position filter populated with {len(c_play_ids)} play_ids")
         
