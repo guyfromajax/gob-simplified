@@ -2178,7 +2178,9 @@ async function handleSimQuarter() {
     payload.full_sim = true;
     
     console.log({event:'simulate-quarter:request', mode, homeTeam, awayTeam, quarter: nextQuarter, gameId, full_sim: true});
-    const res = await fetch(API_CONFIG.buildUrl('/api/simulate-quarter'), {
+    const base = API_CONFIG.buildUrl('/api/simulate-quarter');
+    const simQuarterUrl = base + (base.includes('?') ? '&' : '?') + 'profile=1'; // temporary: cProfile profiling; revert when done
+    const res = await fetch(simQuarterUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -2448,7 +2450,9 @@ async function handleSimFullGame() {
       payload.full_sim = true;
       
       console.log({event:'simulate-quarter:request', mode, homeTeam, awayTeam, quarter: currentQ, gameId: gId, full_sim: true});
-      const res = await fetch(API_CONFIG.buildUrl('/api/simulate-quarter'), {
+      const base = API_CONFIG.buildUrl('/api/simulate-quarter');
+      const simQuarterUrl = base + (base.includes('?') ? '&' : '?') + 'profile=1'; // temporary: cProfile profiling; revert when done
+      const res = await fetch(simQuarterUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
