@@ -164,8 +164,8 @@ PLAYER_ATTR_CLAMP = (1, None)  # Min 1, no max
 
 # Year-based pre-training decay (min, max) for random decrease per attribute. See Training_System.md.
 PRE_TRAINING_DECAY_BY_YEAR = {
-    "freshman": (-6, -1),
-    "sophomore": (-4, -1),
+    "freshman": (-4, -1),
+    "sophomore": (-3, -1),
     "junior": (-3, 0),
     "senior": (-2, 0),
 }
@@ -186,7 +186,7 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
     
     Pre-training conditions:
     - Player attributes (excluding EM, MO, NG): += randint(min, max) per player/attribute,
-      where (min, max) is year-based: Freshman (-6,-1), Sophomore (-4,-1), Junior (-3,0), Senior (-2,0).
+      where (min, max) is year-based: Freshman (-4,-1), Sophomore (-3,-1), Junior (-3,0), Senior (-2,0).
     
     Args:
         players: List of player dicts with attributes
@@ -566,19 +566,19 @@ def _apply_player_training_points(
     """
     Apply training points to a single player attribute.
     
-    Base ranges (Player Attributes):
-    - 0 points: += random.randint(-5, -3)
-    - 1 point: += random.randint(-1, 1)
-    - 2 points: += random.randint(0, 2)
-    - 3 points: += random.randint(1, 4)
-    - 4 points: += random.randint(2, 5)
-    - 5 points: += random.randint(2, 7)
+    Base ranges (Player Attributes). See Training_System.md.
+    - 0 points: += random.randint(0, 1)
+    - 1 point: += random.randint(1, 2)
+    - 2 points: += random.randint(2, 4)
+    - 3 points: += random.randint(2, 5)
+    - 4 points: += random.randint(2, 6)
+    - 5 points: += random.randint(3, 7)
     
-    Year-based adjustments:
-    - Freshman: +1 to min, +4 to max
-    - Sophomore: +1 to min, +2 to max
-    - Junior: no change (base ranges)
-    - Senior: -1 to max only
+    Year-based adjustments: leave minimums as is, only change maximums.
+    - Freshman: +5 to max
+    - Sophomore: +4 to max
+    - Junior: +3 to max
+    - Senior: +2 to max
     
     Focus amplifier: Applied based on sub_option selection
     Multiplier: For attributes like CH that get 0.5 multiplier
@@ -586,49 +586,35 @@ def _apply_player_training_points(
     attrs = player.get("attributes", {})
     anchor_key = f"anchor_{attr}"
     
-    # Handle 0 points: negative change (base range -5 to -3)
+    # Handle 0 points: small increase (base range 0 to 1)
     if points == 0:
-        decrease = random.randint(-5, -3)
+        increase = random.randint(0, 1)
+        increase = int(increase * multiplier)
         current_val = attrs.get(anchor_key, 0)
-        new_val = max(PLAYER_ATTR_CLAMP[0], current_val + decrease)
-        attrs[anchor_key] = new_val
-        attrs[attr] = new_val
+        attrs[anchor_key] = current_val + increase
+        attrs[attr] = attrs[anchor_key]
         return
     
-    # Get player year and calculate year adjustments
+    # Get player year: only adjust max. Freshman +5, Sophomore +4, Junior +3, Senior +2.
     year = player.get("year", "").lower() if player.get("year") else ""
-    min_adjustment = 0
-    max_adjustment = 0
-    if year == "freshman":
-        min_adjustment = 1
-        max_adjustment = 4
-    elif year == "sophomore":
-        min_adjustment = 1
-        max_adjustment = 2
-    elif year == "junior":
-        min_adjustment = 0
-        max_adjustment = 0
-    elif year == "senior":
-        min_adjustment = 0
-        max_adjustment = -1
+    max_adjustment = {"freshman": 5, "sophomore": 4, "junior": 3, "senior": 2}.get(year, 3)
     
-    # Get base range based on points (doc: 1→(-1,1), 2→(0,2), 3→(1,4), 4→(2,5), 5→(2,7)), then year adjustments
+    # Base range (min, max) by points. Doc: 1→(1,2), 2→(2,4), 3→(2,5), 4→(2,6), 5→(3,7)
     if points == 1:
-        base_min, base_max = -1, 1
+        base_min, base_max = 1, 2
     elif points == 2:
-        base_min, base_max = 0, 2
+        base_min, base_max = 2, 4
     elif points == 3:
-        base_min, base_max = 1, 4
-    elif points == 4:
         base_min, base_max = 2, 5
+    elif points == 4:
+        base_min, base_max = 2, 6
     elif points == 5:
-        base_min, base_max = 2, 7
+        base_min, base_max = 3, 7
     else:
-        base_min, base_max = 2, 7
+        base_min, base_max = 3, 7
     
-    adjusted_min = base_min + min_adjustment
-    adjusted_max = max(adjusted_min, base_max + max_adjustment)  # Ensure max >= min
-    increase = random.randint(adjusted_min, adjusted_max)
+    adjusted_max = base_max + max_adjustment
+    increase = random.randint(base_min, adjusted_max)
     
     # Apply multiplier (for CH in conditioning/film_study)
     increase = int(increase * multiplier)
@@ -814,17 +800,18 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
     
     Args:
         team: Team dict
-        points: Training points allocated (1-5)
+        points: Training points allocated (0-5)
         archetype: Optional coaching focus archetype
         sub_option: Optional coaching focus sub-option
         source: "technical_drills" or "scrimmages" - determines which range to use
     
-    Technical Drills ranges (in 0.01 increments):
-    - 1 point: +0.01 to +0.06
-    - 2 points: +0.03 to +0.08
-    - 3 points: +0.04 to +0.10
-    - 4 points: +0.04 to +0.12
-    - 5 points: +0.04 to +0.14
+    Technical Drills ranges (in 0.01 increments). See Training_System.md.
+    - 0 points: -= random.randint(1, 5) / 100.0 (-0.05 to -0.01)
+    - 1 point: += random.randint(0, 3) / 100.0 (0.00 to 0.03)
+    - 2 points: += random.randint(3, 7) / 100.0 (0.03 to 0.07)
+    - 3 points: += random.randint(4, 10) / 100.0 (0.04 to 0.10)
+    - 4 points: += random.randint(4, 12) / 100.0 (0.04 to 0.12)
+    - 5 points: += random.randint(4, 14) / 100.0 (0.04 to 0.14)
     
     Scrimmages ranges (in 0.01 increments):
     - 1 point: +0.01 to +0.03
@@ -833,15 +820,12 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
     - 4 points: +0.03 to +0.09
     - 5 points: +0.03 to +0.10
     """
-    if points == 0:
-        return
-    
     # Get base increase based on source and points
     if source == "technical_drills":
         if points == 0:
-            increase = -random.randint(3, 9) / 100.0  # -0.09 to -0.03
+            increase = -random.randint(1, 5) / 100.0  # -0.05 to -0.01
         elif points == 1:
-            increase = random.randint(-3, 3) / 100.0  # -0.03 to 0.03
+            increase = random.randint(0, 3) / 100.0  # 0.00 to 0.03
         elif points == 2:
             increase = random.randint(3, 7) / 100.0  # 0.03 to 0.07
         elif points == 3:
