@@ -407,30 +407,36 @@ class GameManager:
                 logging.error(f"🚨 FOUL OUT TIMEOUT: Failed to save game state: {e}")
 
     def simulate_macro_turn(self): #run_simulation
+        import time as _time
+        # ⏱️ Coarse timers for full_sim (logged on sample turns)
+        _perf = {}
+
         # Clear timeout flag at start of each turn (will be set if timeout is called)
         self.game_state["timeout_called"] = False
-        
+
         # Increment macro turn counter
         self.macro_turn_count += 1
-        
+
         # Track previous turn result for transition validation
         # Get the last turn result (before this turn executes)
         previous_result = self.turns[-1] if self.turns else None
         previous_offensive_state = self.game_state.get("_previous_offensive_state")
-        
-        # print("Starting new turn")
-        # print(f"offense_team: {self.offense_team}")
+
+        _t0 = _time.time()
         result = self.turn_manager.run_micro_turn()
-        
+        _perf["run_micro_turn"] = (_time.time() - _t0) * 1000
+
         # ✅ SS&S: Centralized next_turn determination (single source of truth)
         # Sets explicit next_turn based on result and conditions
         # This ensures ALL turns have accurate next_turn (no None values)
+        _t0 = _time.time()
         result["next_turn"] = self.determine_next_turn(result)
-        
         self._append_turn(result)
+        _perf["next_turn_append"] = (_time.time() - _t0) * 1000
 
         # If the turn ended with an offensive rebound, create a separate OREB turn
         # Process ALL consecutive OREBs in this same call (for batch efficiency)
+        _t0 = _time.time()
         while self.game_state.get("pending_oreb"):
             # print(f"📦 OREB detected - creating separate OREB turn")
             
@@ -460,6 +466,16 @@ class GameManager:
                 # Clear pending if processing failed to prevent infinite loop
                 self.game_state["pending_oreb"] = None
                 break
+        _perf["oreb_loop"] = (_time.time() - _t0) * 1000
+
+        # Log breakdown on sample turns during full_sim to see what drives user-game slowness
+        if self.game_state.get("_is_full_simulation") and (
+            self.macro_turn_count <= 3 or self.macro_turn_count % 10 == 0
+        ):
+            logging.warning(
+                "⏱️ [PERF] macro_turn %s breakdown: run_micro_turn=%.0fms next_turn_append=%.0fms oreb_loop=%.0fms",
+                self.macro_turn_count, _perf["run_micro_turn"], _perf["next_turn_append"], _perf["oreb_loop"],
+            )
 
         # ✅ FIX 3: Backend flip for DREB → HCO (Pattern B)
         # Handle possession flips for DREB transitions that go directly to HCO (not through inbound)
