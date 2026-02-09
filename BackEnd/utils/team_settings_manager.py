@@ -525,11 +525,12 @@ def load_and_apply_team_settings_to_gamemanager(
         if away_strategy:
             gm.away_team.strategy_settings = dict(away_strategy)
         
-        # Apply playbook_settings
-        if home_playbook:
-            gm.home_team.playbook_settings = dict(home_playbook)
-        if away_playbook:
-            gm.away_team.playbook_settings = dict(away_playbook)
+        # ✅ FIX: Always set playbook_settings (even if empty dict) to prevent DB fallbacks during gameplay
+        # Empty dict means "no settings configured" which is valid - cache it so we don't hit DB repeatedly
+        if home_playbook is not None:
+            gm.home_team.playbook_settings = dict(home_playbook) if home_playbook else {}
+        if away_playbook is not None:
+            gm.away_team.playbook_settings = dict(away_playbook) if away_playbook else {}
         
         logger.info(f"✅ [UNIFIED-SETTINGS] Applied settings to GameManager: home_strategy={bool(home_strategy)}, away_strategy={bool(away_strategy)}, home_playbook={bool(home_playbook)}, away_playbook={bool(away_playbook)}")
     

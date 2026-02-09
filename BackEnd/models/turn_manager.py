@@ -1243,16 +1243,19 @@ class TurnManager:
             return None
         
         # ✅ STEP 1: Check GameManager first (single source of truth during gameplay)
+        # ✅ FIX: Always check GameManager first - attribute is always set during initialization (even if empty dict)
+        # Empty dict {} means "no settings configured" which is valid - return it to avoid DB lookup
+        # This prevents 37 DB lookups per quarter when playbook_settings exists but is empty
         if is_offense_user:
-            if hasattr(offense_team, 'playbook_settings') and offense_team.playbook_settings:
-                slot_count = len(offense_team.playbook_settings.get("slot_assignments", {}))
+            if hasattr(offense_team, 'playbook_settings'):
+                slot_count = len(offense_team.playbook_settings.get("slot_assignments", {})) if offense_team.playbook_settings else 0
                 logging.warning(f"✅ [LOAD PLAYBOOK] Using GameManager for offense team: slot_assignments={slot_count}")
-                return offense_team.playbook_settings
+                return offense_team.playbook_settings or {}  # Return empty dict if None (shouldn't happen after fix)
         elif is_defense_user:
-            if hasattr(defense_team, 'playbook_settings') and defense_team.playbook_settings:
-                slot_count = len(defense_team.playbook_settings.get("slot_assignments", {}))
+            if hasattr(defense_team, 'playbook_settings'):
+                slot_count = len(defense_team.playbook_settings.get("slot_assignments", {})) if defense_team.playbook_settings else 0
                 logging.warning(f"✅ [LOAD PLAYBOOK] Using GameManager for defense team: slot_assignments={slot_count}")
-                return defense_team.playbook_settings
+                return defense_team.playbook_settings or {}  # Return empty dict if None (shouldn't happen after fix)
         
         # ✅ STEP 2: Fall back to DB if GameManager doesn't have settings (shouldn't happen, but safety net)
         from BackEnd.db import games_collection, tournaments_collection, franchises_collection
