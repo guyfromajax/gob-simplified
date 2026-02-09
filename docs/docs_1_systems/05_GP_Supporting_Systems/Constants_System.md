@@ -10,12 +10,12 @@ This document lists all constants and variables that were previously on the depr
 |-----|---------------|--------|
 | `STANDARD_D_FOUL` | 95 | |
 | `STANDARD_O_FOUL` | 5 | |
-| `HARD_STEAL` | -200 | |
-| `SOFT_STEAL` | -100 | |
+| `HARD_STEAL` | -150 | |
+| `SOFT_STEAL` | -50 | |
 | `HARD_FOUL` | 200 | |
 | `SOFT_FOUL` | 100 | |
-| `STEAL_ATTEMPT` | 25 | |
-| `DEAD_BALL_TURNOVER` | 7 | |
+| `STEAL_ATTEMPT` | 30 | |
+| `DEAD_BALL_TURNOVER` | 5 | |
 
 ---
 
@@ -32,10 +32,10 @@ This document lists all constants and variables that were previously on the depr
 
 | Key | Current value | Notes |
 |-----|---------------|--------|
-| `BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD` | 200 | diff above this → shooting foul |
-| `BLOCK_RECONCILIATION_BLOCK_THRESHOLD` | -200 | diff below this → block |
+| `BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD` | 150 | diff above this → shooting foul |
+| `BLOCK_RECONCILIATION_BLOCK_THRESHOLD` | -150 | diff below this → block |
 | `BLOCK_Y_ROLL_MIN` | 1 | Y random range min (block attempt roll) |
-| `BLOCK_Y_ROLL_MAX` | 6 | Y random range max |
+| `BLOCK_Y_ROLL_MAX` | 4 | Y random range max |
 
 ---
 
@@ -72,8 +72,8 @@ Used for TEAM_ATTR_CLAMPS (e.g. training, team init). Min/max clamp for generate
 
 | Key | Current value | Notes |
 |-----|---------------|--------|
-| `shot_threshold_min` | -10 | |
-| `shot_threshold_max` | 190 | |
+| `shot_threshold_min` | 0 | |
+| `shot_threshold_max` | 200 | |
 | `rebound_modifier_min` | 0.0 | |
 | `rebound_modifier_max` | 0.4 | |
 
@@ -87,25 +87,25 @@ Used by `get_time_elapsed(tempo_call)` in `BackEnd/utils/shared.py`. Each tempo 
 
 | Key | Current value |
 |-----|---------------|
-| `tempo_slow_mean` | 24 |
+| `tempo_slow_mean` | 20 |
 | `tempo_slow_std` | 6 |
 | `tempo_slow_min` | 5 |
-| `tempo_slow_max` | 35 |
+| `tempo_slow_max` | 30 |
 
 ### Normal
 
 | Key | Current value |
 |-----|---------------|
-| `tempo_normal_mean` | 18 |
+| `tempo_normal_mean` | 15 |
 | `tempo_normal_std` | 6 |
 | `tempo_normal_min` | 5 |
-| `tempo_normal_max` | 35 |
+| `tempo_normal_max` | 30 |
 
 ### Fast
 
 | Key | Current value |
 |-----|---------------|
-| `tempo_fast_mean` | 12 |
+| `tempo_fast_mean` | 10 |
 | `tempo_fast_std` | 4 |
 | `tempo_fast_min` | 4 |
 | `tempo_fast_max` | 15 |
