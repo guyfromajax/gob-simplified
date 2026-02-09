@@ -79,11 +79,11 @@ BLOCK_PROBABILITY = {
 # Block reconciliation (blocks on shot attempts): diff = shot_score_pre_defense - defense_block_score
 # If diff > BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD → shooting foul; if diff < BLOCK_RECONCILIATION_BLOCK_THRESHOLD → block; else → standard shot
 # Thresholds are independent: adjust either without affecting the other.
-BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD = 200
+BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD = 150
 BLOCK_RECONCILIATION_BLOCK_THRESHOLD = -200
 # Block attempt roll: y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX); attempt when y < aggression
 BLOCK_Y_ROLL_MIN = 1
-BLOCK_Y_ROLL_MAX = 6
+BLOCK_Y_ROLL_MAX = 5
 
 MALLEABLE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT"]
 
@@ -159,11 +159,11 @@ THREE_POINT_SHOT_THRESHOLD_INCREASE = 40
 # - Average target FG% of 45%
 STANDARD_D_FOUL = 95
 STANDARD_O_FOUL = 5
-HARD_STEAL = -200
-SOFT_STEAL = -100
+HARD_STEAL = -150
+SOFT_STEAL = -50
 HARD_FOUL = 200
 SOFT_FOUL = 100
-STEAL_ATTEMPT = 25
+STEAL_ATTEMPT = 30
 DEAD_BALL_TURNOVER = 7
 
 # Charge/Blocking Foul (drive reconciliation thresholds)
@@ -330,13 +330,13 @@ from BackEnd.constants.fast_break_constants import (
 # Tempo time elapsed: get_time_elapsed(tempo_call) uses these (mean, std, min, max → gauss then clamp).
 # Values previously in jamies-cc; now canonical here. See docs Constants_System.md.
 TEMPO_PARAMS = {
-    "slow": {"mean": 24, "std": 6, "min": 5, "max": 35},
-    "normal": {"mean": 18, "std": 6, "min": 5, "max": 35},
-    "fast": {"mean": 12, "std": 4, "min": 4, "max": 15},
+    "slow": {"mean": 20, "std": 6, "min": 5, "max": 30},
+    "normal": {"mean": 15, "std": 6, "min": 5, "max": 30},
+    "fast": {"mean": 10, "std": 4, "min": 4, "max": 15},
 }
 
 # Team attribute clamps (min, max) for shot_threshold and rebound_modifier. Used by team init and training.
 TEAM_ATTR_RANGES = {
-    "shot_threshold": (-10, 190),
+    "shot_threshold": (0, 200),
     "rebound_modifier": (0.0, 0.4),
 }

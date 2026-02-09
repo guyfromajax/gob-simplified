@@ -1928,19 +1928,28 @@ try:
                 # ✅ CRITICAL FIX: Always apply playbook_settings to GameManager when game is cached
                 # Strategy_settings are handled later with proper validity checks, but playbook_settings must be loaded here
                 # This ensures playbook_settings saved pre-game are available during gameplay
-                # ✅ FIX: Always set playbook_settings (even if empty dict) to prevent DB fallbacks
+                # ✅ FIX: Always set playbook_settings (even if empty dict) to prevent DB fallbacks during gameplay
+                # If settings exist in DB, use them; otherwise set empty dict to ensure attribute exists
                 trace_id_cached = f"sim_q{body.quarter}_{body.game_id}_cached"
                 if home_settings and "playbook_settings" in home_settings:
                     db_slots = len(home_settings.get("playbook_settings", {}).get("slot_assignments", {}))
                     before_slots = len(getattr(gm.home_team, 'playbook_settings', {}).get("slot_assignments", {})) if getattr(gm.home_team, 'playbook_settings', None) else 0
                     gm.home_team.playbook_settings = home_settings.get("playbook_settings") or {}
                     after_slots = len(gm.home_team.playbook_settings.get("slot_assignments", {})) if gm.home_team.playbook_settings else 0
+                elif not hasattr(gm.home_team, 'playbook_settings'):
+                    # ✅ FIX: If playbook_settings don't exist in DB and attribute doesn't exist, set empty dict
+                    # This ensures attribute exists so _load_playbook_settings doesn't hit DB 37 times
+                    gm.home_team.playbook_settings = {}
                 
                 if away_settings and "playbook_settings" in away_settings:
                     db_slots = len(away_settings.get("playbook_settings", {}).get("slot_assignments", {}))
                     before_slots = len(getattr(gm.away_team, 'playbook_settings', {}).get("slot_assignments", {})) if getattr(gm.away_team, 'playbook_settings', None) else 0
                     gm.away_team.playbook_settings = away_settings.get("playbook_settings") or {}
                     after_slots = len(gm.away_team.playbook_settings.get("slot_assignments", {})) if gm.away_team.playbook_settings else 0
+                elif not hasattr(gm.away_team, 'playbook_settings'):
+                    # ✅ FIX: If playbook_settings don't exist in DB and attribute doesn't exist, set empty dict
+                    # This ensures attribute exists so _load_playbook_settings doesn't hit DB 37 times
+                    gm.away_team.playbook_settings = {}
             
             # ✅ TIMEOUT RESUME: Unified state restoration (works for all modes and all paths)
             # Only check database for timeout state if we have a game_id (existing game, not new game start)
@@ -2760,14 +2769,35 @@ try:
                                 )
                                 if home_settings:
                                     home_playbook_settings = home_settings.get("playbook_settings", {})
+                                    # ✅ FIX: Also load strategy_settings from master doc if not provided in request
+                                    if not home_strategy and home_settings.get("strategy_settings"):
+                                        home_strategy = home_settings.get("strategy_settings")
+                                        gm.home_team.strategy_settings = dict(home_strategy) if home_strategy else {}
                                 if away_settings:
                                     away_playbook_settings = away_settings.get("playbook_settings", {})
+                                    # ✅ FIX: Also load strategy_settings from master doc if not provided in request
+                                    if not away_strategy and away_settings.get("strategy_settings"):
+                                        away_strategy = away_settings.get("strategy_settings")
+                                        gm.away_team.strategy_settings = dict(away_strategy) if away_strategy else {}
                             elif mode == "franchise" and body.franchise_id:
-                                # ✅ FTD: Load playbook_settings from FTD
+                                # ✅ FTD: Load playbook_settings and strategy_settings from FTD
                                 if home_ftd:
                                     home_playbook_settings = home_ftd.get("playbook_settings", {})
+                                    # ✅ FIX: Also load strategy_settings from FTD if not provided in request
+                                    if not home_strategy and home_ftd.get("strategy_settings"):
+                                        home_strategy = home_ftd.get("strategy_settings")
+                                        gm.home_team.strategy_settings = dict(home_strategy) if home_strategy else {}
                                 if away_ftd:
                                     away_playbook_settings = away_ftd.get("playbook_settings", {})
+                                    # ✅ FIX: Also load strategy_settings from FTD if not provided in request
+                                    if not away_strategy and away_ftd.get("strategy_settings"):
+                                        away_strategy = away_ftd.get("strategy_settings")
+                                        gm.away_team.strategy_settings = dict(away_strategy) if away_strategy else {}
+                            
+                            # ✅ FIX: Apply playbook_settings to GameManager so they're available during gameplay (prevents 37 DB lookups per quarter)
+                            # Always set (even if empty dict) to ensure attribute exists
+                            gm.home_team.playbook_settings = dict(home_playbook_settings) if home_playbook_settings else {}
+                            gm.away_team.playbook_settings = dict(away_playbook_settings) if away_playbook_settings else {}
                             
                             # Create team objects with plays and playbook_settings for skeleton lookup
                             teams_obj = {
@@ -4471,6 +4501,9 @@ try:
             # They may be loaded from teams collection or come from previous saves
             summary["teams"][home_team_id]["playbook_settings"] = home_playbook_settings
             summary["teams"][away_team_id]["playbook_settings"] = away_playbook_settings
+            # ✅ FIX: Always set playbook_settings on GameManager (even if empty) to prevent DB fallbacks during gameplay
+            gm.home_team.playbook_settings = dict(home_playbook_settings) if home_playbook_settings else {}
+            gm.away_team.playbook_settings = dict(away_playbook_settings) if away_playbook_settings else {}
         elif mode == "franchise" and franchise_id:
             # ✅ FTD: Copy master settings from FTD to game doc as baseline
             from BackEnd.api.franchise_routes import get_user_team_from_franchise
@@ -4507,9 +4540,19 @@ try:
                                 if master_playbook:
                                     summary["teams"][user_team_id_in_game]["playbook_settings"] = master_playbook.copy()
                                     logging.warning(f"✅ [FTD] Copied playbook_settings from FTD to game doc for team {user_team_id_in_game}")
+                                    # ✅ FIX: Apply to GameManager so settings are available during gameplay (prevents 37 DB lookups per quarter)
+                                    if user_team_id_in_game == home_team_id:
+                                        gm.home_team.playbook_settings = dict(master_playbook) if master_playbook else {}
+                                    elif user_team_id_in_game == away_team_id:
+                                        gm.away_team.playbook_settings = dict(master_playbook) if master_playbook else {}
                                 if master_strategy:
                                     summary["teams"][user_team_id_in_game]["strategy_settings"] = master_strategy.copy()
                                     logging.warning(f"✅ [FTD] Copied strategy_settings from FTD to game doc for team {user_team_id_in_game}")
+                                    # ✅ FIX: Apply to GameManager so settings are available during gameplay
+                                    if user_team_id_in_game == home_team_id:
+                                        gm.home_team.strategy_settings = dict(master_strategy) if master_strategy else {}
+                                    elif user_team_id_in_game == away_team_id:
+                                        gm.away_team.strategy_settings = dict(master_strategy) if master_strategy else {}
             except Exception as e:
                 logging.warning(f"⚠️ [FTD] Error copying settings from FTD: {e}")
                 import traceback
@@ -4545,9 +4588,19 @@ try:
                             if master_playbook:
                                 summary["teams"][user_team_id_in_game]["playbook_settings"] = master_playbook.copy()
                                 logging.warning(f"✅ [PHASE 5.7] Copied playbook_settings from tournament master to game doc for team {user_team_id_in_game}")
+                                # ✅ FIX: Apply to GameManager so settings are available during gameplay (prevents 37 DB lookups per quarter)
+                                if user_team_id_in_game == home_team_id:
+                                    gm.home_team.playbook_settings = dict(master_playbook) if master_playbook else {}
+                                elif user_team_id_in_game == away_team_id:
+                                    gm.away_team.playbook_settings = dict(master_playbook) if master_playbook else {}
                             if master_strategy:
                                 summary["teams"][user_team_id_in_game]["strategy_settings"] = master_strategy.copy()
                                 logging.warning(f"✅ [PHASE 5.7] Copied strategy_settings from tournament master to game doc for team {user_team_id_in_game}")
+                                # ✅ FIX: Apply to GameManager so settings are available during gameplay
+                                if user_team_id_in_game == home_team_id:
+                                    gm.home_team.strategy_settings = dict(master_strategy) if master_strategy else {}
+                                elif user_team_id_in_game == away_team_id:
+                                    gm.away_team.strategy_settings = dict(master_strategy) if master_strategy else {}
             except Exception as e:
                 logging.warning(f"⚠️ [PHASE 5.7] Error copying settings from tournament master: {e}")
         summary_time = (time.time() - summary_start) * 1000
