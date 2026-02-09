@@ -1247,17 +1247,28 @@ class TurnManager:
         # Empty dict {} means "no settings configured" which is valid - return it to avoid DB lookup
         # This prevents 37 DB lookups per quarter when playbook_settings exists but is empty
         if is_offense_user:
-            if hasattr(offense_team, 'playbook_settings'):
-                slot_count = len(offense_team.playbook_settings.get("slot_assignments", {})) if offense_team.playbook_settings else 0
-                logging.warning(f"✅ [LOAD PLAYBOOK] Using GameManager for offense team: slot_assignments={slot_count}")
-                return offense_team.playbook_settings or {}  # Return empty dict if None (shouldn't happen after fix)
+            has_attr = hasattr(offense_team, 'playbook_settings')
+            logging.warning(f"🔴🔴🔴 [DIAG] _load_playbook_settings OFFENSE: hasattr={has_attr}, team={offense_team.name}, team_id={getattr(offense_team, 'team_id', 'NO_ID')}")
+            if has_attr:
+                attr_value = getattr(offense_team, 'playbook_settings', None)
+                slot_count = len(attr_value.get("slot_assignments", {})) if attr_value else 0
+                logging.warning(f"✅ [LOAD PLAYBOOK] Using GameManager for offense team: slot_assignments={slot_count}, value_type={type(attr_value)}")
+                return attr_value or {}  # Return empty dict if None (shouldn't happen after fix)
+            else:
+                logging.error(f"🔴🔴🔴 [DIAG] OFFENSE TEAM MISSING playbook_settings ATTRIBUTE! team={offense_team.name}, dir(team)={[x for x in dir(offense_team) if not x.startswith('_')][:10]}")
         elif is_defense_user:
-            if hasattr(defense_team, 'playbook_settings'):
-                slot_count = len(defense_team.playbook_settings.get("slot_assignments", {})) if defense_team.playbook_settings else 0
-                logging.warning(f"✅ [LOAD PLAYBOOK] Using GameManager for defense team: slot_assignments={slot_count}")
-                return defense_team.playbook_settings or {}  # Return empty dict if None (shouldn't happen after fix)
+            has_attr = hasattr(defense_team, 'playbook_settings')
+            logging.warning(f"🔴🔴🔴 [DIAG] _load_playbook_settings DEFENSE: hasattr={has_attr}, team={defense_team.name}, team_id={getattr(defense_team, 'team_id', 'NO_ID')}")
+            if has_attr:
+                attr_value = getattr(defense_team, 'playbook_settings', None)
+                slot_count = len(attr_value.get("slot_assignments", {})) if attr_value else 0
+                logging.warning(f"✅ [LOAD PLAYBOOK] Using GameManager for defense team: slot_assignments={slot_count}, value_type={type(attr_value)}")
+                return attr_value or {}  # Return empty dict if None (shouldn't happen after fix)
+            else:
+                logging.error(f"🔴🔴🔴 [DIAG] DEFENSE TEAM MISSING playbook_settings ATTRIBUTE! team={defense_team.name}, dir(team)={[x for x in dir(defense_team) if not x.startswith('_')][:10]}")
         
         # ✅ STEP 2: Fall back to DB if GameManager doesn't have settings (shouldn't happen, but safety net)
+        logging.error(f"🔴🔴🔴 [DIAG] FALLING BACK TO DB - GameManager missing playbook_settings! offense_user={is_offense_user}, defense_user={is_defense_user}")
         from BackEnd.db import games_collection, tournaments_collection, franchises_collection
         from bson import ObjectId
         
