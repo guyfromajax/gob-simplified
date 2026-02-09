@@ -322,7 +322,8 @@ export function createGameScene(Phaser) {
       
       // Note: Q4 possession is handled by backend using opening_tip_winner from Q1
       // No need to pass start_with_inbound for standard Q4 logic
-      const url = API_CONFIG.buildUrl('/api/simulate-quarter');
+      const baseUrl = API_CONFIG.buildUrl('/api/simulate-quarter');
+      const url = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'profile=1'; // temporary: cProfile profiling; revert when done
       const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
