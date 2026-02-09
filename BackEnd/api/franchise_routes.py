@@ -1574,119 +1574,98 @@ def delete_current_franchise(user: dict = Depends(get_current_user)):
 def command_center_data(
     franchise_id: str = None,
     user: dict = Depends(get_current_user),
+    profile: bool = False,
 ):
+    """FCC main data load. Add ?profile=1 to get profile_summary in the response."""
     import time
-    start_time = time.time()
-    # logger.info(f"⏱️ [PERF] /franchise/command-center/data START - franchise_id={franchise_id}")
-    
-    # Get user team info from franchise document (with backward compatibility)
-    team_name = None
-    team_id = None
-    training_completed = False
-    session_type = "in-season"
-    
-    if franchise_id:
-        try:
-            franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
-            fid = franchise_doc["_id"]
-            db_query_start = time.time()
-            db_query_time = time.time() - db_query_start
-            # logger.info(f"⏱️ [PERF] /franchise/command-center/data DB query: {db_query_time:.3f}s")
-            if franchise_doc:
-                team_name, team_id = get_user_team_from_franchise(franchise_doc)
-                
-                training_status = franchise_doc.get("training_status", {})
-                training_completed = training_status.get("training_completed", False)
-                session_type = training_status.get("session_type", "in-season")
-                
-                if team_id:
-                    team_doc = db.teams.find_one({"_id": ObjectId(team_id)}) or {}
-                    ftd = franchise_team_data_collection.find_one(
-                        {"franchise_id": fid, "team_id": ObjectId(team_id)},
-                        {"team_attributes": 1}
-                    )
-                    if ftd:
-                        attrs = ftd.get("team_attributes", {})
-                        team_doc["team_chemistry"] = attrs.get("team_chemistry", 0)
+    def _build():
+        team_name = None
+        team_id = None
+        training_completed = False
+        session_type = "in-season"
+        franchise_doc = None
+        if franchise_id:
+            try:
+                franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+                fid = franchise_doc["_id"]
+                if franchise_doc:
+                    team_name, team_id = get_user_team_from_franchise(franchise_doc)
+                    training_status = franchise_doc.get("training_status", {})
+                    training_completed = training_status.get("training_completed", False)
+                    session_type = training_status.get("session_type", "in-season")
+                    if team_id:
+                        team_doc = db.teams.find_one({"_id": ObjectId(team_id)}) or {}
+                        ftd = franchise_team_data_collection.find_one(
+                            {"franchise_id": fid, "team_id": ObjectId(team_id)},
+                            {"team_attributes": 1}
+                        )
+                        if ftd:
+                            attrs = ftd.get("team_attributes", {})
+                            team_doc["team_chemistry"] = attrs.get("team_chemistry", 0)
+                        else:
+                            team_doc["team_chemistry"] = 0
                     else:
-                        team_doc["team_chemistry"] = 0
+                        team_doc = {}
                 else:
                     team_doc = {}
-        except HTTPException:
-            raise
-        except Exception:
-            team_doc = {}
-    else:
-        # Fallback to state collection if no franchise_id (backward compatibility - deprecated)
+            except HTTPException:
+                raise
+            except Exception:
+                team_doc = {}
+        else:
+            try:
+                state = franchise_state_collection.find_one({"_id": "state"}) or {}
+                team_name = state.get("team", "")
+                if team_name:
+                    logger.warning(f"⚠️ [DEPRECATED] Using franchise_state fallback (no franchise_id provided). ")
+                team_doc = db.teams.find_one({"name": team_name}) or {}
+                team_id = str(team_doc.get("_id", "")) if team_doc.get("_id") else None
+            except Exception as e:
+                logger.debug(f"franchise_state collection not available: {e}")
+                team_doc = {}
+                team_id = None
         try:
             state = franchise_state_collection.find_one({"_id": "state"}) or {}
-            team_name = state.get("team", "")
-            if team_name:
-                logger.warning(f"⚠️ [DEPRECATED] Using franchise_state fallback (no franchise_id provided). "
-                             f"This is legacy behavior - new code should provide franchise_id.")
-            team_doc = db.teams.find_one({"name": team_name}) or {}
-            team_id = str(team_doc.get("_id", "")) if team_doc.get("_id") else None
         except Exception as e:
             logger.debug(f"franchise_state collection not available: {e}")
-            team_doc = {}
-            team_id = None
-    
-    # Get username and seed from state (backward compatibility)
-    # Fallback to state collection (backward compatibility - deprecated)
-    try:
-        state = franchise_state_collection.find_one({"_id": "state"}) or {}
-        if state.get("team"):
-            logger.warning(f"⚠️ [DEPRECATED] Using franchise_state fallback in command_center(). "
-                         f"This is legacy behavior - should use franchise document.")
-    except Exception as e:
-        logger.debug(f"franchise_state collection not available: {e}")
-        state = {}
-    
-    # ✅ EOS TOURNAMENT: Include tournament data if active
-    # ✅ PERFORMANCE: Reuse franchise_doc from above (already loaded with projection)
-    eos_tournament = None
-    eos_tournament_active = False
-    week = None
-    if franchise_id and franchise_doc:
-        try:
-            eos_tournament = franchise_doc.get("eos_tournament")
-            eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
-            week = franchise_doc.get("week", 1)
-        except Exception:
-            pass
-    
-    # ✅ Phase 5.3: Common keys from shared builder; franchise-only keys merged below
-    response = build_command_center_base(team_name, team_id, team_doc)
-    response["intangibles"] = team_doc.get("intangibles", "-")
-    response["prestige"] = team_doc.get("prestige", "-")
-    response["rank"] = team_doc.get("rank", "-")
-    response["username"] = state.get("username", "Coach")
-    response["seed"] = state.get("seed", 1)
-    response["training_completed"] = training_completed
-    response["session_type"] = session_type
-    response["week"] = week if week is not None else 1  # ✅ Always include week (defaults to 1)
-    response["training_status"] = (
-        {"training_completed": training_completed, "session_type": session_type}
-        if franchise_id and franchise_doc else {}
-    )
-    
-    # Add tournament data if active
-    if eos_tournament_active and eos_tournament:
-        response["eos_tournament"] = eos_tournament
-        response["eos_tournament_active"] = True
-    
-    # EOS user-eliminated: disable training, offer "Sim Rest Of Tournament" when rounds remain
-    training_disabled_for_eos = bool(franchise_doc.get("training_status", {}).get("training_disabled_for_eos", False)) if franchise_id and franchise_doc else False
-    response["training_disabled_for_eos"] = training_disabled_for_eos
-    user_eliminated = training_disabled_for_eos
-    tournament_complete = bool(eos_tournament.get("completed", False)) if eos_tournament else False
-    offer_sim_rest = user_eliminated and eos_tournament_active and not tournament_complete
-    response["user_eliminated"] = user_eliminated
-    response["offer_sim_rest"] = offer_sim_rest
-    
-    total_time = time.time() - start_time
-    # logger.info(f"⏱️ [PERF] /franchise/command-center/data COMPLETE: {total_time:.3f}s")
-    return response
+            state = {}
+        eos_tournament = franchise_doc.get("eos_tournament") if franchise_doc else None
+        eos_tournament_active = franchise_doc.get("eos_tournament_active", False) if franchise_doc else False
+        week = franchise_doc.get("week", 1) if franchise_doc else None
+        response = build_command_center_base(team_name, team_id, team_doc)
+        response["intangibles"] = team_doc.get("intangibles", "-")
+        response["prestige"] = team_doc.get("prestige", "-")
+        response["rank"] = team_doc.get("rank", "-")
+        response["username"] = state.get("username", "Coach")
+        response["seed"] = state.get("seed", 1)
+        response["training_completed"] = training_completed
+        response["session_type"] = session_type
+        response["week"] = week if week is not None else 1
+        response["training_status"] = (
+            {"training_completed": training_completed, "session_type": session_type}
+            if franchise_id and franchise_doc else {}
+        )
+        if eos_tournament_active and eos_tournament:
+            response["eos_tournament"] = eos_tournament
+            response["eos_tournament_active"] = True
+        training_disabled_for_eos = bool(franchise_doc.get("training_status", {}).get("training_disabled_for_eos", False)) if franchise_id and franchise_doc else False
+        response["training_disabled_for_eos"] = training_disabled_for_eos
+        user_eliminated = training_disabled_for_eos
+        tournament_complete = bool(eos_tournament.get("completed", False)) if eos_tournament else False
+        offer_sim_rest = user_eliminated and eos_tournament_active and not tournament_complete
+        response["user_eliminated"] = user_eliminated
+        response["offer_sim_rest"] = offer_sim_rest
+        return response
+    if profile:
+        from BackEnd.utils.profiling import run_profiled
+        _out = [None]
+        def _wrapped():
+            _out[0] = _build()
+        profile_summary = run_profiled(_wrapped, top_n=60)
+        result = _out[0]
+        result["profile_summary"] = profile_summary
+        return result
+    return _build()
 
 
 def _ftd_team_list_for_franchise(franchise_id) -> dict:
@@ -1697,102 +1676,90 @@ def _ftd_team_list_for_franchise(franchise_id) -> dict:
 
 
 @router.get("/franchise/standings")
-def standings(franchise_id: str):
+def standings(franchise_id: str, profile: bool = False):
+    """Add ?profile=1 to get profile_summary in the response."""
     import time
-    start_time = time.time()
-    # logger.info(f"⏱️ [PERF] /franchise/standings START - franchise_id={franchise_id}")
-    
-    db_query_start = time.time()
-    franchise_doc = db.franchises.find_one(
-        {"_id": ObjectId(franchise_id)},
-        {"schedule": 1, "week": 1, "eos_tournament": 1, "eos_tournament_active": 1, "results": 1, "_id": 1}
-    )
-    db_query_time = time.time() - db_query_start
-    # logger.info(f"⏱️ [PERF] /franchise/standings DB query: {db_query_time:.3f}s")
-    
-    found = franchise_doc is not None
-    logger.info("standings franchise_id=%s found=%s", franchise_id, found)
-    if not franchise_doc:
-        raise HTTPException(status_code=404, detail="Franchise not found")
-
-    schedule = franchise_doc.get("schedule", [])
-    week = franchise_doc.get("week", 1)
-    id_to_name = {t["_id"]: t["name"] for t in db.teams.find({}, {"name": 1})}
-
-    matchup_map = {}
-    
-    eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
-    eos_tournament = franchise_doc.get("eos_tournament", {})
-    
-    if eos_tournament_active and eos_tournament and week >= 15:
-        current_round = eos_tournament.get("current_round", 1)
-        round_name = get_round_name(current_round)
-        bracket = eos_tournament.get("bracket", {})
-        matchups = bracket.get(round_name, [])
-        
-        for matchup_data in matchups:
-            home_id_str = matchup_data.get("home_team")
-            away_id_str = matchup_data.get("away_team")
-            
-            if home_id_str and away_id_str:
-                try:
-                    home_id = ObjectId(home_id_str)
-                    away_id = ObjectId(away_id_str)
-                    home_name = id_to_name.get(home_id, "")
-                    away_name = id_to_name.get(away_id, "")
-                    matchup_map[str(away_id)] = f"at {home_name}"
-                    matchup_map[str(home_id)] = f"vs {away_name}"
-                except Exception:
-                    continue
-    else:
-        next_games = schedule[week - 1] if week - 1 < len(schedule) else []
-        for away_id, home_id in next_games:
-            home_name = id_to_name.get(home_id, "")
-            away_name = id_to_name.get(away_id, "")
-            matchup_map[str(away_id)] = f"at {home_name}"
-            matchup_map[str(home_id)] = f"vs {away_name}"
-
-    from BackEnd.utils.franchise_standings import calculate_franchise_standings
-    
-    franchise_results = franchise_doc.get("results", {})
-    team_list = _ftd_team_list_for_franchise(franchise_id)
-    
-    standings_data = calculate_franchise_standings(franchise_results, team_list)
-    
-    team_ids_list = [ObjectId(tid) for tid in team_list.keys()]
-    teams = list(db.teams.find({"_id": {"$in": team_ids_list}}, {"name": 1, "_id": 1}))
-
-    output = []
-    for t in teams:
-        team_id_str = str(t["_id"])
-        team_standings = standings_data.get(team_id_str, {"W": 0, "L": 0, "PF": 0, "PA": 0})
-        
-        wins = team_standings.get("W", 0)
-        losses = team_standings.get("L", 0)
-        games_played = wins + losses
-        pct = round(wins / games_played, 3) if games_played else 0.0
-        pf = team_standings.get("PF", 0)
-        pa = team_standings.get("PA", 0)
-        differential = pf - pa
-        
-        output.append({
-            "team_id": team_id_str,
-            "name": t.get("name", ""),
-            "W": wins,
-            "L": losses,
-            "pct": pct,
-            "PF": pf,
-            "PA": pa,
-            "differential": differential,
-            "next": matchup_map.get(team_id_str, "")
-        })
-
-    output.sort(key=lambda x: (x["W"], x["differential"]), reverse=True)
-    logger.info("standings returning franchise_id=%s found=%s", franchise_id, found)
-    
-    total_time = time.time() - start_time
-    # logger.info(f"⏱️ [PERF] /franchise/standings COMPLETE: {total_time:.3f}s")
-    return {"standings": output}
+    def _build():
+        franchise_doc = db.franchises.find_one(
+            {"_id": ObjectId(franchise_id)},
+            {"schedule": 1, "week": 1, "eos_tournament": 1, "eos_tournament_active": 1, "results": 1, "_id": 1}
+        )
+        found = franchise_doc is not None
+        logger.info("standings franchise_id=%s found=%s", franchise_id, found)
+        if not franchise_doc:
+            raise HTTPException(status_code=404, detail="Franchise not found")
+        schedule = franchise_doc.get("schedule", [])
+        week = franchise_doc.get("week", 1)
+        id_to_name = {t["_id"]: t["name"] for t in db.teams.find({}, {"name": 1})}
+        matchup_map = {}
+        eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
+        eos_tournament = franchise_doc.get("eos_tournament", {})
+        if eos_tournament_active and eos_tournament and week >= 15:
+            current_round = eos_tournament.get("current_round", 1)
+            round_name = get_round_name(current_round)
+            bracket = eos_tournament.get("bracket", {})
+            matchups = bracket.get(round_name, [])
+            for matchup_data in matchups:
+                home_id_str = matchup_data.get("home_team")
+                away_id_str = matchup_data.get("away_team")
+                if home_id_str and away_id_str:
+                    try:
+                        home_id = ObjectId(home_id_str)
+                        away_id = ObjectId(away_id_str)
+                        home_name = id_to_name.get(home_id, "")
+                        away_name = id_to_name.get(away_id, "")
+                        matchup_map[str(away_id)] = f"at {home_name}"
+                        matchup_map[str(home_id)] = f"vs {away_name}"
+                    except Exception:
+                        continue
+        else:
+            next_games = schedule[week - 1] if week - 1 < len(schedule) else []
+            for away_id, home_id in next_games:
+                home_name = id_to_name.get(home_id, "")
+                away_name = id_to_name.get(away_id, "")
+                matchup_map[str(away_id)] = f"at {home_name}"
+                matchup_map[str(home_id)] = f"vs {away_name}"
+        from BackEnd.utils.franchise_standings import calculate_franchise_standings
+        franchise_results = franchise_doc.get("results", {})
+        team_list = _ftd_team_list_for_franchise(franchise_id)
+        standings_data = calculate_franchise_standings(franchise_results, team_list)
+        team_ids_list = [ObjectId(tid) for tid in team_list.keys()]
+        teams = list(db.teams.find({"_id": {"$in": team_ids_list}}, {"name": 1, "_id": 1}))
+        output = []
+        for t in teams:
+            team_id_str = str(t["_id"])
+            team_standings = standings_data.get(team_id_str, {"W": 0, "L": 0, "PF": 0, "PA": 0})
+            wins = team_standings.get("W", 0)
+            losses = team_standings.get("L", 0)
+            games_played = wins + losses
+            pct = round(wins / games_played, 3) if games_played else 0.0
+            pf = team_standings.get("PF", 0)
+            pa = team_standings.get("PA", 0)
+            differential = pf - pa
+            output.append({
+                "team_id": team_id_str,
+                "name": t.get("name", ""),
+                "W": wins,
+                "L": losses,
+                "pct": pct,
+                "PF": pf,
+                "PA": pa,
+                "differential": differential,
+                "next": matchup_map.get(team_id_str, "")
+            })
+        output.sort(key=lambda x: (x["W"], x["differential"]), reverse=True)
+        logger.info("standings returning franchise_id=%s found=%s", franchise_id, found)
+        return {"standings": output}
+    if profile:
+        from BackEnd.utils.profiling import run_profiled
+        _out = [None]
+        def _wrapped():
+            _out[0] = _build()
+        profile_summary = run_profiled(_wrapped, top_n=60)
+        result = _out[0]
+        result["profile_summary"] = profile_summary
+        return result
+    return _build()
 
 
 @router.get("/franchise/schedule")
@@ -2475,43 +2442,37 @@ def get_latest_training(franchise_id: str):
 
 
 @router.get("/franchise/state")
-def get_franchise_state(franchise_id: str):
+def get_franchise_state(franchise_id: str, profile: bool = False):
     """
     Get the full franchise document (for loading team data in Command Center).
-    
-    ✅ PERFORMANCE: Only returns players object (used for merging stats into roster).
-    This reduces data transfer from ~402KB to ~300KB (25% reduction).
+    Add ?profile=1 to get profile_summary in the response.
     """
-    import time
-    start_time = time.time()
-    # logger.info(f"⏱️ [PERF] /franchise/state START - franchise_id={franchise_id}")
-    
-    try:
-        fid = ObjectId(franchise_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid franchise ID")
-    
-    # ✅ FPD: Load franchise without players blob; build players from FPD for same response shape
-    db_query_start = time.time()
-    franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 0})  # Exclude players (stored in FPD)
-    db_query_time = time.time() - db_query_start
-    # logger.info(f"⏱️ [PERF] /franchise/state DB query: {db_query_time:.3f}s")
-    if not franchise_doc:
-        raise HTTPException(status_code=404, detail="Franchise not found")
-    fpd_docs = list(franchise_players_data_collection.find(
-        {"franchise_id": str(franchise_id)},
-        {"player_id": 1, "meta": 1, "season": 1, "career": 1, "attributes": 1, "position_ratings": 1}
-    ))
-    franchise_doc["players"] = {d["player_id"]: {k: d[k] for k in ["meta", "season", "career", "attributes", "position_ratings"] if k in d} for d in fpd_docs}
-    players_count = len(franchise_doc["players"])
-    # logger.info(f"⏱️ [PERF] /franchise/state Loaded {players_count} players from FPD")
-    
-    # Convert ObjectId to string for JSON serialization
-    franchise_doc["_id"] = str(franchise_doc["_id"])
-    
-    total_time = time.time() - start_time
-    # logger.info(f"⏱️ [PERF] /franchise/state COMPLETE: {total_time:.3f}s")
-    return jsonable_encoder(franchise_doc, custom_encoder={ObjectId: str})
+    def _build():
+        try:
+            fid = ObjectId(franchise_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid franchise ID")
+        franchise_doc = db.franchises.find_one({"_id": fid}, {"players": 0})
+        if not franchise_doc:
+            raise HTTPException(status_code=404, detail="Franchise not found")
+        fpd_docs = list(franchise_players_data_collection.find(
+            {"franchise_id": str(franchise_id)},
+            {"player_id": 1, "meta": 1, "season": 1, "career": 1, "attributes": 1, "position_ratings": 1}
+        ))
+        franchise_doc["players"] = {d["player_id"]: {k: d[k] for k in ["meta", "season", "career", "attributes", "position_ratings"] if k in d} for d in fpd_docs}
+        franchise_doc["_id"] = str(franchise_doc["_id"])
+        return jsonable_encoder(franchise_doc, custom_encoder={ObjectId: str})
+    if profile:
+        from BackEnd.utils.profiling import run_profiled
+        _out = [None]
+        def _wrapped():
+            _out[0] = _build()
+        profile_summary = run_profiled(_wrapped, top_n=60)
+        result = _out[0]
+        if isinstance(result, dict):
+            result["profile_summary"] = profile_summary
+        return result
+    return _build()
 
 
 @router.get("/franchise/team-data")
@@ -2841,14 +2802,30 @@ def get_training_points(franchise_id: str):
 
 
 @router.post("/franchise/run-training")
-def run_franchise_training(req: FranchiseTrainingRequest):
+def run_franchise_training(req: FranchiseTrainingRequest, profile: bool = False):
     """
     Run training for a franchise team using franchise-specific player/team attributes.
     Updates only the franchise document, not the core collections.
+    Add ?profile=1 to get a profile_summary in the response.
     """
     import time
+    if profile:
+        from BackEnd.utils.profiling import run_profiled
+        _out = [None]
+        def _wrapped():
+            _out[0] = _run_franchise_training_impl(req)
+        profile_summary = run_profiled(_wrapped, top_n=60)
+        result = _out[0]
+        if isinstance(result, dict):
+            result["profile_summary"] = profile_summary
+        return result
+    return _run_franchise_training_impl(req)
+
+
+def _run_franchise_training_impl(req: FranchiseTrainingRequest):
+    """Inner implementation so run_franchise_training can be profiled with ?profile=1."""
+    import time
     endpoint_start = time.time()
-    
     try:
         franchise_id = ObjectId(req.franchise_id)
     except Exception:

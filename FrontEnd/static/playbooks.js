@@ -444,6 +444,7 @@ class PlaybooksUI {
           params.set('franchise_id', franchiseId);
         }
         
+        params.set('profile', '1');
         const response = await fetch(`${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`);
         if (response.ok) {
           data = await response.json();
@@ -818,6 +819,7 @@ class PlaybooksUI {
         params.set('franchise_id', franchiseId);
       }
       
+      params.set('profile', '1');
       console.log('🔍 [PLAYBOOKS] Loading slot assignments from API:', params.toString());
       const response = await fetch(`${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`);
       if (response.ok) {

@@ -102,8 +102,7 @@ async function loadRoster() {
     } else if (mode === 'tournament' && tournamentId) {
       params.append('tournament_id', tournamentId);
     }
-    // If no mode, just load base roster (no params needed)
-    
+    params.append('profile', '1');
     if (params.toString()) {
       url += `?${params.toString()}`;
     }

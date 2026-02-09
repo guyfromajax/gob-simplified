@@ -254,6 +254,7 @@ async function loadRoster() {
   if (franchiseId) {
     params.append('franchise_id', franchiseId);
   }
+  params.append('profile', '1');
   if (params.toString()) {
     url += `?${params.toString()}`;
   }

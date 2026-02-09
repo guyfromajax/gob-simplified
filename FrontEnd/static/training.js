@@ -452,7 +452,8 @@ submitBtn.addEventListener('click', async function() {
     console.log('🔍 [TRAINING] Submitting to endpoint:', endpoint);
     console.log('🔍 [TRAINING] Payload:', payload);
     
-    const response = await fetch(API_CONFIG.buildUrl(endpoint), {
+    const url = API_CONFIG.buildUrl(endpoint) + (endpoint === '/franchise/run-training' ? '?profile=1' : '');
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

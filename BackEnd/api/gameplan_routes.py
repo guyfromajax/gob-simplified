@@ -1497,16 +1497,22 @@ def update_gameplan(request: GamePlanUpdateRequest):
 
 
 @router.get("/api/playbooks")
-def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_id: str = None, game_id: str = None, source: str = None):
+def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_id: str = None, game_id: str = None, source: str = None, profile: bool = False):
     """
     Get plays for a team from the appropriate mode document.
-    Returns plays organized by type (motion, set_play) and focus (inside, attack, outside).
-    
-    PERFORMANCE DIAGNOSTIC: This endpoint is instrumented with timing logs.
+    Add profile=1 to get profile_summary in the response.
     """
     import time
+    if profile:
+        from BackEnd.utils.profiling import run_profiled
+        _out = [None]
+        def _wrapped():
+            _out[0] = get_playbooks(mode, team_id, franchise_id, tournament_id, game_id, source, profile=False)
+        profile_summary = run_profiled(_wrapped, top_n=60)
+        result = _out[0]
+        result["profile_summary"] = profile_summary
+        return result
     endpoint_start = time.time()
-    
     try:
         logger.warning(f"🔍 [GET PLAYBOOKS] query: mode={mode!r}, team_id={team_id!r}, franchise_id={franchise_id!r}, tournament_id={tournament_id!r}, game_id={game_id!r}")
         # ✅ PHASE 5.5: Use helper to get collection and doc_id (simplifies mode handling)

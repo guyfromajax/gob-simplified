@@ -23,7 +23,7 @@ function createButtons() {
 async function selectTeam(team) {
   try {
     const headers = { ...API_CONFIG.getAuthHeaders(), "Content-Type": "application/json" };
-    const res = await fetch(API_CONFIG.buildUrl('/franchise/select-team'), {
+    const res = await fetch(API_CONFIG.buildUrl('/franchise/select-team?profile=1'), {
       method: "POST",
       headers,
       body: JSON.stringify({ team_name: team })
