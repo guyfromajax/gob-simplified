@@ -112,10 +112,10 @@ def get_fast_break_chance(game):
     return [0.0, 0.25, 0.5, 0.75, 1.0][level]
 
 def get_time_elapsed(tempo_call):
-    from BackEnd.utils.config_overrides import get_tempo_params
+    from BackEnd.constants import TEMPO_PARAMS
     if tempo_call not in ("slow", "normal", "fast"):
         tempo_call = "normal"
-    p = get_tempo_params(tempo_call)
+    p = TEMPO_PARAMS[tempo_call]
     return int(max(p["min"], min(p["max"], random.gauss(p["mean"], p["std"]))))
 
 def oreb_shot_attempt(player_attrs):

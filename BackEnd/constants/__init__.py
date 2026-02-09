@@ -327,47 +327,16 @@ from BackEnd.constants.fast_break_constants import (
     STEAL_HCO_SETUP_OTHER_PLAYERS_MOVE_X_MAX,
 )
 
-# Keys that can be overridden by config_overrides.json (God mode / jamies-cc)
-_OVERRIDABLE_CONST_KEYS = (
-    "STANDARD_D_FOUL", "STANDARD_O_FOUL", "HARD_STEAL", "SOFT_STEAL",
-    "HARD_FOUL", "SOFT_FOUL", "STEAL_ATTEMPT", "DEAD_BALL_TURNOVER",
-    "CHARGE_THRESHOLD", "BLOCKING_FOUL_THRESHOLD",
-    "BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD", "BLOCK_RECONCILIATION_BLOCK_THRESHOLD",
-    "BLOCK_Y_ROLL_MIN", "BLOCK_Y_ROLL_MAX",
-    "HARD_SHOOTING_FOUL_THRESHOLD", "SOFT_SHOOTING_FOUL_THRESHOLD", "SOFT_PROB",
-    "THREE_POINTER_FOUL_MISS_CHANCE", "TWO_POINTER_FOUL_MISS_CHANCE",
-    "THREE_POINT_SHOT_THRESHOLD_INCREASE",
-)
+# Tempo time elapsed: get_time_elapsed(tempo_call) uses these (mean, std, min, max → gauss then clamp).
+# Values previously in jamies-cc; now canonical here. See docs Constants_System.md.
+TEMPO_PARAMS = {
+    "slow": {"mean": 24, "std": 6, "min": 5, "max": 35},
+    "normal": {"mean": 18, "std": 6, "min": 5, "max": 35},
+    "fast": {"mean": 12, "std": 4, "min": 4, "max": 15},
+}
 
-
-def _apply_config_overrides():
-    try:
-        from BackEnd.utils.config_overrides import get_overrides
-        ov = get_overrides()
-        for k in _OVERRIDABLE_CONST_KEYS:
-            if k in ov:
-                globals()[k] = ov[k]
-        globals()["AGGRESSION_FOUL_MULTIPLIER"] = {
-            0: ov.get("aggression_foul_1", 0.8),
-            1: ov.get("aggression_foul_2", 0.9),
-            2: ov.get("aggression_foul_3", 1.0),
-            3: ov.get("aggression_foul_4", 1.1),
-            4: ov.get("aggression_foul_5", 1.2),
-        }
-    except Exception:
-        pass
-
-
-def reload_overrides():
-    """Re-read config_overrides.json and re-apply to this module's globals. Call after saving from God mode."""
-    _apply_config_overrides()
-    try:
-        from BackEnd.utils.config_overrides import get_team_attr_range
-        from BackEnd.models import training_execution_v2
-        training_execution_v2.TEAM_ATTR_CLAMPS["shot_threshold"] = get_team_attr_range("shot_threshold")
-        training_execution_v2.TEAM_ATTR_CLAMPS["rebound_modifier"] = get_team_attr_range("rebound_modifier")
-    except Exception:
-        pass
-
-
-_apply_config_overrides()
+# Team attribute clamps (min, max) for shot_threshold and rebound_modifier. Used by team init and training.
+TEAM_ATTR_RANGES = {
+    "shot_threshold": (-10, 190),
+    "rebound_modifier": (0.0, 0.4),
+}
