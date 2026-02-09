@@ -196,7 +196,7 @@ class FranchiseManager:
 
         # Initialize franchise-specific team stats using mode initialization system
         from BackEnd.models.team_manager import TeamManager
-        from BackEnd.api.gameplan_routes import populate_team_plays, populate_scouting_data, initialize_playbook_settings
+        from BackEnd.api.gameplan_routes import populate_team_plays, populate_scouting_data, _get_cached_playbook_settings
 
         _t0 = time.time()
         populated_plays = populate_team_plays(mode="franchise")
@@ -205,7 +205,7 @@ class FranchiseManager:
         scouting_data = populate_scouting_data(mode="franchise")
         _perf["populate_scouting_data"] = (time.time() - _t0) * 1000
         _t0 = time.time()
-        playbook_settings = initialize_playbook_settings()
+        playbook_settings = _get_cached_playbook_settings()
         _perf["initialize_playbook_settings"] = (time.time() - _t0) * 1000
 
         # Initialize training status - training camp happens at week 1 before games are played
