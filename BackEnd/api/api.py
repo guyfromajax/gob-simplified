@@ -1908,54 +1908,52 @@ try:
             # This ensures settings saved pre-game are applied to cached games (e.g., init-game → save settings → simulate-quarter)
             mode = body.mode or "single"
             
-            # ✅ CRITICAL FIX: Always load playbook_settings from DB when game is cached (for single mode)
-            # Strategy_settings are handled later with proper validity checks
+            # ✅ CRITICAL FIX: Always load playbook_settings when game is cached (all modes: single, franchise, tournament)
+            # Previously only single mode set playbook_settings here; franchise/tournament never did, causing 40+ DB fallbacks per quarter.
             logging.warning(f"🔴🔴🔴 [DIAG] simulate-quarter CACHED PATH: gm={gm is not None}, mode={mode}, game_id={body.game_id}, quarter={body.quarter}")
-            if gm is not None and mode == "single" and body.game_id:
-                home_settings = load_team_settings_from_doc(
-                    mode,
-                    body.game_id,
-                    None,
-                    body.home_team
-                )
-                away_settings = load_team_settings_from_doc(
-                    mode,
-                    body.game_id,
-                    None,
-                    body.away_team
-                )
-                # ✅ REMOVED: Verbose BEFORE logs - only log when settings are applied
-                
-                # ✅ CRITICAL FIX: Always apply playbook_settings to GameManager when game is cached
-                # Strategy_settings are handled later with proper validity checks, but playbook_settings must be loaded here
-                # This ensures playbook_settings saved pre-game are available during gameplay
-                # ✅ FIX: Always set playbook_settings (even if empty dict) to prevent DB fallbacks during gameplay
-                # If settings exist in DB, use them; otherwise set empty dict to ensure attribute exists
-                trace_id_cached = f"sim_q{body.quarter}_{body.game_id}_cached"
-                logging.warning(f"🔴🔴🔴 [DIAG] CACHED PATH: Setting playbook_settings on GameManager. gm_id={id(gm)}, home_team_id={id(gm.home_team)}, away_team_id={id(gm.away_team)}")
-                if home_settings and "playbook_settings" in home_settings:
-                    db_slots = len(home_settings.get("playbook_settings", {}).get("slot_assignments", {}))
-                    before_slots = len(getattr(gm.home_team, 'playbook_settings', {}).get("slot_assignments", {})) if getattr(gm.home_team, 'playbook_settings', None) else 0
-                    gm.home_team.playbook_settings = home_settings.get("playbook_settings") or {}
-                    after_slots = len(gm.home_team.playbook_settings.get("slot_assignments", {})) if gm.home_team.playbook_settings else 0
-                    logging.warning(f"🔴🔴🔴 [DIAG] CACHED PATH: Set home playbook_settings: slots={after_slots}, team_obj_id={id(gm.home_team)}")
-                elif not hasattr(gm.home_team, 'playbook_settings'):
-                    # ✅ FIX: If playbook_settings don't exist in DB and attribute doesn't exist, set empty dict
-                    # This ensures attribute exists so _load_playbook_settings doesn't hit DB 37 times
-                    gm.home_team.playbook_settings = {}
-                    logging.warning(f"🔴🔴🔴 [DIAG] CACHED PATH: Set empty home playbook_settings (no DB settings), team_obj_id={id(gm.home_team)}")
-                
-                if away_settings and "playbook_settings" in away_settings:
-                    db_slots = len(away_settings.get("playbook_settings", {}).get("slot_assignments", {}))
-                    before_slots = len(getattr(gm.away_team, 'playbook_settings', {}).get("slot_assignments", {})) if getattr(gm.away_team, 'playbook_settings', None) else 0
-                    gm.away_team.playbook_settings = away_settings.get("playbook_settings") or {}
-                    after_slots = len(gm.away_team.playbook_settings.get("slot_assignments", {})) if gm.away_team.playbook_settings else 0
-                    logging.warning(f"🔴🔴🔴 [DIAG] CACHED PATH: Set away playbook_settings: slots={after_slots}, team_obj_id={id(gm.away_team)}")
-                elif not hasattr(gm.away_team, 'playbook_settings'):
-                    # ✅ FIX: If playbook_settings don't exist in DB and attribute doesn't exist, set empty dict
-                    # This ensures attribute exists so _load_playbook_settings doesn't hit DB 37 times
-                    gm.away_team.playbook_settings = {}
-                    logging.warning(f"🔴🔴🔴 [DIAG] CACHED PATH: Set empty away playbook_settings (no DB settings), team_obj_id={id(gm.away_team)}")
+            if gm is not None and body.game_id:
+                doc_id = None
+                game_id_arg = None
+                if mode == "single":
+                    doc_id = body.game_id
+                elif mode == "franchise" and body.franchise_id:
+                    doc_id = body.franchise_id
+                    game_id_arg = body.game_id
+                elif mode == "tournament" and body.tournament_id:
+                    doc_id = body.tournament_id
+                    game_id_arg = body.game_id
+                if doc_id:
+                    home_settings = load_team_settings_from_doc(
+                        mode,
+                        doc_id,
+                        None,
+                        body.home_team,
+                        game_id=game_id_arg
+                    )
+                    away_settings = load_team_settings_from_doc(
+                        mode,
+                        doc_id,
+                        None,
+                        body.away_team,
+                        game_id=game_id_arg
+                    )
+                    # ✅ Apply playbook_settings to GameManager so _load_playbook_settings uses cache (no DB per turn)
+                    trace_id_cached = f"sim_q{body.quarter}_{body.game_id}_cached"
+                    logging.warning(f"🔴🔴🔴 [DIAG] CACHED PATH: Setting playbook_settings on GameManager. gm_id={id(gm)}, home_team_id={id(gm.home_team)}, away_team_id={id(gm.away_team)}")
+                    if home_settings and "playbook_settings" in home_settings:
+                        gm.home_team.playbook_settings = home_settings.get("playbook_settings") or {}
+                        after_slots = len(gm.home_team.playbook_settings.get("slot_assignments", {})) if gm.home_team.playbook_settings else 0
+                        logging.warning(f"🔴🔴🔴 [DIAG] CACHED PATH: Set home playbook_settings: slots={after_slots}, team_obj_id={id(gm.home_team)}")
+                    elif not hasattr(gm.home_team, 'playbook_settings'):
+                        gm.home_team.playbook_settings = {}
+                        logging.warning(f"🔴🔴🔴 [DIAG] CACHED PATH: Set empty home playbook_settings (no DB settings), team_obj_id={id(gm.home_team)}")
+                    if away_settings and "playbook_settings" in away_settings:
+                        gm.away_team.playbook_settings = away_settings.get("playbook_settings") or {}
+                        after_slots = len(gm.away_team.playbook_settings.get("slot_assignments", {})) if gm.away_team.playbook_settings else 0
+                        logging.warning(f"🔴🔴🔴 [DIAG] CACHED PATH: Set away playbook_settings: slots={after_slots}, team_obj_id={id(gm.away_team)}")
+                    elif not hasattr(gm.away_team, 'playbook_settings'):
+                        gm.away_team.playbook_settings = {}
+                        logging.warning(f"🔴🔴🔴 [DIAG] CACHED PATH: Set empty away playbook_settings (no DB settings), team_obj_id={id(gm.away_team)}")
             
             # ✅ TIMEOUT RESUME: Unified state restoration (works for all modes and all paths)
             # Only check database for timeout state if we have a game_id (existing game, not new game start)
