@@ -272,7 +272,7 @@ async function loadPlaybookSettings() {
     } else if (mode === 'single' && gameId) {
       params.set('game_id', gameId);
     }
-    
+    params.set('profile', '1');
     const res = await fetch(API_CONFIG.buildUrl(`/api/playbooks?${params.toString()}`));
     if (res.ok) {
       playbookSettings = await res.json();
@@ -1784,6 +1784,7 @@ async function fetchTeamRoster(teamName) {
   if (mode === 'franchise' && franchiseId) {
     params.append('franchise_id', franchiseId);
   }
+  params.append('profile', '1');
   const query = params.toString() ? `?${params.toString()}` : '';
   const url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(teamName)}${query}`);
   
@@ -2102,8 +2103,8 @@ async function handleSimQuarter() {
   // Fetch rosters for auto-set lineup generation (needed for Q2-Q4)
   let homeRoster, awayRoster;
   try {
-    const homeRes = await fetch(API_CONFIG.buildUrl(`/roster/${homeTeam}`));
-    const awayRes = await fetch(API_CONFIG.buildUrl(`/roster/${awayTeam}`));
+    const homeRes = await fetch(API_CONFIG.buildUrl(`/roster/${homeTeam}`) + '?profile=1');
+    const awayRes = await fetch(API_CONFIG.buildUrl(`/roster/${awayTeam}`) + '?profile=1');
     if (homeRes.ok) homeRoster = await homeRes.json();
     if (awayRes.ok) awayRoster = await awayRes.json();
   } catch (err) {
@@ -2364,8 +2365,8 @@ async function handleSimFullGame() {
   // Fetch rosters for auto-set lineup generation
   let homeRoster, awayRoster;
   try {
-    const homeRes = await fetch(API_CONFIG.buildUrl(`/roster/${homeTeam}`));
-    const awayRes = await fetch(API_CONFIG.buildUrl(`/roster/${awayTeam}`));
+    const homeRes = await fetch(API_CONFIG.buildUrl(`/roster/${homeTeam}`) + '?profile=1');
+    const awayRes = await fetch(API_CONFIG.buildUrl(`/roster/${awayTeam}`) + '?profile=1');
     if (homeRes.ok) homeRoster = await homeRes.json();
     if (awayRes.ok) awayRoster = await awayRes.json();
   } catch (err) {

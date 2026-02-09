@@ -919,7 +919,7 @@ async function init() {
   console.log('⏱️ [PERF] FCC init() START');
   
   const topDataStartTime = performance.now();
-  const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}`);
+  const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
   const topDataEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
   if (!topData) return; // Access denied or error - redirect already triggered for 401/403
@@ -975,8 +975,8 @@ async function init() {
     }
     try {
       const rosterStartTime = performance.now();
-      const rosterUrl = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(topData.team)}`)}?franchise_id=${franchiseId}`;
-      const stateUrl = `${API_CONFIG.buildUrl('/franchise/state')}?franchise_id=${franchiseId}`;
+      const rosterUrl = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(topData.team)}`)}?franchise_id=${franchiseId}&profile=1`;
+      const stateUrl = `${API_CONFIG.buildUrl('/franchise/state')}?franchise_id=${franchiseId}&profile=1`;
       const result = await RosterLoader.loadRosterWithStats(rosterUrl, stateUrl);
       const rosterEndTime = performance.now();
       console.log(`⏱️ [PERF] roster+state (franchise): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
@@ -986,7 +986,7 @@ async function init() {
     }
   }
   const standingsStartTime = performance.now();
-  const standingsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}`);
+  const standingsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}&profile=1`);
   const standingsEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/standings: ${(standingsEndTime - standingsStartTime).toFixed(2)}ms`);
   renderStandings(standingsData);
@@ -1111,7 +1111,7 @@ playNowBtn.addEventListener('click', async () => {
   const mode = playNowBtn.dataset.mode || 'play';
   
   if (mode === 'training') {
-    const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}`);
+    const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
     if (topData?.training_disabled_for_eos) {
       return;
     }
@@ -1137,7 +1137,7 @@ playNowBtn.addEventListener('click', async () => {
       const result = await res.json();
       
       // Check if championship needs to be simmed
-      const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}`);
+      const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
       const eosTournament = topData?.eos_tournament;
       const currentRound = eosTournament?.current_round;
       
@@ -1377,7 +1377,7 @@ async function loadTeamData() {
     try {
       const rosterStartTime = performance.now();
       // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint
-      const rosterResponse = await fetch(`${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(data.team_name || '')}`)}?franchise_id=${encodeURIComponent(franchiseId)}`, { headers: API_CONFIG.getAuthHeaders() });
+      const rosterResponse = await fetch(`${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(data.team_name || '')}`)}?franchise_id=${encodeURIComponent(franchiseId)}&profile=1`, { headers: API_CONFIG.getAuthHeaders() });
       const rosterEndTime = performance.now();
       console.log(`⏱️ [PERF] loadTeamData() /roster/${data.team_name || ''} (franchise): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
       if (rosterResponse.ok) {
@@ -1812,7 +1812,7 @@ async function renderTournamentBracket() {
   const container = document.getElementById('tournament-bracket-container');
   if (!container) return;
 
-  const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}`);
+  const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
   const eosTournament = topData?.eos_tournament;
 
   if (!eosTournament) {

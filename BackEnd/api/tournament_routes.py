@@ -3,6 +3,7 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 import logging
 import re
+import time
 from typing import Optional
 from BackEnd.db import (
     tournaments_collection,
@@ -220,25 +221,13 @@ def delete_current_tournament(user: dict = Depends(get_current_user)):
     return {"deleted": deleted, "count": result.deleted_count}
 
 
-@router.post("/tournament/start")
-@router.post("/start-tournament")  # Backward compatibility; prefer /tournament/start
-def start_tournament(
-    request: StartTournamentRequest,
-    user: dict = Depends(get_current_user),
-):
-    import time
-    endpoint_start = time.time()
-    
-    team_query_start = time.time()
+def _do_start_tournament(request: StartTournamentRequest, user: dict):
+    """Inner logic for start_tournament so it can be run under cProfile when profile=1."""
     all_teams = list(teams_collection.find({}, {"name": 1, "_id": 1}))
-    team_query_time = (time.time() - team_query_start) * 1000
-    # logger.warning(f"⏱️ [DB TIMING] start-tournament: teams_collection.find(): {team_query_time:.2f}ms, found {len(all_teams)} teams")
-    
     team_names = [t["name"] for t in all_teams]
     if request.user_team_id not in team_names:
         raise HTTPException(status_code=400, detail="Invalid user_team_id")
 
-    # Step 7.2: One tournament per user - block creation if user already has an active one
     existing_tournaments = tournaments_collection.count_documents(
         {"user_id": user.get("user_id"), "completed": False}
     )
@@ -248,16 +237,13 @@ def start_tournament(
             detail="You already have an active tournament. Delete it first to start a new one.",
         )
 
-    # Use first 8 teams for bracket (same pool as before when we had 8)
     team_docs = [{"name": t["name"], "_id": t["_id"]} for t in (all_teams[:8] if len(all_teams) >= 8 else all_teams)]
     if len(team_docs) < 8:
         raise HTTPException(status_code=400, detail="Need at least 8 teams to start a tournament")
 
-    # Reset all player stats for teams in this tournament
     zero_stats = {key: 0 for key in BOX_SCORE_KEYS}
-    zero_stats["Outlet_Score_List"] = []  # Outlet_Score_List is an array, not an integer
+    zero_stats["Outlet_Score_List"] = []
     names_8 = [t["name"] for t in team_docs]
-    player_reset_start = time.time()
     for tid in names_8:
         players_collection.update_many(
             {"team": tid},
@@ -270,24 +256,34 @@ def start_tournament(
                 }
             },
         )
-    player_reset_time = (time.time() - player_reset_start) * 1000
-    # logger.warning(f"⏱️ [DB TIMING] start-tournament: players_collection.update_many() (reset stats): {player_reset_time:.2f}ms")
 
-    tournament_create_start = time.time()
     manager = TournamentManager(
         user_team_id=request.user_team_id,
         tournaments_collection=tournaments_collection,
         team_docs=team_docs,
     )
     tournament = manager.create_tournament(user_id=user.get("user_id"))
-    tournament_create_time = (time.time() - tournament_create_start) * 1000
-    # logger.warning(f"⏱️ [DB TIMING] start-tournament: TournamentManager.create_tournament(): {tournament_create_time:.2f}ms")
-    
-    total_time = (time.time() - endpoint_start) * 1000
-    # logger.warning(f"⏱️ [DB TIMING] start-tournament TOTAL: {total_time:.2f}ms")
-    
     tournament["_id"] = str(tournament["_id"])
     return tournament
+
+
+@router.post("/tournament/start")
+@router.post("/start-tournament")  # Backward compatibility; prefer /tournament/start
+def start_tournament(
+    request: StartTournamentRequest,
+    user: dict = Depends(get_current_user),
+    profile: bool = False,
+):
+    if profile:
+        from BackEnd.utils.profiling import run_profiled
+        _out = [None]
+        def _wrapped():
+            _out[0] = _do_start_tournament(request, user)
+        profile_summary = run_profiled(_wrapped, top_n=60)
+        result = _out[0]
+        result["profile_summary"] = profile_summary
+        return result
+    return _do_start_tournament(request, user)
 
 @router.post("/tournament/simulate-round")
 @router.post("/simulate-tournament-round")  # Backward compatibility; prefer /tournament/simulate-round

@@ -4227,7 +4227,16 @@ try:
     
     
     @app.get("/roster/{team_identifier}")
-    def get_team_roster(team_identifier: str, team_id: str | None = None, tournament_id: str | None = None, franchise_id: str | None = None, response: Response = None):
+    def get_team_roster(team_identifier: str, team_id: str | None = None, tournament_id: str | None = None, franchise_id: str | None = None, response: Response = None, profile: bool = False):
+        if profile:
+            from BackEnd.utils.profiling import run_profiled
+            _out = [None]
+            def _wrapped():
+                _out[0] = get_team_roster(team_identifier, team_id, tournament_id, franchise_id, response, profile=False)
+            profile_summary = run_profiled(_wrapped, top_n=60)
+            result = _out[0]
+            result["profile_summary"] = profile_summary
+            return result
         endpoint_start = time.time()
         # ✅ FIX: Add cache-busting headers to ensure browser fetches fresh player data
         # This ensures updated player attributes (year, jersey, height, etc.) show up immediately
