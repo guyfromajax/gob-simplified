@@ -1928,17 +1928,18 @@ try:
                 # ✅ CRITICAL FIX: Always apply playbook_settings to GameManager when game is cached
                 # Strategy_settings are handled later with proper validity checks, but playbook_settings must be loaded here
                 # This ensures playbook_settings saved pre-game are available during gameplay
+                # ✅ FIX: Always set playbook_settings (even if empty dict) to prevent DB fallbacks
                 trace_id_cached = f"sim_q{body.quarter}_{body.game_id}_cached"
-                if home_settings and home_settings.get("playbook_settings"):
+                if home_settings and "playbook_settings" in home_settings:
                     db_slots = len(home_settings.get("playbook_settings", {}).get("slot_assignments", {}))
                     before_slots = len(getattr(gm.home_team, 'playbook_settings', {}).get("slot_assignments", {})) if getattr(gm.home_team, 'playbook_settings', None) else 0
-                    gm.home_team.playbook_settings = home_settings.get("playbook_settings")
+                    gm.home_team.playbook_settings = home_settings.get("playbook_settings") or {}
                     after_slots = len(gm.home_team.playbook_settings.get("slot_assignments", {})) if gm.home_team.playbook_settings else 0
                 
-                if away_settings and away_settings.get("playbook_settings"):
+                if away_settings and "playbook_settings" in away_settings:
                     db_slots = len(away_settings.get("playbook_settings", {}).get("slot_assignments", {}))
                     before_slots = len(getattr(gm.away_team, 'playbook_settings', {}).get("slot_assignments", {})) if getattr(gm.away_team, 'playbook_settings', None) else 0
-                    gm.away_team.playbook_settings = away_settings.get("playbook_settings")
+                    gm.away_team.playbook_settings = away_settings.get("playbook_settings") or {}
                     after_slots = len(gm.away_team.playbook_settings.get("slot_assignments", {})) if gm.away_team.playbook_settings else 0
             
             # ✅ TIMEOUT RESUME: Unified state restoration (works for all modes and all paths)
@@ -2148,14 +2149,15 @@ try:
                                 gm.home_team.strategy_settings = dict(home_strategy)
                             if away_strategy:
                                 gm.away_team.strategy_settings = dict(away_strategy)
-                            if home_playbook_settings:
-                                gm.home_team.playbook_settings = dict(home_playbook_settings)
-                                slot_count = len(home_playbook_settings.get("slot_assignments", {}))
-                                # logging.warning(f"✅ [UNIFIED-SETTINGS] Applied home playbook_settings to GameManager: slot_assignments={slot_count}")
-                            if away_playbook_settings:
-                                gm.away_team.playbook_settings = dict(away_playbook_settings)
-                                slot_count = len(away_playbook_settings.get("slot_assignments", {}))
-                                # logging.warning(f"✅ [UNIFIED-SETTINGS] Applied away playbook_settings to GameManager: slot_assignments={slot_count}")
+                            # ✅ FIX: Always set playbook_settings (even if empty dict or None) to prevent DB fallbacks during gameplay
+                            # This ensures the attribute exists so _load_playbook_settings can check it without hitting DB 37 times per quarter
+                            # Empty dict means "no settings configured" which is valid - cache it so we don't hit DB
+                            gm.home_team.playbook_settings = dict(home_playbook_settings) if home_playbook_settings else {}
+                            slot_count = len(home_playbook_settings.get("slot_assignments", {})) if home_playbook_settings else 0
+                            # logging.warning(f"✅ [UNIFIED-SETTINGS] Applied home playbook_settings to GameManager: slot_assignments={slot_count}")
+                            gm.away_team.playbook_settings = dict(away_playbook_settings) if away_playbook_settings else {}
+                            slot_count = len(away_playbook_settings.get("slot_assignments", {})) if away_playbook_settings else 0
+                            # logging.warning(f"✅ [UNIFIED-SETTINGS] Applied away playbook_settings to GameManager: slot_assignments={slot_count}")
                             
                             # ✅ VERIFY: Log settings after GameManager creation to confirm they were applied
                             if home_strategy or away_strategy:
@@ -2950,11 +2952,12 @@ try:
                         gm.home_team.strategy_settings = {**default_settings, **home_strategy}
                 
                 # ✅ CRITICAL FIX: Apply playbook_settings from DB (always, regardless of strategy_settings)
-                if home_settings and home_settings.get("playbook_settings"):
+                # ✅ FIX: Always set playbook_settings (even if empty dict) to prevent DB fallbacks
+                if home_settings and "playbook_settings" in home_settings:
                     db_slots = len(home_settings.get("playbook_settings", {}).get("slot_assignments", {}))
                     if gm is not None:
                         before_slots = len(getattr(gm.home_team, 'playbook_settings', {}).get("slot_assignments", {})) if getattr(gm.home_team, 'playbook_settings', None) else 0
-                        gm.home_team.playbook_settings = home_settings.get("playbook_settings")
+                        gm.home_team.playbook_settings = home_settings.get("playbook_settings") or {}
                         after_slots = len(gm.home_team.playbook_settings.get("slot_assignments", {})) if gm.home_team.playbook_settings else 0
                 # ✅ DIAGNOSTIC: Log request vs DB settings comparison for away team
                 db_away_inside = away_settings.get("strategy_settings", {}).get("inside", "MISSING") if away_settings.get("strategy_settings") else "NO_DB_SETTINGS"
@@ -2988,10 +2991,11 @@ try:
                         gm.away_team.strategy_settings = {**default_settings, **away_strategy}
                 
                 # ✅ CRITICAL FIX: Apply playbook_settings from DB (always, regardless of strategy_settings)
-                if away_settings and away_settings.get("playbook_settings"):
+                # ✅ FIX: Always set playbook_settings (even if empty dict) to prevent DB fallbacks
+                if away_settings and "playbook_settings" in away_settings:
                     db_slots = len(away_settings.get("playbook_settings", {}).get("slot_assignments", {}))
                     if gm is not None:
-                        gm.away_team.playbook_settings = away_settings.get("playbook_settings")
+                        gm.away_team.playbook_settings = away_settings.get("playbook_settings") or {}
                         logging.warning(f"✅ [APPLY-SETTINGS] Applied DB away playbook_settings: slot_assignments={db_slots}")
                     home_strategy = home_settings.get("strategy_settings")
                     logging.warning(f"✅ [SIMULATE-QUARTER] Applied home strategy_settings from DB")
