@@ -80,10 +80,10 @@ BLOCK_PROBABILITY = {
 # If diff > BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD → shooting foul; if diff < BLOCK_RECONCILIATION_BLOCK_THRESHOLD → block; else → standard shot
 # Thresholds are independent: adjust either without affecting the other.
 BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD = 150
-BLOCK_RECONCILIATION_BLOCK_THRESHOLD = -200
+BLOCK_RECONCILIATION_BLOCK_THRESHOLD = -150
 # Block attempt roll: y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX); attempt when y < aggression
 BLOCK_Y_ROLL_MIN = 1
-BLOCK_Y_ROLL_MAX = 5
+BLOCK_Y_ROLL_MAX = 4
 
 MALLEABLE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT"]
 
@@ -164,7 +164,7 @@ SOFT_STEAL = -50
 HARD_FOUL = 200
 SOFT_FOUL = 100
 STEAL_ATTEMPT = 30
-DEAD_BALL_TURNOVER = 7
+DEAD_BALL_TURNOVER = 5
 
 # Charge/Blocking Foul (drive reconciliation thresholds)
 # reconciliation = offense_score - defense_score
