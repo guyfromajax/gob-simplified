@@ -60,6 +60,7 @@ try:
     from .pointer_validation_routes import router as pointer_validation_router
     from .auth_routes import router as auth_router
     from .admin_routes import router as admin_router
+    from .feedback_routes import router as feedback_router
     from BackEnd.utils.auth import get_current_user
     from BackEnd.utils.ownership import verify_game_owned_by_user
     import traceback
@@ -192,6 +193,7 @@ try:
     app.include_router(pointer_validation_router)
     app.include_router(auth_router)
     app.include_router(admin_router)
+    app.include_router(feedback_router)
 
     @app.get("/debug/server-state")
     def debug_server_state():

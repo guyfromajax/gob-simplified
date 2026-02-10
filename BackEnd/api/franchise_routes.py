@@ -3239,6 +3239,16 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
                 computer_franchise_player_data = franchise_players.get(pid_str, {})
                 if not computer_franchise_player_data:
                     continue
+
+                # Match user-team training path: include class year so year-based
+                # decay and max adjustments are applied correctly for CPU teams.
+                computer_core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
+                if not computer_core_player:
+                    try:
+                        # Player IDs are UUID strings; keep direct lookup.
+                        computer_core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
+                    except Exception:
+                        computer_core_player = None
                 
                 # Build player dict for training
                 player = {
@@ -3248,6 +3258,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
                     "team": computer_team_name or computer_team_id,
                     "attributes": computer_franchise_player_data.get("attributes", {}),
                     "position_ratings": computer_franchise_player_data.get("position_ratings", {}),
+                    "year": computer_core_player.get("year") if computer_core_player else None,
                 }
                 computer_players_for_training.append(player)
             
