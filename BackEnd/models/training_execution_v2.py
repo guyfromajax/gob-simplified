@@ -416,13 +416,19 @@ def apply_training_points(
     
     # Handle special team attributes
     # Rebound modifier (from technical_drills rebounding)
+    # Docs: Rebounding gives rebound_modifier 0.5 points per drill point.
     if "technical_drills" in normalized_allocations:
         rebounding_points = normalized_allocations["technical_drills"].get("rebounding", 0)
         if rebounding_points > 0:
-            _apply_rebound_modifier_training(team, rebounding_points, archetype, sub_option, source="technical_drills")
+            # Convert to effective team-attribute points using 0.5x accrual, then round half-up.
+            effective_points = int((rebounding_points * 0.5) + 0.5)
+            if effective_points > 0:
+                _apply_rebound_modifier_training(
+                    team, effective_points, archetype, sub_option, source="technical_drills"
+                )
     
     # Handle scrimmages (if scrimmages category exists in allocations)
-    # Scrimmages: Team Chemistry (0.5x multiplier), Shot Threshold (decreases), Rebounding
+    # Scrimmages: Team Chemistry (0.5x multiplier), Shot Threshold (1 point), Rebounding (0.5x)
     # Note: Scrimmages category may not be in the frontend structure yet
     if "scrimmages" in normalized_allocations:
         scrimmage_points = normalized_allocations["scrimmages"]
@@ -433,8 +439,12 @@ def apply_training_points(
                     team_attr_contributions[team_attr] += scrimmage_points * mult
             # Apply to Shot Threshold (decreases)
             _apply_shot_threshold_training(team, scrimmage_points, archetype, sub_option)
-            # Apply to Rebounding (rebound_modifier)
-            _apply_rebound_modifier_training(team, scrimmage_points, archetype, sub_option, source="scrimmages")
+            # Apply to Rebounding (rebound_modifier) with 0.5x accrual, rounded half-up.
+            effective_points = int((scrimmage_points * 0.5) + 0.5)
+            if effective_points > 0:
+                _apply_rebound_modifier_training(
+                    team, effective_points, archetype, sub_option, source="scrimmages"
+                )
     
     # Apply team attribute contributions from multipliers
     # Sum all contributions, round (0.5 rounds up, <0.5 rounds down), then apply
