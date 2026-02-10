@@ -3497,8 +3497,25 @@ try:
                 first_turn = turns[0]
                 logging.info(f"✅ TIMEOUT RESUME: First turn result_type={first_turn.get('result_type')}, current_turn={first_turn.get('current_turn')}, quarter={first_turn.get('quarter')}")
             else:
-                logging.error(f"🚨 TIMEOUT RESUME: No turns returned! This should not happen - SIP turn should have been created in simulate_quarter()")
-            # Turns array already contains the SIP turn created in simulate_quarter() - no need to override
+                timeout_resume_next_play_type = None
+                if isinstance(timeout_saved_state, dict):
+                    timeout_resume_next_play_type = timeout_saved_state.get("timeout_next_play_type")
+                elif isinstance(locals().get("saved"), dict):
+                    timeout_resume_next_play_type = locals()["saved"].get("timeout_next_play_type")
+
+                if timeout_resume_next_play_type == "SIDE_INBOUND":
+                    logging.error("🚨 TIMEOUT RESUME: No turns returned for SIDE_INBOUND resume; expected immediate SIP turn from simulate_quarter()")
+                elif timeout_resume_next_play_type in {"FREE_THROW", "BASELINE_INBOUND"}:
+                    logging.info(
+                        "✅ TIMEOUT RESUME: No immediate turns returned for %s resume (expected; first turn is created on /api/simulate-turn)",
+                        timeout_resume_next_play_type,
+                    )
+                else:
+                    logging.warning(
+                        "⚠️ TIMEOUT RESUME: No turns returned and timeout_next_play_type is unknown/missing (%s)",
+                        timeout_resume_next_play_type,
+                    )
+            # Turns array already contains the SIP turn created in simulate_quarter() when applicable.
         
         # ✅ FIX: Return complete game document when game is final (Q4/OT ends with winner)
         # This eliminates race condition where complete_week() is called before Q4 save completes

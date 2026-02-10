@@ -323,12 +323,19 @@ class TeamManager:
         Initialize strategy settings with weighted randomization for CPU teams (0-4 scale).
         If team document has strategy_settings, those will be used instead via constructor.
         
-        Weighted Distribution (for offense, fast_breaks, defense, aggression):
+        Weighted Distribution (for offense, fast_breaks, defense):
         - 5% chance for 0
         - 15% chance for 1
         - 60% chance for 2 (normal/balanced)
         - 15% chance for 3
         - 5% chance for 4
+
+        Weighted Distribution (for aggression):
+        - 10% chance for 0
+        - 20% chance for 1
+        - 40% chance for 2
+        - 20% chance for 3
+        - 10% chance for 4
 
         Weighted Distribution (for rebounding only):
         - 5% chance for 0, 10% for 1, 15% for 2, 30% for 3, 40% for 4
@@ -367,7 +374,7 @@ class TeamManager:
             "fast_breaks": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
             "play_calling": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
             "defense": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
-            "aggression": random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0],
+            "aggression": random.choices([0, 1, 2, 3, 4], weights=[10, 20, 40, 20, 10], k=1)[0],
             "hc_trap": trap_press_choice,
             "fc_press": trap_press_choice,
             "rebounding": random.choices([0, 1, 2, 3, 4], weights=[5, 10, 15, 30, 40], k=1)[0],
@@ -634,4 +641,3 @@ class TeamManager:
             team_stats["two_defenders_back"] = self.team_stats.get("two_defenders_back", 0)
         
         return team_stats
-
