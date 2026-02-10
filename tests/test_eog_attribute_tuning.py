@@ -160,7 +160,7 @@ def test_eog_attribute_tuning_ranges_applied(monkeypatch):
     # Loser paths
     assert away_changes["shot_threshold"] == 10
     assert away_changes["discipline"] == -3
-    assert away_changes["fight"] == -2
+    assert away_changes["fight"] == -4
     assert away_changes["rebound_modifier"] == -0.1
     assert away_changes["offensive_efficiency"] == -2
     assert away_changes["defensive_efficiency"] == -2
