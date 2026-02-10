@@ -64,6 +64,7 @@
       '</div>',
       '<img id="alpha-badge" class="alpha-badge visible" src="/images/alpha_badge_gold.png" alt="Alpha">',
       '<div class="auth-bar-right">',
+      '  <button type="button" id="feedback-btn" class="feedback-btn">Feedback</button>',
       '  <a href="https://www.youtube.com/@geeked-outbasketball765" target="_blank" rel="noopener noreferrer" class="nav-icon" aria-label="GOB on YouTube">',
       '    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>',
       '  </a>',
@@ -84,67 +85,28 @@
     return bar;
   }
 
-  function positionFeedbackButton() {
-    var bar = document.getElementById('auth-bar');
-    var btn = document.getElementById('feedback-btn');
-    if (!bar || !btn) return;
-
-    var badge = document.getElementById('alpha-badge');
-    var youtubeIcon = bar.querySelector('.auth-bar-right .nav-icon');
-
-    // Fallback if geometry targets aren't available yet.
-    if (!badge || !youtubeIcon) {
-      btn.style.left = 'auto';
-      btn.style.right = '180px';
-      btn.style.top = '50%';
-      btn.style.transform = 'translateY(-50%)';
-      return;
-    }
-
-    var barRect = bar.getBoundingClientRect();
-    var badgeRect = badge.getBoundingClientRect();
-    var youtubeRect = youtubeIcon.getBoundingClientRect();
-
-    // Midpoint between alpha badge right edge and YouTube icon left edge.
-    var midpointX = (badgeRect.right + youtubeRect.left) / 2;
-    var btnWidth = btn.getBoundingClientRect().width;
-    var leftX = midpointX - barRect.left - (btnWidth / 2);
-
-    // Keep within bar bounds.
-    var minLeft = 8;
-    var maxLeft = Math.max(minLeft, barRect.width - btnWidth - 8);
-    leftX = Math.min(Math.max(leftX, minLeft), maxLeft);
-
-    btn.style.left = leftX + 'px';
-    btn.style.top = '50%';
-    btn.style.transform = 'translateY(-50%)';
-  }
-
   function ensureFeedbackButton() {
-    var bar = document.getElementById('auth-bar');
-    if (!bar) return;
+    var right = document.querySelector('#auth-bar .auth-bar-right');
+    if (!right) return;
     if (document.getElementById('feedback-btn')) return;
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.id = 'feedback-btn';
     btn.className = 'feedback-btn';
     btn.textContent = 'Feedback';
-    bar.appendChild(btn);
-    positionFeedbackButton();
+    right.insertBefore(btn, right.firstChild);
   }
 
   function injectAuthBar() {
     var existing = document.getElementById('auth-bar');
     if (existing) {
       ensureFeedbackButton();
-      positionFeedbackButton();
       document.body.classList.add('has-auth-bar');
       return;
     }
     var bar = createAuthBarHTML();
     document.body.insertBefore(bar, document.body.firstChild);
     document.body.classList.add('has-auth-bar');
-    positionFeedbackButton();
   }
 
   function initAuthState() {
@@ -364,10 +326,6 @@
         });
     });
 
-    // Keep button positioned as layout changes.
-    window.addEventListener('resize', positionFeedbackButton);
-    window.addEventListener('load', positionFeedbackButton);
-    setTimeout(positionFeedbackButton, 0);
   }
 
   function initAlphaBadge() {
