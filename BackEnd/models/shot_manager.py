@@ -461,7 +461,12 @@ class ShotManager:
         if shot_type in ("inside", "attack") and defender:
             x = def_team.strategy_settings.get("aggression", 2)
             y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX)
-            if y < x:
+            should_attempt_block_reconciliation = y < x
+            if not should_attempt_block_reconciliation:
+                z = random.randint(0, 15)
+                defense_fight = def_team.team_attributes.get("fight", 0)
+                should_attempt_block_reconciliation = z < defense_fight
+            if should_attempt_block_reconciliation:
                 # Block reconciliation: use shot_score_pre_defense vs defense_block_score
                 shooter_coords_recon = getattr(shooter, "coords", {"x": 50, "y": 25})
                 logging.debug(

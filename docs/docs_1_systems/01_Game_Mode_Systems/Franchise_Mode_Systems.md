@@ -346,3 +346,8 @@ After completing the regular season (week 14), the top 8 teams advance to a sing
 - `Training_System.md` - Training system documentation
 - `Playbooks_Page.md` - Playbook settings management
 
+## Regression Tests
+
+- `tests/test_franchise_game_scoping.py::test_schedule_scopes_game_lookup_to_franchise`
+- `tests/test_franchise_game_scoping.py::test_save_game_result_legacy_lookup_uses_franchise_scope`
+- `tests/test_franchise_game_scoping.py::test_schedule_endpoint_does_not_leak_cross_franchise_game_docs`
