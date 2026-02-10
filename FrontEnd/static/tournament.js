@@ -65,12 +65,12 @@ const DEBUG_TEAM_STATS = window.DEBUG_TEAM_STATS || false;
 const DEBUG_BRACKET = window.DEBUG_BRACKET || false;
 
 const leaderBoards = [
-  { title: "Points", key: "PTS" },
-  { title: "3-Pointers Made", key: "3PTM" },
-  { title: "Rebounds", key: "REB" },
-  { title: "Assists", key: "AST" },
-  { title: "Steals", key: "STL" },
-  { title: "Blocks", key: "BLK" }
+  { title: "Points", key: "PTS", valueHeader: "Points" },
+  { title: "3PTM", key: "3PTM", valueHeader: "3PT Made" },
+  { title: "Rebound", key: "REB", valueHeader: "Rebounds" },
+  { title: "Assists", key: "AST", valueHeader: "Assists" },
+  { title: "Blocks", key: "BLK", valueHeader: "Blocks" },
+  { title: "Steals", key: "STL", valueHeader: "Steals" }
 ];
 
 let leaderData = {};
@@ -569,7 +569,7 @@ function renderLeaderboards() {
     div.className = "scroll-x";
     const table = document.createElement("table");
     table.className = "leaders-table";
-    table.innerHTML = `<thead><tr><th>Rank</th><th>Player</th><th>Team</th><th>Value</th></tr></thead>`;
+    table.innerHTML = `<thead><tr><th>Rank</th><th>Player</th><th>Team</th><th>${board.valueHeader || 'Value'}</th></tr></thead>`;
     const body = document.createElement("tbody");
     const rows = (leaderData[board.key] || []);
     for (let i = 0; i < 10; i++) {

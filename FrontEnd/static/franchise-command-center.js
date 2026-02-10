@@ -143,15 +143,42 @@ function renderLeaders(data) {
   if (!data) return;
   const container = document.getElementById('leaders-container');
   container.innerHTML = '';
-  const categories = Object.keys(data);
+  const preferredOrderGroups = [
+    ['PTS'],
+    ['3PTM', 'TPM'],
+    ['REB'],
+    ['AST'],
+    ['BLK'],
+    ['STL']
+  ];
+  const ordered = preferredOrderGroups
+    .map(group => group.find(cat => Object.prototype.hasOwnProperty.call(data, cat)))
+    .filter(Boolean);
+  const categories = [
+    ...ordered,
+    ...Object.keys(data).filter(cat => !ordered.includes(cat))
+  ];
   const primaryColor = getTeamPrimaryColor(userTeamNameForLeaders);
   
-  // Map category names for display (backward compatibility for old "TPM"/"TPA" keys)
+  // Map category names for display (backward compatibility for old keys)
   const categoryNameMap = {
+    'PTS': 'Points',
     'TPM': '3PTM',  // Legacy key support
-    'TPA': '3PTA',  // Legacy key support
     '3PTM': '3PTM', // ✅ SS&S: Standardized key (backend now uses this)
-    '3PTA': '3PTA'  // ✅ SS&S: Standardized key (backend now uses this)
+    'REB': 'Rebound',
+    'AST': 'Assists',
+    'BLK': 'Blocks',
+    'STL': 'Steals'
+  };
+
+  const valueHeaderMap = {
+    'PTS': 'Points',
+    'TPM': '3PT Made',
+    '3PTM': '3PT Made',
+    'REB': 'Rebounds',
+    'AST': 'Assists',
+    'BLK': 'Blocks',
+    'STL': 'Steals'
   };
   
   categories.forEach(cat => {
@@ -163,7 +190,8 @@ function renderLeaders(data) {
     div.className = 'scroll-x';
     const table = document.createElement('table');
     table.className = 'leaders-table';
-    table.innerHTML = '<thead><tr><th>Rank</th><th>Player</th><th>Team</th><th>Value</th></tr></thead>';
+    const valueHeader = valueHeaderMap[cat] || 'Value';
+    table.innerHTML = `<thead><tr><th>Rank</th><th>Player</th><th>Team</th><th>${valueHeader}</th></tr></thead>`;
     const body = document.createElement('tbody');
     (data[cat] || []).forEach((p, idx) => {
       const tr = document.createElement('tr');
@@ -2325,4 +2353,3 @@ function showDevSimPopup(topData) {
 // ============================================================================
 // 🛠️ END DEV MODE FEATURE
 // ============================================================================
-
