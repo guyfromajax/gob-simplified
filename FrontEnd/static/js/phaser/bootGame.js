@@ -228,13 +228,15 @@ async function loadGamePlanSettings() {
     const params = new URLSearchParams();
     params.set('mode', mode);
     params.set('team_id', teamId);
-    
+
+    // Always include game_id when available so franchise/tournament gameplay reads from game doc.
+    if (gameId) {
+      params.set('game_id', gameId);
+    }
     if (mode === 'franchise' && franchiseId) {
       params.set('franchise_id', franchiseId);
     } else if (mode === 'tournament' && tournamentId) {
       params.set('tournament_id', tournamentId);
-    } else if (mode === 'single' && gameId) {
-      params.set('game_id', gameId);
     }
     
     const res = await fetch(API_CONFIG.buildUrl(`/api/gameplan?${params.toString()}`));
@@ -264,13 +266,15 @@ async function loadPlaybookSettings() {
     const params = new URLSearchParams();
     params.set('mode', mode);
     params.set('team_id', teamId);
-    
+
+    // Always include game_id when available so franchise/tournament gameplay reads from game doc.
+    if (gameId) {
+      params.set('game_id', gameId);
+    }
     if (mode === 'franchise' && franchiseId) {
       params.set('franchise_id', franchiseId);
     } else if (mode === 'tournament' && tournamentId) {
       params.set('tournament_id', tournamentId);
-    } else if (mode === 'single' && gameId) {
-      params.set('game_id', gameId);
     }
     params.set('profile', '1');
     const res = await fetch(API_CONFIG.buildUrl(`/api/playbooks?${params.toString()}`));

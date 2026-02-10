@@ -436,9 +436,12 @@ class PlaybooksUI {
         const params = new URLSearchParams();
         params.set('mode', mode);
         params.set('team_id', teamId);
-        if (mode === 'single' && gameId) {
+
+        // Always include game_id when available so franchise/tournament gameplay reads from game doc.
+        if (gameId) {
           params.set('game_id', gameId);
-        } else if (mode === 'tournament' && tournamentId) {
+        }
+        if (mode === 'tournament' && tournamentId) {
           params.set('tournament_id', tournamentId);
         } else if (mode === 'franchise' && franchiseId) {
           params.set('franchise_id', franchiseId);
@@ -811,9 +814,12 @@ class PlaybooksUI {
       const params = new URLSearchParams();
       params.set('mode', mode);
       params.set('team_id', teamId);
-      if (mode === 'single' && gameId) {
+
+      // Always include game_id when available so franchise/tournament gameplay reads from game doc.
+      if (gameId) {
         params.set('game_id', gameId);
-      } else if (mode === 'tournament' && tournamentId) {
+      }
+      if (mode === 'tournament' && tournamentId) {
         params.set('tournament_id', tournamentId);
       } else if (mode === 'franchise' && franchiseId) {
         params.set('franchise_id', franchiseId);
@@ -2706,4 +2712,3 @@ if (document.readyState === 'loading') {
   console.log('🚀 [PLAYBOOKS] DOM already loaded, calling initializePlaybooks() immediately');
   initializePlaybooks();
 }
-

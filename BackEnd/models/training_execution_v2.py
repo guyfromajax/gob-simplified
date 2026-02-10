@@ -15,12 +15,6 @@ from BackEnd.constants import ALL_ATTRS
 
 logger = logging.getLogger(__name__)
 
-# TEMP PROTOTYPE TEST BOOSTS (easy revert: set to False or remove this block)
-TEMP_TEAM_ATTR_TEST_BOOSTS = {
-    "training_discipline_plus_10_if_allocated": True,
-    "training_fb_efficiency_plus_5_or_10": True,
-}
-
 
 def execute_training(
     players: List[dict],
@@ -463,9 +457,6 @@ def apply_training_points(
         if breaks_points is not None and breaks_points > 0:
             _apply_breaks_effect(players, team, breaks_points, player_baselines, team_baseline)
 
-    # TEMP PROTOTYPE TEST BOOSTS (applied after normal training math/breaks)
-    _apply_temp_training_team_attr_test_boosts(team, normalized_allocations)
-    
     # Apply NG reductions from scrimmages and conditioning
     # Track which players had reductions for training report notes
     scrimmage_reduced_players = []
@@ -746,55 +737,12 @@ def _normalize_allocations(allocations: Dict) -> Dict:
     
     return normalized
 
-
-def _apply_temp_training_team_attr_test_boosts(team: dict, normalized_allocations: Dict) -> None:
-    """
-    TEMP PROTOTYPE TEST BOOSTS.
-    Applies temporary team-attribute boosts requested for prototype validation.
-    Uses TEAM_ATTR_CLAMPS for cap handling.
-    """
-
-    def _clamp_team_attr(attr_name: str, value: float) -> float:
-        lower, upper = TEAM_ATTR_CLAMPS[attr_name]
-        return max(lower, min(upper, value))
-
-    # 1) If at least one discipline-contributing point is allocated, add +10 discipline (capped)
-    if TEMP_TEAM_ATTR_TEST_BOOSTS.get("training_discipline_plus_10_if_allocated", False):
-        discipline_trigger = False
-        defensive = normalized_allocations.get("defensive_drills", {})
-        technical = normalized_allocations.get("technical_drills", {})
-
-        if isinstance(defensive, dict):
-            discipline_trigger = discipline_trigger or int(defensive.get("inside", 0) or 0) >= 1
-            discipline_trigger = discipline_trigger or int(defensive.get("outside", 0) or 0) >= 1
-        if isinstance(technical, dict):
-            discipline_trigger = discipline_trigger or int(technical.get("passing", 0) or 0) >= 1
-            discipline_trigger = discipline_trigger or int(technical.get("ball_handling", 0) or 0) >= 1
-
-        if discipline_trigger:
-            current = team.get("discipline", 0)
-            team["discipline"] = _clamp_team_attr("discipline", current + 10)
-
-    # 2) fb_efficiency bonus from fast_breaks offense_install:
-    #    >=1 point => +5, >=2 points => +10 (capped)
-    if TEMP_TEAM_ATTR_TEST_BOOSTS.get("training_fb_efficiency_plus_5_or_10", False):
-        fb_points = 0
-        fast_breaks = normalized_allocations.get("fast_breaks", {})
-        if isinstance(fast_breaks, dict):
-            fb_points = int(fast_breaks.get("offense_install", 0) or 0)
-
-        fb_bonus = 10 if fb_points >= 2 else 5 if fb_points >= 1 else 0
-        if fb_bonus > 0:
-            current = team.get("fb_efficiency", 0)
-            team["fb_efficiency"] = _clamp_team_attr("fb_efficiency", current + fb_bonus)
-
-
 def _apply_team_training_points(team: dict, team_attr: str, points: int, archetype: Optional[str] = None, sub_option: Optional[str] = None):
     """
     Apply training points to a team attribute.
     
     Team attributes (standard) doc ranges:
-    - 0 points: += random.randint(-4, -2)
+    - 0 points: += random.randint(-2, 0)
     - 1 point: += random.randint(-1, 1)
     - 2 points: += random.randint(0, 2)
     - 3 points: += random.randint(1, 4)
@@ -804,9 +752,9 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
     if team_attr not in TEAM_ATTR_CLAMPS:
         return
     
-    # Handle 0 points: negative change
+    # Handle 0 points range
     if points == 0:
-        decrease = random.randint(-4, -2)
+        decrease = random.randint(-2, 0)
         current_val = team.get(team_attr, 0)
         team[team_attr] = current_val + decrease
         # Clamp

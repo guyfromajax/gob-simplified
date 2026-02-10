@@ -1972,12 +1972,11 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         set_plays_attack.sort(key=lambda x: x["name"])
         set_plays_outside.sort(key=lambda x: x["name"])
         
-        # Reload team_obj from latest doc so playbook_settings/plays are current. Franchise master: keep FTD team_obj.
+        # Reload team_obj from latest doc so playbook_settings/plays are current.
         if mode == "franchise" and not load_from_game_doc:
             pass  # team_obj already from FTD
         elif mode == "franchise":
-            # Franchise + load_from_game_doc: doc is game doc (has "teams")
-            doc = collection.find_one({"_id": ObjectId(doc_id)})
+            # Franchise + load_from_game_doc: keep the already-loaded game doc as source of truth.
             team_obj = (doc.get("teams", {}).get(actual_team_id, {}) if actual_team_id else {}) if doc else {}
         elif mode == "tournament":
             doc = collection.find_one({"_id": ObjectId(doc_id)})
@@ -2038,7 +2037,10 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         else:
             # ✅ UNIFIED: For tournament/franchise (game doc) modes, use unified extract for consistent team_id resolution
             from BackEnd.utils.team_settings_manager import extract_team_settings
-            team_identifier = team_id or (team_obj.get("name") if team_obj else None)
+            team_identifier = (
+                actual_team_id if (mode == "franchise" and load_from_game_doc and actual_team_id)
+                else (team_id or (team_obj.get("name") if team_obj else None))
+            )
             if team_identifier and doc:
                 playbook_settings = extract_team_settings(
                     saved_doc=doc,
@@ -2167,4 +2169,3 @@ def save_playbooks(request: PlaybookSettingsRequest):
     except Exception as e:
         logger.error(f"Error saving playbook settings: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
-

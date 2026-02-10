@@ -39,11 +39,6 @@ from BackEnd.utils.ownership import verify_franchise_owned_by_user
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# TEMP PROTOTYPE TEST BOOSTS (easy revert: set to False or remove this block)
-TEMP_TEAM_ATTR_TEST_BOOSTS = {
-    "eog_fight_plus_10": True,
-}
-
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 
 
@@ -331,11 +326,11 @@ def update_team_attributes_after_game(
         # shot_threshold
         if is_winner:
             if fg_pct > 50:
-                changes["shot_threshold"] = random.randint(5, 15)
+                changes["shot_threshold"] = -random.randint(5, 15)
             elif fg_pct > 42.5:
-                changes["shot_threshold"] = random.randint(15, 25)
+                changes["shot_threshold"] = random.randint(0, 10)
             else:
-                changes["shot_threshold"] = random.randint(25, 35)
+                changes["shot_threshold"] = random.randint(10, 20)
         else:
             changes["shot_threshold"] = random.randint(10, 25)
         
@@ -343,75 +338,79 @@ def update_team_attributes_after_game(
         to = team_totals.get("TO", 0)
         stl = team_totals.get("STL", 0)
         if to > (2 * stl):
-            changes["discipline"] = random.randint(-3, -1)
+            changes["discipline"] = random.randint(-2, -1)
+        elif (to * 2) < stl:
+            changes["discipline"] = random.randint(1, 2)
         else:
-            changes["discipline"] = random.randint(-1, 0)
+            changes["discipline"] = 0
         
         # fight
         if is_winner:
-            changes["fight"] = random.randint(0, 1)
+            changes["fight"] = random.randint(1, 2)
         else:
-            changes["fight"] = random.randint(-4, -2)
+            changes["fight"] = random.randint(-2, -1)
         
         # rebound_modifier
         if treb > (opp_treb + 5):
-            changes["rebound_modifier"] = random.uniform(0, 0.05)
+            changes["rebound_modifier"] = random.uniform(0, 0.1)
+        elif treb < (opp_treb - 5):
+            changes["rebound_modifier"] = random.uniform(-0.1, 0)
         else:
-            changes["rebound_modifier"] = random.uniform(-0.05, 0)
+            changes["rebound_modifier"] = random.uniform(-0.05, 0.05)
         
         # offensive_efficiency
-        changes["offensive_efficiency"] = random.randint(-2, 0)
+        changes["offensive_efficiency"] = random.randint(-1, 1)
         
         # defensive_efficiency
-        changes["defensive_efficiency"] = random.randint(-2, 0)
+        changes["defensive_efficiency"] = random.randint(-1, 1)
         
         # fb_efficiency
         if team_scouting["fb_rate"] > 50:
-            changes["fb_efficiency"] = random.randint(0, 1)
+            changes["fb_efficiency"] = random.randint(1, 2)
         else:
             changes["fb_efficiency"] = random.randint(-2, -1)
         
         # fb_opp_modifier
         if opponent_scouting["fb_rate"] < 40:
-            changes["fb_opp_modifier"] = random.randint(0, 1)
-        else:
+            changes["fb_opp_modifier"] = random.randint(1, 2)
+        elif opponent_scouting["fb_rate"] > 55:
             changes["fb_opp_modifier"] = random.randint(-2, -1)
+        else:
+            changes["fb_opp_modifier"] = 0
         
         # pt_efficiency
         if team_scouting["pt_combined_rate"] > 50:
-            changes["pt_efficiency"] = random.randint(0, 1)
-        else:
+            changes["pt_efficiency"] = random.randint(1, 2)
+        elif team_scouting["pt_combined_rate"] < 30:
             changes["pt_efficiency"] = random.randint(-2, -1)
+        else:
+            changes["pt_efficiency"] = 0
         
         # pt_opp_modifier
-        if opponent_scouting["pt_combined_rate"] < 40:
-            changes["pt_opp_modifier"] = random.randint(0, 1)
-        else:
+        if opponent_scouting["pt_combined_rate"] < 30:
+            changes["pt_opp_modifier"] = random.randint(1, 2)
+        elif opponent_scouting["pt_combined_rate"] > 50:
             changes["pt_opp_modifier"] = random.randint(-2, -1)
+        else:
+            changes["pt_opp_modifier"] = 0
         
         # team_chemistry
         score_delta = winner_score - loser_score
         if is_winner:
             if score_delta < 4:
-                changes["team_chemistry"] = random.randint(0, 1)
-            elif score_delta < 7:
-                changes["team_chemistry"] = random.randint(0, 1)
-            else:
                 changes["team_chemistry"] = random.randint(1, 2)
+            elif score_delta < 10:
+                changes["team_chemistry"] = random.randint(1, 3)
+            else:
+                changes["team_chemistry"] = random.randint(1, 4)
         else:
             if score_delta < 4:
                 changes["team_chemistry"] = random.randint(-2, -1)
-            elif score_delta < 7:
-                changes["team_chemistry"] = random.randint(-4, -2)
+            elif score_delta < 10:
+                changes["team_chemistry"] = random.randint(-3, -1)
             else:
-                changes["team_chemistry"] = random.randint(-6, -4)
+                changes["team_chemistry"] = random.randint(-6, -2)
 
-        # TEMP PROTOTYPE TEST BOOST:
-        # For all teams, add +10 fight during EOG team-attribute update.
-        # Final value is still clamped below via TEAM_ATTR_CLAMPS.
-        if TEMP_TEAM_ATTR_TEST_BOOSTS.get("eog_fight_plus_10", False):
-            changes["fight"] = changes.get("fight", 0) + 10
-        
         # Apply changes and clamp to valid ranges
         ftd_update = {}
         for attr_name, change in changes.items():
