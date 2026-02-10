@@ -29,6 +29,16 @@ const DEFENSE_PLAY_DATA = {
   ],
 };
 
+const ALPHA_HIDE_MAN_DEFENSE_VARIANTS = true;
+
+function getVisibleDefensePlays(sectionKey) {
+  const plays = DEFENSE_PLAY_DATA[sectionKey] || [];
+  if (ALPHA_HIDE_MAN_DEFENSE_VARIANTS && sectionKey === 'man-defense') {
+    return plays.filter(play => play.id === 'man-1');
+  }
+  return plays;
+}
+
 // Placeholder for plays that don't exist yet
 const TO_BE_ADDED_PLACEHOLDER = { id: 'to-be-added', name: 'To Be Added' };
 
@@ -106,7 +116,7 @@ class PlaybooksState {
     
     // Initialize defense plays (hardcoded for now)
     Object.keys(DEFENSE_PLAY_DATA).forEach(sectionKey => {
-      const plays = DEFENSE_PLAY_DATA[sectionKey];
+      const plays = getVisibleDefensePlays(sectionKey);
       plays.forEach((play, index) => {
         this.sections[sectionKey][play.id] = {
           percentage: index === 0 ? 100 : 0,
@@ -299,6 +309,7 @@ class PlaybooksUI {
     // ✅ MIGRATION (Task 6.2): Removed persistence - settings loaded from database only
     this.debounceTimer = null;
     this.playData = null;
+    this.playbookMeta = null;
     this.selectedPositions = []; // Array to track selected positions (max 2, FIFO)
     this.positionFilters = null; // Position filter mappings from API (play_id → position arrays)
     this.evenDistributionEnabled = {
@@ -544,6 +555,10 @@ class PlaybooksUI {
         // Store even_distribution_all flag from API
         this.evenDistributionAllFlag = data.even_distribution_all || false;
         console.log('🔍 [PLAYBOOKS] Loaded even_distribution_all flag from API:', this.evenDistributionAllFlag);
+
+        // Track backend seed metadata so first-load defaults can be applied safely.
+        this.playbookMeta = data.playbook_meta || {};
+        console.log('🔍 [PLAYBOOKS] Loaded playbook_meta from API:', this.playbookMeta);
         
         // Convert API response to play data format
         this.playData = {
@@ -750,7 +765,7 @@ class PlaybooksUI {
       if (percentages.zone_defense && Object.keys(percentages.zone_defense).length > 0) {
         console.log('🔍 [PLAYBOOKS] Applying zone_defense percentages:', percentages.zone_defense);
         Object.keys(this.state.sections['zone-defense'] || {}).forEach(playId => {
-          const play = DEFENSE_PLAY_DATA['zone-defense']?.find(p => p.id === playId);
+          const play = getVisibleDefensePlays('zone-defense').find(p => p.id === playId);
           if (play) {
             if (percentages.zone_defense[play.name] !== undefined) {
               this.state.sections['zone-defense'][playId].percentage = percentages.zone_defense[play.name];
@@ -770,7 +785,7 @@ class PlaybooksUI {
       if (percentages.man_defense && Object.keys(percentages.man_defense).length > 0) {
         console.log('🔍 [PLAYBOOKS] Applying man_defense percentages:', percentages.man_defense);
         Object.keys(this.state.sections['man-defense'] || {}).forEach(playId => {
-          const play = DEFENSE_PLAY_DATA['man-defense']?.find(p => p.id === playId);
+          const play = getVisibleDefensePlays('man-defense').find(p => p.id === playId);
           if (play) {
             if (percentages.man_defense[play.name] !== undefined) {
               this.state.sections['man-defense'][playId].percentage = percentages.man_defense[play.name];
@@ -1021,7 +1036,7 @@ class PlaybooksUI {
       }
     } else {
       // Defense plays (hardcoded) - not filtered by position
-      plays = DEFENSE_PLAY_DATA[sectionKey] || [];
+      plays = getVisibleDefensePlays(sectionKey);
     }
     
     container.innerHTML = '';
@@ -1626,7 +1641,7 @@ class PlaybooksUI {
       const setPlays = this.playData.set_play_outside || [];
       plays = setPlays.filter(play => play.name !== 'To Be Added');
     } else if (sectionKey === 'man-defense' || sectionKey === 'zone-defense') {
-      plays = DEFENSE_PLAY_DATA[sectionKey] || [];
+      plays = getVisibleDefensePlays(sectionKey);
     }
     
     // Filter by position if offense section
@@ -1920,6 +1935,19 @@ class PlaybooksUI {
         });
       } else {
         console.log('📂 [POSITION FILTER] No saved selections found for key:', storageKey);
+
+        // First-time seeded defaults: Standard + SF preselected for offense filtering.
+        if (this.playbookMeta && this.playbookMeta.user_saved === false) {
+          this.selectedPositions = ['standard', 'SF'];
+          this.selectedPositions.forEach(position => {
+            const button = document.querySelector(`.position-filter-btn[data-position="${position}"]`);
+            if (button) {
+              button.classList.add('selected');
+            }
+          });
+          this.savePositionFilterSelections();
+          console.log('✅ [POSITION FILTER] Applied first-load defaults: Standard + SF');
+        }
       }
     } catch (error) {
       console.error('❌ Error loading position filter selections:', error);
@@ -2375,7 +2403,7 @@ class PlaybooksUI {
       Object.keys(this.state.sections['zone-defense'] || {}).forEach(playId => {
         const playData = this.state.sections['zone-defense'][playId];
         // Find play name from DEFENSE_PLAY_DATA
-        const play = DEFENSE_PLAY_DATA['zone-defense']?.find(p => p.id === playId);
+        const play = getVisibleDefensePlays('zone-defense').find(p => p.id === playId);
         if (play && play.name !== 'To Be Added') {
           // Save percentage even if 0 (ensures database is complete source of truth)
           playbookSettings.zone_defense[play.name] = playData.percentage || 0;
@@ -2460,7 +2488,7 @@ class PlaybooksUI {
       playbookSettings.man_defense = {};
       Object.keys(this.state.sections['man-defense'] || {}).forEach(playId => {
         const playData = this.state.sections['man-defense'][playId];
-        const play = DEFENSE_PLAY_DATA['man-defense']?.find(p => p.id === playId);
+        const play = getVisibleDefensePlays('man-defense').find(p => p.id === playId);
         if (play && play.name !== 'To Be Added') {
           // Save percentage even if 0 (ensures database is complete source of truth)
           playbookSettings.man_defense[play.name] = playData.percentage || 0;

@@ -375,22 +375,21 @@ def get_play_ids_by_names(play_names, plays_map=None):
 
 def initialize_playbook_settings():
     """
-    Initialize playbook_settings with defaults: Even distribution across all plays in each container.
-    
-    ✅ UPDATED (February 2025): Changed from first play = 100% to even distribution.
-    Standard and PF position filters are enabled by default.
+    Initialize playbook_settings with alpha-friendly defaults for first-time setup.
+    Offense is seeded with Standard + SF plays only, evenly distributed per container.
     
     Returns:
         dict: playbook_settings structure with defaults:
-        - motion: {play_name: percentage} - Evenly distributed across all motion plays
-        - set_play_inside: {play_name: percentage} - Evenly distributed across all inside set plays
-        - set_play_attack: {play_name: percentage} - Evenly distributed across all attack set plays
-        - set_play_outside: {play_name: percentage} - Evenly distributed across all outside set plays
+        - motion: {play_name: percentage}
+        - set_play_inside: {play_name: percentage}
+        - set_play_attack: {play_name: percentage}
+        - set_play_outside: {play_name: percentage}
         - zone_defense: {defense_name: percentage} - Evenly distributed across all zone defenses
-        - man_defense: {"Man": 100} - Only one man defense exists
+        - man_defense: {"Man": 100}
         - slot_assignments: {}
         - motion_dropdowns: {}
-        - position_filters: {standard: [...], PG: [], SG: [], SF: [], PF: [...], C: []}
+        - position_filters: {standard: [...], PG: [...], SG: [...], SF: [...], PF: [...], C: [...]}
+        - _meta: {"seed_version": "alpha_v1", "user_saved": false}
     """
     try:
         from BackEnd.db import plays_collection
@@ -419,7 +418,11 @@ def initialize_playbook_settings():
                 "PF": [],        # Power Forward plays (play_id ObjectId strings)
                 "C": []          # Center plays (play_id ObjectId strings)
             },
-            "even_distribution_all": False  # Macro toggle for Even Distribution - All
+            "even_distribution_all": True,  # Macro toggle for Even Distribution - All
+            "_meta": {
+                "seed_version": "alpha_v1",
+                "user_saved": False,
+            },
         }
         
         # Group plays by type and focus
@@ -447,53 +450,48 @@ def initialize_playbook_settings():
                 elif play_focus == "outside":
                     set_plays_outside.append(play_name)
         
-        # ✅ UPDATED (February 2025): Even distribution across all plays in each container
-        # Sort plays by name for consistency, then distribute evenly
-        if motion_plays:
-            motion_plays.sort()
-            percentage_per_play = 100.0 / len(motion_plays)
-            # Distribute with rounding to ensure total = 100%
-            remainder = 100.0
-            for i, play_name in enumerate(motion_plays):
-                if i == len(motion_plays) - 1:
-                    # Last play gets remainder to ensure total = 100%
-                    playbook_settings["motion"][play_name] = round(remainder)
-                else:
-                    playbook_settings["motion"][play_name] = round(percentage_per_play)
-                    remainder -= round(percentage_per_play)
-        
-        if set_plays_inside:
-            set_plays_inside.sort()
-            percentage_per_play = 100.0 / len(set_plays_inside)
-            remainder = 100.0
-            for i, play_name in enumerate(set_plays_inside):
-                if i == len(set_plays_inside) - 1:
-                    playbook_settings["set_play_inside"][play_name] = round(remainder)
-                else:
-                    playbook_settings["set_play_inside"][play_name] = round(percentage_per_play)
-                    remainder -= round(percentage_per_play)
-        
-        if set_plays_attack:
-            set_plays_attack.sort()
-            percentage_per_play = 100.0 / len(set_plays_attack)
-            remainder = 100.0
-            for i, play_name in enumerate(set_plays_attack):
-                if i == len(set_plays_attack) - 1:
-                    playbook_settings["set_play_attack"][play_name] = round(remainder)
-                else:
-                    playbook_settings["set_play_attack"][play_name] = round(percentage_per_play)
-                    remainder -= round(percentage_per_play)
-        
-        if set_plays_outside:
-            set_plays_outside.sort()
-            percentage_per_play = 100.0 / len(set_plays_outside)
-            remainder = 100.0
-            for i, play_name in enumerate(set_plays_outside):
-                if i == len(set_plays_outside) - 1:
-                    playbook_settings["set_play_outside"][play_name] = round(remainder)
-                else:
-                    playbook_settings["set_play_outside"][play_name] = round(percentage_per_play)
-                    remainder -= round(percentage_per_play)
+        # Standard + SF seeded offense set (alpha first-load behavior).
+        standard_seed_plays = {
+            "3-2 Motion",
+            "4-1 Motion",
+            "5-0 Motion",
+            "Base Post Play",
+            "Pick & Roll (Lower Wing)",
+            "Double Screen For SG",
+        }
+        sf_seed_plays = {
+            "SF Back Door",
+            "SF Isolation",
+            "SF Misdirection Three",
+        }
+        seeded_offense_plays = standard_seed_plays | sf_seed_plays
+
+        def _apply_even_distribution(target: dict, eligible_plays: list[str]) -> None:
+            if not eligible_plays:
+                return
+            eligible_plays = sorted(eligible_plays)
+            count = len(eligible_plays)
+            base = 100 // count
+            remainder = 100 - (base * count)
+            for idx, play_name in enumerate(eligible_plays):
+                target[play_name] = base + (1 if idx < remainder else 0)
+
+        _apply_even_distribution(
+            playbook_settings["motion"],
+            [p for p in motion_plays if p in seeded_offense_plays],
+        )
+        _apply_even_distribution(
+            playbook_settings["set_play_inside"],
+            [p for p in set_plays_inside if p in seeded_offense_plays],
+        )
+        _apply_even_distribution(
+            playbook_settings["set_play_attack"],
+            [p for p in set_plays_attack if p in seeded_offense_plays],
+        )
+        _apply_even_distribution(
+            playbook_settings["set_play_outside"],
+            [p for p in set_plays_outside if p in seeded_offense_plays],
+        )
         
         # Zone defense: Even distribution across all zone defenses
         # Zone defenses are hardcoded: "2-3 Zone", "3-2 Zone", "1-3-1 Zone"
@@ -622,7 +620,11 @@ def initialize_playbook_settings():
                 "PF": [],
                 "C": []
             },
-            "even_distribution_all": False
+            "even_distribution_all": True,
+            "_meta": {
+                "seed_version": "alpha_v1",
+                "user_saved": False,
+            },
         }
 
 
@@ -2084,6 +2086,9 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         
         # Get even_distribution_all flag (defaults to False if not set)
         even_distribution_all = playbook_settings.get("even_distribution_all", False)
+        playbook_meta = playbook_settings.get("_meta", {}) if playbook_settings else {}
+        if not isinstance(playbook_meta, dict):
+            playbook_meta = {}
         
         return {
             "motion": motion_plays,
@@ -2094,6 +2099,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             "motion_dropdowns": motion_dropdowns,
             "position_filters": position_filters,
             "even_distribution_all": even_distribution_all,
+            "playbook_meta": playbook_meta,
             "playbook_percentages": {
                 "motion": motion_percentages,
                 "set_play_inside": set_play_inside_percentages,
@@ -2140,10 +2146,18 @@ def save_playbooks(request: PlaybookSettingsRequest):
         f"playbook_keys={list((request.playbook_settings or {}).keys())[:12]}"
     )
     try:
+        # Mark settings as user-saved so alpha defaults only apply to first-time/unconfigured playbooks.
+        playbook_settings = dict(request.playbook_settings or {})
+        playbook_meta = playbook_settings.get("_meta", {})
+        if not isinstance(playbook_meta, dict):
+            playbook_meta = {}
+        playbook_meta["user_saved"] = True
+        playbook_settings["_meta"] = playbook_meta
+
         # ✅ UNIFIED: Use unified save function for consistent team_id resolution
         success, actual_team_id, collection_name = save_team_settings(
             settings_type="playbook_settings",
-            settings_data=request.playbook_settings,
+            settings_data=playbook_settings,
             team_id=request.team_id,
             mode=request.mode,
             game_id=request.game_id,
@@ -2159,7 +2173,7 @@ def save_playbooks(request: PlaybookSettingsRequest):
         logger.warning(f"✅ Saved playbook settings for team {actual_team_id} in {request.mode} mode")
         
         # ✅ PHASE 1.3: Telemetry - Log state write (after successful save)
-        slot_count = len(request.playbook_settings.get("slot_assignments", {})) if request.playbook_settings else 0
+        slot_count = len(playbook_settings.get("slot_assignments", {})) if playbook_settings else 0
         logger.warning(f"🟢 [STATE-WRITE] [save_playbooks] playbook_settings to backend | team_id={actual_team_id}, slot_assignments={slot_count}, endpoint=/api/playbooks")
         
         return {"success": True, "message": "Playbook settings saved successfully"}

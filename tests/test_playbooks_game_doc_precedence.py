@@ -57,6 +57,7 @@ def test_get_playbooks_prefers_game_doc_for_franchise_when_game_id_present(monke
         "slot_assignments": {"1": {"section": "motion", "playId": "4-1 Motion"}},
         "motion_dropdowns": {},
         "position_filters": {"standard": ["standard"], "PG": [], "SG": [], "SF": [], "PF": [], "C": []},
+        "_meta": {"seed_version": "alpha_v1", "user_saved": False},
     }
 
     game_doc = {
@@ -91,3 +92,30 @@ def test_get_playbooks_prefers_game_doc_for_franchise_when_game_id_present(monke
     motion_percentages = response["playbook_percentages"]["motion"]
     assert motion_percentages.get("4-1 Motion") == 77
     assert response["slot_assignments"].get("1", {}).get("playId") == "4-1 Motion"
+    assert response["playbook_meta"] == {"seed_version": "alpha_v1", "user_saved": False}
+
+
+def test_save_playbooks_marks_meta_user_saved(monkeypatch):
+    captured = {}
+
+    def _fake_save_team_settings(**kwargs):
+        captured.update(kwargs)
+        return True, "MORRISTOWN", "franchises"
+
+    monkeypatch.setattr("BackEnd.utils.team_settings_manager.save_team_settings", _fake_save_team_settings)
+
+    request = gameplan_routes.PlaybookSettingsRequest(
+        mode="franchise",
+        team_id="MORRISTOWN",
+        franchise_id="507f1f77bcf86cd799439011",
+        playbook_settings={
+            "motion": {"4-1 Motion": 100},
+            "_meta": {"seed_version": "alpha_v1", "user_saved": False},
+        },
+    )
+
+    response = gameplan_routes.save_playbooks(request)
+
+    assert response["success"] is True
+    assert captured["settings_data"]["_meta"]["seed_version"] == "alpha_v1"
+    assert captured["settings_data"]["_meta"]["user_saved"] is True
