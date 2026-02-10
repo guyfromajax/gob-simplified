@@ -720,13 +720,16 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
     
     # Legacy lookup (when game_id not provided or invalid)
     if not game_id:
-        existing = db.games.find_one({
+        lookup_doc = {
             "week": week,
             "$or": [
                 {"team1_id": team1_id, "team2_id": team2_id},
                 {"team1_id": team2_id, "team2_id": team1_id},
             ],
-        })
+        }
+        if franchise_id:
+            lookup_doc["franchise_id"] = str(franchise_id)
+        existing = db.games.find_one(lookup_doc)
 
         if existing:
             filter_doc = {"_id": existing["_id"]}
@@ -1357,6 +1360,7 @@ def complete_week(req: CompleteWeekRequest):
             continue
         existing = db.games.find_one({
             "week": req.week,
+            "franchise_id": str(req.franchise_id),
             "$or": [
                 {"team1_id": away_id, "team2_id": home_id},
                 {"team1_id": home_id, "team2_id": away_id},
@@ -1848,11 +1852,11 @@ def season_schedule(franchise_id: str):
                 away_score, home_score = res
                 status = "complete"
                 # ✅ SS&S: Try to find game_doc even when status comes from results
-                game_doc = db.games.find_one({"week": idx, "team1_id": away_id, "team2_id": home_id}) or \
-                           db.games.find_one({"week": idx, "team1_id": home_id, "team2_id": away_id})
+                game_doc = db.games.find_one({"week": idx, "franchise_id": str(franchise_id), "team1_id": away_id, "team2_id": home_id}) or \
+                           db.games.find_one({"week": idx, "franchise_id": str(franchise_id), "team1_id": home_id, "team2_id": away_id})
             else:
-                game_doc = db.games.find_one({"week": idx, "team1_id": away_id, "team2_id": home_id}) or \
-                           db.games.find_one({"week": idx, "team1_id": home_id, "team2_id": away_id})
+                game_doc = db.games.find_one({"week": idx, "franchise_id": str(franchise_id), "team1_id": away_id, "team2_id": home_id}) or \
+                           db.games.find_one({"week": idx, "franchise_id": str(franchise_id), "team1_id": home_id, "team2_id": away_id})
                 if game_doc:
                     status = "complete"
                     if game_doc["team1_id"] == away_id:
