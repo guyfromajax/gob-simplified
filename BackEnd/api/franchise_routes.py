@@ -342,13 +342,13 @@ def update_team_attributes_after_game(
         elif (to * 2) < stl:
             changes["discipline"] = random.randint(1, 2)
         else:
-            changes["discipline"] = random.randint(-1, 0)
+            changes["discipline"] = random.randint(-2, 0)
         
         # fight
         if is_winner:
             changes["fight"] = random.randint(1, 2)
         else:
-            changes["fight"] = random.randint(-2, -1)
+            changes["fight"] = random.randint(-4, -1)
         
         # rebound_modifier
         if treb > (opp_treb + 5):
