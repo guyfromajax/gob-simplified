@@ -36,6 +36,8 @@ from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS
 from BackEnd.eog_attr_rules import (
     calculate_fb_opp_modifier_change,
     calculate_pt_opp_modifier_change,
+    calculate_special_situations_from_sources,
+    calculate_team_totals_from_sources,
 )
 from BackEnd.utils.auth import get_current_user
 from BackEnd.utils.ownership import verify_franchise_owned_by_user
@@ -204,6 +206,8 @@ def update_team_attributes_after_game(
     # Get box_score and teams object
     box_score = game_doc.get("box_score", {})
     teams_obj = game_doc.get("teams", {})
+    team_totals_obj = game_doc.get("team_totals", {})
+    team_stats_obj = game_doc.get("team_stats", {})
     
     # Try to get team objects - teams object uses team_id strings (like "XAVIEN") as keys
     # But home_team_id/away_team_id might be ObjectId strings, so we need to resolve
@@ -233,7 +237,19 @@ def update_team_attributes_after_game(
             except Exception:
                 pass
     
-    # Calculate team totals from box_score
+    # Resolve canonical team names used by game document keyed maps
+    home_team_name = (
+        home_team_obj.get("name")
+        or (game_doc.get("home_team", {}).get("name") if isinstance(game_doc.get("home_team"), dict) else game_doc.get("home_team"))
+        or home_team_id
+    )
+    away_team_name = (
+        away_team_obj.get("name")
+        or (game_doc.get("away_team", {}).get("name") if isinstance(game_doc.get("away_team"), dict) else game_doc.get("away_team"))
+        or away_team_id
+    )
+
+    # Calculate team totals from box_score (fallback if team_totals missing)
     def calculate_team_totals(team_box_score):
         """Sum all player stats from box_score to get team totals."""
         totals = {
@@ -251,58 +267,22 @@ def update_team_attributes_after_game(
                     totals["OREB"] += player_stats.get("OREB", 0)
         return totals
     
-    # Get team totals - try team_id keys first, then team name keys
-    home_totals = calculate_team_totals(box_score.get(home_team_id, {}))
-    if not home_totals.get("FGA"):
-        home_team_name = home_team_obj.get("name") or game_doc.get("home_team", {}).get("name") if isinstance(game_doc.get("home_team"), dict) else game_doc.get("home_team")
-        if home_team_name:
-            home_totals = calculate_team_totals(box_score.get(home_team_name, {}))
-    
-    away_totals = calculate_team_totals(box_score.get(away_team_id, {}))
-    if not away_totals.get("FGA"):
-        away_team_name = away_team_obj.get("name") or game_doc.get("away_team", {}).get("name") if isinstance(game_doc.get("away_team"), dict) else game_doc.get("away_team")
-        if away_team_name:
-            away_totals = calculate_team_totals(box_score.get(away_team_name, {}))
-    
-    # Get scouting data for FB/HCT/FCP success rates
-    def get_scouting_data(team_obj):
-        """Extract scouting data from team object."""
-        offense = team_obj.get("scouting", {}).get("offense", {})
-        defense = team_obj.get("scouting", {}).get("defense", {})
-        
-        # Fast Break
-        fb_entries = offense.get("Fast_Break_Entries", 0)
-        fb_success = offense.get("Fast_Break_Success", 0)
-        fb_rate = (fb_success / fb_entries * 100) if fb_entries > 0 else 0
-        
-        # HC Trap
-        hct = defense.get("HCT", {})
-        hct_used = hct.get("used", 0)
-        hct_success = hct.get("success", 0)
-        hct_rate = (hct_success / hct_used * 100) if hct_used > 0 else 0
-        
-        # FC Press
-        fcp = defense.get("FCP", {})
-        fcp_used = fcp.get("used", 0)
-        fcp_success = fcp.get("success", 0)
-        fcp_rate = (fcp_success / fcp_used * 100) if fcp_used > 0 else 0
-        
-        # Combined Press/Trap rate
-        pt_total_attempts = hct_used + fcp_used
-        pt_total_successes = hct_success + fcp_success
-        pt_combined_rate = (pt_total_successes / pt_total_attempts * 100) if pt_total_attempts > 0 else 0
-        
-        return {
-            "fb_rate": fb_rate,
-            "fb_entries": fb_entries,
-            "hct_rate": hct_rate,
-            "fcp_rate": fcp_rate,
-            "pt_combined_rate": pt_combined_rate,
-            "pt_total_attempts": pt_total_attempts,
-        }
-    
-    home_scouting = get_scouting_data(home_team_obj)
-    away_scouting = get_scouting_data(away_team_obj)
+    home_totals = calculate_team_totals_from_sources(home_team_id, home_team_name, team_totals_obj, box_score)
+    away_totals = calculate_team_totals_from_sources(away_team_id, away_team_name, team_totals_obj, box_score)
+    home_scouting = calculate_special_situations_from_sources(home_team_name, home_team_obj, team_stats_obj)
+    away_scouting = calculate_special_situations_from_sources(away_team_name, away_team_obj, team_stats_obj)
+
+    logger.info(
+        "🔍 [UPDATE-TEAM-ATTRS] EOG source snapshot home=%s (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s) away=%s (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s)",
+        home_team_name,
+        home_scouting.get("fb_rate", 0),
+        home_scouting.get("pt_combined_rate", 0),
+        home_scouting.get("pt_total_attempts", 0),
+        away_team_name,
+        away_scouting.get("fb_rate", 0),
+        away_scouting.get("pt_combined_rate", 0),
+        away_scouting.get("pt_total_attempts", 0),
+    )
     
     # Calculate attribute changes for each team. team_object_id = ObjectId for FTD; team_id_label = string for logging.
     def calculate_attr_changes(team_object_id, team_id_label, is_winner, team_totals, opponent_totals, team_scouting, opponent_scouting):

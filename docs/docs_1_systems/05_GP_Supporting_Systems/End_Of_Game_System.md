@@ -201,3 +201,22 @@ The End of Game System handles game completion, displays final scores, and provi
 - **`FrontEnd/static/box-score.js`** - Handles "Go To Locker Room" button navigation
 - **`BackEnd/api/api.py`** - ObjectId serialization for tournament/franchise endpoints
 
+### EOG Data Source & Access Method
+
+- **Design goal:** EOG team-attribute calculations should use the same postgame data model that Box Score displays.
+
+- **Canonical totals source (FG%, TO/STL, TREB):**
+  - Primary: `game_doc.team_totals[team_name]`
+  - Fallback: aggregate from `game_doc.box_score`
+
+- **Canonical special-situations source (FB/HCT/FCP):**
+  - Primary: `game_doc.team_stats[team_name].offense/defense`
+  - Fallback: `game_doc.teams[team_id].scouting`
+
+- **Backend access point:**
+  - `BackEnd/api/franchise_routes.py` → `update_team_attributes_after_game()`
+  - Builds per-team EOG stat bundles from the sources above before applying attribute rules.
+
+- **Why this method:**
+  - Keeps Box Score special-situation rates and EOG deltas aligned.
+  - Prevents mismatches caused by reading PT/FB rates from different branches of the game document.

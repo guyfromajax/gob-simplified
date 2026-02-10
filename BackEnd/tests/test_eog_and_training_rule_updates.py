@@ -8,6 +8,10 @@ from BackEnd.models.training_execution_v2 import (
     _pre_training_decay_range_for_year,
 )
 from BackEnd.eog_attr_rules import calculate_fb_opp_modifier_change, calculate_pt_opp_modifier_change
+from BackEnd.eog_attr_rules import (
+    calculate_special_situations_from_sources,
+    calculate_team_totals_from_sources,
+)
 
 
 class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
@@ -148,6 +152,75 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
         self.assertEqual(player["attributes"]["anchor_ID"], 42)
         self.assertEqual(player["attributes"]["anchor_SH"], 40)
         self.assertEqual(player["attributes"]["anchor_OD"], 40)
+
+    def test_eog_totals_source_prefers_team_totals_over_box_score(self):
+        team_totals_obj = {
+            "Morristown": {"FGM": 10, "FGA": 20, "TO": 3, "STL": 4, "DREB": 8, "OREB": 2}
+        }
+        box_score_obj = {
+            "MORRISTOWN": {
+                "p1": {"FGM": 1, "FGA": 1, "TO": 1, "STL": 1, "DREB": 1, "OREB": 1}
+            }
+        }
+        totals = calculate_team_totals_from_sources("MORRISTOWN", "Morristown", team_totals_obj, box_score_obj)
+        self.assertEqual(totals["FGM"], 10)
+        self.assertEqual(totals["FGA"], 20)
+        self.assertEqual(totals["TO"], 3)
+
+    def test_eog_totals_falls_back_to_box_score_aggregation(self):
+        team_totals_obj = {}
+        box_score_obj = {
+            "MORRISTOWN": {
+                "p1": {"FGM": 2, "FGA": 5, "TO": 1, "STL": 0, "DREB": 3, "OREB": 1},
+                "p2": {"FGM": 4, "FGA": 7, "TO": 2, "STL": 2, "DREB": 4, "OREB": 0},
+            }
+        }
+        totals = calculate_team_totals_from_sources("MORRISTOWN", "Morristown", team_totals_obj, box_score_obj)
+        self.assertEqual(totals["FGM"], 6)
+        self.assertEqual(totals["FGA"], 12)
+        self.assertEqual(totals["TO"], 3)
+        self.assertEqual(totals["STL"], 2)
+        self.assertEqual(totals["DREB"], 7)
+        self.assertEqual(totals["OREB"], 1)
+
+    def test_eog_special_situations_prefers_team_stats_over_scouting(self):
+        team_stats_obj = {
+            "Morristown": {
+                "offense": {"Fast_Break_Entries": 10, "Fast_Break_Success": 4},
+                "defense": {
+                    "HCT": {"used": 7, "success": 5},
+                    "FCP": {"used": 1, "success": 0},
+                },
+            }
+        }
+        team_obj = {
+            "scouting": {
+                "offense": {"Fast_Break_Entries": 99, "Fast_Break_Success": 99},
+                "defense": {"HCT": {"used": 99, "success": 99}, "FCP": {"used": 99, "success": 99}},
+            }
+        }
+        special = calculate_special_situations_from_sources("Morristown", team_obj, team_stats_obj)
+        self.assertEqual(special["fb_entries"], 10)
+        self.assertEqual(round(special["fb_rate"], 2), 40.0)
+        self.assertEqual(special["pt_total_attempts"], 8)
+        self.assertEqual(round(special["pt_combined_rate"], 2), 62.5)
+
+    def test_eog_special_situations_falls_back_to_team_scouting(self):
+        team_stats_obj = {}
+        team_obj = {
+            "scouting": {
+                "offense": {"Fast_Break_Entries": 5, "Fast_Break_Success": 1},
+                "defense": {
+                    "HCT": {"used": 4, "success": 1},
+                    "FCP": {"used": 2, "success": 1},
+                },
+            }
+        }
+        special = calculate_special_situations_from_sources("Morristown", team_obj, team_stats_obj)
+        self.assertEqual(special["fb_entries"], 5)
+        self.assertEqual(round(special["fb_rate"], 2), 20.0)
+        self.assertEqual(special["pt_total_attempts"], 6)
+        self.assertEqual(round(special["pt_combined_rate"], 2), 33.33)
 
 
 if __name__ == "__main__":
