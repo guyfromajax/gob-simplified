@@ -1383,22 +1383,45 @@ function setupTabs() {
   const tabButtons = document.querySelectorAll('.tab-button');
   const teamContents = document.querySelectorAll('.team-content');
 
-  // Get team colors from gameData
-  const homeTeam = gameData?.home_team || {};
-  const awayTeam = gameData?.away_team || {};
-  const homePrimaryColor = homeTeam.primary_color || '#000000';
-  const awayPrimaryColor = awayTeam.primary_color || '#000000';
+  const NAVY_FALLBACK = '#1a1a2e';
+  const teamsObj = gameData?.teams || {};
+  const homeTeamId = gameData?.home_team_id;
+  const awayTeamId = gameData?.away_team_id;
+  const homeTeam = (homeTeamId && teamsObj[homeTeamId]) ? teamsObj[homeTeamId] : (gameData?.home_team || {});
+  const awayTeam = (awayTeamId && teamsObj[awayTeamId]) ? teamsObj[awayTeamId] : (gameData?.away_team || {});
+
+  const resolvePrimaryColor = (teamObj) =>
+    teamObj?.colors?.primary_color ||
+    teamObj?.primary_color ||
+    NAVY_FALLBACK;
+
+  const contrastTextColor = (hexColor) => {
+    if (typeof hexColor !== 'string') return '#fff';
+    let hex = hexColor.trim().replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) return '#fff';
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+    return luminance > 165 ? '#111' : '#fff';
+  };
+
+  const homePrimaryColor = resolvePrimaryColor(homeTeam);
+  const awayPrimaryColor = resolvePrimaryColor(awayTeam);
+  const homeTextColor = contrastTextColor(homePrimaryColor);
+  const awayTextColor = contrastTextColor(awayPrimaryColor);
 
   tabButtons.forEach(button => {
-      const team = button.dataset.team;
+    const team = button.dataset.team;
 
     // Set background color based on team
     if (team === 'home') {
       button.style.backgroundColor = homePrimaryColor;
-      button.style.color = '#fff';
+      button.style.color = homeTextColor;
     } else if (team === 'away') {
       button.style.backgroundColor = awayPrimaryColor;
-      button.style.color = '#fff';
+      button.style.color = awayTextColor;
     }
     
     button.addEventListener('click', () => {
@@ -1737,4 +1760,3 @@ function closeSpecialStatsPopup() {
     popup.remove();
   }
 }
-
