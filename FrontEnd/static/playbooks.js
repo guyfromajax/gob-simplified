@@ -787,10 +787,15 @@ class PlaybooksUI {
         Object.keys(this.state.sections['man-defense'] || {}).forEach(playId => {
           const play = getVisibleDefensePlays('man-defense').find(p => p.id === playId);
           if (play) {
-            if (percentages.man_defense[play.name] !== undefined) {
-              this.state.sections['man-defense'][playId].percentage = percentages.man_defense[play.name];
+            const canonicalKey = (playId === 'man-1') ? 'Man' : play.name;
+            const resolvedValue =
+              percentages.man_defense[canonicalKey] ??
+              percentages.man_defense[play.name];
+
+            if (resolvedValue !== undefined) {
+              this.state.sections['man-defense'][playId].percentage = resolvedValue;
               appliedCount++;
-              console.log(`✅ [PLAYBOOKS] Applied man_defense percentage: ${play.name} = ${percentages.man_defense[play.name]}%`);
+              console.log(`✅ [PLAYBOOKS] Applied man_defense percentage: ${canonicalKey} = ${resolvedValue}%`);
             } else {
               // Play exists in state but not in saved percentages - already reset to 0 above
               console.log(`✅ [PLAYBOOKS] Man defense play "${play.name}" (id: ${playId}) not in saved percentages, keeping at 0%`);
@@ -2491,7 +2496,8 @@ class PlaybooksUI {
         const play = getVisibleDefensePlays('man-defense').find(p => p.id === playId);
         if (play && play.name !== 'To Be Added') {
           // Save percentage even if 0 (ensures database is complete source of truth)
-          playbookSettings.man_defense[play.name] = playData.percentage || 0;
+          const canonicalKey = (playId === 'man-1') ? 'Man' : play.name;
+          playbookSettings.man_defense[canonicalKey] = playData.percentage || 0;
         }
       });
       
