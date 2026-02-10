@@ -1,4 +1,4 @@
-"""Helpers for computing 1–100 position ratings from a player record."""
+"""Helpers for computing position ratings from a player record."""
 
 from __future__ import annotations
 
@@ -95,14 +95,17 @@ def _height_to_rating(height: float) -> float:
     return 1 + (h - 60) * (99 / 24)
 
 
-def _clamp(value: float, lower: int = 1, upper: int = 100) -> int:
-    """Round and clamp a value to an integer between ``lower`` and ``upper``."""
+def _clamp(value: float, lower: int = 1, upper: int | None = 100) -> int:
+    """Round and clamp a value to an integer with a lower bound and optional upper bound."""
 
-    return max(lower, min(upper, int(round(value))))
+    rounded = int(round(value))
+    if upper is None:
+        return max(lower, rounded)
+    return max(lower, min(upper, rounded))
 
 
 def compute_position_ratings(player: dict) -> Dict[str, int]:
-    """Compute 1–100 ratings for each basketball position.
+    """Compute position ratings for each basketball position.
 
     ``player`` is a mapping containing numeric attributes either at the top
     level or within ``player['attributes']``.
@@ -119,7 +122,7 @@ def compute_position_ratings(player: dict) -> Dict[str, int]:
             else:
                 val = _get_attr(player, attr)
             total += val * weight
-        ratings[pos] = _clamp(total)
+        ratings[pos] = _clamp(total, lower=1, upper=None)
 
     return ratings
 
