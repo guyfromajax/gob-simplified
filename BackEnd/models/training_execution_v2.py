@@ -753,11 +753,11 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
     
     Team attributes (standard) doc ranges:
     - 0 points: += random.randint(-2, 0)
-    - 1 point: += random.randint(-1, 1)
-    - 2 points: += random.randint(0, 2)
-    - 3 points: += random.randint(1, 4)
-    - 4 points: += random.randint(1, 5)
-    - 5 points: += random.randint(1, 6)
+    - 1 point: += random.randint(1, 2)
+    - 2 points: += random.randint(2, 3)
+    - 3 points: += random.randint(2, 5)
+    - 4 points: += random.randint(2, 6)
+    - 5 points: += random.randint(2, 7)
     """
     if team_attr not in TEAM_ATTR_CLAMPS:
         return
@@ -774,17 +774,17 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
     
     # Get base delta from doc ranges
     if points == 1:
-        delta = random.randint(-1, 1)
+        delta = random.randint(1, 2)
     elif points == 2:
-        delta = random.randint(0, 2)
+        delta = random.randint(2, 3)
     elif points == 3:
-        delta = random.randint(1, 4)
+        delta = random.randint(2, 5)
     elif points == 4:
-        delta = random.randint(1, 5)
+        delta = random.randint(2, 6)
     elif points == 5:
-        delta = random.randint(1, 6)
+        delta = random.randint(2, 7)
     else:
-        delta = random.randint(1, 6)
+        delta = random.randint(2, 7)
     
     # Apply focus amplifier if this attribute is amplified by the selected focus
     if _should_amplify_team_attr(team_attr, archetype, sub_option):
