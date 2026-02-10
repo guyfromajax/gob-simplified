@@ -609,3 +609,26 @@ In Franchise mode, when the user submits training for their team, all computer t
 - Custom attribute selection for Player Maximizer focus
 - Play effectiveness score updates from training
 
+## Training Camp Bonus System Implemantion & Testing
+
+### Implementation
+- **Execution timing:** Runs only during training camp (first training), triggered when `skip_pre_training_depreciation=True`.
+- **Location:** `BackEnd/models/training_execution_v2.py`
+  - `_apply_training_camp_bonus(players)`
+  - `_highest_rt_position(player)`
+  - `_training_camp_core_attrs_for_position(position)`
+  - `_training_camp_bonus_range_for_ch(ch_value)`
+- **Position source:** Uses each player's `position_ratings` map (`PG`, `SG`, `SF`, `PF`, `C`), with random tie-break if multiple positions share highest RT.
+- **SF rule:** Always includes `AG`, plus 2 random picks from `SC`, `SH`, `ID`, `OD`.
+- **Attribute write path:** Applies bonus to both `anchor_{attr}` and live `{attr}`.
+
+### Data Wiring
+- **User and computer teams:** Training payload now includes `position_ratings` before `execute_training()` is called.
+- **Location:** `BackEnd/api/franchise_routes.py` (`run_franchise_training()` user-team and computer-team player build paths).
+
+### Testing
+- **Focused test file:** `BackEnd/tests/test_eog_and_training_rule_updates.py`
+- **Training camp bonus tests:**
+  - `test_training_camp_bonus_applies_for_high_ch_pg`
+  - `test_training_camp_bonus_sf_uses_ag_plus_two_random_attrs`
+- **Additional validation run:** `BackEnd/tests/test_training_system.py` (smoke test).

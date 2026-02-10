@@ -45,41 +45,40 @@ Team attributes will adjust at the end of game based on the notes below. Note th
   - `shot_threshold`
     - winning team: 
       - If game FG% > 50%: -= random.randint(5,15)
-      - elif game FG% > 47.5%: 0
-      - elif gamf FG% > 42.5% += random.randit(5,15)
-      - else: += random.randint(15,25) 
+      - elif game FG% > 45%: 0
+      - else: += random.randit(5,15)
     - losing team: += random.randint(10,25)
   - `discipline` (winning and losing team have same criteria)
-    - if team TO > (2 * team STL): += random.randint(-2, -1)
+    - if team TO > (2 * team STL): += random.randint(-3, -2)
     - elif team (team TO * 2) < team STL: += random.randint(1,2)
-    - else: 0
+    - else: += (-2, 0)
   - `fight` 
     - winning team: += random.randint(1,2)
-    - losing team: += random.randint(-2,-1)
+    - losing team: += random.randint(-4,-1)
   - `rebound_modifier` (winning and losing team have same criteria)
     - if team TREB for the game > opponents TREB for the game + 5: += random.uniform(0, 0.1)
     - elif TREB for the game < oppoens TREB for the game - 5: += random.uniform(-0.1, 0)
     - else: += random.uniform(-0.05, 0.05)
   - `offensive_efficiency` (winning and losing team have same criteria)
-    - += random.randint(-1,1)
+    - += random.randint(-2,0)
   - `defensive_efficiency` (winning and losing team have same criteria)
-    - += random.randint(-1,1)
+    - += random.randint(-2,0)
   - `fb_efficiency`
-    - if fast break success rate > 50%: += random.randint(1,2)
+    - if fast break success rate > 60%: += random.randint(0,1)
     - else: += random.randint(-2,-1)
   - `fb_opp_modifier` - Fast break opponent modifier
-    - if opponents fast break success rate < 40%: += random.randint(1,2)
-    - eli oppoent's fast break success rate > 55%: += random.randint(-2,-1)
-    - else: 0
+    - if opponents fast break success rate < 20%: += random.randint(0,2)
+    - elif oppoent's fast break success rate > 55% OR total fast breaks run by opponent in the game > 12: += random.randint(-3,-2)
+    - else: += random.randint(-1,0)
   - `pt_efficiency` - Press/Trap efficiency rating
-    - if (fc press success rate + hc trap success rate) combined > 50%: += random.randint(1,2)
-    - elif (fc press success rate + hc trap success rate) combined < 30%: += random.randint(-2,-1)
-    - else: 0
+    - if (fc press success rate + hc trap success rate) combined > 60%: += random.randint(1,2)
+    - elif (fc press success rate + hc trap success rate) combined < 30%: += random.randint(-3,-1)
+    - else: += random.randint(-1,0)
     - Note: Combined rate = (FC Press successes + HC Trap successes) / (FC Press attempts + HC Trap attempts)
   - `pt_opp_modifier` - Press/Trap opponent modifier
-    - if opponents (press success rate + trap success rate) combined < 30%: += random.randint(1,2)
-    - elif opponents (press success rate + trap success rate) combined > 50%: += random.randint(-2,-1)
-    - else: 0
+    - if opponents (press success rate + trap success rate) combined < 20%: += random.randint(1,2)
+    - elif opponents (press success rate + trap success rate) combined > 50% OR total FCP and HCT run by opponent in the game > 12: += random.randint(-3,-2)
+    - else: += (-2,-1)
     - Note: Combined rate = (FC Press successes + HC Trap successes) / (FC Press attempts + HC Trap attempts)
   - `team_chemistry` - Team chemistry rating
     - score delta = winning team final score - losing team final score

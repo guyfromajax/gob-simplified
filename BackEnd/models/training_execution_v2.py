@@ -101,6 +101,7 @@ def execute_training(
     # Step 2: Apply training points (pass original baselines for report calculation)
     players, team, training_report = apply_training_points(
         players, team, allocations, coaching_focus,
+        is_training_camp=skip_pre_training_depreciation,
         original_baselines=original_player_baselines,
         original_team_baseline=original_team_baseline
     )
@@ -164,9 +165,9 @@ PLAYER_ATTR_CLAMP = (1, None)  # Min 1, no max
 
 # Year-based pre-training decay (min, max) for random decrease per attribute. See Training_System.md.
 PRE_TRAINING_DECAY_BY_YEAR = {
-    "freshman": (-5, -1),
+    "freshman": (-5, -2),
     "sophomore": (-4, -1),
-    "junior": (-3, 0),
+    "junior": (-3, -1),
     "senior": (-2, 0),
 }
 
@@ -174,7 +175,7 @@ PRE_TRAINING_DECAY_BY_YEAR = {
 def _pre_training_decay_range_for_year(year: str) -> Tuple[int, int]:
     """Return (min, max) for pre-training decay based on player year. Default: junior."""
     key = (year or "").strip().lower()
-    return PRE_TRAINING_DECAY_BY_YEAR.get(key, (-3, 0))
+    return PRE_TRAINING_DECAY_BY_YEAR.get(key, (-3, -1))
 
 
 def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List[dict], dict]:
@@ -214,6 +215,7 @@ def apply_training_points(
     team: dict,
     allocations: Dict[str, Dict],
     coaching_focus: Optional[str] = None,
+    is_training_camp: bool = False,
     original_baselines: Optional[Dict] = None,
     original_team_baseline: Optional[Dict] = None
 ) -> Tuple[List[dict], dict, Dict]:
@@ -495,6 +497,10 @@ def apply_training_points(
             logger.warning(f"🔋 [TRAINING] Skipping conditioning NG reduction: points={conditioning_points} not in [3, 4, 5]")
     else:
         logger.warning(f"🔋 [TRAINING] No conditioning in normalized_allocations: {list(normalized_allocations.keys())}")
+
+    # Training Camp bonus (first training only): apply CH/RT-position-based core-attribute bonus.
+    if is_training_camp:
+        _apply_training_camp_bonus(players)
     
     # Clamp all values
     for player in players:
@@ -579,16 +585,16 @@ def _apply_player_training_points(
     Base ranges (Player Attributes). See Training_System.md.
     - 0 points: += random.randint(-2, -1)
     - 1 point: += random.randint(0, 1)
-    - 2 points: += random.randint(1, 3)
+    - 2 points: += random.randint(2, 3)
     - 3 points: += random.randint(2, 4)
-    - 4 points: += random.randint(2, 5)
+    - 4 points: += random.randint(3, 5)
     - 5 points: += random.randint(3, 6)
     
     Year-based adjustments: leave minimums as is, only change maximums.
     - Freshman: +5 to max
-    - Sophomore: +4 to max
-    - Junior: +3 to max
-    - Senior: +2 to max
+    - Sophomore: +3 to max
+    - Junior: +2 to max
+    - Senior: +1 to max
     
     Focus amplifier: Applied based on sub_option selection
     Multiplier: For attributes like CH that get 0.5 multiplier
@@ -596,21 +602,21 @@ def _apply_player_training_points(
     attrs = player.get("attributes", {})
     anchor_key = f"anchor_{attr}"
     
-    # Get player year: only adjust max. Freshman +5, Sophomore +4, Junior +3, Senior +2.
+    # Get player year: only adjust max. Freshman +5, Sophomore +3, Junior +2, Senior +1.
     year = player.get("year", "").lower() if player.get("year") else ""
-    max_adjustment = {"freshman": 5, "sophomore": 4, "junior": 3, "senior": 2}.get(year, 3)
+    max_adjustment = {"freshman": 5, "sophomore": 3, "junior": 2, "senior": 1}.get(year, 2)
     
-    # Base range (min, max) by points. Doc: 0→(-2,-1), 1→(0,1), 2→(1,3), 3→(2,4), 4→(2,5), 5→(3,6)
+    # Base range (min, max) by points. Doc: 0→(-2,-1), 1→(0,1), 2→(2,3), 3→(2,4), 4→(3,5), 5→(3,6)
     if points == 0:
         base_min, base_max = -2, -1
     elif points == 1:
         base_min, base_max = 0, 1
     elif points == 2:
-        base_min, base_max = 1, 3
+        base_min, base_max = 2, 3
     elif points == 3:
         base_min, base_max = 2, 4
     elif points == 4:
-        base_min, base_max = 2, 5
+        base_min, base_max = 3, 5
     elif points == 5:
         base_min, base_max = 3, 6
     else:
@@ -652,6 +658,75 @@ def _apply_player_training_points(
     current_val = attrs.get(anchor_key, 0)
     attrs[anchor_key] = current_val + increase
     attrs[attr] = attrs[anchor_key]  # Update base attribute too
+
+
+def _training_camp_bonus_range_for_ch(ch_value: int) -> Optional[Tuple[int, int]]:
+    """Return training-camp bonus range based on CH value."""
+    if ch_value > 80:
+        return (1, 6)
+    if ch_value > 60:
+        return (1, 4)
+    if ch_value > 40:
+        return (0, 3)
+    if ch_value > 20:
+        return (0, 2)
+    return None
+
+
+def _training_camp_core_attrs_for_position(position: str) -> List[str]:
+    """Return core attributes for a highest-RT position in training camp."""
+    pos = (position or "").upper()
+    if pos == "PG":
+        return ["PS", "BH", "IQ"]
+    if pos == "SG":
+        return ["SH", "FT", "OD"]
+    if pos == "SF":
+        sf_random = random.sample(["SC", "SH", "ID", "OD"], 2)
+        return ["AG"] + sf_random
+    if pos == "PF":
+        return ["RB", "ST", "ID"]
+    if pos == "C":
+        return ["SC", "ST", "ID"]
+    return []
+
+
+def _highest_rt_position(player: dict) -> Optional[str]:
+    """Pick one highest-RT position (random tie-break) from player.position_ratings."""
+    ratings = player.get("position_ratings") or {}
+    if not isinstance(ratings, dict):
+        return None
+    valid_positions = ["PG", "SG", "SF", "PF", "C"]
+    scored_positions = [(pos, ratings.get(pos)) for pos in valid_positions if isinstance(ratings.get(pos), (int, float))]
+    if not scored_positions:
+        return None
+    max_rt = max(score for _, score in scored_positions)
+    tied = [pos for pos, score in scored_positions if score == max_rt]
+    return random.choice(tied) if tied else None
+
+
+def _apply_training_camp_bonus(players: List[dict]) -> None:
+    """Apply Training Camp CH/RT-position bonus to player anchor attributes."""
+    for player in players:
+        attrs = player.get("attributes", {})
+        ch_value = attrs.get("anchor_CH", attrs.get("CH", 0))
+        bonus_range = _training_camp_bonus_range_for_ch(ch_value)
+        if not bonus_range:
+            continue
+
+        highest_pos = _highest_rt_position(player)
+        if not highest_pos:
+            continue
+
+        core_attrs = _training_camp_core_attrs_for_position(highest_pos)
+        for attr in core_attrs:
+            anchor_key = f"anchor_{attr}"
+            if anchor_key not in attrs and attr not in attrs:
+                continue
+            current = attrs.get(anchor_key, attrs.get(attr, 0))
+            delta = random.randint(bonus_range[0], bonus_range[1])
+            updated = max(PLAYER_ATTR_CLAMP[0], current + delta)
+            attrs[anchor_key] = updated
+            attrs[attr] = updated
 
 
 def _normalize_allocations(allocations: Dict) -> Dict:

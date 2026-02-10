@@ -33,6 +33,10 @@ from BackEnd.utils.roster_builder import build_roster_players
 from BackEnd.utils.command_center_data import build_command_center_base
 from BackEnd.utils.game_id_utils import generate_game_id
 from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS
+from BackEnd.eog_attr_rules import (
+    calculate_fb_opp_modifier_change,
+    calculate_pt_opp_modifier_change,
+)
 from BackEnd.utils.auth import get_current_user
 from BackEnd.utils.ownership import verify_franchise_owned_by_user
 
@@ -290,9 +294,11 @@ def update_team_attributes_after_game(
         
         return {
             "fb_rate": fb_rate,
+            "fb_entries": fb_entries,
             "hct_rate": hct_rate,
             "fcp_rate": fcp_rate,
-            "pt_combined_rate": pt_combined_rate
+            "pt_combined_rate": pt_combined_rate,
+            "pt_total_attempts": pt_total_attempts,
         }
     
     home_scouting = get_scouting_data(home_team_obj)
@@ -371,12 +377,7 @@ def update_team_attributes_after_game(
             changes["fb_efficiency"] = random.randint(-2, -1)
         
         # fb_opp_modifier
-        if opponent_scouting["fb_rate"] < 30:
-            changes["fb_opp_modifier"] = random.randint(0, 1)
-        elif opponent_scouting["fb_rate"] > 55:
-            changes["fb_opp_modifier"] = random.randint(-2, -1)
-        else:
-            changes["fb_opp_modifier"] = 0
+        changes["fb_opp_modifier"] = calculate_fb_opp_modifier_change(opponent_scouting)
         
         # pt_efficiency
         if team_scouting["pt_combined_rate"] > 60:
@@ -387,12 +388,7 @@ def update_team_attributes_after_game(
             changes["pt_efficiency"] = random.randint(-1, 0)
         
         # pt_opp_modifier
-        if opponent_scouting["pt_combined_rate"] < 30:
-            changes["pt_opp_modifier"] = random.randint(1, 2)
-        elif opponent_scouting["pt_combined_rate"] > 50:
-            changes["pt_opp_modifier"] = random.randint(-3, -1)
-        else:
-            changes["pt_opp_modifier"] = random.randint(-1, 0)
+        changes["pt_opp_modifier"] = calculate_pt_opp_modifier_change(opponent_scouting)
         
         # team_chemistry
         score_delta = winner_score - loser_score
@@ -2961,6 +2957,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
             "last_name": franchise_player_data.get("meta", {}).get("last_name", ""),
             "team": team_name or team_id,  # Use team_name if available, otherwise use team_id
             "attributes": franchise_player_data.get("attributes", {}),
+            "position_ratings": franchise_player_data.get("position_ratings", {}),
             "year": core_player.get("year") if core_player else None
         }
         players_for_training.append(player)
@@ -3237,7 +3234,8 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
                     "first_name": computer_franchise_player_data.get("meta", {}).get("first_name", ""),
                     "last_name": computer_franchise_player_data.get("meta", {}).get("last_name", ""),
                     "team": computer_team_name or computer_team_id,
-                    "attributes": computer_franchise_player_data.get("attributes", {})
+                    "attributes": computer_franchise_player_data.get("attributes", {}),
+                    "position_ratings": computer_franchise_player_data.get("position_ratings", {}),
                 }
                 computer_players_for_training.append(player)
             
