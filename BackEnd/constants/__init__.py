@@ -84,6 +84,9 @@ BLOCK_RECONCILIATION_BLOCK_THRESHOLD = -150
 # Block attempt roll: y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX); attempt when y < aggression
 BLOCK_Y_ROLL_MIN = 1
 BLOCK_Y_ROLL_MAX = 4
+# Secondary block attempt roll: z = random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX); attempt when z < defense fight
+BLOCK_FIGHT_RANGE_MIN = 0
+BLOCK_FIGHT_RANGE_MAX = 15
 
 MALLEABLE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT"]
 
@@ -159,12 +162,12 @@ THREE_POINT_SHOT_THRESHOLD_INCREASE = 40
 # - Average target FG% of 45%
 STANDARD_D_FOUL = 95
 STANDARD_O_FOUL = 5
-HARD_STEAL = -150
-SOFT_STEAL = -50
+HARD_STEAL = -135
+SOFT_STEAL = -35
 HARD_FOUL = 200
 SOFT_FOUL = 100
 STEAL_ATTEMPT = 30
-DEAD_BALL_TURNOVER = 5
+DEAD_BALL_TURNOVER = 7
 
 # Charge/Blocking Foul (drive reconciliation thresholds)
 # reconciliation = offense_score - defense_score

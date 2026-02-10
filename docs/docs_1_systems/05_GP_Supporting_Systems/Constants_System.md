@@ -15,7 +15,7 @@ This document lists all constants and variables that were previously on the depr
 | `HARD_FOUL` | 200 | |
 | `SOFT_FOUL` | 100 | |
 | `STEAL_ATTEMPT` | 30 | |
-| `DEAD_BALL_TURNOVER` | 5 | |
+| `DEAD_BALL_TURNOVER` | 7 | |
 
 ---
 
