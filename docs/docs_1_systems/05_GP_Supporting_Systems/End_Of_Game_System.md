@@ -37,7 +37,7 @@
 **Team Attributes Update System**
 Team attributes will adjust at the end of game based on the notes below. Note this will replace the team attribute decay we had coded into the Training System.
 - Values will be capped to normal ranges:
-  - `shot_threshold`: -10 to 190
+  - `shot_threshold`: 0 to 200
   - `rebound_modifier`: 0 to 0.4
   - `team_chemistry`: 7 to 25
   - all others: -10 to 10

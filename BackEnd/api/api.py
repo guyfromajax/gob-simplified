@@ -3264,7 +3264,7 @@ try:
                     "next_lineup_needed": not is_final,
                 }
             )
-            return summary
+            return JSONResponse(content=summary, status_code=200)
     
         # Allow quarter progression: only prevent going backwards or skipping too far ahead
         if body.quarter < gm.quarter:
