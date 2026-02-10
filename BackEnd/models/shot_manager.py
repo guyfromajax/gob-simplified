@@ -10,6 +10,8 @@ from BackEnd.constants import (
     BLOCK_RECONCILIATION_BLOCK_THRESHOLD,
     BLOCK_Y_ROLL_MIN,
     BLOCK_Y_ROLL_MAX,
+    BLOCK_FIGHT_RANGE_MIN,
+    BLOCK_FIGHT_RANGE_MAX,
     THREE_POINT_SHOT_THRESHOLD_INCREASE,
     AGGRESSION_FOUL_MULTIPLIER,
     HARD_SHOOTING_FOUL_THRESHOLD,
@@ -463,7 +465,7 @@ class ShotManager:
             y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX)
             should_attempt_block_reconciliation = y < x
             if not should_attempt_block_reconciliation:
-                z = random.randint(0, 15)
+                z = random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX)
                 defense_fight = def_team.team_attributes.get("fight", 0)
                 should_attempt_block_reconciliation = z < defense_fight
             if should_attempt_block_reconciliation:
