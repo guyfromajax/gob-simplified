@@ -9,7 +9,7 @@ const week = parseInt(urlParams.get('week'), 10);
 const round = parseInt(urlParams.get('round'), 10); // For tournament mode (optional - backend will determine if not provided)
 
 let reportData = null;
-let currentView = 'attributes'; // 'attributes' or 'changes'
+let currentView = 'changes'; // 'attributes' or 'changes'
 
 // Attribute abbreviations mapping
 // NOTE: Order is critical - this is the exact order attributes should be displayed horizontally
@@ -108,6 +108,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function setupViewToggle() {
   const toggleButtons = document.querySelectorAll('.toggle-btn');
+  // Enforce initial active button from currentView
+  toggleButtons.forEach(b => {
+    if (b.dataset.view === currentView) b.classList.add('active');
+    else b.classList.remove('active');
+  });
   toggleButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       toggleButtons.forEach(b => b.classList.remove('active'));
@@ -539,7 +544,7 @@ function createChangeCell(change) {
   
   if (change > 0) {
     td.textContent = `+${change}`;
-    td.className = 'change-positive';
+    td.className = change > 5 ? 'change-gold' : 'change-positive';
   } else if (change < 0) {
     td.textContent = change.toString();
     td.className = 'change-negative';
@@ -614,7 +619,7 @@ function createTeamAttrItem(attrKey, currentValue, change) {
       if (change < 0) {
         // Decrease is good - show as green with +
         changeSpan.textContent = `+${absChange}`;
-        changeSpan.className += ' change-positive';
+        changeSpan.className += absChange > 5 ? ' change-gold' : ' change-positive';
       } else {
         // Increase is bad - show as red with -
         changeSpan.textContent = `-${absChange}`;
@@ -624,12 +629,20 @@ function createTeamAttrItem(attrKey, currentValue, change) {
       // Format rebound_modifier changes to 2 decimal places
       const formattedChange = change > 0 ? `+${change.toFixed(2)}` : change.toFixed(2);
       changeSpan.textContent = formattedChange;
-      changeSpan.className += change > 0 ? ' change-positive' : ' change-negative';
+      if (change > 0) {
+        changeSpan.className += change > 5 ? ' change-gold' : ' change-positive';
+      } else {
+        changeSpan.className += ' change-negative';
+      }
     } else {
       // Standard handling for other attributes
       const formattedChange = change > 0 ? `+${change}` : change.toString();
       changeSpan.textContent = formattedChange;
-      changeSpan.className += change > 0 ? ' change-positive' : ' change-negative';
+      if (change > 0) {
+        changeSpan.className += change > 5 ? ' change-gold' : ' change-positive';
+      } else {
+        changeSpan.className += ' change-negative';
+      }
     }
   } else {
     changeSpan.textContent = 'No change';
@@ -989,4 +1002,3 @@ function renderTrainingNotes() {
     container.appendChild(noteElement);
   });
 }
-

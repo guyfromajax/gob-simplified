@@ -198,6 +198,12 @@ body {
   font-weight: 600;
 }
 
+.change-gold {
+  color: #d4af37;
+  text-shadow: 0 0 1px rgba(255, 255, 255, 0.25);
+  font-weight: 700;
+}
+
 .change-negative {
   color: var(--color-error);
   font-weight: 600;
@@ -558,4 +564,3 @@ body {
   white-space: pre-wrap;
   word-wrap: break-word;
 }
-
