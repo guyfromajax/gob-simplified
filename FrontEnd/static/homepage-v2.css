@@ -148,6 +148,11 @@ body.homepage-v2.has-auth-bar {
   background: rgba(0, 0, 0, 0.45);
 }
 
+/* Carousel 2 only: 25% lighter overlay than the default */
+.carousel-slide-overlay-light {
+  background: rgba(0, 0, 0, 0.34);
+}
+
 .carousel-slide-content {
   position: absolute;
   inset: 0;
