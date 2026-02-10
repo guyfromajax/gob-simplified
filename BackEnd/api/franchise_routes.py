@@ -39,6 +39,11 @@ from BackEnd.utils.ownership import verify_franchise_owned_by_user
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+# TEMP PROTOTYPE TEST BOOSTS (easy revert: set to False or remove this block)
+TEMP_TEAM_ATTR_TEST_BOOSTS = {
+    "eog_fight_plus_10": True,
+}
+
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 
 
@@ -400,6 +405,12 @@ def update_team_attributes_after_game(
                 changes["team_chemistry"] = random.randint(-4, -2)
             else:
                 changes["team_chemistry"] = random.randint(-6, -4)
+
+        # TEMP PROTOTYPE TEST BOOST:
+        # For all teams, add +10 fight during EOG team-attribute update.
+        # Final value is still clamped below via TEAM_ATTR_CLAMPS.
+        if TEMP_TEAM_ATTR_TEST_BOOSTS.get("eog_fight_plus_10", False):
+            changes["fight"] = changes.get("fight", 0) + 10
         
         # Apply changes and clamp to valid ranges
         ftd_update = {}

@@ -11,7 +11,31 @@
 (function () {
   'use strict';
 
-  var PAGES_WITHOUT_AUTH_BAR = ['court.html', 'set-lineup.html', 'training.html', 'training-report.html'];
+  var PAGES_WITHOUT_AUTH_BAR = [
+    // Gameplay / lineup
+    'court.html',
+    'set-lineup.html',
+    // Training
+    'training.html',
+    'training-report.html',
+    // Requested removals
+    'box-score.html',
+    'game-plan.html',
+    'playbooks.html',
+    // Plays screens
+    'plays-builder.html',
+    'play-builder.html',
+    'play-builder-v2.html',
+    'play-details.html',
+    // Optional non-.html route variants
+    '/box-score',
+    '/game-plan',
+    '/playbooks',
+    '/plays-builder',
+    '/play-builder',
+    '/play-builder-v2',
+    '/play-details'
+  ];
 
   function shouldShowAuthBar() {
     var path = window.location.pathname || '';

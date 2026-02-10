@@ -15,6 +15,12 @@ from BackEnd.constants import ALL_ATTRS
 
 logger = logging.getLogger(__name__)
 
+# TEMP PROTOTYPE TEST BOOSTS (easy revert: set to False or remove this block)
+TEMP_TEAM_ATTR_TEST_BOOSTS = {
+    "training_discipline_plus_10_if_allocated": True,
+    "training_fb_efficiency_plus_5_or_10": True,
+}
+
 
 def execute_training(
     players: List[dict],
@@ -164,8 +170,8 @@ PLAYER_ATTR_CLAMP = (1, None)  # Min 1, no max
 
 # Year-based pre-training decay (min, max) for random decrease per attribute. See Training_System.md.
 PRE_TRAINING_DECAY_BY_YEAR = {
-    "freshman": (-4, -1),
-    "sophomore": (-3, -1),
+    "freshman": (-5, -1),
+    "sophomore": (-4, -1),
     "junior": (-3, 0),
     "senior": (-2, 0),
 }
@@ -186,7 +192,7 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
     
     Pre-training conditions:
     - Player attributes (excluding EM, MO, NG): += randint(min, max) per player/attribute,
-      where (min, max) is year-based: Freshman (-4,-1), Sophomore (-3,-1), Junior (-3,0), Senior (-2,0).
+      where (min, max) is year-based: Freshman (-5,-1), Sophomore (-4,-1), Junior (-3,0), Senior (-2,0).
     
     Args:
         players: List of player dicts with attributes
@@ -456,6 +462,9 @@ def apply_training_points(
         breaks_points = normalized_allocations["breaks"]
         if breaks_points is not None and breaks_points > 0:
             _apply_breaks_effect(players, team, breaks_points, player_baselines, team_baseline)
+
+    # TEMP PROTOTYPE TEST BOOSTS (applied after normal training math/breaks)
+    _apply_temp_training_team_attr_test_boosts(team, normalized_allocations)
     
     # Apply NG reductions from scrimmages and conditioning
     # Track which players had reductions for training report notes
@@ -567,12 +576,12 @@ def _apply_player_training_points(
     Apply training points to a single player attribute.
     
     Base ranges (Player Attributes). See Training_System.md.
-    - 0 points: += random.randint(0, 1)
-    - 1 point: += random.randint(1, 2)
-    - 2 points: += random.randint(2, 4)
-    - 3 points: += random.randint(2, 5)
-    - 4 points: += random.randint(2, 6)
-    - 5 points: += random.randint(3, 7)
+    - 0 points: += random.randint(-2, -1)
+    - 1 point: += random.randint(0, 1)
+    - 2 points: += random.randint(1, 3)
+    - 3 points: += random.randint(2, 4)
+    - 4 points: += random.randint(2, 5)
+    - 5 points: += random.randint(3, 6)
     
     Year-based adjustments: leave minimums as is, only change maximums.
     - Freshman: +5 to max
@@ -586,32 +595,25 @@ def _apply_player_training_points(
     attrs = player.get("attributes", {})
     anchor_key = f"anchor_{attr}"
     
-    # Handle 0 points: small increase (base range 0 to 1)
-    if points == 0:
-        increase = random.randint(0, 1)
-        increase = int(increase * multiplier)
-        current_val = attrs.get(anchor_key, 0)
-        attrs[anchor_key] = current_val + increase
-        attrs[attr] = attrs[anchor_key]
-        return
-    
     # Get player year: only adjust max. Freshman +5, Sophomore +4, Junior +3, Senior +2.
     year = player.get("year", "").lower() if player.get("year") else ""
     max_adjustment = {"freshman": 5, "sophomore": 4, "junior": 3, "senior": 2}.get(year, 3)
     
-    # Base range (min, max) by points. Doc: 1→(1,2), 2→(2,4), 3→(2,5), 4→(2,6), 5→(3,7)
-    if points == 1:
-        base_min, base_max = 1, 2
+    # Base range (min, max) by points. Doc: 0→(-2,-1), 1→(0,1), 2→(1,3), 3→(2,4), 4→(2,5), 5→(3,6)
+    if points == 0:
+        base_min, base_max = -2, -1
+    elif points == 1:
+        base_min, base_max = 0, 1
     elif points == 2:
-        base_min, base_max = 2, 4
+        base_min, base_max = 1, 3
     elif points == 3:
-        base_min, base_max = 2, 5
+        base_min, base_max = 2, 4
     elif points == 4:
-        base_min, base_max = 2, 6
+        base_min, base_max = 2, 5
     elif points == 5:
-        base_min, base_max = 3, 7
+        base_min, base_max = 3, 6
     else:
-        base_min, base_max = 3, 7
+        base_min, base_max = 3, 6
     
     adjusted_max = base_max + max_adjustment
     increase = random.randint(base_min, adjusted_max)
@@ -743,6 +745,48 @@ def _normalize_allocations(allocations: Dict) -> Dict:
             normalized["scrimmages"] = team_drills["scrimmages"]
     
     return normalized
+
+
+def _apply_temp_training_team_attr_test_boosts(team: dict, normalized_allocations: Dict) -> None:
+    """
+    TEMP PROTOTYPE TEST BOOSTS.
+    Applies temporary team-attribute boosts requested for prototype validation.
+    Uses TEAM_ATTR_CLAMPS for cap handling.
+    """
+
+    def _clamp_team_attr(attr_name: str, value: float) -> float:
+        lower, upper = TEAM_ATTR_CLAMPS[attr_name]
+        return max(lower, min(upper, value))
+
+    # 1) If at least one discipline-contributing point is allocated, add +10 discipline (capped)
+    if TEMP_TEAM_ATTR_TEST_BOOSTS.get("training_discipline_plus_10_if_allocated", False):
+        discipline_trigger = False
+        defensive = normalized_allocations.get("defensive_drills", {})
+        technical = normalized_allocations.get("technical_drills", {})
+
+        if isinstance(defensive, dict):
+            discipline_trigger = discipline_trigger or int(defensive.get("inside", 0) or 0) >= 1
+            discipline_trigger = discipline_trigger or int(defensive.get("outside", 0) or 0) >= 1
+        if isinstance(technical, dict):
+            discipline_trigger = discipline_trigger or int(technical.get("passing", 0) or 0) >= 1
+            discipline_trigger = discipline_trigger or int(technical.get("ball_handling", 0) or 0) >= 1
+
+        if discipline_trigger:
+            current = team.get("discipline", 0)
+            team["discipline"] = _clamp_team_attr("discipline", current + 10)
+
+    # 2) fb_efficiency bonus from fast_breaks offense_install:
+    #    >=1 point => +5, >=2 points => +10 (capped)
+    if TEMP_TEAM_ATTR_TEST_BOOSTS.get("training_fb_efficiency_plus_5_or_10", False):
+        fb_points = 0
+        fast_breaks = normalized_allocations.get("fast_breaks", {})
+        if isinstance(fast_breaks, dict):
+            fb_points = int(fast_breaks.get("offense_install", 0) or 0)
+
+        fb_bonus = 10 if fb_points >= 2 else 5 if fb_points >= 1 else 0
+        if fb_bonus > 0:
+            current = team.get("fb_efficiency", 0)
+            team["fb_efficiency"] = _clamp_team_attr("fb_efficiency", current + fb_bonus)
 
 
 def _apply_team_training_points(team: dict, team_attr: str, points: int, archetype: Optional[str] = None, sub_option: Optional[str] = None):
@@ -1758,4 +1802,3 @@ def _apply_defense_training(
                     logger.warning(f"📚 [TRAINING] Zone defense '{defense_name}': effectiveness {old_eff} → {old_eff + points} (+{points} points, even distribution)")
     
     return updated_scouting_data
-
