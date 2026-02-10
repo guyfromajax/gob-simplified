@@ -2356,49 +2356,59 @@ try:
                             # Restore team-level stats (score, fouls, totals, points by quarter)
                             # Only restore if this is NOT a new Q1 game (fresh start)
                             if should_restore_stats:
-                                home_team_data = saved.get("home_team", {})
-                                away_team_data = saved.get("away_team", {})
+                                # Prefer unified teams structure for restore (current save format),
+                                # then fallback to legacy home_team/away_team documents.
+                                restore_home_team_data = {}
+                                restore_away_team_data = {}
+                                if home_team_id and isinstance(teams_obj, dict):
+                                    restore_home_team_data = teams_obj.get(home_team_id, {}) or {}
+                                if away_team_id and isinstance(teams_obj, dict):
+                                    restore_away_team_data = teams_obj.get(away_team_id, {}) or {}
+                                if not restore_home_team_data and isinstance(saved.get("home_team"), dict):
+                                    restore_home_team_data = saved.get("home_team", {})
+                                if not restore_away_team_data and isinstance(saved.get("away_team"), dict):
+                                    restore_away_team_data = saved.get("away_team", {})
                                 
                                 # Restore team scores
                                 # 🔍 DEBUG: Log score restoration
                                 logging.warning(f"🔍 [SCORE_RESTORE DEBUG] Before restore: gm.score={gm.score}, gm.quarter={gm.quarter}")
-                                if "score" in home_team_data:
-                                    gm.score[gm.home_team.name] = home_team_data["score"]
-                                    logging.warning(f"🔍 [SCORE_RESTORE DEBUG] Restored home score: {gm.home_team.name}={home_team_data['score']}")
-                                if "score" in away_team_data:
-                                    gm.score[gm.away_team.name] = away_team_data["score"]
-                                    logging.warning(f"🔍 [SCORE_RESTORE DEBUG] Restored away score: {gm.away_team.name}={away_team_data['score']}")
+                                if "score" in restore_home_team_data:
+                                    gm.score[gm.home_team.name] = restore_home_team_data["score"]
+                                    logging.warning(f"🔍 [SCORE_RESTORE DEBUG] Restored home score: {gm.home_team.name}={restore_home_team_data['score']}")
+                                if "score" in restore_away_team_data:
+                                    gm.score[gm.away_team.name] = restore_away_team_data["score"]
+                                    logging.warning(f"🔍 [SCORE_RESTORE DEBUG] Restored away score: {gm.away_team.name}={restore_away_team_data['score']}")
                                 logging.warning(f"🔍 [SCORE_RESTORE DEBUG] After restore: gm.score={gm.score}, gm.quarter={gm.quarter}")
                                 
                                 # Restore team fouls
-                                if "team_fouls" in home_team_data:
-                                    gm.home_team.team_fouls = home_team_data["team_fouls"]
-                                if "team_fouls" in away_team_data:
-                                    gm.away_team.team_fouls = away_team_data["team_fouls"]
+                                if "team_fouls" in restore_home_team_data:
+                                    gm.home_team.team_fouls = restore_home_team_data["team_fouls"]
+                                if "team_fouls" in restore_away_team_data:
+                                    gm.away_team.team_fouls = restore_away_team_data["team_fouls"]
                                 
                                 # Restore team timeouts
-                                if "timeouts" in home_team_data:
-                                    gm.home_team.timeouts = home_team_data["timeouts"]
+                                if "timeouts" in restore_home_team_data:
+                                    gm.home_team.timeouts = restore_home_team_data["timeouts"]
                                 else:
                                     # Default to 4 if not in saved data (backward compatibility)
                                     gm.home_team.timeouts = 4
-                                if "timeouts" in away_team_data:
-                                    gm.away_team.timeouts = away_team_data["timeouts"]
+                                if "timeouts" in restore_away_team_data:
+                                    gm.away_team.timeouts = restore_away_team_data["timeouts"]
                                 else:
                                     # Default to 4 if not in saved data (backward compatibility)
                                     gm.away_team.timeouts = 4
                                 
                                 # Restore team totals (aggregated stats)
-                                if "totals" in home_team_data:
-                                    gm.team_totals[gm.home_team.name] = home_team_data["totals"]
-                                if "totals" in away_team_data:
-                                    gm.team_totals[gm.away_team.name] = away_team_data["totals"]
+                                if "totals" in restore_home_team_data:
+                                    gm.team_totals[gm.home_team.name] = restore_home_team_data["totals"]
+                                if "totals" in restore_away_team_data:
+                                    gm.team_totals[gm.away_team.name] = restore_away_team_data["totals"]
                                 
                                 # Restore points by quarter
-                                if "points_by_quarter" in home_team_data:
-                                    gm.game_state["points_by_quarter"][gm.home_team.name] = home_team_data["points_by_quarter"]
-                                if "points_by_quarter" in away_team_data:
-                                    gm.game_state["points_by_quarter"][gm.away_team.name] = away_team_data["points_by_quarter"]
+                                if "points_by_quarter" in restore_home_team_data:
+                                    gm.game_state["points_by_quarter"][gm.home_team.name] = restore_home_team_data["points_by_quarter"]
+                                if "points_by_quarter" in restore_away_team_data:
+                                    gm.game_state["points_by_quarter"][gm.away_team.name] = restore_away_team_data["points_by_quarter"]
                                 # ✅ PERFORMANCE: Removed debug logging
                                 
                                 # Restore game_stats_initialized flag to prevent stats reset

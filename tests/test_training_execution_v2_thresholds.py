@@ -77,3 +77,59 @@ def test_pre_training_conditions_use_freshman_decay_range(monkeypatch):
     updated = players[0]["attributes"]["anchor_SC"]
 
     assert updated == 45
+
+
+def test_rebound_modifier_uses_half_point_accrual_from_rebounding_and_scrimmages(monkeypatch):
+    players = [
+        {
+            "_id": "p1",
+            "attributes": {"anchor_SC": 50, "SC": 50, "NG": 1.0},
+        }
+    ]
+    team = {
+        "shot_threshold": 100,
+        "discipline": 0,
+        "fight": 0,
+        "rebound_modifier": 0.2,
+        "momentum_score": 0,
+        "offensive_efficiency": 0,
+        "team_chemistry": 10,
+        "defensive_efficiency": 0,
+        "fb_efficiency": 0,
+        "pt_efficiency": 0,
+        "fb_opp_modifier": 0,
+        "pt_opp_modifier": 0,
+    }
+    allocations = {
+        "player_drills": {
+            "technical": {"rebounding": 2},  # 2 * 0.5 => 1 effective point
+        },
+        "team_drills": {
+            "scrimmages": 3,  # 3 * 0.5 => 2 effective points
+        },
+    }
+
+    rebound_calls = []
+    shot_threshold_calls = []
+
+    monkeypatch.setattr(training, "_apply_player_training_points", lambda *args, **kwargs: None)
+    monkeypatch.setattr(training, "_apply_team_training_points", lambda *args, **kwargs: None)
+    monkeypatch.setattr(training, "_apply_breaks_effect", lambda *args, **kwargs: None)
+    monkeypatch.setattr(training, "_apply_ng_reduction_from_scrimmages", lambda *args, **kwargs: [])
+    monkeypatch.setattr(training, "_apply_ng_reduction_from_conditioning", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        training,
+        "_apply_rebound_modifier_training",
+        lambda _team, points, *_args, source="technical_drills", **_kwargs: rebound_calls.append((source, points)),
+    )
+    monkeypatch.setattr(
+        training,
+        "_apply_shot_threshold_training",
+        lambda _team, points, *_args, **_kwargs: shot_threshold_calls.append(points),
+    )
+
+    training.apply_training_points(players, team, allocations)
+
+    assert ("technical_drills", 1) in rebound_calls
+    assert ("scrimmages", 2) in rebound_calls
+    assert shot_threshold_calls == [3]

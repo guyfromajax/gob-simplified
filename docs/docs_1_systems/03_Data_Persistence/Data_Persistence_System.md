@@ -889,6 +889,24 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 
 **Full system (limits, conditions, flow):** `docs/docs_1_systems/05_GP_Supporting_Systems/Computer_Timeout_System.md`
 
+### Mixed Sim→Play Quarter Restore (Unified Teams) ✅ **FIXED** (February 2026)
+
+**Problem:** In mixed gameplay flows (simulate Q1–Q3, then play Q4), box score/team totals could appear mostly zero after loading from DB.
+
+**Root Cause:**
+- `simulate_quarter_endpoint()` restored team-level cumulative stats (score, team fouls, timeouts, totals, points-by-quarter) from legacy `home_team` / `away_team` fields.
+- Current saved game format stores authoritative team state in unified `teams.{team_id}` structure.
+- When legacy fields were absent, restore skipped cumulative values and produced partial/zeroed box score context.
+
+**Solution:**
+- Updated the DB restore path to prefer unified `teams[home_team_id]` / `teams[away_team_id]`.
+- Kept backward compatibility fallback to legacy `home_team` / `away_team` only when unified team records are unavailable.
+
+**Files Changed:**
+- `BackEnd/api/api.py` - simulate-quarter DB restore block for team-level cumulative stats
+- `tests/test_simulate_quarter_endpoint.py` - added focused regression test:
+  - `test_simulate_quarter_restores_team_stats_from_unified_teams`
+
 ### Key Files
 
 **Backend:**
@@ -929,4 +947,3 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 
 - `docs/docs_1_systems/05_GP_Supporting_Systems/Timeout_System.md` - Timeout state persistence
 - `docs/docs_1_systems/05_GP_Supporting_Systems/Computer_Timeout_System.md` - Computer timeout flow
-
