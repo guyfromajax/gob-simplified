@@ -133,3 +133,23 @@ def test_rebound_modifier_uses_half_point_accrual_from_rebounding_and_scrimmages
     assert ("technical_drills", 1) in rebound_calls
     assert ("scrimmages", 2) in rebound_calls
     assert shot_threshold_calls == [3]
+
+
+def test_team_attr_standard_ranges_match_documentation(monkeypatch):
+    calls = []
+
+    def fake_randint(a, b):
+        calls.append((a, b))
+        return a
+
+    monkeypatch.setattr(training.random, "randint", fake_randint)
+
+    team = {"discipline": 0}
+    training._apply_team_training_points(team, "discipline", 0)
+    training._apply_team_training_points(team, "discipline", 1)
+    training._apply_team_training_points(team, "discipline", 2)
+    training._apply_team_training_points(team, "discipline", 3)
+    training._apply_team_training_points(team, "discipline", 4)
+    training._apply_team_training_points(team, "discipline", 5)
+
+    assert calls == [(-2, 0), (1, 2), (2, 3), (2, 5), (2, 6), (2, 7)]
