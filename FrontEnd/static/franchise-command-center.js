@@ -994,6 +994,7 @@ async function init() {
   // Update button based on training status
   updatePlayButton(topData);
   updateScoutingButton(topData);
+  maybeShowChampionshipCompleteModal(topData);
   
   if (topData && topData.team) {
     console.log('Loading franchise roster for team:', topData.team, 'franchiseId:', franchiseId);
@@ -1083,7 +1084,109 @@ async function init() {
     
     const initEndTime = performance.now();
     console.log(`⏱️ [PERF] FCC init() COMPLETE: ${(initEndTime - initStartTime).toFixed(2)}ms`);
+}
+
+function clearFranchiseLocalStorage() {
+  if (typeof localStorage === 'undefined') return;
+  const toRemove = [
+    'franchiseId',
+    'franchise_id',
+    'franchise_week',
+    'franchise_user_team',
+    'franchise_user_team_id',
+  ];
+  toRemove.forEach((k) => localStorage.removeItem(k));
+  Object.keys(localStorage).forEach((k) => {
+    if (k.startsWith('playbooks_position_filters_franchise_')) localStorage.removeItem(k);
+  });
+  localStorage.removeItem('last_game_id');
+  localStorage.removeItem('last_box_score_gameId');
+  localStorage.removeItem('last_box_score_url');
+  localStorage.removeItem('last_game_user_team_side');
+  localStorage.removeItem('game_home');
+  localStorage.removeItem('game_away');
+}
+
+function getChampionshipSeenKey(franchiseIdValue, gameId) {
+  if (!franchiseIdValue || !gameId) return null;
+  return `fcc_championship_seen_${franchiseIdValue}_${gameId}`;
+}
+
+function maybeShowChampionshipCompleteModal(topData) {
+  const summary = topData?.championship_summary;
+  if (!summary || !summary.game_id) return;
+
+  const seenKey = getChampionshipSeenKey(franchiseId, summary.game_id);
+  if (seenKey && typeof localStorage !== 'undefined' && localStorage.getItem(seenKey) === '1') {
+    return;
   }
+  showChampionshipCompleteModal(summary);
+}
+
+function showChampionshipCompleteModal(summary) {
+  const winner = summary.winner_team_name || 'Champion';
+  const homeName = summary.home_team_name || 'Home';
+  const awayName = summary.away_team_name || 'Away';
+  const homeScore = summary.home_score ?? '--';
+  const awayScore = summary.away_score ?? '--';
+  const gameId = summary.game_id;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'fcc-modal-overlay';
+  overlay.innerHTML = `
+    <div class="fcc-modal-card" role="dialog" aria-modal="true" aria-label="Season Complete">
+      <h3 class="fcc-modal-title">Season Complete</h3>
+      <p class="fcc-modal-copy"><strong>${winner}</strong> won the Championship.</p>
+      <p class="fcc-modal-copy">${awayName} ${awayScore} at ${homeName} ${homeScore}</p>
+      <div class="fcc-modal-actions">
+        <button class="fcc-modal-btn fcc-modal-btn-secondary" id="fcc-champ-box-score">Box Score</button>
+        <button class="fcc-modal-btn fcc-modal-btn-primary" id="fcc-champ-back">Back To Locker Room</button>
+      </div>
+    </div>
+  `;
+
+  const markSeen = () => {
+    const seenKey = getChampionshipSeenKey(franchiseId, gameId);
+    if (seenKey && typeof localStorage !== 'undefined') localStorage.setItem(seenKey, '1');
+  };
+
+  overlay.querySelector('#fcc-champ-box-score')?.addEventListener('click', () => {
+    markSeen();
+    const params = new URLSearchParams();
+    params.set('mode', 'franchise');
+    params.set('franchise_id', franchiseId);
+    params.set('game_id', gameId);
+    if (homeName) params.set('home', homeName);
+    if (awayName) params.set('away', awayName);
+    window.location.href = `/box-score.html?${params.toString()}`;
+  });
+
+  overlay.querySelector('#fcc-champ-back')?.addEventListener('click', () => {
+    markSeen();
+    overlay.remove();
+    window.location.href = `/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}`;
+  });
+
+  document.body.appendChild(overlay);
+}
+
+function showNewSeasonConfirmModal() {
+  const overlay = document.createElement('div');
+  overlay.className = 'fcc-modal-overlay';
+  overlay.innerHTML = `
+    <div class="fcc-modal-card" role="dialog" aria-modal="true" aria-label="New Season">
+      <h3 class="fcc-modal-title">Start New Season?</h3>
+      <p class="fcc-modal-copy">All current season data will be deleted.</p>
+      <p class="fcc-modal-copy">This action cannot be undone.</p>
+      <div class="fcc-modal-actions">
+        <button class="fcc-modal-btn fcc-modal-btn-secondary" id="fcc-new-season-cancel">Cancel</button>
+        <button class="fcc-modal-btn fcc-modal-btn-primary" id="fcc-new-season-proceed">Proceed</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  return overlay;
+}
 
 function updatePlayButton(data) {
   const playNowBtn = document.getElementById('play-now');
@@ -1112,14 +1215,14 @@ function updatePlayButton(data) {
   const tournamentComplete = eosTournament?.completed || false;
   
   if (tournamentComplete && week >= 17) {
-    playNowBtn.textContent = 'Finish Current Season';
-    playNowBtn.dataset.mode = 'finish-season';
+    playNowBtn.textContent = 'Next Season';
+    playNowBtn.dataset.mode = 'new-season';
   } else if (showSimRest && eosTournamentActive) {
     playNowBtn.textContent = 'Sim Rest Of Tournament';
     playNowBtn.dataset.mode = 'sim-rest-tournament';
   } else if (trainingDisabledForEos || eliminated) {
-    playNowBtn.textContent = 'Finish Current Season';
-    playNowBtn.dataset.mode = 'finish-season';
+    playNowBtn.textContent = 'Next Season';
+    playNowBtn.dataset.mode = 'new-season';
   } else {
     const trainingCompleted = data.training_completed || false;
     const sessionType = data.session_type || 'in-season';
@@ -1191,8 +1294,16 @@ playNowBtn.addEventListener('click', async () => {
               body: JSON.stringify({ franchise_id: franchiseId })
             });
             if (!champRes.ok) throw new Error('Championship simulation failed');
+            const champData = await champRes.json();
             document.body.removeChild(popup);
-            location.reload(); // Reload to show updated bracket
+            showChampionshipCompleteModal({
+              game_id: champData.game_id,
+              home_team_name: champData.home_team_name,
+              away_team_name: champData.away_team_name,
+              home_score: champData.home_score,
+              away_score: champData.away_score,
+              winner_team_name: champData.winner_name,
+            });
           } catch (err) {
             console.error(err);
             alert('Unable to simulate championship');
@@ -1215,29 +1326,33 @@ playNowBtn.addEventListener('click', async () => {
     return;
   }
   
-  // ✅ EOS TOURNAMENT: Handle finish season
-  if (mode === 'finish-season') {
-    if (!confirm('Finish current season and start a new season?')) return;
-    
-    const originalText = playNowBtn.textContent;
-    playNowBtn.disabled = true;
-    playNowBtn.textContent = 'Finishing Season...';
-    
-    try {
-      const res = await fetch(API_CONFIG.buildUrl('/franchise/finish-season'), {
-        method: 'POST',
-        headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ franchise_id: franchiseId })
-      });
-      if (!res.ok) throw new Error('Finish season failed');
-      const result = await res.json();
-      location.reload(); // Reload to show new season
-    } catch (err) {
-      console.error(err);
-      alert('Unable to finish season');
-      playNowBtn.disabled = false;
-      playNowBtn.textContent = originalText;
-    }
+  // End-of-season alpha flow: delete current season data and start fresh
+  if (mode === 'new-season') {
+    const modal = showNewSeasonConfirmModal();
+    modal.querySelector('#fcc-new-season-cancel')?.addEventListener('click', () => {
+      modal.remove();
+    });
+    modal.querySelector('#fcc-new-season-proceed')?.addEventListener('click', async () => {
+      const originalText = playNowBtn.textContent;
+      playNowBtn.disabled = true;
+      playNowBtn.textContent = 'Starting...';
+      try {
+        const res = await fetch(API_CONFIG.buildUrl('/franchise/delete-current'), {
+          method: 'POST',
+          headers: API_CONFIG.getAuthHeaders(),
+        });
+        if (!res.ok) throw new Error('Delete current franchise failed');
+        clearFranchiseLocalStorage();
+        window.location.href = '/franchise-select-team.html';
+      } catch (err) {
+        console.error(err);
+        alert('Unable to start new season');
+        playNowBtn.disabled = false;
+        playNowBtn.textContent = originalText;
+      } finally {
+        modal.remove();
+      }
+    });
     return;
   }
   

@@ -1638,6 +1638,38 @@ def command_center_data(
         if eos_tournament_active and eos_tournament:
             response["eos_tournament"] = eos_tournament
             response["eos_tournament_active"] = True
+            # Expose championship summary for FCC end-of-season modal (if tournament complete)
+            if eos_tournament.get("completed"):
+                final_matchup = ((eos_tournament.get("bracket") or {}).get("final") or [{}])[0]
+                home_team_id = final_matchup.get("home_team")
+                away_team_id = final_matchup.get("away_team")
+                winner_id = final_matchup.get("winner") or eos_tournament.get("champion")
+                score = final_matchup.get("score") or {}
+                home_score = score.get("home")
+                away_score = score.get("away")
+
+                id_to_name = {}
+                for tid in [home_team_id, away_team_id, winner_id]:
+                    if not tid:
+                        continue
+                    try:
+                        tdoc = db.teams.find_one({"_id": ObjectId(tid)}, {"name": 1})
+                        if tdoc:
+                            id_to_name[str(tid)] = tdoc.get("name", str(tid))
+                    except Exception:
+                        id_to_name[str(tid)] = str(tid)
+
+                response["championship_summary"] = {
+                    "game_id": final_matchup.get("game_id"),
+                    "home_team_id": home_team_id,
+                    "away_team_id": away_team_id,
+                    "home_team_name": id_to_name.get(str(home_team_id), home_team_id),
+                    "away_team_name": id_to_name.get(str(away_team_id), away_team_id),
+                    "home_score": home_score,
+                    "away_score": away_score,
+                    "winner_team_id": winner_id,
+                    "winner_team_name": id_to_name.get(str(winner_id), winner_id),
+                }
         training_disabled_for_eos = bool(franchise_doc.get("training_status", {}).get("training_disabled_for_eos", False)) if franchise_id and franchise_doc else False
         response["training_disabled_for_eos"] = training_disabled_for_eos
         user_eliminated = training_disabled_for_eos
@@ -3912,6 +3944,12 @@ def sim_championship(req: SimChampionshipRequest):
         return {
             "status": "success",
             "winner": str(winner_id),
+            "winner_name": home_name if str(winner_id) == str(home_id) else away_name,
+            "game_id": str(game_id),
+            "home_team_id": str(home_id),
+            "away_team_id": str(away_id),
+            "home_team_name": home_name,
+            "away_team_name": away_name,
             "home_score": home_score,
             "away_score": away_score
         }
