@@ -125,7 +125,10 @@ body.has-auth-bar {
 }
 
 .auth-bar .feedback-btn {
-  position: absolute;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: linear-gradient(160deg, #8b2bd3 0%, #7e22ce 58%, #6520a3 100%);
   border: 1px solid #bcc2ca;
   color: #e4e8ee;
