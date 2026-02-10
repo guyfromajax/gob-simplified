@@ -64,6 +64,7 @@
       '</div>',
       '<img id="alpha-badge" class="alpha-badge visible" src="/images/alpha_badge_gold.png" alt="Alpha">',
       '<div class="auth-bar-right">',
+      '  <button type="button" id="feedback-btn" class="feedback-btn">Feedback</button>',
       '  <a href="https://www.youtube.com/@geeked-outbasketball765" target="_blank" rel="noopener noreferrer" class="nav-icon" aria-label="GOB on YouTube">',
       '    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>',
       '  </a>',
@@ -84,9 +85,22 @@
     return bar;
   }
 
+  function ensureFeedbackButton() {
+    var right = document.querySelector('#auth-bar .auth-bar-right');
+    if (!right) return;
+    if (document.getElementById('feedback-btn')) return;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'feedback-btn';
+    btn.className = 'feedback-btn';
+    btn.textContent = 'Feedback';
+    right.insertBefore(btn, right.firstChild);
+  }
+
   function injectAuthBar() {
     var existing = document.getElementById('auth-bar');
     if (existing) {
+      ensureFeedbackButton();
       document.body.classList.add('has-auth-bar');
       return;
     }
@@ -174,6 +188,145 @@
     }
   }
 
+  function ensureFeedbackModal() {
+    if (document.getElementById('feedback-modal-backdrop')) return;
+    var backdrop = document.createElement('div');
+    backdrop.id = 'feedback-modal-backdrop';
+    backdrop.className = 'feedback-modal-backdrop';
+    backdrop.innerHTML = [
+      '<div class="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-modal-title">',
+      '  <div class="feedback-modal-header">',
+      '    <h3 id="feedback-modal-title" class="feedback-modal-title">Send Feedback</h3>',
+      '    <button type="button" id="feedback-close-btn" class="feedback-modal-close" aria-label="Close">×</button>',
+      '  </div>',
+      '  <div class="feedback-modal-body">',
+      '    <label>Type',
+      '      <select id="feedback-category">',
+      '        <option value="bug">Bug</option>',
+      '        <option value="ux">UX</option>',
+      '        <option value="balance">Balance</option>',
+      '        <option value="content">Content</option>',
+      '        <option value="general" selected>General</option>',
+      '      </select>',
+      '    </label>',
+      '    <label>Message',
+      '      <textarea id="feedback-message" maxlength="5000" placeholder="What should we improve?" required></textarea>',
+      '    </label>',
+      '    <label>Email (optional)',
+      '      <input id="feedback-email" type="email" maxlength="254" placeholder="you@example.com">',
+      '    </label>',
+      '    <div id="feedback-status" class="feedback-modal-status"></div>',
+      '  </div>',
+      '  <div class="feedback-modal-footer">',
+      '    <button type="button" id="feedback-cancel-btn" class="feedback-modal-btn">Cancel</button>',
+      '    <button type="button" id="feedback-submit-btn" class="feedback-modal-btn primary">Send</button>',
+      '  </div>',
+      '</div>'
+    ].join('');
+    document.body.appendChild(backdrop);
+  }
+
+  function initFeedbackModal() {
+    ensureFeedbackModal();
+    var openBtn = document.getElementById('feedback-btn');
+    var backdrop = document.getElementById('feedback-modal-backdrop');
+    var closeBtn = document.getElementById('feedback-close-btn');
+    var cancelBtn = document.getElementById('feedback-cancel-btn');
+    var submitBtn = document.getElementById('feedback-submit-btn');
+    var statusEl = document.getElementById('feedback-status');
+    var messageEl = document.getElementById('feedback-message');
+    var emailEl = document.getElementById('feedback-email');
+    var categoryEl = document.getElementById('feedback-category');
+    if (!openBtn || !backdrop || !closeBtn || !cancelBtn || !submitBtn || !statusEl || !messageEl || !emailEl || !categoryEl) {
+      return;
+    }
+
+    var parsedUser = null;
+    try {
+      var authUser = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_user') : null;
+      parsedUser = authUser ? JSON.parse(authUser) : null;
+    } catch (e) {
+      parsedUser = null;
+    }
+    if (parsedUser && parsedUser.email && !emailEl.value) {
+      emailEl.value = parsedUser.email;
+    }
+
+    function setStatus(text, isError) {
+      statusEl.textContent = text || '';
+      statusEl.style.color = isError ? '#b91c1c' : '#6b7280';
+    }
+
+    function openModal() {
+      setStatus('', false);
+      backdrop.classList.add('open');
+      messageEl.focus();
+    }
+
+    function closeModal() {
+      backdrop.classList.remove('open');
+    }
+
+    openBtn.addEventListener('click', openModal);
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    backdrop.addEventListener('click', function (e) {
+      if (e.target === backdrop) closeModal();
+    });
+
+    submitBtn.addEventListener('click', function () {
+      var message = (messageEl.value || '').trim();
+      if (message.length < 5) {
+        setStatus('Please add a bit more detail (at least 5 characters).', true);
+        return;
+      }
+
+      var url = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl)
+        ? API_CONFIG.buildUrl('/api/feedback')
+        : '/api/feedback';
+      var headers = { 'Content-Type': 'application/json' };
+      if (typeof API_CONFIG !== 'undefined' && API_CONFIG.getAuthHeaders) {
+        var authHeaders = API_CONFIG.getAuthHeaders() || {};
+        for (var k in authHeaders) headers[k] = authHeaders[k];
+      }
+
+      var urlParams = new URLSearchParams(window.location.search || '');
+      var payload = {
+        category: categoryEl.value || 'general',
+        message: message,
+        reporter_email: (emailEl.value || '').trim(),
+        page_url: window.location.href,
+        page_path: window.location.pathname,
+        mode: urlParams.get('mode') || '',
+        user_label: parsedUser ? (parsedUser.username || parsedUser.email || '') : ''
+      };
+
+      submitBtn.disabled = true;
+      setStatus('Sending feedback...', false);
+
+      fetch(url, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload)
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error('Unable to send feedback right now.');
+          return res.json();
+        })
+        .then(function () {
+          setStatus('Thanks. Feedback sent.', false);
+          messageEl.value = '';
+          setTimeout(closeModal, 700);
+        })
+        .catch(function (err) {
+          setStatus(err.message || 'Unable to send feedback right now.', true);
+        })
+        .finally(function () {
+          submitBtn.disabled = false;
+        });
+    });
+  }
+
   function initAlphaBadge() {
     if (typeof AlphaBanner !== 'undefined' && typeof AlphaBanner.init === 'function') {
       AlphaBanner.init();
@@ -195,6 +348,7 @@
     injectAuthBar();
     initAuthState();
     initAlphaBadge();
+    initFeedbackModal();
   }
 
   function run() {
