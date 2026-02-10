@@ -149,25 +149,25 @@ def test_eog_attribute_tuning_ranges_applied(monkeypatch):
     assert home_changes["discipline"] == 1
     assert home_changes["fight"] == 1
     assert home_changes["rebound_modifier"] == 0.0
-    assert home_changes["offensive_efficiency"] == -1
-    assert home_changes["defensive_efficiency"] == -1
-    assert home_changes["fb_efficiency"] == 1
-    assert home_changes["fb_opp_modifier"] == 1
-    assert home_changes["pt_efficiency"] == 1
+    assert home_changes["offensive_efficiency"] == -2
+    assert home_changes["defensive_efficiency"] == -2
+    assert home_changes["fb_efficiency"] == -2
+    assert home_changes["fb_opp_modifier"] == 0
+    assert home_changes["pt_efficiency"] == -1
     assert home_changes["pt_opp_modifier"] == 1
     assert home_changes["team_chemistry"] == 1
 
     # Loser paths
     assert away_changes["shot_threshold"] == 10
-    assert away_changes["discipline"] == -2
+    assert away_changes["discipline"] == -3
     assert away_changes["fight"] == -2
     assert away_changes["rebound_modifier"] == -0.1
-    assert away_changes["offensive_efficiency"] == -1
-    assert away_changes["defensive_efficiency"] == -1
+    assert away_changes["offensive_efficiency"] == -2
+    assert away_changes["defensive_efficiency"] == -2
     assert away_changes["fb_efficiency"] == -2
     assert away_changes["fb_opp_modifier"] == -2
-    assert away_changes["pt_efficiency"] == -2
-    assert away_changes["pt_opp_modifier"] == -2
+    assert away_changes["pt_efficiency"] == -3
+    assert away_changes["pt_opp_modifier"] == -3
     assert away_changes["team_chemistry"] == -3
 
     # Both teams should have been persisted to FTD.

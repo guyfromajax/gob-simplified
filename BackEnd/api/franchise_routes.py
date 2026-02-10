@@ -327,10 +327,10 @@ def update_team_attributes_after_game(
         if is_winner:
             if fg_pct > 50:
                 changes["shot_threshold"] = -random.randint(5, 15)
-            elif fg_pct > 42.5:
-                changes["shot_threshold"] = random.randint(0, 10)
+            elif fg_pct > 45:
+                changes["shot_threshold"] = 0
             else:
-                changes["shot_threshold"] = random.randint(10, 20)
+                changes["shot_threshold"] = random.randint(5, 15)
         else:
             changes["shot_threshold"] = random.randint(10, 25)
         
@@ -338,11 +338,11 @@ def update_team_attributes_after_game(
         to = team_totals.get("TO", 0)
         stl = team_totals.get("STL", 0)
         if to > (2 * stl):
-            changes["discipline"] = random.randint(-2, -1)
+            changes["discipline"] = random.randint(-3, -2)
         elif (to * 2) < stl:
             changes["discipline"] = random.randint(1, 2)
         else:
-            changes["discipline"] = 0
+            changes["discipline"] = random.randint(-1, 0)
         
         # fight
         if is_winner:
@@ -359,40 +359,40 @@ def update_team_attributes_after_game(
             changes["rebound_modifier"] = random.uniform(-0.05, 0.05)
         
         # offensive_efficiency
-        changes["offensive_efficiency"] = random.randint(-1, 1)
+        changes["offensive_efficiency"] = random.randint(-2, 0)
         
         # defensive_efficiency
-        changes["defensive_efficiency"] = random.randint(-1, 1)
+        changes["defensive_efficiency"] = random.randint(-2, 0)
         
         # fb_efficiency
-        if team_scouting["fb_rate"] > 50:
-            changes["fb_efficiency"] = random.randint(1, 2)
+        if team_scouting["fb_rate"] > 60:
+            changes["fb_efficiency"] = random.randint(0, 1)
         else:
             changes["fb_efficiency"] = random.randint(-2, -1)
         
         # fb_opp_modifier
-        if opponent_scouting["fb_rate"] < 40:
-            changes["fb_opp_modifier"] = random.randint(1, 2)
+        if opponent_scouting["fb_rate"] < 30:
+            changes["fb_opp_modifier"] = random.randint(0, 1)
         elif opponent_scouting["fb_rate"] > 55:
             changes["fb_opp_modifier"] = random.randint(-2, -1)
         else:
             changes["fb_opp_modifier"] = 0
         
         # pt_efficiency
-        if team_scouting["pt_combined_rate"] > 50:
+        if team_scouting["pt_combined_rate"] > 60:
             changes["pt_efficiency"] = random.randint(1, 2)
         elif team_scouting["pt_combined_rate"] < 30:
-            changes["pt_efficiency"] = random.randint(-2, -1)
+            changes["pt_efficiency"] = random.randint(-3, -1)
         else:
-            changes["pt_efficiency"] = 0
+            changes["pt_efficiency"] = random.randint(-1, 0)
         
         # pt_opp_modifier
         if opponent_scouting["pt_combined_rate"] < 30:
             changes["pt_opp_modifier"] = random.randint(1, 2)
         elif opponent_scouting["pt_combined_rate"] > 50:
-            changes["pt_opp_modifier"] = random.randint(-2, -1)
+            changes["pt_opp_modifier"] = random.randint(-3, -1)
         else:
-            changes["pt_opp_modifier"] = 0
+            changes["pt_opp_modifier"] = random.randint(-1, 0)
         
         # team_chemistry
         score_delta = winner_score - loser_score
