@@ -9,6 +9,10 @@
 12. Not announcign shooting fouls on Fast Break shots
 13 Need to perfect Fast Break shot animatoin executoin
 
+14. Player foul-out sometimes routes to Lineup Screen without showing the "FOULED OUT!" popup (user lacks context).
+   - Hypothesis: foul-out is being handled via the TIMEOUT system (navigation) while the foul-out popup is triggered via a separate overlay path; navigation can preempt popup render.
+   - Alignment for future fix: use ONE canonical foul-out system driven by `TIMEOUT` with `timeout_reason="FOUL_OUT"` and display foul-out context via the same popup flow as other timeouts/quarter breaks (gate navigation behind acknowledgement).
+
 
 17 Create "DEFENSE" SFX
 18. Defense Matchups pop up -- DEFENSE when appearing, whistle when exiting
