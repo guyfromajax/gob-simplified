@@ -2043,6 +2043,7 @@ class TurnManager:
         """
         game = self.game
         game_state = game.game_state
+        is_full_simulation = game_state.get("_is_full_simulation", False)
         
         logging.debug(f"🔍 [COMPUTER TIMEOUT CHECK] Team: {computer_team.name}, Turn Type: {turn_type}, Quarter: {game.quarter}")
         
@@ -2051,9 +2052,11 @@ class TurnManager:
             logging.debug(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - invalid turn type: {turn_type}")
             return False
         
-        # Only check for computer teams (not user teams)
-        if computer_team.is_user_team:
-            logging.debug(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - user team: {computer_team.name}")
+        # In Play Quarter (turn-by-turn), user teams can only call timeouts manually via the timeout button.
+        # In full simulation (Sim Quarter / Sim Full Game), we allow the user team to use the same
+        # timeout logic as computer teams, silently inside the sim (no UX interruption).
+        if computer_team.is_user_team and not is_full_simulation:
+            logging.debug(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - user team in turn-by-turn mode: {computer_team.name}")
             return False
         
         # Check if team has timeouts remaining
@@ -3408,4 +3411,3 @@ class TurnManager:
                 print(f"  - {key}: {result[key]}")
         
         print("="*80 + "\n")
-
