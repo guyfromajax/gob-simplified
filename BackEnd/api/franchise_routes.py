@@ -297,6 +297,52 @@ def update_team_attributes_after_game(
             return {}
         
         team_attrs = ftd_doc.get("team_attributes", {})
+
+        logger.warning(
+            "🧪 [EOG-TEAM-INPUTS] team=%s winner=%s totals=%s opp_totals=%s scouting=%s opp_scouting=%s",
+            str(team_id_label),
+            bool(is_winner),
+            {
+                "FGM": team_totals.get("FGM", 0),
+                "FGA": team_totals.get("FGA", 0),
+                "TO": team_totals.get("TO", 0),
+                "STL": team_totals.get("STL", 0),
+                "DREB": team_totals.get("DREB", 0),
+                "OREB": team_totals.get("OREB", 0),
+            },
+            {
+                "FGM": opponent_totals.get("FGM", 0),
+                "FGA": opponent_totals.get("FGA", 0),
+                "TO": opponent_totals.get("TO", 0),
+                "STL": opponent_totals.get("STL", 0),
+                "DREB": opponent_totals.get("DREB", 0),
+                "OREB": opponent_totals.get("OREB", 0),
+            },
+            {
+                "fb_rate": team_scouting.get("fb_rate", 0),
+                "fb_entries": team_scouting.get("fb_entries", 0),
+                "fb_success": team_scouting.get("fb_success", 0),
+                "pt_rate": team_scouting.get("pt_combined_rate", 0),
+                "pt_attempts": team_scouting.get("pt_total_attempts", 0),
+                "pt_success": team_scouting.get("pt_total_successes", 0),
+                "hct_used": team_scouting.get("hct_used", 0),
+                "hct_success": team_scouting.get("hct_success", 0),
+                "fcp_used": team_scouting.get("fcp_used", 0),
+                "fcp_success": team_scouting.get("fcp_success", 0),
+            },
+            {
+                "fb_rate": opponent_scouting.get("fb_rate", 0),
+                "fb_entries": opponent_scouting.get("fb_entries", 0),
+                "fb_success": opponent_scouting.get("fb_success", 0),
+                "pt_rate": opponent_scouting.get("pt_combined_rate", 0),
+                "pt_attempts": opponent_scouting.get("pt_total_attempts", 0),
+                "pt_success": opponent_scouting.get("pt_total_successes", 0),
+                "hct_used": opponent_scouting.get("hct_used", 0),
+                "hct_success": opponent_scouting.get("hct_success", 0),
+                "fcp_used": opponent_scouting.get("fcp_used", 0),
+                "fcp_success": opponent_scouting.get("fcp_success", 0),
+            },
+        )
         
         # shot_threshold
         if is_winner:
@@ -312,12 +358,24 @@ def update_team_attributes_after_game(
         # discipline
         to = team_totals.get("TO", 0)
         stl = team_totals.get("STL", 0)
+        discipline_branch = "mid"
         if to > (2 * stl):
+            discipline_branch = "to_gt_2x_stl"
             changes["discipline"] = random.randint(-3, -2)
         elif (to * 2) < stl:
+            discipline_branch = "to_x2_lt_stl"
             changes["discipline"] = random.randint(1, 2)
         else:
+            discipline_branch = "else"
             changes["discipline"] = random.randint(-2, 0)
+        logger.warning(
+            "🧪 [EOG-BRANCH] team=%s attr=discipline branch=%s to=%s stl=%s raw_change=%s",
+            str(team_id_label),
+            discipline_branch,
+            to,
+            stl,
+            changes.get("discipline"),
+        )
         
         # fight
         if is_winner:
@@ -347,6 +405,13 @@ def update_team_attributes_after_game(
         
         # fb_opp_modifier
         changes["fb_opp_modifier"] = calculate_fb_opp_modifier_change(opponent_scouting)
+        logger.warning(
+            "🧪 [EOG-BRANCH] team=%s attr=fb_opp_modifier opp_fb_rate=%.2f opp_fb_entries=%s raw_change=%s",
+            str(team_id_label),
+            float(opponent_scouting.get("fb_rate", 0)),
+            opponent_scouting.get("fb_entries", 0),
+            changes.get("fb_opp_modifier"),
+        )
         
         # pt_efficiency
         if team_scouting["pt_combined_rate"] > 60:
@@ -358,6 +423,17 @@ def update_team_attributes_after_game(
         
         # pt_opp_modifier
         changes["pt_opp_modifier"] = calculate_pt_opp_modifier_change(opponent_scouting)
+        logger.warning(
+            "🧪 [EOG-BRANCH] team=%s attr=pt_opp_modifier opp_pt_rate=%.2f opp_pt_attempts=%s opp_hct=%s/%s opp_fcp=%s/%s raw_change=%s",
+            str(team_id_label),
+            float(opponent_scouting.get("pt_combined_rate", 0)),
+            opponent_scouting.get("pt_total_attempts", 0),
+            opponent_scouting.get("hct_success", 0),
+            opponent_scouting.get("hct_used", 0),
+            opponent_scouting.get("fcp_success", 0),
+            opponent_scouting.get("fcp_used", 0),
+            changes.get("pt_opp_modifier"),
+        )
         
         # team_chemistry
         score_delta = winner_score - loser_score
@@ -387,6 +463,16 @@ def update_team_attributes_after_game(
                 ftd_update[f"team_attributes.{attr_name}"] = clamped_val
                 # Store the actual change (may be different if clamped)
                 changes[attr_name] = clamped_val - current_val
+                logger.warning(
+                    "🧪 [EOG-APPLY] team=%s attr=%s current=%s raw_change=%s unclamped=%s clamped=%s applied_change=%s",
+                    str(team_id_label),
+                    attr_name,
+                    current_val,
+                    change,
+                    new_val,
+                    clamped_val,
+                    changes[attr_name],
+                )
         
         # ✅ FTD: Update FTD collection instead of franchise document
         if ftd_update:
