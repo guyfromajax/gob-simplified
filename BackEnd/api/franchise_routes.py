@@ -1085,6 +1085,13 @@ def save_result(req: FranchiseResultRequest):
 
 @router.post("/franchise/complete-week")
 def complete_week(req: CompleteWeekRequest):
+    logger.warning(
+        "🧭 [COMPLETE-WEEK-ENTRY] franchise_id=%s week=%s game_id=%s has_game_document=%s",
+        req.franchise_id,
+        req.week,
+        req.game_id,
+        bool(req.game_document),
+    )
     try:
         franchise_id = ObjectId(req.franchise_id)
     except Exception:
@@ -1241,33 +1248,34 @@ def complete_week(req: CompleteWeekRequest):
         )
         logger.info(f"✅ [COMPLETE_WEEK] User game - finalize_game completed for game_id: {user_game_id_final}")
 
-        # Run team attribute update once for user's game (skip if already set by save_result)
-        user_game_after = db.games.find_one({"_id": user_game_id_final}, {"team_attribute_changes": 1})
-        if not user_game_after and isinstance(user_game_id_final, str) and ObjectId.is_valid(user_game_id_final):
-            user_game_after = db.games.find_one({"_id": ObjectId(user_game_id_final)}, {"team_attribute_changes": 1})
-        if not (user_game_after and user_game_after.get("team_attribute_changes")):
-            home_id_raw = user_res["team2_id"]
-            away_id_raw = user_res["team1_id"]
-            home_id = _normalize_team_id_to_string(home_id_raw) or str(home_id_raw)
-            away_id = _normalize_team_id_to_string(away_id_raw) or str(away_id_raw)
-            home_score = user_res["team2_score"]
-            away_score = user_res["team1_score"]
-            if home_score > away_score:
-                winner_id, loser_id = home_id, away_id
-                winner_score, loser_score = home_score, away_score
-            else:
-                winner_id, loser_id = away_id, home_id
-                winner_score, loser_score = away_score, home_score
-            _finalize_team_attributes_for_game(
-                game_id=user_game_id_final,
-                franchise_id=franchise_id,
-                home_team_id=home_id,
-                away_team_id=away_id,
-                winner_id=winner_id,
-                loser_id=loser_id,
-                winner_score=winner_score,
-                loser_score=loser_score,
-            )
+        # Recompute team attribute changes every time complete_week runs.
+        # This prevents stale team_attribute_changes from bypassing new EOG logic.
+        logger.warning(
+            "🧭 [COMPLETE-WEEK-EOG] Recomputing team_attribute_changes for user game_id=%s",
+            user_game_id_final,
+        )
+        home_id_raw = user_res["team2_id"]
+        away_id_raw = user_res["team1_id"]
+        home_id = _normalize_team_id_to_string(home_id_raw) or str(home_id_raw)
+        away_id = _normalize_team_id_to_string(away_id_raw) or str(away_id_raw)
+        home_score = user_res["team2_score"]
+        away_score = user_res["team1_score"]
+        if home_score > away_score:
+            winner_id, loser_id = home_id, away_id
+            winner_score, loser_score = home_score, away_score
+        else:
+            winner_id, loser_id = away_id, home_id
+            winner_score, loser_score = away_score, home_score
+        _finalize_team_attributes_for_game(
+            game_id=user_game_id_final,
+            franchise_id=franchise_id,
+            home_team_id=home_id,
+            away_team_id=away_id,
+            winner_id=winner_id,
+            loser_id=loser_id,
+            winner_score=winner_score,
+            loser_score=loser_score,
+        )
     else:
         # Fallback: Try to find game by week + team IDs (legacy behavior)
         logger.warning(f"⚠️ [COMPLETE_WEEK] No game_id provided, attempting legacy lookup: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
@@ -1288,33 +1296,33 @@ def complete_week(req: CompleteWeekRequest):
                     user_game_id, mode="franchise", franchise_id=req.franchise_id
                 )
                 logger.info(f"✅ [COMPLETE_WEEK] User game - finalize_game completed for game_id: {user_game_id}")
-                # Run team attribute update once (skip if already set)
-                leg_doc = db.games.find_one({"_id": user_game_id}, {"team_attribute_changes": 1}) or (
-                    db.games.find_one({"_id": ObjectId(user_game_id)}, {"team_attribute_changes": 1}) if isinstance(user_game_id, str) and ObjectId.is_valid(user_game_id) else None
+                # Legacy lookup path: also recompute every time for consistency.
+                logger.warning(
+                    "🧭 [COMPLETE-WEEK-EOG] Recomputing team_attribute_changes for legacy user game_id=%s",
+                    user_game_id,
                 )
-                if not (leg_doc and leg_doc.get("team_attribute_changes")):
-                    home_id_raw = user_res["team2_id"]
-                    away_id_raw = user_res["team1_id"]
-                    home_id = _normalize_team_id_to_string(home_id_raw) or str(home_id_raw)
-                    away_id = _normalize_team_id_to_string(away_id_raw) or str(away_id_raw)
-                    home_score = user_res["team2_score"]
-                    away_score = user_res["team1_score"]
-                    if home_score > away_score:
-                        winner_id, loser_id = home_id, away_id
-                        winner_score, loser_score = home_score, away_score
-                    else:
-                        winner_id, loser_id = away_id, home_id
-                        winner_score, loser_score = away_score, home_score
-                    _finalize_team_attributes_for_game(
-                        game_id=user_game_id,
-                        franchise_id=franchise_id,
-                        home_team_id=home_id,
-                        away_team_id=away_id,
-                        winner_id=winner_id,
-                        loser_id=loser_id,
-                        winner_score=winner_score,
-                        loser_score=loser_score,
-                    )
+                home_id_raw = user_res["team2_id"]
+                away_id_raw = user_res["team1_id"]
+                home_id = _normalize_team_id_to_string(home_id_raw) or str(home_id_raw)
+                away_id = _normalize_team_id_to_string(away_id_raw) or str(away_id_raw)
+                home_score = user_res["team2_score"]
+                away_score = user_res["team1_score"]
+                if home_score > away_score:
+                    winner_id, loser_id = home_id, away_id
+                    winner_score, loser_score = home_score, away_score
+                else:
+                    winner_id, loser_id = away_id, home_id
+                    winner_score, loser_score = away_score, home_score
+                _finalize_team_attributes_for_game(
+                    game_id=user_game_id,
+                    franchise_id=franchise_id,
+                    home_team_id=home_id,
+                    away_team_id=away_id,
+                    winner_id=winner_id,
+                    loser_id=loser_id,
+                    winner_score=winner_score,
+                    loser_score=loser_score,
+                )
             else:
                 logger.error(f"❌ [COMPLETE_WEEK] User game found but _id is empty: {user_game}")
         else:
