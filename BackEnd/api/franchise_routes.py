@@ -47,6 +47,41 @@ logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 
 
+def _game_doc_richness_score(game_doc: dict) -> int:
+    """
+    Score how complete/useful a game document is for EOG processing.
+    Higher score means better canonical snapshot source.
+    """
+    if not isinstance(game_doc, dict):
+        return -1
+
+    score = 0
+    teams_obj = game_doc.get("teams")
+    if isinstance(teams_obj, dict) and teams_obj:
+        score += 5
+        for team_data in teams_obj.values():
+            if not isinstance(team_data, dict):
+                continue
+            totals = team_data.get("totals", {})
+            if isinstance(totals, dict) and totals.get("FGA", 0) > 0:
+                score += 10
+                break
+            team_box = team_data.get("box_score", {})
+            if isinstance(team_box, dict) and team_box:
+                score += 6
+                break
+
+    top_box = game_doc.get("box_score", {})
+    if isinstance(top_box, dict) and top_box:
+        score += 3
+
+    team_totals = game_doc.get("team_totals", {})
+    if isinstance(team_totals, dict) and team_totals:
+        score += 3
+
+    return score
+
+
 def _resolve_team_id_to_object_id(team_id: str):
     """Resolve team_id (canonical string e.g. MORRISTOWN, or ObjectId string) to ObjectId for FTD lookup. Returns None if not found."""
     import re
@@ -146,7 +181,7 @@ def _finalize_team_attributes_for_game(
     game_id: string or ObjectId (game doc _id).
     """
     try:
-        gid = ObjectId(game_id) if isinstance(game_id, str) and ObjectId.is_valid(game_id) else game_id
+        gid = game_id
         logger.warning(
             "🧭 [EOG-CALL-SITE] About to call update_team_attributes_after_game game_id=%s gid=%s franchise_id=%s home=%s away=%s winner=%s loser=%s",
             str(game_id),
@@ -214,14 +249,46 @@ def update_team_attributes_after_game(
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Winner/Loser - winner_id={winner_id} (type: {type(winner_id)}), loser_id={loser_id} (type: {type(loser_id)})")
     import random
     
-    # Load game document to get stats. Init-game uses string _id; try both.
+    # Load game document to get stats.
+    # Some historical paths created duplicate docs for the same logical game:
+    # one with string _id (canonical gameplay snapshot), one with ObjectId _id
+    # (partial/upsert metadata only). We pick the richer snapshot.
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Loading game document")
-    game_doc = db.games.find_one({"_id": game_id})
-    if not game_doc and isinstance(game_id, ObjectId):
-        game_doc = db.games.find_one({"_id": str(game_id)})
-    if not game_doc:
-        logger.error(f"❌ [UPDATE-TEAM-ATTRS] Game {game_id} not found (tried ObjectId and string)")
+    game_id_str = str(game_id)
+    candidate_docs: list[tuple[str, dict]] = []
+    try:
+        doc_str = db.games.find_one({"_id": game_id_str})
+        if doc_str:
+            candidate_docs.append(("string", doc_str))
+    except Exception:
+        pass
+    try:
+        if ObjectId.is_valid(game_id_str):
+            game_oid = ObjectId(game_id_str)
+            doc_oid = db.games.find_one({"_id": game_oid})
+            if doc_oid:
+                candidate_docs.append(("objectid", doc_oid))
+    except Exception:
+        pass
+
+    if not candidate_docs:
+        logger.error(f"❌ [UPDATE-TEAM-ATTRS] Game {game_id} not found (tried string and ObjectId)")
         return {}
+
+    selected_kind, game_doc = max(
+        candidate_docs,
+        key=lambda pair: _game_doc_richness_score(pair[1]),
+    )
+    logger.warning(
+        "🧭 [EOG-GAME-DOC-SELECT] game_id=%s selected=%s score=%s candidates=%s",
+        game_id_str,
+        selected_kind,
+        _game_doc_richness_score(game_doc),
+        [
+            {"kind": kind, "score": _game_doc_richness_score(doc), "_id": str(doc.get("_id"))}
+            for kind, doc in candidate_docs
+        ],
+    )
     
     # Get teams object for name fallback only
     teams_obj = game_doc.get("teams", {})
@@ -765,14 +832,20 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
     # ✅ SS&S: If game_id is provided, use it directly (this is the actual gameplay document)
     if game_id:
         try:
-            # Try as ObjectId first
-            game_oid = ObjectId(game_id) if isinstance(game_id, str) else game_id
-            existing = db.games.find_one({"_id": game_oid})
+            game_id_str = str(game_id)
+            existing = db.games.find_one({"_id": game_id_str})
             if existing:
-                filter_doc = {"_id": game_oid}
+                filter_doc = {"_id": game_id_str}
             else:
-                # Game document doesn't exist yet, create it
-                filter_doc = {"_id": game_oid}
+                # Try ObjectId only for existing legacy docs; if not found, upsert string _id.
+                existing_oid = None
+                if ObjectId.is_valid(game_id_str):
+                    game_oid = ObjectId(game_id_str)
+                    existing_oid = db.games.find_one({"_id": game_oid})
+                if existing_oid:
+                    filter_doc = {"_id": game_oid}
+                else:
+                    filter_doc = {"_id": game_id_str}
         except Exception as e:
             logger.warning(f"⚠️ [_SAVE_GAME_RESULT] Invalid game_id format: {game_id}, error: {e}. Falling back to legacy lookup.")
             game_id = None  # Fall through to legacy logic
@@ -1243,6 +1316,24 @@ def complete_week(req: CompleteWeekRequest):
             quarter = summary.get("quarter", "N/A")
             is_final = summary.get("is_final", False)
             logger.info(f"🔍 [COMPLETE_WEEK] game_document details: quarter={quarter}, is_final={is_final}, game_id={summary.get('_id') or summary.get('game_id')}")
+            # Persist provided final snapshot so finalize/EOG read canonical data.
+            # Exclude _id from payload to avoid immutable-field update errors.
+            if isinstance(summary, dict):
+                incoming_set = {k: v for k, v in summary.items() if k != "_id"}
+                incoming_set["franchise_id"] = str(req.franchise_id)
+                incoming_set["week"] = req.week
+                user_game_id_str = str(user_game_id)
+                db.games.update_one(
+                    {"_id": user_game_id_str},
+                    {"$set": incoming_set},
+                    upsert=True,
+                )
+                if ObjectId.is_valid(user_game_id_str):
+                    # If a legacy ObjectId duplicate exists, sync it too.
+                    db.games.update_one(
+                        {"_id": ObjectId(user_game_id_str)},
+                        {"$set": incoming_set},
+                    )
         else:
             # Fallback: Look up from database (for backward compatibility)
             logger.info(f"🔍 [COMPLETE_WEEK] game_document not provided, looking up from database...")
