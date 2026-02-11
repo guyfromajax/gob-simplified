@@ -267,6 +267,14 @@ def update_team_attributes_after_game(
         away_scouting.get("pt_combined_rate", 0),
         away_scouting.get("pt_total_attempts", 0),
     )
+    logger.warning(
+        "🧪 [EOG-SNAPSHOT-SOURCES] game_id=%s home_totals_source=%s home_scouting_source=%s away_totals_source=%s away_scouting_source=%s",
+        str(game_doc.get("_id")),
+        eog_inputs.get("home", {}).get("totals_source", "unknown"),
+        eog_inputs.get("home", {}).get("scouting_source", "unknown"),
+        eog_inputs.get("away", {}).get("totals_source", "unknown"),
+        eog_inputs.get("away", {}).get("scouting_source", "unknown"),
+    )
     logger.info(
         "🧪 [EOG-INPUTS-DEBUG] game_id=%s eog_inputs=%s",
         str(game_doc.get("_id")),

@@ -22,6 +22,26 @@ def _resolve_keyed_entry(source_obj: dict, candidates: list[str]) -> dict:
     return {}
 
 
+def _normalize_team_name_key(name: str | None) -> str | None:
+    if not name:
+        return None
+    return str(name).replace("-", "_").replace(" ", "_").upper()
+
+
+def _aggregate_from_box(team_box_score: dict) -> dict:
+    out = {"FGM": 0, "FGA": 0, "TO": 0, "STL": 0, "DREB": 0, "OREB": 0}
+    if isinstance(team_box_score, dict):
+        for player_stats in team_box_score.values():
+            if isinstance(player_stats, dict):
+                out["FGM"] += player_stats.get("FGM", 0)
+                out["FGA"] += player_stats.get("FGA", 0)
+                out["TO"] += player_stats.get("TO", 0)
+                out["STL"] += player_stats.get("STL", 0)
+                out["DREB"] += player_stats.get("DREB", 0)
+                out["OREB"] += player_stats.get("OREB", 0)
+    return out
+
+
 def calculate_fb_opp_modifier_change(opponent_scouting: dict) -> int:
     """Calculate EOG fb_opp_modifier change from opponent fast-break performance."""
     opponent_fb_rate = opponent_scouting.get("fb_rate", 0)
@@ -109,22 +129,11 @@ def calculate_team_totals_from_sources(
             "OREB": totals.get("OREB", 0),
         }
 
-    def _aggregate_from_box(team_box_score):
-        out = {"FGM": 0, "FGA": 0, "TO": 0, "STL": 0, "DREB": 0, "OREB": 0}
-        if isinstance(team_box_score, dict):
-            for player_stats in team_box_score.values():
-                if isinstance(player_stats, dict):
-                    out["FGM"] += player_stats.get("FGM", 0)
-                    out["FGA"] += player_stats.get("FGA", 0)
-                    out["TO"] += player_stats.get("TO", 0)
-                    out["STL"] += player_stats.get("STL", 0)
-                    out["DREB"] += player_stats.get("DREB", 0)
-                    out["OREB"] += player_stats.get("OREB", 0)
-        return out
-
     from_box = _aggregate_from_box((box_score_obj or {}).get(team_id_label, {}))
     if not from_box.get("FGA"):
         from_box = _aggregate_from_box((box_score_obj or {}).get(team_name, {}))
+    if not from_box.get("FGA"):
+        from_box = _aggregate_from_box((box_score_obj or {}).get(_normalize_team_name_key(team_name), {}))
     return from_box
 
 
@@ -168,8 +177,14 @@ def calculate_special_situations_from_sources(
     return {
         "fb_rate": fb_rate,
         "fb_entries": fb_entries,
+        "fb_success": fb_success,
+        "hct_used": hct_used,
+        "hct_success": hct_success,
+        "fcp_used": fcp_used,
+        "fcp_success": fcp_success,
         "pt_combined_rate": pt_combined_rate,
         "pt_total_attempts": pt_total_attempts,
+        "pt_total_successes": pt_total_successes,
     }
 
 
@@ -186,6 +201,7 @@ def build_eog_inputs_from_game_doc(game_doc: dict, home_team_id: str, away_team_
     teams_obj = (game_doc or {}).get("teams", {})
     team_totals_obj = (game_doc or {}).get("team_totals", {})
     box_score = (game_doc or {}).get("box_score", {})
+    team_stats_obj = (game_doc or {}).get("team_stats", {})
 
     home_team_obj = teams_obj.get(home_team_id, {}) if isinstance(teams_obj, dict) else {}
     away_team_obj = teams_obj.get(away_team_id, {}) if isinstance(teams_obj, dict) else {}
@@ -203,9 +219,43 @@ def build_eog_inputs_from_game_doc(game_doc: dict, home_team_id: str, away_team_
 
     home_totals = calculate_team_totals_from_sources(home_team_id, home_team_name, team_totals_obj, box_score)
     away_totals = calculate_team_totals_from_sources(away_team_id, away_team_name, team_totals_obj, box_score)
+    home_totals_source = "team_totals_or_box_score"
+    away_totals_source = "team_totals_or_box_score"
+
+    # Fallback for legacy/nested saves where top-level totals/box_score may be missing.
+    if not home_totals.get("FGA"):
+        nested_home_box = ((game_doc or {}).get("home_team") or {}).get("box_score", {})
+        nested_home_totals = _aggregate_from_box(nested_home_box)
+        if nested_home_totals.get("FGA"):
+            home_totals = nested_home_totals
+            home_totals_source = "home_team.box_score"
+    if not away_totals.get("FGA"):
+        nested_away_box = ((game_doc or {}).get("away_team") or {}).get("box_score", {})
+        nested_away_totals = _aggregate_from_box(nested_away_box)
+        if nested_away_totals.get("FGA"):
+            away_totals = nested_away_totals
+            away_totals_source = "away_team.box_score"
 
     home_scouting = _calculate_special_situations_from_team_scouting(home_team_obj)
     away_scouting = _calculate_special_situations_from_team_scouting(away_team_obj)
+    home_scouting_source = "teams.scouting"
+    away_scouting_source = "teams.scouting"
+
+    # If canonical teams.scouting is empty, fallback to team_stats keyed by team_id/name.
+    if not home_scouting.get("fb_entries") and not home_scouting.get("pt_total_attempts"):
+        home_fallback = calculate_special_situations_from_sources(
+            home_team_name, home_team_obj, team_stats_obj, team_id_label=home_team_id
+        )
+        if home_fallback.get("fb_entries") or home_fallback.get("pt_total_attempts"):
+            home_scouting = home_fallback
+            home_scouting_source = "team_stats_fallback"
+    if not away_scouting.get("fb_entries") and not away_scouting.get("pt_total_attempts"):
+        away_fallback = calculate_special_situations_from_sources(
+            away_team_name, away_team_obj, team_stats_obj, team_id_label=away_team_id
+        )
+        if away_fallback.get("fb_entries") or away_fallback.get("pt_total_attempts"):
+            away_scouting = away_fallback
+            away_scouting_source = "team_stats_fallback"
 
     return {
         "home": {
@@ -213,12 +263,16 @@ def build_eog_inputs_from_game_doc(game_doc: dict, home_team_id: str, away_team_
             "team_name": home_team_name,
             "totals": home_totals,
             "scouting": home_scouting,
+            "totals_source": home_totals_source,
+            "scouting_source": home_scouting_source,
         },
         "away": {
             "team_id": away_team_id,
             "team_name": away_team_name,
             "totals": away_totals,
             "scouting": away_scouting,
+            "totals_source": away_totals_source,
+            "scouting_source": away_scouting_source,
         },
-        "source": "teams.scouting+team_totals_or_box_score",
+        "source": "multi_source_snapshot",
     }
