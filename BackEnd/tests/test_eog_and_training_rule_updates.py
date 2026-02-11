@@ -276,6 +276,13 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
 
         eog_inputs = build_eog_inputs_from_game_doc(game_doc, "LANCASTER", "MORRISTOWN")
         away_scouting = eog_inputs["away"]["scouting"]
+        self.assertEqual(away_scouting["fb_entries"], 4)
+        self.assertEqual(away_scouting["fb_success"], 3)
+        self.assertEqual(away_scouting["hct_used"], 6)
+        self.assertEqual(away_scouting["hct_success"], 4)
+        self.assertEqual(away_scouting["fcp_used"], 5)
+        self.assertEqual(away_scouting["fcp_success"], 4)
+        self.assertEqual(away_scouting["pt_total_successes"], 8)
         self.assertEqual(away_scouting["pt_total_attempts"], 11)
         self.assertAlmostEqual(away_scouting["pt_combined_rate"], 72.7272, places=2)
         self.assertEqual(eog_inputs["source"], "teams.scouting+team_totals_or_box_score")

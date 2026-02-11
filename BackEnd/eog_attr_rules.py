@@ -71,8 +71,14 @@ def _calculate_special_situations_from_team_scouting(team_obj: dict) -> dict:
     return {
         "fb_rate": fb_rate,
         "fb_entries": fb_entries,
+        "fb_success": fb_success,
+        "hct_used": hct_used,
+        "hct_success": hct_success,
+        "fcp_used": fcp_used,
+        "fcp_success": fcp_success,
         "pt_combined_rate": pt_combined_rate,
         "pt_total_attempts": pt_total_attempts,
+        "pt_total_successes": pt_total_successes,
     }
 
 

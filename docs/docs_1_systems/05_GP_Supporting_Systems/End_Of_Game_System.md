@@ -211,4 +211,5 @@ The End of Game System handles game completion, displays final scores, and provi
   - fallback to aggregated `box_score` only if `team_totals` is missing
 - **Backend access point:** `BackEnd/api/franchise_routes.py` → `update_team_attributes_after_game()`
 - **Processing rule:** Build and persist `eog_inputs` once, then compute all EOG attribute changes from `eog_inputs` only.
+- **Postgame display rule:** Box Score "Special Situations" (Fast Breaks, HC Traps, FC Presses) should read from `eog_inputs.*.scouting` so displayed rates match EOG calculations exactly.
 - **Why this method:** Prevents source drift between `team_stats`, `teams.scouting`, and totals; keeps EOG deltas deterministic and aligned to final game state.
