@@ -222,6 +222,26 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
         self.assertEqual(special["pt_total_attempts"], 6)
         self.assertEqual(round(special["pt_combined_rate"], 2), 33.33)
 
+    def test_eog_special_situations_supports_team_id_keyed_team_stats(self):
+        team_stats_obj = {
+            "MORRISTOWN": {
+                "offense": {"Fast_Break_Entries": 8, "Fast_Break_Success": 2},
+                "defense": {
+                    "HCT": {"used": 5, "success": 3},
+                    "FCP": {"used": 3, "success": 3},
+                },
+            }
+        }
+        # Empty scouting fallback should not matter when team_stats has canonical team_id key.
+        team_obj = {}
+        special = calculate_special_situations_from_sources(
+            "Morristown", team_obj, team_stats_obj, team_id_label="MORRISTOWN"
+        )
+        self.assertEqual(special["fb_entries"], 8)
+        self.assertEqual(round(special["fb_rate"], 2), 25.0)
+        self.assertEqual(special["pt_total_attempts"], 8)
+        self.assertEqual(round(special["pt_combined_rate"], 2), 75.0)
+
 
 if __name__ == "__main__":
     unittest.main()

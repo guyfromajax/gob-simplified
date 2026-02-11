@@ -210,7 +210,8 @@ The End of Game System handles game completion, displays final scores, and provi
   - Fallback: aggregate from `game_doc.box_score`
 
 - **Canonical special-situations source (FB/HCT/FCP):**
-  - Primary: `game_doc.team_stats[team_name].offense/defense`
+  - Primary: `game_doc.team_stats[team_id].offense/defense` (canonical team_id key)
+  - Secondary: `game_doc.team_stats[team_name].offense/defense`
   - Fallback: `game_doc.teams[team_id].scouting`
 
 - **Backend access point:**
@@ -220,3 +221,10 @@ The End of Game System handles game completion, displays final scores, and provi
 - **Why this method:**
   - Keeps Box Score special-situation rates and EOG deltas aligned.
   - Prevents mismatches caused by reading PT/FB rates from different branches of the game document.
+  - Avoids key mismatches between `team_name` and canonical `team_id` in mixed save/load paths.
+
+- **Diagnostics (current):**
+  - EOG logs one source snapshot line per game including:
+    - team names + canonical team IDs
+    - FB/PT rates and PT attempts used for calculation
+    - available `team_stats` keys
