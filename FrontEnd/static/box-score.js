@@ -955,13 +955,26 @@ function renderScoutingNotes() {
   const teamStats = gameData.team_stats || {};
   const homeTeamName = homeTeamObj?.name || gameData.home_team?.name || 'Home Team';
   const awayTeamName = awayTeamObj?.name || gameData.away_team?.name || 'Away Team';
+  const eogInputs = gameData.eog_inputs || {};
+  const homeEogSnapshot = eogInputs.home || null;
+  const awayEogSnapshot = eogInputs.away || null;
 
-  renderScoutingContent('home', teamStats[homeTeamName] || {});
-  renderScoutingContent('away', teamStats[awayTeamName] || {});
+  console.log('🔍 [SCOUTING] renderScoutingNotes source selection:', {
+    hasEogInputs: !!gameData.eog_inputs,
+    homeTeamId,
+    awayTeamId,
+    homeTeamName,
+    awayTeamName,
+    homeUsesEogSnapshot: !!homeEogSnapshot,
+    awayUsesEogSnapshot: !!awayEogSnapshot,
+  });
+
+  renderScoutingContent('home', teamStats[homeTeamName] || {}, homeEogSnapshot);
+  renderScoutingContent('away', teamStats[awayTeamName] || {}, awayEogSnapshot);
 }
 
 // Render scouting content for a team
-function renderScoutingContent(team, teamStats) {
+function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   const container = document.getElementById(`${team}-scouting-content`);
   container.innerHTML = '';
 
@@ -997,23 +1010,26 @@ function renderScoutingContent(team, teamStats) {
   specialSection.className = 'scouting-section';
   specialSection.innerHTML = '<h3>Special Situations</h3>';
 
+  // Special situations use canonical EOG snapshot when available (matches EOG attribute calculations).
+  const scoutingSnapshot = (eogSnapshot && eogSnapshot.scouting) || {};
+
   // Fast Breaks
-  const fbEntries = offense.Fast_Break_Entries || 0;
-  const fbSuccess = offense.Fast_Break_Success || 0;
+  const fbEntries = scoutingSnapshot.fb_entries ?? offense.Fast_Break_Entries ?? 0;
+  const fbSuccess = scoutingSnapshot.fb_success ?? offense.Fast_Break_Success ?? 0;
   const fbPct = fbEntries > 0 ? ((fbSuccess / fbEntries) * 100).toFixed(0) : '0';
   specialSection.appendChild(createScoutingItem('Fast Breaks', `${fbSuccess} / ${fbEntries}`, `${fbPct}%`));
 
   // HC Traps
   const hct = defense.HCT || {};
-  const hctUsed = hct.used || 0;
-  const hctSuccess = hct.success || 0;
+  const hctUsed = scoutingSnapshot.hct_used ?? hct.used ?? 0;
+  const hctSuccess = scoutingSnapshot.hct_success ?? hct.success ?? 0;
   const hctPct = hctUsed > 0 ? ((hctSuccess / hctUsed) * 100).toFixed(0) : '0';
   specialSection.appendChild(createScoutingItem('HC Traps', `${hctSuccess} / ${hctUsed}`, `${hctPct}%`));
 
   // FC Presses
   const fcp = defense.FCP || {};
-  const fcpUsed = fcp.used || 0;
-  const fcpSuccess = fcp.success || 0;
+  const fcpUsed = scoutingSnapshot.fcp_used ?? fcp.used ?? 0;
+  const fcpSuccess = scoutingSnapshot.fcp_success ?? fcp.success ?? 0;
   const fcpPct = fcpUsed > 0 ? ((fcpSuccess / fcpUsed) * 100).toFixed(0) : '0';
   specialSection.appendChild(createScoutingItem('FC Presses', `${fcpSuccess} / ${fcpUsed}`, `${fcpPct}%`));
 
