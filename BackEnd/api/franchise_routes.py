@@ -147,6 +147,16 @@ def _finalize_team_attributes_for_game(
     """
     try:
         gid = ObjectId(game_id) if isinstance(game_id, str) and ObjectId.is_valid(game_id) else game_id
+        logger.warning(
+            "🧭 [EOG-CALL-SITE] About to call update_team_attributes_after_game game_id=%s gid=%s franchise_id=%s home=%s away=%s winner=%s loser=%s",
+            str(game_id),
+            str(gid),
+            str(franchise_id),
+            str(home_team_id),
+            str(away_team_id),
+            str(winner_id),
+            str(loser_id),
+        )
         attribute_changes = update_team_attributes_after_game(
             game_id=gid,
             franchise_id=franchise_id,
@@ -156,6 +166,12 @@ def _finalize_team_attributes_for_game(
             loser_id=loser_id,
             winner_score=winner_score,
             loser_score=loser_score,
+        )
+        logger.warning(
+            "🧭 [EOG-CALL-SITE] update_team_attributes_after_game returned game_id=%s has_changes=%s keys=%s",
+            str(game_id),
+            bool(attribute_changes),
+            list((attribute_changes or {}).keys()),
         )
         tac = attribute_changes if attribute_changes else {}
         game_id_str = str(game_id) if not isinstance(game_id, str) else game_id
@@ -187,6 +203,11 @@ def update_team_attributes_after_game(
             away_team_id: {"shot_threshold": +12, "discipline": -2, ...}
         }
     """
+    logger.warning(
+        "🧪 [EOG-FUNC-ENTRY] update_team_attributes_after_game entered game_id=%s franchise_id=%s",
+        str(game_id),
+        str(franchise_id),
+    )
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] FUNCTION CALLED")
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Input parameters - game_id={game_id}, franchise_id={franchise_id}")
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Team IDs - home_team_id={home_team_id} (type: {type(home_team_id)}), away_team_id={away_team_id} (type: {type(away_team_id)})")
