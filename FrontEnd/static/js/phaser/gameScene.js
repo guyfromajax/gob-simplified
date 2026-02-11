@@ -1271,7 +1271,14 @@ export function createGameScene(Phaser) {
         applyTeamStats(turn);
 
         // Check for foul out and show popup
-        if (turn.fouled_out && turn.foul_out_player) {
+        // NOTE: foul-out can surface as either:
+        // - a regular turn with ``fouled_out`` + ``foul_out_player`` (common), or
+        // - a TIMEOUT turn with ``timeout_reason=FOUL_OUT`` + ``foul_out_player`` (when backend appends foul-out timeout).
+        const isFoulOutTimeoutTurn = turn.result_type === 'TIMEOUT' && turn.timeout_reason === 'FOUL_OUT' && turn.foul_out_player;
+        const isFoulOutFlaggedTurn = turn.fouled_out && turn.foul_out_player;
+        const shouldShowFoulOutPopup = isFoulOutFlaggedTurn || isFoulOutTimeoutTurn;
+
+        if (shouldShowFoulOutPopup && !document.querySelector('.foul-out-popup')) {
           // Dynamically import foul out popup
           import('./utils/foulOutPopup.js').then(({ showFoulOutPopup }) => {
             // Get game context from scene
@@ -2013,6 +2020,28 @@ export function createGameScene(Phaser) {
               
               // Update finalTurn to be the last sub-turn in the batch
               finalTurn = subTurn;
+
+              // ✅ FOUL OUT/TIMEOUT SAFETY: A timeout can be appended inside a batch (e.g. foul-out timeout).
+              // When it happens, we must stop the simulate-turn loop immediately, same as the non-batch timeout path.
+              if (subTurn.result_type === 'TIMEOUT') {
+                console.log('⏸️ TIMEOUT: Timeout subTurn detected inside BATCH - stopping simulation loop');
+                timeoutTurnDetected = true;
+                subTurn._responseData = {
+                  clock: turnData.clock,
+                  time_remaining: turnData.time_remaining,
+                  quarter: turnData.quarter,
+                  home_score: turnData.home_score,
+                  away_score: turnData.away_score,
+                  home_team_timeouts: turnData.home_team_timeouts,
+                  away_team_timeouts: turnData.away_team_timeouts
+                };
+                // Stop processing remaining batch turns and exit the main loop.
+                break;
+              }
+            }
+
+            if (timeoutTurnDetected) {
+              break;
             }
           } else {
             // Normal single turn
