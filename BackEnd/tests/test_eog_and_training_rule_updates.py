@@ -285,7 +285,8 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
         self.assertEqual(away_scouting["pt_total_successes"], 8)
         self.assertEqual(away_scouting["pt_total_attempts"], 11)
         self.assertAlmostEqual(away_scouting["pt_combined_rate"], 72.7272, places=2)
-        self.assertEqual(eog_inputs["source"], "teams.scouting+team_totals_or_box_score")
+        self.assertEqual(eog_inputs["source"], "multi_source_snapshot")
+        self.assertEqual(eog_inputs["away"]["scouting_source"], "teams.scouting")
 
     def test_pt_opp_modifier_from_canonical_snapshot_high_rate_branch(self):
         game_doc = {
@@ -317,6 +318,56 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
 
         self.assertEqual(change, -3)
         fake_randint.assert_called_with(-3, -2)
+
+    def test_build_eog_inputs_falls_back_to_team_stats_when_teams_scouting_empty(self):
+        game_doc = {
+            "teams": {
+                "A": {"name": "Alpha", "scouting": {"offense": {}, "defense": {}}},
+                "B": {"name": "Beta", "scouting": {"offense": {}, "defense": {}}},
+            },
+            "team_stats": {
+                "A": {
+                    "offense": {"Fast_Break_Entries": 3, "Fast_Break_Success": 1},
+                    "defense": {"HCT": {"used": 5, "success": 3}, "FCP": {"used": 6, "success": 4}},
+                }
+            },
+            "team_totals": {},
+            "box_score": {},
+        }
+        eog_inputs = build_eog_inputs_from_game_doc(game_doc, "A", "B")
+        home_scouting = eog_inputs["home"]["scouting"]
+        self.assertEqual(home_scouting["fb_entries"], 3)
+        self.assertEqual(home_scouting["fb_success"], 1)
+        self.assertEqual(home_scouting["pt_total_attempts"], 11)
+        self.assertEqual(home_scouting["pt_total_successes"], 7)
+        self.assertEqual(eog_inputs["home"]["scouting_source"], "team_stats_fallback")
+
+    def test_build_eog_inputs_falls_back_to_nested_team_box_score_totals(self):
+        game_doc = {
+            "teams": {
+                "A": {"name": "Alpha", "scouting": {"offense": {}, "defense": {}}},
+                "B": {"name": "Beta", "scouting": {"offense": {}, "defense": {}}},
+            },
+            "team_totals": {},
+            "box_score": {},
+            "home_team": {
+                "box_score": {
+                    "p1": {"FGM": 3, "FGA": 9, "TO": 1, "STL": 2, "DREB": 4, "OREB": 1},
+                    "p2": {"FGM": 2, "FGA": 5, "TO": 0, "STL": 1, "DREB": 3, "OREB": 2},
+                }
+            },
+            "away_team": {
+                "box_score": {
+                    "p3": {"FGM": 1, "FGA": 4, "TO": 2, "STL": 0, "DREB": 2, "OREB": 1},
+                    "p4": {"FGM": 4, "FGA": 8, "TO": 1, "STL": 1, "DREB": 5, "OREB": 0},
+                }
+            },
+        }
+        eog_inputs = build_eog_inputs_from_game_doc(game_doc, "A", "B")
+        self.assertEqual(eog_inputs["home"]["totals"]["FGA"], 14)
+        self.assertEqual(eog_inputs["away"]["totals"]["FGA"], 12)
+        self.assertEqual(eog_inputs["home"]["totals_source"], "home_team.box_score")
+        self.assertEqual(eog_inputs["away"]["totals_source"], "away_team.box_score")
 
 
 if __name__ == "__main__":
