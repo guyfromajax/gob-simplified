@@ -356,6 +356,24 @@ This system documents data persistence across all three game modes when users ar
 
 **Note:** All major persistence issues have been resolved through the Unified State Persistence refactoring (Phases 1-5.7). The fixes documented below are historical and have been integrated into the current system. For complete implementation history, see `Unified_State_Persistence_Work_Plan.md`.
 
+### ✅ Fixed: Franchise EOG Reading Wrong Game Snapshot (February 2026)
+
+**Issue:** End-of-game team attribute calculations intermittently used zero totals/scouting even when box score showed real stats.
+
+**Root Cause:**
+- Franchise completion flow could touch game docs using different `_id` types (string vs `ObjectId`).
+- In some cases this produced a partial duplicate doc (metadata only) and EOG read that doc instead of the canonical gameplay snapshot.
+
+**Fix:**
+- In `complete_week`, when `game_document` is provided, persist that snapshot before finalization/EOG.
+- In `_save_game_result`, prefer string `_id` and only use `ObjectId` if an existing ObjectId doc already exists.
+- In `update_team_attributes_after_game`, evaluate both `_id` candidates and use the richer doc for EOG input generation.
+
+**Operational Check:**
+- Railway logs should show:
+  - `🧭 [EOG-GAME-DOC-SELECT] ...`
+  - `🧪 [EOG-SNAPSHOT-SOURCES]` with `teams.totals` or `teams.box_score` (not `none`) for completed games.
+
 ### ✅ Fixed: Playbook Percentage Persistence (0% Values)
 
 **Issue:** Playbook percentages were not persisting correctly, especially 0% values. When users set percentages and saved, then reloaded the playbooks page, percentages would reset to 0 or default values.
