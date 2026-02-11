@@ -203,28 +203,12 @@ The End of Game System handles game completion, displays final scores, and provi
 
 ### EOG Data Source & Access Method
 
-- **Design goal:** EOG team-attribute calculations should use the same postgame data model that Box Score displays.
-
-- **Canonical totals source (FG%, TO/STL, TREB):**
-  - Primary: `game_doc.team_totals[team_name]`
-  - Fallback: aggregate from `game_doc.box_score`
-
-- **Canonical special-situations source (FB/HCT/FCP):**
-  - Primary: `game_doc.team_stats[team_id].offense/defense` (canonical team_id key)
-  - Secondary: `game_doc.team_stats[team_name].offense/defense`
-  - Fallback: `game_doc.teams[team_id].scouting`
-
-- **Backend access point:**
-  - `BackEnd/api/franchise_routes.py` → `update_team_attributes_after_game()`
-  - Builds per-team EOG stat bundles from the sources above before applying attribute rules.
-
-- **Why this method:**
-  - Keeps Box Score special-situation rates and EOG deltas aligned.
-  - Prevents mismatches caused by reading PT/FB rates from different branches of the game document.
-  - Avoids key mismatches between `team_name` and canonical `team_id` in mixed save/load paths.
-
-- **Diagnostics (current):**
-  - EOG logs one source snapshot line per game including:
-    - team names + canonical team IDs
-    - FB/PT rates and PT attempts used for calculation
-    - available `team_stats` keys
+- **Design goal:** EOG team-attribute calculations must read from one frozen per-game snapshot.
+- **Canonical snapshot field:** `games.eog_inputs`
+- **Built from:**
+  - `teams[team_id].scouting` for FB/HCT/FCP rates and attempts
+  - `team_totals` for box-score totals (`FGM/FGA`, `TO/STL`, `DREB/OREB`)
+  - fallback to aggregated `box_score` only if `team_totals` is missing
+- **Backend access point:** `BackEnd/api/franchise_routes.py` → `update_team_attributes_after_game()`
+- **Processing rule:** Build and persist `eog_inputs` once, then compute all EOG attribute changes from `eog_inputs` only.
+- **Why this method:** Prevents source drift between `team_stats`, `teams.scouting`, and totals; keeps EOG deltas deterministic and aligned to final game state.

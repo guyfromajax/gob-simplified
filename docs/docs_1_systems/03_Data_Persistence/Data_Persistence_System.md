@@ -907,22 +907,20 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 - `tests/test_simulate_quarter_endpoint.py` - added focused regression test:
   - `test_simulate_quarter_restores_team_stats_from_unified_teams`
 
-### EOG Team-Attribute Source Keying (PT/FB) ✅ **FIXED** (February 2026)
+### EOG Canonical Snapshot Persistence ✅ **FIXED** (February 2026)
 
-**Problem:** End-of-game team attribute updates could use incorrect Press/Trap or Fast-Break rates in some games, causing mismatched deltas versus Box Score.
-
-**Root Cause:**
-- EOG special-situations lookup could miss when `team_stats` was keyed by canonical `team_id` but lookup used `team_name`.
-- On key miss, EOG could fall back to empty scouting context and compute 0 attempts / 0% rates.
+**Problem:** EOG team-attribute deltas could drift from expected PT/FB results due to mixed reads across `team_stats`, `teams.scouting`, and totals paths.
 
 **Solution:**
-- EOG special-situations source now resolves by canonical `team_id` first, then `team_name`, then falls back to `teams[team_id].scouting`.
-- Franchise EOG path now normalizes and prefers canonical team IDs from the game document (`home_team_id` / `away_team_id`) for source reads.
-- Added concise EOG source snapshot logging (team name, canonical team_id, PT/FB rates/attempts, available `team_stats` keys).
+- Added a single canonical `eog_inputs` snapshot on each finalized game document.
+- Snapshot is built once from:
+  - `teams[team_id].scouting` for FB/PT special-situations
+  - `team_totals` (fallback: aggregated `box_score`) for totals-based metrics
+- `update_team_attributes_after_game()` now computes EOG attribute changes from `eog_inputs` only.
 
 **Files Changed:**
-- `BackEnd/eog_attr_rules.py` - canonical key resolver + `calculate_special_situations_from_sources(...)` team_id-aware lookup
-- `BackEnd/api/franchise_routes.py` - canonical team_id normalization and EOG source read alignment
+- `BackEnd/eog_attr_rules.py` - `build_eog_inputs_from_game_doc(...)` canonical snapshot builder
+- `BackEnd/api/franchise_routes.py` - persists `games.eog_inputs` and uses it as the sole EOG calculation source
 
 ### Key Files
 
