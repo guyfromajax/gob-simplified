@@ -209,44 +209,30 @@ def update_team_attributes_after_game(
     team_totals_obj = game_doc.get("team_totals", {})
     team_stats_obj = game_doc.get("team_stats", {})
     
-    # Try to get team objects - teams object uses team_id strings (like "XAVIEN") as keys
-    # But home_team_id/away_team_id might be ObjectId strings, so we need to resolve
-    home_team_obj = {}
-    away_team_obj = {}
-    
-    # Try direct lookup first (if home_team_id is already a team_id string)
-    if home_team_id:
-        home_team_obj = teams_obj.get(home_team_id, {})
-        # If not found, try looking up by ObjectId to get team_id string
-        if not home_team_obj and home_team_id:
-            try:
-                team_doc = db.teams.find_one({"_id": ObjectId(home_team_id)}, {"team_id": 1})
-                if team_doc and team_doc.get("team_id"):
-                    home_team_obj = teams_obj.get(team_doc["team_id"], {})
-            except Exception:
-                pass
-    
-    if away_team_id:
-        away_team_obj = teams_obj.get(away_team_id, {})
-        # If not found, try looking up by ObjectId to get team_id string
-        if not away_team_obj and away_team_id:
-            try:
-                team_doc = db.teams.find_one({"_id": ObjectId(away_team_id)}, {"team_id": 1})
-                if team_doc and team_doc.get("team_id"):
-                    away_team_obj = teams_obj.get(team_doc["team_id"], {})
-            except Exception:
-                pass
+    # Resolve canonical team IDs for EOG source lookup.
+    # We prefer IDs stored on the game doc, then fall back to endpoint inputs.
+    game_home_team_id = _normalize_team_id_to_string(game_doc.get("home_team_id"))
+    game_away_team_id = _normalize_team_id_to_string(game_doc.get("away_team_id"))
+    input_home_team_id = _normalize_team_id_to_string(home_team_id)
+    input_away_team_id = _normalize_team_id_to_string(away_team_id)
+
+    canonical_home_team_id = game_home_team_id or input_home_team_id or home_team_id
+    canonical_away_team_id = game_away_team_id or input_away_team_id or away_team_id
+
+    # Try to get team objects from unified teams map (keyed by canonical team_id strings).
+    home_team_obj = teams_obj.get(canonical_home_team_id, {}) if isinstance(teams_obj, dict) else {}
+    away_team_obj = teams_obj.get(canonical_away_team_id, {}) if isinstance(teams_obj, dict) else {}
     
     # Resolve canonical team names used by game document keyed maps
     home_team_name = (
         home_team_obj.get("name")
         or (game_doc.get("home_team", {}).get("name") if isinstance(game_doc.get("home_team"), dict) else game_doc.get("home_team"))
-        or home_team_id
+        or canonical_home_team_id
     )
     away_team_name = (
         away_team_obj.get("name")
         or (game_doc.get("away_team", {}).get("name") if isinstance(game_doc.get("away_team"), dict) else game_doc.get("away_team"))
-        or away_team_id
+        or canonical_away_team_id
     )
 
     # Calculate team totals from box_score (fallback if team_totals missing)
@@ -267,21 +253,28 @@ def update_team_attributes_after_game(
                     totals["OREB"] += player_stats.get("OREB", 0)
         return totals
     
-    home_totals = calculate_team_totals_from_sources(home_team_id, home_team_name, team_totals_obj, box_score)
-    away_totals = calculate_team_totals_from_sources(away_team_id, away_team_name, team_totals_obj, box_score)
-    home_scouting = calculate_special_situations_from_sources(home_team_name, home_team_obj, team_stats_obj)
-    away_scouting = calculate_special_situations_from_sources(away_team_name, away_team_obj, team_stats_obj)
+    home_totals = calculate_team_totals_from_sources(canonical_home_team_id, home_team_name, team_totals_obj, box_score)
+    away_totals = calculate_team_totals_from_sources(canonical_away_team_id, away_team_name, team_totals_obj, box_score)
+    home_scouting = calculate_special_situations_from_sources(
+        home_team_name, home_team_obj, team_stats_obj, team_id_label=canonical_home_team_id
+    )
+    away_scouting = calculate_special_situations_from_sources(
+        away_team_name, away_team_obj, team_stats_obj, team_id_label=canonical_away_team_id
+    )
 
     logger.info(
-        "🔍 [UPDATE-TEAM-ATTRS] EOG source snapshot home=%s (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s) away=%s (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s)",
+        "🔍 [UPDATE-TEAM-ATTRS] EOG source snapshot home=%s[%s] (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s) away=%s[%s] (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s), team_stats_keys=%s",
         home_team_name,
+        canonical_home_team_id,
         home_scouting.get("fb_rate", 0),
         home_scouting.get("pt_combined_rate", 0),
         home_scouting.get("pt_total_attempts", 0),
         away_team_name,
+        canonical_away_team_id,
         away_scouting.get("fb_rate", 0),
         away_scouting.get("pt_combined_rate", 0),
         away_scouting.get("pt_total_attempts", 0),
+        list(team_stats_obj.keys()) if isinstance(team_stats_obj, dict) else [],
     )
     
     # Calculate attribute changes for each team. team_object_id = ObjectId for FTD; team_id_label = string for logging.

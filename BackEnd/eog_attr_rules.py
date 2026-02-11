@@ -1,6 +1,27 @@
 import random
 
 
+def _resolve_keyed_entry(source_obj: dict, candidates: list[str]) -> dict:
+    """
+    Resolve a dict entry from source_obj by trying multiple key candidates.
+    Tries exact keys first, then case-insensitive string matching.
+    """
+    if not isinstance(source_obj, dict):
+        return {}
+
+    for key in candidates:
+        if key and key in source_obj and isinstance(source_obj.get(key), dict):
+            return source_obj.get(key, {})
+
+    lowered = {str(k).lower(): v for k, v in source_obj.items()}
+    for key in candidates:
+        if key:
+            val = lowered.get(str(key).lower())
+            if isinstance(val, dict):
+                return val
+    return {}
+
+
 def calculate_fb_opp_modifier_change(opponent_scouting: dict) -> int:
     """Calculate EOG fb_opp_modifier change from opponent fast-break performance."""
     opponent_fb_rate = opponent_scouting.get("fb_rate", 0)
@@ -73,6 +94,7 @@ def calculate_special_situations_from_sources(
     team_name: str,
     team_obj: dict,
     team_stats_obj: dict,
+    team_id_label: str | None = None,
 ) -> dict:
     """
     Resolve canonical FB/PT special-situations metrics for EOG.
@@ -80,7 +102,8 @@ def calculate_special_situations_from_sources(
     1) team_stats[team_name].offense/defense
     2) teams[team_id].scouting offense/defense
     """
-    stats = (team_stats_obj or {}).get(team_name, {}) if isinstance(team_stats_obj, dict) else {}
+    key_candidates = [team_id_label, team_name]
+    stats = _resolve_keyed_entry(team_stats_obj or {}, key_candidates)
     offense = stats.get("offense", {}) if isinstance(stats, dict) else {}
     defense = stats.get("defense", {}) if isinstance(stats, dict) else {}
 
