@@ -9,6 +9,7 @@ from BackEnd.models.training_execution_v2 import (
 )
 from BackEnd.eog_attr_rules import calculate_fb_opp_modifier_change, calculate_pt_opp_modifier_change
 from BackEnd.eog_attr_rules import (
+    build_eog_inputs_from_game_doc,
     calculate_special_situations_from_sources,
     calculate_team_totals_from_sources,
 )
@@ -241,6 +242,74 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
         self.assertEqual(round(special["fb_rate"], 2), 25.0)
         self.assertEqual(special["pt_total_attempts"], 8)
         self.assertEqual(round(special["pt_combined_rate"], 2), 75.0)
+
+    def test_build_eog_inputs_uses_teams_scouting_over_team_stats(self):
+        game_doc = {
+            "teams": {
+                "LANCASTER": {
+                    "name": "Lancaster",
+                    "scouting": {
+                        "offense": {"Fast_Break_Entries": 2, "Fast_Break_Success": 1},
+                        "defense": {"HCT": {"used": 1, "success": 0}, "FCP": {"used": 1, "success": 0}},
+                    },
+                },
+                "MORRISTOWN": {
+                    "name": "Morristown",
+                    "scouting": {
+                        "offense": {"Fast_Break_Entries": 4, "Fast_Break_Success": 3},
+                        "defense": {"HCT": {"used": 6, "success": 4}, "FCP": {"used": 5, "success": 4}},
+                    },
+                },
+            },
+            "team_totals": {
+                "Lancaster": {"FGM": 20, "FGA": 40, "TO": 8, "STL": 4, "DREB": 18, "OREB": 7},
+                "Morristown": {"FGM": 22, "FGA": 44, "TO": 6, "STL": 5, "DREB": 20, "OREB": 6},
+            },
+            # Contradictory team_stats should not affect canonical snapshot.
+            "team_stats": {
+                "MORRISTOWN": {
+                    "offense": {"Fast_Break_Entries": 99, "Fast_Break_Success": 0},
+                    "defense": {"HCT": {"used": 99, "success": 0}, "FCP": {"used": 99, "success": 0}},
+                }
+            },
+        }
+
+        eog_inputs = build_eog_inputs_from_game_doc(game_doc, "LANCASTER", "MORRISTOWN")
+        away_scouting = eog_inputs["away"]["scouting"]
+        self.assertEqual(away_scouting["pt_total_attempts"], 11)
+        self.assertAlmostEqual(away_scouting["pt_combined_rate"], 72.7272, places=2)
+        self.assertEqual(eog_inputs["source"], "teams.scouting+team_totals_or_box_score")
+
+    def test_pt_opp_modifier_from_canonical_snapshot_high_rate_branch(self):
+        game_doc = {
+            "teams": {
+                "LANCASTER": {
+                    "name": "Lancaster",
+                    "scouting": {
+                        "offense": {"Fast_Break_Entries": 2, "Fast_Break_Success": 1},
+                        "defense": {"HCT": {"used": 1, "success": 0}, "FCP": {"used": 1, "success": 0}},
+                    },
+                },
+                "MORRISTOWN": {
+                    "name": "Morristown",
+                    "scouting": {
+                        "offense": {"Fast_Break_Entries": 4, "Fast_Break_Success": 3},
+                        "defense": {"HCT": {"used": 6, "success": 4}, "FCP": {"used": 5, "success": 4}},
+                    },
+                },
+            },
+            "team_totals": {},
+            "box_score": {},
+        }
+
+        eog_inputs = build_eog_inputs_from_game_doc(game_doc, "LANCASTER", "MORRISTOWN")
+        opponent_scouting = eog_inputs["away"]["scouting"]
+
+        with patch.object(random, "randint", return_value=-3) as fake_randint:
+            change = calculate_pt_opp_modifier_change(opponent_scouting)
+
+        self.assertEqual(change, -3)
+        fake_randint.assert_called_with(-3, -2)
 
 
 if __name__ == "__main__":

@@ -34,10 +34,9 @@ from BackEnd.utils.command_center_data import build_command_center_base
 from BackEnd.utils.game_id_utils import generate_game_id
 from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS
 from BackEnd.eog_attr_rules import (
+    build_eog_inputs_from_game_doc,
     calculate_fb_opp_modifier_change,
     calculate_pt_opp_modifier_change,
-    calculate_special_situations_from_sources,
-    calculate_team_totals_from_sources,
 )
 from BackEnd.utils.auth import get_current_user
 from BackEnd.utils.ownership import verify_franchise_owned_by_user
@@ -203,11 +202,8 @@ def update_team_attributes_after_game(
         logger.error(f"❌ [UPDATE-TEAM-ATTRS] Game {game_id} not found (tried ObjectId and string)")
         return {}
     
-    # Get box_score and teams object
-    box_score = game_doc.get("box_score", {})
+    # Get teams object for name fallback only
     teams_obj = game_doc.get("teams", {})
-    team_totals_obj = game_doc.get("team_totals", {})
-    team_stats_obj = game_doc.get("team_stats", {})
     
     # Resolve canonical team IDs for EOG source lookup.
     # We prefer IDs stored on the game doc, then fall back to endpoint inputs.
@@ -219,51 +215,26 @@ def update_team_attributes_after_game(
     canonical_home_team_id = game_home_team_id or input_home_team_id or home_team_id
     canonical_away_team_id = game_away_team_id or input_away_team_id or away_team_id
 
-    # Try to get team objects from unified teams map (keyed by canonical team_id strings).
-    home_team_obj = teams_obj.get(canonical_home_team_id, {}) if isinstance(teams_obj, dict) else {}
-    away_team_obj = teams_obj.get(canonical_away_team_id, {}) if isinstance(teams_obj, dict) else {}
-    
-    # Resolve canonical team names used by game document keyed maps
-    home_team_name = (
-        home_team_obj.get("name")
-        or (game_doc.get("home_team", {}).get("name") if isinstance(game_doc.get("home_team"), dict) else game_doc.get("home_team"))
-        or canonical_home_team_id
+    # Build a single canonical EOG snapshot and persist it on the game document.
+    # EOG team-attribute logic reads only from this snapshot to avoid source drift.
+    eog_inputs = build_eog_inputs_from_game_doc(
+        game_doc, canonical_home_team_id, canonical_away_team_id
     )
-    away_team_name = (
-        away_team_obj.get("name")
-        or (game_doc.get("away_team", {}).get("name") if isinstance(game_doc.get("away_team"), dict) else game_doc.get("away_team"))
-        or canonical_away_team_id
+    db.games.update_one(
+        {"_id": game_doc.get("_id")},
+        {"$set": {"eog_inputs": eog_inputs}},
     )
 
-    # Calculate team totals from box_score (fallback if team_totals missing)
-    def calculate_team_totals(team_box_score):
-        """Sum all player stats from box_score to get team totals."""
-        totals = {
-            "FGM": 0, "FGA": 0, "TO": 0, "STL": 0,
-            "DREB": 0, "OREB": 0
-        }
-        if isinstance(team_box_score, dict):
-            for player_stats in team_box_score.values():
-                if isinstance(player_stats, dict):
-                    totals["FGM"] += player_stats.get("FGM", 0)
-                    totals["FGA"] += player_stats.get("FGA", 0)
-                    totals["TO"] += player_stats.get("TO", 0)
-                    totals["STL"] += player_stats.get("STL", 0)
-                    totals["DREB"] += player_stats.get("DREB", 0)
-                    totals["OREB"] += player_stats.get("OREB", 0)
-        return totals
-    
-    home_totals = calculate_team_totals_from_sources(canonical_home_team_id, home_team_name, team_totals_obj, box_score)
-    away_totals = calculate_team_totals_from_sources(canonical_away_team_id, away_team_name, team_totals_obj, box_score)
-    home_scouting = calculate_special_situations_from_sources(
-        home_team_name, home_team_obj, team_stats_obj, team_id_label=canonical_home_team_id
-    )
-    away_scouting = calculate_special_situations_from_sources(
-        away_team_name, away_team_obj, team_stats_obj, team_id_label=canonical_away_team_id
-    )
+    home_team_name = eog_inputs.get("home", {}).get("team_name", canonical_home_team_id)
+    away_team_name = eog_inputs.get("away", {}).get("team_name", canonical_away_team_id)
+    home_totals = eog_inputs.get("home", {}).get("totals", {})
+    away_totals = eog_inputs.get("away", {}).get("totals", {})
+    home_scouting = eog_inputs.get("home", {}).get("scouting", {})
+    away_scouting = eog_inputs.get("away", {}).get("scouting", {})
 
     logger.info(
-        "🔍 [UPDATE-TEAM-ATTRS] EOG source snapshot home=%s[%s] (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s) away=%s[%s] (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s), team_stats_keys=%s",
+        "🔍 [UPDATE-TEAM-ATTRS] EOG canonical snapshot source=%s home=%s[%s] (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s) away=%s[%s] (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s)",
+        eog_inputs.get("source", "unknown"),
         home_team_name,
         canonical_home_team_id,
         home_scouting.get("fb_rate", 0),
@@ -274,7 +245,11 @@ def update_team_attributes_after_game(
         away_scouting.get("fb_rate", 0),
         away_scouting.get("pt_combined_rate", 0),
         away_scouting.get("pt_total_attempts", 0),
-        list(team_stats_obj.keys()) if isinstance(team_stats_obj, dict) else [],
+    )
+    logger.info(
+        "🧪 [EOG-INPUTS-DEBUG] game_id=%s eog_inputs=%s",
+        str(game_doc.get("_id")),
+        eog_inputs,
     )
     
     # Calculate attribute changes for each team. team_object_id = ObjectId for FTD; team_id_label = string for logging.

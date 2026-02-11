@@ -44,6 +44,38 @@ def calculate_pt_opp_modifier_change(opponent_scouting: dict) -> int:
     return random.randint(-2, -1)
 
 
+def _calculate_special_situations_from_team_scouting(team_obj: dict) -> dict:
+    """
+    Build FB/PT special-situations metrics from teams[team_id].scouting only.
+    This is the canonical source for finalized game performance metrics.
+    """
+    offense = (team_obj or {}).get("scouting", {}).get("offense", {})
+    defense = (team_obj or {}).get("scouting", {}).get("defense", {})
+
+    fb_entries = offense.get("Fast_Break_Entries", 0)
+    fb_success = offense.get("Fast_Break_Success", 0)
+    fb_rate = (fb_success / fb_entries * 100) if fb_entries > 0 else 0
+
+    hct = defense.get("HCT", {})
+    hct_used = hct.get("used", 0)
+    hct_success = hct.get("success", 0)
+
+    fcp = defense.get("FCP", {})
+    fcp_used = fcp.get("used", 0)
+    fcp_success = fcp.get("success", 0)
+
+    pt_total_attempts = hct_used + fcp_used
+    pt_total_successes = hct_success + fcp_success
+    pt_combined_rate = (pt_total_successes / pt_total_attempts * 100) if pt_total_attempts > 0 else 0
+
+    return {
+        "fb_rate": fb_rate,
+        "fb_entries": fb_entries,
+        "pt_combined_rate": pt_combined_rate,
+        "pt_total_attempts": pt_total_attempts,
+    }
+
+
 def calculate_team_totals_from_sources(
     team_id_label: str,
     team_name: str,
@@ -132,4 +164,55 @@ def calculate_special_situations_from_sources(
         "fb_entries": fb_entries,
         "pt_combined_rate": pt_combined_rate,
         "pt_total_attempts": pt_total_attempts,
+    }
+
+
+def build_eog_inputs_from_game_doc(game_doc: dict, home_team_id: str, away_team_id: str) -> dict:
+    """
+    Build canonical EOG inputs from a single frozen game snapshot.
+    Returns:
+    {
+      "home": {"team_id", "team_name", "totals", "scouting"},
+      "away": {"team_id", "team_name", "totals", "scouting"},
+      "source": "teams.scouting+team_totals_or_box_score"
+    }
+    """
+    teams_obj = (game_doc or {}).get("teams", {})
+    team_totals_obj = (game_doc or {}).get("team_totals", {})
+    box_score = (game_doc or {}).get("box_score", {})
+
+    home_team_obj = teams_obj.get(home_team_id, {}) if isinstance(teams_obj, dict) else {}
+    away_team_obj = teams_obj.get(away_team_id, {}) if isinstance(teams_obj, dict) else {}
+
+    home_team_name = (
+        home_team_obj.get("name")
+        or ((game_doc or {}).get("home_team", {}).get("name") if isinstance((game_doc or {}).get("home_team"), dict) else (game_doc or {}).get("home_team"))
+        or home_team_id
+    )
+    away_team_name = (
+        away_team_obj.get("name")
+        or ((game_doc or {}).get("away_team", {}).get("name") if isinstance((game_doc or {}).get("away_team"), dict) else (game_doc or {}).get("away_team"))
+        or away_team_id
+    )
+
+    home_totals = calculate_team_totals_from_sources(home_team_id, home_team_name, team_totals_obj, box_score)
+    away_totals = calculate_team_totals_from_sources(away_team_id, away_team_name, team_totals_obj, box_score)
+
+    home_scouting = _calculate_special_situations_from_team_scouting(home_team_obj)
+    away_scouting = _calculate_special_situations_from_team_scouting(away_team_obj)
+
+    return {
+        "home": {
+            "team_id": home_team_id,
+            "team_name": home_team_name,
+            "totals": home_totals,
+            "scouting": home_scouting,
+        },
+        "away": {
+            "team_id": away_team_id,
+            "team_name": away_team_name,
+            "totals": away_totals,
+            "scouting": away_scouting,
+        },
+        "source": "teams.scouting+team_totals_or_box_score",
     }
