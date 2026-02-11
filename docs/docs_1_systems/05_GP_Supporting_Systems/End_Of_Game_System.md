@@ -213,3 +213,17 @@ The End of Game System handles game completion, displays final scores, and provi
 - **Processing rule:** Build and persist `eog_inputs` once, then compute all EOG attribute changes from `eog_inputs` only.
 - **Postgame display rule:** Box Score "Special Situations" (Fast Breaks, HC Traps, FC Presses) should read from `eog_inputs.*.scouting` so displayed rates match EOG calculations exactly.
 - **Why this method:** Prevents source drift between `team_stats`, `teams.scouting`, and totals; keeps EOG deltas deterministic and aligned to final game state.
+
+### EOG Persistence Guardrails (February 2026)
+
+- **Issue observed:** EOG logs showed `totals_source=none` and zero team totals/scouting during `complete-week`, causing incorrect deltas (for example PT/FB opponent modifiers and discipline).
+- **Root cause:** Mixed game `_id` handling in franchise flow could create/read two docs for the same game:
+  - canonical gameplay doc with `_id` as **string** (full teams/totals/scouting),
+  - partial metadata doc with `_id` as **ObjectId** (missing totals).
+- **Fix implemented:**
+  - `complete_week()` now persists the provided `game_document` snapshot before EOG runs.
+  - `_save_game_result()` now prefers string `_id` to avoid creating new ObjectId clone docs.
+  - `update_team_attributes_after_game()` now evaluates both `_id` variants and selects the richer doc for EOG (`[EOG-GAME-DOC-SELECT]` log).
+- **Expected log health:**
+  - `🧪 [EOG-SNAPSHOT-SOURCES]` should report `teams.totals` or `teams.box_score` (not `none`) for completed games.
+  - `🧭 [EOG-GAME-DOC-SELECT]` should show which candidate doc was used and its richness score.

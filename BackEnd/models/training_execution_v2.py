@@ -663,13 +663,13 @@ def _apply_player_training_points(
 def _training_camp_bonus_range_for_ch(ch_value: int) -> Optional[Tuple[int, int]]:
     """Return training-camp bonus range based on CH value."""
     if ch_value > 80:
-        return (1, 6)
+        return (4, 8)
     if ch_value > 60:
-        return (1, 4)
+        return (3, 6)
     if ch_value > 40:
-        return (0, 3)
+        return (2, 4)
     if ch_value > 20:
-        return (0, 2)
+        return (1, 2)
     return None
 
 

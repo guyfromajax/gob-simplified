@@ -125,12 +125,15 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
                 "anchor_IQ": 50, "IQ": 50,
             },
         }
-        with patch.object(random, "randint", return_value=3):
+        with patch.object(random, "randint", return_value=4) as fake_randint:
             _apply_training_camp_bonus([player])
 
-        self.assertEqual(player["attributes"]["anchor_PS"], 53)
-        self.assertEqual(player["attributes"]["anchor_BH"], 53)
-        self.assertEqual(player["attributes"]["anchor_IQ"], 53)
+        self.assertEqual(player["attributes"]["anchor_PS"], 54)
+        self.assertEqual(player["attributes"]["anchor_BH"], 54)
+        self.assertEqual(player["attributes"]["anchor_IQ"], 54)
+        self.assertEqual(fake_randint.call_count, 3)
+        for call in fake_randint.call_args_list:
+            self.assertEqual(call.args, (4, 8))
 
     def test_training_camp_bonus_sf_uses_ag_plus_two_random_attrs(self):
         player = {
@@ -145,14 +148,17 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
                 "anchor_OD": 40, "OD": 40,
             },
         }
-        with patch.object(random, "sample", return_value=["SC", "ID"]), patch.object(random, "randint", return_value=2):
+        with patch.object(random, "sample", return_value=["SC", "ID"]), patch.object(random, "randint", return_value=3) as fake_randint:
             _apply_training_camp_bonus([player])
 
-        self.assertEqual(player["attributes"]["anchor_AG"], 42)
-        self.assertEqual(player["attributes"]["anchor_SC"], 42)
-        self.assertEqual(player["attributes"]["anchor_ID"], 42)
+        self.assertEqual(player["attributes"]["anchor_AG"], 43)
+        self.assertEqual(player["attributes"]["anchor_SC"], 43)
+        self.assertEqual(player["attributes"]["anchor_ID"], 43)
         self.assertEqual(player["attributes"]["anchor_SH"], 40)
         self.assertEqual(player["attributes"]["anchor_OD"], 40)
+        self.assertEqual(fake_randint.call_count, 3)
+        for call in fake_randint.call_args_list:
+            self.assertEqual(call.args, (3, 6))
 
     def test_eog_totals_source_prefers_team_totals_over_box_score(self):
         team_totals_obj = {
