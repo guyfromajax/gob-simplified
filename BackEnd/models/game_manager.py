@@ -535,10 +535,16 @@ class GameManager:
             
             # Check both teams - should_computer_call_timeout will filter out user teams
             computer_teams_to_check = []
-            if not self.home_team.is_user_team:
-                computer_teams_to_check.append(self.home_team)
-            if not self.away_team.is_user_team:
-                computer_teams_to_check.append(self.away_team)
+            # In full simulation, allow the user team to use the same timeout logic silently.
+            # In turn-by-turn, keep user timeouts manual-only.
+            is_full_simulation = self.game_state.get("_is_full_simulation", False)
+            if is_full_simulation:
+                computer_teams_to_check = [self.home_team, self.away_team]
+            else:
+                if not self.home_team.is_user_team:
+                    computer_teams_to_check.append(self.home_team)
+                if not self.away_team.is_user_team:
+                    computer_teams_to_check.append(self.away_team)
             
             for computer_team in computer_teams_to_check:
                 if self.turn_manager.should_computer_call_timeout(computer_team, "SIDE_INBOUND"):
@@ -626,10 +632,16 @@ class GameManager:
             
             # Check both teams - should_computer_call_timeout will filter out user teams
             computer_teams_to_check = []
-            if not self.home_team.is_user_team:
-                computer_teams_to_check.append(self.home_team)
-            if not self.away_team.is_user_team:
-                computer_teams_to_check.append(self.away_team)
+            # In full simulation, allow the user team to use the same timeout logic silently.
+            # In turn-by-turn, keep user timeouts manual-only.
+            is_full_simulation = self.game_state.get("_is_full_simulation", False)
+            if is_full_simulation:
+                computer_teams_to_check = [self.home_team, self.away_team]
+            else:
+                if not self.home_team.is_user_team:
+                    computer_teams_to_check.append(self.home_team)
+                if not self.away_team.is_user_team:
+                    computer_teams_to_check.append(self.away_team)
             
             for computer_team in computer_teams_to_check:
                 if self.turn_manager.should_computer_call_timeout(computer_team, "BASELINE_INBOUND"):
@@ -992,7 +1004,6 @@ class GameManager:
         
         # Print defense score statistics
         self.shot_manager.print_defense_score_stats()
-
 
 
 
