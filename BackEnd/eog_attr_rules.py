@@ -217,10 +217,57 @@ def build_eog_inputs_from_game_doc(game_doc: dict, home_team_id: str, away_team_
         or away_team_id
     )
 
-    home_totals = calculate_team_totals_from_sources(home_team_id, home_team_name, team_totals_obj, box_score)
-    away_totals = calculate_team_totals_from_sources(away_team_id, away_team_name, team_totals_obj, box_score)
-    home_totals_source = "team_totals_or_box_score"
-    away_totals_source = "team_totals_or_box_score"
+    home_totals = {}
+    away_totals = {}
+    home_totals_source = "none"
+    away_totals_source = "none"
+
+    # Primary source: unified teams object persisted by summarize_game_state.
+    home_team_totals = (home_team_obj or {}).get("totals", {})
+    if isinstance(home_team_totals, dict) and home_team_totals.get("FGA", 0) > 0:
+        home_totals = {
+            "FGM": home_team_totals.get("FGM", 0),
+            "FGA": home_team_totals.get("FGA", 0),
+            "TO": home_team_totals.get("TO", 0),
+            "STL": home_team_totals.get("STL", 0),
+            "DREB": home_team_totals.get("DREB", 0),
+            "OREB": home_team_totals.get("OREB", 0),
+        }
+        home_totals_source = "teams.totals"
+    else:
+        home_team_box = (home_team_obj or {}).get("box_score", {})
+        home_team_box_totals = _aggregate_from_box(home_team_box)
+        if home_team_box_totals.get("FGA", 0) > 0:
+            home_totals = home_team_box_totals
+            home_totals_source = "teams.box_score"
+
+    away_team_totals = (away_team_obj or {}).get("totals", {})
+    if isinstance(away_team_totals, dict) and away_team_totals.get("FGA", 0) > 0:
+        away_totals = {
+            "FGM": away_team_totals.get("FGM", 0),
+            "FGA": away_team_totals.get("FGA", 0),
+            "TO": away_team_totals.get("TO", 0),
+            "STL": away_team_totals.get("STL", 0),
+            "DREB": away_team_totals.get("DREB", 0),
+            "OREB": away_team_totals.get("OREB", 0),
+        }
+        away_totals_source = "teams.totals"
+    else:
+        away_team_box = (away_team_obj or {}).get("box_score", {})
+        away_team_box_totals = _aggregate_from_box(away_team_box)
+        if away_team_box_totals.get("FGA", 0) > 0:
+            away_totals = away_team_box_totals
+            away_totals_source = "teams.box_score"
+
+    # Fallback sources for legacy documents.
+    if not home_totals.get("FGA"):
+        home_totals = calculate_team_totals_from_sources(home_team_id, home_team_name, team_totals_obj, box_score)
+        if home_totals.get("FGA"):
+            home_totals_source = "team_totals_or_box_score"
+    if not away_totals.get("FGA"):
+        away_totals = calculate_team_totals_from_sources(away_team_id, away_team_name, team_totals_obj, box_score)
+        if away_totals.get("FGA"):
+            away_totals_source = "team_totals_or_box_score"
 
     # Fallback for legacy/nested saves where top-level totals/box_score may be missing.
     if not home_totals.get("FGA"):

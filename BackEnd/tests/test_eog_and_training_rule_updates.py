@@ -369,6 +369,37 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
         self.assertEqual(eog_inputs["home"]["totals_source"], "home_team.box_score")
         self.assertEqual(eog_inputs["away"]["totals_source"], "away_team.box_score")
 
+    def test_build_eog_inputs_prefers_unified_teams_totals(self):
+        game_doc = {
+            "teams": {
+                "A": {
+                    "name": "Alpha",
+                    "totals": {"FGM": 9, "FGA": 20, "TO": 3, "STL": 4, "DREB": 10, "OREB": 3},
+                    "box_score": {
+                        "p1": {"FGM": 1, "FGA": 1, "TO": 1, "STL": 1, "DREB": 1, "OREB": 1}
+                    },
+                    "scouting": {"offense": {}, "defense": {}},
+                },
+                "B": {
+                    "name": "Beta",
+                    "totals": {"FGM": 7, "FGA": 19, "TO": 2, "STL": 2, "DREB": 9, "OREB": 4},
+                    "box_score": {
+                        "p2": {"FGM": 1, "FGA": 1, "TO": 1, "STL": 1, "DREB": 1, "OREB": 1}
+                    },
+                    "scouting": {"offense": {}, "defense": {}},
+                },
+            },
+            "team_totals": {
+                "Alpha": {"FGM": 99, "FGA": 99, "TO": 99, "STL": 99, "DREB": 99, "OREB": 99},
+                "Beta": {"FGM": 88, "FGA": 88, "TO": 88, "STL": 88, "DREB": 88, "OREB": 88},
+            },
+        }
+        eog_inputs = build_eog_inputs_from_game_doc(game_doc, "A", "B")
+        self.assertEqual(eog_inputs["home"]["totals"]["FGA"], 20)
+        self.assertEqual(eog_inputs["away"]["totals"]["FGA"], 19)
+        self.assertEqual(eog_inputs["home"]["totals_source"], "teams.totals")
+        self.assertEqual(eog_inputs["away"]["totals_source"], "teams.totals")
+
 
 if __name__ == "__main__":
     unittest.main()
