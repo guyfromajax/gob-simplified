@@ -413,8 +413,10 @@ def simulate_quarter(
         while len(team.points_by_quarter) < q:
             team.points_by_quarter.append(0)
     gm.game_state["points_by_quarter"] = {
-        gm.home_team.name: gm.home_team.points_by_quarter,
-        gm.away_team.name: gm.away_team.points_by_quarter,
+        # Mirror for backward compatibility; keep as copies to avoid aliasing
+        # (which would double-count when record_team_points increments both).
+        gm.home_team.name: list(gm.home_team.points_by_quarter),
+        gm.away_team.name: list(gm.away_team.points_by_quarter),
     }
 
     # Reset fouls for the upcoming quarter (time_remaining and clock already reset earlier)
