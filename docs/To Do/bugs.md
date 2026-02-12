@@ -27,6 +27,10 @@
 27. Getting some (approx 2) instances per quarter when, when pressing Sim Quarter and the game progresses, teh game temporarily reverts the scoreboard to a previous state. Note is does revert back to the correct score, so this is clearly an edge case tha tis accessing a past game state for a finite amount of time
 28. "Play Quarter" button requires two clicks to start game on first page load - first click does nothing because click handler isn't attached yet
 29. Stale data on initial page load - TOL shows 5, scores incorrect, player NG shows 100% until first turn processes
+30. Franchise mode in-game Playbooks/Game Plan persistence can diverge between DB and live gameplay.
+   - Symptom: settings saved from FCC persist; settings changed during active gameplay may not take effect immediately in court sim.
+   - Root cause hypothesis: DB save succeeds, but live `GameManager` team settings are not always updated on the same code path/team-id resolution branch.
+   - Risk: UI pages can show updated settings while live possession logic still uses stale in-memory settings.
 
 
 ## Future Cleanup (Non-Critical Warnings)

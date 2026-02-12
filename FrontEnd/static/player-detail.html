@@ -341,6 +341,7 @@
     </div>
   </div>
 
+  <script src="/js/config/api-config.js"></script>
   <script>
     const ATTRIBUTE_GROUPS = {
       OFFENSE: ['SC', 'SH'],
@@ -369,6 +370,10 @@
     async function loadPlayerData() {
       const params = new URLSearchParams(window.location.search);
       const playerId = params.get('id');
+      const mode = params.get('mode');
+      const franchiseId = params.get('franchise_id');
+      const tournamentId = params.get('tournament_id');
+      const gameId = params.get('game_id');
       
       if (!playerId) {
         showError('No player ID provided');
@@ -376,8 +381,14 @@
       }
 
       try {
-        const backendURL = window.location.origin;
-        const response = await fetch(`${backendURL}/player/${playerId}`);
+        const qs = new URLSearchParams();
+        if (mode) qs.set('mode', mode);
+        if (franchiseId) qs.set('franchise_id', franchiseId);
+        if (tournamentId) qs.set('tournament_id', tournamentId);
+        if (gameId) qs.set('game_id', gameId);
+
+        const apiUrl = API_CONFIG.buildUrl(`/player/${encodeURIComponent(playerId)}`);
+        const response = await fetch(qs.toString() ? `${apiUrl}?${qs.toString()}` : apiUrl);
         
         if (!response.ok) {
           throw new Error(`Failed to load player: ${response.statusText}`);
@@ -563,6 +574,13 @@
     }
 
     function goBack() {
+      const params = new URLSearchParams(window.location.search);
+      const returnUrl = params.get('return_url');
+      if (returnUrl) {
+        window.location.href = returnUrl;
+        return;
+      }
+
       // Try to go back in history, otherwise redirect to homepage
       if (window.history.length > 1) {
         window.history.back();
@@ -599,4 +617,3 @@
   <script src="/js/shared/attributeTooltips.js"></script>
 </body>
 </html>
-
