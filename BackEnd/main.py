@@ -582,6 +582,26 @@ def simulate_quarter(
         seconds = gm.game_state["time_remaining"] % 60
         gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
 
+    def _has_pending_terminal_free_throw(_gm: GameManager) -> bool:
+        """
+        True when a free throw sequence is still pending and must be resolved
+        even if time_remaining reached 0.
+        """
+        if (_gm.game_state.get("free_throws_remaining", 0) or 0) > 0:
+            return True
+        if _gm.game_state.get("offensive_state") == "FREE_THROW":
+            return True
+        if _gm.turns and isinstance(_gm.turns[-1], dict):
+            last_turn = _gm.turns[-1]
+            if last_turn.get("next_play_type") == "FREE_THROW":
+                return True
+            if (
+                last_turn.get("current_turn") == "FREE_THROW"
+                and (last_turn.get("free_throws_remaining", 0) or 0) > 0
+            ):
+                return True
+        return False
+
     # TURN-BY-TURN MODE: If enabled, skip the full simulation loop
     # Frontend will call /api/simulate-turn repeatedly instead
     if not turn_by_turn_mode:
@@ -596,7 +616,7 @@ def simulate_quarter(
 
         logging.info(f"🏀 Starting full simulation of Q{gm.quarter}, initial time_remaining={gm.game_state['time_remaining']}")
         
-        while gm.game_state["time_remaining"] > 0:
+        while gm.game_state["time_remaining"] > 0 or _has_pending_terminal_free_throw(gm):
             turn_count += 1
             if turn_count > max_turns:
                 logging.error(f"🚨 Infinite loop detected! Exceeded {max_turns} turns. time_remaining={gm.game_state['time_remaining']}, quarter={gm.quarter}")
@@ -1271,5 +1291,4 @@ def run_simulation(home_team_name, away_team_name, home_lineup_ids=None, away_li
 
     # with open("aggregated_stats.json", "w") as f:
     #     json.dump(aggregates, f, indent=2)
-
 

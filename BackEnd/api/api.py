@@ -3595,6 +3595,30 @@ try:
         return JSONResponse(content=frontend_summary, status_code=200)
     
     
+    def _has_pending_terminal_free_throw(gm) -> bool:
+        """
+        True when a free throw sequence is still pending and must be resolved,
+        even if time_remaining has reached 0.
+        """
+        try:
+            if (gm.game_state.get("free_throws_remaining", 0) or 0) > 0:
+                return True
+            if gm.game_state.get("offensive_state") == "FREE_THROW":
+                return True
+            if gm.turns and isinstance(gm.turns[-1], dict):
+                last_turn = gm.turns[-1]
+                if last_turn.get("next_play_type") == "FREE_THROW":
+                    return True
+                if (
+                    last_turn.get("current_turn") == "FREE_THROW"
+                    and (last_turn.get("free_throws_remaining", 0) or 0) > 0
+                ):
+                    return True
+        except Exception:
+            # Defensive fallback: never block normal completion on helper failure.
+            return False
+        return False
+
     @app.post("/api/simulate-turn")
     @_rate_limit_turn
     def simulate_turn_endpoint(request: Request, body: TurnSimulationRequest):
@@ -3618,7 +3642,13 @@ try:
             )
         
         # Log lineup state when simulate-turn is called
-        logging.info(f"🏀 simulate-turn: Retrieved game from ongoing_games, home_lineup_keys={list(gm.home_team.lineup.keys()) if gm.home_team.lineup else 'EMPTY'}, away_lineup_keys={list(gm.away_team.lineup.keys()) if gm.away_team.lineup else 'EMPTY'}")
+        home_lineup = getattr(gm.home_team, "lineup", None)
+        away_lineup = getattr(gm.away_team, "lineup", None)
+        logging.info(
+            f"🏀 simulate-turn: Retrieved game from ongoing_games, "
+            f"home_lineup_keys={list(home_lineup.keys()) if home_lineup else 'EMPTY'}, "
+            f"away_lineup_keys={list(away_lineup.keys()) if away_lineup else 'EMPTY'}"
+        )
         
         # Apply user overrides for THIS turn only
         if body.offense_override:
@@ -3629,8 +3659,11 @@ try:
             gm.game_state["user_defense_override"] = body.defense_override
             logging.info(f"🎮 User defense override: {body.defense_override}")
         
-        # Check if quarter is already over
-        if gm.game_state["time_remaining"] <= 0:
+        pending_terminal_ft = _has_pending_terminal_free_throw(gm)
+
+        # Check if quarter is already over.
+        # Edge-case rule: at 0:00, only continue if a free throw sequence is pending.
+        if gm.game_state["time_remaining"] <= 0 and not pending_terminal_ft:
             early_return = {
                 "quarter_complete": True,
                 "game_id": game_id,
@@ -3647,40 +3680,53 @@ try:
             #     f"quarter={gm.quarter}, total: {total_time:.2f}ms"
             # )
             return JSONResponse(content=early_return, status_code=200)
+        elif gm.game_state["time_remaining"] <= 0 and pending_terminal_ft:
+            logging.warning(
+                "🧭 [EOG-EDGE] time_remaining=0 but pending FT sequence detected; continuing turn simulation"
+            )
         
         # ✅ TIMEOUT: Check if last turn is a TIMEOUT turn (user-initiated or foul out)
         # If so, return it immediately without simulating a new turn
         if gm.turns and isinstance(gm.turns[-1], dict) and gm.turns[-1].get("result_type") == "TIMEOUT":
-            timeout_turn = gm.turns[-1]
-            logging.info(f"⏸️ TIMEOUT: Returning existing TIMEOUT turn (reason: {timeout_turn.get('timeout_reason')})")
-            # Remove the TIMEOUT turn from turns so next API call can simulate the actual next turn
-            gm.turns.pop()
-            return JSONResponse(
-                content={
-                    "turn": timeout_turn,
-                    "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
-                    "time_remaining": gm.game_state["time_remaining"],
-                    "clock": gm.game_state.get("clock", "8:00"),
-                    "quarter_complete": False,
-                    "quarter": gm.quarter,
-                    "is_final": False,
-                    "home_score": gm.score.get(gm.home_team.name, 0),
-                    "away_score": gm.score.get(gm.away_team.name, 0),
-                    "home_team_fouls": gm.home_team.team_fouls,
-                    "away_team_fouls": gm.away_team.team_fouls,
-                    "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
-                    "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
-                    "offense_team": gm.offense_team.name,
-                    "defense_team": gm.defense_team.name,
-                    "game_id": game_id,
-                    "box_score": gm.get_box_score(),
-                    "team_totals": {
-                        gm.home_team.name: gm.home_team.get_team_game_stats(),
-                        gm.away_team.name: gm.away_team.get_team_game_stats()
-                    }
-                },
-                status_code=200,
-            )
+            # Edge-case rule: if clock is 0 and FT is pending, skip timeout UX and
+            # resolve FT/endgame directly.
+            if gm.game_state["time_remaining"] <= 0 and pending_terminal_ft:
+                skipped_timeout = gm.turns.pop()
+                logging.warning(
+                    "🧭 [EOG-EDGE] Skipping TIMEOUT turn at 0:00 to resolve pending FT (reason=%s)",
+                    skipped_timeout.get("timeout_reason"),
+                )
+            else:
+                timeout_turn = gm.turns[-1]
+                logging.info(f"⏸️ TIMEOUT: Returning existing TIMEOUT turn (reason: {timeout_turn.get('timeout_reason')})")
+                # Remove the TIMEOUT turn from turns so next API call can simulate the actual next turn
+                gm.turns.pop()
+                return JSONResponse(
+                    content={
+                        "turn": timeout_turn,
+                        "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
+                        "time_remaining": gm.game_state["time_remaining"],
+                        "clock": gm.game_state.get("clock", "8:00"),
+                        "quarter_complete": False,
+                        "quarter": gm.quarter,
+                        "is_final": False,
+                        "home_score": gm.score.get(gm.home_team.name, 0),
+                        "away_score": gm.score.get(gm.away_team.name, 0),
+                        "home_team_fouls": gm.home_team.team_fouls,
+                        "away_team_fouls": gm.away_team.team_fouls,
+                        "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
+                        "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
+                        "offense_team": gm.offense_team.name,
+                        "defense_team": gm.defense_team.name,
+                        "game_id": game_id,
+                        "box_score": gm.get_box_score(),
+                        "team_totals": {
+                            gm.home_team.name: gm.home_team.get_team_game_stats(),
+                            gm.away_team.name: gm.away_team.get_team_game_stats()
+                        }
+                    },
+                    status_code=200,
+                )
         
         # Simulate ONE turn
         try:
@@ -3788,8 +3834,13 @@ try:
                     "text": " → ".join(t.get("text", "") for t in new_turns)
                 }
             
-            # Check if quarter is now complete
-            quarter_complete = gm.game_state["time_remaining"] <= 0
+            # Check if quarter is now complete.
+            # Edge-case rule: if FT is still pending at 0:00, quarter is NOT complete yet.
+            pending_terminal_ft_after_turn = _has_pending_terminal_free_throw(gm)
+            quarter_complete = (
+                gm.game_state["time_remaining"] <= 0
+                and not pending_terminal_ft_after_turn
+            )
             
             # Debug logging for quarter completion check
             if quarter_complete:
@@ -3797,6 +3848,8 @@ try:
                 turn_text = latest_turn.get("text", "")[:50] if latest_turn else ""
                 time_elapsed = time_before_turn - time_after_turn
                 logging.info(f"✅ [FINAL TURN DEBUG] Quarter complete! time_before_turn={time_before_turn}s, time_after_turn={time_after_turn}s, time_elapsed={time_elapsed}s, clock={gm.game_state.get('clock', 'N/A')}, turn_type={turn_type}, turn_text={turn_text}")
+            elif gm.game_state["time_remaining"] <= 0 and pending_terminal_ft_after_turn:
+                logging.warning("🧭 [EOG-EDGE] Quarter not complete at 0:00 because FT sequence remains pending")
             
             # ✅ QUARTER BREAK RECHARGE: Recharge all players when quarter completes
             # This happens BEFORE game state is saved, so updated NG values are visible on lineup screen
