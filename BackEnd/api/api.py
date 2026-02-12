@@ -4979,7 +4979,7 @@ try:
     
     **Generated:** {request.timestamp}  
     **Game ID:** {request.gameId}  
-    **Quarter:** {body.quarter}  
+    **Quarter:** {request.quarter}  
     **Teams:** {request.homeTeam} vs {request.awayTeam}
     
     ## Summary
@@ -5138,7 +5138,7 @@ try:
     
     **Generated:** {request.timestamp}  
     **Game ID:** {request.gameId}  
-    **Quarter:** {body.quarter}  
+    **Quarter:** {getattr(request, 'quarter', 'N/A')}  
     **Teams:** {request.homeTeam} vs {request.awayTeam}
     
     ## Summary
