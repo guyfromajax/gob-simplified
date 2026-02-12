@@ -986,11 +986,9 @@ function updateCTA(data) {
     simBtn.style.display = 'none';
     simBtn.disabled = true;
     container.style.display = 'none';
-    exitBtn.style.display = 'inline-block';
     return;
   }
 
-  exitBtn.style.display = 'none';
   container.style.display = 'block';
 
   // Check if user is eliminated (need tournament object for bracket data)
@@ -1021,13 +1019,7 @@ function updateCTA(data) {
 // ✅ MIGRATION (Task 6.1): Populate top bar using structured data (aligns with Franchise pattern)
 function populateTop(data) {
   if (!data) return;
-  
-  // Update username (placeholder for tournament mode)
-  const usernameEl = document.querySelector('.username');
-  if (usernameEl) {
-    usernameEl.textContent = data.username || 'Coach';
-  }
-  
+
   // Update team logo
   if (data.team) {
     const formattedTeam = formatTeamName(data.team);
