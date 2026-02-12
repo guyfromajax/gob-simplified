@@ -753,7 +753,10 @@ def record_team_points(game, team, points):
     team_quarters = points_by_quarter_state.setdefault(team.name, [0, 0, 0, 0])
     while len(team_quarters) <= quarter_index:
         team_quarters.append(0)
-    team_quarters[quarter_index] += points
+    # Defensive: if the mirror list accidentally aliases the canonical list,
+    # avoid double-counting. (We still prefer to keep them non-aliased.)
+    if team_quarters is not team.points_by_quarter:
+        team_quarters[quarter_index] += points
 
 def unpack_game_context(game):
     
@@ -1515,4 +1518,3 @@ def calculate_charge(shooter, defender, off_team, def_team):
     if reconciliation > BLOCKING_FOUL_THRESHOLD:
         return "BLOCKING_FOUL"
     return None
-

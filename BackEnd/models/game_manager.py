@@ -132,8 +132,12 @@ class GameManager:
             "defense_team": self.defense_team.name,
             "score": self.score,
             "points_by_quarter": {
-                self.home_team.name: self.home_team.points_by_quarter,
-                self.away_team.name: self.away_team.points_by_quarter
+                # IMPORTANT: Do not alias the TeamManager lists directly here.
+                # Quarter scoring is incremented in both team.points_by_quarter and the
+                # game_state mirror for backward compatibility. If these reference the
+                # same list object, points get double-counted.
+                self.home_team.name: list(self.home_team.points_by_quarter),
+                self.away_team.name: list(self.away_team.points_by_quarter),
             },
             "quarter": self.quarter,
             "time_remaining": 480,
@@ -1023,4 +1027,3 @@ class GameManager:
         
         # Print defense score statistics
         self.shot_manager.print_defense_score_stats()
-
