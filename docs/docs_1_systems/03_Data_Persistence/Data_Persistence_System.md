@@ -940,6 +940,35 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 - `BackEnd/eog_attr_rules.py` - `build_eog_inputs_from_game_doc(...)` canonical snapshot builder
 - `BackEnd/api/franchise_routes.py` - persists `games.eog_inputs` and uses it as the sole EOG calculation source
 
+### Quarter Scoring Canonical Sync ✅ **FIXED** (February 2026)
+
+**Problem:** In some restore/finalization paths, quarter scores in postgame display could drift from final totals due to mixed reads between runtime team arrays and `game_state` mirrors.
+
+**Solution:**
+- Canonical runtime quarter scoring is `team.points_by_quarter`.
+- Every point write now updates both:
+  - `team.points_by_quarter` (source of truth),
+  - `game_state["points_by_quarter"]` (compatibility mirror).
+- Persistence/summary prefers team runtime arrays, with mirror fallback only.
+
+**Files Changed:**
+- `BackEnd/utils/shared.py` - quarter scoring write + summary sourcing
+- `BackEnd/api/api.py` - restore path writes to both runtime arrays and mirror
+- `BackEnd/utils/game_summary_builder.py` - quarter arrays sourced from team runtime state
+
+### Unified Foul-Out Timeout Persistence Path ✅ **FIXED** (February 2026)
+
+**Problem:** Foul-out timeout creation previously had divergence risk from standard timeout creation/persistence flow.
+
+**Solution:**
+- Foul-out timeout now enters the same backend timeout pipeline as user/computer timeout:
+  - `game_manager.call_timeout(...)`
+  - `turn_manager.setup_timeout_turn(...)`
+- This unifies timeout state fields and DB persistence behavior across timeout reasons.
+
+**Files Changed:**
+- `BackEnd/models/game_manager.py`
+
 ### Key Files
 
 **Backend:**

@@ -63,9 +63,16 @@ The timeout system allows game pauses for strategic adjustments, lineup changes,
 - Player fouls out during shot resolution
 - `result["fouled_out"] = True` set in `shot_manager.py`
 - `game_manager.simulate_macro_turn()` detects `fouled_out` flag
-- Captures `timeout_offense_team_id` before creating timeout turn
-- Creates `TIMEOUT` turn with `timeout_reason="FOUL_OUT"`
-- **✅ CRITICAL FIX (January 2025):** Immediately saves game state to database (same pattern as user-initiated timeout)
+- Uses the same unified timeout pipeline as all other timeouts:
+  - `game_manager.call_timeout(...)`
+  - `turn_manager.setup_timeout_turn(...)`
+- Captures/persists `timeout_offense_team_id` before timeout turn creation
+- Creates `TIMEOUT` turn with `timeout_reason="FOUL_OUT"` and standard timeout payload fields
+- Persists state using the same timeout save path used by regular timeouts
+
+**Foul-Out Team Behavior Split:**
+- **User team foul-out:** timeout pauses gameplay and routes user through lineup flow before resume.
+- **Computer team foul-out:** timeout still uses unified backend turn creation/state persistence, but lineup is auto-rebuilt and gameplay continues without user intervention.
 
 **Timeout Turn Payload:**
 ```python
@@ -991,4 +998,3 @@ All three flows use the same core systems:
 
 **Tests:**
 - `tests/test_timeout_functionality.py`: Comprehensive tests for timeout system
-

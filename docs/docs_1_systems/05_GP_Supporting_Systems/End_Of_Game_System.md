@@ -28,11 +28,18 @@
    - Frontend calls `/franchise/save-result` endpoint
    - Player stats are finalized via `stat_updater.finalize_game()`
    - **Team attributes are updated** based on game performance (win/loss, score differential, etc.)
-   - Updated team attributes are saved to `franchise.franchise_teams.{team_id}` and reflected in the game's box score
+   - Updated team attributes are saved via the franchise team data persistence path (FTD) and reflected in the game's box score
 3. **Completion Popup Display**: Shows final score, "Box Score" button, and "Go To Locker Room" button with all navigation parameters
 4. **Navigation Anchor Preservation**: Preserves complete navigation anchor set (mode, doc_id, team_id) for seamless return to command center
 5. **Box Score Navigation**: User can navigate to Box Score page with all context parameters preserved (box score reflects updated team attributes)
 6. **Command Center Navigation**: User can navigate to appropriate Command Center (Tournament, Franchise, or Mode Select) with complete navigation context
+
+### Final-Turn Resolution Guardrail (February 2026)
+
+- At `0:00`, EOG resolution now follows one consistent rule:
+  - If free throws are pending, run the free throws first, then resolve to End of Game or Overtime based on the post-FT score.
+  - If free throws are not pending, resolve directly to End of Game or Overtime (skip other in-turn interruption flows).
+- This prevents final-turn edge cases from skipping score-impacting free throws and keeps quarter/final scoring consistent.
 
 **Team Attributes Update System**
 Team attributes will adjust at the end of game based on the notes below. Note this will replace the team attribute decay we had coded into the Training System.
@@ -46,7 +53,7 @@ Team attributes will adjust at the end of game based on the notes below. Note th
     - winning team: 
       - If game FG% > 50%: -= random.randint(5,15)
       - elif game FG% > 45%: 0
-      - else: += random.randit(5,15)
+      - else: += random.randint(5,15)
     - losing team: += random.randint(10,25)
   - `discipline` (winning and losing team have same criteria)
     - if team TO > (2 * team STL): += random.randint(-3, -2)
@@ -95,7 +102,7 @@ Team attributes will adjust at the end of game based on the notes below. Note th
   - Team statistics (TO, STL, TREB, FG%) come from the current game's box score
   - Fast Break, HC Trap, and FC Press success rates come from the box score's "Special Situations" section
   - Success rates are calculated as: (successes / attempts) * 100%
-  - [FOR REFERENCE ONLY]: Previous deprication rates when run in traning:
+  - [FOR REFERENCE ONLY]: Previous deprecation rates when run in training:
     - Rebound modifier: `+= random.uniform(-0.1, 0)` (pre-training, range from -0.1 to 0)
     - Shot threshold: `+= random.randint(5, 20)`
     - Other team attributes: `+= random.choice([-2, -1, 0])`
