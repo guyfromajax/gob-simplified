@@ -44,6 +44,26 @@ function buildPlayerDetailUrl(playerId) {
   return `/player-detail.html?${qs.toString()}`;
 }
 
+function isGameplayLineupContext() {
+  // During active gameplay/timeouts/quarter resumes, game_id is present.
+  // Pregame lineup flow typically has no game_id yet.
+  return Boolean(gameId);
+}
+
+function applyPlayerDetailLinkBehavior(linkEl, playerId) {
+  if (!linkEl) return;
+  if (isGameplayLineupContext()) {
+    linkEl.removeAttribute('href');
+    linkEl.style.cursor = 'default';
+    linkEl.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    return;
+  }
+  linkEl.href = buildPlayerDetailUrl(playerId);
+}
+
 // ✅ PHASE 2: Validate pointers on page load (if present)
 // Note: game_id is optional for new Q1 games, but if present must be valid
 // franchise_id and tournament_id are required for their respective modes
@@ -564,7 +584,7 @@ function renderRoster() {
       // Make player name a clickable link
       if (idx === 0) {  // First cell is player name
         const link = document.createElement('a');
-        link.href = buildPlayerDetailUrl(p._id);
+        applyPlayerDetailLinkBehavior(link, p._id);
         link.textContent = val ?? '--';
         link.style.color = ng <= 0.89 ? '#fff' : 'inherit';
         link.style.textDecoration = 'none';
@@ -1822,7 +1842,7 @@ function createCardFront(player) {
   
   // Headshot container (clickable link to player detail)
   const headshotLink = document.createElement('a');
-  headshotLink.href = buildPlayerDetailUrl(player._id);
+  applyPlayerDetailLinkBehavior(headshotLink, player._id);
   headshotLink.style.display = 'block';
   headshotLink.style.textDecoration = 'none';
   

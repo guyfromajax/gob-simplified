@@ -22,6 +22,43 @@ let currentView = 'grid'; // 'grid' or 'player'
 const cardFlipState = {}; // Track flip state per player ID
 const dropdownState = {}; // Track dropdown open state per player ID
 
+function getRosterReturnStorageKey() {
+  return [
+    'roster_return_url',
+    mode || 'base',
+    franchiseId || '',
+    tournamentId || '',
+    teamId || teamName || ''
+  ].join(':');
+}
+
+function resolveRosterReturnUrl() {
+  const storageKey = getRosterReturnStorageKey();
+  if (returnUrl) {
+    sessionStorage.setItem(storageKey, returnUrl);
+    return returnUrl;
+  }
+
+  const saved = sessionStorage.getItem(storageKey);
+  if (saved) return saved;
+
+  // Fallback for direct links that didn't include return_url.
+  try {
+    if (document.referrer) {
+      const ref = new URL(document.referrer);
+      if (ref.origin === window.location.origin && !ref.pathname.includes('player-detail.html')) {
+        const relativeRef = `${ref.pathname}${ref.search}`;
+        sessionStorage.setItem(storageKey, relativeRef);
+        return relativeRef;
+      }
+    }
+  } catch (e) {
+    // Ignore referrer parse failures and continue to mode fallback.
+  }
+
+  return null;
+}
+
 function buildPlayerDetailUrl(playerId) {
   const qs = new URLSearchParams();
   qs.set('id', playerId);
@@ -68,9 +105,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function setupBackButton() {
   const backBtn = document.getElementById('back-button');
+  const resolvedReturnUrl = resolveRosterReturnUrl();
   backBtn.addEventListener('click', () => {
-    if (returnUrl) {
-      window.location.href = returnUrl;
+    if (resolvedReturnUrl) {
+      window.location.href = resolvedReturnUrl;
     } else {
       // Build return URL
       let returnPath = '';
