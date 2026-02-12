@@ -32,6 +32,27 @@
    - Root cause hypothesis: DB save succeeds, but live `GameManager` team settings are not always updated on the same code path/team-id resolution branch.
    - Risk: UI pages can show updated settings while live possession logic still uses stale in-memory settings.
 
+31. Timeout flow can crash gameplay session for some users (site unreachable / reload required; occasional game-loss).
+   - User-facing symptom: when timeout is called (user or CPU), gameplay can break and require page reload; in some cases game progress is lost.
+   - Initial triage: likely backend timeout-path reliability (request failure/exception/restart) rather than static host issue.
+   - Investigation checklist:
+     - Capture failing timeout request in browser Network tab (URL/status/payload/timestamp).
+     - Correlate timestamp in Railway logs for timeout endpoints and app restarts.
+     - Check Sentry for timeout-route exceptions at same timestamp.
+   - Mitigation direction:
+     - Ensure game state is persisted before/around timeout transitions.
+     - Add graceful frontend recovery/retry path on timeout-request failure.
+
+32. Intermittent MongoDB `ReplicaSetNoPrimary` write failures in production (`ServerSelectionTimeoutError`, 5s).
+   - Sentry signal: `No replica set members match selector "Primary()"` (example seen on `/api/auth/signup`).
+   - Risk: any write/read path can fail during this window (auth, timeout saves, gameplay persistence), causing user-visible breaks.
+   - Investigation checklist:
+     - Check Mongo Atlas events/metrics at error timestamps for failover/election/maintenance.
+     - Correlate Railway logs at same timestamps for DB connectivity/timeouts across endpoints.
+   - Mitigation direction:
+     - Improve DB retry/recovery handling on critical persistence paths.
+     - Add safe UI fallback/retry when critical writes fail (avoid silent game-state loss).
+
 
 ## Future Cleanup (Non-Critical Warnings)
 

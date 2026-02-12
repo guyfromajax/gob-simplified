@@ -897,10 +897,37 @@ try:
                 logging.warning(f"⚠️ TIMEOUT RESUME: Game {game_id} not found in any document location (mode: {request.mode})")
                 return None
             
-            # Validate that timeout_next_play_type exists
-            if "timeout_next_play_type" not in saved:
-                logging.error(f"❌ TIMEOUT RESUME: timeout_next_play_type missing from saved game {game_id}")
-                return None
+            # Validate/repair timeout_next_play_type.
+            # Older or partially-saved timeout docs can miss this field; infer SIDE_INBOUND
+            # when timeout_offense_team_id is present so resume flow remains deterministic.
+            if not saved.get("timeout_next_play_type"):
+                if saved.get("timeout_offense_team_id"):
+                    inferred_next_play_type = "SIDE_INBOUND"
+                    saved["timeout_next_play_type"] = inferred_next_play_type
+                    try:
+                        games_collection.update_one(
+                            {"_id": game_id},
+                            {"$set": {"timeout_next_play_type": inferred_next_play_type}},
+                        )
+                    except Exception as update_err:
+                        logging.warning(
+                            "⚠️ TIMEOUT RESUME: Failed to persist inferred timeout_next_play_type "
+                            "for game %s: %s",
+                            game_id,
+                            update_err,
+                        )
+                    logging.warning(
+                        "⚠️ TIMEOUT RESUME: timeout_next_play_type missing for game %s; "
+                        "inferred SIDE_INBOUND from timeout_offense_team_id",
+                        game_id,
+                    )
+                else:
+                    logging.warning(
+                        "⚠️ TIMEOUT RESUME: timeout_next_play_type missing from saved game %s "
+                        "and no timeout_offense_team_id present; treating as no timeout resume",
+                        game_id,
+                    )
+                    return None
             
             # ✅ DIAGNOSTIC: Log what settings are loaded from DB during timeout resume
             saved_teams = saved.get("teams", {})
