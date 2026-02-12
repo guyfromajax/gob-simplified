@@ -2434,11 +2434,15 @@ try:
                                 if "totals" in restore_away_team_data:
                                     gm.team_totals[gm.away_team.name] = restore_away_team_data["totals"]
                                 
-                                # Restore points by quarter
+                                # Restore points by quarter (sync team objects + game_state mirror)
                                 if "points_by_quarter" in restore_home_team_data:
-                                    gm.game_state["points_by_quarter"][gm.home_team.name] = restore_home_team_data["points_by_quarter"]
+                                    home_quarters = list(restore_home_team_data["points_by_quarter"] or [0, 0, 0, 0])
+                                    gm.home_team.points_by_quarter = home_quarters
+                                    gm.game_state["points_by_quarter"][gm.home_team.name] = list(home_quarters)
                                 if "points_by_quarter" in restore_away_team_data:
-                                    gm.game_state["points_by_quarter"][gm.away_team.name] = restore_away_team_data["points_by_quarter"]
+                                    away_quarters = list(restore_away_team_data["points_by_quarter"] or [0, 0, 0, 0])
+                                    gm.away_team.points_by_quarter = away_quarters
+                                    gm.game_state["points_by_quarter"][gm.away_team.name] = list(away_quarters)
                                 # ✅ PERFORMANCE: Removed debug logging
                                 
                                 # Restore game_stats_initialized flag to prevent stats reset

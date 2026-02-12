@@ -742,7 +742,18 @@ def record_team_points(game, team, points):
     """
     game.score[team.name] += points
     quarter_index = game.game_state["quarter"] - 1
+
+    # Keep both representations synchronized. team.points_by_quarter is the
+    # canonical runtime source; game_state mirror is maintained for compatibility.
+    while len(team.points_by_quarter) <= quarter_index:
+        team.points_by_quarter.append(0)
     team.points_by_quarter[quarter_index] += points
+
+    points_by_quarter_state = game.game_state.setdefault("points_by_quarter", {})
+    team_quarters = points_by_quarter_state.setdefault(team.name, [0, 0, 0, 0])
+    while len(team_quarters) <= quarter_index:
+        team_quarters.append(0)
+    team_quarters[quarter_index] += points
 
 def unpack_game_context(game):
     
@@ -1237,7 +1248,10 @@ def summarize_game_state(game, exclude_animations=True):
             },
             # Game state fields
             "score": game.score.get(game.home_team.name, 0),
-            "points_by_quarter": game.game_state["points_by_quarter"].get(game.home_team.name, [0, 0, 0, 0]),
+            "points_by_quarter": list(
+                getattr(game.home_team, "points_by_quarter", [])
+                or game.game_state.get("points_by_quarter", {}).get(game.home_team.name, [0, 0, 0, 0])
+            ),
             "team_fouls": game.home_team.team_fouls,
             "timeouts": getattr(game.home_team, 'timeouts', 4),  # Default to 4 if not set (backward compatibility)
             # Data fields (single source of truth)
@@ -1263,7 +1277,10 @@ def summarize_game_state(game, exclude_animations=True):
             },
             # Game state fields
             "score": game.score.get(game.away_team.name, 0),
-            "points_by_quarter": game.game_state["points_by_quarter"].get(game.away_team.name, [0, 0, 0, 0]),
+            "points_by_quarter": list(
+                getattr(game.away_team, "points_by_quarter", [])
+                or game.game_state.get("points_by_quarter", {}).get(game.away_team.name, [0, 0, 0, 0])
+            ),
             "team_fouls": game.away_team.team_fouls,
             "timeouts": getattr(game.away_team, 'timeouts', 4),  # Default to 4 if not set (backward compatibility)
             # Data fields (single source of truth)
@@ -1498,5 +1515,4 @@ def calculate_charge(shooter, defender, off_team, def_team):
     if reconciliation > BLOCKING_FOUL_THRESHOLD:
         return "BLOCKING_FOUL"
     return None
-
 
