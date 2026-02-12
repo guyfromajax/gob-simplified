@@ -1337,7 +1337,9 @@ def summarize_game_state(game, exclude_animations=True):
         
         # Game data
         "turns": turns,  # Animations excluded for database saves
-        "text_log": game.text_log,
+        # text_log is only needed for live/front-end viewing (legacy/debug play-by-play).
+        # Do not persist it to Mongo for normal saves to avoid DB bloat.
+        **({"text_log": game.text_log} if not exclude_animations else {}),
         
         # Players array (for frontend rendering and stats persistence)
         "players": players,
