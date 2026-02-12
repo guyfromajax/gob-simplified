@@ -646,19 +646,34 @@ export function createGameScene(Phaser) {
         emotionEl.textContent = emoji;
         
         // Position and show tooltip
-        updateTooltipPosition(event);
         tooltip.classList.add('visible');
+        updateTooltipPosition(event);
       };
 
       const updateTooltipPosition = (event) => {
         const tooltip = document.getElementById('player-tooltip');
-        if (!tooltip || !tooltip.classList.contains('visible')) return;
-        
-        // Position tooltip near mouse, offset to avoid cursor overlap
+        if (!tooltip) return;
+
         const offsetX = 15;
         const offsetY = 15;
-        tooltip.style.left = `${event.clientX + offsetX}px`;
-        tooltip.style.top = `${event.clientY + offsetY}px`;
+        const pad = 8;
+        const tooltipWidth = tooltip.offsetWidth || 220;
+        const tooltipHeight = tooltip.offsetHeight || 96;
+
+        let left = event.clientX + offsetX;
+        let top = event.clientY + offsetY;
+
+        if (left + tooltipWidth > window.innerWidth - pad) {
+          left = event.clientX - tooltipWidth - offsetX;
+        }
+        if (left < pad) left = pad;
+        if (top + tooltipHeight > window.innerHeight - pad) {
+          top = window.innerHeight - tooltipHeight - pad;
+        }
+        if (top < pad) top = pad;
+
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
       };
 
       const hidePlayerTooltip = () => {
@@ -698,17 +713,33 @@ export function createGameScene(Phaser) {
         effectivenessEl.textContent = effectiveness !== '--' ? `${effectiveness}` : '--';
         
         // Position and show tooltip
-        updatePlayTooltipPosition(event);
         tooltip.classList.add('visible');
+        updatePlayTooltipPosition(event);
       };
       
       const updatePlayTooltipPosition = (event) => {
         const tooltip = document.getElementById('play-tooltip');
         if (!tooltip) return;
-        
+
         const offset = 15;
-        tooltip.style.left = `${event.clientX + offset}px`;
-        tooltip.style.top = `${event.clientY + offset}px`;
+        const pad = 8;
+        const tooltipWidth = tooltip.offsetWidth || 220;
+        const tooltipHeight = tooltip.offsetHeight || 80;
+
+        let left = event.clientX + offset;
+        let top = event.clientY + offset;
+
+        if (left + tooltipWidth > window.innerWidth - pad) {
+          left = event.clientX - tooltipWidth - offset;
+        }
+        if (left < pad) left = pad;
+        if (top + tooltipHeight > window.innerHeight - pad) {
+          top = window.innerHeight - tooltipHeight - pad;
+        }
+        if (top < pad) top = pad;
+
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
       };
       
       const hidePlayTooltip = () => {

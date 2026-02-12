@@ -33,3 +33,13 @@
 **Backend:**
 - `/franchise/scouting-report` endpoint uses shared utility `BackEnd/utils/scouting_utils.py::extract_plays_from_game_document()`
 
+---
+
+## Exit Franchise Button
+
+**Location:** `FrontEnd/static/franchise-command-center.html`, `FrontEnd/static/franchise-command-center.js`, `FrontEnd/static/tournament.css`
+
+**Functionality:**
+- Replaces the old top-left "Coach/Username" text under the team logo.
+- Button label: **Exit Franchise**.
+- On click, exits the active franchise command-center session view and routes user to `/mode-select.html`.
