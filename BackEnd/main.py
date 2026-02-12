@@ -666,7 +666,10 @@ def simulate_quarter(
         _loop_sec = _time.time() - _loop_start
         logging.warning(f"⏱️ [PERF] full_sim loop: Q{gm.quarter} turns={turn_count} loop_time={_loop_sec:.2f}s ({1000*_loop_sec/max(turn_count,1):.0f}ms/turn)")
         logging.info(f"✅ Full simulation complete: Q{gm.quarter} finished after {turn_count} turns, final time_remaining={gm.game_state['time_remaining']}")
+        # Keep gm.quarter and gm.game_state["quarter"] synchronized.
+        # Quarter attribution for points_by_quarter uses game_state["quarter"].
         gm.quarter += 1
+        gm.game_state["quarter"] = gm.quarter
     else:
         # ✅ DEBUG: Explicitly clear flag for turn-by-turn mode (Play Quarter)
         gm.game_state.pop("_is_full_simulation", None)
@@ -1291,4 +1294,3 @@ def run_simulation(home_team_name, away_team_name, home_lineup_ids=None, away_li
 
     # with open("aggregated_stats.json", "w") as f:
     #     json.dump(aggregates, f, indent=2)
-
