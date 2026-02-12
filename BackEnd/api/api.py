@@ -38,6 +38,7 @@ try:
         games_collection,
         tournaments_collection,
         franchises_collection,
+        franchise_players_data_collection,
     )
     from BackEnd.utils.roster_loader import load_roster
     from BackEnd.utils.game_summary_builder import build_game_summary
@@ -4686,7 +4687,13 @@ try:
         return JSONResponse(content=games)
     
     @app.get("/player/{player_id}")
-    def get_player(player_id: str):
+    def get_player(
+        player_id: str,
+        mode: Optional[str] = None,
+        franchise_id: Optional[str] = None,
+        tournament_id: Optional[str] = None,  # reserved for future mode-aware overlays
+        game_id: Optional[str] = None,        # reserved for future mode-aware overlays
+    ):
         try:
             print(f"🔍 Looking up player with ID: {player_id}")
             player = players_collection.find_one({"_id": player_id})
@@ -4699,6 +4706,23 @@ try:
                     # logging.debug(f"📋 Sample player _id format: {sample.get('_id')} (type: {type(sample.get('_id'))})")
                     pass
                 raise HTTPException(status_code=404, detail="Player not found")
+            # Franchise mode: overlay per-franchise player progression if available.
+            # Keep default behavior unchanged for all other modes/contexts.
+            if mode == "franchise" and franchise_id:
+                fpd_doc = franchise_players_data_collection.find_one(
+                    {"franchise_id": str(franchise_id), "player_id": str(player_id)},
+                    {"attributes": 1, "position_ratings": 1, "meta": 1},
+                )
+                if fpd_doc:
+                    if isinstance(fpd_doc.get("attributes"), dict):
+                        player["attributes"] = fpd_doc["attributes"]
+                    if isinstance(fpd_doc.get("position_ratings"), dict):
+                        player["position_ratings"] = fpd_doc["position_ratings"]
+                    if isinstance(fpd_doc.get("meta"), dict):
+                        for key in ("year", "height", "weight", "jersey", "team"):
+                            if key in fpd_doc["meta"]:
+                                player[key] = fpd_doc["meta"][key]
+
             # Debug logging removed - was cluttering logs
             # logging.debug(f"✅ Player found: {player.get('first_name')} {player.get('last_name')}")
             player["_id"] = str(player["_id"])  # ensure JSON serializable

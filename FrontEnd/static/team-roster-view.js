@@ -22,6 +22,16 @@ let currentView = 'grid'; // 'grid' or 'player'
 const cardFlipState = {}; // Track flip state per player ID
 const dropdownState = {}; // Track dropdown open state per player ID
 
+function buildPlayerDetailUrl(playerId) {
+  const qs = new URLSearchParams();
+  qs.set('id', playerId);
+  if (mode) qs.set('mode', mode);
+  if (franchiseId) qs.set('franchise_id', franchiseId);
+  if (tournamentId) qs.set('tournament_id', tournamentId);
+  qs.set('return_url', window.location.pathname + window.location.search);
+  return `/player-detail.html?${qs.toString()}`;
+}
+
 // Attribute groupings for card back
 const ATTR_GROUPS = {
   'OFFENSE': ['SC', 'SH'],
@@ -314,7 +324,7 @@ function renderRoster() {
     // Name with link
     const nameTd = document.createElement('td');
     const nameLink = document.createElement('a');
-    nameLink.href = `/player-detail.html?id=${p._id}`;
+    nameLink.href = buildPlayerDetailUrl(p._id);
     nameLink.textContent = p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
@@ -387,7 +397,7 @@ function renderStats() {
     // Name
     const nameTd = document.createElement('td');
     const nameLink = document.createElement('a');
-    nameLink.href = `/player-detail.html?id=${p._id}`;
+    nameLink.href = buildPlayerDetailUrl(p._id);
     nameLink.textContent = p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
@@ -713,7 +723,7 @@ function createCardFront(player) {
   
   // Headshot container (clickable link to player detail)
   const headshotLink = document.createElement('a');
-  headshotLink.href = `/player-detail.html?id=${player._id}`;
+  headshotLink.href = buildPlayerDetailUrl(player._id);
   headshotLink.style.display = 'block';
   headshotLink.style.textDecoration = 'none';
   
@@ -1062,4 +1072,3 @@ function toggleCardFlip(playerId) {
   card.classList.toggle('flipped');
   cardFlipState[playerId] = card.classList.contains('flipped');
 }
-

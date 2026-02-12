@@ -11,6 +11,16 @@ let userTeamNameForLeaders = null; // Store user team name for leaderboard highl
 let teamColorCache = null; // Cache for team primary colors
 let tournamentRosterData = null; // ✅ SS&S: Store roster data with merged stats (matches Franchise pattern)
 
+function buildPlayerDetailUrl(playerId) {
+  const qs = new URLSearchParams();
+  qs.set('id', playerId);
+  qs.set('mode', 'tournament');
+  const tid = urlTournamentId || tournament?._id || '';
+  if (tid) qs.set('tournament_id', tid);
+  qs.set('return_url', window.location.pathname + window.location.search);
+  return `/player-detail.html?${qs.toString()}`;
+}
+
 // If tournament_id is in URL, use it (overrides localStorage)
 if (urlTournamentId) {
   // Will be loaded in loadTournament() using the URL param
@@ -274,7 +284,7 @@ function renderRoster() {
     // Create player name as clickable link
     const nameTd = document.createElement("td");
     const nameLink = document.createElement("a");
-    nameLink.href = `/player-detail.html?id=${p._id}`;
+    nameLink.href = buildPlayerDetailUrl(p._id);
     nameLink.textContent = p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
@@ -426,7 +436,7 @@ function sortTournamentRoster(columnName, direction) {
     
     const nameTd = document.createElement("td");
     const nameLink = document.createElement("a");
-    nameLink.href = `/player-detail.html?id=${p._id}`;
+    nameLink.href = buildPlayerDetailUrl(p._id);
     nameLink.textContent = p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';

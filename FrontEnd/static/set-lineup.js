@@ -33,6 +33,17 @@ const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 // Note: This is a snapshot of initial URL state - always read from window.location.search when needed
 const gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
 
+function buildPlayerDetailUrl(playerId) {
+  const qs = new URLSearchParams();
+  qs.set('id', playerId);
+  if (modeParam) qs.set('mode', modeParam);
+  if (franchiseId) qs.set('franchise_id', franchiseId);
+  if (tournamentId) qs.set('tournament_id', tournamentId);
+  if (gameId) qs.set('game_id', gameId);
+  qs.set('return_url', window.location.pathname + window.location.search);
+  return `/player-detail.html?${qs.toString()}`;
+}
+
 // ✅ PHASE 2: Validate pointers on page load (if present)
 // Note: game_id is optional for new Q1 games, but if present must be valid
 // franchise_id and tournament_id are required for their respective modes
@@ -553,7 +564,7 @@ function renderRoster() {
       // Make player name a clickable link
       if (idx === 0) {  // First cell is player name
         const link = document.createElement('a');
-        link.href = `/player-detail.html?id=${p._id}`;
+        link.href = buildPlayerDetailUrl(p._id);
         link.textContent = val ?? '--';
         link.style.color = ng <= 0.89 ? '#fff' : 'inherit';
         link.style.textDecoration = 'none';
@@ -1811,7 +1822,7 @@ function createCardFront(player) {
   
   // Headshot container (clickable link to player detail)
   const headshotLink = document.createElement('a');
-  headshotLink.href = `/player-detail.html?id=${player._id}`;
+  headshotLink.href = buildPlayerDetailUrl(player._id);
   headshotLink.style.display = 'block';
   headshotLink.style.textDecoration = 'none';
   
