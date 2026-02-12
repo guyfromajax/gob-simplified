@@ -27,10 +27,12 @@ def build_game_summary(game_manager):
         "score": score,
         "winner": home if score[home] > score[away] else away,
         "quarters": gm.quarter,
-        "points_by_quarter": gm.game_state["points_by_quarter"],
+        "points_by_quarter": {
+            home: list(getattr(gm.home_team, "points_by_quarter", []) or []),
+            away: list(getattr(gm.away_team, "points_by_quarter", []) or []),
+        },
         "box_score": gm.get_box_score(),
         "timestamp": datetime.utcnow().isoformat(),
         "homeTeam": home_obj,
         "awayTeam": away_obj,
     }
-
