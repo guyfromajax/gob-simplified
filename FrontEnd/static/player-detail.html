@@ -406,24 +406,27 @@
 
     function renderPlayerPage(player) {
       const content = document.getElementById('content');
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const staticPrefix = isLocalhost ? '/static' : '';
       
       // Extract data with fallbacks
       const firstName = player.first_name || '';
       const lastName = player.last_name || '';
       const fullName = `${firstName} ${lastName}`.trim() || 'Unknown Player';
-      const team = player.team || 'Free Agent';
+      const rawTeam = player.team || 'Free Agent';
+      const team = normalizeTeamName(rawTeam);
       const height = formatHeight(player.height || player.HT || 75);
       const weight = `${player.weight || player.WT || 200} lbs`;
       // ✅ FIX: Handle jersey number 0 - use explicit check to preserve 0
       const jersey = (typeof player.jersey === 'number') ? player.jersey : (player.jersey !== undefined && player.jersey !== null && player.jersey !== '' ? player.jersey : '');
-      const photo = player.photo || '';
+      const photo = player.photo || `${staticPrefix}/images/players/${player._id}.png`;
       const attributes = player.attributes || {};
       const year = formatYear(player.year);
       
       // Get team info
       const teamId = getTeamId(team);
-      const teamBackground = getTeamBackground(team);
-      const teamLogo = getTeamLogo(team);
+      const teamBackground = getTeamBackground(team, staticPrefix);
+      const teamLogo = getTeamLogo(team, staticPrefix);
       
       content.innerHTML = `
         <div class="header">
@@ -554,21 +557,39 @@
       return teamMap[teamName] || teamName.toUpperCase().replace(/\s+/g, '_');
     }
 
-    function getTeamBackground(teamName) {
-      const normalized = teamName.toLowerCase().replace(/\s+/g, '-');
-      return `/static/images/team-backgrounds/${normalized}-background.png`;
+    function normalizeTeamName(teamName) {
+      if (!teamName) return 'Free Agent';
+      if (teamName.includes('_')) {
+        const byId = {
+          BENTLEY_TRUMAN: 'Bentley-Truman',
+          FOUR_CORNERS: 'Four Corners',
+          LANCASTER: 'Lancaster',
+          LITTLE_YORK: 'Little York',
+          MORRISTOWN: 'Morristown',
+          OCEAN_CITY: 'Ocean City',
+          SOUTH_LANCASTER: 'South Lancaster',
+          XAVIEN: 'Xavien',
+        };
+        return byId[teamName] || teamName.replace(/_/g, ' ');
+      }
+      return teamName;
     }
 
-    function getTeamLogo(teamName) {
+    function getTeamBackground(teamName, staticPrefix = '') {
+      const normalized = teamName.toLowerCase().replace(/\s+/g, '-');
+      return `${staticPrefix}/images/team-backgrounds/${normalized}-background.png`;
+    }
+
+    function getTeamLogo(teamName, staticPrefix = '') {
       const logoMap = {
-        'Bentley-Truman': '/static/images/homepage-logos/Bentley-Truman.png',
-        'Four Corners': '/static/images/homepage-logos/Four Corners.png',
-        'Lancaster': '/static/images/homepage-logos/Lancaster.png',
-        'Little York': '/static/images/homepage-logos/Little York.png',
-        'Morristown': '/static/images/homepage-logos/Morristown.png',
-        'Ocean City': '/static/images/homepage-logos/Ocean City.png',
-        'South Lancaster': '/static/images/homepage-logos/South Lancaster.png',
-        'Xavien': '/static/images/homepage-logos/Xavien.png'
+        'Bentley-Truman': `${staticPrefix}/images/homepage-logos/Bentley-Truman.png`,
+        'Four Corners': `${staticPrefix}/images/homepage-logos/Four Corners.png`,
+        'Lancaster': `${staticPrefix}/images/homepage-logos/Lancaster.png`,
+        'Little York': `${staticPrefix}/images/homepage-logos/Little York.png`,
+        'Morristown': `${staticPrefix}/images/homepage-logos/Morristown.png`,
+        'Ocean City': `${staticPrefix}/images/homepage-logos/Ocean City.png`,
+        'South Lancaster': `${staticPrefix}/images/homepage-logos/South Lancaster.png`,
+        'Xavien': `${staticPrefix}/images/homepage-logos/Xavien.png`
       };
       return logoMap[teamName] || '';
     }
