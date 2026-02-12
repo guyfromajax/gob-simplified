@@ -419,7 +419,8 @@
       const weight = `${player.weight || player.WT || 200} lbs`;
       // ✅ FIX: Handle jersey number 0 - use explicit check to preserve 0
       const jersey = (typeof player.jersey === 'number') ? player.jersey : (player.jersey !== undefined && player.jersey !== null && player.jersey !== '' ? player.jersey : '');
-      const photo = player.photo || `${staticPrefix}/images/players/${player._id}.png`;
+      const fallbackPhoto = `${staticPrefix}/images/players/${player._id}.png`;
+      const photo = normalizePhotoUrl(player.photo, staticPrefix) || fallbackPhoto;
       const attributes = player.attributes || {};
       const year = formatYear(player.year);
       
@@ -447,7 +448,7 @@
         <div class="content-grid">
           <div class="portrait-panel">
             <div class="portrait-container" style="background-image: url('${teamBackground}');">
-              ${photo ? `<img src="${photo}" alt="${fullName}" class="player-headshot">` : ''}
+              ${photo ? `<img src="${photo}" alt="${fullName}" class="player-headshot" onerror="this.onerror=null;this.src='${fallbackPhoto}'">` : ''}
             </div>
             <div class="vitals-bar">
               <div class="vitals-name">${year}</div>
@@ -541,6 +542,21 @@
         'fr': 'Freshman'
       };
       return yearMap[yearStr] || year;
+    }
+
+    function normalizePhotoUrl(photoUrl, staticPrefix = '') {
+      if (!photoUrl || typeof photoUrl !== 'string') return '';
+      const trimmed = photoUrl.trim();
+      if (!trimmed) return '';
+
+      // Normalize legacy local paths to current runtime path strategy.
+      if (trimmed.startsWith('/static/images/')) {
+        return `${staticPrefix}${trimmed.replace(/^\/static/, '')}`;
+      }
+      if (trimmed.startsWith('/images/')) {
+        return `${staticPrefix}${trimmed}`;
+      }
+      return trimmed;
     }
 
     function getTeamId(teamName) {
