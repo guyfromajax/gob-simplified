@@ -47,7 +47,6 @@ const teamIdNameMap = {};
 
 function populateTop(data) {
   if (!data) return;
-  document.querySelector('.username').textContent = data.username || 'User';
   const formattedTeam = formatTeamName(data.team);
   const logoSrc = `/images/homepage-logos/${formattedTeam}.png`;
   document.getElementById('team-logo').src = logoSrc;
@@ -1450,6 +1449,14 @@ window.addEventListener('DOMContentLoaded', () => {
   if (franchiseId) {
     playNowBtn.disabled = false;
   }
+
+  const exitFranchiseBtn = document.getElementById('exit-franchise');
+  if (exitFranchiseBtn) {
+    exitFranchiseBtn.addEventListener('click', () => {
+      window.location.href = '/mode-select.html';
+    });
+  }
+
   init();
 
   // ✅ Phase 4.4: Shared tab management (commandCenterTabs.js)
