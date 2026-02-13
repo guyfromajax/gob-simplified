@@ -1004,15 +1004,15 @@ async function init() {
   updateScoutingButton(topData);
   maybeShowChampionshipCompleteModal(topData);
   
-  if (topData && topData.team) {
-    console.log('Loading franchise roster for team:', topData.team, 'franchiseId:', franchiseId);
+  if (topData && (topData.team_id || topData.team) && userTeamId) {
+    console.log('Loading franchise roster for team_id:', userTeamId, 'franchiseId:', franchiseId);
     if (!franchiseId) {
       console.error('No franchiseId found - cannot load roster');
       return;
     }
     try {
       const rosterStartTime = performance.now();
-      const rosterUrl = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(topData.team)}`)}?franchise_id=${franchiseId}&profile=1`;
+      const rosterUrl = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?franchise_id=${encodeURIComponent(franchiseId)}&profile=1`;
       const stateUrl = `${API_CONFIG.buildUrl('/franchise/state')}?franchise_id=${franchiseId}&profile=1`;
       const result = await RosterLoader.loadRosterWithStats(rosterUrl, stateUrl);
       const rosterEndTime = performance.now();
@@ -1531,14 +1531,13 @@ async function loadTeamData() {
     
     const data = await response.json();
     
-    // Also load players for top scorer lookup
+    // Also load players for top scorer lookup (wire by team_id per Data_Persistence_System / FCC)
     let players = [];
     try {
       const rosterStartTime = performance.now();
-      // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint
-      const rosterResponse = await fetch(`${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(data.team_name || '')}`)}?franchise_id=${encodeURIComponent(franchiseId)}&profile=1`, { headers: API_CONFIG.getAuthHeaders() });
+      const rosterResponse = await fetch(`${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?franchise_id=${encodeURIComponent(franchiseId)}&profile=1`, { headers: API_CONFIG.getAuthHeaders() });
       const rosterEndTime = performance.now();
-      console.log(`⏱️ [PERF] loadTeamData() /roster/${data.team_name || ''} (franchise): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
+      console.log(`⏱️ [PERF] loadTeamData() /roster (team_id): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
       if (rosterResponse.ok) {
         const rosterData = await rosterResponse.json();
         players = rosterData.players || [];
