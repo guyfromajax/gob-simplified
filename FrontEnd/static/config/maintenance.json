@@ -1,5 +1,5 @@
 {
-  "id": "staging-test-2",
+  "id": "default-disabled",
   "enabled": false,
   "starts_at_iso": "",
   "show_minutes_before": 60,
