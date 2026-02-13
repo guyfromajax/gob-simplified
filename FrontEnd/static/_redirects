@@ -1,4 +1,14 @@
 # Netlify redirects file
+
+# Maintenance mode (ENABLE by uncommenting the wildcard rule).
+# These asset rules must come before the wildcard so maintenance.html can load.
+/images/*   /images/:splat   200
+/css/*      /css/:splat      200
+/js/*       /js/:splat       200
+/sounds/*   /sounds/:splat   200
+
+# ENABLE THIS DURING MAINTENANCE:
+# /*        /maintenance.html 200
+
 # Redirect root to homepage.html
 /  /homepage.html  200!
-
