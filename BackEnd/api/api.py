@@ -86,6 +86,35 @@ try:
     # Set IS_ALPHA=true in production for alpha launch, false for public launch
     IS_ALPHA = os.getenv("IS_ALPHA", "false").lower() == "true"
     print(f"🔶 [ALPHA] IS_ALPHA={IS_ALPHA}", file=sys.stderr, flush=True)
+
+    # ============================================================================
+    # MAINTENANCE MODE (Optional - Part C)
+    # ============================================================================
+    # When enabled, block mutation endpoints (POST/PUT/PATCH/DELETE) with a fast 503.
+    # This protects users with already-open tabs during deploys/maintenance.
+    def _maintenance_mode_enabled() -> bool:
+        return os.getenv("MAINTENANCE_MODE", "false").lower() == "true"
+
+    @app.middleware("http")
+    async def maintenance_mode_middleware(request: Request, call_next):
+        # Always allow Railway health checks.
+        if request.url.path.startswith("/health"):
+            return await call_next(request)
+
+        if _maintenance_mode_enabled():
+            method = (request.method or "").upper()
+            if method in ("POST", "PUT", "PATCH", "DELETE"):
+                resp = JSONResponse(
+                    status_code=503,
+                    content={
+                        "error": "maintenance_mode",
+                        "message": "Service temporarily unavailable due to maintenance.",
+                    },
+                )
+                resp.headers["Retry-After"] = "60"
+                return resp
+
+        return await call_next(request)
     
     @app.get("/sentry-debug")
     def sentry_debug():
