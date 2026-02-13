@@ -1,9 +1,8 @@
 {
-  "id": "draft-maintenance-banner",
-  "enabled": false,
+  "id": "staging-test-1",
+  "enabled": true,
   "starts_at_iso": "",
   "show_minutes_before": 60,
   "message": "Maintenance begins soon. Please finish your game to avoid losing progress.",
   "details_url": ""
 }
-
