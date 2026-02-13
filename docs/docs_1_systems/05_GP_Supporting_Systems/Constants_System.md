@@ -10,8 +10,8 @@ This document lists all constants and variables that were previously on the depr
 |-----|---------------|--------|
 | `STANDARD_D_FOUL` | 95 | |
 | `STANDARD_O_FOUL` | 5 | |
-| `HARD_STEAL` | -150 | |
-| `SOFT_STEAL` | -50 | |
+| `HARD_STEAL` | -135 | |
+| `SOFT_STEAL` | -35 | |
 | `HARD_FOUL` | 200 | |
 | `SOFT_FOUL` | 100 | |
 | `STEAL_ATTEMPT` | 30 | |
