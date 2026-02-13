@@ -8,6 +8,19 @@
  * Public pages: homepage, login, signup (and root /)
  */
 (function () {
+  // Always load the maintenance banner script (even on public pages).
+  // authGuard early-returns on public paths, but we still want the banner everywhere.
+  (function loadMaintenanceBanner() {
+    try {
+      var b = document.createElement("script");
+      b.src = "/js/shared/maintenanceBanner.js";
+      b.async = true;
+      (document.head || document.getElementsByTagName("head")[0]).appendChild(b);
+    } catch (e) {
+      // ignore
+    }
+  })();
+
   var publicPaths = [
     "/",
     "/homepage.html",
