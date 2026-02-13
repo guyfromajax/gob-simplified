@@ -593,6 +593,12 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
 - This was the root cause of persistence bugs in TCC/FCC
 - Unified functions ensure consistent key resolution
 
+**Command Center (FCC) data wiring:**
+- **Franchise-level data** (Standings, Schedule, Leaders, Team Stats, Team Traits, Recruits): use **`franchise_id`** only in request URLs.
+- **User's team–scoped data** (Team tab, roster, Training link, Game Plan link): use **`team_id`** (the user's team ObjectId string, e.g. `userTeamId`) as the canonical key. Do **not** wire by team name.
+- **Team tab:** `/franchise/team-data?franchise_id=...&team_id=...`; roster for top-scorer lookup: `/roster/{team_id}?franchise_id=...`. Both use the same `team_id` from URL or command-center/data.
+- **Backend:** `/roster/{team_identifier}` and `/franchise/team-data` accept `team_id` (path or query); roster supports ObjectId string in path. This keeps FCC aligned with FTD keying by `(franchise_id, team_id)`.
+
 ### Complete Flow
 
 #### 1. Pre-Game (FCC/TCC)
