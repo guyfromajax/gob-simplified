@@ -11,6 +11,16 @@ let userTeamNameForLeaders = null; // Store user team name for leaderboard highl
 let teamColorCache = null; // Cache for team primary colors
 let tournamentRosterData = null; // ✅ SS&S: Store roster data with merged stats (matches Franchise pattern)
 
+function buildPlayerDetailUrl(playerId) {
+  const qs = new URLSearchParams();
+  qs.set('id', playerId);
+  qs.set('mode', 'tournament');
+  const tid = urlTournamentId || tournament?._id || '';
+  if (tid) qs.set('tournament_id', tid);
+  qs.set('return_url', window.location.pathname + window.location.search);
+  return `/player-detail.html?${qs.toString()}`;
+}
+
 // If tournament_id is in URL, use it (overrides localStorage)
 if (urlTournamentId) {
   // Will be loaded in loadTournament() using the URL param
@@ -274,7 +284,7 @@ function renderRoster() {
     // Create player name as clickable link
     const nameTd = document.createElement("td");
     const nameLink = document.createElement("a");
-    nameLink.href = `/player-detail.html?id=${p._id}`;
+    nameLink.href = buildPlayerDetailUrl(p._id);
     nameLink.textContent = p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
@@ -426,7 +436,7 @@ function sortTournamentRoster(columnName, direction) {
     
     const nameTd = document.createElement("td");
     const nameLink = document.createElement("a");
-    nameLink.href = `/player-detail.html?id=${p._id}`;
+    nameLink.href = buildPlayerDetailUrl(p._id);
     nameLink.textContent = p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
@@ -976,11 +986,9 @@ function updateCTA(data) {
     simBtn.style.display = 'none';
     simBtn.disabled = true;
     container.style.display = 'none';
-    exitBtn.style.display = 'inline-block';
     return;
   }
 
-  exitBtn.style.display = 'none';
   container.style.display = 'block';
 
   // Check if user is eliminated (need tournament object for bracket data)
@@ -1011,13 +1019,7 @@ function updateCTA(data) {
 // ✅ MIGRATION (Task 6.1): Populate top bar using structured data (aligns with Franchise pattern)
 function populateTop(data) {
   if (!data) return;
-  
-  // Update username (placeholder for tournament mode)
-  const usernameEl = document.querySelector('.username');
-  if (usernameEl) {
-    usernameEl.textContent = data.username || 'Coach';
-  }
-  
+
   // Update team logo
   if (data.team) {
     const formattedTeam = formatTeamName(data.team);

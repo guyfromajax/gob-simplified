@@ -23,6 +23,15 @@ let userTeamNameForLeaders = null; // Store user team name for leaderboard highl
 let teamColorCache = null; // Cache for team primary colors
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
 
+function buildPlayerDetailUrl(playerId) {
+  const qs = new URLSearchParams();
+  qs.set('id', playerId);
+  if (franchiseId) qs.set('mode', 'franchise');
+  if (franchiseId) qs.set('franchise_id', franchiseId);
+  qs.set('return_url', window.location.pathname + window.location.search);
+  return `/player-detail.html?${qs.toString()}`;
+}
+
 const teamMap = {
   "Four Corners": "FC",
   "Bentley-Truman": "BT",
@@ -38,7 +47,6 @@ const teamIdNameMap = {};
 
 function populateTop(data) {
   if (!data) return;
-  document.querySelector('.username').textContent = data.username || 'User';
   const formattedTeam = formatTeamName(data.team);
   const logoSrc = `/images/homepage-logos/${formattedTeam}.png`;
   document.getElementById('team-logo').src = logoSrc;
@@ -404,7 +412,7 @@ function renderTeam(data) {
     // Create player name as clickable link
     const nameTd = document.createElement("td");
     const nameLink = document.createElement("a");
-    nameLink.href = `/player-detail.html?id=${p._id}`;
+    nameLink.href = buildPlayerDetailUrl(p._id);
     nameLink.textContent = p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
@@ -562,7 +570,7 @@ function sortRosterTable(columnName, direction) {
     
     const nameTd = document.createElement("td");
     const nameLink = document.createElement("a");
-    nameLink.href = `/player-detail.html?id=${p._id}`;
+    nameLink.href = buildPlayerDetailUrl(p._id);
     nameLink.textContent = p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
@@ -1441,6 +1449,14 @@ window.addEventListener('DOMContentLoaded', () => {
   if (franchiseId) {
     playNowBtn.disabled = false;
   }
+
+  const exitFranchiseBtn = document.getElementById('exit-franchise');
+  if (exitFranchiseBtn) {
+    exitFranchiseBtn.addEventListener('click', () => {
+      window.location.href = '/mode-select.html';
+    });
+  }
+
   init();
 
   // ✅ Phase 4.4: Shared tab management (commandCenterTabs.js)

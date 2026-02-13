@@ -4191,18 +4191,38 @@
       if (emotionEl) emotionEl.style.display = 'none';
       
       // Position and show tooltip
-      updatePlaycallTooltipPosition(event);
       tooltip.classList.add('visible');
+      updatePlaycallTooltipPosition(event);
     }
     
     function updatePlaycallTooltipPosition(event) {
       const tooltip = document.getElementById('player-tooltip');
-      if (!tooltip || !tooltip.classList.contains('visible')) return;
-      
+      if (!tooltip) return;
+
       const offsetX = 15;
       const offsetY = 15;
-      tooltip.style.left = `${event.clientX + offsetX}px`;
-      tooltip.style.top = `${event.clientY + offsetY}px`;
+      const pad = 8;
+      const tooltipWidth = tooltip.offsetWidth || 220;
+      const tooltipHeight = tooltip.offsetHeight || 96;
+
+      let left = event.clientX + offsetX;
+      let top = event.clientY + offsetY;
+
+      // If tooltip would overflow right edge, place it to the left of cursor.
+      if (left + tooltipWidth > window.innerWidth - pad) {
+        left = event.clientX - tooltipWidth - offsetX;
+      }
+      // Keep within left edge.
+      if (left < pad) left = pad;
+      // Keep within bottom edge.
+      if (top + tooltipHeight > window.innerHeight - pad) {
+        top = window.innerHeight - tooltipHeight - pad;
+      }
+      // Keep within top edge.
+      if (top < pad) top = pad;
+
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
     }
     
     function hidePlaycallHeadshotTooltip() {

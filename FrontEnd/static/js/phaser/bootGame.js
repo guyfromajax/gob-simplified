@@ -1647,19 +1647,11 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       if (response.ok) {
         const result = await response.json();
         
-        // Download markdown file to user's computer
-        if (result.markdownContent) {
-          const blob = new Blob([result.markdownContent], { type: 'text/markdown' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = result.filename;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          
-          console.log(`✅ [FT/FG DIAGNOSTIC] Analysis file downloaded: ${result.filename} (${result.ftMismatchCount || 0} FT mismatches, ${result.fgMismatchCount || 0} FG mismatches)`);
+        // Diagnostics may return markdownContent. Do not trigger browser downloads in production UX.
+        if (result && result.filename) {
+          console.log(
+            `✅ [FT/FG DIAGNOSTIC] Analysis saved (no download): ${result.filename} (${result.ftMismatchCount || 0} FT mismatches, ${result.fgMismatchCount || 0} FG mismatches)`
+          );
         }
       }
     } catch (error) {
@@ -1728,19 +1720,9 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       if (response.ok) {
         const result = await response.json();
         
-        // Download markdown file to user's computer
-        if (result.markdownContent) {
-          const blob = new Blob([result.markdownContent], { type: 'text/markdown' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = result.filename;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          
-          console.log(`✅ [DIAGNOSTIC] Diagnostic file downloaded: ${result.filename} (${result.mismatchCount} mismatches found)`);
+        // Diagnostics may return markdownContent. Do not trigger browser downloads in production UX.
+        if (result && result.filename) {
+          console.log(`✅ [DIAGNOSTIC] Sim Quarter diagnostic saved (no download): ${result.filename} (${result.mismatchCount} mismatches found)`);
         }
       }
     } catch (error) {

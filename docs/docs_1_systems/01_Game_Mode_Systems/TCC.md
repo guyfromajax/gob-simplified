@@ -32,3 +32,13 @@
 **Backend:**
 - `/tournament/scouting-report` endpoint uses shared utility `BackEnd/utils/scouting_utils.py::extract_plays_from_game_document()`
 
+---
+
+## Exit Tournament Button
+
+**Location:** `FrontEnd/static/tournament.html`, `FrontEnd/static/tournament.js`, `FrontEnd/static/tournament.css`
+
+**Functionality:**
+- Replaces the old top-left "Coach/Username" text under the team logo.
+- Button label: **Exit Tournament**.
+- On click, exits the active tournament command-center session view and routes user to `/mode-select.html`.

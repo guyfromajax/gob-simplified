@@ -181,16 +181,16 @@ The training execution system applies pre-training conditions, allocates trainin
 **Player Drills:**
 - Inside Offense → SC 
 - Outside Offense → SH 
-- Inside Defense → ID, (Discipline, 0.25x multiplier) #change here
-- Outside Defense → OD, (Discipline, 0.25x multiplier) #change here
-- Ball Handling → BH, (Discipline, 0.25x multiplier) #change here
-- Passing → PS, (Discipline, 0.25x multiplier) #change here
-- Rebounding → RB
-- Strength Training → ST, (Fight, 0.5x multiplier)#change here
+- Inside Defense → ID, (Discipline: 0.25 points) 
+- Outside Defense → OD, (Discipline: 0.25 points) 
+- Ball Handling → BH, (Discipline: 0.25 points) 
+- Passing → PS, (Discipline, 0.25 points) 
+- Rebounding → RB (Rebound Modifier: 0.5 points)
+- Strength Training → ST, (Fight, 0.5 points)
 - Agility Training → AG
-- Free Throws → FT, (Team Chemistry, 0.25x multiplier) #change here
-- Conditioning → ND (Endurance), CH, (Fight, 0.5x multiplier)#change here
-- Film Study → IQ, CH, (Team Chemistry, 0.25x multiplier) #change here
+- Free Throws → FT, (Team Chemistry: 0.25 points) 
+- Conditioning → ND (Endurance), CH, (Fight: 0.5 points)
+- Film Study → IQ, CH, (Team Chemistry: 0.25 points)
 
 **Team Drills:**
 - Offense Install → `offensive_efficiency`
@@ -199,56 +199,74 @@ The training execution system applies pre-training conditions, allocates trainin
 - Fast Break Defense Install → `fb_opp_modifier`
 - P/T Defense Install → `pt_efficiency`
 - P/T Offense Install → `pt_opp_modifier`
-- Scrimmages → (Team Chemistry, 0.5x multiplier), Shot Threshold (decreases), Rebound Modifier, NG Reduction (if 3-5 points) #change here, added Team Chemistry back with 0.5 multiplier
+- Scrimmages → Team Chemistry: 0.5 points, Shot Threshold: 1 point, Rebound Modifier: 0.5 points, NG Reduction (if 3-5 points)
 
 #### Training Point Ranges
 
 **Player Attributes (Base Ranges):**
-- 0 points: `+= random.randint(-3, -1)` #change here
-- 1 point: `+= random.randint(1, 3)`
-- 2 points: `+= random.randint(2, 4)`
-- 3 points: `+= random.randint(3, 6)`
-- 4 points: `+= random.randint(4, 7)`
-- 5 points: `+= random.randint(4, 9)`
+- 0 points: `+= random.randint(-2, -1)` 
+- 1 point: `+= random.randint(0, 1)`
+- 2 points: `+= random.randint(2, 3)`
+- 3 points: `+= random.randint(2, 4)`
+- 4 points: `+= random.randint(3, 5)`
+- 5 points: `+= random.randint(3, 6)`
 
 **Year-Based Adjustments:**
-- **Freshman**: 2 to min, 7 to max (e.g., 1 point: `random.randint(2, 7)`)
-- **Sophomore**: 2 to min, 5 to max (e.g., 1 point: `random.randint(2, 5)`)
-- **Junior**: 1 to min, 3 to max (base; no change: `random.randint(1, 3)`)
-- **Senior**: 1 to min, 2 to max (e.g., 1 point: `random.randint(1, 2)`)
+Leave minimums as is, only change maximums
+- **Freshman**: 0 to min, 5 to max (e.g., 1 point: `random.randint(0, 6)`)
+- **Sophomore**: 0 to min, 3 to max 
+- **Junior**: 0 to min, 2 to max 
+- **Senior**: 0 to min, 1 to max 
 
 **Year-Based Pre-Training Decay**
-- **Freshman**: -6 to min, -1 to max 
-- **Sophomore**: -4 to min, -1 to max 
-- **Junior**: -3 to min to 0 to max
-- **Senior**: -2 to min to 0 to max
+- **Freshman**: -5  min, -2  max 
+- **Sophomore**: -4  min, -1  max 
+- **Junior**: -3  min to -1  max
+- **Senior**: -2  min to 0  max
+
+**Training Camp Bonus System**
+For training camp only, the following bonus will be run for each player, based on his CH value and his highest RT position.
+-Core Attributes by posiion:
+ -PG: PS, BH, IQ
+ -SG: SH, FT, OD
+ -SF: AG, choose 2 of these at random (SC, SH, ID, OD)
+ -PF: RB, ST, ID
+ -C: SC, ST, ID
+*Note if a player has multiple positions tied for the highest RT, choose one at random
+
+Then use the following CH scale for each player
+-If CH > 80, for each core attribute += random.randint(4,8)
+-elif CH > 60: for each core attribute += random.randing(3,6)
+-elif CH > 40: for each core attribute += random.randint(2,4)
+-elif CH > 20: for each core attribute += random.randing(1,2)
+-else: no bonus applied
 
 **Team Attributes (standard):**
-- 0 points: `+= random.randint(-3, -1)` #change here
+- 0 points: `+= random.randint(-2, 0)` 
 - 1 point: `+= random.randint(1, 2)`
 - 2 points: `+= random.randint(2, 3)`
-- 3 points: `+= random.randint(2, 5)` #change here
-- 4 points: `+= random.randint(2, 6)` #change here
-- 5 points: `+= random.randint(2, 7)` #change here
+- 3 points: `+= random.randint(2, 5)` 
+- 4 points: `+= random.randint(2, 6)` 
+- 5 points: `+= random.randint(2, 7)` 
 
 **Rebound Modifier (Technical Drills - in 0.01 increments):**
-- 0 points: `-= random.randint(3, 9) / 100.0` (-0.09 to -0.03) #change here
-- 1 point: `+= random.randint(-3, 3) / 100.0` (-0.03 to 0.03) #change here
-- 2 points: `+= random.randint(3, 7) / 100.0` (0.03 to 0.07) #change here
-- 3 points: `+= random.randint(4, 10) / 100.0` (0.04 to 0.10) #change here
-- 4 points: `+= random.randint(4, 12) / 100.0` (0.04 to 0.12) #change here
-- 5 points: `+= random.randint(4, 14) / 100.0` (0.04 to 0.14) #change here
+- 0 points: `-= random.randint(1, 5) / 100.0` (-0.05 to -0.01) 
+- 1 point: `+= random.randint(0, 3) / 100.0` (0.00 to 0.03) 
+- 2 points: `+= random.randint(3, 7) / 100.0` (0.03 to 0.07) 
+- 3 points: `+= random.randint(4, 10) / 100.0` (0.04 to 0.10) 
+- 4 points: `+= random.randint(4, 12) / 100.0` (0.04 to 0.12) 
+- 5 points: `+= random.randint(4, 14) / 100.0` (0.04 to 0.14) 
 
 **Rebound Modifier (Scrimmages - in 0.01 increments):**
-- 0 points: `-= random.randint(3, 9) / 100.0` (-0.09 to -0.03) #change here
-- 1 point: `+= random.randint(-3, 3) / 100.0` (-0.03 to 0.03) #change here
-- 2 points: `+= random.randint(2, 5) / 100.0` (0.02 to 0.05) #change here
-- 3 points: `+= random.randint(3, 7) / 100.0` (0.03 to 0.07) #change here
-- 4 points: `+= random.randint(3, 8) / 100.0` (0.03 to 0.08) #change here
-- 5 points: `+= random.randint(3, 9) / 100.0` (0.03 to 0.09) #change here
+- 0 points: `-= random.randint(3, 9) / 100.0` (-0.09 to -0.03) 
+- 1 point: `+= random.randint(-3, 3) / 100.0` (-0.03 to 0.03) 
+- 2 points: `+= random.randint(2, 5) / 100.0` (0.02 to 0.05) 
+- 3 points: `+= random.randint(3, 7) / 100.0` (0.03 to 0.07) 
+- 4 points: `+= random.randint(3, 8) / 100.0` (0.03 to 0.08) 
+- 5 points: `+= random.randint(3, 9) / 100.0` (0.03 to 0.09) 
 
 **Shot Threshold:**
-- 0 points: `+= random.randint(5, 15)` #change here
+- 0 points: `+= random.randint(5, 15)`
 - 1 point: `-= random.randint(5, 15)`
 - 2 points: `-= random.randint(10, 20)`
 - 3 points: `-= random.randint(10, 30)`
@@ -609,26 +627,3 @@ In Franchise mode, when the user submits training for their team, all computer t
 - Custom attribute selection for Player Maximizer focus
 - Play effectiveness score updates from training
 
-## Training Camp Bonus System Implemantion & Testing
-
-### Implementation
-- **Execution timing:** Runs only during training camp (first training), triggered when `skip_pre_training_depreciation=True`.
-- **Location:** `BackEnd/models/training_execution_v2.py`
-  - `_apply_training_camp_bonus(players)`
-  - `_highest_rt_position(player)`
-  - `_training_camp_core_attrs_for_position(position)`
-  - `_training_camp_bonus_range_for_ch(ch_value)`
-- **Position source:** Uses each player's `position_ratings` map (`PG`, `SG`, `SF`, `PF`, `C`), with random tie-break if multiple positions share highest RT.
-- **SF rule:** Always includes `AG`, plus 2 random picks from `SC`, `SH`, `ID`, `OD`.
-- **Attribute write path:** Applies bonus to both `anchor_{attr}` and live `{attr}`.
-
-### Data Wiring
-- **User and computer teams:** Training payload now includes `position_ratings` before `execute_training()` is called.
-- **Location:** `BackEnd/api/franchise_routes.py` (`run_franchise_training()` user-team and computer-team player build paths).
-
-### Testing
-- **Focused test file:** `BackEnd/tests/test_eog_and_training_rule_updates.py`
-- **Training camp bonus tests:**
-  - `test_training_camp_bonus_applies_for_high_ch_pg`
-  - `test_training_camp_bonus_sf_uses_ag_plus_two_random_attrs`
-- **Additional validation run:** `BackEnd/tests/test_training_system.py` (smoke test).

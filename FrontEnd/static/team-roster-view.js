@@ -22,6 +22,53 @@ let currentView = 'grid'; // 'grid' or 'player'
 const cardFlipState = {}; // Track flip state per player ID
 const dropdownState = {}; // Track dropdown open state per player ID
 
+function getRosterReturnStorageKey() {
+  return [
+    'roster_return_url',
+    mode || 'base',
+    franchiseId || '',
+    tournamentId || '',
+    teamId || teamName || ''
+  ].join(':');
+}
+
+function resolveRosterReturnUrl() {
+  const storageKey = getRosterReturnStorageKey();
+  if (returnUrl) {
+    sessionStorage.setItem(storageKey, returnUrl);
+    return returnUrl;
+  }
+
+  const saved = sessionStorage.getItem(storageKey);
+  if (saved) return saved;
+
+  // Fallback for direct links that didn't include return_url.
+  try {
+    if (document.referrer) {
+      const ref = new URL(document.referrer);
+      if (ref.origin === window.location.origin && !ref.pathname.includes('player-detail.html')) {
+        const relativeRef = `${ref.pathname}${ref.search}`;
+        sessionStorage.setItem(storageKey, relativeRef);
+        return relativeRef;
+      }
+    }
+  } catch (e) {
+    // Ignore referrer parse failures and continue to mode fallback.
+  }
+
+  return null;
+}
+
+function buildPlayerDetailUrl(playerId) {
+  const qs = new URLSearchParams();
+  qs.set('id', playerId);
+  if (mode) qs.set('mode', mode);
+  if (franchiseId) qs.set('franchise_id', franchiseId);
+  if (tournamentId) qs.set('tournament_id', tournamentId);
+  qs.set('return_url', window.location.pathname + window.location.search);
+  return `/player-detail.html?${qs.toString()}`;
+}
+
 // Attribute groupings for card back
 const ATTR_GROUPS = {
   'OFFENSE': ['SC', 'SH'],
@@ -58,9 +105,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function setupBackButton() {
   const backBtn = document.getElementById('back-button');
+  const resolvedReturnUrl = resolveRosterReturnUrl();
   backBtn.addEventListener('click', () => {
-    if (returnUrl) {
-      window.location.href = returnUrl;
+    if (resolvedReturnUrl) {
+      window.location.href = resolvedReturnUrl;
     } else {
       // Build return URL
       let returnPath = '';
@@ -314,7 +362,7 @@ function renderRoster() {
     // Name with link
     const nameTd = document.createElement('td');
     const nameLink = document.createElement('a');
-    nameLink.href = `/player-detail.html?id=${p._id}`;
+    nameLink.href = buildPlayerDetailUrl(p._id);
     nameLink.textContent = p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
@@ -387,7 +435,7 @@ function renderStats() {
     // Name
     const nameTd = document.createElement('td');
     const nameLink = document.createElement('a');
-    nameLink.href = `/player-detail.html?id=${p._id}`;
+    nameLink.href = buildPlayerDetailUrl(p._id);
     nameLink.textContent = p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
@@ -713,7 +761,7 @@ function createCardFront(player) {
   
   // Headshot container (clickable link to player detail)
   const headshotLink = document.createElement('a');
-  headshotLink.href = `/player-detail.html?id=${player._id}`;
+  headshotLink.href = buildPlayerDetailUrl(player._id);
   headshotLink.style.display = 'block';
   headshotLink.style.textDecoration = 'none';
   
@@ -1062,4 +1110,3 @@ function toggleCardFlip(playerId) {
   card.classList.toggle('flipped');
   cardFlipState[playerId] = card.classList.contains('flipped');
 }
-

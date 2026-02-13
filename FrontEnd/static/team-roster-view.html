@@ -22,8 +22,8 @@
       padding: 20px;
     }
     #back-button {
-      position: absolute;
-      top: 20px;
+      position: fixed;
+      top: 84px;
       left: 20px;
       padding: 10px 20px;
       background: #4a90e2;
@@ -33,22 +33,34 @@
       cursor: pointer;
       font-size: 14px;
       font-weight: 600;
+      z-index: 20000;
+      display: inline-flex;
+      align-items: center;
     }
     #back-button:hover {
       background: #357abd;
     }
     #team-header {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 60px 0 30px 0;
       position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 60px 0 30px 0;
+      min-height: 48px;
     }
     #team-header h1 {
       font-family: 'Bebas Neue', cursive;
       font-size: 48px;
       margin: 0;
       color: #333;
+      text-align: center;
+    }
+    #team-header .view-toggle {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      margin-left: 0;
     }
     .section-title {
       font-family: 'Bebas Neue', cursive;
@@ -194,4 +206,3 @@
   <script src="/team-roster-view.js"></script>
 </body>
 </html>
-

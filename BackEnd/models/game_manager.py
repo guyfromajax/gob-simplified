@@ -132,8 +132,12 @@ class GameManager:
             "defense_team": self.defense_team.name,
             "score": self.score,
             "points_by_quarter": {
-                self.home_team.name: self.home_team.points_by_quarter,
-                self.away_team.name: self.away_team.points_by_quarter
+                # IMPORTANT: Do not alias the TeamManager lists directly here.
+                # Quarter scoring is incremented in both team.points_by_quarter and the
+                # game_state mirror for backward compatibility. If these reference the
+                # same list object, points get double-counted.
+                self.home_team.name: list(self.home_team.points_by_quarter),
+                self.away_team.name: list(self.away_team.points_by_quarter),
             },
             "quarter": self.quarter,
             "time_remaining": 480,
@@ -185,7 +189,15 @@ class GameManager:
         }
 
 
-    def call_timeout(self, calling_team, timeout_reason="USER", rebuild_both_lineups=False, game_id=None):
+    def call_timeout(
+        self,
+        calling_team,
+        timeout_reason="USER",
+        rebuild_both_lineups=False,
+        game_id=None,
+        foul_out_player=None,
+        foul_out_context=None,
+    ):
         """
         Unified timeout creation method used by both user and computer timeouts.
         This ensures consistent behavior and state management.
@@ -195,6 +207,8 @@ class GameManager:
             timeout_reason: "USER", "COMPUTER", or "FOUL_OUT"
             rebuild_both_lineups: If True, rebuild both team lineups (for computer timeouts during simmed quarters)
             game_id: Optional game_id for database save (if None, skips save)
+            foul_out_player: Optional player object for FOUL_OUT timeout payload
+            foul_out_context: Optional foul context dict for FOUL_OUT timeout payload
         
         Returns:
             dict: Timeout turn payload
@@ -213,7 +227,9 @@ class GameManager:
         # Create timeout turn
         timeout_turn = self.turn_manager.setup_timeout_turn(
             timeout_reason=timeout_reason,
-            calling_team=calling_team
+            calling_team=calling_team,
+            foul_out_player=foul_out_player,
+            foul_out_context=foul_out_context,
         )
         
         # Store next_play_type and offense_team_id for resume
@@ -352,10 +368,7 @@ class GameManager:
             self._handle_foul_out_timeout(turn_result)
 
     def _handle_foul_out_timeout(self, result):
-        """Create and append foul-out timeout turn, then save game state to DB."""
-        from BackEnd.utils.man_defense_matchups import reset_matchups_to_defaults
-        reset_matchups_to_defaults(self.game_state)
-        logging.info("✅ FOUL OUT: Reset man defense matchups to defaults")
+        """Create foul-out timeout turn using the unified timeout path, then save."""
 
         foul_out_player_data = result.get("foul_out_player", {})
         foul_out_player = None
@@ -377,19 +390,29 @@ class GameManager:
                 if foul_out_player:
                     break
 
-        self.game_state["timeout_offense_team_id"] = self.offense_team.team_id
-        logging.info(f"✅ FOUL OUT: Current offense team '{self.offense_team.name}' (team_id: {self.offense_team.team_id})")
         foul_out_context = self.game_state.get("foul_out_context", {})
         if foul_out_context:
             logging.info(f"✅ FOUL OUT: Using foul context - type={foul_out_context.get('foul_type')}, next={foul_out_context.get('next_play_type')}")
 
-        timeout_turn = self.turn_manager.setup_timeout_turn(
+        # Resolve fouled-out player's team so FOUL_OUT uses the same lineup refresh flow
+        # as other timeout types (including autoset/rebuild behavior for computer teams).
+        calling_team = None
+        if foul_out_player and getattr(foul_out_player, "team", None):
+            foul_team = foul_out_player.team
+            if foul_team == self.home_team.name or foul_team == self.home_team.team_id:
+                calling_team = self.home_team
+            elif foul_team == self.away_team.name or foul_team == self.away_team.team_id:
+                calling_team = self.away_team
+
+        timeout_turn = self.call_timeout(
+            calling_team=calling_team,
             timeout_reason="FOUL_OUT",
-            calling_team=None,
             foul_out_player=foul_out_player,
             foul_out_context=foul_out_context,
         )
-        self._append_turn(timeout_turn)
+        if not timeout_turn:
+            logging.error("🚨 FOUL OUT TIMEOUT: call_timeout returned no timeout turn")
+            return
         logging.info(f"⏸️ TIMEOUT: Created timeout turn for foul out - {foul_out_player_data.get('name', 'Unknown')}")
 
         if self.game_id:
@@ -1004,7 +1027,3 @@ class GameManager:
         
         # Print defense score statistics
         self.shot_manager.print_defense_score_stats()
-
-
-
-

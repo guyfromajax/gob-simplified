@@ -1,32 +1,36 @@
 1. Make end of season progression in franchise mode a true EOS (age players, recruiting process, manage player stats, manage user stats?)
-2. Add blocks 
+2. Wire site for SEO
 3. Add glow effect to drag and drop on Lineup Selection screen when starting click on the player image
 4. rebound not resistering to player stats when he gets an OREB from a missed OREB putback attempt (note he made teh follow up shot)
 5. Single Game mode-- player NG are not persisting to the lineup screen on timeouts.
+6. Unknown Player in Plays tab
+7. Frontend Scores display revert during Sim Quarter at times
+8. Don't cap player RT at 100
 9.Pre-populate Playbooks with submittable values
 10. User is still able to put fouled out players into the lineup on the Lineup Selection screen
 11. Blocking Foul on Fast Break shots are broken -- I got a blocking foul on an instance with no defender animated to a position to defend the shot. Also we did not trnasition to SIP, we transitioned to HCO isntead.
 12. Not announcign shooting fouls on Fast Break shots
 13 Need to perfect Fast Break shot animatoin executoin
-
-14. Player foul-out sometimes routes to Lineup Screen without showing the "FOULED OUT!" popup (user lacks context).
-   - Hypothesis: foul-out is being handled via the TIMEOUT system (navigation) while the foul-out popup is triggered via a separate overlay path; navigation can preempt popup render.
-   - Alignment for future fix: use ONE canonical foul-out system driven by `TIMEOUT` with `timeout_reason="FOUL_OUT"` and display foul-out context via the same popup flow as other timeouts/quarter breaks (gate navigation behind acknowledgement).
-
-
+14. Finish Current Season
+15. Chamption Pop Up
+16. Box Score bug
 17 Create "DEFENSE" SFX
 18. Defense Matchups pop up -- DEFENSE when appearing, whistle when exiting
-19. Formalize bug reporting process
+
 20. We need to clean up user Timeout implementation cadence
 21. Airhorn is not sounding on pop up when Computer calls timeout
 22. Rebound position, clamp players from going out of bounds
 23. Touranment mode in-game adjustments to game plan and playbooks are not persisting in game
-
 24. Align on Production Update process once Alpha is live
 
 27. Getting some (approx 2) instances per quarter when, when pressing Sim Quarter and the game progresses, teh game temporarily reverts the scoreboard to a previous state. Note is does revert back to the correct score, so this is clearly an edge case tha tis accessing a past game state for a finite amount of time
 28. "Play Quarter" button requires two clicks to start game on first page load - first click does nothing because click handler isn't attached yet
 29. Stale data on initial page load - TOL shows 5, scores incorrect, player NG shows 100% until first turn processes
+30. Calibrate Tournament init settings to seed
+31. Player Foul Out pop up not appearing
+32. When a player commits a 5th foul, his sprite does not animate to teh completion of that turn. it stalls and remains static on screen. i think we are setting him to ineligible before we are running the foul process
+33. Update Alpha box copy
+34. Latest Sentry bug
 
 
 ## Future Cleanup (Non-Critical Warnings)
