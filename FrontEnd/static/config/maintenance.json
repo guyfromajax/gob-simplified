@@ -1,6 +1,6 @@
 {
   "id": "staging-test-2",
-  "enabled": true,
+  "enabled": false,
   "starts_at_iso": "",
   "show_minutes_before": 60,
   "message": "Maintenance begins soon. Please finish your game to avoid losing progress.",
