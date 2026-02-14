@@ -425,7 +425,11 @@ class GameManager:
                 "⚠️ FOUL OUT: Could not resolve Player object for foul_out_player_id=%s (name=%s); timeout turn may lack foul_out_player",
                 foul_out_player_id, foul_out_player_data.get("name", "Unknown") if isinstance(foul_out_player_data, dict) else None
             )
-        logging.info(f"⏸️ TIMEOUT: Created timeout turn for foul out - {foul_out_player_data.get('name', 'Unknown')}")
+        logging.warning(
+            "⏸️ FOUL OUT TIMEOUT: Created timeout turn for foul out - %s (game_id=%s)",
+            foul_out_player_data.get("name", "Unknown"),
+            self.game_id,
+        )
 
         if self.game_id:
             try:
@@ -450,13 +454,20 @@ class GameManager:
                             )
                     except (ValueError, TypeError):
                         pass  # Invalid ObjectId format - leave as is
-                logging.info(
-                    f"💾 FOUL OUT TIMEOUT: Saved game state immediately: "
-                    f"game_id={self.game_id}, quarter={db_summary.get('quarter')}, "
-                    f"clock={db_summary.get('clock')}, next_play_type={timeout_turn.get('next_play_type')}"
+                logging.warning(
+                    "💾 FOUL OUT TIMEOUT: Saved game state immediately: game_id=%s, quarter=%s, clock=%s, next_play_type=%s",
+                    self.game_id,
+                    db_summary.get("quarter"),
+                    db_summary.get("clock"),
+                    timeout_turn.get("next_play_type"),
                 )
             except Exception as e:
-                logging.error(f"🚨 FOUL OUT TIMEOUT: Failed to save game state: {e}")
+                logging.error("🚨 FOUL OUT TIMEOUT: Failed to save game state: %s", e)
+        else:
+            logging.warning(
+                "⚠️ FOUL OUT TIMEOUT: Skipped save - game_id is missing (game_id=%s)",
+                self.game_id,
+            )
 
     def simulate_macro_turn(self): #run_simulation
         import time as _time
