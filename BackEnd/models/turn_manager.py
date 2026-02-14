@@ -2535,60 +2535,29 @@ class TurnManager:
                     
                     rebounder_id = rebound_data.get("rebounderId")
                     rebound_type = rebound_data.get("rebound_type", "DREB")
-                    logging.warning(f"🔍 [PUTBACK MISS => REBOUND] Looking up rebounder: ID={rebounder_id}, Type={rebound_type}, rebound_data keys: {list(rebound_data.keys())}")
-                    
+                    # Normalize ID for robust lookup (str comparison avoids type mismatch)
+                    rebounder_id_str = str(rebounder_id) if rebounder_id is not None else None
+                    if rebounder_id_str is None:
+                        logging.warning(f"⚠️ [PUTBACK MISS => REBOUND] rebounderId is None, cannot look up rebounder")
                     new_rebounder = None
                     players_searched = 0
                     for player in list(off_team.get_all_players()) + list(def_team.get_all_players()):
                         players_searched += 1
                         player_id = getattr(player, "player_id", None)
-                        if player_id == rebounder_id:
+                        if player_id is not None and str(player_id) == rebounder_id_str:
                             new_rebounder = player
-                            new_rebounder_name = get_name_safe(player)
-                            oreb_stat = player.stats["game"].get(rebound_type, 0)
-                            logging.info(f"✅ [PUTBACK MISS => REBOUND] Found rebounder: {new_rebounder_name} (ID: {player_id}), {rebound_type} stat: {oreb_stat}, Players searched: {players_searched}")
+                            logging.info(f"✅ [PUTBACK MISS => REBOUND] Found rebounder: {get_name_safe(player)} (ID: {player_id}), Type: {rebound_type}")
                             break
-                    
-                    if new_rebounder is None:
-                        logging.warning(f"⚠️ [PUTBACK MISS => REBOUND] Could not find rebounder with ID={rebounder_id} after searching {players_searched} players")
-                    
+                    # Fallback: look up by ID in case iteration missed (e.g. key type)
+                    if new_rebounder is None and rebounder_id_str:
+                        new_rebounder = off_team.get_player_by_id(rebounder_id_str) or def_team.get_player_by_id(rebounder_id_str)
+                        if new_rebounder:
+                            logging.info(f"✅ [PUTBACK MISS => REBOUND] Found rebounder via get_player_by_id: {get_name_safe(new_rebounder)}")
+                    if new_rebounder is None and rebounder_id_str:
+                        logging.warning(f"⚠️ [PUTBACK MISS => REBOUND] Could not find rebounder with ID={rebounder_id_str} after searching {players_searched} players")
+                    # Stat already recorded in shared.py on canonical roster player; no re-record here (avoids double-count)
                     if new_rebounder:
-                        # ✅ FIX: Re-record rebound stat on the player object found by lookup
-                        # This ensures the stat is on the same object instance used for delta computation.
-                        # The stat was already recorded in shared.py, but we re-record here to guarantee
-                        # it's on the correct object instance (matches HCO miss pattern in shot_manager.py).
-                        
-                        # 🔍 DEBUG: Log BEFORE stat recording
-                        rebounder_name = get_name_safe(new_rebounder)
-                        rebounder_obj_id = id(new_rebounder)
-                        rebounder_team = getattr(new_rebounder, "team", None)
-                        rebounder_team_id = getattr(new_rebounder, "team_id", None)
-                        rebounder_pos = None
-                        for pos, player in (off_team.lineup.items() if new_rebounder in off_team.get_all_players() else def_team.lineup.items()):
-                            if player.player_id == rebounder_id:
-                                rebounder_pos = pos
-                                break
-                        
-                        oreb_before = new_rebounder.stats["game"].get("OREB", 0)
-                        dreb_before = new_rebounder.stats["game"].get("DREB", 0)
-                        reb_before = new_rebounder.stats["game"].get("REB", 0)
-                        logging.warning(f"🔍 [PUTBACK MISS => REBOUND] BEFORE record_stat: {rebounder_name} (ID: {rebounder_id}, Pos: {rebounder_pos}), "
-                                      f"Object ID: {rebounder_obj_id}, Team: {rebounder_team}, Team ID: {rebounder_team_id}, "
-                                      f"OREB: {oreb_before}, DREB: {dreb_before}, REB: {reb_before}, Recording: {rebound_type}")
-                        
-                        # Record the stat
-                        new_rebounder.record_stat(rebound_type)
-                        
-                        # 🔍 DEBUG: Log AFTER stat recording
-                        oreb_after = new_rebounder.stats["game"].get("OREB", 0)
-                        dreb_after = new_rebounder.stats["game"].get("DREB", 0)
-                        reb_after = new_rebounder.stats["game"].get("REB", 0)
-                        logging.warning(f"🔍 [PUTBACK MISS => REBOUND] AFTER record_stat: {rebounder_name} (ID: {rebounder_id}), "
-                                      f"Object ID: {rebounder_obj_id}, "
-                                      f"OREB: {oreb_after} (Δ{oreb_after - oreb_before}), DREB: {dreb_after} (Δ{dreb_after - dreb_before}), REB: {reb_after} (Δ{reb_after - reb_before})")
-                        
-                        logging.info(f"✅ [PUTBACK MISS => REBOUND] Re-recorded {rebound_type} stat for {rebounder_name} (ID: {rebounder_id})")
-                        text += f" {rebounder_name} grabs the rebound."
+                        text += f" {get_name_safe(new_rebounder)} grabs the rebound."
                         result["text"] = text
                     
                     # If it's another OREB, set pending for next turn
