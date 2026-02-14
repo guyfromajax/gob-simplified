@@ -449,11 +449,20 @@ class GameManager:
             try:
                 from BackEnd.utils.shared import summarize_game_state
                 from BackEnd.db import games_collection
+                # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log before save (Hypothesis 2)
+                logging.warning(
+                    "🔍 [FOUL_OUT DEBUG] _handle_foul_out_timeout saving: game_id=%s, type=%s",
+                    self.game_id, type(self.game_id).__name__,
+                )
                 db_summary = summarize_game_state(self, exclude_animations=True)
                 result = games_collection.update_one(
                     {"_id": self.game_id}, {"$set": db_summary}, upsert=False
                 )
                 save_matched = result.matched_count > 0
+                logging.warning(
+                    "🔍 [FOUL_OUT DEBUG] _handle_foul_out_timeout first update_one: matched_count=%s, modified_count=%s",
+                    result.matched_count, result.modified_count,
+                )
                 # If no match, document may have been created with ObjectId _id (string vs ObjectId mismatch)
                 if result.matched_count == 0 and self.game_id and len(self.game_id) == 24:
                     try:
@@ -463,6 +472,10 @@ class GameManager:
                             {"_id": oid}, {"$set": db_summary}, upsert=False
                         )
                         save_matched = result2.matched_count > 0
+                        logging.warning(
+                            "🔍 [FOUL_OUT DEBUG] _handle_foul_out_timeout ObjectId retry: matched_count=%s, modified_count=%s",
+                            result2.matched_count, result2.modified_count,
+                        )
                         if result2.matched_count > 0:
                             logging.warning(
                                 "⚠️ FOUL OUT TIMEOUT: Initial update matched 0 documents; retried with ObjectId and matched %s",
@@ -472,7 +485,8 @@ class GameManager:
                         pass  # Invalid ObjectId format - leave as is
                 if not save_matched:
                     logging.error(
-                        "🚨 FOUL OUT TIMEOUT: Save matched 0 documents (game_id=%s) - timeout state not persisted; return to court may reset",
+                        "🚨 FOUL OUT TIMEOUT: Save matched 0 documents (game_id=%s) - timeout state not persisted; "
+                        "return to court may reset / data loss possible",
                         self.game_id,
                     )
                 logging.warning(
@@ -483,7 +497,9 @@ class GameManager:
                     timeout_turn.get("next_play_type"),
                 )
             except Exception as e:
-                logging.error("🚨 FOUL OUT TIMEOUT: Failed to save game state: %s", e)
+                logging.error(
+                    "🚨 FOUL OUT TIMEOUT: Exception during save - data loss on return to court possible: %s", e
+                )
         else:
             logging.warning(
                 "⚠️ FOUL OUT TIMEOUT: Skipped save - game_id is missing (game_id=%s)",

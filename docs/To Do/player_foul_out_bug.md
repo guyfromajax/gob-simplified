@@ -98,6 +98,8 @@ These are candidate causes for “no popup, no lineup, dead sprite” (to confir
 
 - **2025-02-02:** Added end-to-end trace (backend + frontend) and “Working vs broken” hypotheses. No code change yet; next step is to confirm which hypothesis matches the failing case (logs or repro).
 
+- **2025-02-02 (data loss on return to court):** Confirmed from logs: foul-out save to DB was correct (Q4, scores 72–90, `timeout_next_play_type=SIP`). On "return to court" the frontend sent **quarter=1** in the simulate_quarter request instead of 4. Backend saw `body.quarter=1` vs `saved_quarter=4` → treated as quarter mismatch → cleared timeout state and did **not** treat as timeout resume → `should_restore_stats` False (new Q1) → score/stats not restored. **Backend safeguard (surgical fix):** In `restore_timeout_resume_state` (api.py), when `timeout_next_play_type` exists and **saved_quarter > body.quarter** (e.g. requested 1, saved 4), treat as "frontend sent wrong quarter on return to court" → set `body.quarter = saved_quarter`, `body.resume_from_timeout = True`, force DB reload; do **not** clear timeout state. Existing behavior unchanged when `saved_quarter == body.quarter` or `saved_quarter < body.quarter`.
+
 ---
 
 ## System review: step back and fix coherently
@@ -111,7 +113,7 @@ The foul-out flow has broken in **multiple ways** and piecemeal fixes have been 
 | No foul-out popup | Backend sends TIMEOUT turn without `foul_out_player`, or frontend never receives/processes timeout sub-turn (BATCH order, animation hang). |
 | User not taken to lineup | Same as above; or navigation runs but with wrong/missing params; or popup shows but button doesn't navigate. |
 | Dead / stuck sprite | Foul turn applies red tint (negativeActionEffects); if foul-out flow never runs, tint or animation state is never cleared; or sprite left in "fouled" pose when next turn never runs. |
-| Persistence reset (score, clock, stats, NG) | Foul-out save to DB never runs (e.g. `game_id` missing, update matched 0), or runs but doc is overwritten later; on return, `restore_timeout_resume_state` finds no `timeout_next_play_type` and treats as quarter start. |
+| Persistence reset (score, clock, stats, NG) | Foul-out save to DB never runs (e.g. `game_id` missing, update matched 0), or runs but doc is overwritten later; on return, `restore_timeout_resume_state` finds no `timeout_next_play_type` and treats as quarter start. **Or:** frontend sends wrong quarter (e.g. `quarter=1`) on "return to court" while game is in Q4 → backend treats as new Q1 and does not restore → scores/stats zeroed (see below). |
 
 ### Touchpoints (single checklist)
 

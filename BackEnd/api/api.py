@@ -949,6 +949,17 @@ try:
                 logging.warning(f"⚠️ TIMEOUT RESUME: Game {game_id} not found in any document location (mode: {request.mode})")
                 return None
             
+            # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log what we loaded (Hypothesis 2 - confirm doc has timeout state and game_stats_initialized)
+            logging.warning(
+                "🔍 [FOUL_OUT DEBUG] restore_timeout_resume_state loaded doc: game_id=%s, timeout_next_play_type=%s, "
+                "game_stats_initialized=%s, has_teams=%s, top_level_score=%s",
+                game_id,
+                saved.get("timeout_next_play_type"),
+                saved.get("game_stats_initialized"),
+                "teams" in saved and bool(saved.get("teams")),
+                saved.get("score"),
+            )
+            
             # Validate/repair timeout_next_play_type.
             # Older or partially-saved timeout docs can miss this field; infer SIDE_INBOUND
             # when timeout_offense_team_id is present so resume flow remains deterministic.
@@ -2108,6 +2119,20 @@ try:
                         del ongoing_games[game_id]
                         gm = None  # Force reload from DB
                     logging.info(f"🔍 TIMEOUT RESUME: Will load fresh game from DB and apply timeout state")
+                elif timeout_next_play_type and saved_quarter > body.quarter:
+                    # ✅ FOUL-OUT DATA-LOSS FIX: Frontend sometimes sends quarter=1 on "return to court" (e.g. Play Quarter)
+                    # while the game is actually in a later quarter. Use doc as source of truth and treat as timeout resume.
+                    logging.warning(
+                        "⚠️ TIMEOUT RESUME: Quarter mismatch (requested=%s, saved=%s) - using saved quarter and treating as timeout resume (game_id=%s)",
+                        body.quarter, saved_quarter, game_id,
+                    )
+                    body.quarter = saved_quarter
+                    body.resume_from_timeout = True
+                    if gm is not None:
+                        logging.warning(f"🔍 TIMEOUT RESUME: Game in memory, forcing DB reload (game_id={game_id})")
+                        del ongoing_games[game_id]
+                        gm = None
+                    logging.info(f"✅ TIMEOUT RESUME: Corrected body.quarter to %s, resume_from_timeout=True", saved_quarter)
                 else:
                     # Stale timeout data (quarter mismatch or missing next_play_type) - ignore it
                     # logging.warning(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={body.quarter}, next_play_type={timeout_next_play_type})")
@@ -2409,6 +2434,12 @@ try:
                             # ✅ TIMEOUT: If resuming from timeout, always restore stats (we're continuing an existing game)
                             is_new_game = (body.quarter == 1 and saved_quarter > 1) and not body.resume_from_timeout
                             should_restore_stats = not is_new_game or body.resume_from_timeout
+                            # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log restore path so we can confirm Hypothesis 1
+                            logging.warning(
+                                "🔍 [FOUL_OUT DEBUG] Restore path: should_restore_stats=%s, resume_from_timeout=%s, "
+                                "saved_quarter=%s, body.quarter=%s, game_id=%s",
+                                should_restore_stats, body.resume_from_timeout, saved_quarter, body.quarter, game_id,
+                            )
                             
                             # CRITICAL: Build lineups BEFORE restoring player stats
                             # Player stat restoration (below) looks up players in team.lineup, so lineups must exist
@@ -2541,6 +2572,13 @@ try:
                                 if "game_stats_initialized" in saved:
                                     gm.game_state["game_stats_initialized"] = saved["game_stats_initialized"]
                                     logging.info(f"🔄 game_stats_initialized restored: {saved['game_stats_initialized']}")
+                                else:
+                                    # 🔍 FOUL_OUT DATA-LOSS DEBUG: Doc has no game_stats_initialized → simulate_quarter may call _initialize_game_stats and zero everyone
+                                    logging.warning(
+                                        "🔍 [FOUL_OUT DEBUG] should_restore_stats=True but saved doc has NO 'game_stats_initialized' "
+                                        "(game_id=%s); gm.game_stats_initialized will stay False → risk of stats reset in simulate_quarter",
+                                        game_id,
+                                    )
                             else:
                                 # New Q1 game - ensure stats are zeroed
                                 gm.score = {gm.home_team.name: 0, gm.away_team.name: 0}
