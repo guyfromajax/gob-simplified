@@ -13,8 +13,9 @@
    - **POST /api/auth/reset-password** – Set new password with token (body: `token`, `new_password`)
 
 2. **Data**:
-   - **Users collection**: `user_id` (ObjectId), `email`, `password_hash`, `role`, `username` (optional), `username_lower` (for uniqueness), `created_at`, `last_login_at`, `version`
+   - **Users collection**: `user_id` (ObjectId), `email`, `password_hash`, `role`, `subscription`, `geek_points`, `username` (optional), `username_lower` (for uniqueness), `created_at`, `last_login_at`, `version`
    - **role**: `"user"` (default) or `"admin"`. New signups get `role: "user"`. To set admin: run `python scripts/set_admin_user.py <email>` (or `set_admin_user_production.py` for production DB). Admin status is read from the DB when needed: `/api/auth/me` and builder API checks use the DB role so promoting a user to admin works without re-login.
+   - **subscription**, **geek_points**: New signups get `subscription: "alpha"` (string) and `geek_points: 0` (integer). Existing users were backfilled via `scripts/add_user_subscription_geek_points.py`.
    - **password_reset_tokens collection**: `token`, `user_id`, `expires_at`, `created_at` (tokens expire in 1 hour, deleted after use)
    - **access_code_requests collection**: `email`, `created_at`, `status` ("pending"). Used when user clicks "Request Access Code" on signup; admin checks collection and sends codes manually (no transactional email until configured).
    - **JWT**: Stored client-side; sent in `Authorization: Bearer <token>` for protected endpoints

@@ -238,6 +238,8 @@ async def signup(request: Request, body: SignupRequest):
         "email": email,
         "password_hash": hash_password(body.password),
         "role": "user",
+        "subscription": "alpha",
+        "geek_points": 0,
         "created_at": now,
         "updated_at": now,
         "version": 1  # Schema version for future migrations
