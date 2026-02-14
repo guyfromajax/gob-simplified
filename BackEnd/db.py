@@ -88,6 +88,8 @@ if client:
     hct_skeletons_collection = db["hct_skeletons"]
     # Alpha access control - OTP codes for gated signup
     alpha_otps_collection = db["alpha_otps"]
+    # Alpha access code requests (signup page "Request Access Code" – admin checks and sends codes manually)
+    access_code_requests_collection = db["access_code_requests"]
     # Users collection for authentication (Step 1)
     users_collection = db["users"]
     # Password reset tokens (Step 11 - minimal email)
@@ -114,6 +116,8 @@ else:
     hct_skeletons_collection = db["hct_skeletons"]
     # Alpha access control - OTP codes for gated signup
     alpha_otps_collection = db["alpha_otps"]
+    # Alpha access code requests (signup page "Request Access Code")
+    access_code_requests_collection = db["access_code_requests"]
     # Users collection for authentication (Step 1)
     users_collection = db["users"]
     # Password reset tokens (Step 11 - minimal email)

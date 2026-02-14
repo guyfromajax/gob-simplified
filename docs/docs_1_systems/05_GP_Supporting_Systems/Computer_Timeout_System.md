@@ -58,29 +58,39 @@ Computer evaluates timeout conditions in order. Each condition only checks once 
 1. **Player with 3 fouls:** 100% chance (immediate timeout)
 2. **Player with 2 fouls:** 30% chance (checks once at first BIP/SIP after foul)
 
-**Energy Conditions (apply to all quarters Q1-Q4):**
-3. **3 players < 80% NG:** 50% chance (checks once at first BIP/SIP after condition met)
-4. **4 players < 80% NG:** 75% chance (checks once at first BIP/SIP after condition met)
-5. **5 players < 80% NG:** 90% chance (checks once at first BIP/SIP after condition met)
-6. **3 players < 70% NG:** 80% chance (checks once at first BIP/SIP after condition met)
-7. **4 players < 70% NG:** 90% chance (checks once at first BIP/SIP after condition met)
-8. **5 players < 70% NG:** 95% chance (checks once at first BIP/SIP after condition met)
-9. **3 players < 60% NG:** 100% chance (immediate timeout)
+**Energy Conditions (Q1–Q2 use 80% / 70% / 60%; Q3–Q4 use 75% / 65% / 55%):**
+3. **3 players below high threshold (80% in Q1–Q2, 75% in Q3–Q4):** 50% chance (checks once at first BIP/SIP after condition met)
+4. **4 players below high threshold:** 75% chance (checks once at first BIP/SIP after condition met)
+5. **5 players below high threshold:** 90% chance (checks once at first BIP/SIP after condition met)
+6. **3 players below mid threshold (70% in Q1–Q2, 65% in Q3–Q4):** 80% chance (checks once at first BIP/SIP after condition met)
+7. **4 players below mid threshold:** 90% chance (checks once at first BIP/SIP after condition met)
+8. **5 players below mid threshold:** 95% chance (checks once at first BIP/SIP after condition met)
+9. **3 players below low threshold (60% in Q1–Q2, 55% in Q3–Q4):** 100% chance (immediate timeout)
 
-#### Q2 & Q3 Conditions
+#### Q2 Conditions
 
 **Foul Conditions:**
 1. **Player with 4 fouls:** 100% chance (immediate timeout)
 2. **Player with 3 fouls:** 90% chance (checks once at first BIP/SIP after foul)
 
-**Energy Conditions:** Same as Q1 (conditions 3-9 above)
+**Energy Conditions:** Same as Q1 (80% / 70% / 60% thresholds; conditions 3–9 above)
+
+#### Q3 Conditions
+
+**Foul Conditions (only if time_remaining ≤ 240 seconds / 4:00):**
+1. **Player with 4 fouls:** 100% chance (immediate timeout)
+2. **Player with 3 fouls:** 90% chance (checks once at first BIP/SIP after foul)
+
+If time_remaining > 240 (more than 4:00 left in the quarter), foul conditions are not evaluated in Q3; energy conditions still apply.
+
+**Energy Conditions:** Same thresholds as Q4: **75% / 65% / 55%** (5% lower than Q1–Q2). Conditions 3–9 apply with these thresholds.
 
 #### Q4 Conditions
 
 **Foul Conditions (only if time_remaining > 60 seconds):**
 1. **Player with 4 fouls:** 90% chance (checks once at first BIP/SIP after foul, only if more than 1 minute remaining)
 
-**Energy Conditions:** Same as Q1 (conditions 3-9 above)
+**Energy Conditions:** Same thresholds as Q3: **75% / 65% / 55%** (5% lower than Q1–Q2). Conditions 3–9 apply with these thresholds.
 
 **Note:** Conditions are evaluated in order. If a higher-priority condition triggers (e.g., 4 fouls = 100% in Q2/Q3), lower-priority conditions are not checked. Energy conditions apply to all quarters (Q1-Q4).
 
