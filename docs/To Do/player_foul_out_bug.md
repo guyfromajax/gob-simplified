@@ -93,6 +93,7 @@ These are candidate causes for “no popup, no lineup, dead sprite” (to confir
 
 *(Add dated notes here as we try fixes.)*
 
+- **2025-02-02 (solution summary):** Offensive-foul possession fix in `call_timeout()` (timeout_offense_team_id = defense_team when foul_type == OFFENSIVE). FREE_THROW resume: persist/restore shooter + FT state for 5th-foul-on-shooting-foul (miss and AND-1). Full solution summary and edge-case notes added to this doc; Timeout_System.md and timeout_data_&_state_persistence.md updated with cross-references.
 - **2025-02 (later):** Defensive fix: timeout turn gets `foul_out_player` from result when Player lookup fails (game_manager). Frontend: FOUL_OUT branch in handleTimeout always runs when `timeout_reason === 'FOUL_OUT'`; warn when `foul_out_player` missing and return. Backend: ObjectId fallback for foul-out save; logs upgraded to WARNING. Persistence: doc often has no `timeout_next_play_type` on return; foul-out save may not run or match. FOUL_OUT_TEST_MODE env var added for testing.
 
 - **2025-02-02:** Added end-to-end trace (backend + frontend) and “Working vs broken” hypotheses. No code change yet; next step is to confirm which hypothesis matches the failing case (logs or repro).
@@ -131,3 +132,28 @@ The foul-out flow has broken in **multiple ways** and piecemeal fixes have been 
 2. **Frontend:** In handleTimeout, if `timeout_reason === 'FOUL_OUT'` always show popup (placeholder if no player) and navigate; never fall through to computer timeout. Ensure BATCH always processes timeout sub-turn even if foul sub-turn errors.
 3. **Persistence:** Single save/load path; defensive _id retry and logging.
 4. **Sprite:** On foul-out popup (or when applying foul-out from turn), clear red tint for fouled-out player's sprite.
+
+---
+
+## Solution summary (2025-02)
+
+**What was fixed (concise):**
+
+| Scenario | Fix |
+|----------|-----|
+| **5th foul on shooting foul (miss or AND-1)** | Backend sets `foul_out_context` with `next_play_type="FREE_THROW"` and `shooter`; persist `timeout_free_throws_remaining`, `timeout_shooter_id`, etc. in `summarize_game_state`; restore in `apply_timeout_resume_state_to_gm` so first `simulate_turn` runs `resolve_free_throw()`. |
+| **5th foul on offensive foul (charge or HCO o-foul)** | `timeout_offense_team_id` was saved *before* the possession flip, so the fouling team was restored as offense. Fix: in `call_timeout()`, when `timeout_reason == "FOUL_OUT"` and `foul_out_context.foul_type == "OFFENSIVE"`, set `timeout_offense_team_id = self.defense_team.team_id` (the team that receives the ball). |
+
+**Code locations:**
+- **Offensive-foul possession:** `BackEnd/models/game_manager.py` → `call_timeout()` (branch before DREB⇒HCO check).
+- **FREE_THROW resume persist:** `BackEnd/utils/shared.py` → `summarize_game_state()` (when `timeout_next_play_type == "FREE_THROW"`).
+- **FREE_THROW resume restore:** `BackEnd/api/api.py` → `apply_timeout_resume_state_to_gm()` (restore `offensive_state`, `shooter`, `free_throws_remaining` from saved doc).
+- **Shooting-foul foul-out (miss + d_foul):** `BackEnd/models/shot_manager.py` (miss + d_foul block sets `foul_out_context` and result `fouled_out` like AND-1).
+
+**Edge cases / what to watch:**
+- **Offensive foul:** Only `foul_type == "OFFENSIVE"` in `foul_out_context` triggers the possession fix; charge and HCO o-foul both set that.
+- **FREE_THROW resume:** Shooter is resolved by `timeout_shooter_id` from both teams’ rosters; if lineup was rebuilt and shooter is no longer in roster, log warns and FT turn could fail.
+- **Blocking foul on made shot + 5th foul:** Path may set `foul_out_context` in a different place; confirm if ever used and that `foul_type` / `next_play_type` are correct.
+- **Persistence:** Foul-out save uses same `game_id` as load; ObjectId retry exists for string vs ObjectId mismatch. If save matches 0 docs, timeout state is not persisted and return-to-court can reset.
+
+**Cross-references:** Timeout flow → `docs/docs_1_systems/05_GP_Supporting_Systems/Timeout_System.md`. Persistence → `docs/docs_1_systems/03_Data_Persistence/timeout_data_&_state_persistence.md`.
