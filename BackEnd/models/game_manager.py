@@ -239,7 +239,12 @@ class GameManager:
         # For SIP/BIP, self.offense_team.team_id is already correct (possession flipped before turn creation)
         # This fixes the bug where timeout_offense_team_id was saved as the wrong team during DREB => HCO
         last_turn = self.turns[-1] if self.turns else None
-        if (last_turn and 
+        foul_out_ctx = self.game_state.get("foul_out_context") or {}
+        if timeout_reason == "FOUL_OUT" and foul_out_ctx.get("foul_type") == "OFFENSIVE":
+            # Offensive foul (charge or HCO o-foul): possession flips after this turn; save the team that receives the ball (current defense)
+            timeout_offense_team_id = self.defense_team.team_id
+            logging.info(f"✅ TIMEOUT: FOUL_OUT offensive foul - using defense_team as next offense (ball goes to them): {timeout_offense_team_id}")
+        elif (last_turn and 
             last_turn.get("next_play_type") == "HCO" and 
             last_turn.get("rebound_type") == "DREB" and
             last_turn.get("offense_team_id")):
