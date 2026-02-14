@@ -59,6 +59,11 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
         return
 
     if game_id:
+        # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log game_id type (string vs ObjectId mismatch can make find_one return None)
+        logging.warning(
+            "🔍 [FOUL_OUT DEBUG] _initialize_game_stats find_one: game_id=%s, type=%s",
+            game_id, type(game_id).__name__,
+        )
         doc = games_collection.find_one({"_id": game_id})
         if doc and doc.get("game_stats_initialized"):
             # Build maps for stats and attributes
@@ -86,6 +91,12 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
                         player.attributes["anchor_MO"] = player.attributes["MO"]
             gm.game_state["game_stats_initialized"] = True
             return
+        # 🔍 FOUL_OUT DATA-LOSS DEBUG: Doc missing or no game_stats_initialized → we are about to zero everyone
+        _doc_flag = doc.get("game_stats_initialized") if doc else "N/A"
+        logging.warning(
+            "🔍 [FOUL_OUT DEBUG] _initialize_game_stats: doc_found=%s, doc.game_stats_initialized=%s → will RESET stats (data loss if this was timeout resume)",
+            doc is not None, _doc_flag,
+        )
 
     logging.info("🚨 RESETTING GAME STATS (should only happen in Q1!)")
     # TEMPORARY: FOUL_OUT_TEST_MODE=1 starts all players with 4 fouls so first foul triggers foul-out (for testing)
@@ -292,7 +303,14 @@ def simulate_quarter(
 
     # Zero per-game stats exactly once per game before the opening tip.
     # Only initialize stats if game_stats_initialized flag is not set (prevents resetting stats mid-game)
-    if not gm.game_state.get("game_stats_initialized", False):
+    # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log before _initialize_game_stats (Hypothesis 1)
+    _flag = gm.game_state.get("game_stats_initialized", False)
+    logging.warning(
+        "🔍 [FOUL_OUT DEBUG] simulate_quarter before _initialize_game_stats: game_id=%s, resume_from_timeout=%s, "
+        "game_stats_initialized=%s (if False we will call _initialize_game_stats)",
+        game_id, resume_from_timeout, _flag,
+    )
+    if not _flag:
         _initialize_game_stats(gm, game_id)
         gm.game_state["game_stats_initialized"] = True
     
