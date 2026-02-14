@@ -1315,6 +1315,17 @@ def summarize_game_state(game, exclude_animations=True):
         # ✅ TIMEOUT/FOUL_OUT: Only write when truthy so normal saves don't overwrite DB and wipe resume state (we $unset on actual resume in main.py)
         **({"timeout_next_play_type": game.game_state["timeout_next_play_type"]} if game.game_state.get("timeout_next_play_type") else {}),
         **({"timeout_offense_team_id": game.game_state["timeout_offense_team_id"]} if game.game_state.get("timeout_offense_team_id") else {}),
+        # ✅ FREE_THROW timeout resume: persist FT state so first simulate_turn creates the FT turn
+        **(
+            {
+                "timeout_free_throws_remaining": game.game_state.get("free_throws_remaining"),
+                "timeout_free_throws": game.game_state.get("free_throws"),
+                "timeout_shooter_id": getattr(game.game_state.get("shooter"), "player_id", None),
+                "timeout_one_and_one": game.game_state.get("one_and_one", False),
+            }
+            if game.game_state.get("timeout_next_play_type") == "FREE_THROW"
+            else {}
+        ),
         "clock": game.game_state.get("clock", "8:00"),  # ✅ TIMEOUT: Save clock for resume (same as quarter breaks)
         "time_remaining": game.game_state.get("time_remaining", 480),  # ✅ TIMEOUT: Save time_remaining for resume (same as quarter breaks)
         "man_defense_matchups": game.game_state.get("man_defense_matchups", {}),  # ✅ MAN DEFENSE MATCHUPS: User team matchups for persistence

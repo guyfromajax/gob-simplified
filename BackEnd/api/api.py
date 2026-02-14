@@ -1228,6 +1228,32 @@ try:
             gm.game_state["timeout_next_play_type"] = saved["timeout_next_play_type"]
             logging.info(f"🔄 TIMEOUT RESUME: Applied timeout_next_play_type={saved['timeout_next_play_type']}")
         
+        # ✅ FREE_THROW timeout resume: restore offensive_state, shooter, free_throws so first simulate_turn creates the FT turn
+        if saved.get("timeout_next_play_type") == "FREE_THROW":
+            gm.game_state["offensive_state"] = "FREE_THROW"
+            if "timeout_free_throws_remaining" in saved and saved["timeout_free_throws_remaining"] is not None:
+                gm.game_state["free_throws_remaining"] = saved["timeout_free_throws_remaining"]
+            if "timeout_free_throws" in saved and saved["timeout_free_throws"] is not None:
+                gm.game_state["free_throws"] = saved["timeout_free_throws"]
+            if "timeout_one_and_one" in saved:
+                gm.game_state["one_and_one"] = saved["timeout_one_and_one"]
+            shooter_id = saved.get("timeout_shooter_id")
+            if shooter_id:
+                shooter = None
+                shooter_id_str = str(shooter_id)
+                for team in (gm.home_team, gm.away_team):
+                    for p in team.get_all_players():
+                        if str(getattr(p, "player_id", None) or "") == shooter_id_str:
+                            shooter = p
+                            break
+                    if shooter is not None:
+                        break
+                if shooter is not None:
+                    gm.game_state["shooter"] = shooter
+                    logging.info(f"🔄 TIMEOUT RESUME: Restored FREE_THROW state (shooter_id={shooter_id}, free_throws_remaining={gm.game_state.get('free_throws_remaining')})")
+                else:
+                    logging.warning(f"⚠️ TIMEOUT RESUME: FREE_THROW resume could not find shooter_id={shooter_id} in rosters")
+        
         # ✅ CRITICAL FIX: Restore offense team from timeout_offense_team_id
         # This ensures the correct team has possession after timeout (e.g., if user called timeout during BIP)
         if "timeout_offense_team_id" in saved:
