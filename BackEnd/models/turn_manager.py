@@ -1996,12 +1996,13 @@ class TurnManager:
                     calling_team.timeouts -= 1
                     logging.info(f"⏸️ TIMEOUT: {calling_team.name} called timeout. Remaining: {calling_team.timeouts}")
         
-        # Add foul out player info
+        # Add foul out player info (include photo so frontend can show player image)
         if foul_out_player:
             payload["foul_out_player"] = {
                 "name": getattr(foul_out_player, "name", "Unknown"),
                 "player_id": getattr(foul_out_player, "player_id", None),
                 "team": getattr(foul_out_player, "team", None),
+                "photo": getattr(foul_out_player, "photo", None),
             }
         
         # Add current timeout counts for frontend display
