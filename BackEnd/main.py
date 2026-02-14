@@ -405,9 +405,17 @@ def simulate_quarter(
                 try:
                     from BackEnd.db import games_collection
                     
+                    unset_fields = {
+                        "timeout_next_play_type": "",
+                        "timeout_offense_team_id": "",
+                        "timeout_free_throws_remaining": "",
+                        "timeout_free_throws": "",
+                        "timeout_shooter_id": "",
+                        "timeout_one_and_one": "",
+                    }
                     games_collection.update_one(
                         {"_id": game_id},
-                        {"$unset": {"timeout_next_play_type": "", "timeout_offense_team_id": ""}}
+                        {"$unset": unset_fields}
                     )
                     
                     logging.info(f"🧹 TIMEOUT RESUME: Cleared timeout state from database for game_id={game_id}")

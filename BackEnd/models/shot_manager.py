@@ -1023,6 +1023,24 @@ class ShotManager:
                 result["next_play_type"] = "FREE_THROW"
                 text = f"{get_name_safe(foul_player)} fouls {get_name_safe(shooter)} on the shot."
                 possession_flips = False
+                # ✅ FOUL OUT: When 5th foul is on shooting foul (miss), set result + context so foul-out popup → lineup → return to free throw
+                if foul_out_info["fouled_out"]:
+                    result["fouled_out"] = True
+                    result["foul_out_player"] = {
+                        "player_id": foul_out_info["foul_player_id"],
+                        "name": foul_out_info["foul_player_name"],
+                        "photo": foul_out_info["foul_player_photo"],
+                        "team": foul_out_info["foul_player_team"],
+                    }
+                    result["foul_count"] = foul_out_info["foul_count"]
+                    self.game_state["foul_out_context"] = {
+                        "foul_type": "DEFENSIVE",
+                        "is_shooting_foul": True,
+                        "is_bonus": False,
+                        "next_play_type": "FREE_THROW",
+                        "shooter": shooter,
+                    }
+                    logging.info(f"✅ FOUL OUT: Stored shooting foul context (miss + d_foul) - shooter={get_name_safe(shooter)}")
             elif charge_result == "BLOCKING_FOUL":
                 # Blocking foul on missed shot - add blocking foul text
                 text = f"{get_name_safe(shooter)} misses the {'3' if is_three else 'shot'}. {get_name_safe(defender)} commits a blocking foul!"
