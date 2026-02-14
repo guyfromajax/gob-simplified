@@ -30,7 +30,9 @@
     "/signup.html",
     "/signup",
     "/reset-password.html",
-    "/reset-password"
+    "/reset-password",
+    "/faqs.html",
+    "/faqs"
   ];
 
   var path = window.location.pathname;
