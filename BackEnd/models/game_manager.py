@@ -432,7 +432,24 @@ class GameManager:
                 from BackEnd.utils.shared import summarize_game_state
                 from BackEnd.db import games_collection
                 db_summary = summarize_game_state(self, exclude_animations=True)
-                games_collection.update_one({"_id": self.game_id}, {"$set": db_summary}, upsert=True)
+                result = games_collection.update_one(
+                    {"_id": self.game_id}, {"$set": db_summary}, upsert=False
+                )
+                # If no match, document may have been created with ObjectId _id (string vs ObjectId mismatch)
+                if result.matched_count == 0 and self.game_id and len(self.game_id) == 24:
+                    try:
+                        from bson import ObjectId
+                        oid = ObjectId(self.game_id)
+                        result2 = games_collection.update_one(
+                            {"_id": oid}, {"$set": db_summary}, upsert=False
+                        )
+                        if result2.matched_count > 0:
+                            logging.warning(
+                                "⚠️ FOUL OUT TIMEOUT: Initial update matched 0 documents; retried with ObjectId and matched %s",
+                                result2.matched_count,
+                            )
+                    except (ValueError, TypeError):
+                        pass  # Invalid ObjectId format - leave as is
                 logging.info(
                     f"💾 FOUL OUT TIMEOUT: Saved game state immediately: "
                     f"game_id={self.game_id}, quarter={db_summary.get('quarter')}, "

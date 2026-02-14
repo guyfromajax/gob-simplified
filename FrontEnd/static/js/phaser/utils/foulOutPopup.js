@@ -113,28 +113,50 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
   
   const lineupUrl = `/set-lineup.html?${params.toString()}`;
 
-  // Create popup
+  // Resolve player image URL (backend may send photo; fallback to /images/players/{id}.png)
+  const playerId = player?.player_id || player?.playerId || player?.id;
+  const rawPhoto = player?.photo || player?.image_url;
+  const staticPath = (typeof window !== 'undefined' && window.API_CONFIG) ? window.API_CONFIG.getStaticPath() : '';
+  const defaultPlayerImg = `${staticPath || ''}/images/players/default.png`;
+  let photoUrl = '';
+  if (rawPhoto && typeof rawPhoto === 'string' && rawPhoto.trim()) {
+    const t = rawPhoto.trim();
+    if (t.startsWith('http://') || t.startsWith('https://')) {
+      photoUrl = t;
+    } else {
+      const base = staticPath || window.location.origin;
+      photoUrl = t.startsWith('/') ? `${base}${t}` : `${base}/${t}`;
+    }
+  }
+  if (!photoUrl && playerId) {
+    photoUrl = `${staticPath || ''}/images/players/${playerId}.png`;
+  }
+  const safePhotoUrl = photoUrl.replace(/"/g, '&quot;');
+  const safeDefaultImg = defaultPlayerImg.replace(/"/g, '&quot;');
+  const safeName = (player?.name || 'Player').replace(/"/g, '&quot;');
+  const initialContent = photoUrl
+    ? `<img src="${safePhotoUrl}" alt="${safeName}" class="foul-out-player-image" onerror="this.onerror=null;this.src='${safeDefaultImg}'">`
+    : `<div class="foul-out-player-placeholder">${(player?.name || 'P').charAt(0)}</div>`;
+
+  // Create popup (same design as end-of-quarter and timeout: white content, gray border)
   const popup = document.createElement('div');
   popup.className = 'foul-out-popup';
   popup.innerHTML = `
     <div class="foul-out-content">
       <div class="foul-out-header">
         <div class="foul-out-player-image-container">
-          ${player.photo ? 
-            `<img src="${player.photo}" alt="${player.name}" class="foul-out-player-image" onerror="this.src='/images/default-player.png'">` :
-            `<div class="foul-out-player-placeholder">${player.name?.charAt(0) || 'P'}</div>`
-          }
+          ${initialContent}
         </div>
         <h2 class="foul-out-title">FOULED OUT!</h2>
       </div>
-      <div class="foul-out-player-name">${player.name || 'Player'}</div>
+      <div class="foul-out-player-name">${(player?.name || 'Player').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
       <div class="foul-out-button-container">
         <a href="${lineupUrl}" class="foul-out-button sub-players-button">Sub Players</a>
       </div>
     </div>
   `;
 
-  // Add styles if not already present
+  // Add styles if not already present (same design as end-of-quarter and timeout popups)
   if (!document.getElementById('foul-out-popup-styles')) {
     const style = document.createElement('style');
     style.id = 'foul-out-popup-styles';
@@ -145,7 +167,7 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.85);
+        background: rgba(0, 0, 0, 0.7);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -153,16 +175,17 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
       }
 
       .foul-out-content {
-        background: #222;
-        border: 4px solid #e74c3c;
+        background: #fff;
+        border: 6px solid #c0c0c0;
         border-radius: 12px;
-        padding: 40px 50px;
+        padding: 40px 60px;
         display: flex;
         flex-direction: column;
-        gap: 25px;
+        gap: 30px;
         align-items: center;
         min-width: 400px;
-        box-shadow: 0 4px 20px rgba(231, 76, 60, 0.5);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+        text-align: center;
       }
 
       .foul-out-header {
@@ -177,8 +200,8 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
         height: 160px;
         border-radius: 8px;
         overflow: hidden;
-        border: 3px solid #e74c3c;
-        background: #1a1a1a;
+        border: 3px solid #c0c0c0;
+        background: #f5f5f5;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -198,24 +221,23 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
         justify-content: center;
         font-size: 60px;
         font-weight: bold;
-        color: #e74c3c;
-        background: #1a1a1a;
+        color: #999;
+        background: #f5f5f5;
       }
 
       .foul-out-title {
-        font-size: 48px;
+        font-size: 36px;
         font-weight: bold;
-        color: #e74c3c;
+        color: #333;
         margin: 0;
         font-family: 'Bebas Neue', sans-serif;
-        letter-spacing: 3px;
-        text-shadow: 0 0 10px rgba(231, 76, 60, 0.8);
+        letter-spacing: 2px;
       }
 
       .foul-out-player-name {
         font-size: 24px;
         font-weight: bold;
-        color: #fff;
+        color: #333;
         text-align: center;
         margin: 0;
       }
@@ -225,12 +247,11 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
         gap: 20px;
         width: 100%;
         justify-content: center;
-        margin-top: 10px;
       }
 
       .foul-out-button {
         padding: 15px 40px;
-        font-size: 20px;
+        font-size: 18px;
         font-weight: bold;
         border: none;
         border-radius: 6px;
@@ -249,7 +270,7 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
       .sub-players-button:hover {
         background: #f57c00;
         transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(255, 152, 0, 0.4);
+        box-shadow: 0 4px 8px rgba(255, 152, 0, 0.3);
       }
     `;
     document.head.appendChild(style);
