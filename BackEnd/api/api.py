@@ -890,6 +890,30 @@ try:
                 print(f"❌ Error saving game to franchise doc: {e}")
                 traceback.print_exc()
     
+    def find_game_doc(games_collection, game_id: str):
+        """
+        Single load path: find game doc by _id, trying string then ObjectId.
+        Returns (doc, effective_id) so callers can use effective_id for updates.
+        """
+        if not games_collection or not game_id:
+            return None, None
+        saved = games_collection.find_one({"_id": game_id})
+        if saved:
+            return saved, game_id
+        if len(game_id) == 24:
+            try:
+                oid = ObjectId(game_id)
+                saved = games_collection.find_one({"_id": oid})
+                if saved:
+                    logging.info(
+                        "🔍 [PERSISTENCE] find_game_doc: string _id missed; found with ObjectId for game_id=%s",
+                        game_id,
+                    )
+                    return saved, oid
+            except (ValueError, TypeError):
+                pass
+        return None, None
+
     def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest, games_collection) -> dict | None:
         """
         Unified function to restore timeout resume state from DB.
@@ -909,14 +933,13 @@ try:
         # If timeout_next_play_type exists in DB, we're resuming from a timeout
         
         saved = None
+        query_id = None  # _id that matched (string or ObjectId) for updates
         
         try:
             # ✅ CRITICAL FIX: Games are saved as standalone documents in games_collection (not nested)
-            # handle_timeout_save_and_response() saves to games_collection
-            # simulate_quarter_endpoint() saves to games_collection
-            # Always read from games_collection - this is where we save, so this is the source of truth
+            # Use single load path (string then ObjectId) so we find doc regardless of _id type
             if games_collection is not None:
-                saved = games_collection.find_one({"_id": game_id})
+                saved, query_id = find_game_doc(games_collection, game_id)
                 if saved:
                     logging.info(f"✅ TIMEOUT RESUME: Found game in games_collection (where we save)")
             else:
@@ -934,8 +957,9 @@ try:
                     inferred_next_play_type = "SIDE_INBOUND"
                     saved["timeout_next_play_type"] = inferred_next_play_type
                     try:
+                        # Use same _id that matched find (string or ObjectId)
                         games_collection.update_one(
-                            {"_id": game_id},
+                            {"_id": query_id or game_id},
                             {"$set": {"timeout_next_play_type": inferred_next_play_type}},
                         )
                     except Exception as update_err:
@@ -2062,7 +2086,13 @@ try:
                         if "timeout_offense_team_id" in timeout_saved_state:
                             update_data["timeout_offense_team_id"] = None
                         if update_data:
-                            games_collection.update_one({"_id": game_id}, {"$unset": update_data})
+                            unset_op = {"$unset": update_data}
+                            r = games_collection.update_one({"_id": game_id}, unset_op)
+                            if r.matched_count == 0 and game_id and len(game_id) == 24:
+                                try:
+                                    games_collection.update_one({"_id": ObjectId(game_id)}, unset_op)
+                                except (ValueError, TypeError):
+                                    pass
                     
                     timeout_saved_state = None  # Clear invalid timeout state
                     # ✅ QUARTER BREAK: Clear resume_from_timeout flag and timeout state if no valid timeout state
@@ -2097,11 +2127,7 @@ try:
                         game_id,
                     )
                 db_lookup_start = time.time()
-                saved = (
-                    games_collection.find_one({"_id": game_id})
-                    if games_collection is not None
-                    else None
-                )
+                saved, _ = find_game_doc(games_collection, game_id) if games_collection and game_id else (None, None)
                 db_lookup_time = (time.time() - db_lookup_start) * 1000
                 # logging.warning(f"⏱️ [DB TIMING] simulate_quarter: games_collection.find_one(game_id={game_id}): {db_lookup_time:.2f}ms, found={saved is not None}")
                 if saved:

@@ -425,6 +425,15 @@ class GameManager:
                 "⚠️ FOUL OUT: Could not resolve Player object for foul_out_player_id=%s (name=%s); timeout turn may lack foul_out_player",
                 foul_out_player_id, foul_out_player_data.get("name", "Unknown") if isinstance(foul_out_player_data, dict) else None
             )
+        # Contract: timeout turn always has foul_out_player so frontend can show popup (use placeholder if missing)
+        if not timeout_turn.get("foul_out_player"):
+            timeout_turn["foul_out_player"] = (
+                dict(foul_out_player_data) if isinstance(foul_out_player_data, dict) and foul_out_player_data
+                else {"name": "Unknown", "player_id": None, "team": None, "photo": None}
+            )
+            logging.warning(
+                "⚠️ FOUL OUT: Attached placeholder foul_out_player so frontend always receives one (result had fouled_out=True but no usable data)"
+            )
         logging.warning(
             "⏸️ FOUL OUT TIMEOUT: Created timeout turn for foul out - %s (game_id=%s)",
             foul_out_player_data.get("name", "Unknown"),
@@ -439,6 +448,7 @@ class GameManager:
                 result = games_collection.update_one(
                     {"_id": self.game_id}, {"$set": db_summary}, upsert=False
                 )
+                save_matched = result.matched_count > 0
                 # If no match, document may have been created with ObjectId _id (string vs ObjectId mismatch)
                 if result.matched_count == 0 and self.game_id and len(self.game_id) == 24:
                     try:
@@ -447,6 +457,7 @@ class GameManager:
                         result2 = games_collection.update_one(
                             {"_id": oid}, {"$set": db_summary}, upsert=False
                         )
+                        save_matched = result2.matched_count > 0
                         if result2.matched_count > 0:
                             logging.warning(
                                 "⚠️ FOUL OUT TIMEOUT: Initial update matched 0 documents; retried with ObjectId and matched %s",
@@ -454,6 +465,11 @@ class GameManager:
                             )
                     except (ValueError, TypeError):
                         pass  # Invalid ObjectId format - leave as is
+                if not save_matched:
+                    logging.error(
+                        "🚨 FOUL OUT TIMEOUT: Save matched 0 documents (game_id=%s) - timeout state not persisted; return to court may reset",
+                        self.game_id,
+                    )
                 logging.warning(
                     "💾 FOUL OUT TIMEOUT: Saved game state immediately: game_id=%s, quarter=%s, clock=%s, next_play_type=%s",
                     self.game_id,

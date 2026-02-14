@@ -1304,12 +1304,20 @@ export function createGameScene(Phaser) {
         // Check for foul out and show popup
         // NOTE: foul-out can surface as either:
         // - a regular turn with ``fouled_out`` + ``foul_out_player`` (common), or
-        // - a TIMEOUT turn with ``timeout_reason=FOUL_OUT`` + ``foul_out_player`` (when backend appends foul-out timeout).
-        const isFoulOutTimeoutTurn = turn.result_type === 'TIMEOUT' && turn.timeout_reason === 'FOUL_OUT' && turn.foul_out_player;
+        // - a TIMEOUT turn with ``timeout_reason=FOUL_OUT`` (backend always sends foul_out_player; use placeholder if missing).
+        const isFoulOutTimeoutTurn = turn.result_type === 'TIMEOUT' && turn.timeout_reason === 'FOUL_OUT';
         const isFoulOutFlaggedTurn = turn.fouled_out && turn.foul_out_player;
         const shouldShowFoulOutPopup = isFoulOutFlaggedTurn || isFoulOutTimeoutTurn;
+        const foulOutPlayer = turn.foul_out_player || (isFoulOutTimeoutTurn ? { name: 'Unknown', player_id: null, team: null, photo: null } : null);
 
-        if (shouldShowFoulOutPopup && !document.querySelector('.foul-out-popup')) {
+        if (shouldShowFoulOutPopup && foulOutPlayer && !document.querySelector('.foul-out-popup')) {
+          // Clear red tint on fouled-out player's sprite so it doesn't stay "dead"
+          const foulOutId = foulOutPlayer.player_id ?? foulOutPlayer.playerId;
+          if (foulOutId) {
+            import('./animation/negativeActionEffects.js').then(({ clearFoulTintForPlayer }) => {
+              clearFoulTintForPlayer(this, foulOutId);
+            }).catch(() => {});
+          }
           // Dynamically import foul out popup
           import('./utils/foulOutPopup.js').then(({ showFoulOutPopup }) => {
             // Get game context from scene
@@ -1326,7 +1334,7 @@ export function createGameScene(Phaser) {
             const userTeamId = urlParams.get('user_team_id');
             
             showFoulOutPopup({
-              player: turn.foul_out_player,
+              player: foulOutPlayer,
               gameId: this.gameId,
               mode: mode,
               quarter: liveQuarter,
@@ -2018,7 +2026,7 @@ export function createGameScene(Phaser) {
           if (turn.result_type === 'BATCH' && turn.batch_turns) {
             // ✅ REMOVED: Batch turn logging (cluttering console)
             
-            // Animate each turn in the batch
+            // Animate each turn in the batch (try/catch so timeout sub-turn still runs if foul sub-turn errors)
             for (const subTurn of turn.batch_turns) {
               turnCount++;
               subTurn.index = turnCount;
@@ -2036,18 +2044,23 @@ export function createGameScene(Phaser) {
                 appendToTextScroll(subTurn.debug_turn_result);
               }
               
-              await animateGameTurns({
-                scene: this,
-                simData: { 
-                  ...initialSimData,
-                  turns: [subTurn],
-                  home_team: initialSimData.home_team,
-                  away_team: initialSimData.away_team
-                },
-                playerSprites: this.playerSprites,
-                ballSprite: this.ballSprite,
-                onUpdate: updateScoreboard
-              });
+              try {
+                await animateGameTurns({
+                  scene: this,
+                  simData: { 
+                    ...initialSimData,
+                    turns: [subTurn],
+                    home_team: initialSimData.home_team,
+                    away_team: initialSimData.away_team
+                  },
+                  playerSprites: this.playerSprites,
+                  ballSprite: this.ballSprite,
+                  onUpdate: updateScoreboard
+                });
+              } catch (batchSubErr) {
+                console.error(`❌ BATCH sub-turn (${subTurn.result_type}) animation error; continuing to next sub-turn:`, batchSubErr);
+                // Continue so timeout sub-turn (e.g. foul-out) still runs
+              }
               
               // Update finalTurn to be the last sub-turn in the batch
               finalTurn = subTurn;

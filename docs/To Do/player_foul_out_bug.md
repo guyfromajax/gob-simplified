@@ -93,4 +93,41 @@ These are candidate causes for “no popup, no lineup, dead sprite” (to confir
 
 *(Add dated notes here as we try fixes.)*
 
+- **2025-02 (later):** Defensive fix: timeout turn gets `foul_out_player` from result when Player lookup fails (game_manager). Frontend: FOUL_OUT branch in handleTimeout always runs when `timeout_reason === 'FOUL_OUT'`; warn when `foul_out_player` missing and return. Backend: ObjectId fallback for foul-out save; logs upgraded to WARNING. Persistence: doc often has no `timeout_next_play_type` on return; foul-out save may not run or match. FOUL_OUT_TEST_MODE env var added for testing.
+
 - **2025-02-02:** Added end-to-end trace (backend + frontend) and “Working vs broken” hypotheses. No code change yet; next step is to confirm which hypothesis matches the failing case (logs or repro).
+
+---
+
+## System review: step back and fix coherently
+
+The foul-out flow has broken in **multiple ways** and piecemeal fixes have been unstable. Recommended approach: **treat foul-out as one system**, define a clear contract, then fix backend and frontend to that contract in order.
+
+### Known failure modes (observed)
+
+| Symptom | Likely cause |
+|--------|---------------|
+| No foul-out popup | Backend sends TIMEOUT turn without `foul_out_player`, or frontend never receives/processes timeout sub-turn (BATCH order, animation hang). |
+| User not taken to lineup | Same as above; or navigation runs but with wrong/missing params; or popup shows but button doesn't navigate. |
+| Dead / stuck sprite | Foul turn applies red tint (negativeActionEffects); if foul-out flow never runs, tint or animation state is never cleared; or sprite left in "fouled" pose when next turn never runs. |
+| Persistence reset (score, clock, stats, NG) | Foul-out save to DB never runs (e.g. `game_id` missing, update matched 0), or runs but doc is overwritten later; on return, `restore_timeout_resume_state` finds no `timeout_next_play_type` and treats as quarter start. |
+
+### Touchpoints (single checklist)
+
+**Backend:** Detection (phase_resolution, shot_manager, game_manager) → result has `fouled_out` + `foul_out_player`. Funnel: `_append_turn` → `_check_lineups_for_foul_out` → `_handle_foul_out_timeout`. Timeout turn: `call_timeout(FOUL_OUT)` → `setup_timeout_turn`; payload must include `foul_out_player` (from Player or result dict). game_state: `timeout_next_play_type`, `timeout_offense_team_id` set then saved via `summarize_game_state` + `update_one`; save must match game doc. API returns BATCH with `[foul_turn, timeout_turn]`; timeout turn must have `result_type: "TIMEOUT"`, `timeout_reason: "FOUL_OUT"`, `foul_out_player`.
+
+**Frontend:** BATCH handling: animateGameTurns loops over `batch_turns`; each sub-turn animated then `onUpdate` and router (handleTimeout for TIMEOUT). If foul animation hangs, timeout sub-turn may never run. Popup: updateScoreboard and handleTimeout both require `foul_out_player` for foul-out popup; if missing, handleTimeout falls through to computer timeout. Navigation: foulOutPopup builds URL via TimeoutNavigationHelper. Sprite: negativeActionEffects applies red tint on foul; if foul-out flow never completes, no clear-tint step → sprite can look "dead".
+
+### Proposed contract
+
+1. **Backend:** Every foul-out returns BATCH of two turns; second turn is TIMEOUT with `timeout_reason: "FOUL_OUT"` and **always** has `foul_out_player` (from result dict if Player lookup fails). Backend **always** persists timeout state in the same request and uses _id that matches on read.
+2. **Frontend:** For BATCH whose second turn is TIMEOUT with `timeout_reason === 'FOUL_OUT'`, **always** show foul-out popup (use placeholder if `foul_out_player` missing) and navigate; never fall through to computer timeout. Ensure timeout sub-turn is always processed (don't swallow if foul sub-turn fails).
+3. **Persistence:** One save path for foul-out (same _id format as load); one load path on return to court.
+4. **Sprite:** When foul-out popup is shown, clear fouled-out player's tint / set consistent "out" state so sprite doesn't stay "dead".
+
+### Recommended fix order
+
+1. **Backend:** Ensure `_handle_foul_out_timeout` always attaches `foul_out_player` to timeout turn; ensure save always runs and matches game doc; optionally unify with user/computer timeout save path.
+2. **Frontend:** In handleTimeout, if `timeout_reason === 'FOUL_OUT'` always show popup (placeholder if no player) and navigate; never fall through to computer timeout. Ensure BATCH always processes timeout sub-turn even if foul sub-turn errors.
+3. **Persistence:** Single save/load path; defensive _id retry and logging.
+4. **Sprite:** On foul-out popup (or when applying foul-out from turn), clear red tint for fouled-out player's sprite.
