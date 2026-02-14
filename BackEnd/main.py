@@ -1,3 +1,4 @@
+import os
 import random
 import json
 import logging
@@ -87,10 +88,17 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
             return
 
     logging.info("🚨 RESETTING GAME STATS (should only happen in Q1!)")
+    # TEMPORARY: FOUL_OUT_TEST_MODE=1 starts all players with 4 fouls so first foul triggers foul-out (for testing)
+    _foul_out_test = os.environ.get("FOUL_OUT_TEST_MODE", "").strip().lower() in ("1", "true", "yes")
+    _start_fouls = 4 if _foul_out_test else 0
+    if _foul_out_test:
+        logging.warning("⚠️ FOUL_OUT_TEST_MODE enabled: all players starting with F=4 (first foul = foul-out)")
     affected: list[str] = []
     for team in (gm.home_team, gm.away_team):
         for player in team.get_all_players():
             player.reset_stats()
+            if _start_fouls:
+                player.stats["game"]["F"] = _start_fouls
             # Randomize EM, CH, MO for new game instance
             player.attributes = Player.randomize_game_attributes(player.attributes)
             affected.append(player.player_id)
@@ -102,13 +110,16 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
         players_payload = []
         for label, team in (("home", gm.home_team), ("away", gm.away_team)):
             for pos, player in team.lineup.items():
+                stats = _init_game_stats_dict()
+                if _start_fouls:
+                    stats["F"] = _start_fouls
                 players_payload.append(
                     {
                         "playerId": player.player_id,
                         "team": label,
                         "team_id": team.team_id,
                         "pos": pos,
-                        "stats": _init_game_stats_dict(),
+                        "stats": stats,
                         "attributes": {
                             "EM": player.attributes.get("EM", 0),
                             "CH": player.attributes.get("CH", 0),
