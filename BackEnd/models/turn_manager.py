@@ -2133,15 +2133,15 @@ class TurnManager:
                     else:
                         logging.debug(f"🔍 [COMPUTER TIMEOUT] Q1 Condition checked: {player.get_name()} has 2 fouls (30% chance, rolled {roll:.2f} - no timeout)")
         
-        # Q2 & Q3: Player foul logic
-        elif quarter in [2, 3]:
+        # Q2: Player foul logic (no time gate)
+        elif quarter == 2:
             # Condition 1: Player with 4 fouls - 100% chance
             for player in active_players:
                 fouls = player.get_stat("F", "game")
                 condition_key = f"4_fouls_{player.player_id}"
                 if fouls == 4 and condition_key not in checked:
                     checked.add(condition_key)
-                    logging.debug(f"✅ [COMPUTER TIMEOUT] Q{quarter} Condition met: {player.get_name()} has 4 fouls (100% chance)")
+                    logging.debug(f"✅ [COMPUTER TIMEOUT] Q2 Condition met: {player.get_name()} has 4 fouls (100% chance)")
                     return True  # 100% chance
             
             # Condition 2: Player with 3 fouls - 90% chance
@@ -2152,10 +2152,37 @@ class TurnManager:
                     checked.add(condition_key)
                     roll = random.random()
                     if roll < 0.90:
-                        logging.debug(f"✅ [COMPUTER TIMEOUT] Q{quarter} Condition met: {player.get_name()} has 3 fouls (90% chance, rolled {roll:.2f})")
+                        logging.debug(f"✅ [COMPUTER TIMEOUT] Q2 Condition met: {player.get_name()} has 3 fouls (90% chance, rolled {roll:.2f})")
                         return True
                     else:
-                        logging.debug(f"🔍 [COMPUTER TIMEOUT] Q{quarter} Condition checked: {player.get_name()} has 3 fouls (90% chance, rolled {roll:.2f} - no timeout)")
+                        logging.debug(f"🔍 [COMPUTER TIMEOUT] Q2 Condition checked: {player.get_name()} has 3 fouls (90% chance, rolled {roll:.2f} - no timeout)")
+        
+        # Q3: Player foul logic (only if time_remaining <= 240 seconds / 4:00)
+        elif quarter == 3:
+            if time_remaining <= 240:
+                # Condition 1: Player with 4 fouls - 100% chance
+                for player in active_players:
+                    fouls = player.get_stat("F", "game")
+                    condition_key = f"4_fouls_{player.player_id}"
+                    if fouls == 4 and condition_key not in checked:
+                        checked.add(condition_key)
+                        logging.debug(f"✅ [COMPUTER TIMEOUT] Q3 Condition met: {player.get_name()} has 4 fouls (100% chance)")
+                        return True  # 100% chance
+                
+                # Condition 2: Player with 3 fouls - 90% chance
+                for player in active_players:
+                    fouls = player.get_stat("F", "game")
+                    condition_key = f"3_fouls_{player.player_id}"
+                    if fouls == 3 and condition_key not in checked:
+                        checked.add(condition_key)
+                        roll = random.random()
+                        if roll < 0.90:
+                            logging.debug(f"✅ [COMPUTER TIMEOUT] Q3 Condition met: {player.get_name()} has 3 fouls (90% chance, rolled {roll:.2f})")
+                            return True
+                        else:
+                            logging.debug(f"🔍 [COMPUTER TIMEOUT] Q3 Condition checked: {player.get_name()} has 3 fouls (90% chance, rolled {roll:.2f} - no timeout)")
+            else:
+                logging.debug(f"🔍 [COMPUTER TIMEOUT] Q3 Skipping foul check - time_remaining ({time_remaining}s) > 240s (4:00)")
         
         # Q4: Player foul logic (only if time_remaining > 60 seconds)
         elif quarter == 4:
@@ -2176,88 +2203,91 @@ class TurnManager:
                 logging.debug(f"🔍 [COMPUTER TIMEOUT] Q4 Skipping foul check - time_remaining ({time_remaining}s) <= 60s")
         
         # ========== ENERGY CONDITIONS (All Quarters Q1-Q4) ==========
+        # Q1-Q2: thresholds 80% / 70% / 60%. Q3-Q4: thresholds 75% / 65% / 55% (5% lower).
+        if quarter in [3, 4]:
+            thresh_80, thresh_70, thresh_60 = 0.75, 0.65, 0.55
+        else:
+            thresh_80, thresh_70, thresh_60 = 0.80, 0.70, 0.60
         
-        # Conditions 3-9: Energy (NG) levels
         # Count players below each threshold (only from active lineup)
-        players_below_80 = [p for p in active_players if p.attributes.get("NG", 1.0) < 0.80]
-        players_below_70 = [p for p in active_players if p.attributes.get("NG", 1.0) < 0.70]
-        players_below_60 = [p for p in active_players if p.attributes.get("NG", 1.0) < 0.60]
-        
+        players_below_80 = [p for p in active_players if p.attributes.get("NG", 1.0) < thresh_80]
+        players_below_70 = [p for p in active_players if p.attributes.get("NG", 1.0) < thresh_70]
+        players_below_60 = [p for p in active_players if p.attributes.get("NG", 1.0) < thresh_60]
         count_80 = len(players_below_80)
         count_70 = len(players_below_70)
         count_60 = len(players_below_60)
         
-        # Condition 3: 3 players < 80% NG - 50% chance
+        # Condition 3: 3 players < high threshold (80% or 75%) - 50% chance
         condition_key = "3_players_80_ng"
         if count_80 >= 3 and condition_key not in checked:
             checked.add(condition_key)
             roll = random.random()
             if roll < 0.50:
-                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 3 players < 80% NG (50% chance, rolled {roll:.2f})")
+                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 3 players < {int(thresh_80*100)}% NG (50% chance, rolled {roll:.2f})")
                 return True
             else:
-                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 3 players < 80% NG (50% chance, rolled {roll:.2f} - no timeout)")
+                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 3 players < {int(thresh_80*100)}% NG (50% chance, rolled {roll:.2f} - no timeout)")
         
-        # Condition 4: 4 players < 80% NG - 75% chance
+        # Condition 4: 4 players < high threshold - 75% chance
         condition_key = "4_players_80_ng"
         if count_80 >= 4 and condition_key not in checked:
             checked.add(condition_key)
             roll = random.random()
             if roll < 0.75:
-                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 4 players < 80% NG (75% chance, rolled {roll:.2f})")
+                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 4 players < {int(thresh_80*100)}% NG (75% chance, rolled {roll:.2f})")
                 return True
             else:
-                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 4 players < 80% NG (75% chance, rolled {roll:.2f} - no timeout)")
+                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 4 players < {int(thresh_80*100)}% NG (75% chance, rolled {roll:.2f} - no timeout)")
         
-        # Condition 5: 5 players < 80% NG - 90% chance
+        # Condition 5: 5 players < high threshold - 90% chance
         condition_key = "5_players_80_ng"
         if count_80 >= 5 and condition_key not in checked:
             checked.add(condition_key)
             roll = random.random()
             if roll < 0.90:
-                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 5 players < 80% NG (90% chance, rolled {roll:.2f})")
+                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 5 players < {int(thresh_80*100)}% NG (90% chance, rolled {roll:.2f})")
                 return True
             else:
-                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 5 players < 80% NG (90% chance, rolled {roll:.2f} - no timeout)")
+                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 5 players < {int(thresh_80*100)}% NG (90% chance, rolled {roll:.2f} - no timeout)")
         
-        # Condition 6: 3 players < 70% NG - 80% chance
+        # Condition 6: 3 players < mid threshold (70% or 65%) - 80% chance
         condition_key = "3_players_70_ng"
         if count_70 >= 3 and condition_key not in checked:
             checked.add(condition_key)
             roll = random.random()
             if roll < 0.80:
-                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 3 players < 70% NG (80% chance, rolled {roll:.2f})")
+                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 3 players < {int(thresh_70*100)}% NG (80% chance, rolled {roll:.2f})")
                 return True
             else:
-                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 3 players < 70% NG (80% chance, rolled {roll:.2f} - no timeout)")
+                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 3 players < {int(thresh_70*100)}% NG (80% chance, rolled {roll:.2f} - no timeout)")
         
-        # Condition 7: 4 players < 70% NG - 90% chance
+        # Condition 7: 4 players < mid threshold - 90% chance
         condition_key = "4_players_70_ng"
         if count_70 >= 4 and condition_key not in checked:
             checked.add(condition_key)
             roll = random.random()
             if roll < 0.90:
-                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 4 players < 70% NG (90% chance, rolled {roll:.2f})")
+                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 4 players < {int(thresh_70*100)}% NG (90% chance, rolled {roll:.2f})")
                 return True
             else:
-                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 4 players < 70% NG (90% chance, rolled {roll:.2f} - no timeout)")
+                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 4 players < {int(thresh_70*100)}% NG (90% chance, rolled {roll:.2f} - no timeout)")
         
-        # Condition 8: 5 players < 70% NG - 95% chance
+        # Condition 8: 5 players < mid threshold - 95% chance
         condition_key = "5_players_70_ng"
         if count_70 >= 5 and condition_key not in checked:
             checked.add(condition_key)
             roll = random.random()
             if roll < 0.95:
-                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 5 players < 70% NG (95% chance, rolled {roll:.2f})")
+                logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 5 players < {int(thresh_70*100)}% NG (95% chance, rolled {roll:.2f})")
                 return True
             else:
-                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 5 players < 70% NG (95% chance, rolled {roll:.2f} - no timeout)")
+                logging.debug(f"🔍 [COMPUTER TIMEOUT] Energy condition checked: 5 players < {int(thresh_70*100)}% NG (95% chance, rolled {roll:.2f} - no timeout)")
         
-        # Condition 9: 3 players < 60% NG - 100% chance
+        # Condition 9: 3 players < low threshold (60% or 55%) - 100% chance
         condition_key = "3_players_60_ng"
         if count_60 >= 3 and condition_key not in checked:
             checked.add(condition_key)
-            logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 3 players < 60% NG (100% chance)")
+            logging.debug(f"✅ [COMPUTER TIMEOUT] Energy condition met: 3 players < {int(thresh_60*100)}% NG (100% chance)")
             return True  # 100% chance
         
         logging.debug(f"🔍 [COMPUTER TIMEOUT] No conditions met for {computer_team.name} Q{quarter}")
