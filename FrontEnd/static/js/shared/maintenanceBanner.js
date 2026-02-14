@@ -52,8 +52,19 @@
     if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
   }
 
+  /** Pages where we defer the banner so users in an active game are not interrupted. */
+  function isDeferredPage() {
+    try {
+      var path = (typeof window !== "undefined" && window.location && window.location.pathname) ? window.location.pathname : "";
+      return /court\.html|set-lineup\.html|game-plan\.html/.test(path);
+    } catch (e) {
+      return false;
+    }
+  }
+
   function shouldShow(config) {
     if (!config || config.enabled !== true) return false;
+    if (isDeferredPage()) return false;
 
     var startsAtMs = safeParseTimeMs(config.starts_at_iso);
     if (startsAtMs == null) {

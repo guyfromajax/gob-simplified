@@ -1,5 +1,21 @@
 # Franchise Command Center (FCC)
 
+## Data wiring
+
+**Franchise-level tabs** (Standings, Schedule, Leaders, Team Stats, Team Traits, Recruits) request data with **`franchise_id`** only (e.g. `/franchise/standings?franchise_id=...`).
+
+**User's team–scoped data** uses **`team_id`** (ObjectId string, exposed as `userTeamId` in the frontend). Wire by `team_id`; do not use team name as the key.
+
+| Data / action | How to wire |
+|---------------|--------------|
+| Team tab (attributes, plays, scouting) | `/franchise/team-data?franchise_id=...&team_id=...` |
+| Roster (Team tab and top bar) | `/roster/{userTeamId}?franchise_id=...` |
+| Training, Game Plan, Set Lineup links | Include `team_id=${userTeamId}` in URL params |
+
+`userTeamId` is resolved from the URL param `team_id` or from `/franchise/command-center/data` (response `team_id`). The backend accepts `team_id` for `/franchise/team-data` and `/roster/{team_identifier}` (path can be ObjectId or team_id string). See **Data_Persistence_System.md** § Team ID Resolution / Command Center (FCC) data wiring.
+
+---
+
 ## Tournament tab (EOS bracket)
 
 **Location:** `FrontEnd/static/franchise-command-center.js` — `renderTournamentBracket()`; shared UI in `FrontEnd/static/bracket.js`.

@@ -4,8 +4,7 @@ from BackEnd.constants import (
     THREE_POINT_PROBABILITY, 
     THREE_POINT_SPOTS,
     PAINT_SPOTS,
-    PLAYCALL_ATTRIBUTE_WEIGHTS, 
-    BLOCK_PROBABILITY,
+    PLAYCALL_ATTRIBUTE_WEIGHTS,
     BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD,
     BLOCK_RECONCILIATION_BLOCK_THRESHOLD,
     BLOCK_Y_ROLL_MIN,
@@ -1096,17 +1095,8 @@ class ShotManager:
                         release_player.coords = coords.copy()
                 result["defense_release_coords"] = defense_release_coords
             else:
-                # Regular miss → rebound logic (or block outcome using block spot)
+                # Regular miss → rebound logic (or block outcome using block spot from reconciliation only)
                 block_spot_used = getattr(self, "_block_spot", None)
-                if not block_spot_used:
-                    defense_attrs = defender.attributes if defender else {"ID": 0}
-                    base_block_prob = BLOCK_PROBABILITY.get(playcall, 0.0)
-                    block_skill = defense_attrs["ID"] / 100
-                    final_block_chance = base_block_prob * (0.5 + block_skill)
-                    is_block = random.random() < final_block_chance
-                    if is_block:
-                        text += f" {get_name_safe(defender)} blocks the shot! Great block!"
-                        defender.record_stat("BLK")
 
                 if is_fast_break:
                     # ==================== FAST BREAK REBOUND (x-eligibility) ====================

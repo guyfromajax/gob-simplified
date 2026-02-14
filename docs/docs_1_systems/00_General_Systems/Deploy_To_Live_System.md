@@ -1,104 +1,88 @@
 # Deploy To Live System
 
-This is the simple workflow to deploy safely and predictably.
+- **Branch rules:** `develop` = staging (Netlify + Railway). `main` = production. Don’t push to `main` until staging is verified on `develop`.
 
-## Branch Rules
-
-- `develop` = staging (Netlify staging + Railway staging)
-- `main` = production/live (Netlify production + Railway production)
-- Do not deploy to `main` until staging is verified on `develop`.
+---
 
 ## Standard Deploy (No Maintenance)
 
-1. Make changes on `develop`.
-2. Push `develop` and confirm deploys complete:
-   - Netlify staging deploy is successful.
-   - Railway staging deploy is successful (if backend changed).
-3. Test staging:
-   - Smoke test the exact screens you touched.
-   - Verify no obvious regressions (login, mode-select, scrimmage start, etc.).
-4. Promote to production:
-   - Merge `develop` into `main`.
-   - Push `main`.
-5. Confirm production deploys complete:
-   - Netlify production deploy is successful.
-   - Railway production deploy is successful (if backend changed).
-6. Smoke test production (quick check):
-   - Homepage loads.
-   - Auth + mode-select works.
-   - A basic gameplay action works (or at least API health).
+1. Make changes on `develop`, push, confirm staging deploys (Netlify + Railway if backend changed).
+2. Smoke test staging.
+3. Merge `develop` into `main`, push `main`.
+4. Confirm production deploys, then smoke test production (homepage, auth, a quick gameplay check).
 
-## Maintenance Deploy (Banner + Full Maintenance + Backend Protection)
+---
 
-These three toggles are separate. You can enable them independently.
+## Maintenance Deploy (Update to Live with Warning)
 
-### A) Warning Banner (Frontend Only, Does Not Block The Site)
+**High-level:**
 
-Config file:
-- `FrontEnd/static/config/maintenance.json`
+1. **T–60 min:** Push the warning banner live (steps below). No Railway change. Users see a dismissible red banner; it does not show on court/set-lineup/game-plan so it won’t disrupt active games.
+2. **Right before the real deploy:** Turn on the maintenance page (Netlify) and block writes (Railway): uncomment the wildcard in `FrontEnd/static/_redirects` and push `main`; set Railway production `MAINTENANCE_MODE=true`.
+3. **Push the update to main** (merge your branch into `main`, push).
+4. **After deploys are done:** Set Railway `MAINTENANCE_MODE=false`; comment `_redirects` back and set `maintenance.json` `enabled: false`; push `main`. Users then see the live app with the new code.
 
-How it behaves:
-- If `"enabled": false`, banner is off.
-- If `"enabled": true` and `"starts_at_iso"` is set, banner appears starting `show_minutes_before` minutes before the start time.
-- If `"enabled": true` and `"starts_at_iso"` is blank, banner shows immediately.
-- Users can dismiss it; changing `"id"` forces it to reappear.
+---
 
-Steps:
-1. On `main`, update `FrontEnd/static/config/maintenance.json`:
-   - Set `"enabled": true`
-   - Set a new `"id"` (unique per maintenance event)
-   - Set `"starts_at_iso"` (UTC) and keep `"show_minutes_before": 60`
-   - Update `"message"` if needed
-2. Commit + push `main` (Netlify production deploy).
-3. Verify banner appears on production.
+### Step 1 — T–60 min: Push the warning banner only
 
-### B) Full Maintenance Screen (Frontend Blocks All Routes)
+Do **not** merge your feature branch yet. Deploy only the banner config.
 
-Redirect file:
-- `FrontEnd/static/_redirects`
+1. Checkout `main` and pull latest (stash or commit any other work first):
 
-Rule to toggle:
-- OFF (normal site): `# /*        /maintenance.html 200!`
-- ON (maintenance): `/*        /maintenance.html 200!`
+   ```bash
+   git checkout main
+   git pull origin main
+   ```
 
-Steps:
-1. At maintenance start time, on `main`, uncomment the wildcard line:
-   - Change `# /*        /maintenance.html 200!` to `/*        /maintenance.html 200!`
-2. Commit + push `main` (Netlify production deploy).
-3. Verify production routes all show the maintenance page:
-   - `/`
-   - `/homepage.html`
-   - `/mode-select.html`
-   - A random URL like `/anything`
+2. Edit **only** `FrontEnd/static/config/maintenance.json`. Use a new `id` and set `starts_at_iso` to the maintenance start time (UTC). Example:
 
-### C) Backend Protection (Blocks Writes)
+   ```json
+   {
+     "id": "maintenance-2025-02-15",
+     "enabled": true,
+     "starts_at_iso": "2025-02-15T20:00:00Z",
+     "show_minutes_before": 60,
+     "message": "Maintenance begins soon. Please finish your game to avoid losing progress.",
+     "details_url": ""
+   }
+   ```
 
-Railway env var:
-- `MAINTENANCE_MODE`
+3. Commit and push only that file:
 
-Values:
-- `false` = normal
-- `true` = block mutations with `503` (POST/PUT/PATCH/DELETE)
+   ```bash
+   git add FrontEnd/static/config/maintenance.json
+   git commit -m "chore: enable 60-min maintenance warning banner"
+   git push origin main
+   ```
 
-Steps:
-1. At maintenance start time, set Railway production `MAINTENANCE_MODE=true`.
-2. Verify:
-   - `GET /health` returns `200`
-   - `POST /api/simulate-quarter` returns `503`
-   - `POST /api/simulate-turn` returns `503`
+4. After Netlify deploys, check production (e.g. mode-select or homepage). The red banner should appear there; it will not appear on court/set-lineup/game-plan.
 
-## Reopen After Maintenance
+---
 
-1. Railway production:
-   - Set `MAINTENANCE_MODE=false`
-2. Netlify production:
-   - Comment the wildcard line again in `FrontEnd/static/_redirects` and push `main`
-3. Frontend banner:
-   - Set `FrontEnd/static/config/maintenance.json` `"enabled": false` and push `main`
+### Step 2 — Right before the real deploy: Maintenance on
 
-## Gotchas (Read This Once)
+- **Netlify (maintenance page):** On `main`, in `FrontEnd/static/_redirects`, uncomment the wildcard so all routes serve the maintenance page:
+  - Change `# /*        /maintenance.html 200!` → `/*        /maintenance.html 200!`  
+  - (The `200!` is required so the redirect overrides existing HTML.)  
+  Commit and push `main`.
+- **Railway:** Set production env `MAINTENANCE_MODE=true` so the API returns 503 on writes (POST/PUT/PATCH/DELETE).
 
-- A push to `main` always triggers a new production deploy. Keep “toggle-only” commits small and intentional.
-- For full maintenance mode to override existing `.html` files, the wildcard must be `200!` (the `!` matters).
-- The banner dismissal is stored in browser `localStorage` and is not tied to a user account.
+---
 
+### Step 3 — Push the update
+
+Merge your branch (e.g. `develop`) into `main` and push. Wait for Netlify and Railway production deploys to finish.
+
+---
+
+### Step 4 — Reopen after maintenance
+
+1. **Railway:** Set production `MAINTENANCE_MODE=false`.
+2. **Netlify:** In `FrontEnd/static/_redirects`, comment the wildcard line back (`# /* ...`), and in `FrontEnd/static/config/maintenance.json` set `"enabled": false`. Commit and push `main`.
+
+Users will now see the live site with the new code.
+
+---
+
+**Reference:** Banner dismissal is stored in browser localStorage by `id`; changing `id` in the config makes the banner show again for returning users.
