@@ -61,12 +61,13 @@ The timeout system allows game pauses for strategic adjustments, lineup changes,
 
 **Foul-Out Timeout:**
 - Player fouls out during shot resolution
-- `result["fouled_out"] = True` set in `shot_manager.py`
+- `result["fouled_out"] = True` set in `shot_manager.py` (or added by `_check_lineups_for_foul_out` in game_manager)
 - `game_manager.simulate_macro_turn()` detects `fouled_out` flag
 - Uses the same unified timeout pipeline as all other timeouts:
   - `game_manager.call_timeout(...)`
   - `turn_manager.setup_timeout_turn(...)`
-- Captures/persists `timeout_offense_team_id` before timeout turn creation
+- **Possession for resume:** `timeout_offense_team_id` is set in `call_timeout()`. For **offensive foul** (charge or HCO o-foul), possession *flips* after the foul turn but we save state *before* that flip; so we explicitly set `timeout_offense_team_id = self.defense_team.team_id` when `foul_out_context.foul_type == "OFFENSIVE"`. For defensive foul-out (e.g. shooting foul) we use current offense. See `docs/To Do/player_foul_out_bug.md` (Solution summary) for edge cases.
+- **FREE_THROW resume:** When next play is free throw (5th foul on shooting foul), we persist `timeout_free_throws_remaining`, `timeout_shooter_id`, etc.; on return we restore `offensive_state`, `shooter`, and FT count so the first `simulate_turn` creates the free throw.
 - Creates `TIMEOUT` turn with `timeout_reason="FOUL_OUT"` and standard timeout payload fields
 - Persists state using the same timeout save path used by regular timeouts
 
