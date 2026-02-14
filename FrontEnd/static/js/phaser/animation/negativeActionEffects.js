@@ -99,6 +99,23 @@ export function triggerFoulEffect(scene, playerId) {
 }
 
 /**
+ * Clear red foul tint for a player (e.g. when they foul out and we show the foul-out popup).
+ * Prevents the sprite from staying "dead" / red when navigating to lineup.
+ */
+export function clearFoulTintForPlayer(scene, playerId) {
+  if (!playerId || !scene?.playerSprites) return;
+  const sprite = scene.playerSprites[playerId];
+  if (!sprite) return;
+  if (sprite.type === 'Container') {
+    sprite.list.forEach(child => {
+      if (child.clearTint) child.clearTint();
+    });
+  } else if (sprite.clearTint) {
+    sprite.clearTint();
+  }
+}
+
+/**
  * Trigger turnover effect for a player
  */
 export function triggerTurnoverEffect(scene, playerId) {
