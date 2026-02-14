@@ -109,6 +109,21 @@
     document.body.classList.add('has-auth-bar');
   }
 
+  function createFooterHTML() {
+    var footer = document.createElement('footer');
+    footer.id = 'site-footer';
+    footer.className = 'site-footer';
+    footer.innerHTML = '<a href="/faqs.html">FAQs</a>';
+    return footer;
+  }
+
+  function injectFooter() {
+    if (document.getElementById('site-footer')) return;
+    var footer = createFooterHTML();
+    document.body.appendChild(footer);
+    document.body.classList.add('has-footer');
+  }
+
   function initAuthState() {
     var authLoggedOut = document.getElementById('auth-logged-out');
     var authLoggedIn = document.getElementById('auth-logged-in');
@@ -347,6 +362,7 @@
     if (!shouldShowAuthBar()) return;
     ensureAuthBarStyles();
     injectAuthBar();
+    injectFooter();
     initAuthState();
     initAlphaBadge();
     initFeedbackModal();

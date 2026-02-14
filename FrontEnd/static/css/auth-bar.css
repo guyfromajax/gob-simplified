@@ -256,3 +256,28 @@ body.has-auth-bar {
   font-size: 12px;
   color: #6b7280;
 }
+
+/* Site footer – same screens as auth bar */
+body.has-auth-bar.has-footer {
+  padding-bottom: 52px;
+}
+.site-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  padding: 12px 20px;
+  text-align: center;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.06);
+  z-index: 9997;
+  font-size: 14px;
+}
+.site-footer a {
+  color: #ff7a00;
+  text-decoration: none;
+  font-weight: 600;
+}
+.site-footer a:hover {
+  text-decoration: underline;
+}
