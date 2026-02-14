@@ -132,6 +132,19 @@ body {
   color: #666;
 }
 
+.request-access-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 14px;
+  color: #ff9800;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.request-access-link:hover {
+  text-decoration: underline;
+}
+
 /* OTP input special styling */
 #otp-code {
   font-family: 'Bebas Neue', monospace;
@@ -231,6 +244,45 @@ body {
 
 .back-link:hover {
   color: #ff9800;
+}
+
+/* Request Access Code thanks modal */
+.access-request-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+}
+
+.access-request-modal-backdrop.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.access-request-modal {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: 24px;
+  max-width: 320px;
+  text-align: center;
+}
+
+.access-request-modal-text {
+  margin: 0 0 20px 0;
+  font-size: 16px;
+  color: #333;
+  line-height: 1.4;
+}
+
+.access-request-modal-close {
+  margin: 0;
 }
 
 /* Responsive */

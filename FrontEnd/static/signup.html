@@ -55,6 +55,7 @@
         <label for="otp-code">Alpha Access Code</label>
         <input type="text" id="otp-code" name="otp_code" placeholder="Enter your access code">
         <div class="form-hint">Required for alpha signup</div>
+        <a href="#" id="request-access-link" class="request-access-link">Request Access Code</a>
       </div>
       
       <div id="error-message" class="error-message"></div>
@@ -67,6 +68,14 @@
     
     <div class="auth-footer">
       Already have an account? <a href="/login.html">Log in</a>
+    </div>
+  </div>
+
+  <!-- Thanks popup (shown after successful Request Access Code) -->
+  <div id="access-request-modal-backdrop" class="access-request-modal-backdrop" aria-hidden="true">
+    <div class="access-request-modal" role="dialog" aria-labelledby="access-request-modal-title">
+      <p id="access-request-modal-title" class="access-request-modal-text">Thanks Coach, we'll send your access code shortly.</p>
+      <button type="button" id="access-request-modal-close" class="auth-button access-request-modal-close">OK</button>
     </div>
   </div>
   
@@ -162,6 +171,58 @@
       }
     });
     
+    // Request Access Code: validate email, POST, show thanks popup
+    document.getElementById('request-access-link').addEventListener('click', async (e) => {
+      e.preventDefault();
+      const emailEl = document.getElementById('email');
+      const email = emailEl.value.trim();
+      const errorEl = document.getElementById('error-message');
+      errorEl.textContent = '';
+      errorEl.style.display = 'none';
+
+      if (!email) {
+        errorEl.textContent = 'Please enter your email above to request an access code.';
+        errorEl.style.display = 'block';
+        return;
+      }
+      if (!emailEl.checkValidity()) {
+        errorEl.textContent = 'Please enter a valid email address.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      try {
+        const response = await fetch(API_CONFIG.buildUrl('/api/auth/request-access-code'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          const msg = data.detail || (Array.isArray(data.detail) ? data.detail[0]?.msg : 'Request failed');
+          errorEl.textContent = msg;
+          errorEl.style.display = 'block';
+          return;
+        }
+        document.getElementById('access-request-modal-backdrop').classList.add('open');
+        document.getElementById('access-request-modal-backdrop').setAttribute('aria-hidden', 'false');
+      } catch (err) {
+        errorEl.textContent = 'Something went wrong. Please try again.';
+        errorEl.style.display = 'block';
+      }
+    });
+
+    document.getElementById('access-request-modal-close').addEventListener('click', () => {
+      document.getElementById('access-request-modal-backdrop').classList.remove('open');
+      document.getElementById('access-request-modal-backdrop').setAttribute('aria-hidden', 'true');
+    });
+    document.getElementById('access-request-modal-backdrop').addEventListener('click', (e) => {
+      if (e.target.id === 'access-request-modal-backdrop') {
+        document.getElementById('access-request-modal-backdrop').classList.remove('open');
+        document.getElementById('access-request-modal-backdrop').setAttribute('aria-hidden', 'true');
+      }
+    });
+
     // Initialize page
     initPage();
   </script>

@@ -28,7 +28,7 @@ try:
 except Exception:
     def _auth_rate_limit(f):
         return f
-from BackEnd.db import users_collection, password_reset_tokens_collection
+from BackEnd.db import users_collection, password_reset_tokens_collection, access_code_requests_collection
 from BackEnd.utils.auth import (
     hash_password,
     verify_password,
@@ -100,6 +100,11 @@ class ResetRequest(BaseModel):
     email: EmailStr
 
 
+class RequestAccessCodeRequest(BaseModel):
+    """Request an alpha access code (signup page). Stores request for admin to process manually."""
+    email: EmailStr
+
+
 def _validate_password(v: str) -> str:
     """Shared password rules (signup and reset)."""
     if len(v) < 8:
@@ -159,6 +164,32 @@ async def get_auth_config():
     return AuthConfigResponse(
         is_alpha=alpha,
         otp_required=alpha
+    )
+
+
+@router.post("/request-access-code")
+@_auth_rate_limit
+async def request_access_code(request: Request, body: RequestAccessCodeRequest):
+    """
+    Record a request for an alpha access code.
+    
+    User enters email on signup page and clicks "Request Access Code".
+    Request is stored in access_code_requests; admin checks the collection
+    and sends codes manually. No email is sent (transactional email can be
+    added later).
+    """
+    email = body.email.lower().strip()
+    now = datetime.now(timezone.utc)
+    doc = {
+        "email": email,
+        "created_at": now,
+        "status": "pending",
+    }
+    access_code_requests_collection.insert_one(doc)
+    logger.info("Access code request recorded for %s", email)
+    return JSONResponse(
+        content={"message": "Request received. We'll send your access code shortly."},
+        status_code=200,
     )
 
 
