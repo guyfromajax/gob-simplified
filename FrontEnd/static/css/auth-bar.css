@@ -257,21 +257,14 @@ body.has-auth-bar {
   color: #6b7280;
 }
 
-/* Site footer – same screens as auth bar */
-body.has-auth-bar.has-footer {
-  padding-bottom: 52px;
-}
+/* Site footer – same screens as auth bar; in document flow so visible when user scrolls to bottom */
 .site-footer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
   background: #fff;
   padding: 12px 20px;
   text-align: center;
   box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.06);
-  z-index: 9997;
   font-size: 14px;
+  margin-top: auto;
 }
 .site-footer a {
   color: #ff7a00;
