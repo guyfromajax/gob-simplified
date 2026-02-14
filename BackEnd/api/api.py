@@ -2138,7 +2138,7 @@ try:
                         game_id,
                     )
                 db_lookup_start = time.time()
-                saved, _ = find_game_doc(games_collection, game_id) if games_collection and game_id else (None, None)
+                saved, _ = find_game_doc(games_collection, game_id) if (games_collection is not None and game_id) else (None, None)
                 db_lookup_time = (time.time() - db_lookup_start) * 1000
                 # logging.warning(f"⏱️ [DB TIMING] simulate_quarter: games_collection.find_one(game_id={game_id}): {db_lookup_time:.2f}ms, found={saved is not None}")
                 if saved:
@@ -2824,10 +2824,10 @@ try:
                                 detail=f"game_id required for Q1. Game document must be created via /api/init-game before simulating Q1. This ensures playbook and game plan settings persist."
                             )
                         # Verify game document exists in database
-                        saved = games_collection.find_one({"_id": body.game_id}) if games_collection else None
+                        saved = games_collection.find_one({"_id": body.game_id}) if games_collection is not None else None
                         if not saved:
                             try:
-                                saved = games_collection.find_one({"_id": ObjectId(body.game_id)}) if games_collection else None
+                                saved = games_collection.find_one({"_id": ObjectId(body.game_id)}) if games_collection is not None else None
                             except:
                                 pass
                         if not saved:
@@ -3232,10 +3232,10 @@ try:
             game_id = normalize_game_id(body.game_id)
             if original_game_id != game_id:
                 logger.warning(f"🔍 [NORMALIZE] POST /api/simulate-quarter - Normalized game_id from '{original_game_id}' to '{game_id}'")
-            saved = games_collection.find_one({"_id": game_id}) if games_collection else None
+            saved = games_collection.find_one({"_id": game_id}) if games_collection is not None else None
             if not saved:
                 try:
-                    saved = games_collection.find_one({"_id": ObjectId(game_id)}) if games_collection else None
+                    saved = games_collection.find_one({"_id": ObjectId(game_id)}) if games_collection is not None else None
                 except:
                     pass
             if not saved:
