@@ -1034,6 +1034,13 @@ try:
         game_id_type = type(game_id).__name__
         logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] Saving with _id: '{game_id}' (type: {game_id_type})")
         result = games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
+        if result.matched_count == 0 and isinstance(game_id, str) and len(game_id) == 24:
+            try:
+                result = games_collection.update_one({"_id": ObjectId(game_id)}, {"$set": db_summary}, upsert=True)
+                if result.matched_count > 0:
+                    logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] Retried with ObjectId - matched: {result.matched_count}")
+            except (ValueError, TypeError):
+                pass
         logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] Update result - matched: {result.matched_count}, modified: {result.modified_count}, upserted_id: {result.upserted_id}")
         
         # ✅ DIAGNOSTIC: Log what was saved in db_summary
@@ -1897,6 +1904,10 @@ try:
         import time
         start_time = time.time()
         game_id = body.game_id
+        # ✅ TIMEOUT/FOUL_OUT RESUME: Normalize game_id once so restore_timeout_resume_state and DB load use same _id as save
+        if game_id:
+            from BackEnd.utils.game_id_utils import normalize_game_id
+            game_id = normalize_game_id(game_id) or game_id
         # ✅ PERFORMANCE: Removed debug logging - only log errors and critical events
         if debug:
             logging.debug(
@@ -3892,6 +3903,18 @@ try:
                     "batch_turns": new_turns,
                     "text": " → ".join(t.get("text", "") for t in new_turns)
                 }
+            
+            # ✅ FOUL_OUT RESUME: Persist timeout state via same path as user/computer timeout so return-to-court finds it
+            for t in new_turns:
+                if isinstance(t, dict) and t.get("result_type") == "TIMEOUT" and t.get("timeout_reason") == "FOUL_OUT":
+                    try:
+                        save_id = getattr(gm, "game_id", None) or game_id
+                        if save_id:
+                            handle_timeout_save_and_response(gm, t, save_id, timeout_reason="FOUL_OUT")
+                            logging.info(f"💾 FOUL_OUT: Saved timeout state via handle_timeout_save_and_response (game_id={save_id})")
+                    except Exception as e:
+                        logging.error(f"🚨 FOUL_OUT: handle_timeout_save_and_response failed: {e}")
+                    break
             
             # Check if quarter is now complete.
             # Edge-case rule: if FT is still pending at 0:00, quarter is NOT complete yet.
