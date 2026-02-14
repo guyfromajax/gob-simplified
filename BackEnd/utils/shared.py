@@ -1312,8 +1312,9 @@ def summarize_game_state(game, exclude_animations=True):
         "opening_tip_winner": game.game_state.get("opening_tip_winner"),
         "game_stats_initialized": game.game_state.get("game_stats_initialized", False),  # Preserve stats initialization flag
         "user_team_side": game.game_state.get("user_team_side"),  # ✅ SS&S: Save user_team_side for persistent override checking
-        "timeout_next_play_type": game.game_state.get("timeout_next_play_type"),  # ✅ TIMEOUT: Save next_play_type for resume
-        "timeout_offense_team_id": game.game_state.get("timeout_offense_team_id"),  # ✅ TIMEOUT: Save possession team for resume
+        # ✅ TIMEOUT/FOUL_OUT: Only write when truthy so normal saves don't overwrite DB and wipe resume state (we $unset on actual resume in main.py)
+        **({"timeout_next_play_type": game.game_state["timeout_next_play_type"]} if game.game_state.get("timeout_next_play_type") else {}),
+        **({"timeout_offense_team_id": game.game_state["timeout_offense_team_id"]} if game.game_state.get("timeout_offense_team_id") else {}),
         "clock": game.game_state.get("clock", "8:00"),  # ✅ TIMEOUT: Save clock for resume (same as quarter breaks)
         "time_remaining": game.game_state.get("time_remaining", 480),  # ✅ TIMEOUT: Save time_remaining for resume (same as quarter breaks)
         "man_defense_matchups": game.game_state.get("man_defense_matchups", {}),  # ✅ MAN DEFENSE MATCHUPS: User team matchups for persistence
