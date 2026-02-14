@@ -477,42 +477,46 @@ export class AnimationEngine {
     }
 
     // ✅ FOUL OUT: Show foul-out popup and let it handle navigation (do not use "team calls timeout" path)
-    if (turnData.timeout_reason === 'FOUL_OUT' && turnData.foul_out_player) {
-      const gameId = this.scene.gameId || this.scene.simData?.game_id;
-      if (gameId) {
-        try {
-          const { showFoulOutPopup } = await import('../utils/foulOutPopup.js');
-          const responseData = turnData._responseData || {};
-          const clock = responseData.clock || turnData.clock || this.scene.simData?.clock;
-          const mode = this.scene.mode || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('mode') : null) || 'single';
-          const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : { get: () => null };
-          const tournamentId = urlParams.get?.('tournament_id') || null;
-          const franchiseId = urlParams.get?.('franchise_id') || null;
-          const { home: homeTeam, away: awayTeam } = gameStore.getTeams();
-          const homeId = this.scene.homeTeamId || urlParams.get?.('home_id');
-          const awayId = this.scene.awayTeamId || urlParams.get?.('away_id');
-          const myTeamSide = urlParams.get?.('my_team');
-          const userTeamId = urlParams.get?.('user_team_id');
-          const quarter = turnData.quarter ?? this.scene.quarter ?? 1;
-          const periodLabel = quarter > 4 ? `OT${quarter - 4}` : `Q${quarter}`;
-          showFoulOutPopup({
-            player: turnData.foul_out_player,
-            gameId,
-            mode,
-            quarter: periodLabel,
-            clock,
-            tournamentId,
-            franchiseId,
-            homeTeam,
-            awayTeam,
-            homeId,
-            awayId,
-            myTeamSide,
-            userTeamId
-          });
-        } catch (err) {
-          console.error('❌ FOUL OUT: Failed to show foul-out popup:', err);
+    if (turnData.timeout_reason === 'FOUL_OUT') {
+      if (turnData.foul_out_player) {
+        const gameId = this.scene.gameId || this.scene.simData?.game_id;
+        if (gameId) {
+          try {
+            const { showFoulOutPopup } = await import('../utils/foulOutPopup.js');
+            const responseData = turnData._responseData || {};
+            const clock = responseData.clock || turnData.clock || this.scene.simData?.clock;
+            const mode = this.scene.mode || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('mode') : null) || 'single';
+            const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : { get: () => null };
+            const tournamentId = urlParams.get?.('tournament_id') || null;
+            const franchiseId = urlParams.get?.('franchise_id') || null;
+            const { home: homeTeam, away: awayTeam } = gameStore.getTeams();
+            const homeId = this.scene.homeTeamId || urlParams.get?.('home_id');
+            const awayId = this.scene.awayTeamId || urlParams.get?.('away_id');
+            const myTeamSide = urlParams.get?.('my_team');
+            const userTeamId = urlParams.get?.('user_team_id');
+            const quarter = turnData.quarter ?? this.scene.quarter ?? 1;
+            const periodLabel = quarter > 4 ? `OT${quarter - 4}` : `Q${quarter}`;
+            showFoulOutPopup({
+              player: turnData.foul_out_player,
+              gameId,
+              mode,
+              quarter: periodLabel,
+              clock,
+              tournamentId,
+              franchiseId,
+              homeTeam,
+              awayTeam,
+              homeId,
+              awayId,
+              myTeamSide,
+              userTeamId
+            });
+          } catch (err) {
+            console.error('❌ FOUL OUT: Failed to show foul-out popup:', err);
+          }
         }
+      } else {
+        console.warn('⚠️ [FOUL OUT] TIMEOUT turn has timeout_reason=FOUL_OUT but no foul_out_player; falling through to computer timeout path. Check backend _handle_foul_out_timeout / setup_timeout_turn.');
       }
       return;
     }

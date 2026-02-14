@@ -413,6 +413,18 @@ class GameManager:
         if not timeout_turn:
             logging.error("🚨 FOUL OUT TIMEOUT: call_timeout returned no timeout turn")
             return
+        # Ensure frontend always receives foul_out_player: if lookup failed, attach the dict from the result
+        if not timeout_turn.get("foul_out_player") and isinstance(foul_out_player_data, dict) and foul_out_player_data:
+            timeout_turn["foul_out_player"] = dict(foul_out_player_data)
+            logging.warning(
+                "⚠️ FOUL OUT: Player lookup failed; attached foul_out_player from result so frontend can show popup - player_id=%s name=%s",
+                foul_out_player_data.get("player_id"), foul_out_player_data.get("name", "Unknown")
+            )
+        elif not foul_out_player and foul_out_player_data:
+            logging.warning(
+                "⚠️ FOUL OUT: Could not resolve Player object for foul_out_player_id=%s (name=%s); timeout turn may lack foul_out_player",
+                foul_out_player_id, foul_out_player_data.get("name", "Unknown") if isinstance(foul_out_player_data, dict) else None
+            )
         logging.info(f"⏸️ TIMEOUT: Created timeout turn for foul out - {foul_out_player_data.get('name', 'Unknown')}")
 
         if self.game_id:
