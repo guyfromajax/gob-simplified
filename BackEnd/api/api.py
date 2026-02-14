@@ -895,7 +895,7 @@ try:
         Single load path: find game doc by _id, trying string then ObjectId.
         Returns (doc, effective_id) so callers can use effective_id for updates.
         """
-        if not games_collection or not game_id:
+        if games_collection is None or not game_id:
             return None, None
         saved = games_collection.find_one({"_id": game_id})
         if saved:
