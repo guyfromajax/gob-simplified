@@ -463,7 +463,7 @@ const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
    - **Frontend Changes:** 
      - Updated `gameScene.js` to store full response data in `turn._responseData` for computer timeouts
      - Updated `AnimationEngine.handleTimeout()` to extract `clock` and `time_remaining` from `turnData._responseData`
-     - **✅ FIX (January 2025):** `AnimationEngine.handleTimeout()` now checks `timeout_reason === 'USER'` and skips navigation for user timeouts (navigation is handled by `showUserTimeoutPopup` button click). Only computer timeouts trigger automatic navigation.
+     - **✅ FIX (January 2025):** `AnimationEngine.handleTimeout()` branches on `timeout_reason`: **USER** → skip navigation (handled by `showUserTimeoutPopup` button click). **FOUL_OUT** → show foul-out popup via `showFoulOutPopup()` (popup handles navigation to lineup; no "team calls timeout" message). **COMPUTER** → automatic navigation via `showTimeoutPopup()`.
 
 2. **Computer Timeout State Restoration Bug Fix:**
    - **Problem:** When computer called timeout, game state was saved to DB correctly, but when user returned, if game was still in `ongoing_games` (in-memory cache), the system would use stale in-memory state instead of loading the saved DB state. This caused incorrect scores, clock, and other game state to be restored.
@@ -760,8 +760,8 @@ This prevents stale timeout state from affecting future games.
   - Safeguard 1: Checks if popup still exists (should be removed by button click)
   - Safeguard 2: Checks if `scene.userTimeoutButtonClicked === true` (set by button click)
   - If both pass, navigation proceeds to lineup screen
-- **Step 6:** `AnimationEngine.handleTimeout()` is called for the timeout turn → Checks `timeout_reason === 'USER'` → Skips navigation (already handled by popup button click)
-- **Key Point:** `AnimationEngine.handleTimeout()` only navigates for computer timeouts (`timeout_reason !== 'USER'`). User timeout navigation is handled exclusively by the popup button click.
+- **Step 6:** `AnimationEngine.handleTimeout()` is called for the timeout turn → Branches on `timeout_reason`: USER → skip (popup already handled); FOUL_OUT → show foul-out popup; COMPUTER → navigate via `showTimeoutPopup()`
+- **Key Point:** USER timeout navigation is handled by the popup button click. FOUL_OUT uses the foul-out popup (not the generic "team calls timeout" flow). Only COMPUTER timeouts trigger automatic navigation via `showTimeoutPopup()`.
 
 **Animation Freezing:**
 - When timeout button is pressed, all animations are immediately paused
@@ -987,7 +987,7 @@ All three flows use the same core systems:
 - `FrontEnd/static/js/phaser/utils/timeoutButtonManager.js`: Timeout button logic and state management
 - `FrontEnd/static/js/phaser/utils/foulOutPopup.js`: Foul out popup and navigation
 - `FrontEnd/static/js/shared/timeoutNavigationHelper.js`: Unified navigation helper
-- `FrontEnd/static/js/phaser/animation/AnimationEngine.js` `handleTimeout()`: Handles timeout turn (extracts clock/time_remaining from response data)
+- `FrontEnd/static/js/phaser/animation/AnimationEngine.js` `handleTimeout()`: Branches on `timeout_reason` (USER skip / FOUL_OUT show foul-out popup / COMPUTER navigate); extracts clock/time_remaining from response data
 - `FrontEnd/static/js/phaser/animation/animateGameTurns.js`: Stops animation loop on timeout
 - `FrontEnd/static/js/phaser/gameScene.js`: Scoreboard immediate update logic, stores response data in `turn._responseData` for computer timeouts
 - `FrontEnd/static/js/phaser/bootGame.js`: Auto-start logic for timeout resume, pre-game container visibility control
