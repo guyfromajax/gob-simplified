@@ -662,6 +662,9 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
 - Settings applied to GameManager for continued gameplay
 - Settings persist through timeout navigation
 
+**Game Plan and Playbooks pages must send `game_id` on load when present in the URL.**  
+For franchise/tournament, when the user opens Game Plan or Playbooks during a game (e.g. from lineup with `game_id` in the URL), the **GET** request for settings must include `game_id` in the query params. Otherwise the backend loads from the master doc (FTD/tournament) and returns pre-game settings instead of the in-game game doc. Save (PUT/POST) already sends `game_id`; the load path must match.
+
 **Playcall Center (court) and the 6 presets:**  
 When the user changes one of the 6 preset plays in the Playcall Center during a timeout, the court must **also** call **POST /api/playbooks** with the updated `slot_assignments` (and `game_id`, `franchise_id`/`tournament_id`, etc.). If the court only calls `/api/set-playcall-override`, that sets the *next play* override in memory but does **not** update the game document’s `teams.{id}.playbook_settings.slot_assignments`. So on reopen, GET /api/playbooks would still return the old presets. The fix is: on play-option click, update the in-memory slot_assignments, then POST /api/playbooks so the game doc is updated.
 
