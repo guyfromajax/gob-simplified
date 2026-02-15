@@ -550,7 +550,7 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
 **Determined by `get_save_location_for_franchise_tournament()`:**
 
 **Pre-Game (FCC/TCC):**
-- No `game_id` provided OR game not active (quarter = 0)
+- No `game_id` provided OR game document does not exist
 - **Save to:** Master store for franchise/tournament
   - **Franchise:** `franchise_team_data` collection (FTD). One doc per `(franchise_id, team_id)`. Settings stored as `strategy_settings` / `playbook_settings` top-level fields. Save uses **upsert**: if no FTD doc exists, one is created on first save (fixes Game-Plan-first persistence).
   - **Tournament:** `tournaments` document → `teams.{team_id}.{settings_type}`
@@ -558,9 +558,9 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
   - Franchise FTD and tournament `teams` use ObjectId strings as keys (from `user_team_object_id`)
   - Settings persist across all games in the franchise/tournament
 
-**During Active Gameplay:**
-- `game_id` provided AND game is active (quarter > 0)
-- **Save to:** Game document only
+**When a game exists (lineup, in-game, or timeout):**
+- `game_id` provided AND game document exists and belongs to this franchise/tournament
+- **Save to:** Game document only (no quarter check; lineup saves before first Play persist to game doc)
   - All modes: `teams.{team_id}.{settings_type}`
 - **Team ID Format:** Canonical format (e.g., `"FOUR_CORNERS"`)
   - Game docs use canonical team_id strings as keys
@@ -638,7 +638,7 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
 4. Settings persist through timeout/quarter breaks
 
 **Backend Flow:**
-- `save_team_settings()` called with `game_id` and `quarter > 0`
+- `save_team_settings()` called with `game_id` when game doc exists (e.g. from lineup or in-game)
 - `get_save_location_for_franchise_tournament()` returns game doc
 - Team ID normalized to canonical format
 - Settings saved to `teams.{canonical_team_id}.{settings_type}` in game doc
