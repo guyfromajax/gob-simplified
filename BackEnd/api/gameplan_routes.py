@@ -1255,16 +1255,16 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                             elif mode == "tournament":
                                 user_team_name, _ = get_user_team_from_tournament(master_doc)
                             
-                            # Find matching team_id in game doc
+                            # Find matching team_id in game doc (case-insensitive so master "Ocean City" matches doc "Ocean City")
                             for tid, team_obj in game_teams.items():
-                                if team_obj.get("name") == user_team_name:
+                                doc_name = (team_obj.get("name") or "").strip()
+                                master_name = (user_team_name or "").strip()
+                                if doc_name.lower() == master_name.lower():
                                     game_doc_team_id = tid
-                                    # Check if game doc has strategy_settings for this team
-                                    if team_obj.get("strategy_settings"):
-                                        # Game doc has settings - use it
-                                        doc = game_doc
-                                        load_from_game_doc = True
-                                        break
+                                    # Use game doc so we load in-game strategy (even if empty yet)
+                                    doc = game_doc
+                                    load_from_game_doc = True
+                                    break
             except Exception as e:
                 pass
         
@@ -1622,16 +1622,16 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                             elif mode == "tournament":
                                 user_team_name, _ = get_user_team_from_tournament(master_doc)
                             
-                            # Find matching team_id in game doc
+                            # Find matching team_id in game doc (use game doc whenever team exists so in-game saves are visible)
                             for tid, team_obj in game_teams.items():
-                                if team_obj.get("name") == user_team_name:
+                                doc_name = (team_obj.get("name") or "").strip()
+                                master_name = (user_team_name or "").strip()
+                                if doc_name.lower() == master_name.lower():
                                     game_doc_team_id = tid
-                                    # Check if game doc has playbook_settings for this team
-                                    if team_obj.get("playbook_settings"):
-                                        # Game doc has settings - use it
-                                        doc = game_doc
-                                        load_from_game_doc = True
-                                        break
+                                    # Use game doc so we load in-game playbook/slot_assignments (even if empty yet)
+                                    doc = game_doc
+                                    load_from_game_doc = True
+                                    break
             except Exception as e:
                 logger.warning(f"🔍 [GET PLAYBOOKS] Game doc path failed: {e!r}")
         
