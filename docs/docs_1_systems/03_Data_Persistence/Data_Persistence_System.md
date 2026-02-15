@@ -648,7 +648,7 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
 
 **User Flow:**
 1. User calls timeout during game
-2. User navigates to Game Plan/Playbooks
+2. User navigates to Game Plan/Playbooks (or changes 6 presets in Playcall Center on court)
 3. Settings loaded from game document (current game state)
 4. User makes changes (or keeps current)
 5. Settings saved to game document (if changed)
@@ -661,6 +661,9 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
 - If user visits Game Plan/Playbooks, request settings override DB settings
 - Settings applied to GameManager for continued gameplay
 - Settings persist through timeout navigation
+
+**Playcall Center (court) and the 6 presets:**  
+When the user changes one of the 6 preset plays in the Playcall Center during a timeout, the court must **also** call **POST /api/playbooks** with the updated `slot_assignments` (and `game_id`, `franchise_id`/`tournament_id`, etc.). If the court only calls `/api/set-playcall-override`, that sets the *next play* override in memory but does **not** update the game document’s `teams.{id}.playbook_settings.slot_assignments`. So on reopen, GET /api/playbooks would still return the old presets. The fix is: on play-option click, update the in-memory slot_assignments, then POST /api/playbooks so the game doc is updated.
 
 ### Key Implementation Details
 
