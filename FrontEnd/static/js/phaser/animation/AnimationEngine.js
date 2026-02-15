@@ -509,12 +509,11 @@ export class AnimationEngine {
           const myTeamSide = urlParams.get?.('my_team');
           const userTeamId = urlParams.get?.('user_team_id');
           const quarter = turnData.quarter ?? this.scene.quarter ?? 1;
-          const periodLabel = quarter > 4 ? `OT${quarter - 4}` : `Q${quarter}`;
           showFoulOutPopup({
             player,
             gameId,
             mode,
-            quarter: periodLabel,
+            quarter,
             clock,
             tournamentId,
             franchiseId,
