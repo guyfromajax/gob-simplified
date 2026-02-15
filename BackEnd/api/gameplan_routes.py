@@ -1428,8 +1428,13 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
             if mode == "franchise":
                 # ✅ FTD: Strategy settings already loaded from FTD above
                 strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
+            elif load_from_game_doc and team_obj:
+                # ✅ FIX: Loading from game doc (canonical keys); team_obj already set - use it directly.
+                # extract_team_settings would look up by ObjectId and fail (game doc has FOUR_CORNERS/MORRISTOWN).
+                logger.warning(f"🔍 [GET GAMEPLAN] Using game doc team_obj for strategy_settings (load_from_game_doc=True, canonical key)")
+                strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
             else:
-                # Tournament mode - use existing extract logic
+                # Tournament master doc - use extract (doc has ObjectId keys)
                 from BackEnd.utils.team_settings_manager import extract_team_settings
                 team_identifier = team_id or (team_obj.get("name") if team_obj else None)
                 if team_identifier:
@@ -2001,10 +2006,15 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         elif mode == "franchise":
             # Franchise + load_from_game_doc: keep the already-loaded game doc as source of truth.
             team_obj = (doc.get("teams", {}).get(actual_team_id, {}) if actual_team_id else {}) if doc else {}
-        elif mode == "tournament":
+        elif mode == "tournament" and not load_from_game_doc:
+            # ✅ FIX: Only reload from tournament doc when NOT loading from game doc.
+            # When load_from_game_doc we already have doc=game_doc and team_obj; overwriting doc lost game data.
+            logger.warning("🔍 [GET PLAYBOOKS] Reloading doc from tournament master (load_from_game_doc=False)")
             doc = collection.find_one({"_id": ObjectId(doc_id)})
             teams = doc.get("teams", {})
             team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
+        elif mode == "tournament" and load_from_game_doc:
+            logger.warning("🔍 [GET PLAYBOOKS] Keeping game doc (load_from_game_doc=True), skipping tournament reload")
         else:
             # For single mode, try both formats
             doc = collection.find_one({"_id": doc_id})
@@ -2057,8 +2067,15 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         elif mode == "franchise" and not load_from_game_doc:
             # FTD: Playbook settings come from FTD team_obj
             playbook_settings = (team_obj or {}).get("playbook_settings", {})
+        elif load_from_game_doc and team_obj:
+            # ✅ FIX: Loading from game doc - team_obj already has playbook_settings; doc has canonical keys.
+            # Using extract_team_settings with request team_id (ObjectId) would fail.
+            pb = team_obj.get("playbook_settings") or {}
+            slot_count = len(pb.get("slot_assignments", {}))
+            logger.warning(f"🔍 [GET PLAYBOOKS] Using game doc team_obj for playbook_settings (load_from_game_doc=True), slot_assignments={slot_count}")
+            playbook_settings = team_obj.get("playbook_settings", {})
         else:
-            # ✅ UNIFIED: For tournament/franchise (game doc) modes, use unified extract for consistent team_id resolution
+            # Tournament/franchise master doc - use extract (doc has ObjectId keys)
             from BackEnd.utils.team_settings_manager import extract_team_settings
             team_identifier = (
                 actual_team_id if (mode == "franchise" and load_from_game_doc and actual_team_id)
