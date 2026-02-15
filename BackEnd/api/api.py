@@ -2102,14 +2102,15 @@ try:
             
             if timeout_saved_state:
                 # Validate quarter match to prevent stale data from affecting new games
+                # Only restore timeout state when the client explicitly asked for it (resume_from_timeout=true).
+                # Otherwise we clear it - e.g. "Play Quarter" after "Sim quarter" for prior quarters must not
+                # restore leftover timeout_next_play_type (e.g. FREE_THROW at end of Q3) or user gets instant EOG.
                 saved_quarter = timeout_saved_state.get("quarter", 0)
                 timeout_next_play_type = timeout_saved_state.get("timeout_next_play_type")
                 
-                if timeout_next_play_type and saved_quarter == body.quarter:
+                if body.resume_from_timeout and timeout_next_play_type and saved_quarter == body.quarter:
                     logging.info(f"✅ TIMEOUT RESUME: Found valid timeout state in DB, timeout_next_play_type={timeout_next_play_type}, quarter={saved_quarter}")
-                    # Override body.resume_from_timeout to ensure simulate_quarter() handles timeout resume
-                    body.resume_from_timeout = True
-                    logging.info(f"✅ TIMEOUT RESUME: Detected valid timeout state in DB, setting resume_from_timeout=True for simulate_quarter()")
+                    # body.resume_from_timeout already True from client
                     # ✅ CRITICAL FIX: Always force reload from DB when resuming from timeout
                     # This ensures we use the latest saved state, not stale in-memory state
                     # This fixes the bug where computer timeout → user timeout shows stale data
@@ -2119,7 +2120,7 @@ try:
                         del ongoing_games[game_id]
                         gm = None  # Force reload from DB
                     logging.info(f"🔍 TIMEOUT RESUME: Will load fresh game from DB and apply timeout state")
-                elif timeout_next_play_type and saved_quarter > body.quarter:
+                elif body.resume_from_timeout and timeout_next_play_type and saved_quarter > body.quarter:
                     # ✅ FOUL-OUT DATA-LOSS FIX: Frontend sometimes sends quarter=1 on "return to court" (e.g. Play Quarter)
                     # while the game is actually in a later quarter. Use doc as source of truth and treat as timeout resume.
                     logging.warning(
@@ -2157,6 +2158,11 @@ try:
                                     pass
                     
                     timeout_saved_state = None  # Clear invalid timeout state
+                    # Force reload from DB so we use the cleared doc (no timeout state), not cached gm with stale state
+                    if gm is not None:
+                        logging.info(f"✅ QUARTER BREAK: Clearing cache so next load uses doc without timeout state (game_id={game_id})")
+                        del ongoing_games[game_id]
+                        gm = None
                     # ✅ QUARTER BREAK: Clear resume_from_timeout flag and timeout state if no valid timeout state
                     # This handles cases where resume_from_timeout was incorrectly preserved across quarter boundaries
                     # Quarter breaks should NOT have timeout state - clear it explicitly
@@ -2410,25 +2416,9 @@ try:
                             elif not gm.game_state.get(COMPUTER_MATCHUPS_KEY):
                                 gm.game_state[COMPUTER_MATCHUPS_KEY] = get_default_matchups()
                             
-                            # ✅ TIMEOUT RESUME: Check for timeout state BEFORE calculating should_restore_stats
-                            # This ensures scores/fouls are restored when resuming from timeout
-                            # Check if timeout state exists in saved document (regardless of URL parameter)
-                            has_timeout_state = "timeout_next_play_type" in saved and saved.get("timeout_next_play_type") is not None
-                            if has_timeout_state and saved_quarter == body.quarter:
-                                # Timeout state found - ensure resume_from_timeout is set
-                                if not body.resume_from_timeout:
-                                    body.resume_from_timeout = True
-                                    # ✅ PERFORMANCE: Removed debug logging
-                            
-                            # ✅ TIMEOUT RESUME: Check for timeout state in saved document BEFORE calculating should_restore_stats
-                            # This ensures scores/fouls are restored when resuming from timeout
-                            # Check if timeout state exists in saved document (regardless of URL parameter or timeout_saved_state)
-                            has_timeout_state = "timeout_next_play_type" in saved and saved.get("timeout_next_play_type") is not None
-                            if has_timeout_state and saved_quarter == body.quarter:
-                                # Timeout state found in saved document - ensure resume_from_timeout is set
-                                if not body.resume_from_timeout:
-                                    body.resume_from_timeout = True
-                                    # ✅ PERFORMANCE: Removed debug logging
+                            # ✅ TIMEOUT RESUME: Do NOT set body.resume_from_timeout from doc here.
+                            # We only treat as timeout resume when the client sent resume_from_timeout=true (see earlier block).
+                            # Otherwise "Play Quarter" after "Sim quarter" would incorrectly restore FREE_THROW state and cause instant EOG.
                             
                             # Simple check: If requesting Q1 but saved game is at a later quarter, start fresh (new game)
                             # ✅ TIMEOUT: If resuming from timeout, always restore stats (we're continuing an existing game)
