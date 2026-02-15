@@ -109,9 +109,13 @@ def save_team_settings(
                 except:
                     doc_id_obj = doc_id
                 
-                collection.update_one(
+                result = collection.update_one(
                     {"_id": doc_id_obj},
                     {"$set": {update_path: settings_data}}
+                )
+                logger.warning(
+                    f"🔍 [SAVE-TEAM-SETTINGS] game doc write: doc_id={doc_id!r}, actual_team_id={actual_team_id!r}, "
+                    f"update_path={update_path!r}, matched={result.matched_count}, modified={result.modified_count}"
                 )
             else:
                 # ✅ FTD: Saving to FTD collection (FCC / pre-game). Always use authoritative user_team_object_id
