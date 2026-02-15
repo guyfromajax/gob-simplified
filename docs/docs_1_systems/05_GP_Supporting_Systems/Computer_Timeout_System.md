@@ -7,6 +7,7 @@
 3. **Timeout Limits**:
    - **Q1-Q3**: Maximum 1 timeout per quarter
    - **Q4**: Maximum number of timeouts equal to remaining timeouts upon entering the quarter
+   - **Q4 time gate**: Computer cannot call a timeout in the fourth quarter until time remaining is less than 4 minutes (240 seconds). If time_remaining ≥ 240 in Q4, no timeout is evaluated.
 4. **Deferred Creation**: Pending timeout stored in `game_state["pending_computer_timeout"]` instead of creating immediately
 5. **State Tracking**: `game_state["computer_timeouts"][team_name][quarter]["count"]` and `["checked_conditions"]`
 6. **Key Files**:
@@ -44,6 +45,7 @@ The computer timeout system enables AI-controlled teams to call timeouts during 
 **Timeout Limits:**
 - **Q1-Q3:** Computer can call maximum 1 timeout per quarter
 - **Q4:** Computer can call maximum number of timeouts equal to remaining timeouts upon entering the quarter
+- **Q4 time gate:** Computer cannot call a timeout in the fourth quarter until time remaining is less than 4 minutes (240 seconds). When time_remaining ≥ 240 in Q4, the computer does not evaluate any timeout conditions for that turn.
 - If max timeouts are reached, all timeout percentages become 0% for that quarter
 
 ### Timeout Conditions
@@ -87,12 +89,14 @@ If time_remaining > 240 (more than 4:00 left in the quarter), foul conditions ar
 
 #### Q4 Conditions
 
-**Foul Conditions (only if time_remaining > 60 seconds):**
+**Q4 time gate:** Computer cannot call a timeout in Q4 until time remaining is less than 4 minutes (time_remaining < 240 seconds). If time_remaining ≥ 240, no timeout conditions are evaluated for that turn (no foul or energy checks).
+
+**Foul Conditions (only if time_remaining < 240 and time_remaining > 60 seconds):**
 1. **Player with 4 fouls:** 90% chance (checks once at first BIP/SIP after foul, only if more than 1 minute remaining)
 
-**Energy Conditions:** Same thresholds as Q3: **75% / 65% / 55%** (5% lower than Q1–Q2). Conditions 3–9 apply with these thresholds.
+**Energy Conditions:** Same thresholds as Q3: **75% / 65% / 55%** (5% lower than Q1–Q2). Conditions 3–9 apply with these thresholds (only when time_remaining < 240 in Q4).
 
-**Note:** Conditions are evaluated in order. If a higher-priority condition triggers (e.g., 4 fouls = 100% in Q2/Q3), lower-priority conditions are not checked. Energy conditions apply to all quarters (Q1-Q4).
+**Note:** Conditions are evaluated in order. If a higher-priority condition triggers (e.g., 4 fouls = 100% in Q2/Q3), lower-priority conditions are not checked. Energy conditions apply to all quarters (Q1-Q4). In Q4, the time gate is applied first; only when time remaining is under 4 minutes are any conditions evaluated.
 
 ### Implementation Details
 

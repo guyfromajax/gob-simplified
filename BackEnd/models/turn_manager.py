@@ -2098,6 +2098,13 @@ class TurnManager:
             logging.debug(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - max timeouts reached: {computer_team.name} Q{quarter} (count: {quarter_data['count']}, max: {max_timeouts})")
             return False  # Already at max for this quarter
         
+        time_remaining = game_state.get("time_remaining", 0)
+        
+        # Q4: Computer cannot call timeout until time remaining is under 4 minutes
+        if quarter == 4 and time_remaining >= 240:
+            logging.debug(f"🔍 [COMPUTER TIMEOUT CHECK] Skipping - Q4 time gate: time_remaining ({time_remaining}s) >= 240s (4:00)")
+            return False
+        
         logging.debug(f"🔍 [COMPUTER TIMEOUT CHECK] Evaluating conditions for {computer_team.name} Q{quarter} (current count: {quarter_data['count']}, max: {max_timeouts})")
         
         # ✅ FIX: Only check players in the active lineup (not all players on the team)
@@ -2106,7 +2113,6 @@ class TurnManager:
         
         # Check conditions (each only checks once per occurrence)
         checked = quarter_data["checked_conditions"]
-        time_remaining = game_state.get("time_remaining", 0)
         
         # ========== FOUL CONDITIONS (Quarter-Specific) ==========
         
