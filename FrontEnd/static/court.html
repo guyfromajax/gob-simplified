@@ -3257,6 +3257,28 @@
           playIdToPlay[play.name] = play;
         });
         
+        // Store for persisting slot changes to game doc (Data Persistence: in-game → game document)
+        const playNameToSection = {};
+        motionPlays.forEach(p => { playNameToSection[p.name] = 'motion'; });
+        setPlayInside.forEach(p => { playNameToSection[p.name] = 'set_play_inside'; });
+        setPlayAttack.forEach(p => { playNameToSection[p.name] = 'set_play_attack'; });
+        setPlayOutside.forEach(p => { playNameToSection[p.name] = 'set_play_outside'; });
+        const percentages = data.playbook_percentages || {};
+        const playbookPayload = {
+          motion: percentages.motion || {},
+          set_play_inside: percentages.set_play_inside || {},
+          set_play_attack: percentages.set_play_attack || {},
+          set_play_outside: percentages.set_play_outside || {},
+          zone_defense: percentages.zone_defense || {},
+          man_defense: percentages.man_defense || {},
+          slot_assignments: JSON.parse(JSON.stringify(slotAssignments)),
+          motion_dropdowns: data.motion_dropdowns || {},
+          position_filters: data.position_filters || { standard: [], PG: [], SG: [], SF: [], PF: [], C: [] },
+          even_distribution_all: data.even_distribution_all || false,
+          _meta: data.playbook_meta && typeof data.playbook_meta === 'object' ? data.playbook_meta : {}
+        };
+        lastPlaybookDataForSave = { playNameToSection, playbookPayload };
+        
         // Get scroller element
         const scroller = document.getElementById('offense-play-scroller');
         if (!scroller) {
@@ -3495,9 +3517,45 @@
           // Select this play
           option.classList.add('selected');
           
-          // ✅ SS&S: Store override via API (use full play name from data-play attribute)
           const playName = option.dataset.play;
+          // ✅ SS&S: Store override via API (next play uses this)
           await setPlaycallOverride('offense', playName);
+          
+          // ✅ Data Persistence: Persist this slot change to game document so presets survive timeout/reopen
+          if (lastPlaybookDataForSave && playName) {
+            const slotNum = Array.prototype.indexOf.call(allPlayOptions, option) + 1;
+            if (slotNum >= 1 && slotNum <= 6) {
+              const section = lastPlaybookDataForSave.playNameToSection[playName] || 'set_play_inside';
+              const slotKey = String(slotNum);
+              lastPlaybookDataForSave.playbookPayload.slot_assignments[slotKey] = { section: section, playId: playName };
+              const urlParams = new URLSearchParams(window.location.search);
+              const mode = urlParams.get('mode') || (urlParams.get('tournament_id') ? 'tournament' : urlParams.get('franchise_id') ? 'franchise' : 'single');
+              const teamId = urlParams.get('team_id') || urlParams.get('user_team_id') || urlParams.get('home_id') || urlParams.get('away_id');
+              const gameId = urlParams.get('game_id');
+              const franchiseId = urlParams.get('franchise_id');
+              const tournamentId = urlParams.get('tournament_id');
+              const body = {
+                mode: mode,
+                team_id: teamId,
+                playbook_settings: lastPlaybookDataForSave.playbookPayload
+              };
+              if (gameId) body.game_id = gameId;
+              if (franchiseId) body.franchise_id = franchiseId;
+              if (tournamentId) body.tournament_id = tournamentId;
+              try {
+                const res = await fetch(API_CONFIG.buildUrl('/api/playbooks'), {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(body)
+                });
+                if (!res.ok) {
+                  console.warn('⚠️ [PLAYCALL CENTER] Failed to persist slot to game doc:', res.status);
+                }
+              } catch (err) {
+                console.warn('⚠️ [PLAYCALL CENTER] Error persisting slot to game doc:', err);
+              }
+            }
+          }
         });
       }
       
@@ -4061,6 +4119,8 @@
     // ==================== SLOT-BASED PLAY NAVIGATION ====================
     let currentPlayIndex = 0;
     let playOptions = []; // Will be populated after slot assignments are loaded
+    // Persist 6-preset changes to game doc (Data Persistence: in-game changes saved to game document)
+    let lastPlaybookDataForSave = null; // { slot_assignments, playNameToSection, playbookPayload }
     
     function updatePlayOptions() {
       playOptions = Array.from(document.querySelectorAll('#offense-play-scroller .play-option'));
