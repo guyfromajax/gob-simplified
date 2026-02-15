@@ -1724,6 +1724,30 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             teams = doc.get("teams", {})
             team_obj = teams.get(authoritative_team_id, {})
             actual_team_id = authoritative_team_id
+            # ✅ Franchise in-game: game doc has playbook_settings but not the full plays structure; merge plays from FTD
+            if mode == "franchise" and (not team_obj.get("plays") or len(team_obj.get("plays", {})) == 0):
+                franchise_doc = collection.find_one(
+                    {"_id": ObjectId(doc_id)},
+                    {"user_team_id": 1, "user_team_object_id": 1}
+                )
+                if franchise_doc:
+                    _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+                    if user_team_object_id:
+                        try:
+                            ftd_doc = franchise_team_data_collection.find_one(
+                                {"franchise_id": ObjectId(doc_id), "team_id": ObjectId(user_team_object_id)},
+                                {"plays": 1}
+                            )
+                            if ftd_doc and ftd_doc.get("plays"):
+                                team_obj["plays"] = ftd_doc["plays"]
+                            else:
+                                team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
+                        except Exception:
+                            team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
+                    else:
+                        team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
+                else:
+                    team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
         elif mode == "franchise":
             # ✅ FTD: Load playbook_settings from FTD collection instead of franchise doc
             from BackEnd.db import franchise_team_data_collection

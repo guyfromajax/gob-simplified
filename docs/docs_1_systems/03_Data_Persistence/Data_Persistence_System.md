@@ -374,6 +374,19 @@ This system documents data persistence across all three game modes when users ar
   - `🧭 [EOG-GAME-DOC-SELECT] ...`
   - `🧪 [EOG-SNAPSHOT-SOURCES]` with `teams.totals` or `teams.box_score` (not `none`) for completed games.
 
+### ✅ Fixed: In-Game Game Plan/Playbook Save Not Persisting (February 15, 2026)
+
+**Issue:** Game Plan and Playbook settings changed during gameplay (e.g. from lineup or timeout) did not persist in Franchise or Tournament mode. Save returned 200 but reopening the page showed previous/default values.
+
+**Root Cause:**
+- `init-game` creates game documents with `_id` stored as a **string** (24-char hex from `generate_game_id()`); it uses `update_one({"_id": game_id}, ..., upsert=True)` with string `game_id`.
+- `save_team_settings()` when saving to the game doc was querying with **ObjectId** only (`_id: ObjectId(doc_id)`). In MongoDB, `_id: "69921c08..."` (string) does not match `_id: ObjectId("69921c08...")`, so `update_one` matched 0 documents and no write occurred.
+
+**Fix:**
+- In `BackEnd/utils/team_settings_manager.py`, when saving to a game doc (franchise or tournament), try `update_one({"_id": doc_id}, ...)` (string) first. If `matched_count == 0` and `doc_id` is 24-char hex, retry with `update_one({"_id": ObjectId(doc_id)}, ...)`. This works whether the game doc was stored with string or ObjectId `_id`.
+
+**See also:** Game Plan & Playbook Settings Persistence → Key Implementation Details (“Game document `_id` when saving to game doc”).
+
 ### ✅ Fixed: Playbook Percentage Persistence (0% Values)
 
 **Issue:** Playbook percentages were not persisting correctly, especially 0% values. When users set percentages and saved, then reloaded the playbooks page, percentages would reset to 0 or default values.
@@ -683,6 +696,9 @@ if mode in ["franchise", "tournament"]:
         # Master doc - use ObjectId string directly
         actual_team_id = team_id  # Don't normalize
 ```
+
+**Game document `_id` when saving to game doc:**  
+Game documents are created by `init-game` with `_id` set to a **string** (24-char hex from `generate_game_id()`). When `save_team_settings()` writes to a game doc, it must try `_id` as **string** first (`update_one({"_id": doc_id}, ...)`). If no document is matched and `doc_id` is 24-char hex, retry with `ObjectId(doc_id)`. This ensures the update finds the document regardless of whether it was stored with string or ObjectId `_id`.
 
 **Unified Extract Function:**
 - **Tournament / game docs:** `extract_team_settings()` uses `teams` (or `franchise_teams` for legacy paths). Resolves team_identifier; tries direct lookup, then name matching.
