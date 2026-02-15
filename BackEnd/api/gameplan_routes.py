@@ -157,6 +157,12 @@ def get_save_location_for_franchise_tournament(mode: str, game_id: str = None, f
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode for get_save_location: {mode}")
     
+    # Single source of truth: franchise/tournament always save to FTD or tournament doc, never to game doc
+    if mode == "franchise":
+        return franchises_collection, franchise_id, False
+    if mode == "tournament":
+        return tournaments_collection, tournament_id, False
+    
     # Check if game exists and is active (franchise/tournament games use ObjectId _id; try that first)
     try:
         game_doc = None
@@ -1256,15 +1262,16 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                             elif mode == "tournament":
                                 user_team_name, _ = get_user_team_from_tournament(master_doc)
                             
-                            # Find matching team_id in game doc (case-insensitive so master "Ocean City" matches doc "Ocean City")
+                            # Find matching team_id in game doc (case-insensitive; franchise/tournament use single source: FTD or tournament doc)
                             for tid, team_obj in game_teams.items():
                                 doc_name = (team_obj.get("name") or "").strip()
                                 master_name = (user_team_name or "").strip()
                                 if doc_name.lower() == master_name.lower():
                                     game_doc_team_id = tid
-                                    # Use game doc so we load in-game strategy (even if empty yet)
-                                    doc = game_doc
-                                    load_from_game_doc = True
+                                    # Single source of truth: franchise/tournament never use game doc for game plan
+                                    if mode not in ["franchise", "tournament"]:
+                                        doc = game_doc
+                                        load_from_game_doc = True
                                     break
             except Exception as e:
                 logger.warning(f"🔍 [GET GAMEPLAN] Game doc path failed: {e!r}")
@@ -1628,15 +1635,16 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                             elif mode == "tournament":
                                 user_team_name, _ = get_user_team_from_tournament(master_doc)
                             
-                            # Find matching team_id in game doc (use game doc whenever team exists so in-game saves are visible)
+                            # Find matching team_id in game doc (for single mode only; franchise/tournament use single source: FTD or tournament doc)
                             for tid, team_obj in game_teams.items():
                                 doc_name = (team_obj.get("name") or "").strip()
                                 master_name = (user_team_name or "").strip()
                                 if doc_name.lower() == master_name.lower():
                                     game_doc_team_id = tid
-                                    # Use game doc so we load in-game playbook/slot_assignments (even if empty yet)
-                                    doc = game_doc
-                                    load_from_game_doc = True
+                                    # Single source of truth: franchise/tournament never use game doc for playbooks
+                                    if mode not in ["franchise", "tournament"]:
+                                        doc = game_doc
+                                        load_from_game_doc = True
                                     break
             except Exception as e:
                 logger.warning(f"🔍 [GET PLAYBOOKS] Game doc path failed: {e!r}")
@@ -1725,6 +1733,13 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             team_obj = teams.get(authoritative_team_id, {})
             actual_team_id = authoritative_team_id
             # ✅ Franchise in-game: game doc has playbook_settings but not the full plays structure; merge plays from FTD
+            if mode == "franchise":
+                _pl = team_obj.get("plays") or {}
+                _n = len(_pl) if isinstance(_pl, dict) else 0
+                if (not _pl or _n == 0):
+                    logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: entering FTD merge block (team_obj plays count={_n})")
+                else:
+                    logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: skipping FTD merge (team_obj already has {_n} plays)")
             if mode == "franchise" and (not team_obj.get("plays") or len(team_obj.get("plays", {})) == 0):
                 franchise_doc = collection.find_one(
                     {"_id": ObjectId(doc_id)},
@@ -1740,14 +1755,19 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                             )
                             if ftd_doc and ftd_doc.get("plays"):
                                 team_obj["plays"] = ftd_doc["plays"]
+                                logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: set plays from FTD (count={len(ftd_doc['plays'])})")
                             else:
                                 team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
-                        except Exception:
+                                logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: set plays from cache (FTD missing or empty)")
+                        except Exception as ex:
                             team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
+                            logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: set plays from cache (FTD lookup error: {ex!r})")
                     else:
                         team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
+                        logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: set plays from cache (no user_team_object_id)")
                 else:
                     team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
+                    logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: set plays from cache (franchise_doc not found)")
         elif mode == "franchise":
             # ✅ FTD: Load playbook_settings from FTD collection instead of franchise doc
             from BackEnd.db import franchise_team_data_collection
@@ -1922,6 +1942,12 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                             {"$set": {f"{team_key}.playbook_settings": existing_playbook_settings}}
                         )
                         doc = update_coll.find_one({"_id": update_id})
+                        if mode == "franchise" and load_from_game_doc:
+                            if doc is None:
+                                logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: position_filters reload got doc=None, update_id={update_id!r}; falling back to game_doc")
+                                doc = game_doc
+                            else:
+                                logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: position_filters reload doc ok, update_id={update_id!r}")
                     
                     # Reload team_obj (game/tournament doc both have "teams")
                     # Franchise in-game: game doc has no plays; preserve FTD-merged plays
@@ -1962,10 +1988,13 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                         {"$set": {f"{team_key}.plays": populated_plays}}
                     )
                     doc = update_coll.find_one({"_id": update_id})
+                    if mode == "franchise" and load_from_game_doc and doc is None:
+                        logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: Ensure-plays reload got doc=None, update_id={update_id!r}; falling back to game_doc")
+                        doc = game_doc
                 
                 # Reload team_obj (game/tournament doc both have "teams")
                 if mode == "franchise":
-                    team_obj = doc.get("teams", {}).get(actual_team_id, {}) if actual_team_id else {}
+                    team_obj = doc.get("teams", {}).get(actual_team_id, {}) if (actual_team_id and doc) else {}
                 elif mode == "tournament":
                     teams = doc.get("teams", {})
                     team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
@@ -1979,8 +2008,8 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         # Playbook_settings come from GameManager (percentages/slot_assignments), but plays come from DB
         # This ensures consistency with game start flow
         plays = team_obj.get("plays", {})
-        
-        # ✅ PERFORMANCE: Removed debug logging
+        if mode == "franchise" and load_from_game_doc:
+            logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: before response build, team_obj plays count={len(plays)}, response built from team_obj")
         
         # Organize plays by type and focus
         motion_plays = []
