@@ -1924,8 +1924,12 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                         doc = update_coll.find_one({"_id": update_id})
                     
                     # Reload team_obj (game/tournament doc both have "teams")
+                    # Franchise in-game: game doc has no plays; preserve FTD-merged plays
+                    preserved_plays = (team_obj.get("plays") or {}) if (mode == "franchise" and load_from_game_doc) else None
                     if mode == "franchise":
-                        team_obj = doc.get("teams", {}).get(actual_team_id, {})
+                        team_obj = doc.get("teams", {}).get(actual_team_id, {}) if doc else {}
+                        if preserved_plays and (not team_obj.get("plays") or len(team_obj.get("plays", {})) == 0):
+                            team_obj["plays"] = preserved_plays
                     elif mode == "tournament":
                         team_obj = doc.get("teams", {}).get(actual_team_id, {})
                     else:
@@ -2027,8 +2031,10 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         # Reload team_obj from latest doc so playbook_settings/plays are current.
         if mode == "franchise" and not load_from_game_doc:
             pass  # team_obj already from FTD
+        elif mode == "franchise" and load_from_game_doc:
+            # Franchise in-game: team_obj already has game doc team + plays merged from FTD; game doc does not store full plays.
+            pass
         elif mode == "franchise":
-            # Franchise + load_from_game_doc: keep the already-loaded game doc as source of truth.
             team_obj = (doc.get("teams", {}).get(actual_team_id, {}) if actual_team_id else {}) if doc else {}
         elif mode == "tournament" and not load_from_game_doc:
             # ✅ FIX: Only reload from tournament doc when NOT loading from game doc.
