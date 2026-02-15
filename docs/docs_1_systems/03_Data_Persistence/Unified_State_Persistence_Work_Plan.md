@@ -22,6 +22,7 @@
 - ✅ Phase 4: Enforce Failure Modes (all tasks complete)
 - ✅ Phase 5.1-5.6: Architecture Simplification (all tasks complete)
 - ✅ Phase 5.7: Game-Scoped Settings (all tasks complete, bug fixed and tested)
+- ✅ **Post-5.7 (February 2026): Single source of truth for franchise/tournament** — Game plan and playbook settings for franchise and tournament are no longer read from or written to the game document. They are always read from and written to the master store (FTD for franchise, tournament doc for tournament). This simplifies persistence and fixes "lost on comeback" when returning to lineup after timeout. See Data_Persistence_System.md "Game Plan & Playbook Settings Persistence" and "Fixed: Single Source of Truth (February 2026)".
 
 **In Progress:**
 - None
