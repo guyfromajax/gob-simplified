@@ -201,10 +201,15 @@ def save_team_settings(
             except:
                 doc_id_obj = doc_id
             
-            collection.update_one(
+            result = collection.update_one(
                 {"_id": doc_id_obj},
                 {"$set": {update_path: settings_data}}
             )
+            if is_game_doc:
+                logger.warning(
+                    f"🔍 [SAVE-TEAM-SETTINGS] game doc write: doc_id={doc_id!r}, actual_team_id={actual_team_id!r}, "
+                    f"update_path={update_path!r}, matched={result.matched_count}, modified={result.modified_count}"
+                )
         else:
             logger.error(f"❌ [SAVE-TEAM-SETTINGS] Invalid mode/ID combination: mode={mode}, game_id={game_id}, franchise_id={franchise_id}, tournament_id={tournament_id}")
             return False, None, None
