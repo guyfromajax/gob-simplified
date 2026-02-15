@@ -190,18 +190,17 @@ def get_save_location_for_franchise_tournament(mode: str, game_id: str = None, f
             
             if mode == "franchise":
                 if game_mode == "franchise" and str(game_franchise_id) == str(franchise_id):
-                    quarter = game_doc.get("quarter", 0)
-                    if quarter > 0:
-                        # Game is active - save to game doc
-                        return games_collection, game_id, True
+                    # Save to game doc whenever game exists (including quarter=0 so lineup saves persist)
+                    logger.warning(f"🔍 [SAVE-LOCATION] franchise: game doc (game_id={game_id!r})")
+                    return games_collection, game_id, True
             elif mode == "tournament":
                 if game_mode == "tournament" and str(game_tournament_id) == str(tournament_id):
-                    quarter = game_doc.get("quarter", 0)
-                    if quarter > 0:
-                        # Game is active - save to game doc
-                        return games_collection, game_id, True
+                    # Save to game doc whenever game exists (including quarter=0 so lineup saves persist)
+                    logger.warning(f"🔍 [SAVE-LOCATION] tournament: game doc (game_id={game_id!r})")
+                    return games_collection, game_id, True
         
-        # Game doesn't exist or isn't active - save to master
+        # Game doesn't exist or doesn't match - save to master
+        logger.warning(f"🔍 [SAVE-LOCATION] {mode}: master (game_id={game_id!r})")
         if mode == "franchise":
             return franchises_collection, franchise_id, False
         elif mode == "tournament":
@@ -1215,19 +1214,21 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
         game_doc_team_id = None
         
         if mode in ["franchise", "tournament"] and game_id:
-            # Try to load from game doc first
+            # Try to load from game doc first (ObjectId first for franchise/tournament games)
             try:
-                game_doc = games_collection.find_one(
-                    {"_id": game_id},
-                    {"teams": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "home_team": 1, "away_team": 1, "_id": 1}
-                )
+                proj = {"teams": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "home_team": 1, "away_team": 1, "_id": 1}
+                game_doc = None
+                if isinstance(game_id, str) and len(game_id) == 24 and all(c in "0123456789abcdefABCDEF" for c in game_id):
+                    try:
+                        game_doc = games_collection.find_one({"_id": ObjectId(game_id)}, proj)
+                    except Exception:
+                        pass
+                if not game_doc:
+                    game_doc = games_collection.find_one({"_id": game_id}, proj)
                 if not game_doc:
                     try:
-                        game_doc = games_collection.find_one(
-                            {"_id": ObjectId(game_id)},
-                            {"teams": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "home_team": 1, "away_team": 1, "_id": 1}
-                        )
-                    except:
+                        game_doc = games_collection.find_one({"_id": ObjectId(game_id)}, proj)
+                    except Exception:
                         pass
                 
                 if game_doc:
@@ -1266,7 +1267,7 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                                     load_from_game_doc = True
                                     break
             except Exception as e:
-                pass
+                logger.warning(f"🔍 [GET GAMEPLAN] Game doc path failed: {e!r}")
         
         # If not loading from game doc, load from master doc (existing logic)
         if not load_from_game_doc:
