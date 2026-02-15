@@ -1232,10 +1232,12 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                         # Game belongs to this franchise/tournament - check if it has settings
                         game_teams = game_doc.get("teams", {})
                         # Get user team name from master doc to find matching team_id in game doc
+                        master_proj = {"user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+                        if mode == "tournament":
+                            master_proj["teams"] = 1
                         master_doc = collection.find_one(
                             {"_id": ObjectId(doc_id)},
-                            {"teams": 1 if mode == "tournament" else None,
-                             "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+                            master_proj
                         )
                         if master_doc:
                             user_team_name = None
@@ -1568,19 +1570,22 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         game_doc_team_id = None
         
         if mode in ["franchise", "tournament"] and game_id:
-            # Try to load from game doc first
+            # Try to load from game doc first (during gameplay, game doc has in-game playbook/slot_assignments)
             try:
-                game_doc = games_collection.find_one(
-                    {"_id": game_id},
-                    {"teams": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "home_team": 1, "away_team": 1, "_id": 1}
-                )
+                proj = {"teams": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "home_team": 1, "away_team": 1, "_id": 1}
+                game_doc = None
+                # Franchise/tournament games typically use ObjectId _id; try that first when game_id looks like 24-char hex
+                if isinstance(game_id, str) and len(game_id) == 24 and all(c in "0123456789abcdefABCDEF" for c in game_id):
+                    try:
+                        game_doc = games_collection.find_one({"_id": ObjectId(game_id)}, proj)
+                    except Exception:
+                        pass
+                if not game_doc:
+                    game_doc = games_collection.find_one({"_id": game_id}, proj)
                 if not game_doc:
                     try:
-                        game_doc = games_collection.find_one(
-                            {"_id": ObjectId(game_id)},
-                            {"teams": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "home_team": 1, "away_team": 1, "_id": 1}
-                        )
-                    except:
+                        game_doc = games_collection.find_one({"_id": ObjectId(game_id)}, proj)
+                    except Exception:
                         pass
                 
                 if game_doc:
@@ -1594,10 +1599,12 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                         # Game belongs to this franchise/tournament - check if it has settings
                         game_teams = game_doc.get("teams", {})
                         # Get user team name from master doc to find matching team_id in game doc
+                        master_proj = {"user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+                        if mode == "tournament":
+                            master_proj["teams"] = 1
                         master_doc = collection.find_one(
                             {"_id": ObjectId(doc_id)},
-                            {"teams": 1 if mode == "tournament" else None,
-                             "user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+                            master_proj
                         )
                         if master_doc:
                             user_team_name = None
@@ -1617,7 +1624,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                                         load_from_game_doc = True
                                         break
             except Exception as e:
-                pass
+                logger.warning(f"🔍 [GET PLAYBOOKS] Game doc path failed: {e!r}")
         
         # If not loading from game doc, load from master doc (existing logic)
         if not load_from_game_doc:
@@ -1862,6 +1869,8 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 else:
                     # Else branch: updating game or tournament doc (both use "teams")
                     team_key = f"teams.{actual_team_id}"
+                    update_coll = games_collection if (load_from_game_doc and mode == "franchise") else collection
+                    update_id = game_doc["_id"] if (load_from_game_doc and mode == "franchise") else (ObjectId(doc_id) if mode != "single" else doc_id)
                     if mode == "single":
                         result = collection.update_one(
                             {"_id": doc_id},
@@ -1869,11 +1878,11 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                         )
                         doc = collection.find_one({"_id": doc_id})
                     else:
-                        result = collection.update_one(
-                            {"_id": ObjectId(doc_id)},
+                        result = update_coll.update_one(
+                            {"_id": update_id},
                             {"$set": {f"{team_key}.playbook_settings": existing_playbook_settings}}
                         )
-                        doc = collection.find_one({"_id": ObjectId(doc_id)})
+                        doc = update_coll.find_one({"_id": update_id})
                     
                     # Reload team_obj (game/tournament doc both have "teams")
                     if mode == "franchise":
@@ -1896,6 +1905,8 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             else:
                 # Else branch: updating game or tournament doc (both use "teams")
                 team_key = f"teams.{actual_team_id}"
+                update_coll = games_collection if (load_from_game_doc and mode == "franchise") else collection
+                update_id = game_doc["_id"] if (load_from_game_doc and mode == "franchise") else (ObjectId(doc_id) if mode != "single" else doc_id)
                 if mode == "single":
                     collection.update_one(
                         {"_id": doc_id},
@@ -1903,11 +1914,11 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                     )
                     doc = collection.find_one({"_id": doc_id})
                 else:
-                    collection.update_one(
-                        {"_id": ObjectId(doc_id)},
+                    update_coll.update_one(
+                        {"_id": update_id},
                         {"$set": {f"{team_key}.plays": populated_plays}}
                     )
-                    doc = collection.find_one({"_id": ObjectId(doc_id)})
+                    doc = update_coll.find_one({"_id": update_id})
                 
                 # Reload team_obj (game/tournament doc both have "teams")
                 if mode == "franchise":
