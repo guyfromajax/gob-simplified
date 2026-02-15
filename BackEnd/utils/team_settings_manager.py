@@ -103,16 +103,19 @@ def save_team_settings(
                 # Saving to game doc - resolve to canonical format (game docs use canonical keys)
                 actual_team_id = normalize_team_id_to_canonical(team_id, mode, None)
                 update_path = f"teams.{actual_team_id}.{settings_type}"
-                
-                try:
-                    doc_id_obj = ObjectId(doc_id)
-                except:
-                    doc_id_obj = doc_id
-                
+                # init-game stores _id as string; try string first, then ObjectId so we match either
                 result = collection.update_one(
-                    {"_id": doc_id_obj},
+                    {"_id": doc_id},
                     {"$set": {update_path: settings_data}}
                 )
+                if result.matched_count == 0 and doc_id and len(str(doc_id)) == 24:
+                    try:
+                        result = collection.update_one(
+                            {"_id": ObjectId(doc_id)},
+                            {"$set": {update_path: settings_data}}
+                        )
+                    except Exception:
+                        pass
                 logger.warning(
                     f"🔍 [SAVE-TEAM-SETTINGS] game doc write: doc_id={doc_id!r}, actual_team_id={actual_team_id!r}, "
                     f"update_path={update_path!r}, matched={result.matched_count}, modified={result.modified_count}"
@@ -195,16 +198,19 @@ def save_team_settings(
                 # Saving to tournament master doc - use ObjectId string directly
                 actual_team_id = team_id
                 update_path = f"teams.{actual_team_id}.{settings_type}"
-            
-            try:
-                doc_id_obj = ObjectId(doc_id)
-            except:
-                doc_id_obj = doc_id
-            
+            # Game docs: init-game stores _id as string; try string first, then ObjectId
             result = collection.update_one(
-                {"_id": doc_id_obj},
+                {"_id": doc_id},
                 {"$set": {update_path: settings_data}}
             )
+            if is_game_doc and result.matched_count == 0 and doc_id and len(str(doc_id)) == 24:
+                try:
+                    result = collection.update_one(
+                        {"_id": ObjectId(doc_id)},
+                        {"$set": {update_path: settings_data}}
+                    )
+                except Exception:
+                    pass
             if is_game_doc:
                 logger.warning(
                     f"🔍 [SAVE-TEAM-SETTINGS] game doc write: doc_id={doc_id!r}, actual_team_id={actual_team_id!r}, "
