@@ -323,8 +323,10 @@ async function loadSettings() {
     
     if (mode === 'franchise' && franchiseId) {
       params.set('franchise_id', franchiseId);
+      if (gameId) params.set('game_id', gameId);
     } else if (mode === 'tournament' && tournamentId) {
       params.set('tournament_id', tournamentId);
+      if (gameId) params.set('game_id', gameId);
     } else if (mode === 'single' && gameId) {
       params.set('game_id', gameId);
     }
