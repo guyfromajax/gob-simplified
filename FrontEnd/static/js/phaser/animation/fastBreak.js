@@ -595,8 +595,8 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
   // Stop rebounder animations when ball hits rim (made shot)
   if (turnData.result_type === "MAKE") {
     rebounderTweens.forEach(tween => {
-      if (tween && tween.isPlaying && scene.tweens) {
-        scene.tweens.killTweensOf(tween.targets);
+      if (tween && tween.isPlaying) {
+        tween.stop();
       }
     });
   }
@@ -690,8 +690,8 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
         if (distanceToBall < 30) {
           monitoringActive = false;
           rebounderTweens.forEach(tween => {
-            if (tween && tween.isPlaying && scene.tweens) {
-              scene.tweens.killTweensOf(tween.targets);
+            if (tween && tween.isPlaying) {
+              tween.stop();
             }
           });
           return;
@@ -873,8 +873,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   // ✅ Stop rebounder animations when ball hits rim (made shot)
   if (turnData.result_type === "MAKE") {
     rebounderTweens.forEach(tween => {
-      if (tween && tween.isPlaying && scene.tweens) {
-        scene.tweens.killTweensOf(tween.targets);
+      if (tween && tween.isPlaying) {
+        tween.stop();
       }
     });
   }
@@ -971,7 +971,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
             if (distanceToBall < 30) {
               monitoringActive = false;
               rebounderTweens.forEach(tween => {
-                if (tween && tween.isPlaying && scene.tweens) scene.tweens.killTweensOf(tween.targets);
+                if (tween && tween.isPlaying) tween.stop();
               });
               return;
             }
@@ -1078,8 +1078,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         if (distanceToBall < 30) {
           monitoringActive = false;
           rebounderTweens.forEach(tween => {
-            if (tween && tween.isPlaying && scene.tweens) {
-              scene.tweens.killTweensOf(tween.targets);
+            if (tween && tween.isPlaying) {
+              tween.stop();
             }
           });
           return;
@@ -1254,8 +1254,8 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
           const checkAndStopRebounders = () => {
             if (handlerComplete && stopperComplete) {
               rebounderTweens.forEach(tween => {
-                if (tween && tween.isPlaying && scene.tweens) {
-                  scene.tweens.killTweensOf(tween.targets);
+                if (tween && tween.isPlaying) {
+                  tween.stop();
                 }
               });
             }
@@ -1423,8 +1423,8 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
     const checkAndStopRebounders = () => {
       if (handlerComplete && stopperComplete) {
         rebounderTweens.forEach(tween => {
-          if (tween && tween.isPlaying && scene.tweens) {
-            scene.tweens.killTweensOf(tween.targets);
+          if (tween && tween.isPlaying) {
+            tween.stop();
           }
         });
       }
