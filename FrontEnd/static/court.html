@@ -3277,7 +3277,11 @@
           even_distribution_all: data.even_distribution_all || false,
           _meta: data.playbook_meta && typeof data.playbook_meta === 'object' ? data.playbook_meta : {}
         };
-        lastPlaybookDataForSave = { playNameToSection, playbookPayload };
+        lastPlaybookDataForSave = {
+          playNameToSection,
+          playbookPayload,
+          requestContext: { mode, teamId, gameId, franchiseId, tournamentId }
+        };
         
         // Get scroller element
         const scroller = document.getElementById('offense-play-scroller');
@@ -3522,26 +3526,21 @@
           await setPlaycallOverride('offense', playName);
           
           // ✅ Data Persistence: Persist this slot change to game document so presets survive timeout/reopen
-          if (lastPlaybookDataForSave && playName) {
+          if (lastPlaybookDataForSave && playName && lastPlaybookDataForSave.requestContext) {
             const slotNum = Array.prototype.indexOf.call(allPlayOptions, option) + 1;
             if (slotNum >= 1 && slotNum <= 6) {
               const section = lastPlaybookDataForSave.playNameToSection[playName] || 'set_play_inside';
               const slotKey = String(slotNum);
               lastPlaybookDataForSave.playbookPayload.slot_assignments[slotKey] = { section: section, playId: playName };
-              const urlParams = new URLSearchParams(window.location.search);
-              const mode = urlParams.get('mode') || (urlParams.get('tournament_id') ? 'tournament' : urlParams.get('franchise_id') ? 'franchise' : 'single');
-              const teamId = urlParams.get('team_id') || urlParams.get('user_team_id') || urlParams.get('home_id') || urlParams.get('away_id');
-              const gameId = urlParams.get('game_id');
-              const franchiseId = urlParams.get('franchise_id');
-              const tournamentId = urlParams.get('tournament_id');
+              const ctx = lastPlaybookDataForSave.requestContext;
               const body = {
-                mode: mode,
-                team_id: teamId,
+                mode: ctx.mode,
+                team_id: ctx.teamId,
                 playbook_settings: lastPlaybookDataForSave.playbookPayload
               };
-              if (gameId) body.game_id = gameId;
-              if (franchiseId) body.franchise_id = franchiseId;
-              if (tournamentId) body.tournament_id = tournamentId;
+              if (ctx.gameId) body.game_id = ctx.gameId;
+              if (ctx.franchiseId) body.franchise_id = ctx.franchiseId;
+              if (ctx.tournamentId) body.tournament_id = ctx.tournamentId;
               try {
                 const res = await fetch(API_CONFIG.buildUrl('/api/playbooks'), {
                   method: 'POST',
@@ -3549,7 +3548,8 @@
                   body: JSON.stringify(body)
                 });
                 if (!res.ok) {
-                  console.warn('⚠️ [PLAYCALL CENTER] Failed to persist slot to game doc:', res.status);
+                  const errText = await res.text();
+                  console.warn('⚠️ [PLAYCALL CENTER] Failed to persist slot to game doc:', res.status, errText);
                 }
               } catch (err) {
                 console.warn('⚠️ [PLAYCALL CENTER] Error persisting slot to game doc:', err);

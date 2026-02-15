@@ -157,20 +157,29 @@ def get_save_location_for_franchise_tournament(mode: str, game_id: str = None, f
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode for get_save_location: {mode}")
     
-    # Check if game exists and is active
+    # Check if game exists and is active (franchise/tournament games use ObjectId _id; try that first)
     try:
-        game_doc = games_collection.find_one(
-            {"_id": game_id},
-            {"quarter": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "_id": 1}
-        )
-        if not game_doc:
-            # Try as ObjectId
+        game_doc = None
+        if isinstance(game_id, str) and len(game_id) == 24 and all(c in "0123456789abcdefABCDEF" for c in game_id):
             try:
                 game_doc = games_collection.find_one(
                     {"_id": ObjectId(game_id)},
                     {"quarter": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "_id": 1}
                 )
-            except:
+            except Exception:
+                pass
+        if not game_doc:
+            game_doc = games_collection.find_one(
+                {"_id": game_id},
+                {"quarter": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "_id": 1}
+            )
+        if not game_doc:
+            try:
+                game_doc = games_collection.find_one(
+                    {"_id": ObjectId(game_id)},
+                    {"quarter": 1, "mode": 1, "franchise_id": 1, "tournament_id": 1, "_id": 1}
+                )
+            except Exception:
                 pass
         
         if game_doc:
