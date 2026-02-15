@@ -102,6 +102,8 @@ These are candidate causes for “no popup, no lineup, dead sprite” (to confir
 
 - **2025-02-02 (quarter carry-over – to address later):** **Rule:** Quarter should never end with a carry-over; every new quarter must start clean. **Current bug:** If the final play of a quarter results in free throws (e.g. shooting foul at buzzer), we can persist `timeout_next_play_type=FREE_THROW` and 0:00 for the *next* quarter, so the next quarter does not start clean. **Intended behavior:** Run the free-throw turn(s) from that final play as part of finishing the quarter, then enter the quarter-break scenario and save a clean state (no pending FTs for next quarter). **Symptom patch in place:** We only restore timeout state when client sends `resume_from_timeout=true`, so "Play Quarter" after "Sim quarter" no longer restores that bad state and causes instant EOG. The underlying fix is to never persist a carry-over: resolve FTs before marking the quarter complete.
 
+- **Verify (likely fixed):** Shot resolution – `defender` was None when calling `defender.record_stat("BLK")` in `BackEnd/models/shot_manager.py` ~L557 (block reconciliation). Guard: only run block path when `defender` truthy (L462). Sentry 7240215980.
+
 ---
 
 ## System review: step back and fix coherently
