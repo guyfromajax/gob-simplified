@@ -1,3 +1,4 @@
+import os
 import random
 import json
 import logging
@@ -58,6 +59,11 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
         return
 
     if game_id:
+        # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log game_id type (string vs ObjectId mismatch can make find_one return None)
+        logging.warning(
+            "🔍 [FOUL_OUT DEBUG] _initialize_game_stats find_one: game_id=%s, type=%s",
+            game_id, type(game_id).__name__,
+        )
         doc = games_collection.find_one({"_id": game_id})
         if doc and doc.get("game_stats_initialized"):
             # Build maps for stats and attributes
@@ -85,12 +91,25 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
                         player.attributes["anchor_MO"] = player.attributes["MO"]
             gm.game_state["game_stats_initialized"] = True
             return
+        # 🔍 FOUL_OUT DATA-LOSS DEBUG: Doc missing or no game_stats_initialized → we are about to zero everyone
+        _doc_flag = doc.get("game_stats_initialized") if doc else "N/A"
+        logging.warning(
+            "🔍 [FOUL_OUT DEBUG] _initialize_game_stats: doc_found=%s, doc.game_stats_initialized=%s → will RESET stats (data loss if this was timeout resume)",
+            doc is not None, _doc_flag,
+        )
 
     logging.info("🚨 RESETTING GAME STATS (should only happen in Q1!)")
+    # TEMPORARY: FOUL_OUT_TEST_MODE=1 starts all players with 4 fouls so first foul triggers foul-out (for testing)
+    _foul_out_test = os.environ.get("FOUL_OUT_TEST_MODE", "").strip().lower() in ("1", "true", "yes")
+    _start_fouls = 4 if _foul_out_test else 0
+    if _foul_out_test:
+        logging.warning("⚠️ FOUL_OUT_TEST_MODE enabled: all players starting with F=4 (first foul = foul-out)")
     affected: list[str] = []
     for team in (gm.home_team, gm.away_team):
         for player in team.get_all_players():
             player.reset_stats()
+            if _start_fouls:
+                player.stats["game"]["F"] = _start_fouls
             # Randomize EM, CH, MO for new game instance
             player.attributes = Player.randomize_game_attributes(player.attributes)
             affected.append(player.player_id)
@@ -102,13 +121,16 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
         players_payload = []
         for label, team in (("home", gm.home_team), ("away", gm.away_team)):
             for pos, player in team.lineup.items():
+                stats = _init_game_stats_dict()
+                if _start_fouls:
+                    stats["F"] = _start_fouls
                 players_payload.append(
                     {
                         "playerId": player.player_id,
                         "team": label,
                         "team_id": team.team_id,
                         "pos": pos,
-                        "stats": _init_game_stats_dict(),
+                        "stats": stats,
                         "attributes": {
                             "EM": player.attributes.get("EM", 0),
                             "CH": player.attributes.get("CH", 0),
@@ -281,7 +303,14 @@ def simulate_quarter(
 
     # Zero per-game stats exactly once per game before the opening tip.
     # Only initialize stats if game_stats_initialized flag is not set (prevents resetting stats mid-game)
-    if not gm.game_state.get("game_stats_initialized", False):
+    # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log before _initialize_game_stats (Hypothesis 1)
+    _flag = gm.game_state.get("game_stats_initialized", False)
+    logging.warning(
+        "🔍 [FOUL_OUT DEBUG] simulate_quarter before _initialize_game_stats: game_id=%s, resume_from_timeout=%s, "
+        "game_stats_initialized=%s (if False we will call _initialize_game_stats)",
+        game_id, resume_from_timeout, _flag,
+    )
+    if not _flag:
         _initialize_game_stats(gm, game_id)
         gm.game_state["game_stats_initialized"] = True
     
@@ -394,9 +423,17 @@ def simulate_quarter(
                 try:
                     from BackEnd.db import games_collection
                     
+                    unset_fields = {
+                        "timeout_next_play_type": "",
+                        "timeout_offense_team_id": "",
+                        "timeout_free_throws_remaining": "",
+                        "timeout_free_throws": "",
+                        "timeout_shooter_id": "",
+                        "timeout_one_and_one": "",
+                    }
                     games_collection.update_one(
                         {"_id": game_id},
-                        {"$unset": {"timeout_next_play_type": "", "timeout_offense_team_id": ""}}
+                        {"$unset": unset_fields}
                     )
                     
                     logging.info(f"🧹 TIMEOUT RESUME: Cleared timeout state from database for game_id={game_id}")

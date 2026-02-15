@@ -890,6 +890,30 @@ try:
                 print(f"❌ Error saving game to franchise doc: {e}")
                 traceback.print_exc()
     
+    def find_game_doc(games_collection, game_id: str):
+        """
+        Single load path: find game doc by _id, trying string then ObjectId.
+        Returns (doc, effective_id) so callers can use effective_id for updates.
+        """
+        if games_collection is None or not game_id:
+            return None, None
+        saved = games_collection.find_one({"_id": game_id})
+        if saved:
+            return saved, game_id
+        if len(game_id) == 24:
+            try:
+                oid = ObjectId(game_id)
+                saved = games_collection.find_one({"_id": oid})
+                if saved:
+                    logging.info(
+                        "🔍 [PERSISTENCE] find_game_doc: string _id missed; found with ObjectId for game_id=%s",
+                        game_id,
+                    )
+                    return saved, oid
+            except (ValueError, TypeError):
+                pass
+        return None, None
+
     def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest, games_collection) -> dict | None:
         """
         Unified function to restore timeout resume state from DB.
@@ -909,14 +933,13 @@ try:
         # If timeout_next_play_type exists in DB, we're resuming from a timeout
         
         saved = None
+        query_id = None  # _id that matched (string or ObjectId) for updates
         
         try:
             # ✅ CRITICAL FIX: Games are saved as standalone documents in games_collection (not nested)
-            # handle_timeout_save_and_response() saves to games_collection
-            # simulate_quarter_endpoint() saves to games_collection
-            # Always read from games_collection - this is where we save, so this is the source of truth
+            # Use single load path (string then ObjectId) so we find doc regardless of _id type
             if games_collection is not None:
-                saved = games_collection.find_one({"_id": game_id})
+                saved, query_id = find_game_doc(games_collection, game_id)
                 if saved:
                     logging.info(f"✅ TIMEOUT RESUME: Found game in games_collection (where we save)")
             else:
@@ -926,6 +949,17 @@ try:
                 logging.warning(f"⚠️ TIMEOUT RESUME: Game {game_id} not found in any document location (mode: {request.mode})")
                 return None
             
+            # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log what we loaded (Hypothesis 2 - confirm doc has timeout state and game_stats_initialized)
+            logging.warning(
+                "🔍 [FOUL_OUT DEBUG] restore_timeout_resume_state loaded doc: game_id=%s, timeout_next_play_type=%s, "
+                "game_stats_initialized=%s, has_teams=%s, top_level_score=%s",
+                game_id,
+                saved.get("timeout_next_play_type"),
+                saved.get("game_stats_initialized"),
+                "teams" in saved and bool(saved.get("teams")),
+                saved.get("score"),
+            )
+            
             # Validate/repair timeout_next_play_type.
             # Older or partially-saved timeout docs can miss this field; infer SIDE_INBOUND
             # when timeout_offense_team_id is present so resume flow remains deterministic.
@@ -934,8 +968,9 @@ try:
                     inferred_next_play_type = "SIDE_INBOUND"
                     saved["timeout_next_play_type"] = inferred_next_play_type
                     try:
+                        # Use same _id that matched find (string or ObjectId)
                         games_collection.update_one(
-                            {"_id": game_id},
+                            {"_id": query_id or game_id},
                             {"$set": {"timeout_next_play_type": inferred_next_play_type}},
                         )
                     except Exception as update_err:
@@ -1010,6 +1045,13 @@ try:
         game_id_type = type(game_id).__name__
         logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] Saving with _id: '{game_id}' (type: {game_id_type})")
         result = games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
+        if result.matched_count == 0 and isinstance(game_id, str) and len(game_id) == 24:
+            try:
+                result = games_collection.update_one({"_id": ObjectId(game_id)}, {"$set": db_summary}, upsert=True)
+                if result.matched_count > 0:
+                    logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] Retried with ObjectId - matched: {result.matched_count}")
+            except (ValueError, TypeError):
+                pass
         logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] Update result - matched: {result.matched_count}, modified: {result.modified_count}, upserted_id: {result.upserted_id}")
         
         # ✅ DIAGNOSTIC: Log what was saved in db_summary
@@ -1196,6 +1238,32 @@ try:
         if "timeout_next_play_type" in saved:
             gm.game_state["timeout_next_play_type"] = saved["timeout_next_play_type"]
             logging.info(f"🔄 TIMEOUT RESUME: Applied timeout_next_play_type={saved['timeout_next_play_type']}")
+        
+        # ✅ FREE_THROW timeout resume: restore offensive_state, shooter, free_throws so first simulate_turn creates the FT turn
+        if saved.get("timeout_next_play_type") == "FREE_THROW":
+            gm.game_state["offensive_state"] = "FREE_THROW"
+            if "timeout_free_throws_remaining" in saved and saved["timeout_free_throws_remaining"] is not None:
+                gm.game_state["free_throws_remaining"] = saved["timeout_free_throws_remaining"]
+            if "timeout_free_throws" in saved and saved["timeout_free_throws"] is not None:
+                gm.game_state["free_throws"] = saved["timeout_free_throws"]
+            if "timeout_one_and_one" in saved:
+                gm.game_state["one_and_one"] = saved["timeout_one_and_one"]
+            shooter_id = saved.get("timeout_shooter_id")
+            if shooter_id:
+                shooter = None
+                shooter_id_str = str(shooter_id)
+                for team in (gm.home_team, gm.away_team):
+                    for p in team.get_all_players():
+                        if str(getattr(p, "player_id", None) or "") == shooter_id_str:
+                            shooter = p
+                            break
+                    if shooter is not None:
+                        break
+                if shooter is not None:
+                    gm.game_state["shooter"] = shooter
+                    logging.info(f"🔄 TIMEOUT RESUME: Restored FREE_THROW state (shooter_id={shooter_id}, free_throws_remaining={gm.game_state.get('free_throws_remaining')})")
+                else:
+                    logging.warning(f"⚠️ TIMEOUT RESUME: FREE_THROW resume could not find shooter_id={shooter_id} in rosters")
         
         # ✅ CRITICAL FIX: Restore offense team from timeout_offense_team_id
         # This ensures the correct team has possession after timeout (e.g., if user called timeout during BIP)
@@ -1873,6 +1941,10 @@ try:
         import time
         start_time = time.time()
         game_id = body.game_id
+        # ✅ TIMEOUT/FOUL_OUT RESUME: Normalize game_id once so restore_timeout_resume_state and DB load use same _id as save
+        if game_id:
+            from BackEnd.utils.game_id_utils import normalize_game_id
+            game_id = normalize_game_id(game_id) or game_id
         # ✅ PERFORMANCE: Removed debug logging - only log errors and critical events
         if debug:
             logging.debug(
@@ -2030,14 +2102,15 @@ try:
             
             if timeout_saved_state:
                 # Validate quarter match to prevent stale data from affecting new games
+                # Only restore timeout state when the client explicitly asked for it (resume_from_timeout=true).
+                # Otherwise we clear it - e.g. "Play Quarter" after "Sim quarter" for prior quarters must not
+                # restore leftover timeout_next_play_type (e.g. FREE_THROW at end of Q3) or user gets instant EOG.
                 saved_quarter = timeout_saved_state.get("quarter", 0)
                 timeout_next_play_type = timeout_saved_state.get("timeout_next_play_type")
                 
-                if timeout_next_play_type and saved_quarter == body.quarter:
+                if body.resume_from_timeout and timeout_next_play_type and saved_quarter == body.quarter:
                     logging.info(f"✅ TIMEOUT RESUME: Found valid timeout state in DB, timeout_next_play_type={timeout_next_play_type}, quarter={saved_quarter}")
-                    # Override body.resume_from_timeout to ensure simulate_quarter() handles timeout resume
-                    body.resume_from_timeout = True
-                    logging.info(f"✅ TIMEOUT RESUME: Detected valid timeout state in DB, setting resume_from_timeout=True for simulate_quarter()")
+                    # body.resume_from_timeout already True from client
                     # ✅ CRITICAL FIX: Always force reload from DB when resuming from timeout
                     # This ensures we use the latest saved state, not stale in-memory state
                     # This fixes the bug where computer timeout → user timeout shows stale data
@@ -2047,6 +2120,20 @@ try:
                         del ongoing_games[game_id]
                         gm = None  # Force reload from DB
                     logging.info(f"🔍 TIMEOUT RESUME: Will load fresh game from DB and apply timeout state")
+                elif body.resume_from_timeout and timeout_next_play_type and saved_quarter > body.quarter:
+                    # ✅ FOUL-OUT DATA-LOSS FIX: Frontend sometimes sends quarter=1 on "return to court" (e.g. Play Quarter)
+                    # while the game is actually in a later quarter. Use doc as source of truth and treat as timeout resume.
+                    logging.warning(
+                        "⚠️ TIMEOUT RESUME: Quarter mismatch (requested=%s, saved=%s) - using saved quarter and treating as timeout resume (game_id=%s)",
+                        body.quarter, saved_quarter, game_id,
+                    )
+                    body.quarter = saved_quarter
+                    body.resume_from_timeout = True
+                    if gm is not None:
+                        logging.warning(f"🔍 TIMEOUT RESUME: Game in memory, forcing DB reload (game_id={game_id})")
+                        del ongoing_games[game_id]
+                        gm = None
+                    logging.info(f"✅ TIMEOUT RESUME: Corrected body.quarter to %s, resume_from_timeout=True", saved_quarter)
                 else:
                     # Stale timeout data (quarter mismatch or missing next_play_type) - ignore it
                     # logging.warning(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={body.quarter}, next_play_type={timeout_next_play_type})")
@@ -2062,9 +2149,20 @@ try:
                         if "timeout_offense_team_id" in timeout_saved_state:
                             update_data["timeout_offense_team_id"] = None
                         if update_data:
-                            games_collection.update_one({"_id": game_id}, {"$unset": update_data})
+                            unset_op = {"$unset": update_data}
+                            r = games_collection.update_one({"_id": game_id}, unset_op)
+                            if r.matched_count == 0 and game_id and len(game_id) == 24:
+                                try:
+                                    games_collection.update_one({"_id": ObjectId(game_id)}, unset_op)
+                                except (ValueError, TypeError):
+                                    pass
                     
                     timeout_saved_state = None  # Clear invalid timeout state
+                    # Force reload from DB so we use the cleared doc (no timeout state), not cached gm with stale state
+                    if gm is not None:
+                        logging.info(f"✅ QUARTER BREAK: Clearing cache so next load uses doc without timeout state (game_id={game_id})")
+                        del ongoing_games[game_id]
+                        gm = None
                     # ✅ QUARTER BREAK: Clear resume_from_timeout flag and timeout state if no valid timeout state
                     # This handles cases where resume_from_timeout was incorrectly preserved across quarter boundaries
                     # Quarter breaks should NOT have timeout state - clear it explicitly
@@ -2097,11 +2195,7 @@ try:
                         game_id,
                     )
                 db_lookup_start = time.time()
-                saved = (
-                    games_collection.find_one({"_id": game_id})
-                    if games_collection is not None
-                    else None
-                )
+                saved, _ = find_game_doc(games_collection, game_id) if (games_collection is not None and game_id) else (None, None)
                 db_lookup_time = (time.time() - db_lookup_start) * 1000
                 # logging.warning(f"⏱️ [DB TIMING] simulate_quarter: games_collection.find_one(game_id={game_id}): {db_lookup_time:.2f}ms, found={saved is not None}")
                 if saved:
@@ -2322,30 +2416,20 @@ try:
                             elif not gm.game_state.get(COMPUTER_MATCHUPS_KEY):
                                 gm.game_state[COMPUTER_MATCHUPS_KEY] = get_default_matchups()
                             
-                            # ✅ TIMEOUT RESUME: Check for timeout state BEFORE calculating should_restore_stats
-                            # This ensures scores/fouls are restored when resuming from timeout
-                            # Check if timeout state exists in saved document (regardless of URL parameter)
-                            has_timeout_state = "timeout_next_play_type" in saved and saved.get("timeout_next_play_type") is not None
-                            if has_timeout_state and saved_quarter == body.quarter:
-                                # Timeout state found - ensure resume_from_timeout is set
-                                if not body.resume_from_timeout:
-                                    body.resume_from_timeout = True
-                                    # ✅ PERFORMANCE: Removed debug logging
-                            
-                            # ✅ TIMEOUT RESUME: Check for timeout state in saved document BEFORE calculating should_restore_stats
-                            # This ensures scores/fouls are restored when resuming from timeout
-                            # Check if timeout state exists in saved document (regardless of URL parameter or timeout_saved_state)
-                            has_timeout_state = "timeout_next_play_type" in saved and saved.get("timeout_next_play_type") is not None
-                            if has_timeout_state and saved_quarter == body.quarter:
-                                # Timeout state found in saved document - ensure resume_from_timeout is set
-                                if not body.resume_from_timeout:
-                                    body.resume_from_timeout = True
-                                    # ✅ PERFORMANCE: Removed debug logging
+                            # ✅ TIMEOUT RESUME: Do NOT set body.resume_from_timeout from doc here.
+                            # We only treat as timeout resume when the client sent resume_from_timeout=true (see earlier block).
+                            # Otherwise "Play Quarter" after "Sim quarter" would incorrectly restore FREE_THROW state and cause instant EOG.
                             
                             # Simple check: If requesting Q1 but saved game is at a later quarter, start fresh (new game)
                             # ✅ TIMEOUT: If resuming from timeout, always restore stats (we're continuing an existing game)
                             is_new_game = (body.quarter == 1 and saved_quarter > 1) and not body.resume_from_timeout
                             should_restore_stats = not is_new_game or body.resume_from_timeout
+                            # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log restore path so we can confirm Hypothesis 1
+                            logging.warning(
+                                "🔍 [FOUL_OUT DEBUG] Restore path: should_restore_stats=%s, resume_from_timeout=%s, "
+                                "saved_quarter=%s, body.quarter=%s, game_id=%s",
+                                should_restore_stats, body.resume_from_timeout, saved_quarter, body.quarter, game_id,
+                            )
                             
                             # CRITICAL: Build lineups BEFORE restoring player stats
                             # Player stat restoration (below) looks up players in team.lineup, so lineups must exist
@@ -2478,6 +2562,13 @@ try:
                                 if "game_stats_initialized" in saved:
                                     gm.game_state["game_stats_initialized"] = saved["game_stats_initialized"]
                                     logging.info(f"🔄 game_stats_initialized restored: {saved['game_stats_initialized']}")
+                                else:
+                                    # 🔍 FOUL_OUT DATA-LOSS DEBUG: Doc has no game_stats_initialized → simulate_quarter may call _initialize_game_stats and zero everyone
+                                    logging.warning(
+                                        "🔍 [FOUL_OUT DEBUG] should_restore_stats=True but saved doc has NO 'game_stats_initialized' "
+                                        "(game_id=%s); gm.game_stats_initialized will stay False → risk of stats reset in simulate_quarter",
+                                        game_id,
+                                    )
                             else:
                                 # New Q1 game - ensure stats are zeroed
                                 gm.score = {gm.home_team.name: 0, gm.away_team.name: 0}
@@ -2787,10 +2878,10 @@ try:
                                 detail=f"game_id required for Q1. Game document must be created via /api/init-game before simulating Q1. This ensures playbook and game plan settings persist."
                             )
                         # Verify game document exists in database
-                        saved = games_collection.find_one({"_id": body.game_id}) if games_collection else None
+                        saved = games_collection.find_one({"_id": body.game_id}) if games_collection is not None else None
                         if not saved:
                             try:
-                                saved = games_collection.find_one({"_id": ObjectId(body.game_id)}) if games_collection else None
+                                saved = games_collection.find_one({"_id": ObjectId(body.game_id)}) if games_collection is not None else None
                             except:
                                 pass
                         if not saved:
@@ -3195,10 +3286,10 @@ try:
             game_id = normalize_game_id(body.game_id)
             if original_game_id != game_id:
                 logger.warning(f"🔍 [NORMALIZE] POST /api/simulate-quarter - Normalized game_id from '{original_game_id}' to '{game_id}'")
-            saved = games_collection.find_one({"_id": game_id}) if games_collection else None
+            saved = games_collection.find_one({"_id": game_id}) if games_collection is not None else None
             if not saved:
                 try:
-                    saved = games_collection.find_one({"_id": ObjectId(game_id)}) if games_collection else None
+                    saved = games_collection.find_one({"_id": ObjectId(game_id)}) if games_collection is not None else None
                 except:
                     pass
             if not saved:
@@ -3866,6 +3957,18 @@ try:
                     "batch_turns": new_turns,
                     "text": " → ".join(t.get("text", "") for t in new_turns)
                 }
+            
+            # ✅ FOUL_OUT RESUME: Persist timeout state via same path as user/computer timeout so return-to-court finds it
+            for t in new_turns:
+                if isinstance(t, dict) and t.get("result_type") == "TIMEOUT" and t.get("timeout_reason") == "FOUL_OUT":
+                    try:
+                        save_id = getattr(gm, "game_id", None) or game_id
+                        if save_id:
+                            handle_timeout_save_and_response(gm, t, save_id, timeout_reason="FOUL_OUT")
+                            logging.info(f"💾 FOUL_OUT: Saved timeout state via handle_timeout_save_and_response (game_id={save_id})")
+                    except Exception as e:
+                        logging.error(f"🚨 FOUL_OUT: handle_timeout_save_and_response failed: {e}")
+                    break
             
             # Check if quarter is now complete.
             # Edge-case rule: if FT is still pending at 0:00, quarter is NOT complete yet.

@@ -43,7 +43,8 @@
 
 **Critical State (for resume):**
 - `timeout_next_play_type`: `"SIDE_INBOUND"` (or `"FREE_THROW"` if applicable) - **Only for timeouts**
-- `timeout_offense_team_id`: Team ID that had possession when timeout called - **Only for timeouts**
+- `timeout_offense_team_id`: Team ID that has (or will have) the ball after resume. For **foul-out on offensive foul** this is the *defense* team (they receive the ball); for all other timeouts it is the team that had possession when timeout was called. **Only for timeouts.** (See `docs/To Do/player_foul_out_bug.md` for foul-out edge cases.)
+- For `timeout_next_play_type === "FREE_THROW"` we also persist `timeout_free_throws_remaining`, `timeout_free_throws`, `timeout_shooter_id`, `timeout_one_and_one` so the first turn after resume is the free throw.
 - `clock`: Current game clock (e.g., `"4:23"`)
 - `time_remaining`: Seconds remaining (e.g., `263`)
 - `quarter`: Current quarter (1-4) - **Incremented on quarter break**

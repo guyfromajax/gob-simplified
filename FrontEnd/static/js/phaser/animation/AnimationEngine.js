@@ -475,7 +475,64 @@ export class AnimationEngine {
       console.log('⏸️ USER TIMEOUT: Skipping navigation - already handled by timeoutButtonManager');
       return; // Don't navigate - showUserTimeoutPopup already handled it
     }
-    
+
+    // ✅ FOUL OUT: Always show foul-out popup and let it handle navigation (never fall through to computer timeout).
+    // Use placeholder player if backend didn't send foul_out_player (contract: backend now always sends one).
+    if (turnData.timeout_reason === 'FOUL_OUT') {
+      const gameId = this.scene.gameId || this.scene.simData?.game_id;
+      const player = turnData.foul_out_player || { name: 'Unknown', player_id: null, team: null, photo: null };
+      if (!turnData.foul_out_player) {
+        console.warn('⚠️ [FOUL OUT] TIMEOUT turn has timeout_reason=FOUL_OUT but no foul_out_player; showing popup with placeholder.');
+      }
+      // Clear red tint on fouled-out player's sprite so it doesn't stay "dead" when we navigate
+      const foulOutPlayerId = player?.player_id ?? player?.playerId;
+      if (foulOutPlayerId && this.scene) {
+        try {
+          const { clearFoulTintForPlayer } = await import('./negativeActionEffects.js');
+          clearFoulTintForPlayer(this.scene, foulOutPlayerId);
+        } catch (e) {
+          console.warn('⚠️ [FOUL OUT] Could not clear sprite tint:', e);
+        }
+      }
+      if (gameId) {
+        try {
+          const { showFoulOutPopup } = await import('../utils/foulOutPopup.js');
+          const responseData = turnData._responseData || {};
+          const clock = responseData.clock || turnData.clock || this.scene.simData?.clock;
+          const mode = this.scene.mode || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('mode') : null) || 'single';
+          const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : { get: () => null };
+          const tournamentId = urlParams.get?.('tournament_id') || null;
+          const franchiseId = urlParams.get?.('franchise_id') || null;
+          const { home: homeTeam, away: awayTeam } = gameStore.getTeams();
+          const homeId = this.scene.homeTeamId || urlParams.get?.('home_id');
+          const awayId = this.scene.awayTeamId || urlParams.get?.('away_id');
+          const myTeamSide = urlParams.get?.('my_team');
+          const userTeamId = urlParams.get?.('user_team_id');
+          const quarter = turnData.quarter ?? this.scene.quarter ?? 1;
+          showFoulOutPopup({
+            player,
+            gameId,
+            mode,
+            quarter,
+            clock,
+            tournamentId,
+            franchiseId,
+            homeTeam,
+            awayTeam,
+            homeId,
+            awayId,
+            myTeamSide,
+            userTeamId
+          });
+        } catch (err) {
+          console.error('❌ FOUL OUT: Failed to show foul-out popup:', err);
+        }
+      } else {
+        console.error('❌ FOUL OUT: Cannot show popup - game_id missing for navigation.');
+      }
+      return;
+    }
+
     // ✅ COMPUTER TIMEOUT: Navigate to lineup screen automatically
     // For computer timeouts, we need to trigger navigation immediately
     // User timeouts navigate via button click, but computer timeouts need automatic navigation

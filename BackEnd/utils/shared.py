@@ -224,29 +224,31 @@ def resolve_offensive_rebound(game, rebounder):
             
             new_rebounder, new_team, new_stat = determine_rebounder(game, bounce_spot, exclude_player_ids, penalize_player_ids)
             
-            # Debug: Log when putback miss rebound stat is recorded
+            # Get rebounder ID (support both Player and dict for robustness)
             new_rebounder_id = getattr(new_rebounder, "player_id", None)
-            new_rebounder_name = get_name_safe(new_rebounder)
-            oreb_before = new_rebounder.stats["game"].get(new_stat, 0)
-            logging.warning(f"🏀 Putback Miss Rebound: {new_rebounder_name} (ID: {new_rebounder_id}) credited with {new_stat} (putback miss) - Before: {oreb_before}")
-            new_rebounder.record_stat(new_stat)
-            oreb_after = new_rebounder.stats["game"].get(new_stat, 0)
-            logging.warning(f"🏀 Putback Miss Rebound: {new_rebounder_name} (ID: {new_rebounder_id}) credited with {new_stat} - After: {oreb_after}")
-            # ✅ DEBUG: Also log team to verify player object
-            new_rebounder_team = getattr(new_rebounder, "team", None)
-            new_rebounder_team_id = getattr(new_rebounder, "team_id", None)
-            logging.warning(f"🏀 Putback Miss Rebound: Player team={new_rebounder_team}, team_id={new_rebounder_team_id}, object_id={id(new_rebounder)}")
+            if new_rebounder_id is None and isinstance(new_rebounder, dict):
+                new_rebounder_id = new_rebounder.get("player_id") or new_rebounder.get("playerId")
+            pid_str = str(new_rebounder_id) if new_rebounder_id is not None else None
+
+            # Record stat on canonical roster player so deltas and persistence use the same instance
+            canonical = new_team.get_player_by_id(pid_str) if pid_str else None
+            if canonical is not None:
+                canonical.record_stat(new_stat)
+                logging.warning(f"🏀 Putback Miss Rebound: {get_name_safe(canonical)} (ID: {pid_str}) credited with {new_stat} on canonical roster player")
+            else:
+                new_rebounder.record_stat(new_stat)
+                logging.warning(f"🏀 Putback Miss Rebound: {get_name_safe(new_rebounder)} (ID: {pid_str}) credited with {new_stat} on lineup player (canonical lookup failed)")
             # DON'T flip possession here - let turn_manager handle it after the rebound
             # This ensures the shot animates to the correct basket before possession flips
             event["possession_flips"] = False
-            
+
             # Use calculated bounce spot for frontend animation
             ballSpot = {"x": bounce_spot["x"], "y": bounce_spot["y"]}
-            
-            # Add rebound information for frontend animation
+
+            # Add rebound information for frontend animation (use normalized ID)
             event["rebound"] = {
-                "rebounderId": getattr(new_rebounder, "player_id", None),
-                "rebounder_player_id": getattr(new_rebounder, "player_id", None),
+                "rebounderId": pid_str,
+                "rebounder_player_id": pid_str,
                 "rebound_type": new_stat,
                 "ballSpot": ballSpot
             }
@@ -1310,8 +1312,20 @@ def summarize_game_state(game, exclude_animations=True):
         "opening_tip_winner": game.game_state.get("opening_tip_winner"),
         "game_stats_initialized": game.game_state.get("game_stats_initialized", False),  # Preserve stats initialization flag
         "user_team_side": game.game_state.get("user_team_side"),  # ✅ SS&S: Save user_team_side for persistent override checking
-        "timeout_next_play_type": game.game_state.get("timeout_next_play_type"),  # ✅ TIMEOUT: Save next_play_type for resume
-        "timeout_offense_team_id": game.game_state.get("timeout_offense_team_id"),  # ✅ TIMEOUT: Save possession team for resume
+        # ✅ TIMEOUT/FOUL_OUT: Only write when truthy so normal saves don't overwrite DB and wipe resume state (we $unset on actual resume in main.py)
+        **({"timeout_next_play_type": game.game_state["timeout_next_play_type"]} if game.game_state.get("timeout_next_play_type") else {}),
+        **({"timeout_offense_team_id": game.game_state["timeout_offense_team_id"]} if game.game_state.get("timeout_offense_team_id") else {}),
+        # ✅ FREE_THROW timeout resume: persist FT state so first simulate_turn creates the FT turn
+        **(
+            {
+                "timeout_free_throws_remaining": game.game_state.get("free_throws_remaining"),
+                "timeout_free_throws": game.game_state.get("free_throws"),
+                "timeout_shooter_id": getattr(game.game_state.get("shooter"), "player_id", None),
+                "timeout_one_and_one": game.game_state.get("one_and_one", False),
+            }
+            if game.game_state.get("timeout_next_play_type") == "FREE_THROW"
+            else {}
+        ),
         "clock": game.game_state.get("clock", "8:00"),  # ✅ TIMEOUT: Save clock for resume (same as quarter breaks)
         "time_remaining": game.game_state.get("time_remaining", 480),  # ✅ TIMEOUT: Save time_remaining for resume (same as quarter breaks)
         "man_defense_matchups": game.game_state.get("man_defense_matchups", {}),  # ✅ MAN DEFENSE MATCHUPS: User team matchups for persistence

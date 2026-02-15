@@ -3181,8 +3181,10 @@
           params.set('game_id', gameId);
         } else if (mode === 'tournament' && tournamentId) {
           params.set('tournament_id', tournamentId);
+          if (gameId) params.set('game_id', gameId);
         } else if (mode === 'franchise' && franchiseId) {
           params.set('franchise_id', franchiseId);
+          if (gameId) params.set('game_id', gameId);
         }
         
         const apiUrl = API_CONFIG.buildUrl(`/api/playbooks?${params.toString()}`);
@@ -3254,6 +3256,32 @@
           }
           playIdToPlay[play.name] = play;
         });
+        
+        // Store for persisting slot changes to game doc (Data Persistence: in-game → game document)
+        const playNameToSection = {};
+        motionPlays.forEach(p => { playNameToSection[p.name] = 'motion'; });
+        setPlayInside.forEach(p => { playNameToSection[p.name] = 'set_play_inside'; });
+        setPlayAttack.forEach(p => { playNameToSection[p.name] = 'set_play_attack'; });
+        setPlayOutside.forEach(p => { playNameToSection[p.name] = 'set_play_outside'; });
+        const percentages = data.playbook_percentages || {};
+        const playbookPayload = {
+          motion: percentages.motion || {},
+          set_play_inside: percentages.set_play_inside || {},
+          set_play_attack: percentages.set_play_attack || {},
+          set_play_outside: percentages.set_play_outside || {},
+          zone_defense: percentages.zone_defense || {},
+          man_defense: percentages.man_defense || {},
+          slot_assignments: JSON.parse(JSON.stringify(slotAssignments)),
+          motion_dropdowns: data.motion_dropdowns || {},
+          position_filters: data.position_filters || { standard: [], PG: [], SG: [], SF: [], PF: [], C: [] },
+          even_distribution_all: data.even_distribution_all || false,
+          _meta: data.playbook_meta && typeof data.playbook_meta === 'object' ? data.playbook_meta : {}
+        };
+        lastPlaybookDataForSave = {
+          playNameToSection,
+          playbookPayload,
+          requestContext: { mode, teamId, gameId, franchiseId, tournamentId }
+        };
         
         // Get scroller element
         const scroller = document.getElementById('offense-play-scroller');
@@ -3493,9 +3521,41 @@
           // Select this play
           option.classList.add('selected');
           
-          // ✅ SS&S: Store override via API (use full play name from data-play attribute)
           const playName = option.dataset.play;
+          // ✅ SS&S: Store override via API (next play uses this)
           await setPlaycallOverride('offense', playName);
+          
+          // ✅ Data Persistence: Persist this slot change to game document so presets survive timeout/reopen
+          if (lastPlaybookDataForSave && playName && lastPlaybookDataForSave.requestContext) {
+            const slotNum = Array.prototype.indexOf.call(allPlayOptions, option) + 1;
+            if (slotNum >= 1 && slotNum <= 6) {
+              const section = lastPlaybookDataForSave.playNameToSection[playName] || 'set_play_inside';
+              const slotKey = String(slotNum);
+              lastPlaybookDataForSave.playbookPayload.slot_assignments[slotKey] = { section: section, playId: playName };
+              const ctx = lastPlaybookDataForSave.requestContext;
+              const body = {
+                mode: ctx.mode,
+                team_id: ctx.teamId,
+                playbook_settings: lastPlaybookDataForSave.playbookPayload
+              };
+              if (ctx.gameId) body.game_id = ctx.gameId;
+              if (ctx.franchiseId) body.franchise_id = ctx.franchiseId;
+              if (ctx.tournamentId) body.tournament_id = ctx.tournamentId;
+              try {
+                const res = await fetch(API_CONFIG.buildUrl('/api/playbooks'), {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(body)
+                });
+                if (!res.ok) {
+                  const errText = await res.text();
+                  console.warn('⚠️ [PLAYCALL CENTER] Failed to persist slot to game doc:', res.status, errText);
+                }
+              } catch (err) {
+                console.warn('⚠️ [PLAYCALL CENTER] Error persisting slot to game doc:', err);
+              }
+            }
+          }
         });
       }
       
@@ -4059,6 +4119,8 @@
     // ==================== SLOT-BASED PLAY NAVIGATION ====================
     let currentPlayIndex = 0;
     let playOptions = []; // Will be populated after slot assignments are loaded
+    // Persist 6-preset changes to game doc (Data Persistence: in-game changes saved to game document)
+    let lastPlaybookDataForSave = null; // { slot_assignments, playNameToSection, playbookPayload }
     
     function updatePlayOptions() {
       playOptions = Array.from(document.querySelectorAll('#offense-play-scroller .play-option'));

@@ -8,7 +8,7 @@ Title:
 - ALPHA RELEASE
 
 Body:
-- **February 13 Update** Wired players' pages, fixed player foul out bug, timeout bug and other bugs, and added a number of quality of life updatres.
+- **February 15 Update** Fixed player foul out bug, fixed rebound stats not registering on offensive rebound misses, and added a number of quality of life updates.
 
 Source:
 - `FrontEnd/static/mode-select.html`

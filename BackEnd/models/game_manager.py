@@ -239,7 +239,12 @@ class GameManager:
         # For SIP/BIP, self.offense_team.team_id is already correct (possession flipped before turn creation)
         # This fixes the bug where timeout_offense_team_id was saved as the wrong team during DREB => HCO
         last_turn = self.turns[-1] if self.turns else None
-        if (last_turn and 
+        foul_out_ctx = self.game_state.get("foul_out_context") or {}
+        if timeout_reason == "FOUL_OUT" and foul_out_ctx.get("foul_type") == "OFFENSIVE":
+            # Offensive foul (charge or HCO o-foul): possession flips after this turn; save the team that receives the ball (current defense)
+            timeout_offense_team_id = self.defense_team.team_id
+            logging.info(f"✅ TIMEOUT: FOUL_OUT offensive foul - using defense_team as next offense (ball goes to them): {timeout_offense_team_id}")
+        elif (last_turn and 
             last_turn.get("next_play_type") == "HCO" and 
             last_turn.get("rebound_type") == "DREB" and
             last_turn.get("offense_team_id")):
@@ -413,21 +418,93 @@ class GameManager:
         if not timeout_turn:
             logging.error("🚨 FOUL OUT TIMEOUT: call_timeout returned no timeout turn")
             return
-        logging.info(f"⏸️ TIMEOUT: Created timeout turn for foul out - {foul_out_player_data.get('name', 'Unknown')}")
+        # Ensure frontend always receives foul_out_player: if lookup failed, attach the dict from the result
+        if not timeout_turn.get("foul_out_player") and isinstance(foul_out_player_data, dict) and foul_out_player_data:
+            timeout_turn["foul_out_player"] = dict(foul_out_player_data)
+            logging.warning(
+                "⚠️ FOUL OUT: Player lookup failed; attached foul_out_player from result so frontend can show popup - player_id=%s name=%s",
+                foul_out_player_data.get("player_id"), foul_out_player_data.get("name", "Unknown")
+            )
+        elif not foul_out_player and foul_out_player_data:
+            logging.warning(
+                "⚠️ FOUL OUT: Could not resolve Player object for foul_out_player_id=%s (name=%s); timeout turn may lack foul_out_player",
+                foul_out_player_id, foul_out_player_data.get("name", "Unknown") if isinstance(foul_out_player_data, dict) else None
+            )
+        # Contract: timeout turn always has foul_out_player so frontend can show popup (use placeholder if missing)
+        if not timeout_turn.get("foul_out_player"):
+            timeout_turn["foul_out_player"] = (
+                dict(foul_out_player_data) if isinstance(foul_out_player_data, dict) and foul_out_player_data
+                else {"name": "Unknown", "player_id": None, "team": None, "photo": None}
+            )
+            logging.warning(
+                "⚠️ FOUL OUT: Attached placeholder foul_out_player so frontend always receives one (result had fouled_out=True but no usable data)"
+            )
+        logging.warning(
+            "⏸️ FOUL OUT TIMEOUT: Created timeout turn for foul out - %s (game_id=%s)",
+            foul_out_player_data.get("name", "Unknown"),
+            self.game_id,
+        )
 
         if self.game_id:
             try:
                 from BackEnd.utils.shared import summarize_game_state
                 from BackEnd.db import games_collection
+                # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log before save (Hypothesis 2)
+                logging.warning(
+                    "🔍 [FOUL_OUT DEBUG] _handle_foul_out_timeout saving: game_id=%s, type=%s",
+                    self.game_id, type(self.game_id).__name__,
+                )
                 db_summary = summarize_game_state(self, exclude_animations=True)
-                games_collection.update_one({"_id": self.game_id}, {"$set": db_summary}, upsert=True)
-                logging.info(
-                    f"💾 FOUL OUT TIMEOUT: Saved game state immediately: "
-                    f"game_id={self.game_id}, quarter={db_summary.get('quarter')}, "
-                    f"clock={db_summary.get('clock')}, next_play_type={timeout_turn.get('next_play_type')}"
+                result = games_collection.update_one(
+                    {"_id": self.game_id}, {"$set": db_summary}, upsert=False
+                )
+                save_matched = result.matched_count > 0
+                logging.warning(
+                    "🔍 [FOUL_OUT DEBUG] _handle_foul_out_timeout first update_one: matched_count=%s, modified_count=%s",
+                    result.matched_count, result.modified_count,
+                )
+                # If no match, document may have been created with ObjectId _id (string vs ObjectId mismatch)
+                if result.matched_count == 0 and self.game_id and len(self.game_id) == 24:
+                    try:
+                        from bson import ObjectId
+                        oid = ObjectId(self.game_id)
+                        result2 = games_collection.update_one(
+                            {"_id": oid}, {"$set": db_summary}, upsert=False
+                        )
+                        save_matched = result2.matched_count > 0
+                        logging.warning(
+                            "🔍 [FOUL_OUT DEBUG] _handle_foul_out_timeout ObjectId retry: matched_count=%s, modified_count=%s",
+                            result2.matched_count, result2.modified_count,
+                        )
+                        if result2.matched_count > 0:
+                            logging.warning(
+                                "⚠️ FOUL OUT TIMEOUT: Initial update matched 0 documents; retried with ObjectId and matched %s",
+                                result2.matched_count,
+                            )
+                    except (ValueError, TypeError):
+                        pass  # Invalid ObjectId format - leave as is
+                if not save_matched:
+                    logging.error(
+                        "🚨 FOUL OUT TIMEOUT: Save matched 0 documents (game_id=%s) - timeout state not persisted; "
+                        "return to court may reset / data loss possible",
+                        self.game_id,
+                    )
+                logging.warning(
+                    "💾 FOUL OUT TIMEOUT: Saved game state immediately: game_id=%s, quarter=%s, clock=%s, next_play_type=%s",
+                    self.game_id,
+                    db_summary.get("quarter"),
+                    db_summary.get("clock"),
+                    timeout_turn.get("next_play_type"),
                 )
             except Exception as e:
-                logging.error(f"🚨 FOUL OUT TIMEOUT: Failed to save game state: {e}")
+                logging.error(
+                    "🚨 FOUL OUT TIMEOUT: Exception during save - data loss on return to court possible: %s", e
+                )
+        else:
+            logging.warning(
+                "⚠️ FOUL OUT TIMEOUT: Skipped save - game_id is missing (game_id=%s)",
+                self.game_id,
+            )
 
     def simulate_macro_turn(self): #run_simulation
         import time as _time
