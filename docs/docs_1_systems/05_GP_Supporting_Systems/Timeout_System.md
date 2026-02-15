@@ -861,10 +861,9 @@ Current game plan settings are fetched and passed to the game plan screen:
 
 **Game Plan & Playbook Settings Persistence:**
 - Settings persistence uses unified functions for consistent behavior across all modes
-- **Pre-Game (FCC/TCC):** Settings saved to master franchise/tournament document (persist across all games)
-- **During Active Gameplay:** Settings saved to game document only (master doc preserved)
-- **Timeout Resume:** Settings loaded from game document, persist through timeout navigation
-- **Team ID Resolution:** Master docs use ObjectId keys, game docs use canonical keys
+- **Franchise/Tournament (single source of truth, February 2026):** Settings are always read from and written to the master store (FTD for franchise, tournament doc for tournament)—both before the game and during gameplay (lineup, timeout). The game document is not used for these settings. Timeout resume loads from the same master store, so settings persist automatically.
+- **Single Game:** Settings are stored in and loaded from the game document when a game is in progress.
+- **Team ID Resolution:** Master docs use ObjectId keys; single-game game docs use canonical keys
 - **See:** `docs/docs_1_systems/03_Data_Persistence/Data_Persistence_System.md` - "Game Plan & Playbook Settings Persistence" section for complete documentation
 
 **Lineup Screen Population (Foul Out):**

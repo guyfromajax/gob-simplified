@@ -20,11 +20,11 @@
 - `games` collection → `teams.{team_id}.playbook_settings`
 - `games` collection → `teams.{team_id}.strategy_settings`
 
-**Franchise/Tournament Mode:**
-- `franchises` / `tournaments` collection → `teams.{team_id}.playbook_settings`
-- `franchises` / `tournaments` collection → `teams.{team_id}.strategy_settings`
+**Franchise/Tournament Mode (single source of truth, February 2026):**
+- **Franchise:** `franchise_team_data` (FTD) collection → `playbook_settings` / `strategy_settings` (one doc per franchise + team). Used for both pre-game and in-game; the game document is not used for these settings.
+- **Tournament:** `tournaments` collection → `teams.{team_id}.playbook_settings` and `teams.{team_id}.strategy_settings`. Used for both pre-game and in-game; the game document is not used for these settings.
 
-**Key Point:** Settings stored in database only. Never localStorage or URL params.
+**Key Point:** Settings stored in database only. Never localStorage or URL params. Franchise and tournament never use the game document for game plan or playbooks.
 
 ---
 
@@ -81,18 +81,11 @@
 
 ### 5. **Timeout Persistence** (Settings survive timeouts)
 
-**When timeout is called:**
-1. `summarize_game_state()` preserves `playbook_settings` and `strategy_settings` in game document
-2. Settings saved to database with game state
-3. GameManager removed from `ongoing_games` cache
+**Franchise/Tournament:** Game plan and playbook settings are always stored in the master store (FTD or tournament doc), not in the game document. When the user opens Game Plan or Playbooks during a timeout, GET endpoints load from that same store. Saves go to the same store. So settings persist through timeout with no special "restore from game doc" step.
 
-**When resuming from timeout:**
-1. Game loaded from database
-2. Settings loaded from database (`teams.{team_id}.playbook_settings` / `strategy_settings`)
-3. Settings applied to newly created GameManager
-4. Game continues with correct settings
+**Single Game:** When timeout is called, `summarize_game_state()` can preserve settings in the game document. On resume, settings are loaded from the game document and applied to GameManager.
 
-**Key Point:** Settings preserved in game document during timeout, restored on resume.
+**Key Point:** Franchise/tournament use a single source of truth (FTD/tournament doc) for settings, so timeout persistence is automatic. Single game uses the game document.
 
 ---
 
