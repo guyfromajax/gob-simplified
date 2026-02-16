@@ -111,12 +111,17 @@ body.has-auth-bar {
   width: 32px;
   height: 32px;
 }
-.auth-bar .nav-icon svg {
+.auth-bar .nav-icon svg,
+.auth-bar .nav-icon img {
   width: 24px;
   height: 24px;
+  display: block;
 }
 .auth-bar .nav-icon:hover {
   color: #ff7a00;
+}
+.auth-bar .nav-icon:hover img {
+  opacity: 0.85;
 }
 
 .auth-bar .auth-status {
