@@ -139,10 +139,17 @@
   flex-shrink: 0;
 }
 
-/* Pop-up 3: center the Tutorials button */
+/* Pop-up 3: center the Tutorials button relative to entire modal width */
 .fte-tutorial-wrap {
   text-align: center;
   margin-top: 12px;
+}
+.fte-tutorial-wrap--full-width {
+  margin-left: -80px; /* 64px img + 16px gap */
+  width: calc(100% + 80px);
+  display: flex;
+  justify-content: center;
+  text-align: center;
 }
 .fte-tutorial-preview {
   display: inline-flex;
