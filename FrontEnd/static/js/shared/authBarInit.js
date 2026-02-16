@@ -69,7 +69,7 @@
     { title: 'We assume you know hoops. Now learn GOB.', body: '', showBack: true, primaryLabel: 'Next' },
     {
       title: 'Tap the yellow Tutorial button in the nav bar.',
-      body: '<div class="fte-tutorial-preview" aria-hidden="true">Tutorials</div>',
+      body: '<div class="fte-tutorial-wrap"><div class="fte-tutorial-preview" aria-hidden="true">Tutorials</div></div>',
       showBack: true,
       primaryLabel: 'Next'
     },
