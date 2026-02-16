@@ -87,6 +87,7 @@ class UserResponse(BaseModel):
     role: str
     username: Optional[str] = None
     created_at: Optional[str] = None
+    fte: Optional[bool] = None  # First-time experience; True = show FTE, False = completed
 
 
 class AuthConfigResponse(BaseModel):
@@ -240,6 +241,7 @@ async def signup(request: Request, body: SignupRequest):
         "role": "user",
         "subscription": "alpha",
         "geek_points": 0,
+        "fte": True,
         "created_at": now,
         "updated_at": now,
         "version": 1  # Schema version for future migrations
@@ -463,14 +465,34 @@ async def get_me(user: dict = Depends(get_current_user)):
     username = db_user.get("username") if db_user else None
     # Use role from DB when available so admin status is live (no re-login needed)
     role = db_user.get("role", user.get("role", "user")) if db_user else user.get("role", "user")
+    # FTE: True = show first-time experience; False = already completed (default True if missing)
+    fte = db_user.get("fte", True) if db_user else True
 
     return UserResponse(
         user_id=user["user_id"],
         email=user["email"],
         role=role,
         username=username,
-        created_at=created_at
+        created_at=created_at,
+        fte=fte
     )
+
+
+@router.post("/fte-complete")
+async def fte_complete(user: dict = Depends(get_current_user)):
+    """
+    Mark the first-time experience as completed for the current user.
+    Sets fte to False so the FTE pop-up is not shown again.
+    """
+    try:
+        users_collection.update_one(
+            {"_id": ObjectId(user["user_id"])},
+            {"$set": {"fte": False, "updated_at": datetime.now(timezone.utc)}}
+        )
+    except Exception as e:
+        logger.warning("[FTE] fte-complete update failed for user_id=%s: %s", user["user_id"], e)
+        raise HTTPException(status_code=500, detail="Failed to update FTE status")
+    return {"message": "FTE completed", "fte": False}
 
 
 @router.post("/logout")
