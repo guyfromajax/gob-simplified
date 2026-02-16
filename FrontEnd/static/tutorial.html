@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Tutorials - Geeked Out Basketball</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/auth-bar.css">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #fff;
+      margin: 0;
+      padding: 0;
+      padding-top: 50px;
+      color: #1a1a1a;
+      line-height: 1.6;
+    }
+    .tutorial-page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px 24px 80px;
+    }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 1rem;
+      color: #ff7a00;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    .tutorial-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0;
+      border-bottom: 1px solid #e0e0e0;
+      margin-bottom: 0;
+      background: #fafafa;
+    }
+    .tutorial-tab {
+      padding: 12px 20px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: #555;
+      background: #f0f0f0;
+      border: none;
+      border-right: 1px solid #e0e0e0;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .tutorial-tab:last-of-type {
+      border-right: none;
+    }
+    .tutorial-tab:hover {
+      background: #e8e8e8;
+      color: #333;
+    }
+    .tutorial-tab.active {
+      background: #e0e0e0;
+      color: #1a1a1a;
+      font-weight: 700;
+    }
+    .tutorial-content {
+      background: #fff;
+      padding: 24px 0;
+      min-height: 320px;
+    }
+    .tutorial-panel {
+      display: none;
+    }
+    .tutorial-panel.active {
+      display: block;
+    }
+    .tutorial-panel h2 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.5rem;
+      margin: 0 0 1rem;
+      color: #1a1a1a;
+    }
+    .tutorial-panel .placeholder {
+      color: #888;
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body class="has-auth-bar has-footer">
+  <div id="auth-bar" class="auth-bar">
+    <div class="auth-bar-left">
+      <a href="/" class="logo-link"><img src="/images/geekedout_logo.png" alt="Geeked-Out Basketball logo" class="logo"></a>
+    </div>
+    <img id="alpha-badge" class="alpha-badge" src="/images/alpha_badge_gold.png" alt="Alpha">
+    <div class="auth-bar-right">
+      <a href="https://www.youtube.com/@geeked-outbasketball765" target="_blank" rel="noopener noreferrer" class="nav-icon" aria-label="GOB on YouTube"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+      <a href="https://x.com/geekedoutbball" target="_blank" rel="noopener noreferrer" class="nav-icon" aria-label="GOB on X"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg></a>
+      <div id="auth-logged-out" class="auth-status"><a href="/login.html" class="auth-link">Log In</a><span class="auth-divider">|</span><a href="/signup.html" class="auth-link">Sign Up</a></div>
+      <div id="auth-logged-in" class="auth-status" style="display: none;"><span id="auth-user-email" class="auth-email"></span><button type="button" id="logout-btn" class="auth-logout-btn">Log Out</button></div>
+    </div>
+  </div>
+
+  <div class="tutorial-page">
+    <a href="/homepage.html" class="back-link">← Back</a>
+
+    <div class="tutorial-tabs" role="tablist" aria-label="Tutorial sections">
+      <button type="button" class="tutorial-tab active" role="tab" aria-selected="true" aria-controls="panel-player-attributes" id="tab-player-attributes">Player Attributes</button>
+      <button type="button" class="tutorial-tab" role="tab" aria-selected="false" aria-controls="panel-team-attributes" id="tab-team-attributes">Team Attributes</button>
+      <button type="button" class="tutorial-tab" role="tab" aria-selected="false" aria-controls="panel-game-plans" id="tab-game-plans">Game Plans</button>
+      <button type="button" class="tutorial-tab" role="tab" aria-selected="false" aria-controls="panel-playbooks" id="tab-playbooks">Playbooks</button>
+      <button type="button" class="tutorial-tab" role="tab" aria-selected="false" aria-controls="panel-training" id="tab-training">Training</button>
+    </div>
+
+    <div class="tutorial-content">
+      <div id="panel-player-attributes" class="tutorial-panel active" role="tabpanel" aria-labelledby="tab-player-attributes">
+        <h2>Player Attributes</h2>
+        <p class="placeholder">Content for this section will go here.</p>
+      </div>
+      <div id="panel-team-attributes" class="tutorial-panel" role="tabpanel" aria-labelledby="tab-team-attributes">
+        <h2>Team Attributes</h2>
+        <p class="placeholder">Content for this section will go here.</p>
+      </div>
+      <div id="panel-game-plans" class="tutorial-panel" role="tabpanel" aria-labelledby="tab-game-plans">
+        <h2>Game Plans</h2>
+        <p class="placeholder">Content for this section will go here.</p>
+      </div>
+      <div id="panel-playbooks" class="tutorial-panel" role="tabpanel" aria-labelledby="tab-playbooks">
+        <h2>Playbooks</h2>
+        <p class="placeholder">Content for this section will go here.</p>
+      </div>
+      <div id="panel-training" class="tutorial-panel" role="tabpanel" aria-labelledby="tab-training">
+        <h2>Training</h2>
+        <p class="placeholder">Content for this section will go here.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer id="site-footer" class="site-footer">
+    <a href="/faqs.html">FAQs</a>
+  </footer>
+
+  <script>
+    (function() {
+      var tabs = document.querySelectorAll('.tutorial-tab');
+      var panels = document.querySelectorAll('.tutorial-panel');
+      function showPanel(panelId) {
+        panels.forEach(function(p) {
+          p.classList.toggle('active', p.id === panelId);
+          p.setAttribute('aria-hidden', p.id !== panelId);
+        });
+        tabs.forEach(function(t) {
+          var isActive = t.getAttribute('aria-controls') === panelId;
+          t.classList.toggle('active', isActive);
+          t.setAttribute('aria-selected', isActive);
+        });
+      }
+      tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+          showPanel(tab.getAttribute('aria-controls'));
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
