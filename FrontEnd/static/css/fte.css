@@ -1,0 +1,168 @@
+/**
+ * First Time Experience (FTE) modal — desktop-optimized.
+ * White container; header: metallic silver fill, black copy, Sammy headshot left, title right.
+ */
+.fte-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+.fte-backdrop.open {
+  display: flex;
+}
+
+.fte-modal {
+  width: min(520px, 92vw);
+  max-height: 90vh;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header: metallic silver, Sammy left, title right */
+.fte-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: linear-gradient(160deg, #e8e8e8 0%, #c0c0c0 58%, #a0a0a0 100%);
+  border-bottom: 1px solid #000;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.15);
+  position: relative;
+}
+.fte-header::before {
+  content: "";
+  position: absolute;
+  inset: 1px 1px auto 1px;
+  height: 45%;
+  border-radius: 0 0 8px 8px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.05));
+  pointer-events: none;
+}
+.fte-header-img {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+.fte-header-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #000;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  position: relative;
+  z-index: 1;
+}
+
+.fte-body {
+  padding: 24px 20px;
+  overflow-y: auto;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #1a1a1a;
+}
+.fte-body p {
+  margin: 0 0 0.75em 0;
+}
+.fte-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* In-modal Tutorial button visual (step 3) */
+.fte-tutorial-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 12px 0;
+  padding: 8px 16px;
+  background: linear-gradient(160deg, #e6c547 0%, #d4a84b 58%, #b8860b 100%);
+  border: 1px solid #000;
+  color: #000;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 6px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 0 16px 4px rgba(212, 168, 75, 0.5);
+}
+
+.fte-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid #e5e5e5;
+  background: #fafafa;
+}
+
+/* Back = blue metallic; Next/Done = orange metallic (match existing nav button style) */
+.fte-btn {
+  padding: 7px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid;
+  position: relative;
+  z-index: 1;
+}
+.fte-btn-back {
+  background: linear-gradient(160deg, #5b8fd6 0%, #4a7bc4 58%, #2d5a9e 100%);
+  border-color: #1a3a6b;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 2px 5px rgba(0, 0, 0, 0.2);
+}
+.fte-btn-back:hover {
+  filter: brightness(1.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+    0 3px 8px rgba(0, 0, 0, 0.25);
+}
+.fte-btn-next {
+  background: linear-gradient(160deg, #e6c547 0%, #d4a84b 58%, #b8860b 100%);
+  border-color: #000;
+  color: #000;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 2px 5px rgba(0, 0, 0, 0.2);
+}
+.fte-btn-next:hover {
+  background: linear-gradient(160deg, #f0d054 0%, #e0b83d 58%, #c99a0d 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+    0 3px 8px rgba(0, 0, 0, 0.24);
+}
+
+.fte-step {
+  display: none;
+}
+.fte-step.active {
+  display: block;
+}

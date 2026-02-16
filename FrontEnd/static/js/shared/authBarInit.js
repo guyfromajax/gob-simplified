@@ -54,6 +54,129 @@
     document.head.appendChild(link);
   }
 
+  function ensureFTEStyles() {
+    if (document.getElementById('fte-styles-link')) return;
+    if (document.querySelector('link[href*="fte.css"]')) return;
+    var link = document.createElement('link');
+    link.id = 'fte-styles-link';
+    link.rel = 'stylesheet';
+    link.href = '/css/fte.css';
+    document.head.appendChild(link);
+  }
+
+  var FTE_STEPS = [
+    { title: 'Hey Coach!', body: '<p>Welcome to Geeked-Out Basketball.</p>', showBack: false, primaryLabel: 'Next' },
+    { title: "Let's Begin", body: '<p>We assume you know hoops.</p>', showBack: true, primaryLabel: 'Next' },
+    {
+      title: 'Start Here',
+      body: '<p>Tap the yellow Tutorial button to learn GOB.</p><div class="fte-tutorial-preview" aria-hidden="true">Tutorials</div>',
+      showBack: true,
+      primaryLabel: 'Next'
+    },
+    {
+      title: 'Want More Info?',
+      body: '<p>Watch our YouTube breakdowns. Good luck Coach!</p>',
+      showBack: true,
+      primaryLabel: 'Done'
+    }
+  ];
+
+  function ensureFTEModal() {
+    if (document.getElementById('fte-backdrop')) return;
+    var backdrop = document.createElement('div');
+    backdrop.id = 'fte-backdrop';
+    backdrop.className = 'fte-backdrop';
+    backdrop.setAttribute('role', 'dialog');
+    backdrop.setAttribute('aria-modal', 'true');
+    backdrop.setAttribute('aria-labelledby', 'fte-header-title');
+    backdrop.innerHTML = [
+      '<div class="fte-modal">',
+      '  <div class="fte-header">',
+      '    <img src="/images/sammy_tutorial.png" alt="" class="fte-header-img">',
+      '    <h2 id="fte-header-title" class="fte-header-title"></h2>',
+      '  </div>',
+      '  <div class="fte-body" id="fte-body"></div>',
+      '  <div class="fte-footer">',
+      '    <button type="button" id="fte-btn-back" class="fte-btn fte-btn-back">Back</button>',
+      '    <button type="button" id="fte-btn-primary" class="fte-btn fte-btn-next"></button>',
+      '  </div>',
+      '</div>'
+    ].join('');
+    document.body.appendChild(backdrop);
+  }
+
+  function showFTEStep(stepIndex) {
+    var step = FTE_STEPS[stepIndex];
+    var titleEl = document.getElementById('fte-header-title');
+    var bodyEl = document.getElementById('fte-body');
+    var backBtn = document.getElementById('fte-btn-back');
+    var primaryBtn = document.getElementById('fte-btn-primary');
+    if (!titleEl || !bodyEl || !backBtn || !primaryBtn) return;
+    titleEl.textContent = step.title;
+    bodyEl.innerHTML = step.body;
+    backBtn.style.display = step.showBack ? '' : 'none';
+    primaryBtn.textContent = step.primaryLabel;
+  }
+
+  function runFTE(meData) {
+    if (!meData || meData.fte !== true) return;
+    ensureFTEStyles();
+    ensureFTEModal();
+    var backdrop = document.getElementById('fte-backdrop');
+    var backBtn = document.getElementById('fte-btn-back');
+    var primaryBtn = document.getElementById('fte-btn-primary');
+    if (!backdrop || !primaryBtn) return;
+
+    var currentStep = 0;
+    showFTEStep(currentStep);
+    backdrop.classList.add('open');
+
+    function closeFTE() {
+      backdrop.classList.remove('open');
+    }
+
+    function completeFTE() {
+      if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.buildUrl === 'function' && typeof API_CONFIG.getAuthHeaders === 'function') {
+        fetch(API_CONFIG.buildUrl('/api/auth/fte-complete'), {
+          method: 'POST',
+          headers: API_CONFIG.getAuthHeaders()
+        }).then(function () {
+          try {
+            var authUser = localStorage.getItem('auth_user');
+            if (authUser) {
+              var user = JSON.parse(authUser);
+              user.fte = false;
+              localStorage.setItem('auth_user', JSON.stringify(user));
+            }
+          } catch (e) {}
+          closeFTE();
+        }).catch(function () {
+          closeFTE();
+        });
+      } else {
+        closeFTE();
+      }
+    }
+
+    backBtn.addEventListener('click', function () {
+      if (currentStep > 0) {
+        currentStep -= 1;
+        showFTEStep(currentStep);
+      }
+    });
+
+    primaryBtn.addEventListener('click', function () {
+      if (currentStep === 3 && FTE_STEPS[3].primaryLabel === 'Done') {
+        completeFTE();
+        return;
+      }
+      if (currentStep < FTE_STEPS.length - 1) {
+        currentStep += 1;
+        showFTEStep(currentStep);
+      }
+    });
+  }
+
   function createAuthBarHTML() {
     var bar = document.createElement('div');
     bar.id = 'auth-bar';
@@ -148,6 +271,7 @@
                 if (authLoggedIn) authLoggedIn.style.display = 'flex';
                 res.json().then(function (meData) {
                   if (authUserEmail) authUserEmail.textContent = meData.username || meData.email || user.email;
+                  if (meData.fte === true) runFTE(meData);
                 }).catch(function () {
                   if (authUserEmail) authUserEmail.textContent = user.username || user.email;
                 });
