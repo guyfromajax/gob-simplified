@@ -91,6 +91,18 @@
       margin: 0 0 1rem;
       color: #1a1a1a;
     }
+    .tutorial-summary {
+      max-width: 56em;
+      margin: 0 0 24px 0;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    .tutorial-summary p {
+      margin: 0 0 0.75em 0;
+    }
+    .tutorial-summary p:last-child {
+      margin-bottom: 0;
+    }
     .tutorial-panel .placeholder {
       color: #888;
       font-size: 0.95rem;
@@ -266,57 +278,61 @@
         </div>
       </div>
       <div id="panel-team-attributes" class="tutorial-panel" role="tabpanel" aria-labelledby="tab-team-attributes">
+        <div class="tutorial-summary">
+          <p>Team Attributes represent your program’s identity over time. They reflect how your team plays, how it responds to adversity, and how well it sustains its style under pressure.</p>
+          <p>Unlike Player Attributes, these traits evolve throughout the season. Winning builds confidence and cohesion. Predictability erodes sharpness. Your training emphasis, strategic diversity, and in-game performance all shape the DNA of your team.</p>
+        </div>
         <div class="tutorial-two-col">
           <div class="tutorial-col">
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-shooting" id="attr-toggle-ta-shooting"><span>Shooting</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-shooting" role="region" aria-labelledby="attr-toggle-ta-shooting"><p class="tutorial-attr-body">Content for this section will go here.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-shooting" role="region" aria-labelledby="attr-toggle-ta-shooting"><p class="tutorial-attr-body">Represents your team’s collective confidence and rhythm as shooters. High Shooting teams trust their spacing, step into open looks decisively, and maintain composure when shots aren’t falling early. Success fuels it. Poor selection and cold stretches can slowly chip away at it.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-offense" id="attr-toggle-ta-offense"><span>Offense</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-offense" role="region" aria-labelledby="attr-toggle-ta-offense"><p class="tutorial-attr-body">Content for this section will go here.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-offense" role="region" aria-labelledby="attr-toggle-ta-offense"><p class="tutorial-attr-body">Reflects how effectively your team executes its offensive structure before the shot is taken. Ball movement, spacing, timing, and decision-making all flow through this attribute. Running varied schemes sharpens it. Becoming predictable puts it on tape — and makes execution harder.</p><p class="tutorial-attr-body">Offense and Shooting work together. One creates the opportunity. The other converts it.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-fastbreaks" id="attr-toggle-ta-fastbreaks"><span>Fast Breaks</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-fastbreaks" role="region" aria-labelledby="attr-toggle-ta-fastbreaks"><p class="tutorial-attr-body">Content for this section will go here.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-fastbreaks" role="region" aria-labelledby="attr-toggle-ta-fastbreaks"><p class="tutorial-attr-body">Determines how efficiently your team turns defense into immediate offense. Outlet decisions, lane discipline, and transition awareness all contribute. Teams that push with intention sharpen this trait. Reckless transition play can blunt it over time.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-fight" id="attr-toggle-ta-fight"><span>Fight</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-fight" role="region" aria-labelledby="attr-toggle-ta-fight"><p class="tutorial-attr-body">Content for this section will go here.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-fight" role="region" aria-labelledby="attr-toggle-ta-fight"><p class="tutorial-attr-body">Represents your team’s competitive edge. High Fight teams embrace physical play, respond to runs with resilience, and perform with urgency when trailing. Winning builds it. Adversity tests it. This trait defines how your team responds when the game turns hostile.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-momentum" id="attr-toggle-ta-momentum"><span>Momentum</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-momentum" role="region" aria-labelledby="attr-toggle-ta-momentum"><p class="tutorial-attr-body">Content for this section will go here.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-momentum" role="region" aria-labelledby="attr-toggle-ta-momentum"><p class="tutorial-attr-body">An in-game amplifier. Momentum builds during strong stretches and can temporarily lift collective performance. While individual players may get “hot,” team momentum affects the group as a whole. Home teams tend to generate it more easily, but sustained execution is what keeps it alive.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-fb-defense" id="attr-toggle-ta-fb-defense"><span>Fast Break Defense</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-fb-defense" role="region" aria-labelledby="attr-toggle-ta-fb-defense"><p class="tutorial-attr-body">Content for this section will go here.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-fb-defense" role="region" aria-labelledby="attr-toggle-ta-fb-defense"><p class="tutorial-attr-body">Determines how quickly and effectively your team regains structure in transition. Stopping the ball, identifying matchups, and protecting the rim all matter. Teams that prioritize transition awareness see this grow over time.</p></div>
             </div>
           </div>
           <div class="tutorial-col">
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-rebounding" id="attr-toggle-ta-rebounding"><span>Rebounding</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-rebounding" role="region" aria-labelledby="attr-toggle-ta-rebounding"><p class="tutorial-attr-body">Content for this section will go here.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-rebounding" role="region" aria-labelledby="attr-toggle-ta-rebounding"><p class="tutorial-attr-body">Measures how consistently your team finishes possessions. Strong Rebounding teams anticipate misses, secure position early, and treat loose balls as momentum plays. Over time, disciplined fundamentals and physical commitment strengthen this trait — while lapses in effort weaken it.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-defense" id="attr-toggle-ta-defense"><span>Defense</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-defense" role="region" aria-labelledby="attr-toggle-ta-defense"><p class="tutorial-attr-body">Content for this section will go here.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-defense" role="region" aria-labelledby="attr-toggle-ta-defense"><p class="tutorial-attr-body">Captures your team’s cohesion and discipline on the defensive end. Rotations, help positioning, communication, and overall structure are all influenced here. Teams that consistently defend with purpose see this grow. Breakdowns and careless play gradually erode it.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-press-trap" id="attr-toggle-ta-press-trap"><span>Press/Trap</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-press-trap" role="region" aria-labelledby="attr-toggle-ta-press-trap"><p class="tutorial-attr-body">Content for this section will go here.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-press-trap" role="region" aria-labelledby="attr-toggle-ta-press-trap"><p class="tutorial-attr-body">Measures your team’s ability to apply structured pressure. Timing, coordination, and controlled aggression all matter. Repeated, predictable pressure schemes may lose effectiveness as opponents adjust. Strategic variety keeps this sharp.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-discipline" id="attr-toggle-ta-discipline"><span>Discipline</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-discipline" role="region" aria-labelledby="attr-toggle-ta-discipline"><p class="tutorial-attr-body">Content for this section will go here.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-discipline" role="region" aria-labelledby="attr-toggle-ta-discipline"><p class="tutorial-attr-body">Reflects polish and control. Disciplined teams commit fewer unnecessary fouls and turnovers, execute aggressive strategies with precision, and maintain composure late in games. It balances Fight — aggression without structure becomes chaos.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-chemistry" id="attr-toggle-ta-chemistry"><span>Team Chemistry</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-chemistry" role="region" aria-labelledby="attr-toggle-ta-chemistry"><p class="tutorial-attr-body">Content for this section will go here.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-chemistry" role="region" aria-labelledby="attr-toggle-ta-chemistry"><p class="tutorial-attr-body">The connective tissue of your roster. Chemistry influences how well players support one another through mistakes, adversity, and high-pressure moments. Winning strengthens it. Internal friction and extended losing can strain it. You may not see it directly — but you will feel it in tight games.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-press-trap-breaks" id="attr-toggle-ta-press-trap-breaks"><span>Press/Trap Breaks</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-press-trap-breaks" role="region" aria-labelledby="attr-toggle-ta-press-trap-breaks"><p class="tutorial-attr-body">Content for this section will go here.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-press-trap-breaks" role="region" aria-labelledby="attr-toggle-ta-press-trap-breaks"><p class="tutorial-attr-body">Measures your team’s composure under pressure. Spacing discipline, passing clarity, and decision-making against traps all feed this attribute. Teams that regularly face and solve pressure become sharper. Panic erodes it.</p></div>
             </div>
           </div>
         </div>
