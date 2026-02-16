@@ -230,6 +230,8 @@
   }
 
   function openFTESteps() {
+    var usernameBackdrop = document.getElementById('fte-username-backdrop');
+    if (usernameBackdrop) usernameBackdrop.classList.remove('open');
     ensureFTEModal();
     var backdrop = document.getElementById('fte-backdrop');
     var backBtn = document.getElementById('fte-btn-back');
@@ -292,11 +294,15 @@
 
     var hasUsername = meData.username && String(meData.username).trim().length > 0;
     if (!hasUsername) {
+      var fteBackdrop = document.getElementById('fte-backdrop');
+      if (fteBackdrop) fteBackdrop.classList.remove('open');
       openUsernameModal(function () {
         openFTESteps();
       });
       return;
     }
+    var usernameBackdrop = document.getElementById('fte-username-backdrop');
+    if (usernameBackdrop) usernameBackdrop.classList.remove('open');
     openFTESteps();
   }
 
