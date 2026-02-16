@@ -61,6 +61,7 @@
     bar.innerHTML = [
       '<div class="auth-bar-left">',
       '  <a href="/" class="logo-link"><img src="/images/geekedout_logo.png" alt="Geeked-Out Basketball logo" class="logo"></a>',
+      '  <a href="/tutorial.html" class="tutorials-nav-btn">Tutorials</a>',
       '</div>',
       '<img id="alpha-badge" class="alpha-badge visible" src="/images/alpha_badge_gold.png" alt="Alpha">',
       '<div class="auth-bar-right">',
