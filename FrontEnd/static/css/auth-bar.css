@@ -117,6 +117,10 @@ body.has-auth-bar {
   height: 24px;
   display: block;
 }
+.auth-bar .nav-icon-yt img {
+  width: 31px;
+  height: 31px;
+}
 .auth-bar .nav-icon:hover {
   color: #ff7a00;
 }
