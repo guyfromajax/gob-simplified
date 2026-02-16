@@ -68,14 +68,14 @@
     { title: 'Hey Coach!', body: '<p>Welcome to Geeked-Out Basketball.</p>', showBack: false, primaryLabel: 'Next' },
     { title: 'We assume you know hoops.', body: '<p>Now learn GOB.</p>', showBack: true, primaryLabel: 'Next' },
     {
-      title: 'Tap the yellow Tutorial button in the nav bar.',
+      title: 'The Tutorial button sits in the top nav.',
       body: '<div class="fte-tutorial-wrap fte-tutorial-wrap--full-width"><div class="fte-tutorial-preview" aria-hidden="true">Tutorials</div></div>',
       showBack: true,
       primaryLabel: 'Next'
     },
     {
-      title: 'Want more?',
-      body: '<p>Want more?</p><div class="fte-row-with-img"><span class="fte-content-text">Watch our YouTube breakdowns.</span><img src="/images/yt_icon_red_digital.png" alt="YouTube" class="fte-yt-logo"></div>',
+      title: 'Deeper breakdowns live on our YouTube channel.',
+      body: '<div class="fte-row-with-img"><span class="fte-content-text">Deeper breakdowns live on our YouTube channel.</span><img src="/images/yt_icon_red_digital.png" alt="YouTube" class="fte-yt-logo"></div>',
       showBack: true,
       primaryLabel: 'Done'
     }
