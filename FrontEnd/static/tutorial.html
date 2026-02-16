@@ -105,16 +105,52 @@
       .tutorial-two-col { grid-template-columns: 1fr; }
     }
     .tutorial-attr {
-      margin-bottom: 1.25rem;
+      margin-bottom: 0.5rem;
+      border: 1px solid #e5e5e5;
+      border-radius: 4px;
+      overflow: hidden;
     }
     .tutorial-attr:last-child {
       margin-bottom: 0;
     }
-    .tutorial-attr-title {
+    .tutorial-attr-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 12px;
       font-weight: 700;
       font-size: 0.95rem;
       color: #1a1a1a;
-      margin: 0 0 0.35rem;
+      text-align: left;
+      background: #fafafa;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .tutorial-attr-toggle:hover {
+      background: #f0f0f0;
+    }
+    .tutorial-attr-toggle .tutorial-attr-caret {
+      flex-shrink: 0;
+      display: inline-block;
+      transition: transform 0.2s ease;
+    }
+    .tutorial-attr.is-open .tutorial-attr-caret {
+      transform: rotate(0deg);
+    }
+    .tutorial-attr:not(.is-open) .tutorial-attr-caret {
+      transform: rotate(-90deg);
+    }
+    .tutorial-attr-body-wrap {
+      display: none;
+      padding: 12px 12px 14px;
+      border-top: 1px solid #e5e5e5;
+      background: #fff;
+    }
+    .tutorial-attr.is-open .tutorial-attr-body-wrap {
+      display: block;
     }
     .tutorial-attr-body {
       margin: 0;
@@ -153,55 +189,55 @@
       <div id="panel-player-attributes" class="tutorial-panel active" role="tabpanel" aria-labelledby="tab-player-attributes">
         <div class="tutorial-two-col">
           <div class="tutorial-col">
-            <div class="tutorial-attr">
-              <div class="tutorial-attr-title">SC (Scoring)</div>
-              <p class="tutorial-attr-body">Simply put, this is a player's ability to put the ball in the hoop. A high SC score indicates a player's ability to utilize post moves and adjust his shot to score in high-traffic areas. The closer the shot is to the basket, the more relevant this trait will be.</p>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-sc" id="attr-toggle-sc"><span>Scoring (SC)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-sc" role="region" aria-labelledby="attr-toggle-sc"><p class="tutorial-attr-body">Simply put, this is a player's ability to put the ball in the hoop. A high SC score indicates a player's ability to utilize post moves and adjust his shot to score in high-traffic areas. The closer the shot is to the basket, the more relevant this trait will be.</p></div>
             </div>
-            <div class="tutorial-attr">
-              <div class="tutorial-attr-title">SH (Shooting)</div>
-              <p class="tutorial-attr-body">You guessed it! This is a player's ability to shoot the rock. It's most important on outside shots — particularly 3-pointers. The further away a player's shot is from the basket, the more relevant this trait will be.</p>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-sh" id="attr-toggle-sh"><span>Shooting (SH)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-sh" role="region" aria-labelledby="attr-toggle-sh"><p class="tutorial-attr-body">You guessed it! This is a player's ability to shoot the rock. It's most important on outside shots — particularly 3-pointers. The further away a player's shot is from the basket, the more relevant this trait will be.</p></div>
             </div>
-            <div class="tutorial-attr">
-              <div class="tutorial-attr-title">PS (Passing)</div>
-              <p class="tutorial-attr-body">This is a player's ability to make good fundamental passes. A higher passing rating means fewer turnovers as well as a better pass being delivered to a potential shooter, which will increase the effectiveness of his shot.</p>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ps" id="attr-toggle-ps"><span>Passing (PS)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ps" role="region" aria-labelledby="attr-toggle-ps"><p class="tutorial-attr-body">This is a player's ability to make good fundamental passes. A higher passing rating means fewer turnovers as well as a better pass being delivered to a potential shooter, which will increase the effectiveness of his shot.</p></div>
             </div>
-            <div class="tutorial-attr">
-              <div class="tutorial-attr-title">BH (Ball Handling)</div>
-              <p class="tutorial-attr-body">This trait is all about dribbling and handling the ball. A high BH score indicates a player who is less likely to turn the ball over and more effective when driving to the basket. Clearly this is most important for point guards and players who attack the hoop.</p>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-bh" id="attr-toggle-bh"><span>Ball Handling (BH)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-bh" role="region" aria-labelledby="attr-toggle-bh"><p class="tutorial-attr-body">This trait is all about dribbling and handling the ball. A high BH score indicates a player who is less likely to turn the ball over and more effective when driving to the basket. Clearly this is most important for point guards and players who attack the hoop.</p></div>
             </div>
-            <div class="tutorial-attr">
-              <div class="tutorial-attr-title">AG (Agility)</div>
-              <p class="tutorial-attr-body">An indication of a player's foot speed. A high AG score will be very important when driving to the basket on offense, playing perimeter defense and covering a lot of ground as a zone defender.</p>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ag" id="attr-toggle-ag"><span>Agility (AG)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ag" role="region" aria-labelledby="attr-toggle-ag"><p class="tutorial-attr-body">An indication of a player's foot speed. A high AG score will be very important when driving to the basket on offense, playing perimeter defense and covering a lot of ground as a zone defender.</p></div>
             </div>
-            <div class="tutorial-attr">
-              <div class="tutorial-attr-title">ND (Endurance)</div>
-              <p class="tutorial-attr-body">This represents a player's conditioning and willingness to fight through fatigue. Players with high ND scores will tire less. As a player's energy level erodes during gameplay, you'll notice he loses effectiveness in all traits across the board.</p>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-nd" id="attr-toggle-nd"><span>Endurance (ND)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-nd" role="region" aria-labelledby="attr-toggle-nd"><p class="tutorial-attr-body">This represents a player's conditioning and willingness to fight through fatigue. Players with high ND scores will tire less. As a player's energy level erodes during gameplay, you'll notice he loses effectiveness in all traits across the board.</p></div>
             </div>
           </div>
           <div class="tutorial-col">
-            <div class="tutorial-attr">
-              <div class="tutorial-attr-title">ID (Inside Defense)</div>
-              <p class="tutorial-attr-body">The ability to defend near and around the basket. The closer the opponent's shot is to the hoop, the more relevant this trait is. Taller players with high ID scores will establish themselves as "rim protectors" and block more shots.</p>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-id" id="attr-toggle-id"><span>Inside Defense (ID)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-id" role="region" aria-labelledby="attr-toggle-id"><p class="tutorial-attr-body">The ability to defend near and around the basket. The closer the opponent's shot is to the hoop, the more relevant this trait is. Taller players with high ID scores will establish themselves as "rim protectors" and block more shots.</p></div>
             </div>
-            <div class="tutorial-attr">
-              <div class="tutorial-attr-title">OD (Outside Defense)</div>
-              <p class="tutorial-attr-body">This trait represents a player's ability to guard the perimeter. Outside shots and drives to the hoop are better guarded by players with a high OD score. Also, it's indicative of a player's ability to reduce the effectiveness of passes and create turnovers.</p>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-od" id="attr-toggle-od"><span>Outside Defense (OD)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-od" role="region" aria-labelledby="attr-toggle-od"><p class="tutorial-attr-body">This trait represents a player's ability to guard the perimeter. Outside shots and drives to the hoop are better guarded by players with a high OD score. Also, it's indicative of a player's ability to reduce the effectiveness of passes and create turnovers.</p></div>
             </div>
-            <div class="tutorial-attr">
-              <div class="tutorial-attr-title">RB (Rebounding)</div>
-              <p class="tutorial-attr-body">This trait represents a player's technical know-how when fighting for rebounds. A high RB score means a player is proficient at reading missed shots and getting into good rebounding position. It also indicates a player's ability to box out an opponent.</p>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-rb" id="attr-toggle-rb"><span>Rebounding (RB)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-rb" role="region" aria-labelledby="attr-toggle-rb"><p class="tutorial-attr-body">This trait represents a player's technical know-how when fighting for rebounds. A high RB score means a player is proficient at reading missed shots and getting into good rebounding position. It also indicates a player's ability to box out an opponent.</p></div>
             </div>
-            <div class="tutorial-attr">
-              <div class="tutorial-attr-title">ST (Strength)</div>
-              <p class="tutorial-attr-body">This is the measure of how strong a player is. This trait comes into play when attempting to score or defend near the basket, fighting for a good shot when driving to the hoop, when rebounding, and when setting or fighting through screens.</p>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-st" id="attr-toggle-st"><span>Strength (ST)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-st" role="region" aria-labelledby="attr-toggle-st"><p class="tutorial-attr-body">This is the measure of how strong a player is. This trait comes into play when attempting to score or defend near the basket, fighting for a good shot when driving to the hoop, when rebounding, and when setting or fighting through screens.</p></div>
             </div>
-            <div class="tutorial-attr">
-              <div class="tutorial-attr-title">IQ (Basketball IQ)</div>
-              <p class="tutorial-attr-body">Basketball IQ is the closest thing you'll get to understanding a player's intangibles. Players who score high in this trait do many of the little things well. Getting teammates involved, making clutch plays and committing fewer fouls are just a few examples.</p>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-iq" id="attr-toggle-iq"><span>Basketball IQ (IQ)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-iq" role="region" aria-labelledby="attr-toggle-iq"><p class="tutorial-attr-body">Basketball IQ is the closest thing you'll get to understanding a player's intangibles. Players who score high in this trait do many of the little things well. Getting teammates involved, making clutch plays and committing fewer fouls are just a few examples.</p></div>
             </div>
-            <div class="tutorial-attr">
-              <div class="tutorial-attr-title">FT (Free Throws)</div>
-              <p class="tutorial-attr-body">Exactly what you would expect. This trait indicates a player's ability at the charity stripe. Note this is a different skill than SH as it requires a different type of technical discipline and mental focus.</p>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ft" id="attr-toggle-ft"><span>Free Throws (FT)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ft" role="region" aria-labelledby="attr-toggle-ft"><p class="tutorial-attr-body">Exactly what you would expect. This trait indicates a player's ability at the charity stripe. Note this is a different skill than SH as it requires a different type of technical discipline and mental focus.</p></div>
             </div>
           </div>
         </div>
@@ -257,6 +293,14 @@
       tabs.forEach(function(tab) {
         tab.addEventListener('click', function() {
           showPanel(tab.getAttribute('aria-controls'));
+        });
+      });
+      // Player Attributes accordions: toggle on header click
+      document.querySelectorAll('.tutorial-attr-toggle').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var attr = this.closest('.tutorial-attr');
+          var isOpen = attr.classList.toggle('is-open');
+          this.setAttribute('aria-expanded', isOpen);
         });
       });
     })();
