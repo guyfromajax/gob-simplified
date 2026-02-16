@@ -8,7 +8,7 @@ Title:
 - ALPHA RELEASE
 
 Body:
-- **February 15 Update** Fixed player foul out bug, fixed rebound stats not registering on offensive rebound misses, and added a number of quality of life updates.
+- **February 16 Update** Added tutorials and a first-time user experience.
 
 Source:
 - `FrontEnd/static/mode-select.html`
