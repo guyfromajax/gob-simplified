@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Tutorials - Geeked Out Basketball</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/auth-bar.css">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #fff;
+      margin: 0;
+      padding: 0;
+      padding-top: 50px;
+      color: #1a1a1a;
+      line-height: 1.6;
+    }
+    .tutorial-page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px 24px 80px;
+    }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 1rem;
+      color: #ff7a00;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    .back-link-btn {
+      border: none;
+      cursor: pointer;
+      background: none;
+      font: inherit;
+    }
+    .tutorial-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0;
+      border-bottom: 1px solid #e0e0e0;
+      margin-bottom: 0;
+      background: #fafafa;
+    }
+    .tutorial-tab {
+      padding: 12px 20px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: #555;
+      background: #f0f0f0;
+      border: none;
+      border-right: 1px solid #e0e0e0;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .tutorial-tab:last-of-type {
+      border-right: none;
+    }
+    .tutorial-tab:hover {
+      background: #e8e8e8;
+      color: #333;
+    }
+    .tutorial-tab.active {
+      background: #e0e0e0;
+      color: #1a1a1a;
+      font-weight: 700;
+    }
+    .tutorial-content {
+      background: #fff;
+      padding: 24px 0;
+      min-height: 320px;
+    }
+    .tutorial-panel {
+      display: none;
+    }
+    .tutorial-panel.active {
+      display: block;
+    }
+    .tutorial-panel h2 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.5rem;
+      margin: 0 0 1rem;
+      color: #1a1a1a;
+    }
+    .tutorial-summary {
+      max-width: 56em;
+      margin: 0 0 24px 0;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    .tutorial-summary p {
+      margin: 0 0 0.75em 0;
+    }
+    .tutorial-summary p:last-child {
+      margin-bottom: 0;
+    }
+    .tutorial-panel .placeholder {
+      color: #888;
+      font-size: 0.95rem;
+    }
+    .tutorial-two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px 32px;
+      align-items: start;
+    }
+    @media (max-width: 640px) {
+      .tutorial-two-col { grid-template-columns: 1fr; }
+    }
+    .tutorial-attr {
+      margin-bottom: 0.5rem;
+      border: 1px solid #e5e5e5;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .tutorial-attr:last-child {
+      margin-bottom: 0;
+    }
+    .tutorial-attr-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 12px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #1a1a1a;
+      text-align: left;
+      background: #fafafa;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .tutorial-attr-toggle:hover {
+      background: #f0f0f0;
+    }
+    .tutorial-attr-toggle .tutorial-attr-caret {
+      flex-shrink: 0;
+      display: inline-block;
+      transition: transform 0.2s ease;
+    }
+    .tutorial-attr.is-open .tutorial-attr-caret {
+      transform: rotate(0deg);
+    }
+    .tutorial-attr:not(.is-open) .tutorial-attr-caret {
+      transform: rotate(-90deg);
+    }
+    .tutorial-attr-body-wrap {
+      display: none;
+      padding: 12px 12px 14px;
+      border-top: 1px solid #e5e5e5;
+      background: #fff;
+    }
+    .tutorial-attr.is-open .tutorial-attr-body-wrap {
+      display: block;
+    }
+    .tutorial-attr-body {
+      margin: 0 0 0.75em 0;
+      font-size: 0.9rem;
+      color: #444;
+    }
+    .tutorial-attr-body:last-child {
+      margin-bottom: 0;
+      line-height: 1.5;
+    }
+    .tutorial-image-wrap {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .tutorial-image-wrap--reduced {
+      max-width: 48%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .tutorial-image-wrap img {
+      max-width: 100%;
+      height: auto;
+      display: inline-block;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="has-auth-bar has-footer">
+  <div id="auth-bar" class="auth-bar">
+    <div class="auth-bar-left">
+      <a href="/" class="logo-link"><img src="/images/geekedout_logo.png" alt="Geeked-Out Basketball logo" class="logo"></a>
+    </div>
+    <img id="alpha-badge" class="alpha-badge" src="/images/alpha_badge_gold.png" alt="Alpha">
+    <div class="auth-bar-right">
+      <a href="https://www.youtube.com/@geeked-outbasketball765" target="_blank" rel="noopener noreferrer" class="nav-icon nav-icon-yt" aria-label="GOB on YouTube"><img src="/images/yt_icon_red_digital.png" alt="" width="24" height="24"></a>
+      <a href="https://x.com/geekedoutbball" target="_blank" rel="noopener noreferrer" class="nav-icon" aria-label="GOB on X"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg></a>
+      <div id="auth-logged-out" class="auth-status"><a href="/login.html" class="auth-link">Log In</a><span class="auth-divider">|</span><a href="/signup.html" class="auth-link">Sign Up</a></div>
+      <div id="auth-logged-in" class="auth-status" style="display: none;"><span id="auth-user-email" class="auth-email"></span><button type="button" id="logout-btn" class="auth-logout-btn">Log Out</button></div>
+    </div>
+  </div>
+
+  <div class="tutorial-page">
+    <button type="button" class="back-link back-link-btn" id="tutorial-back-btn" aria-label="Go back">← Back</button>
+
+    <div class="tutorial-tabs" role="tablist" aria-label="Tutorial sections">
+      <button type="button" class="tutorial-tab active" role="tab" aria-selected="true" aria-controls="panel-player-attributes" id="tab-player-attributes">Player Attributes</button>
+      <button type="button" class="tutorial-tab" role="tab" aria-selected="false" aria-controls="panel-team-attributes" id="tab-team-attributes">Team Attributes</button>
+      <button type="button" class="tutorial-tab" role="tab" aria-selected="false" aria-controls="panel-game-plans" id="tab-game-plans">Game Plans</button>
+      <button type="button" class="tutorial-tab" role="tab" aria-selected="false" aria-controls="panel-playbooks" id="tab-playbooks">Playbooks</button>
+      <button type="button" class="tutorial-tab" role="tab" aria-selected="false" aria-controls="panel-training" id="tab-training">Training</button>
+    </div>
+
+    <div class="tutorial-content">
+      <div id="panel-player-attributes" class="tutorial-panel active" role="tabpanel" aria-labelledby="tab-player-attributes">
+        <div class="tutorial-summary">
+          <p>Player Attributes are the foundation of GOB. Every possession begins with individual ability — skill, instinct, and execution in the moment.</p>
+          <p>Over the course of a season, your players will evolve. Training emphasis, in-game decisions, and role assignments all shape their growth. Develop them intentionally, and they’ll define your ceiling.</p>
+        </div>
+        <div class="tutorial-two-col">
+          <div class="tutorial-col">
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-sc" id="attr-toggle-sc"><span>Scoring (SC)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-sc" role="region" aria-labelledby="attr-toggle-sc"><p class="tutorial-attr-body">Simply put, this is a player's ability to put the ball in the hoop. A high SC score indicates a player's ability to utilize post moves and adjust his shot to score in high-traffic areas. The closer the shot is to the basket, the more relevant this trait will be.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-sh" id="attr-toggle-sh"><span>Shooting (SH)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-sh" role="region" aria-labelledby="attr-toggle-sh"><p class="tutorial-attr-body">You guessed it! This is a player's ability to shoot the rock. It's most important on outside shots — particularly 3-pointers. The further away a player's shot is from the basket, the more relevant this trait will be.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ps" id="attr-toggle-ps"><span>Passing (PS)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ps" role="region" aria-labelledby="attr-toggle-ps"><p class="tutorial-attr-body">This is a player's ability to make good fundamental passes. A higher passing rating means fewer turnovers as well as a better pass being delivered to a potential shooter, which will increase the effectiveness of his shot.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-bh" id="attr-toggle-bh"><span>Ball Handling (BH)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-bh" role="region" aria-labelledby="attr-toggle-bh"><p class="tutorial-attr-body">This trait is all about dribbling and handling the ball. A high BH score indicates a player who is less likely to turn the ball over and more effective when driving to the basket. Clearly this is most important for point guards and players who attack the hoop.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ag" id="attr-toggle-ag"><span>Agility (AG)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ag" role="region" aria-labelledby="attr-toggle-ag"><p class="tutorial-attr-body">An indication of a player's foot speed. A high AG score will be very important when driving to the basket on offense, playing perimeter defense and covering a lot of ground as a zone defender.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-nd" id="attr-toggle-nd"><span>Endurance (ND)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-nd" role="region" aria-labelledby="attr-toggle-nd"><p class="tutorial-attr-body">This represents a player's conditioning and willingness to fight through fatigue. Players with high ND scores will tire less. As a player's energy level erodes during gameplay, you'll notice he loses effectiveness in all traits across the board.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-em" id="attr-toggle-em"><span>Emotion (EM)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-em" role="region" aria-labelledby="attr-toggle-em"><p class="tutorial-attr-body">😎 happiest<br>😊 happy<br>😐 neutral<br>🙁 unhappy<br>🤢 disruptive</p></div>
+            </div>
+          </div>
+          <div class="tutorial-col">
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-id" id="attr-toggle-id"><span>Inside Defense (ID)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-id" role="region" aria-labelledby="attr-toggle-id"><p class="tutorial-attr-body">The ability to defend near and around the basket. The closer the opponent's shot is to the hoop, the more relevant this trait is. Taller players with high ID scores will establish themselves as "rim protectors" and block more shots.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-od" id="attr-toggle-od"><span>Outside Defense (OD)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-od" role="region" aria-labelledby="attr-toggle-od"><p class="tutorial-attr-body">This trait represents a player's ability to guard the perimeter. Outside shots and drives to the hoop are better guarded by players with a high OD score. Also, it's indicative of a player's ability to reduce the effectiveness of passes and create turnovers.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-rb" id="attr-toggle-rb"><span>Rebounding (RB)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-rb" role="region" aria-labelledby="attr-toggle-rb"><p class="tutorial-attr-body">This trait represents a player's technical know-how when fighting for rebounds. A high RB score means a player is proficient at reading missed shots and getting into good rebounding position. It also indicates a player's ability to box out an opponent.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-st" id="attr-toggle-st"><span>Strength (ST)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-st" role="region" aria-labelledby="attr-toggle-st"><p class="tutorial-attr-body">This is the measure of how strong a player is. This trait comes into play when attempting to score or defend near the basket, fighting for a good shot when driving to the hoop, when rebounding, and when setting or fighting through screens.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-iq" id="attr-toggle-iq"><span>Basketball IQ (IQ)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-iq" role="region" aria-labelledby="attr-toggle-iq"><p class="tutorial-attr-body">Basketball IQ is the closest thing you'll get to understanding a player's intangibles. Players who score high in this trait do many of the little things well. Getting teammates involved, making clutch plays and committing fewer fouls are just a few examples.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ft" id="attr-toggle-ft"><span>Free Throws (FT)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ft" role="region" aria-labelledby="attr-toggle-ft"><p class="tutorial-attr-body">Exactly what you would expect. This trait indicates a player's ability at the charity stripe. Note this is a different skill than SH as it requires a different type of technical discipline and mental focus.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-mo" id="attr-toggle-mo"><span>Momentum (MO)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-mo" role="region" aria-labelledby="attr-toggle-mo"><p class="tutorial-attr-body">Strictly an in-game measure. Players start each game with 0 momentum, and the value toggles up or down based on the flow of the game, their team's performance, and their individual performance. Timeouts and quarter breaks will bring each player's momentum closer to equilibrium. Valuable to reset your cold players and slow down your opponent's hot players.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="panel-team-attributes" class="tutorial-panel" role="tabpanel" aria-labelledby="tab-team-attributes">
+        <div class="tutorial-summary">
+          <p>Team Attributes represent your program’s identity over time. They reflect how your team plays, how it responds to adversity, and how well it sustains its style under pressure.</p>
+          <p>Similar to Player Attributes, these traits evolve throughout the season. Winning builds confidence and cohesion. Predictability erodes sharpness. Your training emphasis, strategic diversity, and in-game performance all shape the DNA of your team.</p>
+        </div>
+        <div class="tutorial-two-col">
+          <div class="tutorial-col">
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-shooting" id="attr-toggle-ta-shooting"><span>Shooting</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-shooting" role="region" aria-labelledby="attr-toggle-ta-shooting"><p class="tutorial-attr-body">Represents your team’s collective confidence and rhythm as shooters. High Shooting teams trust their spacing, step into open looks decisively, and maintain composure when shots aren’t falling early. Success fuels it. Poor selection and cold stretches can slowly chip away at it.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-offense" id="attr-toggle-ta-offense"><span>Offense</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-offense" role="region" aria-labelledby="attr-toggle-ta-offense"><p class="tutorial-attr-body">Reflects how effectively your team executes its offensive structure before the shot is taken. Ball movement, spacing, timing, and decision-making all flow through this attribute. Running varied schemes sharpens it. Becoming predictable puts it on tape — and makes execution harder.</p><p class="tutorial-attr-body">Offense and Shooting work together. One creates the opportunity. The other converts it.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-fastbreaks" id="attr-toggle-ta-fastbreaks"><span>Fast Breaks</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-fastbreaks" role="region" aria-labelledby="attr-toggle-ta-fastbreaks"><p class="tutorial-attr-body">Determines how efficiently your team turns defense into immediate offense. Outlet decisions, lane discipline, and transition awareness all contribute. Teams that push with intention sharpen this trait. Reckless transition play can blunt it over time.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-fight" id="attr-toggle-ta-fight"><span>Fight</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-fight" role="region" aria-labelledby="attr-toggle-ta-fight"><p class="tutorial-attr-body">Represents your team’s competitive edge. High Fight teams embrace physical play, respond to runs with resilience, and perform with urgency when trailing. Winning builds it. Adversity tests it. This trait defines how your team responds when the game turns hostile.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-momentum" id="attr-toggle-ta-momentum"><span>Momentum</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-momentum" role="region" aria-labelledby="attr-toggle-ta-momentum"><p class="tutorial-attr-body">An in-game amplifier. Momentum builds during strong stretches and can temporarily lift collective performance. While individual players may get “hot,” team momentum affects the group as a whole. Home teams tend to generate it more easily, but sustained execution is what keeps it alive.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-fb-defense" id="attr-toggle-ta-fb-defense"><span>Fast Break Defense</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-fb-defense" role="region" aria-labelledby="attr-toggle-ta-fb-defense"><p class="tutorial-attr-body">Determines how quickly and effectively your team regains structure in transition. Stopping the ball, identifying matchups, and protecting the rim all matter. Teams that prioritize transition awareness see this grow over time.</p></div>
+            </div>
+          </div>
+          <div class="tutorial-col">
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-rebounding" id="attr-toggle-ta-rebounding"><span>Rebounding</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-rebounding" role="region" aria-labelledby="attr-toggle-ta-rebounding"><p class="tutorial-attr-body">Measures how consistently your team finishes possessions. Strong Rebounding teams anticipate misses, secure position early, and treat loose balls as momentum plays. Over time, disciplined fundamentals and physical commitment strengthen this trait — while lapses in effort weaken it.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-defense" id="attr-toggle-ta-defense"><span>Defense</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-defense" role="region" aria-labelledby="attr-toggle-ta-defense"><p class="tutorial-attr-body">Captures your team’s cohesion and discipline on the defensive end. Rotations, help positioning, communication, and overall structure are all influenced here. Teams that consistently defend with purpose see this grow. Breakdowns and careless play gradually erode it.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-press-trap" id="attr-toggle-ta-press-trap"><span>Press/Trap</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-press-trap" role="region" aria-labelledby="attr-toggle-ta-press-trap"><p class="tutorial-attr-body">Measures your team’s ability to apply structured pressure. Timing, coordination, and controlled aggression all matter. Repeated, predictable pressure schemes may lose effectiveness as opponents adjust. Strategic variety keeps this sharp.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-discipline" id="attr-toggle-ta-discipline"><span>Discipline</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-discipline" role="region" aria-labelledby="attr-toggle-ta-discipline"><p class="tutorial-attr-body">Reflects polish and control. Disciplined teams commit fewer unnecessary fouls and turnovers, execute aggressive strategies with precision, and maintain composure late in games. It balances Fight — aggression without structure becomes chaos.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-chemistry" id="attr-toggle-ta-chemistry"><span>Team Chemistry</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-chemistry" role="region" aria-labelledby="attr-toggle-ta-chemistry"><p class="tutorial-attr-body">The connective tissue of your roster. Chemistry influences how well players support one another through mistakes, adversity, and high-pressure moments. Winning strengthens it. Internal friction and extended losing can strain it. You may not see it directly — but you will feel it in tight games.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-press-trap-breaks" id="attr-toggle-ta-press-trap-breaks"><span>Press/Trap Breaks</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-press-trap-breaks" role="region" aria-labelledby="attr-toggle-ta-press-trap-breaks"><p class="tutorial-attr-body">Measures your team’s composure under pressure. Spacing discipline, passing clarity, and decision-making against traps all feed this attribute. Teams that regularly face and solve pressure become sharper. Panic erodes it.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="panel-game-plans" class="tutorial-panel" role="tabpanel" aria-labelledby="tab-game-plans">
+        <div class="tutorial-two-col">
+          <div class="tutorial-col">
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-gp-offense" id="attr-toggle-gp-offense"><span>Offense</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-gp-offense" role="region" aria-labelledby="attr-toggle-gp-offense"><p class="tutorial-attr-body">Determines your mix of motion offense vs structured set plays. Leaning toward motion increases read-and-react freedom. Leaning toward sets emphasizes designed execution and called actions.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-gp-inside" id="attr-toggle-gp-inside"><span>Inside</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-gp-inside" role="region" aria-labelledby="attr-toggle-gp-inside"><p class="tutorial-attr-body">Controls how frequently you prioritize inside scoring. This influences both the number of Inside Set Plays you call and how aggressively your team looks to establish paint touches within motion offense. All things being equal, inside shots tend to be your most high-percentage shots.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-gp-attack" id="attr-toggle-gp-attack"><span>Attack</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-gp-attack" role="region" aria-labelledby="attr-toggle-gp-attack"><p class="tutorial-attr-body">Controls how often your team looks to generate attack shots — drives, cuts, and downhill pressure. A higher setting increases Attack Set Plays and pushes motion offense toward rim pressure. Attack shots tend to draw the most defensive fouls, and are best executed by your most athletic players.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-gp-outside" id="attr-toggle-gp-outside"><span>Outside</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-gp-outside" role="region" aria-labelledby="attr-toggle-gp-outside"><p class="tutorial-attr-body">Controls how frequently your team prioritizes perimeter scoring. This affects both Outside Set Plays and your shot selection tendencies within motion offense. Outside shots are your lowest percentage shots, but they tend to have the most impact on the game.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-gp-fastbreaks" id="attr-toggle-gp-fastbreaks"><span>Fast Breaks</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-gp-fastbreaks" role="region" aria-labelledby="attr-toggle-gp-fastbreaks"><p class="tutorial-attr-body">Determines how aggressively your team pushes in transition. Higher settings increase fast break attempts. Lower settings favor entering structured half-court offense.</p></div>
+            </div>
+          </div>
+          <div class="tutorial-col">
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-gp-defense" id="attr-toggle-gp-defense"><span>Defense</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-gp-defense" role="region" aria-labelledby="attr-toggle-gp-defense"><p class="tutorial-attr-body">Determines your mix of man-to-man vs zone defense. Adjusting this shifts how your team protects the rim, contests perimeter shots, and handles defensive rotations.</p><p class="tutorial-attr-body">Man defense generates more individual matchups and high-impact plays. It’s ideal if you have disciplined defenders who can win their assignments and recover quickly.</p><p class="tutorial-attr-body">Zone defense offers structural advantages. Players fatigue less, commit fewer fouls, and receive more consistent help support. However, zones are more vulnerable to perimeter shooting and can concede offensive rebounds due to the lack of fixed box-out assignments. Zone schemes are also executed more effectively by high-IQ defenders who anticipate and rotate instinctively.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-gp-aggression" id="attr-toggle-gp-aggression"><span>Aggression</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-gp-aggression" role="region" aria-labelledby="attr-toggle-gp-aggression"><p class="tutorial-attr-body">Controls how aggressively your team attempts to create disruption. Higher aggression increases steal attempts and playmaking risks across the floor. It also increases fatigue rate and foul likelihood.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-gp-hct" id="attr-toggle-gp-hct"><span>Half-Court Trap</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-gp-hct" role="region" aria-labelledby="attr-toggle-gp-hct"><p class="tutorial-attr-body">Determines how frequently your team executes half-court traps. Trapping increases turnover potential and can disrupt offensive chemistry, but defenders fatigue faster and are more prone to fouls.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-gp-fcp" id="attr-toggle-gp-fcp"><span>Full-Court Press</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-gp-fcp" role="region" aria-labelledby="attr-toggle-gp-fcp"><p class="tutorial-attr-body">Determines how frequently your team applies full-court pressure. Presses amplify turnover potential and disruption more than half-court traps, but also carry greater fatigue cost and foul risk.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-gp-rebounding" id="attr-toggle-gp-rebounding"><span>Rebounding</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-gp-rebounding" role="region" aria-labelledby="attr-toggle-gp-rebounding"><p class="tutorial-attr-body">Determines how aggressively your team attacks the offensive glass. Higher settings send more players to crash for second-chance opportunities. Lower settings prioritize defensive balance and transition coverage.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="panel-playbooks" class="tutorial-panel" role="tabpanel" aria-labelledby="tab-playbooks">
+        <div class="tutorial-two-col" style="margin-bottom: 24px;">
+          <div class="tutorial-col">
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-tr-playcall-dist" id="attr-toggle-tr-playcall-dist"><span>Playcall Distribution</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-tr-playcall-dist" role="region" aria-labelledby="attr-toggle-tr-playcall-dist"><p class="tutorial-attr-body">Determines how frequently each play type is called within your overall offensive system. These are the micro-level decisions layered on top of your macro Game Plan settings (Motion vs Set Plays, Inside vs Attack vs Outside).</p><p class="tutorial-attr-body">Your distribution settings shape the rhythm of your offense — influencing which actions appear most often over the course of a game.</p></div>
+            </div>
+          </div>
+          <div class="tutorial-col">
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-tr-playcall-center" id="attr-toggle-tr-playcall-center"><span>Playcall Center Settings</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-tr-playcall-center" role="region" aria-labelledby="attr-toggle-tr-playcall-center"><p class="tutorial-attr-body">Select up to six plays to feature in your Playcall Center during live gameplay. These are the actions immediately available when you want to choose a specific play.</p><p class="tutorial-attr-body">Your Playcall Center defines your go-to options in key moments. Choose a balanced mix, or load it with situational weapons — the decision is yours.</p></div>
+            </div>
+          </div>
+        </div>
+        <div class="tutorial-image-wrap tutorial-image-wrap--reduced">
+          <img src="/images/training-playcall-offense.png" alt="Offense play distribution and playcall settings interface" width="800">
+        </div>
+      </div>
+      <div id="panel-training" class="tutorial-panel" role="tabpanel" aria-labelledby="tab-training">
+        <div class="tutorial-two-col">
+          <div class="tutorial-col">
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-tr-player-drills" id="attr-toggle-tr-player-drills"><span>Player Drills &amp; General</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-tr-player-drills" role="region" aria-labelledby="attr-toggle-tr-player-drills"><p class="tutorial-attr-body">Focused drills designed to improve specific player attributes. Most drills directly enhance the attribute listed in the header, with a few key exceptions:</p><p class="tutorial-attr-body">Conditioning improves Endurance (ND).</p><p class="tutorial-attr-body">Film Study improves Basketball IQ (IQ) and gives players better insight into upcoming opponents — especially tendencies from their most recent game.</p><p class="tutorial-attr-body">Breaks enhance the overall effectiveness of all drills (Player, Team, and Scrimmages).</p><p class="tutorial-attr-body">Breaks also reduce fatigue heading into the next game. However, too many breaks can strain team chemistry and weaken Fight and Discipline. Teams with strong chemistry can absorb more downtime without losing edge.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-tr-coaching-style" id="attr-toggle-tr-coaching-style"><span>Coaching Style</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-tr-coaching-style" role="region" aria-labelledby="attr-toggle-tr-coaching-style"><p class="tutorial-attr-body">This is where you define your identity.</p><p class="tutorial-attr-body">Your chosen coaching focus determines what you emphasize during drills, scrimmages, post-practice wrap-ups, and pre-game locker room talks. It shapes motivation, preparation tone, and the areas where your team sees the most growth. For maximum impact, your coaching focus should align with the drills you emphasize that week.</p><p class="tutorial-attr-body">Leaning heavily into one primary category builds a clear, recognizable identity. Pairing it with a strong secondary focus can create compounded gains as the season progresses. The style you choose each week influences not just development — but who your team ultimately becomes.</p></div>
+            </div>
+          </div>
+          <div class="tutorial-col">
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-tr-team-drills" id="attr-toggle-tr-team-drills"><span>Team Drills</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-tr-team-drills" role="region" aria-labelledby="attr-toggle-tr-team-drills"><p class="tutorial-attr-body">Designed to improve Team Attributes directly. Each drill aligns explicitly with its category — Offense, Defense, Fast Breaks, Fast Break Defense, Press/Traps, and Press/Trap Breaks.</p><p class="tutorial-attr-body">Consistent, targeted emphasis strengthens these traits over time. Neglect allows them to erode.</p></div>
+            </div>
+            <div class="tutorial-attr" role="group">
+              <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-tr-scrimmages" id="attr-toggle-tr-scrimmages"><span>Scrimmages</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
+              <div class="tutorial-attr-body-wrap" id="attr-body-tr-scrimmages" role="region" aria-labelledby="attr-toggle-tr-scrimmages"><p class="tutorial-attr-body">Where preparation becomes application. Scrimmages sharpen execution, improve overall readiness, and reinforce system cohesion.</p><p class="tutorial-attr-body">More scrimmaging generally leads to better game preparedness. However, excessive scrimmages increase fatigue and can strain team chemistry. Depending on how your team responds, chemistry may improve through competitive bonding — or decline under pressure.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer id="site-footer" class="site-footer">
+    <a href="/faqs.html">FAQs</a>
+  </footer>
+
+  <script>
+    (function() {
+      var backBtn = document.getElementById('tutorial-back-btn');
+      if (backBtn) {
+        backBtn.addEventListener('click', function() {
+          if (window.history.length > 1) {
+            window.history.back();
+          } else {
+            window.location.href = '/homepage.html';
+          }
+        });
+      }
+      var tabs = document.querySelectorAll('.tutorial-tab');
+      var panels = document.querySelectorAll('.tutorial-panel');
+      function showPanel(panelId) {
+        panels.forEach(function(p) {
+          p.classList.toggle('active', p.id === panelId);
+          p.setAttribute('aria-hidden', p.id !== panelId);
+        });
+        tabs.forEach(function(t) {
+          var isActive = t.getAttribute('aria-controls') === panelId;
+          t.classList.toggle('active', isActive);
+          t.setAttribute('aria-selected', isActive);
+        });
+      }
+      tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+          showPanel(tab.getAttribute('aria-controls'));
+        });
+      });
+      // Player Attributes accordions: toggle on header click
+      document.querySelectorAll('.tutorial-attr-toggle').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var attr = this.closest('.tutorial-attr');
+          var isOpen = attr.classList.toggle('is-open');
+          this.setAttribute('aria-expanded', isOpen);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

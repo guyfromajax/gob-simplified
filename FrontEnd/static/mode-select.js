@@ -399,7 +399,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Check if user is logged in
   const authToken = localStorage.getItem('auth_token');
   const authUser = localStorage.getItem('auth_user');
-  let needsUsername = false;
 
   if (authToken && authUser) {
     try {
@@ -410,13 +409,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (authUserEmail) authUserEmail.textContent = user.username || user.email;
       console.log('[AUTH] User logged in:', user.email);
 
-      // Check if user needs to set username (fetch fresh from API)
+      // Sync username from API; prompt is handled by FTE username modal (authBarInit) when fte: true
       const meRes = await fetch(API_CONFIG.buildUrl('/api/auth/me'), { headers: API_CONFIG.getAuthHeaders() });
       if (meRes.ok) {
         const meData = await meRes.json();
-        if (!meData.username || meData.username.trim() === '') {
-          needsUsername = true;
-        } else {
+        if (meData.username && meData.username.trim()) {
           if (authUserEmail) authUserEmail.textContent = meData.username;
           const stored = JSON.parse(authUser);
           stored.username = meData.username;
@@ -438,76 +435,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Show set-username modal if needed (blocks mode-select until username is set)
-  const setUsernameModal = document.getElementById('set-username-modal');
-  const setUsernameInput = document.getElementById('set-username-input');
-  const setUsernameSubmit = document.getElementById('set-username-submit');
-  const setUsernameError = document.getElementById('set-username-error');
+  // Username is now collected by the shared FTE username modal (authBarInit) when fte: true and no username.
+  // The old set-username modal on mode-select is no longer shown.
 
-  if (needsUsername && setUsernameModal) {
-    setUsernameModal.style.display = 'flex';
-
-    const submitUsername = async () => {
-      const raw = setUsernameInput.value.trim();
-      if (!raw) {
-        setUsernameError.textContent = 'Please enter a username';
-        return;
-      }
-      if (/\s/.test(raw)) {
-        setUsernameError.textContent = 'Username cannot contain spaces';
-        return;
-      }
-      if (raw.length < 3) {
-        setUsernameError.textContent = 'Username must be at least 3 characters';
-        return;
-      }
-      if (raw.length > 24) {
-        setUsernameError.textContent = 'Username must be at most 24 characters';
-        return;
-      }
-      if (!/^[a-zA-Z0-9_]+$/.test(raw)) {
-        setUsernameError.textContent = 'Username can only contain letters, numbers, and underscores';
-        return;
-      }
-
-      setUsernameError.textContent = '';
-      setUsernameSubmit.disabled = true;
-
-      try {
-        const res = await fetch(API_CONFIG.buildUrl('/api/auth/set-username'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...API_CONFIG.getAuthHeaders() },
-          body: JSON.stringify({ username: raw })
-        });
-        const data = await res.json();
-
-        if (!res.ok) {
-          setUsernameError.textContent = data.detail || 'Could not set username';
-          setUsernameSubmit.disabled = false;
-          return;
-        }
-
-        // Update localStorage and auth bar
-        const stored = JSON.parse(localStorage.getItem('auth_user') || '{}');
-        stored.username = data.username;
-        localStorage.setItem('auth_user', JSON.stringify(stored));
-        if (authUserEmail) authUserEmail.textContent = data.username;
-
-        setUsernameModal.style.display = 'none';
-      } catch (err) {
-        setUsernameError.textContent = err.message || 'Something went wrong';
-      } finally {
-        setUsernameSubmit.disabled = false;
-      }
-    };
-
-    setUsernameSubmit.addEventListener('click', submitUsername);
-    setUsernameInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') submitUsername();
-    });
-    setUsernameInput.focus();
-  }
-  
   // Handle logout
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {

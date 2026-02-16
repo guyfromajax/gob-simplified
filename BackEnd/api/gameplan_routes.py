@@ -31,6 +31,11 @@ def serve_playbooks_html():
     """Return the playbooks page so query params work in production."""
     return FileResponse(STATIC_DIR / "playbooks.html")
 
+@router.get("/tutorial.html")
+def serve_tutorial_html():
+    """Return the tutorials page."""
+    return FileResponse(STATIC_DIR / "tutorial.html")
+
 class GamePlanSettings(BaseModel):
     strategy_settings: dict[str, int]
 

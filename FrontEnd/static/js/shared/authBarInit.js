@@ -54,6 +54,258 @@
     document.head.appendChild(link);
   }
 
+  function ensureFTEStyles() {
+    if (document.getElementById('fte-styles-link')) return;
+    if (document.querySelector('link[href*="fte.css"]')) return;
+    var link = document.createElement('link');
+    link.id = 'fte-styles-link';
+    link.rel = 'stylesheet';
+    link.href = '/css/fte.css';
+    document.head.appendChild(link);
+  }
+
+  var FTE_STEPS = [
+    { title: 'Hey Coach!', body: '<p>Welcome to Geeked-Out Basketball.</p>', showBack: false, primaryLabel: 'Next' },
+    { title: 'We assume you know hoops.', body: '<p>Now learn GOB.</p>', showBack: true, primaryLabel: 'Next' },
+    {
+      title: 'The Tutorial button sits in the top nav.',
+      body: '<div class="fte-tutorial-wrap fte-tutorial-wrap--full-width"><div class="fte-tutorial-preview" aria-hidden="true">Tutorials</div></div>',
+      showBack: true,
+      primaryLabel: 'Next'
+    },
+    {
+      title: 'Deeper breakdowns live on our YouTube channel.',
+      body: '<div class="fte-row-with-img"><span class="fte-content-text">Deeper breakdowns live on our YouTube channel.</span><img src="/images/yt_icon_red_digital.png" alt="YouTube" class="fte-yt-logo"></div>',
+      showBack: true,
+      primaryLabel: 'Done'
+    }
+  ];
+
+  function ensureUsernameModal() {
+    if (document.getElementById('fte-username-backdrop')) return;
+    var backdrop = document.createElement('div');
+    backdrop.id = 'fte-username-backdrop';
+    backdrop.className = 'fte-username-backdrop';
+    backdrop.setAttribute('role', 'dialog');
+    backdrop.setAttribute('aria-modal', 'true');
+    backdrop.setAttribute('aria-labelledby', 'fte-username-title');
+    backdrop.innerHTML = [
+      '<div class="fte-modal">',
+      '  <div class="fte-content">',
+      '    <img src="/images/sammy_tutorial.png" alt="" class="fte-content-img">',
+      '    <div class="fte-content-main">',
+      '      <p id="fte-username-title">Choose a username</p>',
+      '      <p class="fte-username-hint">No spaces • Letters, numbers, underscores only • 3-24 characters</p>',
+      '      <input type="text" id="fte-username-input" class="fte-username-input" placeholder="Username" maxlength="24" autocomplete="username">',
+      '      <div id="fte-username-error" class="fte-username-error" role="alert" style="display: none;"></div>',
+      '    </div>',
+      '  </div>',
+      '  <div class="fte-footer">',
+      '    <button type="button" id="fte-username-submit" class="fte-btn fte-btn-next">Continue</button>',
+      '  </div>',
+      '</div>'
+    ].join('');
+    document.body.appendChild(backdrop);
+  }
+
+  function ensureFTEModal() {
+    if (document.getElementById('fte-backdrop')) return;
+    var backdrop = document.createElement('div');
+    backdrop.id = 'fte-backdrop';
+    backdrop.className = 'fte-backdrop';
+    backdrop.setAttribute('role', 'dialog');
+    backdrop.setAttribute('aria-modal', 'true');
+    backdrop.setAttribute('aria-labelledby', 'fte-content-main');
+    backdrop.innerHTML = [
+      '<div class="fte-modal">',
+      '  <div class="fte-content">',
+      '    <img src="/images/sammy_tutorial.png" alt="" class="fte-content-img">',
+      '    <div id="fte-content-main" class="fte-content-main"></div>',
+      '  </div>',
+      '  <div class="fte-footer">',
+      '    <button type="button" id="fte-btn-back" class="fte-btn fte-btn-back">Back</button>',
+      '    <button type="button" id="fte-btn-primary" class="fte-btn fte-btn-next"></button>',
+      '  </div>',
+      '</div>'
+    ].join('');
+    document.body.appendChild(backdrop);
+  }
+
+  function showFTEStep(stepIndex) {
+    var step = FTE_STEPS[stepIndex];
+    var mainEl = document.getElementById('fte-content-main');
+    var backBtn = document.getElementById('fte-btn-back');
+    var primaryBtn = document.getElementById('fte-btn-primary');
+    if (!mainEl || !backBtn || !primaryBtn) return;
+    if (stepIndex === 3 && step.body) {
+      mainEl.innerHTML = step.body;
+    } else if (step.body) {
+      mainEl.innerHTML = '<p>' + step.title + '</p>' + step.body;
+    } else {
+      mainEl.innerHTML = '<p>' + step.title + '</p>';
+    }
+    backBtn.style.display = step.showBack ? '' : 'none';
+    primaryBtn.textContent = step.primaryLabel;
+  }
+
+  function validateUsername(value) {
+    var v = (value || '').trim();
+    if (v.length < 3) return 'Username must be at least 3 characters';
+    if (v.length > 24) return 'Username must be at most 24 characters';
+    if (/[\s]/.test(v)) return 'No spaces allowed';
+    if (!/^[a-zA-Z0-9_]+$/.test(v)) return 'Only letters, numbers, and underscores';
+    return null;
+  }
+
+  function openUsernameModal(onSuccess) {
+    ensureUsernameModal();
+    var backdrop = document.getElementById('fte-username-backdrop');
+    var input = document.getElementById('fte-username-input');
+    var errorEl = document.getElementById('fte-username-error');
+    var submitBtn = document.getElementById('fte-username-submit');
+    if (!backdrop || !input || !submitBtn) return;
+
+    errorEl.style.display = 'none';
+    errorEl.textContent = '';
+    input.value = '';
+    backdrop.classList.add('open');
+    input.focus();
+
+    function closeUsernameModal() {
+      backdrop.classList.remove('open');
+    }
+
+    submitBtn.onclick = function () {
+      var username = (input.value || '').trim();
+      var err = validateUsername(username);
+      if (err) {
+        errorEl.textContent = err;
+        errorEl.style.display = 'block';
+        return;
+      }
+      errorEl.style.display = 'none';
+      errorEl.textContent = '';
+
+      if (typeof API_CONFIG === 'undefined' || typeof API_CONFIG.buildUrl !== 'function' || typeof API_CONFIG.getAuthHeaders !== 'function') {
+        closeUsernameModal();
+        if (onSuccess) onSuccess();
+        return;
+      }
+
+      submitBtn.disabled = true;
+      fetch(API_CONFIG.buildUrl('/api/auth/set-username'), {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, API_CONFIG.getAuthHeaders()),
+        body: JSON.stringify({ username: username })
+      })
+        .then(function (res) {
+          return res.json().then(function (data) {
+            if (res.ok) {
+              try {
+                var authUser = localStorage.getItem('auth_user');
+                if (authUser) {
+                  var user = JSON.parse(authUser);
+                  user.username = data.username;
+                  localStorage.setItem('auth_user', JSON.stringify(user));
+                }
+              } catch (e) {}
+              var authUserEmail = document.getElementById('auth-user-email');
+              if (authUserEmail) authUserEmail.textContent = data.username;
+              closeUsernameModal();
+              if (onSuccess) onSuccess();
+            } else {
+              errorEl.textContent = data.detail || 'This username is already taken';
+              errorEl.style.display = 'block';
+            }
+          });
+        })
+        .catch(function () {
+          errorEl.textContent = 'Something went wrong. Try again.';
+          errorEl.style.display = 'block';
+        })
+        .then(function () {
+          submitBtn.disabled = false;
+        });
+    };
+  }
+
+  function openFTESteps() {
+    var usernameBackdrop = document.getElementById('fte-username-backdrop');
+    if (usernameBackdrop) usernameBackdrop.classList.remove('open');
+    ensureFTEModal();
+    var backdrop = document.getElementById('fte-backdrop');
+    var backBtn = document.getElementById('fte-btn-back');
+    var primaryBtn = document.getElementById('fte-btn-primary');
+    if (!backdrop || !primaryBtn) return;
+
+    var currentStep = 0;
+    showFTEStep(currentStep);
+    backdrop.classList.add('open');
+
+    function closeFTE() {
+      backdrop.classList.remove('open');
+    }
+
+    function completeFTE() {
+      if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.buildUrl === 'function' && typeof API_CONFIG.getAuthHeaders === 'function') {
+        fetch(API_CONFIG.buildUrl('/api/auth/fte-complete'), {
+          method: 'POST',
+          headers: API_CONFIG.getAuthHeaders()
+        }).then(function () {
+          try {
+            var authUser = localStorage.getItem('auth_user');
+            if (authUser) {
+              var user = JSON.parse(authUser);
+              user.fte = false;
+              localStorage.setItem('auth_user', JSON.stringify(user));
+            }
+          } catch (e) {}
+          closeFTE();
+        }).catch(function () {
+          closeFTE();
+        });
+      } else {
+        closeFTE();
+      }
+    }
+
+    backBtn.addEventListener('click', function () {
+      if (currentStep > 0) {
+        currentStep -= 1;
+        showFTEStep(currentStep);
+      }
+    });
+
+    primaryBtn.addEventListener('click', function () {
+      if (currentStep === 3 && FTE_STEPS[3].primaryLabel === 'Done') {
+        completeFTE();
+        return;
+      }
+      if (currentStep < FTE_STEPS.length - 1) {
+        currentStep += 1;
+        showFTEStep(currentStep);
+      }
+    });
+  }
+
+  function runFTE(meData) {
+    if (!meData || meData.fte !== true) return;
+    ensureFTEStyles();
+
+    var hasUsername = meData.username && String(meData.username).trim().length > 0;
+    if (!hasUsername) {
+      var fteBackdrop = document.getElementById('fte-backdrop');
+      if (fteBackdrop) fteBackdrop.classList.remove('open');
+      openUsernameModal(function () {
+        openFTESteps();
+      });
+      return;
+    }
+    var usernameBackdrop = document.getElementById('fte-username-backdrop');
+    if (usernameBackdrop) usernameBackdrop.classList.remove('open');
+    openFTESteps();
+  }
+
   function createAuthBarHTML() {
     var bar = document.createElement('div');
     bar.id = 'auth-bar';
@@ -61,12 +313,13 @@
     bar.innerHTML = [
       '<div class="auth-bar-left">',
       '  <a href="/" class="logo-link"><img src="/images/geekedout_logo.png" alt="Geeked-Out Basketball logo" class="logo"></a>',
+      '  <a href="/tutorial.html" class="tutorials-nav-btn">Tutorials</a>',
       '</div>',
       '<img id="alpha-badge" class="alpha-badge visible" src="/images/alpha_badge_gold.png" alt="Alpha">',
       '<div class="auth-bar-right">',
       '  <button type="button" id="feedback-btn" class="feedback-btn">Feedback</button>',
-      '  <a href="https://www.youtube.com/@geeked-outbasketball765" target="_blank" rel="noopener noreferrer" class="nav-icon" aria-label="GOB on YouTube">',
-      '    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>',
+      '  <a href="https://www.youtube.com/@geeked-outbasketball765" target="_blank" rel="noopener noreferrer" class="nav-icon nav-icon-yt" aria-label="GOB on YouTube">',
+      '    <img src="/images/yt_icon_red_digital.png" alt="" width="24" height="24">',
       '  </a>',
       '  <a href="https://x.com/geekedoutbball" target="_blank" rel="noopener noreferrer" class="nav-icon" aria-label="GOB on X">',
       '    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg>',
@@ -147,6 +400,7 @@
                 if (authLoggedIn) authLoggedIn.style.display = 'flex';
                 res.json().then(function (meData) {
                   if (authUserEmail) authUserEmail.textContent = meData.username || meData.email || user.email;
+                  if (meData.fte === true) runFTE(meData);
                 }).catch(function () {
                   if (authUserEmail) authUserEmail.textContent = user.username || user.email;
                 });
