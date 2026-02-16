@@ -65,17 +65,17 @@
   }
 
   var FTE_STEPS = [
-    { title: 'Hey Coach!', body: '<p>Welcome to Geeked-Out Basketball.</p>', showBack: false, primaryLabel: 'Next' },
-    { title: "Let's Begin", body: '<p>We assume you know hoops.</p>', showBack: true, primaryLabel: 'Next' },
+    { title: 'Hey Coach! Welcome to Geeked-Out Basketball.', body: '', showBack: false, primaryLabel: 'Next' },
+    { title: 'We assume you know hoops. Now learn GOB.', body: '', showBack: true, primaryLabel: 'Next' },
     {
-      title: 'Start Here',
-      body: '<p>Tap the yellow Tutorial button to learn GOB.</p><div class="fte-tutorial-preview" aria-hidden="true">Tutorials</div>',
+      title: 'Tap the yellow Tutorial button in the nav bar.',
+      body: '<div class="fte-tutorial-preview" aria-hidden="true">Tutorials</div>',
       showBack: true,
       primaryLabel: 'Next'
     },
     {
-      title: 'Want More Info?',
-      body: '<p>Watch our YouTube breakdowns. Good luck Coach!</p>',
+      title: 'Want more? Watch our YouTube breakdowns.',
+      body: '<div class="fte-row-with-img"><span class="fte-content-text">Want more? Watch our YouTube breakdowns.</span><img src="/images/yt_icon_red_digital.png" alt="YouTube" class="fte-yt-logo"></div>',
       showBack: true,
       primaryLabel: 'Done'
     }
@@ -88,14 +88,13 @@
     backdrop.className = 'fte-backdrop';
     backdrop.setAttribute('role', 'dialog');
     backdrop.setAttribute('aria-modal', 'true');
-    backdrop.setAttribute('aria-labelledby', 'fte-header-title');
+    backdrop.setAttribute('aria-labelledby', 'fte-content-main');
     backdrop.innerHTML = [
       '<div class="fte-modal">',
-      '  <div class="fte-header">',
-      '    <img src="/images/sammy_tutorial.png" alt="" class="fte-header-img">',
-      '    <h2 id="fte-header-title" class="fte-header-title"></h2>',
+      '  <div class="fte-content">',
+      '    <img src="/images/sammy_tutorial.png" alt="" class="fte-content-img">',
+      '    <div id="fte-content-main" class="fte-content-main"></div>',
       '  </div>',
-      '  <div class="fte-body" id="fte-body"></div>',
       '  <div class="fte-footer">',
       '    <button type="button" id="fte-btn-back" class="fte-btn fte-btn-back">Back</button>',
       '    <button type="button" id="fte-btn-primary" class="fte-btn fte-btn-next"></button>',
@@ -107,13 +106,17 @@
 
   function showFTEStep(stepIndex) {
     var step = FTE_STEPS[stepIndex];
-    var titleEl = document.getElementById('fte-header-title');
-    var bodyEl = document.getElementById('fte-body');
+    var mainEl = document.getElementById('fte-content-main');
     var backBtn = document.getElementById('fte-btn-back');
     var primaryBtn = document.getElementById('fte-btn-primary');
-    if (!titleEl || !bodyEl || !backBtn || !primaryBtn) return;
-    titleEl.textContent = step.title;
-    bodyEl.innerHTML = step.body;
+    if (!mainEl || !backBtn || !primaryBtn) return;
+    if (stepIndex === 3 && step.body) {
+      mainEl.innerHTML = step.body;
+    } else if (step.body) {
+      mainEl.innerHTML = '<p>' + step.title + '</p>' + step.body;
+    } else {
+      mainEl.innerHTML = '<p>' + step.title + '</p>';
+    }
     backBtn.style.display = step.showBack ? '' : 'none';
     primaryBtn.textContent = step.primaryLabel;
   }
