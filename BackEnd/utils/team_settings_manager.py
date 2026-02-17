@@ -190,17 +190,41 @@ def save_team_settings(
                     logger.error(f"❌ [SAVE-TEAM-SETTINGS] Validation failed: {e}")
                     return False, None, None
             
+            update_doc_id = doc_id  # for game doc we use as-is (string); for tournament master we overwrite
             if is_game_doc:
                 # Saving to game doc - resolve to canonical format (game docs use canonical keys)
                 actual_team_id = normalize_team_id_to_canonical(team_id, mode, None)
                 update_path = f"teams.{actual_team_id}.{settings_type}"
             else:
-                # Saving to tournament master doc - use ObjectId string directly
-                actual_team_id = team_id
+                # Saving to tournament master doc - use authoritative user_team_object_id (same key as load path)
+                from BackEnd.api.tournament_routes import get_user_team_from_tournament
+                try:
+                    doc_id_obj = ObjectId(doc_id)
+                except Exception as e:
+                    logger.error(f"❌ [SAVE-TEAM-SETTINGS] Invalid tournament_id: {doc_id}: {e}")
+                    return False, None, None
+                tournament_doc = collection.find_one(
+                    {"_id": doc_id_obj},
+                    {"user_team_id": 1, "user_team_object_id": 1, "_id": 1}
+                )
+                if not tournament_doc:
+                    logger.error(f"❌ [SAVE-TEAM-SETTINGS] Tournament not found: {doc_id}")
+                    return False, None, None
+                _, user_team_object_id = get_user_team_from_tournament(tournament_doc)
+                if not user_team_object_id:
+                    logger.error(f"❌ [SAVE-TEAM-SETTINGS] user_team_object_id missing in tournament {doc_id}")
+                    return False, None, None
+                actual_team_id = user_team_object_id
                 update_path = f"teams.{actual_team_id}.{settings_type}"
+                update_doc_id = doc_id_obj  # tournament docs use ObjectId _id
+                if team_id != actual_team_id:
+                    logger.warning(
+                        f"🔍 [SAVE-TEAM-SETTINGS] Tournament master save: using authoritative user_team_object_id={actual_team_id!r} "
+                        f"(request team_id={team_id!r} ignored)"
+                    )
             # Game docs: init-game stores _id as string; try string first, then ObjectId
             result = collection.update_one(
-                {"_id": doc_id},
+                {"_id": update_doc_id},
                 {"$set": {update_path: settings_data}}
             )
             if is_game_doc and result.matched_count == 0 and doc_id and len(str(doc_id)) == 24:
