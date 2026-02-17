@@ -1,3 +1,11 @@
+function playSound(filename) {
+  try {
+    var a = new Audio("/sounds/" + encodeURIComponent(filename));
+    a.volume = 0.7;
+    a.play().catch(function () {});
+  } catch (e) {}
+}
+
 const teams = [
   "Bentley-Truman",
   "Lancaster",
@@ -15,7 +23,10 @@ function createButtons() {
     const btn = document.createElement("button");
     btn.className = "team-button";
     btn.innerHTML = `<img src="./images/homepage-logos/${team}.png" alt="${team} logo"><span>${team}</span>`;
-    btn.addEventListener("click", () => selectTeam(team));
+    btn.addEventListener("click", () => {
+      playSound("click-beep.wav");
+      selectTeam(team);
+    });
     container.appendChild(btn);
   });
 }

@@ -10,8 +10,8 @@ They're not "too many," but you should focus the homepage around 1 primary inten
 
 Complete these one by one. Copy direction for carousel/homepage is in `docs/Website_Copy/carousel_copy.md`. Full brief is in `docs/To Do/seo_homepage_brief.md`.
 
-- [ ] **Homepage / carousel copy:** Update live homepage HTML so carousel headlines and sub-copy match `carousel_copy.md` (basketball simulation game, basketball sim, basketball simulation in sub-copy).
-- [ ] **Meta title:** Set homepage `<title>` to one of the options in `seo_homepage_brief.md` (e.g. "Basketball Sim | Basketball Simulation Game — Geeked Out Basketball") or close variant; keep ~60 characters.
-- [ ] **Meta description:** Add `<meta name="description" content="...">` with "basketball sim" and "basketball simulation game"; keep ~155 characters. See `seo_homepage_brief.md` for example.
+- [X] **Homepage / carousel copy:** Update live homepage HTML so carousel headlines and sub-copy match `carousel_copy.md` (basketball simulation game, basketball sim, basketball simulation in sub-copy).
+- [X] **Meta title:** Set homepage `<title>` to one of the options in `seo_homepage_brief.md` (e.g. "Basketball Sim | Basketball Simulation Game — Geeked Out Basketball") or close variant; keep ~60 characters.
+- [X] **Meta description:** Add `<meta name="description" content="...">` with "basketball sim" and "basketball simulation game"; keep ~155 characters. See `seo_homepage_brief.md` for example.
 - [ ] **FAQ block:** Add an FAQ section to the homepage with 3–6 questions/answers from `seo_homepage_brief.md` (optional: add FAQ schema/structured data later).
-- [ ] **Canonical / other:** Confirm canonical URL is `https://geekedoutbasketball.com` (already set via Netlify). No www in canonical.
+-  [X] **Canonical / other:** Confirm canonical URL is `https://geekedoutbasketball.com` (already set via Netlify). No www in canonical.

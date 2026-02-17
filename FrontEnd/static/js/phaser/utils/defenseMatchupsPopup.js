@@ -357,7 +357,7 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
     // Submit button handler
     const submitButton = popup.querySelector('.submit-matchups-button');
     submitButton.addEventListener('click', async () => {
-        if (typeof window.playSound === 'function') window.playSound('positive-plop.wav');
+        if (typeof window.playSound === 'function') window.playSound('confirm-1.mp3');
         await handleSubmit(popup, gameId);
         if (onResolve) {
             onResolve(); // Resolve promise to allow animation to continue
@@ -367,6 +367,7 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
     // Checkbox handler: persist so "don't show again" survives navigation (e.g. lineup -> court full page load)
     const checkbox = popup.querySelector('#dont-show-again-checkbox');
     checkbox.addEventListener('change', (e) => {
+        if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
         const checked = e.target.checked;
         dontShowAgainThisGame = checked;
         if (typeof sessionStorage !== 'undefined' && gameId) {

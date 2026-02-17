@@ -350,16 +350,36 @@
     right.insertBefore(btn, right.firstChild);
   }
 
+  function function playNavSound(filename) {
+    try {
+      var a = new Audio('/sounds/' + encodeURIComponent(filename));
+      a.volume = 0.7;
+      a.play().catch(function () {});
+    } catch (e) {}
+  }
+
   function injectAuthBar() {
     var existing = document.getElementById('auth-bar');
     if (existing) {
       ensureFeedbackButton();
+      ensureTutorialsNavSound();
       document.body.classList.add('has-auth-bar');
       return;
     }
     var bar = createAuthBarHTML();
     document.body.insertBefore(bar, document.body.firstChild);
     document.body.classList.add('has-auth-bar');
+    ensureTutorialsNavSound();
+  }
+
+  function ensureTutorialsNavSound() {
+    var bar = document.getElementById('auth-bar');
+    if (!bar) return;
+    var tutorialsBtn = bar.querySelector('.tutorials-nav-btn');
+    if (tutorialsBtn && !tutorialsBtn.dataset.soundBound) {
+      tutorialsBtn.dataset.soundBound = '1';
+      tutorialsBtn.addEventListener('click', function () { playNavSound('click-tiny.wav'); });
+    }
   }
 
   function createFooterHTML() {
@@ -526,7 +546,15 @@
       statusEl.style.color = isError ? '#b91c1c' : '#6b7280';
     }
 
+    function playSound(filename) {
+      try {
+        var a = new Audio('/sounds/' + encodeURIComponent(filename));
+        a.volume = 0.7;
+        a.play().catch(function () {});
+      } catch (e) {}
+    }
     function openModal() {
+      playSound('click-tiny.wav');
       setStatus('', false);
       backdrop.classList.add('open');
       messageEl.focus();

@@ -1,5 +1,13 @@
 // Training Report Page JavaScript
 
+function playSound(filename) {
+  try {
+    const a = new Audio('/sounds/' + encodeURIComponent(filename));
+    a.volume = 0.7;
+    a.play().catch(() => {});
+  } catch (e) {}
+}
+
 const urlParams = new URLSearchParams(window.location.search);
 const mode = urlParams.get('mode');
 const franchiseId = urlParams.get('franchise_id');
@@ -115,6 +123,7 @@ function setupViewToggle() {
   });
   toggleButtons.forEach(btn => {
     btn.addEventListener('click', () => {
+      playSound('click-tiny.wav');
       toggleButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentView = btn.dataset.view;
@@ -128,6 +137,7 @@ function setupLockerRoomButton() {
   if (!btn) return;
   
   btn.addEventListener('click', () => {
+    playSound('click-strong.wav');
     if (mode === 'franchise') {
       window.location.href = `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}`;
     } else if (mode === 'tournament') {

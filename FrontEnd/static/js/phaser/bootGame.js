@@ -2042,6 +2042,7 @@ async function handleGameCompletion({ gameId, lastSummary, tournamentId, franchi
 }
 
 async function handleSimQuarter() {
+  if (typeof window.playSound === 'function') window.playSound('positive-beep.wav');
   // ✅ FIX: Calculate next quarter (handle pre-game screen where quarter = 0)
   // On pre-game screen (quarter = 0), nextQuarter = 0 + 1 = 1 (correct)
   // On Q1 break (quarter = 1), nextQuarter = 1 + 1 = 2 (correct)
@@ -2303,6 +2304,7 @@ async function handleSimQuarter() {
 }
 
 async function handleSimFullGame() {
+  if (typeof window.playSound === 'function') window.playSound('positive-plop.wav');
   if (isSimulating) return;
   
   // ✅ PHASE 1.1: URL is source of truth - read from URL if module-level gameId is missing
@@ -2570,6 +2572,7 @@ async function initGame() {
   
   if (playBtn) {
     playBtn.addEventListener('click', async () => {
+      if (typeof window.playSound === 'function') window.playSound('positive-slide.wav');
       try {
         await handleButtonClick(true);
       } catch (error) {

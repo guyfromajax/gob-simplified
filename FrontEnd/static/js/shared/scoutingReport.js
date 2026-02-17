@@ -94,6 +94,11 @@ function setupScoutingReport(loadScoutingReportCallback) {
   
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
+      try {
+        var a = new Audio('/sounds/' + encodeURIComponent('x-back.mp3'));
+        a.volume = 0.7;
+        a.play().catch(function () {});
+      } catch (e) {}
       if (modal) modal.style.display = 'none';
     });
   }

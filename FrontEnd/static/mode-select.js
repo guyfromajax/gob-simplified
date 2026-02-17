@@ -1,3 +1,11 @@
+function playSound(filename) {
+  try {
+    var a = new Audio('/sounds/' + encodeURIComponent(filename));
+    a.volume = 0.7;
+    a.play().catch(function () {});
+  } catch (e) {}
+}
+
 const scrimmageBtn = document.getElementById('scrimmage-btn');
 const tournamentPlayNowBtn = document.getElementById('tournament-play-now-btn');
 const tournamentNewBtn = document.getElementById('tournament-new-btn');
@@ -102,6 +110,7 @@ function franchiseStatusLabel(data) {
 
 if (scrimmageBtn) {
   scrimmageBtn.addEventListener('click', () => {
+    playSound('click-strong.wav');
     window.location.href = './scrimmage-select.html';
   });
 }
@@ -109,6 +118,7 @@ if (scrimmageBtn) {
 // Tournament: Play Now → TCC (or resolved TCC when completed; same URL)
 if (tournamentPlayNowBtn) {
   tournamentPlayNowBtn.addEventListener('click', () => {
+    playSound('click-strong.wav');
     if (currentTournament && currentTournament._id) {
       window.location.href = `./tournament.html?tournament_id=${encodeURIComponent(currentTournament._id)}`;
     } else {
@@ -136,6 +146,7 @@ function goToNewTournament() {
 
 if (tournamentNewBtn) {
   tournamentNewBtn.addEventListener('click', () => {
+    playSound('click-beep.wav');
     const dontShow = typeof localStorage !== 'undefined' && localStorage.getItem(DONT_SHOW_NEW_TOURNAMENT_WARNING_KEY) === '1';
     const hasExistingTournament = !!currentTournament;
     if (hasExistingTournament && !dontShow) {
@@ -176,6 +187,7 @@ if (newTournamentModalConfirm) {
 // Franchise: Play Now → FCC (or resolved FCC when in end state; same URL)
 if (franchisePlayNowBtn) {
   franchisePlayNowBtn.addEventListener('click', () => {
+    playSound('click-strong.wav');
     if (currentFranchise && currentFranchise.franchise_id) {
       window.location.href = `./franchise-command-center.html?franchise_id=${encodeURIComponent(currentFranchise.franchise_id)}`;
     } else {
@@ -203,6 +215,7 @@ function goToNewFranchise() {
 
 if (franchiseNewBtn) {
   franchiseNewBtn.addEventListener('click', async () => {
+    playSound('click-beep.wav');
     const dontShow = typeof localStorage !== 'undefined' && localStorage.getItem(DONT_SHOW_NEW_FRANCHISE_WARNING_KEY) === '1';
     const hasExistingFranchise = !!currentFranchise;
     if (hasExistingFranchise && !dontShow) {

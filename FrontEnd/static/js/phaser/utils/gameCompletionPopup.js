@@ -243,6 +243,17 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
 
   // Single game: delete completed game from DB when user leaves via "Go To Locker Room" (not when viewing Box Score)
   const lockerRoomBtn = popup.querySelector('.locker-room-button');
+  const boxScoreBtn = popup.querySelector('.box-score-button');
+  if (boxScoreBtn) {
+    boxScoreBtn.addEventListener('click', () => {
+      if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
+    });
+  }
+  if (lockerRoomBtn) {
+    lockerRoomBtn.addEventListener('click', () => {
+      if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
+    });
+  }
   if (lockerRoomBtn && mode === 'single' && gameId) {
     lockerRoomBtn.addEventListener('click', async (e) => {
       e.preventDefault();

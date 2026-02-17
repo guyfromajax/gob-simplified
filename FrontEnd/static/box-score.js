@@ -1,6 +1,14 @@
 // Box Score Page JavaScript
 // Fetches game data and renders box score information
 
+function playSound(filename) {
+  try {
+    const a = new Audio('/sounds/' + encodeURIComponent(filename));
+    a.volume = 0.7;
+    a.play().catch(() => {});
+  } catch (e) {}
+}
+
 let gameData = null;
 
 // Initialize on page load
@@ -1441,6 +1449,7 @@ function setupTabs() {
     }
     
     button.addEventListener('click', () => {
+      playSound('click-tiny.wav');
       // Update active tab
       tabButtons.forEach(btn => btn.classList.remove('active'));
       button.classList.add('active');
@@ -1543,6 +1552,7 @@ function setupLockerRoomButton() {
     backButton.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
+      playSound('x-back.mp3');
       window.location.href = backUrl;
     });
     return;

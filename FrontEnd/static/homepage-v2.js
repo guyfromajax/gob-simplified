@@ -7,6 +7,14 @@
   const CAROUSEL_INTERVAL_MS = 7500;
   var carouselInitialized = false;
 
+  function playSound(filename) {
+    try {
+      var a = new Audio('/sounds/' + encodeURIComponent(filename));
+      a.volume = 0.7;
+      a.play().catch(function () {});
+    } catch (e) {}
+  }
+
   function initCarousel() {
     if (carouselInitialized) return;
     const slides = document.querySelectorAll('.carousel-slide');
@@ -66,6 +74,10 @@
       } else {
         startInterval();
       }
+    });
+
+    document.querySelectorAll('.carousel-cta').forEach(function (link) {
+      link.addEventListener('click', function () { playSound('click-strong.wav'); });
     });
   }
 

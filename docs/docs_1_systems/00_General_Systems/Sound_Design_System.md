@@ -1,84 +1,182 @@
-# SFX System
+# Sound Design System
 
-Sound effects used across the app. Assets live under `FrontEnd/static/sounds/`. Playback uses root-relative `/sounds/` with `encodeURIComponent(filename)` for names with spaces/parentheses. Volume is typically 0.7; playback is wrapped in try/catch and `play().catch(() => {})` to avoid autoplay errors.
+Sound effects used across the app. Assets live under `FrontEnd/static/sounds/`. The canonical spec is `FrontEnd/static/sounds/_SFX_notes.md`. Playback uses root-relative `/sounds/` with `encodeURIComponent(filename)` for names with spaces/parentheses. Volume is typically 0.7; playback is wrapped in try/catch and `play().catch(() => {})` to avoid autoplay errors.
 
 ---
 
-## Timeout popup
+## Sound name → file reference
+
+| Short name       | Filename           |
+|-----------------|--------------------|
+| click-strong    | click-strong.wav   |
+| click-tiny      | click-tiny.wav     |
+| click-beep      | click-beep.wav     |
+| click-handgun   | click-handgun.mp3  |
+| click-soft      | click-soft.mp3     |
+| x-back          | x-back.mp3         |
+| positive-beep   | positive-beep.wav  |
+| positive-slide  | positive-slide.wav |
+| positive-plop   | positive-plop.wav  |
+| confirm-1       | confirm-1.mp3      |
+| confirm-2       | confirm-2.mp3      |
+| movement-cycle  | movement-cycle.mp3 |
+| chaotic-choice  | chaotic-choice.wav |
+| whistle-3       | whistle-3.mp3      |
+
+---
+
+## Homepage
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| Play Alpha button (carousel CTA) | click-strong | `click-strong.wav` | `FrontEnd/static/homepage-v2.js` — `.carousel-cta` click |
+
+---
+
+## Top Nav Bar
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| Tutorials button | click-tiny | `click-tiny.wav` | `FrontEnd/static/js/shared/authBarInit.js` — `.tutorials-nav-btn` click |
+| Feedback button | click-tiny | `click-tiny.wav` | `authBarInit.js` — `#feedback-btn` → `openModal()` |
+
+---
+
+## Tutorials
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| Tab headers (Player Attributes, Team Attributes, etc.) | click-tiny | `click-tiny.wav` | `FrontEnd/static/tutorial.html` — `.tutorial-tab` click |
+| Closing an accordion section | movement-cycle | `movement-cycle.mp3` | `tutorial.html` — `.tutorial-attr-toggle` click when toggling to closed (`!isOpen`) |
+
+---
+
+## Mode-Select
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| Play Now (Scrimmage, Tournament, Franchise) | click-strong | `click-strong.wav` | `FrontEnd/static/mode-select.js` — scrimmage-btn, tournament-play-now-btn, franchise-play-now-btn |
+| New Tournament / New Franchise | click-beep | `click-beep.wav` | `mode-select.js` — tournament-new-btn, franchise-new-btn |
+
+---
+
+## Team-Select
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| Team buttons (Single Game / Scrimmage) | click-handgun | `click-handgun.mp3` | `FrontEnd/static/team-select.js` — logo button click and drop |
+| Team buttons (Tournament / Franchise) | click-beep | `click-beep.wav` | `tournament-select.js`, `franchise-select-team.js` — team button click |
+| Play Now (Single Game) | click-beep | `click-beep.wav` | `team-select.js` — `#play-btn` click |
+
+---
+
+## FCC / TCC
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| Exit Tournament / Exit Franchise | x-back | `x-back.mp3` | `tournament.js` — `#exit-tournament`; `franchise-command-center.js` — `#exit-franchise` |
+| Set Game Plan, Playbooks | positive-beep | `positive-beep.wav` | `franchise-command-center.js`, `tournament.js` — set-gameplan / playbooks button click |
+| Scouting Report | positive-slide | `positive-slide.wav` | `franchise-command-center.js`, `tournament.js` — `loadScoutingReport()` start |
+| Play Next Game / Run Training | confirm-1 | `confirm-1.mp3` | Same files — `#play-now` click |
+| Tab headers | click-tiny | `click-tiny.wav` | `FrontEnd/static/js/shared/commandCenterTabs.js` — tab button click |
+
+---
+
+## Game Plan
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| Save Game Plan (button or modal) | confirm-2 | `confirm-2.mp3` | `FrontEnd/static/game-plan.js` — btnSaveGamePlan click, modal Save click |
+| Slider move & release | click-tiny | `click-tiny.wav` | `game-plan.js` — slider `change` in `setupSliders()` |
+| Back To Locker Room | x-back | `x-back.mp3` | `game-plan.js` — btnNavPrimary (Back To Locker Room) click |
+| Play Game | confirm-1 | `confirm-1.mp3` | `game-plan.js` — btnNavPrimary (Play Game) click; navigation delayed 200 ms |
+
+---
+
+## Playbooks
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| Save Playbooks | confirm-2 | `confirm-2.mp3` | `FrontEnd/static/playbooks.js` — `handleSubmit()` start |
+| Even Distribution (on/off) | click-handgun | `click-handgun.mp3` | `playbooks.js` — `handleEvenDistribution()`, `handleEvenDistributionAll()` |
+| Playcall Center slot buttons (1–6) | click-tiny | `click-tiny.wav` | `playbooks.js` — `handleSlotClick()` |
+| Percentage spinner up/down | click-tiny | `click-tiny.wav` | `playbooks.js` — percentage input `input` when delta ±1 |
+| Percentage manual entry (commit) | click-soft | `click-soft.mp3` | `playbooks.js` — percentage input `change` |
+| Standard / PG / SG / SF / PF / C (position filter) | positive-plop | `positive-plop.wav` | `playbooks.js` — `.position-filter-btn` click |
+
+---
+
+## Scouting Report Pop-Up
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| X to close | x-back | `x-back.mp3` | `FrontEnd/static/js/shared/scoutingReport.js` — `.scouting-modal-close` click |
+
+---
+
+## Lineup Screen
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| Add player (click row or drag & drop into slot) | click-soft | `click-soft.mp3` | `FrontEnd/static/set-lineup.js` — roster row click, slot `drop` |
+| Remove player (Red X) | x-back | `x-back.mp3` | `set-lineup.js` — slot `.remove` click before `clearSlot()` |
+| Drag & drop within lineup (reorder) | click-soft | `click-soft.mp3` | `set-lineup.js` — slot `drop` when swapping/reassigning |
+| Game Plan, Playbooks buttons | positive-beep | `positive-beep.wav` | `set-lineup.js` — `#gameplan-optional`, `#playbooks-button` |
+| Box Score button | positive-slide | `positive-slide.wav` | `set-lineup.js` — `#box-score-button` |
+| Autoset Lineup | chaotic-choice | `chaotic-choice.wav` | `set-lineup.js` — `autosetLineup()` start |
+| Grid View / Player View toggle | click-tiny | `click-tiny.wav` | `set-lineup.js` — `.view-toggle-btn` click |
+| Play Game | confirm-1 | `confirm-1.mp3` | `set-lineup.js` — `#play-now` click; navigation delayed 200 ms |
+
+---
+
+## Gameplay Buttons Popup (court.html)
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| Play Quarter | positive-slide | `positive-slide.wav` | `FrontEnd/static/js/phaser/bootGame.js` — `.play-button` click |
+| Sim Full Game / Sim Rest of Game | positive-plop | `positive-plop.wav` | `bootGame.js` — `handleSimFullGame()` start |
+| Sim Quarter | positive-beep | `positive-beep.wav` | `bootGame.js` — `handleSimQuarter()` start |
+
+---
+
+## Defense Matchups Popup (court.html)
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| Drag & drop players | click-soft | `click-soft.mp3` | `FrontEnd/static/js/phaser/utils/defenseMatchupsPopup.js` — drop handler |
+| Submit Defense Matchups | confirm-1 | `confirm-1.mp3` | `defenseMatchupsPopup.js` — `.submit-matchups-button` click |
+| Don't show again this game checkbox | click-tiny | `click-tiny.wav` | `defenseMatchupsPopup.js` — `#dont-show-again-checkbox` change |
+
+---
+
+## Playcall Center (court.html)
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| Offense play select | confirm-2 | `confirm-2.mp3` | `FrontEnd/static/court.html` — `#offense-play-scroller` click |
+| Up/down toggle arrows (offense plays) | click-tiny | `click-tiny.wav` | `court.html` — `#play-nav-up`, `#play-nav-down` |
+| Defense play or aggression select | confirm-2 | `confirm-2.mp3` | `court.html` — defense override button click |
+| Red X (offense, defense, aggression) | x-back | `x-back.mp3` | `court.html` — clear-offense-override-x, clear-defense-override-x, clear-aggression-override-x |
+
+---
+
+## Court UI (in-game)
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| Timeout (green UI button) | click-beep | `click-beep.wav` | `FrontEnd/static/js/phaser/utils/timeoutButtonManager.js` — timeout button click |
+| Pause / Resume | click-tiny | `click-tiny.wav` | `FrontEnd/static/js/phaser/gameScene.js` — `#pause-btn` click |
+| Game Speed (button and options) | click-tiny | `click-tiny.wav` | `gameScene.js` — `#game-speed-btn`, `.speed-option` click |
+| In-game popup buttons (Go To Timeout, quarter break, foul out, EOG) | click-tiny | `click-tiny.wav` | `timeoutButtonManager.js` (Go To Timeout); `gameScene.js` (quarter/OT popups); `foulOutPopup.js` (Sub Players); `gameCompletionPopup.js` (Box Score, Go To Locker Room) |
+
+---
+
+## Timeout popup (airhorn)
 
 | Trigger | Sound | Asset | Volume | Location |
 |--------|--------|-------|--------|----------|
-| Timeout popup appears (user-called timeout) | Airhorn | `sounds/Timeout - Airhorn.mp3` | 70% | `FrontEnd/static/js/phaser/utils/timeoutButtonManager.js` |
-| Computer timeout (navigate to lineup) | Airhorn | `sounds/Timeout - Airhorn.mp3` | 70% | `timeoutButtonManager.js` → `showTimeoutPopup(computerTimeout: true)` |
-
-The airhorn plays when the user calls a timeout and the “**[Team] Called Timeout**” popup (with “Go To Timeout” button) is shown. For **user** timeouts, playback is immediately before the popup; for **computer** timeouts, at the start of `showTimeoutPopup(computerTimeout: true)` with an 800 ms delay before navigation so it's audible. Sounds are loaded on demand via `ensureTimeoutSounds()` so the airhorn works for computer timeouts even if the timeout button was never initialized.
-
----
-
-## Lineup
-
-| Trigger | Sound | Asset | Location |
-|--------|--------|-------|----------|
-| Player dropped into a lineup slot | Click | `click-soft.mp3` | `FrontEnd/static/set-lineup.js` — `playSound('click-soft.mp3')` in both drop handlers (slotsContainer `drop` and slot `drop` in `setupSlotDragAndDrop`) |
-| Click row (no drag) to add player to next slot | Click | `click-soft.mp3` | `FrontEnd/static/set-lineup.js` — roster row click before `fillNextSlot()` |
-| Red X — remove player from slot | Collapse/expand | `collapse-expand.mp3` | `FrontEnd/static/set-lineup.js` — slot `.remove` button click before `clearSlot()` |
-| Game Plan button | Button click | `click-strong.wav` | `FrontEnd/static/set-lineup.js` — `#gameplan-optional` click |
-| Playbooks button | Button click | `click-strong.wav` | `FrontEnd/static/set-lineup.js` — `#playbooks-button` click |
-| Box Score button | Button click | `click-strong.wav` | `FrontEnd/static/set-lineup.js` — `#box-score-button` click |
-| Autoset Lineup button | Confirm | `confirm-1.mp3` | `FrontEnd/static/set-lineup.js` — at start of `autosetLineup()` |
-
----
-
-## Save actions
-
-| Trigger | Sound | Asset | Location |
-|--------|--------|-------|----------|
-| Save Game Plan (main button or modal "Save Game Plan") | Confirm | `confirm-1.mp3` | `FrontEnd/static/game-plan.js` — before `saveGamePlan()` |
-| Save Playbooks (submit or modal "Save Playbooks") | Confirm | `confirm-1.mp3` | `FrontEnd/static/playbooks.js` — at start of `handleSubmit()` |
-
----
-
-## Playbooks screen
-
-| Trigger | Sound | Asset | Location |
-|--------|--------|-------|----------|
-| 1–6 slot buttons (assign play to Playcall Center slot) | Pace | `positive-slide.wav` | `FrontEnd/static/playbooks.js` — at start of `handleSlotClick()` |
-| Even Distribution (per section) or Even Distribution - All | Handgun | `click-handgun.mp3` | `FrontEnd/static/playbooks.js` — at start of `handleEvenDistribution()` and `handleEvenDistributionAll()` |
-
----
-
-## FCC / TCC — nav buttons
-
-| Trigger | Sound | Asset | Location |
-|--------|--------|-------|----------|
-| Game Plan button (FCC) | Button click | `click-strong.wav` | `FrontEnd/static/franchise-command-center.js` — `#set-gameplan-franchise` click |
-| Playbooks button (FCC) | Button click | `click-strong.wav` | `FrontEnd/static/franchise-command-center.js` — `#playbooks-franchise` click |
-| Scouting Report button (FCC) | Button click | `click-strong.wav` | `FrontEnd/static/franchise-command-center.js` — at start of `loadScoutingReport()` |
-| Game Plan button (TCC) | Button click | `click-strong.wav` | `FrontEnd/static/tournament.js` — `#set-gameplan-tournament` click |
-| Playbooks button (TCC) | Button click | `click-strong.wav` | `FrontEnd/static/tournament.js` — `#playbooks-tournament` click |
-| Scouting Report button (TCC) | Button click | `click-strong.wav` | `FrontEnd/static/tournament.js` — at start of `loadScoutingReport()` |
-
----
-
-## Playcall Center (court)
-
-| Trigger | Sound | Asset | Location |
-|--------|--------|-------|----------|
-| Offense play selected (user clicks a play in the offense scroller) | Confirm | `confirm-2.mp3` | `FrontEnd/static/court.html` — offense `#offense-play-scroller` click handler |
-| Defense play selected (Man/Zone) or aggression selected (Passive/Normal/Aggressive) | Confirm | `confirm-2.mp3` | `FrontEnd/static/court.html` — defense override button click handler |
-| Offense play up/down toggle arrows (▲ ▼) | Defense | `click-tiny.wav` | `FrontEnd/static/court.html` — `#play-nav-up` and `#play-nav-down` click handlers |
-| Red X — clear offense override | Collapse/expand | `collapse-expand.mp3` | `FrontEnd/static/court.html` — `#clear-offense-override-x` click |
-| Red X — clear defense override | Collapse/expand | `collapse-expand.mp3` | `FrontEnd/static/court.html` — `#clear-defense-override-x` click |
-| Red X — clear aggression override | Collapse/expand | `collapse-expand.mp3` | `FrontEnd/static/court.html` — `#clear-aggression-override-x` click |
-
----
-
-## Play Game
-
-| Trigger | Sound | Asset | Location |
-|--------|--------|-------|----------|
-| Play Game button (Lineup screen, `#play-now`) | Offense | `positive-plop.wav` | `FrontEnd/static/set-lineup.js` — before navigating to court; navigation delayed 200 ms so sound can start |
-| Play Game button (Game Plan screen) | Offense | `positive-plop.wav` | `FrontEnd/static/game-plan.js` — `btnNavPrimary` click when label is "Play Game"; `navigateToCourt()` delayed 200 ms so sound can start |
+| Timeout popup appears (user-called timeout) | Airhorn | `Timeout - Airhorn.mp3` | 70% | `timeoutButtonManager.js` |
+| Computer timeout (navigate to lineup) | Airhorn | `Timeout - Airhorn.mp3` | 70% | `timeoutButtonManager.js` → `showTimeoutPopup(computerTimeout: true)` |
 
 ---
 
@@ -86,24 +184,37 @@ The airhorn plays when the user calls a timeout and the “**[Team] Called Timeo
 
 | Trigger | Sound | Asset | Location |
 |--------|--------|-------|----------|
-| Shooting foul, offensive foul, defensive non-shooting foul, dead ball turnover — when the on-screen announcement appears | Match wise | `whistle-1.mp3` | `FrontEnd/static/js/phaser/utils/announcements.js` — in `showAnnouncement()` when text is foul- or dead-ball-turnover-related; in `showAndOneAnnouncement()` for AND-1 (shooting foul). **Not** played for STEAL! (live-ball turnover). |
-
-Playback is synced to the moment the announcement is shown (same frame as adding to DOM / adding `active` class).
+| Foul or dead-ball turnover announcement shown | whistle-1 | `whistle-1.mp3` | `FrontEnd/static/js/phaser/utils/announcements.js` — `showAnnouncement()`, `showAndOneAnnouncement()` when text is foul- or dead-ball-turnover-related. Not played for STEAL! (live-ball). |
 
 ---
 
-## FCC / TCC / Tutorials — tab click
+## Box Score
 
 | Trigger | Sound | Asset | Location |
 |--------|--------|-------|----------|
-| New tab selected in Franchise Command Center | Back | `x-back.mp3` | `FrontEnd/static/js/shared/commandCenterTabs.js` — tab button click |
-| New tab selected in Tournament Command Center | Back | `x-back.mp3` | Same shared module |
-| New tab selected in Tutorials (Player Attributes, Team Attributes, Game Plans, Playbooks, Training) | Back | `x-back.mp3` | `FrontEnd/static/tutorial.html` — `.tutorial-tab` click |
+| Team tabs (Home/Away) | click-tiny | `click-tiny.wav` | `FrontEnd/static/box-score.js` — `.tab-button` click in `setupTabs()` |
+| Back | x-back | `x-back.mp3` | `box-score.js` — Back button click (when from lineup/game-plan) |
 
 ---
 
-## Tutorials — accordion expand
+## Training
 
 | Trigger | Sound | Asset | Location |
 |--------|--------|-------|----------|
-| Any accordion header expanded (e.g. Scoring (SC), Fight, Discipline) in any Tutorial tab | Cycle | `movement-cycle.mp3` | `FrontEnd/static/tutorial.html` — `.tutorial-attr-toggle` click, when toggling to open (`isOpen === true`) |
+| Auto-Train | chaotic-choice | `chaotic-choice.wav` | `FrontEnd/static/training.js` — `autoAssignTraining()` start |
+| Submit Training | confirm-2 | `confirm-2.mp3` | `training.js` — submit button click |
+| Slider move & release | click-tiny | `click-tiny.wav` | `training.js` — slider `change` |
+| Coaching style / focus: Authoritarian (any of four) | whistle-3 | `whistle-3.mp3` | `training.js` — coaching radio `change` when value starts with `authoritarian` |
+| Coaching style / focus: Systems Coach (any of four) | positive-slide | `positive-slide.wav` | `training.js` — value starts with `systems-coach` |
+| Coaching style / focus: Player Maximizer (any of four) | positive-plop | `positive-plop.wav` | `training.js` — value starts with `player-maximizer` |
+| Coaching style / focus: Culture Builder (any of four) | positive-beep | `positive-beep.wav` | `training.js` — value starts with `culture-builder` |
+| Close button (auto-training popup) | click-tiny | `click-tiny.wav` | `training.js` — `#auto-train-modal-close` click |
+
+---
+
+## Training Report
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| Attributes / Training Changes toggle | click-tiny | `click-tiny.wav` | `FrontEnd/static/training-report.js` — `.toggle-btn` click |
+| Go To Locker Room | click-strong | `click-strong.wav` | `training-report.js` — `#locker-room-btn` click |

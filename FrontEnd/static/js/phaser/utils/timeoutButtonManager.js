@@ -57,7 +57,7 @@ function ensureTimeoutSounds() {
         const API_CONFIG = window.API_CONFIG;
         const staticPath = API_CONFIG ? API_CONFIG.getStaticPath() : '/static';
         if (!timeoutSound) {
-            timeoutSound = new Audio(`${staticPath}/sounds/click-strong.wav`);
+            timeoutSound = new Audio(`${staticPath}/sounds/click-beep.wav`);
             timeoutSound.volume = 0.5;
         }
         if (!airhornSound) {
@@ -661,6 +661,7 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
     // ✅ FIX 2: Add click handler for button - navigation only happens on explicit click
     const goToTimeoutBtn = popup.querySelector('.go-to-timeout-button');
     goToTimeoutBtn.addEventListener('click', async () => {
+        if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
         console.log('🔍 [TIMEOUT DEBUG] User clicked "Go To Timeout" button');
         
         // ✅ SAFEGUARD: Set flag to indicate user explicitly clicked button

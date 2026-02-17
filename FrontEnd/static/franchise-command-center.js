@@ -1255,7 +1255,7 @@ function playSound(filename) {
 const playNowBtn = document.getElementById('play-now');
 playNowBtn.disabled = true;
 playNowBtn.addEventListener('click', async () => {
-  playSound('click-handgun.mp3');
+  playSound('confirm-1.mp3');
   const mode = playNowBtn.dataset.mode || 'play';
   
   if (mode === 'training') {
@@ -1416,7 +1416,7 @@ function wireFccNavButtons() {
   const setGameplanBtn = document.getElementById('set-gameplan-franchise');
   if (setGameplanBtn) {
     setGameplanBtn.addEventListener('click', () => {
-      playSound('click-strong.wav');
+      playSound('positive-beep.wav');
       if (!franchiseId || !userTeamId) {
         alert('Franchise or user team not loaded');
         return;
@@ -1428,7 +1428,7 @@ function wireFccNavButtons() {
   const playbooksBtn = document.getElementById('playbooks-franchise');
   if (playbooksBtn) {
     playbooksBtn.addEventListener('click', () => {
-      playSound('click-strong.wav');
+      playSound('positive-beep.wav');
       if (!franchiseId || !userTeamId) {
         alert('Franchise or user team not loaded');
         return;
@@ -1460,6 +1460,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const exitFranchiseBtn = document.getElementById('exit-franchise');
   if (exitFranchiseBtn) {
     exitFranchiseBtn.addEventListener('click', () => {
+      playSound('x-back.mp3');
       window.location.href = '/mode-select.html';
     });
   }
@@ -2081,7 +2082,7 @@ function updateScoutingButton(data) {
 }
 
 async function loadScoutingReport() {
-  playSound('click-strong.wav');
+  playSound('positive-slide.wav');
   if (!upcomingOpponent || !franchiseId) {
     alert('No upcoming opponent found');
     return;

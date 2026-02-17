@@ -770,7 +770,7 @@ function updatePlayButton() {
 }
 
 function autosetLineup() {
-  playSound('confirm-1.mp3');
+  playSound('chaotic-choice.wav');
   // Clear current lineup
   document.querySelectorAll('.slot').forEach(slot => clearSlot(slot));
   
@@ -1242,7 +1242,7 @@ function wireLineupNavButtons() {
   const gameplanBtn = document.getElementById('gameplan-optional');
   if (gameplanBtn) {
     gameplanBtn.addEventListener('click', async () => {
-      playSound('click-strong.wav');
+      playSound('positive-beep.wav');
       console.log('🎮 GAME PLAN BUTTON CLICKED! Redirecting to game-plan.html');
       const currentUrlParams = new URLSearchParams(window.location.search);
       let currentGameId = currentUrlParams.get('game_id');
@@ -1308,7 +1308,7 @@ function wireLineupNavButtons() {
   const playbooksBtn = document.getElementById('playbooks-button');
   if (playbooksBtn) {
     playbooksBtn.addEventListener('click', async () => {
-      playSound('click-strong.wav');
+      playSound('positive-beep.wav');
       console.log('📚 PLAYBOOKS BUTTON CLICKED! Redirecting to playbooks.html');
       const currentUrlParams = new URLSearchParams(window.location.search);
       let currentGameId = currentUrlParams.get('game_id');
@@ -1378,7 +1378,7 @@ function wireLineupNavButtons() {
   const boxBtn = document.getElementById('box-score-button');
   if (boxBtn) {
     boxBtn.addEventListener('click', () => {
-      playSound('click-strong.wav');
+      playSound('positive-slide.wav');
       const helper = window.TimeoutNavigationHelper;
       if (!helper) {
         console.error('❌ [SET-LINEUP] TimeoutNavigationHelper not loaded!');
@@ -1580,7 +1580,7 @@ async function init() {
       DEBUG && console.log('[lineup] launching quarter', quarter);
       const finalUrl = `/court.html?${params.toString()}`;
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Navigating to court.html:', finalUrl);
-      playSound('positive-plop.wav');
+      playSound('confirm-1.mp3');
       // Delay navigation so the sound can start before the page unloads
       setTimeout(() => { window.location.href = finalUrl; }, 200);
     });
@@ -1613,6 +1613,7 @@ function initViewToggle() {
   const toggleBtns = document.querySelectorAll('.view-toggle-btn');
   toggleBtns.forEach(btn => {
     btn.addEventListener('click', () => {
+      playSound('click-tiny.wav');
       const view = btn.dataset.view;
       switchView(view);
     });
@@ -2262,7 +2263,7 @@ function setupSlotDragAndDrop() {
       
       newRemoveBtn.addEventListener('click', (e) => {
         e.stopPropagation(); // Prevent slot click from firing
-        playSound('collapse-expand.mp3');
+        playSound('x-back.mp3');
         clearSlot(slot);
       });
     }
