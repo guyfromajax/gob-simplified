@@ -36,8 +36,12 @@ The airhorn plays when the user calls a timeout and the “**[Team] Called Timeo
 
 | Trigger | Sound | Asset | Location |
 |--------|--------|-------|----------|
-| Offense play selected (user clicks a play in the offense scroller) | Confirm | `Confirm - Option 2 (1).mp3` | `FrontEnd/static/court.html` — offense `#offense-play-scroller` click handler, after selecting option |
-| Defense type or aggression clicked (Man/Zone or Passive/Normal/Aggressive) | Defense | `Defense buttons.wav` | `FrontEnd/static/court.html` — defense button click handler (at start of click) |
+| Offense play selected (user clicks a play in the offense scroller) | Confirm | `Confirm - Option 2 (1).mp3` | `FrontEnd/static/court.html` — offense `#offense-play-scroller` click handler |
+| Defense play selected (Man/Zone) or aggression selected (Passive/Normal/Aggressive) | Confirm | `Confirm - Option 2 (1).mp3` | `FrontEnd/static/court.html` — defense override button click handler |
+| Offense play up/down toggle arrows (▲ ▼) | Defense | `Defense buttons.wav` | `FrontEnd/static/court.html` — `#play-nav-up` and `#play-nav-down` click handlers |
+| Red X — clear offense override | Collapse/expand | `Collapse & Expand.mp3` | `FrontEnd/static/court.html` — `#clear-offense-override-x` click |
+| Red X — clear defense override | Collapse/expand | `Collapse & Expand.mp3` | `FrontEnd/static/court.html` — `#clear-defense-override-x` click |
+| Red X — clear aggression override | Collapse/expand | `Collapse & Expand.mp3` | `FrontEnd/static/court.html` — `#clear-aggression-override-x` click |
 
 ---
 
@@ -45,9 +49,8 @@ The airhorn plays when the user calls a timeout and the “**[Team] Called Timeo
 
 | Trigger | Sound | Asset | Location |
 |--------|--------|-------|----------|
-| Play Game button (Game Plan screen) | Offense | `Offense buttons.wav` | `FrontEnd/static/game-plan.js` — `btnNavPrimary` click when label is "Play Game", before `navigateToCourt()` |
-
-*(Lineup screen does not have a separate "Play Game" button; user goes to Game Plan first, then Play Game.)*
+| Play Game button (Lineup screen, `#play-now`) | Offense | `Offense buttons.wav` | `FrontEnd/static/set-lineup.js` — before navigating to court; navigation delayed 200 ms so sound can start |
+| Play Game button (Game Plan screen) | Offense | `Offense buttons.wav` | `FrontEnd/static/game-plan.js` — `btnNavPrimary` click when label is "Play Game"; `navigateToCourt()` delayed 200 ms so sound can start |
 
 ---
 
@@ -55,7 +58,7 @@ The airhorn plays when the user calls a timeout and the “**[Team] Called Timeo
 
 | Trigger | Sound | Asset | Location |
 |--------|--------|-------|----------|
-| Shooting foul, offensive foul, defensive non-shooting foul, dead ball turnover, steal — when the on-screen announcement appears | Match wise | `matchWisel.mp3` | `FrontEnd/static/js/phaser/utils/announcements.js` — in `showAnnouncement()` when text is foul- or turnover-related; in `showAndOneAnnouncement()` for AND-1 (shooting foul) |
+| Shooting foul, offensive foul, defensive non-shooting foul, dead ball turnover — when the on-screen announcement appears | Match wise | `matchWisel.mp3` | `FrontEnd/static/js/phaser/utils/announcements.js` — in `showAnnouncement()` when text is foul- or dead-ball-turnover-related; in `showAndOneAnnouncement()` for AND-1 (shooting foul). **Not** played for STEAL! (live-ball turnover). |
 
 Playback is synced to the moment the announcement is shown (same frame as adding to DOM / adding `active` class).
 

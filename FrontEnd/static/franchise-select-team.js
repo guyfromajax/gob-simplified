@@ -51,4 +51,13 @@ async function selectTeam(team) {
   }
 }
 
-document.addEventListener("DOMContentLoaded", createButtons);
+document.addEventListener("DOMContentLoaded", function () {
+  // Looping lobby music on franchise team-select screen
+  try {
+    var lobbyMusic = new Audio("/sounds/crossover-21738.mp3");
+    lobbyMusic.loop = true;
+    lobbyMusic.volume = 0.4;
+    lobbyMusic.play().catch(function () {});
+  } catch (e) {}
+  createButtons();
+});

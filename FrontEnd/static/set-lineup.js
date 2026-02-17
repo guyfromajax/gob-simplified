@@ -770,6 +770,7 @@ function updatePlayButton() {
 }
 
 function autosetLineup() {
+  playSound('Confirm - Option 1 (3).mp3');
   // Clear current lineup
   document.querySelectorAll('.slot').forEach(slot => clearSlot(slot));
   
@@ -1410,15 +1411,18 @@ async function init() {
       DEBUG && console.log('[lineup] launching quarter', quarter);
       const finalUrl = `/court.html?${params.toString()}`;
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Navigating to court.html:', finalUrl);
-      window.location.href = finalUrl;
+      playSound('Offense buttons.wav');
+      // Delay navigation so the sound can start before the page unloads
+      setTimeout(() => { window.location.href = finalUrl; }, 200);
     });
   }
-  
+
   // NEW: Optional Game Plan button (always enabled)
   const gameplanBtn = document.getElementById('gameplan-optional');
   console.log('🔍 Game Plan button found:', gameplanBtn);
   if (gameplanBtn) {
     gameplanBtn.addEventListener('click', async () => {
+      playSound('buttonClickSound.wav');
       console.log('🎮 GAME PLAN BUTTON CLICKED! Redirecting to game-plan.html');
       
       // ✅ PHASE 1.1: Ensure game_id exists before navigating (init-game might be in progress)
@@ -1528,6 +1532,7 @@ async function init() {
   const playbooksBtn = document.getElementById('playbooks-button');
   if (playbooksBtn) {
     playbooksBtn.addEventListener('click', async () => {
+      playSound('buttonClickSound.wav');
       console.log('📚 PLAYBOOKS BUTTON CLICKED! Redirecting to playbooks.html');
       
       // ✅ PHASE 1.1: Ensure game_id exists before navigating (init-game might be in progress)
@@ -1637,6 +1642,7 @@ async function init() {
   const boxBtn = document.getElementById('box-score-button');
   if (boxBtn) {
     boxBtn.addEventListener('click', () => {
+      playSound('buttonClickSound.wav');
       // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
       const helper = window.TimeoutNavigationHelper;
       if (!helper) {
@@ -2311,6 +2317,7 @@ renderRoster = function() {
       if (!p.ineligible && !p.fouled_out) {
         row.addEventListener('click', (e) => {
           if (!selectedIds.includes(p._id)) {
+            playSound('Click (1).mp3');
             fillNextSlot(p._id);
           }
         });
@@ -2346,6 +2353,7 @@ function setupSlotDragAndDrop() {
       
       newRemoveBtn.addEventListener('click', (e) => {
         e.stopPropagation(); // Prevent slot click from firing
+        playSound('Collapse & Expand.mp3');
         clearSlot(slot);
       });
     }

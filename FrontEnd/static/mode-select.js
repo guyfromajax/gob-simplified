@@ -371,6 +371,14 @@ async function checkForSavedGame() {
 */
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Looping lobby music on mode-select screen
+  try {
+    const lobbyMusic = new Audio('/sounds/crossover-21738.mp3');
+    lobbyMusic.loop = true;
+    lobbyMusic.volume = 0.4;
+    lobbyMusic.play().catch(() => {});
+  } catch (e) {}
+
   // ============================================================================
   // ALPHA MODE CONFIGURATION
   // ============================================================================

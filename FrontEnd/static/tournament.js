@@ -1625,9 +1625,17 @@ async function initializeTournament() {
   // Load team data for Team tab
   await loadTeamData();
 
+  function playSound(filename) {
+    try {
+      const a = new Audio('/sounds/' + encodeURIComponent(filename));
+      a.volume = 0.7;
+      a.play().catch(function() {});
+    } catch (e) {}
+  }
   const playBtn = document.getElementById('play-now');
   if (playBtn) {
     playBtn.addEventListener('click', async () => {
+      playSound('handgun.mp3');
       if (!tournament || !tournament._id) {
         alert('Tournament not loaded');
         return;

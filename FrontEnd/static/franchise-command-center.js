@@ -1244,9 +1244,18 @@ function updatePlayButton(data) {
   }
 }
 
+function playSound(filename) {
+  try {
+    const a = new Audio('/sounds/' + encodeURIComponent(filename));
+    a.volume = 0.7;
+    a.play().catch(function() {});
+  } catch (e) {}
+}
+
 const playNowBtn = document.getElementById('play-now');
 playNowBtn.disabled = true;
 playNowBtn.addEventListener('click', async () => {
+  playSound('handgun.mp3');
   const mode = playNowBtn.dataset.mode || 'play';
   
   if (mode === 'training') {

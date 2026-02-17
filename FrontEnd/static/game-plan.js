@@ -902,7 +902,8 @@ async function init() {
       btnNavPrimary.addEventListener('click', () => {
         console.log('🚀 [GAME-PLAN] btnNavPrimary (Play Game) CLICKED! About to call navigateToCourt()');
         playSound('Offense buttons.wav');
-        navigateToCourt();
+        // Delay navigation so the sound can start before the page unloads
+        setTimeout(() => navigateToCourt(), 200);
       });
     }
     if (btnBackToLineup) {

@@ -273,8 +273,9 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
   }
   
   // SFX: foul/turnover announcements (synced to on-screen announcement)
-  const isTurnoverAnnouncement = (text.includes('Turnover') || text === 'STEAL!');
-  if (isFoulAnnouncement || isTurnoverAnnouncement) {
+  // Dead-ball turnovers only (no whistle for STEAL! — live-ball turnover)
+  const isDeadBallTurnoverAnnouncement = text.includes('Turnover') && text !== 'STEAL!';
+  if (isFoulAnnouncement || isDeadBallTurnoverAnnouncement) {
     try {
       const sfx = new Audio('/sounds/' + encodeURIComponent('matchWisel.mp3'));
       sfx.volume = 0.7;

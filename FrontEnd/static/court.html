@@ -3571,7 +3571,7 @@
       // Handle defense button clicks
       defenseButtons.forEach(btn => {
         btn.addEventListener('click', async () => {
-          playSound('Defense buttons.wav');
+          playSound('Confirm - Option 2 (1).mp3');
           const defenseType = btn.dataset.defense; // 'Man' or 'Zone'
           const aggression = btn.dataset.aggression; // 'Passive', 'Normal', or 'Aggressive'
           
@@ -3638,6 +3638,7 @@
       // Clear offense override (query live DOM like defense/aggression Red X)
       if (clearOffenseBtn) {
         clearOffenseBtn.addEventListener('click', async () => {
+          playSound('Collapse & Expand.mp3');
           document.querySelectorAll('#offense-play-scroller .play-option').forEach(opt => opt.classList.remove('selected'));
           await setPlaycallOverride('offense', null); // null clears the override
         });
@@ -3656,6 +3657,7 @@
       const clearDefenseXBtn = document.getElementById('clear-defense-override-x');
       if (clearDefenseXBtn) {
         clearDefenseXBtn.addEventListener('click', async () => {
+          playSound('Collapse & Expand.mp3');
           // Only clear defense buttons (Man/Zone)
           document.querySelectorAll('.defense-override-btn[data-defense]').forEach(btn => {
             btn.classList.remove('selected');
@@ -3668,6 +3670,7 @@
       const clearAggressionXBtn = document.getElementById('clear-aggression-override-x');
       if (clearAggressionXBtn) {
         clearAggressionXBtn.addEventListener('click', async () => {
+          playSound('Collapse & Expand.mp3');
           // Only clear aggression buttons (Passive/Normal/Aggressive)
           document.querySelectorAll('.defense-override-btn[data-aggression]').forEach(btn => {
             btn.classList.remove('selected');
@@ -4152,6 +4155,7 @@
     
     // Up button - goes to previous slot (1→2→3→4→5→6, wraps to 6)
     document.getElementById('play-nav-up')?.addEventListener('click', () => {
+      playSound('Defense buttons.wav');
       if (playOptions.length === 0) updatePlayOptions();
       const newIndex = (currentPlayIndex - 1 + playOptions.length) % playOptions.length;
       showPlay(newIndex);
@@ -4159,6 +4163,7 @@
     
     // Down button - goes to next slot (6→5→4→3→2→1, wraps to 1)
     document.getElementById('play-nav-down')?.addEventListener('click', () => {
+      playSound('Defense buttons.wav');
       if (playOptions.length === 0) updatePlayOptions();
       const newIndex = (currentPlayIndex + 1) % playOptions.length;
       showPlay(newIndex);

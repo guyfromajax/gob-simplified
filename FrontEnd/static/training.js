@@ -385,11 +385,20 @@ function collectTrainingData() {
   return data;
 }
 
+function playSound(filename) {
+  try {
+    const a = new Audio('/sounds/' + encodeURIComponent(filename));
+    a.volume = 0.7;
+    a.play().catch(function() {});
+  } catch (e) {}
+}
+
 /**
  * Handle submit button click
  */
 submitBtn.addEventListener('click', async function() {
   if (this.disabled) return;
+  playSound('Confirm - Option 2 (1).mp3');
   
   const trainingData = collectTrainingData();
   
