@@ -2,7 +2,7 @@
 
 **Purpose:** Clear, concise guide to how playbook and game plan settings persist across all game modes and gameplay scenarios.
 
-**Last Updated:** January 2026
+**Last Updated:** February 2026
 
 ---
 
@@ -68,14 +68,16 @@
 
 **Problem:** Settings must be saved/loaded using the same key format.
 
-**Solution:** Canonical `team_id` format everywhere (e.g., "MORRISTOWN", "OCEAN_CITY")
+**Solution:**
+- **Single game:** Canonical `team_id` format (e.g., "MORRISTOWN", "OCEAN_CITY").
+- **Franchise/Tournament:** Backend uses the **authoritative** `user_team_object_id` from the franchise or tournament document for both save and load; request `team_id` is ignored for master saves. This ensures the same key is used whether the user saves from FCC/TCC or from in-game (lineup/timeout).
 
 **Requirements:**
 - Same resolution logic in save and load paths
-- No team name → team_id conversion needed (use `team_id` directly)
+- Franchise/tournament: resolve team id from master doc, not from URL/request
 - Consistent key format prevents "settings saved but not found" bugs
 
-**Key Point:** Use canonical `team_id` keys consistently in save and load.
+**Key Point:** Use the same team key for save and load. In franchise/tournament that means the doc's `user_team_object_id`.
 
 ---
 

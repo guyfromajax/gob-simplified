@@ -96,6 +96,9 @@ function updatePointsRemaining() {
  * Handle slider input - prevent over-allocation
  */
 allSliders.forEach(slider => {
+  slider.addEventListener('change', function() {
+    playSound('click-tiny.wav');
+  });
   slider.addEventListener('input', function() {
     const currentValue = parseInt(this.value);
     const previousValue = parseInt(this.dataset.prev || '0');
@@ -132,6 +135,7 @@ allSliders.forEach(slider => {
  * Auto-Train: assign all points and pick a random focus
  */
 function autoAssignTraining() {
+  playSound('chaotic-choice.wav');
   const sliders = Array.from(allSliders);
   if (sliders.length === 0) return;
 
@@ -161,6 +165,7 @@ function autoAssignTraining() {
     if (validFocusRadios.length > 0) {
       const randomRadio = validFocusRadios[Math.floor(Math.random() * validFocusRadios.length)];
       randomRadio.checked = true;
+      if (typeof window !== 'undefined') window.__trainingAutoAssigning = true;
       randomRadio.dispatchEvent(new Event('change', { bubbles: true }));
       focusLabel = getFocusLabelText(randomRadio);
       archetypeLabel = getArchetypeLabelText(randomRadio);
@@ -227,6 +232,7 @@ if (autoTrainBtn) {
 }
 if (autoTrainModalClose && autoTrainModal) {
   autoTrainModalClose.addEventListener('click', () => {
+    playSound('click-tiny.wav');
     autoTrainModal.style.display = 'none';
   });
 }
@@ -239,13 +245,28 @@ coachingRadios.forEach(radio => {
   radio.addEventListener('change', function() {
     if (!this.checked) return;
     
+    // SFX per coaching style — skip when Auto-Train triggered this change (avoid double sound with chaotic-choice)
+    const value = this.value;
+    const skipSound = typeof window !== 'undefined' && window.__trainingAutoAssigning;
+    if (typeof window !== 'undefined') window.__trainingAutoAssigning = false;
+    if (!skipSound) {
+      if (value.startsWith('authoritarian')) {
+        playSound('whistle-3.mp3');
+      } else if (value.startsWith('systems-coach')) {
+        playSound('positive-slide.wav');
+      } else if (value.startsWith('player-maximizer')) {
+        playSound('positive-plop.wav');
+      } else if (value.startsWith('culture-builder')) {
+        playSound('positive-beep.wav');
+      }
+    }
+    
     // Remove all active states
     document.querySelectorAll('.archetype-block').forEach(block => {
       block.classList.remove('active', 'header-selected', 'sub-option-selected');
     });
     
     // Determine which archetype this radio belongs to
-    const value = this.value;
     let archetype = null;
     
     if (value.startsWith('authoritarian')) {
@@ -385,11 +406,20 @@ function collectTrainingData() {
   return data;
 }
 
+function playSound(filename) {
+  try {
+    const a = new Audio('/sounds/' + encodeURIComponent(filename));
+    a.volume = 0.7;
+    a.play().catch(function() {});
+  } catch (e) {}
+}
+
 /**
  * Handle submit button click
  */
 submitBtn.addEventListener('click', async function() {
   if (this.disabled) return;
+  playSound('confirm-2.mp3');
   
   const trainingData = collectTrainingData();
   

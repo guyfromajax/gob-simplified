@@ -936,6 +936,10 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     // Find corresponding event in eventResults array
     // Match by time and result type, but handle special cases (FREE_THROW, PUTBACK_MAKE/MISS)
     const event = eventResults.find(e => {
+      // Skip already-matched events so we never reuse one event for multiple turns (prevents score/clock revert when multiple events share same time+type)
+      const eventIndex = eventResults.indexOf(e);
+      if (matchedEventIndices.has(eventIndex)) return false;
+
       // Handle PUTBACK_MAKE/MISS first - they may not have time_remaining, so be more flexible with matching
       if (turn.result_type === 'PUTBACK_MAKE' || turn.result_type === 'PUTBACK_MISS') {
         const expectedResultType = turn.result_type === 'PUTBACK_MAKE' ? 'MAKE' : 'MISS';
@@ -966,11 +970,10 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         const expectedMade = turnPoints > 0;
         const expectedResultType = expectedMade ? 'MAKE' : 'MISS';
         
-        // Match by event type AND result type AND time, and ensure not already matched
+        // Match by event type AND result type AND time (already-matched check is at top of find callback)
         const eventIndex = eventResults.indexOf(e);
         const isMatch = e.eventType === 'FREE_THROW' && 
-                       e.resultType === expectedResultType && 
-                       !matchedEventIndices.has(eventIndex);
+                       e.resultType === expectedResultType;
         
         // ✅ DEBUG: Log free throw matching
         if (e.eventType === 'FREE_THROW') {
@@ -2042,6 +2045,7 @@ async function handleGameCompletion({ gameId, lastSummary, tournamentId, franchi
 }
 
 async function handleSimQuarter() {
+  if (typeof window.playSound === 'function') window.playSound('positive-beep.wav');
   // ✅ FIX: Calculate next quarter (handle pre-game screen where quarter = 0)
   // On pre-game screen (quarter = 0), nextQuarter = 0 + 1 = 1 (correct)
   // On Q1 break (quarter = 1), nextQuarter = 1 + 1 = 2 (correct)
@@ -2303,6 +2307,7 @@ async function handleSimQuarter() {
 }
 
 async function handleSimFullGame() {
+  if (typeof window.playSound === 'function') window.playSound('positive-plop.wav');
   if (isSimulating) return;
   
   // ✅ PHASE 1.1: URL is source of truth - read from URL if module-level gameId is missing
@@ -2570,6 +2575,7 @@ async function initGame() {
   
   if (playBtn) {
     playBtn.addEventListener('click', async () => {
+      if (typeof window.playSound === 'function') window.playSound('positive-slide.wav');
       try {
         await handleButtonClick(true);
       } catch (error) {

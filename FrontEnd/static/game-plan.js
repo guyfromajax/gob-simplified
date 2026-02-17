@@ -1,6 +1,15 @@
 // Parse URL parameters
 const urlParams = new URLSearchParams(window.location.search);
 
+function playSound(filename) {
+  try {
+    const base = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/sounds/') : '/sounds/';
+    const a = new Audio(base + encodeURIComponent(filename));
+    a.volume = 0.7;
+    a.play().catch(() => {});
+  } catch (e) {}
+}
+
 // ✅ PHASE 1.3: Set telemetry context
 if (window.StateTelemetry) {
   window.StateTelemetry.setContext('game-plan');
@@ -257,6 +266,9 @@ function setupSliders() {
         valueDisplay.textContent = value;
         currentSettings.strategy_settings[key] = value;
         markUnsavedChanges();
+      });
+      slider.addEventListener('change', () => {
+        playSound('click-tiny.wav');
       });
     }
   }
@@ -795,6 +807,7 @@ function showUnsavedChangesWarning(onContinue) {
       sessionStorage.setItem('gameplan_suppress_warning', 'true');
     }
     overlay.remove();
+    playSound('confirm-2.mp3');
     await saveGamePlan();
     // After successful save, continue with navigation
     if (!hasUnsavedChanges) {
@@ -866,6 +879,7 @@ async function init() {
       btnNavPrimary.style.display = 'inline-block';
       btnNavPrimary.addEventListener('click', () => {
         console.log('🚀 [GAME-PLAN] btnNavPrimary (Back To Locker Room) CLICKED!');
+        playSound('x-back.mp3');
         navigateToCommandCenter();
       });
     }
@@ -892,7 +906,9 @@ async function init() {
       
       btnNavPrimary.addEventListener('click', () => {
         console.log('🚀 [GAME-PLAN] btnNavPrimary (Play Game) CLICKED! About to call navigateToCourt()');
-        navigateToCourt();
+        playSound('confirm-1.mp3');
+        // Delay navigation so the sound can start before the page unloads
+        setTimeout(() => navigateToCourt(), 200);
       });
     }
     if (btnBackToLineup) {
@@ -910,6 +926,7 @@ async function init() {
     console.log('🔍 [GAME-PLAN] init() - btnSaveGamePlan found, adding click listener');
     btnSaveGamePlan.addEventListener('click', () => {
       console.log('🚀 [GAME-PLAN] btnSaveGamePlan CLICKED! About to call saveGamePlan()');
+      playSound('confirm-2.mp3');
       saveGamePlan();
     });
   } else {

@@ -276,6 +276,12 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
     document.head.appendChild(style);
   }
 
+  const subBtn = popup.querySelector('.sub-players-button');
+  if (subBtn) {
+    subBtn.addEventListener('click', () => {
+      if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
+    });
+  }
   document.body.appendChild(popup);
 }
 

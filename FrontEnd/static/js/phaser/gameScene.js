@@ -1406,6 +1406,7 @@ export function createGameScene(Phaser) {
       if (gameSpeedBtn && speedDropdown) {
         gameSpeedBtn.addEventListener('click', (e) => {
           e.stopPropagation();
+          if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
           const isVisible = speedDropdown.style.display !== 'none';
           speedDropdown.style.display = isVisible ? 'none' : 'flex';
         });
@@ -1422,6 +1423,7 @@ export function createGameScene(Phaser) {
         speedOptions.forEach(option => {
           option.addEventListener('click', (e) => {
             e.stopPropagation();
+            if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
             const speed = parseInt(option.dataset.speed, 10);
             setGameSpeed(speed);
             updateSpeedDropdown(speed);
@@ -1445,6 +1447,7 @@ export function createGameScene(Phaser) {
       
       if (pauseBtn) {
         pauseBtn.addEventListener('click', () => {
+          if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
           this.isPaused = !this.isPaused;
           if (this.isPaused) {
             // Pause all tweens
@@ -1711,6 +1714,7 @@ export function createGameScene(Phaser) {
 
             const button = popup.querySelector('.locker-room-button');
             button.addEventListener('click', () => {
+              if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
               window.location.href = `/set-lineup.html?${params.toString()}`;
             });
 
@@ -2363,6 +2367,7 @@ export function createGameScene(Phaser) {
         // Wire up button
         const button = popup.querySelector('.locker-room-button');
         button.addEventListener('click', () => {
+          if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
           window.location.href = `/set-lineup.html?${params.toString()}`;
         });
         return;
@@ -2393,6 +2398,7 @@ export function createGameScene(Phaser) {
         // Wire up button
         const button = popup.querySelector('.locker-room-button');
         button.addEventListener('click', () => {
+          if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
           window.location.href = `/set-lineup.html?${params.toString()}`;
         });
         return;
@@ -2601,6 +2607,7 @@ export function createGameScene(Phaser) {
         // Wire up button
         const button = popup.querySelector('.locker-room-button');
         button.addEventListener('click', () => {
+          if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
           const finalUrl = `/set-lineup.html?${params.toString()}`;
           console.log('🔍 [DEBUG QTR BREAK] gameScene.js - Navigating to set-lineup:', finalUrl);
           window.location.href = finalUrl;

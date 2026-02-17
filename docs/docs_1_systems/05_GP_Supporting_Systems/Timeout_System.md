@@ -407,7 +407,8 @@ All frontend navigation now uses a unified helper (`FrontEnd/static/js/shared/ti
 - `franchise_id`: Franchise identifier (if applicable)
 - `week`: Week number (franchise mode)
 - Lineup parameters: `home_pg`, `home_sg`, etc.
-- `clock`: Clock time (preserved for foul out/timeout)
+- `clock`: Clock time (preserved for foul out/timeout); **required for lineup header** when `resume_from_timeout=true` (lineup page reads clock from URL for the header).
+- `home_score`, `away_score`: Optional; when present the lineup page uses them for the header so it shows what the user saw at timeout (same source as clock).
 
 **Frontend Detection Logic (SS&S - January 2025):**
 
@@ -425,6 +426,8 @@ const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
 // 2. If gameId exists but param is missing (stale URL), false is safer than true
 // 3. If it's truly a timeout resume, the helper should have set it to 'true'
 ```
+
+**Lineup page header:** When `resume_from_timeout=true`, the lineup page displays **clock** (and when present **scores**) from the URL for the header. Timeout navigation must therefore include `clock` (and optionally `home_score`/`away_score`) in the lineup URL so the header matches the state at the moment the user entered the timeout.
 
 **Key Principles:**
 - **No Database Fallback:** Frontend does NOT check database for timeout state - relies exclusively on URL param
@@ -811,17 +814,10 @@ if (quarterEl) quarterEl.textContent = livePeriodLabel;
 
 **Clock Preservation for Timeout Navigation:**
 - Location: `FrontEnd/static/js/phaser/utils/timeoutButtonManager.js` `showTimeoutPopup()` function
-- Clock is retrieved using a prioritized fallback chain:
-  1. **API Response** (`timeoutResult.clock`): **Most reliable** - backend source of truth, returned by `/api/call-timeout` endpoint at the moment the timeout is called
-  2. **DOM Element** (`#game-clock`): What's actually displayed to the user
-  3. **scene.simData.clock**: Updated by `updateScoreboard()` as turns are processed
-  4. **Last Processed Turn**: If turns array exists, get clock from the last turn's `clock` or `game_clock` field
-  5. **URL Parameters**: Fallback for initial load scenarios
-  6. **Default**: `8:00` if no clock found (should never happen in normal flow)
-
-**Key Fix (February 2025):**
-- **Initial Fix:** `scene.simData.clock` was only set on initial load and never updated, causing stale clock values. Fixed by updating `scene.simData.clock` in `updateScoreboard()` whenever a turn's clock is processed.
-- **Final Fix:** The `/api/call-timeout` endpoint now returns the current clock value (`gm.game_state.get("clock")`) in its response, ensuring the frontend always has the accurate clock at the moment the timeout is called. This prevents timing issues where the DOM or scene state might be stale when the timeout button is pressed.
+- The chosen clock is placed in the lineup URL; the **lineup page** then reads the `clock` URL param for its header when `resume_from_timeout=true`.
+- **User timeout:** Clock is taken from a prioritized chain so the lineup shows **what the user saw**: (1) **DOM** (`#game-clock`), (2) **scene.simData.clock**, (3) API response, (4) last processed turn, (5) URL params, (6) default `8:00`. Preferring DOM/simData over API avoids showing a clock one turn behind when the next simulate_turn is in flight.
+- **Computer timeout:** API response is used first (same request that triggered navigation), then the same fallbacks as above.
+- Scores are also passed in the URL (`home_score`, `away_score`) when available (DOM or timeout response) so the lineup header can show the same state the user saw.
 
 ### Lineup and Game Plan Pre-Population
 

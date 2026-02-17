@@ -8,7 +8,7 @@ Title:
 - ALPHA RELEASE
 
 Body:
-- **February 16 Update** Added tutorials and a first-time user experience.
+- **February 17 Update** Fixed Sim Quarter scoreboard regression bug and Lineup Screen showing incorrect score / time remaining bug. Added UI SFX. 
 
 Source:
 - `FrontEnd/static/mode-select.html`

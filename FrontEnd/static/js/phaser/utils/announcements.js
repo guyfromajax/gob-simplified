@@ -107,6 +107,13 @@ export function showAndOneAnnouncement(team, shooterData, foulPlayerData) {
   announcement.appendChild(row1);
   announcement.appendChild(row2);
   
+  // SFX: AND-1 shooting foul (synced to on-screen announcement)
+  try {
+    const sfx = new Audio('/sounds/' + encodeURIComponent('whistle-1.mp3'));
+    sfx.volume = 0.7;
+    sfx.play().catch(() => {});
+  } catch (e) {}
+
   // Add to body
   document.body.appendChild(announcement);
   currentAnnouncement = announcement;
@@ -265,6 +272,17 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
     announcement.appendChild(headshotContainer);
   }
   
+  // SFX: foul/turnover announcements (synced to on-screen announcement)
+  // Dead-ball turnovers only (no whistle for STEAL! — live-ball turnover)
+  const isDeadBallTurnoverAnnouncement = text.includes('Turnover') && text !== 'STEAL!';
+  if (isFoulAnnouncement || isDeadBallTurnoverAnnouncement) {
+    try {
+      const sfx = new Audio('/sounds/' + encodeURIComponent('whistle-1.mp3'));
+      sfx.volume = 0.7;
+      sfx.play().catch(() => {});
+    } catch (e) {}
+  }
+
   // Add to body
   document.body.appendChild(announcement);
   currentAnnouncement = announcement;

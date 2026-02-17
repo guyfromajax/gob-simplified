@@ -35,10 +35,19 @@ function initCommandCenterTabs(options) {
   setActive(activeTab);
   onTabShow(activeTab);
 
+  function playSound(filename) {
+    try {
+      var a = new Audio('/sounds/' + encodeURIComponent(filename));
+      a.volume = 0.7;
+      a.play().catch(function () {});
+    } catch (e) {}
+  }
+
   tabButtons.forEach(function (btn) {
     btn.addEventListener('click', function () {
       var tabName = btn.dataset.tab;
       if (!tabName) return;
+      playSound('click-tiny.wav');
       setActive(tabName);
       updateUrl(tabName);
       onTabShow(tabName);

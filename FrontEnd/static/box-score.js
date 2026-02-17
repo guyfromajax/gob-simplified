@@ -1,6 +1,15 @@
 // Box Score Page JavaScript
 // Fetches game data and renders box score information
 
+function playSound(filename) {
+  try {
+    const base = (typeof window.API_CONFIG !== 'undefined' && window.API_CONFIG.buildStaticPath) ? window.API_CONFIG.buildStaticPath('/sounds/') : '/sounds/';
+    const a = new Audio(base + encodeURIComponent(filename));
+    a.volume = 0.7;
+    a.play().catch(() => {});
+  } catch (e) {}
+}
+
 let gameData = null;
 
 // Initialize on page load
@@ -1441,6 +1450,7 @@ function setupTabs() {
     }
     
     button.addEventListener('click', () => {
+      playSound('click-tiny.wav');
       // Update active tab
       tabButtons.forEach(btn => btn.classList.remove('active'));
       button.classList.add('active');
@@ -1543,6 +1553,7 @@ function setupLockerRoomButton() {
     backButton.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
+      playSound('x-back.mp3');
       window.location.href = backUrl;
     });
     return;
@@ -1596,9 +1607,24 @@ function setupLockerRoomButton() {
     lockerRoomUrl = '/mode-select.html';
   }
 
-  cleanButton.addEventListener('click', (e) => {
+  cleanButton.addEventListener('click', async (e) => {
     e.preventDefault();
     e.stopPropagation();
+    // Single game: delete completed game from DB when user leaves for mode-select
+    if (navMode === 'single' && lockerRoomUrl === '/mode-select.html') {
+      const gameId = urlParams.get('game_id');
+      if (gameId && typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl && API_CONFIG.getAuthHeaders) {
+        try {
+          await fetch(API_CONFIG.buildUrl('/api/games/delete-completed-single'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...API_CONFIG.getAuthHeaders() },
+            body: JSON.stringify({ game_id: gameId }),
+          });
+        } catch (err) {
+          console.warn('[BOX-SCORE] delete-completed-single failed:', err);
+        }
+      }
+    }
     console.log('🚪 [BOX-SCORE] Navigating to locker room:', lockerRoomUrl);
     window.location.href = lockerRoomUrl;
   });

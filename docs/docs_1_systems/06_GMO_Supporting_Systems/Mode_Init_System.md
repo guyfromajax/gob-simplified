@@ -1,4 +1,4 @@
-## Mode Initialization System ✅ **COMPLETE** (January 2025)
+stat## Mode Initialization System ✅ **COMPLETE** (January 2025)
 
 **Base Constants**
 
@@ -7,11 +7,12 @@
    - **Randomized**: NG=1.0, CH (Character)=random(1-100), MO (Momentum)=0, EM (Emotion)=random(1-100)
 
 2. **Team Attribute Ranges**:
-   - **Single Game & Tournament**: `random.randint(-10, 10)` for most attributes, `team_chemistry=random(7-25)`, `rebound_modifier=random(0.0-0.4)`
-   - **Franchise**: `random.randint(-1, 1)` for most attributes, `team_chemistry=random(7-10)`, `rebound_modifier=0.2` (fixed)
+   - **Single Game**: `random.randint(-10, 10)` for A Group, `team_chemistry=random(7-25)`, `rebound_modifier=random(0.0-0.4)`, `shot_threshold=random(0, 200)`
+   - **Tournament**: Seed-based (Seed 1 best → Seed 8 worst); see "Team Attribute Initialization" below for per-seed ranges
+   - **Franchise**: `random.randint(-1, 1)` for most attributes, `team_chemistry=random(7-10)`, `rebound_modifier=0.2` (fixed), `shot_threshold=random(90, 110)`
 
 3. **Common Team Attributes** (all modes):
-   - `shot_threshold`: `random.randint(-10, 190)`
+   - `shot_threshold`
    - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
 
 **Mode Initialization Flow (3 Steps)**
@@ -70,25 +71,44 @@ The Mode Initialization System diversifies attribute values when users create a 
 
 **Location:** `BackEnd/models/team_manager.py` - `TeamManager.init_team_attributes()` (lines 185-226)
 
-**Common Attributes (All Modes):**
-- `shot_threshold`: `random.randint(-10, 190)`
 
 **Mode-Specific Ranges:**
 
-**Single Game & Tournament Mode:**
+**Single Game:**
 - Attribute range: `random.randint(-10, 10)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
 - `team_chemistry`: `random.randint(7, 25)`
 - `rebound_modifier`: `random.randint(0, 40) / 100.0` (random 0.0-0.4 in 0.01 increments)
+- `shot_threshold`: `random.randint(0, 200)`
+
+**Tournament Mode:**
+Ranges will be determined by each team's seed
+- A Group:
+  - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
+- Custom Group: `team_chemistry`, `rebound_modifier`,`shot_threshold`
+- Seed 1: 
+  - A Group: each gets random.randint(5,10), 
+  - Custom Group: team_chemistry random.randint(20,25), rebound_modifier `random.randint(30, 40) / 100.0` (random 0.3-0.4 in 0.01 increments), shot_threshold random.randint(0, 100)
+- Seeds 2-4: 
+  - A Group: each gets random.randint(-2,10), 
+  - Custom Group: team_chemistry random.randint(12,25), rebound_modifier `random.randint(15, 40) / 100.0` (random 0.15-0.4 in 0.01 increments), shot_threshold random.randint(0,150)
+- Seeds 5-7: 
+  - A Group: each gets random.randint(-8,5), 
+  - Custom Group: team_chemistry random.randint(8,18), rebound_modifier `random.randint(1, 40) / 100.0` (random 0.01-0.4 in 0.01 increments), shot_threshold random.randint(50,200)
+- Seeds 8: 
+  - A Group: each gets random.randint(-10,-2), 
+  - Custom Group: team_chemistry random.randint(7,12), rebound_modifier `random.randint(1, 20) / 100.0` (random 0.01-0.2 in 0.01 increments), shot_threshold random.randint(100,200)
 
 **Franchise Mode:**
 - Attribute range: `random.randint(-1, 1)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
 - `team_chemistry`: `random.randint(7, 10)` (tighter range for more controlled progression)
 - `rebound_modifier`: `0.2` (fixed center value)
+- `shot_threshold`: `random.randint(90, 110)`
 
 **Implementation:**
-- Accepts `mode` parameter to determine attribute ranges
+- `TeamManager.init_team_attributes(mode, tournament_seed=None)`: accepts `mode` and, for `mode="tournament"`, optional `tournament_seed` (1–8). When `tournament_seed` is provided, uses the seed-based ranges above; otherwise falls back to single-game-style ranges.
+- Tournament: called from `create_tournament()` with `tournament_seed` = 1 for first team in seed order through 8 for the last (seed order is set by the initial shuffle of the 8 teams).
 - Called during team initialization when `team_attributes` is not provided
 
 ### Initialization Points

@@ -1244,9 +1244,19 @@ function updatePlayButton(data) {
   }
 }
 
+function playSound(filename) {
+  try {
+    const base = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/sounds/') : '/sounds/';
+    const a = new Audio(base + encodeURIComponent(filename));
+    a.volume = 0.7;
+    a.play().catch(function() {});
+  } catch (e) {}
+}
+
 const playNowBtn = document.getElementById('play-now');
 playNowBtn.disabled = true;
 playNowBtn.addEventListener('click', async () => {
+  playSound('confirm-1.mp3');
   const mode = playNowBtn.dataset.mode || 'play';
   
   if (mode === 'training') {
@@ -1402,42 +1412,40 @@ playNowBtn.addEventListener('click', async () => {
   }
 });
 
-// Set Game Plan button (Franchise Command Center)
-const setGameplanBtn = document.getElementById('set-gameplan-franchise');
-if (setGameplanBtn) {
-  setGameplanBtn.addEventListener('click', () => {
-    if (!franchiseId || !userTeamId) {
-      alert('Franchise or user team not loaded');
-      return;
-    }
-    
-    // ✅ SS&S: Redirect to Game Plan screen with ObjectId for consistent navigation
-    const url = `/game-plan.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=command_center`;
-    window.location.href = url;
-  });
-}
-
-// Playbooks button (Franchise Command Center)
-const playbooksBtn = document.getElementById('playbooks-franchise');
-if (playbooksBtn) {
-  playbooksBtn.addEventListener('click', () => {
-    if (!franchiseId || !userTeamId) {
-      alert('Franchise or user team not loaded');
-      return;
-    }
-    
-      // ✅ SS&S: Build playbooks URL with ObjectId for consistent navigation
+// Set Game Plan, Playbooks (and Scouting Report via loadScoutingReport) — wire on DOMContentLoaded so buttons exist
+function wireFccNavButtons() {
+  const setGameplanBtn = document.getElementById('set-gameplan-franchise');
+  if (setGameplanBtn) {
+    setGameplanBtn.addEventListener('click', () => {
+      playSound('positive-beep.wav');
+      if (!franchiseId || !userTeamId) {
+        alert('Franchise or user team not loaded');
+        return;
+      }
+      const url = `/game-plan.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=command_center`;
+      window.location.href = url;
+    });
+  }
+  const playbooksBtn = document.getElementById('playbooks-franchise');
+  if (playbooksBtn) {
+    playbooksBtn.addEventListener('click', () => {
+      playSound('positive-beep.wav');
+      if (!franchiseId || !userTeamId) {
+        alert('Franchise or user team not loaded');
+        return;
+      }
       const params = new URLSearchParams();
       params.set('mode', 'franchise');
       params.set('franchise_id', franchiseId);
       params.set('team_id', userTeamId);
-      params.set('from', 'franchise-command-center'); // Track navigation source
-      
+      params.set('from', 'franchise-command-center');
       window.location.href = `/playbooks.html?${params.toString()}`;
-  });
+    });
+  }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  wireFccNavButtons();
   // ✅ PHASE 2.4: Removed localStorage fallback - franchise_id must come from URL
   const urlParams = new URLSearchParams(window.location.search);
   franchiseId = urlParams.get('franchise_id');
@@ -1453,6 +1461,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const exitFranchiseBtn = document.getElementById('exit-franchise');
   if (exitFranchiseBtn) {
     exitFranchiseBtn.addEventListener('click', () => {
+      playSound('x-back.mp3');
       window.location.href = '/mode-select.html';
     });
   }
@@ -2074,6 +2083,7 @@ function updateScoutingButton(data) {
 }
 
 async function loadScoutingReport() {
+  playSound('positive-slide.wav');
   if (!upcomingOpponent || !franchiseId) {
     alert('No upcoming opponent found');
     return;

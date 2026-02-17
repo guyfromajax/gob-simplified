@@ -362,9 +362,9 @@ This system documents data persistence across all three game modes when users ar
 
 **Root Cause:** Settings were sometimes read from or written to the game document and sometimes to the master store (FTD or tournament doc). When the backend chose the wrong source (e.g. read from master after writing to game doc, or overwrite in-memory state from game doc), the UI showed stale or empty settings.
 
-**Fix:** Franchise and tournament now use a **single source of truth** for game plan and playbook settings. Settings are **always** read from and written to the master store (FTD for franchise, tournament document for tournament). The game document is not used for these settings in franchise or tournament mode. Implementation: (1) `get_save_location_for_franchise_tournament()` always returns `is_game_doc = False` for franchise and tournament. (2) GET gameplan and GET playbooks never set `load_from_game_doc = True` for franchise or tournament, so they always load from FTD or tournament doc. No code changes in `team_settings_manager.py`; only `gameplan_routes.py` was updated.
+**Fix:** Franchise and tournament now use a **single source of truth** for game plan and playbook settings. Settings are **always** read from and written to the master store (FTD for franchise, tournament document for tournament). The game document is not used for these settings in franchise or tournament mode. Implementation: (1) `get_save_location_for_franchise_tournament()` always returns `is_game_doc = False` for franchise and tournament. (2) GET gameplan and GET playbooks never set `load_from_game_doc = True` for franchise or tournament, so they always load from FTD or tournament doc. (3) **Follow-up (February 2026):** Tournament save in `team_settings_manager.py` was updated to resolve the authoritative `user_team_object_id` from the tournament document (same as franchise uses from franchise doc); request `team_id` is ignored for tournament master save. This ensures save and load use the same key (`teams.{user_team_object_id}`) and fixes tournament settings not persisting from TCC or in-game.
 
-**Files Changed:** `BackEnd/api/gameplan_routes.py` (get_save_location_for_franchise_tournament, get_gameplan, get_playbooks)
+**Files Changed:** `BackEnd/api/gameplan_routes.py` (get_save_location_for_franchise_tournament, get_gameplan, get_playbooks); `BackEnd/utils/team_settings_manager.py` (tournament master save uses authoritative user_team_object_id)
 
 ### ✅ Fixed: Franchise EOG Reading Wrong Game Snapshot (February 2026)
 
@@ -595,7 +595,7 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
    - **Franchise:** FTD collection, keyed by `(franchise_id, team_id)` with ObjectIds. `team_id` = `user_team_object_id`.
    - **Tournament:** `teams` on tournament document; keys = ObjectId strings (e.g. `"68c98b08674d3f9b04546b2f"`).
    - Source: `user_team_object_id` from franchise/tournament document.
-   - **Save:** Use ObjectId string directly (no normalization). **Franchise:** resolve `team_id` from franchise doc (`user_team_object_id`); request `team_id` is ignored (FCC / pre-game). FTD upsert. **Tournament:** `teams.{team_id}` from request.
+   - **Save:** Use ObjectId string directly (no normalization). **Franchise:** resolve `team_id` from franchise doc (`user_team_object_id`); request `team_id` ignored. FTD upsert. **Tournament:** resolve `team_id` from tournament doc (`user_team_object_id`); request `team_id` ignored. Both use the same key for save and load.
    - **Load:** Franchise → FTD lookup by `(franchise_id, user_team_object_id)`; tournament → `extract_team_settings` on doc.
 
 2. **Game Documents (All Modes):**
@@ -630,7 +630,7 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
 - `save_team_settings()` called with `game_id=None` or game not active
 - `get_save_location_for_franchise_tournament()` returns master (franchise → FTD, tournament → tournament doc)
 - **Franchise:** Team ID resolved from franchise doc (`user_team_object_id`); request `team_id` ignored. Settings saved to `franchise_team_data` via `update_one(..., upsert=True)`. First save creates FTD doc if missing.
-- **Tournament:** Team ID from request (ObjectId string). Settings saved to `teams.{ObjectId}.{settings_type}` in tournament document.
+- **Tournament:** Team ID resolved from tournament doc (`user_team_object_id`); request `team_id` ignored. Settings saved to `teams.{user_team_object_id}.{settings_type}` in tournament document.
 - **Load:** Franchise master settings loaded from FTD (`load_team_settings_from_doc()` queries FTD by `franchise_id` + `user_team_object_id`). Tournament uses `extract_team_settings()` on tournament doc.
 
 #### 2. Game Start
@@ -723,7 +723,7 @@ if gm:
 ### Key Files
 
 **Backend:**
-- `BackEnd/utils/team_settings_manager.py`: Unified save/extract/load. Franchise master save writes to FTD with **upsert**.
+- `BackEnd/utils/team_settings_manager.py`: Unified save/extract/load. Franchise master save writes to FTD with **upsert**. Tournament master save resolves authoritative `user_team_object_id` from tournament doc (same key as load).
 - `BackEnd/api/gameplan_routes.py`: `get_save_location_for_franchise_tournament()`, `normalize_team_id_to_canonical()`
 - `BackEnd/api/gameplan_routes.py`: `save_playbooks()`, `update_gameplan()` endpoints (use `save_team_settings`)
 - `BackEnd/api/api.py`: `simulate_quarter_endpoint()` (uses unified load), `load_team_settings_from_doc()` (franchise master → FTD, tournament → extract)
@@ -802,6 +802,8 @@ The `/api/game/{game_id}` endpoint supports a `source` parameter:
 // Lineup screen always uses source=db for fresh data
 const gameRes = await fetch(`/api/game/${gameId}?quarter=1&source=db`);
 ```
+
+**Lineup header during timeout resume:** The lineup page header (time remaining and score) must show the state at the moment the user entered the timeout. **Clock** is read from the **URL** when `resume_from_timeout=true` (timeout navigation puts the displayed clock in the URL). **Scores** are read from the URL when `home_score`/`away_score` are present (same rationale as clock); otherwise scores are loaded from the API with `source=db`. Quarter breaks force clock to 8:00 or 4:00 (OT) and do not use URL clock.
 
 **Backend Implementation:**
 ```python
@@ -1004,7 +1006,7 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 **Frontend:**
 - `FrontEnd/static/set-lineup.js`:
   - `loadRoster()` (line 190): Uses `source=db` for player energy, reads from `attributes.NG`
-  - `setHeader()` (line 900): Uses `source=db` for scores/clock
+  - `setHeader()`: During timeout resume, **clock** from URL (and **scores** from URL when `home_score`/`away_score` present); otherwise scores from API with `source=db`. Quarter breaks force clock to 8:00/4:00 (OT).
 
 ### Benefits
 

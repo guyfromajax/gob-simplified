@@ -31,6 +31,14 @@ const DEFENSE_PLAY_DATA = {
 
 const ALPHA_HIDE_MAN_DEFENSE_VARIANTS = true;
 
+function playSound(filename) {
+  try {
+    const a = new Audio('/sounds/' + encodeURIComponent(filename));
+    a.volume = 0.7;
+    a.play().catch(() => {});
+  } catch (e) {}
+}
+
 function getVisibleDefensePlays(sectionKey) {
   const plays = DEFENSE_PLAY_DATA[sectionKey] || [];
   if (ALPHA_HIDE_MAN_DEFENSE_VARIANTS && sectionKey === 'man-defense') {
@@ -1112,7 +1120,16 @@ class PlaybooksUI {
       input.style.cursor = 'not-allowed';
     } else {
       input.addEventListener('input', (e) => {
+        const newVal = e.target.value === '' ? NaN : parseInt(e.target.value, 10);
+        const prevVal = input.dataset.prev === undefined ? NaN : parseInt(input.dataset.prev, 10);
+        if (!isNaN(newVal) && !isNaN(prevVal) && Math.abs(newVal - prevVal) === 1) {
+          playSound('click-tiny.wav');
+        }
+        input.dataset.prev = e.target.value;
         this.handlePercentageChange(sectionKey, play.id, e.target.value);
+      });
+      input.addEventListener('change', (e) => {
+        playSound('click-soft.mp3');
       });
       input.addEventListener('blur', () => {
         this.validateAndUpdate();
@@ -1352,6 +1369,7 @@ class PlaybooksUI {
   // UI state (position filters, even distribution toggles) is saved separately via savePositionFilterSelections()
 
   handleSlotClick(slotNumber, sectionKey, playId) {
+    playSound('click-tiny.wav');
     const dropdown = sectionKey === 'motion' 
       ? (this.state.motionDropdowns[playId] || 'Inside')
       : null;
@@ -1522,6 +1540,7 @@ class PlaybooksUI {
       }
       
       backBtn.addEventListener('click', () => {
+        playSound('x-back.mp3');
         this.handleBack();
       });
     }
@@ -1536,6 +1555,7 @@ class PlaybooksUI {
       console.log(`🔍 [ATTACH LISTENERS] Attaching listener to button ${index + 1}: ${btn.dataset.position}`);
       btn.addEventListener('click', () => {
         console.log(`🔍 [BUTTON CLICK] Position filter button clicked: ${btn.dataset.position}`);
+        playSound('positive-plop.wav');
         this.handlePositionFilterClick(btn);
       });
     });
@@ -1543,6 +1563,7 @@ class PlaybooksUI {
   }
   
   handleEvenDistribution(sectionKey) {
+    playSound('click-handgun.mp3');
     // Toggle Even Distribution for this section
     this.evenDistributionEnabled[sectionKey] = !this.evenDistributionEnabled[sectionKey];
     
@@ -1563,6 +1584,7 @@ class PlaybooksUI {
   }
   
   handleEvenDistributionAll() {
+    playSound('click-handgun.mp3');
     // Apply Even Distribution to all offense sections
     const offenseSections = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'];
     
@@ -2310,6 +2332,7 @@ class PlaybooksUI {
     if (!this.state.areAllSectionsValid()) {
       return;
     }
+    playSound('confirm-2.mp3');
     
     // Final validation
     this.validateAndUpdate();

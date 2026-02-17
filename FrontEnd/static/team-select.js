@@ -4,8 +4,18 @@ const homeBox = document.getElementById('home-box');
 const awayCheck = document.getElementById('away-check');
 const homeCheck = document.getElementById('home-check');
 const playBtn = document.getElementById('play-btn');
-const clickSound = new Audio('./sounds/mixkit-click.wav');
-const addSound = new Audio('./sounds/handgun.mp3');
+const clickSound = new Audio('./sounds/click-beep.wav');
+const addSound = new Audio('./sounds/click-handgun.mp3');
+
+// Looping lobby music on team-select (scrimmage/single game) screen
+(function () {
+  try {
+    var lobbyMusic = new Audio('/sounds/crossover-21738.mp3');
+    lobbyMusic.loop = true;
+    lobbyMusic.volume = 0.4;
+    lobbyMusic.play().catch(function () {});
+  } catch (e) {}
+})();
 
 const teamCodeMap = {
   "Bentley-Truman": "bt",

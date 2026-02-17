@@ -114,11 +114,11 @@ class TournamentManager:
         playbook_settings = initialize_playbook_settings()
         
         teams_obj = {}
-        for t in docs:
+        for seed_one_based, t in enumerate(docs, start=1):
             team_id = str(t["_id"])
             team_name = t["name"]
-            # Use TeamManager static method to generate mode-specific team attributes
-            team_attrs = TeamManager.init_team_attributes(mode="tournament")
+            # Seed-based team attributes: seed 1 = best, seed 8 = worst (Mode_Init_System.md)
+            team_attrs = TeamManager.init_team_attributes(mode="tournament", tournament_seed=seed_one_based)
             teams_obj[team_id] = {
                 "name": team_name,
                 "team_chemistry": team_attrs["team_chemistry"],

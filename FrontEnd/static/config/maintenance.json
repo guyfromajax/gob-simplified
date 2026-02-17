@@ -1,8 +1,8 @@
 {
-  "id": "maintenance-2026-02-17",
-  "enabled": true,
-  "starts_at_iso": "2026-02-17T23:00:00Z",
-  "show_minutes_before": 12,
+  "id": "default-disabled",
+  "enabled": false,
+  "starts_at_iso": "",
+  "show_minutes_before": 60,
   "message": "Maintenance begins soon. Please finish your game to avoid losing progress.",
   "details_url": ""
 }

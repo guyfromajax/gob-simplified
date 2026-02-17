@@ -33,26 +33,8 @@ export function initTimeoutButton() {
         return;
     }
     
-    // Load sound effects
-    try {
-        // Use API_CONFIG to get correct static path for local vs production
-        const API_CONFIG = window.API_CONFIG;
-        const staticPath = API_CONFIG ? API_CONFIG.getStaticPath() : '/static';
-        
-        // Button click sound (plays when button is clicked)
-        const clickSoundPath = `${staticPath}/sounds/buttonClickSound.wav`;
-        timeoutSound = new Audio(clickSoundPath);
-        timeoutSound.volume = 0.5; // Set volume to 50%
-        console.log('✅ [TIMEOUT] Click sound loaded:', clickSoundPath);
-        
-        // Airhorn sound (plays when timeout executes/popup appears)
-        const airhornPath = `${staticPath}/sounds/Timeout - Airhorn.mp3`;
-        airhornSound = new Audio(airhornPath);
-        airhornSound.volume = 0.7; // Set volume to 70%
-        console.log('✅ [TIMEOUT] Airhorn sound loaded:', airhornPath);
-    } catch (error) {
-        console.warn('⚠️ [TIMEOUT] Could not load sound effects:', error);
-    }
+    // Load sound effects (shared with computer timeout so airhorn plays in both cases)
+    ensureTimeoutSounds();
     
     console.log('🔍 [TIMEOUT DEBUG] Attaching click listener to timeout button');
     button.addEventListener('click', (e) => {
@@ -64,6 +46,27 @@ export function initTimeoutButton() {
     
     // Make button always live (enabled)
     updateTimeoutButtonState(true, 'Timeout available');
+}
+
+/**
+ * Load timeout sounds if not already loaded (used by both user and computer timeout so airhorn plays in both cases)
+ */
+function ensureTimeoutSounds() {
+    if (airhornSound && timeoutSound) return;
+    try {
+        const API_CONFIG = window.API_CONFIG;
+        const staticPath = API_CONFIG ? API_CONFIG.getStaticPath() : '/static';
+        if (!timeoutSound) {
+            timeoutSound = new Audio(`${staticPath}/sounds/click-beep.wav`);
+            timeoutSound.volume = 0.5;
+        }
+        if (!airhornSound) {
+            airhornSound = new Audio(`${staticPath}/sounds/Timeout - Airhorn.mp3`);
+            airhornSound.volume = 0.7;
+        }
+    } catch (err) {
+        console.warn('⚠️ [TIMEOUT] Could not load timeout sounds:', err);
+    }
 }
 
 /**
@@ -658,6 +661,7 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
     // ✅ FIX 2: Add click handler for button - navigation only happens on explicit click
     const goToTimeoutBtn = popup.querySelector('.go-to-timeout-button');
     goToTimeoutBtn.addEventListener('click', async () => {
+        if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
         console.log('🔍 [TIMEOUT DEBUG] User clicked "Go To Timeout" button');
         
         // ✅ SAFEGUARD: Set flag to indicate user explicitly clicked button
@@ -697,7 +701,23 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
  */
 export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTimeout = false, computerTeamName = null) {
     console.log('🔍 [TIMEOUT DEBUG] showTimeoutPopup called', { computerTimeout, hasResult: !!timeoutResult });
-    
+
+    // Computer timeout: play airhorn when timeout triggers (same as user timeout), then brief delay so it’s audible before navigation
+    if (computerTimeout) {
+        ensureTimeoutSounds(); // Load sounds if not yet loaded (button may never have been initialized)
+        if (airhornSound) {
+            try {
+                airhornSound.currentTime = 0;
+                airhornSound.play().catch(err => {
+                    console.warn('⚠️ [TIMEOUT] Could not play airhorn (computer timeout):', err);
+                });
+            } catch (err) {
+                console.warn('⚠️ [TIMEOUT] Airhorn play error (computer timeout):', err);
+            }
+            await new Promise(r => setTimeout(r, 800));
+        }
+    }
+
     // ✅ FIX 2: Guard against auto-navigation for user timeouts
     // If this is a user timeout (not computer), make sure it's being called from button click
     if (!computerTimeout) {
@@ -782,52 +802,60 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
     
     const currentQuarter = scene.simData?.quarter || scene.quarter || 1;
     
-    // ✅ TIMEOUT: Get clock from API response first (backend source of truth - most reliable)
-    // The /api/call-timeout endpoint returns the current clock at the moment the timeout is called
+    // ✅ TIMEOUT CLOCK: Prefer what the user sees on screen for user timeouts (avoids stale API when
+    // next simulate_turn is in flight). For computer timeouts, API response is authoritative.
     let clock = null;
-    if (timeoutResult && timeoutResult.clock) {
-        clock = timeoutResult.clock;
-        console.log(`✅ TIMEOUT: Using clock from API response: ${clock}`);
+    if (computerTimeout) {
+        // Computer timeout: use API response first (same request that triggered navigation)
+        if (timeoutResult && timeoutResult.clock) {
+            clock = timeoutResult.clock;
+            console.log(`✅ TIMEOUT: Using clock from API response: ${clock}`);
+        }
     }
-    
-    // Fallback to DOM element (what's actually displayed to user)
+    // User timeout: prefer displayed clock (DOM → simData) so lineup shows what user saw
     if (!clock) {
         const clockEl = document.getElementById('game-clock');
         if (clockEl && clockEl.textContent && clockEl.textContent.trim()) {
             clock = clockEl.textContent.trim();
-            console.log(`✅ TIMEOUT: Using clock from DOM element: ${clock}`);
+            console.log(`✅ TIMEOUT: Using clock from DOM (displayed): ${clock}`);
         }
     }
-    
-    // Fallback to scene.simData.clock (updated by updateScoreboard as turns are processed)
-    if (!clock) {
-        clock = scene.simData?.clock || null;
-        if (clock) {
-            console.log(`✅ TIMEOUT: Using clock from scene.simData: ${clock}`);
-        }
+    if (!clock && scene.simData?.clock) {
+        clock = scene.simData.clock;
+        console.log(`✅ TIMEOUT: Using clock from scene.simData: ${clock}`);
     }
-    
-    // Fallback to last processed turn (if turns array exists)
+    if (!clock && timeoutResult && timeoutResult.clock) {
+        clock = timeoutResult.clock;
+        console.log(`✅ TIMEOUT: Using clock from API response: ${clock}`);
+    }
     if (!clock && scene.simData?.turns && Array.isArray(scene.simData.turns) && scene.simData.turns.length > 0) {
         const lastTurn = scene.simData.turns[scene.simData.turns.length - 1];
         clock = lastTurn?.clock || lastTurn?.game_clock || null;
-        if (clock) {
-            console.log(`✅ TIMEOUT: Using clock from last processed turn: ${clock}`);
-        }
+        if (clock) console.log(`✅ TIMEOUT: Using clock from last turn: ${clock}`);
     }
-    
-    // Fallback to URL params (for initial load scenarios)
     if (!clock) {
-        clock = urlParams.get('clock');
-        if (clock) {
-            console.log(`✅ TIMEOUT: Using clock from URL params: ${clock}`);
-        }
+        clock = urlParams.get('clock') || null;
+        if (clock) console.log(`✅ TIMEOUT: Using clock from URL params: ${clock}`);
     }
-    
-    // Final fallback: default to 8:00 if no clock found
     if (!clock) {
         clock = '8:00';
         console.warn(`⚠️ TIMEOUT: No clock found, defaulting to ${clock}`);
+    }
+    
+    // ✅ TIMEOUT SCORES: Pass displayed scores in URL so lineup header shows what user saw (same rationale as clock)
+    let homeScore = null;
+    let awayScore = null;
+    const homeScoreEl = document.getElementById('home-score');
+    const awayScoreEl = document.getElementById('away-score');
+    if (homeScoreEl && awayScoreEl) {
+        const h = homeScoreEl.textContent?.trim();
+        const a = awayScoreEl.textContent?.trim();
+        if (h !== undefined && h !== '' && !isNaN(Number(h))) homeScore = Number(h);
+        if (a !== undefined && a !== '' && !isNaN(Number(a))) awayScore = Number(a);
+    }
+    if ((homeScore === null || awayScore === null) && timeoutResult) {
+        if (homeScore === null && typeof timeoutResult.home_score === 'number') homeScore = timeoutResult.home_score;
+        if (awayScore === null && typeof timeoutResult.away_score === 'number') awayScore = timeoutResult.away_score;
     }
     
     // Build lineup object from scene
@@ -865,7 +893,9 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
             franchise_id: franchiseId,
             week: weekParam,
             tournament_id: tournamentId,
-            mode: modeParam
+            mode: modeParam,
+            home_score: homeScore ?? undefined,
+            away_score: awayScore ?? undefined
         }
     });
     
