@@ -22,14 +22,14 @@ Wire the noted components with the SFX specified. If anything is unclear, please
 ---
 
 Homepage
-- Play Alpha button -- click-strong (NOT WORKING)
+- Play Alpha button -- click-strong (WORKING)
 
 Top Nav Bar
--Tutorials and Feedback buttons: click-tiny (NOT WORKING)
+-Tutorials and Feedback buttons: click-tiny (WORKING INCONSISTENTLY)
 
 Tutorials
 - add movement-cycle when closing or opening a section in the Tutorials tabs
-- Back link: x-back
+- Back link: x-back (NOT WORKING)
 
 Mode-Select
 - Play Now (all three modes): click-strong (WORKING)

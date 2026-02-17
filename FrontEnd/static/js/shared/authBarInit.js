@@ -350,7 +350,7 @@
     right.insertBefore(btn, right.firstChild);
   }
 
-  function function playNavSound(filename) {
+  function playNavSound(filename) {
     try {
       var a = new Audio('/sounds/' + encodeURIComponent(filename));
       a.volume = 0.7;
