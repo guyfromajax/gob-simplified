@@ -1633,13 +1633,6 @@ async function initializeTournament() {
   // Load team data for Team tab
   await loadTeamData();
 
-  function playSound(filename) {
-    try {
-      const a = new Audio('/sounds/' + encodeURIComponent(filename));
-      a.volume = 0.7;
-      a.play().catch(function() {});
-    } catch (e) {}
-  }
   const playBtn = document.getElementById('play-now');
   if (playBtn) {
     playBtn.addEventListener('click', async () => {
@@ -1693,48 +1686,7 @@ async function initializeTournament() {
     });
   }
 
-  // Set Game Plan button (Tournament Command Center)
-  const setGameplanBtn = document.getElementById('set-gameplan-tournament');
-  if (setGameplanBtn) {
-    setGameplanBtn.addEventListener('click', () => {
-      playSound('buttonClickSound.wav');
-      if (!tournament || !tournament._id || !userTeamId) {
-        alert('Tournament or user team not loaded');
-        return;
-      }
-      
-      // ✅ MIGRATION (Task 6.1): Use team_id parameter (aligns with Franchise pattern)
-      // ✅ SS&S: Redirect to Game Plan screen with ObjectId for consistent navigation
-      const params = new URLSearchParams();
-      params.set('mode', 'tournament');
-      params.set('tournament_id', tournament._id);
-      params.set('team_id', userTeamId); // Use team_id (not user_team_id) for consistency
-      params.set('from', 'tournament-command-center'); // Track navigation source
-      
-      window.location.href = `/game-plan.html?${params.toString()}`;
-    });
-  }
-
-  // Playbooks button (Tournament Command Center)
-  const playbooksBtn = document.getElementById('playbooks-tournament');
-  if (playbooksBtn) {
-    playbooksBtn.addEventListener('click', () => {
-      playSound('buttonClickSound.wav');
-      if (!tournament || !tournament._id || !userTeamId) {
-        alert('Tournament or user team not loaded');
-        return;
-      }
-      
-      // ✅ SS&S: Build playbooks URL with ObjectId for consistent navigation
-      const params = new URLSearchParams();
-      params.set('mode', 'tournament');
-      params.set('tournament_id', tournament._id);
-      params.set('team_id', userTeamId);
-      params.set('from', 'tournament-command-center'); // Track navigation source
-      
-      window.location.href = `/playbooks.html?${params.toString()}`;
-    });
-  }
+  // Game Plan and Playbooks buttons are wired in wireTccNavButtons() on DOMContentLoaded
 
   const simBtn = document.getElementById('sim-remaining');
   if (simBtn) {
@@ -1887,10 +1839,47 @@ async function loadScoutingReport() {
 // renderScoutingTeamReport, renderPlayUsage, and setupScoutingReport are now in /js/shared/scoutingReport.js
 
 // ✅ FIX: Check readyState - if page is already loaded, run immediately
+// Wire TCC Game Plan and Playbooks buttons as soon as DOM is ready (so sound + nav work; tournament/userTeamId set by init)
+function wireTccNavButtons() {
+  const setGameplanBtn = document.getElementById('set-gameplan-tournament');
+  if (setGameplanBtn) {
+    setGameplanBtn.addEventListener('click', () => {
+      playSound('buttonClickSound.wav');
+      if (!tournament || !tournament._id || !userTeamId) {
+        alert('Tournament or user team not loaded');
+        return;
+      }
+      const params = new URLSearchParams();
+      params.set('mode', 'tournament');
+      params.set('tournament_id', tournament._id);
+      params.set('team_id', userTeamId);
+      params.set('from', 'tournament-command-center');
+      window.location.href = `/game-plan.html?${params.toString()}`;
+    });
+  }
+  const playbooksBtnEl = document.getElementById('playbooks-tournament');
+  if (playbooksBtnEl) {
+    playbooksBtnEl.addEventListener('click', () => {
+      playSound('buttonClickSound.wav');
+      if (!tournament || !tournament._id || !userTeamId) {
+        alert('Tournament or user team not loaded');
+        return;
+      }
+      const params = new URLSearchParams();
+      params.set('mode', 'tournament');
+      params.set('tournament_id', tournament._id);
+      params.set('team_id', userTeamId);
+      params.set('from', 'tournament-command-center');
+      window.location.href = `/playbooks.html?${params.toString()}`;
+    });
+  }
+}
+
 // Otherwise wait for DOMContentLoaded (handles case where script loads late)
 if (document.readyState === 'loading') {
   // DOM is still loading, wait for DOMContentLoaded
   document.addEventListener('DOMContentLoaded', () => {
+    wireTccNavButtons();
     initializeTournament();
     // ✅ SS&S: Initialize scouting report using shared function
     if (typeof setupScoutingReport === 'function') {
@@ -1900,6 +1889,7 @@ if (document.readyState === 'loading') {
 } else {
   // DOM is already loaded (interactive or complete), run immediately
   console.log('🚀 [TOURNAMENT] DOM already loaded, calling initializeTournament() immediately');
+  wireTccNavButtons();
   initializeTournament();
   // ✅ SS&S: Initialize scouting report using shared function
   if (typeof setupScoutingReport === 'function') {

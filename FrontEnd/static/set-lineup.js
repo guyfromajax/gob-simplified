@@ -1238,7 +1238,176 @@ function removeIneligiblePlayersFromLineup() {
   }
 }
 
+function wireLineupNavButtons() {
+  const gameplanBtn = document.getElementById('gameplan-optional');
+  if (gameplanBtn) {
+    gameplanBtn.addEventListener('click', async () => {
+      playSound('buttonClickSound.wav');
+      console.log('🎮 GAME PLAN BUTTON CLICKED! Redirecting to game-plan.html');
+      const currentUrlParams = new URLSearchParams(window.location.search);
+      let currentGameId = currentUrlParams.get('game_id');
+      const resumeFromTimeout = currentUrlParams.get('resume_from_timeout') === 'true';
+      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && !initGameInProgress) {
+        initGameInProgress = true;
+        try {
+          const mode = modeParam || 'single';
+          const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: mode };
+          if (mode === 'tournament' && tournamentId) initPayload.tournament_id = tournamentId;
+          else if (mode === 'franchise' && franchiseId) initPayload.franchise_id = franchiseId;
+          const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
+            method: 'POST',
+            headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(initPayload)
+          });
+          if (initRes.ok) {
+            const initData = await initRes.json();
+            currentGameId = initData.game_id;
+            currentUrlParams.set('game_id', currentGameId);
+            if (typeof history !== 'undefined' && history.replaceState) {
+              history.replaceState(null, '', `${window.location.pathname}?${currentUrlParams.toString()}`);
+            }
+          }
+        } catch (err) {
+          console.error('❌ [SET-LINEUP] Error initializing game for Game Plan navigation:', err);
+          alert('Failed to initialize game. Please try again.');
+          initGameInProgress = false;
+          return;
+        }
+        initGameInProgress = false;
+      } else if (initGameInProgress) {
+        let waitCount = 0;
+        while (initGameInProgress && waitCount < 50) {
+          await new Promise(r => setTimeout(r, 100));
+          waitCount++;
+          currentGameId = new URLSearchParams(window.location.search).get('game_id');
+          if (currentGameId) break;
+        }
+        if (!currentGameId) {
+          alert('Game initialization is taking longer than expected. Please try again.');
+          return;
+        }
+      }
+      const helper = window.TimeoutNavigationHelper;
+      if (!helper) {
+        console.error('❌ [SET-LINEUP] TimeoutNavigationHelper not loaded!');
+        return;
+      }
+      const params = helper.buildGameNavigationParams({
+        sourceParams: currentUrlParams,
+        targetQuarter: quarter,
+        gameId: currentGameId,
+        resumeFromTimeout: resumeFromTimeout,
+        lineup: lineup,
+        myTeamSide: myTeamSide
+      });
+      params.set('from', 'lineup');
+      if (DEBUG) params.set('debug', '1');
+      window.location.href = `/game-plan.html?${params.toString()}`;
+    });
+  }
+  const playbooksBtn = document.getElementById('playbooks-button');
+  if (playbooksBtn) {
+    playbooksBtn.addEventListener('click', async () => {
+      playSound('buttonClickSound.wav');
+      console.log('📚 PLAYBOOKS BUTTON CLICKED! Redirecting to playbooks.html');
+      const currentUrlParams = new URLSearchParams(window.location.search);
+      let currentGameId = currentUrlParams.get('game_id');
+      const resumeFromTimeout = currentUrlParams.get('resume_from_timeout') === 'true';
+      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && !initGameInProgress) {
+        initGameInProgress = true;
+        try {
+          const mode = modeParam || 'single';
+          const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: mode };
+          if (mode === 'tournament' && tournamentId) initPayload.tournament_id = tournamentId;
+          else if (mode === 'franchise' && franchiseId) initPayload.franchise_id = franchiseId;
+          const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
+            method: 'POST',
+            headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(initPayload)
+          });
+          if (initRes.ok) {
+            const initData = await initRes.json();
+            currentGameId = initData.game_id;
+            currentUrlParams.set('game_id', currentGameId);
+            if (typeof history !== 'undefined' && history.replaceState) {
+              history.replaceState(null, '', `${window.location.pathname}?${currentUrlParams.toString()}`);
+            }
+          } else {
+            alert('Failed to initialize game. Please try again.');
+            initGameInProgress = false;
+            return;
+          }
+        } catch (err) {
+          console.error('❌ [SET-LINEUP] Error initializing game for Playbooks navigation:', err);
+          alert('Failed to initialize game. Please try again.');
+          initGameInProgress = false;
+          return;
+        }
+        initGameInProgress = false;
+      } else if (initGameInProgress) {
+        let waitCount = 0;
+        while (initGameInProgress && waitCount < 50) {
+          await new Promise(r => setTimeout(r, 100));
+          waitCount++;
+          currentGameId = new URLSearchParams(window.location.search).get('game_id');
+          if (currentGameId) break;
+        }
+        if (!currentGameId) {
+          alert('Game initialization is taking longer than expected. Please try again.');
+          return;
+        }
+      }
+      const helper = window.TimeoutNavigationHelper;
+      if (!helper) {
+        console.error('❌ [SET-LINEUP] TimeoutNavigationHelper not loaded!');
+        return;
+      }
+      const params = helper.buildGameNavigationParams({
+        sourceParams: currentUrlParams,
+        targetQuarter: quarter,
+        gameId: currentGameId,
+        resumeFromTimeout: resumeFromTimeout,
+        lineup: lineup,
+        myTeamSide: myTeamSide
+      });
+      params.set('from', 'lineup');
+      if (DEBUG) params.set('debug', '1');
+      window.location.href = `/playbooks.html?${params.toString()}`;
+    });
+  }
+  const boxBtn = document.getElementById('box-score-button');
+  if (boxBtn) {
+    boxBtn.addEventListener('click', () => {
+      playSound('buttonClickSound.wav');
+      const helper = window.TimeoutNavigationHelper;
+      if (!helper) {
+        console.error('❌ [SET-LINEUP] TimeoutNavigationHelper not loaded!');
+        return;
+      }
+      const currentUrlParams = new URLSearchParams(window.location.search);
+      const currentGameId = helper.getGameId(currentUrlParams);
+      const resumeFromTimeout = helper.getResumeFromTimeout(currentUrlParams);
+      const params = helper.buildGameNavigationParams({
+        sourceParams: currentUrlParams,
+        targetQuarter: quarter,
+        gameId: currentGameId,
+        resumeFromTimeout: resumeFromTimeout,
+        lineup: lineup,
+        myTeamSide: myTeamSide
+      });
+      if (currentGameId) {
+        params.set('game_id', currentGameId);
+      } else {
+        params.set('pregame', '1');
+      }
+      params.set('from', 'lineup');
+      window.location.href = `/box-score.html?${params.toString()}`;
+    });
+  }
+}
+
 async function init() {
+  wireLineupNavButtons();
   // ✅ PHASE 2: Validate pointers on page load
   const validationPassed = await validatePointersOnLoad();
   if (!validationPassed) {
@@ -1416,267 +1585,7 @@ async function init() {
       setTimeout(() => { window.location.href = finalUrl; }, 200);
     });
   }
-
-  // NEW: Optional Game Plan button (always enabled)
-  const gameplanBtn = document.getElementById('gameplan-optional');
-  console.log('🔍 Game Plan button found:', gameplanBtn);
-  if (gameplanBtn) {
-    gameplanBtn.addEventListener('click', async () => {
-      playSound('buttonClickSound.wav');
-      console.log('🎮 GAME PLAN BUTTON CLICKED! Redirecting to game-plan.html');
-      
-      // ✅ PHASE 1.1: Ensure game_id exists before navigating (init-game might be in progress)
-      // ✅ SS&S: URL is the source of truth - always read from window.location.search
-      const currentUrlParams = new URLSearchParams(window.location.search);
-      let currentGameId = currentUrlParams.get('game_id'); // Read from URL only (source of truth)
-      const resumeFromTimeout = currentUrlParams.get('resume_from_timeout') === 'true';
-      
-      // ✅ PHASE 1.1: If game_id doesn't exist yet, wait for init-game to complete (if not already in progress)
-      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && !initGameInProgress) {
-        console.log('⏳ [SET-LINEUP] game_id not found, waiting for init-game to complete...');
-        
-        initGameInProgress = true; // Prevent duplicate calls
-        try {
-          const mode = modeParam || 'single';
-          const initPayload = {
-            home_team: homeTeam,
-            away_team: awayTeam,
-            mode: mode
-          };
-          
-          if (mode === 'tournament' && tournamentId) {
-            initPayload.tournament_id = tournamentId;
-          } else if (mode === 'franchise' && franchiseId) {
-            initPayload.franchise_id = franchiseId;
-          }
-          
-          const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
-            method: 'POST',
-            headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-            body: JSON.stringify(initPayload)
-          });
-          
-          if (initRes.ok) {
-            const initData = await initRes.json();
-            currentGameId = initData.game_id;
-            console.log(`✅ [SET-LINEUP] Initialized game_id for Game Plan: ${currentGameId}`);
-            
-            // ✅ SS&S: URL is the source of truth - update URL with game_id
-            currentUrlParams.set('game_id', currentGameId);
-            if (typeof history !== 'undefined' && history.replaceState) {
-              history.replaceState(null, '', `${window.location.pathname}?${currentUrlParams.toString()}`);
-            }
-          } else {
-            console.error('❌ [SET-LINEUP] Failed to initialize game for Game Plan navigation');
-            alert('Failed to initialize game. Please try again.');
-            return;
-          }
-        } catch (err) {
-          console.error('❌ [SET-LINEUP] Error initializing game for Game Plan navigation:', err);
-          alert('Failed to initialize game. Please try again.');
-          return;
-        } finally {
-          initGameInProgress = false; // Reset flag
-        }
-      } else if (initGameInProgress) {
-        console.log('⏳ [SET-LINEUP] init-game already in progress, waiting...');
-        // Wait for init-game to complete by polling
-        let waitCount = 0;
-        while (initGameInProgress && waitCount < 50) { // Max 5 seconds
-          await new Promise(resolve => setTimeout(resolve, 100));
-          waitCount++;
-          // ✅ SS&S: Re-check URL for game_id (source of truth)
-          const updatedParams = new URLSearchParams(window.location.search);
-          currentGameId = updatedParams.get('game_id');
-          if (currentGameId) break;
-        }
-        if (!currentGameId) {
-          console.error('❌ [SET-LINEUP] init-game did not complete in time');
-          alert('Game initialization is taking longer than expected. Please try again.');
-          return;
-        }
-      }
-      
-      // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
-      const helper = window.TimeoutNavigationHelper;
-      if (!helper) {
-        console.error('❌ [SET-LINEUP] TimeoutNavigationHelper not loaded!');
-        return;
-      }
-      
-      // Use current URL params (might have been updated by init-game)
-      const params = helper.buildGameNavigationParams({
-        sourceParams: currentUrlParams,
-        targetQuarter: quarter,
-        gameId: currentGameId,
-        resumeFromTimeout: resumeFromTimeout,
-        lineup: lineup,
-        myTeamSide: myTeamSide
-      });
-
-      if (DEBUG) {
-        params.set('debug', '1');
-      }
-      
-      // Add "from=lineup" so Game Plan screen knows where user came from
-      params.set('from', 'lineup');
-      
-      if (DEBUG) {
-        console.debug('🔀 Redirecting to game-plan.html', { home: homeTeam, away: awayTeam, gameId: currentGameId });
-      }
-      window.location.href = `/game-plan.html?${params.toString()}`;
-    });
-  }
-
-  // ✅ TASK 0: PLAYBOOKS button: navigate to playbooks page
-  const playbooksBtn = document.getElementById('playbooks-button');
-  if (playbooksBtn) {
-    playbooksBtn.addEventListener('click', async () => {
-      playSound('buttonClickSound.wav');
-      console.log('📚 PLAYBOOKS BUTTON CLICKED! Redirecting to playbooks.html');
-      
-      // ✅ PHASE 1.1: Ensure game_id exists before navigating (init-game might be in progress)
-      // ✅ SS&S: URL is the source of truth - always read from window.location.search
-      const currentUrlParams = new URLSearchParams(window.location.search);
-      let currentGameId = currentUrlParams.get('game_id'); // Read from URL only (source of truth)
-      const resumeFromTimeout = currentUrlParams.get('resume_from_timeout') === 'true';
-      
-      // ✅ PHASE 1.1: If game_id doesn't exist yet, wait for init-game to complete (if not already in progress)
-      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && !initGameInProgress) {
-        console.log('⏳ [SET-LINEUP] game_id not found, waiting for init-game to complete...');
-        
-        initGameInProgress = true; // Prevent duplicate calls
-        try {
-          const mode = modeParam || 'single';
-          const initPayload = {
-            home_team: homeTeam,
-            away_team: awayTeam,
-            mode: mode
-          };
-          
-          if (mode === 'tournament' && tournamentId) {
-            initPayload.tournament_id = tournamentId;
-          } else if (mode === 'franchise' && franchiseId) {
-            initPayload.franchise_id = franchiseId;
-          }
-          
-          const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
-            method: 'POST',
-            headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-            body: JSON.stringify(initPayload)
-          });
-          
-          if (initRes.ok) {
-            const initData = await initRes.json();
-            currentGameId = initData.game_id;
-            console.log(`✅ [SET-LINEUP] Initialized game_id for Playbooks: ${currentGameId}`);
-            
-            // ✅ SS&S: URL is the source of truth - update URL with game_id
-            currentUrlParams.set('game_id', currentGameId);
-            if (typeof history !== 'undefined' && history.replaceState) {
-              history.replaceState(null, '', `${window.location.pathname}?${currentUrlParams.toString()}`);
-            }
-          } else {
-            console.error('❌ [SET-LINEUP] Failed to initialize game for Playbooks navigation');
-            alert('Failed to initialize game. Please try again.');
-            return;
-          }
-        } catch (err) {
-          console.error('❌ [SET-LINEUP] Error initializing game for Playbooks navigation:', err);
-          alert('Failed to initialize game. Please try again.');
-          return;
-        } finally {
-          initGameInProgress = false; // Reset flag
-        }
-      } else if (initGameInProgress) {
-        console.log('⏳ [SET-LINEUP] init-game already in progress, waiting...');
-        // Wait for init-game to complete by polling
-        let waitCount = 0;
-        while (initGameInProgress && waitCount < 50) { // Max 5 seconds
-          await new Promise(resolve => setTimeout(resolve, 100));
-          waitCount++;
-          // ✅ SS&S: Re-check URL for game_id (source of truth)
-          const updatedParams = new URLSearchParams(window.location.search);
-          currentGameId = updatedParams.get('game_id');
-          if (currentGameId) break;
-        }
-        if (!currentGameId) {
-          console.error('❌ [SET-LINEUP] init-game did not complete in time');
-          alert('Game initialization is taking longer than expected. Please try again.');
-          return;
-        }
-      }
-      
-      // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
-      const helper = window.TimeoutNavigationHelper;
-      if (!helper) {
-        console.error('❌ [SET-LINEUP] TimeoutNavigationHelper not loaded!');
-        return;
-      }
-      
-      // Use current URL params (might have been updated by init-game)
-      const params = helper.buildGameNavigationParams({
-        sourceParams: currentUrlParams,
-        targetQuarter: quarter,
-        gameId: currentGameId,
-        resumeFromTimeout: resumeFromTimeout,
-        lineup: lineup,
-        myTeamSide: myTeamSide
-      });
-
-      if (DEBUG) {
-        params.set('debug', '1');
-      }
-      
-      // Add "from=lineup" so Playbooks screen knows where user came from
-      params.set('from', 'lineup');
-      
-      if (DEBUG) {
-        console.debug('🔀 Redirecting to playbooks.html', { home: homeTeam, away: awayTeam, gameId: currentGameId });
-      }
-      window.location.href = `/playbooks.html?${params.toString()}`;
-    });
-  }
-
-  // BOX SCORE button: go to current game's box score if available
-  const boxBtn = document.getElementById('box-score-button');
-  if (boxBtn) {
-    boxBtn.addEventListener('click', () => {
-      playSound('buttonClickSound.wav');
-      // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
-      const helper = window.TimeoutNavigationHelper;
-      if (!helper) {
-        console.error('❌ [SET-LINEUP] TimeoutNavigationHelper not loaded!');
-        return;
-      }
-      
-      const currentGameId = helper.getGameId(urlParams);
-      const resumeFromTimeout = helper.getResumeFromTimeout(urlParams);
-      
-      // Build params using helper (preserves resume_from_timeout and all timeout state)
-      const params = helper.buildGameNavigationParams({
-        sourceParams: urlParams,
-        targetQuarter: quarter,
-        gameId: currentGameId,
-        resumeFromTimeout: resumeFromTimeout, // ✅ SS&S: Preserves timeout state
-        lineup: lineup,
-        myTeamSide: myTeamSide
-      });
-
-      // If we have an active game, include it so Box Score shows live stats
-      if (currentGameId) {
-        params.set('game_id', currentGameId);
-      } else {
-        // Pre-game: let Box Score know to render zeroed stats
-        params.set('pregame', '1');
-      }
-
-      // Mark that navigation originated from lineup so Box Score can "Back" here
-      params.set('from', 'lineup');
-
-      window.location.href = `/box-score.html?${params.toString()}`;
-    });
-  }
+  // Game Plan, Playbooks, Box Score wired in wireLineupNavButtons()
 }
 
 // ========== PLAYER VIEW IMPLEMENTATION ==========
