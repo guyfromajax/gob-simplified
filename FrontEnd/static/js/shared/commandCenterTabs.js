@@ -47,7 +47,7 @@ function initCommandCenterTabs(options) {
     btn.addEventListener('click', function () {
       var tabName = btn.dataset.tab;
       if (!tabName) return;
-      playSound('X (Back) (3).mp3');
+      playSound('x-back.mp3');
       setActive(tabName);
       updateUrl(tabName);
       onTabShow(tabName);

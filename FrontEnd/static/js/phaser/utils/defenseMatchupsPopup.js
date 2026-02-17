@@ -351,13 +351,13 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
         updatePopupDisplay(popup, newMatchups);
         
         // SFX: drag-and-drop to change matchups
-        if (typeof window.playSound === 'function') window.playSound('Click (1).mp3');
+        if (typeof window.playSound === 'function') window.playSound('click-soft.mp3');
     });
     
     // Submit button handler
     const submitButton = popup.querySelector('.submit-matchups-button');
     submitButton.addEventListener('click', async () => {
-        if (typeof window.playSound === 'function') window.playSound('Offense buttons.wav');
+        if (typeof window.playSound === 'function') window.playSound('positive-plop.wav');
         await handleSubmit(popup, gameId);
         if (onResolve) {
             onResolve(); // Resolve promise to allow animation to continue

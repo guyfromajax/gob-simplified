@@ -476,7 +476,7 @@
       }
       tabs.forEach(function(tab) {
         tab.addEventListener('click', function() {
-          playSound('X (Back) (3).mp3');
+          playSound('x-back.mp3');
           showPanel(tab.getAttribute('aria-controls'));
         });
       });
@@ -486,7 +486,7 @@
           var attr = this.closest('.tutorial-attr');
           var isOpen = attr.classList.toggle('is-open');
           this.setAttribute('aria-expanded', isOpen);
-          if (isOpen) playSound('Team Cycle (1).mp3');
+          if (isOpen) playSound('movement-cycle.mp3');
         });
       });
     })();

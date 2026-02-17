@@ -57,7 +57,7 @@ function ensureTimeoutSounds() {
         const API_CONFIG = window.API_CONFIG;
         const staticPath = API_CONFIG ? API_CONFIG.getStaticPath() : '/static';
         if (!timeoutSound) {
-            timeoutSound = new Audio(`${staticPath}/sounds/buttonClickSound.wav`);
+            timeoutSound = new Audio(`${staticPath}/sounds/click-strong.wav`);
             timeoutSound.volume = 0.5;
         }
         if (!airhornSound) {

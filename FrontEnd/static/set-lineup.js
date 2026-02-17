@@ -770,7 +770,7 @@ function updatePlayButton() {
 }
 
 function autosetLineup() {
-  playSound('Confirm - Option 1 (3).mp3');
+  playSound('confirm-1.mp3');
   // Clear current lineup
   document.querySelectorAll('.slot').forEach(slot => clearSlot(slot));
   
@@ -1025,7 +1025,7 @@ function setupSlots() {
 
     updateAllSlotDisplays();
     updatePlayButton();
-    playSound('Click (1).mp3');
+    playSound('click-soft.mp3');
 
     if (currentView === 'player') {
       renderPlayerView();
@@ -1242,7 +1242,7 @@ function wireLineupNavButtons() {
   const gameplanBtn = document.getElementById('gameplan-optional');
   if (gameplanBtn) {
     gameplanBtn.addEventListener('click', async () => {
-      playSound('buttonClickSound.wav');
+      playSound('click-strong.wav');
       console.log('🎮 GAME PLAN BUTTON CLICKED! Redirecting to game-plan.html');
       const currentUrlParams = new URLSearchParams(window.location.search);
       let currentGameId = currentUrlParams.get('game_id');
@@ -1308,7 +1308,7 @@ function wireLineupNavButtons() {
   const playbooksBtn = document.getElementById('playbooks-button');
   if (playbooksBtn) {
     playbooksBtn.addEventListener('click', async () => {
-      playSound('buttonClickSound.wav');
+      playSound('click-strong.wav');
       console.log('📚 PLAYBOOKS BUTTON CLICKED! Redirecting to playbooks.html');
       const currentUrlParams = new URLSearchParams(window.location.search);
       let currentGameId = currentUrlParams.get('game_id');
@@ -1378,7 +1378,7 @@ function wireLineupNavButtons() {
   const boxBtn = document.getElementById('box-score-button');
   if (boxBtn) {
     boxBtn.addEventListener('click', () => {
-      playSound('buttonClickSound.wav');
+      playSound('click-strong.wav');
       const helper = window.TimeoutNavigationHelper;
       if (!helper) {
         console.error('❌ [SET-LINEUP] TimeoutNavigationHelper not loaded!');
@@ -1580,7 +1580,7 @@ async function init() {
       DEBUG && console.log('[lineup] launching quarter', quarter);
       const finalUrl = `/court.html?${params.toString()}`;
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Navigating to court.html:', finalUrl);
-      playSound('Offense buttons.wav');
+      playSound('positive-plop.wav');
       // Delay navigation so the sound can start before the page unloads
       setTimeout(() => { window.location.href = finalUrl; }, 200);
     });
@@ -2226,7 +2226,7 @@ renderRoster = function() {
       if (!p.ineligible && !p.fouled_out) {
         row.addEventListener('click', (e) => {
           if (!selectedIds.includes(p._id)) {
-            playSound('Click (1).mp3');
+            playSound('click-soft.mp3');
             fillNextSlot(p._id);
           }
         });
@@ -2262,7 +2262,7 @@ function setupSlotDragAndDrop() {
       
       newRemoveBtn.addEventListener('click', (e) => {
         e.stopPropagation(); // Prevent slot click from firing
-        playSound('Collapse & Expand.mp3');
+        playSound('collapse-expand.mp3');
         clearSlot(slot);
       });
     }
@@ -2306,7 +2306,7 @@ function setupSlotDragAndDrop() {
       } else {
         assignToSlot(targetPos, draggedId);
       }
-      playSound('Click (1).mp3');
+      playSound('click-soft.mp3');
     });
   });
 }

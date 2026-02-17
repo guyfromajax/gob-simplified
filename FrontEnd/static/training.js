@@ -398,7 +398,7 @@ function playSound(filename) {
  */
 submitBtn.addEventListener('click', async function() {
   if (this.disabled) return;
-  playSound('Confirm - Option 2 (1).mp3');
+  playSound('confirm-2.mp3');
   
   const trainingData = collectTrainingData();
   

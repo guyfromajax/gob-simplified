@@ -1636,7 +1636,7 @@ async function initializeTournament() {
   const playBtn = document.getElementById('play-now');
   if (playBtn) {
     playBtn.addEventListener('click', async () => {
-      playSound('handgun.mp3');
+      playSound('click-handgun.mp3');
       if (!tournament || !tournament._id) {
         alert('Tournament not loaded');
         return;
@@ -1784,7 +1784,7 @@ function updateScoutingButton(data) {
 }
 
 async function loadScoutingReport() {
-  playSound('buttonClickSound.wav');
+  playSound('click-strong.wav');
   if (!upcomingOpponent || !tournament || !tournament._id) {
     alert('No upcoming opponent found');
     return;
@@ -1844,7 +1844,7 @@ function wireTccNavButtons() {
   const setGameplanBtn = document.getElementById('set-gameplan-tournament');
   if (setGameplanBtn) {
     setGameplanBtn.addEventListener('click', () => {
-      playSound('buttonClickSound.wav');
+      playSound('click-strong.wav');
       if (!tournament || !tournament._id || !userTeamId) {
         alert('Tournament or user team not loaded');
         return;
@@ -1860,7 +1860,7 @@ function wireTccNavButtons() {
   const playbooksBtnEl = document.getElementById('playbooks-tournament');
   if (playbooksBtnEl) {
     playbooksBtnEl.addEventListener('click', () => {
-      playSound('buttonClickSound.wav');
+      playSound('click-strong.wav');
       if (!tournament || !tournament._id || !userTeamId) {
         alert('Tournament or user team not loaded');
         return;

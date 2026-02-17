@@ -10,7 +10,7 @@ The following sound files are taking up significant space:
 - `Echoes Through History.wav`: 32MB
 - `Conquering Olympus.wav`: 16MB
 - `symphony-of-victory.mp3`: 3.8MB
-- `Player buttons.wav`: 2.9MB
+- `positive-beep.wav`: 2.9MB
 
 ## Impact
 - **Current:** Not causing performance issues
