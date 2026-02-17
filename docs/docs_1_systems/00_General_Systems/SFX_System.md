@@ -20,6 +20,12 @@ The airhorn plays when the user calls a timeout and the “**[Team] Called Timeo
 | Trigger | Sound | Asset | Location |
 |--------|--------|-------|----------|
 | Player dropped into a lineup slot | Click | `Click (1).mp3` | `FrontEnd/static/set-lineup.js` — `playSound('Click (1).mp3')` in both drop handlers (slotsContainer `drop` and slot `drop` in `setupSlotDragAndDrop`) |
+| Click row (no drag) to add player to next slot | Click | `Click (1).mp3` | `FrontEnd/static/set-lineup.js` — roster row click before `fillNextSlot()` |
+| Red X — remove player from slot | Collapse/expand | `Collapse & Expand.mp3` | `FrontEnd/static/set-lineup.js` — slot `.remove` button click before `clearSlot()` |
+| Game Plan button | Button click | `buttonClickSound.wav` | `FrontEnd/static/set-lineup.js` — `#gameplan-optional` click |
+| Playbooks button | Button click | `buttonClickSound.wav` | `FrontEnd/static/set-lineup.js` — `#playbooks-button` click |
+| Box Score button | Button click | `buttonClickSound.wav` | `FrontEnd/static/set-lineup.js` — `#box-score-button` click |
+| Autoset Lineup button | Confirm | `Confirm - Option 1 (3).mp3` | `FrontEnd/static/set-lineup.js` — at start of `autosetLineup()` |
 
 ---
 
@@ -29,6 +35,28 @@ The airhorn plays when the user calls a timeout and the “**[Team] Called Timeo
 |--------|--------|-------|----------|
 | Save Game Plan (main button or modal "Save Game Plan") | Confirm | `Confirm - Option 1 (3).mp3` | `FrontEnd/static/game-plan.js` — before `saveGamePlan()` |
 | Save Playbooks (submit or modal "Save Playbooks") | Confirm | `Confirm - Option 1 (3).mp3` | `FrontEnd/static/playbooks.js` — at start of `handleSubmit()` |
+
+---
+
+## Playbooks screen
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| 1–6 slot buttons (assign play to Playcall Center slot) | Pace | `Pace buttons.wav` | `FrontEnd/static/playbooks.js` — at start of `handleSlotClick()` |
+| Even Distribution (per section) or Even Distribution - All | Handgun | `handgun.mp3` | `FrontEnd/static/playbooks.js` — at start of `handleEvenDistribution()` and `handleEvenDistributionAll()` |
+
+---
+
+## FCC / TCC — nav buttons
+
+| Trigger | Sound | Asset | Location |
+|--------|--------|-------|----------|
+| Game Plan button (FCC) | Button click | `buttonClickSound.wav` | `FrontEnd/static/franchise-command-center.js` — `#set-gameplan-franchise` click |
+| Playbooks button (FCC) | Button click | `buttonClickSound.wav` | `FrontEnd/static/franchise-command-center.js` — `#playbooks-franchise` click |
+| Scouting Report button (FCC) | Button click | `buttonClickSound.wav` | `FrontEnd/static/franchise-command-center.js` — at start of `loadScoutingReport()` |
+| Game Plan button (TCC) | Button click | `buttonClickSound.wav` | `FrontEnd/static/tournament.js` — `#set-gameplan-tournament` click |
+| Playbooks button (TCC) | Button click | `buttonClickSound.wav` | `FrontEnd/static/tournament.js` — `#playbooks-tournament` click |
+| Scouting Report button (TCC) | Button click | `buttonClickSound.wav` | `FrontEnd/static/tournament.js` — at start of `loadScoutingReport()` |
 
 ---
 

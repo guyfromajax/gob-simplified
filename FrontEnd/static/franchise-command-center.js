@@ -1415,6 +1415,7 @@ playNowBtn.addEventListener('click', async () => {
 const setGameplanBtn = document.getElementById('set-gameplan-franchise');
 if (setGameplanBtn) {
   setGameplanBtn.addEventListener('click', () => {
+    playSound('buttonClickSound.wav');
     if (!franchiseId || !userTeamId) {
       alert('Franchise or user team not loaded');
       return;
@@ -1430,6 +1431,7 @@ if (setGameplanBtn) {
 const playbooksBtn = document.getElementById('playbooks-franchise');
 if (playbooksBtn) {
   playbooksBtn.addEventListener('click', () => {
+    playSound('buttonClickSound.wav');
     if (!franchiseId || !userTeamId) {
       alert('Franchise or user team not loaded');
       return;
@@ -2083,6 +2085,7 @@ function updateScoutingButton(data) {
 }
 
 async function loadScoutingReport() {
+  playSound('buttonClickSound.wav');
   if (!upcomingOpponent || !franchiseId) {
     alert('No upcoming opponent found');
     return;

@@ -1360,6 +1360,7 @@ class PlaybooksUI {
   // UI state (position filters, even distribution toggles) is saved separately via savePositionFilterSelections()
 
   handleSlotClick(slotNumber, sectionKey, playId) {
+    playSound('Pace buttons.wav');
     const dropdown = sectionKey === 'motion' 
       ? (this.state.motionDropdowns[playId] || 'Inside')
       : null;
@@ -1551,6 +1552,7 @@ class PlaybooksUI {
   }
   
   handleEvenDistribution(sectionKey) {
+    playSound('handgun.mp3');
     // Toggle Even Distribution for this section
     this.evenDistributionEnabled[sectionKey] = !this.evenDistributionEnabled[sectionKey];
     
@@ -1571,6 +1573,7 @@ class PlaybooksUI {
   }
   
   handleEvenDistributionAll() {
+    playSound('handgun.mp3');
     // Apply Even Distribution to all offense sections
     const offenseSections = ['motion', 'set-play-inside', 'set-play-attack', 'set-play-outside'];
     

@@ -11,6 +11,14 @@ let userTeamNameForLeaders = null; // Store user team name for leaderboard highl
 let teamColorCache = null; // Cache for team primary colors
 let tournamentRosterData = null; // ✅ SS&S: Store roster data with merged stats (matches Franchise pattern)
 
+function playSound(filename) {
+  try {
+    const a = new Audio('/sounds/' + encodeURIComponent(filename));
+    a.volume = 0.7;
+    a.play().catch(function() {});
+  } catch (e) {}
+}
+
 function buildPlayerDetailUrl(playerId) {
   const qs = new URLSearchParams();
   qs.set('id', playerId);
@@ -1689,6 +1697,7 @@ async function initializeTournament() {
   const setGameplanBtn = document.getElementById('set-gameplan-tournament');
   if (setGameplanBtn) {
     setGameplanBtn.addEventListener('click', () => {
+      playSound('buttonClickSound.wav');
       if (!tournament || !tournament._id || !userTeamId) {
         alert('Tournament or user team not loaded');
         return;
@@ -1710,6 +1719,7 @@ async function initializeTournament() {
   const playbooksBtn = document.getElementById('playbooks-tournament');
   if (playbooksBtn) {
     playbooksBtn.addEventListener('click', () => {
+      playSound('buttonClickSound.wav');
       if (!tournament || !tournament._id || !userTeamId) {
         alert('Tournament or user team not loaded');
         return;
@@ -1822,6 +1832,7 @@ function updateScoutingButton(data) {
 }
 
 async function loadScoutingReport() {
+  playSound('buttonClickSound.wav');
   if (!upcomingOpponent || !tournament || !tournament._id) {
     alert('No upcoming opponent found');
     return;
