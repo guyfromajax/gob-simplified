@@ -4,7 +4,7 @@
 
 1. **Quarter Display Logic**: Shows quarter that just completed (`quarter - 1`), not the quarter being simulated
 2. **Turn Filtering**: Filters turns by `turn.quarter` field, with fallback to `quarter - 1` if no turns found
-3. **Shot Event Types**: Only `MAKE` and `MISS` result types are displayed in the scroll
+3. **Event Types in Scroll**: MAKE, MISS, PUTBACK_MAKE/MISS, FREE_THROW, FOUL, DEAD_BALL, STEAL (all displayable turn types create scroll entries; score/clock use event-matching pipeline)
 4. **Update Timing**:
    - Shot entries: 2 second delay between each shot
    - Clock updates: 200ms delay for non-shot turns
@@ -25,7 +25,7 @@
    - Scoreboard scores update with each shot
    - Scoreboard clock updates with each turn (all turns, not just shots)
    - Shot entries scroll into view with 2-second delays
-7. **Shot Processing**: Only turns with `result_type === 'MAKE'` or `result_type === 'MISS'` create scroll entries
+7. **Event Processing**: Turns that match displayable types (MAKE, MISS, PUTBACK, FREE_THROW, FOUL, DEAD_BALL, STEAL) are matched to events and create scroll entries; each event is used at most once to avoid score/clock revert
 8. **Completion**: After all shots processed (or "No shots" message), 2-second delay, then popup hidden
 9. **Navigation**: If game complete, show completion popup; otherwise navigate to lineup screen for next quarter
 10. **Game Controls**: Game control buttons (Game Speed, Pause, Skip, Timeout) restored when popup hidden
@@ -149,13 +149,21 @@ if (turns.length === 0 && quarter > 1) {
 - Maps player IDs to player data (name, jersey, team) from `lastSummary.players`
 - Determines shot type: `points === 3 ? '3-pt' : '2-pt'`
 
+**Event Pipeline (two passes):**
+1. **Build `eventResults`**: One pass over `turns`; for each displayable turn (MAKE/MISS, PUTBACK, FREE_THROW, FOUL, DEAD_BALL, STEAL), push an object with `homeScore`/`awayScore` from that turn’s `turn.score` (cumulative), plus time, type, player info.
+2. **Match and update**: Second pass over `turns`; for each turn, find the corresponding event in `eventResults` by time and result/event type (with special handling for PUTBACK and FREE_THROW). The scoreboard is updated from the **matched event’s** `homeScore`/`awayScore` (and the scroll entry is built from that event). So scores shown are always the cumulative score from the turn that produced that event.
+
+**Match-at-most-once (prevents score/clock revert):**
+- When multiple events share the same `time_remaining` and same type (e.g. two fouls or two steals at the same clock), reusing the same event for each turn would apply an older cumulative score and cause the display to “revert” 2–4 times per quarter.
+- The code tracks which events have already been matched (`matchedEventIndices`). At the start of each `eventResults.find(...)` call, any event whose index is in that set is skipped. Every matched event is added to the set. So each event is used at most once, and each turn gets the correct event and thus the correct score.
+
 **Real-Time Scoreboard Updates:**
-- **Scores**: Updated from `turn.score` object (authoritative source, same pattern as `gameScene.js`)
-- **Clock**: Updated from `turn.time_remaining`, `turn.clock`, or `turn.game_clock`
-- **Clock Format**: Converts seconds to `MM:SS` format if needed
+- **Scores**: Updated from the **matched event’s** `homeScore`/`awayScore` (each event was built from `turn.score` for that turn; same authoritative source as `gameScene.js`).
+- **Clock**: Updated from `turn.time_remaining`, `turn.clock`, or `turn.game_clock` on **every** turn (before matching).
+- **Clock Format**: Converts seconds to `MM:SS` format if needed.
 - **Update Frequency**: 
-  - Scores: Only when shot occurs (score changes)
-  - Clock: Every turn (200ms delay for non-shots, 2s delay for shots)
+  - Scores: When a turn has a matched event (score comes from that event).
+  - Clock: Every turn (200ms delay for non-event turns, 2s delay when an event is displayed).
 
 **Team Color Resolution:**
 - Checks unified `teams[team_id]` structure first (SS&S pattern from `gameScene.js`)
@@ -204,10 +212,9 @@ if (turns.length === 0 && quarter > 1) {
 - Display quarter is `nextQuarter - 1` (the quarter that just completed)
 
 **Score Synchronization:**
-- Uses `turn.score` object as authoritative source (same as `updateScoreboard` in `gameScene.js`)
-- `turn.score` is a dict: `{homeTeamName: score, awayTeamName: score}`
-- Initial scores from `lastSummary.start_box_score` (scores at start of quarter)
-- Each shot updates scores from that turn's `turn.score` value
+- Authoritative source is `turn.score` (dict: `{homeTeamName: score, awayTeamName: score}`), same as `updateScoreboard` in `gameScene.js`. When building `eventResults`, each event stores that turn’s cumulative score; when we match a turn to an event, we update the scoreboard from that event’s score.
+- Initial scores from `lastSummary.start_box_score` (or first turn’s score if unavailable).
+- Each displayed event updates the scoreboard from the **matched event’s** score (one-to-one matching via `matchedEventIndices` prevents reusing an event and avoids reverts).
 
 **Error Handling:**
 - Popup elements checked before processing
