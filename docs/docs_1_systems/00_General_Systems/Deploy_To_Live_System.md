@@ -35,13 +35,20 @@ Do **not** merge your feature branch yet. Deploy only the banner config.
    git pull origin main
    ```
 
-2. Edit **only** `FrontEnd/static/config/maintenance.json`. Use a new `id` and set `starts_at_iso` to the maintenance start time (UTC). Example:
+2. Edit **only** `FrontEnd/static/config/maintenance.json`:
+
+   - Set `"enabled": true`.
+   - Set `"id"` to a **new** value (e.g. `maintenance-2026-02-17`). Changing the id ensures returning users who dismissed a previous banner will see this one.
+   - Set `"starts_at_iso"` to the **exact UTC time** when you plan to start the real maintenance (when you’ll turn on the maintenance page and set Railway `MAINTENANCE_MODE=true`). The banner will appear **60 minutes before** that time (or immediately if that time is less than 60 minutes away).
+   - Optionally keep or edit `"message"` and leave `"details_url": ""` unless you have a link.
+
+   Example (replace the date/time with your planned maintenance start in UTC):
 
    ```json
    {
-     "id": "maintenance-2025-02-15",
+     "id": "maintenance-2026-02-17",
      "enabled": true,
-     "starts_at_iso": "2025-02-15T20:00:00Z",
+     "starts_at_iso": "2026-02-17T20:00:00Z",
      "show_minutes_before": 60,
      "message": "Maintenance begins soon. Please finish your game to avoid losing progress.",
      "details_url": ""

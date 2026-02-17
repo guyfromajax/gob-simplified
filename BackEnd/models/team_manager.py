@@ -383,37 +383,61 @@ class TeamManager:
         }
 
     @staticmethod
-    def init_team_attributes(mode="single"):
+    def init_team_attributes(mode="single", tournament_seed=None):
         """
         Initialize team attributes for a new mode instance.
-        
+
         Args:
             mode (str): Game mode ("single", "tournament", or "franchise")
-                - Single Game & Tournament: Attributes use range -10 to 10, team_chemistry 7-25
-                - Franchise: Attributes use range -3 to 3, team_chemistry 7-13
-        
+            tournament_seed (int | None): For mode "tournament" only, seed 1-8 (1=best).
+                When provided, uses seed-based ranges per Mode_Init_System.md.
+
         Returns:
             dict: Team attributes with mode-specific randomization
         """
-        # Common attributes for all modes (ranges from constants)
         from BackEnd.constants import TEAM_ATTR_RANGES
-        st_lo, st_hi = TEAM_ATTR_RANGES["shot_threshold"]
-        shot_threshold = random.randint(int(st_lo), int(st_hi))
-        rm_lo, rm_hi = TEAM_ATTR_RANGES["rebound_modifier"]
-        # Mode-specific ranges
-        if mode == "franchise":
-            # Franchise mode: tighter ranges for more controlled progression
-            attr_range = (-1, 1)
-            team_chemistry = random.randint(7, 10)
-            # Franchise: All teams start at center value (0.2)
-            rebound_modifier = 0.2
+
+        # Tournament seed-based ranges (Mode_Init_System.md): Seed 1 = best, Seed 8 = worst
+        if mode == "tournament" and tournament_seed is not None and 1 <= tournament_seed <= 8:
+            if tournament_seed == 1:
+                a_lo, a_hi = 5, 10
+                tc_lo, tc_hi = 20, 25
+                rm_lo, rm_hi = 30, 40  # 0.30-0.40
+                st_lo, st_hi = 0, 100
+            elif tournament_seed <= 4:
+                a_lo, a_hi = -2, 10
+                tc_lo, tc_hi = 12, 25
+                rm_lo, rm_hi = 15, 40  # 0.15-0.40
+                st_lo, st_hi = 0, 150
+            elif tournament_seed <= 7:
+                a_lo, a_hi = -8, 5
+                tc_lo, tc_hi = 8, 18
+                rm_lo, rm_hi = 1, 40  # 0.01-0.40
+                st_lo, st_hi = 50, 200
+            else:  # seed 8
+                a_lo, a_hi = -10, -2
+                tc_lo, tc_hi = 7, 12
+                rm_lo, rm_hi = 1, 20  # 0.01-0.20
+                st_lo, st_hi = 100, 200
+            attr_range = (a_lo, a_hi)
+            team_chemistry = random.randint(tc_lo, tc_hi)
+            rebound_modifier = round(random.randint(rm_lo, rm_hi) / 100.0, 2)
+            shot_threshold = random.randint(st_lo, st_hi)
         else:
-            # Single Game & Tournament mode: wider ranges
-            attr_range = (-10, 10)
-            team_chemistry = random.randint(7, 25)
-            # Single/Tournament: Random value in [rm_lo, rm_hi] from constants
-            rebound_modifier = round(rm_lo + random.random() * (rm_hi - rm_lo), 2)
-        
+            # Common/single/franchise or tournament without seed (fallback)
+            st_lo, st_hi = TEAM_ATTR_RANGES["shot_threshold"]
+            shot_threshold = random.randint(int(st_lo), int(st_hi))
+            rm_lo, rm_hi = TEAM_ATTR_RANGES["rebound_modifier"]
+            if mode == "franchise":
+                attr_range = (-1, 1)
+                team_chemistry = random.randint(7, 10)
+                rebound_modifier = 0.2
+            else:
+                # Single Game or tournament fallback (no seed)
+                attr_range = (-10, 10)
+                team_chemistry = random.randint(7, 25)
+                rebound_modifier = round(rm_lo + random.random() * (rm_hi - rm_lo), 2)
+
         return {
             "shot_threshold": shot_threshold,
             "discipline": random.randint(attr_range[0], attr_range[1]),
