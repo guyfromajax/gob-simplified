@@ -240,5 +240,25 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
   }
 
   document.body.appendChild(popup);
+
+  // Single game: delete completed game from DB when user leaves via "Go To Locker Room" (not when viewing Box Score)
+  const lockerRoomBtn = popup.querySelector('.locker-room-button');
+  if (lockerRoomBtn && mode === 'single' && gameId) {
+    lockerRoomBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        if (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl && API_CONFIG.getAuthHeaders) {
+          await fetch(API_CONFIG.buildUrl('/api/games/delete-completed-single'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...API_CONFIG.getAuthHeaders() },
+            body: JSON.stringify({ game_id: gameId }),
+          });
+        }
+      } catch (err) {
+        console.warn('[gameCompletionPopup] delete-completed-single failed:', err);
+      }
+      window.location.href = lockerRoomUrl;
+    });
+  }
 }
 

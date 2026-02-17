@@ -1,6 +1,14 @@
 // Parse URL parameters
 const urlParams = new URLSearchParams(window.location.search);
 
+function playSound(filename) {
+  try {
+    const a = new Audio('/sounds/' + encodeURIComponent(filename));
+    a.volume = 0.7;
+    a.play().catch(() => {});
+  } catch (e) {}
+}
+
 // ✅ PHASE 1.3: Set telemetry context
 if (window.StateTelemetry) {
   window.StateTelemetry.setContext('game-plan');
@@ -795,6 +803,7 @@ function showUnsavedChangesWarning(onContinue) {
       sessionStorage.setItem('gameplan_suppress_warning', 'true');
     }
     overlay.remove();
+    playSound('Confirm - Option 1 (3).mp3');
     await saveGamePlan();
     // After successful save, continue with navigation
     if (!hasUnsavedChanges) {
@@ -892,6 +901,7 @@ async function init() {
       
       btnNavPrimary.addEventListener('click', () => {
         console.log('🚀 [GAME-PLAN] btnNavPrimary (Play Game) CLICKED! About to call navigateToCourt()');
+        playSound('Offense buttons.wav');
         navigateToCourt();
       });
     }
@@ -910,6 +920,7 @@ async function init() {
     console.log('🔍 [GAME-PLAN] init() - btnSaveGamePlan found, adding click listener');
     btnSaveGamePlan.addEventListener('click', () => {
       console.log('🚀 [GAME-PLAN] btnSaveGamePlan CLICKED! About to call saveGamePlan()');
+      playSound('Confirm - Option 1 (3).mp3');
       saveGamePlan();
     });
   } else {

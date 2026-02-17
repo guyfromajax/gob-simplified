@@ -31,6 +31,14 @@ const DEFENSE_PLAY_DATA = {
 
 const ALPHA_HIDE_MAN_DEFENSE_VARIANTS = true;
 
+function playSound(filename) {
+  try {
+    const a = new Audio('/sounds/' + encodeURIComponent(filename));
+    a.volume = 0.7;
+    a.play().catch(() => {});
+  } catch (e) {}
+}
+
 function getVisibleDefensePlays(sectionKey) {
   const plays = DEFENSE_PLAY_DATA[sectionKey] || [];
   if (ALPHA_HIDE_MAN_DEFENSE_VARIANTS && sectionKey === 'man-defense') {
@@ -2310,6 +2318,7 @@ class PlaybooksUI {
     if (!this.state.areAllSectionsValid()) {
       return;
     }
+    playSound('Confirm - Option 1 (3).mp3');
     
     // Final validation
     this.validateAndUpdate();

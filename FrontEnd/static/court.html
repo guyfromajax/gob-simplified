@@ -2715,6 +2715,14 @@
     // console.log('🚨 HTML: Basic JavaScript is working!');
     // console.log('🚨 HTML: About to load bootGame.js');
     
+    function playSound(filename) {
+      try {
+        const a = new Audio('/sounds/' + encodeURIComponent(filename));
+        a.volume = 0.7;
+        a.play().catch(function() {});
+      } catch (e) {}
+    }
+    
     // Stats toggle functionality
     function initializeStatsToggle() {
       // Add click handlers to all toggle buttons
@@ -3520,6 +3528,7 @@
           
           // Select this play
           option.classList.add('selected');
+          playSound('Confirm - Option 2 (1).mp3');
           
           const playName = option.dataset.play;
           // ✅ SS&S: Store override via API (next play uses this)
@@ -3562,6 +3571,7 @@
       // Handle defense button clicks
       defenseButtons.forEach(btn => {
         btn.addEventListener('click', async () => {
+          playSound('Defense buttons.wav');
           const defenseType = btn.dataset.defense; // 'Man' or 'Zone'
           const aggression = btn.dataset.aggression; // 'Passive', 'Normal', or 'Aggressive'
           

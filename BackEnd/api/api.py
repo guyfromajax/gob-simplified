@@ -4901,7 +4901,41 @@ try:
             game["_id"] = str(game["_id"])
     
         return JSONResponse(content=games)
-    
+
+    class DeleteCompletedSingleGameRequest(BaseModel):
+        game_id: str
+
+    @app.post("/api/games/delete-completed-single")
+    def delete_completed_single_game(body: DeleteCompletedSingleGameRequest):
+        """
+        Delete a completed Single Game mode game from the database.
+        Safe to call when the user has left the game (e.g. returned to mode-select).
+        Only deletes if the game is single mode (no franchise_id, no tournament_id) and is_final.
+        Idempotent: returns 200 if game already missing or after delete.
+        """
+        game_id = (body.game_id or "").strip()
+        if not game_id:
+            return {"ok": True, "deleted": False, "reason": "no_game_id"}
+        try:
+            doc_id = ObjectId(game_id)
+        except Exception:
+            doc_id = game_id
+        game = games_collection.find_one({"_id": doc_id})
+        if not game:
+            return {"ok": True, "deleted": False, "reason": "not_found"}
+        if game.get("franchise_id") or game.get("tournament_id"):
+            raise HTTPException(
+                status_code=400,
+                detail="Game is not a single game (has franchise_id or tournament_id)",
+            )
+        if not game.get("is_final"):
+            raise HTTPException(
+                status_code=400,
+                detail="Game is not completed (is_final is not true)",
+            )
+        games_collection.delete_one({"_id": doc_id})
+        return {"ok": True, "deleted": True}
+
     @app.get("/player/{player_id}")
     def get_player(
         player_id: str,

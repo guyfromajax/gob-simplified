@@ -33,26 +33,8 @@ export function initTimeoutButton() {
         return;
     }
     
-    // Load sound effects
-    try {
-        // Use API_CONFIG to get correct static path for local vs production
-        const API_CONFIG = window.API_CONFIG;
-        const staticPath = API_CONFIG ? API_CONFIG.getStaticPath() : '/static';
-        
-        // Button click sound (plays when button is clicked)
-        const clickSoundPath = `${staticPath}/sounds/buttonClickSound.wav`;
-        timeoutSound = new Audio(clickSoundPath);
-        timeoutSound.volume = 0.5; // Set volume to 50%
-        console.log('✅ [TIMEOUT] Click sound loaded:', clickSoundPath);
-        
-        // Airhorn sound (plays when timeout executes/popup appears)
-        const airhornPath = `${staticPath}/sounds/Timeout - Airhorn.mp3`;
-        airhornSound = new Audio(airhornPath);
-        airhornSound.volume = 0.7; // Set volume to 70%
-        console.log('✅ [TIMEOUT] Airhorn sound loaded:', airhornPath);
-    } catch (error) {
-        console.warn('⚠️ [TIMEOUT] Could not load sound effects:', error);
-    }
+    // Load sound effects (shared with computer timeout so airhorn plays in both cases)
+    ensureTimeoutSounds();
     
     console.log('🔍 [TIMEOUT DEBUG] Attaching click listener to timeout button');
     button.addEventListener('click', (e) => {
@@ -64,6 +46,27 @@ export function initTimeoutButton() {
     
     // Make button always live (enabled)
     updateTimeoutButtonState(true, 'Timeout available');
+}
+
+/**
+ * Load timeout sounds if not already loaded (used by both user and computer timeout so airhorn plays in both cases)
+ */
+function ensureTimeoutSounds() {
+    if (airhornSound && timeoutSound) return;
+    try {
+        const API_CONFIG = window.API_CONFIG;
+        const staticPath = API_CONFIG ? API_CONFIG.getStaticPath() : '/static';
+        if (!timeoutSound) {
+            timeoutSound = new Audio(`${staticPath}/sounds/buttonClickSound.wav`);
+            timeoutSound.volume = 0.5;
+        }
+        if (!airhornSound) {
+            airhornSound = new Audio(`${staticPath}/sounds/Timeout - Airhorn.mp3`);
+            airhornSound.volume = 0.7;
+        }
+    } catch (err) {
+        console.warn('⚠️ [TIMEOUT] Could not load timeout sounds:', err);
+    }
 }
 
 /**
@@ -697,7 +700,23 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
  */
 export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTimeout = false, computerTeamName = null) {
     console.log('🔍 [TIMEOUT DEBUG] showTimeoutPopup called', { computerTimeout, hasResult: !!timeoutResult });
-    
+
+    // Computer timeout: play airhorn when timeout triggers (same as user timeout), then brief delay so it’s audible before navigation
+    if (computerTimeout) {
+        ensureTimeoutSounds(); // Load sounds if not yet loaded (button may never have been initialized)
+        if (airhornSound) {
+            try {
+                airhornSound.currentTime = 0;
+                airhornSound.play().catch(err => {
+                    console.warn('⚠️ [TIMEOUT] Could not play airhorn (computer timeout):', err);
+                });
+            } catch (err) {
+                console.warn('⚠️ [TIMEOUT] Airhorn play error (computer timeout):', err);
+            }
+            await new Promise(r => setTimeout(r, 800));
+        }
+    }
+
     // ✅ FIX 2: Guard against auto-navigation for user timeouts
     // If this is a user timeout (not computer), make sure it's being called from button click
     if (!computerTimeout) {

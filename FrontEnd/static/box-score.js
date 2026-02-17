@@ -1596,9 +1596,24 @@ function setupLockerRoomButton() {
     lockerRoomUrl = '/mode-select.html';
   }
 
-  cleanButton.addEventListener('click', (e) => {
+  cleanButton.addEventListener('click', async (e) => {
     e.preventDefault();
     e.stopPropagation();
+    // Single game: delete completed game from DB when user leaves for mode-select
+    if (navMode === 'single' && lockerRoomUrl === '/mode-select.html') {
+      const gameId = urlParams.get('game_id');
+      if (gameId && typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl && API_CONFIG.getAuthHeaders) {
+        try {
+          await fetch(API_CONFIG.buildUrl('/api/games/delete-completed-single'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...API_CONFIG.getAuthHeaders() },
+            body: JSON.stringify({ game_id: gameId }),
+          });
+        } catch (err) {
+          console.warn('[BOX-SCORE] delete-completed-single failed:', err);
+        }
+      }
+    }
     console.log('🚪 [BOX-SCORE] Navigating to locker room:', lockerRoomUrl);
     window.location.href = lockerRoomUrl;
   });

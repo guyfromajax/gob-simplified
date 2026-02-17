@@ -33,6 +33,14 @@ const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 // Note: This is a snapshot of initial URL state - always read from window.location.search when needed
 const gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
 
+function playSound(filename) {
+  try {
+    const a = new Audio('/sounds/' + encodeURIComponent(filename));
+    a.volume = 0.7;
+    a.play().catch(() => {});
+  } catch (e) {}
+}
+
 function buildPlayerDetailUrl(playerId) {
   const qs = new URLSearchParams();
   qs.set('id', playerId);
@@ -1016,6 +1024,7 @@ function setupSlots() {
 
     updateAllSlotDisplays();
     updatePlayButton();
+    playSound('Click (1).mp3');
 
     if (currentView === 'player') {
       renderPlayerView();
@@ -2380,6 +2389,7 @@ function setupSlotDragAndDrop() {
       } else {
         assignToSlot(targetPos, draggedId);
       }
+      playSound('Click (1).mp3');
     });
   });
 }
