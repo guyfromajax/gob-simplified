@@ -802,52 +802,60 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
     
     const currentQuarter = scene.simData?.quarter || scene.quarter || 1;
     
-    // ✅ TIMEOUT: Get clock from API response first (backend source of truth - most reliable)
-    // The /api/call-timeout endpoint returns the current clock at the moment the timeout is called
+    // ✅ TIMEOUT CLOCK: Prefer what the user sees on screen for user timeouts (avoids stale API when
+    // next simulate_turn is in flight). For computer timeouts, API response is authoritative.
     let clock = null;
-    if (timeoutResult && timeoutResult.clock) {
-        clock = timeoutResult.clock;
-        console.log(`✅ TIMEOUT: Using clock from API response: ${clock}`);
+    if (computerTimeout) {
+        // Computer timeout: use API response first (same request that triggered navigation)
+        if (timeoutResult && timeoutResult.clock) {
+            clock = timeoutResult.clock;
+            console.log(`✅ TIMEOUT: Using clock from API response: ${clock}`);
+        }
     }
-    
-    // Fallback to DOM element (what's actually displayed to user)
+    // User timeout: prefer displayed clock (DOM → simData) so lineup shows what user saw
     if (!clock) {
         const clockEl = document.getElementById('game-clock');
         if (clockEl && clockEl.textContent && clockEl.textContent.trim()) {
             clock = clockEl.textContent.trim();
-            console.log(`✅ TIMEOUT: Using clock from DOM element: ${clock}`);
+            console.log(`✅ TIMEOUT: Using clock from DOM (displayed): ${clock}`);
         }
     }
-    
-    // Fallback to scene.simData.clock (updated by updateScoreboard as turns are processed)
-    if (!clock) {
-        clock = scene.simData?.clock || null;
-        if (clock) {
-            console.log(`✅ TIMEOUT: Using clock from scene.simData: ${clock}`);
-        }
+    if (!clock && scene.simData?.clock) {
+        clock = scene.simData.clock;
+        console.log(`✅ TIMEOUT: Using clock from scene.simData: ${clock}`);
     }
-    
-    // Fallback to last processed turn (if turns array exists)
+    if (!clock && timeoutResult && timeoutResult.clock) {
+        clock = timeoutResult.clock;
+        console.log(`✅ TIMEOUT: Using clock from API response: ${clock}`);
+    }
     if (!clock && scene.simData?.turns && Array.isArray(scene.simData.turns) && scene.simData.turns.length > 0) {
         const lastTurn = scene.simData.turns[scene.simData.turns.length - 1];
         clock = lastTurn?.clock || lastTurn?.game_clock || null;
-        if (clock) {
-            console.log(`✅ TIMEOUT: Using clock from last processed turn: ${clock}`);
-        }
+        if (clock) console.log(`✅ TIMEOUT: Using clock from last turn: ${clock}`);
     }
-    
-    // Fallback to URL params (for initial load scenarios)
     if (!clock) {
-        clock = urlParams.get('clock');
-        if (clock) {
-            console.log(`✅ TIMEOUT: Using clock from URL params: ${clock}`);
-        }
+        clock = urlParams.get('clock') || null;
+        if (clock) console.log(`✅ TIMEOUT: Using clock from URL params: ${clock}`);
     }
-    
-    // Final fallback: default to 8:00 if no clock found
     if (!clock) {
         clock = '8:00';
         console.warn(`⚠️ TIMEOUT: No clock found, defaulting to ${clock}`);
+    }
+    
+    // ✅ TIMEOUT SCORES: Pass displayed scores in URL so lineup header shows what user saw (same rationale as clock)
+    let homeScore = null;
+    let awayScore = null;
+    const homeScoreEl = document.getElementById('home-score');
+    const awayScoreEl = document.getElementById('away-score');
+    if (homeScoreEl && awayScoreEl) {
+        const h = homeScoreEl.textContent?.trim();
+        const a = awayScoreEl.textContent?.trim();
+        if (h !== undefined && h !== '' && !isNaN(Number(h))) homeScore = Number(h);
+        if (a !== undefined && a !== '' && !isNaN(Number(a))) awayScore = Number(a);
+    }
+    if ((homeScore === null || awayScore === null) && timeoutResult) {
+        if (homeScore === null && typeof timeoutResult.home_score === 'number') homeScore = timeoutResult.home_score;
+        if (awayScore === null && typeof timeoutResult.away_score === 'number') awayScore = timeoutResult.away_score;
     }
     
     // Build lineup object from scene
@@ -885,7 +893,9 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
             franchise_id: franchiseId,
             week: weekParam,
             tournament_id: tournamentId,
-            mode: modeParam
+            mode: modeParam,
+            home_score: homeScore ?? undefined,
+            away_score: awayScore ?? undefined
         }
     });
     

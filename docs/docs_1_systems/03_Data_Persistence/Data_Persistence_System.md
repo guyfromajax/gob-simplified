@@ -803,6 +803,8 @@ The `/api/game/{game_id}` endpoint supports a `source` parameter:
 const gameRes = await fetch(`/api/game/${gameId}?quarter=1&source=db`);
 ```
 
+**Lineup header during timeout resume:** The lineup page header (time remaining and score) must show the state at the moment the user entered the timeout. **Clock** is read from the **URL** when `resume_from_timeout=true` (timeout navigation puts the displayed clock in the URL). **Scores** are read from the URL when `home_score`/`away_score` are present (same rationale as clock); otherwise scores are loaded from the API with `source=db`. Quarter breaks force clock to 8:00 or 4:00 (OT) and do not use URL clock.
+
 **Backend Implementation:**
 ```python
 @app.get("/api/game/{game_id}")
@@ -1004,7 +1006,7 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 **Frontend:**
 - `FrontEnd/static/set-lineup.js`:
   - `loadRoster()` (line 190): Uses `source=db` for player energy, reads from `attributes.NG`
-  - `setHeader()` (line 900): Uses `source=db` for scores/clock
+  - `setHeader()`: During timeout resume, **clock** from URL (and **scores** from URL when `home_score`/`away_score` present); otherwise scores from API with `source=db`. Quarter breaks force clock to 8:00/4:00 (OT).
 
 ### Benefits
 

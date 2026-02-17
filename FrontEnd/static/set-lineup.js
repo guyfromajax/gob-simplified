@@ -1073,18 +1073,29 @@ async function setHeader() {
   
   console.log('[setHeader] Setting header:', { userTeamName, opponentTeamName, gameId });
   
-  // Get scores from game data (default to 0)
+  // Get scores: when resuming from timeout, prefer URL params (what user saw) then API
   let userTeamScore = 0;
   let opponentTeamScore = 0;
-  
-  if (gameId) {
+  let scoresFromUrl = false;
+  const resumeFromTimeoutForScores = urlParams.get('resume_from_timeout') === 'true';
+  const urlHomeScore = urlParams.get('home_score');
+  const urlAwayScore = urlParams.get('away_score');
+  if (resumeFromTimeoutForScores && urlHomeScore !== null && urlHomeScore !== '' && urlAwayScore !== null && urlAwayScore !== '') {
+    const h = parseInt(urlHomeScore, 10);
+    const a = parseInt(urlAwayScore, 10);
+    if (!isNaN(h) && !isNaN(a)) {
+      userTeamScore = myTeamSide === 'home' ? h : a;
+      opponentTeamScore = myTeamSide === 'home' ? a : h;
+      scoresFromUrl = true;
+      console.log('[setHeader] Using scores from URL (timeout):', { userTeamScore, opponentTeamScore });
+    }
+  }
+  let gameData = null;
+  if (!scoresFromUrl && gameId) {
     try {
-      // ✅ HYBRID APPROACH: Use source=db to ensure fresh data from database
-      // This is acceptable performance cost (~13 reads per game: timeouts + quarter breaks)
-      // Pass actual quarter from URL params to ensure correct stats loading
       const gameRes = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}?quarter=${quarter}&source=db`), { headers: API_CONFIG.getAuthHeaders() });
       if (gameRes.ok) {
-        const gameData = await gameRes.json();
+        gameData = await gameRes.json();
         const score = gameData.score || {};
         userTeamScore = score[userTeamName] || 0;
         opponentTeamScore = score[opponentTeamName] || 0;
@@ -1095,7 +1106,7 @@ async function setHeader() {
     } catch (err) {
       console.warn("[setHeader] Could not fetch game scores for header:", err);
     }
-  } else {
+  } else if (!gameId && !scoresFromUrl) {
     console.log('[setHeader] No gameId, using default scores (0)');
   }
   
@@ -1126,6 +1137,14 @@ async function setHeader() {
   } else if (!resumeFromTimeout && (!clockTime || clockTime === '0:00')) {
     // Fallback: If not a timeout and clock is 0:00 or missing, show correct time for upcoming quarter
     clockTime = currentQuarter > 4 ? '4:00' : '8:00'; // OT = 4:00, regular = 8:00
+  } else if (resumeFromTimeout && (!clockTime || clockTime === '')) {
+    // Step 3 fallback: when resuming from timeout and URL has no clock, use DB if we have gameData.
+    // Note: This may not fix wrong clock – DB was written at the same timeout save as the response,
+    // so it can be just as stale. If the header still shows wrong time, we may need to revisit.
+    if (gameData && gameData.clock) {
+      clockTime = gameData.clock;
+      console.log('[setHeader] Using clock from API (timeout resume, URL clock missing):', clockTime);
+    }
   }
   
   // Format clock time (ensure MM:SS format)

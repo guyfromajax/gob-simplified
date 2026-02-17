@@ -117,6 +117,16 @@
     }
     
     // ============================================
+    // 5b. SCORE PRESERVATION (timeout resume – lineup header shows what user saw)
+    // ============================================
+    const homeScore = overrides.home_score !== undefined && overrides.home_score !== null
+      ? String(overrides.home_score) : sourceParams.get('home_score');
+    const awayScore = overrides.away_score !== undefined && overrides.away_score !== null
+      ? String(overrides.away_score) : sourceParams.get('away_score');
+    if (homeScore !== null && homeScore !== undefined) params.set('home_score', homeScore);
+    if (awayScore !== null && awayScore !== undefined) params.set('away_score', awayScore);
+    
+    // ============================================
     // 6. LINEUP PARAMS
     // ============================================
     if (myTeamSide && lineup) {
