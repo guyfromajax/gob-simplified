@@ -1540,6 +1540,7 @@ class PlaybooksUI {
       }
       
       backBtn.addEventListener('click', () => {
+        playSound('x-back.mp3');
         this.handleBack();
       });
     }

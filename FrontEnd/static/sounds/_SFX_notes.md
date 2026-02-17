@@ -22,95 +22,97 @@ Wire the noted components with the SFX specified. If anything is unclear, please
 ---
 
 Homepage
-- Play Alpha button -- click-strong
+- Play Alpha button -- click-strong (NOT WORKING)
 
 Top Nav Bar
--Tutorials and Feedback buttons: click-tiny
+-Tutorials and Feedback buttons: click-tiny (NOT WORKING)
 
 Tutorials
-- add movement-cycle.mp3 when closing a section in the Tutorials tabs
+- add movement-cycle when closing or opening a section in the Tutorials tabs
+- Back link: x-back
 
 Mode-Select
-- Play Now (all three modes): click-strong
-- New Tournament or New Franchise: click-beep
+- Play Now (all three modes): click-strong (WORKING)
+- New Tournament or New Franchise: click-beep (WORKING)
 
 Team-Select
-- Team buttons (Single Game mode): click-handgun
-- Team buttons (T & F modes): click-beep
-- Play Now (SG mode): click-beep
+- Team buttons (Single Game mode): click-handgun (WORKING)
+- Team buttons (T & F modes): click-beep (WORKING)
+- Play Now (SG mode): click-beep (WORKING)
 
 FCC / TCC
-- Exit Tournament / Exit Franchise: x-back
-- Set Game Plan, Playbooks: positive-beep
-- Scouting Report: positive-slide
-- Play Next Game / Run Training: confirm-1
-- Tab Headers: click-tiny
+- Exit Tournament / Exit Franchise: x-back (NOT WORKING)
+- Set Game Plan, Playbooks: positive-beep (NOT WORKING)
+- Scouting Report: positive-slide (WORKING)
+- Play Next Game / Run Training: confirm-1 (WORKING)
+- Tab Headers: click-tiny (WORKING)
 
 Game Plan
-- Save Game Plan: confirm-2
-- move & release a slider: click-tiny
-- Back To Locker Room: x-back
-- Play Game: confirm-1
+- Save Game Plan: confirm-2 (WORKING)
+- move & release a slider: click-tiny (WORKING)
+- Back To Locker Room: x-back (NOT WORKING)
+- Play Game: confirm-1 (WORKING)
 
 Playbooks
-- Save Playbooks: confirm-2
-- Even Distribution (on/off): click-handgun
-- Playcall Center assignment buttons (1-6): click-tiny
-- Percentage increments up and down: click-tiny
-- Percentages added manually: click-soft
-- Standard / PG / SG / SF / PF / C buttons: positive-plop
+- Save Playbooks: confirm-2 (WORKING)
+- Even Distribution (on/off): click-handgun (WORKING)
+- Playcall Center assignment buttons (1-6): click-tiny (WORKING)
+- Percentage increments up and down: click-tiny (WORKING)
+- Percentages added manually: click-soft (WORKING)
+- Standard / PG / SG / SF / PF / C buttons: positive-plop (WORKING)
+- Back To Lineup: x-back (NOT WORKING)
 
 Scouting Report Pop-Up
-- X to close: x-back
+- X to close: x-back (WORKING)
 
 Lineup Screen
-- Add player to lineup either via press or drag & drop: click-soft
-- Remove from lineup via Red X button: x-back
-- Drag & Drop within the lineup containers: click-soft
-- Game Plan, Playbooks: positive-beep
-- Box Score: positive-slide
-- Autoset Lineup: chaotic-choice
-- Grid View / Player View toggle: click-tiny
-- Play Game: confirm-1
+- Add player to lineup either via press or drag & drop: click-soft (WORKING)
+- Remove from lineup via Red X button: x-back (WORKING)
+- Drag & Drop within the lineup containers: click-soft (WORKING)
+- Game Plan, Playbooks: positive-beep (NOT WORKING)
+- Box Score: positive-slide (NOT WORKING)
+- Autoset Lineup: chaotic-choice (WORKING)
+- Grid View / Player View toggle: click-tiny (WORKING)
+- Play Game: confirm-1 (WORKING)
 
 Gameplay Buttons Popup on court.html
-- Play Quarter: positive-slide
-- Sim Full Game / Sim Rest of Game: positive-plop
-- Sim Quarter: positive-beep
+- Play Quarter: positive-slide (WORKING)
+- Sim Full Game / Sim Rest of Game: positive-plop (WORKING)
+- Sim Quarter: positive-beep (WORKING)
 
 Defense Matchups Popup on court.html
-- Drag & Drop players: click-soft
-- Submit Defense Matchups: confirm-1
-- Don't show this op up again this game check box: click-tiny
+- Drag & Drop players: click-soft (WORKING)
+- Submit Defense Matchups: confirm-1 (WORKING)
+- Don't show this op up again this game check box: click-tiny (WORKING)
 
 Playcall Center on court.html
-- Offense Play select: confirm-2
-- up & down toggle arrows for offensive plays: click-tiny
-- Defense Play Select or Aggression Setting: confirm-2
-- Red X for all three (offense plays, defense plays, aggression): x-back
+- Offense Play select: confirm-2 (WORKING)
+- up & down toggle arrows for offensive plays: click-tiny (WORKING)
+- Defense Play Select or Aggression Setting: confirm-2 (WORKING)
+- Red X for all three (offense plays, defense plays, aggression): x-back (WORKING)
 
 Court.html
-- Timeout (UI Button): click-beep
-- Pause/Resume (UI Button): click-tiny
-- Speed (UI Button): click-tiny
-- Skip To End (UI Button, when we enable it): positive-plop
-- All In-game pop up buttons (timeout, quarter break, player foul out, EOG): click-tiny
+- Timeout (UI Button): click-beep (WORKING)
+- Pause/Resume (UI Button): click-tiny (WORKING)
+- Speed (UI Button): click-tiny (WORKING)
+- Skip To End (UI Button, when we enable it): positive-plop (WORKING)
+- All In-game pop up buttons (timeout, quarter break, player foul out, EOG): click-tiny (WORKING)
 
 Box Score
-- Team tabs: click-tiny
-- Back: x-back
+- Team tabs: click-tiny (WORKING)
+- Back: x-back (NOT WORKING)
 
 Training
-- Auto-Train: chaotic-choice
-- Submit Training: confirm-2
-- move & release a slider: click-tiny
+- Auto-Train: chaotic-choice (only; coaching-style sound is skipped when Auto-Train triggers the random selection)
+- Submit Training: confirm-2 (WORKING)
+- move & release a slider: click-tiny (WORKING)
 - Choose a coaching style / focus: 
-    - Authoritarian (any of the four): whistle-3
-    - Systems Coach (any of the four): positive-slide
-    - Player Maximizer (any of the four): positive-plop
-    - Culture Builder (any of the four): positive-beep
-- Close button in auto-training pop up: click-tiny
+    - Authoritarian (any of the four): whistle-3 (WORKING)
+    - Systems Coach (any of the four): positive-slide (WORKING)
+    - Player Maximizer (any of the four): positive-plop (WORKING)
+    - Culture Builder (any of the four): positive-beep (WORKING)
+- Close button in auto-training pop up: click-tiny (WORKING)
 
 Training Report
-- Attributes / Training Changes toggle: click-tiny
-- Go To Locker Room: click-strong
+- Attributes / Training Changes toggle: click-tiny (WORKING)
+- Go To Locker Room: click-strong (NOT WORKING)

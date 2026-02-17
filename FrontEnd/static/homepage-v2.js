@@ -77,8 +77,21 @@
     });
 
     document.querySelectorAll('.carousel-cta').forEach(function (link) {
-      link.addEventListener('click', function () { playSound('click-strong.wav'); });
+      link.addEventListener('click', function (e) {
+        e.preventDefault();
+        playSound('click-strong.wav');
+        var href = link.getAttribute('href');
+        if (href) setTimeout(function () { window.location.href = href; }, 200);
+      });
     });
+    // Top nav: Tutorials (and Feedback if present) — homepage has static bar, authBarInit may not run
+    document.querySelectorAll('.tutorials-nav-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { playSound('click-tiny.wav'); });
+    });
+    var feedbackBtn = document.getElementById('feedback-btn');
+    if (feedbackBtn) {
+      feedbackBtn.addEventListener('click', function () { playSound('click-tiny.wav'); });
+    }
   }
 
   if (document.readyState === 'loading') {

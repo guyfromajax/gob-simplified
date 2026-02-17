@@ -454,6 +454,7 @@
       var backBtn = document.getElementById('tutorial-back-btn');
       if (backBtn) {
         backBtn.addEventListener('click', function() {
+          playSound('x-back.mp3');
           if (window.history.length > 1) {
             window.history.back();
           } else {
@@ -486,7 +487,7 @@
           var attr = this.closest('.tutorial-attr');
           var isOpen = attr.classList.toggle('is-open');
           this.setAttribute('aria-expanded', isOpen);
-          if (!isOpen) playSound('movement-cycle.mp3');
+          playSound('movement-cycle.mp3');
         });
       });
     })();

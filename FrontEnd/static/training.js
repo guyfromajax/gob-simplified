@@ -165,6 +165,7 @@ function autoAssignTraining() {
     if (validFocusRadios.length > 0) {
       const randomRadio = validFocusRadios[Math.floor(Math.random() * validFocusRadios.length)];
       randomRadio.checked = true;
+      if (typeof window !== 'undefined') window.__trainingAutoAssigning = true;
       randomRadio.dispatchEvent(new Event('change', { bubbles: true }));
       focusLabel = getFocusLabelText(randomRadio);
       archetypeLabel = getArchetypeLabelText(randomRadio);
@@ -244,16 +245,20 @@ coachingRadios.forEach(radio => {
   radio.addEventListener('change', function() {
     if (!this.checked) return;
     
-    // SFX per coaching style (any of the four options under that style)
+    // SFX per coaching style — skip when Auto-Train triggered this change (avoid double sound with chaotic-choice)
     const value = this.value;
-    if (value.startsWith('authoritarian')) {
-      playSound('whistle-3.mp3');
-    } else if (value.startsWith('systems-coach')) {
-      playSound('positive-slide.wav');
-    } else if (value.startsWith('player-maximizer')) {
-      playSound('positive-plop.wav');
-    } else if (value.startsWith('culture-builder')) {
-      playSound('positive-beep.wav');
+    const skipSound = typeof window !== 'undefined' && window.__trainingAutoAssigning;
+    if (typeof window !== 'undefined') window.__trainingAutoAssigning = false;
+    if (!skipSound) {
+      if (value.startsWith('authoritarian')) {
+        playSound('whistle-3.mp3');
+      } else if (value.startsWith('systems-coach')) {
+        playSound('positive-slide.wav');
+      } else if (value.startsWith('player-maximizer')) {
+        playSound('positive-plop.wav');
+      } else if (value.startsWith('culture-builder')) {
+        playSound('positive-beep.wav');
+      }
     }
     
     // Remove all active states

@@ -1246,7 +1246,8 @@ function updatePlayButton(data) {
 
 function playSound(filename) {
   try {
-    const a = new Audio('/sounds/' + encodeURIComponent(filename));
+    const base = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/sounds/') : '/sounds/';
+    const a = new Audio(base + encodeURIComponent(filename));
     a.volume = 0.7;
     a.play().catch(function() {});
   } catch (e) {}
