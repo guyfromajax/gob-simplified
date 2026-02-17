@@ -13,6 +13,7 @@
    - `FrontEnd/static/court.html`: Popup HTML structure and CSS styling
    - `BackEnd/api/api.py`: `/api/simulate-quarter` endpoint
 6. **API Endpoint**: `POST /api/simulate-quarter` with `full_sim=true` parameter
+7. **Score/clock revert fix (do not remove):** Multiple events can share the same `time_remaining` and type (e.g. two fouls at same clock). If the same event were matched for each turn, the scoreboard would show an older cumulative score and “revert” 2–4 times per quarter. **Fix:** At the start of `eventResults.find(...)` in `showSimQuarterResults()`, skip any event whose index is in `matchedEventIndices`; add every matched event to that set. Each event is then used at most once. Code: `bootGame.js` inside the find callback, first lines.
 
 **System Flow (10 Steps)**
 
@@ -154,8 +155,8 @@ if (turns.length === 0 && quarter > 1) {
 2. **Match and update**: Second pass over `turns`; for each turn, find the corresponding event in `eventResults` by time and result/event type (with special handling for PUTBACK and FREE_THROW). The scoreboard is updated from the **matched event’s** `homeScore`/`awayScore` (and the scroll entry is built from that event). So scores shown are always the cumulative score from the turn that produced that event.
 
 **Match-at-most-once (prevents score/clock revert):**
-- When multiple events share the same `time_remaining` and same type (e.g. two fouls or two steals at the same clock), reusing the same event for each turn would apply an older cumulative score and cause the display to “revert” 2–4 times per quarter.
-- The code tracks which events have already been matched (`matchedEventIndices`). At the start of each `eventResults.find(...)` call, any event whose index is in that set is skipped. Every matched event is added to the set. So each event is used at most once, and each turn gets the correct event and thus the correct score.
+- **Problem:** Multiple events can share the same `time_remaining` and type. Without tracking, `find()` returns the first match every time, so the second+ turn at that time would reuse the first event’s (older) score and the scoreboard would revert.
+- **Solution:** `matchedEventIndices` (a Set) records which event indices have been matched. At the **start** of every `eventResults.find(...)` callback, `if (matchedEventIndices.has(eventIndex)) return false`. After a match, `matchedEventIndices.add(eventIndex)`. Each event is used at most once; each turn gets the correct event and score. **Do not remove this guard**—see Base Constants item 7.
 
 **Real-Time Scoreboard Updates:**
 - **Scores**: Updated from the **matched event’s** `homeScore`/`awayScore` (each event was built from `turn.score` for that turn; same authoritative source as `gameScene.js`).
