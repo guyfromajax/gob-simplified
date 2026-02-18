@@ -8,7 +8,7 @@
 /sounds/*   /sounds/:splat   200
 
 # ENABLE THIS DURING MAINTENANCE:
-# /*        /maintenance.html 200!
+/*        /maintenance.html 200!
 
 # Redirect root to homepage.html
 /  /homepage.html  200!
