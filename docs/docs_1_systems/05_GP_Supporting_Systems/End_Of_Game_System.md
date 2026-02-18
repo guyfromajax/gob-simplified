@@ -25,7 +25,8 @@
 
 1. **Game Completion Detection**: Game completes when Q4 ends (or overtime), detected in `gameScene.js` when `quarter === 4` and game is finalized
 2. **Backend Game Finalization** (Franchise Mode Only): 
-   - Frontend calls `/franchise/save-result` endpoint
+   - Frontend calls `/franchise/complete-week` with `result: { team1_id, team2_id, team1_score, team2_score }` (and optional `game_document`)
+   - Backend resolves team ids via `_normalize_team_id()` (ObjectId, or universal `teams` by _id/name/code, or canonical → name; see below)
    - Player stats are finalized via `stat_updater.finalize_game()`
    - **Team attributes are updated** based on game performance (win/loss, score differential, etc.)
    - Updated team attributes are saved via the franchise team data persistence path (FTD) and reflected in the game's box score
@@ -180,6 +181,15 @@ The End of Game System handles game completion, displays final scores, and provi
 - Box Score page now receives `mode`, `tournament_id`, `franchise_id`, and `team_id` in URL params
 - Navigation logic prioritizes URL parameters over localStorage to prevent stale data issues
 - Franchise mode uses correct path: `/static/franchise-command-center.html` (not `/franchise/command-center`)
+
+### Franchise complete-week team id resolution (February 2026)
+
+- **Endpoint:** `POST /franchise/complete-week` (request body: `franchise_id`, `week`, `result: { team1_id, team2_id, team1_score, team2_score }`, optional `game_id`, optional `game_document`).
+- **Team ids:** Backend normalizes `result.team1_id` and `result.team2_id` via `_normalize_team_id()` in `BackEnd/api/franchise_routes.py`:
+  1. If the value is a valid ObjectId string, it is returned.
+  2. Else lookup in universal `teams` by `_id`, `name`, or `code`; if found, return that document’s `_id`.
+  3. **Canonical fallback:** If still not found and the value contains an underscore (e.g. `FOUR_CORNERS`), convert to a name by replacing `_` with space and title-casing (e.g. `"Four Corners"`), then lookup by `name`; if found, return that document’s `_id`.
+- This allows the frontend to send either ObjectIds (e.g. from URL params) or canonical keys from the game doc (e.g. when Play Quarter completes and URL params are missing). Sim Quarter, Sim Full Game, and Play Quarter all use the same flow; only the value sent for team ids can differ.
 
 ### Backend ObjectId Serialization
 

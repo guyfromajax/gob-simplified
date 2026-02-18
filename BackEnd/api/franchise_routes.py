@@ -803,6 +803,11 @@ def _normalize_team_id(team_id: str):
             {"$or": [{"_id": team_id}, {"name": team_id}, {"code": team_id}]}
         )
         if not doc:
+            # Fallback: canonical key (e.g. LANCASTER, SOUTH_LANCASTER) -> resolve via name (e.g. "Lancaster", "South Lancaster")
+            # Frontend may send canonical ids from game doc when URL params are missing (e.g. Play Quarter)
+            name_from_canonical = team_id.replace("_", " ").title()
+            doc = db.teams.find_one({"name": name_from_canonical})
+        if not doc:
             raise HTTPException(status_code=400, detail=f"Unknown team id {team_id}")
         return doc["_id"]
 

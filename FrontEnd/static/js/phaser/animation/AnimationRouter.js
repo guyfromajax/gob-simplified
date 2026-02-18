@@ -130,13 +130,6 @@ export class AnimationRouter {
         
         // Set eligibility flag at start of turn (used by both button press and queued timeout check)
         this.scene.currentTurnTimeoutEligible = checkTimeoutEligibility(this.scene, turnData);
-        console.log('🔍 [TIMEOUT DEBUG] Turn eligibility set at start:', {
-          turnIndex: turnIndex ?? turnData.index,
-          result_type: turnData.result_type,
-          current_turn: turnData.current_turn,
-          previous_turn: this.scene.previousTurnData?.current_turn || this.scene.previousTurnData?.result_type,
-          eligible: this.scene.currentTurnTimeoutEligible
-        });
         
         // Check if queued timeout should execute (Scenario B: queued from ineligible turn)
         const timeoutExecuted = await checkAndExecuteQueuedTimeout(this.scene, turnData);
