@@ -36,13 +36,10 @@ export function initTimeoutButton() {
     // Load sound effects (shared with computer timeout so airhorn plays in both cases)
     ensureTimeoutSounds();
     
-    console.log('🔍 [TIMEOUT DEBUG] Attaching click listener to timeout button');
-    button.addEventListener('click', (e) => {
-        console.log('🔍 [TIMEOUT DEBUG] Timeout button clicked! Event:', e);
+    button.addEventListener('click', () => {
         handleTimeoutButtonClick(false);
     });
     buttonInitialized = true;
-    console.log('🔍 [TIMEOUT DEBUG] Timeout button initialized, buttonInitialized:', buttonInitialized);
     
     // Make button always live (enabled)
     updateTimeoutButtonState(true, 'Timeout available');
@@ -170,42 +167,27 @@ function isUserTeamOnOffense(scene, turnData) {
  * @returns {boolean} - True if eligible, false otherwise
  */
 export function checkTimeoutEligibility(scene, turnData) {
-    console.log('🔍 [TIMEOUT DEBUG] checkTimeoutEligibility called with turnData:', {
-        result_type: turnData?.result_type,
-        current_turn: turnData?.current_turn,
-        offense_team_id: turnData?.offense_team_id,
-        possession_team_id: turnData?.possession_team_id,
-        index: turnData?.index
-    });
-    
     if (!ENABLE_TIMEOUT_BUTTON) {
-        console.log('🔍 [TIMEOUT DEBUG] ENABLE_TIMEOUT_BUTTON is false');
         return false;
     }
     
     ensureButtonInitialized();
     
     if (!scene || !turnData) {
-        console.log('🔍 [TIMEOUT DEBUG] Missing scene or turnData:', { hasScene: !!scene, hasTurnData: !!turnData });
         return false;
     }
     
     // Get user team side
     const userTeamSide = scene.userTeamSide || scene.simData?.user_team_side;
-    console.log('🔍 [TIMEOUT DEBUG] userTeamSide:', userTeamSide);
     if (!userTeamSide) {
-        console.log('🔍 [TIMEOUT DEBUG] No userTeamSide found');
         return false;
     }
     
     // Check 1: Is current turn BIP or SIP? (Always eligible, regardless of offense team)
     const currentTurn = turnData?.current_turn || turnData?.result_type;
-    console.log('🔍 [TIMEOUT DEBUG] Check 1 - currentTurn:', currentTurn);
     if (currentTurn === 'SIDE_INBOUND' || currentTurn === 'BASELINE_INBOUND') {
-        console.log('🔍 [TIMEOUT DEBUG] Check 1 PASSED - BIP or SIP turn (always eligible)');
         return true;
     }
-    console.log('🔍 [TIMEOUT DEBUG] Check 1 FAILED - not BIP or SIP');
     
     // Check 2: Is current turn HCO AND previous turn was MISS with DREB AND user team is on offense?
     // This covers DREB => HCO transition when user team gets the defensive rebound
@@ -213,62 +195,38 @@ export function checkTimeoutEligibility(scene, turnData) {
     // ✅ EXCLUDE: MISS/DREB turns themselves are NOT eligible (even if current_turn is HCO)
     // We want to wait for the NEXT HCO turn after DREB animation completes
     if ((turnData?.result_type === 'MISS' || turnData?.result_type === 'BLOCK') && turnData?.rebound_type === 'DREB') {
-        console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - Current turn is MISS/DREB (not eligible, wait for next HCO turn)');
         return false;
     }
     
     if (currentTurn === 'HCO' || turnData?.result_type === 'HCO') {
-        console.log('🔍 [TIMEOUT DEBUG] Check 2 - Current turn is HCO, checking previous turn and offense team');
-        
         // Check if previous turn was MISS with DREB
         const previousTurn = scene.previousTurnData;
         const previousResultType = previousTurn?.result_type;
         const previousReboundType = previousTurn?.rebound_type;
         const previousNextPlayType = previousTurn?.next_play_type;
-        console.log('🔍 [TIMEOUT DEBUG] Previous turn:', {
-            result_type: previousResultType,
-            rebound_type: previousReboundType,
-            next_play_type: previousNextPlayType
-        });
         
         // Check if previous turn was MISS with DREB (not Fast Break)
         // DREB => HCO: previous turn is MISS with rebound_type: "DREB" and next_play_type: "HCO"
         // DREB => Fast Break: previous turn is MISS with rebound_type: "DREB" and next_play_type: "FAST_BREAK" (not eligible)
         if (previousResultType === 'MISS' && previousReboundType === 'DREB' && previousNextPlayType === 'HCO') {
-            console.log('🔍 [TIMEOUT DEBUG] Previous turn was MISS with DREB => HCO, checking if user team is on offense');
-            
             // Check if user team is on offense
             const offenseTeamId = turnData?.offense_team_id || turnData?.possession_team_id;
             if (!offenseTeamId) {
-                console.log('🔍 [TIMEOUT DEBUG] No offense_team_id or possession_team_id found');
                 return false;
             }
             
             // ✅ SS&S: Use scene.teamId (universal identifier) instead of computing from userTeamSide
             const userTeamId = scene.teamId;
             if (!userTeamId) {
-                console.log('🔍 [TIMEOUT DEBUG] No scene.teamId found');
                 return false;
             }
             
-            console.log('🔍 [TIMEOUT DEBUG] Check 2 - userTeamId:', userTeamId, 'offenseTeamId:', offenseTeamId);
             if (String(offenseTeamId) === String(userTeamId)) {
-                console.log('🔍 [TIMEOUT DEBUG] Check 2 PASSED - DREB => HCO transition with user team on offense');
                 return true;
             }
-            console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - user team not on offense');
-        } else {
-            console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - previous turn was not MISS with DREB => HCO', {
-                was_miss: previousResultType === 'MISS',
-                had_dreb: previousReboundType === 'DREB',
-                was_hco: previousNextPlayType === 'HCO'
-            });
         }
-    } else {
-        console.log('🔍 [TIMEOUT DEBUG] Check 2 FAILED - current turn is not HCO');
     }
     
-    console.log('🔍 [TIMEOUT DEBUG] All checks failed - NOT eligible');
     return false;
 }
 
@@ -320,27 +278,19 @@ export function resetTimeoutQueue() {
  * If not, turn processes normally and timeout waits for next eligible turn.
  */
 export async function checkAndExecuteQueuedTimeout(scene, turnData) {
-    console.log('🔍 [TIMEOUT DEBUG] checkAndExecuteQueuedTimeout called');
-    console.log('🔍 [TIMEOUT DEBUG] timeoutQueued:', timeoutQueued);
-    
     if (!ENABLE_TIMEOUT_BUTTON || !timeoutQueued) {
-        console.log('🔍 [TIMEOUT DEBUG] Not enabled or not queued, returning false');
         return false;
     }
     
     // ✅ SIMPLIFIED: Use eligibility flag set at start of turn (single source of truth)
     // This eliminates stale data issues - eligibility was determined once with fresh turnData
     const isEligible = scene.currentTurnTimeoutEligible;
-    console.log('🔍 [TIMEOUT DEBUG] Current turn eligibility (from flag):', isEligible);
     
     if (!isEligible) {
-        // Not eligible, don't execute - keep flag set and check again on next turn
-        console.log('🔍 [TIMEOUT DEBUG] Current turn not eligible, returning false (will check next turn)');
         return false;
     }
     
     // ✅ Eligible turn detected - execute timeout immediately at start of turn
-    console.log('🔍 [TIMEOUT DEBUG] Eligible turn detected, executing timeout immediately');
     console.log('⏸️ TIMEOUT: Executing at start of eligible turn');
     
     // ✅ IMMEDIATE TURN KILLING: Stop all animations before executing timeout
@@ -361,7 +311,6 @@ export async function checkAndExecuteQueuedTimeout(scene, turnData) {
     // handleTimeoutButtonClick is in the same file, so we can call it directly
     try {
         await handleTimeoutButtonClick(true); // Pass true to skip toggle (just execute)
-        console.log('✅ [TIMEOUT DEBUG] Timeout executed successfully at start of eligible turn');
     } catch (error) {
         console.error('❌ TIMEOUT: Failed to execute timeout at start of eligible turn:', error);
         // Reset queue on error
@@ -378,16 +327,12 @@ export async function checkAndExecuteQueuedTimeout(scene, turnData) {
  * @param {boolean} executeOnly - If true, execute timeout without toggling state (used when eligible turn is reached)
  */
 async function handleTimeoutButtonClick(executeOnly = false) {
-    console.log('🔍 [TIMEOUT DEBUG] handleTimeoutButtonClick called - executeOnly:', executeOnly);
-    
     if (!ENABLE_TIMEOUT_BUTTON) {
-        console.log('🔍 [TIMEOUT DEBUG] ENABLE_TIMEOUT_BUTTON is false, returning');
         return;
     }
     
     const button = document.getElementById('timeout-btn');
     if (!button) {
-        console.log('🔍 [TIMEOUT DEBUG] Button not found, returning');
         return;
     }
     
@@ -399,12 +344,9 @@ async function handleTimeoutButtonClick(executeOnly = false) {
         return;
     }
     
-    console.log('🔍 [TIMEOUT DEBUG] Scene found, executeOnly:', executeOnly);
-    
     // ✅ SIMPLIFIED: Button click only toggles queue state, never executes immediately
     // Timeouts only execute at the start of eligible turns (checked in checkAndExecuteQueuedTimeout)
     if (!executeOnly) {
-        console.log('🔍 [TIMEOUT DEBUG] User clicked button (executeOnly=false)');
         
         // Check if user team has timeouts remaining (button state is managed by updateTimeoutButtonState)
         // Button is automatically disabled when timeouts = 0
@@ -423,8 +365,6 @@ async function handleTimeoutButtonClick(executeOnly = false) {
         
         // Toggle timeout queue state
         timeoutQueued = !timeoutQueued;
-        
-        console.log('🔍 [TIMEOUT DEBUG] Button clicked - timeoutQueued:', timeoutQueued);
         
         if (timeoutQueued) {
             updateButtonHighlight(true);
@@ -461,22 +401,6 @@ async function handleTimeoutButtonClick(executeOnly = false) {
     }
     
     try {
-        // 🔍 DEBUG: Log current turn data before calling timeout API (for DREB => HCO bug diagnosis)
-        const currentTurnData = scene.currentTurnData || scene.simData?.turns?.[scene.currentTurn] || null;
-        console.log('🔍 [TIMEOUT DEBUG] handleTimeoutButtonClick() - BEFORE API call:');
-        console.log('🔍 [TIMEOUT DEBUG]   - scene.currentTurn:', scene.currentTurn);
-        console.log('🔍 [TIMEOUT DEBUG]   - scene.currentTurnData?.result_type:', scene.currentTurnData?.result_type);
-        console.log('🔍 [TIMEOUT DEBUG]   - scene.currentTurnData?.current_turn:', scene.currentTurnData?.current_turn);
-        console.log('🔍 [TIMEOUT DEBUG]   - scene.currentTurnData?.offense_team_id:', scene.currentTurnData?.offense_team_id);
-        console.log('🔍 [TIMEOUT DEBUG]   - scene.currentTurnData?.next_play_type:', scene.currentTurnData?.next_play_type);
-        console.log('🔍 [TIMEOUT DEBUG]   - scene.previousTurnData?.result_type:', scene.previousTurnData?.result_type);
-        console.log('🔍 [TIMEOUT DEBUG]   - scene.previousTurnData?.rebound_type:', scene.previousTurnData?.rebound_type);
-        console.log('🔍 [TIMEOUT DEBUG]   - scene.previousTurnData?.next_play_type:', scene.previousTurnData?.next_play_type);
-        console.log('🔍 [TIMEOUT DEBUG]   - scene.previousTurnData?.offense_team_id:', scene.previousTurnData?.offense_team_id);
-        console.log('🔍 [TIMEOUT DEBUG]   - scene.userTeamSide:', scene.userTeamSide);
-        console.log('🔍 [TIMEOUT DEBUG]   - scene.simData?.home_team_id:', scene.simData?.home_team_id);
-        console.log('🔍 [TIMEOUT DEBUG]   - scene.simData?.away_team_id:', scene.simData?.away_team_id);
-        
         // Call timeout API
         const API_CONFIG = window.API_CONFIG;
         if (!API_CONFIG) {
@@ -662,7 +586,6 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
     const goToTimeoutBtn = popup.querySelector('.go-to-timeout-button');
     goToTimeoutBtn.addEventListener('click', async () => {
         if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
-        console.log('🔍 [TIMEOUT DEBUG] User clicked "Go To Timeout" button');
         
         // ✅ SAFEGUARD: Set flag to indicate user explicitly clicked button
         // This prevents auto-navigation from other code paths
@@ -685,7 +608,6 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
     });
     
     document.body.appendChild(popup);
-    console.log('🔍 [TIMEOUT DEBUG] User timeout popup displayed, waiting for user to click button');
 }
 
 /**
@@ -700,8 +622,6 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
  * Computer timeouts can call this directly for automatic navigation
  */
 export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTimeout = false, computerTeamName = null) {
-    console.log('🔍 [TIMEOUT DEBUG] showTimeoutPopup called', { computerTimeout, hasResult: !!timeoutResult });
-
     // Computer timeout: play airhorn when timeout triggers (same as user timeout), then brief delay so it’s audible before navigation
     if (computerTimeout) {
         ensureTimeoutSounds(); // Load sounds if not yet loaded (button may never have been initialized)
