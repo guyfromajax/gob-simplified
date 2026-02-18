@@ -615,6 +615,11 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
 - **Team tab:** `/franchise/team-data?franchise_id=...&team_id=...`; roster for top-scorer lookup: `/roster/{team_id}?franchise_id=...`. Both use the same `team_id` from URL or command-center/data.
 - **Backend:** `/roster/{team_identifier}` and `/franchise/team-data` accept `team_id` (path or query); roster supports ObjectId string in path. This keeps FCC aligned with FTD keying by `(franchise_id, team_id)`.
 
+**FCC Play Next Game → set-lineup URL ("your team" resolution):**
+- Same approach as tournament: **do not** rely on `localStorage` `franchise_user_team` for building the set-lineup URL. Use **API-sourced** user team first, then **id-derived** fallback.
+- **Resolution order** (in `franchise-command-center.js` Play Next Game handler): (1) Compare API-sourced team name (`userTeamNameForLeaders` from `topData.team`) to play-next-game response `home`/`away` → set `my_team` to `'home'` or `'away'`. (2) If no match, derive from `userTeamId` vs `home_id`/`away_id` (String comparison). (3) Append `team_id` and `my_team` to the set-lineup URL when present.
+- **Set-lineup contract:** Set-lineup expects **`my_team`** (home/away) or **`user_team_id`** to resolve "your team"; it does not read `team_id`. So FCC must send `my_team` (and optionally `team_id`) for the lineup screen to load correctly.
+
 ### Complete Flow
 
 #### 1. Pre-Game (FCC/TCC)

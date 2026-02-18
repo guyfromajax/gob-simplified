@@ -1397,11 +1397,16 @@ playNowBtn.addEventListener('click', async () => {
     try {
       localStorage.setItem('franchise_week', week);
     } catch {}
-    const mySide = userTeamName === home ? 'home' : (userTeamName === away ? 'away' : '');
+    // Same approach as tournament: prefer API-sourced team name (userTeamNameForLeaders from topData), then derive from userTeamId vs home_id/away_id. Avoids reliance on localStorage franchise_user_team which may be missing or stale.
+    let resolvedSide = (userTeamNameForLeaders === home ? 'home' : (userTeamNameForLeaders === away ? 'away' : ''));
+    if (!resolvedSide && userTeamId && home_id != null && away_id != null) {
+      if (String(userTeamId) === String(home_id)) resolvedSide = 'home';
+      else if (String(userTeamId) === String(away_id)) resolvedSide = 'away';
+    }
     let url = `/set-lineup.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&home_id=${encodeURIComponent(home_id)}&away_id=${encodeURIComponent(away_id)}`;
     // ✅ SS&S: Use ObjectId for consistent navigation
     if (userTeamId) url += `&team_id=${encodeURIComponent(userTeamId)}`;
-    if (mySide) url += `&my_team=${mySide}`;
+    if (resolvedSide) url += `&my_team=${resolvedSide}`;
     console.log('Navigating to', url);
     window.location.href = url;
   } catch (err) {

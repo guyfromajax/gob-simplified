@@ -45,6 +45,8 @@ Franchise Mode supports multi-season career mode where team and player data pers
 
 ### Franchise Command Center
 
+**Play Next Game → set-lineup (February 2026):** When the user clicks "Play Next Game", the command center builds the set-lineup URL using the **same approach as tournament**: API-sourced user team first (`topData.team` → `userTeamNameForLeaders` compared to matchup `home`/`away`), then id-derived fallback (`userTeamId` vs `home_id`/`away_id`). This avoids reliance on `localStorage` `franchise_user_team`, which can be missing or stale and caused "Can't determine your team" for some users. Implementation: `FrontEnd/static/franchise-command-center.js` (Play Next Game handler). See Data Persistence System doc: "FCC Play Next Game → set-lineup URL".
+
 **Tabs (in order):**
 1. **Standings** - Conference standings table showing wins, losses, win percentage, points for/against, and next opponent
 2. **Roster** - Team roster (player attributes) and player statistics for the current season
