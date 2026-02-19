@@ -300,7 +300,36 @@ export class ShotAnimationSystem {
       console.log('⚠️ [ShotAnimationSystem.animatePlayerMovement] Skipping - skipToEnd is true');
       return;
     }
-    
+
+    // 🔍 [SHOT ANIM PAYLOAD] One-time log to compare "good" vs "bad" turns (e.g. MAKE/OREB vs MISS+DREB)
+    const { detectPassAtStep } = await import('./passDetection.js');
+    const passAtSteps = [];
+    for (let si = 1; si < maxSteps; si++) {
+      if (detectPassAtStep(turnData.animations, si)) passAtSteps.push(si);
+    }
+    const animSummary = (turnData.animations || []).map(a => ({
+      id: (a.playerId || '').toString().substring(0, 8),
+      movementLen: (a.movement && Array.isArray(a.movement)) ? a.movement.length : 0
+    }));
+    console.log('🔍 [SHOT ANIM PAYLOAD]', {
+      result_type: turnData.result_type,
+      rebound_type: turnData.rebound_type ?? null,
+      animationsCount: (turnData.animations || []).length,
+      maxSteps,
+      passAtSteps,
+      animSummary
+    });
+
+    // 🔍 [SHOT ANIM STATE] Cross-turn state at start of this shot turn (compare after DREB vs after MAKE/OREB)
+    console.log('🔍 [SHOT ANIM STATE]', {
+      result_type: turnData.result_type,
+      rebound_type: turnData.rebound_type ?? null,
+      passInFlight: this.scene.passInFlight === true,
+      currentBallOwnerId: currentBallOwnerRef?.value?.playerId ?? null,
+      _previousTurnWasShot: this.scene._previousTurnWasShot === true,
+      sceneRebounderId: this.scene.rebounderId ?? null
+    });
+
     // ✅ CRITICAL FIX: Kill all ball tweens before starting step loop
     // Lingering ball tweens from previous shots/passes can block the tween manager
     if (ballSprite && this.scene.tweens) {
@@ -420,7 +449,10 @@ export class ShotAnimationSystem {
       // ✅ SCALABLE FIX: Use shared pass detection utility
       // This ensures passes work for HCO shots, fouls, turnovers, etc.
       const passInfo = detectPassAtStep(turnData.animations, stepIndex);
-      
+      // 🔍 [SHOT ANIM TIMING] Collect defender tween start times only on first step that has a pass
+      const isFirstPassStep = passAtSteps.length > 0 && stepIndex === passAtSteps[0];
+      const step4DefenderStarts = isFirstPassStep ? [] : null;
+
       // ✅ COMMENTED OUT: Pass detection result log (cluttering console)
       // console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Pass detection result`, {
       //   passInfo: passInfo ? {
@@ -494,17 +526,14 @@ export class ShotAnimationSystem {
             passerPromise = promise;
           }
         } else {
-          // ✅ COMMENTED OUT: Timing logs (didn't solve the issue)
-          // const defensiveTweenStartTime = performance.now();
-          // console.log(`⏱️ [TIMING] Step ${stepIndex}: Defensive tween CREATED and STARTED for ${anim.playerId?.substring(0, 8)}`, {
-          //   playerId: anim.playerId?.substring(0, 8),
-          //   animateStepCallDuration: afterAnimateStep - beforeAnimateStep,
-          //   tweenStartTime: defensiveTweenStartTime,
-          //   note: 'Tween starts immediately when animateStep() is called, not when Phase 2 begins'
-          // });
+          if (step4DefenderStarts) {
+            step4DefenderStarts.push({
+              id: (anim.playerId || '').toString().substring(0, 8),
+              startTime: beforeAnimateStep
+            });
+          }
           defensivePromises.push({
             promise,
-            // startTime: defensiveTweenStartTime,
             playerId: anim.playerId
           });
         }
@@ -563,6 +592,20 @@ export class ShotAnimationSystem {
       // Extract promises from defensivePromises array (which now contains objects with {promise, playerId})
       const defensivePromiseArray = defensivePromises.map(dp => dp.promise);
       passAndDefensePromises.push(...defensivePromiseArray);
+
+      // 🔍 [SHOT ANIM TIMING] Log only for first step with a pass (compare DREB vs non-DREB)
+      if (step4DefenderStarts && step4DefenderStarts.length > 0) {
+        const earliest = Math.min(...step4DefenderStarts.map(d => d.startTime));
+        console.log('🔍 [SHOT ANIM TIMING]', {
+          stepIndex,
+          result_type: turnData.result_type,
+          rebound_type: turnData.rebound_type ?? null,
+          phase2StartTime,
+          defenderStarts: step4DefenderStarts,
+          earliestDefenderStart: earliest,
+          msFromFirstDefenderToPhase2: Math.round(phase2StartTime - earliest)
+        });
+      }
       // ✅ COMMENTED OUT: Defensive animations added log (cluttering console)
       // console.log(`✅ [SHOT ANIM] Step ${stepIndex}: Added ${defensivePromiseArray.length} defensive animations to Phase 2`);
       
