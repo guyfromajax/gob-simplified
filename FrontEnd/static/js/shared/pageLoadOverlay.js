@@ -38,7 +38,7 @@
     var img = document.createElement('img');
     img.src = LOADER_IMG_PATH;
     img.alt = 'Loading…';
-    img.style.cssText = 'max-width:80px;height:auto;';
+    img.style.cssText = 'max-width:240px;height:auto;';
     overlay.appendChild(img);
 
     document.body.appendChild(overlay);

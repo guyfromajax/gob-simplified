@@ -810,6 +810,8 @@ const gameRes = await fetch(`/api/game/${gameId}?quarter=1&source=db`);
 
 **Lineup header during timeout resume:** The lineup page header (time remaining and score) must show the state at the moment the user entered the timeout. **Clock** is read from the **URL** when `resume_from_timeout=true` (timeout navigation puts the displayed clock in the URL). **Scores** are read from the URL when `home_score`/`away_score` are present (same rationale as clock); otherwise scores are loaded from the API with `source=db`. Quarter breaks force clock to 8:00 or 4:00 (OT) and do not use URL clock.
 
+**Court display on return (timeout / quarter break / foul-out):** When the user returns to court with an existing `game_id`, the scoreboard (scores, clock, TOL, fouls) and the Player and Team box scores must show current game state, not stale start-of-quarter data. Scoreboard immediacy and the force-update of Player and Team box scores from `GET /api/game/{game_id}` are documented in **`docs/docs_1_systems/05_GP_Supporting_Systems/Timeout_System.md`** — see “Scoreboard Display Immediacy System” and “Player and Team Box Score Force-Update on Resume”.
+
 **Backend Implementation:**
 ```python
 @app.get("/api/game/{game_id}")

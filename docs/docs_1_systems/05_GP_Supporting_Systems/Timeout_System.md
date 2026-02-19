@@ -819,6 +819,25 @@ if (quarterEl) quarterEl.textContent = livePeriodLabel;
 - **Computer timeout:** API response is used first (same request that triggered navigation), then the same fallbacks as above.
 - Scores are also passed in the URL (`home_score`, `away_score`) when available (DOM or timeout response) so the lineup header can show the same state the user saw.
 
+**Applies to:** Timeout resume, quarter-break return, and foul-out return (any time the user returns to court with an existing `game_id`). The same scoreboard source (simData / first turn) is used so scores, clock, TOL, and fouls show correctly as soon as the overlay hides.
+
+### Player and Team Box Score Force-Update on Resume (February 2026)
+
+**Problem:** When returning to court from a timeout, quarter break, or player foul-out, the scoreboard showed correct data (scores, clock, TOL, fouls) but the **Player Box Score** and **Team Box Score** (S1, S2, S3 tabs) showed stale data (e.g. start-of-quarter stats) until the first turn completed.
+
+**Cause:** The game scene initializes box scores from `simData.start_box_score` (start of quarter) and empty team totals. The scoreboard is driven from current simData/turn state, but the box score tables are only updated incrementally by `applyPlayerStats(turn)` and `applyTeamStats(turn)` on each turn. So on resume, box scores were one sync step behind.
+
+**Solution:** When the scene has a `game_id` (resumed game), after the initial table setup and first `updateScoreboard()` call, the frontend fetches current game state from `GET /api/game/{game_id}` and **only** forces an update of:
+
+1. **Player Box Score** – `this.playerStats` and the stats table DOM cells are overwritten from `gameData.box_score`, and `window.currentPlayerStats` is set so the stats toggle stays in sync. No other court UI is changed.
+2. **Team Box Score** – `window.setTeamBoxData()` is called with `gameData.team_totals`, `gameData.team_stats`, and team attributes so S1, S2, and S3 tabs show current data.
+
+No force-updates are applied to the scoreboard, lineup, buttons, sprites, or any other court state at this point; the scoreboard is already correct from the existing flow.
+
+**Location:** `FrontEnd/static/js/phaser/gameScene.js` – inside `create()`, immediately after the initial Team Box Score init block, when `this.gameId && homeTeam && awayTeam`. Uses `fetchGameState()` from `./utils/loadGameStats.js`.
+
+**Applies to:** Timeout resume, quarter-break return, and foul-out return (same as scoreboard immediacy). Ensures all three—scoreboard, player box, and team box—reflect the same current game state as soon as the user sees the court.
+
 ### Lineup and Game Plan Pre-Population
 
 **Lineup Pre-Population:**

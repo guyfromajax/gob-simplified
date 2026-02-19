@@ -966,6 +966,83 @@ export function createGameScene(Phaser) {
         });
       }
 
+      // Resumed game (timeout/quarter break/foul-out): force Player and Team box scores from current game state
+      // so they match the scoreboard; only these two areas are updated—nothing else on court.
+      if (this.gameId && homeTeam && awayTeam) {
+        try {
+          const { fetchGameState } = await import('./utils/loadGameStats.js');
+          const gameData = await fetchGameState(this.gameId);
+          if (gameData) {
+            // Force Team Box Score (S1, S2, S3) from current game state
+            if (typeof window.setTeamBoxData === 'function') {
+              const homeTotals = gameData.team_totals?.[homeTeam] || {};
+              const awayTotals = gameData.team_totals?.[awayTeam] || {};
+              const hTeamId = gameData.home_team_id;
+              const aTeamId = gameData.away_team_id;
+              const teamsObj = gameData.teams || {};
+              const hObj = hTeamId && teamsObj[hTeamId] ? teamsObj[hTeamId] : null;
+              const aObj = aTeamId && teamsObj[aTeamId] ? teamsObj[aTeamId] : null;
+              const hAttrs = hObj?.attributes || gameData.home_team?.attributes || {};
+              const aAttrs = aObj?.attributes || gameData.away_team?.attributes || {};
+              const hOff = gameData.team_stats?.[homeTeam]?.offense || {};
+              const aOff = gameData.team_stats?.[awayTeam]?.offense || {};
+              const hDef = gameData.team_stats?.[homeTeam]?.defense || {};
+              const aDef = gameData.team_stats?.[awayTeam]?.defense || {};
+              window.setTeamBoxData({
+                home: { offense: hOff, defense: hDef, attributes: hAttrs, totals: homeTotals },
+                away: { offense: aOff, defense: aDef, attributes: aAttrs, totals: awayTotals }
+              });
+            }
+            // Force Player Box Score: sync this.playerStats and DOM cells from current game state
+            const boxScore = gameData.box_score || {};
+            ['home', 'away'].forEach(teamKey => {
+              const teamName = teamKey === 'home' ? homeTeam : awayTeam;
+              const teamBox = boxScore[teamName] || {};
+              Object.values(teamBox).forEach((statBlock) => {
+                if (!statBlock || typeof statBlock !== 'object' || !statBlock.name) return;
+                const playerId = this.nameToId[statBlock.name];
+                if (!playerId) return;
+                const ps = this.playerStats[playerId];
+                if (!ps || !ps.cells) return;
+                const oreb = statBlock.OREB ?? 0;
+                const dreb = statBlock.DREB ?? 0;
+                const reb = statBlock.REB ?? (oreb + dreb);
+                ps.PTS = statBlock.PTS ?? 0;
+                ps.F = statBlock.F ?? 0;
+                ps.OREB = oreb;
+                ps.DREB = dreb;
+                ps.REB = reb;
+                ps.AST = statBlock.AST ?? 0;
+                ps.STL = statBlock.STL ?? 0;
+                ps.BLK = statBlock.BLK ?? 0;
+                ps.TO = statBlock.TO ?? 0;
+                ps.DEF_A = statBlock.DEF_A ?? 0;
+                ps.DEF_S = statBlock.DEF_S ?? 0;
+                const defPct = ps.DEF_A > 0 ? Math.round((ps.DEF_S / ps.DEF_A) * 100) : 0;
+                ps.DEF_PCT = `${defPct}%`;
+                if (ps.cells.pts) ps.cells.pts.textContent = ps.PTS;
+                if (ps.cells.reb) ps.cells.reb.textContent = ps.REB;
+                if (ps.cells.ast) ps.cells.ast.textContent = ps.AST;
+                if (ps.cells.fouls) ps.cells.fouls.textContent = ps.F;
+                if (ps.cells.stl) ps.cells.stl.textContent = ps.STL;
+                if (ps.cells.blk) ps.cells.blk.textContent = ps.BLK;
+                if (ps.cells.to) ps.cells.to.textContent = ps.TO;
+                if (ps.cells.defAttempts) ps.cells.defAttempts.textContent = ps.DEF_A;
+                if (ps.cells.def) ps.cells.def.textContent = ps.DEF_PCT;
+              });
+            });
+            if (boxScore[homeTeam] || boxScore[awayTeam]) {
+              window.currentPlayerStats = {
+                home: boxScore[homeTeam] || {},
+                away: boxScore[awayTeam] || {}
+              };
+            }
+          }
+        } catch (err) {
+          console.warn('⚠️ Could not refresh box scores from game state:', err);
+        }
+      }
+
       if (this.animate) {
         // Count existing sprites in the scene BEFORE creating new ones
         const existingContainers = this.children.list.filter(child => 
