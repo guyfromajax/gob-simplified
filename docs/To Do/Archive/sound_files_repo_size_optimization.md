@@ -43,4 +43,3 @@ The following sound files are taking up significant space:
 - Current performance is acceptable
 - No immediate action required
 - Documented for future reference when repo size becomes a concern
-

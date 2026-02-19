@@ -1,7 +1,7 @@
 /**
  * Announcement system for significant game events
  * Shows animated text that pops from scoreboard to center screen
- * Also triggers visual effects (red flash, sprite tint) for fouls/turnovers
+ * Optionally triggers legacy effect hooks (no-ops; feedback is via announcement styling)
  */
 
 import { triggerFoulEffect, triggerTurnoverEffect, triggerMadeShotFlash } from '../animation/negativeActionEffects.js';
