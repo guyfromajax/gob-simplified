@@ -60,13 +60,15 @@ The Announcement System provides visual feedback for game events using timing-ba
 **Location:** `FrontEnd/static/js/phaser/utils/announcements.js` - `announceFromTurnData()` (lines 334-493)
 
 **Shot Results:**
-- **"It's Good!"** - Handled in `ballManager.js` when ball reaches rim (line 542)
+- **"It's Good!"** - Handled in `ballManager.js` when ball reaches rim (line 542); **Fast Break** shots use `fastBreak.js` (see below).
 - **"It's Good! And 1!"** - Detected when text includes "AND-1" OR (`foul_player_id` exists + `result === "MAKE"` + `foul_team === "DEFENSE"`)
   - Uses `showAndOneAnnouncement()` for two-row announcement with shooter and fouler headshots
   - Fallback: Single-row announcement if player data missing
-- **"Shooting Foul!"** - Detected when `foul_player_id` exists, `foul_team === "DEFENSE"`, and `result === "MISS"`
+- **"Shooting Foul!"** - Detected when `result === "MISS"` and (`next_play_type === 'FREE_THROW'` or `free_throws_remaining > 0`)
   - Always displays announcement even if player sprite/info is missing (fallback pattern)
   - Dark yellow text with silver border
+
+**Fast Break shot path:** Fast Break shots are animated only in `fastBreak.js` (`animateFastBreakShot`, `animateFastBreakShotWithStopper`). They use `animateShotToRim()` and do **not** go through `ballManager.shootBall()` or ShotAnimationSystem. Therefore **AND-1** and **"Shooting Foul!"** (on miss) must be detected and announced inside `fastBreak.js` using the same logic as in `ballManager.js` (same `turnData` fields and `showAnnouncement` / `showAndOneAnnouncement` / `triggerFoulEffect`).
 
 **Steal Announcements:**
 - **"STEAL!"** - Triggered when `result_type === 'STEAL'` or (`result_type === 'TURNOVER'` and text includes "steal")
@@ -150,6 +152,8 @@ When a steal leads to a fast break:
 - `FrontEnd/static/js/phaser/animation/ballManager.js`
   - Shot result announcements when ball reaches rim (lines 476-598)
   - Rebound announcements when ball reaches rebounder (lines 822-839)
+- `FrontEnd/static/js/phaser/animation/fastBreak.js`
+  - Fast Break shot result announcements (AND-1, "Shooting Foul!" on miss) in `animateFastBreakShot` and `animateFastBreakShotWithStopper` (separate path from ballManager)
 - `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js`
   - BLOCK announcement at start of `handleMissedShot` when `result_type === 'BLOCK'` (before bounce/rebound)
   - Rebound announcement in `handleEmbeddedRebound` (e.g. before outlet setup)
