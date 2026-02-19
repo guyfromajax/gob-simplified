@@ -994,13 +994,17 @@ export function createGameScene(Phaser) {
               });
             }
             // Force Player Box Score: sync this.playerStats and DOM cells from current game state
+            // API returns box_score keyed by team_id (not team name) - use home_team_id/away_team_id
             const boxScore = gameData.box_score || {};
+            const homeTeamId = gameData.home_team_id;
+            const awayTeamId = gameData.away_team_id;
             ['home', 'away'].forEach(teamKey => {
+              const teamId = teamKey === 'home' ? homeTeamId : awayTeamId;
               const teamName = teamKey === 'home' ? homeTeam : awayTeam;
-              const teamBox = boxScore[teamName] || {};
+              const teamBox = (teamId && boxScore[teamId]) ? boxScore[teamId] : (boxScore[teamName] || {});
               Object.values(teamBox).forEach((statBlock) => {
                 if (!statBlock || typeof statBlock !== 'object' || !statBlock.name) return;
-                const playerId = this.nameToId[statBlock.name];
+                const playerId = (statBlock.playerId ?? statBlock.player_id) || this.nameToId[statBlock.name];
                 if (!playerId) return;
                 const ps = this.playerStats[playerId];
                 if (!ps || !ps.cells) return;
@@ -1031,11 +1035,25 @@ export function createGameScene(Phaser) {
                 if (ps.cells.def) ps.cells.def.textContent = ps.DEF_PCT;
               });
             });
-            if (boxScore[homeTeam] || boxScore[awayTeam]) {
-              window.currentPlayerStats = {
-                home: boxScore[homeTeam] || {},
-                away: boxScore[awayTeam] || {}
-              };
+            // Apply energy (NG) from gameData.players so rows show correct energy color on resume
+            const playersList = gameData.players || [];
+            playersList.forEach((p) => {
+              const playerId = p._id ?? p.playerId ?? p.player_id;
+              if (!playerId) return;
+              const ps = this.playerStats[playerId];
+              if (!ps || !ps.cells) return;
+              const ng = p.NG ?? p.attributes?.NG ?? 1.0;
+              ps.NG = ng;
+              const color = getEnergyColor(ng);
+              Object.values(ps.cells).forEach((cell) => {
+                if (cell) cell.style.color = color;
+              });
+              if (ps.nameCell) ps.nameCell.style.color = color;
+            });
+            const homeBox = (homeTeamId && boxScore[homeTeamId]) ? boxScore[homeTeamId] : (boxScore[homeTeam] || {});
+            const awayBox = (awayTeamId && boxScore[awayTeamId]) ? boxScore[awayTeamId] : (boxScore[awayTeam] || {});
+            if (Object.keys(homeBox).length || Object.keys(awayBox).length) {
+              window.currentPlayerStats = { home: homeBox, away: awayBox };
             }
           }
         } catch (err) {
