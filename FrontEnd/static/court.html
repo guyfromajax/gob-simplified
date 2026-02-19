@@ -11,6 +11,7 @@
   <title>GOB Court</title>
   <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/analytics.js"></script>
+  <script src="/js/shared/pageLoadOverlay.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="command-center-team-styles.css" />
   <style>
@@ -2197,6 +2198,10 @@
   </style>
 </head>
 <body>
+  <!-- Page load overlay: hides stale scoreboard/box scores until initializeGameStats (and init) complete -->
+  <div id="page-load-overlay" role="status" aria-live="polite" aria-busy="true" style="position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;margin:0;padding:0;">
+    <img src="/images/loader1.gif" alt="Loading…" style="max-width:80px;height:auto;">
+  </div>
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
@@ -4054,12 +4059,16 @@
     }
     
     // Load accumulated stats if this is a resumed game
-    await initializeGameStats();
-    
-    // Initialize stats toggle functionality
-    initializeStatsToggle();
-    // Initialize team box score tabs
-    initializeTeamBoxscoreTabs();
+    try {
+      await initializeGameStats();
+      // Initialize stats toggle functionality
+      initializeStatsToggle();
+      // Initialize team box score tabs
+      initializeTeamBoxscoreTabs();
+    } finally {
+      // Always hide overlay when this init block is done (success, early return, or error)
+      if (window.PageLoadOverlay) window.PageLoadOverlay.hide();
+    }
   </script>
   <script>
     // Load timeoutNavigationHelper with environment-aware path

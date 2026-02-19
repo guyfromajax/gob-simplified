@@ -1484,24 +1484,23 @@ window.handleTournamentUpdate = handleTournamentUpdate;
 
 async function initializeTournament() {
   console.log('🔍 [TOURNAMENT INIT] initializeTournament() called, readyState:', document.readyState);
-  
+
+  try {
   // ✅ ALPHA: Initialize alpha banner (shows badge if IS_ALPHA=true)
   if (typeof AlphaBanner !== 'undefined') {
     await AlphaBanner.init();
   }
-  
+
   // ✅ MIGRATION (Task 6.1): Use command center data endpoint (aligns with Franchise pattern)
   let commandCenterData = null;
   try {
     commandCenterData = await loadCommandCenterData();
-    if (commandCenterData === null) return; // Access denied - redirect already triggered
+    if (commandCenterData === null) return; // Access denied - redirect already triggered; finally will hide overlay
   } catch (err) {
     console.error("❌ Failed to load command center data", err);
     // Fallback to old method for backward compatibility
     await loadTournament();
   }
-
-  if (typeof AccessDenied !== 'undefined' && AccessDenied.hideLoadingOverlay) AccessDenied.hideLoadingOverlay();
 
   // Ensure tournament loaded successfully before proceeding
   if (!tournament || !tournament._id) {
@@ -1737,6 +1736,10 @@ async function initializeTournament() {
       playSound('x-back.mp3');
       window.location.href = '/mode-select.html';
     });
+  }
+  } finally {
+    if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+    if (typeof AccessDenied !== 'undefined' && AccessDenied.hideLoadingOverlay) AccessDenied.hideLoadingOverlay();
   }
 }
 
