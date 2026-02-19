@@ -858,6 +858,9 @@ export class ShotAnimationSystem {
         }
         // Else: y is exactly 25 or 26, keep it the same (rare)
         
+        // Clamp X to court between the two rims (prevent players moving out of bounds on HCO shot attempts)
+        targetGridX = Math.max(9, Math.min(91, targetGridX));
+        
         // Convert target grid back to pixels
         const targetPixel = gridToPixels(targetGridX, targetGridY, canvasWidth, canvasHeight);
         
