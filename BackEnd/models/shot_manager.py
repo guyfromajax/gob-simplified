@@ -348,11 +348,11 @@ class ShotManager:
             is_three = False
             is_paint = True
         else:
-        # Determine if shot is three-pointer based on shooter's spot
-        is_three = self.is_three_point_shot(shooter, roles)
-        # Determine if shot is from the paint (PIP)
-        is_paint = self.is_paint_shot(shooter, roles)
-        
+            # Determine if shot is three-pointer based on shooter's spot
+            is_three = self.is_three_point_shot(shooter, roles)
+            # Determine if shot is from the paint (PIP)
+            is_paint = self.is_paint_shot(shooter, roles)
+
         # Determine shot_type (inside/attack/outside) for shot score calculation
         # Motion offense: use randomly chosen type from resolve_motion_offense_shot (motion_shot_type)
         # Set plays: infer from skeleton (location + handle_ball/drive detection)
@@ -368,20 +368,20 @@ class ShotManager:
             if steps and shooter_pos and len(steps) >= 2:
                 shoot_step = steps[-1]
                 pos_actions = shoot_step.get("pos_actions", {})
-                    shooter_action = pos_actions.get(shooter_pos, {})
-                    if shooter_action.get("action") == "shoot":
+                shooter_action = pos_actions.get(shooter_pos, {})
+                if shooter_action.get("action") == "shoot":
                     shoot_location_key = shooter_action.get("location") or shooter_action.get("spot", "")
                     shoot_location_lower = shoot_location_key.lower() if shoot_location_key else ""
                     if shoot_location_lower in PAINT_SPOTS:
                         prev_step = steps[-2]
-                            prev_pos_actions = prev_step.get("pos_actions", {})
-                            prev_action = prev_pos_actions.get(shooter_pos, {})
+                        prev_pos_actions = prev_step.get("pos_actions", {})
+                        prev_action = prev_pos_actions.get(shooter_pos, {})
                         if prev_action.get("action") == "handle_ball":
                             prev_location_key = prev_action.get("location") or prev_action.get("spot", "")
                             prev_location_lower = prev_location_key.lower() if prev_location_key else ""
                             if prev_location_lower != shoot_location_lower:
                                 has_drive = True
-            
+
             # Determine shot_type based on location and drive (same logic as Motion plays)
             if shooter_location:
                 shooter_location_lower = shooter_location.lower()
@@ -1229,9 +1229,9 @@ class ShotManager:
                     if block_spot_used:
                         bounce_spot = block_spot_used
                     else:
-                shooter_pos, shooter_spot = self._get_shooter_position_and_spot(shooter, roles)
-                bounce_spot = calculate_bounce_spot(self.game, shooter_spot=shooter_spot)
-                
+                        shooter_pos, shooter_spot = self._get_shooter_position_and_spot(shooter, roles)
+                        bounce_spot = calculate_bounce_spot(self.game, shooter_spot=shooter_spot)
+
                 # Step 2: Filter lineups to only eligible rebounders (those crashing boards)
                 # Build filtered lineups containing only players in offense_rebounders/defense_rebounders
                 o_rebounder_lineup = {pos: off_team.lineup[pos] for pos in offense_rebounders if off_team.lineup.get(pos) is not None}
