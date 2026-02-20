@@ -28,11 +28,11 @@ Top Nav Bar
 -Tutorials and Feedback buttons: click-tiny (WORKING INCONSISTENTLY)
 
 Tutorials
-- add movement-cycle when closing or opening a section in the Tutorials tabs
+- add movement-cycle when closing or opening a section in the Tutorials tabs (WORKING)
 - Back link: x-back (NOT WORKING)
 
 Mode-Select
-- Play Now (all three modes): click-strong (WORKING)
+- Play Now (all three modes): click-strong (NOW NOT WORKING)
 - New Tournament or New Franchise: click-beep (WORKING)
 
 Team-Select

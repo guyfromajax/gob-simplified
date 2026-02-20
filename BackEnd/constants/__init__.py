@@ -167,7 +167,7 @@ SOFT_STEAL = -35
 HARD_FOUL = 200
 SOFT_FOUL = 100
 STEAL_ATTEMPT = 30
-DEAD_BALL_TURNOVER = 7
+DEAD_BALL_TURNOVER = 30  # temp change from 7
 
 # Charge/Blocking Foul (drive reconciliation thresholds)
 # reconciliation = offense_score - defense_score
