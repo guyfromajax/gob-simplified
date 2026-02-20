@@ -491,8 +491,8 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
             if (pos === "SF" && sfSprite && ballSprite && ball_spot) {
               attachBallToPlayer(scene, ballSprite, sfSprite);
               animationDebugLog(`[sideInbound][ballAttach][SF] sf:${sfId}`);
-              // ✅ TIMEOUT: Hold for 0.2 seconds after ball is placed with inbound passer
-              await new Promise(resolve => setTimeout(resolve, 200));
+              const holdMs = animationConfig.inbound?.holdAfterPlaceMs ?? 200;
+              await new Promise(resolve => setTimeout(resolve, holdMs));
             }
             resolve();
           },
@@ -502,8 +502,8 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
             if (pos === "SF" && sfSprite && ballSprite && ball_spot) {
               attachBallToPlayer(scene, ballSprite, sfSprite);
               animationDebugLog(`[sideInbound][ballAttach][SF] sf:${sfId}`);
-              // ✅ TIMEOUT: Hold for 0.2 seconds after ball is placed with inbound passer
-              await new Promise(resolve => setTimeout(resolve, 200));
+              const holdMs = animationConfig.inbound?.holdAfterPlaceMs ?? 200;
+              await new Promise(resolve => setTimeout(resolve, holdMs));
             }
             resolve();
           }
@@ -1812,11 +1812,9 @@ async function runInboundSetup({
   animationDebugLog(`[inbound][ballAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   attachBallToPlayer(scene, ballSprite, sfSprite);
   
-  // ✅ TIMEOUT: Hold for 0.2 seconds after ball is placed with inbound passer
-  await new Promise(resolve => setTimeout(resolve, 200));
-  
-  // ✅ TIMEOUT: Hold for 0.2 seconds after ball is placed with inbound passer
-  await new Promise(resolve => setTimeout(resolve, 200));
+  const inboundHoldMs = animationConfig.inbound?.holdAfterPlaceMs ?? 200;
+  await new Promise(resolve => setTimeout(resolve, inboundHoldMs));
+  await new Promise(resolve => setTimeout(resolve, inboundHoldMs));
 
   animationDebugLog(`[inbound][holdStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   // Removed 1000ms pause for smoother transitions

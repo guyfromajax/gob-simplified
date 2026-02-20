@@ -19,6 +19,7 @@ import { AnimationStates } from './SimplifiedStateMachine.js';
 import { DebugFlags } from '../utils/debugFlags.js';
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from './courtConstants.js';
 import { gridToPixels } from '../utils/gridToPixels.js';
+import animationConfig from './animation_config.js';
 
 export class FreeThrowAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -282,12 +283,13 @@ export class FreeThrowAnimationSystem {
       // Keep ball visible during hold
       ballSprite.setVisible(true);
       
-      // Hold ball at rim for 1 second (no sliding down for non-final free throws)
+      // Hold ball at rim (announcement hold from config)
+      const makeRimHoldMs = animationConfig.freeThrow?.makeRimHoldMs ?? 1000;
       await new Promise(resolve => {
         if (this.scene.time?.delayedCall) {
-          this.scene.time.delayedCall(1000, resolve);
+          this.scene.time.delayedCall(makeRimHoldMs, resolve);
         } else {
-          setTimeout(resolve, 1000);
+          setTimeout(resolve, makeRimHoldMs);
         }
       });
 

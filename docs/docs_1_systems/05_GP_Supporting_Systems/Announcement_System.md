@@ -14,6 +14,9 @@
 3. **Idempotent Flags**:
    - `turn._contextAnnouncementsShown` - Prevents duplicate start announcements
 
+4. **Announcement hold time**:
+   - **1000 ms** — Uniform delay after result announcements ("It's Good!", "Great Stop!", made shot rim hold, FT make rim hold, FB make) before the next animation. Do not reduce when tuning other animation delays; see "Hold time after result announcements" below.
+
 **Announcement System Flow (2 Phases)**
 
 1. **Start Announcements** (`timing='start'`)
@@ -94,6 +97,22 @@ The Announcement System provides visual feedback for game events using timing-ba
 **Rebound Announcements:**
 - **"Rebound!"** - Handled in `ballManager.js` / `ShotAnimationSystem.handleEmbeddedRebound` when ball reaches rebounder
 - Shows rebounder's headshot in rebounder's team color
+
+### Hold time after result announcements (1000 ms)
+
+**Rule:** All result announcements that trigger a post-announcement hold use a **uniform 1000 ms** delay before the next animation (inbound, transition, etc.). This keeps announcements on screen long enough to read while allowing other delays (e.g. rim hold, rebound attach) to be tuned separately for seamless transitions.
+
+**Where the 1000 ms hold is used:**
+
+| Announcement / context | Location | Note |
+|------------------------|----------|------|
+| Shot make — "It's Good!" / AND-1 | `ShotAnimationSystem.js` | After announcement, before inbound setup |
+| Made shot rim hold (ballManager path) | `ballManager.js` | Holds after ball at rim; allows announcement to display |
+| Free throw make — rim hold | `FreeThrowAnimationSystem.js` | Non-final FT; ball at rim then next attempt or transition |
+| Fast break make — "It's Good!" | `fastBreak.js` | After FB make announcement |
+| Fast break defensive stop — "Great Stop!" | `fastBreak.js` | After "Great Stop!" before transition to HalfCourt |
+
+**Do not reduce** these holds below 1000 ms when tuning animation delays; see `docs/To Do/SEAMLESS_DELAY_TUNING_AND_NEXT_STEPS.md` for which delays are safe to shorten (e.g. shot rim hold, rebound attach, OREB pause) vs announcement holds.
 
 ### Idempotent Design
 

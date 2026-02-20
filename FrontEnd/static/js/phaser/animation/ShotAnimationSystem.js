@@ -21,6 +21,7 @@ import { gridToPixels } from '../utils/gridToPixels.js';
 import { animateStep } from './animateStep.js';
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from './courtConstants.js';
 import { getPlayerDuration } from './turnAnimation.js';
+import animationConfig from './animation_config.js';
 
 export class ShotAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -986,9 +987,11 @@ export class ShotAnimationSystem {
     // Match the behavior of putback makes and free throws (no repositioning)
     const ballSprite = this.ballController.ballSprite;
     
-    // Determine rim hold duration: 1 second for HCO, 2 seconds for fast break
+    // Rim hold: from config (HCO vs fast break)
     const isFastBreak = turnData.fast_break === true;
-    const rimHoldDuration = isFastBreak ? 2000 : 1000;
+    const rimHoldDuration = isFastBreak
+      ? (animationConfig.fastBreak?.rimHoldMs ?? 2000)
+      : (animationConfig.shot?.rimHoldMs ?? 1000);
     
     if (ballSprite) {
       // Keep ball visible and hold at rim
@@ -1104,8 +1107,9 @@ export class ShotAnimationSystem {
         showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
       }
       
-      // Wait for announcement (like Fast Break)
-      await new Promise(resolve => this.scene.time.delayedCall(1000, resolve));
+      // Wait for announcement (announcement hold from config)
+      const holdMs = animationConfig.shot?.makeAnnouncementHoldMs ?? 1000;
+      await new Promise(resolve => this.scene.time.delayedCall(holdMs, resolve));
       
       // ✅ FIX: Only call runInboundSetup if next_play_type is BASELINE_INBOUND
       // For AND-1 situations (next_play_type === "FREE_THROW"), let the free throw system handle the transition

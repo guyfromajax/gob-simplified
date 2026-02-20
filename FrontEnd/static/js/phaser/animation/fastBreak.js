@@ -963,7 +963,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
     }
     
-    await new Promise(resolve => scene.time.delayedCall(1000, resolve));
+    const makeHoldMs = animationConfig.fastBreak?.makeAnnouncementHoldMs ?? 1000;
+    await new Promise(resolve => scene.time.delayedCall(makeHoldMs, resolve));
     
     // ✅ OPTION 1 FIX: Ensure onShotEnd() is called before transitioning to inbound pass
     // This ensures ball state is cleared before inbound setup
@@ -1578,7 +1579,8 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
       const defenseTeam = isHomeOffense ? 'away' : 'home';
       showAnnouncement("Great Stop!", defenseTeam, stopperPlayerData);
       
-      await new Promise(resolve => scene.time.delayedCall(1000, resolve));
+      const stopHoldMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
+      await new Promise(resolve => scene.time.delayedCall(stopHoldMs, resolve));
     }
   } else {
     // Display outcome text for non-Fast Break stops

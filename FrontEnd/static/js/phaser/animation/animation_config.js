@@ -19,6 +19,16 @@ const defaults = {
     duration: 150,
     easing: 'Sine.easeInOut',
     arc: null,
+    // Hold after ball placed with inbound passer (SIP/BIP); applied twice in sequence
+    holdAfterPlaceMs: 200,
+  },
+  shot: {
+    // Rim hold: ball at rim after make/miss (HCO normal)
+    rimHoldMs: 1000,
+    // After "It's Good!" / AND-1 before inbound (announcement hold)
+    makeAnnouncementHoldMs: 1000,
+    // Made shot rim hold in ballManager path (announcement hold)
+    madeRimHoldMs: 1000,
   },
   kickout: {
     duration: 300,
@@ -41,7 +51,7 @@ const defaults = {
     // Duration in ms for players to collapse toward the rebound spot
     playerMoveMs: 300,
     // Delay before possession is considered secured
-    attachDelayMs: 1000,
+    attachDelayMs: 500,
   },
   freeThrow: {
     lineupMoveMs: 800,
@@ -50,6 +60,8 @@ const defaults = {
     useArc: false,
     arcHeight: 40,
     rimHoldMs: 300,
+    // Made FT rim hold (non-final); announcement hold
+    makeRimHoldMs: 1000,
   },
   fastBreak: {
     sprintSpeed: 1.5, // multiplier
@@ -59,7 +71,11 @@ const defaults = {
     shotMs: 500,
     arcHeight: 60,
     // Time to hold the ball at the rim after a made fast break shot
-    rimHoldMs: 2000,
+    rimHoldMs: 1000,
+    // Announcement hold after "It's Good!" (FB make)
+    makeAnnouncementHoldMs: 1000,
+    // Announcement hold after "Great Stop!" (FB defensive stop)
+    defensiveStopHoldMs: 1000,
   },
   offensiveRebound: { pauseMs: 1000 },
   putback: { duration: 500, easing: 'Sine.easeInOut' },
@@ -84,6 +100,7 @@ export const animationConfig = {
   pass: { ...defaults.pass, ...(overrides.pass || {}) },
   possession: { ...defaults.possession, ...(overrides.possession || {}) },
   inbound: { ...defaults.inbound, ...(overrides.inbound || {}) },
+  shot: { ...defaults.shot, ...(overrides.shot || {}) },
   kickout: { ...defaults.kickout, ...(overrides.kickout || {}) },
   steal: { ...defaults.steal, ...(overrides.steal || {}) },
   rebound: {

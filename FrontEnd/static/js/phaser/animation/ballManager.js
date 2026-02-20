@@ -611,11 +611,12 @@ export async function shootBall({
               resolve();
             });
           };
-          // Keep rim hold delay for made shots (allows announcement to display)
+          // Keep rim hold delay for made shots (announcement hold from config)
+          const madeRimHoldMs = animationConfig.shot?.madeRimHoldMs ?? 1000;
           if (scene.time?.delayedCall) {
-            scene.time.delayedCall(1000, finish);
+            scene.time.delayedCall(madeRimHoldMs, finish);
           } else {
-            setTimeout(finish, 1000);
+            setTimeout(finish, madeRimHoldMs);
           }
         } else if (result === "MISS") {
           if (scene.stateMachine?.is(States.ShotAttempt)) {
