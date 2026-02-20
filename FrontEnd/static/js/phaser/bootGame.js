@@ -2571,8 +2571,14 @@ async function initGame() {
     } else {
       preGameContainer.classList.remove('hidden');
       // Quarter break: play airhorn when the quarter-break popup appears (not pre-Q1)
-      if (quarter > 1 && typeof window.playSound === 'function') {
-        window.playSound('Timeout - Airhorn.mp3');
+      // Use environment-aware static path (same as timeoutButtonManager) so it works on localhost (/static/sounds/) and production (/sounds/)
+      if (quarter > 1) {
+        try {
+          const staticPath = (typeof window.API_CONFIG !== 'undefined' && window.API_CONFIG.getStaticPath) ? window.API_CONFIG.getStaticPath() : '';
+          const airhorn = new Audio(`${staticPath}/sounds/Timeout - Airhorn.mp3`);
+          airhorn.volume = 0.7;
+          airhorn.play().catch(() => {});
+        } catch (e) {}
       }
     }
   }
