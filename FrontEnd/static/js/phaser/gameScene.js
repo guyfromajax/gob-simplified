@@ -1937,27 +1937,8 @@ export function createGameScene(Phaser) {
       
       // Initialize with any turns from the initial simulation (e.g., opening tip, inbound)
       const initialTurns = initialSimData.turns || [];
-      
-      // Animate initial turns first (opening tip, quarter start inbound, etc.)
-      if (initialTurns.length > 0) {
-        // ✅ REMOVED: Animating initial turns logging (cluttering console)
-        
-        // Add indices to initial turns for text scroll
-        initialTurns.forEach((turn, idx) => {
-          turn.index = idx;
-          turnCount++;
-        });
-        
-        await animateGameTurns({
-          scene: this,
-          simData: { ...initialSimData, turns: initialTurns },
-          playerSprites: this.playerSprites,
-          ballSprite: this.ballSprite,
-          onUpdate: updateScoreboard
-        });
-      }
 
-      // Part 2 (Preload): helper to fetch next turn. Used for both direct fetch and preload (no overrides).
+      // Part 2 (Preload): helper and state defined early so we can preload during initial turns (opening tip → first HCO).
       const simMode = this.mode || 'single';
       const fetchTurnData = async (offenseOverride, defenseOverride) => {
         const response = await fetch(API_CONFIG.buildUrl('/api/simulate-turn'), {
@@ -1997,6 +1978,25 @@ export function createGameScene(Phaser) {
       };
 
       let preloadedTurnPromise = null;
+
+      // Animate initial turns first (opening tip, quarter start inbound, etc.)
+      if (initialTurns.length > 0) {
+        // Part 2: Preload first HCO while opening tip (and any quarter-start inbound) animates.
+        preloadedTurnPromise = fetchTurnData(null, null);
+        // Add indices to initial turns for text scroll
+        initialTurns.forEach((turn, idx) => {
+          turn.index = idx;
+          turnCount++;
+        });
+        
+        await animateGameTurns({
+          scene: this,
+          simData: { ...initialSimData, turns: initialTurns },
+          playerSprites: this.playerSprites,
+          ballSprite: this.ballSprite,
+          onUpdate: updateScoreboard
+        });
+      }
 
       // Main turn-by-turn loop
       while (!quarterComplete) {

@@ -14,8 +14,8 @@ This doc supports reducing the pause between turns in two parts: (1) a step-by-s
 
 ### Step 1: Centralize and document current delay values
 
-- **Action:** List every fixed delay that contributes to “pause” at turn boundaries, with current value and file/line (or config key).
-- **Output:** A single reference table (in this doc or a short “Delay inventory” section) so we can track what we change and why.
+- **Action:** List every fixed delay that contributes to "pause" at turn boundaries, with current value and file/line (or config key).
+- **Output:** A single reference table (in this doc or a short "Delay inventory" section) so we can track what we change and why.
 #### Delay inventory (Step 1 output)
 
 | Purpose | Current value | Location | Config key (if any) |
@@ -45,11 +45,11 @@ This doc supports reducing the pause between turns in two parts: (1) a step-by-s
 ### Step 2: Define target values and constraints
 
 - **Action:** For each delay from Step 1, decide:
-  - **Target value** (e.g. 1000 → 500 ms) or “make configurable” (e.g. by game speed).
-  - **Constraint:** Minimum time needed for announcements, score pop, or “possession secured” feel (so we don’t remove entirely without testing).
+  - **Target value** (e.g. 1000 → 500 ms) or "make configurable" (e.g. by game speed).
+  - **Constraint:** Minimum time needed for announcements, score pop, or "possession secured" feel (so we don't remove entirely without testing).
 - **Suggested starting targets (to align):**
-  - **Rim hold (shot):** 1000 ms → 500–600 ms (normal); 2000 ms → 1000–1200 ms (fast break) — keep enough time for “swish”/announcement.
-  - **Rebound attach delay:** 1000 ms → 400–500 ms (ball “secured” by rebounder).
+  - **Rim hold (shot):** 1000 ms → 500–600 ms (normal); 2000 ms → 1000–1200 ms (fast break) — keep enough time for "swish"/announcement.
+  - **Rebound attach delay:** 1000 ms → 400–500 ms (ball "secured" by rebounder).
   - **Offensive rebound pause (before kickout/putback):** 1000 ms → 300–500 ms.
   - **Free throw rim hold:** Keep or slightly reduce (e.g. 300 ms already in config for one path; 1000 ms in FreeThrowAnimationSystem — align with design).
   - **Fast break rim hold:** Align with rim hold (shot) targets above.
@@ -99,7 +99,7 @@ This doc supports reducing the pause between turns in two parts: (1) a step-by-s
 ### Step 5: Test and validate
 
 - **Action:** Manually (and optionally with a short checklist) verify:
-  - **Shot → miss → DREB → next HCO:** Pause feels shorter; score/announcement still readable; ball attach doesn’t look glitchy.
+  - **Shot → miss → DREB → next HCO:** Pause feels shorter; score/announcement still readable; ball attach doesn't look glitchy.
   - **Shot → make:** Brief rim hold then transition; no regression.
   - **Fast break make/miss:** Same.
   - **Offensive rebound (kickout/putback):** Pause before next action feels acceptable.
@@ -110,7 +110,7 @@ This doc supports reducing the pause between turns in two parts: (1) a step-by-s
 
 ### Step 6: (Optional) Tie to game speed
 
-- **Action:** If we have a game-speed factor (e.g. “fast” vs “normal”), consider scaling these delays by that factor so faster play has shorter pauses. Implement only after base tuning is validated.
+- **Action:** If we have a game-speed factor (e.g. "fast" vs "normal"), consider scaling these delays by that factor so faster play has shorter pauses. Implement only after base tuning is validated.
 
 ---
 
@@ -121,26 +121,26 @@ This doc supports reducing the pause between turns in two parts: (1) a step-by-s
 
 ## Part 2: Tradeoffs — Preload vs Batch vs Same-Response (Next Turn)
 
-After delay tuning, the remaining “pause” is largely the **API round-trip** for the next turn. The three ways to get the next turn earlier (or without an extra wait) are summarized below.
+After delay tuning, the remaining "pause" is largely the **API round-trip** for the next turn. The three ways to get the next turn earlier (or without an extra wait) are summarized below.
 
 | Criterion | **Preload** (fetch next while current animates) | **Batch** (backend returns N turns per request) | **Same-response** (current + next turn in one response) |
 |-----------|--------------------------------------------------|--------------------------------------------------|---------------------------------------------------------|
-| **Long-term SS&S** | Good: frontend stays “one turn at a time”; backend API unchanged. | **Strongest:** one source of truth (backend decides how many turns); frontend just consumes a list. | Good: one request per “step”; contract is “current + optional next.” |
+| **Long-term SS&S** | Good: frontend stays "one turn at a time"; backend API unchanged. | **Strongest:** one source of truth (backend decides how many turns); frontend just consumes a list. | Good: one request per "step"; contract is "current + optional next." |
 | **Risk to existing code** | **Lowest:** add a parallel fetch and a small buffer; `simulateTurnByTurn` and handlers mostly unchanged. | **Medium:** backend must support returning multiple turns; frontend loop changes (consume batch, then request next batch). | **Medium–low:** backend adds optional `next_turn`; frontend uses it when present. |
 | **Backend change** | **None** (still one turn per request). | **Yes:** new or extended endpoint (or flag) that runs N turns and returns a list. | **Yes:** include next turn (or preview) in current response when possible. |
 | **When next turn is available** | When current turn *starts* (or shortly after), if next request is fired then. | When the batch is returned (next turn is already in the array). | When current turn is returned (next is in the same payload). |
-| **Best for** | Minimizing change; keeping “one request per turn” semantics. | Clean, scalable “chunks of turns”; future features (replay, rewind). | Minimal frontend loop change; bridge can run as soon as current handler finishes. |
+| **Best for** | Minimizing change; keeping "one request per turn" semantics. | Clean, scalable "chunks of turns"; future features (replay, rewind). | Minimal frontend loop change; bridge can run as soon as current handler finishes. |
 
 **One-line takeaway:**
 
-- **Most long-term SS&S:** **Batch** (backend owns “how many turns”; frontend is a simple consumer).
+- **Most long-term SS&S:** **Batch** (backend owns "how many turns"; frontend is a simple consumer).
 - **Least likely to break existing code:** **Preload** (no backend change; small frontend addition).
-- **Easiest to plug into current “one response per turn” flow:** **Same-response** (backend adds optional field; frontend uses it for bridging when present).
+- **Easiest to plug into current "one response per turn" flow:** **Same-response** (backend adds optional field; frontend uses it for bridging when present).
 
 **Other considerations:**
 
 - **Preload:** Need a clear rule for *when* to fire the next request (e.g. at turn start vs after first step). Too early can waste work on timeout/foul-out; too late and the next turn might not be ready when the current one ends.
-- **Batch:** Need a policy for batch size (e.g. “until next dead ball / timeout / quarter” or “fixed N”). Timeouts and quarter end require the frontend to stop consuming the batch and possibly request a new state.
+- **Batch:** Need a policy for batch size (e.g. "until next dead ball / timeout / quarter" or "fixed N"). Timeouts and quarter end require the frontend to stop consuming the batch and possibly request a new state.
 - **Same-response:** Backend must compute the next turn (or a minimal preview) when returning the current one. Slightly more work per response, but the next turn is available immediately for a BallSpot-style bridge.
 
 **Part 2 (Preload) implementation:** ✅ Done in `gameScene.js` `simulateTurnByTurn()`. `fetchTurnData(offenseOverride, defenseOverride)` runs the simulate-turn request. The loop uses a preloaded turn when one is available and there are no overrides; otherwise it fetches (with overrides). Preload is started at the start of each iteration (after receiving the current turn, before animating) when the turn is not TIMEOUT and not the final turn of the quarter. On preload failure, the loop falls back to a fresh fetch. No backend changes.

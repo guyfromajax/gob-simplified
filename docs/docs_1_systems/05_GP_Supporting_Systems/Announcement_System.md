@@ -15,7 +15,7 @@
    - `turn._contextAnnouncementsShown` - Prevents duplicate start announcements
 
 4. **Announcement hold time**:
-   - **1000 ms** — Uniform delay after result announcements ("It's Good!", "Great Stop!", made shot rim hold, FT make rim hold, FB make) before the next animation. Do not reduce when tuning other animation delays; see "Hold time after result announcements" below.
+   - **1000 ms** — Uniform delay for result announcements before the next animation. In **ShotAnimationSystem** (HCO/regular makes), the rim hold and "It's Good!" / AND-1 run **in unison**: one 1000 ms period with ball at rim and announcement both visible. Other paths (ballManager made shot, FT make, FB make, "Great Stop!") use a 1000 ms hold after the announcement. Do not reduce when tuning other animation delays; see "Hold time after result announcements" below.
 
 **Announcement System Flow (2 Phases)**
 
@@ -100,13 +100,13 @@ The Announcement System provides visual feedback for game events using timing-ba
 
 ### Hold time after result announcements (1000 ms)
 
-**Rule:** All result announcements that trigger a post-announcement hold use a **uniform 1000 ms** delay before the next animation (inbound, transition, etc.). This keeps announcements on screen long enough to read while allowing other delays (e.g. rim hold, rebound attach) to be tuned separately for seamless transitions.
+**Rule:** All result announcements use a **uniform 1000 ms** period on screen before the next animation. In **ShotAnimationSystem** (HCO made shots), the rim hold and "It's Good!" / AND-1 run **in unison**: the announcement is shown immediately and the ball stays at the rim for the same 1000 ms, so there is a single 1000 ms period (not rim hold then announcement). Other paths use a 1000 ms hold after the announcement. Do not reduce below 1000 ms when tuning animation delays.
 
 **Where the 1000 ms hold is used:**
 
 | Announcement / context | Location | Note |
 |------------------------|----------|------|
-| Shot make — "It's Good!" / AND-1 | `ShotAnimationSystem.js` | After announcement, before inbound setup |
+| Shot make — "It's Good!" / AND-1 | `ShotAnimationSystem.js` | **In unison** with rim hold: one 1000 ms period (ball at rim + announcement together) |
 | Made shot rim hold (ballManager path) | `ballManager.js` | Holds after ball at rim; allows announcement to display |
 | Free throw make — rim hold | `FreeThrowAnimationSystem.js` | Non-final FT; ball at rim then next attempt or transition |
 | Fast break make — "It's Good!" | `fastBreak.js` | After FB make announcement |

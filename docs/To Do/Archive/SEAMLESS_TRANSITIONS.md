@@ -600,4 +600,3 @@ if (scene.game.state.tweenRegistry) {
 - This analysis was performed on the WIP_GOB codebase for research purposes
 - No code changes were made to the current gob-simplified system
 - This document serves as a reference for potential future implementation
-

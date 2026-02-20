@@ -1,6 +1,12 @@
 # Transition Systems — Hold Times and Delay Reference
 
-This doc lists all config-driven **hold times and delays** that affect turn transitions and announcement display. Use it to request tweaks (e.g. "set shot rim hold to 600 ms" or "reduce rebound attach to 400 ms"). All values live in **`FrontEnd/static/js/phaser/animation/animation_config.js`**; code reads them via `animationConfig.*`.
+## Summary
+
+The transition system controls every **hold and delay** at turn boundaries (shot→rim, rebound attach, inbound, fast break, free throw) so pauses feel consistent and tunable without touching call sites. All values are **centralized** in **`FrontEnd/static/js/phaser/animation/animation_config.js`** and read via `animationConfig.*`; optional overrides can be applied via `globalThis.animation_config`.
+
+**Announcement-related holds** are fixed at **1000 ms** so result text ("It's Good!", "Great Stop!", FT make, FB make, ballManager made shot) stays readable. In **ShotAnimationSystem** (HCO made shots), the rim hold and "It's Good!" / AND-1 run **in unison**: one 1000 ms period with the ball at the rim and the announcement visible together, then cleanup. Other paths use a 1000 ms hold after the announcement. **Non-announcement** delays have been tuned for shorter perceived pauses: shot rim hold 1000 ms (putback/miss path), rebound attach **500 ms**, inbound **200 ms** (×2). Fast break rim hold is 1000 ms (makes); FB misses use the rebound flow.
+
+To change a value: edit the **`defaults`** object in `animation_config.js` (and optionally overrides). No call-site changes are needed. For the full list of keys, where they run, and which files use them, see the tables below.
 
 ---
 
@@ -8,8 +14,8 @@ This doc lists all config-driven **hold times and delays** that affect turn tran
 
 | Config key | Value (ms) | When it runs |
 |------------|------------|--------------|
-| `shot.rimHoldMs` | 1000 | Ball at rim after **make or miss** (HCO); same duration for both. |
-| `shot.makeAnnouncementHoldMs` | 1000 | After "It's Good!" / AND-1, before inbound. **Make only.** |
+| `shot.rimHoldMs` | 1000 | Ball at rim (putback makes only in ShotAnimationSystem; else runs **in unison** with announcement). |
+| `shot.makeAnnouncementHoldMs` | 1000 | **In unison** with rim hold for makes: one 1000 ms period with ball at rim + "It's Good!" / AND-1. |
 | `shot.madeRimHoldMs` | 1000 | Made shot rim hold in ballManager path (announcement). **Make only.** |
 | `fastBreak.rimHoldMs` | 1000 | Ball at rim after **fast break make**. FB misses use rebound flow (no separate rim hold). |
 | `fastBreak.makeAnnouncementHoldMs` | 1000 | After "It's Good!" on FB make. **Make only.** |
@@ -25,8 +31,10 @@ This doc lists all config-driven **hold times and delays** that affect turn tran
 ## By context (make vs miss)
 
 **Shot (HCO)**  
-- **Make and miss:** Same rim hold → `shot.rimHoldMs` (1000 ms). Ball at rim, then make path does announcement + `shot.makeAnnouncementHoldMs`; miss path goes to rebound.  
-- **Make-only (ballManager path):** `shot.madeRimHoldMs` (1000 ms).
+- **Make (ShotAnimationSystem):** Rim hold and "It's Good!" / AND-1 run **in unison**: announcement and ball at rim for one period (`shot.makeAnnouncementHoldMs`, 1000 ms), then cleanup.  
+- **Make (ballManager path):** `shot.madeRimHoldMs` (1000 ms).  
+- **Miss:** Rim hold `shot.rimHoldMs` then rebound.  
+- **Putback make:** Rim hold only (`shot.rimHoldMs` or `fastBreak.rimHoldMs`) — no announcement in this path.
 
 **Fast break**  
 - **Make:** Ball at rim → `fastBreak.rimHoldMs` (1000 ms). Then "It's Good!" → `fastBreak.makeAnnouncementHoldMs` (1000 ms).  

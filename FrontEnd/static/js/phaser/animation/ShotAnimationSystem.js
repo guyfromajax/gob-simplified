@@ -983,145 +983,93 @@ export class ShotAnimationSystem {
       });
     }
 
-    // ✅ FIX: Ball is already at rim from animateBallFlight() - just hold it there
-    // Match the behavior of putback makes and free throws (no repositioning)
+    // ✅ FIX: Ball is already at rim from animateBallFlight() - hold and show announcement in unison
     const ballSprite = this.ballController.ballSprite;
-    
-    // Rim hold: from config (HCO vs fast break)
     const isFastBreak = turnData.fast_break === true;
-    const rimHoldDuration = isFastBreak
-      ? (animationConfig.fastBreak?.rimHoldMs ?? 2000)
-      : (animationConfig.shot?.rimHoldMs ?? 1000);
-    
+
     if (ballSprite) {
-      // Keep ball visible and hold at rim
       ballSprite.setVisible(true);
-      
-      // Hold ball at rim (allows announcement to display)
-      await new Promise(resolve => {
-        if (this.scene.time?.delayedCall) {
-          this.scene.time.delayedCall(rimHoldDuration, resolve);
-        } else {
-          setTimeout(resolve, rimHoldDuration);
-        }
-      });
-      
-      // ✅ FIX: Stop get-back player animations after rim hold completes
-      // Players may not have reached their destination, which is fine
-      if (this._getBackTweens) {
-        const beforeKill = getTweenManagerState();
-        this._getBackTweens.forEach(tween => {
-          if (tween && tween.isPlaying && this.scene.tweens) {
-            this.scene.tweens.killTweensOf(tween.targets);
-          }
-        });
-        this._getBackTweens = [];
-        const afterKill = getTweenManagerState();
-        console.log(`🔍 [MAKE HANDLER] After killing _getBackTweens`, {
-          beforeKill,
-          afterKill,
-          killedCount: this._getBackTweens ? 0 : 'N/A'
-        });
-      }
-      
-      // Hide ball after hold
-      ballSprite.setVisible(false);
     }
 
-    // Transition to IDLE state (end of possession)
-    if (this.stateMachine) {
-      this.stateMachine.transition(AnimationStates.IDLE, {
-        reason: 'shot_made',
-        shooter_id: turnData.shooter_id
-      });
-      console.log(`🔍 [MAKE HANDLER] After state transition to IDLE`, {
-        currentState: this.stateMachine.state
-      });
-    }
-
-    // Ball hold already handled above (1 second), no additional delay needed
-    
-    // ✅ PRIORITY 1 FIX: Call onShotEnd() to clear in-flight state
-    // This matches the pattern in ballManager.js (line 626)
-    this.ballController.onShotEnd();
-    console.log(`🔍 [MAKE HANDLER] After onShotEnd()`, {
-      ballControllerState: {
-        isAttached: this.ballController.isAttached,
-        isInFlight: this.ballController.isInFlight
-      }
-    });
-    
-    // ✅ FIX: Show announcement for ALL made shots (like Fast Break does)
-    // This includes both regular makes and AND-1 situations
+    // Show announcement and flash immediately so they run in unison with rim hold (single 1000ms period)
     if (!isPutbackMake) {
       const { showAnnouncement, showAndOneAnnouncement } = await import('../utils/announcements.js');
       const { triggerMadeShotFlash } = await import('./negativeActionEffects.js');
       const shooterInfo = this.scene.playerInfo?.[turnData.shooter_id];
       const shooterSprite = this.playerSprites[turnData.shooter_id];
       const shooterTeamId = shooterSprite?.team_id;
-      
-      // Handle both new nested structure (object) and old flat structure (string)
       const homeTeamField = this.scene.simData?.home_team;
       const awayTeamField = this.scene.simData?.away_team;
       const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
       const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
       const shooterTeamName = shooterTeamId === this.scene.simData?.home_team_id ? homeTeamName : awayTeamName;
-      
       const shooterPlayerData = shooterInfo ? {
         playerId: turnData.shooter_id,
         photo: shooterSprite?.photo || null,
         teamName: shooterTeamName
       } : null;
-      
       const isHomeOffense = shooterTeamId === this.scene.simData?.home_team_id;
       const teamStyle = isHomeOffense ? 'home' : 'away';
-      
-      // Check if this is an AND-1 situation (made shot with defensive foul)
-      const isAndOne = turnData.next_play_type === "FREE_THROW" && 
+      const isAndOne = turnData.next_play_type === "FREE_THROW" &&
                        (turnData.foul_player_id || turnData.foul_player?.player_id);
-      
-      // Trigger green flash (full screen for regular makes, same for AND-1)
       triggerMadeShotFlash(this.scene, isAndOne);
-      
       if (isAndOne) {
-        // AND-1 - Use special two-row announcement (red box with shooter + fouler)
         const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
         if (foulPlayerId && shooterPlayerData) {
           const foulPlayerSprite = this.playerSprites[foulPlayerId];
           const foulPlayerTeamId = foulPlayerSprite?.team_id;
           const foulPlayerTeamName = foulPlayerTeamId === this.scene.simData?.home_team_id ? homeTeamName : awayTeamName;
-          
           const foulPlayerData = {
             playerId: foulPlayerId,
             photo: foulPlayerSprite?.photo || null,
             teamName: foulPlayerTeamName
           };
-          
           showAndOneAnnouncement(teamStyle, shooterPlayerData, foulPlayerData);
         } else {
-          // Fallback if data missing
           showAnnouncement("It's Good! And 1!", teamStyle, shooterPlayerData);
         }
       } else {
-        // Regular made shot
         showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
       }
-      
-      // Wait for announcement (announcement hold from config)
-      const holdMs = animationConfig.shot?.makeAnnouncementHoldMs ?? 1000;
-      await new Promise(resolve => this.scene.time.delayedCall(holdMs, resolve));
-      
-      // ✅ FIX: Only call runInboundSetup if next_play_type is BASELINE_INBOUND
-      // For AND-1 situations (next_play_type === "FREE_THROW"), let the free throw system handle the transition
-      // ✅ CRITICAL: Also check possession_flips flag to prevent AND-1 from flipping possession
-      // ✅ FIX: Don't call runInboundSetup() here if next_play_type === "BASELINE_INBOUND"
-      // The BASELINE_INBOUND turn will handle the inbound setup via AnimationEngine.handleBaselineInbound()
-      // Calling it here causes double inbound passes and double setup animations
-      const shouldFlipPossession = turnData.next_play_type === "BASELINE_INBOUND" && 
+    }
+
+    // Single wait: rim hold and announcement in unison (use announcement hold so announcement stays 1000ms)
+    const holdMs = !isPutbackMake
+      ? (animationConfig.shot?.makeAnnouncementHoldMs ?? 1000)
+      : (isFastBreak ? (animationConfig.fastBreak?.rimHoldMs ?? 1000) : (animationConfig.shot?.rimHoldMs ?? 1000));
+    await new Promise(resolve => {
+      if (this.scene.time?.delayedCall) {
+        this.scene.time.delayedCall(holdMs, resolve);
+      } else {
+        setTimeout(resolve, holdMs);
+      }
+    });
+
+    if (ballSprite) {
+      if (this._getBackTweens) {
+        this._getBackTweens.forEach(tween => {
+          if (tween && tween.isPlaying && this.scene.tweens) {
+            this.scene.tweens.killTweensOf(tween.targets);
+          }
+        });
+        this._getBackTweens = [];
+      }
+      ballSprite.setVisible(false);
+    }
+
+    if (this.stateMachine) {
+      this.stateMachine.transition(AnimationStates.IDLE, {
+        reason: 'shot_made',
+        shooter_id: turnData.shooter_id
+      });
+    }
+    this.ballController.onShotEnd();
+
+    if (!isPutbackMake) {
+      const shouldFlipPossession = turnData.next_play_type === "BASELINE_INBOUND" &&
                                    (turnData.possession_flips !== false);
       if (shouldFlipPossession) {
-        // ✅ REMOVED: runInboundSetup() call - BASELINE_INBOUND turn handles it
-        // This prevents double inbound passes and double setup animations
+        // BASELINE_INBOUND turn handles inbound setup
       }
     }
     
