@@ -3095,3 +3095,15 @@ if (remainingOffensivePromises.length > 0) {
 - ✅ All offensive players complete their movements
 - ✅ No regression in other animation systems
 
+---
+
+## Possession-Change Turn: Pass/Defender Sync Fix (February 2025)
+
+**Bug:** On the *same* turn that ends in **Steal**, **Miss + DREB**, or **Dead ball turnover**, steps that involve a pass showed defenders animating first, then the pass (out of sync). Other results (O Foul, Charge, MAKE, etc.) stayed in sync.
+
+**Root cause:** For Steal and DREB, the backend was overwriting the result turn’s `offense_team_id` with the **new** team (after the possession flip) in `game_manager.py`. The frontend uses `offense_team_id` once at turn start to classify players as offense vs defense for the whole step loop. With the wrong team, the passer was classified as “defense,” so the pass phase ran after the defense phase → defenders moved first, then the pass.
+
+**Fix (backend):** In the DREB→HCO and DREB→Fast Break blocks in `BackEnd/models/game_manager.py`, we still call `switch_possession()` and clear `result["possession_flips"]`, but we **do not** set `result["offense_team_id"] = self.offense_team.team_id`. The result turn keeps the **old** offense (the team that had the ball during the play). The frontend then classifies offense/defense correctly for the step loop; pass and defenders animate in sync. End-of-turn ball attachment (stealer/rebounder) is unchanged and does not rely on the result’s `offense_team_id`.
+
+**Why Dead ball was fixed too:** When the *previous* turn was a Steal or DREB, we had been writing the new team onto that turn’s result, so the frontend set `scene.offenseTeamId` to the new team. The *next* turn (e.g. Dead ball) could then use that stale scene value before updating from the dead ball turn’s payload, so dead ball appeared out of sync. By no longer writing the new team onto Steal/DREB results, we stopped poisoning scene for the following turn; dead ball’s payload (old offense) now drives classification correctly.
+
