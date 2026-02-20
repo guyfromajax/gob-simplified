@@ -176,12 +176,12 @@ CHARGE_THRESHOLD = -240
 BLOCKING_FOUL_THRESHOLD = 220
 
 # Situational Logic (Q4/OT): Quick Shot / Slow It Down (see docs/.../Situational_Logic_System.md)
-# Time remaining is in the quarter (seconds). Tiers: < 180, < 120, < 60, < 20.
+# Time remaining is in the quarter (seconds). Tiers: < 30, < 60, < 120, < 180 (most restrictive first).
 SITUATIONAL_TIME_TIERS = (
-    (180, {"slow_threshold": 15, "quick_threshold": -15, "outside_ratio": 0.70, "force_foul": False}),
-    (120, {"slow_threshold": 12, "quick_threshold": -12, "outside_ratio": 0.85, "force_foul": False}),
-    (60, {"slow_threshold": 9, "quick_threshold": -9, "outside_ratio": 0.95, "force_foul_range": True}),  # 0 <= score_delta <= threshold
-    (20, {"slow_threshold": 6, "quick_threshold": -6, "outside_ratio": 1.0, "force_foul_range": True}),
+    (30, {"slow_threshold": 1, "quick_threshold": 1, "outside_ratio": 1.0, "force_foul_range": True}),
+    (60, {"slow_threshold": 6, "quick_threshold": -6, "outside_ratio": 0.95, "force_foul_range": True}),
+    (120, {"slow_threshold": 9, "quick_threshold": -9, "outside_ratio": 0.85, "force_foul": False}),
+    (180, {"slow_threshold": 12, "quick_threshold": -12, "outside_ratio": 0.70, "force_foul": False}),
 )
 SITUATIONAL_QUICK_SHOT_ATTACK_RATIO = 0.75   # If not outside: 75% attack / 25% inside
 SITUATIONAL_FORCE_FOUL_TIME_ELAPSED_MIN = 1

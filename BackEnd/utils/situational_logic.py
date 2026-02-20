@@ -21,7 +21,7 @@ from BackEnd.constants import (
 def get_situational_tier(time_remaining_seconds):
     """
     Return the tier dict for the given time remaining in the quarter (seconds).
-    Tiers: < 180, < 120, < 60, < 20. Returns the first matching tier (most restrictive first).
+    Tiers: < 30, < 60, < 120, < 180. Returns the first matching tier (most restrictive first).
     """
     if time_remaining_seconds is None:
         return None
@@ -82,7 +82,7 @@ def is_quick_shot(game, time_remaining_seconds):
 def should_force_foul(game, time_remaining_seconds):
     """
     True when defense is trailing by <= Slow It Down threshold (0 <= Score Delta <= threshold)
-    in the < 1 min or < 20 sec tiers. Never true when defense is leading.
+    in the < 1 min or < 30 sec tiers. Never true when defense is leading.
     """
     if not is_situational_active(game.quarter):
         return False
@@ -111,12 +111,18 @@ def get_situational_play_focus_override(game, time_remaining_seconds):
     """
     When Quick Shot is active, returns weighted focus: (outside_ratio, attack_ratio, inside_ratio)
     for (outside, attack, inside). If not Quick Shot, returns None.
+    When time <= 30 sec: only apply override if -7 < Score Delta < -2 (trailing by 3-6); else standard logic.
     """
     if not is_quick_shot(game, time_remaining_seconds):
         return None
     tier = get_situational_tier(time_remaining_seconds)
     if not tier:
         return None
+    delta = get_score_delta(game)
+    # Last 30 seconds: only force outside/attack/inside when trailing by 3-6 (-7 < delta < -2)
+    if time_remaining_seconds is not None and time_remaining_seconds <= 30:
+        if not (-7 < delta < -2):
+            return None
     outside_ratio = tier.get("outside_ratio", 0.7)
     # If not outside: 75% attack / 25% inside
     remainder = 1.0 - outside_ratio
