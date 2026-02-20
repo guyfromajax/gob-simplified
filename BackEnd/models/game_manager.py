@@ -586,9 +586,12 @@ class GameManager:
             old_offense = self.offense_team.name
             self.switch_possession()
             result["possession_flips"] = False
-            # ✅ CRITICAL FIX: Update offense_team_id AFTER flip (was set to old team in turn_manager)
-            result["offense_team_id"] = self.offense_team.team_id
-            logging.debug(f"🔄 [DREB→HCO] Flipped possession before HCO: {old_offense} → {self.offense_team.name}, updated offense_team_id={result['offense_team_id']}")
+            # ✅ ANIMATION FIX: Do NOT update result["offense_team_id"] here. The skeleton was built
+            # with the team that had the ball during the play (old offense). The frontend uses
+            # offense_team_id to classify offense/defense for the step loop; if we set it to the new
+            # team, defenders animate first and the pass animates after (wrong order). Keep the
+            # result turn's offense_team_id = old team so pass steps animate in sync.
+            logging.debug(f"🔄 [DREB→HCO] Flipped possession before HCO: {old_offense} → {self.offense_team.name} (result keeps offense_team_id=old team for animation)")
 
         # ✅ FIX 4: Backend flip for DREB → Fast Break (Pattern C)
         # Handle possession flips for DREB transitions that go to Fast Break
@@ -597,9 +600,9 @@ class GameManager:
             old_offense = self.offense_team.name
             self.switch_possession()
             result["possession_flips"] = False
-            # ✅ CRITICAL FIX: Update offense_team_id AFTER flip (was set to old team in turn_manager)
-            result["offense_team_id"] = self.offense_team.team_id
-            logging.debug(f"🔄 [DREB→FB] Flipped possession before Fast Break: {old_offense} → {self.offense_team.name}, updated offense_team_id={result['offense_team_id']}")
+            # ✅ ANIMATION FIX: Do NOT update result["offense_team_id"] here (same as DREB→HCO).
+            # Keep result turn's offense_team_id = old team so frontend classifies correctly for step animation.
+            logging.debug(f"🔄 [DREB→FB] Flipped possession before Fast Break: {old_offense} → {self.offense_team.name} (result keeps offense_team_id=old team for animation)")
 
         # (Foul-out check and timeout creation now run inside _append_turn for the main result)
 
