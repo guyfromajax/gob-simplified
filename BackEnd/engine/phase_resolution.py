@@ -317,9 +317,50 @@ def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup):
     
     return foul_player
 
+
+def select_defender_closest_to_victim(victim_coords, def_lineup, defender_coords_by_pos=None):
+    """
+    For intentional foul (situational Force Foul): select the defender closest to the victim
+    by Euclidean distance in court coordinates.
+
+    Args:
+        victim_coords: dict with "x" and "y" (e.g. from HCO_STRING_SPOTS or inbound oDestinations)
+        def_lineup: dict position -> Player
+        defender_coords_by_pos: optional dict position -> {"x", "y"}. If None, use position-based
+            default spots (key) for all defenders as fallback.
+
+    Returns:
+        Player object that is closest to victim_coords, or None if def_lineup empty.
+    """
+    if not def_lineup or not victim_coords:
+        return None
+    vx = victim_coords.get("x", 50)
+    vy = victim_coords.get("y", 25)
+    from BackEnd.constants import HCO_STRING_SPOTS
+    best_defender = None
+    best_dist_sq = float("inf")
+    for pos, defender in def_lineup.items():
+        if defender is None:
+            continue
+        if defender_coords_by_pos and pos in defender_coords_by_pos:
+            coords = defender_coords_by_pos[pos]
+            dx = coords.get("x", 50)
+            dy = coords.get("y", 25)
+        else:
+            coords = HCO_STRING_SPOTS.get("key", {"x": 50, "y": 25})
+            dx = coords.get("x", 50)
+            dy = coords.get("y", 25)
+        dist_sq = (dx - vx) ** 2 + (dy - vy) ** 2
+        if dist_sq < best_dist_sq:
+            best_dist_sq = dist_sq
+            best_defender = defender
+    return best_defender
+
     
-def resolve_non_shooting_foul(roles, game):
-    
+def resolve_non_shooting_foul(roles, game, time_elapsed_override=None):
+    """
+    time_elapsed_override: if provided (e.g. situational Force Foul), use instead of tempo-based time.
+    """
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     foul_team = off_team if game_state["foul_team"] == "OFFENSE" else def_team
     
@@ -329,8 +370,11 @@ def resolve_non_shooting_foul(roles, game):
     shooter = roles["shooter"]
     screener = roles.get("screener", "")
     passer = roles.get("passer", "")
-    tempo = off_team.strategy_calls["tempo_call"]
-    time_elapsed = get_time_elapsed(tempo)
+    if time_elapsed_override is not None:
+        time_elapsed = time_elapsed_override
+    else:
+        tempo = off_team.strategy_calls["tempo_call"]
+        time_elapsed = get_time_elapsed(tempo)
 
     # Track the foul
     foul_player.record_stat("F")

@@ -12,10 +12,10 @@ This document lists all constants and variables that were previously on the depr
 | `STANDARD_O_FOUL` | 5 | |
 | `HARD_STEAL` | -135 | |
 | `SOFT_STEAL` | -35 | |
-| `HARD_FOUL` | 200 | |
-| `SOFT_FOUL` | 100 | |
+| `HARD_FOUL` | 250 | |
+| `SOFT_FOUL` | 150 | |
 | `STEAL_ATTEMPT` | 30 | |
-| `DEAD_BALL_TURNOVER` | 30 | |
+| `DEAD_BALL_TURNOVER` | 30 | | #temp change from 7
 
 ---
 

@@ -685,8 +685,8 @@ def resolve_steal_attempt(offense_value, defense_value, soft_steal, hard_steal, 
         defense_value: Defender's steal attempt value (pressure)
         soft_steal: Soft steal threshold (default: -100)
         hard_steal: Hard steal threshold (default: -200)
-        soft_foul: Soft foul threshold (default: 100)
-        hard_foul: Hard foul threshold (default: 200)
+        soft_foul: Soft foul threshold (default: 150, from constants.SOFT_FOUL)
+        hard_foul: Hard foul threshold (default: 250, from constants.HARD_FOUL)
     
     Returns:
         One of:

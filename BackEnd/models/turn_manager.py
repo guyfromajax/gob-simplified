@@ -128,11 +128,14 @@ class TurnManager:
         d_dest = getAwayTeamCoords(d_dest_home.copy()) if is_away_offense else d_dest_home
         self.logger.log("defenseUpdate:end")
 
+        from BackEnd.constants import SITUATIONAL_SIP_RECEIVER_POS
+        receiver_pos = SITUATIONAL_SIP_RECEIVER_POS
         payload = {
             "result_type": "SIDE_INBOUND",
             "ball_spot": getAwayTeamCoords({"tmp": inbound_spot_home})["tmp"] if is_away_offense else inbound_spot_home,
             "oDestinations": o_dest,
             "dDestinations": d_dest,
+            "receiver_pos": receiver_pos,  # for situational Force Foul (pass receiver)
             "offense_team_id": offense_team.team_id,  # ✅ SS&S: Team on offense during this turn
             "current_turn": "SIDE_INBOUND",  # ✅ SS&S: Explicit turn type
             "next_turn": "HCO",  # ✅ SS&S: Always transitions to HCO after side inbound
@@ -259,11 +262,13 @@ class TurnManager:
                 d_dest[pos] = d_coords
         self.logger.log("defenseUpdate:end")
 
+        from BackEnd.constants import SITUATIONAL_BIP_RECEIVER_POS
         payload = {
             "result_type": "BASELINE_INBOUND",
             "ball_spot": getAwayTeamCoords({"tmp": inbound_spot_home})["tmp"] if is_away_offense else inbound_spot_home,
             "oDestinations": o_dest,
             "dDestinations": d_dest,
+            "receiver_pos": SITUATIONAL_BIP_RECEIVER_POS,  # for situational Force Foul (pass receiver)
             "offense_team_id": offense_team.team_id,  # ✅ SS&S: Use offense_team_id (not possession_team_id)
             "current_turn": "BASELINE_INBOUND",  # ✅ SS&S: Explicit turn type
             "quarter": self.game.quarter,
@@ -312,6 +317,26 @@ class TurnManager:
 
         # STEP 1: Set strategy calls (tempo + aggression)
         self.set_strategy_calls()
+        
+        # ✅ Situational Logic (Q4/OT): tempo and temp overrides (revert when situation ends)
+        from BackEnd.utils import situational_logic as sl
+        game_state = self.game.game_state
+        time_remaining = game_state.get("time_remaining")
+        quarter = getattr(self.game, "quarter", None)
+        if sl.is_situational_active(quarter) and time_remaining is not None:
+            if sl.is_slow_it_down(self.game, time_remaining):
+                self.game.offense_team.strategy_calls["tempo_call"] = "slow"
+                game_state["_situational_fast_break_override_team_id"] = self.game.offense_team.team_id
+            else:
+                game_state.pop("_situational_fast_break_override_team_id", None)
+            if sl.is_quick_shot(self.game, time_remaining):
+                self.game.offense_team.strategy_calls["tempo_call"] = "fast"
+                game_state["_situational_quick_shot_fcp_hct_override"] = True
+            else:
+                game_state.pop("_situational_quick_shot_fcp_hct_override", None)
+        else:
+            game_state.pop("_situational_fast_break_override_team_id", None)
+            game_state.pop("_situational_quick_shot_fcp_hct_override", None)
         
         # ✅ LOG: Check for Playcall Center overrides at start of turn
         # ✅ PERFORMANCE: Skip Playcall Center checks during full simulation (full_sim=True)
@@ -388,84 +413,154 @@ class TurnManager:
             self.logger.log("hct:start")
             result = resolve_half_court_trap_logic(self.game)
         else:
-            calls = self.set_playcalls()
-            self.game.game_state["current_playcall"] = calls["offense"]
-            self.game.game_state["defense_playcall"] = calls["defense"]
-            
-            # Track defensive playcall usage
-            from BackEnd.utils.defense_utils import map_defense_playcall_to_tracking_name
-            def_team = self.game.defense_team
-            defense_playcall = calls["defense"]  # "Man", "2-3 Zone", "3-2 Zone", etc.
-            # Defense playcall is now stored as specific name (e.g., "2-3 Zone")
-            tracking_name = defense_playcall  # Use specific name directly
-            if tracking_name in def_team.scouting_data["defense"]:
-                # Get offensive play type and focus for granular tracking
-                # ✅ SS&S: Use offense_play_type as single source of truth (works for both user overrides and normal selection)
-                offense_play_type_raw = calls.get("offense_play_type", "")
-                offense_play_type = offense_play_type_raw.lower() if offense_play_type_raw else ""
-                offense_focus = calls.get("offense_focus", "")  # "inside", "attack", "outside"
-                
-                # Normalize play type (set_play -> set) to match phase_resolution.py
-                if offense_play_type == "set_play":
-                    offense_play_type = "set"
-                
-                def_team.scouting_data["defense"][tracking_name]["used"] += 1
-                def_team.scouting_data["defense"][tracking_name]["game_stats"]["used"] += 1
-                
-                # Track granular usage by play type
-                if offense_play_type == "motion":
-                    def_team.scouting_data["defense"][tracking_name]["game_stats"]["vs_motion"]["attempts"] += 1
-                elif offense_play_type == "set":
-                    def_team.scouting_data["defense"][tracking_name]["game_stats"]["vs_set"]["attempts"] += 1
-                
-                # Track granular usage by focus type
-                if offense_focus in ["inside", "attack", "outside"]:
-                    def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_{offense_focus}"]["attempts"] += 1
-                    
-                    # Track combination of play type + focus
-                    if offense_play_type == "motion":
-                        def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_motion_{offense_focus}"]["attempts"] += 1
-                    elif offense_play_type == "set":
-                        def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_set_{offense_focus}"]["attempts"] += 1
-            
-            # Calculate EV (Expected Value) for the playcall matchup
-            ev = self.calculate_ev(
-                offensive_playcall=calls["offense"],
-                defensive_playcall=calls["defense"],
-                offensive_lineup=self.game.offense_team.lineup,
-                defensive_lineup=self.game.defense_team.lineup,
-                offensive_team=self.game.offense_team,
-                defensive_team=self.game.defense_team
+            # ✅ Situational Logic: Force Foul (after BIP/SIP pending, or at start of HCO e.g. DREB→HCO)
+            result = None
+            from BackEnd.utils import situational_logic as sl
+            from BackEnd.engine.phase_resolution import (
+                resolve_non_shooting_foul,
+                select_defender_closest_to_victim,
             )
+            pending_foul = self.game.game_state.pop("situational_force_foul_pending", None)
+            if pending_foul:
+                victim_id = pending_foul.get("victim_id")
+                victim_coords = pending_foul.get("victim_coords") or {"x": 50, "y": 25}
+                off_lineup = self.game.offense_team.lineup
+                def_lineup = self.game.defense_team.lineup
+                victim = None
+                for p in off_lineup.values():
+                    if p and getattr(p, "player_id", None) == victim_id:
+                        victim = p
+                        break
+                if victim and def_lineup:
+                    d_dest = pending_foul.get("defender_coords_by_pos")
+                    foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, d_dest)
+                    if foul_player:
+                        roles = {
+                            "ball_handler": victim,
+                            "defender": foul_player,
+                            "foul_player": foul_player,
+                            "shooter": victim,
+                            "screener": None,
+                            "passer": None,
+                        }
+                        self.game.game_state["foul_team"] = "DEFENSE"
+                        result = resolve_non_shooting_foul(
+                            roles, self.game, time_elapsed_override=sl.force_foul_time_elapsed()
+                        )
+                        result["offense_team_id"] = self.game.offense_team.team_id
+                        result["current_turn"] = "HCO"
+            if result is None:
+                # Force Foul at start of HCO (DREB→HCO: victim = last_rebounder)
+                time_remaining_sec = self.game.game_state.get("time_remaining")
+                if (
+                    sl.is_situational_active(getattr(self.game, "quarter", None))
+                    and sl.is_slow_it_down(self.game, time_remaining_sec)
+                    and sl.should_force_foul(self.game, time_remaining_sec)
+                ):
+                    victim = self.game.game_state.get("last_rebounder")
+                    if victim and self.game.defense_team.lineup:
+                        from BackEnd.constants import HCO_STRING_SPOTS
+                        victim_coords = HCO_STRING_SPOTS.get("key", {"x": 50, "y": 25})
+                        foul_player = select_defender_closest_to_victim(
+                            victim_coords, self.game.defense_team.lineup, None
+                        )
+                        if foul_player:
+                            roles = {
+                                "ball_handler": victim,
+                                "defender": foul_player,
+                                "foul_player": foul_player,
+                                "shooter": victim,
+                                "screener": None,
+                                "passer": None,
+                            }
+                            self.game.game_state["foul_team"] = "DEFENSE"
+                            result = resolve_non_shooting_foul(
+                                roles, self.game, time_elapsed_override=sl.force_foul_time_elapsed()
+                            )
+                            result["offense_team_id"] = self.game.offense_team.team_id
+                            result["current_turn"] = "HCO"
+            if result is not None:
+                # Force Foul result already set; skip set_playcalls and resolve_half_court_offense
+                pass
+            else:
+                calls = self.set_playcalls()
+                self.game.game_state["current_playcall"] = calls["offense"]
+                self.game.game_state["defense_playcall"] = calls["defense"]
             
-            # Store EV score in scouting data
-            self._store_ev_score(ev, calls, self.game.offense_team, self.game.defense_team)
-            
-            result = self.resolve_half_court_offense()
-            # Add playcalls to result for frontend display
-            # ✅ FIX 2: Use current_playcall from game_state (may be overridden for Motion plays)
-            # This ensures Motion play overrides (like "3-2 Motion") are reflected in the result
-            result["offensive_playcall"] = self.game.game_state.get("current_playcall", calls["offense"])
-            result["defensive_playcall"] = calls["defense"]
-            # ✅ PERFORMANCE: Skip playcall logging during full simulations
-            if not is_full_simulation:
-                offense_name = calls["offense"]
-                defense_name = calls["defense"]
-                logging.info(f"🎮 [PLAYCALL RESULT] Added to result: offensive_playcall='{offense_name}', defensive_playcall='{defense_name}'")
-            # ✅ SS&S: Set offense_override_cleared flag from calls (overrides default False)
-            result["offense_override_cleared"] = calls.get("offense_override_cleared", False)
-            
-            # Add play type and focus for frontend display
-            # ✅ SS&S: Use offense_play_type as single source of truth (works for both user overrides and normal selection)
-            offense_play_type = calls.get("offense_play_type", None)
-            # Capitalize for display (Motion/Set) if we have a value, otherwise use "-"
-            result["offensive_play_type"] = offense_play_type.title() if offense_play_type else "-"
-            result["offensive_play_focus"] = calls.get("offense_focus", None)
-            result["defensive_play_type"] = calls.get("defense_type", "-")
-            result["defensive_play_focus"] = calls.get("defense_focus", None)
-            
-            # Add EV to result for frontend display
-            result["ev"] = ev
+                # Track defensive playcall usage
+                from BackEnd.utils.defense_utils import map_defense_playcall_to_tracking_name
+                def_team = self.game.defense_team
+                defense_playcall = calls["defense"]  # "Man", "2-3 Zone", "3-2 Zone", etc.
+                # Defense playcall is now stored as specific name (e.g., "2-3 Zone")
+                tracking_name = defense_playcall  # Use specific name directly
+                if tracking_name in def_team.scouting_data["defense"]:
+                    # Get offensive play type and focus for granular tracking
+                    # ✅ SS&S: Use offense_play_type as single source of truth (works for both user overrides and normal selection)
+                    offense_play_type_raw = calls.get("offense_play_type", "")
+                    offense_play_type = offense_play_type_raw.lower() if offense_play_type_raw else ""
+                    offense_focus = calls.get("offense_focus", "")  # "inside", "attack", "outside"
+                    
+                    # Normalize play type (set_play -> set) to match phase_resolution.py
+                    if offense_play_type == "set_play":
+                        offense_play_type = "set"
+                    
+                    def_team.scouting_data["defense"][tracking_name]["used"] += 1
+                    def_team.scouting_data["defense"][tracking_name]["game_stats"]["used"] += 1
+                    
+                    # Track granular usage by play type
+                    if offense_play_type == "motion":
+                        def_team.scouting_data["defense"][tracking_name]["game_stats"]["vs_motion"]["attempts"] += 1
+                    elif offense_play_type == "set":
+                        def_team.scouting_data["defense"][tracking_name]["game_stats"]["vs_set"]["attempts"] += 1
+                    
+                    # Track granular usage by focus type
+                    if offense_focus in ["inside", "attack", "outside"]:
+                        def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_{offense_focus}"]["attempts"] += 1
+                        
+                        # Track combination of play type + focus
+                        if offense_play_type == "motion":
+                            def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_motion_{offense_focus}"]["attempts"] += 1
+                        elif offense_play_type == "set":
+                            def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_set_{offense_focus}"]["attempts"] += 1
+                
+                # Calculate EV (Expected Value) for the playcall matchup
+                ev = self.calculate_ev(
+                    offensive_playcall=calls["offense"],
+                    defensive_playcall=calls["defense"],
+                    offensive_lineup=self.game.offense_team.lineup,
+                    defensive_lineup=self.game.defense_team.lineup,
+                    offensive_team=self.game.offense_team,
+                    defensive_team=self.game.defense_team
+                )
+                
+                # Store EV score in scouting data
+                self._store_ev_score(ev, calls, self.game.offense_team, self.game.defense_team)
+                
+                result = self.resolve_half_court_offense()
+                # Add playcalls to result for frontend display
+                # ✅ FIX 2: Use current_playcall from game_state (may be overridden for Motion plays)
+                # This ensures Motion play overrides (like "3-2 Motion") are reflected in the result
+                result["offensive_playcall"] = self.game.game_state.get("current_playcall", calls["offense"])
+                result["defensive_playcall"] = calls["defense"]
+                # ✅ PERFORMANCE: Skip playcall logging during full simulations
+                if not is_full_simulation:
+                    offense_name = calls["offense"]
+                    defense_name = calls["defense"]
+                    logging.info(f"🎮 [PLAYCALL RESULT] Added to result: offensive_playcall='{offense_name}', defensive_playcall='{defense_name}'")
+                # ✅ SS&S: Set offense_override_cleared flag from calls (overrides default False)
+                result["offense_override_cleared"] = calls.get("offense_override_cleared", False)
+                
+                # Add play type and focus for frontend display
+                # ✅ SS&S: Use offense_play_type as single source of truth (works for both user overrides and normal selection)
+                offense_play_type = calls.get("offense_play_type", None)
+                # Capitalize for display (Motion/Set) if we have a value, otherwise use "-"
+                result["offensive_play_type"] = offense_play_type.title() if offense_play_type else "-"
+                result["offensive_play_focus"] = calls.get("offense_focus", None)
+                result["defensive_play_type"] = calls.get("defense_type", "-")
+                result["defensive_play_focus"] = calls.get("defense_focus", None)
+                
+                # Add EV to result for frontend display
+                result["ev"] = ev
 
         # ✅ SS&S: Set offense_team_id (single source of truth)
         # This represents the team on offense DURING this turn (for animations)
@@ -1065,25 +1160,32 @@ class TurnManager:
         chosen_play_type = weighted_random_from_dict(weights)
         
         # Level 2: Determine play focus (inside/attack/outside)
-        inside_val = self.game.offense_team.strategy_settings.get("inside", 2)
-        attack_val = self.game.offense_team.strategy_settings.get("attack", 2)
-        outside_val = self.game.offense_team.strategy_settings.get("outside", 2)
-        
-        total = inside_val + attack_val + outside_val
-        
-        if total == 0:
-            # Fallback if all are zero (shouldn't happen but safe)
-            chosen_focus = "inside"
+        # ✅ Situational Logic (Q4/OT): Quick Shot overrides to outside-heavy focus
+        from BackEnd.utils import situational_logic as sl
+        time_remaining = self.game.game_state.get("time_remaining")
+        focus_override = sl.get_situational_play_focus_override(self.game, time_remaining) if sl.is_situational_active(getattr(self.game, "quarter", None)) else None
+        if focus_override:
+            chosen_focus = sl.choose_focus_from_override(focus_override)
         else:
-            # Roll random number from 1 to total
-            roll = random.randint(1, total)
+            inside_val = self.game.offense_team.strategy_settings.get("inside", 2)
+            attack_val = self.game.offense_team.strategy_settings.get("attack", 2)
+            outside_val = self.game.offense_team.strategy_settings.get("outside", 2)
             
-            if roll <= inside_val:
+            total = inside_val + attack_val + outside_val
+            
+            if total == 0:
+                # Fallback if all are zero (shouldn't happen but safe)
                 chosen_focus = "inside"
-            elif roll <= inside_val + attack_val:
-                chosen_focus = "attack"
             else:
-                chosen_focus = "outside"
+                # Roll random number from 1 to total
+                roll = random.randint(1, total)
+                
+                if roll <= inside_val:
+                    chosen_focus = "inside"
+                elif roll <= inside_val + attack_val:
+                    chosen_focus = "attack"
+                else:
+                    chosen_focus = "outside"
         
         # Query plays collection for matching play (cached per game process to avoid 200+ DB round-trips per quarter)
         # ✅ FIX: Motion plays don't filter by play_focus (focus is only for tracking/influence)
@@ -3297,6 +3399,10 @@ class TurnManager:
         # After a made shot, possession will flip. The team that just scored
         # (currently offense_team) will become the defense team and apply pressure.
         def_team = self.game.offense_team
+        
+        # ✅ Situational Logic (Q4/OT): Quick Shot overrides defense FCP/HCT to 0
+        if self.game.game_state.get("_situational_quick_shot_fcp_hct_override"):
+            return "HCO"
         
         # Ensure strategy_settings is initialized (but don't overwrite existing settings)
         # Only initialize if it's completely missing (None), not if it's an empty dict

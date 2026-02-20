@@ -164,8 +164,8 @@ STANDARD_D_FOUL = 95
 STANDARD_O_FOUL = 5
 HARD_STEAL = -135
 SOFT_STEAL = -35
-HARD_FOUL = 200
-SOFT_FOUL = 100
+HARD_FOUL = 250
+SOFT_FOUL = 150
 STEAL_ATTEMPT = 30
 DEAD_BALL_TURNOVER = 30  # temp change from 7
 
@@ -174,6 +174,21 @@ DEAD_BALL_TURNOVER = 30  # temp change from 7
 # < CHARGE_THRESHOLD → charge (offensive foul); > BLOCKING_FOUL_THRESHOLD → blocking foul (defensive foul)
 CHARGE_THRESHOLD = -240
 BLOCKING_FOUL_THRESHOLD = 220
+
+# Situational Logic (Q4/OT): Quick Shot / Slow It Down (see docs/.../Situational_Logic_System.md)
+# Time remaining is in the quarter (seconds). Tiers: < 180, < 120, < 60, < 20.
+SITUATIONAL_TIME_TIERS = (
+    (180, {"slow_threshold": 15, "quick_threshold": -15, "outside_ratio": 0.70, "force_foul": False}),
+    (120, {"slow_threshold": 12, "quick_threshold": -12, "outside_ratio": 0.85, "force_foul": False}),
+    (60, {"slow_threshold": 9, "quick_threshold": -9, "outside_ratio": 0.95, "force_foul_range": True}),  # 0 <= score_delta <= threshold
+    (20, {"slow_threshold": 6, "quick_threshold": -6, "outside_ratio": 1.0, "force_foul_range": True}),
+)
+SITUATIONAL_QUICK_SHOT_ATTACK_RATIO = 0.75   # If not outside: 75% attack / 25% inside
+SITUATIONAL_FORCE_FOUL_TIME_ELAPSED_MIN = 1
+SITUATIONAL_FORCE_FOUL_TIME_ELAPSED_MAX = 3
+# Inbound pass receiver position for Force Foul (BIP/SIP)
+SITUATIONAL_BIP_RECEIVER_POS = "SG"
+SITUATIONAL_SIP_RECEIVER_POS = "SG"
 
 HCO_STRING_SPOTS = {
     "key": {"x": 64, "y": 25},

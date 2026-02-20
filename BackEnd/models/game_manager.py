@@ -506,6 +506,29 @@ class GameManager:
                 self.game_id,
             )
 
+    def _maybe_set_force_foul_pending_after_inbound(self, inbound_payload, inbound_type):
+        """
+        Situational Logic (Q4/OT): If Slow It Down + Force Foul, set pending so the next
+        API turn returns a defensive foul on the inbound pass receiver (after frontend animates the pass).
+        """
+        from BackEnd.utils import situational_logic as sl
+        time_remaining = self.game_state.get("time_remaining")
+        if not (
+            sl.is_situational_active(self.quarter)
+            and sl.is_slow_it_down(self, time_remaining)
+            and sl.should_force_foul(self, time_remaining)
+        ):
+            return
+        receiver_pos = inbound_payload.get("receiver_pos", "SG")
+        off_lineup = self.offense_team.lineup
+        if receiver_pos not in off_lineup or not off_lineup[receiver_pos]:
+            return
+        self.game_state["situational_force_foul_pending"] = {
+            "victim_id": getattr(off_lineup[receiver_pos], "player_id", None),
+            "victim_coords": inbound_payload.get("oDestinations", {}).get(receiver_pos, {"x": 50, "y": 25}),
+            "defender_coords_by_pos": inbound_payload.get("dDestinations", {}),
+        }
+
     def simulate_macro_turn(self): #run_simulation
         import time as _time
         # ⏱️ Coarse timers for full_sim (logged on sample turns)
@@ -695,6 +718,8 @@ class GameManager:
                     # Don't append SIP turn - timeout will replace it on next API call
                     return
             else:
+                # ✅ Situational Logic: Force Foul after SIP — set pending so next turn is the foul
+                self._maybe_set_force_foul_pending_after_inbound(inbound_payload, "SIDE_INBOUND")
                 self._append_turn(inbound_payload)
             
             # Reset offensive state to HCO after side inbound (FCP/HCT only apply after made shots)
@@ -792,6 +817,8 @@ class GameManager:
                     # Don't append BIP turn - timeout will replace it on next API call
                     return
             else:
+                # ✅ Situational Logic: Force Foul after BIP — set pending so next turn is the foul
+                self._maybe_set_force_foul_pending_after_inbound(inbound_payload, "BASELINE_INBOUND")
                 self._append_turn(inbound_payload, text="Baseline inbound after made shot")
             
             # Preserve offensive_state for next API call
