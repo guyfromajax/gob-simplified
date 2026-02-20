@@ -610,7 +610,7 @@ class ShotManager:
                     "events": [],
                     "foul_player_id": shooter.player_id,
                     "foul_team": "OFFENSE",
-                    "next_play_type": "SIP",
+                    "next_play_type": "SIDE_INBOUND",
                     "offense_team_id": off_team.team_id,
                     "defense_team_id": def_team.team_id,
                 }
