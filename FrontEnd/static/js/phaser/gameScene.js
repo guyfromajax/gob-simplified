@@ -1956,82 +1956,75 @@ export function createGameScene(Phaser) {
           onUpdate: updateScoreboard
         });
       }
-      
+
+      // Part 2 (Preload): helper to fetch next turn. Used for both direct fetch and preload (no overrides).
+      const simMode = this.mode || 'single';
+      const fetchTurnData = async (offenseOverride, defenseOverride) => {
+        const response = await fetch(API_CONFIG.buildUrl('/api/simulate-turn'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            game_id: gameId,
+            offense_override: offenseOverride ?? null,
+            defense_override: defenseOverride ?? null,
+            mode: simMode
+          })
+        });
+        if (!response.ok) {
+          let errorData;
+          try {
+            errorData = await response.json();
+          } catch {
+            errorData = { detail: `HTTP ${response.status}: ${response.statusText}` };
+          }
+          console.error('❌ /api/simulate-turn failed:', errorData);
+          if (response.status === 404 && errorData.detail && errorData.detail.includes('not found')) {
+            if (window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
+              const urlParams = new URLSearchParams(window.location.search);
+              window.ErrorHandler.showMissingTruthError({
+                pointerType: 'game_id',
+                pointerValue: urlParams.get('game_id') || 'unknown',
+                message: errorData.detail || 'Game was cleared from backend memory. This may indicate a backend restart or timeout.',
+                mode: urlParams.get('mode') || 'single',
+                recoveryOptions: { redirectTo: 'mode-select', redirectLabel: 'Go to Mode Select' }
+              });
+            }
+            throw new Error(`Game not found: ${errorData.detail || 'Game was cleared from backend memory'}`);
+          }
+          throw new Error(`API error: ${errorData.detail || `HTTP ${response.status}`}`);
+        }
+        return await response.json();
+      };
+
+      let preloadedTurnPromise = null;
+
       // Main turn-by-turn loop
       while (!quarterComplete) {
         try {
-          // ✅ SS&S: Overrides are now stored in team.strategy_calls via /api/set-playcall-override
-          // No need to pass overrides here - backend checks team.strategy_calls automatically
-          // Legacy support: Still check window globals for backward compatibility (will be removed)
           const offenseOverride = window.nextOffenseOverride || null;
           const defenseOverride = window.nextDefenseOverride || null;
-          
-          // Clear legacy window globals after reading (single-use)
           window.nextOffenseOverride = null;
           window.nextDefenseOverride = null;
           window.nextDefenseTypeOverride = null;
           window.nextDefenseAggressionOverride = null;
-          
-          // Clear visual selections in Playcall Center (only if override was used)
-          // Note: Highlighting will be managed by tracking which turn used the override
-          // For now, clear on every turn (will be refined to only clear after override is used)
           if (window.clearPlaycallOverrides && (offenseOverride || defenseOverride)) {
             window.clearPlaycallOverrides();
           }
-          
-          const response = await fetch(API_CONFIG.buildUrl('/api/simulate-turn'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              game_id: gameId,
-              offense_override: offenseOverride,  // Legacy support - will be removed
-              defense_override: defenseOverride,   // Legacy support - will be removed
-              mode: this.mode || 'single'
-            })
-          });
-          
-          if (!response.ok) {
-            let errorData;
+
+          // Part 2: Use preloaded turn when available and no overrides; else fetch. On preload failure, fetch with overrides.
+          let turnData;
+          if (preloadedTurnPromise && !offenseOverride && !defenseOverride) {
             try {
-              errorData = await response.json();
-            } catch {
-              errorData = { detail: `HTTP ${response.status}: ${response.statusText}` };
+              turnData = await preloadedTurnPromise;
+            } catch (e) {
+              console.warn('⚠️ Preloaded turn failed, fetching fresh:', e?.message);
+              turnData = await fetchTurnData(offenseOverride, defenseOverride);
             }
-            console.error('❌ /api/simulate-turn failed:', errorData);
-            // ✅ FIX: Don't assume 404 = quarter complete
-            // A 404 could mean: game not found, backend restart, network issue, etc.
-            // Only mark quarter complete if backend explicitly says so (quarter_complete=true)
-            if (response.status === 404 && errorData.detail && errorData.detail.includes('not found')) {
-              console.error('⚠️ Game was cleared from backend memory. This may indicate a backend restart or timeout.');
-              
-              // ✅ Phase 4: Show missing truth error screen for game not found
-              if (window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
-                const urlParams = new URLSearchParams(window.location.search);
-                const gameId = urlParams.get('game_id');
-                const mode = urlParams.get('mode') || 'single';
-                
-                window.ErrorHandler.showMissingTruthError({
-                  pointerType: 'game_id',
-                  pointerValue: gameId || 'unknown',
-                  message: errorData.detail || 'Game was cleared from backend memory. This may indicate a backend restart or timeout.',
-                  mode,
-                  recoveryOptions: {
-                    redirectTo: 'mode-select',
-                    redirectLabel: 'Go to Mode Select'
-                  }
-                });
-              }
-              
-              // ✅ FIX: Don't break - throw error to be caught by outer catch block
-              // This prevents quarter completion logic from running
-              throw new Error(`Game not found: ${errorData.detail || 'Game was cleared from backend memory'}`);
-            }
-            // ✅ FIX: For other errors, throw to prevent quarter completion
-            throw new Error(`API error: ${errorData.detail || `HTTP ${response.status}`}`);
+            preloadedTurnPromise = null;
+          } else {
+            if (preloadedTurnPromise) preloadedTurnPromise = null;
+            turnData = await fetchTurnData(offenseOverride, defenseOverride);
           }
-          
-          const turnData = await response.json();
-          
           // ✅ FIX: Only break if there's no turn to animate
           // If quarter_complete is True but turn exists, animate the turn first (it's the final turn of the quarter)
           if (!turnData.turn) {
@@ -2088,6 +2081,11 @@ export function createGameScene(Phaser) {
             });
           }
           let finalTurn = turn; // Track the final turn for Quick Adjust logic
+
+          // Part 2: Start preload for next turn (runs in parallel with animation). Skip when we will exit after this turn (timeout or final turn of quarter).
+          if (turn.result_type !== 'TIMEOUT' && !turnData.quarter_complete) {
+            preloadedTurnPromise = fetchTurnData(null, null);
+          }
           
           // ✅ TIMEOUT: Check if this is a timeout turn - if so, stop the simulation loop
           if (turn.result_type === "TIMEOUT") {
@@ -2346,9 +2344,6 @@ export function createGameScene(Phaser) {
             
             break;
           }
-          
-          // Small delay between turns for readability (optional)
-          await new Promise(resolve => setTimeout(resolve, 100));
           
         } catch (error) {
           console.error('❌ Error in turn-by-turn loop:', error);

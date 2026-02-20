@@ -143,4 +143,4 @@ After delay tuning, the remaining “pause” is largely the **API round-trip** 
 - **Batch:** Need a policy for batch size (e.g. “until next dead ball / timeout / quarter” or “fixed N”). Timeouts and quarter end require the frontend to stop consuming the batch and possibly request a new state.
 - **Same-response:** Backend must compute the next turn (or a minimal preview) when returning the current one. Slightly more work per response, but the next turn is available immediately for a BallSpot-style bridge.
 
-This section is for alignment when we decide to move beyond delay tuning; no implementation steps are implied here.
+**Part 2 (Preload) implementation:** ✅ Done in `gameScene.js` `simulateTurnByTurn()`. `fetchTurnData(offenseOverride, defenseOverride)` runs the simulate-turn request. The loop uses a preloaded turn when one is available and there are no overrides; otherwise it fetches (with overrides). Preload is started at the start of each iteration (after receiving the current turn, before animating) when the turn is not TIMEOUT and not the final turn of the quarter. On preload failure, the loop falls back to a fresh fetch. No backend changes.
