@@ -2570,9 +2570,13 @@ async function initGame() {
       preGameContainer.classList.add('hidden');
     } else {
       preGameContainer.classList.remove('hidden');
+      // Quarter break: play airhorn when the quarter-break popup appears (not pre-Q1)
+      if (quarter > 1 && typeof window.playSound === 'function') {
+        window.playSound('Timeout - Airhorn.mp3');
+      }
     }
   }
-  
+
   if (playBtn) {
     playBtn.addEventListener('click', async () => {
       if (typeof window.playSound === 'function') window.playSound('positive-slide.wav');
