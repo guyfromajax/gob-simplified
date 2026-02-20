@@ -1586,6 +1586,9 @@ async function init() {
         myTeamSide: myTeamSide,
         clock: currentUrlParams.get('clock')
       });
+      // Pass through quarter_break_from so court knows whether to play airhorn (play_quarter only)
+      const quarterBreakFrom = currentUrlParams.get('quarter_break_from');
+      if (quarterBreakFrom) params.set('quarter_break_from', quarterBreakFrom);
       
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - After building params:', {
         resume_from_timeout: params.get('resume_from_timeout'),

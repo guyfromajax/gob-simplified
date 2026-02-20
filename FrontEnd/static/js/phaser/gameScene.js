@@ -2672,7 +2672,7 @@ export function createGameScene(Phaser) {
             team_id: this.teamId
           }
         });
-        
+        params.set('quarter_break_from', 'play_quarter'); // Airhorn only on Play Quarter quarter break
         console.log('🔍 [DEBUG QTR BREAK] gameScene.js - Using TimeoutNavigationHelper (Sim Quarter pattern):', {
           quarter: this.quarter,
           nextQ: nextQ,
