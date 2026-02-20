@@ -5,8 +5,20 @@
  */
 
 import { triggerFoulEffect, triggerTurnoverEffect, triggerMadeShotFlash } from '../animation/negativeActionEffects.js';
+import gameStore from '../../state/gameStore.js';
 
 let currentAnnouncement = null;
+
+/** Resolve team secondary color from scene (home/away by team_id). Returns hex string or fallback. */
+export function getSecondaryColorForTeam(scene, teamId) {
+  if (!scene?.simData || teamId == null) return '#333333';
+  const colors = gameStore.getColors();
+  const homeId = scene.simData.home_team_id;
+  const awayId = scene.simData.away_team_id;
+  const isHome = String(teamId) === String(homeId);
+  const side = isHome ? colors.home : colors.away;
+  return side?.secondary_color || '#333333';
+}
 
 /**
  * Trigger visual effects for fouls/turnovers
@@ -136,8 +148,9 @@ export function showAndOneAnnouncement(team, shooterData, foulPlayerData) {
 
 /**
  * Helper to create headshot element
- * @param {Object} playerData - { playerId, photo, teamName }
+ * @param {Object} playerData - { playerId, photo, teamName, secondaryColor }
  * @param {number} scale - Size multiplier (1.0 = full, 0.6 = 60%)
+ * Headshot background uses team secondary color (no team background image).
  */
 function createHeadshotElement(playerData, scale = 1.0) {
   const container = document.createElement('div');
@@ -145,17 +158,10 @@ function createHeadshotElement(playerData, scale = 1.0) {
   container.style.width = `${60 * scale}px`;
   container.style.height = `${60 * scale}px`;
   container.style.flexShrink = '0';
-  
-  if (playerData.teamName) {
-    const teamNameNormalized = playerData.teamName.toLowerCase().replace(/\s+/g, '-');
-    // Use environment-aware path
-    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    const staticPrefix = isLocalhost ? '/static' : '';
-    container.style.backgroundImage = `url(${staticPrefix}/images/team-backgrounds/${teamNameNormalized}-background.png)`;
-    container.style.backgroundSize = 'cover';
-    container.style.backgroundPosition = 'center';
-  }
-  
+  container.style.backgroundColor = playerData.secondaryColor || '#333333';
+  container.style.backgroundSize = 'cover';
+  container.style.backgroundPosition = 'center';
+
   const img = document.createElement('img');
   img.src = playerData.photo || `/images/players/${playerData.playerId}.png`;
   img.alt = 'Player';
@@ -166,7 +172,7 @@ function createHeadshotElement(playerData, scale = 1.0) {
     img.style.display = 'none';
   };
   container.appendChild(img);
-  
+
   return container;
 }
 
@@ -242,22 +248,14 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
   
   announcement.appendChild(textSpan);
   
-  // Add player headshot if provided (will appear after text)
+  // Add player headshot if provided (will appear after text). Background = team secondary color.
   if (playerData && (playerData.photo || playerData.playerId)) {
     const headshotContainer = document.createElement('div');
     headshotContainer.className = 'announcement-headshot';
-    
-    // Set team background
-    if (playerData.teamName) {
-      const teamNameNormalized = playerData.teamName.toLowerCase().replace(/\s+/g, '-');
-      // Use environment-aware path
-      const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-      const staticPrefix = isLocalhost ? '/static' : '';
-      headshotContainer.style.backgroundImage = `url(${staticPrefix}/images/team-backgrounds/${teamNameNormalized}-background.png)`;
-      headshotContainer.style.backgroundSize = 'cover';
-      headshotContainer.style.backgroundPosition = 'center';
-    }
-    
+    headshotContainer.style.backgroundColor = playerData.secondaryColor || '#333333';
+    headshotContainer.style.backgroundSize = 'cover';
+    headshotContainer.style.backgroundPosition = 'center';
+
     const img = document.createElement('img');
     img.src = playerData.photo || `/images/players/${playerData.playerId}.png`;
     img.alt = 'Player';
@@ -268,7 +266,7 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
       img.style.display = 'none';
     };
     headshotContainer.appendChild(img);
-    
+
     announcement.appendChild(headshotContainer);
   }
   
@@ -375,7 +373,8 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
           playerData = {
             playerId: foulerId,
             photo: foulPlayerSprite?.photo || null,
-            teamName: foulPlayerTeamName
+            teamName: foulPlayerTeamName,
+            secondaryColor: getSecondaryColorForTeam(scene, foulPlayerSprite.team_id)
           };
         }
       }
@@ -411,14 +410,15 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
           const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
           const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
           const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-          
+
           playerData = {
             playerId: foulPlayerId,
             photo: foulPlayerSprite?.photo || null,
-            teamName: foulPlayerTeamName
+            teamName: foulPlayerTeamName,
+            secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId)
           };
         }
-        
+
         if (foulTeam === 'OFFENSE') {
           // Offensive foul - show in defense team color (they benefited)
           showAnnouncement("OFFENSIVE FOUL!", defenseTeam, playerData);
@@ -450,14 +450,15 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
         const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
         const stealerTeamName = stealerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-        
+
         playerData = {
           playerId: stealerId,
           photo: stealerSprite?.photo || null,
-          teamName: stealerTeamName
+          teamName: stealerTeamName,
+          secondaryColor: getSecondaryColorForTeam(scene, stealerTeamId)
         };
       }
-      
+
       showAnnouncement("STEAL!", defenseTeam, playerData);
       
       // Trigger visual effect on turnover victim (ball handler who got stolen from)
@@ -483,14 +484,15 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
         const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
         const victimTeamName = victimTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-        
+
         playerData = {
           playerId: victimId,
           photo: victimSprite?.photo || null,
-          teamName: victimTeamName
+          teamName: victimTeamName,
+          secondaryColor: getSecondaryColorForTeam(scene, victimTeamId)
         };
       }
-      
+
       // Determine turnover type from dedicated field or text parsing
       // ✅ FIX: For dead ball turnovers, randomly choose "Travel!" or "Double Dribble!" (50/50)
       let turnoverText = "TURNOVER!";

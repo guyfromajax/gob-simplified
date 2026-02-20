@@ -993,7 +993,7 @@ export class ShotAnimationSystem {
 
     // Show announcement and flash immediately so they run in unison with rim hold (single 1000ms period)
     if (!isPutbackMake) {
-      const { showAnnouncement, showAndOneAnnouncement } = await import('../utils/announcements.js');
+      const { showAnnouncement, showAndOneAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
       const { triggerMadeShotFlash } = await import('./negativeActionEffects.js');
       const shooterInfo = this.scene.playerInfo?.[turnData.shooter_id];
       const shooterSprite = this.playerSprites[turnData.shooter_id];
@@ -1006,7 +1006,8 @@ export class ShotAnimationSystem {
       const shooterPlayerData = shooterInfo ? {
         playerId: turnData.shooter_id,
         photo: shooterSprite?.photo || null,
-        teamName: shooterTeamName
+        teamName: shooterTeamName,
+        secondaryColor: getSecondaryColorForTeam(this.scene, shooterTeamId)
       } : null;
       const isHomeOffense = shooterTeamId === this.scene.simData?.home_team_id;
       const teamStyle = isHomeOffense ? 'home' : 'away';
@@ -1022,7 +1023,8 @@ export class ShotAnimationSystem {
           const foulPlayerData = {
             playerId: foulPlayerId,
             photo: foulPlayerSprite?.photo || null,
-            teamName: foulPlayerTeamName
+            teamName: foulPlayerTeamName,
+            secondaryColor: getSecondaryColorForTeam(this.scene, foulPlayerTeamId)
           };
           showAndOneAnnouncement(teamStyle, shooterPlayerData, foulPlayerData);
         } else {
@@ -1102,8 +1104,8 @@ export class ShotAnimationSystem {
     
     if (isShootingFoul) {
       // ✅ FIX: Replicate AND-1 announcement pattern exactly (matches made shot flow from ballManager.js)
-      const { showAnnouncement } = await import('../utils/announcements.js');
-      
+      const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
+
       // Get foul player data from turnData (same pattern as AND-1)
       const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
       if (foulPlayerId && this.scene) {
@@ -1116,11 +1118,12 @@ export class ShotAnimationSystem {
           const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
           const foulPlayerTeamId = foulPlayerSprite?.team_id;
           const foulPlayerTeamName = foulPlayerTeamId === this.scene.homeTeamId ? homeTeamName : awayTeamName;
-          
+
           const foulPlayerData = {
             playerId: foulPlayerId,
             photo: foulPlayerSprite?.photo || null,
-            teamName: foulPlayerTeamName
+            teamName: foulPlayerTeamName,
+            secondaryColor: getSecondaryColorForTeam(this.scene, foulPlayerTeamId)
           };
           
           // Trigger foul effect
@@ -1490,14 +1493,15 @@ export class ShotAnimationSystem {
       // ✅ FIX: Announce rebound before outlet animation
       // ballManager only announces rebounds for its own rebound positioning code
       // Outlet pass system needs to announce too
-      const { showAnnouncement } = await import('../utils/announcements.js');
+      const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
       const rebounderSprite = this.playerSprites[turnData.rebounderId];
       if (rebounderSprite) {
         const rebounderTeam = rebounderSprite.team; // "home" or "away"
         const playerData = {
           playerId: turnData.rebounderId,
           photo: rebounderSprite.photo || null,
-          teamName: rebounderSprite.team_id
+          teamName: rebounderSprite.team_id,
+          secondaryColor: getSecondaryColorForTeam(this.scene, rebounderSprite.team_id)
         };
         showAnnouncement("Rebound!", rebounderTeam, playerData);
       }

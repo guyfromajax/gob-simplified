@@ -473,7 +473,7 @@ export async function shootBall({
         // console.log(`🏀 shootBall: Tween COMPLETE | Result: ${result} | Actual: ${actualDuration}ms / Expected: ${duration}ms | Ratio: ${(actualDuration / duration).toFixed(2)}x`);
         
         // Announce shot result when ball reaches rim
-        const { showAnnouncement, showAndOneAnnouncement } = await import('../utils/announcements.js');
+        const { showAnnouncement, showAndOneAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
         const { triggerFoulEffect, triggerMadeShotFlash } = await import('./negativeActionEffects.js');
         const teamStyle = isHomeTeam ? 'home' : 'away';
         
@@ -519,7 +519,8 @@ export async function shootBall({
         const shooterPlayerData = shooterInfo ? {
           playerId: shooterId,
           photo: shooterSprite?.photo || null,
-          teamName: shooterTeamName
+          teamName: shooterTeamName,
+          secondaryColor: getSecondaryColorForTeam(scene, shooterTeamId)
         } : null;
         
         if (result === "MAKE") {
@@ -537,9 +538,10 @@ export async function shootBall({
               const foulPlayerData = {
                 playerId: foulPlayerId,
                 photo: foulPlayerSprite?.photo || null,
-                teamName: foulPlayerTeamName
+                teamName: foulPlayerTeamName,
+                secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId)
               };
-              
+
               showAndOneAnnouncement(teamStyle, shooterPlayerData, foulPlayerData);
               
               // NOTE: Red visual is handled by announcement box styling
@@ -565,13 +567,14 @@ export async function shootBall({
               const foulPlayerData = {
                 playerId: foulPlayerId,
                 photo: foulPlayerSprite?.photo || null,
-                teamName: foulPlayerTeamName
+                teamName: foulPlayerTeamName,
+                secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId)
               };
-              
+
               // Trigger foul effect
               const { triggerFoulEffect } = await import('./negativeActionEffects.js');
               triggerFoulEffect(scene, foulPlayerId);
-              
+
               // Show announcement with player data (matches AND-1 pattern)
               showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
             } else {
@@ -819,23 +822,24 @@ export function animateRebound({
               }
               
               // Announce rebound when rebounder reaches the ball
-              const { showAnnouncement } = await import('../utils/announcements.js');
+              const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
               const rebounderTeam = rebounderSprite.team; // "home" or "away"
               const rebounderTeamId = rebounderSprite.team_id;
-              
+
               // Handle both new nested structure (object) and old flat structure (string)
               const homeTeamField = scene.simData?.home_team;
               const awayTeamField = scene.simData?.away_team;
               const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
               const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
               const rebounderTeamName = rebounderTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-              
+
               const playerData = {
                 playerId: rebounderId,
                 photo: rebounderSprite?.photo || null,
-                teamName: rebounderTeamName
+                teamName: rebounderTeamName,
+                secondaryColor: getSecondaryColorForTeam(scene, rebounderTeamId)
               };
-              
+
               showAnnouncement("Rebound!", rebounderTeam, playerData);
               
               // Identify if this is OREB or DREB (rebounderTeamId already declared above on line 911)

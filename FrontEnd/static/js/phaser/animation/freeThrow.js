@@ -216,26 +216,27 @@ export async function runFreeThrowSequence(
     
     // Announce made free throw
     if (result === "MAKE") {
-      const { showAnnouncement } = await import('../utils/announcements.js');
+      const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
       const shooterId = turnData.shooter_id;
       const shooterSprite = playerSprites[shooterId];
       const shooterTeamId = turnData.offense_team_id;
       const isHomeTeam = shooterTeamId === scene.simData?.home_team_id;
       const teamStyle = isHomeTeam ? 'home' : 'away';
-      
+
       // Handle both new nested structure (object) and old flat structure (string)
       const homeTeamField = scene.simData?.home_team;
       const awayTeamField = scene.simData?.away_team;
       const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
       const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
       const shooterTeamName = isHomeTeam ? homeTeamName : awayTeamName;
-      
+
       const playerData = {
         playerId: shooterId,
         photo: shooterSprite?.photo || null,
-        teamName: shooterTeamName
+        teamName: shooterTeamName,
+        secondaryColor: getSecondaryColorForTeam(scene, shooterTeamId)
       };
-      
+
       showAnnouncement("It's Good!", teamStyle, playerData);
     }
     
