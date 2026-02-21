@@ -394,9 +394,10 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
       const isShootingFoul = hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow;
       
       if (!isShootingFoul) {
-        // Non-shooting fouls: announce as "OFFENSIVE FOUL!" or "DEFENSIVE FOUL!"
+        // Non-shooting fouls: "Quick Foul!" for situational Force Foul, else "OFFENSIVE FOUL!" / "DEFENSIVE FOUL!"
         const foulTeam = turnData.foul_team || 'OFFENSE'; // Default to offense if not specified
-        
+        const isQuickFoul = !!turnData.quick_foul;
+
         // Extract foul player data for headshot display
         let playerData = null;
         if (scene && turnData.foul_player_id) {
@@ -423,8 +424,9 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
           // Offensive foul - show in defense team color (they benefited)
           showAnnouncement("OFFENSIVE FOUL!", defenseTeam, playerData);
         } else {
-          // Defensive foul - show in offense team color (they benefited)
-          showAnnouncement("DEFENSIVE FOUL!", offenseTeam, playerData);
+          // Defensive foul: situational Force Foul → "Quick Foul!"; else "DEFENSIVE FOUL!"
+          const defensiveFoulText = isQuickFoul ? "Quick Foul!" : "DEFENSIVE FOUL!";
+          showAnnouncement(defensiveFoulText, offenseTeam, playerData);
         }
         
         // Trigger visual effect on fouling player

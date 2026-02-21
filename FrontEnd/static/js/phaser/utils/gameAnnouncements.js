@@ -116,6 +116,15 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       showAnnouncement("Fast Break!", offenseTeam);
       break;
 
+    // ========== SITUATIONAL LOGIC (Q4/OT) ==========
+    case 'SLOW_IT_DOWN':
+      showAnnouncement("Slow It Down", offenseTeam);
+      break;
+
+    case 'QUICK_SHOT':
+      showAnnouncement("Quick Shot", offenseTeam);
+      break;
+
     case 'DEFENSIVE_STOP':
       // Get stopper data if available
       const stopperId = context.stopperId || turnData.stopper_id;

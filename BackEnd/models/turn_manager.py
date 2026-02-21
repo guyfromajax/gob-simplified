@@ -449,6 +449,7 @@ class TurnManager:
                         )
                         result["offense_team_id"] = self.game.offense_team.team_id
                         result["current_turn"] = "HCO"
+                        result["quick_foul"] = True  # Situational Force Foul → frontend announces "Quick Foul"
             if result is None:
                 # Force Foul at start of HCO (DREB→HCO: victim = last_rebounder)
                 time_remaining_sec = self.game.game_state.get("time_remaining")
@@ -479,6 +480,7 @@ class TurnManager:
                             )
                             result["offense_team_id"] = self.game.offense_team.team_id
                             result["current_turn"] = "HCO"
+                            result["quick_foul"] = True  # Situational Force Foul (DREB→HCO) → frontend announces "Quick Foul"
             if result is not None:
                 # Force Foul result already set; skip set_playcalls and resolve_half_court_offense
                 pass
@@ -561,6 +563,12 @@ class TurnManager:
                 
                 # Add EV to result for frontend display
                 result["ev"] = ev
+
+                # Situational Logic (Q4/OT): flags for HCO turn-start announcements (Slow It Down / Quick Shot)
+                from BackEnd.utils import situational_logic as sl
+                time_remaining = self.game.game_state.get("time_remaining")
+                result["slow_it_down"] = sl.is_slow_it_down(self.game, time_remaining)
+                result["quick_shot"] = sl.is_quick_shot(self.game, time_remaining)
 
         # ✅ SS&S: Set offense_team_id (single source of truth)
         # This represents the team on offense DURING this turn (for animations)
