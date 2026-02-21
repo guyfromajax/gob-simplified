@@ -571,6 +571,8 @@ class GameManager:
                 oreb_turn["next_turn"] = self.determine_next_turn(oreb_turn)
                 
                 self._append_turn(oreb_turn)
+                # Apply OREB turn's time_elapsed to game state (same method as run_micro_turn)
+                self.turn_manager.update_clock_and_possession(oreb_turn)
                 
                 # Handle possession flip for OREB turn (doesn't go through run_micro_turn)
                 if oreb_turn.get("possession_flips"):

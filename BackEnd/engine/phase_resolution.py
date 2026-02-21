@@ -3576,15 +3576,25 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
                 "action": "stand",
                 "location": other_spot_by_pos.get(pos, position_to_spot.get(pos, "key")),
             }
-    step2 = {"timestamp": 600, "pos_actions": {}}
-    for pos in ["PG", "SG", "SF", "PF", "C"]:
-        if pos == shooter_pos:
-            step2["pos_actions"][pos] = {"action": ACTIONS["SHOOT"], "location": shot_wing}
-        else:
-            # Non-shooters stay at their step 1 location (no move back to step 0)
-            step1_location = "deep key" if pos == bh_pos else other_spot_by_pos.get(pos, position_to_spot.get(pos, "key"))
-            step2["pos_actions"][pos] = {"action": "stand", "location": step1_location}
-    skeleton = {"steps": [step0, step1, step2]}
+    is_away_offense = off_team.team_id == game.away_team.team_id
+    if shot_type == "Attack":
+        # Reuse Motion offense logic: drive to basket then shoot (two steps, shooter only in those steps)
+        valid_destinations = _determine_attack_drive_destination(shot_wing)
+        destination = random.choice(valid_destinations) if valid_destinations else "basketSpot"
+        drive_shoot_steps = _create_attack_drive_shoot_steps(
+            shooter_pos, shot_wing, destination, timestamp=600, is_away_offense=is_away_offense
+        )
+        skeleton = {"steps": [step0, step1] + drive_shoot_steps}
+    else:
+        # Outside: shoot at wing (single step 2)
+        step2 = {"timestamp": 600, "pos_actions": {}}
+        for pos in ["PG", "SG", "SF", "PF", "C"]:
+            if pos == shooter_pos:
+                step2["pos_actions"][pos] = {"action": ACTIONS["SHOOT"], "location": shot_wing}
+            else:
+                step1_location = "deep key" if pos == bh_pos else other_spot_by_pos.get(pos, position_to_spot.get(pos, "key"))
+                step2["pos_actions"][pos] = {"action": "stand", "location": step1_location}
+        skeleton = {"steps": [step0, step1, step2]}
     roles = game.turn_manager.assign_roles(
         off_call=shot_type, def_call=game_state.get("defense_playcall", "2-3 Zone"), skeleton=skeleton
     )
