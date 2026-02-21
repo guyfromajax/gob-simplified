@@ -400,9 +400,52 @@ class TurnManager:
         #     print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
 
         # STEP 3: Route based on offensive state
-        # ✅ Situational Logic: Force Foul after BIP/SIP — execute first so it runs regardless of next step (HCO, HCT, FCP)
         result = None
         from BackEnd.utils import situational_logic as sl
+
+        # ✅ Final Turn (Q4/OT): clear "triggered" flag when quarter/period changes so each period gets one chance
+        quarter = getattr(self.game, "quarter", None)
+        if game_state.get("_last_final_turn_quarter") != quarter:
+            game_state["_last_final_turn_quarter"] = quarter
+            game_state["final_turn_triggered_this_period"] = False
+
+        # ✅ Final Turn (Phase 6): first possession with time_remaining <= 30s triggers Final Turn (all quarters + OT).
+        # OREB and Fast Break: excluded by design — state must be HCO, HCT, or FCP. The *next* turn after OREB/FB
+        # (when time is still <= 30 and quarter >= 4) is the one evaluated for Final Turn.
+        time_remaining_sec = game_state.get("time_remaining")
+        final_turn_eligible = (
+            quarter is not None
+            and time_remaining_sec is not None
+            and int(time_remaining_sec) <= 30
+            and state != "FAST_BREAK"
+            and state in ("HCO", "HCT", "FCP")
+            and not game_state.get("final_turn_triggered_this_period")
+        )
+        if final_turn_eligible:
+            game_state["final_turn_triggered_this_period"] = True
+            if quarter >= 4:
+                # Q4/OT: decide subtype (FINAL_HOLD, Force Foul, Quick Shot, or normal final shot)
+                slow = sl.is_slow_it_down(self.game, time_remaining_sec)
+                quick = sl.is_quick_shot(self.game, time_remaining_sec)
+                force_foul = sl.should_force_foul(self.game, time_remaining_sec)
+                if slow and not force_foul:
+                    # FINAL_HOLD: hold until 0, no shot, no fouls/turnovers
+                    result = self._build_final_hold_result(time_remaining_sec)
+                elif slow and force_foul:
+                    # Phase 6 edge case: Slow It Down + Force Foul — execute Force Foul (existing logic).
+                    # No special Final Turn alignment for this possession; victim = current ball handler / PG.
+                    result = self._execute_final_turn_force_foul()
+                elif quick:
+                    # Normal Quick Shot turn — fall through to state routing (don't set result)
+                    pass
+                else:
+                    # Normal final shot (trailing/tied): use Final Turn play execution (Phase 2)
+                    game_state["final_turn_shot_this_turn"] = True
+            else:
+                # Qs 1–3: Final Turn shot (same play execution as Q4 "normal" final shot)
+                game_state["final_turn_shot_this_turn"] = True
+
+        # ✅ Situational Logic: Force Foul after BIP/SIP — execute first so it runs regardless of next step (HCO, HCT, FCP)
         from BackEnd.engine.phase_resolution import (
             resolve_non_shooting_foul,
             select_defender_closest_to_victim,
@@ -511,7 +554,11 @@ class TurnManager:
                 # Store EV score in scouting data
                 self._store_ev_score(ev, calls, self.game.offense_team, self.game.defense_team)
                 
-                result = self.resolve_half_court_offense()
+                # Final Turn shot uses dedicated resolver (Phase 2 will add alignment + shot); for now stub to normal HCO
+                if game_state.pop("final_turn_shot_this_turn", False):
+                    result = self.resolve_final_turn_shot()
+                else:
+                    result = self.resolve_half_court_offense()
                 # Add playcalls to result for frontend display
                 # ✅ FIX 2: Use current_playcall from game_state (may be overridden for Motion plays)
                 # This ensures Motion play overrides (like "3-2 Motion") are reflected in the result
@@ -644,23 +691,33 @@ class TurnManager:
                 self.game.game_state["fastBreakInProgress"] = False
         # If animations weren't assigned yet (e.g. fast break, free throw), use fallback
         if "animations" not in result:
-            roles = result.get("roles")
-            if roles:
-                # ✅ FIX: Reconstruct player references if they're missing from serializable_roles
-                # serializable_roles may not include Player objects, but capture_halfcourt_animation needs them
-                if "shooter" not in roles and result.get("shooter"):
-                    roles["shooter"] = result["shooter"]
-                if "ball_handler" not in roles and result.get("ball_handler"):
-                    roles["ball_handler"] = result["ball_handler"]
-                
+            # Phase 5: Final Turn shot — use skeleton_to_animations for play execution (BH/shooter movement, then shot)
+            if result.get("final_turn") and result.get("skeleton"):
                 from BackEnd.models.animator import Animator
                 animator = Animator(self.game)
-                result["animations"] = animator.capture_halfcourt_animation(
-                    roles=roles,
-                    event_step=result.get("event_step")
+                off_lineup = self.game.offense_team.lineup
+                def_lineup = self.game.defense_team.lineup
+                result["animations"] = animator.skeleton_to_animations(
+                    result["skeleton"], off_lineup, def_lineup, add_defenders=True, is_fcp=False, is_hct=False
                 )
             else:
-                result["animations"] = []  # No animation possible (e.g., free throw or turnover with no roles)
+                roles = result.get("roles")
+                if roles:
+                    # ✅ FIX: Reconstruct player references if they're missing from serializable_roles
+                    # serializable_roles may not include Player objects, but capture_halfcourt_animation needs them
+                    if "shooter" not in roles and result.get("shooter"):
+                        roles["shooter"] = result["shooter"]
+                    if "ball_handler" not in roles and result.get("ball_handler"):
+                        roles["ball_handler"] = result["ball_handler"]
+                    
+                    from BackEnd.models.animator import Animator
+                    animator = Animator(self.game)
+                    result["animations"] = animator.capture_halfcourt_animation(
+                        roles=roles,
+                        event_step=result.get("event_step")
+                    )
+                else:
+                    result["animations"] = []  # No animation possible (e.g., free throw or turnover with no roles)
         # ✅ REMOVED: possession_team_id is now set BEFORE update_clock_and_possession (line 373)
         # This ensures it represents the team on offense DURING the turn, not after any flips
 
@@ -2007,6 +2064,124 @@ class TurnManager:
         from BackEnd.engine.phase_resolution import resolve_half_court_offense_logic
         return resolve_half_court_offense_logic(self.game)
 
+    def resolve_final_turn_shot(self):
+        """Final Turn shot (≤30s): alignment (Phase 2) + shot execution (Phase 3)."""
+        from BackEnd.engine.phase_resolution import resolve_final_turn_shot_logic
+        o_dest, position_to_spot, bh_pos = self._build_final_turn_offense_alignment()
+        d_dest, zone_playcall = self._build_final_turn_defense_alignment()
+        self.game.game_state["defense_playcall"] = zone_playcall
+        return resolve_final_turn_shot_logic(
+            self.game, o_dest, d_dest, position_to_spot, bh_pos
+        )
+
+    def _build_final_turn_offense_alignment(self):
+        """Final Turn offense: BH 60% PG / 30% SG / 10% SF; PG/SG deep wings; SF/PF corners; C key. Returns (oDestinations, position_to_spot, bh_pos)."""
+        from BackEnd.constants import HCO_STRING_SPOTS
+        from BackEnd.utils.shared import get_away_player_coords
+        game = self.game
+        off_team = game.offense_team
+        off_lineup = off_team.lineup
+        is_away_offense = off_team.team_id == game.away_team.team_id
+        # Ball handler position: 60% PG, 30% SG, 10% SF
+        r = random.random()
+        bh_pos = "PG" if r < 0.60 else ("SG" if r < 0.90 else "SF")
+        # Deep wings (random order for PG/SG)
+        wings = ["deep upper wing", "deep lower wing"]
+        random.shuffle(wings)
+        pg_wing, sg_wing = wings[0], wings[1]
+        # Corners: one upper, one lower from {upper corner, lower corner, upper midCorner, lower midCorner}
+        upper_spots = ["upper corner", "upper midCorner"]
+        lower_spots = ["lower corner", "lower midCorner"]
+        random.shuffle(upper_spots)
+        random.shuffle(lower_spots)
+        sf_spot = upper_spots[0]
+        pf_spot = lower_spots[0]
+        if random.random() < 0.5:
+            sf_spot, pf_spot = pf_spot, sf_spot  # swap so one upper one lower
+        position_to_spot = {"C": "key"}
+        if bh_pos == "SF":
+            position_to_spot["SF"] = pg_wing
+            position_to_spot["SG"] = sg_wing
+            position_to_spot["PG"] = random.choice(upper_spots)
+            position_to_spot["PF"] = random.choice(lower_spots)
+        else:
+            position_to_spot["PG"] = pg_wing
+            position_to_spot["SG"] = sg_wing
+            position_to_spot["SF"] = sf_spot
+            position_to_spot["PF"] = pf_spot
+        o_destinations = {}
+        for pos in ["PG", "SG", "SF", "PF", "C"]:
+            spot = position_to_spot.get(pos, "key")
+            coords = HCO_STRING_SPOTS.get(spot, {"x": 64, "y": 25})
+            if is_away_offense:
+                coords = get_away_player_coords(coords)
+            o_destinations[pos] = dict(coords)
+        return (o_destinations, position_to_spot, bh_pos)
+
+    def _build_final_turn_defense_alignment(self):
+        """Final Turn defense: 50/50 2-3 or 3-2 zone, ball-at-key positions. Returns (dDestinations, zone_playcall)."""
+        from BackEnd.constants import HCO_STRING_SPOTS
+        from BackEnd.utils.shared import get_away_player_coords
+        from BackEnd.utils.shared_defense import ZONE_23_NORMAL, ZONE_32_NORMAL
+        game = self.game
+        def_team = game.defense_team
+        is_away_defense = def_team.team_id == game.away_team.team_id
+        zone_playcall = random.choice(["2-3 Zone", "3-2 Zone"])
+        zone_map = ZONE_23_NORMAL if zone_playcall == "2-3 Zone" else ZONE_32_NORMAL
+        d_destinations = {}
+        for pos, spots in zone_map.items():
+            spot = spots[0] if spots else "key"
+            coords = HCO_STRING_SPOTS.get(spot, {"x": 64, "y": 25})
+            if is_away_defense:
+                coords = get_away_player_coords(coords)
+            d_destinations[pos] = dict(coords)
+        return (d_destinations, zone_playcall)
+
+    def _build_final_hold_result(self, time_remaining_sec):
+        """Build FINAL_HOLD result: time_elapsed = time_remaining, no shot, no fouls/turnovers. Quarter ends after."""
+        return {
+            "result_type": "FINAL_HOLD",
+            "current_turn": "HCO",
+            "time_elapsed": int(time_remaining_sec),
+            "offense_team_id": self.game.offense_team.team_id,
+            "possession_flips": False,
+            "text": "Hold for final shot.",
+            "next_play_type": None,
+            "next_turn": None,
+        }
+
+    def _execute_final_turn_force_foul(self):
+        """Edge case: Slow It Down + Force Foul at Final Turn time. Victim = PG (ball handler)."""
+        from BackEnd.utils import situational_logic as sl
+        from BackEnd.engine.phase_resolution import (
+            resolve_non_shooting_foul,
+            select_defender_closest_to_victim,
+        )
+        off_lineup = self.game.offense_team.lineup
+        def_lineup = self.game.defense_team.lineup
+        victim = off_lineup.get("PG") or next((p for p in off_lineup.values() if p), None)
+        if not victim or not def_lineup:
+            return None
+        victim_coords = {"x": 50, "y": 25}
+        foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, None)
+        if not foul_player:
+            return None
+        self.game.game_state["foul_team"] = "DEFENSE"
+        roles = {
+            "ball_handler": victim,
+            "defender": foul_player,
+            "foul_player": foul_player,
+            "shooter": victim,
+            "screener": None,
+            "passer": None,
+        }
+        result = resolve_non_shooting_foul(
+            roles, self.game, time_elapsed_override=sl.force_foul_time_elapsed()
+        )
+        result["offense_team_id"] = self.game.offense_team.team_id
+        result["current_turn"] = "HCO"
+        result["quick_foul"] = True
+        return result
 
     def resolve_fast_break(self):
         return resolve_fast_break_logic(self.game) 

@@ -159,8 +159,15 @@ export class ShotAnimationSystem {
         )
       : 0;
     
-    // 1. Setup: Move players to step 0 positions
-    await this.runSetupTween(turnData, ballSprite, currentBallOwnerRef);
+    // 1. Setup: Move players to step 0 positions (Phase 5: skip for Final Turn — alignment already done in Phase 4)
+    if (!turnData.final_turn) {
+      await this.runSetupTween(turnData, ballSprite, currentBallOwnerRef);
+    } else {
+      const delayMs = animationConfig?.finalTurn?.moveDelayMs ?? 0;
+      if (delayMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
     
     // ✅ MATCH playTurnAnimation EXACTLY: Update ball ownership at step 0
     const { updateBallOwnership } = await import('./BallControllerAdapter.js');
@@ -185,9 +192,9 @@ export class ShotAnimationSystem {
     
     // ✅ CRITICAL FIX: If we are coming directly from an inbound or opening tip, the ball should already be attached
     // to the inbound receiver or tip winner, so we don't re-derive or re-attach at step 0.
-    // This is the key difference between HCO shots (don't come from inbound) and FCP/HCT shots (come from inbound)
+    // Phase 5: Final Turn — ball already attached to ball handler in runFinalTurnAlignment.
     let step0OwnerSprite = null;
-    if (!previousTurnWasShot && !fromInbound && !fromOpeningTip) {
+    if (!previousTurnWasShot && !fromInbound && !fromOpeningTip && !turnData.final_turn) {
       for (const anim of turnData.animations) {
         if (anim.hasBallAtStep?.[0]) {
           step0OwnerSprite = this.playerSprites[anim.playerId];

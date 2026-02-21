@@ -3972,6 +3972,9 @@ try:
             
             # Check if quarter is now complete.
             # Edge-case rule: if FT is still pending at 0:00, quarter is NOT complete yet.
+            # Phase 6: Final Turn shot and FINAL_HOLD use time_elapsed = time_remaining, so clock reaches 0
+            # after the turn (or after FTs if shooting foul); this block then sets quarter_complete and
+            # advances to Quarter Break / OT / game end via existing logic.
             pending_terminal_ft_after_turn = _has_pending_terminal_free_throw(gm)
             quarter_complete = (
                 gm.game_state["time_remaining"] <= 0

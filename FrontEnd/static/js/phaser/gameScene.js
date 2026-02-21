@@ -2304,7 +2304,9 @@ export function createGameScene(Phaser) {
           */
           
           // ✅ FIX: Check if quarter is complete AFTER animating the turn
-          // This ensures the final turn of the quarter is animated before handling quarter completion
+          // This ensures the final turn of the quarter is animated before handling quarter completion.
+          // Phase 6: Final Turn shot and FINAL_HOLD are covered — backend sets quarter_complete when
+          // time_remaining hits 0 (after the turn or after FTs); we advance to Quarter Break / game end here.
           if (turnData.quarter_complete) {
             console.log('✅ [FINAL TURN DEBUG] Quarter complete! (after final turn animation)', {
               turn_result_type: turn?.result_type,

@@ -70,6 +70,9 @@ export class AnimationEngine {
     this.animationHandlers.set('DEFENSIVE_STOP', this.handleDefensiveStop.bind(this));
     // ✅ TIMEOUT: Add handler for TIMEOUT turns
     this.animationHandlers.set('TIMEOUT', this.handleTimeout.bind(this));
+    // ✅ Phase 4: Final Turn — FINAL_HOLD (clock out, quarter end) and Final Turn shot (alignment then shot)
+    this.animationHandlers.set('FINAL_HOLD', this.handleFinalHold.bind(this));
+    this.animationHandlers.set('FINAL_TURN_SHOT', this.handleFinalTurnShot.bind(this));
   }
 
   /**
@@ -125,6 +128,14 @@ export class AnimationEngine {
                         turnData.result_type === "FAST_BREAK";
     if (isFastBreak) {
       return this.animationHandlers.get('FAST_BREAK');
+    }
+
+    // ✅ Phase 4: Final Turn — route FINAL_HOLD and Final Turn shot to dedicated handlers
+    if (turnData.result_type === 'FINAL_HOLD') {
+      return this.animationHandlers.get('FINAL_HOLD');
+    }
+    if (turnData.final_turn === true && this.isShotAttempt(turnData)) {
+      return this.animationHandlers.get('FINAL_TURN_SHOT');
     }
 
     // ✅ SS&S: FCP/HCT routes through same handlers as HCO
@@ -627,6 +638,51 @@ export class AnimationEngine {
     }
     
     // Note: Announcements and score updates are handled by AnimationRouter (finalizeTurnAfterAnimation)
+  }
+
+  /**
+   * Phase 4: FINAL_HOLD — no shot, run clock out (short delay), then complete.
+   * Quarter/game end is triggered by the API when quarter_complete is true.
+   */
+  async handleFinalHold(turnData, context) {
+    if (turnData.text && this.scene.events) {
+      this.scene.events.emit('textScroll', turnData.text);
+    }
+    const animationConfig = (await import('./animation_config.js')).default;
+    const holdMs = animationConfig?.finalTurn?.holdClockOutMs ?? 1800;
+    await new Promise(resolve => setTimeout(resolve, holdMs));
+  }
+
+  /**
+   * Phase 4: Final Turn shot — tween offense/defense to oDestinations/dDestinations (alignment),
+   * then run standard shot animation (ShotAnimationSystem or playTurnAnimation).
+   */
+  async handleFinalTurnShot(turnData, context) {
+    const { runFinalTurnAlignment } = await import('./turnAnimation.js');
+    await runFinalTurnAlignment({
+      scene: this.scene,
+      playerSprites: context.playerSprites,
+      ballSprite: context.ballSprite,
+      turnData
+    });
+    if (this.shotSystem) {
+      await this.shotSystem.processShot(turnData);
+    } else {
+      const { playTurnAnimation } = await import('./turnAnimation.js');
+      await playTurnAnimation({
+        scene: this.scene,
+        simData: context.simData,
+        playerSprites: context.playerSprites,
+        turnData,
+        ballSprite: context.ballSprite,
+        onAction: context.onAction,
+        turnIndex: context.turnIndex,
+        onUpdate: context.onUpdate
+      });
+    }
+    if (turnData.result_type === "MAKE" || turnData.result_type === "MISS" || turnData.result_type === "BLOCK") {
+      this.scene._previousTurnWasShot = true;
+    }
   }
 
   async handleDefensiveStop(turnData, context) {

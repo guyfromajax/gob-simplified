@@ -2866,6 +2866,77 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 }
 
+/**
+ * Phase 4: Final Turn alignment — tween offense and defense to oDestinations/dDestinations.
+ * Flips offense coords for away team (home-side coords from backend). Attaches ball to ball handler when done.
+ */
+export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, turnData }) {
+  if (scene?.skipToEnd || !turnData) return;
+  const oDestinations = turnData.oDestinations || turnData.o_destinations || {};
+  const dDestinations = turnData.dDestinations || turnData.d_destinations || {};
+  const offenseTeamId = turnData.offense_team_id || turnData.possession_team_id || scene.offenseTeamId;
+  const homeTeamId = scene.simData?.home_team_id;
+  const isAwayOffense = offenseTeamId && homeTeamId && String(offenseTeamId) !== String(homeTeamId);
+  const flipCoords = (coords) => ({ x: 101 - coords.x, y: coords.y });
+
+  const width = scene.game.config.width;
+  const height = scene.game.config.height;
+  const cfg = animationConfig?.finalTurn?.alignment || {};
+  const ease = cfg.ease ?? "Linear";
+
+  const offenseSprites = {};
+  const defenseSprites = {};
+  let ballHandlerSprite = null;
+
+  if (scene.tweens && ballSprite) scene.tweens.killTweensOf(ballSprite);
+  for (const [id, sprite] of Object.entries(playerSprites)) {
+    const info = scene.playerInfo?.[id];
+    if (!info) continue;
+    if (scene.tweens) scene.tweens.killTweensOf(sprite);
+    if (String(sprite.team_id) === String(offenseTeamId)) {
+      offenseSprites[info.pos] = sprite;
+    } else {
+      defenseSprites[info.pos] = sprite;
+    }
+  }
+
+  const addTween = (sprite, coords, pos) => {
+    if (!sprite || !coords) return Promise.resolve();
+    const { x, y } = gridToPixels(coords.x, coords.y, width, height);
+    const duration = getPlayerDuration(sprite, x, y);
+    return new Promise((resolve) => {
+      scene.tweens.add({
+        targets: sprite,
+        x, y, duration, ease,
+        onComplete: resolve,
+        onStop: resolve
+      });
+    });
+  };
+
+  const promises = [];
+  Object.entries(oDestinations).forEach(([pos, coords]) => {
+    const c = isAwayOffense ? flipCoords(coords) : coords;
+    promises.push(addTween(offenseSprites[pos], c, pos));
+  });
+  Object.entries(dDestinations).forEach(([pos, coords]) => {
+    promises.push(addTween(defenseSprites[pos], coords, pos));
+  });
+
+  await Promise.all(promises);
+
+  const ballHandlerId = turnData.ball_handler_id ?? turnData.roles?.ball_handler_id ?? turnData.ball_handler?.player_id;
+  if (!ballHandlerId && turnData.animations?.length) {
+    const animWithBall = turnData.animations.find(a => a.hasBallAtStep?.[0]);
+    if (animWithBall) ballHandlerSprite = playerSprites[animWithBall.playerId];
+  } else if (ballHandlerId) {
+    ballHandlerSprite = playerSprites[ballHandlerId];
+  }
+  if (ballSprite && ballHandlerSprite) {
+    attachBallToPlayer(scene, ballSprite, ballHandlerSprite);
+  }
+}
+
 export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup, runOffensiveReboundKickoutSetup, getPlayerDuration, animateQuickFoulDefenderToReceiver };
 // Provide an uncapped duration helper for long transitions (e.g., inbound -> HCO)
 export function getPlayerDurationUncapped(sprite, targetX, targetY) {

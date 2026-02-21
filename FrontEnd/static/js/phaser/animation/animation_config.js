@@ -79,6 +79,11 @@ const defaults = {
   },
   offensiveRebound: { pauseMs: 1000 },
   putback: { duration: 500, easing: 'Sine.easeInOut' },
+  finalTurn: {
+    holdClockOutMs: 1800,
+    alignment: { ease: 'Linear' },
+    moveDelayMs: 0, // Optional delay before BH/shooter movement (e.g. 1500 for "3–5 seconds remaining" feel)
+  },
   possession: {
     msPerTick: 1,
     minFrameDurationMs: 120,
@@ -120,6 +125,7 @@ export const animationConfig = {
     ...(overrides.offensiveRebound || {}),
   },
   putback: { ...defaults.putback, ...(overrides.putback || {}) },
+  finalTurn: { ...defaults.finalTurn, ...(overrides.finalTurn || {}) },
   possession: {
     msPerTick: overrides.possession?.msPerTick ?? defaults.possession.msPerTick,
     minFrameDurationMs:

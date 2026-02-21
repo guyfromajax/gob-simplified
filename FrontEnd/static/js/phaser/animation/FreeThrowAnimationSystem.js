@@ -609,6 +609,7 @@ export class FreeThrowAnimationSystem {
     // - If free_throws_remaining > 0: More FTs remain, this is NOT final
     // - If free_throws_remaining === 0: No more FTs remain, this IS final
     // - If free_throws_remaining is undefined: Fall back to ftIndex/ftTotal (batch mode)
+    // Phase 5: Final Turn blocking foul — backend sends exactly 2 FTs; do not override (use as-is).
     let isFinal;
     if (turnData.free_throws_remaining !== undefined) {
       // Turn-by-turn mode: Use free_throws_remaining as authoritative

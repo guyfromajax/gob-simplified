@@ -630,8 +630,17 @@ class ShotManager:
                     from BackEnd.engine.phase_resolution import check_and_handle_foul_out
                     blocking_foul_out_info = check_and_handle_foul_out(defender, self.game_state, def_team)
                     
+                    # Final Turn attack: blocking foul always awards exactly 2 FTs (no and-1, no 3 FTs for three)
+                    if self.game_state.get("final_turn") and shot_type == "attack":
+                        self.game_state["offensive_state"] = "FREE_THROW"
+                        self.game_state["free_throws"] = 2
+                        self.game_state["free_throws_remaining"] = 2
+                        self.game_state["one_and_one"] = False
+                        self.game_state["last_ball_handler"] = shooter
+                        self.game_state["shooter"] = shooter
+                        next_play_type = "FREE_THROW"
                     # Check bonus status (reuse logic from resolve_non_shooting_foul)
-                    if def_team.team_fouls >= 10:
+                    elif def_team.team_fouls >= 10:
                         # Double bonus (10+ fouls): 2 free throws
                         self.game_state["offensive_state"] = "FREE_THROW"
                         self.game_state["free_throws"] = 2

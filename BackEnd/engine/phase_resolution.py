@@ -3494,6 +3494,97 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup):
     }
 
 
+def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position_to_spot, bh_pos):
+    """
+    Final Turn shot: build minimal skeleton (alignment -> pass/receive -> shoot), pick shooter by
+    SH (outside) or SC+AG (attack) with weights 50/30/20/9/1, then resolve_shot. Attach alignment
+    and time_elapsed = time_remaining to result. Clock runs to 0 on this turn, so quarter/game end
+    triggers after the shot (or after FTs if shooting foul); blocking foul on attack awards 2 FTs only.
+    """
+    import random
+    from BackEnd.constants import ACTIONS
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    # Shot type: 50% outside, 50% attack
+    shot_type = "Outside" if random.random() < 0.5 else "Attack"
+    game_state["current_playcall"] = shot_type
+    # Shooter: rank by SH (outside) or SC+AG (attack), weighted random 50/30/20/9/1
+    weights = [0.50, 0.30, 0.20, 0.09, 0.01]
+    candidates = []
+    for pos, player in off_lineup.items():
+        if not player:
+            continue
+        attrs = getattr(player, "attributes", {}) or {}
+        if shot_type == "Outside":
+            score = attrs.get("SH", 0)
+        else:
+            score = attrs.get("SC", 0) + attrs.get("AG", 0)
+        candidates.append((player, pos, score))
+    candidates.sort(key=lambda t: (t[2], random.random()), reverse=True)
+    if not candidates:
+        for pos in ["PG", "SG", "SF", "PF", "C"]:
+            if off_lineup.get(pos):
+                shooter, shooter_pos = off_lineup[pos], pos
+                break
+        else:
+            shooter, shooter_pos = None, "PG"
+    else:
+        r = random.random()
+        cum = 0
+        shooter, shooter_pos = candidates[0][0], candidates[0][1]
+        for i, (player, pos, _) in enumerate(candidates):
+            w = weights[i] if i < len(weights) else (1.0 - cum)
+            cum += w
+            if r <= cum:
+                shooter, shooter_pos = player, pos
+                break
+    shot_wing = random.choice(["upper wing", "lower wing"])
+    bh_is_shooter = bh_pos == shooter_pos
+    # Skeleton: step 0 alignment, step 1 pass/receive (or BH to wing if BH shoots), step 2 shoot
+    step0 = {"timestamp": 0, "pos_actions": {}}
+    for pos in ["PG", "SG", "SF", "PF", "C"]:
+        spot = position_to_spot.get(pos, "key")
+        step0["pos_actions"][pos] = {
+            "action": ACTIONS["HANDLE"] if pos == bh_pos else "stand",
+            "location": spot,
+        }
+    step1 = {"timestamp": 300, "pos_actions": {}}
+    for pos in ["PG", "SG", "SF", "PF", "C"]:
+        if bh_is_shooter and pos == bh_pos:
+            step1["pos_actions"][pos] = {"action": ACTIONS["HANDLE"], "location": shot_wing}
+        elif not bh_is_shooter and pos == bh_pos:
+            step1["pos_actions"][pos] = {"action": ACTIONS["PASS"], "location": "key"}
+        elif pos == shooter_pos:
+            step1["pos_actions"][pos] = {"action": ACTIONS["RECEIVE"], "location": shot_wing}
+        else:
+            step1["pos_actions"][pos] = {"action": "stand", "location": position_to_spot.get(pos, "key")}
+    step2 = {"timestamp": 600, "pos_actions": {}}
+    for pos in ["PG", "SG", "SF", "PF", "C"]:
+        if pos == shooter_pos:
+            step2["pos_actions"][pos] = {"action": ACTIONS["SHOOT"], "location": shot_wing}
+        else:
+            step2["pos_actions"][pos] = {"action": "stand", "location": position_to_spot.get(pos, "key")}
+    skeleton = {"steps": [step0, step1, step2]}
+    roles = game.turn_manager.assign_roles(
+        off_call=shot_type, def_call=game_state.get("defense_playcall", "2-3 Zone"), skeleton=skeleton
+    )
+    # Set final_turn so shot_manager can apply Final Turn rules (e.g. blocking foul = 2 FTs only on attack)
+    game_state["final_turn"] = True
+    try:
+        shot_result = game.shot_manager.resolve_shot(roles)
+    finally:
+        game_state.pop("final_turn", None)
+    # Use time_elapsed = time_remaining for the turn so clock goes to 0 and quarter/game end triggers
+    time_remaining = game_state.get("time_remaining", 24)
+    shot_result["time_elapsed"] = int(time_remaining)
+    shot_result["oDestinations"] = o_destinations
+    shot_result["dDestinations"] = d_destinations
+    shot_result["skeleton"] = skeleton
+    shot_result["final_turn"] = True
+    shot_result["current_turn"] = shot_result.get("current_turn", "HCO")
+    shot_result["offense_team_id"] = off_team.team_id
+    return shot_result
+
+
 def resolve_half_court_offense_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
 

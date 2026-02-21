@@ -1026,6 +1026,20 @@ export async function animateGameTurns({ //hasBallAtStep
       }
     }
 
+    // ✅ Phase 4: Final Turn — route FINAL_HOLD to AnimationRouter (clock out, then quarter/game end)
+    if (turn.result_type === "FINAL_HOLD") {
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      continue;
+    }
+
+    // ✅ Phase 4: Final Turn shot (blocking foul) — route FOUL with final_turn to AnimationRouter
+    if (turn.final_turn === true && turn.result_type === "FOUL") {
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      continue;
+    }
+
     const shouldDebugHCO =
       DEBUG_FLOW ||
       debugEnabled ||
