@@ -4,13 +4,16 @@
 19. Defense Matchups pop up is not consistently showing when it should - coming out of quarter breaks
 20. We need to clean up user Timeout implementation cadence
 21. Remove team backgrounds from Announcement System
+22. Sentry Bug Report 2.21.2026
 29. Stale data on initial page load - TOL shows 5, scores incorrect, player NG shows 100% until first turn processes
-
+30. Fast Break / DREB animation bug
 34. Player Of The Game
 35. Verify Special Stats are tracking properly
 36. Season & Career Stats for Players for special stats
-
+37. Player Foul Out Next Step bug
 39. Not getting a Timeout pop up when the computer calls timeout
+
+40. **Final play of quarter hold — clock display:** ~~During the 3-second hold… show **0:00**.~~ **Fixed:** AnimationEngine calls `context.onUpdate({ clock: '0:00' })` at the start of the hold in `handleFinalTurnShot` and `handleFreeThrow` when `quarter_ends_after`, so the scoreboard shows 0:00 for the full hold.
 
 
 ## Future Cleanup (Non-Critical Warnings)

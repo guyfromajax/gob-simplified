@@ -81,7 +81,7 @@ const defaults = {
   putback: { duration: 500, easing: 'Sine.easeInOut' },
   finalTurn: {
     holdClockOutMs: 1800,
-    holdFinalShotMs: 2000, // Hold at rim (make) or bounce (miss) before quarter end; no BIP/rebound
+    holdFinalShotMs: 3000, // Hold at rim (make) or bounce (miss) before quarter end; no BIP/rebound
     alignment: { ease: 'Linear' },
     moveDelayMs: 0, // Optional delay before BH/shooter movement (e.g. 1500 for "3–5 seconds remaining" feel)
   },
