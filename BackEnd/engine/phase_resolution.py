@@ -3581,7 +3581,9 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
         if pos == shooter_pos:
             step2["pos_actions"][pos] = {"action": ACTIONS["SHOOT"], "location": shot_wing}
         else:
-            step2["pos_actions"][pos] = {"action": "stand", "location": position_to_spot.get(pos, "key")}
+            # Non-shooters stay at their step 1 location (no move back to step 0)
+            step1_location = "deep key" if pos == bh_pos else other_spot_by_pos.get(pos, position_to_spot.get(pos, "key"))
+            step2["pos_actions"][pos] = {"action": "stand", "location": step1_location}
     skeleton = {"steps": [step0, step1, step2]}
     roles = game.turn_manager.assign_roles(
         off_call=shot_type, def_call=game_state.get("defense_playcall", "2-3 Zone"), skeleton=skeleton
