@@ -266,6 +266,12 @@ export class AnimationEngine {
     const { appendToTextScroll } = await import('../utils/textScroll.js');
     appendToTextScroll(turnData.text || "Free throw attempt");
     
+    // Final play of quarter (e.g. Final Turn shooting foul → FTs): hold 2s then quarter end (no BIP)
+    if (turnData.quarter_ends_after) {
+      const animationConfig = (await import('./animation_config.js')).default;
+      const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 2000;
+      await new Promise(resolve => setTimeout(resolve, holdMs));
+    }
     // Note: onUpdate is already called inside runFreeThrowSequence for each FT attempt
     // Do NOT call it again here or stats will be double counted
   }
@@ -682,6 +688,16 @@ export class AnimationEngine {
     }
     if (turnData.result_type === "MAKE" || turnData.result_type === "MISS" || turnData.result_type === "BLOCK") {
       this.scene._previousTurnWasShot = true;
+    }
+    // Final play of quarter: hold ball at rim (make) or bounce (miss) 2s, announce "It's Good" on make, then quarter end (no BIP/rebound)
+    if (turnData.quarter_ends_after) {
+      const animationConfig = (await import('./animation_config.js')).default;
+      const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 2000;
+      if (turnData.result_type === 'MAKE') {
+        const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+        announceGameEvent('SHOT_MAKE', turnData, this.scene, context);
+      }
+      await new Promise(resolve => setTimeout(resolve, holdMs));
     }
   }
 

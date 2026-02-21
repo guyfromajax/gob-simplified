@@ -1210,17 +1210,25 @@ class ShotManager:
 
                     if stat == "OREB":
                         possession_flips = False
-                        self.game_state["pending_oreb"] = {
-                            "rebounder": rebounder,
-                            "rebounder_id": getattr(rebounder, "player_id", None),
-                            "from_block": getattr(self, "_block_spot", None) is not None,
-                        }
-                        result["next_play_type"] = "OREB"
+                        if self.game_state.get("final_turn"):
+                            result["quarter_ends_after"] = True
+                            result["next_play_type"] = None
+                        else:
+                            self.game_state["pending_oreb"] = {
+                                "rebounder": rebounder,
+                                "rebounder_id": getattr(rebounder, "player_id", None),
+                                "from_block": getattr(self, "_block_spot", None) is not None,
+                            }
+                            result["next_play_type"] = "OREB"
                     else:
                         possession_flips = True
-                        self.game_state["offensive_state"] = "HCO"
-                        self.game_state["last_rebounder"] = rebounder
-                        result["next_play_type"] = "HCO"
+                        if self.game_state.get("final_turn"):
+                            result["quarter_ends_after"] = True
+                            result["next_play_type"] = None
+                        else:
+                            self.game_state["offensive_state"] = "HCO"
+                            self.game_state["last_rebounder"] = rebounder
+                            result["next_play_type"] = "HCO"
 
                     is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
                     for pos, rebounder_player in o_rebounder_lineup.items():
@@ -1416,57 +1424,57 @@ class ShotManager:
                 
                 if stat == "OREB":
                     possession_flips = False
-                    # Store OREB info for game_manager to create a separate OREB turn
-                    self.game_state["pending_oreb"] = {
-                        "rebounder": rebounder,
-                        "rebounder_id": getattr(rebounder, "player_id", None),
-                        "from_block": getattr(self, "_block_spot", None) is not None,
-                    }
-                    # OREB will be handled as a separate turn
-                    # Don't process putback here - let next turn handle it
-                    # ✅ FIX: Set next_play_type for OREB (will be overridden by OREB turn, but ensures it's never None)
-                    result["next_play_type"] = "OREB"
+                    if self.game_state.get("final_turn"):
+                        result["quarter_ends_after"] = True
+                        result["next_play_type"] = None
+                    else:
+                        # Store OREB info for game_manager to create a separate OREB turn
+                        self.game_state["pending_oreb"] = {
+                            "rebounder": rebounder,
+                            "rebounder_id": getattr(rebounder, "player_id", None),
+                            "from_block": getattr(self, "_block_spot", None) is not None,
+                        }
+                        result["next_play_type"] = "OREB"
                 else:
                     # DREB - determine next play type (or Force Foul: forgo FB/HCO and outlet)
                     possession_flips = True
-                    events.append({
-                        "event_type": "defReb",
-                        "rebounderId": getattr(rebounder, "player_id", None),
-                    })
-                    self.game.turn_manager.logger.log("defReb")
-                    self.game_state["last_rebounder"] = rebounder
-                    
-                    # ✅ Situational Logic: Force Foul after DREB — execute immediately, forgo FB/HCO and outlet
-                    from BackEnd.utils import situational_logic as sl
-                    time_remaining_sec = self.game_state.get("time_remaining")
-                    force_foul_after_dreb = (
-                        sl.is_situational_active(getattr(self.game, "quarter", None))
-                        and sl.is_slow_it_down(self.game, time_remaining_sec)
-                        and sl.should_force_foul(self.game, time_remaining_sec)
-                    )
-                    if force_foul_after_dreb:
-                        result["force_foul_after_dreb"] = True
-                        # Still set next_play_type so game_manager does DREB possession flip; foul is injected after
-                        next_play_type = "HCO"
-                        self.game_state["last_release_player"] = None
-                        self.game_state["offensive_state"] = "HCO"
-                        result["next_play_type"] = next_play_type
+                    if self.game_state.get("final_turn"):
+                        result["quarter_ends_after"] = True
+                        result["next_play_type"] = None
                     else:
-                        # NEW FAST BREAK LOGIC:
-                        # Fast Break is determined DURING the shot (by defense tempo), not after DREB
-                        next_play_type = "FAST_BREAK" if defense_release_list else "HCO"
-                        if defense_release_list:
-                            release_pos = defense_release_list[0]
-                            release_player = def_team.lineup.get(release_pos)
-                            if release_player:
-                                self.game_state["last_release_player"] = release_player
-                            else:
-                                pass
-                        else:
+                        events.append({
+                            "event_type": "defReb",
+                            "rebounderId": getattr(rebounder, "player_id", None),
+                        })
+                        self.game.turn_manager.logger.log("defReb")
+                        self.game_state["last_rebounder"] = rebounder
+                        # ✅ Situational Logic: Force Foul after DREB — execute immediately, forgo FB/HCO and outlet
+                        from BackEnd.utils import situational_logic as sl
+                        time_remaining_sec = self.game_state.get("time_remaining")
+                        force_foul_after_dreb = (
+                            sl.is_situational_active(getattr(self.game, "quarter", None))
+                            and sl.is_slow_it_down(self.game, time_remaining_sec)
+                            and sl.should_force_foul(self.game, time_remaining_sec)
+                        )
+                        if force_foul_after_dreb:
+                            result["force_foul_after_dreb"] = True
                             next_play_type = "HCO"
                             self.game_state["last_release_player"] = None
-                        self.game_state["offensive_state"] = next_play_type
-                        result["next_play_type"] = next_play_type
+                            self.game_state["offensive_state"] = "HCO"
+                            result["next_play_type"] = next_play_type
+                        else:
+                            # NEW FAST BREAK LOGIC:
+                            next_play_type = "FAST_BREAK" if defense_release_list else "HCO"
+                            if defense_release_list:
+                                release_pos = defense_release_list[0]
+                                release_player = def_team.lineup.get(release_pos)
+                                if release_player:
+                                    self.game_state["last_release_player"] = release_player
+                            else:
+                                next_play_type = "HCO"
+                                self.game_state["last_release_player"] = None
+                            self.game_state["offensive_state"] = next_play_type
+                            result["next_play_type"] = next_play_type
 
         # ⏱️ Add tempo-based time to turn
         # If HCO came after FCP/HCT, adjust time based on pressure phase time
@@ -1989,12 +1997,15 @@ class ShotManager:
                     result["rebounderId"] = getattr(rebounder, "player_id", None)
                     result["rebound_type"] = "OREB"
                     possession_flips = False
-                    # Store OREB info for game_manager to create a separate OREB turn
-                    self.game_state["pending_oreb"] = {
-                        "rebounder": rebounder,
-                        "rebounder_id": getattr(rebounder, "player_id", None),
-                        "from_block": getattr(self, "_block_spot", None) is not None,
-                    }
+                    if self.game_state.get("final_turn"):
+                        result["quarter_ends_after"] = True
+                        result["next_play_type"] = None
+                    else:
+                        self.game_state["pending_oreb"] = {
+                            "rebounder": rebounder,
+                            "rebounder_id": getattr(rebounder, "player_id", None),
+                            "from_block": getattr(self, "_block_spot", None) is not None,
+                        }
                 else:
                     # DREB: Transition to HCO with outlet step
                     rebounder.record_stat("DREB")
@@ -2002,11 +2013,15 @@ class ShotManager:
                     result["rebounderId"] = getattr(rebounder, "player_id", None)
                     result["rebound_type"] = "DREB"
                     possession_flips = True
-                    text += " -- entering half court."
-                    self.game_state["offensive_state"] = "HCO"
-                    self.game_state["last_rebounder"] = rebounder
-                    self.game_state["last_rebound"] = "DREB"
-                    result["next_play_type"] = "HCO"
+                    if self.game_state.get("final_turn"):
+                        result["quarter_ends_after"] = True
+                        result["next_play_type"] = None
+                    else:
+                        text += " -- entering half court."
+                        self.game_state["offensive_state"] = "HCO"
+                        self.game_state["last_rebounder"] = rebounder
+                        self.game_state["last_rebound"] = "DREB"
+                        result["next_play_type"] = "HCO"
             else:
                 # 1+ defenders: Find closest defender to bounce spot
                 # Build lineup from defenders present

@@ -772,7 +772,13 @@ class GameManager:
             return
         
         last_turn = self.turns[-1] if self.turns else None
+        # ✅ Final play of quarter: no BIP after make or after FTs when time_remaining == 0
         if last_turn and last_turn.get("next_play_type") == "BASELINE_INBOUND":
+            if self.game_state.get("time_remaining", 1) == 0:
+                last_turn["quarter_ends_after"] = True
+                last_turn["next_play_type"] = None
+                logging.debug("✅ [FINAL PLAY] Skipping BIP — quarter ends after this turn (time_remaining=0)")
+                return
             # ✅ Flip possession BEFORE creating BASELINE_INBOUND (gold standard pattern)
             if last_turn.get("possession_flips"):
                 old_offense = self.offense_team.name
