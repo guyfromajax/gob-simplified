@@ -347,7 +347,7 @@ def select_defender_closest_to_victim(victim_coords, def_lineup, defender_coords
             dx = coords.get("x", 50)
             dy = coords.get("y", 25)
         else:
-            coords = HCO_STRING_SPOTS.get("key", {"x": 50, "y": 25})
+            coords = HCO_STRING_SPOTS.get(pos, {"x": 50, "y": 25})
             dx = coords.get("x", 50)
             dy = coords.get("y", 25)
         dist_sq = (dx - vx) ** 2 + (dy - vy) ** 2

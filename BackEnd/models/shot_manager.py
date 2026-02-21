@@ -1418,7 +1418,7 @@ class ShotManager:
                     # ✅ FIX: Set next_play_type for OREB (will be overridden by OREB turn, but ensures it's never None)
                     result["next_play_type"] = "OREB"
                 else:
-                    # DREB - determine next play type
+                    # DREB - determine next play type (or Force Foul: forgo FB/HCO and outlet)
                     possession_flips = True
                     events.append({
                         "event_type": "defReb",
@@ -1427,35 +1427,37 @@ class ShotManager:
                     self.game.turn_manager.logger.log("defReb")
                     self.game_state["last_rebounder"] = rebounder
                     
-                    # NEW FAST BREAK LOGIC:
-                    # Fast Break is determined DURING the shot (by defense tempo), not after DREB
-                    # If a defender released for fast break during shot → auto-trigger fast break
-                    # If no defender released → regular HCO
-                    next_play_type = "FAST_BREAK" if defense_release_list else "HCO"
-                    if defense_release_list:
-                        # next_play_type = "FAST_BREAK"
-                        # Log fast break determination with release player info
-                        release_player_ids = [def_team.lineup[pos].player_id for pos in defense_release_list]
-                        # ✅ Store release player in game_state for use in resolve_fast_break_logic
-                        # The outlet pass should go to the release player, not a randomly chosen ball handler
-                        release_pos = defense_release_list[0]  # Get first release position (usually only one)
-                        release_player = def_team.lineup.get(release_pos)
-                        if release_player:
-                            self.game_state["last_release_player"] = release_player
-                            # ✅ COMMENTED OUT: Fast break debug logs (cluttering transition debugging)
-                            # logging.info(f"🏀 FAST_BREAK determined during shot: defense_release_list={defense_release_list}, release_player_ids={release_player_ids}, release_player_stored={getattr(release_player, 'player_id', None)}, shooter={get_name_safe(shooter)}")
-                        else:
-                            # logging.warning(f"⚠️ FAST_BREAK determined but release_player not found at position {release_pos}")
-                            pass  # Debug logging commented out
-                    else:
+                    # ✅ Situational Logic: Force Foul after DREB — execute immediately, forgo FB/HCO and outlet
+                    from BackEnd.utils import situational_logic as sl
+                    time_remaining_sec = self.game_state.get("time_remaining")
+                    force_foul_after_dreb = (
+                        sl.is_situational_active(getattr(self.game, "quarter", None))
+                        and sl.is_slow_it_down(self.game, time_remaining_sec)
+                        and sl.should_force_foul(self.game, time_remaining_sec)
+                    )
+                    if force_foul_after_dreb:
+                        result["force_foul_after_dreb"] = True
+                        # Still set next_play_type so game_manager does DREB possession flip; foul is injected after
                         next_play_type = "HCO"
-                        # Clear release player if not doing fast break
                         self.game_state["last_release_player"] = None
-                        # logging.info(f"🏀 HCO determined during shot: no defense_release_list, shooter={get_name_safe(shooter)}")
-                    
-                    self.game_state["offensive_state"] = next_play_type
-                    # ✅ FIX: Always set next_play_type for MISS with DREB (HCO or FAST_BREAK)
-                    result["next_play_type"] = next_play_type
+                        self.game_state["offensive_state"] = "HCO"
+                        result["next_play_type"] = next_play_type
+                    else:
+                        # NEW FAST BREAK LOGIC:
+                        # Fast Break is determined DURING the shot (by defense tempo), not after DREB
+                        next_play_type = "FAST_BREAK" if defense_release_list else "HCO"
+                        if defense_release_list:
+                            release_pos = defense_release_list[0]
+                            release_player = def_team.lineup.get(release_pos)
+                            if release_player:
+                                self.game_state["last_release_player"] = release_player
+                            else:
+                                pass
+                        else:
+                            next_play_type = "HCO"
+                            self.game_state["last_release_player"] = None
+                        self.game_state["offensive_state"] = next_play_type
+                        result["next_play_type"] = next_play_type
 
         # ⏱️ Add tempo-based time to turn
         # If HCO came after FCP/HCT, adjust time based on pressure phase time

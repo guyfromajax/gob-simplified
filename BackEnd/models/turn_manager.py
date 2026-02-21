@@ -400,7 +400,47 @@ class TurnManager:
         #     print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
 
         # STEP 3: Route based on offensive state
-        if state == "FREE_THROW":
+        # ✅ Situational Logic: Force Foul after BIP/SIP — execute first so it runs regardless of next step (HCO, HCT, FCP)
+        result = None
+        from BackEnd.utils import situational_logic as sl
+        from BackEnd.engine.phase_resolution import (
+            resolve_non_shooting_foul,
+            select_defender_closest_to_victim,
+        )
+        pending_foul = self.game.game_state.pop("situational_force_foul_pending", None)
+        if pending_foul:
+            victim_id = pending_foul.get("victim_id")
+            victim_coords = pending_foul.get("victim_coords") or {"x": 50, "y": 25}
+            off_lineup = self.game.offense_team.lineup
+            def_lineup = self.game.defense_team.lineup
+            victim = None
+            for p in off_lineup.values():
+                if p and getattr(p, "player_id", None) == victim_id:
+                    victim = p
+                    break
+            if victim and def_lineup:
+                d_dest = pending_foul.get("defender_coords_by_pos")
+                foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, d_dest)
+                if foul_player:
+                    roles = {
+                        "ball_handler": victim,
+                        "defender": foul_player,
+                        "foul_player": foul_player,
+                        "shooter": victim,
+                        "screener": None,
+                        "passer": None,
+                    }
+                    self.game.game_state["foul_team"] = "DEFENSE"
+                    result = resolve_non_shooting_foul(
+                        roles, self.game, time_elapsed_override=sl.force_foul_time_elapsed()
+                    )
+                    result["offense_team_id"] = self.game.offense_team.team_id
+                    result["current_turn"] = "HCO"
+                    result["quick_foul"] = True  # Situational Force Foul → frontend announces "Quick Foul"
+
+        if result is not None:
+            pass  # Force Foul already handled; skip state routing (HCO/HCT/FCP)
+        elif state == "FREE_THROW":
             result = self.resolve_free_throw()
         elif state == "FAST_BREAK":
             self.logger.log("fb:start")
@@ -413,74 +453,7 @@ class TurnManager:
             self.logger.log("hct:start")
             result = resolve_half_court_trap_logic(self.game)
         else:
-            # ✅ Situational Logic: Force Foul (after BIP/SIP pending, or at start of HCO e.g. DREB→HCO)
-            result = None
-            from BackEnd.utils import situational_logic as sl
-            from BackEnd.engine.phase_resolution import (
-                resolve_non_shooting_foul,
-                select_defender_closest_to_victim,
-            )
-            pending_foul = self.game.game_state.pop("situational_force_foul_pending", None)
-            if pending_foul:
-                victim_id = pending_foul.get("victim_id")
-                victim_coords = pending_foul.get("victim_coords") or {"x": 50, "y": 25}
-                off_lineup = self.game.offense_team.lineup
-                def_lineup = self.game.defense_team.lineup
-                victim = None
-                for p in off_lineup.values():
-                    if p and getattr(p, "player_id", None) == victim_id:
-                        victim = p
-                        break
-                if victim and def_lineup:
-                    d_dest = pending_foul.get("defender_coords_by_pos")
-                    foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, d_dest)
-                    if foul_player:
-                        roles = {
-                            "ball_handler": victim,
-                            "defender": foul_player,
-                            "foul_player": foul_player,
-                            "shooter": victim,
-                            "screener": None,
-                            "passer": None,
-                        }
-                        self.game.game_state["foul_team"] = "DEFENSE"
-                        result = resolve_non_shooting_foul(
-                            roles, self.game, time_elapsed_override=sl.force_foul_time_elapsed()
-                        )
-                        result["offense_team_id"] = self.game.offense_team.team_id
-                        result["current_turn"] = "HCO"
-                        result["quick_foul"] = True  # Situational Force Foul → frontend announces "Quick Foul"
-            if result is None:
-                # Force Foul at start of HCO (DREB→HCO: victim = last_rebounder)
-                time_remaining_sec = self.game.game_state.get("time_remaining")
-                if (
-                    sl.is_situational_active(getattr(self.game, "quarter", None))
-                    and sl.is_slow_it_down(self.game, time_remaining_sec)
-                    and sl.should_force_foul(self.game, time_remaining_sec)
-                ):
-                    victim = self.game.game_state.get("last_rebounder")
-                    if victim and self.game.defense_team.lineup:
-                        from BackEnd.constants import HCO_STRING_SPOTS
-                        victim_coords = HCO_STRING_SPOTS.get("key", {"x": 50, "y": 25})
-                        foul_player = select_defender_closest_to_victim(
-                            victim_coords, self.game.defense_team.lineup, None
-                        )
-                        if foul_player:
-                            roles = {
-                                "ball_handler": victim,
-                                "defender": foul_player,
-                                "foul_player": foul_player,
-                                "shooter": victim,
-                                "screener": None,
-                                "passer": None,
-                            }
-                            self.game.game_state["foul_team"] = "DEFENSE"
-                            result = resolve_non_shooting_foul(
-                                roles, self.game, time_elapsed_override=sl.force_foul_time_elapsed()
-                            )
-                            result["offense_team_id"] = self.game.offense_team.team_id
-                            result["current_turn"] = "HCO"
-                            result["quick_foul"] = True  # Situational Force Foul (DREB→HCO) → frontend announces "Quick Foul"
+            # HCO: normal half-court offense (Force Foul after DREB is now handled at DREB time in game_manager)
             if result is not None:
                 # Force Foul result already set; skip set_playcalls and resolve_half_court_offense
                 pass

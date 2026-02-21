@@ -173,13 +173,16 @@ export class AnimationRouter {
       // No need to kill turns mid-animation - timeouts wait for turn boundaries
       
       // ✅ PHASE 2.1: Enhanced context object with all required parameters
+      // ✅ Force Foul: nextTurn so BIP/SIP can animate defender move in same turn when next is quick_foul
+      const nextTurn = this.scene._currentTurnBatch?.[(turnData.index ?? turnIndex ?? 0) + 1];
       const context = {
         playerSprites: this.playerSprites,
         ballSprite: this.ballSprite,
         onUpdate: this.onUpdate,
         simData: this.scene.simData,
         onAction: this.onAction, // Pass onAction callback if provided
-        turnIndex: turnIndex // ✅ PHASE 2.1: Add turnIndex to context
+        turnIndex: turnIndex, // ✅ PHASE 2.1: Add turnIndex to context
+        nextTurn: nextTurn ?? null
       };
       
       if (!shouldLog) {

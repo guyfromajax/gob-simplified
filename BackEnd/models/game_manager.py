@@ -627,6 +627,39 @@ class GameManager:
             # Keep result turn's offense_team_id = old team so frontend classifies correctly for step animation.
             logging.debug(f"🔄 [DREB→FB] Flipped possession before Fast Break: {old_offense} → {self.offense_team.name} (result keeps offense_team_id=old team for animation)")
 
+        # ✅ Situational Logic: Force Foul after DREB — inject FOUL turn and forgo outlet/FB/HCO
+        if result.get("force_foul_after_dreb"):
+            from BackEnd.utils import situational_logic as sl
+            from BackEnd.engine.phase_resolution import (
+                resolve_non_shooting_foul,
+                select_defender_closest_to_victim,
+            )
+            victim = self.game_state.get("last_rebounder")
+            def_lineup = self.defense_team.lineup  # After DREB flip, rebounder's team is offense; fouling team is defense
+            victim_coords = {"x": 50, "y": 25}  # Rebounder at half-court; defender positions use HCO fallback
+            foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, None)
+            if victim and foul_player:
+                self.game_state["foul_team"] = "DEFENSE"
+                roles = {
+                    "ball_handler": victim,
+                    "defender": foul_player,
+                    "foul_player": foul_player,
+                    "shooter": victim,
+                    "screener": None,
+                    "passer": None,
+                }
+                foul_result = resolve_non_shooting_foul(
+                    roles, self, time_elapsed_override=sl.force_foul_time_elapsed()
+                )
+                foul_result["offense_team_id"] = self.offense_team.team_id
+                foul_result["current_turn"] = "HCO"
+                foul_result["quick_foul"] = True
+                foul_result["force_foul_after_dreb"] = True  # Frontend: animate defender→rebounder, no outlet
+                foul_result["victim_id"] = getattr(victim, "player_id", None)  # Rebounder (fouled player) for animation
+                foul_result["next_turn"] = foul_result.get("next_play_type") or "SIDE_INBOUND"
+                self._append_turn(foul_result)
+                result = foul_result  # So FOUL/SIP block below runs
+
         # (Foul-out check and timeout creation now run inside _append_turn for the main result)
 
         # If the turn ended with a dead-ball turnover, a non-shooting foul

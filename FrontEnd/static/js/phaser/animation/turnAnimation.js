@@ -387,7 +387,7 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
 }
 
 // Setup sideline inbound play
-async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData }) {
+async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData, context = null }) {
   if (!turnData || scene?.skipToEnd || scene?.stateMachine?.is(States.FreeThrow)) return;
 
   scene.isInboundSetup = true;
@@ -560,21 +560,30 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
     // ✅ TIMEOUT: Removed markInboundPassStarted - button is always live now
     
     if (!scene.stateMachine?.is(States.FastBreak)) {
-      if (passInfo) {
-        // ✅ Use dynamic pass from animation data
-        console.log('🏀 [SIDE_INBOUND] Using dynamic pass from animation data', passInfo);
-        await handlePassAnimation({
-          scene,
-          passInfo,
-          playerSprites
-        });
-      } else if (pgSprite) {
-        // Fallback to hardcoded SF→PG pass
-        console.log('🏀 [SIDE_INBOUND] Using fallback hardcoded SF→PG pass');
-        await runPass(scene, { fromId: sfId, toId: pgId, easing: ease });
+      // ✅ Force Foul: when next turn is Quick Foul, animate defender to receiver in same step as the pass
+      const nextTurn = context?.nextTurn;
+      const isQuickFoulNext = nextTurn?.quick_foul && nextTurn?.result_type === 'FOUL';
+      const passPromise = passInfo
+        ? (console.log('🏀 [SIDE_INBOUND] Using dynamic pass from animation data', passInfo),
+           handlePassAnimation({ scene, passInfo, playerSprites }))
+        : pgSprite
+          ? (console.log('🏀 [SIDE_INBOUND] Using fallback hardcoded SF→PG pass'),
+             runPass(scene, { fromId: sfId, toId: pgId, easing: ease }))
+          : Promise.resolve();
+
+      let defenderPromise = Promise.resolve();
+      if (isQuickFoulNext) {
+        const receiverId = passInfo?.receiverId ?? pgId;
+        const receiverSprite = playerSprites[receiverId];
+        const defenderSprite = nextTurn.foul_player_id ? playerSprites[nextTurn.foul_player_id] : null;
+        if (receiverSprite && defenderSprite) {
+          defenderPromise = animateQuickFoulDefenderToReceiver(scene, defenderSprite, receiverSprite);
+          nextTurn._quickFoulAnimatedDuringInbound = true;
+        }
       }
+      await Promise.all([passPromise, defenderPromise]);
     }
-    
+
     animationDebugLog(`[sideInbound][passEnd] sf:${sfId} pg:${pgId}`);
     if (pgSprite) {
       animationDebugLog(`[sideInbound][pgAttach] sf:${sfId} pg:${pgId}`);
@@ -1233,6 +1242,22 @@ async function runOffensiveReboundKickoutSetup({ scene, ballSprite, playerSprite
   animationDebugLog('runOffensiveReboundKickoutSetup: Outlet positioning complete');
 }
 
+/**
+ * Animate the fouling defender moving to within 1-2 x spots and ±1 y spots of the receiver (Quick Foul after BIP/SIP).
+ * Used in the same turn as the inbound pass so ball and defender move together.
+ */
+function animateQuickFoulDefenderToReceiver(scene, defenderSprite, receiverSprite) {
+  if (!scene?.tweens || !defenderSprite || !receiverSprite) return Promise.resolve();
+  const w = scene.game.config?.width ?? 1229;
+  const h = scene.game.config?.height ?? 768;
+  const spotW = w / 100;
+  const spotH = h / 50;
+  const offsetX = spotW * (Math.random() < 0.5 ? 1 : 2);
+  const offsetY = spotH * (Math.random() * 2 - 1); // -1 to 1
+  const target = { x: receiverSprite.x + offsetX, y: receiverSprite.y + offsetY };
+  return tweenPlayerTo(scene, defenderSprite, target, { duration: 400, easing: 'Linear' });
+}
+
 // Setup baseline inbound play after a made basket
 async function runInboundSetup({
   scene,
@@ -1243,7 +1268,8 @@ async function runInboundSetup({
   awayTeamId,
   skipRetreat = false,  // Allow skipping retreat for FCP/HCT
   pressureType = null,   // "FCP" or "HCT" to determine defensive positioning
-  turnData = null        // ✅ NEW: Optional turnData for dynamic pass detection
+  turnData = null,       // ✅ NEW: Optional turnData for dynamic pass detection
+  context = null        // ✅ Force Foul: nextTurn so we can animate defender move in same turn
 }) {
   // ✅ CRITICAL: ALWAYS set scene.offenseTeamId to match newOffenseSide BEFORE doing anything else
   // This ensures that any code that reads scene.offenseTeamId will get the correct value
@@ -1869,23 +1895,26 @@ async function runInboundSetup({
   }
   
   // Allow inbound pass regardless of current state (including FastBreak)
-  if (passInfo) {
-    // ✅ Use dynamic pass from animation data
-    console.log('🏀 [BASELINE_INBOUND] Using dynamic pass from animation data', passInfo);
-    await handlePassAnimation({
-      scene,
-      passInfo,
-      playerSprites
-    });
-  } else {
-    // Fallback to hardcoded SF→PG pass
-    await runPass(scene, {
-      fromId: sfId,
-      toId: pgId,
-      duration: 500,
-      easing: "Sine.easeInOut"
-    });
+  // ✅ Force Foul: when next turn is Quick Foul, animate defender to receiver in same step as the pass
+  const nextTurn = context?.nextTurn;
+  const isQuickFoulNext = nextTurn?.quick_foul && nextTurn?.result_type === 'FOUL';
+  const passPromise = passInfo
+    ? (console.log('🏀 [BASELINE_INBOUND] Using dynamic pass from animation data', passInfo),
+       handlePassAnimation({ scene, passInfo, playerSprites }))
+    : runPass(scene, { fromId: sfId, toId: pgId, duration: 500, easing: "Sine.easeInOut" });
+
+  let defenderPromise = Promise.resolve();
+  if (isQuickFoulNext) {
+    const receiverId = passInfo?.receiverId ?? pgId;
+    const receiverSprite = playerSprites[receiverId];
+    const defenderSprite = nextTurn.foul_player_id ? playerSprites[nextTurn.foul_player_id] : null;
+    if (receiverSprite && defenderSprite) {
+      defenderPromise = animateQuickFoulDefenderToReceiver(scene, defenderSprite, receiverSprite);
+      nextTurn._quickFoulAnimatedDuringInbound = true;
+    }
   }
+  await Promise.all([passPromise, defenderPromise]);
+
   animationDebugLog(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   animationDebugLog(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
 
@@ -2837,7 +2866,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 }
 
-export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup, runOffensiveReboundKickoutSetup, getPlayerDuration };
+export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup, runOffensiveReboundKickoutSetup, getPlayerDuration, animateQuickFoulDefenderToReceiver };
 // Provide an uncapped duration helper for long transitions (e.g., inbound -> HCO)
 export function getPlayerDurationUncapped(sprite, targetX, targetY) {
   const currentX = sprite.x;

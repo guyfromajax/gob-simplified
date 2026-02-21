@@ -905,7 +905,25 @@ export class AnimationEngine {
       hct_foul: turnData.hct_foul,
       pressureSequenceActive: this.scene.pressureSequenceActive
     });
-    
+
+    // ✅ Force Foul: animation (defender move) was already done during BIP/SIP turn
+    if (turnData.result_type === 'FOUL' && turnData._quickFoulAnimatedDuringInbound) {
+      return;
+    }
+
+    // ✅ Force Foul after DREB: animate defender→victim (rebounder), then finalize ("Quick Foul")
+    if (turnData.result_type === 'FOUL' && turnData.force_foul_after_dreb) {
+      const victimId = turnData.victim_id;
+      const foulPlayerId = turnData.foul_player_id;
+      const victimSprite = context.playerSprites?.[victimId];
+      const defenderSprite = context.playerSprites?.[foulPlayerId];
+      if (victimSprite && defenderSprite) {
+        const { animateQuickFoulDefenderToReceiver } = await import('./turnAnimation.js');
+        await animateQuickFoulDefenderToReceiver(this.scene, defenderSprite, victimSprite);
+      }
+      return;
+    }
+
     // ✅ PHASE 2.3: Note: Pre/post setup is handled by AnimationRouter
     // This handler only needs to call playTurnAnimation with the provided context
     // Import and use existing turn animation handler for now

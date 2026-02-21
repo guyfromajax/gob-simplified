@@ -241,7 +241,8 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
       
       // If DREB, set up next play (outlet pass for HCO only)
       // For FAST_BREAK, the outlet pass is handled in the fast break sequence itself
-      if (turnData.rebound_type === "DREB" && turnData.next_play_type !== "FAST_BREAK") {
+      // ✅ Force Foul after DREB: skip outlet — foul turn will animate defender→rebounder and "Quick Foul"
+      if (turnData.rebound_type === "DREB" && turnData.next_play_type !== "FAST_BREAK" && !turnData.force_foul_after_dreb) {
         // For putback misses leading to DREB, find the original MISS turn that has offense_getback
         // This might be a previous turn (the original shot attempt) or the putback turn itself
         let missTurn = null;
@@ -518,7 +519,9 @@ export async function animateGameTurns({ //hasBallAtStep
   // console.log('🎬 animateGameTurns: Starting turn processing loop', { totalTurns: turns.length });
   
   // Removed verbose loop start log
-  
+  // ✅ Force Foul: Expose current batch so router can pass nextTurn to BIP/SIP (same-turn defender move)
+  scene._currentTurnBatch = turns;
+
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
     

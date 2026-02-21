@@ -1487,7 +1487,8 @@ export class ShotAnimationSystem {
     
     // Use the same defensive rebound setup for HCO, HCT, and FCP
     // Fast breaks handle outlet in their own turn
-    if (nextPlayType === 'HCO' || nextPlayType === 'HCT' || nextPlayType === 'FCP') {
+    // ✅ Force Foul after DREB: skip outlet — foul turn animates defender→rebounder and "Quick Foul"
+    if ((nextPlayType === 'HCO' || nextPlayType === 'HCT' || nextPlayType === 'FCP') && !turnData.force_foul_after_dreb) {
       // ✅ REMOVED: Defensive rebound logging (cluttering console)
       
       // ✅ FIX: Announce rebound before outlet animation

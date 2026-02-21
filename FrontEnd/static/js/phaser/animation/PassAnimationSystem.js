@@ -382,16 +382,17 @@ export class PassAnimationSystem {
           awayTeamId: this.scene.awayTeamId,
           skipRetreat: skipRetreat,
           pressureType: pressureType,
-          turnData: turnData  // ✅ Pass turnData for dynamic pass detection
+          turnData: turnData,  // ✅ Pass turnData for dynamic pass detection
+          context: context    // ✅ Force Foul: nextTurn for same-turn defender move
         });
       } else {
         // For side inbound passes (after dead balls/fouls), use runSideInboundSetup
-        // Side inbound (log removed)
         await runSideInboundSetup({
           scene: this.scene,
           ballSprite: context.ballSprite,
           playerSprites: this.playerSprites,
-          turnData: turnData
+          turnData: turnData,
+          context: context  // ✅ Force Foul: nextTurn for same-turn defender move
         });
       }
       
