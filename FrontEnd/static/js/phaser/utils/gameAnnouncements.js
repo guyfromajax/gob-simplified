@@ -125,6 +125,11 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       showAnnouncement("Quick Shot", offenseTeam);
       break;
 
+    // ========== FINAL TURN (end of quarter/game) ==========
+    case 'FINAL_SHOT':
+      showAnnouncement("Final Shot", offenseTeam);
+      break;
+
     case 'DEFENSIVE_STOP':
       // Get stopper data if available
       const stopperId = context.stopperId || turnData.stopper_id;

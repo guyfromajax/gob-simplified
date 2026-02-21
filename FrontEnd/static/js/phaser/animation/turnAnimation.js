@@ -2868,7 +2868,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
 
 /**
  * Phase 4: Final Turn alignment — tween offense and defense to oDestinations/dDestinations.
- * Flips offense coords for away team (home-side coords from backend). Attaches ball to ball handler when done.
+ * When away team is on offense, flip both offense and defense coords so the whole setup is on the
+ * away (attacking) half; backend sends home-side coords. Attaches ball to ball handler when done.
  */
 export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, turnData }) {
   if (scene?.skipToEnd || !turnData) return;
@@ -2920,7 +2921,8 @@ export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, 
     promises.push(addTween(offenseSprites[pos], c, pos));
   });
   Object.entries(dDestinations).forEach(([pos, coords]) => {
-    promises.push(addTween(defenseSprites[pos], coords, pos));
+    const c = isAwayOffense ? flipCoords(coords) : coords;
+    promises.push(addTween(defenseSprites[pos], c, pos));
   });
 
   await Promise.all(promises);

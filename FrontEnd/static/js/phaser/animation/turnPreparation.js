@@ -115,6 +115,11 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
       }
     }
 
+    // Final Turn: announce "Final Shot" at start of Final Turn shot attempt (not FINAL_HOLD)
+    if (turn.final_turn && turn.result_type !== 'FINAL_HOLD') {
+      announceGameEvent('FINAL_SHOT', turn, scene);
+    }
+
     turn._contextAnnouncementsShown = true;
   }
   
