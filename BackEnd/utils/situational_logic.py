@@ -9,8 +9,7 @@ Temp overrides (Fast Break, FCP, HCT) revert when the situation ends (re-evaluat
 import random
 import logging
 from BackEnd.constants import (
-    SITUATIONAL_TIME_TIERS,
-    SITUATIONAL_QUICK_SHOT_ATTACK_RATIO,
+    SITUATIONAL_TIME_BANDS,
     SITUATIONAL_FORCE_FOUL_TIME_ELAPSED_MIN,
     SITUATIONAL_FORCE_FOUL_TIME_ELAPSED_MAX,
     SITUATIONAL_BIP_RECEIVER_POS,
@@ -20,14 +19,18 @@ from BackEnd.constants import (
 
 def get_situational_tier(time_remaining_seconds):
     """
-    Return the tier dict for the given time remaining in the quarter (seconds).
-    Tiers: < 30, < 60, < 120, < 180. Returns the first matching tier (most restrictive first).
+    Return the band config for the given time remaining in the quarter (seconds).
+    Bands: 2:01-3:00 (121-180), 1:01-2:00 (61-120), 0:31-1:00 (31-60), 0:01-0:30 (0-30).
+    Returns the first band where min_sec <= time <= max_sec, or None if time > 180 or None.
     """
     if time_remaining_seconds is None:
         return None
-    for threshold_seconds, tier in SITUATIONAL_TIME_TIERS:
-        if time_remaining_seconds < threshold_seconds:
-            return tier.copy()
+    t = int(time_remaining_seconds)
+    if t > 180:
+        return None
+    for min_sec, max_sec, config in SITUATIONAL_TIME_BANDS:
+        if min_sec <= t <= max_sec:
+            return config.copy()
     return None
 
 
@@ -48,52 +51,57 @@ def get_score_delta(game):
 
 def is_slow_it_down(game, time_remaining_seconds):
     """
-    True when offense is ahead by at least Slow It Down threshold (Q4/OT).
-    Revert when situation ends (no persistent override).
+    True when offense is ahead by at least this band's Slow It Down minimum (Q4/OT).
+    Per time-band table: delta >= slow_min for the current band.
     """
     if not is_situational_active(game.quarter):
         return False
     tier = get_situational_tier(time_remaining_seconds)
     if not tier:
         return False
-    threshold = tier.get("slow_threshold")
-    if threshold is None:
+    slow_min = tier.get("slow_min")
+    if slow_min is None:
         return False
     delta = get_score_delta(game)
-    return delta >= threshold
+    return delta >= slow_min
 
 
 def is_quick_shot(game, time_remaining_seconds):
     """
-    True when offense is behind by at least Quick Shot threshold (Q4/OT).
+    True when Score Delta is in this band's Quick Shot range (Q4/OT).
+    Per time-band table: quick_lo < delta < quick_hi.
     """
     if not is_situational_active(game.quarter):
         return False
     tier = get_situational_tier(time_remaining_seconds)
     if not tier:
         return False
-    threshold = tier.get("quick_threshold")
-    if threshold is None:
+    quick_lo = tier.get("quick_lo")
+    quick_hi = tier.get("quick_hi")
+    if quick_lo is None or quick_hi is None:
         return False
     delta = get_score_delta(game)
-    return delta <= threshold
+    return quick_lo < delta < quick_hi
 
 
 def should_force_foul(game, time_remaining_seconds):
     """
-    True when defense is trailing by <= Slow It Down threshold (0 <= Score Delta <= threshold)
-    in the < 1 min or < 30 sec tiers. Never true when defense is leading.
+    True when this band has Force Foul and Score Delta is in the foul range (Q4/OT).
+    Per time-band table: 0:31-1:00 → 3 < delta < 12; 0:01-0:30 → 1 < delta < 9; else False.
     """
     if not is_situational_active(game.quarter):
         return False
     tier = get_situational_tier(time_remaining_seconds)
-    if not tier or not tier.get("force_foul_range"):
-        return tier and tier.get("force_foul") is True
-    threshold = tier.get("slow_threshold")
-    if threshold is None:
+    if not tier:
+        return False
+    if tier.get("force_foul") is False:
+        return False
+    force_lo = tier.get("force_foul_lo")
+    force_hi = tier.get("force_foul_hi")
+    if force_lo is None or force_hi is None:
         return False
     delta = get_score_delta(game)
-    return 0 <= delta <= threshold
+    return force_lo < delta < force_hi
 
 
 def get_situational_tempo_override(game, time_remaining_seconds):
@@ -109,9 +117,8 @@ def get_situational_tempo_override(game, time_remaining_seconds):
 
 def get_situational_play_focus_override(game, time_remaining_seconds):
     """
-    When Quick Shot is active, returns weighted focus: (outside_ratio, attack_ratio, inside_ratio)
-    for (outside, attack, inside). If not Quick Shot, returns None.
-    When time <= 30 sec: only apply override if -7 < Score Delta < -2 (trailing by 3-6); else standard logic.
+    When Quick Shot is active, returns (outside_ratio, attack_ratio, inside_ratio) per time-band table.
+    Band 0:01-0:30: if Score Delta < -2 → 100% outside; else None (normal playcall). Other bands: fixed ratios.
     """
     if not is_quick_shot(game, time_remaining_seconds):
         return None
@@ -119,16 +126,17 @@ def get_situational_play_focus_override(game, time_remaining_seconds):
     if not tier:
         return None
     delta = get_score_delta(game)
-    # Last 30 seconds: only force outside/attack/inside when trailing by 3-6 (-7 < delta < -2)
-    if time_remaining_seconds is not None and time_remaining_seconds <= 30:
-        if not (-7 < delta < -2):
+    # 0:01-0:30 band: only override when delta < -2 (100% outside); else normal logic
+    if tier.get("last_30_quick"):
+        below = tier.get("outside_if_delta_below", -2)
+        if delta >= below:
             return None
-    outside_ratio = tier.get("outside_ratio", 0.7)
-    # If not outside: 75% attack / 25% inside
-    remainder = 1.0 - outside_ratio
-    attack_ratio = remainder * SITUATIONAL_QUICK_SHOT_ATTACK_RATIO
-    inside_ratio = remainder * (1.0 - SITUATIONAL_QUICK_SHOT_ATTACK_RATIO)
-    return (outside_ratio, attack_ratio, inside_ratio)
+        return (1.0, 0.0, 0.0)
+    # Other bands: use explicit outside / attack / inside from band
+    o = tier.get("outside", 0.7)
+    a = tier.get("attack", 0.2)
+    i = tier.get("inside", 0.1)
+    return (o, a, i)
 
 
 def choose_focus_from_override(focus_weights):

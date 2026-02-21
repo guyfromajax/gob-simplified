@@ -175,15 +175,16 @@ DEAD_BALL_TURNOVER = 30  # temp change from 7
 CHARGE_THRESHOLD = -240
 BLOCKING_FOUL_THRESHOLD = 220
 
-# Situational Logic (Q4/OT): Quick Shot / Slow It Down (see docs/.../Situational_Logic_System.md)
-# Time remaining is in the quarter (seconds). Tiers: < 30, < 60, < 120, < 180 (most restrictive first).
-SITUATIONAL_TIME_TIERS = (
-    (30, {"slow_threshold": 1, "quick_threshold": 1, "outside_ratio": 1.0, "force_foul_range": True}),
-    (60, {"slow_threshold": 6, "quick_threshold": -6, "outside_ratio": 0.95, "force_foul_range": True}),
-    (120, {"slow_threshold": 9, "quick_threshold": -9, "outside_ratio": 0.85, "force_foul": False}),
-    (180, {"slow_threshold": 12, "quick_threshold": -12, "outside_ratio": 0.70, "force_foul": False}),
+# Situational Logic (Q4/OT): time-band table (see docs/.../Situational_Logic_System.md)
+# Each entry: (min_sec, max_sec, config). Time remaining in quarter (seconds). Bands: 2:01-3:00, 1:01-2:00, 0:31-1:00, 0:01-0:30.
+SITUATIONAL_TIME_BANDS = (
+    (121, 180, {"slow_min": 12, "quick_lo": -24, "quick_hi": -12, "outside": 0.60, "attack": 0.20, "inside": 0.20, "force_foul": False}),
+    (61, 120, {"slow_min": 9, "quick_lo": -18, "quick_hi": -9, "outside": 0.70, "attack": 0.20, "inside": 0.10, "force_foul": False}),
+    (31, 60, {"slow_min": 3, "quick_lo": -12, "quick_hi": -3, "outside": 0.80, "attack": 0.15, "inside": 0.05, "force_foul_lo": 3, "force_foul_hi": 12}),
+    (0, 30, {"slow_min": 1, "quick_lo": -9, "quick_hi": -1, "last_30_quick": True, "outside_if_delta_below": -2, "force_foul_lo": 1, "force_foul_hi": 9}),
 )
-SITUATIONAL_QUICK_SHOT_ATTACK_RATIO = 0.75   # If not outside: 75% attack / 25% inside
+# Legacy: used only if a caller expects single ratio; bands above define explicit outside/attack/inside
+SITUATIONAL_QUICK_SHOT_ATTACK_RATIO = 0.75
 SITUATIONAL_FORCE_FOUL_TIME_ELAPSED_MIN = 1
 SITUATIONAL_FORCE_FOUL_TIME_ELAPSED_MAX = 3
 # Inbound pass receiver position for Force Foul (BIP/SIP)
