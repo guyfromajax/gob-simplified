@@ -269,6 +269,7 @@ export class AnimationEngine {
     // Final play of quarter (e.g. Final Turn shooting foul → FTs): show 0:00, hold then quarter end (no BIP)
     if (turnData.quarter_ends_after) {
       if (context.onUpdate) context.onUpdate({ clock: '0:00' });
+      this._playFinalHoldAirhorn();
       const animationConfig = (await import('./animation_config.js')).default;
       const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 3000;
       await new Promise(resolve => setTimeout(resolve, holdMs));
@@ -648,6 +649,22 @@ export class AnimationEngine {
   }
 
   /**
+   * Play Timeout - Airhorn.mp3 when the clock hits 0:00 (e.g. final play of quarter hold).
+   */
+  _playFinalHoldAirhorn() {
+    if (typeof window === 'undefined') return;
+    try {
+      const staticPath = (window.API_CONFIG && typeof window.API_CONFIG.getStaticPath === 'function')
+        ? window.API_CONFIG.getStaticPath()
+        : '/static';
+      const airhorn = new Audio(`${staticPath}/sounds/Timeout - Airhorn.mp3`);
+      airhorn.volume = 0.7;
+      airhorn.currentTime = 0;
+      airhorn.play().catch(() => {});
+    } catch (e) {}
+  }
+
+  /**
    * Phase 4: FINAL_HOLD — no shot, run clock out (short delay), then complete.
    * Quarter/game end is triggered by the API when quarter_complete is true.
    */
@@ -693,6 +710,7 @@ export class AnimationEngine {
     // Final play of quarter: hold ball at rim (make) or bounce (miss), announce "It's Good" on make, then quarter end (no BIP/rebound)
     if (turnData.quarter_ends_after) {
       if (context.onUpdate) context.onUpdate({ clock: '0:00' });
+      this._playFinalHoldAirhorn();
       const animationConfig = (await import('./animation_config.js')).default;
       const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 3000;
       if (turnData.result_type === 'MAKE') {
