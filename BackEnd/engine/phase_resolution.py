@@ -3539,6 +3539,22 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
                 break
     shot_wing = random.choice(["upper wing", "lower wing"])
     bh_is_shooter = bh_pos == shooter_pos
+    # Opposite vertical half spots for the other 3 or 4 players (doc: midWing, wing, midCorner, corner, deep wing, deep baseline)
+    if shot_wing == "upper wing":
+        opposite_half_spots = [
+            "lower midWing", "lower wing", "lower midCorner", "lower corner",
+            "deep lower wing", "deep lower baseline",
+        ]
+    else:
+        opposite_half_spots = [
+            "upper midWing", "upper wing", "upper midCorner", "upper corner",
+            "deep upper wing", "deep upper baseline",
+        ]
+    random.shuffle(opposite_half_spots)
+    other_positions = [p for p in ["PG", "SG", "SF", "PF", "C"] if p != bh_pos and p != shooter_pos]
+    other_spot_by_pos = {}
+    for i, pos in enumerate(other_positions):
+        other_spot_by_pos[pos] = opposite_half_spots[i % len(opposite_half_spots)]
     # Skeleton: step 0 alignment, step 1 pass/receive (or BH to wing if BH shoots), step 2 shoot
     step0 = {"timestamp": 0, "pos_actions": {}}
     for pos in ["PG", "SG", "SF", "PF", "C"]:
@@ -3552,11 +3568,14 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
         if bh_is_shooter and pos == bh_pos:
             step1["pos_actions"][pos] = {"action": ACTIONS["HANDLE"], "location": shot_wing}
         elif not bh_is_shooter and pos == bh_pos:
-            step1["pos_actions"][pos] = {"action": ACTIONS["PASS"], "location": "key"}
+            step1["pos_actions"][pos] = {"action": ACTIONS["PASS"], "location": "deep key"}
         elif pos == shooter_pos:
             step1["pos_actions"][pos] = {"action": ACTIONS["RECEIVE"], "location": shot_wing}
         else:
-            step1["pos_actions"][pos] = {"action": "stand", "location": position_to_spot.get(pos, "key")}
+            step1["pos_actions"][pos] = {
+                "action": "stand",
+                "location": other_spot_by_pos.get(pos, position_to_spot.get(pos, "key")),
+            }
     step2 = {"timestamp": 600, "pos_actions": {}}
     for pos in ["PG", "SG", "SF", "PF", "C"]:
         if pos == shooter_pos:
