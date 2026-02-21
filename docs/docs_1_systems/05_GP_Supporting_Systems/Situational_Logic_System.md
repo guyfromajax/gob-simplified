@@ -63,7 +63,22 @@ Temp overrides (Fast Break, FCP, HCT) are re-evaluated each turn and revert when
 
 **Force Foul after DREB:** On a defensive rebound (HCO shot miss → DREB), we **evaluate Force Foul immediately**. If Slow It Down + Force Foul apply, we execute the foul right away: we do not run the normal “next step” logic (no Fast Break vs HCO decision, no outlet pass). The victim is the last rebounder; the fouling defender is the defender closest to that rebounder. We inject a FOUL turn and then enter the standard defensive non-shooting foul flow (possession flip, SIDE_INBOUND or FREE_THROW). Animation: no outlet pass; on the FOUL turn we animate the defender moving to the rebounder and announce “Quick Foul.”
 
+## Announcement System
+
+Situational and result announcements are driven by a central game announcement system. At **turn start** (during turn preparation, before animation), the following context announcements may be shown based on turn data:
+
+- **Fast Break** — when the turn is a fast break (and not steal-initiated).
+- **Press!** / **Trap!** — when a baseline inbound is setting up FCP or HCT (defense).
+- **Slow It Down** / **Quick Shot** — when an HCO turn has Slow It Down or Quick Shot set (offense).
+- **Final Shot** — when the turn is a Final Turn shot attempt (offense). Not shown for FINAL_HOLD (hold until 0).
+
+At **turn end** (or at specific animation moments), the system announces shot results (e.g. "It's Good!", "Shooting Foul!"), fouls ("Quick Foul", "CHARGE!", "BLOCKING FOUL!", etc.), rebounds, steals, and turnovers. Force Foul animations use the announcement system with the fouling player image and text "Quick Foul" as described in Force Foul Execution above.
+
+---
+
 ## Final Turn Execution
+
+**Trigger:** The first possession with `time_remaining ≤ 30` seconds that is **not** OREB and **not** Fast Break (i.e. state is HCO, HCT, or FCP) is eligible for Final Turn. Only one Final Turn is triggered per quarter/OT (`final_turn_triggered_this_period`). The *next* turn after an OREB or Fast Break (when time is still ≤ 30 and quarter ≥ 4) is the one evaluated for Final Turn.
 
 **Qs 1–3:**
 - The first team to take possession of the ball with ≤ 30 seconds remaining will hold for the final shot, so time_elapsed will be equal to time remaining.
@@ -92,10 +107,12 @@ Temp overrides (Fast Break, FCP, HCT) are re-evaluated each turn and revert when
           - Two or more players cannot occupy the same spot.
         - With 3–5 seconds remaining, the shooter attempts his shot — animate outside or attack shot same as we do in the Motion offense outside and attack shots.
           - Note: the detail of the shot being attempted with 3–5 seconds remaining is irrelevant now, but it will be relevant once we adjust the game engine to count down the clock in real time instead of in chunks turn by turn like we do now.
-      - Execute the shot via our standard shot attempt logic, and process the result as we do all shot attempts with 0 seconds remaining in the quarter. Process Make or Miss; if no shooting foul the quarter ends; if Charge on attack shot, the quarter ends; if blocking foul on attack shot, treat as a shooting foul in this instance and shoot two free throws; if shooting foul, the quarter ends with the number of free throw(s).
+      - Execute the shot via our standard shot attempt logic, and process the result as we do all shot attempts with 0 seconds remaining in the quarter. Process Make or Miss; if no shooting foul the quarter ends; if Charge on attack shot, the quarter ends; **if blocking foul on Final Turn attack shot, award exactly two free throws (no and-1, no 3 FTs for a three-point attempt)**; if shooting foul, the quarter ends with the number of free throw(s). After the shot (or FTs if shooting foul), quarter ends and game ends if it is the final period.
+  - **Alignment (frontend):** The backend sends `oDestinations` and `dDestinations` in home-side coordinates. When the away team is on offense, both offense and defense positions are flipped so the whole setup is on the away (attacking) half of the court.
+  - **Announcement:** "Final Shot" is announced at the start of a Final Turn shot attempt (see Announcement System); not shown for FINAL_HOLD.
 
-**Q4:**
-- If Slow It Down is true and Force Foul is false: the offense and defense get into Starting Alignments defined above, and the offense holds the ball until the clock reaches 0. They do not attempt a shot.
-- If Slow It Down is true and Force Foul is true: a force foul should have happened by this point, but if not, execute the Force Foul.
-- If Quick Shot: treat as a normal quick shot turn.
-- If not Slow It Down, and not Quick Shot, and not Force Foul: treat as the same final shot logic as above (this can only be the case if the team is trailing or the score is tied — a team leading should never enter this instance).
+**Q4 (and OT):**
+- If Slow It Down is true and Force Foul is false: produce a **FINAL_HOLD** turn. The offense and defense get into Starting Alignments, and the offense holds the ball until the clock reaches 0 (`time_elapsed = time_remaining`). No shot is attempted. Quarter (or game) ends after this turn.
+- If Slow It Down is true and Force Foul is true: execute the Force Foul (existing logic); no special Final Turn alignment for that possession.
+- If Quick Shot: treat as a normal quick shot turn (no Final Turn alignment or play execution).
+- If not Slow It Down, and not Quick Shot, and not Force Foul: treat as the same final shot logic as above (trailing or tied; a team leading should never enter this instance).

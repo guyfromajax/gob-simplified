@@ -2875,7 +2875,8 @@ export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, 
   if (scene?.skipToEnd || !turnData) return;
   const oDestinations = turnData.oDestinations || turnData.o_destinations || {};
   const dDestinations = turnData.dDestinations || turnData.d_destinations || {};
-  const offenseTeamId = turnData.offense_team_id || turnData.possession_team_id || scene.offenseTeamId;
+  const { resolveOffenseTeamId } = await import('../utils/offenseTeamIdResolver.js');
+  const offenseTeamId = resolveOffenseTeamId({ scene, turnData, playerSprites });
   const homeTeamId = scene.simData?.home_team_id;
   const isAwayOffense = offenseTeamId && homeTeamId && String(offenseTeamId) !== String(homeTeamId);
   const flipCoords = (coords) => ({ x: 101 - coords.x, y: coords.y });
