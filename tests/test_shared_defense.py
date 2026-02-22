@@ -84,7 +84,7 @@ def test_get_spacing_non_bh_defenders():
 
 def test_verify_defender_closer_to_basket():
     """Test verification that defender is closer to basket"""
-    basket = {"x": 90, "y": 25}
+    basket = {"x": 91, "y": 25}
     
     # Defender closer to basket (should pass)
     assert verify_defender_closer_to_basket(85, 25, 70, 25, basket["x"], basket["y"]) == True

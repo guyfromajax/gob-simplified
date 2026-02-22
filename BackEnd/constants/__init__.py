@@ -290,8 +290,8 @@ OFFSET_SPOTS = {
 }
 
 # Shared court coordinates
-HOME_RIM_COORDS = {"x": 90, "y": 25}
-AWAY_RIM_COORDS = {"x": 10, "y": 25}
+HOME_RIM_COORDS = {"x": 91, "y": 25}
+AWAY_RIM_COORDS = {"x": 9, "y": 25}
 HOME_TOP_KEY = {"x": 64, "y": 25}
 AWAY_TOP_KEY = {"x": 36, "y": 25}
 HOME_INBOUND_LEFT = {"x": 97, "y": 20}  # Home team inbounding from left side (under away basket)

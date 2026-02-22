@@ -4,7 +4,7 @@
  * These constants define movement ranges, offsets, and coordinate ranges used throughout
  * the Fast Break system (DREB → Fast Break, Steal → Fast Break).
  * 
- * All coordinates are in HOME orientation (basket at x=90 for home, x=10 for away).
+ * All coordinates are in HOME orientation (basket at x=91 for home, x=9 for away).
  */
 
 // Ball Handler Movement (Defensive Stop / Shot Attempt)
@@ -46,4 +46,3 @@ export const STEAL_HCO_SETUP_MOVE_X_MAX = 7; // Maximum x movement away from bas
 export const STEAL_HCO_SETUP_MOVE_Y_RANGE = 3; // ±3 y-coords
 export const STEAL_HCO_SETUP_Y_MIN = 3; // Minimum y-coord (clamped)
 export const STEAL_HCO_SETUP_Y_MAX = 47; // Maximum y-coord (clamped)
-

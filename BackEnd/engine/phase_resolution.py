@@ -895,16 +895,16 @@ def resolve_fast_break_logic(game: "GameManager"):
     # logging.debug(f"  is_away_offense: {is_away_offense}")
     
     # Determine direction toward basket
-    # Home offense: basket at x=90, so direction = +1 (right)
-    # Away offense: basket at x=10, so direction = -1 (left)
+    # Home offense: basket at x=91, so direction = +1 (right)
+    # Away offense: basket at x=9, so direction = -1 (left)
     if is_away_offense:
         # Away offense: smaller x is closer to basket
         direction = -1
-        basket_x = 10
+        basket_x = 9
     else:
         # Home offense: larger x is closer to basket
         direction = 1
-        basket_x = 90
+        basket_x = 91
     
     # ============================================================================
     # STEAL ENTRY vs OUTLET PASS: Different logic for steals vs rebounds

@@ -1696,7 +1696,7 @@
         // Ball at basket (rim coordinates from constants)
         const rimCoords = HCO_STRING_SPOTS['key']; // Using key as approximate rim location
         if (rimCoords) {
-          finalBallLeft = '90%'; // HOME_RIM_COORDS x = 90
+          finalBallLeft = '91%'; // HOME_RIM_COORDS x = 91
           finalBallTop = '50%'; // HOME_RIM_COORDS y = 25 → (50-25)*2 = 50%
         }
       } else if (currentBallHandler) {
@@ -1737,7 +1737,7 @@
       if (!basketTarget) {
         basketTarget = document.createElement('div');
         basketTarget.className = 'basket-target';
-        basketTarget.style.left = '90%'; // HOME_RIM_COORDS x = 90
+        basketTarget.style.left = '91%'; // HOME_RIM_COORDS x = 91
         basketTarget.style.top = '50%'; // HOME_RIM_COORDS y = 25 → (50-25)*2 = 50%
         container.appendChild(basketTarget);
         
