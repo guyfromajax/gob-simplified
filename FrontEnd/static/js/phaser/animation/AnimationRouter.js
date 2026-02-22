@@ -116,6 +116,10 @@ export class AnimationRouter {
         noImpactResultTypes.has(turnData?.result_type);
 
       if (this.scene?.gameClock) {
+        const clockState = this.scene.gameClock.getState?.() || {};
+        if (!clockState.running && !isNoImpactTurn && !this.scene.isPaused) {
+          this.scene.gameClock.start();
+        }
         if (isNoImpactTurn) {
           this.scene.gameClock.pause('no_impact_turn');
         } else {

@@ -13,7 +13,7 @@ Define how gameplay turns map to clock countdown behavior using four clock categ
 Used for turn types with skeleton steps (`HCO`, `FCP`, `HCT`).
 
 Clock calculation:
-- For each executed skeleton step: `step_seconds = random.randint(1,5)`
+- For each executed skeleton step: `step_seconds = random.randint(1,2)`
 - Backend emits per-step timing contract:
   - `step_clock_seconds[]`
   - `resolution_step_index`
@@ -68,6 +68,7 @@ Execution:
 - No countdown decrement during turn
 - Clock display remains unchanged except for backend sync if response includes updated clock context
 - Frontend realtime countdown is explicitly frozen during no-impact turns to prevent local drift
+- Realtime clock start is deferred until first impact turn (non no-impact), preventing pre-turn drift on page load/resume flows
 
 ## Turn Classification Matrix
 

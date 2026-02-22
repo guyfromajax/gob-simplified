@@ -523,7 +523,7 @@ export function createGameScene(Phaser) {
         clockElement: clockEl,
         tickMs: 700,
       });
-      this.gameClock.start();
+      // Start is deferred until first impact turn (non No Impact) is processed.
       if (quarterEl && livePeriodLabel) {
         quarterEl.textContent = livePeriodLabel;
       }
