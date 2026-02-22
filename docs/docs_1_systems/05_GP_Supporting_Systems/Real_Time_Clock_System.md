@@ -13,7 +13,7 @@ Define how gameplay turns map to clock countdown behavior using four clock categ
 Used for turn types with skeleton steps (`HCO`, `FCP`, `HCT`).
 
 Clock calculation:
-- For each executed skeleton step: `step_seconds = random.randint(1,2)`
+- For each executed skeleton step: `step_seconds = 1`
 - Backend emits per-step timing contract:
   - `step_clock_seconds[]`
   - `resolution_step_index`

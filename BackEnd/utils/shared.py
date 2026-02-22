@@ -198,7 +198,7 @@ def calc_skeleton_step_timing_contract(
     Build deterministic per-step clock timing contract for skeleton turns.
     """
     if not steps:
-        one_step = random.randint(1, 2)
+        one_step = 1
         return {
             "step_clock_seconds": [one_step],
             "time_elapsed": clamp_turn_time_elapsed(one_step, cap=cap),
@@ -212,7 +212,7 @@ def calc_skeleton_step_timing_contract(
     resolution_step_index = max(0, min(max_index, int(resolution_step_index)))
 
     executed_count = resolution_step_index + 1
-    step_clock_seconds = [random.randint(1, 2) for _ in range(executed_count)]
+    step_clock_seconds = [1 for _ in range(executed_count)]
 
     if include_hco_step1_bringup and len(step_clock_seconds) > 0:
         step_clock_seconds[0] += _calc_hco_step1_bringup_overhead_seconds(steps)
