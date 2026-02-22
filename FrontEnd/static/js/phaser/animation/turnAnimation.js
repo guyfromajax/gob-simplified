@@ -339,10 +339,13 @@ async function updateBallOwnership({ scene, ballSprite, animations, playerSprite
  * Locks the ball to the player with hasBallAtStep[0] during this setup tween.
  */
 
-async function runSetupTween({ scene, ballSprite, animations, playerSprites, currentBallOwnerRef }) {
+async function runSetupTween({ scene, ballSprite, animations, playerSprites, currentBallOwnerRef, turnData = null }) {
   if (scene.skipToEnd) return;
   const stepIndex = 0;
   const promises = [];
+  const shouldClampXToRims =
+    turnData?.result_type !== "SIDE_INBOUND" &&
+    turnData?.result_type !== "BASELINE_INBOUND";
 
   for (const anim of animations) {
     if (scene.skipToEnd) break;
@@ -350,8 +353,12 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
     const firstStep = anim.movement?.[stepIndex];
     if (!sprite || !firstStep) continue;
 
+    const targetGridX = shouldClampXToRims
+      ? Phaser.Math.Clamp(firstStep.coords.x, 9, 91)
+      : firstStep.coords.x;
+
     const { x, y } = gridToPixels(
-      firstStep.coords.x,
+      targetGridX,
       firstStep.coords.y,
       scene.game.config.width,
       scene.game.config.height
@@ -2212,7 +2219,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       ballSprite,
       animations: turnData.animations,
       playerSprites,
-      currentBallOwnerRef
+      currentBallOwnerRef,
+      turnData
     });
   } else {
     console.log('⏭️ [FCP/HCT] Skipping runSetupTween() - players already positioned at step 0 from BIP');

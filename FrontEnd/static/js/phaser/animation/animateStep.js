@@ -106,8 +106,14 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     }, timeoutMs);
     // Use nextStep.coords if available (for movement target), otherwise step.coords
     const targetStep = nextStep || step;
+    const shouldClampXToRims =
+      turnData?.result_type !== "SIDE_INBOUND" &&
+      turnData?.result_type !== "BASELINE_INBOUND";
+    const targetGridX = shouldClampXToRims
+      ? Math.max(9, Math.min(91, targetStep.coords.x))
+      : targetStep.coords.x;
     const { x: targetX, y: targetY } = gridToPixels(
-      targetStep.coords.x,
+      targetGridX,
       targetStep.coords.y,
       scene.game.config.width,
       scene.game.config.height
