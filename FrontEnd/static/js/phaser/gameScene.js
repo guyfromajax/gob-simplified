@@ -1396,10 +1396,29 @@ export function createGameScene(Phaser) {
           }
         }
         if (this.gameClock) {
+          const clockState = this.gameClock.getState?.() || {};
+          const currentClockSec = Number.isFinite(clockState.timeRemaining) ? clockState.timeRemaining : null;
+          const incomingQuarter = (typeof turn.quarter === 'number') ? turn.quarter : liveQuarter;
+          const allowIncrease = incomingQuarter > liveQuarter;
+          let incomingClockSec = null;
           if (typeof turn.time_remaining === 'number') {
-            this.gameClock.syncWithBackend(turn.time_remaining);
+            incomingClockSec = Math.max(0, Math.floor(turn.time_remaining));
           } else if (turn.clock || turn.game_clock) {
-            this.gameClock.syncWithBackend(parseClockToSeconds(turn.clock || turn.game_clock));
+            incomingClockSec = parseClockToSeconds(turn.clock || turn.game_clock);
+          }
+          if (Number.isFinite(incomingClockSec)) {
+            if (currentClockSec == null || allowIncrease || incomingClockSec <= currentClockSec) {
+              this.gameClock.syncWithBackend(incomingClockSec);
+            } else {
+              // Ignore stale/out-of-order clock payloads in the same period.
+              console.warn('⏱️ Ignoring non-monotonic clock update', {
+                currentClockSec,
+                incomingClockSec,
+                liveQuarter,
+                incomingQuarter,
+                result_type: turn.result_type
+              });
+            }
           }
         }
         if (turn.quarter != null) liveQuarter = turn.quarter;
@@ -1416,7 +1435,7 @@ export function createGameScene(Phaser) {
         if (awayFoulsEl) awayFoulsEl.textContent = `F: ${liveAwayFouls}`;
         if (homeTolEl) homeTolEl.textContent = `TOL: ${liveHomeTimeouts}`;
         if (awayTolEl) awayTolEl.textContent = `TOL: ${liveAwayTimeouts}`;
-        if (clockEl) clockEl.textContent = liveClock;
+        // Clock text is written only by gameClock (single-writer authority).
         if (quarterEl) quarterEl.textContent = livePeriodLabel;
 
         applyPlayerStats(turn);

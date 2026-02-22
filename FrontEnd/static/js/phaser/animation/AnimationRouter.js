@@ -114,11 +114,20 @@ export class AnimationRouter {
       const isNoImpactTurn =
         (hasElapsedValue && elapsedValue === 0) ||
         noImpactResultTypes.has(turnData?.result_type);
+      const isOpeningTipTurn = turnData?.result_type === 'OPENING_TIP';
 
       if (this.scene?.gameClock) {
         const clockState = this.scene.gameClock.getState?.() || {};
-        if (!clockState.running && !isNoImpactTurn && !this.scene.isPaused) {
+        if (!clockState.running && !isNoImpactTurn && !this.scene.isPaused && !isOpeningTipTurn) {
           this.scene.gameClock.start();
+        } else if (!clockState.running && isOpeningTipTurn) {
+          // Start gameplay clock at opening tip jump apex, not on turn load.
+          this.scene.events?.once('openingTipApex', () => {
+            if (this.scene?.gameClock && !this.scene.isPaused) {
+              this.scene.gameClock.start();
+              this.scene.gameClock.resume('no_impact_turn');
+            }
+          });
         }
         if (isNoImpactTurn) {
           this.scene.gameClock.pause('no_impact_turn');
