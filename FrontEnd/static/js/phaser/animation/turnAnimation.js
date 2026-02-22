@@ -367,9 +367,6 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
   if (scene.skipToEnd) return;
   const stepIndex = 0;
   const promises = [];
-  const stepStartMs = performance.now();
-  const stepBallHandlerId = getStepBallHandlerId(animations, stepIndex);
-  let ballHandlerPlannedDurationMs = 0;
   const shouldClampXToRims =
     turnData?.result_type !== "SIDE_INBOUND" &&
     turnData?.result_type !== "BASELINE_INBOUND";
@@ -393,29 +390,13 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
 
     // ✅ FIX: Use distance-based duration for consistent speed (matches step animations)
     // This ensures smooth transitions between turns and consistent speeds
-    const distanceDuration = getPlayerDuration(sprite, x, y);
-    const isStepBallHandler = !!stepBallHandlerId && anim.playerId === stepBallHandlerId;
-    const shouldCutAtStepBoundary =
-      !isStepBallHandler &&
-      Number.isFinite(stepDurationMs) &&
-      stepDurationMs > 0 &&
-      distanceDuration > stepDurationMs;
-    const duration = shouldCutAtStepBoundary ? stepDurationMs : distanceDuration;
-    if (isStepBallHandler) {
-      ballHandlerPlannedDurationMs = Math.max(ballHandlerPlannedDurationMs, distanceDuration);
-    }
-    const targetX = shouldCutAtStepBoundary
-      ? sprite.x + (x - sprite.x) * (stepDurationMs / distanceDuration)
-      : x;
-    const targetY = shouldCutAtStepBoundary
-      ? sprite.y + (y - sprite.y) * (stepDurationMs / distanceDuration)
-      : y;
+    const duration = getPlayerDuration(sprite, x, y);
 
     promises.push(new Promise((resolve) => {
       const tween = scene.tweens.add({
         targets: [sprite],
-        x: targetX,
-        y: targetY,
+        x,
+        y,
         duration,
         ease: "Linear",
         onUpdate: () => {
@@ -434,14 +415,6 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
   }
 
   await Promise.all(promises);
-  if (Number.isFinite(stepDurationMs) && stepDurationMs > 0) {
-    const effectiveStepMs = Math.max(stepDurationMs, ballHandlerPlannedDurationMs || 0);
-    const elapsedMs = performance.now() - stepStartMs;
-    const holdMs = effectiveStepMs - elapsedMs;
-    if (holdMs > 0) {
-      await delayMs(scene, holdMs);
-    }
-  }
 }
 
 // Setup sideline inbound play
@@ -2290,7 +2263,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
-    const stepStartMs = performance.now();
     
     // ✅ REMOVED: Special FCP/HCT FastBreak check - FCP/HCT now routes through AnimationRouter (same as HCO)
     const willEarlyExit = scene.skipToEnd || scene.stateMachine?.is(States.FastBreak);
@@ -2332,15 +2304,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     
     const passInfo = detectPassAtStep(turnData.animations, stepIndex);
     const passHappeningAtThisStep = !!passInfo;
-    const stepBudgetMs = (() => {
-      const stepSeconds = stepClockSeconds?.[stepIndex];
-      if (Number.isFinite(stepSeconds) && stepSeconds > 0) {
-        return Math.max(0, Math.round(stepSeconds * clockSecondMs));
-      }
-      return null;
-    })();
-    const stepBallHandlerId = getStepBallHandlerId(turnData.animations, stepIndex);
-    let ballHandlerPlannedDurationMs = 0;
     
     // 🔍 DEBUG: Log step processing for step 16 (3-2 Motion bug)
     if (stepIndex === 16) {
@@ -2437,27 +2400,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       // The sprite's current position (sprite.x, sprite.y) is where it actually is,
       // which may be from the end of the previous turn or from a previous step
       const distanceDuration = getPlayerDuration(sprite, targetX, targetY);
-      const isStepBallHandler = !!stepBallHandlerId && anim.playerId === stepBallHandlerId;
-      const shouldCutAtStepBoundary =
-        !isStepBallHandler &&
-        Number.isFinite(stepBudgetMs) &&
-        stepBudgetMs > 0 &&
-        distanceDuration > stepBudgetMs;
-      const duration = shouldCutAtStepBoundary
-        ? stepBudgetMs
-        : distanceDuration;
-      if (isStepBallHandler) {
-        ballHandlerPlannedDurationMs = Math.max(ballHandlerPlannedDurationMs, distanceDuration);
-      }
-      const nextStepForTween = shouldCutAtStepBoundary
-        ? {
-            ...curr,
-            coords: {
-              x: prev.coords.x + (curr.coords.x - prev.coords.x) * (stepBudgetMs / distanceDuration),
-              y: prev.coords.y + (curr.coords.y - prev.coords.y) * (stepBudgetMs / distanceDuration),
-            },
-          }
-        : curr;
+      const duration = distanceDuration;
       
 
       DEBUG && animationDebugLog('[turn]', turnData?.id, step.timestamp, nextStep.timestamp, duration, {
@@ -2487,7 +2430,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         scene,
         sprite,
         step: prev,  // Previous step (for position calculation)
-        nextStep: nextStepForTween,  // Current step target (may be clipped at step boundary)
+        nextStep: curr,  // Current step (for action checking)
         duration,
         ballSprite,
         currentBallOwnerRef,
@@ -2512,7 +2455,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           scene,
           sprite,
           step: prev,
-          nextStep: nextStepForTween,
+          nextStep: curr,
           duration,
           ballSprite,
           currentBallOwnerRef,
@@ -2966,14 +2909,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       }
     }
 
-    if (Number.isFinite(stepBudgetMs) && stepBudgetMs > 0) {
-      const effectiveStepMs = Math.max(stepBudgetMs, ballHandlerPlannedDurationMs || 0);
-      const elapsedMs = performance.now() - stepStartMs;
-      const holdMs = effectiveStepMs - elapsedMs;
-      if (holdMs > 0) {
-        await delayMs(scene, holdMs);
-      }
-    }
   }
 }
 
