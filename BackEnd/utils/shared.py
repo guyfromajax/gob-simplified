@@ -133,18 +133,111 @@ def calc_skeleton_time_elapsed(steps, resolution_step_index=None, cap=30):
     """
     Calculate skeleton turn time from per-step random seconds (1..5).
     """
+    timing = calc_skeleton_step_timing_contract(
+        steps,
+        resolution_step_index=resolution_step_index,
+        cap=cap,
+        include_hco_step1_bringup=False,
+    )
+    return timing["time_elapsed"]
+
+
+def _extract_step_location_coords(action_info):
+    """Resolve a step action location payload to {x, y} when possible."""
+    if not isinstance(action_info, dict):
+        return None
+    coords = action_info.get("coords")
+    if isinstance(coords, dict) and "x" in coords and "y" in coords:
+        return {"x": coords.get("x", 50), "y": coords.get("y", 25)}
+
+    spot = action_info.get("location") or action_info.get("spot")
+    if isinstance(spot, str):
+        spot_coords = HCO_STRING_SPOTS.get(spot)
+        if spot_coords:
+            return {"x": spot_coords.get("x", 50), "y": spot_coords.get("y", 25)}
+    return None
+
+
+def _get_step_ball_handler_pos(step):
+    """Best-effort ball handler position for a skeleton step."""
+    pos_actions = (step or {}).get("pos_actions", {})
+    for pos, action_info in pos_actions.items():
+        action = (action_info or {}).get("action", "")
+        if action in ["handle_ball", "receive", "shoot", "pass", "drive"]:
+            return pos
+    return None
+
+
+def _calc_hco_step1_bringup_overhead_seconds(steps):
+    """
+    Estimate extra step-1 bring-up time for HCO turns from step0 -> step1 ball-handler move.
+    """
+    if not steps or len(steps) < 2:
+        return 0
+    step0 = steps[0]
+    step1 = steps[1]
+    ball_handler_pos = _get_step_ball_handler_pos(step1) or _get_step_ball_handler_pos(step0)
+    if not ball_handler_pos:
+        return 0
+    step0_action = (step0.get("pos_actions", {}) or {}).get(ball_handler_pos, {})
+    step1_action = (step1.get("pos_actions", {}) or {}).get(ball_handler_pos, {})
+    start = _extract_step_location_coords(step0_action)
+    end = _extract_step_location_coords(step1_action)
+    if not start or not end:
+        return 0
+    return int(round(calc_cg_segment_seconds(start, end)))
+
+
+def calc_skeleton_step_timing_contract(
+    steps,
+    resolution_step_index=None,
+    cap=30,
+    include_hco_step1_bringup=False,
+):
+    """
+    Build deterministic per-step clock timing contract for skeleton turns.
+    """
     if not steps:
-        return random.randint(1, 5)
+        one_step = random.randint(1, 5)
+        return {
+            "step_clock_seconds": [one_step],
+            "time_elapsed": clamp_turn_time_elapsed(one_step, cap=cap),
+            "resolution_step_index": 0,
+            "executed_step_count": 1,
+        }
 
     max_index = len(steps) - 1
     if resolution_step_index is None:
         resolution_step_index = max_index
     resolution_step_index = max(0, min(max_index, int(resolution_step_index)))
 
-    total = 0
-    for _ in range(resolution_step_index + 1):
-        total += random.randint(1, 5)
-    return clamp_turn_time_elapsed(total, cap=cap)
+    executed_count = resolution_step_index + 1
+    step_clock_seconds = [random.randint(1, 5) for _ in range(executed_count)]
+
+    if include_hco_step1_bringup and len(step_clock_seconds) > 0:
+        step_clock_seconds[0] += _calc_hco_step1_bringup_overhead_seconds(steps)
+
+    total = sum(step_clock_seconds)
+    if total > cap:
+        overflow = total - cap
+        # Reduce from the end while keeping each executed step at >=1s.
+        for idx in range(len(step_clock_seconds) - 1, -1, -1):
+            if overflow <= 0:
+                break
+            reducible = max(0, step_clock_seconds[idx] - 1)
+            if reducible <= 0:
+                continue
+            reduce_by = min(reducible, overflow)
+            step_clock_seconds[idx] -= reduce_by
+            overflow -= reduce_by
+
+    final_total = clamp_turn_time_elapsed(sum(step_clock_seconds), cap=cap)
+    return {
+        "step_clock_seconds": step_clock_seconds,
+        "time_elapsed": final_total,
+        "resolution_step_index": resolution_step_index,
+        "executed_step_count": len(step_clock_seconds),
+    }
 
 
 def calc_cg_segment_seconds(start, end):

@@ -21,6 +21,7 @@ from BackEnd.utils.shared import (
     apply_scoring,
     get_time_elapsed,
     calc_skeleton_time_elapsed,
+    calc_skeleton_step_timing_contract,
     resolve_offensive_rebound,
     get_player_position,
     calculate_screen_score,
@@ -523,7 +524,12 @@ class ShotManager:
                         text = f"{get_name_safe(shooter)} misses. {get_name_safe(defender)} fouls him!"
                     shooter_pos = get_player_position(off_lineup, shooter)
                     # Keep turn timing aligned to skeleton progression for shot attempts.
-                    time_elapsed_ft = calc_skeleton_time_elapsed(steps, shot_step_index)
+                    timing_contract = calc_skeleton_step_timing_contract(
+                        steps,
+                        resolution_step_index=shot_step_index,
+                        include_hco_step1_bringup=(self.game_state.get("offensive_state") == "HCO"),
+                    )
+                    time_elapsed_ft = timing_contract["time_elapsed"]
                     ft_remaining = 1 if made_from_foul else 2
                     result = {
                         "result_type": "MAKE" if made_from_foul else "MISS",
@@ -535,6 +541,9 @@ class ShotManager:
                         "offense_team_id": off_team.team_id, "defense_team_id": def_team.team_id,
                         "has_and_one": made_from_foul,
                         "one_and_one": False,
+                        "step_clock_seconds": timing_contract["step_clock_seconds"],
+                        "resolution_step_index": timing_contract["resolution_step_index"],
+                        "executed_step_count": timing_contract["executed_step_count"],
                     }
                     if block_recon_foul_out_info and block_recon_foul_out_info.get("fouled_out"):
                         result["fouled_out"] = True
@@ -584,7 +593,12 @@ class ShotManager:
             # Handle CHARGE: Return early with possession flip, no shot attempt
             if charge_result == "CHARGE":
                 shooter_pos = get_player_position(off_lineup, shooter)
-                time_elapsed = calc_skeleton_time_elapsed(steps, shot_step_index)
+                timing_contract = calc_skeleton_step_timing_contract(
+                    steps,
+                    resolution_step_index=shot_step_index,
+                    include_hco_step1_bringup=(self.game_state.get("offensive_state") == "HCO"),
+                )
+                time_elapsed = timing_contract["time_elapsed"]
                 
                 # Record foul on shooter (offensive foul)
                 shooter.record_stat("F")
@@ -613,6 +627,9 @@ class ShotManager:
                     "next_play_type": "SIDE_INBOUND",
                     "offense_team_id": off_team.team_id,
                     "defense_team_id": def_team.team_id,
+                    "step_clock_seconds": timing_contract["step_clock_seconds"],
+                    "resolution_step_index": timing_contract["resolution_step_index"],
+                    "executed_step_count": timing_contract["executed_step_count"],
                 }
                 return result
             
@@ -667,7 +684,12 @@ class ShotManager:
                     
                     # Early return: nullify shot attempt, return result for next turn
                     shooter_pos = get_player_position(off_lineup, shooter)
-                    time_elapsed = calc_skeleton_time_elapsed(steps, shot_step_index)
+                    timing_contract = calc_skeleton_step_timing_contract(
+                        steps,
+                        resolution_step_index=shot_step_index,
+                        include_hco_step1_bringup=(self.game_state.get("offensive_state") == "HCO"),
+                    )
+                    time_elapsed = timing_contract["time_elapsed"]
                     intended_shooter_pos = roles.get("intended_shooter_pos")
                     intended_shooter = off_lineup.get(intended_shooter_pos) if intended_shooter_pos else None
                     intended_shooter_id = intended_shooter.player_id if intended_shooter else None
@@ -692,6 +714,9 @@ class ShotManager:
                         "next_play_type": next_play_type,
                         "offense_team_id": off_team.team_id,
                         "defense_team_id": def_team.team_id,
+                        "step_clock_seconds": timing_contract["step_clock_seconds"],
+                        "resolution_step_index": timing_contract["resolution_step_index"],
+                        "executed_step_count": timing_contract["executed_step_count"],
                     }
                     if next_play_type == "FREE_THROW":
                         result["free_throws_remaining"] = self.game_state.get("free_throws_remaining", 0)
@@ -1477,10 +1502,16 @@ class ShotManager:
 
         # ⏱️ Skeleton turns use per-step random (1..5) up to shot resolution step.
         # Fast breaks are CG turns and will be overwritten in resolve_fast_break_logic.
+        timing_contract = None
         if roles.get("is_fast_break"):
             time_elapsed = 0
         else:
-            time_elapsed = calc_skeleton_time_elapsed(steps, shot_step_index)
+            timing_contract = calc_skeleton_step_timing_contract(
+                steps,
+                resolution_step_index=shot_step_index,
+                include_hco_step1_bringup=(self.game_state.get("offensive_state") == "HCO"),
+            )
+            time_elapsed = timing_contract["time_elapsed"]
 
         shooter_pos = get_player_position(off_lineup, shooter)
         
@@ -1522,6 +1553,10 @@ class ShotManager:
             "foul_player_id": getattr(foul_player, "player_id", None) if d_foul and foul_player else (defender.player_id if charge_result == "BLOCKING_FOUL" and defender else None),
             "foul_team": self.game_state.get("foul_team") if (d_foul or charge_result == "BLOCKING_FOUL") else None,
         })
+        if timing_contract is not None:
+            result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
+            result["resolution_step_index"] = timing_contract["resolution_step_index"]
+            result["executed_step_count"] = timing_contract["executed_step_count"]
         if is_block_outcome:
             result["blocker_id"] = getattr(self._block_defender, "player_id", None) if getattr(self, "_block_defender", None) else None
             if hasattr(self, "_block_spot"):

@@ -14,12 +14,19 @@ Used for turn types with skeleton steps (`HCO`, `FCP`, `HCT`).
 
 Clock calculation:
 - For each executed skeleton step: `step_seconds = random.randint(1,5)`
-- Turn elapsed: sum of step seconds up to the resolution point
+- Backend emits per-step timing contract:
+  - `step_clock_seconds[]`
+  - `resolution_step_index`
+  - `executed_step_count`
+- Turn elapsed: `time_elapsed = sum(step_clock_seconds)`
 - Cap per turn: `min(sum_steps, 30)`
+- HCO step-1 bring-up overhead:
+  - Add movement-based overhead seconds to step 0 timing (setup-to-step1 bring-up), then apply cap.
+  - Overhead uses distance rule aligned with CG scaling and rounds to nearest second.
 
 Execution:
 - Backend computes authoritative `time_elapsed`
-- Frontend animates steps in sync with the step timeline
+- Frontend animates each step using backend `step_clock_seconds[]` (not guessed durations)
 - Frontend countdown is presentation only, then syncs to backend `time_remaining` at turn end
 
 ### 2. CG (Cover-Ground)
@@ -76,6 +83,7 @@ Execution:
 - No additional API calls for per-step/per-second updates.
 - One turn response syncs the clock state (`time_remaining`/`clock`) at turn boundaries.
 - Frontend must freeze realtime countdown when `time_elapsed = 0` (no-impact turns).
+- For skeleton turns, frontend must consume backend `step_clock_seconds[]` so per-step animation time and elapsed clock time are aligned.
 
 ## Implementation Plan
 
@@ -94,6 +102,10 @@ Goal: compute `time_elapsed` on backend for every turn using the clock category 
 4. Keep all existing clock decrement mechanics unchanged after `time_elapsed` is set:
 - backend continues to update `time_remaining` and formatted `clock` as today.
 5. Include derived `time_elapsed` in turn payload (already standard) for frontend use and debugging.
+6. For skeleton turns, include per-step timing contract fields in payload:
+- `step_clock_seconds[]`
+- `resolution_step_index`
+- `executed_step_count`
 
 ### Phase 2: Frontend Real-Time Countdown Module
 Goal: add UX countdown that follows gameplay without changing backend authority.
@@ -116,7 +128,9 @@ Goal: add UX countdown that follows gameplay without changing backend authority.
 Goal: align visual countdown progression with movement/action progression.
 
 1. Skeleton turns:
-- use step timeline so offense and defense remain synchronized to the same step clock.
+- use backend `step_clock_seconds[]` per executed step.
+- apply `step_duration_ms = step_clock_seconds[i] * clock_second_ms` for each step animation.
+- keep backend turn-end sync as guardrail only (should be near no-op when aligned).
 2. CG turns:
 - use movement segments for animation timing and clock progression.
 3. non-CG turns:

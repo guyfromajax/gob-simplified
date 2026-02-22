@@ -20,6 +20,7 @@ from BackEnd.utils.shared import (
     get_name_safe,
     get_time_elapsed,
     calc_skeleton_time_elapsed,
+    calc_skeleton_step_timing_contract,
     calc_cg_segment_seconds,
     clamp_turn_time_elapsed,
     get_fast_break_chance,
@@ -4249,10 +4250,15 @@ def resolve_half_court_offense_logic(game):
                 turnover_type = "DEAD BALL"
             # Pass from_resolution_system=True to respect the resolution system's determination
             turn_result = resolve_turnover_logic(roles, game, turnover_type=turnover_type, from_resolution_system=True)
-            turn_result["time_elapsed"] = calc_skeleton_time_elapsed(
+            timing_contract = calc_skeleton_step_timing_contract(
                 roles.get("steps", []),
-                roles.get("event_step")
+                resolution_step_index=roles.get("event_step"),
+                include_hco_step1_bringup=True,
             )
+            turn_result["time_elapsed"] = timing_contract["time_elapsed"]
+            turn_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
+            turn_result["resolution_step_index"] = timing_contract["resolution_step_index"]
+            turn_result["executed_step_count"] = timing_contract["executed_step_count"]
             # Add skeleton and animations to result
             turn_result["skeleton"] = skeleton or {}
             turn_result["animations"] = animations
@@ -4285,10 +4291,15 @@ def resolve_half_court_offense_logic(game):
             game_state["foul_team"] = "OFFENSE"
             logging.warning(f"🔍 [HCO O_FOUL] About to call resolve_non_shooting_foul() - offense_team={game.offense_team.name}, defense_team={game.defense_team.name}")
             foul_result = resolve_non_shooting_foul(roles, game)
-            foul_result["time_elapsed"] = calc_skeleton_time_elapsed(
+            timing_contract = calc_skeleton_step_timing_contract(
                 roles.get("steps", []),
-                roles.get("event_step")
+                resolution_step_index=roles.get("event_step"),
+                include_hco_step1_bringup=True,
             )
+            foul_result["time_elapsed"] = timing_contract["time_elapsed"]
+            foul_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
+            foul_result["resolution_step_index"] = timing_contract["resolution_step_index"]
+            foul_result["executed_step_count"] = timing_contract["executed_step_count"]
             logging.warning(f"🔍 [HCO O_FOUL] After resolve_non_shooting_foul() - offense_team={game.offense_team.name}, defense_team={game.defense_team.name}, possession_flips={foul_result.get('possession_flips')}")
             # Add skeleton and animations to result
             foul_result["skeleton"] = skeleton or {}
@@ -4321,10 +4332,15 @@ def resolve_half_court_offense_logic(game):
         elif event_type == "D_FOUL":
             game_state["foul_team"] = "DEFENSE"
             foul_result = resolve_non_shooting_foul(roles, game)
-            foul_result["time_elapsed"] = calc_skeleton_time_elapsed(
+            timing_contract = calc_skeleton_step_timing_contract(
                 roles.get("steps", []),
-                roles.get("event_step")
+                resolution_step_index=roles.get("event_step"),
+                include_hco_step1_bringup=True,
             )
+            foul_result["time_elapsed"] = timing_contract["time_elapsed"]
+            foul_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
+            foul_result["resolution_step_index"] = timing_contract["resolution_step_index"]
+            foul_result["executed_step_count"] = timing_contract["executed_step_count"]
             # Add skeleton and animations to result
             foul_result["skeleton"] = skeleton or {}
             foul_result["animations"] = animations
@@ -5268,10 +5284,12 @@ def resolve_full_court_press_logic(game: "GameManager"):
     # For DEAD BALL, O_FOUL, D_FOUL: next_play_type is now set to SIDE_INBOUND (unless FREE_THROW)
     
     # Calculate skeleton-aligned time for FCP phase
-    fcp_time_elapsed = calc_skeleton_time_elapsed(
+    fcp_timing_contract = calc_skeleton_step_timing_contract(
         roles.get("steps", []),
-        len(roles.get("steps", [])) - 1 if roles.get("steps") else None
+        resolution_step_index=(len(roles.get("steps", [])) - 1 if roles.get("steps") else None),
+        include_hco_step1_bringup=False,
     )
+    fcp_time_elapsed = fcp_timing_contract["time_elapsed"]
     
     # Track FCP player stats for non-SHOT results
     fcp_roles = {
@@ -5298,6 +5316,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "offense_team_id": off_team.team_id,  # ✅ SS&S: Team on offense DURING this turn
         "possession_flips": possession_flips,  # ✅ Backend internal flag (tells backend when to call switch_possession)
         "time_elapsed": fcp_time_elapsed,  # Time spent in FCP phase
+        "step_clock_seconds": fcp_timing_contract["step_clock_seconds"],
+        "resolution_step_index": fcp_timing_contract["resolution_step_index"],
+        "executed_step_count": fcp_timing_contract["executed_step_count"],
         "events": [],
         "skeleton": skeleton,
         "animations": animations,
@@ -6406,10 +6427,12 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     # For DEAD BALL, O_FOUL, D_FOUL: next_play_type is now set to SIDE_INBOUND (unless FREE_THROW)
     
     # Calculate skeleton-aligned time for HCT phase
-    hct_time_elapsed = calc_skeleton_time_elapsed(
+    hct_timing_contract = calc_skeleton_step_timing_contract(
         roles.get("steps", []),
-        len(roles.get("steps", [])) - 1 if roles.get("steps") else None
+        resolution_step_index=(len(roles.get("steps", [])) - 1 if roles.get("steps") else None),
+        include_hco_step1_bringup=False,
     )
+    hct_time_elapsed = hct_timing_contract["time_elapsed"]
     
     # Track HCT player stats for non-SHOT results
     hct_roles = {
@@ -6436,6 +6459,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "offense_team_id": off_team.team_id,  # ✅ SS&S: Team on offense DURING this turn
         "possession_flips": possession_flips,  # ✅ Backend internal flag (tells backend when to call switch_possession)
         "time_elapsed": hct_time_elapsed,  # Time spent in HCT phase
+        "step_clock_seconds": hct_timing_contract["step_clock_seconds"],
+        "resolution_step_index": hct_timing_contract["resolution_step_index"],
+        "executed_step_count": hct_timing_contract["executed_step_count"],
         "events": [],
         "skeleton": skeleton,
         "animations": animations,

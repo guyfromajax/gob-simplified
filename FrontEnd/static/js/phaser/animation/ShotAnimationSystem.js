@@ -251,6 +251,11 @@ export class ShotAnimationSystem {
     
     // getPlayerDuration is already imported at top of file
     const stepIndex = 0;
+    const clockSecondMs = this.scene?.gameClock?.getState?.().tickMs || 700;
+    const stepSeconds = Array.isArray(turnData?.step_clock_seconds) ? turnData.step_clock_seconds?.[0] : null;
+    const contractDurationMs = (Number.isFinite(stepSeconds) && stepSeconds > 0)
+      ? Math.max(50, Math.round(stepSeconds * clockSecondMs))
+      : null;
     const promises = [];
     
     for (const anim of turnData.animations) {
@@ -268,7 +273,7 @@ export class ShotAnimationSystem {
       
       // ✅ FIX: Use distance-based duration for consistent speed (matches step animations)
       // This ensures smooth transitions between turns and consistent speeds
-      const duration = getPlayerDuration(sprite, x, y);
+      const duration = contractDurationMs ?? getPlayerDuration(sprite, x, y);
       
       promises.push(new Promise((resolve) => {
         const tween = this.scene.tweens.add({
@@ -308,6 +313,17 @@ export class ShotAnimationSystem {
       console.log('⚠️ [ShotAnimationSystem.animatePlayerMovement] Skipping - skipToEnd is true');
       return;
     }
+    const clockSecondMs = this.scene?.gameClock?.getState?.().tickMs || 700;
+    const stepClockSeconds = Array.isArray(turnData?.step_clock_seconds)
+      ? turnData.step_clock_seconds
+      : null;
+    const getContractStepDurationMs = (stepIndex, fallbackDurationMs) => {
+      const stepSeconds = stepClockSeconds?.[stepIndex];
+      if (Number.isFinite(stepSeconds) && stepSeconds > 0) {
+        return Math.max(50, Math.round(stepSeconds * clockSecondMs));
+      }
+      return fallbackDurationMs;
+    };
 
     // 🔍 [SHOT ANIM PAYLOAD] One-time log to compare "good" vs "bad" turns (e.g. MAKE/OREB vs MISS+DREB)
     const { detectPassAtStep } = await import('./passDetection.js');
@@ -497,7 +513,8 @@ export class ShotAnimationSystem {
           this.scene.game.config.width,
           this.scene.game.config.height
         );
-        const duration = getPlayerDuration(sprite, targetX, targetY);
+        const distanceDuration = getPlayerDuration(sprite, targetX, targetY);
+        const duration = getContractStepDurationMs(stepIndex, distanceDuration);
         
         if (nextStep.action === "shoot") {
           shotInfo = { step: nextStep, playerId: anim.playerId, stepIndex };

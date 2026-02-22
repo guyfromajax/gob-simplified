@@ -339,7 +339,7 @@ async function updateBallOwnership({ scene, ballSprite, animations, playerSprite
  * Locks the ball to the player with hasBallAtStep[0] during this setup tween.
  */
 
-async function runSetupTween({ scene, ballSprite, animations, playerSprites, currentBallOwnerRef, turnData = null }) {
+async function runSetupTween({ scene, ballSprite, animations, playerSprites, currentBallOwnerRef, turnData = null, stepDurationMs = null }) {
   if (scene.skipToEnd) return;
   const stepIndex = 0;
   const promises = [];
@@ -366,7 +366,9 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
 
     // ✅ FIX: Use distance-based duration for consistent speed (matches step animations)
     // This ensures smooth transitions between turns and consistent speeds
-    const duration = getPlayerDuration(sprite, x, y);
+    const duration = (Number.isFinite(stepDurationMs) && stepDurationMs > 0)
+      ? Math.max(50, Math.round(stepDurationMs))
+      : getPlayerDuration(sprite, x, y);
 
     promises.push(new Promise((resolve) => {
       const tween = scene.tweens.add({
@@ -2138,6 +2140,17 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // ShotAnimationSystem.runSetupTween() handles setup for all skeleton animations, including FCP/HCT
 
   let eventsProcessed = false;
+  const clockSecondMs = scene?.gameClock?.getState?.().tickMs || 700;
+  const stepClockSeconds = Array.isArray(turnData?.step_clock_seconds)
+    ? turnData.step_clock_seconds
+    : null;
+  const getContractStepDurationMs = (stepIndex, fallbackDurationMs) => {
+    const stepSeconds = stepClockSeconds?.[stepIndex];
+    if (Number.isFinite(stepSeconds) && stepSeconds > 0) {
+      return Math.max(50, Math.round(stepSeconds * clockSecondMs));
+    }
+    return fallbackDurationMs;
+  };
 
   // ✅ CRITICAL FIX: Kill all ball tweens before starting step loop
   // Lingering ball tweens from previous shots/passes can block the tween manager
@@ -2220,7 +2233,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       animations: turnData.animations,
       playerSprites,
       currentBallOwnerRef,
-      turnData
+      turnData,
+      stepDurationMs: getContractStepDurationMs(0, null),
     });
   } else {
     console.log('⏭️ [FCP/HCT] Skipping runSetupTween() - players already positioned at step 0 from BIP');
@@ -2363,7 +2377,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       // This ensures smooth transitions between turns and consistent speeds
       // The sprite's current position (sprite.x, sprite.y) is where it actually is,
       // which may be from the end of the previous turn or from a previous step
-      const duration = getPlayerDuration(sprite, targetX, targetY);
+      const distanceDuration = getPlayerDuration(sprite, targetX, targetY);
+      const duration = getContractStepDurationMs(stepIndex, distanceDuration);
       
 
       DEBUG && animationDebugLog('[turn]', turnData?.id, step.timestamp, nextStep.timestamp, duration, {
