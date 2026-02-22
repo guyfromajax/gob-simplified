@@ -1379,8 +1379,8 @@ export class ShotAnimationSystem {
       let targetGridX = bounceGridX + offsetX;
       let targetGridY = bounceGridY + offsetY;
       
-      // Clamp to court bounds (0-100 x, 0-50 y)
-      targetGridX = Math.max(0, Math.min(100, targetGridX));
+      // Clamp to court bounds between rims on X (9-91) and full court on Y (0-50)
+      targetGridX = Math.max(9, Math.min(91, targetGridX));
       targetGridY = Math.max(0, Math.min(50, targetGridY));
       
       const targetPixel = gridToPixels(targetGridX, targetGridY, this.scene.game.config.width, this.scene.game.config.height);

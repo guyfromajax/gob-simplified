@@ -901,8 +901,8 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       const targetGrid = {
         x: Phaser.Math.Clamp(
           currentGridX + direction * distance,
-          4,  // Stay in bounds
-          97
+          9,  // Stay between rims
+          91
         ),
         y: Phaser.Math.Clamp(
           currentGridY + Phaser.Math.Between(-10, 10),
@@ -3012,4 +3012,3 @@ export async function runDefensiveStopTransition({ scene, playerSprites, ballSpr
 if (typeof window !== "undefined") {
   window.playTurnAnimation = playTurnAnimation;
 }
-

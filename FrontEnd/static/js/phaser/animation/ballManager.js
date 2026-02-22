@@ -985,7 +985,7 @@ export function animateRebound({
     const targetX = Phaser.Math.Clamp(
       ballSpot.x + Phaser.Math.Between(-6, 6),
       9,
-      92
+      91
     );
     const targetY = Phaser.Math.Clamp(
       ballSpot.y + Phaser.Math.Between(-8, 8),
