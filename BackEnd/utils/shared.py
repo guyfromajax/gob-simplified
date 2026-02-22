@@ -1,3 +1,4 @@
+import math
 import random
 import logging
 from BackEnd.constants import (
@@ -118,6 +119,56 @@ def get_time_elapsed(tempo_call):
     p = TEMPO_PARAMS[tempo_call]
     return int(max(p["min"], min(p["max"], random.gauss(p["mean"], p["std"]))))
 
+
+def clamp_turn_time_elapsed(seconds, cap=30):
+    """Clamp turn time to [0, cap] and return int."""
+    try:
+        value = int(seconds)
+    except (TypeError, ValueError):
+        value = 0
+    return max(0, min(cap, value))
+
+
+def calc_skeleton_time_elapsed(steps, resolution_step_index=None, cap=30):
+    """
+    Calculate skeleton turn time from per-step random seconds (1..5).
+    """
+    if not steps:
+        return random.randint(1, 5)
+
+    max_index = len(steps) - 1
+    if resolution_step_index is None:
+        resolution_step_index = max_index
+    resolution_step_index = max(0, min(max_index, int(resolution_step_index)))
+
+    total = 0
+    for _ in range(resolution_step_index + 1):
+        total += random.randint(1, 5)
+    return clamp_turn_time_elapsed(total, cap=cap)
+
+
+def calc_cg_segment_seconds(start, end):
+    """
+    Cover-ground segment duration using anisotropic distance scaling.
+    """
+    if not start or not end:
+        return 0.0
+    dx = abs((end.get("x", 0) or 0) - (start.get("x", 0) or 0))
+    dy = abs((end.get("y", 0) or 0) - (start.get("y", 0) or 0))
+    return math.sqrt((dx / 20.0) ** 2 + (dy / 10.0) ** 2)
+
+
+def calc_cg_time_elapsed_from_movement_points(points, cap=30):
+    """
+    Round-at-end CG time from ordered movement points.
+    """
+    if not points or len(points) < 2:
+        return 0
+    total = 0.0
+    for idx in range(1, len(points)):
+        total += calc_cg_segment_seconds(points[idx - 1], points[idx])
+    return clamp_turn_time_elapsed(round(total), cap=cap)
+
 def oreb_shot_attempt(player_attrs):
     """
     Calculate shot score for OREB putback attempts.
@@ -162,7 +213,7 @@ def resolve_offensive_rebound(game, rebounder):
         attrs = rebounder.attributes
         # ✅ NEW: Use dedicated OREB shot attempt function
         shot_score = oreb_shot_attempt(attrs)
-        time_elapsed = random.randint(2, 5)
+        time_elapsed = random.randint(1, 5)
 
         defender_pos = random.choice(["C", "C", "C", "PF", "PF", "SF", "SF", "SG", "PG"])
         defender = def_team.lineup[defender_pos]
@@ -257,7 +308,7 @@ def resolve_offensive_rebound(game, rebounder):
 
     # Kick out to PG
     pg = off_team.lineup.get("PG")
-    duration = random.randint(1, 3)
+    duration = random.randint(1, 5)
     from_coords = getattr(rebounder, "coords", {"x": 25, "y": 50})
     to_coords = getattr(pg, "coords", {"x": 25, "y": 50}) if pg else {"x": 25, "y": 50}
 

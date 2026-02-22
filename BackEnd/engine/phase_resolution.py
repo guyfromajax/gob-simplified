@@ -19,6 +19,9 @@ from BackEnd.models.animator import Animator
 from BackEnd.utils.shared import (
     get_name_safe,
     get_time_elapsed,
+    calc_skeleton_time_elapsed,
+    calc_cg_segment_seconds,
+    clamp_turn_time_elapsed,
     get_fast_break_chance,
     calculate_rebound_score,
     calculate_outlet_pass_score,
@@ -373,8 +376,12 @@ def resolve_non_shooting_foul(roles, game, time_elapsed_override=None):
     if time_elapsed_override is not None:
         time_elapsed = time_elapsed_override
     else:
-        tempo = off_team.strategy_calls["tempo_call"]
-        time_elapsed = get_time_elapsed(tempo)
+        steps = roles.get("steps", [])
+        event_step_index = roles.get("event_step")
+        if steps:
+            time_elapsed = calc_skeleton_time_elapsed(steps, event_step_index)
+        else:
+            time_elapsed = random.randint(1, 5)
 
     # Track the foul
     foul_player.record_stat("F")
@@ -1271,6 +1278,62 @@ def resolve_fast_break_logic(game: "GameManager"):
         _record_outlet_pass_stats(outlet_passer_id, outlet_score, is_successful, game)
     # ==================== END OUTLET PASS STAT TRACKING ====================
 
+    def _apply_fast_break_cg_time(turn_result, shot_attempted=False):
+        """
+        Cover-ground timing for fast breaks:
+        - distance time from ball handler movement path
+        - +1s pass, +1s receive, +1s shot overhead (when applicable)
+        - round at end, cap at 30
+        """
+        roles_data = turn_result.get("roles", {}) or {}
+        animations_data = turn_result.get("animations", []) or []
+        path_points = []
+
+        bh = roles_data.get("ball_handler")
+        bh_id = getattr(bh, "player_id", None) if bh else None
+        if bh_id:
+            for anim in animations_data:
+                if anim.get("playerId") == bh_id:
+                    movement = anim.get("movement", []) or []
+                    for step in movement:
+                        coords = step.get("coords") or {}
+                        if "x" in coords and "y" in coords:
+                            path_points.append({"x": coords["x"], "y": coords["y"]})
+                    break
+
+        if len(path_points) < 2:
+            start = {
+                "x": roles_data.get("ball_handler_outlet_x"),
+                "y": roles_data.get("ball_handler_outlet_y"),
+            }
+            end = turn_result.get("shot_spot")
+            if not end and bh_id:
+                for anim in animations_data:
+                    if anim.get("playerId") == bh_id and isinstance(anim.get("end"), dict):
+                        end = anim.get("end")
+                        break
+            if isinstance(start.get("x"), (int, float)) and isinstance(start.get("y"), (int, float)) and end:
+                path_points = [start, {"x": end.get("x", start["x"]), "y": end.get("y", start["y"])}]
+
+        distance_seconds = 0.0
+        if len(path_points) >= 2:
+            for idx in range(1, len(path_points)):
+                distance_seconds += calc_cg_segment_seconds(path_points[idx - 1], path_points[idx])
+
+        overhead_seconds = 0.0
+        if roles_data.get("outlet_passer"):
+            overhead_seconds += 1.0
+        if roles_data.get("outlet_receiver"):
+            overhead_seconds += 1.0
+        if shot_attempted:
+            overhead_seconds += 1.0
+
+        turn_result["time_elapsed"] = clamp_turn_time_elapsed(
+            round(distance_seconds + overhead_seconds),
+            cap=30
+        )
+        return turn_result
+
     # If defensive stop triggered, defense stopped the fast break
     # NOTE: This should NOT happen if has_outlet_pass is True (handled above)
     if event_type == "DEFENSIVE_STOP":
@@ -1293,7 +1356,7 @@ def resolve_fast_break_logic(game: "GameManager"):
             "defender": best_defender,
             "text": f"Fast Break! Nice stop by {defender_name}!",
             "possession_flips": False,
-            "time_elapsed": 3,
+            "time_elapsed": 0,
             "animations": animations,
             "current_turn": "FAST_BREAK",  # ✅ SS&S: Explicit turn type
             "next_play_type": "HCO",
@@ -1323,6 +1386,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         # Record Fast Break stats for release player (offensive) and get-back players (defensive)
         _record_fast_break_stats(fb_roles, result, game)
         # ==================== END FAST BREAK STAT TRACKING ====================
+        _apply_fast_break_cg_time(result, shot_attempted=False)
         
         return result
 
@@ -1451,6 +1515,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         )
     turn_result["roles"] = fb_roles
     turn_result["fast_break"] = True  # ✅ Add fast_break flag for frontend routing
+    _apply_fast_break_cg_time(turn_result, shot_attempted=(event_type == "SHOT"))
 
     # ✅ SS&S: Backend is single source of truth for shot spot and defender placement on Fast Break shots
     # Expose so frontend uses these instead of recomputing (avoids mismatch and missing defender)
@@ -4184,6 +4249,10 @@ def resolve_half_court_offense_logic(game):
                 turnover_type = "DEAD BALL"
             # Pass from_resolution_system=True to respect the resolution system's determination
             turn_result = resolve_turnover_logic(roles, game, turnover_type=turnover_type, from_resolution_system=True)
+            turn_result["time_elapsed"] = calc_skeleton_time_elapsed(
+                roles.get("steps", []),
+                roles.get("event_step")
+            )
             # Add skeleton and animations to result
             turn_result["skeleton"] = skeleton or {}
             turn_result["animations"] = animations
@@ -4216,6 +4285,10 @@ def resolve_half_court_offense_logic(game):
             game_state["foul_team"] = "OFFENSE"
             logging.warning(f"🔍 [HCO O_FOUL] About to call resolve_non_shooting_foul() - offense_team={game.offense_team.name}, defense_team={game.defense_team.name}")
             foul_result = resolve_non_shooting_foul(roles, game)
+            foul_result["time_elapsed"] = calc_skeleton_time_elapsed(
+                roles.get("steps", []),
+                roles.get("event_step")
+            )
             logging.warning(f"🔍 [HCO O_FOUL] After resolve_non_shooting_foul() - offense_team={game.offense_team.name}, defense_team={game.defense_team.name}, possession_flips={foul_result.get('possession_flips')}")
             # Add skeleton and animations to result
             foul_result["skeleton"] = skeleton or {}
@@ -4248,6 +4321,10 @@ def resolve_half_court_offense_logic(game):
         elif event_type == "D_FOUL":
             game_state["foul_team"] = "DEFENSE"
             foul_result = resolve_non_shooting_foul(roles, game)
+            foul_result["time_elapsed"] = calc_skeleton_time_elapsed(
+                roles.get("steps", []),
+                roles.get("event_step")
+            )
             # Add skeleton and animations to result
             foul_result["skeleton"] = skeleton or {}
             foul_result["animations"] = animations
@@ -5022,6 +5099,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "shooter": ball_handler,
         "passer": None,
         "screener": None,
+        "steps": skeleton.get("steps", []) if skeleton else [],
     }
     
     # Handle foul results - use standard foul types for frontend
@@ -5189,12 +5267,11 @@ def resolve_full_court_press_logic(game: "GameManager"):
                 game_state["offensive_state"] = "HCO"
     # For DEAD BALL, O_FOUL, D_FOUL: next_play_type is now set to SIDE_INBOUND (unless FREE_THROW)
     
-    # Calculate time elapsed for FCP phase
-    fcp_time_elapsed = random.randint(5, 9)
-    
-    # If transitioning to HCO, store the FCP time for HCO to add to its time
-    if result_type == "HCO":
-        game_state["pressure_phase_time"] = fcp_time_elapsed
+    # Calculate skeleton-aligned time for FCP phase
+    fcp_time_elapsed = calc_skeleton_time_elapsed(
+        roles.get("steps", []),
+        len(roles.get("steps", [])) - 1 if roles.get("steps") else None
+    )
     
     # Track FCP player stats for non-SHOT results
     fcp_roles = {
@@ -6167,6 +6244,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "shooter": ball_handler,
         "passer": None,
         "screener": None,
+        "steps": skeleton.get("steps", []) if skeleton else [],
     }
     
     # Initialize animator if not already initialized
@@ -6327,12 +6405,11 @@ def resolve_half_court_trap_logic(game: "GameManager"):
                 game_state["offensive_state"] = "HCO"
     # For DEAD BALL, O_FOUL, D_FOUL: next_play_type is now set to SIDE_INBOUND (unless FREE_THROW)
     
-    # Calculate time elapsed for HCT phase
-    hct_time_elapsed = random.randint(5, 9)
-    
-    # If transitioning to HCO, store the HCT time for HCO to add to its time
-    if result_type == "HCO":
-        game_state["pressure_phase_time"] = hct_time_elapsed
+    # Calculate skeleton-aligned time for HCT phase
+    hct_time_elapsed = calc_skeleton_time_elapsed(
+        roles.get("steps", []),
+        len(roles.get("steps", [])) - 1 if roles.get("steps") else None
+    )
     
     # Track HCT player stats for non-SHOT results
     hct_roles = {

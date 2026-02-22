@@ -20,6 +20,7 @@ from BackEnd.constants import (
 from BackEnd.utils.shared import (
     apply_scoring,
     get_time_elapsed,
+    calc_skeleton_time_elapsed,
     resolve_offensive_rebound,
     get_player_position,
     calculate_screen_score,
@@ -521,8 +522,8 @@ class ShotManager:
                     else:
                         text = f"{get_name_safe(shooter)} misses. {get_name_safe(defender)} fouls him!"
                     shooter_pos = get_player_position(off_lineup, shooter)
-                    tempo = off_team.strategy_calls.get("tempo_call", "normal")
-                    time_elapsed_ft = get_time_elapsed(tempo)
+                    # Keep turn timing aligned to skeleton progression for shot attempts.
+                    time_elapsed_ft = calc_skeleton_time_elapsed(steps, shot_step_index)
                     ft_remaining = 1 if made_from_foul else 2
                     result = {
                         "result_type": "MAKE" if made_from_foul else "MISS",
@@ -583,8 +584,7 @@ class ShotManager:
             # Handle CHARGE: Return early with possession flip, no shot attempt
             if charge_result == "CHARGE":
                 shooter_pos = get_player_position(off_lineup, shooter)
-                tempo = off_team.strategy_calls.get("tempo_call", "normal")
-                time_elapsed = get_time_elapsed(tempo)
+                time_elapsed = calc_skeleton_time_elapsed(steps, shot_step_index)
                 
                 # Record foul on shooter (offensive foul)
                 shooter.record_stat("F")
@@ -667,8 +667,7 @@ class ShotManager:
                     
                     # Early return: nullify shot attempt, return result for next turn
                     shooter_pos = get_player_position(off_lineup, shooter)
-                    tempo = off_team.strategy_calls.get("tempo_call", "normal")
-                    time_elapsed = get_time_elapsed(tempo)
+                    time_elapsed = calc_skeleton_time_elapsed(steps, shot_step_index)
                     intended_shooter_pos = roles.get("intended_shooter_pos")
                     intended_shooter = off_lineup.get(intended_shooter_pos) if intended_shooter_pos else None
                     intended_shooter_id = intended_shooter.player_id if intended_shooter else None
@@ -1476,22 +1475,12 @@ class ShotManager:
                             self.game_state["offensive_state"] = next_play_type
                             result["next_play_type"] = next_play_type
 
-        # ⏱️ Add tempo-based time to turn
-        # If HCO came after FCP/HCT, adjust time based on pressure phase time
-        pressure_phase_time = game_state.get("pressure_phase_time", 0)
-        
-        if pressure_phase_time > 0:
-            # Adjust HCO time: random.randint(15 - pressure_phase_time, min(35, 35 - pressure_phase_time))
-            min_time = max(1, 15 - pressure_phase_time)  # Ensure min_time doesn't go below 1
-            max_time = min(35, 35 - pressure_phase_time)
-            hco_time = random.randint(min_time, max_time)
-            time_elapsed += hco_time + pressure_phase_time  # Total = FCP/HCT time + HCO time
-            # Clear pressure_phase_time after use
-            game_state["pressure_phase_time"] = 0
+        # ⏱️ Skeleton turns use per-step random (1..5) up to shot resolution step.
+        # Fast breaks are CG turns and will be overwritten in resolve_fast_break_logic.
+        if roles.get("is_fast_break"):
+            time_elapsed = 0
         else:
-            # Normal HCO without pressure phase
-            tempo = off_team.strategy_calls["tempo_call"]
-            time_elapsed += get_time_elapsed(tempo)
+            time_elapsed = calc_skeleton_time_elapsed(steps, shot_step_index)
 
         shooter_pos = get_player_position(off_lineup, shooter)
         

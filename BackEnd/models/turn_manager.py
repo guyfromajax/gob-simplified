@@ -132,6 +132,7 @@ class TurnManager:
         receiver_pos = SITUATIONAL_SIP_RECEIVER_POS
         payload = {
             "result_type": "SIDE_INBOUND",
+            "time_elapsed": 0,
             "ball_spot": getAwayTeamCoords({"tmp": inbound_spot_home})["tmp"] if is_away_offense else inbound_spot_home,
             "oDestinations": o_dest,
             "dDestinations": d_dest,
@@ -265,6 +266,7 @@ class TurnManager:
         from BackEnd.constants import SITUATIONAL_BIP_RECEIVER_POS
         payload = {
             "result_type": "BASELINE_INBOUND",
+            "time_elapsed": 0,
             "ball_spot": getAwayTeamCoords({"tmp": inbound_spot_home})["tmp"] if is_away_offense else inbound_spot_home,
             "oDestinations": o_dest,
             "dDestinations": d_dest,
@@ -2620,7 +2622,7 @@ class TurnManager:
                 "ball_handler": getattr(rebounder, "player_id", None),
                 "text": f"{rebounder_name} secures the rebound after the block. Reset to half-court.",
                 "possession_flips": False,
-                "time_elapsed": 2,
+                "time_elapsed": random.randint(1, 5),
                 "offense_team_id": self.game.offense_team.team_id,
                 "current_turn": "OREB",
                 "next_play_type": "HCO",
@@ -2723,7 +2725,7 @@ class TurnManager:
                     "defender": getattr(defender, "player_id", None),
                     "text": text,
                     "possession_flips": possession_flips,
-                    "time_elapsed": oreb_event.get("timeElapsed", 3),
+                    "time_elapsed": oreb_event.get("timeElapsed", random.randint(1, 5)),
                     "points": oreb_event.get("points", 2),
                     "scoring_team": off_team.name,
                     "offense_team_id": off_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
@@ -2773,7 +2775,7 @@ class TurnManager:
                     "defender": getattr(defender, "player_id", None),
                     "text": text,
                     "possession_flips": possession_flips,  # Will be updated based on rebound type
-                    "time_elapsed": oreb_event.get("timeElapsed", 3),
+                    "time_elapsed": oreb_event.get("timeElapsed", random.randint(1, 5)),
                     "offense_team_id": off_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
                     "current_turn": "OREB",  # ✅ SS&S: Explicit turn type
                     "animations": [],
@@ -2942,7 +2944,7 @@ class TurnManager:
                 "ball_handler": getattr(rebounder, "player_id", None),
                 "text": text,
                 "possession_flips": False,
-                "time_elapsed": oreb_event.get("timeElapsed", 2),
+                "time_elapsed": oreb_event.get("timeElapsed", random.randint(1, 5)),
                 "offense_team_id": self.game.offense_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
                 "current_turn": "OREB",  # ✅ SS&S: Explicit turn type
                 "next_turn": "HCO",  # ✅ SS&S: Kickouts continue to HCO

@@ -156,8 +156,7 @@ def execute_opening_tip(game):
     
     # Random time elapsed (2-5 seconds)
     # ✅ TEMPORARILY DISABLED: Opening tip no longer consumes time to avoid clock issues
-    # time_elapsed = random.randint(2, 5)
-    time_elapsed = 0  # Set to 0 to prevent clock consumption
+    time_elapsed = random.randint(1, 5)
     
     text = f"{winner_name} wins the tip!"
     

@@ -97,7 +97,11 @@ These rules define how `time_elapsed` should be derived per turn type in Phase 1
   - `dx = abs(x2 - x1)`
   - `dy = abs(y2 - y1)`
   - `segment_seconds = sqrt((dx/20)^2 + (dy/10)^2)`
-- Sum segment times (plus optional small fixed action costs, if used later) to get turn `time_elapsed`.
+- Sum segment times and then add fixed action overhead:
+  - `+1s` to throw a pass
+  - `+1s` to receive a pass
+  - `+1s` to take a shot
+- Round at the end, then cap total turn `time_elapsed` at `30` seconds.
 - Example:
   - Start `(50,15)` -> End `(90,25)`
   - `dx=40`, `dy=10`
@@ -258,6 +262,13 @@ This file is a working implementation plan. Final canonical behavior/spec should
 ### 5. Non-step turns use synthetic phases
 - For turns without predefined steps, build timing phases from distance moved + actions taken.
 - Example phase types: advance, pass, finish, rebound/reset.
+
+### 6. CG action overhead is explicit
+- For CG turns, add fixed action overhead on top of movement time:
+  - `+1s` pass throw
+  - `+1s` pass receive
+  - `+1s` shot attempt
+- Apply rounding at the end of total CG calculation, then clamp to `30` seconds.
 - Apply the same weighted pacing model used for step turns.
 
 ### 6. Game speed controls visible countdown rate

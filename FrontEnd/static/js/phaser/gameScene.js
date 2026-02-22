@@ -10,6 +10,7 @@ import { initializePossessionManager } from './utils/possessionManager.js';
 import gameStore from '../state/gameStore.js';
 import { animateCountdownTransition } from './animation/countdownAnimation.js';
 import { ENABLE_TIMEOUT_BUTTON, initTimeoutButton } from './utils/timeoutButtonManager.js';
+import { createGameClock, parseClockToSeconds } from './utils/gameClock.js';
 
 const DEBUG_SIM_PAYLOAD =
   (typeof window !== 'undefined' && window.DEBUG_SIM_PAYLOAD) ||
@@ -42,6 +43,7 @@ export function createGameScene(Phaser) {
       
       // Initialize centralized possession manager
       this.possessionManager = null; // Will be initialized in create()
+      this.gameClock = null;
     }
 
     init(data) {
@@ -91,6 +93,10 @@ export function createGameScene(Phaser) {
       
       // Reset pause state and kill all tweens
       this.isPaused = false;
+      if (this.gameClock) {
+        this.gameClock.stop();
+        this.gameClock = null;
+      }
       if (this.tweens) {
         // Resume all tweens before killing them to prevent stuck state
         this.tweens.resumeAll();
@@ -505,6 +511,19 @@ export function createGameScene(Phaser) {
       if (clockEl && liveClock) {
         clockEl.textContent = liveClock;
       }
+      // Realtime UX countdown: 1 game-second every 700ms (temporary global mapping).
+      if (this.gameClock) {
+        this.gameClock.stop();
+      }
+      const initialClockSeconds =
+        (typeof simData.time_remaining === 'number' ? simData.time_remaining : null) ??
+        parseClockToSeconds(liveClock);
+      this.gameClock = createGameClock({
+        timeRemainingSeconds: initialClockSeconds,
+        clockElement: clockEl,
+        tickMs: 700,
+      });
+      this.gameClock.start();
       if (quarterEl && livePeriodLabel) {
         quarterEl.textContent = livePeriodLabel;
       }
@@ -1376,6 +1395,13 @@ export function createGameScene(Phaser) {
             this.simData.clock = liveClock;
           }
         }
+        if (this.gameClock) {
+          if (typeof turn.time_remaining === 'number') {
+            this.gameClock.syncWithBackend(turn.time_remaining);
+          } else if (turn.clock || turn.game_clock) {
+            this.gameClock.syncWithBackend(parseClockToSeconds(turn.clock || turn.game_clock));
+          }
+        }
         if (turn.quarter != null) liveQuarter = turn.quarter;
         if (turn.period_label) {
           livePeriodLabel = turn.period_label;
@@ -1555,6 +1581,7 @@ export function createGameScene(Phaser) {
                 tweenManagerTimeScale: this.tweens.timeScale
               });
             }
+            if (this.gameClock) this.gameClock.pause();
             pauseBtn.textContent = 'Resume';
           } else {
             // Resume all tweens
@@ -1598,6 +1625,7 @@ export function createGameScene(Phaser) {
                 resumedTweens: activeTweens.length
               });
             }
+            if (this.gameClock) this.gameClock.resume();
             
             pauseBtn.textContent = 'Pause';
           }
