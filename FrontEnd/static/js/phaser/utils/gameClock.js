@@ -21,14 +21,14 @@ export function parseClockToSeconds(clock) {
 export function createGameClock({
   timeRemainingSeconds = 0,
   clockElement = null,
-  tickMs = 700,
+  tickMs = 450,
   onZero = null,
 } = {}) {
   let timeRemaining = Math.max(0, Math.floor(Number(timeRemainingSeconds) || 0));
   let intervalId = null;
   let running = false;
   const pauseReasons = new Set();
-  let tickIntervalMs = Math.max(50, Math.floor(Number(tickMs) || 700));
+  let tickIntervalMs = Math.max(50, Math.floor(Number(tickMs) || 450));
 
   const render = () => {
     if (clockElement) {
@@ -86,7 +86,7 @@ export function createGameClock({
       render();
     },
     setTickMs(nextTickMs) {
-      const parsed = Math.max(50, Math.floor(Number(nextTickMs) || 700));
+      const parsed = Math.max(50, Math.floor(Number(nextTickMs) || 450));
       tickIntervalMs = parsed;
       if (running) {
         clear();

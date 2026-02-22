@@ -511,7 +511,7 @@ export function createGameScene(Phaser) {
       if (clockEl && liveClock) {
         clockEl.textContent = liveClock;
       }
-      // Realtime UX countdown: 1 game-second every 700ms (temporary global mapping).
+      // Realtime UX countdown: 1 game-second every 450ms (temporary global mapping).
       if (this.gameClock) {
         this.gameClock.stop();
       }
@@ -521,7 +521,7 @@ export function createGameScene(Phaser) {
       this.gameClock = createGameClock({
         timeRemainingSeconds: initialClockSeconds,
         clockElement: clockEl,
-        tickMs: 700,
+        tickMs: 450,
       });
       // Start is deferred until first impact turn (non No Impact) is processed.
       if (quarterEl && livePeriodLabel) {
