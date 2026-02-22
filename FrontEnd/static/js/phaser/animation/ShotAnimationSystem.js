@@ -251,11 +251,28 @@ export class ShotAnimationSystem {
     
     // getPlayerDuration is already imported at top of file
     const stepIndex = 0;
+    const stepStartMs = performance.now();
     const clockSecondMs = this.scene?.gameClock?.getState?.().tickMs || 700;
     const stepSeconds = Array.isArray(turnData?.step_clock_seconds) ? turnData.step_clock_seconds?.[0] : null;
     const contractDurationMs = (Number.isFinite(stepSeconds) && stepSeconds > 0)
       ? Math.max(50, Math.round(stepSeconds * clockSecondMs))
       : null;
+    const getStepBallHandlerId = (animations, idx) => {
+      if (!Array.isArray(animations)) return null;
+      for (const anim of animations) {
+        if (anim?.hasBallAtStep?.[idx]) return anim.playerId;
+      }
+      for (const anim of animations) {
+        const step = anim?.movement?.[idx];
+        const action = step?.action;
+        if (action === "handle_ball" || action === "receive" || action === "pass" || action === "shoot" || action === "drive") {
+          return anim.playerId;
+        }
+      }
+      return null;
+    };
+    const stepBallHandlerId = getStepBallHandlerId(turnData?.animations, stepIndex);
+    let ballHandlerPlannedDurationMs = 0;
     const promises = [];
     
     for (const anim of turnData.animations) {
@@ -273,13 +290,29 @@ export class ShotAnimationSystem {
       
       // ✅ FIX: Use distance-based duration for consistent speed (matches step animations)
       // This ensures smooth transitions between turns and consistent speeds
-      const duration = contractDurationMs ?? getPlayerDuration(sprite, x, y);
+      const distanceDuration = getPlayerDuration(sprite, x, y);
+      const isStepBallHandler = !!stepBallHandlerId && anim.playerId === stepBallHandlerId;
+      const shouldCutAtStepBoundary =
+        !isStepBallHandler &&
+        Number.isFinite(contractDurationMs) &&
+        contractDurationMs > 0 &&
+        distanceDuration > contractDurationMs;
+      const duration = shouldCutAtStepBoundary ? contractDurationMs : distanceDuration;
+      if (isStepBallHandler) {
+        ballHandlerPlannedDurationMs = Math.max(ballHandlerPlannedDurationMs, distanceDuration);
+      }
+      const targetX = shouldCutAtStepBoundary
+        ? sprite.x + (x - sprite.x) * (contractDurationMs / distanceDuration)
+        : x;
+      const targetY = shouldCutAtStepBoundary
+        ? sprite.y + (y - sprite.y) * (contractDurationMs / distanceDuration)
+        : y;
       
       promises.push(new Promise((resolve) => {
         const tween = this.scene.tweens.add({
           targets: [sprite],
-          x,
-          y,
+          x: targetX,
+          y: targetY,
           duration,
           ease: "Linear",
           // ✅ FIX: Removed manual ball positioning - BallController handles ball following automatically
@@ -295,6 +328,20 @@ export class ShotAnimationSystem {
     }
     
     await Promise.all(promises);
+    if (Number.isFinite(contractDurationMs) && contractDurationMs > 0) {
+      const effectiveStepMs = Math.max(contractDurationMs, ballHandlerPlannedDurationMs || 0);
+      const elapsedMs = performance.now() - stepStartMs;
+      const holdMs = effectiveStepMs - elapsedMs;
+      if (holdMs > 0) {
+        await new Promise((resolve) => {
+          if (this.scene?.time?.delayedCall) {
+            this.scene.time.delayedCall(Math.floor(holdMs), resolve);
+          } else {
+            setTimeout(resolve, Math.floor(holdMs));
+          }
+        });
+      }
+    }
   }
   
   /**
@@ -317,12 +364,19 @@ export class ShotAnimationSystem {
     const stepClockSeconds = Array.isArray(turnData?.step_clock_seconds)
       ? turnData.step_clock_seconds
       : null;
-    const getContractStepDurationMs = (stepIndex, fallbackDurationMs) => {
-      const stepSeconds = stepClockSeconds?.[stepIndex];
-      if (Number.isFinite(stepSeconds) && stepSeconds > 0) {
-        return Math.max(50, Math.round(stepSeconds * clockSecondMs));
+    const getStepBallHandlerId = (animations, idx) => {
+      if (!Array.isArray(animations)) return null;
+      for (const anim of animations) {
+        if (anim?.hasBallAtStep?.[idx]) return anim.playerId;
       }
-      return fallbackDurationMs;
+      for (const anim of animations) {
+        const step = anim?.movement?.[idx];
+        const action = step?.action;
+        if (action === "handle_ball" || action === "receive" || action === "pass" || action === "shoot" || action === "drive") {
+          return anim.playerId;
+        }
+      }
+      return null;
     };
 
     // 🔍 [SHOT ANIM PAYLOAD] One-time log to compare "good" vs "bad" turns (e.g. MAKE/OREB vs MISS+DREB)
@@ -420,6 +474,16 @@ export class ShotAnimationSystem {
     }
     
     for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
+      const stepStartMs = performance.now();
+      const stepBudgetMs = (() => {
+        const stepSeconds = stepClockSeconds?.[stepIndex];
+        if (Number.isFinite(stepSeconds) && stepSeconds > 0) {
+          return Math.max(0, Math.round(stepSeconds * clockSecondMs));
+        }
+        return null;
+      })();
+      const stepBallHandlerId = getStepBallHandlerId(turnData.animations, stepIndex);
+      let ballHandlerPlannedDurationMs = 0;
       if (this.scene.skipToEnd) break;
       
       // Trigger lean meter animation at middle step
@@ -514,7 +578,25 @@ export class ShotAnimationSystem {
           this.scene.game.config.height
         );
         const distanceDuration = getPlayerDuration(sprite, targetX, targetY);
-        const duration = getContractStepDurationMs(stepIndex, distanceDuration);
+        const isStepBallHandler = !!stepBallHandlerId && anim.playerId === stepBallHandlerId;
+        const shouldCutAtStepBoundary =
+          !isStepBallHandler &&
+          Number.isFinite(stepBudgetMs) &&
+          stepBudgetMs > 0 &&
+          distanceDuration > stepBudgetMs;
+        const duration = shouldCutAtStepBoundary ? stepBudgetMs : distanceDuration;
+        if (isStepBallHandler) {
+          ballHandlerPlannedDurationMs = Math.max(ballHandlerPlannedDurationMs, distanceDuration);
+        }
+        const nextStepForTween = shouldCutAtStepBoundary
+          ? {
+              ...curr,
+              coords: {
+                x: prev.coords.x + (curr.coords.x - prev.coords.x) * (stepBudgetMs / distanceDuration),
+                y: prev.coords.y + (curr.coords.y - prev.coords.y) * (stepBudgetMs / distanceDuration),
+              },
+            }
+          : curr;
         
         if (nextStep.action === "shoot") {
           shotInfo = { step: nextStep, playerId: anim.playerId, stepIndex };
@@ -530,7 +612,7 @@ export class ShotAnimationSystem {
           scene: this.scene,
           sprite,
           step: prev,  // Previous step (for position calculation)
-          nextStep: curr,  // Current step (for action checking)
+          nextStep: nextStepForTween,  // Current step target (may be clipped at step boundary)
           duration,
           ballSprite,
           currentBallOwnerRef,
@@ -678,6 +760,20 @@ export class ShotAnimationSystem {
       if (shotInfo) {
         currentBallOwnerRef.value = null;
         await this.handleShotAtStep(shotInfo, turnData);
+      }
+      if (Number.isFinite(stepBudgetMs) && stepBudgetMs > 0) {
+        const effectiveStepMs = Math.max(stepBudgetMs, ballHandlerPlannedDurationMs || 0);
+        const elapsedMs = performance.now() - stepStartMs;
+        const holdMs = effectiveStepMs - elapsedMs;
+        if (holdMs > 0) {
+          await new Promise((resolve) => {
+            if (this.scene?.time?.delayedCall) {
+              this.scene.time.delayedCall(Math.floor(holdMs), resolve);
+            } else {
+              setTimeout(resolve, Math.floor(holdMs));
+            }
+          });
+        }
       }
     }
     

@@ -27,6 +27,10 @@ Clock calculation:
 Execution:
 - Backend computes authoritative `time_elapsed`
 - Frontend animates each step using backend `step_clock_seconds[]` (not guessed durations)
+- Frontend movement speed remains distance-based/consistent (not stretched to fill step)
+- After a player reaches step destination, they hold until next step boundary
+- Non-ball-handler overrun rule: if a move exceeds step budget, movement is clipped at boundary and continues next step from live position
+- Ball-handler exception: if ball-handler move exceeds step budget, the step window extends until ball-handler movement completes
 - Frontend countdown is presentation only, then syncs to backend `time_remaining` at turn end
 
 ### 2. CG (Cover-Ground)
@@ -129,7 +133,11 @@ Goal: align visual countdown progression with movement/action progression.
 
 1. Skeleton turns:
 - use backend `step_clock_seconds[]` per executed step.
-- apply `step_duration_ms = step_clock_seconds[i] * clock_second_ms` for each step animation.
+- apply `step_budget_ms = step_clock_seconds[i] * clock_second_ms` per step.
+- animate movement at normal distance-based speed.
+- hold remaining step time when movement finishes early.
+- clip non-ball-handler movement at boundary if movement would exceed budget.
+- extend step if ball-handler movement exceeds budget.
 - keep backend turn-end sync as guardrail only (should be near no-op when aligned).
 2. CG turns:
 - use movement segments for animation timing and clock progression.
