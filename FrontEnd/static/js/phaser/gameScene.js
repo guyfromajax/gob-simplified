@@ -1581,7 +1581,7 @@ export function createGameScene(Phaser) {
                 tweenManagerTimeScale: this.tweens.timeScale
               });
             }
-            if (this.gameClock) this.gameClock.pause();
+            if (this.gameClock) this.gameClock.pause('user_pause');
             pauseBtn.textContent = 'Resume';
           } else {
             // Resume all tweens
@@ -1625,7 +1625,7 @@ export function createGameScene(Phaser) {
                 resumedTweens: activeTweens.length
               });
             }
-            if (this.gameClock) this.gameClock.resume();
+            if (this.gameClock) this.gameClock.resume('user_pause');
             
             pauseBtn.textContent = 'Pause';
           }

@@ -56,6 +56,7 @@ Clock calculation:
 Execution:
 - No countdown decrement during turn
 - Clock display remains unchanged except for backend sync if response includes updated clock context
+- Frontend realtime countdown is explicitly frozen during no-impact turns to prevent local drift
 
 ## Turn Classification Matrix
 
@@ -74,6 +75,7 @@ Execution:
 - Frontend countdown is UX pacing only.
 - No additional API calls for per-step/per-second updates.
 - One turn response syncs the clock state (`time_remaining`/`clock`) at turn boundaries.
+- Frontend must freeze realtime countdown when `time_elapsed = 0` (no-impact turns).
 
 ## Implementation Plan
 
@@ -104,7 +106,11 @@ Goal: add UX countdown that follows gameplay without changing backend authority.
 - initialize from authoritative backend time at scene start.
 - pause/resume with gameplay pause conditions.
 - stop/cleanup on scene teardown/navigation.
-4. Keep existing scoreboard updates; add sync call at turn boundaries using backend `time_remaining`.
+4. Use reason-based pause tokens so multiple pause causes do not conflict:
+- `user_pause`: controlled by Pause/Resume button.
+- `no_impact_turn`: applied during no-impact turns, removed on impact turns.
+- Clock runs only when no pause tokens are active.
+5. Keep existing scoreboard updates; add sync call at turn boundaries using backend `time_remaining`.
 
 ### Phase 3: Animation Synchronization
 Goal: align visual countdown progression with movement/action progression.

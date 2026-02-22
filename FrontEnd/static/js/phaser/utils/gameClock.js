@@ -27,7 +27,7 @@ export function createGameClock({
   let timeRemaining = Math.max(0, Math.floor(Number(timeRemainingSeconds) || 0));
   let intervalId = null;
   let running = false;
-  let paused = false;
+  const pauseReasons = new Set();
   let tickIntervalMs = Math.max(50, Math.floor(Number(tickMs) || 700));
 
   const render = () => {
@@ -44,7 +44,7 @@ export function createGameClock({
   };
 
   const tick = () => {
-    if (!running || paused) return;
+    if (!running || pauseReasons.size > 0) return;
     if (timeRemaining <= 0) {
       clear();
       running = false;
@@ -59,21 +59,25 @@ export function createGameClock({
     start() {
       if (running && intervalId) return;
       running = true;
-      paused = false;
+      pauseReasons.clear();
       render();
       clear();
       intervalId = setInterval(tick, tickIntervalMs);
     },
-    pause() {
-      paused = true;
+    pause(reason = 'manual') {
+      pauseReasons.add(String(reason || 'manual'));
     },
-    resume() {
+    resume(reason = null) {
       if (!running) return;
-      paused = false;
+      if (typeof reason === 'string' && reason.length > 0) {
+        pauseReasons.delete(reason);
+      } else {
+        pauseReasons.clear();
+      }
     },
     stop() {
       running = false;
-      paused = false;
+      pauseReasons.clear();
       clear();
     },
     syncWithBackend(timeRemainingSecondsValue) {
@@ -93,7 +97,8 @@ export function createGameClock({
       return {
         timeRemaining,
         running,
-        paused,
+        paused: pauseReasons.size > 0,
+        pauseReasons: Array.from(pauseReasons),
         tickMs: tickIntervalMs,
       };
     },

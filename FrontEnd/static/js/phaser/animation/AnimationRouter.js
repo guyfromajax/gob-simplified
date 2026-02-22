@@ -100,6 +100,32 @@ export class AnimationRouter {
     const isHCO = !turnData.fast_break && (turnData.result_type === "MAKE" || turnData.result_type === "MISS" || turnData.result_type === "BLOCK");
 
     try {
+      // Clock control for no-impact turns:
+      // Pause UX countdown when backend marks no time elapsed (or known no-impact result types),
+      // then release that pause token for impact turns.
+      const noImpactResultTypes = new Set([
+        'FREE_THROW',
+        'SIDE_INBOUND',
+        'BASELINE_INBOUND',
+        'TIMEOUT',
+      ]);
+      const elapsedValue = Number(turnData?.time_elapsed ?? turnData?.timeElapsed);
+      const hasElapsedValue = Number.isFinite(elapsedValue);
+      const isNoImpactTurn =
+        (hasElapsedValue && elapsedValue === 0) ||
+        noImpactResultTypes.has(turnData?.result_type);
+
+      if (this.scene?.gameClock) {
+        if (isNoImpactTurn) {
+          this.scene.gameClock.pause('no_impact_turn');
+        } else {
+          this.scene.gameClock.resume('no_impact_turn');
+          if (this.scene.isPaused) {
+            this.scene.gameClock.pause('user_pause');
+          }
+        }
+      }
+
       // ✅ PHASE 2.3: Call prepareTurnForAnimation at the start
       // Extract turnIndex from turnData (will be set by prepareTurnForAnimation if not present)
       turnIndex = turnData.index ?? turnData.turnIndex ?? null;
