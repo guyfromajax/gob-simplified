@@ -3962,9 +3962,6 @@ try:
                     # ✅ UNIFIED: Use shared helper function for timeout save and response
                     # This ensures user and computer timeouts work identically
                     try:
-                        # Remove the TIMEOUT turn from turns so next API call can simulate the actual next turn
-                        timeout_turn = gm.turns.pop()
-                        
                         # ✅ UNIFIED: Use shared helper function (same as user timeout)
                         timeout_response = handle_timeout_save_and_response(gm, timeout_turn, game_id, timeout_reason="COMPUTER")
                         
@@ -3980,7 +3977,6 @@ try:
                         logging.error(f"🚨 COMPUTER TIMEOUT: Failed to save game state: {e}")
                         # Don't fail the timeout return if save fails - game is still in memory
                         # Return timeout turn without save (fallback)
-                        timeout_turn = gm.turns.pop() if gm.turns else None
                         if timeout_turn:
                             fallback = {
                                 "turn": timeout_turn,

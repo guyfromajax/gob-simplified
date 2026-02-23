@@ -2218,7 +2218,8 @@ export function createGameScene(Phaser) {
               home_score: turnData.home_score,
               away_score: turnData.away_score,
               home_team_timeouts: turnData.home_team_timeouts,
-              away_team_timeouts: turnData.away_team_timeouts
+              away_team_timeouts: turnData.away_team_timeouts,
+              timeout_trace_id: turnData.timeout_trace_id
             };
             // Animate the timeout turn (will handle navigation)
             await animateGameTurns({
@@ -2292,7 +2293,8 @@ export function createGameScene(Phaser) {
                   home_score: turnData.home_score,
                   away_score: turnData.away_score,
                   home_team_timeouts: turnData.home_team_timeouts,
-                  away_team_timeouts: turnData.away_team_timeouts
+                  away_team_timeouts: turnData.away_team_timeouts,
+                  timeout_trace_id: turnData.timeout_trace_id
                 };
                 // Stop processing remaining batch turns and exit the main loop.
                 break;

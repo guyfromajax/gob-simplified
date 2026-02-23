@@ -581,7 +581,8 @@ export class AnimationEngine {
           home_team_timeouts: responseData.home_team_timeouts || turnData.home_team_timeouts || 0,
           away_team_timeouts: responseData.away_team_timeouts || turnData.away_team_timeouts || 0,
           clock: responseClock,  // ✅ UNIFIED: Use clock from API response (same as user timeout)
-          time_remaining: responseTimeRemaining  // ✅ UNIFIED: Use time_remaining from API response
+          time_remaining: responseTimeRemaining,  // ✅ UNIFIED: Use time_remaining from API response
+          timeout_trace_id: responseData.timeout_trace_id || turnData.timeout_trace_id
         };
         // ✅ COMPUTER TIMEOUT: Navigate directly (no popup) - same flow as user timeouts
         const computerTeamName = turnData.timeout_calling_team?.name || 
