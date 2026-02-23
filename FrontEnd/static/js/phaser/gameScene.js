@@ -178,6 +178,7 @@ export function createGameScene(Phaser) {
       // We'll show the popup after simData is fetched but before animation starts
       const urlParams = new URLSearchParams(window.location.search);
       const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+      const timeoutTraceId = urlParams.get('timeout_trace_id');
       const fromLineup = urlParams.get('from') === 'set-lineup';
       const isQ1Start = this.quarter === 1 && !resumeFromTimeout && !fromLineup;
       const isAfterBreak = resumeFromTimeout || fromLineup;
@@ -273,6 +274,18 @@ export function createGameScene(Phaser) {
       if (resumeFromTimeout) {
         payload.resume_from_timeout = true;
         // ✅ REMOVED: Timeout resume logging (cluttering console)
+      }
+      if (timeoutTraceId) {
+        payload.timeout_trace_id = timeoutTraceId;
+      }
+      if (timeoutTraceId) {
+        console.log('🧭 [TIMEOUT TRACE] lineup->court URL', {
+          timeout_trace_id: timeoutTraceId,
+          game_id: this.gameId,
+          quarter: this.quarter,
+          resume_from_timeout: resumeFromTimeout,
+          clock: urlParams.get('clock')
+        });
       }
       if (DEBUG_FLOW) {
         console.log('[gameScene] request payload', {

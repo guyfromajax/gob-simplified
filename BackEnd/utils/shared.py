@@ -1459,6 +1459,7 @@ def summarize_game_state(game, exclude_animations=True):
         # ✅ TIMEOUT/FOUL_OUT: Only write when truthy so normal saves don't overwrite DB and wipe resume state (we $unset on actual resume in main.py)
         **({"timeout_next_play_type": game.game_state["timeout_next_play_type"]} if game.game_state.get("timeout_next_play_type") else {}),
         **({"timeout_offense_team_id": game.game_state["timeout_offense_team_id"]} if game.game_state.get("timeout_offense_team_id") else {}),
+        **({"timeout_trace_id": game.game_state["timeout_trace_id"]} if game.game_state.get("timeout_trace_id") else {}),
         # ✅ FREE_THROW timeout resume: persist FT state so first simulate_turn creates the FT turn
         **(
             {

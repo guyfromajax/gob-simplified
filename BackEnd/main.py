@@ -408,6 +408,7 @@ def simulate_quarter(
             # ✅ TIMEOUT: Clear timeout state from memory
             gm.game_state.pop("timeout_next_play_type", None)
             gm.game_state.pop("timeout_offense_team_id", None)  # Also clear possession team
+            gm.game_state.pop("timeout_trace_id", None)
             
             # ✅ TIMEOUT: Clear timeout state from database after resume (defensive cleanup)
             # This prevents stale timeout state from affecting future games
@@ -418,6 +419,7 @@ def simulate_quarter(
                     unset_fields = {
                         "timeout_next_play_type": "",
                         "timeout_offense_team_id": "",
+                        "timeout_trace_id": "",
                         "timeout_free_throws_remaining": "",
                         "timeout_free_throws": "",
                         "timeout_shooter_id": "",
@@ -688,6 +690,7 @@ def simulate_quarter(
             logging.warning(f"🧹 QUARTER COMPLETE: Clearing stale timeout state (quarter {gm.quarter} finished)")
             gm.game_state.pop("timeout_next_play_type", None)
             gm.game_state.pop("timeout_offense_team_id", None)
+            gm.game_state.pop("timeout_trace_id", None)
         
         _loop_sec = _time.time() - _loop_start
         logging.warning(f"⏱️ [PERF] full_sim loop: Q{gm.quarter} turns={turn_count} loop_time={_loop_sec:.2f}s ({1000*_loop_sec/max(turn_count,1):.0f}ms/turn)")

@@ -814,6 +814,7 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
             week: weekParam,
             tournament_id: tournamentId,
             mode: modeParam,
+            timeout_trace_id: timeoutResult?.timeout_trace_id || undefined,
             home_score: homeScore ?? undefined,
             away_score: awayScore ?? undefined
         }
@@ -853,4 +854,3 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
 }
 
 // Progress bar functions removed - no longer needed
-

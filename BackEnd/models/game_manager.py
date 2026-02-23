@@ -12,6 +12,7 @@ from BackEnd.utils.transition_validator import validate_transition, get_turn_typ
 from BackEnd.utils.transition_event_detector import detect_instigating_event, validate_event_matches_transition
 from BackEnd.utils.transition_registry import TurnType
 import logging
+import uuid
 
 class GameManager:
     def __init__(self, home_team_name, away_team_name, home_strategy_settings=None, away_strategy_settings=None, home_team_attributes=None, away_team_attributes=None, home_scouting_data=None, away_scouting_data=None, home_plays_data=None, away_plays_data=None, home_strategy_calls=None, away_strategy_calls=None, mode="single", user_team_side=None, franchise_id=None):
@@ -235,6 +236,8 @@ class GameManager:
         
         # Store next_play_type and offense_team_id for resume
         self.game_state["timeout_next_play_type"] = timeout_turn.get("next_play_type", "SIDE_INBOUND")
+        # Stable trace id for end-to-end timeout resume diagnostics.
+        self.game_state["timeout_trace_id"] = self.game_state.get("timeout_trace_id") or f"to-{uuid.uuid4().hex[:10]}"
         
         # ✅ FIX: For DREB => HCO transitions, read offense_team_id from the last turn (which was updated after flip)
         # For SIP/BIP, self.offense_team.team_id is already correct (possession flipped before turn creation)
@@ -258,7 +261,12 @@ class GameManager:
         
         self.game_state["timeout_offense_team_id"] = timeout_offense_team_id
         
-        logging.info(f"✅ TIMEOUT: Stored next_play_type '{self.game_state['timeout_next_play_type']}' and offense_team_id '{timeout_offense_team_id}' for resume")
+        logging.info(
+            "✅ TIMEOUT: Stored next_play_type '%s' offense_team_id '%s' trace_id '%s' for resume",
+            self.game_state["timeout_next_play_type"],
+            timeout_offense_team_id,
+            self.game_state.get("timeout_trace_id"),
+        )
         
         # Rebuild lineups
         from BackEnd.utils.db_utils import build_lineup_from_mongo, autoset_strategy_settings
