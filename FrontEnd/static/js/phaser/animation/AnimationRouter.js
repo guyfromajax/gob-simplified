@@ -116,27 +116,35 @@ export class AnimationRouter {
         noImpactResultTypes.has(turnData?.result_type);
       const isOpeningTipTurn = turnData?.result_type === 'OPENING_TIP';
 
-      if (this.scene?.gameClock) {
-        const clockState = this.scene.gameClock.getState?.() || {};
-        if (!clockState.running && !isNoImpactTurn && !this.scene.isPaused && !isOpeningTipTurn) {
-          this.scene.gameClock.start();
-        } else if (!clockState.running && isOpeningTipTurn) {
-          // Start gameplay clock at opening tip jump apex, not on turn load.
-          this.scene.events?.once('openingTipApex', () => {
-            if (this.scene?.gameClock && !this.scene.isPaused) {
-              this.scene.gameClock.start();
-              this.scene.gameClock.resume('no_impact_turn');
-            }
-          });
-        }
-        if (isNoImpactTurn) {
-          this.scene.gameClock.pause('no_impact_turn');
-        } else {
-          this.scene.gameClock.resume('no_impact_turn');
-          if (this.scene.isPaused) {
-            this.scene.gameClock.pause('user_pause');
+      if (this.scene?.gameClock || this.scene?.shotClock) {
+        const applyClockControl = (clockRef, { syncToThirty = false } = {}) => {
+          if (!clockRef) return;
+          const clockState = clockRef.getState?.() || {};
+          if (syncToThirty) {
+            clockRef.syncWithBackend?.(30);
           }
-        }
+          if (!clockState.running && !isNoImpactTurn && !this.scene.isPaused && !isOpeningTipTurn) {
+            clockRef.start();
+          } else if (!clockState.running && isOpeningTipTurn) {
+            this.scene.events?.once('openingTipApex', () => {
+              if (clockRef && !this.scene.isPaused) {
+                clockRef.start();
+                clockRef.resume('no_impact_turn');
+              }
+            });
+          }
+          if (isNoImpactTurn) {
+            clockRef.pause('no_impact_turn');
+          } else {
+            clockRef.resume('no_impact_turn');
+            if (this.scene.isPaused) {
+              clockRef.pause('user_pause');
+            }
+          }
+        };
+
+        applyClockControl(this.scene.gameClock, { syncToThirty: false });
+        applyClockControl(this.scene.shotClock, { syncToThirty: isNoImpactTurn });
       }
 
       // ✅ PHASE 2.3: Call prepareTurnForAnimation at the start

@@ -44,6 +44,7 @@ export function createGameScene(Phaser) {
       // Initialize centralized possession manager
       this.possessionManager = null; // Will be initialized in create()
       this.gameClock = null;
+      this.shotClock = null;
     }
 
     init(data) {
@@ -96,6 +97,10 @@ export function createGameScene(Phaser) {
       if (this.gameClock) {
         this.gameClock.stop();
         this.gameClock = null;
+      }
+      if (this.shotClock) {
+        this.shotClock.stop();
+        this.shotClock = null;
       }
       if (this.tweens) {
         // Resume all tweens before killing them to prevent stuck state
@@ -485,6 +490,7 @@ export function createGameScene(Phaser) {
       const awayTolEl = document.getElementById('away-tol');
       const clockEl = document.getElementById('game-clock');
       const quarterEl = document.getElementById('quarter');
+      const shotClockEl = document.getElementById('shot-clock');
       
       // ✅ FOUL OUT RESUME: Initialize clock early (before DOM usage)
       // When resuming from timeout/foul out, the first turn has the correct clock from backend
@@ -515,6 +521,9 @@ export function createGameScene(Phaser) {
       if (this.gameClock) {
         this.gameClock.stop();
       }
+      if (this.shotClock) {
+        this.shotClock.stop();
+      }
       const initialClockSeconds =
         (typeof simData.time_remaining === 'number' ? simData.time_remaining : null) ??
         parseClockToSeconds(liveClock);
@@ -523,6 +532,12 @@ export function createGameScene(Phaser) {
         clockElement: clockEl,
         tickMs: 450,
       });
+      this.shotClock = createGameClock({
+        timeRemainingSeconds: 30,
+        clockElement: shotClockEl,
+        tickMs: 450,
+      });
+      this.shotClock.syncWithBackend(30);
       // Start is deferred until first impact turn (non No Impact) is processed.
       if (quarterEl && livePeriodLabel) {
         quarterEl.textContent = livePeriodLabel;
@@ -1350,6 +1365,23 @@ export function createGameScene(Phaser) {
       const awayTimeoutsFromData = awayTeamObj?.timeouts ?? simData.timeouts?.away ?? simData.away_team_timeouts;
       let liveHomeTimeouts = typeof homeTimeoutsFromData === 'number' ? homeTimeoutsFromData : (isNewGame ? 4 : 4);
       let liveAwayTimeouts = typeof awayTimeoutsFromData === 'number' ? awayTimeoutsFromData : (isNewGame ? 4 : 4);
+      const noImpactShotClockTypes = new Set(['FREE_THROW', 'BASELINE_INBOUND', 'SIDE_INBOUND']);
+      const isNoImpactShotClockTurn = (turn = {}) => noImpactShotClockTypes.has(turn?.result_type);
+      const shouldResetShotClockOnTurn = (turn = {}) => {
+        const rt = turn?.result_type;
+        const foulType = String(turn?.foul_type || '').toUpperCase();
+        const nextPlayType = String(turn?.next_play_type || turn?.next_turn || '').toUpperCase();
+        const possessionFlips = turn?.possession_flips === true;
+
+        if (isNoImpactShotClockTurn(turn)) return true;
+        if (rt === 'OREB') return true;
+        if (rt === 'MAKE') return true;
+        if (rt === 'STEAL' || rt === 'DEAD BALL' || rt === 'TURNOVER' || rt === 'CHARGE') return true;
+        if (rt === 'FOUL' && foulType === 'OFFENSIVE') return true;
+        if (rt === 'FOUL' && foulType === 'DEFENSIVE' && nextPlayType === 'SIDE_INBOUND') return true;
+        if (possessionFlips && rt !== 'TIMEOUT') return true;
+        return false;
+      };
 
       const updateScoreboard = (turn = {}) => {
         const prevHome = liveScore[homeTeam];
@@ -1437,6 +1469,12 @@ export function createGameScene(Phaser) {
         if (awayTolEl) awayTolEl.textContent = `TOL: ${liveAwayTimeouts}`;
         // Clock text is written only by gameClock (single-writer authority).
         if (quarterEl) quarterEl.textContent = livePeriodLabel;
+        if (this.shotClock && shouldResetShotClockOnTurn(turn)) {
+          this.shotClock.syncWithBackend(30);
+          if (isNoImpactShotClockTurn(turn)) {
+            this.shotClock.pause('no_impact_turn');
+          }
+        }
 
         applyPlayerStats(turn);
         applyTeamStats(turn);
@@ -1601,6 +1639,7 @@ export function createGameScene(Phaser) {
               });
             }
             if (this.gameClock) this.gameClock.pause('user_pause');
+            if (this.shotClock) this.shotClock.pause('user_pause');
             pauseBtn.textContent = 'Resume';
           } else {
             // Resume all tweens
@@ -1645,6 +1684,7 @@ export function createGameScene(Phaser) {
               });
             }
             if (this.gameClock) this.gameClock.resume('user_pause');
+            if (this.shotClock) this.shotClock.resume('user_pause');
             
             pauseBtn.textContent = 'Pause';
           }

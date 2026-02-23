@@ -250,7 +250,7 @@
       z-index: 100; /* Above grid elements */
       pointer-events: none; /* Allow clicks to pass through */
       width: auto;
-      min-width: 100px;
+      min-width: 180px;
     }
 
     /* COMMENTED OUT: Now in Playcall Center */
@@ -280,6 +280,21 @@
       font-size: 24px;
       line-height: 1;
       color: var(--home-vibrant-color);
+    }
+
+    #scoreboard .center .period-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    #scoreboard .center .shot-clock {
+      font-size: 24px;
+      line-height: 1;
+      color: #FFD700;
+      font-weight: 700;
     }
 
     /* COMMENTED OUT: Strategy bars now in Playcall Center */
@@ -2309,7 +2324,10 @@
     <!-- Center Clock/Quarter - Grid column 14 -->
     <div class="center">
       <div id="game-clock" class="clock">8:00</div>
-      <div id="quarter" class="quarter">Q1</div>
+      <div class="period-row">
+        <div id="quarter" class="quarter">Q1</div>
+        <div id="shot-clock" class="shot-clock">30</div>
+      </div>
     </div>
     
     <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
