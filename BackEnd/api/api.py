@@ -2106,10 +2106,8 @@ try:
                 timeout_saved_state = restore_timeout_resume_state(game_id, body, games_collection)
             
             if timeout_saved_state:
-                # Validate quarter match to prevent stale data from affecting new games
-                # Only restore timeout state when the client explicitly asked for it (resume_from_timeout=true).
-                # Otherwise we clear it - e.g. "Play Quarter" after "Sim quarter" for prior quarters must not
-                # restore leftover timeout_next_play_type (e.g. FREE_THROW at end of Q3) or user gets instant EOG.
+                # Only activate timeout resume when the client explicitly requested it.
+                # Non-resume requests should ignore timeout state (without mutating/clearing DB state).
                 saved_quarter = timeout_saved_state.get("quarter", 0)
                 timeout_next_play_type = timeout_saved_state.get("timeout_next_play_type")
                 
@@ -2125,54 +2123,30 @@ try:
                         del ongoing_games[game_id]
                         gm = None  # Force reload from DB
                     logging.info(f"🔍 TIMEOUT RESUME: Will load fresh game from DB and apply timeout state")
-                elif body.resume_from_timeout and timeout_next_play_type and saved_quarter > body.quarter:
-                    # ✅ FOUL-OUT DATA-LOSS FIX: Frontend sometimes sends quarter=1 on "return to court" (e.g. Play Quarter)
-                    # while the game is actually in a later quarter. Use doc as source of truth and treat as timeout resume.
+                elif body.resume_from_timeout and timeout_next_play_type and saved_quarter != body.quarter:
+                    # Timeout resume requested with quarter mismatch: use saved quarter as source of truth.
                     logging.warning(
                         "⚠️ TIMEOUT RESUME: Quarter mismatch (requested=%s, saved=%s) - using saved quarter and treating as timeout resume (game_id=%s)",
                         body.quarter, saved_quarter, game_id,
                     )
                     body.quarter = saved_quarter
-                    body.resume_from_timeout = True
                     if gm is not None:
                         logging.warning(f"🔍 TIMEOUT RESUME: Game in memory, forcing DB reload (game_id={game_id})")
                         del ongoing_games[game_id]
                         gm = None
                     logging.info(f"✅ TIMEOUT RESUME: Corrected body.quarter to %s, resume_from_timeout=True", saved_quarter)
                 else:
-                    # Stale timeout data (quarter mismatch or missing next_play_type) - ignore it
-                    # logging.warning(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={body.quarter}, next_play_type={timeout_next_play_type})")
-                    
-                    # ✅ QUARTER BREAK: Explicitly clear any stale timeout state in saved document BEFORE clearing timeout_saved_state
-                    # This ensures quarter breaks are treated as new quarter starts, not timeout resumes
-                    # timeout_saved_state still contains the saved document at this point
-                    if timeout_saved_state and ("timeout_next_play_type" in timeout_saved_state or "timeout_offense_team_id" in timeout_saved_state):
-                        logging.info(f"✅ QUARTER BREAK: Clearing stale timeout state from saved document (quarter {body.quarter})")
-                        update_data = {}
-                        if "timeout_next_play_type" in timeout_saved_state:
-                            update_data["timeout_next_play_type"] = None
-                        if "timeout_offense_team_id" in timeout_saved_state:
-                            update_data["timeout_offense_team_id"] = None
-                        if update_data:
-                            unset_op = {"$unset": update_data}
-                            r = games_collection.update_one({"_id": game_id}, unset_op)
-                            if r.matched_count == 0 and game_id and len(game_id) == 24:
-                                try:
-                                    games_collection.update_one({"_id": ObjectId(game_id)}, unset_op)
-                                except (ValueError, TypeError):
-                                    pass
-                    
-                    timeout_saved_state = None  # Clear invalid timeout state
-                    # Force reload from DB so we use the cleared doc (no timeout state), not cached gm with stale state
-                    if gm is not None:
-                        logging.info(f"✅ QUARTER BREAK: Clearing cache so next load uses doc without timeout state (game_id={game_id})")
-                        del ongoing_games[game_id]
-                        gm = None
-                    # ✅ QUARTER BREAK: Clear resume_from_timeout flag and timeout state if no valid timeout state
-                    # This handles cases where resume_from_timeout was incorrectly preserved across quarter boundaries
-                    # Quarter breaks should NOT have timeout state - clear it explicitly
+                    # Non-resume requests (or missing next_play_type): ignore timeout state for this request.
+                    # Do not mutate DB timeout fields here; timeout state is cleared after a successful resume.
+                    timeout_saved_state = None
                     if body.resume_from_timeout:
-                        logging.warning(f"⚠️ QUARTER BREAK: Clearing invalid resume_from_timeout flag (no valid timeout state for quarter {body.quarter})")
+                        logging.warning(
+                            "⚠️ QUARTER BREAK: resume_from_timeout=true but timeout state is incomplete/invalid "
+                            "(saved_quarter=%s, requested_quarter=%s, next_play_type=%s). Treating as normal quarter start.",
+                            saved_quarter,
+                            body.quarter,
+                            timeout_next_play_type,
+                        )
                         body.resume_from_timeout = False
             else:
                 if body.resume_from_timeout:
@@ -2588,7 +2562,7 @@ try:
                             # ✅ TIMEOUT RESUME: Apply unified timeout state restoration (if resuming from timeout)
                             # This uses the state we loaded earlier from DB (single source of truth)
                             # Only apply if we actually found timeout state and quarter matches (not stale data)
-                            if timeout_saved_state:
+                            if timeout_saved_state and body.resume_from_timeout:
                                 # Validate that this is actually a timeout resume (not stale data from previous game)
                                 # Check that timeout_next_play_type exists and quarter matches
                                 saved_quarter = saved.get("quarter", 0)
