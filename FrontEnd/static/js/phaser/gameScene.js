@@ -1370,12 +1370,16 @@ export function createGameScene(Phaser) {
       const isNoImpactShotClockTurn = (turn = {}) => noImpactShotClockTypes.has(turn?.result_type);
       const shouldResetShotClockOnTurn = (turn = {}) => {
         const rt = turn?.result_type;
+        const reboundType = String(turn?.rebound_type || '').toUpperCase();
         const foulType = String(turn?.foul_type || '').toUpperCase();
         const nextPlayType = String(turn?.next_play_type || turn?.next_turn || '').toUpperCase();
         const possessionFlips = turn?.possession_flips === true;
 
         if (isNoImpactShotClockTurn(turn)) return true;
         if (rt === 'OREB') return true;
+        // DREB turns can arrive with possession_flips=false after backend flip handling
+        // (e.g., DREB => FAST_BREAK), but they still represent a new possession.
+        if (reboundType === 'DREB') return true;
         if (rt === 'MAKE') return true;
         if (rt === 'STEAL' || rt === 'DEAD BALL' || rt === 'TURNOVER' || rt === 'CHARGE') return true;
         if (rt === 'FOUL' && foulType === 'OFFENSIVE') return true;
@@ -1470,8 +1474,15 @@ export function createGameScene(Phaser) {
         if (awayTolEl) awayTolEl.textContent = `TOL: ${liveAwayTimeouts}`;
         // Clock text is written only by gameClock (single-writer authority).
         if (quarterEl) quarterEl.textContent = livePeriodLabel;
-        if (this.shotClock && shouldResetShotClockOnTurn(turn)) {
-          this.shotClock.syncWithBackend(30);
+        if (this.shotClock) {
+          const hasBackendShotClock = Number.isFinite(Number(turn?.shot_clock_remaining));
+          if (hasBackendShotClock) {
+            const backendShotClock = Math.max(0, Math.floor(Number(turn.shot_clock_remaining)));
+            this.shotClock.syncWithBackend(backendShotClock);
+          } else if (shouldResetShotClockOnTurn(turn)) {
+            this.shotClock.syncWithBackend(30);
+          }
+
           if (isNoImpactShotClockTurn(turn)) {
             this.shotClock.pause('no_impact_turn');
           }
