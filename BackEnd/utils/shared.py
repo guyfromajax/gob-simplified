@@ -8,6 +8,19 @@ from BackEnd.constants import (
     CHARGE_THRESHOLD,
     BLOCKING_FOUL_THRESHOLD,
 )
+from BackEnd.utils.movement_constants import (
+    COURT_WIDTH_PX,
+    COURT_HEIGHT_PX,
+    COURT_WIDTH_UNITS,
+    COURT_HEIGHT_UNITS,
+    DEFAULT_GAME_SPEED_PX_PER_SEC,
+    SPEED_OPEN_COURT,
+    SPEED_HALF_COURT,
+    SPEED_PRESS_TRAP,
+    SPEED_PASS,
+    OVERHEAD_PASS,
+    ELAPSED_REBOUND,
+)
 
 
 def format_height(value) -> str:
@@ -120,6 +133,148 @@ def get_time_elapsed(tempo_call):
     return int(max(p["min"], min(p["max"], random.gauss(p["mean"], p["std"]))))
 
 
+def grid_to_pixel(grid_x, grid_y, width=COURT_WIDTH_PX, height=COURT_HEIGHT_PX):
+    """Mirror frontend gridToPixels conversion."""
+    px = (float(grid_x) / float(COURT_WIDTH_UNITS)) * float(width)
+    py = ((float(COURT_HEIGHT_UNITS) - float(grid_y)) / float(COURT_HEIGHT_UNITS)) * float(height)
+    return px, py
+
+
+def location_to_grid(action_data):
+    """
+    Resolve an action payload into (x, y) grid coordinates.
+
+    Supports:
+    - direct coords dict: {"coords": {"x": ..., "y": ...}}
+    - location string: {"location": "upper midCorner"}
+    - spot string: {"spot": "upper midCorner"}
+    """
+    if action_data is None:
+        return None
+
+    if isinstance(action_data, dict):
+        coords = action_data.get("coords")
+        if isinstance(coords, dict) and "x" in coords and "y" in coords:
+            try:
+                return float(coords.get("x")), float(coords.get("y"))
+            except (TypeError, ValueError):
+                return None
+
+        spot = action_data.get("location") or action_data.get("spot")
+    elif isinstance(action_data, str):
+        spot = action_data
+    else:
+        spot = None
+
+    if isinstance(spot, str):
+        spot_coords = HCO_STRING_SPOTS.get(spot)
+        if isinstance(spot_coords, dict) and "x" in spot_coords and "y" in spot_coords:
+            try:
+                return float(spot_coords.get("x")), float(spot_coords.get("y"))
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def calc_movement_elapsed(x1, y1, x2, y2, speed_constant, game_speed_px_per_sec=DEFAULT_GAME_SPEED_PX_PER_SEC):
+    """
+    Compute elapsed game-seconds from movement distance.
+
+    Backend estimator mirrors frontend shape:
+    - convert start/end to pixels using grid_to_pixel
+    - duration ~= distance_px / speed_px_per_sec
+    """
+    try:
+        x1f = float(x1)
+        y1f = float(y1)
+        x2f = float(x2)
+        y2f = float(y2)
+        speed = float(speed_constant)
+    except (TypeError, ValueError):
+        return 0.0
+
+    if speed <= 0:
+        return 0.0
+
+    px1, py1 = grid_to_pixel(x1f, y1f)
+    px2, py2 = grid_to_pixel(x2f, y2f)
+    distance_px = math.sqrt((px2 - px1) ** 2 + (py2 - py1) ** 2)
+
+    # Convert grid-units/sec to px/sec using runtime court scaling.
+    px_per_unit = ((COURT_WIDTH_PX / COURT_WIDTH_UNITS) + (COURT_HEIGHT_PX / COURT_HEIGHT_UNITS)) / 2.0
+    speed_px_per_sec = speed * px_per_unit
+    if speed_px_per_sec <= 0:
+        return 0.0
+
+    return distance_px / speed_px_per_sec
+
+
+def calc_path_elapsed(points, speed_constant, game_speed_px_per_sec=DEFAULT_GAME_SPEED_PX_PER_SEC):
+    """Sum movement elapsed across a sequence of path points."""
+    if not points or len(points) < 2:
+        return 0.0
+    total = 0.0
+    for idx in range(1, len(points)):
+        start = points[idx - 1] or {}
+        end = points[idx] or {}
+        total += calc_movement_elapsed(
+            start.get("x"), start.get("y"),
+            end.get("x"), end.get("y"),
+            speed_constant,
+            game_speed_px_per_sec=game_speed_px_per_sec,
+        )
+    return total
+
+
+def calc_skeleton_turn_elapsed(
+    skeleton_steps,
+    speed_constant,
+    game_speed_px_per_sec=DEFAULT_GAME_SPEED_PX_PER_SEC,
+    overhead_per_action=None,
+):
+    """Compute elapsed for full skeleton by per-step max movement + max overhead."""
+    from BackEnd.utils.movement_constants import OVERHEAD_PASS, OVERHEAD_SHOT
+
+    if overhead_per_action is None:
+        overhead_per_action = {
+            "pass": OVERHEAD_PASS,
+            "shoot": OVERHEAD_SHOT,
+            "receive": 0.0,
+            "cut": 0.0,
+            "stationary": 0.0,
+            "post_up": 0.0,
+        }
+
+    total_elapsed = 0.0
+    prev_positions = {}
+
+    for step in skeleton_steps or []:
+        pos_actions = (step or {}).get("pos_actions", {}) or {}
+        step_max_elapsed = 0.0
+        step_overhead = 0.0
+
+        for position, action_data in pos_actions.items():
+            current_xy = location_to_grid(action_data)
+            if current_xy is not None and position in prev_positions:
+                x1, y1 = prev_positions[position]
+                x2, y2 = current_xy
+                movement_elapsed = calc_movement_elapsed(
+                    x1, y1, x2, y2, speed_constant, game_speed_px_per_sec=game_speed_px_per_sec
+                )
+                step_max_elapsed = max(step_max_elapsed, movement_elapsed)
+
+            action = (action_data or {}).get("action")
+            if isinstance(action, str):
+                step_overhead = max(step_overhead, float(overhead_per_action.get(action, 0.0)))
+
+            if current_xy is not None:
+                prev_positions[position] = current_xy
+
+        total_elapsed += step_max_elapsed + step_overhead
+
+    return total_elapsed
+
+
 def clamp_turn_time_elapsed(seconds, cap=30):
     """Clamp turn time to [0, cap] and return int."""
     try:
@@ -193,6 +348,8 @@ def calc_skeleton_step_timing_contract(
     resolution_step_index=None,
     cap=30,
     include_hco_step1_bringup=False,
+    skeleton_phase="HCO",
+    game_speed_px_per_sec=DEFAULT_GAME_SPEED_PX_PER_SEC,
 ):
     """
     Build deterministic per-step clock timing contract for skeleton turns.
@@ -231,7 +388,22 @@ def calc_skeleton_step_timing_contract(
             step_clock_seconds[idx] -= reduce_by
             overflow -= reduce_by
 
-    final_total = clamp_turn_time_elapsed(sum(step_clock_seconds), cap=cap)
+    phase = str(skeleton_phase or "HCO").upper()
+    if phase in {"FCP", "HCT"}:
+        speed_constant = SPEED_PRESS_TRAP
+    else:
+        speed_constant = SPEED_HALF_COURT
+
+    executed_steps = (steps or [])[:executed_count]
+    movement_elapsed = calc_skeleton_turn_elapsed(
+        executed_steps,
+        speed_constant=speed_constant,
+        game_speed_px_per_sec=game_speed_px_per_sec,
+    )
+    if include_hco_step1_bringup:
+        movement_elapsed += _calc_hco_step1_bringup_overhead_seconds(steps)
+
+    final_total = clamp_turn_time_elapsed(round(movement_elapsed), cap=cap)
     return {
         "step_clock_seconds": step_clock_seconds,
         "time_elapsed": final_total,
@@ -251,15 +423,17 @@ def calc_cg_segment_seconds(start, end):
     return math.sqrt((dx / 20.0) ** 2 + (dy / 10.0) ** 2)
 
 
-def calc_cg_time_elapsed_from_movement_points(points, cap=30):
+def calc_cg_time_elapsed_from_movement_points(points, cap=30, game_speed_px_per_sec=DEFAULT_GAME_SPEED_PX_PER_SEC):
     """
     Round-at-end CG time from ordered movement points.
     """
     if not points or len(points) < 2:
         return 0
-    total = 0.0
-    for idx in range(1, len(points)):
-        total += calc_cg_segment_seconds(points[idx - 1], points[idx])
+    total = calc_path_elapsed(
+        points,
+        speed_constant=SPEED_OPEN_COURT,
+        game_speed_px_per_sec=game_speed_px_per_sec,
+    )
     return clamp_turn_time_elapsed(round(total), cap=cap)
 
 def oreb_shot_attempt(player_attrs):
@@ -306,7 +480,7 @@ def resolve_offensive_rebound(game, rebounder):
         attrs = rebounder.attributes
         # ✅ NEW: Use dedicated OREB shot attempt function
         shot_score = oreb_shot_attempt(attrs)
-        time_elapsed = random.randint(1, 5)
+        time_elapsed = int(round(ELAPSED_REBOUND))
 
         defender_pos = random.choice(["C", "C", "C", "PF", "PF", "SF", "SF", "SG", "PG"])
         defender = def_team.lineup[defender_pos]
@@ -401,9 +575,14 @@ def resolve_offensive_rebound(game, rebounder):
 
     # Kick out to PG
     pg = off_team.lineup.get("PG")
-    duration = random.randint(1, 5)
     from_coords = getattr(rebounder, "coords", {"x": 25, "y": 50})
     to_coords = getattr(pg, "coords", {"x": 25, "y": 50}) if pg else {"x": 25, "y": 50}
+    pass_elapsed = calc_movement_elapsed(
+        from_coords.get("x"), from_coords.get("y"),
+        to_coords.get("x"), to_coords.get("y"),
+        SPEED_PASS,
+    ) + OVERHEAD_PASS
+    duration = int(round(max(pass_elapsed, 1.0)))
 
     return {
         "event_type": "KICKOUT_RESET",

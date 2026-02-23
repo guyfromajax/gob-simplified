@@ -746,7 +746,13 @@ class TurnManager:
                     shot_clock_remaining,
                 )
             elif should_consider_shot_boundary and crosses_shot_boundary:
-                if random.random() < 0.5:
+                decision = self.resolve_shot_clock_expiry({
+                    "state": state,
+                    "result": result,
+                    "shot_clock_remaining": shot_clock_remaining,
+                    "game_clock_remaining": game_clock_remaining,
+                })
+                if decision == "forced_shot":
                     boundary_result = self._execute_forced_shot(state)
                     boundary_path = "FORCED_SHOT"
                 else:
@@ -1146,6 +1152,10 @@ class TurnManager:
             "forced_shot": False,
             "events": [],
         }
+
+    def resolve_shot_clock_expiry(self, context=None):
+        """Determine shot-clock boundary outcome (current prototype: 50/50)."""
+        return "forced_shot" if random.random() < 0.5 else "violation"
 
     def _coords_to_nearest_spot(self, coords):
         from BackEnd.constants import HCO_STRING_SPOTS
@@ -2828,6 +2838,7 @@ class TurnManager:
         """
         from BackEnd.utils.shared import resolve_offensive_rebound, get_name_safe, unpack_game_context, serialize_lineup
         from BackEnd.models.shot_manager import ShotManager
+        from BackEnd.utils.movement_constants import ELAPSED_REBOUND
         
         logging.warning(f"🔍 [RESOLVE_OREB_TURN] ENTRY: Function called")
         pending_oreb = self.game.game_state.get("pending_oreb")
@@ -2886,7 +2897,7 @@ class TurnManager:
                 "ball_handler": getattr(rebounder, "player_id", None),
                 "text": f"{rebounder_name} secures the rebound after the block. Reset to half-court.",
                 "possession_flips": False,
-                "time_elapsed": random.randint(1, 5),
+                "time_elapsed": int(round(ELAPSED_REBOUND)),
                 "offense_team_id": self.game.offense_team.team_id,
                 "current_turn": "OREB",
                 "next_play_type": "HCO",
@@ -2989,7 +3000,7 @@ class TurnManager:
                     "defender": getattr(defender, "player_id", None),
                     "text": text,
                     "possession_flips": possession_flips,
-                    "time_elapsed": oreb_event.get("timeElapsed", random.randint(1, 5)),
+                    "time_elapsed": int(round(oreb_event.get("timeElapsed", ELAPSED_REBOUND))),
                     "points": oreb_event.get("points", 2),
                     "scoring_team": off_team.name,
                     "offense_team_id": off_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
@@ -3039,7 +3050,7 @@ class TurnManager:
                     "defender": getattr(defender, "player_id", None),
                     "text": text,
                     "possession_flips": possession_flips,  # Will be updated based on rebound type
-                    "time_elapsed": oreb_event.get("timeElapsed", random.randint(1, 5)),
+                    "time_elapsed": int(round(oreb_event.get("timeElapsed", ELAPSED_REBOUND))),
                     "offense_team_id": off_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
                     "current_turn": "OREB",  # ✅ SS&S: Explicit turn type
                     "animations": [],
@@ -3208,7 +3219,7 @@ class TurnManager:
                 "ball_handler": getattr(rebounder, "player_id", None),
                 "text": text,
                 "possession_flips": False,
-                "time_elapsed": oreb_event.get("timeElapsed", random.randint(1, 5)),
+                "time_elapsed": int(round(oreb_event.get("timeElapsed", ELAPSED_REBOUND))),
                 "offense_team_id": self.game.offense_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
                 "current_turn": "OREB",  # ✅ SS&S: Explicit turn type
                 "next_turn": "HCO",  # ✅ SS&S: Kickouts continue to HCO
@@ -3279,6 +3290,8 @@ class TurnManager:
                 min(30, game_remaining_before),
             ) or 0
         )
+        clock_start = game_remaining_before
+        shot_clock_start = shot_remaining_before
 
         # 🕒 Reduce clock by time_elapsed with legal cap enforcement.
         time_elapsed = int(result.get("time_elapsed", 0) or 0)
@@ -3304,13 +3317,22 @@ class TurnManager:
             self.game.game_state["shot_clock_remaining"] = min(30, int(self.game.game_state.get("time_remaining", 0)))
 
         # Reset/hold shot clock based on possession events.
+        shot_clock_reset = False
         if _should_reset_shot_clock(result):
             self.game.game_state["shot_clock_remaining"] = min(30, int(self.game.game_state.get("time_remaining", 0)))
+            shot_clock_reset = True
 
         # Convert to clock display (e.g., 400 → "6:40")
         minutes = self.game.game_state["time_remaining"] // 60
         seconds = self.game.game_state["time_remaining"] % 60
         self.game.game_state["clock"] = f"{minutes}:{seconds:02d}"
+
+        # Explicit clock contract fields for frontend authoritative sync.
+        result["clock_start"] = clock_start
+        result["clock_end"] = int(self.game.game_state.get("time_remaining", 0) or 0)
+        result["shot_clock_start"] = shot_clock_start
+        result["shot_clock_end"] = int(self.game.game_state.get("shot_clock_remaining", 0) or 0)
+        result["shot_clock_reset"] = bool(shot_clock_reset)
 
         # ✅ Track MIN (minutes played) for all active players
         # Only track if time_elapsed > 0 (skip timeouts and other 0-time turns)

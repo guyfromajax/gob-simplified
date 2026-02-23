@@ -22,6 +22,7 @@ from BackEnd.utils.shared import (
     calc_skeleton_time_elapsed,
     calc_skeleton_step_timing_contract,
     calc_cg_segment_seconds,
+    calc_path_elapsed,
     clamp_turn_time_elapsed,
     get_fast_break_chance,
     calculate_rebound_score,
@@ -32,6 +33,11 @@ from BackEnd.utils.shared import (
     calculate_bounce_spot,
     determine_rebounder,
     update_player_coords_from_animations,
+)
+from BackEnd.utils.movement_constants import (
+    ELAPSED_DEAD_BALL,
+    ELAPSED_FOUL,
+    SPEED_TRANSITION,
 )
 from BackEnd.playcall_skeletons.fcp_skeletons import FCP_1, FCP_SKELETONS_DICT
 from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
@@ -382,7 +388,7 @@ def resolve_non_shooting_foul(roles, game, time_elapsed_override=None):
         if steps:
             time_elapsed = calc_skeleton_time_elapsed(steps, event_step_index)
         else:
-            time_elapsed = random.randint(1, 5)
+            time_elapsed = int(round(ELAPSED_FOUL))
 
     # Track the foul
     foul_player.record_stat("F")
@@ -1316,10 +1322,12 @@ def resolve_fast_break_logic(game: "GameManager"):
             if isinstance(start.get("x"), (int, float)) and isinstance(start.get("y"), (int, float)) and end:
                 path_points = [start, {"x": end.get("x", start["x"]), "y": end.get("y", start["y"])}]
 
-        distance_seconds = 0.0
-        if len(path_points) >= 2:
-            for idx in range(1, len(path_points)):
-                distance_seconds += calc_cg_segment_seconds(path_points[idx - 1], path_points[idx])
+        game_speed_px_per_sec = int(game.game_state.get("game_speed_px_per_sec", 450) or 450)
+        distance_seconds = calc_path_elapsed(
+            path_points,
+            SPEED_TRANSITION,
+            game_speed_px_per_sec=game_speed_px_per_sec,
+        )
 
         overhead_seconds = 0.0
         if roles_data.get("outlet_passer"):
@@ -1851,7 +1859,7 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
         "result_type": turnover_type,
         "ball_handler": ball_handler,
         "text": text,
-        "time_elapsed": random.randint(3, 8),
+        "time_elapsed": int(round(ELAPSED_DEAD_BALL)),
         "possession_flips": True,  # Let the turn loop handle the flip
         "offense_team_id": game.offense_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
         "current_turn": "HCO",  # ✅ SS&S: Standalone turnovers occur in HCO context
@@ -4254,6 +4262,8 @@ def resolve_half_court_offense_logic(game):
                 roles.get("steps", []),
                 resolution_step_index=roles.get("event_step"),
                 include_hco_step1_bringup=True,
+                skeleton_phase="HCO",
+                game_speed_px_per_sec=game_state.get("game_speed_px_per_sec"),
             )
             turn_result["time_elapsed"] = timing_contract["time_elapsed"]
             turn_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
@@ -4295,6 +4305,8 @@ def resolve_half_court_offense_logic(game):
                 roles.get("steps", []),
                 resolution_step_index=roles.get("event_step"),
                 include_hco_step1_bringup=True,
+                skeleton_phase="HCO",
+                game_speed_px_per_sec=game_state.get("game_speed_px_per_sec"),
             )
             foul_result["time_elapsed"] = timing_contract["time_elapsed"]
             foul_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
@@ -4336,6 +4348,8 @@ def resolve_half_court_offense_logic(game):
                 roles.get("steps", []),
                 resolution_step_index=roles.get("event_step"),
                 include_hco_step1_bringup=True,
+                skeleton_phase="HCO",
+                game_speed_px_per_sec=game_state.get("game_speed_px_per_sec"),
             )
             foul_result["time_elapsed"] = timing_contract["time_elapsed"]
             foul_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
@@ -5288,6 +5302,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
         roles.get("steps", []),
         resolution_step_index=(len(roles.get("steps", [])) - 1 if roles.get("steps") else None),
         include_hco_step1_bringup=False,
+        skeleton_phase="FCP",
+        game_speed_px_per_sec=game_state.get("game_speed_px_per_sec"),
     )
     fcp_time_elapsed = fcp_timing_contract["time_elapsed"]
     
@@ -6431,6 +6447,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         roles.get("steps", []),
         resolution_step_index=(len(roles.get("steps", [])) - 1 if roles.get("steps") else None),
         include_hco_step1_bringup=False,
+        skeleton_phase="HCT",
+        game_speed_px_per_sec=game_state.get("game_speed_px_per_sec"),
     )
     hct_time_elapsed = hct_timing_contract["time_elapsed"]
     

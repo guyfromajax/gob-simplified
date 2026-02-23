@@ -28,6 +28,7 @@ export function createGameClock({
   let timeRemaining = Math.max(0, Math.floor(Number(timeRemainingSeconds) || 0));
   let intervalId = null;
   let running = false;
+  let targetTime = null;
   const pauseReasons = new Set();
   let tickIntervalMs = Math.max(50, Math.floor(Number(tickMs) || 350));
   const formatFn = typeof formatter === 'function' ? formatter : formatClock;
@@ -47,19 +48,47 @@ export function createGameClock({
 
   const tick = () => {
     if (!running || pauseReasons.size > 0) return;
-    if (timeRemaining <= 0) {
+    const stopFloor = Number.isFinite(targetTime) ? targetTime : 0;
+    if (timeRemaining <= stopFloor) {
       clear();
       running = false;
+      if (Number.isFinite(targetTime)) {
+        timeRemaining = stopFloor;
+        targetTime = null;
+        render();
+        return;
+      }
       if (typeof onZero === 'function') onZero();
       return;
     }
     timeRemaining -= 1;
+    if (Number.isFinite(targetTime) && timeRemaining < targetTime) {
+      timeRemaining = targetTime;
+    }
     render();
   };
 
   return {
     start() {
       if (running && intervalId) return;
+      running = true;
+      targetTime = null;
+      pauseReasons.clear();
+      render();
+      clear();
+      intervalId = setInterval(tick, tickIntervalMs);
+    },
+    runToTarget(targetSeconds) {
+      const parsedTarget = Math.max(0, Math.floor(Number(targetSeconds) || 0));
+      if (timeRemaining <= parsedTarget) {
+        timeRemaining = parsedTarget;
+        targetTime = null;
+        running = false;
+        clear();
+        render();
+        return;
+      }
+      targetTime = parsedTarget;
       running = true;
       pauseReasons.clear();
       render();
@@ -79,12 +108,14 @@ export function createGameClock({
     },
     stop() {
       running = false;
+      targetTime = null;
       pauseReasons.clear();
       clear();
     },
     syncWithBackend(timeRemainingSecondsValue) {
       const parsed = Math.max(0, Math.floor(Number(timeRemainingSecondsValue) || 0));
       timeRemaining = parsed;
+      targetTime = null;
       render();
     },
     setTickMs(nextTickMs) {
@@ -102,6 +133,7 @@ export function createGameClock({
         paused: pauseReasons.size > 0,
         pauseReasons: Array.from(pauseReasons),
         tickMs: tickIntervalMs,
+        targetTime,
       };
     },
     render,

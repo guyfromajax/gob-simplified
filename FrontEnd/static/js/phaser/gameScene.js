@@ -1446,28 +1446,34 @@ export function createGameScene(Phaser) {
           }
         }
         if (this.gameClock) {
-          const clockState = this.gameClock.getState?.() || {};
-          const currentClockSec = Number.isFinite(clockState.timeRemaining) ? clockState.timeRemaining : null;
-          const incomingQuarter = (typeof turn.quarter === 'number') ? turn.quarter : liveQuarter;
-          const allowIncrease = incomingQuarter > liveQuarter;
-          let incomingClockSec = null;
-          if (typeof turn.time_remaining === 'number') {
-            incomingClockSec = Math.max(0, Math.floor(turn.time_remaining));
-          } else if (turn.clock || turn.game_clock) {
-            incomingClockSec = parseClockToSeconds(turn.clock || turn.game_clock);
-          }
-          if (Number.isFinite(incomingClockSec)) {
-            if (currentClockSec == null || allowIncrease || incomingClockSec <= currentClockSec) {
-              this.gameClock.syncWithBackend(incomingClockSec);
+          const hasClockContract = Number.isFinite(Number(turn?.clock_start)) &&
+            Number.isFinite(Number(turn?.clock_end));
+          if (hasClockContract) {
+            const startSec = Math.max(0, Math.floor(Number(turn.clock_start)));
+            const endSec = Math.max(0, Math.floor(Number(turn.clock_end)));
+            this.gameClock.syncWithBackend(startSec);
+            if (startSec !== endSec) {
+              this.gameClock.runToTarget?.(endSec);
             } else {
-              // Ignore stale/out-of-order clock payloads in the same period.
-              console.warn('⏱️ Ignoring non-monotonic clock update', {
-                currentClockSec,
-                incomingClockSec,
-                liveQuarter,
-                incomingQuarter,
-                result_type: turn.result_type
-              });
+              this.gameClock.stop();
+              this.gameClock.syncWithBackend(endSec);
+            }
+          } else {
+            const clockState = this.gameClock.getState?.() || {};
+            const currentClockSec = Number.isFinite(clockState.timeRemaining) ? clockState.timeRemaining : null;
+            let incomingClockSec = null;
+            if (typeof turn.time_remaining === 'number') {
+              incomingClockSec = Math.max(0, Math.floor(turn.time_remaining));
+            } else if (turn.clock || turn.game_clock) {
+              incomingClockSec = parseClockToSeconds(turn.clock || turn.game_clock);
+            }
+            if (Number.isFinite(incomingClockSec)) {
+              if (currentClockSec != null && incomingClockSec > currentClockSec) {
+                console.warn(
+                  `Non-monotonic clock update: incoming=${incomingClockSec}, current=${currentClockSec}. Accepting value from backend contract.`
+                );
+              }
+              this.gameClock.syncWithBackend(incomingClockSec);
             }
           }
         }
@@ -1488,12 +1494,26 @@ export function createGameScene(Phaser) {
         // Clock text is written only by gameClock (single-writer authority).
         if (quarterEl) quarterEl.textContent = livePeriodLabel;
         if (this.shotClock) {
-          const hasBackendShotClock = Number.isFinite(Number(turn?.shot_clock_remaining));
-          if (hasBackendShotClock) {
-            const backendShotClock = Math.max(0, Math.floor(Number(turn.shot_clock_remaining)));
-            this.shotClock.syncWithBackend(backendShotClock);
-          } else if (shouldResetShotClockOnTurn(turn)) {
-            this.shotClock.syncWithBackend(30);
+          const hasShotClockContract = Number.isFinite(Number(turn?.shot_clock_start)) &&
+            Number.isFinite(Number(turn?.shot_clock_end));
+          if (hasShotClockContract) {
+            const shotStart = Math.max(0, Math.floor(Number(turn.shot_clock_start)));
+            const shotEnd = Math.max(0, Math.floor(Number(turn.shot_clock_end)));
+            this.shotClock.syncWithBackend(shotStart);
+            if (shotStart !== shotEnd) {
+              this.shotClock.runToTarget?.(shotEnd);
+            } else {
+              this.shotClock.stop();
+              this.shotClock.syncWithBackend(shotEnd);
+            }
+          } else {
+            const hasBackendShotClock = Number.isFinite(Number(turn?.shot_clock_remaining));
+            if (hasBackendShotClock) {
+              const backendShotClock = Math.max(0, Math.floor(Number(turn.shot_clock_remaining)));
+              this.shotClock.syncWithBackend(backendShotClock);
+            } else if (shouldResetShotClockOnTurn(turn)) {
+              this.shotClock.syncWithBackend(30);
+            }
           }
 
           if (isNoImpactShotClockTurn(turn)) {
@@ -2064,7 +2084,8 @@ export function createGameScene(Phaser) {
             game_id: gameId,
             offense_override: offenseOverride ?? null,
             defense_override: defenseOverride ?? null,
-            mode: simMode
+            mode: simMode,
+            game_speed_px_per_sec: window.__GAME_SPEED || 450
           })
         });
         if (!response.ok) {

@@ -363,6 +363,8 @@ try:
         # Optional user overrides for this specific turn
         offense_override: str | None = None  # e.g., "Inside", "Attack", "Outside"
         defense_override: str | None = None  # e.g., "Zone", "Man"
+        # Active frontend movement speed (px/sec) for clock-sync elapsed calculations
+        game_speed_px_per_sec: int | None = None
     
     
     class CallTimeoutRequest(BaseModel):
@@ -1125,11 +1127,19 @@ try:
         
         # Return consistent response format (same for both user and computer)
         # Use saved data (db_summary) to ensure response matches what was saved to DB
+        if isinstance(timeout_turn, dict):
+            timeout_turn.setdefault("shot_clock_start", int(gm.game_state.get("shot_clock_remaining", 0) or 0))
+            timeout_turn.setdefault("shot_clock_end", int(gm.game_state.get("shot_clock_remaining", 0) or 0))
+            timeout_turn.setdefault("shot_clock_reset", False)
         response = {
             "turn": timeout_turn,
             "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
             "time_remaining": db_summary.get("time_remaining", gm.game_state.get("time_remaining", 480)),
+            "shot_clock_remaining": gm.game_state.get("shot_clock_remaining", min(30, int(gm.game_state.get("time_remaining", 0) or 0))),
             "clock": db_summary.get("clock", gm.game_state.get("clock", "8:00")),
+            "shot_clock_start": timeout_turn.get("shot_clock_start") if isinstance(timeout_turn, dict) else gm.game_state.get("shot_clock_remaining", 30),
+            "shot_clock_end": timeout_turn.get("shot_clock_end") if isinstance(timeout_turn, dict) else gm.game_state.get("shot_clock_remaining", 30),
+            "shot_clock_reset": bool(timeout_turn.get("shot_clock_reset")) if isinstance(timeout_turn, dict) else False,
             "quarter_complete": False,  # ✅ CRITICAL: Always False for timeout (not quarter end)
             "quarter": db_summary.get("quarter", gm.quarter),
             "is_final": False,
@@ -3902,6 +3912,38 @@ try:
                 detail=f"Game {game_id} not found. Start a quarter first with /api/simulate-quarter"
             )
 
+        def enrich_turn_clock_fields(turn: dict, game_state: dict):
+            """
+            Fallback enrichment for turns that bypassed update_clock_and_possession.
+            Only fills genuinely missing fields.
+            """
+            if not isinstance(turn, dict):
+                return turn
+            current_clock = int(game_state.get("time_remaining", 0) or 0)
+            current_shot_clock = int(game_state.get("shot_clock_remaining", 0) or 0)
+            if "clock_start" not in turn:
+                turn["clock_start"] = current_clock
+            if "clock_end" not in turn:
+                turn["clock_end"] = current_clock
+            if "shot_clock_start" not in turn:
+                turn["shot_clock_start"] = current_shot_clock
+            if "shot_clock_end" not in turn:
+                turn["shot_clock_end"] = current_shot_clock
+            if "shot_clock_reset" not in turn:
+                turn["shot_clock_reset"] = False
+            return turn
+
+        def enrich_turn_payload(turn: dict, game_state: dict):
+            """Apply enrichment to a single turn or every subturn in a BATCH wrapper."""
+            if not isinstance(turn, dict):
+                return turn
+            if turn.get("result_type") == "BATCH" and isinstance(turn.get("batch_turns"), list):
+                for idx, subturn in enumerate(turn["batch_turns"]):
+                    if isinstance(subturn, dict):
+                        turn["batch_turns"][idx] = enrich_turn_clock_fields(subturn, game_state)
+                return turn
+            return enrich_turn_clock_fields(turn, game_state)
+
         logging.warning(
             "🧭 [SIM TURN ENTRY TRACE] game_id=%s quarter=%s clock=%s time_remaining=%s shot_clock_remaining=%s offensive_state=%s turns_len=%s",
             game_id,
@@ -3930,6 +3972,12 @@ try:
         if body.defense_override:
             gm.game_state["user_defense_override"] = body.defense_override
             logging.info(f"🎮 User defense override: {body.defense_override}")
+
+        # Backend authoritative speed source for elapsed computations in this request/turn.
+        from BackEnd.utils.movement_constants import get_game_speed_px_per_sec
+        gm.game_state["game_speed_px_per_sec"] = get_game_speed_px_per_sec(
+            body.game_speed_px_per_sec
+        )
         
         pending_terminal_ft = _has_pending_terminal_free_throw(gm)
 
@@ -3986,6 +4034,7 @@ try:
                 )
             else:
                 timeout_turn = gm.turns[-1]
+                timeout_turn = enrich_turn_payload(timeout_turn, gm.game_state)
                 logging.info(f"⏸️ TIMEOUT: Returning existing TIMEOUT turn (reason: {timeout_turn.get('timeout_reason')})")
                 # Remove the TIMEOUT turn from turns so next API call can simulate the actual next turn
                 gm.turns.pop()
@@ -4044,6 +4093,8 @@ try:
                     try:
                         # ✅ UNIFIED: Use shared helper function (same as user timeout)
                         timeout_response = handle_timeout_save_and_response(gm, timeout_turn, game_id, timeout_reason="COMPUTER")
+                        if isinstance(timeout_response, dict) and isinstance(timeout_response.get("turn"), dict):
+                            timeout_response["turn"] = enrich_turn_payload(timeout_response["turn"], gm.game_state)
                         
                         # ⏱️ PERFORMANCE: Log timeout return path
                         total_time = (time.time() - start_time) * 1000
@@ -4065,6 +4116,8 @@ try:
                                 "quarter_complete": False,
                                 "quarter": gm.quarter,
                             }
+                            if isinstance(fallback.get("turn"), dict):
+                                fallback["turn"] = enrich_turn_payload(fallback["turn"], gm.game_state)
                             return JSONResponse(content=fallback, status_code=200)
                     # ⏱️ PERFORMANCE: Log timeout return path
                     total_time = (time.time() - start_time) * 1000
@@ -4124,11 +4177,23 @@ try:
             else:
                 # Multiple turns created (e.g., HCO miss → OREB turn)
                 # Return them as a batch for the frontend to animate sequentially
+                for i in range(len(new_turns) - 1):
+                    current_end = float(new_turns[i].get("clock_end", -1))
+                    next_start = float(new_turns[i + 1].get("clock_start", -1))
+                    if abs(current_end - next_start) > 0.01:
+                        logging.warning(
+                            "Batch clock chain mismatch at turn %s: clock_end=%s != next clock_start=%s",
+                            i,
+                            current_end,
+                            next_start,
+                        )
                 latest_turn = {
                     "result_type": "BATCH",
                     "batch_turns": new_turns,
                     "text": " → ".join(t.get("text", "") for t in new_turns)
                 }
+            if isinstance(latest_turn, dict):
+                latest_turn = enrich_turn_payload(latest_turn, gm.game_state)
             
             # ✅ FOUL_OUT RESUME: Persist timeout state via same path as user/computer timeout so return-to-court finds it
             for t in new_turns:
@@ -4475,6 +4540,7 @@ try:
         backend_shot = int(
             gm.game_state.get("shot_clock_remaining", min(30, int(gm.game_state.get("time_remaining", 0) or 0))) or 0
         )
+        shot_clock_start = backend_shot
         displayed_shot = (
             int(request.displayed_shot_clock_remaining)
             if isinstance(request.displayed_shot_clock_remaining, int)
@@ -4486,6 +4552,8 @@ try:
             gm.game_state["shot_clock_remaining"] = effective_shot
         else:
             gm.game_state["shot_clock_remaining"] = max(0, min(backend_shot, effective_time))
+        shot_clock_end = int(gm.game_state.get("shot_clock_remaining", 0) or 0)
+        shot_clock_reset = (shot_clock_end != shot_clock_start)
 
         if request.timeout_trace_id:
             gm.game_state["timeout_trace_id"] = request.timeout_trace_id
@@ -4513,6 +4581,10 @@ try:
             rebuild_both_lineups=False,  # User timeout only rebuilds computer team
             game_id=None  # Don't save here - we'll save below
         )
+        if isinstance(timeout_turn, dict):
+            timeout_turn["shot_clock_start"] = shot_clock_start
+            timeout_turn["shot_clock_end"] = shot_clock_end
+            timeout_turn["shot_clock_reset"] = shot_clock_reset
         
         if not timeout_turn:
             raise HTTPException(
@@ -4540,6 +4612,10 @@ try:
                 "away_team_timeouts": timeout_response["away_team_timeouts"],
                 "clock": timeout_response["clock"],  # ✅ Use saved data from DB (not cache)
                 "time_remaining": timeout_response["time_remaining"],  # ✅ Use saved data from DB (not cache)
+                "shot_clock_remaining": timeout_response.get("shot_clock_remaining", gm.game_state.get("shot_clock_remaining")),
+                "shot_clock_start": timeout_response.get("shot_clock_start", shot_clock_start),
+                "shot_clock_end": timeout_response.get("shot_clock_end", shot_clock_end),
+                "shot_clock_reset": timeout_response.get("shot_clock_reset", shot_clock_reset),
                 "turn": timeout_response["turn"],  # Include turn for frontend consistency
                 "quarter": timeout_response["quarter"],
                 "quarter_complete": timeout_response["quarter_complete"],
@@ -4558,9 +4634,13 @@ try:
             "timeouts_remaining": getattr(calling_team, 'timeouts', 4),
             "home_team_timeouts": getattr(gm.home_team, 'timeouts', 4),
             "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
-                "clock": gm.game_state.get("clock", "8:00"),
-                "time_remaining": gm.game_state.get("time_remaining", 480),
-                "timeout_trace_id": gm.game_state.get("timeout_trace_id"),
+            "clock": gm.game_state.get("clock", "8:00"),
+            "time_remaining": gm.game_state.get("time_remaining", 480),
+            "shot_clock_remaining": gm.game_state.get("shot_clock_remaining", min(30, int(gm.game_state.get("time_remaining", 0) or 0))),
+            "shot_clock_start": shot_clock_start,
+            "shot_clock_end": shot_clock_end,
+            "shot_clock_reset": shot_clock_reset,
+            "timeout_trace_id": gm.game_state.get("timeout_trace_id"),
         }
     
     
