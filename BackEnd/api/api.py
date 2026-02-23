@@ -1945,11 +1945,52 @@ try:
         """Rate limited: 30/minute per IP. quiet_sim=True sets log level to ERROR during sim (sanity check for logging cost)."""
         import time
         start_time = time.time()
-        game_id = body.game_id
-        # ✅ TIMEOUT/FOUL_OUT RESUME: Normalize game_id once so restore_timeout_resume_state and DB load use same _id as save
+        raw_game_id = body.game_id
+        game_id = raw_game_id
+        # Keep non-ObjectId ids stable. Normalizing non-ObjectId values can generate
+        # a new id and break timeout resume hydration.
         if game_id:
-            from BackEnd.utils.game_id_utils import normalize_game_id
-            game_id = normalize_game_id(game_id) or game_id
+            from BackEnd.utils.game_id_utils import normalize_game_id, validate_game_id
+            if validate_game_id(game_id):
+                game_id = normalize_game_id(game_id) or game_id
+            else:
+                logging.info(
+                    "🔍 simulate_quarter_endpoint: preserving non-ObjectId game_id for lookup (%s)",
+                    game_id,
+                )
+
+        def _candidate_game_ids():
+            ids = []
+            if game_id:
+                ids.append(game_id)
+            if raw_game_id and raw_game_id not in ids:
+                ids.append(raw_game_id)
+            return ids
+
+        def _get_cached_game():
+            for gid in _candidate_game_ids():
+                cached = ongoing_games.get(gid)
+                if cached is not None:
+                    return cached, gid
+            return None, None
+
+        def _drop_cached_game():
+            for gid in _candidate_game_ids():
+                if gid in ongoing_games:
+                    del ongoing_games[gid]
+
+        def _store_cached_game(gm_obj):
+            for gid in _candidate_game_ids():
+                ongoing_games[gid] = gm_obj
+
+        def _find_saved_game_doc():
+            if games_collection is None:
+                return None, None
+            for gid in _candidate_game_ids():
+                saved_doc, effective = find_game_doc(games_collection, gid)
+                if saved_doc:
+                    return saved_doc, (effective or gid)
+            return None, None
         # ✅ PERFORMANCE: Removed debug logging - only log errors and critical events
         if debug:
             logging.debug(
@@ -1967,7 +2008,7 @@ try:
         # This ensures user_team_side persists even if it's not in the saved document or request
         preserved_user_team_side = None
         if game_id:
-            gm = ongoing_games.get(game_id)
+            gm, _ = _get_cached_game()
             if gm is not None:
                 sim_quarter_load_source = "cache"
             # ✅ DEBUG: Track ongoing_games state at start of simulate_quarter_endpoint
@@ -1998,7 +2039,7 @@ try:
                 logging.warning(
                     f"🆕 [ONGOING_GAMES] Removing game from cache: game_id={game_id}, reason='New game scenario (Q1 requested but game in memory at Q{gm.quarter})'"
                 )
-                del ongoing_games[game_id]
+                _drop_cached_game()
                 gm = None  # Force reload from DB where new game detection will run
                 sim_quarter_load_source = None
             
@@ -2120,7 +2161,7 @@ try:
                     if gm is not None:
                         logging.warning(f"🔍 TIMEOUT RESUME: Game in memory, but forcing DB reload to ensure latest state (game_id={game_id})")
                         logging.warning(f"🔄 [ONGOING_GAMES] Removing game from cache: game_id={game_id}, reason='Timeout resume - forcing DB reload'")
-                        del ongoing_games[game_id]
+                        _drop_cached_game()
                         gm = None  # Force reload from DB
                     logging.info(f"🔍 TIMEOUT RESUME: Will load fresh game from DB and apply timeout state")
                 elif body.resume_from_timeout and timeout_next_play_type and saved_quarter != body.quarter:
@@ -2132,7 +2173,7 @@ try:
                     body.quarter = saved_quarter
                     if gm is not None:
                         logging.warning(f"🔍 TIMEOUT RESUME: Game in memory, forcing DB reload (game_id={game_id})")
-                        del ongoing_games[game_id]
+                        _drop_cached_game()
                         gm = None
                     logging.info(f"✅ TIMEOUT RESUME: Corrected body.quarter to %s, resume_from_timeout=True", saved_quarter)
                 else:
@@ -2174,7 +2215,7 @@ try:
                         game_id,
                     )
                 db_lookup_start = time.time()
-                saved, _ = find_game_doc(games_collection, game_id) if (games_collection is not None and game_id) else (None, None)
+                saved, _ = _find_saved_game_doc()
                 db_lookup_time = (time.time() - db_lookup_start) * 1000
                 # logging.warning(f"⏱️ [DB TIMING] simulate_quarter: games_collection.find_one(game_id={game_id}): {db_lookup_time:.2f}ms, found={saved is not None}")
                 if saved:
@@ -2604,7 +2645,7 @@ try:
                                 # Clear any old turns from previous game - opening tip will be added in simulate_quarter
                                 gm.turns = []
                             
-                            ongoing_games[game_id] = gm
+                            _store_cached_game(gm)
                             sim_quarter_load_source = "db"
                             # ✅ DEBUG: Track when game is added to ongoing_games
                             # ✅ REMOVED: Verbose debug log
