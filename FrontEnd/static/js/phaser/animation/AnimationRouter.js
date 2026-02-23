@@ -120,12 +120,13 @@ export class AnimationRouter {
         const applyClockControl = (clockRef, { syncToThirty = false } = {}) => {
           if (!clockRef) return;
           const clockState = clockRef.getState?.() || {};
+          const hasTimeRemaining = Number.isFinite(clockState.timeRemaining) && clockState.timeRemaining > 0;
           if (syncToThirty) {
             clockRef.syncWithBackend?.(30);
           }
-          if (!clockState.running && !isNoImpactTurn && !this.scene.isPaused && !isOpeningTipTurn) {
+          if (!clockState.running && hasTimeRemaining && !isNoImpactTurn && !this.scene.isPaused && !isOpeningTipTurn) {
             clockRef.start();
-          } else if (!clockState.running && isOpeningTipTurn) {
+          } else if (!clockState.running && hasTimeRemaining && isOpeningTipTurn) {
             this.scene.events?.once('openingTipApex', () => {
               if (clockRef && !this.scene.isPaused) {
                 clockRef.start();

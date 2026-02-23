@@ -367,6 +367,20 @@ class GameManager:
         creates and appends the foul-out timeout turn. Ensures we check after every
         turn (main result, OREB, SIP, BIP, timeouts).
         """
+        # Keep clock payload fields present on every emitted turn so frontend scoreboard
+        # and shot-clock sync remain authoritative even for non-micro helper turns.
+        if isinstance(turn_result, dict):
+            turn_result.setdefault("time_remaining", self.game_state.get("time_remaining", 0))
+            turn_result.setdefault("clock", self.game_state.get("clock", "0:00"))
+            turn_result.setdefault(
+                "shot_clock_remaining",
+                self.game_state.get(
+                    "shot_clock_remaining",
+                    min(30, int(self.game_state.get("time_remaining", 0) or 0)),
+                ),
+            )
+            turn_result.setdefault("quarter", self.game_state.get("quarter", self.quarter))
+
         self.turns.append(turn_result)
         self.text_log.append(text if text is not None else turn_result.get("text", ""))
         self._check_lineups_for_foul_out(turn_result)

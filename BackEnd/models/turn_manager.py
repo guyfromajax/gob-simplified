@@ -487,17 +487,13 @@ class TurnManager:
 
         if result is not None:
             pass  # Force Foul already handled; skip state routing (HCO/HCT/FCP)
-        elif state in ("HCO", "FCP", "HCT", "FAST_BREAK") and game_clock_remaining <= 0:
-            # Game clock precedence: quarter/endgame handling wins over shot-clock handling.
-            result = self._build_final_hold_result(0)
         elif state in ("HCO", "FCP", "HCT", "FAST_BREAK") and game_clock_remaining <= 1:
-            # Force final-turn shot execution with 1 second left on game clock.
+            # Game clock precedence: force final-turn shot execution at 1 or 0 seconds.
             result = self.resolve_final_turn_shot()
             result["forced_shot"] = True
             result["forced_shot_reason"] = "GAME_CLOCK"
-        elif state in ("HCO", "FCP", "HCT", "FAST_BREAK") and shot_clock_remaining <= 0:
-            result = self._build_shot_clock_violation_result(state)
         elif state in ("HCO", "FCP", "HCT", "FAST_BREAK") and shot_clock_remaining <= 1:
+            # Force shot-clock attempt at 1 or 0 seconds.
             result = self._execute_forced_shot(state)
         elif state == "FREE_THROW":
             result = self.resolve_free_throw()

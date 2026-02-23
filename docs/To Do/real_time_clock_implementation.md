@@ -259,6 +259,39 @@ This file is a working implementation plan. Final canonical behavior/spec should
 - Total turn time is capped at `30` seconds.
 - Tempo-based weighting/refinements can be layered later.
 
+## Recently Implemented Fixes
+
+### A. Made-shot rim hold now freezes clocks
+- Scope: frontend made-shot flow only.
+- File: `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js`.
+- Change:
+  - During `handleMadeShot(...)`, both `gameClock` and `shotClock` are paused with a dedicated pause token (`made_shot_hold`) at the start of rim hold/announcement.
+  - Both clocks are resumed after the hold window in a `finally` block.
+- Effect:
+  - Clock countdown no longer continues during the made-shot rim hold + announcement window.
+  - Missed-shot and rebound timing behavior is unchanged.
+
+### B. Forced-shot-at-zero linkage hardening (frontend/backend handoff)
+- Objective:
+  - Ensure visible `0` aligns with backend enforcement timing at turn boundaries.
+- Changes:
+  1. Disable speculative turn preloading in live-clock turn loop.
+     - File: `FrontEnd/static/js/phaser/gameScene.js`.
+     - `ENABLE_TURN_PRELOAD = false` for live clock flow, so next turn is fetched only after current turn animation completes.
+     - This prevents backend decisions from being computed too early relative to what the user is currently seeing on screen.
+  2. Prevent auto-restarting clocks when already at `0`.
+     - File: `FrontEnd/static/js/phaser/animation/AnimationRouter.js`.
+     - Clock auto-start now requires `timeRemaining > 0`.
+     - This keeps both clocks visually locked at `0` until backend returns the next authoritative turn.
+  3. Guarantee authoritative clock fields on every emitted turn payload.
+     - File: `BackEnd/models/game_manager.py` (`_append_turn`).
+     - `time_remaining`, `clock`, `shot_clock_remaining`, and `quarter` are defaulted onto all appended turns (including helper/setup/batch sub-turns) if missing.
+     - This removes sync gaps where some frontend-animated turns lacked shot-clock data.
+
+- Combined effect:
+  - Frontend display and backend turn-start enforcement are now aligned at possession boundaries.
+  - The system remains backend-authoritative while eliminating visible “clock hit 0 but logic did not trigger” drift cases.
+
 ### 5. Non-step turns use synthetic phases
 - For turns without predefined steps, build timing phases from distance moved + actions taken.
 - Example phase types: advance, pass, finish, rebound/reset.
