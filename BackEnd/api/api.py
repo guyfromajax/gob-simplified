@@ -1170,6 +1170,8 @@ try:
             gm.game_state["clock"] = saved["clock"]
         if "time_remaining" in saved:
             gm.game_state["time_remaining"] = saved["time_remaining"]
+        if "shot_clock_remaining" in saved:
+            gm.game_state["shot_clock_remaining"] = saved["shot_clock_remaining"]
         
         # Update scores
         if "score" in saved and isinstance(saved["score"], dict):
@@ -1292,6 +1294,9 @@ try:
         if "time_remaining" in saved:
             gm.game_state["time_remaining"] = saved["time_remaining"]
             logging.info(f"🔄 TIMEOUT RESUME: Restored time_remaining={saved['time_remaining']} from saved document")
+        if "shot_clock_remaining" in saved:
+            gm.game_state["shot_clock_remaining"] = saved["shot_clock_remaining"]
+            logging.info(f"🔄 TIMEOUT RESUME: Restored shot_clock_remaining={saved['shot_clock_remaining']} from saved document")
         
         # ✅ COMPUTER TIMEOUT: Restore per-quarter count and checked_conditions (enforces max 1 per quarter Q1–Q3 after DB load)
         if "computer_timeouts" in saved and saved["computer_timeouts"]:
@@ -4057,6 +4062,7 @@ try:
                 "turn": latest_turn,
                 "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
                 "time_remaining": gm.game_state["time_remaining"],
+                "shot_clock_remaining": gm.game_state.get("shot_clock_remaining", min(30, gm.game_state.get("time_remaining", 0))),
                 "clock": gm.game_state.get("clock", "8:00"),
                 "quarter_complete": quarter_complete,
                 "quarter": gm.quarter,

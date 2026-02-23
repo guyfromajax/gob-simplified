@@ -142,6 +142,7 @@ class GameManager:
             "quarter": self.quarter,
             "time_remaining": 480,
             "clock": "8:00",
+            "shot_clock_remaining": 30,
             "time_elapsed": 0,
             "turns": self.turns,
             "current_playcall": "Outside",

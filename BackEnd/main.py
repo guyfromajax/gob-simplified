@@ -338,6 +338,7 @@ def simulate_quarter(
         new_clock = "8:00" if q <= 4 else "4:00"
         gm.game_state["time_remaining"] = new_time
         gm.game_state["clock"] = new_clock
+        gm.game_state["shot_clock_remaining"] = min(30, int(new_time))
 
     # ✅ TIMEOUT: If resuming from timeout, skip all quarter initialization
     # Reuse the same pattern as quarter breaks - preserve all game state

@@ -404,6 +404,8 @@ class TurnManager:
         # STEP 3: Route based on offensive state
         result = None
         from BackEnd.utils import situational_logic as sl
+        shot_clock_remaining = int(game_state.get("shot_clock_remaining", min(30, int(game_state.get("time_remaining", 30) or 30))))
+        game_clock_remaining = int(game_state.get("time_remaining", 0) or 0)
 
         # ✅ Final Turn (Q4/OT): clear "triggered" flag when quarter/period changes so each period gets one chance
         quarter = getattr(self.game, "quarter", None)
@@ -485,6 +487,18 @@ class TurnManager:
 
         if result is not None:
             pass  # Force Foul already handled; skip state routing (HCO/HCT/FCP)
+        elif state in ("HCO", "FCP", "HCT", "FAST_BREAK") and game_clock_remaining <= 0:
+            # Game clock precedence: quarter/endgame handling wins over shot-clock handling.
+            result = self._build_final_hold_result(0)
+        elif state in ("HCO", "FCP", "HCT", "FAST_BREAK") and game_clock_remaining <= 1:
+            # Force final-turn shot execution with 1 second left on game clock.
+            result = self.resolve_final_turn_shot()
+            result["forced_shot"] = True
+            result["forced_shot_reason"] = "GAME_CLOCK"
+        elif state in ("HCO", "FCP", "HCT", "FAST_BREAK") and shot_clock_remaining <= 0:
+            result = self._build_shot_clock_violation_result(state)
+        elif state in ("HCO", "FCP", "HCT", "FAST_BREAK") and shot_clock_remaining <= 1:
+            result = self._execute_forced_shot(state)
         elif state == "FREE_THROW":
             result = self.resolve_free_throw()
         elif state == "FAST_BREAK":
@@ -931,6 +945,7 @@ class TurnManager:
         result["awayFouls"] = self.game.away_team.team_fouls
         
         result["clock"] = self.game.game_state["clock"]
+        result["shot_clock_remaining"] = self.game.game_state.get("shot_clock_remaining", 30)
         result["quarter"] = self.game.game_state["quarter"]
         result["period_label"] = self.game.game_state.get("period_label")
         # Ensure no Player objects remain in the result payload
@@ -947,6 +962,90 @@ class TurnManager:
 
         # print(f"inside run_micro_turn result: {result}")
         
+        return result
+
+    def _build_shot_clock_violation_result(self, current_state):
+        offense_team = self.game.offense_team
+        defense_team = self.game.defense_team
+        return {
+            "result_type": "DEAD BALL",
+            "text": "Shot Clock Violation",
+            "turnover_type": "DEAD BALL",
+            "time_elapsed": 0,
+            "possession_flips": True,
+            "next_play_type": "SIDE_INBOUND",
+            "next_turn": "SIDE_INBOUND",
+            "offense_team_id": offense_team.team_id,
+            "defense_team_id": defense_team.team_id,
+            "current_turn": current_state,
+            "forced_shot": False,
+            "events": [],
+        }
+
+    def _coords_to_nearest_spot(self, coords):
+        from BackEnd.constants import HCO_STRING_SPOTS
+        if not isinstance(coords, dict):
+            return "key"
+        x = coords.get("x")
+        y = coords.get("y")
+        if x is None or y is None:
+            return "key"
+        best_spot = "key"
+        best_dist = float("inf")
+        for spot, s_coords in HCO_STRING_SPOTS.items():
+            dx = (s_coords.get("x", 50) - x)
+            dy = (s_coords.get("y", 25) - y)
+            dist = (dx * dx) + (dy * dy)
+            if dist < best_dist:
+                best_dist = dist
+                best_spot = spot
+        return best_spot
+
+    def _execute_forced_shot(self, current_state):
+        from BackEnd.constants import ACTIONS, POSITION_LIST
+        from BackEnd.utils.shared import get_player_position
+        from BackEnd.engine.phase_resolution import select_defender_closest_to_victim
+
+        off_lineup = self.game.offense_team.lineup
+        def_lineup = self.game.defense_team.lineup
+        ball_handler = self.game.game_state.get("last_ball_handler")
+        if not ball_handler:
+            ball_handler = off_lineup.get("PG") or next((p for p in off_lineup.values() if p), None)
+
+        if not ball_handler:
+            return self._build_shot_clock_violation_result(current_state)
+
+        shooter = ball_handler
+        shooter_pos = get_player_position(off_lineup, shooter) or "PG"
+        shooter_coords = getattr(shooter, "coords", {"x": 50, "y": 25}) or {"x": 50, "y": 25}
+        shooter_spot = self._coords_to_nearest_spot(shooter_coords)
+        defender = select_defender_closest_to_victim(shooter_coords, def_lineup, None) if def_lineup else None
+
+        step0 = {"timestamp": 0, "pos_actions": {}}
+        step1 = {"timestamp": 300, "pos_actions": {}}
+        for pos in POSITION_LIST:
+            if pos == shooter_pos:
+                step0["pos_actions"][pos] = {"action": ACTIONS["HANDLE"], "location": shooter_spot}
+                step1["pos_actions"][pos] = {"action": ACTIONS["SHOOT"], "location": shooter_spot}
+            else:
+                step0["pos_actions"][pos] = {"action": "stand", "location": "key"}
+                step1["pos_actions"][pos] = {"action": "stand", "location": "key"}
+
+        roles = {
+            "skeleton": {"steps": [step0, step1]},
+            "steps": [step0, step1],
+            "ball_handler": ball_handler,
+            "shooter": shooter,
+            "passer": None,
+            "screener": None,
+            "defender": defender,
+            "shot_type": "inside" if shooter_spot.lower() in ("lower lowpost", "lower midpost", "upper lowpost", "upper midpost", "midlane", "basketspot") else "outside",
+            "forced_shot": True,
+            "shooter_location": shooter_spot,
+        }
+        result = self.game.shot_manager.resolve_shot(roles)
+        result["forced_shot"] = True
+        result["forced_shot_reason"] = "SHOT_CLOCK"
         return result
 
 
@@ -2975,13 +3074,69 @@ class TurnManager:
             }
 
     def update_clock_and_possession(self, result):
-        # 🕒 Reduce clock by time_elapsed
-        time_elapsed = result.get("time_elapsed", 0)
+        def _is_no_impact_turn(turn_result):
+            no_impact_types = {"FREE_THROW", "SIDE_INBOUND", "BASELINE_INBOUND", "TIMEOUT"}
+            rt = turn_result.get("result_type")
+            if rt in no_impact_types:
+                return True
+            te = turn_result.get("time_elapsed", 0)
+            return int(te or 0) == 0 and rt in {"SIDE_INBOUND", "BASELINE_INBOUND"}
+
+        def _should_reset_shot_clock(turn_result):
+            rt = turn_result.get("result_type")
+            foul_type = str(turn_result.get("foul_type") or turn_result.get("foul_team") or "").upper()
+            next_play_type = str(turn_result.get("next_play_type") or turn_result.get("next_turn") or "").upper()
+            possession_flips = bool(turn_result.get("possession_flips"))
+            if _is_no_impact_turn(turn_result):
+                return True
+            if rt == "OREB":
+                return True
+            if rt == "MAKE":
+                return True
+            if rt in {"STEAL", "DEAD BALL", "TURNOVER", "CHARGE"}:
+                return True
+            if rt == "FOUL" and foul_type == "OFFENSIVE":
+                return True
+            if rt == "FOUL" and foul_type == "DEFENSIVE" and next_play_type in {"SIDE_INBOUND", "SIP"}:
+                return True
+            if possession_flips and rt != "TIMEOUT":
+                return True
+            return False
+
+        game_remaining_before = int(self.game.game_state.get("time_remaining", 0) or 0)
+        shot_remaining_before = int(
+            self.game.game_state.get(
+                "shot_clock_remaining",
+                min(30, game_remaining_before),
+            ) or 0
+        )
+
+        # 🕒 Reduce clock by time_elapsed with legal cap enforcement.
+        time_elapsed = int(result.get("time_elapsed", 0) or 0)
+        impact_turn = not _is_no_impact_turn(result)
+        if impact_turn:
+            legal_cap = max(0, min(game_remaining_before, shot_remaining_before))
+            if time_elapsed > legal_cap:
+                time_elapsed = legal_cap
+        else:
+            time_elapsed = 0
+
+        result["time_elapsed"] = time_elapsed
         self.game.game_state["time_remaining"] -= time_elapsed
 
         # Clamp to 0
         if self.game.game_state["time_remaining"] < 0:
             self.game.game_state["time_remaining"] = 0
+
+        # Decrement shot clock only on impact turns.
+        if impact_turn:
+            self.game.game_state["shot_clock_remaining"] = max(0, shot_remaining_before - time_elapsed)
+        else:
+            self.game.game_state["shot_clock_remaining"] = min(30, int(self.game.game_state.get("time_remaining", 0)))
+
+        # Reset/hold shot clock based on possession events.
+        if _should_reset_shot_clock(result):
+            self.game.game_state["shot_clock_remaining"] = min(30, int(self.game.game_state.get("time_remaining", 0)))
 
         # Convert to clock display (e.g., 400 → "6:40")
         minutes = self.game.game_state["time_remaining"] // 60

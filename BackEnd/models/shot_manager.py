@@ -229,6 +229,22 @@ class ShotManager:
         
         # Check if spot is a paint spot (case insensitive)
         return spot in PAINT_SPOTS
+
+    def _resolve_forced_shot_type(self, shooter, roles):
+        """
+        Forced shot classification:
+        - inside: lower/upper lowpost, lower/upper midpost, midlane, basketspot
+        - outside: any other location
+        """
+        _, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
+        shooter_location_str = (shooter_location or "unknown").strip()
+        shooter_location_key = shooter_location_str.lower()
+
+        is_inside_forced = shooter_location_key in PAINT_SPOTS
+        forced_shot_type = "inside" if is_inside_forced else "outside"
+        is_paint_forced = is_inside_forced
+
+        return forced_shot_type, is_paint_forced, shooter_location_str
     
     def _calculate_getback_coordinates(self, getback_player, off_team, def_team):
         """
@@ -355,52 +371,57 @@ class ShotManager:
             # Determine if shot is from the paint (PIP)
             is_paint = self.is_paint_shot(shooter, roles)
 
+        forced_shot = bool(roles.get("forced_shot", False))
+
         # Determine shot_type (inside/attack/outside) for shot score calculation
         # Motion offense: use randomly chosen type from resolve_motion_offense_shot (motion_shot_type)
         # Set plays: infer from skeleton (location + handle_ball/drive detection)
-        shot_type = roles.get("shot_type") or roles.get("motion_shot_type")
-        if not shot_type:
-            # For Set plays, determine shot_type from skeleton analysis (location + attack detection)
-            # Attack = paint shot where shooter had "handle_ball" in previous step and moved to shoot spot
-            shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
-            steps = roles.get("steps", [])
-            
-            # Attack detection: shoot step is last step; if shoot location is paint, check step before for handle_ball + different location
-            has_drive = False
-            if steps and shooter_pos and len(steps) >= 2:
-                shoot_step = steps[-1]
-                pos_actions = shoot_step.get("pos_actions", {})
-                shooter_action = pos_actions.get(shooter_pos, {})
-                if shooter_action.get("action") == "shoot":
-                    shoot_location_key = shooter_action.get("location") or shooter_action.get("spot", "")
-                    shoot_location_lower = shoot_location_key.lower() if shoot_location_key else ""
-                    if shoot_location_lower in PAINT_SPOTS:
-                        prev_step = steps[-2]
-                        prev_pos_actions = prev_step.get("pos_actions", {})
-                        prev_action = prev_pos_actions.get(shooter_pos, {})
-                        if prev_action.get("action") == "handle_ball":
-                            prev_location_key = prev_action.get("location") or prev_action.get("spot", "")
-                            prev_location_lower = prev_location_key.lower() if prev_location_key else ""
-                            if prev_location_lower != shoot_location_lower:
-                                has_drive = True
+        if forced_shot:
+            shot_type, is_paint, _ = self._resolve_forced_shot_type(shooter, roles)
+        else:
+            shot_type = roles.get("shot_type") or roles.get("motion_shot_type")
+            if not shot_type:
+                # For Set plays, determine shot_type from skeleton analysis (location + attack detection)
+                # Attack = paint shot where shooter had "handle_ball" in previous step and moved to shoot spot
+                shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
+                steps = roles.get("steps", [])
+                
+                # Attack detection: shoot step is last step; if shoot location is paint, check step before for handle_ball + different location
+                has_drive = False
+                if steps and shooter_pos and len(steps) >= 2:
+                    shoot_step = steps[-1]
+                    pos_actions = shoot_step.get("pos_actions", {})
+                    shooter_action = pos_actions.get(shooter_pos, {})
+                    if shooter_action.get("action") == "shoot":
+                        shoot_location_key = shooter_action.get("location") or shooter_action.get("spot", "")
+                        shoot_location_lower = shoot_location_key.lower() if shoot_location_key else ""
+                        if shoot_location_lower in PAINT_SPOTS:
+                            prev_step = steps[-2]
+                            prev_pos_actions = prev_step.get("pos_actions", {})
+                            prev_action = prev_pos_actions.get(shooter_pos, {})
+                            if prev_action.get("action") == "handle_ball":
+                                prev_location_key = prev_action.get("location") or prev_action.get("spot", "")
+                                prev_location_lower = prev_location_key.lower() if prev_location_key else ""
+                                if prev_location_lower != shoot_location_lower:
+                                    has_drive = True
 
-            # Determine shot_type based on location and drive (same logic as Motion plays)
-            if shooter_location:
-                shooter_location_lower = shooter_location.lower()
-                if shooter_location_lower in PAINT_SPOTS:
-                    # Paint spot: attack if there was a drive, otherwise inside
-                    shot_type = "attack" if has_drive else "inside"
+                # Determine shot_type based on location and drive (same logic as Motion plays)
+                if shooter_location:
+                    shooter_location_lower = shooter_location.lower()
+                    if shooter_location_lower in PAINT_SPOTS:
+                        # Paint spot: attack if there was a drive, otherwise inside
+                        shot_type = "attack" if has_drive else "inside"
+                    else:
+                        # Not a paint spot: outside shot
+                        shot_type = "outside"
                 else:
-                    # Not a paint spot: outside shot
-                    shot_type = "outside"
-            else:
-                # Fallback to playcall if location not found
-                if playcall == "Inside":
-                    shot_type = "inside"
-                elif playcall == "Attack" or playcall == "Set":
-                    shot_type = "attack"
-                else:
-                    shot_type = "outside"
+                    # Fallback to playcall if location not found
+                    if playcall == "Inside":
+                        shot_type = "inside"
+                    elif playcall == "Attack" or playcall == "Set":
+                        shot_type = "attack"
+                    else:
+                        shot_type = "outside"
         
         # ✅ BALANCING SYSTEM: Check for balancing override first
         # Balancing override is set when score difference exceeds threshold based on quarter and team attributes
@@ -450,6 +471,9 @@ class ShotManager:
         shot_score, shot_score_pre_defense, d_foul, foul_player = self.calculate_shot_score(
             shooter, passer, screener, defender, shot_type, defense_call, is_three, is_paint, second_defender, shooter_location_str
         )
+        if forced_shot:
+            # Forced shots keep standard defender/defense scoring, then apply hard penalty.
+            shot_score -= 100
         
         # ✅ MOTION OFFENSE: Apply attack penalty if applicable
         motion_attack_penalty = roles.get("motion_attack_penalty", 0) or game_state.get("motion_attack_penalty", 0)
