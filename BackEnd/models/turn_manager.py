@@ -485,14 +485,36 @@ class TurnManager:
                     result["current_turn"] = "HCO"
                     result["quick_foul"] = True  # Situational Force Foul → frontend announces "Quick Foul"
 
+        clock_enforced_states = ("HCO", "FCP", "HCT", "FAST_BREAK")
+
         if result is not None:
             pass  # Force Foul already handled; skip state routing (HCO/HCT/FCP)
-        elif state in ("HCO", "FCP", "HCT", "FAST_BREAK") and game_clock_remaining <= 1:
+        elif state in clock_enforced_states and game_clock_remaining <= 0:
+            # At exact 0 game clock: temporary 50/50 behavior.
+            # 1) Forced shot path
+            # 2) No-shot expiration path (quarter/game ends normally)
+            if random.random() < 0.5:
+                result = self.resolve_final_turn_shot()
+                result["forced_shot"] = True
+                result["forced_shot_reason"] = "GAME_CLOCK"
+            else:
+                result = self._build_final_hold_result(0)
+                result["text"] = "Clock expires before a shot."
+                result["forced_shot"] = False
+        elif state in clock_enforced_states and shot_clock_remaining <= 0:
+            # At exact 0 shot clock: temporary 50/50 behavior.
+            # 1) Forced shot path
+            # 2) Shot clock violation path
+            if random.random() < 0.5:
+                result = self._execute_forced_shot(state)
+            else:
+                result = self._build_shot_clock_violation_result(state)
+        elif state in clock_enforced_states and game_clock_remaining <= 1:
             # Game clock precedence: force final-turn shot execution at 1 or 0 seconds.
             result = self.resolve_final_turn_shot()
             result["forced_shot"] = True
             result["forced_shot_reason"] = "GAME_CLOCK"
-        elif state in ("HCO", "FCP", "HCT", "FAST_BREAK") and shot_clock_remaining <= 1:
+        elif state in clock_enforced_states and shot_clock_remaining <= 1:
             # Force shot-clock attempt at 1 or 0 seconds.
             result = self._execute_forced_shot(state)
         elif state == "FREE_THROW":
