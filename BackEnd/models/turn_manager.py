@@ -670,6 +670,64 @@ class TurnManager:
         if "next_play_type" in result and result["next_play_type"]:
             result["next_turn"] = result["next_play_type"]
 
+        # Shot-clock boundary enforcement (pre-turn crossing):
+        # If planned elapsed time for this turn would consume the remaining shot clock
+        # (and game clock does not end first), enforce terminal shot-clock outcome now.
+        # This avoids missed/late enforcement when a long turn crosses the boundary.
+        try:
+            no_impact_types = {"FREE_THROW", "SIDE_INBOUND", "BASELINE_INBOUND", "TIMEOUT"}
+            shot_like_results = {"MAKE", "MISS", "BLOCK"}
+            result_type = str(result.get("result_type") or "").upper()
+            planned_elapsed = int(result.get("time_elapsed", 0) or 0)
+            is_no_impact = result_type in no_impact_types or planned_elapsed == 0
+            is_shot_like = result_type in shot_like_results
+            game_ends_first = game_clock_remaining <= shot_clock_remaining
+            crosses_shot_boundary = shot_clock_remaining > 0 and planned_elapsed >= shot_clock_remaining
+            should_consider_boundary = (
+                state in clock_enforced_states
+                and game_clock_remaining > 0
+                and not is_no_impact
+                and not is_shot_like
+            )
+
+            logging.warning(
+                "🧭 [SHOT CLOCK BOUNDARY TRACE] pre-check state=%s result_type=%s planned_elapsed=%s shot_remaining=%s game_remaining=%s should_consider=%s game_ends_first=%s crosses_boundary=%s",
+                state,
+                result_type,
+                planned_elapsed,
+                shot_clock_remaining,
+                game_clock_remaining,
+                should_consider_boundary,
+                game_ends_first,
+                crosses_shot_boundary,
+            )
+
+            if should_consider_boundary and not game_ends_first and crosses_shot_boundary:
+                if random.random() < 0.5:
+                    boundary_result = self._execute_forced_shot(state)
+                    boundary_path = "FORCED_SHOT"
+                else:
+                    boundary_result = self._build_shot_clock_violation_result(state)
+                    boundary_path = "VIOLATION"
+
+                boundary_result["time_elapsed"] = int(shot_clock_remaining)
+                boundary_result["shot_clock_boundary_enforced"] = True
+                boundary_result["shot_clock_boundary_path"] = boundary_path
+                boundary_result["shot_clock_remaining_at_boundary"] = int(shot_clock_remaining)
+                boundary_result["planned_time_elapsed_before_boundary"] = int(planned_elapsed)
+                result = boundary_result
+
+                logging.warning(
+                    "🧭 [SHOT CLOCK BOUNDARY TRACE] enforced path=%s state=%s enforced_time_elapsed=%s shot_remaining=%s game_remaining=%s",
+                    boundary_path,
+                    state,
+                    result.get("time_elapsed"),
+                    shot_clock_remaining,
+                    game_clock_remaining,
+                )
+        except Exception as boundary_error:
+            logging.error("🚨 [SHOT CLOCK BOUNDARY TRACE] boundary enforcement check failed: %s", boundary_error)
+
         # STEP 4: Final updates (clock, logs, animation)
         try:
             self.update_clock_and_possession(result)
