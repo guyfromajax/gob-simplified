@@ -843,6 +843,38 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 - Foul/timeout changes: Saved to DB during turn completion
 - Cache refreshed after timeout saves (most critical for consistency)
 
+#### 4. Timeout Click Clock Reconciliation (February 2026)
+
+**Problem:** With realtime frontend countdown, timeout can be clicked between backend turn commits. In those moments, backend `time_remaining` can lag the displayed clock by a few seconds. Saving timeout state from backend-only time caused resume-to-court to jump backward.
+
+**Solution:** Reconcile game/shot clock at timeout click in `/api/call-timeout` using a monotonic min rule before timeout save.
+
+**Reconciliation Rule:**
+- `effective_game_time = min(backend_time_remaining, displayed_time_remaining)`
+- `effective_shot_clock = min(backend_shot_clock_remaining, displayed_shot_clock_remaining, effective_game_time)`
+- Clamp both to `>= 0`
+
+**Contract (Frontend -> Backend):**
+- Frontend timeout click sends:
+  - `displayed_clock`
+  - `displayed_time_remaining`
+  - `displayed_shot_clock_remaining`
+  - `timeout_trace_id`
+- Backend uses these values only for timeout snapshot capture, then persists normally.
+
+**Traceability:**
+- `timeout_trace_id` is carried through:
+  - timeout save log
+  - timeout DB snapshot
+  - resume request (`simulate-quarter`)
+  - resume response diagnostics
+- This allows end-to-end correlation of click time, saved snapshot, and resumed first-turn state.
+
+**Persistence Impact:**
+- Database remains authoritative for resume.
+- Cache is refreshed from DB after timeout save as before.
+- Lineup and resume now read a timeout snapshot that reflects what user saw when timeout was called, preventing clock rollback on return to court.
+
 ### Player Energy (NG) Persistence ✅ **FIXED** (January 2025)
 
 **Problem:** After timeouts and quarter breaks, player energy (NG) values were displaying as 100% on the lineup screen and initial court.html load, even though backend maintained correct values.

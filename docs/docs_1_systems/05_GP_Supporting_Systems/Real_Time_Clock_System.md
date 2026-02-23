@@ -171,3 +171,30 @@ Goal: ensure correctness, responsiveness, and stable UX.
 - `INBOUND_PASS`, `SIDE_INBOUND_PASS`, and `FREE_THROW` always return `time_elapsed = 0`.
 - Frontend countdown runs continuously during active play, pauses correctly, and syncs at turn boundaries.
 - No increase in backend/API call frequency.
+
+## Timeout Click Clock Reconciliation (February 2026)
+
+### Problem
+During live countdown, a timeout click can happen between backend turn boundaries. In that gap, backend `game_state.time_remaining` may still be slightly higher than the user-visible clock on `court.html`. If timeout save uses backend-only time, lineup can show the expected value while return-to-court resumes from an earlier (higher) time.
+
+### Rule
+At timeout click, backend reconciles clocks using:
+- `effective_game_time = min(backend_time_remaining, displayed_time_remaining)`
+- `effective_shot_clock = min(backend_shot_clock_remaining, displayed_shot_clock_remaining, effective_game_time)`
+
+Both are clamped to `>= 0`.
+
+### Execution Flow
+1. Frontend sends timeout click payload with:
+- `displayed_clock`
+- `displayed_time_remaining`
+- `displayed_shot_clock_remaining`
+- `timeout_trace_id`
+2. `/api/call-timeout` applies the min-reconciliation before `gm.call_timeout(...)`.
+3. Timeout snapshot persisted to DB uses reconciled values.
+4. Resume (`/api/simulate-quarter?resume_from_timeout=true`) restores from that saved snapshot.
+
+### Notes
+- Backend remains source of truth for persisted state.
+- Frontend remains presentation clock; click capture prevents drift at timeout boundary.
+- This reconciliation is surgical and only applies on timeout-click save path.

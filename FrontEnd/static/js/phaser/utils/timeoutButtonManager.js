@@ -401,6 +401,36 @@ async function handleTimeoutButtonClick(executeOnly = false) {
     }
     
     try {
+        const parseClockToSeconds = (clockText) => {
+            if (!clockText || typeof clockText !== 'string') return null;
+            const parts = clockText.trim().split(':');
+            if (parts.length !== 2) return null;
+            const m = Number(parts[0]);
+            const s = Number(parts[1]);
+            if (!Number.isFinite(m) || !Number.isFinite(s) || m < 0 || s < 0 || s > 59) return null;
+            return Math.max(0, Math.floor(m * 60 + s));
+        };
+
+        const displayedClockText = (document.getElementById('game-clock')?.textContent || '').trim() || null;
+        const displayedClockSecondsFromDom = parseClockToSeconds(displayedClockText);
+        const displayedClockSecondsFromState = Number.isFinite(scene?.gameClock?.getState?.().timeRemaining)
+            ? Math.max(0, Math.floor(scene.gameClock.getState().timeRemaining))
+            : null;
+        const displayedTimeRemaining =
+            displayedClockSecondsFromState != null ? displayedClockSecondsFromState : displayedClockSecondsFromDom;
+
+        const shotClockText = (document.getElementById('shot-clock')?.textContent || '').trim() || null;
+        const displayedShotFromDom = Number.isFinite(Number(shotClockText))
+            ? Math.max(0, Math.floor(Number(shotClockText)))
+            : null;
+        const displayedShotFromState = Number.isFinite(scene?.shotClock?.getState?.().timeRemaining)
+            ? Math.max(0, Math.floor(scene.shotClock.getState().timeRemaining))
+            : null;
+        const displayedShotClockRemaining =
+            displayedShotFromState != null ? displayedShotFromState : displayedShotFromDom;
+
+        const timeoutTraceId = `to-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
         // Call timeout API
         const API_CONFIG = window.API_CONFIG;
         if (!API_CONFIG) {
@@ -416,6 +446,10 @@ async function handleTimeoutButtonClick(executeOnly = false) {
             body: JSON.stringify({
                 game_id: gameId,
                 calling_team: myTeamSide,
+                displayed_clock: displayedClockText,
+                displayed_time_remaining: displayedTimeRemaining,
+                displayed_shot_clock_remaining: displayedShotClockRemaining,
+                timeout_trace_id: timeoutTraceId,
             }),
         });
         

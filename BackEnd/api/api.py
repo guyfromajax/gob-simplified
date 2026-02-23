@@ -370,6 +370,10 @@ try:
         calling_team: str  # "home" or "away"
         offense_override: str | None = None  # e.g., "Inside", "Attack", "Outside"
         defense_override: str | None = None  # e.g., "Zone", "Man"
+        displayed_clock: str | None = None
+        displayed_time_remaining: int | None = None
+        displayed_shot_clock_remaining: int | None = None
+        timeout_trace_id: str | None = None
         # Mode context
     
     
@@ -4308,6 +4312,70 @@ try:
         gm = ongoing_games.get(game_id) if game_id else None
         if gm is None:
             raise HTTPException(status_code=404, detail=f"Game {game_id} not found.")
+
+        def _parse_clock_to_seconds(clock_str: str | None) -> int | None:
+            if not clock_str or not isinstance(clock_str, str):
+                return None
+            try:
+                parts = clock_str.strip().split(":")
+                if len(parts) != 2:
+                    return None
+                minutes = int(parts[0])
+                seconds = int(parts[1])
+                if minutes < 0 or seconds < 0 or seconds > 59:
+                    return None
+                return minutes * 60 + seconds
+            except Exception:
+                return None
+
+        # Timeout-click clock reconciliation:
+        # If frontend display is ahead of backend game_state, preserve the more-elapsed value for timeout save.
+        backend_time = int(gm.game_state.get("time_remaining", 0) or 0)
+        backend_clock = gm.game_state.get("clock")
+        displayed_time = (
+            int(request.displayed_time_remaining)
+            if isinstance(request.displayed_time_remaining, int)
+            else _parse_clock_to_seconds(request.displayed_clock)
+        )
+        effective_time = backend_time
+        if displayed_time is not None:
+            effective_time = max(0, min(backend_time, int(displayed_time)))
+
+        if effective_time != backend_time:
+            gm.game_state["time_remaining"] = effective_time
+            gm.game_state["clock"] = f"{effective_time // 60}:{effective_time % 60:02d}"
+
+        backend_shot = int(
+            gm.game_state.get("shot_clock_remaining", min(30, int(gm.game_state.get("time_remaining", 0) or 0))) or 0
+        )
+        displayed_shot = (
+            int(request.displayed_shot_clock_remaining)
+            if isinstance(request.displayed_shot_clock_remaining, int)
+            else None
+        )
+        effective_shot = backend_shot
+        if displayed_shot is not None:
+            effective_shot = max(0, min(backend_shot, displayed_shot, effective_time))
+            gm.game_state["shot_clock_remaining"] = effective_shot
+        else:
+            gm.game_state["shot_clock_remaining"] = max(0, min(backend_shot, effective_time))
+
+        if request.timeout_trace_id:
+            gm.game_state["timeout_trace_id"] = request.timeout_trace_id
+
+        logging.warning(
+            "🧭 [TIMEOUT TRACE] click-capture trace_id=%s game_id=%s backend_clock=%s backend_time=%s displayed_clock=%s displayed_time=%s effective_time=%s backend_shot=%s displayed_shot=%s effective_shot=%s",
+            gm.game_state.get("timeout_trace_id") or request.timeout_trace_id,
+            game_id,
+            backend_clock,
+            backend_time,
+            request.displayed_clock,
+            displayed_time,
+            gm.game_state.get("time_remaining"),
+            backend_shot,
+            displayed_shot,
+            gm.game_state.get("shot_clock_remaining"),
+        )
         
         calling_team = gm.home_team if calling_team_side == 'home' else gm.away_team
         
