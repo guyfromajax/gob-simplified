@@ -3811,8 +3811,8 @@ try:
         try:
             if (gm.game_state.get("free_throws_remaining", 0) or 0) > 0:
                 return True
-            if gm.game_state.get("offensive_state") == "FREE_THROW":
-                return True
+            # Do not treat offensive_state alone as authoritative for pending FT.
+            # It can be stale across transitions and incorrectly suppress quarter end.
             if gm.turns and isinstance(gm.turns[-1], dict):
                 last_turn = gm.turns[-1]
                 if last_turn.get("next_play_type") == "FREE_THROW":

@@ -490,17 +490,11 @@ class TurnManager:
         if result is not None:
             pass  # Force Foul already handled; skip state routing (HCO/HCT/FCP)
         elif state in clock_enforced_states and game_clock_remaining <= 0:
-            # At exact 0 game clock: temporary 50/50 behavior.
-            # 1) Forced shot path
-            # 2) No-shot expiration path (quarter/game ends normally)
-            if random.random() < 0.5:
-                result = self.resolve_final_turn_shot()
-                result["forced_shot"] = True
-                result["forced_shot_reason"] = "GAME_CLOCK"
-            else:
-                result = self._build_final_hold_result(0)
-                result["text"] = "Clock expires before a shot."
-                result["forced_shot"] = False
+            # At exact 0 game clock, do not run a normal possession.
+            # This should terminally hand control back to API quarter-end handling.
+            result = self._build_final_hold_result(0)
+            result["text"] = "Clock expires before a shot."
+            result["forced_shot"] = False
         elif state in clock_enforced_states and shot_clock_remaining <= 0:
             # At exact 0 shot clock: temporary 50/50 behavior.
             # 1) Forced shot path

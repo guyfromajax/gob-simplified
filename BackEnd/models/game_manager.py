@@ -1024,6 +1024,10 @@ class GameManager:
         current = result.get("current_turn")
         result_type = result.get("result_type")
         
+        # FINAL_HOLD is terminal for the possession/period boundary.
+        if result_type == "FINAL_HOLD":
+            return None
+
         # OPENING_TIP → HCO (always)
         if current == "OPENING_TIP":
             return "HCO"
