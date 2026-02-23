@@ -3809,18 +3809,43 @@ try:
         even if time_remaining has reached 0.
         """
         try:
-            if (gm.game_state.get("free_throws_remaining", 0) or 0) > 0:
+            free_throws_remaining = int(gm.game_state.get("free_throws_remaining", 0) or 0)
+            if free_throws_remaining > 0:
+                logging.warning(
+                    "🧭 [EOG TRACE] pending-terminal-ft=True reason=game_state.free_throws_remaining game_id=%s quarter=%s clock=%s time_remaining=%s free_throws_remaining=%s",
+                    getattr(gm, "game_id", None),
+                    getattr(gm, "quarter", None),
+                    gm.game_state.get("clock"),
+                    gm.game_state.get("time_remaining"),
+                    free_throws_remaining,
+                )
                 return True
             # Do not treat offensive_state alone as authoritative for pending FT.
             # It can be stale across transitions and incorrectly suppress quarter end.
             if gm.turns and isinstance(gm.turns[-1], dict):
                 last_turn = gm.turns[-1]
                 if last_turn.get("next_play_type") == "FREE_THROW":
+                    logging.warning(
+                        "🧭 [EOG TRACE] pending-terminal-ft=True reason=last_turn.next_play_type game_id=%s quarter=%s clock=%s time_remaining=%s last_turn_type=%s",
+                        getattr(gm, "game_id", None),
+                        getattr(gm, "quarter", None),
+                        gm.game_state.get("clock"),
+                        gm.game_state.get("time_remaining"),
+                        last_turn.get("result_type"),
+                    )
                     return True
                 if (
                     last_turn.get("current_turn") == "FREE_THROW"
                     and (last_turn.get("free_throws_remaining", 0) or 0) > 0
                 ):
+                    logging.warning(
+                        "🧭 [EOG TRACE] pending-terminal-ft=True reason=last_turn.free_throw_remaining game_id=%s quarter=%s clock=%s time_remaining=%s last_turn_ft_remaining=%s",
+                        getattr(gm, "game_id", None),
+                        getattr(gm, "quarter", None),
+                        gm.game_state.get("clock"),
+                        gm.game_state.get("time_remaining"),
+                        last_turn.get("free_throws_remaining"),
+                    )
                     return True
         except Exception:
             # Defensive fallback: never block normal completion on helper failure.
@@ -4060,6 +4085,45 @@ try:
                 gm.game_state["time_remaining"] <= 0
                 and not pending_terminal_ft_after_turn
             )
+
+            if gm.game_state["time_remaining"] <= 2 or int(gm.game_state.get("shot_clock_remaining", 0) or 0) <= 2:
+                latest_turn_type = latest_turn.get("result_type") if isinstance(latest_turn, dict) else None
+                latest_turn_next = latest_turn.get("next_play_type") if isinstance(latest_turn, dict) else None
+                latest_turn_elapsed = latest_turn.get("time_elapsed") if isinstance(latest_turn, dict) else None
+                logging.warning(
+                    "🧭 [ZERO CLOCK TRACE] simulate-turn post-turn game_id=%s quarter=%s time_before=%s time_after=%s shot_after=%s latest_turn_type=%s latest_turn_next=%s latest_turn_elapsed=%s pending_terminal_ft=%s quarter_complete=%s",
+                    game_id,
+                    gm.quarter,
+                    time_before_turn,
+                    gm.game_state.get("time_remaining"),
+                    gm.game_state.get("shot_clock_remaining"),
+                    latest_turn_type,
+                    latest_turn_next,
+                    latest_turn_elapsed,
+                    pending_terminal_ft_after_turn,
+                    quarter_complete,
+                )
+
+            # Detect repeated FINAL_HOLD at 0:00 (infinite-loop symptom).
+            if isinstance(latest_turn, dict) and latest_turn.get("result_type") == "FINAL_HOLD" and gm.game_state.get("time_remaining", 0) <= 0:
+                streak = int(gm.game_state.get("_debug_final_hold_streak", 0) or 0) + 1
+                gm.game_state["_debug_final_hold_streak"] = streak
+                if streak >= 2:
+                    logging.error(
+                        "🚨 [ZERO CLOCK LOOP TRACE] repeated FINAL_HOLD streak=%s game_id=%s quarter=%s clock=%s time_remaining=%s shot_clock_remaining=%s pending_terminal_ft=%s free_throws_remaining=%s offensive_state=%s latest_turn_next=%s",
+                        streak,
+                        game_id,
+                        gm.quarter,
+                        gm.game_state.get("clock"),
+                        gm.game_state.get("time_remaining"),
+                        gm.game_state.get("shot_clock_remaining"),
+                        pending_terminal_ft_after_turn,
+                        gm.game_state.get("free_throws_remaining"),
+                        gm.game_state.get("offensive_state"),
+                        latest_turn.get("next_play_type"),
+                    )
+            else:
+                gm.game_state["_debug_final_hold_streak"] = 0
             
             # Debug logging for quarter completion check
             if quarter_complete:

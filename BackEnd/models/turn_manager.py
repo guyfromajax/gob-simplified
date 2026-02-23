@@ -487,6 +487,8 @@ class TurnManager:
 
         clock_enforced_states = ("HCO", "FCP", "HCT", "FAST_BREAK")
 
+        low_clock_branch = None
+
         if result is not None:
             pass  # Force Foul already handled; skip state routing (HCO/HCT/FCP)
         elif state in clock_enforced_states and game_clock_remaining <= 0:
@@ -495,22 +497,27 @@ class TurnManager:
             result = self._build_final_hold_result(0)
             result["text"] = "Clock expires before a shot."
             result["forced_shot"] = False
+            low_clock_branch = "GAME_CLOCK_LE_0_FINAL_HOLD"
         elif state in clock_enforced_states and shot_clock_remaining <= 0:
             # At exact 0 shot clock: temporary 50/50 behavior.
             # 1) Forced shot path
             # 2) Shot clock violation path
             if random.random() < 0.5:
                 result = self._execute_forced_shot(state)
+                low_clock_branch = "SHOT_CLOCK_LE_0_FORCED_SHOT"
             else:
                 result = self._build_shot_clock_violation_result(state)
+                low_clock_branch = "SHOT_CLOCK_LE_0_VIOLATION"
         elif state in clock_enforced_states and game_clock_remaining <= 1:
             # Game clock precedence: force final-turn shot execution at 1 or 0 seconds.
             result = self.resolve_final_turn_shot()
             result["forced_shot"] = True
             result["forced_shot_reason"] = "GAME_CLOCK"
+            low_clock_branch = "GAME_CLOCK_LE_1_FORCED_SHOT"
         elif state in clock_enforced_states and shot_clock_remaining <= 1:
             # Force shot-clock attempt at 1 or 0 seconds.
             result = self._execute_forced_shot(state)
+            low_clock_branch = "SHOT_CLOCK_LE_1_FORCED_SHOT"
         elif state == "FREE_THROW":
             result = self.resolve_free_throw()
         elif state == "FAST_BREAK":
@@ -934,6 +941,25 @@ class TurnManager:
                 }
         result["player_energy"] = player_energy
         
+        if low_clock_branch:
+            logging.warning(
+                "🧭 [ZERO CLOCK TRACE] run_micro_turn branch=%s state=%s game_clock_remaining=%s shot_clock_remaining=%s result_type=%s next_play_type=%s next_turn=%s",
+                low_clock_branch,
+                state,
+                game_clock_remaining,
+                shot_clock_remaining,
+                result.get("result_type") if isinstance(result, dict) else None,
+                result.get("next_play_type") if isinstance(result, dict) else None,
+                result.get("next_turn") if isinstance(result, dict) else None,
+            )
+        elif state in clock_enforced_states and (game_clock_remaining <= 2 or shot_clock_remaining <= 2):
+            logging.warning(
+                "🧭 [ZERO CLOCK TRACE] run_micro_turn near-zero NO_BRANCH state=%s game_clock_remaining=%s shot_clock_remaining=%s",
+                state,
+                game_clock_remaining,
+                shot_clock_remaining,
+            )
+
         # Include strategy calls for frontend strategy bars (actual calls, not settings)
         result["offense_tempo_call"] = self.game.offense_team.strategy_calls.get("tempo_call", "normal")
         result["offense_aggression_call"] = self.game.offense_team.strategy_calls.get("aggression_call", "normal")
@@ -3098,10 +3124,14 @@ class TurnManager:
             rt = turn_result.get("result_type")
             foul_type = str(turn_result.get("foul_type") or turn_result.get("foul_team") or "").upper()
             next_play_type = str(turn_result.get("next_play_type") or turn_result.get("next_turn") or "").upper()
+            current_turn = str(turn_result.get("current_turn") or "").upper()
+            rebound_type = str(turn_result.get("rebound_type") or "").upper()
             possession_flips = bool(turn_result.get("possession_flips"))
             if _is_no_impact_turn(turn_result):
                 return True
-            if rt == "OREB":
+            # Reset on any offensive rebound event, not just a literal "OREB" result_type.
+            # OREB flows commonly use result types like OREB_KICKOUT / PUTBACK_* with rebound_type="OREB".
+            if rebound_type == "OREB" or current_turn == "OREB" or rt == "OREB":
                 return True
             if rt == "MAKE":
                 return True
