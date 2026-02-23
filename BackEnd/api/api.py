@@ -3873,6 +3873,17 @@ try:
                 status_code=404,
                 detail=f"Game {game_id} not found. Start a quarter first with /api/simulate-quarter"
             )
+
+        logging.warning(
+            "🧭 [SIM TURN ENTRY TRACE] game_id=%s quarter=%s clock=%s time_remaining=%s shot_clock_remaining=%s offensive_state=%s turns_len=%s",
+            game_id,
+            getattr(gm, "quarter", None),
+            gm.game_state.get("clock"),
+            gm.game_state.get("time_remaining"),
+            gm.game_state.get("shot_clock_remaining"),
+            gm.game_state.get("offensive_state"),
+            len(getattr(gm, "turns", []) or []),
+        )
         
         # Log lineup state when simulate-turn is called
         home_lineup = getattr(gm.home_team, "lineup", None)
@@ -3897,6 +3908,15 @@ try:
         # Check if quarter is already over.
         # Edge-case rule: at 0:00, only continue if a free throw sequence is pending.
         if gm.game_state["time_remaining"] <= 0 and not pending_terminal_ft:
+            logging.warning(
+                "🧭 [SIM TURN EARLY RETURN TRACE] reason=quarter_complete game_id=%s quarter=%s clock=%s time_remaining=%s shot_clock_remaining=%s pending_terminal_ft=%s",
+                game_id,
+                getattr(gm, "quarter", None),
+                gm.game_state.get("clock"),
+                gm.game_state.get("time_remaining"),
+                gm.game_state.get("shot_clock_remaining"),
+                pending_terminal_ft,
+            )
             early_return = {
                 "quarter_complete": True,
                 "game_id": game_id,
@@ -3915,7 +3935,14 @@ try:
             return JSONResponse(content=early_return, status_code=200)
         elif gm.game_state["time_remaining"] <= 0 and pending_terminal_ft:
             logging.warning(
-                "🧭 [EOG-EDGE] time_remaining=0 but pending FT sequence detected; continuing turn simulation"
+                "🧭 [SIM TURN EARLY RETURN TRACE] reason=pending_terminal_ft_continue game_id=%s quarter=%s clock=%s time_remaining=%s shot_clock_remaining=%s free_throws_remaining=%s offensive_state=%s",
+                game_id,
+                getattr(gm, "quarter", None),
+                gm.game_state.get("clock"),
+                gm.game_state.get("time_remaining"),
+                gm.game_state.get("shot_clock_remaining"),
+                gm.game_state.get("free_throws_remaining"),
+                gm.game_state.get("offensive_state"),
             )
         
         # ✅ TIMEOUT: Check if last turn is a TIMEOUT turn (user-initiated or foul out)
