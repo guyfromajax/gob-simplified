@@ -2246,6 +2246,9 @@ export function createGameScene(Phaser) {
             for (const subTurn of turn.batch_turns) {
               turnCount++;
               subTurn.index = turnCount;
+              const clockBeforeSubTurn = Number.isFinite(this?.gameClock?.getState?.().timeRemaining)
+                ? this.gameClock.getState().timeRemaining
+                : null;
               
               console.log(`🎬 Turn ${turnCount}: ${subTurn.result_type} - ${subTurn.text?.substring(0, 50)}...`);
               
@@ -2277,6 +2280,20 @@ export function createGameScene(Phaser) {
                 console.error(`❌ BATCH sub-turn (${subTurn.result_type}) animation error; continuing to next sub-turn:`, batchSubErr);
                 // Continue so timeout sub-turn (e.g. foul-out) still runs
               }
+
+              const clockAfterSubTurn = Number.isFinite(this?.gameClock?.getState?.().timeRemaining)
+                ? this.gameClock.getState().timeRemaining
+                : null;
+              const frontendElapsed = (
+                Number.isFinite(clockBeforeSubTurn) && Number.isFinite(clockAfterSubTurn)
+              ) ? Math.max(0, Math.floor(clockBeforeSubTurn - clockAfterSubTurn)) : null;
+              const backendElapsed = Number.isFinite(Number(subTurn?.time_elapsed))
+                ? Math.max(0, Math.floor(Number(subTurn.time_elapsed)))
+                : 0;
+              const deltaElapsed = (frontendElapsed == null) ? null : (frontendElapsed - backendElapsed);
+              console.log(
+                `🔵🔵🔵🔵🔵 Turn #${turnCount}, Frontend Actual Clock Elapsed = ${frontendElapsed ?? 'N/A'}, Backend Estimate Time Elapsed = ${backendElapsed}, Delta = ${deltaElapsed ?? 'N/A'}`
+              );
               
               // Update finalTurn to be the last sub-turn in the batch
               finalTurn = subTurn;
@@ -2308,6 +2325,9 @@ export function createGameScene(Phaser) {
             // Normal single turn
             turnCount++;
             turn.index = turnCount;
+            const clockBeforeTurn = Number.isFinite(this?.gameClock?.getState?.().timeRemaining)
+              ? this.gameClock.getState().timeRemaining
+              : null;
             
             console.log(`🎬 Turn ${turnCount}: ${turn.result_type} - ${turn.text?.substring(0, 50)}...`);
             
@@ -2341,6 +2361,20 @@ export function createGameScene(Phaser) {
               ballSprite: this.ballSprite,
               onUpdate: updateScoreboard
             });
+
+            const clockAfterTurn = Number.isFinite(this?.gameClock?.getState?.().timeRemaining)
+              ? this.gameClock.getState().timeRemaining
+              : null;
+            const frontendElapsed = (
+              Number.isFinite(clockBeforeTurn) && Number.isFinite(clockAfterTurn)
+            ) ? Math.max(0, Math.floor(clockBeforeTurn - clockAfterTurn)) : null;
+            const backendElapsed = Number.isFinite(Number(turn?.time_elapsed))
+              ? Math.max(0, Math.floor(Number(turn.time_elapsed)))
+              : 0;
+            const deltaElapsed = (frontendElapsed == null) ? null : (frontendElapsed - backendElapsed);
+            console.log(
+              `🔵🔵🔵🔵🔵 Turn #${turnCount}, Frontend Actual Clock Elapsed = ${frontendElapsed ?? 'N/A'}, Backend Estimate Time Elapsed = ${backendElapsed}, Delta = ${deltaElapsed ?? 'N/A'}`
+            );
             if (turn.is_final_turn_of_quarter) {
               console.log('✅ [FINAL TURN DEBUG] Animation of final turn completed', {
                 turn_result_type: turn.result_type,
