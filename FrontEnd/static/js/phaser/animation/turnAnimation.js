@@ -2162,7 +2162,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // ShotAnimationSystem.runSetupTween() handles setup for all skeleton animations, including FCP/HCT
 
   let eventsProcessed = false;
-  const clockSecondMs = scene?.gameClock?.getState?.().tickMs || 450;
+  const clockSecondMs = scene?.gameClock?.getState?.().tickMs || 350;
   const stepClockSeconds = Array.isArray(turnData?.step_clock_seconds)
     ? turnData.step_clock_seconds
     : null;
