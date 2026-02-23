@@ -991,6 +991,10 @@ export class ShotAnimationSystem {
     }
 
     // ✅ FIX: Ball is already at rim from animateBallFlight() - hold and show announcement in unison
+    // Freeze clocks during rim hold + made-shot announcement window.
+    const clockPauseReason = 'made_shot_hold';
+    this.scene?.gameClock?.pause?.(clockPauseReason);
+    this.scene?.shotClock?.pause?.(clockPauseReason);
     const ballSprite = this.ballController.ballSprite;
     const isFastBreak = turnData.fast_break === true;
 
@@ -1046,13 +1050,18 @@ export class ShotAnimationSystem {
     const holdMs = !isPutbackMake
       ? (animationConfig.shot?.makeAnnouncementHoldMs ?? 1000)
       : (isFastBreak ? (animationConfig.fastBreak?.rimHoldMs ?? 1000) : (animationConfig.shot?.rimHoldMs ?? 1000));
-    await new Promise(resolve => {
-      if (this.scene.time?.delayedCall) {
-        this.scene.time.delayedCall(holdMs, resolve);
-      } else {
-        setTimeout(resolve, holdMs);
-      }
-    });
+    try {
+      await new Promise(resolve => {
+        if (this.scene.time?.delayedCall) {
+          this.scene.time.delayedCall(holdMs, resolve);
+        } else {
+          setTimeout(resolve, holdMs);
+        }
+      });
+    } finally {
+      this.scene?.gameClock?.resume?.(clockPauseReason);
+      this.scene?.shotClock?.resume?.(clockPauseReason);
+    }
 
     if (ballSprite) {
       if (this._getBackTweens) {
