@@ -3507,14 +3507,33 @@ class TurnManager:
                     touch_counts[player] += 1
 
             for event in events:
-                if event["type"] == "pass":
-                    passer = off_lineup[event["from"]]
-                    receiver = off_lineup[event["to"]]
-                    touch_counts[passer] += 1
-                    touch_counts[receiver] += 1
-                elif event["type"] == "shot":
-                    shooter = off_lineup[event["by"]]
-                    touch_counts[shooter] += 1
+                event_type = event.get("type")
+                if event_type == "pass":
+                    passer_pos = event.get("from")
+                    receiver_pos = event.get("to")
+                    if passer_pos in off_lineup and receiver_pos in off_lineup:
+                        passer = off_lineup[passer_pos]
+                        receiver = off_lineup[receiver_pos]
+                        touch_counts[passer] += 1
+                        touch_counts[receiver] += 1
+                elif event_type == "shot":
+                    shooter_pos = event.get("by")
+                    # Final-turn helper skeletons can emit {"type":"shot"} without "by".
+                    # Fall back to the shooter action in this step.
+                    if shooter_pos not in off_lineup:
+                        for pos, action_info in pos_actions.items():
+                            if action_info.get("action") == ACTIONS["SHOOT"]:
+                                shooter_pos = pos
+                                break
+                    if shooter_pos in off_lineup:
+                        shooter = off_lineup[shooter_pos]
+                        touch_counts[shooter] += 1
+                    else:
+                        logging.warning(
+                            "🧭 [FINAL TURN TRACE] assign_roles shot event missing valid shooter mapping; event=%s step_index=%s",
+                            event,
+                            step_index,
+                        )
 
         # --- Step 4: Derive primary roles from steps (optimized - uses final steps only)
         derived_roles = derive_roles_from_steps(steps, off_lineup)
