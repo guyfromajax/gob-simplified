@@ -3809,21 +3809,49 @@ try:
         even if time_remaining has reached 0.
         """
         try:
+            last_turn = gm.turns[-1] if (gm.turns and isinstance(gm.turns[-1], dict)) else {}
+            timeout_next_play_type = str(gm.game_state.get("timeout_next_play_type") or "").upper()
+            offensive_state = str(gm.game_state.get("offensive_state") or "").upper()
+            last_turn_next_play = str(last_turn.get("next_play_type") or "").upper()
+            last_turn_current = str(last_turn.get("current_turn") or "").upper()
+            has_ft_context = (
+                offensive_state == "FREE_THROW"
+                or timeout_next_play_type == "FREE_THROW"
+                or last_turn_next_play == "FREE_THROW"
+                or last_turn_current == "FREE_THROW"
+            )
+
             free_throws_remaining = int(gm.game_state.get("free_throws_remaining", 0) or 0)
             if free_throws_remaining > 0:
+                if has_ft_context:
+                    logging.warning(
+                        "🧭 [EOG TRACE] pending-terminal-ft=True reason=game_state.free_throws_remaining game_id=%s quarter=%s clock=%s time_remaining=%s free_throws_remaining=%s offensive_state=%s timeout_next_play_type=%s last_turn_current=%s last_turn_next_play=%s",
+                        getattr(gm, "game_id", None),
+                        getattr(gm, "quarter", None),
+                        gm.game_state.get("clock"),
+                        gm.game_state.get("time_remaining"),
+                        free_throws_remaining,
+                        offensive_state,
+                        timeout_next_play_type,
+                        last_turn_current,
+                        last_turn_next_play,
+                    )
+                    return True
                 logging.warning(
-                    "🧭 [EOG TRACE] pending-terminal-ft=True reason=game_state.free_throws_remaining game_id=%s quarter=%s clock=%s time_remaining=%s free_throws_remaining=%s",
+                    "🧭 [EOG TRACE] pending-terminal-ft=False reason=stale_free_throws_remaining game_id=%s quarter=%s clock=%s time_remaining=%s free_throws_remaining=%s offensive_state=%s timeout_next_play_type=%s last_turn_current=%s last_turn_next_play=%s",
                     getattr(gm, "game_id", None),
                     getattr(gm, "quarter", None),
                     gm.game_state.get("clock"),
                     gm.game_state.get("time_remaining"),
                     free_throws_remaining,
+                    offensive_state,
+                    timeout_next_play_type,
+                    last_turn_current,
+                    last_turn_next_play,
                 )
-                return True
             # Do not treat offensive_state alone as authoritative for pending FT.
             # It can be stale across transitions and incorrectly suppress quarter end.
             if gm.turns and isinstance(gm.turns[-1], dict):
-                last_turn = gm.turns[-1]
                 if last_turn.get("next_play_type") == "FREE_THROW":
                     logging.warning(
                         "🧭 [EOG TRACE] pending-terminal-ft=True reason=last_turn.next_play_type game_id=%s quarter=%s clock=%s time_remaining=%s last_turn_type=%s",

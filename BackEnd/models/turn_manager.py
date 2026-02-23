@@ -407,6 +407,32 @@ class TurnManager:
         shot_clock_remaining = int(game_state.get("shot_clock_remaining", min(30, int(game_state.get("time_remaining", 30) or 30))))
         game_clock_remaining = int(game_state.get("time_remaining", 0) or 0)
 
+        # Defensive scrub: free_throws_remaining can occasionally leak across non-FT turns.
+        # Keep FT state only when there is coherent FT context.
+        free_throws_remaining = int(game_state.get("free_throws_remaining", 0) or 0)
+        if free_throws_remaining > 0:
+            timeout_next_play_type = str(game_state.get("timeout_next_play_type") or "").upper()
+            last_turn = self.game.turns[-1] if self.game.turns and isinstance(self.game.turns[-1], dict) else {}
+            last_turn_next_play = str(last_turn.get("next_play_type") or "").upper()
+            last_turn_current = str(last_turn.get("current_turn") or "").upper()
+            has_ft_context = (
+                str(state).upper() == "FREE_THROW"
+                or timeout_next_play_type == "FREE_THROW"
+                or last_turn_next_play == "FREE_THROW"
+                or last_turn_current == "FREE_THROW"
+            )
+            if not has_ft_context:
+                logging.warning(
+                    "🧭 [FT SCRUB TRACE] Clearing stale free_throws_remaining=%s state=%s timeout_next_play_type=%s last_turn_current=%s last_turn_next_play=%s",
+                    free_throws_remaining,
+                    state,
+                    timeout_next_play_type,
+                    last_turn_current,
+                    last_turn_next_play,
+                )
+                game_state["free_throws_remaining"] = 0
+                game_state["one_and_one"] = False
+
         # ✅ Final Turn (Q4/OT): clear "triggered" flag when quarter/period changes so each period gets one chance
         quarter = getattr(self.game, "quarter", None)
         if game_state.get("_last_final_turn_quarter") != quarter:
