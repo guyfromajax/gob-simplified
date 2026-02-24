@@ -1,6 +1,5 @@
 import random
 from BackEnd.utils.shared import calculate_rebound_score, get_name_safe
-from BackEnd.utils.movement_constants import ELAPSED_REBOUND
 
 class ReboundManager:
     def __init__(self, game):
@@ -71,6 +70,6 @@ class ReboundManager:
             "result_type": stat,
             "ball_handler": rebounder,
             "text": f"{rebounder} grabs the {print_variable}.",
-            "time_elapsed": int(round(ELAPSED_REBOUND)),
+            "time_elapsed": random.randint(3, 6),
             "possession_flips": rebound_team == self.def_team,
         }

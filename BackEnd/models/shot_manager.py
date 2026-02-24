@@ -37,9 +37,7 @@ from BackEnd.utils.shared import (
     calculate_charge,
     height_to_block_score,
     calculate_block_spot,
-    calc_path_elapsed,
 )
-from BackEnd.utils.movement_constants import SPEED_TRANSITION, OVERHEAD_SHOT, ELAPSED_REBOUND
 from BackEnd.constants.fast_break_constants import DEFENSIVE_STOP_Y_RANGE
 
 
@@ -554,8 +552,6 @@ class ShotManager:
                         steps,
                         resolution_step_index=shot_step_index,
                         include_hco_step1_bringup=(self.game_state.get("offensive_state") == "HCO"),
-                        skeleton_phase=self.game_state.get("offensive_state", "HCO"),
-                        game_speed_px_per_sec=self.game_state.get("game_speed_px_per_sec"),
                     )
                     time_elapsed_ft = timing_contract["time_elapsed"]
                     ft_remaining = 1 if made_from_foul else 2
@@ -625,8 +621,6 @@ class ShotManager:
                     steps,
                     resolution_step_index=shot_step_index,
                     include_hco_step1_bringup=(self.game_state.get("offensive_state") == "HCO"),
-                    skeleton_phase=self.game_state.get("offensive_state", "HCO"),
-                    game_speed_px_per_sec=self.game_state.get("game_speed_px_per_sec"),
                 )
                 time_elapsed = timing_contract["time_elapsed"]
                 
@@ -718,8 +712,6 @@ class ShotManager:
                         steps,
                         resolution_step_index=shot_step_index,
                         include_hco_step1_bringup=(self.game_state.get("offensive_state") == "HCO"),
-                        skeleton_phase=self.game_state.get("offensive_state", "HCO"),
-                        game_speed_px_per_sec=self.game_state.get("game_speed_px_per_sec"),
                     )
                     time_elapsed = timing_contract["time_elapsed"]
                     intended_shooter_pos = roles.get("intended_shooter_pos")
@@ -1542,8 +1534,6 @@ class ShotManager:
                 steps,
                 resolution_step_index=shot_step_index,
                 include_hco_step1_bringup=(self.game_state.get("offensive_state") == "HCO"),
-                skeleton_phase=self.game_state.get("offensive_state", "HCO"),
-                game_speed_px_per_sec=self.game_state.get("game_speed_px_per_sec"),
             )
             time_elapsed = timing_contract["time_elapsed"]
 
@@ -2117,28 +2107,7 @@ class ShotManager:
             result["ball_bounce_x"] = bounce_spot["x"]
             result["ball_bounce_y"] = bounce_spot["y"]
 
-        game_speed_px_per_sec = int(self.game_state.get("game_speed_px_per_sec", 450) or 450)
-        path_points = []
-        start_x = fb_roles.get("ball_handler_outlet_x")
-        start_y = fb_roles.get("ball_handler_outlet_y")
-        if isinstance(start_x, (int, float)) and isinstance(start_y, (int, float)):
-            path_points.append({"x": start_x, "y": start_y})
-
-        end_x = fb_roles.get("_bh_final_x")
-        end_y = fb_roles.get("_bh_final_y")
-        if not (isinstance(end_x, (int, float)) and isinstance(end_y, (int, float))):
-            shooter_coords = getattr(shooter, "coords", {}) or {}
-            end_x = shooter_coords.get("x")
-            end_y = shooter_coords.get("y")
-        if isinstance(end_x, (int, float)) and isinstance(end_y, (int, float)):
-            path_points.append({"x": end_x, "y": end_y})
-
-        distance_elapsed = calc_path_elapsed(
-            path_points,
-            SPEED_TRANSITION,
-            game_speed_px_per_sec=game_speed_px_per_sec,
-        )
-        time_elapsed = int(round(max(distance_elapsed + OVERHEAD_SHOT, ELAPSED_REBOUND)))
+        time_elapsed = random.randint(5, 10)
 
         shooter_pos = get_player_position(off_lineup, shooter)
 

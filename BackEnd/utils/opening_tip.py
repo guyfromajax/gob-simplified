@@ -1,5 +1,4 @@
 import random
-from BackEnd.utils.movement_constants import ELAPSED_OPENING_TIP
 
 # Starting positions for opening tip
 OPENING_TIP_POSITIONS = {
@@ -155,8 +154,9 @@ def execute_opening_tip(game):
                 "action": "CONVERGE_ON_BALL"
             })
     
-    # Deterministic opening tip elapsed for clock sync.
-    time_elapsed = int(round(ELAPSED_OPENING_TIP))
+    # Random time elapsed (2-5 seconds)
+    # ✅ TEMPORARILY DISABLED: Opening tip no longer consumes time to avoid clock issues
+    time_elapsed = random.randint(1, 5)
     
     text = f"{winner_name} wins the tip!"
     
