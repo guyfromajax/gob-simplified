@@ -58,6 +58,8 @@ export function createGameClock({
   };
 
   return {
+    // PHASE2: Countdown interval (start()) is intentionally never called; clock is driven by bounded
+    // interpolation in AnimationRouter (clock_start → clock_end over real_time_elapsed_ms) and final snap in updateScoreboard.
     start() {
       if (running && intervalId) return;
       running = true;

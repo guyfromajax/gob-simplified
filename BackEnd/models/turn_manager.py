@@ -65,6 +65,66 @@ class TurnManager:
                 if not hasattr(player, "coords"):
                     setattr(player, "coords", {"x": 25, "y": 50})
 
+    def _compute_real_time_elapsed_ms(self, result: dict) -> int:
+        """
+        Compute total wall clock animation duration in ms for this turn.
+        Formula: (game_time_elapsed * 350) + fixed_phases_ms
+        Clock runs through fixed phases except: announcement holds, rim hold on makes,
+        OPENING_TIP initial_hold. Used by frontend to interpolate clock display.
+        """
+        game_time_elapsed = int(result.get("time_elapsed", 0) or 0)
+        movement_ms = game_time_elapsed * 350
+
+        result_type = (result.get("result_type") or "").strip()
+        points = int(result.get("points", 0) or 0)
+        is_make = points > 0 or result_type == "MAKE"
+        is_fast_break = result.get("fast_break") is True or result_type == "FAST_BREAK"
+
+        fixed_ms = 0
+
+        # Zero-elapsed turns: clock does not move
+        if result_type in ("FREE_THROW", "SIDE_INBOUND", "BASELINE_INBOUND", "TIMEOUT"):
+            return 0
+
+        if result_type == "DEFENSIVE_STOP":
+            # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
+            fixed_ms = 1000 if is_fast_break else 0
+
+        elif result_type in ("MAKE", "MISS", "BLOCK"):
+            if is_fast_break:
+                # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
+                fixed_ms = 1050 if is_make else 2050  # pass + outlet + shot; rim excluded on make
+            else:
+                # HCO / FCP / HCT: pass or steal 150ms; rim 1000ms on miss only
+                # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
+                fixed_ms = 150 if is_make else 1150
+
+        elif result_type == "FINAL_HOLD":
+            # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
+            fixed_ms = 1800  # holdClockOutMs
+
+        elif result_type in ("OREB_KICKOUT", "PUTBACK_MAKE", "PUTBACK_MISS"):
+            # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
+            if result_type == "PUTBACK_MAKE":
+                fixed_ms = 800   # rebound_move + attach_delay; rim excluded
+            elif result_type == "PUTBACK_MISS":
+                fixed_ms = 1800  # rebound_move + attach_delay + rim_hold
+            else:
+                fixed_ms = 800   # OREB_KICKOUT
+
+        elif result_type == "FOUL":
+            fixed_ms = 0
+
+        elif result_type == "OPENING_TIP":
+            # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
+            fixed_ms = 400  # apex_delay + pass_delay; initial_hold excluded
+
+        else:
+            # STEAL, DEAD BALL, TURNOVER, CHARGE, etc.
+            fixed_ms = 0
+
+        return movement_ms + fixed_ms
+
     def _attach_clock_contract(
         self,
         result: dict,
@@ -85,6 +145,7 @@ class TurnManager:
         result["shot_clock_end"] = sc_end
         result["shot_clock_reset"] = bool(sc_reset)
         result["clock_contract_source"] = source
+        result["real_time_elapsed_ms"] = self._compute_real_time_elapsed_ms(result)
         logging.warning(
             "⏱️ [CLOCK CONTRACT] type=%s source=%s "
             "clock=%d→%d elapsed=%d sc=%d→%d reset=%s",
