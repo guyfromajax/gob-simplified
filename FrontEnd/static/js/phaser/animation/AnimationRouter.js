@@ -115,9 +115,12 @@ export class AnimationRouter {
         (hasElapsedValue && elapsedValue === 0) ||
         noImpactResultTypes.has(turnData?.result_type);
       const isOpeningTipTurn = turnData?.result_type === 'OPENING_TIP';
-      const hasGameClockContract = Number.isFinite(Number(turnData?.clock_start)) &&
+      const hasNativeClockContract = turnData?.clock_contract_source === 'native';
+      const hasGameClockContract = hasNativeClockContract &&
+        Number.isFinite(Number(turnData?.clock_start)) &&
         Number.isFinite(Number(turnData?.clock_end));
-      const hasShotClockContract = Number.isFinite(Number(turnData?.shot_clock_start)) &&
+      const hasShotClockContract = hasNativeClockContract &&
+        Number.isFinite(Number(turnData?.shot_clock_start)) &&
         Number.isFinite(Number(turnData?.shot_clock_end));
 
       if (this.scene?.gameClock || this.scene?.shotClock) {

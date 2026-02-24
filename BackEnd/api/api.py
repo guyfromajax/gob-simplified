@@ -1131,6 +1131,7 @@ try:
             timeout_turn.setdefault("shot_clock_start", int(gm.game_state.get("shot_clock_remaining", 0) or 0))
             timeout_turn.setdefault("shot_clock_end", int(gm.game_state.get("shot_clock_remaining", 0) or 0))
             timeout_turn.setdefault("shot_clock_reset", False)
+            timeout_turn.setdefault("clock_contract_source", "fallback")
         response = {
             "turn": timeout_turn,
             "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
@@ -3931,6 +3932,8 @@ try:
                 turn["shot_clock_end"] = current_shot_clock
             if "shot_clock_reset" not in turn:
                 turn["shot_clock_reset"] = False
+            if "clock_contract_source" not in turn:
+                turn["clock_contract_source"] = "fallback"
             return turn
 
         def enrich_turn_payload(turn: dict, game_state: dict):
@@ -4585,6 +4588,7 @@ try:
             timeout_turn["shot_clock_start"] = shot_clock_start
             timeout_turn["shot_clock_end"] = shot_clock_end
             timeout_turn["shot_clock_reset"] = shot_clock_reset
+            timeout_turn["clock_contract_source"] = "fallback"
         
         if not timeout_turn:
             raise HTTPException(
