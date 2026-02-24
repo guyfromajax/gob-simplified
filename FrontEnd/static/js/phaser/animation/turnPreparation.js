@@ -14,6 +14,88 @@ import { updatePlaycallCenter, parseLeanScoreFromText } from "../ui/playcallCent
 import { announceFromTurnData } from "../utils/announcements.js";
 // ✅ TIMEOUT: Removed resetTimeoutQueue import - timeout queue persists until executed
 
+function applyTurnClockContractAtStart(scene, turn, turnIndex) {
+  if (!scene || !turn || !Number.isFinite(Number(turnIndex))) return;
+  if (turn._clockContractAppliedTurnIndex === turnIndex) return;
+
+  const source = turn?.clock_contract_source;
+  const gameStart = Number(turn?.clock_start);
+  const gameEnd = Number(turn?.clock_end);
+  const shotStart = Number(turn?.shot_clock_start);
+  const shotEnd = Number(turn?.shot_clock_end);
+  const hasNativeGame = source === "native" && Number.isFinite(gameStart) && Number.isFinite(gameEnd);
+  const hasNativeShot = source === "native" && Number.isFinite(shotStart) && Number.isFinite(shotEnd);
+
+  // Always hard-stop both clocks before applying this turn's contract to prevent turn-boundary bleed.
+  scene.gameClock?.stop?.();
+  scene.shotClock?.stop?.();
+
+  if (hasNativeGame && scene.gameClock) {
+    const startSec = Math.max(0, Math.floor(gameStart));
+    const endSec = Math.max(0, Math.floor(gameEnd));
+    scene.gameClock.syncWithBackend(startSec);
+    if (startSec > endSec) {
+      scene.gameClock.runToTarget?.(endSec);
+    } else {
+      scene.gameClock.syncWithBackend(endSec);
+    }
+  } else {
+    console.warn("⏱️ Missing native game clock contract at turn start; holding clock for this turn", {
+      turn_index: turnIndex,
+      result_type: turn?.result_type,
+      current_turn: turn?.current_turn,
+      contract_source: source ?? null,
+      has_clock_start: turn?.clock_start != null,
+      has_clock_end: turn?.clock_end != null,
+    });
+  }
+
+  if (hasNativeShot && scene.shotClock) {
+    const startSec = Math.max(0, Math.floor(shotStart));
+    const endSec = Math.max(0, Math.floor(shotEnd));
+    scene.shotClock.syncWithBackend(startSec);
+    if (startSec > endSec) {
+      scene.shotClock.runToTarget?.(endSec);
+    } else {
+      scene.shotClock.syncWithBackend(endSec);
+    }
+  } else {
+    console.warn("⏱️ Missing native shot clock contract at turn start; holding shot clock for this turn", {
+      turn_index: turnIndex,
+      result_type: turn?.result_type,
+      current_turn: turn?.current_turn,
+      contract_source: source ?? null,
+      has_shot_start: turn?.shot_clock_start != null,
+      has_shot_end: turn?.shot_clock_end != null,
+    });
+  }
+
+  turn._clockContractAppliedTurnIndex = turnIndex;
+}
+
+function finalizeTurnClockContractAtEnd(scene, turn) {
+  if (!scene || !turn) return;
+  const source = turn?.clock_contract_source;
+  const gameEnd = Number(turn?.clock_end);
+  const shotEnd = Number(turn?.shot_clock_end);
+  const hasNativeGame = source === "native" && Number.isFinite(gameEnd);
+  const hasNativeShot = source === "native" && Number.isFinite(shotEnd);
+
+  // End-of-turn clamp: prevent residual countdown from bleeding into next turn.
+  if (scene.gameClock) {
+    scene.gameClock.stop?.();
+    if (hasNativeGame) {
+      scene.gameClock.syncWithBackend(Math.max(0, Math.floor(gameEnd)));
+    }
+  }
+  if (scene.shotClock) {
+    scene.shotClock.stop?.();
+    if (hasNativeShot) {
+      scene.shotClock.syncWithBackend(Math.max(0, Math.floor(shotEnd)));
+    }
+  }
+}
+
 /**
  * Prepare a turn for animation by setting up all required state and UI updates.
  * 
@@ -41,6 +123,9 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
   
   // Set turn.index (required for context)
   turn.index = turnIndex;
+
+  // Apply authoritative clock contract at turn start (single deterministic gate).
+  applyTurnClockContractAtStart(scene, turn, turnIndex);
   
   // ✅ FIX (Bug 1): Update offense_team_id BEFORE turn executes (not after)
   // SIP and other turns need correct offense_team_id at START, not END
@@ -225,6 +310,9 @@ export async function finalizeTurnAfterAnimation({
   // ✅ UNIVERSAL TRANSITION HANDLER - Handle possession flips and state transitions
   // This runs FIRST to ensure possession is correct before other finalization steps
   handleTurnTransition(scene, turn);
+
+  // Clamp clocks at the end of this turn so countdown cannot bleed into the next turn window.
+  finalizeTurnClockContractAtEnd(scene, turn);
   
   // ✅ DEBUG: Log finalization
   if (false) console.log('[Finalizing]', {
@@ -300,7 +388,7 @@ export async function finalizeTurnAfterAnimation({
   // Call onUpdate callback if provided
   if (onUpdate) {
     try {
-      onUpdate(turn);
+      onUpdate({ ...turn, _skipClockSync: true });
       if (false) console.log('[onUpdate]', {
         turnIndex: turnIndex ?? turn.index,
         result_type: turn.result_type
@@ -315,4 +403,3 @@ export async function finalizeTurnAfterAnimation({
     updateDebugScore(turn, { turnIndex, possessionId });
   }
 }
-

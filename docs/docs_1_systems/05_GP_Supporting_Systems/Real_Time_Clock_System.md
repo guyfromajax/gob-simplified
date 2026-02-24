@@ -43,9 +43,12 @@ No-impact turn families (clock hold behavior):
 - `TIMEOUT`
 
 ## Frontend Clock Owner Model
-Single writer for clock state:
-- `FrontEnd/static/js/phaser/gameScene.js`
-- function: `updateScoreboard(turn)`
+Single writer path for clock state:
+- turn-start apply in `FrontEnd/static/js/phaser/animation/turnPreparation.js`
+  - `prepareTurnForAnimation(...)`
+- turn-end clamp in `FrontEnd/static/js/phaser/animation/turnPreparation.js`
+  - `finalizeTurnAfterAnimation(...)`
+- `gameScene.updateScoreboard(turn)` is scoreboard/state only during turn finalization (`_skipClockSync: true`).
 
 Router ownership:
 - `AnimationRouter` does not mutate clock state.
@@ -70,9 +73,14 @@ If native contract is missing:
 - hold clock state for that turn
 - emit warning log
 
+Turn-boundary clamp:
+- at end of each turn, both clocks are force-stopped
+- if native contract exists, both are hard-synced to `clock_end` / `shot_clock_end`
+- prevents countdown bleed from turn N into turn N+1
+
 ## Critical Stabilizer (Implemented)
-`updateScoreboard()` is called in two contexts:
-1. per-turn animation finalization (contract-bearing turn payload)
+`updateScoreboard()` is called in multiple contexts:
+1. per-turn animation finalization
 2. post-turn summary refresh (scores/fouls/timeouts aggregate payload)
 
 The summary refresh now passes:
@@ -82,7 +90,7 @@ When `_skipClockSync` is true:
 - `updateScoreboard()` updates scores/fouls/timeouts only
 - game clock and shot clock are not started/stopped/synced
 
-This prevents summary refreshes from overriding contract-driven countdown decisions.
+This prevents summary refreshes/finalization from overriding turn-start contract decisions.
 
 ## Tick Cadence
 - `createGameClock()` tick interval remains fixed at `350ms` per game-second.
@@ -90,7 +98,7 @@ This prevents summary refreshes from overriding contract-driven countdown decisi
 
 ## Expected Behavior After This Update
 1. Impact turns with native contract and `start > end`:
-- both clocks count down normally for that turn window
+- both clocks begin countdown at turn start and stop at turn end target
 
 2. No-impact turns with native contract and `start == end`:
 - both clocks hold steady (no countdown)
@@ -99,8 +107,8 @@ This prevents summary refreshes from overriding contract-driven countdown decisi
 - scores/fouls/timeouts/period update
 - clock run/hold state is unaffected
 
-4. Reduced false warnings and oscillation:
-- no more clock stop/start flips caused by non-contract summary payloads
+4. Reduced turn-attribution inversion:
+- countdown no longer bleeds from one turn window into the next
 
 ## Known Remaining Risk Areas
 - Any backend flow that emits fallback-only turns for impact cases will still hold (by design of native-only gate).

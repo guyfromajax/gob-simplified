@@ -11,7 +11,10 @@ This document reflects the active code path (`BackEnd/api/api.py`, `BackEnd/mode
 ## Current Authority Model
 - Backend is authoritative for turn-level clock state.
 - Frontend renders clocks from backend turn contracts.
-- `gameScene.updateScoreboard(turn)` is the single frontend owner for game/shot clock mutations.
+- Turn lifecycle hooks own clock mutation:
+  - start-of-turn apply in `turnPreparation.prepareTurnForAnimation(...)`
+  - end-of-turn clamp in `turnPreparation.finalizeTurnAfterAnimation(...)`
+- `gameScene.updateScoreboard(turn)` updates scoreboard/state and is called with `_skipClockSync: true` during turn finalization/summary refresh.
 - `AnimationRouter` does not mutate clock state.
 
 ## Turn Clock Contract (Per Turn)
@@ -45,7 +48,7 @@ No-impact turns (clock holds):
 - `TIMEOUT`
 
 ## Frontend Clock Consumption
-In `gameScene.js` `updateScoreboard(turn)`:
+In `turnPreparation.js`:
 - Native contract gate:
   - `turn.clock_contract_source === "native"`
   - finite `clock_start` and `clock_end` for game clock
@@ -53,12 +56,16 @@ In `gameScene.js` `updateScoreboard(turn)`:
 - Behavior when gate passes:
 1. `syncWithBackend(start)`
 2. If `start > end`, `runToTarget(end)`
-3. Else stop and hold at `end`
+3. Else hold at `end`
 - Behavior when gate fails:
-  - stop clock
+  - stop/hold clocks
   - hold current display
   - emit warning log
   - no legacy fallback ticking from `time_remaining` / `clock` / `shot_clock_remaining`
+
+End-of-turn boundary:
+- `finalizeTurnAfterAnimation(...)` force-stops both clocks and syncs to `*_end` when native contract exists.
+- This prevents countdown bleed from turn N into turn N+1.
 
 Clock engine:
 - `createGameClock()` in `gameClock.js`
@@ -67,7 +74,7 @@ Clock engine:
 
 ## Router Clock Guard (Important)
 `AnimationRouter` does not run game clock or shot clock control logic.
-Clock state is intentionally controlled only by `gameScene.updateScoreboard(turn)`.
+Clock state is intentionally controlled in turn lifecycle hooks, not router logic.
 
 This avoids dual-writer clock drift between router and scoreboard update flow.
 

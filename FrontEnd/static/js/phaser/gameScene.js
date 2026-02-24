@@ -1605,6 +1605,7 @@ export function createGameScene(Phaser) {
         clock: liveClock,
         quarter: liveQuarter,
         period_label: livePeriodLabel,
+        _skipClockSync: true,
       });
 
       const pauseBtn = document.getElementById('pause-btn');
