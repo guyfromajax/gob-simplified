@@ -52,11 +52,11 @@ In `turnPreparation.js`:
 - Native contract gate:
   - `turn.clock_contract_source === "native"`
   - finite `clock_start` and `clock_end` for game clock
-- finite `shot_clock_start` and `shot_clock_end` for shot clock value sync
+  - finite `shot_clock_start` and `shot_clock_end` for shot clock
 - Behavior when gate passes:
 1. `syncWithBackend(start)`
-2. Compute one shared run/hold decision from game clock: `clock_start > clock_end`
-3. Apply that same run/hold mode to both clocks, each with its own end target
+2. If `start > end`, `runToTarget(end)`
+3. Else hold at `end`
 - Behavior when gate fails:
   - stop/hold clocks
   - hold current display

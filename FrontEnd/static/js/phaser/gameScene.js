@@ -1402,9 +1402,7 @@ export function createGameScene(Phaser) {
       };
 
       const updateScoreboard = (turn = {}) => {
-        // Clock control is handled in turnPreparation turn start/end hooks.
-        // Scoreboard updates default to no clock mutation unless explicitly requested.
-        const skipClockSync = turn?._skipClockSync !== false;
+        const skipClockSync = Boolean(turn?._skipClockSync);
         const prevHome = liveScore[homeTeam];
         const prevAway = liveScore[awayTeam];
         

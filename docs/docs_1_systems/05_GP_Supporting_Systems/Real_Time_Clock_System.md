@@ -57,13 +57,17 @@ Router ownership:
 Clock countdown only runs when all are true:
 - `turn.clock_contract_source === "native"`
 - finite `clock_start` and `clock_end` (game clock)
-- finite `shot_clock_start` and `shot_clock_end` (shot clock value sync)
+- finite `shot_clock_start` and `shot_clock_end` (shot clock)
 
-Shared run/hold behavior (both clocks):
+Game clock behavior:
 1. `syncWithBackend(clock_start)`
-2. Compute one run/hold gate from game clock: `clock_start > clock_end`
-3. Apply that run/hold mode to both clocks
-4. Use each clock's own end target (`clock_end`, `shot_clock_end`)
+2. if `clock_start > clock_end`: `runToTarget(clock_end)`
+3. else: hold at `clock_end`
+
+Shot clock behavior:
+1. `syncWithBackend(shot_clock_start)`
+2. if `shot_clock_start > shot_clock_end`: `runToTarget(shot_clock_end)`
+3. else: hold at `shot_clock_end`
 
 If native contract is missing:
 - hold clock state for that turn
