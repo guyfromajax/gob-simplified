@@ -4098,18 +4098,6 @@ try:
             # ✅ CRITICAL: If pending_computer_timeout was just processed above, timeout_turn was already created and returned
             # In that case, simulate_macro_turn() wasn't called, so new_turns will be empty - that's expected and correct
             new_turns = gm.turns[turns_before:] if len(gm.turns) > turns_before else []
-
-            # Turn-level backend elapsed diagnostics for FE/BE comparison.
-            for idx, t in enumerate(new_turns, start=1):
-                if not isinstance(t, dict):
-                    continue
-                turn_number = turns_before + idx
-                backend_elapsed = int(t.get("time_elapsed", 0) or 0)
-                logging.warning(
-                    "🔵🔵🔵🔵🔵 Turn #%s, Backend Estimate Time Elapsed = %s",
-                    turn_number,
-                    backend_elapsed,
-                )
             
             if not new_turns:
                 # No turns were created - this can happen legitimately if pending_computer_timeout was processed above
