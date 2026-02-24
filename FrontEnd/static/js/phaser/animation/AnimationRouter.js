@@ -100,8 +100,64 @@ export class AnimationRouter {
     const isHCO = !turnData.fast_break && (turnData.result_type === "MAKE" || turnData.result_type === "MISS" || turnData.result_type === "BLOCK");
 
     try {
-      // Clock control is owned by gameScene.updateScoreboard().
-      // Router must not mutate clock state (start/pause/resume/sync) to avoid dual-writer drift.
+      // Clock control for no-impact turns (legacy path):
+      // When explicit clock contracts are present, gameScene owns countdown control.
+      // Router-level start/pause/sync must stay inactive to avoid double-writer drift.
+      const noImpactResultTypes = new Set([
+        'FREE_THROW',
+        'SIDE_INBOUND',
+        'BASELINE_INBOUND',
+        'TIMEOUT',
+      ]);
+      const elapsedValue = Number(turnData?.time_elapsed ?? turnData?.timeElapsed);
+      const hasElapsedValue = Number.isFinite(elapsedValue);
+      const isNoImpactTurn =
+        (hasElapsedValue && elapsedValue === 0) ||
+        noImpactResultTypes.has(turnData?.result_type);
+      const isOpeningTipTurn = turnData?.result_type === 'OPENING_TIP';
+      const hasNativeClockContract = turnData?.clock_contract_source === 'native';
+      const hasGameClockContract = hasNativeClockContract &&
+        Number.isFinite(Number(turnData?.clock_start)) &&
+        Number.isFinite(Number(turnData?.clock_end));
+      const hasShotClockContract = hasNativeClockContract &&
+        Number.isFinite(Number(turnData?.shot_clock_start)) &&
+        Number.isFinite(Number(turnData?.shot_clock_end));
+
+      if (this.scene?.gameClock || this.scene?.shotClock) {
+        const applyClockControl = (clockRef, { syncToThirty = false } = {}) => {
+          if (!clockRef) return;
+          const clockState = clockRef.getState?.() || {};
+          const hasTimeRemaining = Number.isFinite(clockState.timeRemaining) && clockState.timeRemaining > 0;
+          if (syncToThirty) {
+            clockRef.syncWithBackend?.(30);
+          }
+          if (!clockState.running && hasTimeRemaining && !isNoImpactTurn && !this.scene.isPaused && !isOpeningTipTurn) {
+            clockRef.start();
+          } else if (!clockState.running && hasTimeRemaining && isOpeningTipTurn) {
+            this.scene.events?.once('openingTipApex', () => {
+              if (clockRef && !this.scene.isPaused) {
+                clockRef.start();
+                clockRef.resume('no_impact_turn');
+              }
+            });
+          }
+          if (isNoImpactTurn) {
+            clockRef.pause('no_impact_turn');
+          } else {
+            clockRef.resume('no_impact_turn');
+            if (this.scene.isPaused) {
+              clockRef.pause('user_pause');
+            }
+          }
+        };
+
+        if (!hasGameClockContract) {
+          applyClockControl(this.scene.gameClock, { syncToThirty: false });
+        }
+        if (!hasShotClockContract) {
+          applyClockControl(this.scene.shotClock, { syncToThirty: isNoImpactTurn });
+        }
+      }
 
       // ✅ PHASE 2.3: Call prepareTurnForAnimation at the start
       // Extract turnIndex from turnData (will be set by prepareTurnForAnimation if not present)
