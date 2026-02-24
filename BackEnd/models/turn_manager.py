@@ -1067,7 +1067,7 @@ class TurnManager:
         return {
             "result_type": "DEAD BALL",
             "text": "Shot Clock Violation",
-            "turnover_type": "DEAD BALL",
+            "turnover_type": "SHOT_CLOCK",
             "time_elapsed": 0,
             "possession_flips": True,
             "next_play_type": "SIDE_INBOUND",
@@ -3237,6 +3237,22 @@ class TurnManager:
             self.game.game_state["shot_clock_remaining"] = max(0, shot_remaining_before - time_elapsed)
         else:
             self.game.game_state["shot_clock_remaining"] = min(30, int(self.game.game_state.get("time_remaining", 0)))
+
+        # Shot clock ran to 0 this turn and result would reset (e.g. miss + defensive rebound).
+        # We never "start" a turn with shot_clock=0 because we always reset on possession change,
+        # so the start-of-turn violation branch is never hit. Replace this result with a violation.
+        _clock_enforced = ("HCO", "FCP", "HCT", "FAST_BREAK")
+        if (
+            impact_turn
+            and self.game.game_state["shot_clock_remaining"] == 0
+            and _should_reset_shot_clock(result)
+            and result.get("current_turn") in _clock_enforced
+        ):
+            state = result.get("current_turn", "HCO")
+            violation = self._build_shot_clock_violation_result(state)
+            violation["time_elapsed"] = time_elapsed
+            result.clear()
+            result.update(violation)
 
         # Reset/hold shot clock based on possession events.
         if _should_reset_shot_clock(result):
