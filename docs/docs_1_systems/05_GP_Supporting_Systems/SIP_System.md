@@ -52,6 +52,10 @@ Side inbound passes (`SIDE_INBOUND`) occur after dead ball situations such as fo
 7. Inbound pass is executed (SF → PG)
 8. Next turn (typically HCO) begins
 
+**State Guard Note (Current Behavior):**
+- SIP pass execution is not gated by `FastBreak` state.
+- If state lingers from a prior fast-break sequence, SIP still runs and then normalizes to HalfCourt at turn end.
+
 ### Ball Handling
 
 **Ball Positioning:**
@@ -147,4 +151,3 @@ Side inbound passes (`SIDE_INBOUND`) occur after dead ball situations such as fo
 - `FrontEnd/static/js/phaser/animation/AnimationEngine.js` - `handleSideInbound()` method
 - `FrontEnd/static/js/phaser/animation/PassAnimationSystem.js` - `executeInboundSequence()` method
 - `FrontEnd/static/js/phaser/animation/turnAnimation.js` - `runSideInboundSetup()` function (lines 393-415)
-

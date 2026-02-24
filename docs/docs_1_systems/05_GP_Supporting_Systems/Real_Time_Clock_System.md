@@ -59,11 +59,11 @@ Clock countdown only runs when all are true:
 - finite `clock_start` and `clock_end` (game clock)
 - finite `shot_clock_start` and `shot_clock_end` (shot clock value sync)
 
-Shared run/hold behavior (both clocks):
-1. `syncWithBackend(clock_start)`
-2. Compute one run/hold gate from game clock: `clock_start > clock_end`
-3. Apply that run/hold mode to both clocks
-4. Use each clock's own end target (`clock_end`, `shot_clock_end`)
+Run/hold behavior (current implementation):
+1. Game clock: `syncWithBackend(clock_start)` then run only if `clock_start > clock_end`
+2. Shot clock: `syncWithBackend(shot_clock_start)` then run only if `shot_clock_start > shot_clock_end`
+3. Each clock uses its own end target (`clock_end`, `shot_clock_end`)
+4. Both are still clamped at turn end to prevent bleed into the next turn
 
 If native contract is missing:
 - hold clock state for that turn

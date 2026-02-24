@@ -489,7 +489,7 @@ export class PassAnimationSystem {
              turnData.oDestinations &&
              turnData.dDestinations &&
              turnData.ball_spot &&
-             turnData.possession_team_id;
+             (turnData.offense_team_id || turnData.possession_team_id);
       return isValid;
     }
     return false;
