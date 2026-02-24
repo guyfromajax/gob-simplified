@@ -519,7 +519,12 @@ export function createGameScene(Phaser) {
         // For new games or non-timeout resumes, use URL param or simData
         // Reuse urlParams from above (line 167)
         const urlClock = urlParams.get('clock');
-        liveClock = urlClock || simData.clock || '8:00';
+        // ✅ BUG 2 FIX: Quarter break (Q2+ start) — backend is source of truth; ignore URL clock so stale Q1 clock never overrides 8:00
+        if (this.quarter > 1 && !resumeFromTimeout) {
+          liveClock = simData.clock || '8:00';
+        } else {
+          liveClock = urlClock || simData.clock || '8:00';
+        }
       }
       
       let liveQuarter = this.quarter;

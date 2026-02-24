@@ -4099,6 +4099,26 @@ try:
             # In that case, simulate_macro_turn() wasn't called, so new_turns will be empty - that's expected and correct
             new_turns = gm.turns[turns_before:] if len(gm.turns) > turns_before else []
             
+            # ✅ BUG 1 FIX: When we deferred a computer timeout (pending_computer_timeout set), persist current
+            # state to DB now so that if the user navigates away before the next /api/simulate-turn (which would
+            # create the timeout and save), resume-from-timeout still loads the correct clock/time_remaining.
+            if gm.game_state.get("pending_computer_timeout") and game_id:
+                try:
+                    db_summary = summarize_game_state(gm, exclude_animations=True)
+                    _pid = game_id
+                    _res = games_collection.update_one({"_id": _pid}, {"$set": db_summary})
+                    if _res.matched_count == 0 and isinstance(_pid, str) and len(_pid) == 24:
+                        try:
+                            _res = games_collection.update_one({"_id": ObjectId(_pid)}, {"$set": db_summary})
+                        except (ValueError, TypeError):
+                            pass
+                    logging.info(
+                        "💾 [PENDING TIMEOUT] Persisted game state so resume has correct clock: game_id=%s clock=%s time_remaining=%s",
+                        game_id, db_summary.get("clock"), db_summary.get("time_remaining"),
+                    )
+                except Exception as e:
+                    logging.error("🚨 [PENDING TIMEOUT] Failed to persist state for deferred computer timeout: %s", e)
+            
             if not new_turns:
                 # No turns were created - this can happen legitimately if pending_computer_timeout was processed above
                 # In that case, the timeout was already returned, so we shouldn't reach here
