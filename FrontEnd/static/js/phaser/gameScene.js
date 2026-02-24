@@ -1446,10 +1446,8 @@ export function createGameScene(Phaser) {
           }
         }
         if (this.gameClock) {
-          const isNativeClockContract = turn?.clock_contract_source === 'native';
           const hasClockContract = Number.isFinite(Number(turn?.clock_start)) &&
-            Number.isFinite(Number(turn?.clock_end)) &&
-            isNativeClockContract;
+            Number.isFinite(Number(turn?.clock_end));
           if (hasClockContract) {
             const startSec = Math.max(0, Math.floor(Number(turn.clock_start)));
             const endSec = Math.max(0, Math.floor(Number(turn.clock_end)));
@@ -1496,10 +1494,8 @@ export function createGameScene(Phaser) {
         // Clock text is written only by gameClock (single-writer authority).
         if (quarterEl) quarterEl.textContent = livePeriodLabel;
         if (this.shotClock) {
-          const isNativeClockContract = turn?.clock_contract_source === 'native';
           const hasShotClockContract = Number.isFinite(Number(turn?.shot_clock_start)) &&
-            Number.isFinite(Number(turn?.shot_clock_end)) &&
-            isNativeClockContract;
+            Number.isFinite(Number(turn?.shot_clock_end));
           if (hasShotClockContract) {
             const shotStart = Math.max(0, Math.floor(Number(turn.shot_clock_start)));
             const shotEnd = Math.max(0, Math.floor(Number(turn.shot_clock_end)));

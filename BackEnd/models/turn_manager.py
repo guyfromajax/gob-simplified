@@ -3333,7 +3333,6 @@ class TurnManager:
         result["shot_clock_start"] = shot_clock_start
         result["shot_clock_end"] = int(self.game.game_state.get("shot_clock_remaining", 0) or 0)
         result["shot_clock_reset"] = bool(shot_clock_reset)
-        result["clock_contract_source"] = "native"
 
         # ✅ Track MIN (minutes played) for all active players
         # Only track if time_elapsed > 0 (skip timeouts and other 0-time turns)
