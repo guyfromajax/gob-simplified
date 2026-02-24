@@ -1454,29 +1454,22 @@ export function createGameScene(Phaser) {
             const startSec = Math.max(0, Math.floor(Number(turn.clock_start)));
             const endSec = Math.max(0, Math.floor(Number(turn.clock_end)));
             this.gameClock.syncWithBackend(startSec);
-            if (startSec !== endSec) {
+            if (startSec > endSec) {
               this.gameClock.runToTarget?.(endSec);
             } else {
               this.gameClock.stop();
               this.gameClock.syncWithBackend(endSec);
             }
           } else {
-            const clockState = this.gameClock.getState?.() || {};
-            const currentClockSec = Number.isFinite(clockState.timeRemaining) ? clockState.timeRemaining : null;
-            let incomingClockSec = null;
-            if (typeof turn.time_remaining === 'number') {
-              incomingClockSec = Math.max(0, Math.floor(turn.time_remaining));
-            } else if (turn.clock || turn.game_clock) {
-              incomingClockSec = parseClockToSeconds(turn.clock || turn.game_clock);
-            }
-            if (Number.isFinite(incomingClockSec)) {
-              if (currentClockSec != null && incomingClockSec > currentClockSec) {
-                console.warn(
-                  `Non-monotonic clock update: incoming=${incomingClockSec}, current=${currentClockSec}. Accepting value from backend contract.`
-                );
-              }
-              this.gameClock.syncWithBackend(incomingClockSec);
-            }
+            // Deterministic fallback: hold and wait for native contract turn.
+            this.gameClock.stop();
+            console.warn('⏱️ Missing native game clock contract; holding clock for this turn', {
+              result_type: turn?.result_type,
+              current_turn: turn?.current_turn,
+              contract_source: turn?.clock_contract_source ?? null,
+              has_clock_start: turn?.clock_start != null,
+              has_clock_end: turn?.clock_end != null,
+            });
           }
         }
         if (turn.quarter != null) liveQuarter = turn.quarter;
@@ -1504,24 +1497,22 @@ export function createGameScene(Phaser) {
             const shotStart = Math.max(0, Math.floor(Number(turn.shot_clock_start)));
             const shotEnd = Math.max(0, Math.floor(Number(turn.shot_clock_end)));
             this.shotClock.syncWithBackend(shotStart);
-            if (shotStart !== shotEnd) {
+            if (shotStart > shotEnd) {
               this.shotClock.runToTarget?.(shotEnd);
             } else {
               this.shotClock.stop();
               this.shotClock.syncWithBackend(shotEnd);
             }
           } else {
-            const hasBackendShotClock = Number.isFinite(Number(turn?.shot_clock_remaining));
-            if (hasBackendShotClock) {
-              const backendShotClock = Math.max(0, Math.floor(Number(turn.shot_clock_remaining)));
-              this.shotClock.syncWithBackend(backendShotClock);
-            } else if (shouldResetShotClockOnTurn(turn)) {
-              this.shotClock.syncWithBackend(30);
-            }
-          }
-
-          if (isNoImpactShotClockTurn(turn)) {
-            this.shotClock.pause('no_impact_turn');
+            // Deterministic fallback: hold and wait for native contract turn.
+            this.shotClock.stop();
+            console.warn('⏱️ Missing native shot clock contract; holding shot clock for this turn', {
+              result_type: turn?.result_type,
+              current_turn: turn?.current_turn,
+              contract_source: turn?.clock_contract_source ?? null,
+              has_shot_start: turn?.shot_clock_start != null,
+              has_shot_end: turn?.shot_clock_end != null,
+            });
           }
         }
 

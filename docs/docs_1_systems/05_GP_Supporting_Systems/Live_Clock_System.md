@@ -11,7 +11,8 @@ This document reflects the active code path (`BackEnd/api/api.py`, `BackEnd/mode
 ## Current Authority Model
 - Backend is authoritative for turn-level clock state.
 - Frontend renders clocks from backend turn contracts.
-- Frontend no longer treats router-level live clock control as primary when contract fields exist.
+- `gameScene.updateScoreboard(turn)` is the single frontend owner for game/shot clock mutations.
+- `AnimationRouter` does not mutate clock state.
 
 ## Turn Clock Contract (Per Turn)
 Every turn is expected to carry:
@@ -45,12 +46,19 @@ No-impact turns (clock holds):
 
 ## Frontend Clock Consumption
 In `gameScene.js` `updateScoreboard(turn)`:
-- If contract fields exist:
-1. `syncWithBackend(clock_start)`
-2. `runToTarget(clock_end)` (or hold if equal)
-3. same pattern for shot clock
-- If contract fields are missing:
-fallback to legacy `time_remaining`/`clock` and `shot_clock_remaining`.
+- Native contract gate:
+  - `turn.clock_contract_source === "native"`
+  - finite `clock_start` and `clock_end` for game clock
+  - finite `shot_clock_start` and `shot_clock_end` for shot clock
+- Behavior when gate passes:
+1. `syncWithBackend(start)`
+2. If `start > end`, `runToTarget(end)`
+3. Else stop and hold at `end`
+- Behavior when gate fails:
+  - stop clock
+  - hold current display
+  - emit warning log
+  - no legacy fallback ticking from `time_remaining` / `clock` / `shot_clock_remaining`
 
 Clock engine:
 - `createGameClock()` in `gameClock.js`
@@ -58,9 +66,8 @@ Clock engine:
 - supports `runToTarget()` and hard sync.
 
 ## Router Clock Guard (Important)
-`AnimationRouter` contains legacy clock control logic, but now:
-- when game clock contract fields are present, router does not control game clock
-- when shot clock contract fields are present, router does not control shot clock
+`AnimationRouter` does not run game clock or shot clock control logic.
+Clock state is intentionally controlled only by `gameScene.updateScoreboard(turn)`.
 
 This avoids dual-writer clock drift between router and scoreboard update flow.
 
@@ -95,4 +102,3 @@ Backend logs:
 
 Frontend logs:
 - `🔵🔵🔵🔵🔵 Turn #..., Frontend Actual Clock Elapsed = ..., Backend Estimate Time Elapsed = ..., Delta = ...`
-
