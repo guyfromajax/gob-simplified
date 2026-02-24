@@ -116,24 +116,15 @@ export class AnimationRouter {
         noImpactResultTypes.has(turnData?.result_type);
       const isOpeningTipTurn = turnData?.result_type === 'OPENING_TIP';
 
+      // Clocks are backend-driven: display is updated only from turn data (syncWithBackend in updateScoreboard).
+      // We never start the countdown interval so game clock and shot clock stay in sync with the backend and with each other.
       if (this.scene?.gameClock || this.scene?.shotClock) {
         const applyClockControl = (clockRef, { syncToThirty = false } = {}) => {
           if (!clockRef) return;
-          const clockState = clockRef.getState?.() || {};
-          const hasTimeRemaining = Number.isFinite(clockState.timeRemaining) && clockState.timeRemaining > 0;
           if (syncToThirty) {
             clockRef.syncWithBackend?.(30);
           }
-          if (!clockState.running && hasTimeRemaining && !isNoImpactTurn && !this.scene.isPaused && !isOpeningTipTurn) {
-            clockRef.start();
-          } else if (!clockState.running && hasTimeRemaining && isOpeningTipTurn) {
-            this.scene.events?.once('openingTipApex', () => {
-              if (clockRef && !this.scene.isPaused) {
-                clockRef.start();
-                clockRef.resume('no_impact_turn');
-              }
-            });
-          }
+          // Pause/resume kept for API compatibility; no interval runs so display only changes on syncWithBackend.
           if (isNoImpactTurn) {
             clockRef.pause('no_impact_turn');
           } else {
