@@ -1402,7 +1402,6 @@ export function createGameScene(Phaser) {
       };
 
       const updateScoreboard = (turn = {}) => {
-        const skipClockSync = Boolean(turn?._skipClockSync);
         const prevHome = liveScore[homeTeam];
         const prevAway = liveScore[awayTeam];
         
@@ -1446,7 +1445,7 @@ export function createGameScene(Phaser) {
             this.simData.clock = liveClock;
           }
         }
-        if (!skipClockSync && this.gameClock) {
+        if (this.gameClock) {
           const isNativeClockContract = turn?.clock_contract_source === 'native';
           const hasClockContract = Number.isFinite(Number(turn?.clock_start)) &&
             Number.isFinite(Number(turn?.clock_end)) &&
@@ -1489,7 +1488,7 @@ export function createGameScene(Phaser) {
         if (awayTolEl) awayTolEl.textContent = `TOL: ${liveAwayTimeouts}`;
         // Clock text is written only by gameClock (single-writer authority).
         if (quarterEl) quarterEl.textContent = livePeriodLabel;
-        if (!skipClockSync && this.shotClock) {
+        if (this.shotClock) {
           const isNativeClockContract = turn?.clock_contract_source === 'native';
           const hasShotClockContract = Number.isFinite(Number(turn?.shot_clock_start)) &&
             Number.isFinite(Number(turn?.shot_clock_end)) &&
@@ -2179,8 +2178,7 @@ export function createGameScene(Phaser) {
               away_score: turnData.away_score,
               home_team_fouls: turnData.home_team_fouls,
               away_team_fouls: turnData.away_team_fouls,
-              clock: turnData.clock,
-              _skipClockSync: true
+              clock: turnData.clock
             });
             
             // Update tracked scores from final turnData
@@ -2407,8 +2405,7 @@ export function createGameScene(Phaser) {
             away_score: turnData.away_score,
             home_team_fouls: turnData.home_team_fouls,
             away_team_fouls: turnData.away_team_fouls,
-            clock: turnData.clock,
-            _skipClockSync: true
+            clock: turnData.clock
           });
           
           // Track latest scores for game completion check
@@ -2501,8 +2498,7 @@ export function createGameScene(Phaser) {
               away_score: turnData.away_score,
               home_team_fouls: turnData.home_team_fouls,
               away_team_fouls: turnData.away_team_fouls,
-              clock: turnData.clock,
-              _skipClockSync: true
+              clock: turnData.clock
             });
             
             // Update tracked scores from final turnData
