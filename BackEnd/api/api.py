@@ -4027,6 +4027,29 @@ try:
                 
                 logging.debug(f"⏸️ COMPUTER TIMEOUT: Creating deferred timeout turn for {calling_team.name} (turn_type: {turn_type})")
                 
+                # ✅ BUG 1 (lineup/resume clock): When processing deferred computer timeout, gm may have stale
+                # clock (e.g. from cache refresh or eviction). The previous request persisted the correct clock
+                # when it set pending_computer_timeout. Load that doc and apply clock so the timeout response
+                # (and thus lineup screen) and the save both use the correct time.
+                if game_id:
+                    _saved = games_collection.find_one({"_id": game_id})
+                    if not _saved and isinstance(game_id, str) and len(game_id) == 24:
+                        try:
+                            _saved = games_collection.find_one({"_id": ObjectId(game_id)})
+                        except (ValueError, TypeError):
+                            pass
+                    if _saved and ("clock" in _saved or "time_remaining" in _saved):
+                        if "clock" in _saved:
+                            gm.game_state["clock"] = _saved["clock"]
+                        if "time_remaining" in _saved:
+                            gm.game_state["time_remaining"] = _saved["time_remaining"]
+                        if "shot_clock_remaining" in _saved:
+                            gm.game_state["shot_clock_remaining"] = _saved["shot_clock_remaining"]
+                        logging.info(
+                            "💾 COMPUTER TIMEOUT: Restored clock from persisted doc for lineup/resume: clock=%s time_remaining=%s",
+                            gm.game_state.get("clock"), gm.game_state.get("time_remaining"),
+                        )
+                
                 # Create the timeout turn now (after previous turn was animated)
                 timeout_turn = gm.call_timeout(
                     calling_team=calling_team,
