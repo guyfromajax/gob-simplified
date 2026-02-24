@@ -65,6 +65,39 @@ class TurnManager:
                 if not hasattr(player, "coords"):
                     setattr(player, "coords", {"x": 25, "y": 50})
 
+    def _attach_clock_contract(
+        self,
+        result: dict,
+        clock_start: int,
+        shot_clock_start: int,
+        game_state: dict,
+        source: str,
+    ) -> None:
+        """Attach authoritative clock contract fields to a turn result dict."""
+        clock_end = int(game_state.get("time_remaining", 0))
+        sc_end = int(game_state.get("shot_clock_remaining", 30))
+        sc_reset = sc_end > shot_clock_start or (
+            sc_end == 30 and clock_start != clock_end
+        )
+        result["clock_start"] = clock_start
+        result["clock_end"] = clock_end
+        result["shot_clock_start"] = shot_clock_start
+        result["shot_clock_end"] = sc_end
+        result["shot_clock_reset"] = bool(sc_reset)
+        result["clock_contract_source"] = source
+        logging.warning(
+            "⏱️ [CLOCK CONTRACT] type=%s source=%s "
+            "clock=%d→%d elapsed=%d sc=%d→%d reset=%s",
+            result.get("result_type", "UNKNOWN"),
+            source,
+            clock_start,
+            clock_end,
+            clock_start - clock_end,
+            shot_clock_start,
+            sc_end,
+            sc_reset,
+        )
+
     def setup_side_inbound(self):
         """
         Prepare coordinates for a sideline inbound following a dead-ball
@@ -3138,6 +3171,9 @@ class TurnManager:
             }
 
     def update_clock_and_possession(self, result):
+        _cc_clock_start = int(self.game.game_state.get("time_remaining", 0))
+        _cc_sc_start = int(self.game.game_state.get("shot_clock_remaining", 30))
+
         def _is_no_impact_turn(turn_result):
             no_impact_types = {"FREE_THROW", "SIDE_INBOUND", "BASELINE_INBOUND", "TIMEOUT"}
             rt = turn_result.get("result_type")
@@ -3218,6 +3254,14 @@ class TurnManager:
                 for position, player in team.lineup.items():
                     if player:  # Skip None slots (empty lineup positions)
                         player.stats["game"]["MIN"] += time_elapsed
+
+        self._attach_clock_contract(
+            result,
+            clock_start=_cc_clock_start,
+            shot_clock_start=_cc_sc_start,
+            game_state=self.game.game_state,
+            source=f"ucp:{result.get('result_type', 'UNKNOWN')}",
+        )
 
         # ✅ REMOVED: Possession flips now handled in game_manager (Fixes 2-4)
         # This old flip caused double-flipping with the new system

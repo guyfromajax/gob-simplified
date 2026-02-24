@@ -382,6 +382,13 @@ def simulate_quarter(
             # ✅ TIMEOUT RESUME: Ensure clock is in turn payload for frontend
             if "clock" not in sip_turn:
                 sip_turn["clock"] = gm.game_state.get("clock", "0:00")
+            gm.turn_manager._attach_clock_contract(
+                sip_turn,
+                clock_start=int(gm.game_state.get("time_remaining", 0)),
+                shot_clock_start=int(gm.game_state.get("shot_clock_remaining", 30)),
+                game_state=gm.game_state,
+                source="bypass:SIP_RESUME",
+            )
             gm.turns.append(sip_turn)
             gm.text_log.append(sip_turn.get("text", "Side inbound"))
             # No-impact turn: SIDE_INBOUND does not consume game clock.
@@ -399,6 +406,13 @@ def simulate_quarter(
             logging.warning(f"⚠️ TIMEOUT RESUME: timeout_next_play_type={timeout_next_play_type} is unexpected, defaulting to SIDE_INBOUND")
             gm.turn_manager.set_strategy_calls()
             sip_turn = gm.turn_manager.setup_side_inbound()
+            gm.turn_manager._attach_clock_contract(
+                sip_turn,
+                clock_start=int(gm.game_state.get("time_remaining", 0)),
+                shot_clock_start=int(gm.game_state.get("shot_clock_remaining", 30)),
+                game_state=gm.game_state,
+                source="bypass:SIP_RESUME",
+            )
             gm.turns.append(sip_turn)
             gm.text_log.append(sip_turn.get("text", "Side inbound"))
             # No-impact turn: SIDE_INBOUND does not consume game clock.
@@ -481,6 +495,13 @@ def simulate_quarter(
         # Opening tip for Q1 and all OT periods
         from BackEnd.utils.opening_tip import execute_opening_tip
         _, _, tip_turn = execute_opening_tip(gm)
+        gm.turn_manager._attach_clock_contract(
+            tip_turn,
+            clock_start=int(gm.game_state.get("time_remaining", 0)),
+            shot_clock_start=int(gm.game_state.get("shot_clock_remaining", 30)),
+            game_state=gm.game_state,
+            source="bypass:OPENING_TIP",
+        )
         gm.turns.append(tip_turn)
         # Keep opening tip start clock fixed at quarter start baseline (Q1=8:00, OT=4:00).
     elif q == 2:
@@ -517,6 +538,13 @@ def simulate_quarter(
             "quarter": q,
         }
         
+        gm.turn_manager._attach_clock_contract(
+            inbound_turn,
+            clock_start=int(gm.game_state.get("time_remaining", 0)),
+            shot_clock_start=int(gm.game_state.get("shot_clock_remaining", 30)),
+            game_state=gm.game_state,
+            source="bypass:BIP_QUARTER_START",
+        )
         gm.turns.append(inbound_turn)
         gm.text_log.append(inbound_turn["text"])
         
@@ -559,6 +587,13 @@ def simulate_quarter(
             "quarter": q,
         }
         
+        gm.turn_manager._attach_clock_contract(
+            inbound_turn,
+            clock_start=int(gm.game_state.get("time_remaining", 0)),
+            shot_clock_start=int(gm.game_state.get("shot_clock_remaining", 30)),
+            game_state=gm.game_state,
+            source="bypass:BIP_QUARTER_START",
+        )
         gm.turns.append(inbound_turn)
         gm.text_log.append(inbound_turn["text"])
         
@@ -601,6 +636,13 @@ def simulate_quarter(
             "quarter": q,
         }
         
+        gm.turn_manager._attach_clock_contract(
+            inbound_turn,
+            clock_start=int(gm.game_state.get("time_remaining", 0)),
+            shot_clock_start=int(gm.game_state.get("shot_clock_remaining", 30)),
+            game_state=gm.game_state,
+            source="bypass:BIP_QUARTER_START",
+        )
         gm.turns.append(inbound_turn)
         gm.text_log.append(inbound_turn["text"])
         

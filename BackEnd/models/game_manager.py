@@ -311,10 +311,17 @@ class GameManager:
         
         for team in [self.home_team, self.away_team]:
             for player in team.get_all_players():
-                recharge_amount = random.choice(timeout_recharge_amounts)
-                if hasattr(player, "recharge_energy"):
-                    player.recharge_energy(recharge_amount)
+                    recharge_amount = random.choice(timeout_recharge_amounts)
+                    if hasattr(player, "recharge_energy"):
+                        player.recharge_energy(recharge_amount)
         
+        self.turn_manager._attach_clock_contract(
+            timeout_turn,
+            clock_start=int(self.game_state.get("time_remaining", 0)),
+            shot_clock_start=int(self.game_state.get("shot_clock_remaining", 30)),
+            game_state=self.game_state,
+            source="bypass:TIMEOUT",
+        )
         self._append_turn(timeout_turn)
         
         # Set timeout_called flag (for simulation loop stopping)
@@ -682,6 +689,13 @@ class GameManager:
                 foul_result["force_foul_after_dreb"] = True  # Frontend: animate defender→rebounder, no outlet
                 foul_result["victim_id"] = getattr(victim, "player_id", None)  # Rebounder (fouled player) for animation
                 foul_result["next_turn"] = foul_result.get("next_play_type") or "SIDE_INBOUND"
+                self.turn_manager._attach_clock_contract(
+                    foul_result,
+                    clock_start=int(self.game_state.get("time_remaining", 0)),
+                    shot_clock_start=int(self.game_state.get("shot_clock_remaining", 30)),
+                    game_state=self.game_state,
+                    source="bypass:FOUL_AFTER_DREB",
+                )
                 self._append_turn(foul_result)
                 result = foul_result  # So FOUL/SIP block below runs
 
@@ -778,6 +792,13 @@ class GameManager:
             else:
                 # ✅ Situational Logic: Force Foul after SIP — set pending so next turn is the foul
                 self._maybe_set_force_foul_pending_after_inbound(inbound_payload, "SIDE_INBOUND")
+                self.turn_manager._attach_clock_contract(
+                    inbound_payload,
+                    clock_start=int(self.game_state.get("time_remaining", 0)),
+                    shot_clock_start=int(self.game_state.get("shot_clock_remaining", 30)),
+                    game_state=self.game_state,
+                    source="bypass:SIP",
+                )
                 self._append_turn(inbound_payload)
             
             # Reset offensive state to HCO after side inbound (FCP/HCT only apply after made shots)
@@ -883,6 +904,13 @@ class GameManager:
             else:
                 # ✅ Situational Logic: Force Foul after BIP — set pending so next turn is the foul
                 self._maybe_set_force_foul_pending_after_inbound(inbound_payload, "BASELINE_INBOUND")
+                self.turn_manager._attach_clock_contract(
+                    inbound_payload,
+                    clock_start=int(self.game_state.get("time_remaining", 0)),
+                    shot_clock_start=int(self.game_state.get("shot_clock_remaining", 30)),
+                    game_state=self.game_state,
+                    source="bypass:BIP",
+                )
                 self._append_turn(inbound_payload, text="Baseline inbound after made shot")
             
             # Preserve offensive_state for next API call
