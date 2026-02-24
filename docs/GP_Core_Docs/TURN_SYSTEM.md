@@ -441,7 +441,7 @@ This section maps the execution structure of each turn type to identify patterns
 
 **Code Locations**:
 - Backend: `setup_side_inbound()`
-- Frontend: `AnimationEngine.handleSideInbound()` → `PassAnimationSystem.executeInboundSequence()` → `runSideInboundSetup()`
+- Frontend: `AnimationEngine.handleSideInbound()` → `runInboundSetup()`
 
 ---
 
@@ -655,9 +655,9 @@ Based on `transition_registry.py`, all turn types are:
 - Turn-type-specific logic as parameters
 
 ### 3. **Unified Inbound System**
-- Inbound helpers are split:
-  - `runInboundSetup()` for BIP (with FCP/HCT setup)
-  - `runSideInboundSetup()` for SIP (always HCO)
+- Enhance `runInboundSetup()` to handle:
+  - BIP (with FCP/HCT setup)
+  - SIP (always HCO)
 - Parameter: `inboundType: "baseline" | "side"`
 
 ### 4. **Execution Structure Template**
@@ -739,3 +739,4 @@ Based on `transition_registry.py`, all turn types are:
 ---
 
 **This document consolidates the previous `turn_data_structure.md` and `TURN_EXECUTION_STRUCTURE.md` into a single comprehensive reference.**
+

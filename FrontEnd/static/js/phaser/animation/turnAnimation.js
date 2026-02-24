@@ -590,35 +590,36 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
     
     // ✅ TIMEOUT: Removed markInboundPassStarted - button is always live now
     
-    // Always run SIDE_INBOUND pass animation even if state machine is stale FastBreak.
-    // State is normalized below after pass completion.
-    const nextTurn = context?.nextTurn;
-    const isQuickFoulNext = nextTurn?.quick_foul && nextTurn?.result_type === 'FOUL';
-    const passPromise = passInfo
-      ? (console.log('🏀 [SIDE_INBOUND] Using dynamic pass from animation data', passInfo),
-         handlePassAnimation({ scene, passInfo, playerSprites }))
-      : pgSprite
-        ? (console.log('🏀 [SIDE_INBOUND] Using fallback hardcoded SF→PG pass'),
-           runPass(scene, { fromId: sfId, toId: pgId, easing: ease }))
-        : Promise.resolve();
+    if (!scene.stateMachine?.is(States.FastBreak)) {
+      // ✅ Force Foul: when next turn is Quick Foul, animate defender to receiver in same step as the pass
+      const nextTurn = context?.nextTurn;
+      const isQuickFoulNext = nextTurn?.quick_foul && nextTurn?.result_type === 'FOUL';
+      const passPromise = passInfo
+        ? (console.log('🏀 [SIDE_INBOUND] Using dynamic pass from animation data', passInfo),
+           handlePassAnimation({ scene, passInfo, playerSprites }))
+        : pgSprite
+          ? (console.log('🏀 [SIDE_INBOUND] Using fallback hardcoded SF→PG pass'),
+             runPass(scene, { fromId: sfId, toId: pgId, easing: ease }))
+          : Promise.resolve();
 
-    let defenderPromise = Promise.resolve();
-    if (isQuickFoulNext) {
-      const receiverId = passInfo?.receiverId ?? pgId;
-      const receiverSprite = playerSprites[receiverId];
-      const defenderSprite = nextTurn.foul_player_id ? playerSprites[nextTurn.foul_player_id] : null;
-      if (receiverSprite && defenderSprite) {
-        defenderPromise = animateQuickFoulDefenderToReceiver(scene, defenderSprite, receiverSprite);
-        nextTurn._quickFoulAnimatedDuringInbound = true;
+      let defenderPromise = Promise.resolve();
+      if (isQuickFoulNext) {
+        const receiverId = passInfo?.receiverId ?? pgId;
+        const receiverSprite = playerSprites[receiverId];
+        const defenderSprite = nextTurn.foul_player_id ? playerSprites[nextTurn.foul_player_id] : null;
+        if (receiverSprite && defenderSprite) {
+          defenderPromise = animateQuickFoulDefenderToReceiver(scene, defenderSprite, receiverSprite);
+          nextTurn._quickFoulAnimatedDuringInbound = true;
+        }
       }
+      await Promise.all([passPromise, defenderPromise]);
     }
-    await Promise.all([passPromise, defenderPromise]);
 
     animationDebugLog(`[sideInbound][passEnd] sf:${sfId} pg:${pgId}`);
     if (pgSprite) {
       animationDebugLog(`[sideInbound][pgAttach] sf:${sfId} pg:${pgId}`);
     }
-    if (scene.stateMachine && !scene.stateMachine.is(States.HalfCourt)) {
+    if (scene.stateMachine?.is(States.Inbound))
       safeTransition(
         scene.stateMachine,
         States.HalfCourt,
@@ -629,7 +630,6 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
         },
         ["stepIndex"]
       );
-    }
   }
   scene.isInboundSetup = false;
   scene.passInFlight = false;
@@ -2041,33 +2041,21 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     : 0;
   
 
-  const inFastBreakState = scene.stateMachine?.is(States.FastBreak);
-  const hasAnimationPayload = Array.isArray(turnData?.animations) && turnData.animations.length > 0;
-  const isHalfCourtSetupTurn = (
-    turnData?.result_type === "HCO" ||
-    turnData?.current_turn === "HCO" ||
-    turnData?.current_turn === "FCP" ||
-    turnData?.current_turn === "HCT"
-  ) && hasAnimationPayload;
-  // ✅ Allow half-court setup turns even if state lingers in FastBreak.
-  const allowFromFastBreak = inFastBreakState && isHalfCourtSetupTurn;
+  // ✅ Allow HCO turns even if state is FastBreak (can happen after defensive stop transition fails)
+  // Check if this is an HCO turn (not fast_break and has animations) - if so, allow it
+  const isHCOAfterFastBreak = !turnData.fast_break && 
+                               (turnData.result_type === "MAKE" || turnData.result_type === "MISS" || turnData.result_type === "BLOCK") &&
+                               turnData.animations?.length > 0 &&
+                               scene.stateMachine?.is(States.FastBreak);
   
   // ✅ REMOVED: Special FCP/HCT FastBreak check - FCP/HCT now routes through AnimationRouter (same as HCO)
-  if (inFastBreakState && !allowFromFastBreak) {
-    console.warn("⏭️ [ANIM GUARD] playTurnAnimation early return in FastBreak state", {
-      result_type: turnData?.result_type,
-      current_turn: turnData?.current_turn,
-      has_animations: hasAnimationPayload,
-    });
+  if (scene.stateMachine?.is(States.FastBreak) && !isHCOAfterFastBreak) {
     return;
   }
   
-  // If we're allowing a setup turn after FastBreak, force transition to HalfCourt first.
-  if (allowFromFastBreak) {
-    console.log("🔄 playTurnAnimation: Forcing transition from FastBreak to HalfCourt for setup turn", {
-      result_type: turnData?.result_type,
-      current_turn: turnData?.current_turn,
-    });
+  // If we're allowing HCO after FastBreak, force transition to HalfCourt
+  if (isHCOAfterFastBreak) {
+    console.log("🔄 playTurnAnimation: Forcing transition from FastBreak to HalfCourt for HCO turn");
     const { safeTransition, States: StateMachineStates } = await import('../state/gameStateMachine.js');
     safeTransition(scene.stateMachine, StateMachineStates.HalfCourt);
   }
