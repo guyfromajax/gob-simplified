@@ -1004,7 +1004,7 @@ export async function animateGameTurns({ //hasBallAtStep
     // ✅ DEBUG: Log HCO routing decision
     if (turn.result_type === "HCO") {
       
-      // ✅ FIX: Route ALL HCO result_type turns with animations through AnimationRouter
+      // ✅ FIX: Route ALL HCO result_type turns through AnimationRouter.
       // This includes FCP/HCT → HCO transitions (press break) and regular HCO setup turns
       if (turn.animations && turn.animations.length > 0) {
         // HCO with animations - route through AnimationRouter
@@ -1012,16 +1012,9 @@ export async function animateGameTurns({ //hasBallAtStep
       await animationRouter.processTurn(turn);
       continue;
       } else {
-        // HCO without animations - just do announcements and updates
-        announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
-        if (onUpdate) {
-          try {
-            onUpdate(turn);
-          } catch (err) {
-            console.error('Scoreboard update failed:', err);
-          }
-        }
-        updateDebugScore(turn, { turnIndex: i, possessionId });
+        // HCO without animations still needs normal router lifecycle (pre/finalize + transitions).
+        turn.index = i;
+        await animationRouter.processTurn(turn);
         continue;
       }
     }

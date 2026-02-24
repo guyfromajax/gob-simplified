@@ -1989,12 +1989,20 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   
   // ✅ REMOVED: Step-by-step animation logging (cluttering console)
   
-  // Guard: Skip if this is an opening tip, putback, or if animations is missing
+  // Guard: Skip if this is an opening tip, putback, or if animations are missing
+  // for non-setup turns. Setup transitions (HCO/FCP/HCT) may legitimately arrive
+  // without animation arrays and should continue through normal turn finalization.
   // Putback turns are handled by handleOrebTurn in animateGameTurns.js
+  const isSetupTransitionTurn =
+    turnData?.result_type === "HCO" ||
+    turnData?.current_turn === "HCO" ||
+    turnData?.current_turn === "FCP" ||
+    turnData?.current_turn === "HCT";
+  const hasAnimationsArray = Array.isArray(turnData?.animations) && turnData.animations.length > 0;
   if (turnData.result_type === "OPENING_TIP" || 
       turnData.result_type === "PUTBACK_MAKE" || 
       turnData.result_type === "PUTBACK_MISS" ||
-      !turnData.animations) {
+      (!hasAnimationsArray && !isSetupTransitionTurn)) {
     if (turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS") {
       console.warn('⚠️ playTurnAnimation called for putback turn - this should be handled by handleOrebTurn:', turnData.result_type);
     } else {
@@ -2024,7 +2032,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // Store a reference on the scene so other modules (e.g., runPass)
   // can update ball ownership consistently.
   scene.currentBallOwnerRef = currentBallOwnerRef;
-  const maxSteps = turnData.animations && turnData.animations.length > 0
+  const maxSteps = hasAnimationsArray
     ? Math.max(
         ...turnData.animations
           .filter(anim => anim.movement && Array.isArray(anim.movement))
@@ -2252,7 +2260,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     await runSetupTween({
       scene,
       ballSprite,
-      animations: turnData.animations,
+      animations: hasAnimationsArray ? turnData.animations : [],
       playerSprites,
       currentBallOwnerRef,
       turnData,

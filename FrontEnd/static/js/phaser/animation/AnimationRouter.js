@@ -100,9 +100,9 @@ export class AnimationRouter {
     const isHCO = !turnData.fast_break && (turnData.result_type === "MAKE" || turnData.result_type === "MISS" || turnData.result_type === "BLOCK");
 
     try {
-      // Clock control for no-impact turns:
-      // Pause UX countdown when backend marks no time elapsed (or known no-impact result types),
-      // then release that pause token for impact turns.
+      // Clock control for no-impact turns (legacy path):
+      // When explicit clock contracts are present, gameScene owns countdown control.
+      // Router-level start/pause/sync must stay inactive to avoid double-writer drift.
       const noImpactResultTypes = new Set([
         'FREE_THROW',
         'SIDE_INBOUND',
@@ -115,6 +115,10 @@ export class AnimationRouter {
         (hasElapsedValue && elapsedValue === 0) ||
         noImpactResultTypes.has(turnData?.result_type);
       const isOpeningTipTurn = turnData?.result_type === 'OPENING_TIP';
+      const hasGameClockContract = Number.isFinite(Number(turnData?.clock_start)) &&
+        Number.isFinite(Number(turnData?.clock_end));
+      const hasShotClockContract = Number.isFinite(Number(turnData?.shot_clock_start)) &&
+        Number.isFinite(Number(turnData?.shot_clock_end));
 
       if (this.scene?.gameClock || this.scene?.shotClock) {
         const applyClockControl = (clockRef, { syncToThirty = false } = {}) => {
@@ -144,8 +148,12 @@ export class AnimationRouter {
           }
         };
 
-        applyClockControl(this.scene.gameClock, { syncToThirty: false });
-        applyClockControl(this.scene.shotClock, { syncToThirty: isNoImpactTurn });
+        if (!hasGameClockContract) {
+          applyClockControl(this.scene.gameClock, { syncToThirty: false });
+        }
+        if (!hasShotClockContract) {
+          applyClockControl(this.scene.shotClock, { syncToThirty: isNoImpactTurn });
+        }
       }
 
       // ✅ PHASE 2.3: Call prepareTurnForAnimation at the start
