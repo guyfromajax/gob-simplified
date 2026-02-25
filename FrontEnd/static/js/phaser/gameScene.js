@@ -1493,10 +1493,16 @@ export function createGameScene(Phaser) {
         // Clock text is written only by gameClock (single-writer authority).
         if (quarterEl) quarterEl.textContent = livePeriodLabel;
         if (this.shotClock) {
-          const hasBackendShotClock = Number.isFinite(Number(turn?.shot_clock_remaining));
-          if (hasBackendShotClock) {
-            const backendShotClock = Math.max(0, Math.floor(Number(turn.shot_clock_remaining)));
-            this.shotClock.syncWithBackend(backendShotClock);
+          // Same pattern as game clock: use explicit field when present, else contract end value (shot_clock_end on every turn).
+          const fromRemaining = Number(turn?.shot_clock_remaining ?? turn?.shotClockRemaining);
+          const fromContractEnd = Number(turn?.shot_clock_end ?? turn?.shotClockEnd);
+          const shotSec = Number.isFinite(fromRemaining)
+            ? Math.max(0, Math.floor(fromRemaining))
+            : Number.isFinite(fromContractEnd)
+              ? Math.max(0, Math.floor(fromContractEnd))
+              : null;
+          if (shotSec !== null) {
+            this.shotClock.syncWithBackend(shotSec);
           } else if (shouldResetShotClockOnTurn(turn)) {
             this.shotClock.syncWithBackend(30);
           }
