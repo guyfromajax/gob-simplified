@@ -31,7 +31,8 @@ from BackEnd.utils.shared import (
     get_player_position,
     update_player_coords_from_animations,
     serialize_lineup,
-    getAwayTeamCoords
+    getAwayTeamCoords,
+    calc_pass_segment_seconds,
 )
 from BackEnd.utils.shared_defense import (
     get_defender_coords
@@ -2874,8 +2875,15 @@ class TurnManager:
                         "team": team.name
                     }
             self.game.update_team_stats()
-            # OREB: collapse+attach 3 game s + hold/action rand(1,3); rebounder holds until 1 game s remains then acts
-            _oreb_te = 3 + random.randint(1, 3)
+            # OREB: collapse+attach 3 game s + hold/action rand(1,3); add pass time (rebounder -> PG)
+            _base = 3 + random.randint(1, 3)
+            _pass_sec = 0.0
+            if rebounder and pg:
+                rc = getattr(rebounder, "coords", None) or {}
+                pc = getattr(pg, "coords", None) or {}
+                if isinstance(rc, dict) and isinstance(pc, dict) and "x" in rc and "y" in rc and "x" in pc and "y" in pc:
+                    _pass_sec = calc_pass_segment_seconds(rc, pc)
+            _oreb_te = round(_base + _pass_sec)
             return {
                 "result_type": "OREB_KICKOUT",
                 "ball_handler": getattr(rebounder, "player_id", None),
@@ -3205,8 +3213,15 @@ class TurnManager:
             
             # Update team stats before sending
             self.game.update_team_stats()
-            # OREB: collapse+attach 3 game s + hold/action rand(1,3); rebounder holds until 1 game s remains then acts
-            _oreb_te_kickout = 3 + random.randint(1, 3)
+            # OREB: collapse+attach 3 game s + hold/action rand(1,3); add pass time (rebounder -> PG)
+            _base_kickout = 3 + random.randint(1, 3)
+            _pass_sec_kickout = 0.0
+            if rebounder and pg:
+                rc = getattr(rebounder, "coords", None) or {}
+                pc = getattr(pg, "coords", None) or {}
+                if isinstance(rc, dict) and isinstance(pc, dict) and "x" in rc and "y" in rc and "x" in pc and "y" in pc:
+                    _pass_sec_kickout = calc_pass_segment_seconds(rc, pc)
+            _oreb_te_kickout = round(_base_kickout + _pass_sec_kickout)
             return {
                 "result_type": "OREB_KICKOUT",
                 "ball_handler": getattr(rebounder, "player_id", None),

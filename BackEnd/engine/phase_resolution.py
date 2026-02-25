@@ -22,6 +22,7 @@ from BackEnd.utils.shared import (
     calc_skeleton_time_elapsed,
     calc_skeleton_step_timing_contract,
     calc_cg_segment_seconds,
+    calc_pass_segment_seconds,
     clamp_turn_time_elapsed,
     get_fast_break_chance,
     calculate_rebound_score,
@@ -781,7 +782,12 @@ def resolve_fast_break_logic(game: "GameManager"):
             if rebounder and rebounder != ball_handler:
                 fb_roles["outlet_passer"] = getattr(rebounder, "player_id", None)
                 fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
-                
+                rebounder_coords = getattr(rebounder, "coords", None) or {}
+                if isinstance(rebounder_coords, dict):
+                    fb_roles["outlet_passer_x"] = rebounder_coords.get("x")
+                    fb_roles["outlet_passer_y"] = rebounder_coords.get("y")
+                else:
+                    fb_roles["outlet_passer_x"] = fb_roles["outlet_passer_y"] = None
                 # Calculate outlet pass score for stat tracking
                 outlet_score = calculate_outlet_pass_score(rebounder)
                 fb_roles["outlet_score"] = outlet_score
@@ -791,6 +797,7 @@ def resolve_fast_break_logic(game: "GameManager"):
             else:
                 fb_roles["outlet_passer"] = None
                 fb_roles["outlet_receiver"] = None
+                fb_roles["outlet_passer_x"] = fb_roles["outlet_passer_y"] = None
                 fb_roles["outlet_score"] = None
         else:
             # Fallback: Random ball handler if no release player (shouldn't happen, but safety check)
@@ -804,7 +811,12 @@ def resolve_fast_break_logic(game: "GameManager"):
             if rebounder and rebounder != ball_handler:
                 fb_roles["outlet_passer"] = getattr(rebounder, "player_id", None)
                 fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
-                
+                rebounder_coords = getattr(rebounder, "coords", None) or {}
+                if isinstance(rebounder_coords, dict):
+                    fb_roles["outlet_passer_x"] = rebounder_coords.get("x")
+                    fb_roles["outlet_passer_y"] = rebounder_coords.get("y")
+                else:
+                    fb_roles["outlet_passer_x"] = fb_roles["outlet_passer_y"] = None
                 # Calculate outlet pass score for stat tracking
                 outlet_score = calculate_outlet_pass_score(rebounder)
                 fb_roles["outlet_score"] = outlet_score
@@ -814,6 +826,7 @@ def resolve_fast_break_logic(game: "GameManager"):
             else:
                 fb_roles["outlet_passer"] = None
                 fb_roles["outlet_receiver"] = None
+                fb_roles["outlet_passer_x"] = fb_roles["outlet_passer_y"] = None
                 fb_roles["outlet_score"] = None
 
         # No additional offensive players when starting from a rebound
@@ -1322,10 +1335,19 @@ def resolve_fast_break_logic(game: "GameManager"):
                 distance_seconds += calc_cg_segment_seconds(path_points[idx - 1], path_points[idx])
 
         overhead_seconds = 0.0
-        if roles_data.get("outlet_passer"):
-            overhead_seconds += 1.0
-        if roles_data.get("outlet_receiver"):
-            overhead_seconds += 1.0
+        # Outlet pass: use distance-based pass time (passer -> receiver) when coords available
+        outlet_passer_x = roles_data.get("outlet_passer_x")
+        outlet_passer_y = roles_data.get("outlet_passer_y")
+        receiver_x = roles_data.get("ball_handler_outlet_x")
+        receiver_y = roles_data.get("ball_handler_outlet_y")
+        if (roles_data.get("outlet_passer") and roles_data.get("outlet_receiver")
+                and isinstance(outlet_passer_x, (int, float)) and isinstance(outlet_passer_y, (int, float))
+                and isinstance(receiver_x, (int, float)) and isinstance(receiver_y, (int, float))):
+            passer_coords = {"x": outlet_passer_x, "y": outlet_passer_y}
+            receiver_coords = {"x": receiver_x, "y": receiver_y}
+            overhead_seconds += calc_pass_segment_seconds(passer_coords, receiver_coords)
+        elif roles_data.get("outlet_passer") and roles_data.get("outlet_receiver"):
+            overhead_seconds += 2.0  # fallback when coords missing
         if shot_attempted:
             overhead_seconds += 1.0
 

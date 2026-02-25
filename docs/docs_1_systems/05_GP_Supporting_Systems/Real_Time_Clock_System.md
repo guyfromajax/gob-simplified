@@ -13,7 +13,7 @@ Define how gameplay turns map to clock countdown behavior using four clock categ
 Used for turn types with skeleton steps (`HCO`, `FCP`, `HCT`).
 
 Clock calculation:
-- For each executed skeleton step: `step_seconds = 1` (default). **Attack drive steps** (motion HCO drive to basket): use attack drive rate (1 game second per 12 grid spots, Euclidean); step gets `max(1, round(distance/12))`.
+- For each executed skeleton step: `step_seconds = 1` (default). **Attack drive steps** (motion HCO drive to basket): use attack drive rate (1 game second per 12 grid spots, Euclidean); step gets `max(1, round(distance/12))`. **Pass steps**: add ball-in-air time from passer (x,y) to receiver (x,y) using pass rate (1 game second per 36 grid spots, Euclidean); added to that step’s clock seconds.
 - Backend emits per-step timing contract:
   - `step_clock_seconds[]`
   - `resolution_step_index`
@@ -76,6 +76,7 @@ Execution:
 |--------|------|----------------|
 | **CG (cover-ground)** | Anisotropic | `segment_seconds = sqrt((dx/20)^2 + (dy/10)^2)` — e.g. fast break, pre-HCO bring-up. |
 | **Attack drive to basket** | 1 game second per 12 grid spots | Euclidean grid distance: `segment_seconds = sqrt(dx^2 + dy^2) / 12`. Used for drive steps in motion HCO (attack shot drives to the basket). |
+| **Pass (ball in air)** | 1 game second per 36 grid spots | Euclidean grid distance from passer to receiver: `segment_seconds = sqrt(dx^2 + dy^2) / 36`. Used in: **HCO, HCT, FCP** (skeleton steps with pass events); **Fast Break** (outlet pass from rebounder to ball handler); **OREB Kickout** (kickout pass from rebounder to PG). Affects both game-time elapsed and (via step budget) real-time estimate. |
 
 ## Turn Classification Matrix
 

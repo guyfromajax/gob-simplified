@@ -8,6 +8,7 @@ from BackEnd.constants import (
     CHARGE_THRESHOLD,
     BLOCKING_FOUL_THRESHOLD,
     ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND,
+    PASS_GRID_SPOTS_PER_GAME_SECOND,
 )
 
 
@@ -280,6 +281,27 @@ def calc_skeleton_step_timing_contract(
                 step_clock_seconds[i] = max(1, round(drive_sec))
             break  # one drive per step
 
+    # Pass steps (ball in air): add game seconds from passer to receiver grid distance
+    for i in range(executed_count):
+        step_i = steps[i] if i < len(steps) else None
+        if not step_i:
+            continue
+        events = step_i.get("events") or []
+        pos_actions_i = step_i.get("pos_actions") or {}
+        for ev in events:
+            if (ev or {}).get("type") != "pass":
+                continue
+            from_pos = (ev or {}).get("from")
+            to_pos = (ev or {}).get("to")
+            if not from_pos or not to_pos:
+                continue
+            passer_info = pos_actions_i.get(from_pos)
+            receiver_info = pos_actions_i.get(to_pos)
+            passer_coords = _extract_step_location_coords(passer_info) if passer_info else None
+            receiver_coords = _extract_step_location_coords(receiver_info) if receiver_info else None
+            if passer_coords and receiver_coords:
+                step_clock_seconds[i] += round(calc_pass_segment_seconds(passer_coords, receiver_coords))
+
     if include_hco_step1_bringup and len(step_clock_seconds) > 0:
         step_clock_seconds[0] += _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions)
 
@@ -328,6 +350,19 @@ def calc_drive_segment_seconds(start, end):
     dy = abs((end.get("y", 0) or 0) - (start.get("y", 0) or 0))
     grid_dist = math.sqrt(dx * dx + dy * dy)
     return grid_dist / float(ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND)
+
+
+def calc_pass_segment_seconds(passer_coords, receiver_coords):
+    """
+    Ball in air (pass): 1 game second per PASS_GRID_SPOTS_PER_GAME_SECOND grid spots
+    (Euclidean). Used for HCO steps that contain a pass event.
+    """
+    if not passer_coords or not receiver_coords:
+        return 0.0
+    dx = abs((receiver_coords.get("x", 0) or 0) - (passer_coords.get("x", 0) or 0))
+    dy = abs((receiver_coords.get("y", 0) or 0) - (passer_coords.get("y", 0) or 0))
+    grid_dist = math.sqrt(dx * dx + dy * dy)
+    return grid_dist / float(PASS_GRID_SPOTS_PER_GAME_SECOND)
 
 
 def calc_cg_time_elapsed_from_movement_points(points, cap=30):
