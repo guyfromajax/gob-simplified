@@ -3331,9 +3331,6 @@ class TurnManager:
             result.clear()
             result.update(violation)
 
-        if _should_reset_shot_clock(result):
-            self.game.game_state["shot_clock_remaining"] = min(30, clock_end)
-
         # Convert to clock display (e.g., 400 → "6:40")
         minutes = self.game.game_state["time_remaining"] // 60
         seconds = self.game.game_state["time_remaining"] % 60
@@ -3347,6 +3344,8 @@ class TurnManager:
                     if player:  # Skip None slots (empty lineup positions)
                         player.stats["game"]["MIN"] += time_elapsed
 
+        # Attach contract while game_state still has raw_shot_end (current turn's end).
+        # Contract must show derived shot_clock_end so frontend animates start→end during this turn.
         self._attach_clock_contract(
             result,
             clock_start=_cc_clock_start,
@@ -3354,6 +3353,10 @@ class TurnManager:
             game_state=self.game.game_state,
             source=f"ucp:{result.get('result_type', 'UNKNOWN')}",
         )
+
+        # Reset only affects NEXT turn: set shot_clock_remaining=30 so next turn's _cc_sc_start is 30.
+        if _should_reset_shot_clock(result):
+            self.game.game_state["shot_clock_remaining"] = min(30, clock_end)
 
         # ✅ REMOVED: Possession flips now handled in game_manager (Fixes 2-4)
         # This old flip caused double-flipping with the new system
