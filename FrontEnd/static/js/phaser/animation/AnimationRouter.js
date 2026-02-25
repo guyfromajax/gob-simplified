@@ -139,18 +139,15 @@ export class AnimationRouter {
       const durationMs = Math.max(0, Math.floor(Number(turnData?.real_time_elapsed_ms ?? turnData?.realTimeElapsedMs) || 0));
       const gameSecondsToCount = Number.isFinite(clockStart) && Number.isFinite(clockEnd) ? clockStart - clockEnd : 0;
 
-      if (!this.scene._clockContractLogged) {
-        this.scene._clockContractLogged = true;
-        console.log('⏱️ [CLOCK CONTRACT] First turn dict clock fields', {
-          clock_start: turnData?.clock_start,
-          clock_end: turnData?.clock_end,
-          shot_clock_start: turnData?.shot_clock_start,
-          shot_clock_end: turnData?.shot_clock_end,
-          real_time_elapsed_ms: turnData?.real_time_elapsed_ms,
-          result_type: turnData?.result_type,
-          keys: typeof turnData === 'object' ? Object.keys(turnData).filter(k => k.includes('clock') || k === 'real_time_elapsed_ms') : [],
-        });
-      }
+      console.log('⏱️ [CLOCK CONTRACT] Turn dict clock fields', {
+        clock_start: turnData?.clock_start,
+        clock_end: turnData?.clock_end,
+        shot_clock_start: turnData?.shot_clock_start,
+        shot_clock_end: turnData?.shot_clock_end,
+        real_time_elapsed_ms: turnData?.real_time_elapsed_ms,
+        result_type: turnData?.result_type,
+        keys: typeof turnData === 'object' ? Object.keys(turnData).filter(k => k.includes('clock') || k === 'real_time_elapsed_ms') : [],
+      });
 
       if (this.scene._clockInterpolationTween) {
         this.scene._clockInterpolationTween.remove();
