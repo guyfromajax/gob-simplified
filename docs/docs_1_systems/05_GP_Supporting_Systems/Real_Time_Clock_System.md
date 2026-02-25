@@ -201,3 +201,41 @@ Both are clamped to `>= 0`.
 - Backend remains source of truth for persisted state.
 - Frontend remains presentation clock; click capture prevents drift at timeout boundary.
 - This reconciliation is surgical and only applies on timeout-click save path.
+
+## Shot Clock Rules
+
+Whenever the game clock is running, the shot clock runs.
+
+### Backend: Shot clock derivation (same delta as game clock)
+
+The backend does **not** track shot clock independently. For each turn it derives shot clock end from the game clock delta:
+
+1. **Current turn’s contract**
+   - `game_seconds_elapsed = clock_start - clock_end` (e.g. 11 seconds for 4:01 → 3:50).
+   - `shot_clock_end = shot_clock_start - game_seconds_elapsed`, clamped to 0.
+   - Example: clock 4:01→3:50 (11 sec), shot clock start 30 → shot clock end 19.
+   - The **clock contract** attached to the turn uses this derived `shot_clock_end` so the frontend animates from `shot_clock_start` to `shot_clock_end` during the turn.
+
+2. **Reset only affects the next turn**
+   - Reset logic (make, miss with possession change, steal, dead ball, etc.) must **not** change the current turn’s `shot_clock_end`.
+   - After the contract is attached, the backend sets `game_state["shot_clock_remaining"] = 30` (or min(30, time_remaining)) so that the **next** turn’s `shot_clock_start` is 30.
+   - Order of operations: compute derived `shot_clock_end` → attach contract (so current turn shows start→end) → then, if reset, set game_state for next turn to 30.
+
+3. **Shot clock at 0**
+   - If the derived `shot_clock_end` would be 0 and the turn is in a clock-enforced state (HCO, FCP, HCT, FAST_BREAK), the backend triggers shot clock violation / forced shot logic instead of using that result.
+
+### Shot clock reset instances
+
+1. All shot attempts — reset at rim hold of make or miss; shot clock restarts when game clock restarts.
+2. Offensive foul.
+3. Defensive foul.
+4. Steal.
+5. Dead ball turnover.
+6. Shot clock violation.
+
+### Shot clock carryover between turns
+
+1. FCP/HCT to HCO (with no foul or turnover in between).
+2. Steal to HCO (with no foul or turnover in between).
+3. OREB Kickout to HCO (with no foul or turnover in between).
+
