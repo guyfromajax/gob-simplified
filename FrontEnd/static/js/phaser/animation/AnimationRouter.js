@@ -165,6 +165,17 @@ export class AnimationRouter {
         this.scene._clockInterpolationTween = null;
       }
 
+      // Always set both clocks to this turn's contract start so they "start" consistently every turn
+      if (this.scene?.gameClock && this.scene?.shotClock) {
+        if (Number.isFinite(clockStart)) {
+          this.scene.gameClock.syncWithBackend(clockStart);
+        }
+        if (Number.isFinite(shotClockStart)) {
+          this.scene.shotClock.syncWithBackend(shotClockStart);
+        }
+      }
+
+      // Run bounded interpolation only when this turn has elapsed time and game clock movement
       if (durationMs > 0 && gameSecondsToCount > 0 && this.scene?.gameClock && this.scene?.shotClock) {
         const gameClock = this.scene.gameClock;
         const shotClock = this.scene.shotClock;
@@ -172,8 +183,6 @@ export class AnimationRouter {
         const endGame = Number.isFinite(clockEnd) ? clockEnd : 0;
         const startShot = Number.isFinite(shotClockStart) ? shotClockStart : 30;
         const endShot = Number.isFinite(shotClockEnd) ? shotClockEnd : 30;
-        gameClock.syncWithBackend(startGame);
-        shotClock.syncWithBackend(startShot);
         const progressObj = { p: 0 };
         this.scene._clockInterpolationTween = this.scene.tweens.add({
           targets: progressObj,
