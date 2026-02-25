@@ -3332,7 +3332,7 @@ class TurnManager:
             state = result.get("current_turn", "HCO")
             violation = self._build_shot_clock_violation_result(state)
             violation["time_elapsed"] = time_elapsed
-            result.clear()
+            # Overwrite outcome only; keep skeleton, step_clock_seconds, animations so frontend can animate full turn.
             result.update(violation)
 
         # Convert to clock display (e.g., 400 → "6:40")
