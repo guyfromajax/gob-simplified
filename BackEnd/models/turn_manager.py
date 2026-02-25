@@ -87,13 +87,13 @@ class TurnManager:
             return 0
 
         if result_type == "DEFENSIVE_STOP":
-            # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
-            fixed_ms = 1000 if is_fast_break else 0
+            # Announcement hold only; 500ms real, 0 game time (do not expire game time)
+            fixed_ms = 500 if is_fast_break else 0
 
         elif result_type in ("MAKE", "MISS", "BLOCK"):
             if is_fast_break:
-                # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
-                fixed_ms = 1050 if is_make else 2050  # pass + outlet + shot; rim excluded on make
+                # pass 250ms + outlet move 300ms + shot 350ms; rim excluded on make
+                fixed_ms = 900 if is_make else 1900  # 900 + 1000 rim on miss
             else:
                 # HCO / FCP / HCT: pass or steal 150ms; rim 1000ms on miss only
                 # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
@@ -2874,12 +2874,16 @@ class TurnManager:
                         "team": team.name
                     }
             self.game.update_team_stats()
+            # OREB: collapse+attach 3 game s + hold/action rand(1,3); rebounder holds until 1 game s remains then acts
+            _oreb_te = 3 + random.randint(1, 3)
             return {
                 "result_type": "OREB_KICKOUT",
                 "ball_handler": getattr(rebounder, "player_id", None),
                 "text": f"{rebounder_name} secures the rebound after the block. Reset to half-court.",
                 "possession_flips": False,
-                "time_elapsed": random.randint(1, 5),
+                "time_elapsed": _oreb_te,
+                "oreb_hold_seconds": _oreb_te - 1,
+                "oreb_action_seconds": 1,
                 "offense_team_id": self.game.offense_team.team_id,
                 "current_turn": "OREB",
                 "next_play_type": "HCO",
@@ -2916,7 +2920,9 @@ class TurnManager:
         if oreb_event["event_type"] == "PUTBACK_ATTEMPT":
             self.logger.log("putbackStart")
             self.logger.log(oreb_event["result"].lower())
-            
+            # OREB: collapse+attach 3 game s + hold/action rand(1,3); rebounder holds until 1 game s remains then acts
+            _oreb_te = 3 + random.randint(1, 3)
+
             # Build roles for the putback shot (for animation and three-point determination)
             # Putback shots don't have a skeleton, so we'll use current coords
             defender_pos = ["C", "PF", "SF"][0]  # Simplified - closest big
@@ -2982,7 +2988,9 @@ class TurnManager:
                     "defender": getattr(defender, "player_id", None),
                     "text": text,
                     "possession_flips": possession_flips,
-                    "time_elapsed": oreb_event.get("timeElapsed", random.randint(1, 5)),
+                    "time_elapsed": _oreb_te,
+                    "oreb_hold_seconds": _oreb_te - 1,
+                    "oreb_action_seconds": 1,
                     "points": oreb_event.get("points", 2),
                     "scoring_team": off_team.name,
                     "offense_team_id": off_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
@@ -3032,7 +3040,9 @@ class TurnManager:
                     "defender": getattr(defender, "player_id", None),
                     "text": text,
                     "possession_flips": possession_flips,  # Will be updated based on rebound type
-                    "time_elapsed": oreb_event.get("timeElapsed", random.randint(1, 5)),
+                    "time_elapsed": _oreb_te,
+                    "oreb_hold_seconds": _oreb_te - 1,
+                    "oreb_action_seconds": 1,
                     "offense_team_id": off_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
                     "current_turn": "OREB",  # ✅ SS&S: Explicit turn type
                     "animations": [],
@@ -3195,13 +3205,16 @@ class TurnManager:
             
             # Update team stats before sending
             self.game.update_team_stats()
-            
+            # OREB: collapse+attach 3 game s + hold/action rand(1,3); rebounder holds until 1 game s remains then acts
+            _oreb_te_kickout = 3 + random.randint(1, 3)
             return {
                 "result_type": "OREB_KICKOUT",
                 "ball_handler": getattr(rebounder, "player_id", None),
                 "text": text,
                 "possession_flips": False,
-                "time_elapsed": oreb_event.get("timeElapsed", random.randint(1, 5)),
+                "time_elapsed": _oreb_te_kickout,
+                "oreb_hold_seconds": _oreb_te_kickout - 1,
+                "oreb_action_seconds": 1,
                 "offense_team_id": self.game.offense_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
                 "current_turn": "OREB",  # ✅ SS&S: Explicit turn type
                 "next_turn": "HCO",  # ✅ SS&S: Kickouts continue to HCO

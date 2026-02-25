@@ -139,8 +139,14 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
       ballSprite.setPosition(rebounderSprite.x, rebounderSprite.y);
       ballSprite.setVisible(true);
     }
-    
-    
+
+    // OREB hold: rebounder holds until 1 game s remains, then acts (1 game s = 350ms real)
+    const orebHoldSeconds = turnData.oreb_hold_seconds;
+    if (typeof orebHoldSeconds === 'number' && orebHoldSeconds > 0 && scene.time) {
+      const holdMs = orebHoldSeconds * 350;
+      await new Promise((resolve) => scene.time.delayedCall(holdMs, resolve));
+    }
+
     const shotResult = await shootBall({
       scene,
       ballSprite,
@@ -307,6 +313,13 @@ async function handleOrebKickout(scene, { playerSprites, ballSprite, rebounderId
   if (!pgId) {
     console.warn('handleOrebKickout: No PG ID provided', turnData);
     return;
+  }
+
+  // OREB hold: rebounder holds until 1 game s remains, then acts (1 game s = 350ms real)
+  const orebHoldSeconds = turnData.oreb_hold_seconds;
+  if (typeof orebHoldSeconds === 'number' && orebHoldSeconds > 0 && scene.time) {
+    const holdMs = orebHoldSeconds * 350;
+    await new Promise((resolve) => scene.time.delayedCall(holdMs, resolve));
   }
 
   // Step 1: Run outlet positioning animation (PG and rebounder move to outlet spots)

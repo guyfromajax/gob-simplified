@@ -68,14 +68,14 @@ const defaults = {
     laneSpacing: 6,
     passMs: 250,
     outletMoveMs: 300, // duration for outlet receiver advance
-    shotMs: 500,
+    shotMs: 350, // synced to 1 game second (350ms = 1 game s)
     arcHeight: 60,
     // Time to hold the ball at the rim after a made fast break shot
     rimHoldMs: 1000,
     // Announcement hold after "It's Good!" (FB make)
     makeAnnouncementHoldMs: 1000,
-    // Announcement hold after "Great Stop!" (FB defensive stop)
-    defensiveStopHoldMs: 1000,
+    // Announcement hold after "Great Stop!" (FB defensive stop); 0 game time
+    defensiveStopHoldMs: 500,
   },
   offensiveRebound: { pauseMs: 1000 },
   putback: { duration: 500, easing: 'Sine.easeInOut' },

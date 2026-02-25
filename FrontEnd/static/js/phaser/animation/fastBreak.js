@@ -587,7 +587,7 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
     shotTargetPxWithStopper = gridToPixels(adjustedBasket.x, adjustedBasket.y, width, height);
   }
   await animateShotToRim(scene, shotTargetPxWithStopper, {
-    duration: 400,
+    duration: animationConfig.fastBreak?.shotMs ?? 350,
     easing: "Sine.easeInOut",
     arc: { height: 50 }
   });
@@ -912,7 +912,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   }
   // ✅ STEP 3 MIGRATION: Use new animateShotToRim() helper instead of manual detach + animate
   await animateShotToRim(scene, shotTargetPx, {
-    duration: 400,
+    duration: animationConfig.fastBreak?.shotMs ?? 350,
     easing: "Sine.easeInOut",
     arc: { height: 50 }
   });

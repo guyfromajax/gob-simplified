@@ -129,6 +129,21 @@ def clamp_turn_time_elapsed(seconds, cap=30):
     return max(0, min(cap, value))
 
 
+def round_fractional_game_seconds(fractional_seconds_list):
+    """
+    Sum fractional game seconds, then round: down if decimal <= .49, up if >= .50.
+    Returns int seconds to add to the final non-rim-hold event.
+    """
+    if not fractional_seconds_list:
+        return 0
+    total = sum(float(x) for x in fractional_seconds_list)
+    whole = int(total)
+    decimal = total - whole
+    if decimal <= 0.49:
+        return whole
+    return whole + 1
+
+
 def calc_skeleton_time_elapsed(steps, resolution_step_index=None, cap=30):
     """
     Calculate skeleton turn time from per-step random seconds (1..5).
