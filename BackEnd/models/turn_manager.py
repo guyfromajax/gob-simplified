@@ -146,7 +146,7 @@ class TurnManager:
         result["shot_clock_reset"] = bool(sc_reset)
         result["clock_contract_source"] = source
         result["real_time_elapsed_ms"] = self._compute_real_time_elapsed_ms(result)
-        logging.warning(
+        logging.debug(
             "⏱️ [CLOCK CONTRACT] type=%s source=%s "
             "clock=%d→%d elapsed=%d sc=%d→%d reset=%s",
             result.get("result_type", "UNKNOWN"),
@@ -3306,19 +3306,22 @@ class TurnManager:
         if self.game.game_state["time_remaining"] < 0:
             self.game.game_state["time_remaining"] = 0
 
-        # Decrement shot clock only on impact turns.
-        if impact_turn:
-            self.game.game_state["shot_clock_remaining"] = max(0, shot_remaining_before - time_elapsed)
-        else:
-            self.game.game_state["shot_clock_remaining"] = min(30, int(self.game.game_state.get("time_remaining", 0)))
+        clock_end = int(self.game.game_state.get("time_remaining", 0))
+        game_seconds_elapsed = _cc_clock_start - clock_end
 
-        # Shot clock ran to 0 this turn and result would reset (e.g. miss + defensive rebound).
-        # We never "start" a turn with shot_clock=0 because we always reset on possession change,
-        # so the start-of-turn violation branch is never hit. Replace this result with a violation.
+        # Shot clock: reduce by same amount as game clock, then apply reset.
+        if impact_turn:
+            raw_shot_end = max(0, _cc_sc_start - game_seconds_elapsed)
+        else:
+            raw_shot_end = min(30, clock_end)
+
+        self.game.game_state["shot_clock_remaining"] = raw_shot_end
+
+        # Shot clock hit 0 this turn → forced shot / violation.
         _clock_enforced = ("HCO", "FCP", "HCT", "FAST_BREAK")
         if (
             impact_turn
-            and self.game.game_state["shot_clock_remaining"] == 0
+            and raw_shot_end == 0
             and _should_reset_shot_clock(result)
             and result.get("current_turn") in _clock_enforced
         ):
@@ -3328,9 +3331,8 @@ class TurnManager:
             result.clear()
             result.update(violation)
 
-        # Reset/hold shot clock based on possession events.
         if _should_reset_shot_clock(result):
-            self.game.game_state["shot_clock_remaining"] = min(30, int(self.game.game_state.get("time_remaining", 0)))
+            self.game.game_state["shot_clock_remaining"] = min(30, clock_end)
 
         # Convert to clock display (e.g., 400 → "6:40")
         minutes = self.game.game_state["time_remaining"] // 60
