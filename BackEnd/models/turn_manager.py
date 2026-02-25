@@ -146,6 +146,11 @@ class TurnManager:
         result["shot_clock_reset"] = bool(sc_reset)
         result["clock_contract_source"] = source
         result["real_time_elapsed_ms"] = self._compute_real_time_elapsed_ms(result)
+        # Display/snap fields for frontend end-of-turn sync (same values as contract end state).
+        # Ensures every turn with a contract has clock/shot_clock for updateScoreboard; preserves reset pattern.
+        result["clock"] = game_state.get("clock")
+        result["time_remaining"] = int(game_state.get("time_remaining", 0))
+        result["shot_clock_remaining"] = int(game_state.get("shot_clock_remaining", 30))
         logging.warning(
             "⏱️ [CLOCK CONTRACT] type=%s source=%s "
             "clock=%d→%d elapsed=%d sc=%d→%d reset=%s",

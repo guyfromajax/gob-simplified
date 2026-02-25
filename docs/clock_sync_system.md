@@ -29,6 +29,9 @@ Attached to every turn that receives a clock contract (all normal and bypass tur
 | `shot_clock_reset` | bool | True if shot clock was reset this turn | All turns with contract |
 | `clock_contract_source` | str | Where the contract was attached (e.g. `update_clock_and_possession`, `timeout`, `opening_tip`) | All turns with contract |
 | `real_time_elapsed_ms` | int | Total wall clock ms for this turn’s animation (used for clock interpolation) | All turns with contract |
+| `clock` | str | Game clock display string at turn end (e.g. `"6:40"`) for frontend snap | All turns with contract |
+| `time_remaining` | int | Game seconds remaining at turn end; same as `clock_end` | All turns with contract |
+| `shot_clock_remaining` | int | Shot clock at turn end; same as `shot_clock_end`. Ensures end-of-turn snap works for all turns; reset pattern unchanged. | All turns with contract |
 
 ## 4. TURN TIME ELAPSED
 
@@ -112,7 +115,17 @@ For TIMEOUT, SIP, BIP: `time_elapsed` is 0 and `real_time_elapsed_ms` is 0; no c
 - **Fast break (anisotropic):** `sqrt((dx/20)^2 + (dy/10)^2)` game seconds per segment.
 - **Sprint multiplier (1.5x):** Present in config; currently unused.
 
-## 9. KNOWN ISSUES / FUTURE WORK
+## 9. DISPLAY/SNAP FIELDS (END-OF-TURN)
+
+The frontend calls `updateScoreboard(turn)` with only the turn object after each turn. To snap the game clock and shot clock to the correct values (including after resets), the turn must include the post-turn display values. These are attached in `_attach_clock_contract` from the same `game_state` used for `clock_end` / `shot_clock_end`:
+
+- **`clock`** — Display string (e.g. `"6:40"`) for the game clock.
+- **`time_remaining`** — Game seconds remaining at turn end (same as `clock_end`).
+- **`shot_clock_remaining`** — Shot clock at turn end (same as `shot_clock_end`). Reset pattern is unchanged: backend still sets `game_state["shot_clock_remaining"]` in `update_clock_and_possession` (decrement or reset to 30 / min(30, time_remaining)); we only copy that value onto the turn so the frontend can read it.
+
+Without these fields on the turn, only turns that went through `run_micro_turn` (which previously set them) would get a correct end-of-turn snap; opening tip, inbounds, OREB, and other bypass paths would not. Attaching them in `_attach_clock_contract` ensures every turn that receives the contract also has the display/snap fields the frontend needs.
+
+## 10. KNOWN ISSUES / FUTURE WORK
 
 - **Shot clock violation:** Trigger depends on backend `shot_clock_remaining` reaching zero before reset; a log check is recommended to confirm behavior.
 - **Quarter start:** Clock initialization at quarter start should be verified for continuity with the first turn’s clock contract (e.g. clock_start matches expected value after quarter break).

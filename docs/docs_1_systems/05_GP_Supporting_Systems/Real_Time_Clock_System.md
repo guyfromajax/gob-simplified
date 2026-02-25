@@ -90,6 +90,9 @@ Execution:
 - Frontend must freeze realtime countdown when `time_elapsed = 0` (no-impact turns).
 - For skeleton turns, frontend must consume backend `step_clock_seconds[]` so per-step animation time and elapsed clock time are aligned.
 
+## Live clock end-of-turn snap
+Every turn that receives the clock contract (see `clock_sync_system.md`) also receives display/snap fields on the turn dict: `clock`, `time_remaining`, and `shot_clock_remaining`. These are set in `_attach_clock_contract` from the same `game_state` used for `clock_end` / `shot_clock_end`, so the frontend can snap the game clock and shot clock at turn end for all turn types (including opening tip, inbounds, OREB). The shot clock reset pattern is unchanged; the backend still computes reset in `update_clock_and_possession` and we only copy the final value onto the turn.
+
 ## Implementation Plan
 
 ### Phase 1: Backend Time Elapsed Derivation (SS&S Source of Truth)
