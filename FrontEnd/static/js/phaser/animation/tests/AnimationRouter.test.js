@@ -11,6 +11,10 @@ import { AnimationStates } from '../SimplifiedStateMachine.js';
 jest.mock('../AnimationEngine.js');
 jest.mock('../SimplifiedStateMachine.js');
 jest.mock('../BallController.js');
+jest.mock('../turnPreparation.js', () => ({
+  prepareTurnForAnimation: jest.fn().mockResolvedValue(undefined),
+  finalizeTurnAfterAnimation: jest.fn().mockResolvedValue(undefined),
+}));
 
 // Mock debug flags
 jest.mock('../../utils/debugFlags.js', () => ({
@@ -507,6 +511,122 @@ describe('AnimationRouter', () => {
         AnimationStates.IDLE,
         { turnData: turnoverTurn }
       );
+    });
+  });
+
+  describe('Clock interpolation (Phase 2)', () => {
+    let clockScene;
+    let mockGameClock;
+    let mockShotClock;
+    let mockTweensAdd;
+    let clockRouter;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockGameClock = { syncWithBackend: jest.fn(), pause: jest.fn(), resume: jest.fn() };
+      mockShotClock = { syncWithBackend: jest.fn(), pause: jest.fn(), resume: jest.fn() };
+      mockTweensAdd = jest.fn(() => ({ remove: jest.fn() }));
+      clockScene = {
+        ...createMockScene(),
+        gameClock: mockGameClock,
+        shotClock: mockShotClock,
+        tweens: { add: mockTweensAdd },
+        simData: {},
+        isPaused: false,
+      };
+      clockRouter = new AnimationRouter(
+        clockScene,
+        createMockPlayerSprites(),
+        createMockBallSprite(),
+        jest.fn()
+      );
+    });
+
+    test('syncs both clocks to contract start when turn has snake_case clock fields', async () => {
+      const turnData = {
+        ...createMockTurnData('MAKE'),
+        clock_start: 600,
+        clock_end: 597,
+        shot_clock_start: 24,
+        shot_clock_end: 21,
+        real_time_elapsed_ms: 1050,
+      };
+      await clockRouter.processTurn(turnData);
+      expect(mockGameClock.syncWithBackend).toHaveBeenCalledWith(600);
+      expect(mockShotClock.syncWithBackend).toHaveBeenCalledWith(24);
+      expect(mockTweensAdd).toHaveBeenCalled();
+    });
+
+    test('syncs both clocks and runs tween when turn uses camelCase clock contract', async () => {
+      const turnData = {
+        ...createMockTurnData('MISS'),
+        clockStart: 720,
+        clockEnd: 717,
+        shotClockStart: 18,
+        shotClockEnd: 15,
+        realTimeElapsedMs: 1050,
+      };
+      await clockRouter.processTurn(turnData);
+      expect(mockGameClock.syncWithBackend).toHaveBeenCalledWith(720);
+      expect(mockShotClock.syncWithBackend).toHaveBeenCalledWith(18);
+      expect(mockTweensAdd).toHaveBeenCalledWith(
+        expect.objectContaining({
+          duration: 1050,
+          ease: 'Linear',
+        })
+      );
+    });
+
+    test('adds tween when only shot clock moves (game clock unchanged)', async () => {
+      const turnData = {
+        ...createMockTurnData('MAKE'),
+        clock_start: 600,
+        clock_end: 600,
+        shot_clock_start: 24,
+        shot_clock_end: 21,
+        real_time_elapsed_ms: 1050,
+      };
+      await clockRouter.processTurn(turnData);
+      expect(mockGameClock.syncWithBackend).toHaveBeenCalledWith(600);
+      expect(mockShotClock.syncWithBackend).toHaveBeenCalledWith(24);
+      expect(mockTweensAdd).toHaveBeenCalled();
+      const tweenConfig = mockTweensAdd.mock.calls[0][0];
+      expect(typeof tweenConfig.onUpdate).toBe('function');
+      tweenConfig.onUpdate();
+      expect(mockShotClock.syncWithBackend).toHaveBeenCalledTimes(2);
+    });
+
+    test('does not add tween when durationMs is 0', async () => {
+      const turnData = {
+        ...createMockTurnData('SIDE_INBOUND'),
+        clock_start: 600,
+        clock_end: 600,
+        shot_clock_start: 30,
+        shot_clock_end: 30,
+        real_time_elapsed_ms: 0,
+      };
+      await clockRouter.processTurn(turnData);
+      expect(mockTweensAdd).not.toHaveBeenCalled();
+    });
+
+    test('tween onUpdate interpolates shot clock from start to end', async () => {
+      const turnData = {
+        ...createMockTurnData('MAKE'),
+        clock_start: 600,
+        clock_end: 597,
+        shot_clock_start: 24,
+        shot_clock_end: 21,
+        real_time_elapsed_ms: 1050,
+      };
+      await clockRouter.processTurn(turnData);
+      const tweenConfig = mockTweensAdd.mock.calls[0][0];
+      const progressObj = Array.isArray(tweenConfig.targets) ? tweenConfig.targets[0] : tweenConfig.targets;
+      progressObj.p = 0;
+      tweenConfig.onUpdate();
+      expect(mockShotClock.syncWithBackend).toHaveBeenNthCalledWith(2, 24);
+      progressObj.p = 1;
+      tweenConfig.onUpdate();
+      expect(mockShotClock.syncWithBackend).toHaveBeenLastCalledWith(21);
     });
   });
 });
