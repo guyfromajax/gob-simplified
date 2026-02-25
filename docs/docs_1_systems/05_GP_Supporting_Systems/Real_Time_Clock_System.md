@@ -13,7 +13,7 @@ Define how gameplay turns map to clock countdown behavior using four clock categ
 Used for turn types with skeleton steps (`HCO`, `FCP`, `HCT`).
 
 Clock calculation:
-- For each executed skeleton step: `step_seconds = 1` (default). **Attack drive steps** (motion HCO drive to basket): use attack drive rate (1 game second per 12 grid spots, Euclidean); step gets `max(1, round(distance/12))`. **Pass steps**: add ball-in-air time from passer (x,y) to receiver (x,y) using pass rate (1 game second per 36 grid spots, Euclidean); added to that step’s clock seconds.
+- **HCO**: each executed skeleton step = **2** game seconds (base). **FCP** and **HCT**: each step = **1** game second (base). **Attack drive steps** (motion HCO): use attack drive rate (1 game second per 12 grid spots, Euclidean); step gets `max(base_step_seconds, round(distance/12))`. **Pass steps**: add ball-in-air time from passer (x,y) to receiver (x,y) using pass rate (1 game second per 36 grid spots, Euclidean); added to that step’s clock seconds.
 - Backend emits per-step timing contract:
   - `step_clock_seconds[]`
   - `resolution_step_index`

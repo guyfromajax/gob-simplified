@@ -241,14 +241,17 @@ def calc_skeleton_step_timing_contract(
     cap=30,
     include_hco_step1_bringup=False,
     prev_offense_positions=None,
+    base_step_seconds=1,
 ):
     """
     Build deterministic per-step clock timing contract for skeleton turns.
     When include_hco_step1_bringup is True, prev_offense_positions (e.g. from BIP/SIP
     oDestinations) is used when provided for pre-step-0 bring-up (max distance to step 0).
+    base_step_seconds: default 1; use 2 for HCO so each skeleton step accounts for 2 game seconds.
+    FCP and HCT keep 1 second per step.
     """
     if not steps:
-        one_step = 1
+        one_step = base_step_seconds
         return {
             "step_clock_seconds": [one_step],
             "time_elapsed": clamp_turn_time_elapsed(one_step, cap=cap),
@@ -262,7 +265,7 @@ def calc_skeleton_step_timing_contract(
     resolution_step_index = max(0, min(max_index, int(resolution_step_index)))
 
     executed_count = resolution_step_index + 1
-    step_clock_seconds = [1 for _ in range(executed_count)]
+    step_clock_seconds = [base_step_seconds for _ in range(executed_count)]
 
     # Attack drive steps (motion HCO): 1 game second per 12 grid spots (Euclidean)
     for i in range(1, executed_count):
@@ -278,7 +281,7 @@ def calc_skeleton_step_timing_contract(
             end_coords = _extract_step_location_coords(action_info)
             if start_coords and end_coords:
                 drive_sec = calc_drive_segment_seconds(start_coords, end_coords)
-                step_clock_seconds[i] = max(1, round(drive_sec))
+                step_clock_seconds[i] = max(base_step_seconds, round(drive_sec))
             break  # one drive per step
 
     # Pass steps (ball in air): add game seconds from passer to receiver grid distance
@@ -308,11 +311,11 @@ def calc_skeleton_step_timing_contract(
     total = sum(step_clock_seconds)
     if total > cap:
         overflow = total - cap
-        # Reduce from the end while keeping each executed step at >=1s.
+        # Reduce from the end while keeping each executed step at >= base_step_seconds.
         for idx in range(len(step_clock_seconds) - 1, -1, -1):
             if overflow <= 0:
                 break
-            reducible = max(0, step_clock_seconds[idx] - 1)
+            reducible = max(0, step_clock_seconds[idx] - base_step_seconds)
             if reducible <= 0:
                 continue
             reduce_by = min(reducible, overflow)

@@ -4276,6 +4276,7 @@ def resolve_half_court_offense_logic(game):
                 roles.get("steps", []),
                 resolution_step_index=roles.get("event_step"),
                 include_hco_step1_bringup=True,
+                base_step_seconds=2,
             )
             turn_result["time_elapsed"] = timing_contract["time_elapsed"]
             turn_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
@@ -4317,6 +4318,7 @@ def resolve_half_court_offense_logic(game):
                 roles.get("steps", []),
                 resolution_step_index=roles.get("event_step"),
                 include_hco_step1_bringup=True,
+                base_step_seconds=2,
             )
             foul_result["time_elapsed"] = timing_contract["time_elapsed"]
             foul_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
@@ -4358,6 +4360,7 @@ def resolve_half_court_offense_logic(game):
                 roles.get("steps", []),
                 resolution_step_index=roles.get("event_step"),
                 include_hco_step1_bringup=True,
+                base_step_seconds=2,
             )
             foul_result["time_elapsed"] = timing_contract["time_elapsed"]
             foul_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
