@@ -140,12 +140,15 @@ export class AnimationRouter {
       }
 
       // PHASE2: Bounded clock interpolation — count from clock_start to clock_end over real_time_elapsed_ms
-      const clockStart = Number(turnData?.clock_start);
-      const clockEnd = Number(turnData?.clock_end);
-      const shotClockStart = Number(turnData?.shot_clock_start);
-      const shotClockEnd = Number(turnData?.shot_clock_end);
-      const durationMs = Math.max(0, Math.floor(Number(turnData?.real_time_elapsed_ms) || 0));
+      // Support both snake_case (backend) and camelCase (in case payload is transformed)
+      const clockStart = Number(turnData?.clock_start ?? turnData?.clockStart);
+      const clockEnd = Number(turnData?.clock_end ?? turnData?.clockEnd);
+      const shotClockStart = Number(turnData?.shot_clock_start ?? turnData?.shotClockStart);
+      const shotClockEnd = Number(turnData?.shot_clock_end ?? turnData?.shotClockEnd);
+      const durationMs = Math.max(0, Math.floor(Number(turnData?.real_time_elapsed_ms ?? turnData?.realTimeElapsedMs) || 0));
       const gameSecondsToCount = Number.isFinite(clockStart) && Number.isFinite(clockEnd) ? clockStart - clockEnd : 0;
+      const shotClockDelta = Number.isFinite(shotClockStart) && Number.isFinite(shotClockEnd) ? Math.abs(shotClockEnd - shotClockStart) : 0;
+      const hasShotClockMovement = shotClockDelta > 0;
 
       if (!this.scene._clockContractLogged) {
         this.scene._clockContractLogged = true;
@@ -175,8 +178,9 @@ export class AnimationRouter {
         }
       }
 
-      // Run bounded interpolation only when this turn has elapsed time and game clock movement
-      if (durationMs > 0 && gameSecondsToCount > 0 && this.scene?.gameClock && this.scene?.shotClock) {
+      // Run bounded interpolation when this turn has elapsed time and either clock needs to move
+      const shouldRunClockTween = durationMs > 0 && (gameSecondsToCount > 0 || hasShotClockMovement) && this.scene?.gameClock && this.scene?.shotClock;
+      if (shouldRunClockTween) {
         const gameClock = this.scene.gameClock;
         const shotClock = this.scene.shotClock;
         const startGame = Number.isFinite(clockStart) ? clockStart : 0;
@@ -191,7 +195,9 @@ export class AnimationRouter {
           ease: 'Linear',
           onUpdate: () => {
             const progress = Math.min(1, Math.max(0, progressObj.p));
-            const gameSeconds = Math.max(endGame, Math.min(startGame, startGame - progress * gameSecondsToCount));
+            const gameSeconds = gameSecondsToCount > 0
+              ? Math.max(endGame, Math.min(startGame, startGame - progress * gameSecondsToCount))
+              : startGame;
             const shotSeconds = Math.max(0, Math.min(30, startShot + progress * (endShot - startShot)));
             gameClock.syncWithBackend(gameSeconds);
             shotClock.syncWithBackend(shotSeconds);
