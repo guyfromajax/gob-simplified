@@ -116,39 +116,28 @@ export class AnimationRouter {
         noImpactResultTypes.has(turnData?.result_type);
       const isOpeningTipTurn = turnData?.result_type === 'OPENING_TIP';
 
-      // Clocks are backend-driven: display is updated only from turn data (syncWithBackend in updateScoreboard).
-      // We never start the countdown interval so game clock and shot clock stay in sync with the backend and with each other.
+      // Clocks: same code path for both. Game clock drives "when"; shot clock uses same when + keys + clamp 30 + no-impact reset.
       if (this.scene?.gameClock || this.scene?.shotClock) {
         const applyClockControl = (clockRef, { syncToThirty = false } = {}) => {
           if (!clockRef) return;
-          if (syncToThirty) {
-            clockRef.syncWithBackend?.(30);
-          }
-          // Pause/resume kept for API compatibility; no interval runs so display only changes on syncWithBackend.
-          if (isNoImpactTurn) {
-            clockRef.pause('no_impact_turn');
-          } else {
+          if (syncToThirty) clockRef.syncWithBackend?.(30);
+          if (isNoImpactTurn) clockRef.pause('no_impact_turn');
+          else {
             clockRef.resume('no_impact_turn');
-            if (this.scene.isPaused) {
-              clockRef.pause('user_pause');
-            }
+            if (this.scene.isPaused) clockRef.pause('user_pause');
           }
         };
-
         applyClockControl(this.scene.gameClock, { syncToThirty: false });
-        applyClockControl(this.scene.shotClock, { syncToThirty: isNoImpactTurn });
+        applyClockControl(this.scene.shotClock, { syncToThirty: isNoImpactTurn }); // shot-clock-only: reset to 30 on no-impact
       }
 
-      // PHASE2: Bounded clock interpolation — count from clock_start to clock_end over real_time_elapsed_ms
-      // Support both snake_case (backend) and camelCase (in case payload is transformed)
+      // Contract fields (snake_case + camelCase)
       const clockStart = Number(turnData?.clock_start ?? turnData?.clockStart);
       const clockEnd = Number(turnData?.clock_end ?? turnData?.clockEnd);
       const shotClockStart = Number(turnData?.shot_clock_start ?? turnData?.shotClockStart);
       const shotClockEnd = Number(turnData?.shot_clock_end ?? turnData?.shotClockEnd);
       const durationMs = Math.max(0, Math.floor(Number(turnData?.real_time_elapsed_ms ?? turnData?.realTimeElapsedMs) || 0));
       const gameSecondsToCount = Number.isFinite(clockStart) && Number.isFinite(clockEnd) ? clockStart - clockEnd : 0;
-      const shotClockDelta = Number.isFinite(shotClockStart) && Number.isFinite(shotClockEnd) ? Math.abs(shotClockEnd - shotClockStart) : 0;
-      const hasShotClockMovement = shotClockDelta > 0;
 
       if (!this.scene._clockContractLogged) {
         this.scene._clockContractLogged = true;
@@ -168,25 +157,22 @@ export class AnimationRouter {
         this.scene._clockInterpolationTween = null;
       }
 
-      // Always set both clocks to this turn's contract start so they "start" consistently every turn
-      if (this.scene?.gameClock && this.scene?.shotClock) {
-        if (Number.isFinite(clockStart)) {
-          this.scene.gameClock.syncWithBackend(clockStart);
-        }
-        if (Number.isFinite(shotClockStart)) {
-          this.scene.shotClock.syncWithBackend(shotClockStart);
-        }
+      // Turn start: same condition for both — when game clock has contract, sync both (shot uses shot keys, clamp 30)
+      if (this.scene?.gameClock && this.scene?.shotClock && Number.isFinite(clockStart)) {
+        this.scene.gameClock.syncWithBackend(clockStart);
+        const shotStart = Number.isFinite(shotClockStart) ? Math.min(30, shotClockStart) : 30;
+        this.scene.shotClock.syncWithBackend(shotStart);
       }
 
-      // Run bounded interpolation when this turn has elapsed time and either clock needs to move
-      const shouldRunClockTween = durationMs > 0 && (gameSecondsToCount > 0 || hasShotClockMovement) && this.scene?.gameClock && this.scene?.shotClock;
+      // Tween: run when game clock runs (same condition). Update both in lockstep; shot clamp 30.
+      const shouldRunClockTween = durationMs > 0 && gameSecondsToCount > 0 && this.scene?.gameClock && this.scene?.shotClock;
       if (shouldRunClockTween) {
         const gameClock = this.scene.gameClock;
         const shotClock = this.scene.shotClock;
         const startGame = Number.isFinite(clockStart) ? clockStart : 0;
         const endGame = Number.isFinite(clockEnd) ? clockEnd : 0;
-        const startShot = Number.isFinite(shotClockStart) ? shotClockStart : 30;
-        const endShot = Number.isFinite(shotClockEnd) ? shotClockEnd : 30;
+        const startShot = Number.isFinite(shotClockStart) ? Math.min(30, shotClockStart) : 30;
+        const endShot = Number.isFinite(shotClockEnd) ? Math.min(30, shotClockEnd) : 30;
         const progressObj = { p: 0 };
         this.scene._clockInterpolationTween = this.scene.tweens.add({
           targets: progressObj,
@@ -195,9 +181,7 @@ export class AnimationRouter {
           ease: 'Linear',
           onUpdate: () => {
             const progress = Math.min(1, Math.max(0, progressObj.p));
-            const gameSeconds = gameSecondsToCount > 0
-              ? Math.max(endGame, Math.min(startGame, startGame - progress * gameSecondsToCount))
-              : startGame;
+            const gameSeconds = Math.max(endGame, Math.min(startGame, startGame - progress * gameSecondsToCount));
             const shotSeconds = Math.max(0, Math.min(30, startShot + progress * (endShot - startShot)));
             gameClock.syncWithBackend(gameSeconds);
             shotClock.syncWithBackend(shotSeconds);

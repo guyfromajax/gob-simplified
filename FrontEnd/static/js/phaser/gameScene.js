@@ -1450,32 +1450,43 @@ export function createGameScene(Phaser) {
             this.simData.clock = liveClock;
           }
         }
-        if (this.gameClock) {
+        // Same code path for both clocks: get incoming value (explicit then contract end), then sync. Game: monotonic check. Shot: clamp 30.
+        const incomingGameSec = typeof turn.time_remaining === 'number'
+          ? Math.max(0, Math.floor(turn.time_remaining))
+          : (turn.clock || turn.game_clock)
+            ? parseClockToSeconds(turn.clock || turn.game_clock)
+            : Number.isFinite(Number(turn?.clock_end ?? turn?.clockEnd))
+              ? Math.max(0, Math.floor(Number(turn.clock_end ?? turn.clockEnd)))
+              : null;
+        const incomingShotSecRaw = Number(turn?.shot_clock_remaining ?? turn?.shotClockRemaining ?? turn?.shot_clock_end ?? turn?.shotClockEnd);
+        const incomingShotSec = Number.isFinite(incomingShotSecRaw) ? Math.max(0, Math.min(30, Math.floor(incomingShotSecRaw))) : null;
+
+        if (this.gameClock && Number.isFinite(incomingGameSec)) {
           const clockState = this.gameClock.getState?.() || {};
           const currentClockSec = Number.isFinite(clockState.timeRemaining) ? clockState.timeRemaining : null;
           const incomingQuarter = (typeof turn.quarter === 'number') ? turn.quarter : liveQuarter;
           const allowIncrease = incomingQuarter > liveQuarter;
-          let incomingClockSec = null;
-          if (typeof turn.time_remaining === 'number') {
-            incomingClockSec = Math.max(0, Math.floor(turn.time_remaining));
-          } else if (turn.clock || turn.game_clock) {
-            incomingClockSec = parseClockToSeconds(turn.clock || turn.game_clock);
-          }
-          if (Number.isFinite(incomingClockSec)) {
-            if (currentClockSec == null || allowIncrease || incomingClockSec <= currentClockSec) {
-              this.gameClock.syncWithBackend(incomingClockSec);
-            } else {
-              // Ignore stale/out-of-order clock payloads in the same period.
-              console.warn('⏱️ Ignoring non-monotonic clock update', {
-                currentClockSec,
-                incomingClockSec,
-                liveQuarter,
-                incomingQuarter,
-                result_type: turn.result_type
-              });
-            }
+          if (currentClockSec == null || allowIncrease || incomingGameSec <= currentClockSec) {
+            this.gameClock.syncWithBackend(incomingGameSec);
+          } else {
+            console.warn('⏱️ Ignoring non-monotonic clock update', {
+              currentClockSec,
+              incomingClockSec: incomingGameSec,
+              liveQuarter,
+              incomingQuarter,
+              result_type: turn.result_type
+            });
           }
         }
+        if (this.shotClock && incomingShotSec !== null) {
+          this.shotClock.syncWithBackend(incomingShotSec);
+        } else if (this.shotClock && shouldResetShotClockOnTurn(turn)) {
+          this.shotClock.syncWithBackend(30); // shot-clock-only: reset when no value but turn type resets
+        }
+        if (this.shotClock && isNoImpactShotClockTurn(turn)) {
+          this.shotClock.pause('no_impact_turn');
+        }
+
         if (turn.quarter != null) liveQuarter = turn.quarter;
         if (turn.period_label) {
           livePeriodLabel = turn.period_label;
@@ -1492,25 +1503,6 @@ export function createGameScene(Phaser) {
         if (awayTolEl) awayTolEl.textContent = `TOL: ${liveAwayTimeouts}`;
         // Clock text is written only by gameClock (single-writer authority).
         if (quarterEl) quarterEl.textContent = livePeriodLabel;
-        if (this.shotClock) {
-          // Same pattern as game clock: use explicit field when present, else contract end value (shot_clock_end on every turn).
-          const fromRemaining = Number(turn?.shot_clock_remaining ?? turn?.shotClockRemaining);
-          const fromContractEnd = Number(turn?.shot_clock_end ?? turn?.shotClockEnd);
-          const shotSec = Number.isFinite(fromRemaining)
-            ? Math.max(0, Math.floor(fromRemaining))
-            : Number.isFinite(fromContractEnd)
-              ? Math.max(0, Math.floor(fromContractEnd))
-              : null;
-          if (shotSec !== null) {
-            this.shotClock.syncWithBackend(shotSec);
-          } else if (shouldResetShotClockOnTurn(turn)) {
-            this.shotClock.syncWithBackend(30);
-          }
-
-          if (isNoImpactShotClockTurn(turn)) {
-            this.shotClock.pause('no_impact_turn');
-          }
-        }
 
         applyPlayerStats(turn);
         applyTeamStats(turn);
