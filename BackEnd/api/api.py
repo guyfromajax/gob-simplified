@@ -4294,9 +4294,25 @@ try:
                 finally:
                     db_save_time = (time.time() - db_save_start) * 1000
             
+            # Clock contract at top level so frontend can always apply it (turn may be BATCH wrapper without contract)
+            _src = latest_turn
+            if isinstance(_src, dict) and _src.get("result_type") == "BATCH" and _src.get("batch_turns"):
+                _src = _src["batch_turns"][0]
+            _contract = (
+                _src.get("clock_start"),
+                _src.get("clock_end"),
+                _src.get("shot_clock_start"),
+                _src.get("shot_clock_end"),
+                _src.get("real_time_elapsed_ms"),
+            ) if isinstance(_src, dict) else (None, None, None, None, None)
             # Return turn data + metadata
             response_data = {
                 "turn": latest_turn,
+                "clock_start": _contract[0],
+                "clock_end": _contract[1],
+                "shot_clock_start": _contract[2],
+                "shot_clock_end": _contract[3],
+                "real_time_elapsed_ms": _contract[4],
                 "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
                 "time_remaining": gm.game_state["time_remaining"],
                 "shot_clock_remaining": gm.game_state.get("shot_clock_remaining", min(30, gm.game_state.get("time_remaining", 0))),

@@ -2186,7 +2186,23 @@ export function createGameScene(Phaser) {
           
           // Animate this single turn (or batch of turns)
           const turn = turnData.turn;
-          
+          // Guarantee clock contract on turn so AnimationRouter always has clock_start/shot_clock_start (API now sends at top level)
+          const clockContractKeys = [
+            ['clock_start', 'clockStart'],
+            ['clock_end', 'clockEnd'],
+            ['shot_clock_start', 'shotClockStart'],
+            ['shot_clock_end', 'shotClockEnd'],
+            ['real_time_elapsed_ms', 'realTimeElapsedMs'],
+          ];
+          const mergeClockContract = (target, source) => {
+            if (!target || !source) return;
+            for (const [snake, camel] of clockContractKeys) {
+              const val = source[snake] ?? source[camel];
+              if (val != null && (target[snake] == null || target[snake] === undefined)) target[snake] = val;
+            }
+          };
+          mergeClockContract(turn, turnData);
+
           // ✅ FIX: Check if this is the final turn of the quarter AFTER getting the turn
           // This ensures the final turn is animated before handling quarter completion
           if (turnData.quarter_complete) {
@@ -2249,7 +2265,7 @@ export function createGameScene(Phaser) {
             for (const subTurn of turn.batch_turns) {
               turnCount++;
               subTurn.index = turnCount;
-              
+              mergeClockContract(subTurn, turnData);
               console.log(`🎬 Turn ${turnCount}: ${subTurn.result_type} - ${subTurn.text?.substring(0, 50)}...`);
               
               // Display debug info in text scroll
