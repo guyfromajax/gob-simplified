@@ -7,6 +7,7 @@ from BackEnd.constants import (
     HCO_STRING_SPOTS,
     CHARGE_THRESHOLD,
     BLOCKING_FOUL_THRESHOLD,
+    ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND,
 )
 
 
@@ -183,18 +184,48 @@ def _get_step_ball_handler_pos(step):
     return None
 
 
-def _calc_hco_step1_bringup_overhead_seconds(steps):
+def _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions=None):
     """
-    Estimate extra step-1 bring-up time for HCO turns from step0 -> step1 ball-handler move.
+    Pre-HCO bring-up time: distance-based using same rate as CG (unabated up the floor).
+    Rate: sqrt((dx/20)^2 + (dy/10)^2) game seconds per segment (Real_Time_Clock_System.md).
+
+    When prev_offense_positions is provided (e.g. from BIP/SIP oDestinations): use the
+    player who has the most distance to cover to reach their Step 0 position; that
+    determines the segment duration so the whole unit arrives in sync.
+
+    When prev_offense_positions is not provided (e.g. DREB→HCO): fall back to step0→step1
+    ball-handler move (legacy bring-up).
     """
-    if not steps or len(steps) < 2:
+    if not steps:
         return 0
     step0 = steps[0]
+    pos_actions0 = (step0.get("pos_actions") or {})
+
+    if prev_offense_positions:
+        # Pre-step-0: max over offense players of (distance from prev position to step 0 position)
+        max_seconds = 0.0
+        for pos, prev_coords in prev_offense_positions.items():
+            if not prev_coords or not isinstance(prev_coords, dict):
+                continue
+            action_info = pos_actions0.get(pos)
+            if not action_info:
+                continue
+            step0_coords = _extract_step_location_coords(action_info)
+            if not step0_coords:
+                continue
+            seg = calc_cg_segment_seconds(prev_coords, step0_coords)
+            if seg > max_seconds:
+                max_seconds = seg
+        return int(round(max_seconds)) if max_seconds > 0 else 0
+
+    # Fallback: step0 → step1 ball-handler move (e.g. when no inbound positions stored)
+    if len(steps) < 2:
+        return 0
     step1 = steps[1]
     ball_handler_pos = _get_step_ball_handler_pos(step1) or _get_step_ball_handler_pos(step0)
     if not ball_handler_pos:
         return 0
-    step0_action = (step0.get("pos_actions", {}) or {}).get(ball_handler_pos, {})
+    step0_action = pos_actions0.get(ball_handler_pos, {})
     step1_action = (step1.get("pos_actions", {}) or {}).get(ball_handler_pos, {})
     start = _extract_step_location_coords(step0_action)
     end = _extract_step_location_coords(step1_action)
@@ -208,9 +239,12 @@ def calc_skeleton_step_timing_contract(
     resolution_step_index=None,
     cap=30,
     include_hco_step1_bringup=False,
+    prev_offense_positions=None,
 ):
     """
     Build deterministic per-step clock timing contract for skeleton turns.
+    When include_hco_step1_bringup is True, prev_offense_positions (e.g. from BIP/SIP
+    oDestinations) is used when provided for pre-step-0 bring-up (max distance to step 0).
     """
     if not steps:
         one_step = 1
@@ -229,8 +263,25 @@ def calc_skeleton_step_timing_contract(
     executed_count = resolution_step_index + 1
     step_clock_seconds = [1 for _ in range(executed_count)]
 
+    # Attack drive steps (motion HCO): 1 game second per 12 grid spots (Euclidean)
+    for i in range(1, executed_count):
+        step_i = steps[i] if i < len(steps) else None
+        pos_actions_i = (step_i.get("pos_actions") or {}) if step_i else {}
+        for pos, action_info in pos_actions_i.items():
+            if (action_info or {}).get("action") != "drive":
+                continue
+            prev_step = steps[i - 1] if i - 1 < len(steps) else None
+            prev_actions = (prev_step.get("pos_actions") or {}) if prev_step else {}
+            prev_info = prev_actions.get(pos)
+            start_coords = _extract_step_location_coords(prev_info) if prev_info else None
+            end_coords = _extract_step_location_coords(action_info)
+            if start_coords and end_coords:
+                drive_sec = calc_drive_segment_seconds(start_coords, end_coords)
+                step_clock_seconds[i] = max(1, round(drive_sec))
+            break  # one drive per step
+
     if include_hco_step1_bringup and len(step_clock_seconds) > 0:
-        step_clock_seconds[0] += _calc_hco_step1_bringup_overhead_seconds(steps)
+        step_clock_seconds[0] += _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions)
 
     total = sum(step_clock_seconds)
     if total > cap:
@@ -264,6 +315,19 @@ def calc_cg_segment_seconds(start, end):
     dx = abs((end.get("x", 0) or 0) - (start.get("x", 0) or 0))
     dy = abs((end.get("y", 0) or 0) - (start.get("y", 0) or 0))
     return math.sqrt((dx / 20.0) ** 2 + (dy / 10.0) ** 2)
+
+
+def calc_drive_segment_seconds(start, end):
+    """
+    Attack drive to basket: 1 game second per ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND
+    grid spots (Euclidean distance). Used for motion HCO drive steps.
+    """
+    if not start or not end:
+        return 0.0
+    dx = abs((end.get("x", 0) or 0) - (start.get("x", 0) or 0))
+    dy = abs((end.get("y", 0) or 0) - (start.get("y", 0) or 0))
+    grid_dist = math.sqrt(dx * dx + dy * dy)
+    return grid_dist / float(ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND)
 
 
 def calc_cg_time_elapsed_from_movement_points(points, cap=30):

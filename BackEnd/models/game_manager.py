@@ -799,6 +799,8 @@ class GameManager:
                     game_state=self.game_state,
                     source="bypass:SIP",
                 )
+                # Store offense destinations so next HCO turn can use pre-step-0 bring-up (max distance to step 0)
+                self.game_state["_prev_offense_positions_for_hco"] = inbound_payload.get("oDestinations") or {}
                 self._append_turn(inbound_payload)
             
             # Reset offensive state to HCO after side inbound (FCP/HCT only apply after made shots)
@@ -911,6 +913,9 @@ class GameManager:
                     game_state=self.game_state,
                     source="bypass:BIP",
                 )
+                # Store offense destinations for pre-step-0 bring-up when next turn is HCO
+                if not next_defensive_setup:
+                    self.game_state["_prev_offense_positions_for_hco"] = inbound_payload.get("oDestinations") or {}
                 self._append_turn(inbound_payload, text="Baseline inbound after made shot")
             
             # Preserve offensive_state for next API call

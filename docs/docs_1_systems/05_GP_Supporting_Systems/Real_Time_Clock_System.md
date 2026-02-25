@@ -13,7 +13,7 @@ Define how gameplay turns map to clock countdown behavior using four clock categ
 Used for turn types with skeleton steps (`HCO`, `FCP`, `HCT`).
 
 Clock calculation:
-- For each executed skeleton step: `step_seconds = 1`
+- For each executed skeleton step: `step_seconds = 1` (default). **Attack drive steps** (motion HCO drive to basket): use attack drive rate (1 game second per 12 grid spots, Euclidean); step gets `max(1, round(distance/12))`.
 - Backend emits per-step timing contract:
   - `step_clock_seconds[]`
   - `resolution_step_index`
@@ -69,6 +69,13 @@ Execution:
 - Clock display remains unchanged except for backend sync if response includes updated clock context
 - Frontend realtime countdown is explicitly frozen during no-impact turns to prevent local drift
 - Realtime clock start is deferred until first impact turn (non no-impact), preventing pre-turn drift on page load/resume flows
+
+## Movement rates (game seconds vs grid distance)
+
+| Context | Rate | Formula / note |
+|--------|------|----------------|
+| **CG (cover-ground)** | Anisotropic | `segment_seconds = sqrt((dx/20)^2 + (dy/10)^2)` — e.g. fast break, pre-HCO bring-up. |
+| **Attack drive to basket** | 1 game second per 12 grid spots | Euclidean grid distance: `segment_seconds = sqrt(dx^2 + dy^2) / 12`. Used for drive steps in motion HCO (attack shot drives to the basket). |
 
 ## Turn Classification Matrix
 

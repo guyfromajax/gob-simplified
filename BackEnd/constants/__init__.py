@@ -191,6 +191,10 @@ SITUATIONAL_FORCE_FOUL_TIME_ELAPSED_MAX = 3
 SITUATIONAL_BIP_RECEIVER_POS = "SG"
 SITUATIONAL_SIP_RECEIVER_POS = "SG"
 
+# Movement rates (game seconds vs grid distance); see Real_Time_Clock_System.md
+# Attack drive to basket: 1 game second per N grid spots (Euclidean)
+ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND = 12
+
 HCO_STRING_SPOTS = {
     "key": {"x": 64, "y": 25},
     "upper midWing": {"x": 68, "y": 36}, 

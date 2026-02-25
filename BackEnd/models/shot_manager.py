@@ -548,10 +548,12 @@ class ShotManager:
                         text = f"{get_name_safe(shooter)} misses. {get_name_safe(defender)} fouls him!"
                     shooter_pos = get_player_position(off_lineup, shooter)
                     # Keep turn timing aligned to skeleton progression for shot attempts.
+                    is_hco = self.game_state.get("offensive_state") == "HCO"
                     timing_contract = calc_skeleton_step_timing_contract(
                         steps,
                         resolution_step_index=shot_step_index,
-                        include_hco_step1_bringup=(self.game_state.get("offensive_state") == "HCO"),
+                        include_hco_step1_bringup=is_hco,
+                        prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
                     )
                     time_elapsed_ft = timing_contract["time_elapsed"]
                     ft_remaining = 1 if made_from_foul else 2
@@ -617,10 +619,12 @@ class ShotManager:
             # Handle CHARGE: Return early with possession flip, no shot attempt
             if charge_result == "CHARGE":
                 shooter_pos = get_player_position(off_lineup, shooter)
+                is_hco = self.game_state.get("offensive_state") == "HCO"
                 timing_contract = calc_skeleton_step_timing_contract(
                     steps,
                     resolution_step_index=shot_step_index,
-                    include_hco_step1_bringup=(self.game_state.get("offensive_state") == "HCO"),
+                    include_hco_step1_bringup=is_hco,
+                    prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
                 )
                 time_elapsed = timing_contract["time_elapsed"]
                 
@@ -708,10 +712,12 @@ class ShotManager:
                     
                     # Early return: nullify shot attempt, return result for next turn
                     shooter_pos = get_player_position(off_lineup, shooter)
+                    is_hco = self.game_state.get("offensive_state") == "HCO"
                     timing_contract = calc_skeleton_step_timing_contract(
                         steps,
                         resolution_step_index=shot_step_index,
-                        include_hco_step1_bringup=(self.game_state.get("offensive_state") == "HCO"),
+                        include_hco_step1_bringup=is_hco,
+                        prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
                     )
                     time_elapsed = timing_contract["time_elapsed"]
                     intended_shooter_pos = roles.get("intended_shooter_pos")
@@ -1530,10 +1536,12 @@ class ShotManager:
         if roles.get("is_fast_break"):
             time_elapsed = 0
         else:
+            is_hco = self.game_state.get("offensive_state") == "HCO"
             timing_contract = calc_skeleton_step_timing_contract(
                 steps,
                 resolution_step_index=shot_step_index,
-                include_hco_step1_bringup=(self.game_state.get("offensive_state") == "HCO"),
+                include_hco_step1_bringup=is_hco,
+                prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
             )
             time_elapsed = timing_contract["time_elapsed"]
 
