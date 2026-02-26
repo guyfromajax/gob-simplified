@@ -805,6 +805,8 @@ class GameManager:
             
             # Reset offensive state to HCO after side inbound (FCP/HCT only apply after made shots)
             self.game_state["offensive_state"] = "HCO"
+            # Any time we come out of a SIP, shot clock resets to 30 (next turn is HCO with full clock)
+            self.game_state["shot_clock_remaining"] = min(30, int(self.game_state.get("time_remaining", 30)))
 
         # ✅ FIX 2: Backend flip for Made Shots → Inbound (Pattern A)
         # Create BASELINE_INBOUND turns for ALL made shots (HCO, FT, FB, FCP/HCT, OREB)

@@ -1478,10 +1478,10 @@ export function createGameScene(Phaser) {
             });
           }
         }
-        // No-impact turns (SIP, BIP, FT): always sync to 30 so shot clock resets on the inbound (same as
-        // offensive foul / dead ball). Impact turns (e.g. D_FOUL): use turn's value so we don't show 30 on
-        // the FOUL (that caused the next HCO to be skipped); reset happens when we process the following SIP.
-        if (this.shotClock && isNoImpactShotClockTurn(turn) && shouldResetShotClockOnTurn(turn)) {
+        // Any time we come out of a SIP, shot clock = 30 (same rule as backend).
+        if (this.shotClock && turn?.result_type === 'SIDE_INBOUND') {
+          this.shotClock.syncWithBackend(30);
+        } else if (this.shotClock && isNoImpactShotClockTurn(turn) && shouldResetShotClockOnTurn(turn)) {
           this.shotClock.syncWithBackend(30);
         } else if (this.shotClock && incomingShotSec !== null) {
           this.shotClock.syncWithBackend(incomingShotSec);
