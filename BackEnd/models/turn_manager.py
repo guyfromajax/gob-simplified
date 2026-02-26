@@ -3314,8 +3314,21 @@ class TurnManager:
         else:
             time_elapsed = 0
 
-        result["time_elapsed"] = time_elapsed
-        self.game.game_state["time_remaining"] -= time_elapsed
+        # Shot attempt: add 1 game second to game clock only (rim-hold time); shot clock does not get the +1.
+        is_shot_attempt = result.get("result_type") in ("MAKE", "MISS", "BLOCK") or (
+            result.get("result_type") == "FOUL"
+            and (int(result.get("free_throws_remaining", 0) or 0) > 0
+                 or result.get("next_play_type") == "FREE_THROW")
+        )
+        if impact_turn and is_shot_attempt:
+            effective_game_elapsed = min(time_elapsed + 1, legal_cap) if impact_turn else time_elapsed
+            shot_elapsed = time_elapsed
+        else:
+            effective_game_elapsed = time_elapsed
+            shot_elapsed = time_elapsed
+
+        result["time_elapsed"] = effective_game_elapsed
+        self.game.game_state["time_remaining"] -= effective_game_elapsed
 
         # Clamp to 0
         if self.game.game_state["time_remaining"] < 0:
@@ -3324,21 +3337,8 @@ class TurnManager:
         clock_end = int(self.game.game_state.get("time_remaining", 0))
         game_seconds_elapsed = _cc_clock_start - clock_end
 
-        # Shot clock: for shot-attempt turns, stop at moment of shot (use game seconds up to resolution step only).
+        # Shot clock: same as game clock except on shot attempts (shot_elapsed = time_elapsed, game = time_elapsed + 1).
         if impact_turn:
-            shot_elapsed = game_seconds_elapsed
-            step_clock_seconds = result.get("step_clock_seconds")
-            resolution_step_index = result.get("resolution_step_index")
-            is_shot_attempt = result.get("result_type") in ("MAKE", "MISS", "BLOCK") or (
-                result.get("result_type") == "FOUL"
-                and (int(result.get("free_throws_remaining", 0) or 0) > 0
-                     or result.get("next_play_type") == "FREE_THROW")
-            )
-            if is_shot_attempt and isinstance(step_clock_seconds, list) and step_clock_seconds and resolution_step_index is not None:
-                legal_cap = max(0, min(game_remaining_before, shot_remaining_before))
-                end_idx = min(max(0, int(resolution_step_index)), len(step_clock_seconds) - 1)
-                game_seconds_at_shot = sum(int(step_clock_seconds[i]) for i in range(end_idx + 1))
-                shot_elapsed = min(game_seconds_at_shot, legal_cap)
             raw_shot_end = max(0, _cc_sc_start - shot_elapsed)
         else:
             raw_shot_end = min(30, clock_end)
@@ -3359,7 +3359,7 @@ class TurnManager:
         ):
             state = result.get("current_turn", "HCO")
             violation = self._build_shot_clock_violation_result(state)
-            violation["time_elapsed"] = time_elapsed
+            violation["time_elapsed"] = effective_game_elapsed
             # Overwrite outcome only; keep skeleton, step_clock_seconds, animations so frontend can animate full turn.
             result.update(violation)
 
@@ -3369,12 +3369,12 @@ class TurnManager:
         self.game.game_state["clock"] = f"{minutes}:{seconds:02d}"
 
         # ✅ Track MIN (minutes played) for all active players
-        # Only track if time_elapsed > 0 (skip timeouts and other 0-time turns)
-        if time_elapsed > 0:
+        # Only track if effective_game_elapsed > 0 (skip timeouts and other 0-time turns)
+        if effective_game_elapsed > 0:
             for team in [self.game.home_team, self.game.away_team]:
                 for position, player in team.lineup.items():
                     if player:  # Skip None slots (empty lineup positions)
-                        player.stats["game"]["MIN"] += time_elapsed
+                        player.stats["game"]["MIN"] += effective_game_elapsed
 
         # Attach contract while game_state still has raw_shot_end (current turn's end).
         # Contract must show derived shot_clock_end so frontend animates start→end during this turn.
