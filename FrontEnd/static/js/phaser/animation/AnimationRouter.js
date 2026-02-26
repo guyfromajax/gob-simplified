@@ -161,7 +161,7 @@ export class AnimationRouter {
         this.scene.shotClock.syncWithBackend(shotStart);
       }
 
-      // Tween: run when game clock runs (same condition). Update both in lockstep; shot clamp 30.
+      // Tween: run when game clock runs (same condition). Two-phase when shot stops early: both in sync, then shot paused.
       const shouldRunClockTween = durationMs > 0 && gameSecondsToCount > 0 && this.scene?.gameClock && this.scene?.shotClock;
       if (shouldRunClockTween) {
         const gameClock = this.scene.gameClock;
@@ -170,6 +170,10 @@ export class AnimationRouter {
         const endGame = Number.isFinite(clockEnd) ? clockEnd : 0;
         const startShot = Number.isFinite(shotClockStart) ? Math.min(30, shotClockStart) : 30;
         const endShot = Number.isFinite(shotClockEnd) ? Math.min(30, shotClockEnd) : 30;
+        const shotSecondsToCount = Math.max(0, startShot - endShot);
+        // When shot elapsed < game elapsed, phase 1 = both in sync for shotSecondsToCount, phase 2 = shot paused, game continues.
+        const useTwoPhase = gameSecondsToCount > 0 && shotSecondsToCount < gameSecondsToCount;
+        const ratio = useTwoPhase ? shotSecondsToCount / gameSecondsToCount : 1;
         const progressObj = { p: 0 };
         this.scene._clockInterpolationTween = this.scene.tweens.add({
           targets: progressObj,
@@ -178,10 +182,24 @@ export class AnimationRouter {
           ease: 'Linear',
           onUpdate: () => {
             const progress = Math.min(1, Math.max(0, progressObj.p));
-            const gameSeconds = Math.max(endGame, Math.min(startGame, startGame - progress * gameSecondsToCount));
-            const shotSeconds = Math.max(0, Math.min(30, startShot + progress * (endShot - startShot)));
-            gameClock.syncWithBackend(gameSeconds);
-            shotClock.syncWithBackend(shotSeconds);
+            let gameSeconds;
+            let shotSeconds;
+            if (useTwoPhase && ratio > 0) {
+              if (progress <= ratio) {
+                const phase1Progress = progress / ratio;
+                gameSeconds = startGame - phase1Progress * shotSecondsToCount;
+                shotSeconds = startShot - phase1Progress * shotSecondsToCount;
+              } else {
+                const phase2Progress = (progress - ratio) / (1 - ratio);
+                gameSeconds = (startGame - shotSecondsToCount) - phase2Progress * (gameSecondsToCount - shotSecondsToCount);
+                shotSeconds = endShot;
+              }
+            } else {
+              gameSeconds = startGame - progress * gameSecondsToCount;
+              shotSeconds = startShot + progress * (endShot - startShot);
+            }
+            gameClock.syncWithBackend(Math.max(endGame, Math.min(startGame, gameSeconds)));
+            shotClock.syncWithBackend(Math.max(0, Math.min(30, shotSeconds)));
           },
           onComplete: () => {
             if (this.scene._clockInterpolationTween) {

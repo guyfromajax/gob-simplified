@@ -118,5 +118,75 @@ def test_turn_result_includes_possession_ids():
     assert result["possession_team_id"] == game.offense_team.team_id
 
 
+def _init_min_for_players(game):
+    """Ensure MIN exists so update_clock_and_possession doesn't KeyError (MockPlayer doesn't set it)."""
+    for team in (game.home_team, game.away_team):
+        for player in (team.lineup or {}).values():
+            if player and isinstance(player.stats.get("game"), dict):
+                player.stats["game"].setdefault("MIN", 0)
+
+
+def test_shot_clock_stops_at_shot_attempt_when_step_timing_present():
+    """Shot clock uses game_seconds_at_shot (sum of steps to resolution_step_index), not full turn elapsed."""
+    game = build_mock_game()
+    _init_min_for_players(game)
+    game.game_state["time_remaining"] = 600
+    game.game_state["shot_clock_remaining"] = 30
+    # Turn: shot at step 1; steps [2, 3, 4] → game_seconds_at_shot = 2+3 = 5, full time_elapsed = 9
+    result = {
+        "result_type": "MAKE",
+        "time_elapsed": 9,
+        "current_turn": "HCO",
+        "step_clock_seconds": [2, 3, 4],
+        "resolution_step_index": 1,
+    }
+    game.turn_manager.update_clock_and_possession(result)
+    # Game clock: full 9 seconds elapsed
+    assert result["clock_start"] == 600
+    assert result["clock_end"] == 591
+    # Shot clock: stopped at shot → only 5 seconds burned (steps 0+1)
+    assert result["shot_clock_start"] == 30
+    assert result["shot_clock_end"] == 25
+
+
+def test_shot_clock_uses_full_elapsed_when_no_step_timing():
+    """Shot-attempt turn without step_clock_seconds/resolution_step_index falls back to full elapsed."""
+    game = build_mock_game()
+    _init_min_for_players(game)
+    game.game_state["time_remaining"] = 600
+    game.game_state["shot_clock_remaining"] = 30
+    result = {
+        "result_type": "MISS",
+        "time_elapsed": 9,
+        "current_turn": "FAST_BREAK",
+        # no step_clock_seconds / resolution_step_index
+    }
+    game.turn_manager.update_clock_and_possession(result)
+    assert result["clock_start"] == 600
+    assert result["clock_end"] == 591
+    assert result["shot_clock_start"] == 30
+    assert result["shot_clock_end"] == 21  # 30 - 9 (full elapsed)
+
+
+def test_shot_clock_stops_at_shot_for_shooting_foul_turn():
+    """FOUL with free_throws_remaining is treated as shot attempt; shot clock stops at resolution step."""
+    game = build_mock_game()
+    _init_min_for_players(game)
+    game.game_state["time_remaining"] = 600
+    game.game_state["shot_clock_remaining"] = 30
+    result = {
+        "result_type": "FOUL",
+        "free_throws_remaining": 2,
+        "time_elapsed": 8,
+        "current_turn": "HCO",
+        "step_clock_seconds": [2, 2, 4],
+        "resolution_step_index": 0,
+    }
+    game.turn_manager.update_clock_and_possession(result)
+    # Game seconds at shot = step 0 only = 2
+    assert result["shot_clock_start"] == 30
+    assert result["shot_clock_end"] == 28
+    assert result["clock_end"] == 592
+
 
  
