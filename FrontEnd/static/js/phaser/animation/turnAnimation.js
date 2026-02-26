@@ -367,16 +367,17 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
   if (scene.skipToEnd) return;
   const stepIndex = 0;
   const promises = [];
-  const shouldClampXToRims =
-    turnData?.result_type !== "SIDE_INBOUND" &&
-    turnData?.result_type !== "BASELINE_INBOUND";
-
   for (const anim of animations) {
     if (scene.skipToEnd) break;
     const sprite = playerSprites[anim.playerId];
     const firstStep = anim.movement?.[stepIndex];
     if (!sprite || !firstStep) continue;
 
+    const isInboundSpot = firstStep.coords.x <= 5 || firstStep.coords.x >= 95;
+    const shouldClampXToRims =
+      !isInboundSpot &&
+      turnData?.result_type !== "SIDE_INBOUND" &&
+      turnData?.result_type !== "BASELINE_INBOUND";
     const targetGridX = shouldClampXToRims
       ? Phaser.Math.Clamp(firstStep.coords.x, 9, 91)
       : firstStep.coords.x;
