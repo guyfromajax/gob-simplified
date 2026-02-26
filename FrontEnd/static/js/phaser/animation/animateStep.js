@@ -106,7 +106,9 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     }, timeoutMs);
     // Use nextStep.coords if available (for movement target), otherwise step.coords
     const targetStep = nextStep || step;
+    const isInboundSpot = targetStep.coords.x <= 5 || targetStep.coords.x >= 95;
     const shouldClampXToRims =
+      !isInboundSpot &&
       turnData?.result_type !== "SIDE_INBOUND" &&
       turnData?.result_type !== "BASELINE_INBOUND";
     const targetGridX = shouldClampXToRims
