@@ -235,23 +235,27 @@ def _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions=None):
     return int(round(calc_cg_segment_seconds(start, end)))
 
 
+# Minimum game seconds per step when movement cannot be computed (no blanket per-step default).
+FALLBACK_STEP_SECONDS = 1
+
+
 def calc_skeleton_step_timing_contract(
     steps,
     resolution_step_index=None,
     cap=30,
     include_hco_step1_bringup=False,
     prev_offense_positions=None,
-    base_step_seconds=1,
 ):
     """
     Build deterministic per-step clock timing contract for skeleton turns.
-    When include_hco_step1_bringup is True, prev_offense_positions (e.g. from BIP/SIP
-    oDestinations) is used when provided for pre-step-0 bring-up (max distance to step 0).
-    base_step_seconds: default 1; use 2 for HCO so each skeleton step accounts for 2 game seconds.
-    FCP and HCT keep 1 second per step.
+    Each step's duration = max over all movers in that step (time for last player to reach
+    destination): drive actions use drive rate (1 game sec per 12 grid spots), other movement
+    uses CG rate. Pass in-air time is added to the step. When include_hco_step1_bringup is
+    True, prev_offense_positions (e.g. from BIP/SIP oDestinations) is used for pre-step-0
+    bring-up. Steps with no computable movement use FALLBACK_STEP_SECONDS.
     """
     if not steps:
-        one_step = base_step_seconds
+        one_step = FALLBACK_STEP_SECONDS
         return {
             "step_clock_seconds": [one_step],
             "time_elapsed": clamp_turn_time_elapsed(one_step, cap=cap),
@@ -265,33 +269,41 @@ def calc_skeleton_step_timing_contract(
     resolution_step_index = max(0, min(max_index, int(resolution_step_index)))
 
     executed_count = resolution_step_index + 1
-    step_clock_seconds = [base_step_seconds for _ in range(executed_count)]
+    step_clock_seconds = []
 
-    # Attack drive steps (motion HCO): 1 game second per 12 grid spots (Euclidean)
-    for i in range(1, executed_count):
-        step_i = steps[i] if i < len(steps) else None
-        pos_actions_i = (step_i.get("pos_actions") or {}) if step_i else {}
-        for pos, action_info in pos_actions_i.items():
-            if (action_info or {}).get("action") != "drive":
-                continue
-            prev_step = steps[i - 1] if i - 1 < len(steps) else None
-            prev_actions = (prev_step.get("pos_actions") or {}) if prev_step else {}
-            prev_info = prev_actions.get(pos)
-            start_coords = _extract_step_location_coords(prev_info) if prev_info else None
-            end_coords = _extract_step_location_coords(action_info)
-            if start_coords and end_coords:
-                drive_sec = calc_drive_segment_seconds(start_coords, end_coords)
-                step_clock_seconds[i] = max(base_step_seconds, round(drive_sec))
-            break  # one drive per step
-
-    # Pass steps (ball in air): add game seconds from passer to receiver grid distance
     for i in range(executed_count):
         step_i = steps[i] if i < len(steps) else None
         if not step_i:
+            step_clock_seconds.append(FALLBACK_STEP_SECONDS)
             continue
-        events = step_i.get("events") or []
+
+        mover_durations = []
+        if i > 0:
+            prev_step = steps[i - 1]
+            pos_actions_i = step_i.get("pos_actions") or {}
+            prev_actions = prev_step.get("pos_actions") or {}
+            for pos, action_info in (pos_actions_i or {}).items():
+                action_info = action_info or {}
+                action = action_info.get("action", "")
+                end_coords = _extract_step_location_coords(action_info)
+                if not end_coords:
+                    continue
+                prev_info = prev_actions.get(pos)
+                start_coords = _extract_step_location_coords(prev_info) if prev_info else None
+                if action == "drive" and start_coords:
+                    sec = calc_drive_segment_seconds(start_coords, end_coords)
+                    mover_durations.append(sec)
+                elif start_coords:
+                    sec = calc_cg_segment_seconds(start_coords, end_coords)
+                    if sec > 0:
+                        mover_durations.append(sec)
+
+        step_sec = max(mover_durations) if mover_durations else 0
+        step_sec = max(FALLBACK_STEP_SECONDS, round(step_sec)) if step_sec else FALLBACK_STEP_SECONDS
+
+        # Pass in-air time for this step
         pos_actions_i = step_i.get("pos_actions") or {}
-        for ev in events:
+        for ev in step_i.get("events") or []:
             if (ev or {}).get("type") != "pass":
                 continue
             from_pos = (ev or {}).get("from")
@@ -303,7 +315,9 @@ def calc_skeleton_step_timing_contract(
             passer_coords = _extract_step_location_coords(passer_info) if passer_info else None
             receiver_coords = _extract_step_location_coords(receiver_info) if receiver_info else None
             if passer_coords and receiver_coords:
-                step_clock_seconds[i] += round(calc_pass_segment_seconds(passer_coords, receiver_coords))
+                step_sec += round(calc_pass_segment_seconds(passer_coords, receiver_coords))
+
+        step_clock_seconds.append(int(step_sec))
 
     if include_hco_step1_bringup and len(step_clock_seconds) > 0:
         step_clock_seconds[0] += _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions)
@@ -311,11 +325,10 @@ def calc_skeleton_step_timing_contract(
     total = sum(step_clock_seconds)
     if total > cap:
         overflow = total - cap
-        # Reduce from the end while keeping each executed step at >= base_step_seconds.
         for idx in range(len(step_clock_seconds) - 1, -1, -1):
             if overflow <= 0:
                 break
-            reducible = max(0, step_clock_seconds[idx] - base_step_seconds)
+            reducible = max(0, step_clock_seconds[idx] - FALLBACK_STEP_SECONDS)
             if reducible <= 0:
                 continue
             reduce_by = min(reducible, overflow)
