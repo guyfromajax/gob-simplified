@@ -207,9 +207,9 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
         step = steps[i]
         pos_actions = step.get("pos_actions", {})
         
-        # Find who has ball at this step
+        # Find who has ball at this step (normalize action so we don't miss due to casing)
         for pos, action_info in pos_actions.items():
-            action = action_info.get("action", "")
+            action = (action_info.get("action") or "").lower().strip()
             # Actions that indicate ball possession
             if action in ["handle_ball", "receive", "shoot"]:
                 # Found ball handler position
@@ -217,7 +217,7 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
                 if ball_handler_player:
                     return ball_handler_player
     
-    # Fallback: use PG or first player
+    # Fallback: use PG or first player (only when no step had a clear ball handler)
     return off_lineup.get("PG", list(off_lineup.values())[0])
 
 
@@ -445,6 +445,8 @@ def resolve_non_shooting_foul(roles, game, time_elapsed_override=None):
     # This ensures consistent behavior: all possession flips for SIP transitions happen in one place
     logging.warning(f"⏭️ [RESOLVE_FOUL] NOT flipping possession here - SIP setup will handle it (possession_flips={possession_flips})")
     
+    # next_play_type so turn_manager._should_reset_shot_clock resets on D_FOUL → SIDE_INBOUND (Real_Time_Clock_System.md)
+    next_play_type = "FREE_THROW" if game_state.get("offensive_state") == "FREE_THROW" else "SIDE_INBOUND"
     result = {
         "result_type": "FOUL",
         "ball_handler": ball_handler,
@@ -459,7 +461,9 @@ def resolve_non_shooting_foul(roles, game, time_elapsed_override=None):
         "foul_player_id": getattr(foul_player, "player_id", None) if foul_player else None,
         "foul_team": game_state.get("foul_team"),
         "foul_count": foul_out_info["foul_count"],
-        "fouled_out": foul_out_info["fouled_out"]
+        "fouled_out": foul_out_info["fouled_out"],
+        "next_play_type": next_play_type,
+        "next_turn": next_play_type,
     }
     
     # Add foul out player info if applicable
@@ -2906,11 +2910,11 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
     ball_handler_location = "key"  # Default location
     ball_handler_action_info = None  # Store full action_info to preserve opp, coords, etc.
     
-    # Find ball handler in the stop step
+    # Find ball handler in the stop step (include "shoot" so violation-on-shot credits the shooter, not PG fallback)
     pos_actions = stop_step.get("pos_actions", {})
     for pos, action_info in pos_actions.items():
         action = action_info.get("action", "").lower()
-        if action in ["handle_ball", "receive", "pass"]:
+        if action in ["handle_ball", "receive", "pass", "shoot"]:
             ball_handler_pos = pos
             ball_handler_location = action_info.get("location", "key")
             ball_handler_action_info = action_info  # Store full action_info
@@ -2922,7 +2926,7 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
         prev_pos_actions = prev_step.get("pos_actions", {})
         for pos, action_info in prev_pos_actions.items():
             action = action_info.get("action", "").lower()
-            if action in ["handle_ball", "receive"]:
+            if action in ["handle_ball", "receive", "shoot"]:
                 ball_handler_pos = pos
                 ball_handler_location = action_info.get("location", "key")
                 ball_handler_action_info = action_info  # Store full action_info

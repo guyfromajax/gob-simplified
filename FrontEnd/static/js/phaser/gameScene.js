@@ -1401,7 +1401,7 @@ export function createGameScene(Phaser) {
         if (rt === 'MAKE') return true;
         if (rt === 'STEAL' || rt === 'DEAD BALL' || rt === 'TURNOVER' || rt === 'CHARGE') return true;
         if (rt === 'FOUL' && foulType === 'OFFENSIVE') return true;
-        if (rt === 'FOUL' && foulType === 'DEFENSIVE' && nextPlayType === 'SIDE_INBOUND') return true;
+        if (rt === 'FOUL' && foulType === 'DEFENSIVE' && (nextPlayType === 'SIDE_INBOUND' || nextPlayType === 'SIP')) return true;
         if (possessionFlips && rt !== 'TIMEOUT') return true;
         return false;
       };

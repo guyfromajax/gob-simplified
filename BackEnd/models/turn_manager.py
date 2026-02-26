@@ -3531,7 +3531,7 @@ class TurnManager:
                 
                 # Find who has ball at this step
                 for pos, action_info in pos_actions.items():
-                    action = action_info.get("action", "")
+                    action = (action_info.get("action") or "").lower().strip()
                     
                     if action in ["handle_ball", "receive", "shoot", "pass"]:
                         step_owner = pos
@@ -3544,6 +3544,9 @@ class TurnManager:
                         elif action == "handle_ball":
                             if current_owner_pos is None:
                                 current_owner_pos = pos
+                        elif action == "shoot":
+                            # Shooter has ball at this step; track so stopper/empty-step fallback credits them
+                            current_owner_pos = pos
                         
                         break
                 
