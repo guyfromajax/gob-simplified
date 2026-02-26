@@ -50,9 +50,9 @@ Execution:
 ### 3. non-CG
 Used for non-skeleton turns in compressed space with local action (`OPENING_TIP`, `OREB`).
 
-Clock calculation:
-- Treat as one step for now
-- `time_elapsed = random.randint(1,5)`
+Clock calculation (OREB):
+- **Putback (PUTBACK_MAKE / PUTBACK_MISS):** `time_elapsed = 3` game seconds (collapse + attach: players to rebound spot, ball secured by rebounder).
+- **Kickout (OREB_KICKOUT):** `time_elapsed = round(3 + pass_sec)` where `pass_sec` is distance-based from rebounder to PG (pass rate: 1 game sec per 36 grid spots). The 3 is the same collapse+attach phase.
 
 Execution:
 - Single-phase countdown for the turn

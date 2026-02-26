@@ -12,8 +12,8 @@ This document compares **game time** (`time_elapsed`, game seconds) and **real t
 | Component | Game time (backend) | Real time (frontend / _compute_real_time_elapsed_ms) | Synced? |
 |-----------|---------------------|-------------------------------------------------------|---------|
 | **Movement (skeleton steps)** | Yes. `calc_skeleton_step_timing_contract(steps, shot_step_index)` → `step_clock_seconds` per step (1 s each, step0 may have bringup). Sum → `time_elapsed`. | Yes. `movement_ms = time_elapsed × 350`. | ✅ |
-| **Pass before shot (pass_delay)** | **No.** Not in skeleton; no extra game seconds. | Yes. 150 ms (animation_config `pass.duration`). | ❌ Real only |
-| **Rim hold (miss/block)** | **No.** Not in skeleton. | Yes. 1000 ms (animation_config `shot.rimHoldMs`). | ❌ Real only |
+| **Pass before shot (pass_delay)** | **No.** Not in skeleton; no extra game seconds. | Yes. 150 ms (animation_config `pass.duration`). | ❌ Real only | (JD - add this to game time calculation)
+| **Rim hold (miss/block)** | **No.** Not in skeleton. | Yes. 1000 ms (animation_config `shot.rimHoldMs`). | ❌ Real only | (JD - keep this real time only for now and we'll see how this feels)
 | **Rim hold (make)** | No. | **Excluded by design** (clock paused on makes). | ✅ N/A |
 
 **Summary:** Game time = skeleton steps only. Real time adds **150 ms** (pass) and **1000 ms** (rim on miss) with no game-time equivalent. To sync: either add ~0 game s for 150 ms pass and ~1 game s for 1000 ms rim-on-miss, or document as intentional real-only.
@@ -25,8 +25,8 @@ This document compares **game time** (`time_elapsed`, game seconds) and **real t
 | Component | Game time (backend) | Real time | Synced? |
 |-----------|---------------------|-----------|---------|
 | **Movement (skeleton steps)** | Yes. `calc_skeleton_step_timing_contract(steps, resolution_step_index)` for FCP/HCT phase. | `movement_ms = time_elapsed × 350`. | ✅ |
-| **Steal / pass phase** | **No.** Not a separate game second. | 150 ms (animation_config `steal.duration`). | ❌ Real only |
-| **Rim hold (miss)** | No. | 1000 ms (same as HCO). | ❌ Real only |
+| **Steal / pass phase** | **No.** Not a separate game second. | 150 ms (animation_config `steal.duration`). | ❌ Real only | (JD - add this to game time calculation)
+| **Rim hold (miss)** | No. | 1000 ms (same as HCO). | ❌ Real only | (JD - exclude this from game time calculation and we'll see how it feels)
 | **Rim hold (make)** | No. | Excluded by design. | ✅ N/A |
 
 **Summary:** Same as HCO: **150 ms** (steal) and **1000 ms** (rim on miss) are real-only.
@@ -38,10 +38,10 @@ This document compares **game time** (`time_elapsed`, game seconds) and **real t
 | Component | Game time (backend) | Real time | Synced? |
 |-----------|---------------------|-----------|---------|
 | **Movement (distance)** | Yes. `_apply_fast_break_cg_time`: `distance_seconds` from `calc_cg_segment_seconds` along path. | `movement_ms = time_elapsed × 350` (includes overhead below). | ✅ |
-| **Outlet pass** | Yes. +1 game s if `outlet_passer`. | 250 ms (animation_config `fastBreak.passMs`). | ⚠️ Backend 1 s (350 ms); real 250 ms |
-| **Outlet receiver move** | Yes. +1 game s if `outlet_receiver`. | 300 ms (`fastBreak.outletMoveMs`). | ⚠️ Backend 1 s (350 ms); real 300 ms |
-| **Shot attempt** | Yes. +1 game s if `shot_attempted`. | 500 ms (`fastBreak.shotMs`). | ⚠️ Backend 1 s (350 ms); real 500 ms |
-| **Rim hold (miss)** | **No.** | 1000 ms. | ❌ Real only |
+| **Outlet pass** | Yes. +1 game s if `outlet_passer`. | 250 ms (animation_config `fastBreak.passMs`). | ⚠️ Backend 1 s (350 ms); real 250 ms | (JD - sync both to 250ms)
+| **Outlet receiver move** | Yes. +1 game s if `outlet_receiver`. | 300 ms (`fastBreak.outletMoveMs`). | ⚠️ Backend 1 s (350 ms); real 300 ms | (JD - sync both to 300ms)
+| **Shot attempt** | Yes. +1 game s if `shot_attempted`. | 500 ms (`fastBreak.shotMs`). | ⚠️ Backend 1 s (350 ms); real 500 ms | (JD - sync both to 350ms)
+| **Rim hold (miss)** | **No.** | 1000 ms. | ❌ Real only | (JD - keep excluded from game time for now)
 | **Rim hold (make)** | No. | Excluded by design. | ✅ N/A |
 
 **Summary:** Backend uses 3 flat game seconds for pass + receiver + shot (= 1050 ms at 350 ms/s). Real time uses 250 + 300 + 500 = 1050 ms. Totals match; per-phase mapping differs (game uses 1 s each, real uses exact ms). Rim on miss **1000 ms** is real-only.
@@ -53,7 +53,7 @@ This document compares **game time** (`time_elapsed`, game seconds) and **real t
 | Component | Game time (backend) | Real time | Synced? |
 |-----------|---------------------|-----------|---------|
 | **Movement + outlet** | Yes. `_apply_fast_break_cg_time(result, shot_attempted=False)`: distance + 1 (outlet_passer) + 1 (outlet_receiver). No shot second. | `movement_ms = time_elapsed × 350`. | ✅ |
-| **Defensive stop hold** | **No.** No extra game second for the hold. | 1000 ms (`fastBreak.defensiveStopHoldMs`). | ❌ Real only |
+| **Defensive stop hold** | **No.** No extra game second for the hold. | 1000 ms (`fastBreak.defensiveStopHoldMs`). | ❌ Real only | (JD - sync both to 500ms) -- question is this hold independent of the announcement? All announcements should not expire game time
 
 **Summary:** **1000 ms** stop hold is real-only; no game second for it.
 
@@ -63,13 +63,12 @@ This document compares **game time** (`time_elapsed`, game seconds) and **real t
 
 | Component | Game time (backend) | Real time | Synced? |
 |-----------|---------------------|-----------|---------|
-| **“Possession” time** | Yes. `time_elapsed` = `oreb_event.get("timeElapsed", random.randint(1, 5))` or kickout `random.randint(1, 5)`. No per-phase breakdown. | `movement_ms = time_elapsed × 350`. | ✅ |
-| **Rebound move (collapse)** | **No.** Not broken out in backend. | 300 ms (`rebound.playerMoveMs`). | ❌ Real only |
-| **Attach delay** | **No.** | 500 ms (`rebound.attachDelayMs`). | ❌ Real only |
+| **Collapse + attach** | Yes. **3 game seconds** for all OREB (players to rebound spot, ball secured by rebounder). | `movement_ms = time_elapsed × 350`; fixed phases in `_compute_real_time_elapsed_ms`. | ✅ |
+| **Kickout pass** | Yes. OREB_KICKOUT only: `time_elapsed = round(3 + pass_sec)` (pass rate 1 game s per 36 grid spots, rebounder→PG). | Included in movement_ms. | ✅ |
 | **Rim hold (putback miss)** | No. | 1000 ms (same rim hold). | ❌ Real only |
 | **Rim hold (putback make)** | No. | Excluded by design. | ✅ N/A |
 
-**Summary:** **300 ms** (rebound move) and **500 ms** (attach delay) and **1000 ms** (rim on putback miss) are real-only. Game time is a single 1–5 s (or from event) for the whole OREB.
+**Summary:** **Putback:** 3 game seconds (collapse+attach). **Kickout:** 3 + pass time (rebounder→PG). No random component. Real time from `time_elapsed × 350` plus fixed phases per result type. Rim hold (putback miss) remains real-only.
 
 ---
 
@@ -90,8 +89,8 @@ This document compares **game time** (`time_elapsed`, game seconds) and **real t
 |-----------|---------------------|-----------|---------|
 | **Tip “possession” time** | Yes. `time_elapsed = random.randint(1, 5)` (opening_tip.py). | `movement_ms = time_elapsed × 350`. | ✅ |
 | **Initial hold** | **No.** (Clock not started yet.) | Excluded by design (2000 ms in frontend; we don’t count it in real_time_elapsed_ms). | ✅ N/A |
-| **Apex delay** | **No.** | 100 ms (from prompt; may be in frontend config). | ❌ Real only |
-| **Pass delay** | **No.** | 300 ms (prompt / apex + pass). We use fixed 400 ms total (apex + pass). | ❌ Real only |
+| **Apex delay** | **No.** | 100 ms (from prompt; may be in frontend config). | ❌ Real only | (JD -- what is this? Please explain. I'm sure we need it, but I don't know what it is)
+| **Pass delay** | **No.** | 300 ms (prompt / apex + pass). We use fixed 400 ms total (apex + pass). | ❌ Real only | (JD -- add to game time calculation)
 
 **Summary:** **400 ms** (apex_delay + pass_delay) is real-only; game time is only the 1–5 s tip time.
 
@@ -101,7 +100,7 @@ This document compares **game time** (`time_elapsed`, game seconds) and **real t
 
 | Component | Game time (backend) | Real time | Synced? |
 |-----------|---------------------|-----------|---------|
-| **Movement + shot** | Yes. `time_elapsed = time_remaining` (full drain to 0). Skeleton steps to shot. | `movement_ms = time_elapsed × 350`. | ✅ |
+| **Movement + shot** | Yes. `time_elapsed = time_remaining` (full drain to 0). Skeleton steps to shot. | `movement_ms = time_elapsed × 350`. | ✅ | (JD -- we need to tighten this execution, ball handler should hold the ball in his spot until the clock hits 5 game seconds, then move to his spot to execute teh pass, I believe it's the key, execute the pass at 4 game seconds, the shooter receives the pass at 3 game seconds, then executes the shot. If hte ball handler is the shooter, keep this timing exactly as is, and instead of passing at 4 seconds, he moves from the key to the shooting position at 4 seconds -- LMK if you need more clarification )
 | **Hold at 0 (holdClockOutMs)** | **No.** Clock already 0; no extra game seconds. | 1800 ms (`finalTurn.holdClockOutMs`). | ❌ Real only |
 
 **Summary:** **1800 ms** hold-at-zero is real-only; game time is already the full drain.

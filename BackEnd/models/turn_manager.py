@@ -2875,8 +2875,8 @@ class TurnManager:
                         "team": team.name
                     }
             self.game.update_team_stats()
-            # OREB: collapse+attach 3 game s + hold/action rand(1,3); add pass time (rebounder -> PG)
-            _base = 3 + random.randint(1, 3)
+            # OREB: collapse+attach 3 game s; add pass time (rebounder -> PG)
+            _base = 3
             _pass_sec = 0.0
             if rebounder and pg:
                 rc = getattr(rebounder, "coords", None) or {}
@@ -2928,8 +2928,8 @@ class TurnManager:
         if oreb_event["event_type"] == "PUTBACK_ATTEMPT":
             self.logger.log("putbackStart")
             self.logger.log(oreb_event["result"].lower())
-            # OREB: collapse+attach 3 game s + hold/action rand(1,3); rebounder holds until 1 game s remains then acts
-            _oreb_te = 3 + random.randint(1, 3)
+            # OREB: collapse+attach 3 game s; rebounder then acts (putback)
+            _oreb_te = 3
 
             # Build roles for the putback shot (for animation and three-point determination)
             # Putback shots don't have a skeleton, so we'll use current coords
@@ -3213,8 +3213,8 @@ class TurnManager:
             
             # Update team stats before sending
             self.game.update_team_stats()
-            # OREB: collapse+attach 3 game s + hold/action rand(1,3); add pass time (rebounder -> PG)
-            _base_kickout = 3 + random.randint(1, 3)
+            # OREB: collapse+attach 3 game s; add pass time (rebounder -> PG)
+            _base_kickout = 3
             _pass_sec_kickout = 0.0
             if rebounder and pg:
                 rc = getattr(rebounder, "coords", None) or {}

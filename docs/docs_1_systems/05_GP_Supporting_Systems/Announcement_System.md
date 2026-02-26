@@ -83,6 +83,7 @@ The Announcement System provides visual feedback for game events using timing-ba
   - Triggered when `result_type === 'DEAD BALL'` or (`result_type === 'TURNOVER'` without steal indicators)
 - **Other Turnovers:** Parsed from `turnover_type` field or text:
   - "OUT OF BOUNDS!", "BAD PASS!", "PALMING!", "ILLEGAL DRIBBLE!", "SHOT CLOCK VIOLATION!", "BACKCOURT VIOLATION!"
+- **Shot Clock Violation:** Displays "Shot Clock Violation!" (when `turnover_type === 'SHOT_CLOCK'`). Uses **whistle-3.mp3** (see Sounds below).
 - Shows victim's headshot in offense team color
 
 **Foul Announcements:**
@@ -97,6 +98,16 @@ The Announcement System provides visual feedback for game events using timing-ba
 **Rebound Announcements:**
 - **"Rebound!"** - Handled in `ballManager.js` / `ShotAnimationSystem.handleEmbeddedRebound` when ball reaches rebounder
 - Shows rebounder's headshot in rebounder's team color
+
+### Sounds (SFX)
+
+| Announcement | Sound file | Location |
+|--------------|------------|----------|
+| **Shot Clock Violation!** | `whistle-3.mp3` | `announcements.js` – `showAnnouncement()` when `text === 'Shot Clock Violation!'` |
+| Dead ball turnovers (Travel!, Double Dribble!, etc.), foul announcements | `whistle-1.mp3` | `announcements.js` – `showAnnouncement()` for foul or dead-ball turnover text |
+| AND-1 (shooting foul on make) | `whistle-1.mp3` | `announcements.js` – `showAndOneAnnouncement()` |
+
+Sounds are played in sync with the on-screen announcement (volume 0.7). Path: `/sounds/` + filename.
 
 ### Hold time after result announcements (1000 ms)
 
