@@ -1478,9 +1478,12 @@ export function createGameScene(Phaser) {
             });
           }
         }
-        // Value first, then reset: use turn's shot clock when present so we don't show 30 on the FOUL
-        // (showing 30 on FOUL caused the next HCO to be skipped). Reset still applies when no value (e.g. SIP).
-        if (this.shotClock && incomingShotSec !== null) {
+        // No-impact turns (SIP, BIP, FT): always sync to 30 so shot clock resets on the inbound (same as
+        // offensive foul / dead ball). Impact turns (e.g. D_FOUL): use turn's value so we don't show 30 on
+        // the FOUL (that caused the next HCO to be skipped); reset happens when we process the following SIP.
+        if (this.shotClock && isNoImpactShotClockTurn(turn) && shouldResetShotClockOnTurn(turn)) {
+          this.shotClock.syncWithBackend(30);
+        } else if (this.shotClock && incomingShotSec !== null) {
           this.shotClock.syncWithBackend(incomingShotSec);
         } else if (this.shotClock && shouldResetShotClockOnTurn(turn)) {
           this.shotClock.syncWithBackend(30);
