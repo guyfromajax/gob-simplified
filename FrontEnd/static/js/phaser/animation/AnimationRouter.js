@@ -138,6 +138,10 @@ export class AnimationRouter {
       const shotClockEnd = Number(turnData?.shot_clock_end ?? turnData?.shotClockEnd);
       const durationMs = Math.max(0, Math.floor(Number(turnData?.real_time_elapsed_ms ?? turnData?.realTimeElapsedMs) || 0));
       const gameSecondsToCount = Number.isFinite(clockStart) && Number.isFinite(clockEnd) ? clockStart - clockEnd : 0;
+      const shotSecondsToCount = Number.isFinite(shotClockStart) && Number.isFinite(shotClockEnd) ? shotClockStart - shotClockEnd : 0;
+      // Sync diagnostics: compare backend real-time estimate to game time (1:1 would be game_seconds * 1000)
+      const expectedRealMsIf1To1 = gameSecondsToCount * 1000;
+      const ratioRealToGame = expectedRealMsIf1To1 > 0 ? (durationMs / expectedRealMsIf1To1) : null;
 
       console.log('⏱️ [CLOCK CONTRACT] Turn dict clock fields', {
         clock_start: turnData?.clock_start,
@@ -146,6 +150,12 @@ export class AnimationRouter {
         shot_clock_end: turnData?.shot_clock_end,
         real_time_elapsed_ms: turnData?.real_time_elapsed_ms,
         result_type: turnData?.result_type,
+        // Sync diagnostics: game/shot seconds vs backend real-time estimate
+        game_seconds_elapsed: gameSecondsToCount,
+        shot_seconds_elapsed: shotSecondsToCount,
+        real_time_elapsed_ms_estimate: durationMs,
+        expected_real_ms_if_1_to_1: expectedRealMsIf1To1,
+        ratio_real_to_game: ratioRealToGame != null ? `${(ratioRealToGame * 100).toFixed(0)}%` : null,
         keys: typeof turnData === 'object' ? Object.keys(turnData).filter(k => k.includes('clock') || k === 'real_time_elapsed_ms') : [],
       });
 
