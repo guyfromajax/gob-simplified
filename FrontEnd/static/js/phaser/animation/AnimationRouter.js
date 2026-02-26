@@ -116,19 +116,18 @@ export class AnimationRouter {
         noImpactResultTypes.has(turnData?.result_type);
       const isOpeningTipTurn = turnData?.result_type === 'OPENING_TIP';
 
-      // Clocks: same code path for both. Game clock drives "when"; shot clock uses same when + keys + clamp 30 + no-impact reset.
+      // Clocks: game clock never forced; shot clock uses contract only (backend authority — Real_Time_Clock_System §101–102).
       if (this.scene?.gameClock || this.scene?.shotClock) {
-        const applyClockControl = (clockRef, { syncToThirty = false } = {}) => {
+        const applyClockControl = (clockRef) => {
           if (!clockRef) return;
-          if (syncToThirty) clockRef.syncWithBackend?.(30);
           if (isNoImpactTurn) clockRef.pause('no_impact_turn');
           else {
             clockRef.resume('no_impact_turn');
             if (this.scene.isPaused) clockRef.pause('user_pause');
           }
         };
-        applyClockControl(this.scene.gameClock, { syncToThirty: false });
-        applyClockControl(this.scene.shotClock, { syncToThirty: isNoImpactTurn }); // shot-clock-only: reset to 30 on no-impact
+        applyClockControl(this.scene.gameClock);
+        applyClockControl(this.scene.shotClock);
       }
 
       // Contract fields (snake_case + camelCase)

@@ -99,7 +99,7 @@ Execution:
 - For skeleton turns, frontend must consume backend `step_clock_seconds[]` so per-step animation time and elapsed clock time are aligned.
 
 ## Live clock end-of-turn snap
-The frontend snaps the shot clock using the same pattern as the game clock: use turn’s explicit field when present (`shot_clock_remaining`), else use the contract end value **`shot_clock_end`** (on every turn with a contract). No extra backend fields; reset and shot-clock violation remain backend-only. See `clock_sync_system.md` §9.
+The frontend snaps the shot clock using the same pattern as the game clock: use turn’s explicit field when present (`shot_clock_remaining`), else use the contract end value **`shot_clock_end`** (on every turn with a contract). No extra backend fields; reset and shot-clock violation remain backend-only. The frontend does not implement reset or SIP→30 logic; it displays only values sent by the backend (turn or response). See `clock_sync_system.md` §9.
 
 ## Implementation Plan
 

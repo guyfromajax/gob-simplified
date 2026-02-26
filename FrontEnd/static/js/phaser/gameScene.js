@@ -1386,25 +1386,6 @@ export function createGameScene(Phaser) {
       let liveAwayTimeouts = typeof awayTimeoutsFromData === 'number' ? awayTimeoutsFromData : (isNewGame ? 4 : 4);
       const noImpactShotClockTypes = new Set(['FREE_THROW', 'BASELINE_INBOUND', 'SIDE_INBOUND']);
       const isNoImpactShotClockTurn = (turn = {}) => noImpactShotClockTypes.has(turn?.result_type);
-      const shouldResetShotClockOnTurn = (turn = {}) => {
-        const rt = turn?.result_type;
-        const reboundType = String(turn?.rebound_type || '').toUpperCase();
-        const foulType = String(turn?.foul_type || '').toUpperCase();
-        const nextPlayType = String(turn?.next_play_type || turn?.next_turn || '').toUpperCase();
-        const possessionFlips = turn?.possession_flips === true;
-
-        if (isNoImpactShotClockTurn(turn)) return true;
-        if (rt === 'OREB') return true;
-        // DREB turns can arrive with possession_flips=false after backend flip handling
-        // (e.g., DREB => FAST_BREAK), but they still represent a new possession.
-        if (reboundType === 'DREB') return true;
-        if (rt === 'MAKE') return true;
-        if (rt === 'STEAL' || rt === 'DEAD BALL' || rt === 'TURNOVER' || rt === 'CHARGE') return true;
-        if (rt === 'FOUL' && foulType === 'OFFENSIVE') return true;
-        if (rt === 'FOUL' && foulType === 'DEFENSIVE' && (nextPlayType === 'SIDE_INBOUND' || nextPlayType === 'SIP')) return true;
-        if (possessionFlips && rt !== 'TIMEOUT') return true;
-        return false;
-      };
 
       const updateScoreboard = (turn = {}) => {
         const prevHome = liveScore[homeTeam];
@@ -1450,7 +1431,7 @@ export function createGameScene(Phaser) {
             this.simData.clock = liveClock;
           }
         }
-        // Same code path for both clocks: get incoming value (explicit then contract end), then sync. Game: monotonic check. Shot: clamp 30.
+        // Same code path for both clocks: get incoming value (explicit then contract end), then sync. Game: monotonic check. Shot: backend authority only (Real_Time_Clock_System §101–102).
         const incomingGameSec = typeof turn.time_remaining === 'number'
           ? Math.max(0, Math.floor(turn.time_remaining))
           : (turn.clock || turn.game_clock)
@@ -1458,7 +1439,8 @@ export function createGameScene(Phaser) {
             : Number.isFinite(Number(turn?.clock_end ?? turn?.clockEnd))
               ? Math.max(0, Math.floor(Number(turn.clock_end ?? turn.clockEnd)))
               : null;
-        const incomingShotSecRaw = Number(turn?.shot_clock_remaining ?? turn?.shotClockRemaining ?? turn?.shot_clock_end ?? turn?.shotClockEnd);
+        // Single source: turn/response from backend (shot_clock_remaining, then contract end, then start). No frontend reset logic.
+        const incomingShotSecRaw = Number(turn?.shot_clock_remaining ?? turn?.shotClockRemaining ?? turn?.shot_clock_end ?? turn?.shotClockEnd ?? turn?.shot_clock_start ?? turn?.shotClockStart);
         const incomingShotSec = Number.isFinite(incomingShotSecRaw) ? Math.max(0, Math.min(30, Math.floor(incomingShotSecRaw))) : null;
 
         if (this.gameClock && Number.isFinite(incomingGameSec)) {
@@ -1478,15 +1460,8 @@ export function createGameScene(Phaser) {
             });
           }
         }
-        // Any time we come out of a SIP, shot clock = 30 (same rule as backend).
-        if (this.shotClock && turn?.result_type === 'SIDE_INBOUND') {
-          this.shotClock.syncWithBackend(30);
-        } else if (this.shotClock && isNoImpactShotClockTurn(turn) && shouldResetShotClockOnTurn(turn)) {
-          this.shotClock.syncWithBackend(30);
-        } else if (this.shotClock && incomingShotSec !== null) {
+        if (this.shotClock && incomingShotSec !== null) {
           this.shotClock.syncWithBackend(incomingShotSec);
-        } else if (this.shotClock && shouldResetShotClockOnTurn(turn)) {
-          this.shotClock.syncWithBackend(30);
         }
         if (this.shotClock && isNoImpactShotClockTurn(turn)) {
           this.shotClock.pause('no_impact_turn');
@@ -2164,13 +2139,15 @@ export function createGameScene(Phaser) {
             quarterComplete = true;
             lastTurnData = turnData; // Store last turn data for game completion check
             
-            // Update final scores
+            // Update final scores (include response shot_clock for backend authority)
             updateScoreboard({
               home_score: turnData.home_score,
               away_score: turnData.away_score,
               home_team_fouls: turnData.home_team_fouls,
               away_team_fouls: turnData.away_team_fouls,
-              clock: turnData.clock
+              clock: turnData.clock,
+              shot_clock_remaining: turnData.shot_clock_remaining,
+              time_remaining: turnData.time_remaining
             });
             
             // Update tracked scores from final turnData
@@ -2373,13 +2350,15 @@ export function createGameScene(Phaser) {
             }
           }
           
-          // Update scores and game state after each turn
+          // Update scores and game state after each turn (include response shot_clock so display uses backend authority)
           updateScoreboard({
             home_score: turnData.home_score,
             away_score: turnData.away_score,
             home_team_fouls: turnData.home_team_fouls,
             away_team_fouls: turnData.away_team_fouls,
-            clock: turnData.clock
+            clock: turnData.clock,
+            shot_clock_remaining: turnData.shot_clock_remaining,
+            time_remaining: turnData.time_remaining
           });
           
           // Track latest scores for game completion check
@@ -2466,13 +2445,15 @@ export function createGameScene(Phaser) {
             quarterComplete = true;
             lastTurnData = turnData; // Store last turn data for game completion check
             
-            // Update final scores
+            // Update final scores (include response shot_clock for backend authority)
             updateScoreboard({
               home_score: turnData.home_score,
               away_score: turnData.away_score,
               home_team_fouls: turnData.home_team_fouls,
               away_team_fouls: turnData.away_team_fouls,
-              clock: turnData.clock
+              clock: turnData.clock,
+              shot_clock_remaining: turnData.shot_clock_remaining,
+              time_remaining: turnData.time_remaining
             });
             
             // Update tracked scores from final turnData
