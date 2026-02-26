@@ -99,7 +99,7 @@ Execution:
 - For skeleton turns, frontend must consume backend `step_clock_seconds[]` so per-step animation time and elapsed clock time are aligned.
 
 ## Live clock end-of-turn snap
-The frontend snaps the shot clock using the same pattern as the game clock: use turn’s explicit field when present (`shot_clock_remaining`), else use the contract end value **`shot_clock_end`** (on every turn with a contract). No extra backend fields; reset and shot-clock violation remain backend-only. The frontend does not implement reset or SIP→30 logic; it displays only values sent by the backend (turn or response). See `clock_sync_system.md` §9.
+The frontend snaps the shot clock using the same pattern as the game clock: use turn’s explicit field when present (`shot_clock_remaining`), else use the contract end value **`shot_clock_end`**, else **`shot_clock_start`** (on every turn with a contract). When updating after a batch or at a turn boundary without a per-turn payload (e.g. summary update), the frontend uses the response’s top-level **`shot_clock_remaining`**. No extra backend fields; reset and shot-clock violation remain backend-only. The frontend does not implement reset or SIP→30 logic; it displays only values sent by the backend (turn or response). See `clock_sync_system.md` §9.
 
 ## Implementation Plan
 
@@ -254,4 +254,20 @@ The backend does **not** track shot clock independently. For each turn it derive
 1. FCP/HCT to HCO (with no foul or turnover in between).
 2. Steal to HCO (with no foul or turnover in between).
 3. OREB Kickout to HCO (with no foul or turnover in between).
+
+
+**Shot Attempt or Shot Clock Violation**
+When we reach the point of a potential Shot Clock Violation
+
+chemistry = offense team's chemistry value (7-25)
+discipline = offense team's discipline value (-10 - 10)
+intelligence = int(ball handler' IQ attribute / 5) (0-20)
+*Note you don't need to use these exact variable names in the code, I'm just using them as placeholder in the documentation to commuicate intent
+
+50 + chemistry + discipline + intelligence = violation_threshold
+x = random.randint(1, 100)
+if x > violation_threshold, violation = True, else shot attempt = True
+
+if shot attempt, the ball handler shoots from his location at the point the turn ends
+- add 100 to the shot threshold when calculating shot success
 

@@ -462,6 +462,10 @@ class ShotManager:
             # Debug logging removed - was cluttering logs
             # logging.debug(f"🎯 Variant modifier: {variant} → {variant_modifier:+d} (threshold: {shot_threshold})")
 
+        # Shot-at-1 (shot clock would hit 0, chose shot attempt at 1s): add 100 to threshold (Real_Time_Clock_System.md)
+        if game_state.pop("shot_at_one_second", False):
+            shot_threshold += 100
+
         # Get shooter location for debug logs
         shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
         shooter_location_str = shooter_location if shooter_location else "unknown"

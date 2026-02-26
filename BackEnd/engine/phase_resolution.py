@@ -3810,7 +3810,7 @@ def resolve_half_court_offense_logic(game):
     if final_skeleton:
         final_skeleton = copy.deepcopy(final_skeleton)
     
-    # Shot clock violation: if result is SHOT but shot clock would hit 0 during this turn, treat as stopper (same as dead ball turnover).
+    # Shot clock violation: if result is SHOT but shot clock would hit 0 during this turn, either violation or shot-at-1 (Real_Time_Clock_System.md).
     if result == "SHOT" and final_skeleton and "steps" in final_skeleton:
         steps = final_skeleton["steps"]
         if steps:
@@ -3826,8 +3826,35 @@ def resolve_half_court_offense_logic(game):
             for i, sec in enumerate(step_clock_seconds):
                 cumulative += sec
                 if cumulative >= shot_remaining:
-                    game_state["shot_clock_violation_step_index"] = i
-                    result = "SHOT_CLOCK_VIOLATION"
+                    # Decide: violation (path A) or shot attempt at 1s (path B) via violation_threshold
+                    chemistry = int(off_team.team_attributes.get("team_chemistry", 7))
+                    discipline = int(off_team.team_attributes.get("discipline", 0))
+                    ball_handler_at_step = get_ball_handler_from_skeleton(final_skeleton, off_lineup, step_index=i)
+                    iq = int(getattr(ball_handler_at_step, "attributes", {}).get("IQ", 0) or 0)
+                    intelligence = min(20, iq // 5)
+                    violation_threshold = 50 + chemistry + discipline + intelligence
+                    x = random.randint(1, 100)
+                    if x > violation_threshold:
+                        # Path A: shot clock violation (current behavior)
+                        game_state["shot_clock_violation_step_index"] = i
+                        result = "SHOT_CLOCK_VIOLATION"
+                    else:
+                        # Path B: shot attempt at 1 second remaining — truncate skeleton, keep result SHOT
+                        movement_target = shot_remaining - 1
+                        cum = 0
+                        j = -1
+                        for idx, s in enumerate(step_clock_seconds):
+                            cum += s
+                            if cum <= movement_target:
+                                j = idx
+                            else:
+                                break
+                        if j < 0:
+                            j = 0
+                        truncated_steps = steps[: j + 1] + [steps[-1]]
+                        final_skeleton["steps"] = truncated_steps
+                        game_state["shot_at_one_second"] = True
+                        game_state["_shot_at_one_second_time_elapsed"] = shot_remaining - 1
                     break
     
     # ✅ STOPER SYSTEM: Apply stopper system to skeleton (truncate and add stopper step if needed)
@@ -4508,6 +4535,10 @@ def resolve_half_court_offense_logic(game):
     update_player_coords_from_animations(game, animations)
     set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)  # After so block spot uses shot location, not animation coords
     shot_result = game.shot_manager.resolve_shot(roles)
+    
+    # Shot-at-1 path: set time_elapsed so shot clock ends at 1 (Real_Time_Clock_System.md)
+    if "_shot_at_one_second_time_elapsed" in game_state:
+        shot_result["time_elapsed"] = game_state.pop("_shot_at_one_second_time_elapsed")
     
     # Add playcall and variant debug info to the text
     variant = skeleton.get("_variant", "unknown") if skeleton else "unknown"
