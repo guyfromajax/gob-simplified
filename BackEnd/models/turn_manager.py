@@ -3324,9 +3324,22 @@ class TurnManager:
         clock_end = int(self.game.game_state.get("time_remaining", 0))
         game_seconds_elapsed = _cc_clock_start - clock_end
 
-        # Shot clock: reduce by same amount as game clock, then apply reset.
+        # Shot clock: for shot-attempt turns, stop at moment of shot (use game seconds up to resolution step only).
         if impact_turn:
-            raw_shot_end = max(0, _cc_sc_start - game_seconds_elapsed)
+            shot_elapsed = game_seconds_elapsed
+            step_clock_seconds = result.get("step_clock_seconds")
+            resolution_step_index = result.get("resolution_step_index")
+            is_shot_attempt = result.get("result_type") in ("MAKE", "MISS", "BLOCK") or (
+                result.get("result_type") == "FOUL"
+                and (int(result.get("free_throws_remaining", 0) or 0) > 0
+                     or result.get("next_play_type") == "FREE_THROW")
+            )
+            if is_shot_attempt and isinstance(step_clock_seconds, list) and step_clock_seconds and resolution_step_index is not None:
+                legal_cap = max(0, min(game_remaining_before, shot_remaining_before))
+                end_idx = min(max(0, int(resolution_step_index)), len(step_clock_seconds) - 1)
+                game_seconds_at_shot = sum(int(step_clock_seconds[i]) for i in range(end_idx + 1))
+                shot_elapsed = min(game_seconds_at_shot, legal_cap)
+            raw_shot_end = max(0, _cc_sc_start - shot_elapsed)
         else:
             raw_shot_end = min(30, clock_end)
 

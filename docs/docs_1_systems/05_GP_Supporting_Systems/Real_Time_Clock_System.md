@@ -212,16 +212,24 @@ Both are clamped to `>= 0`.
 
 ## Shot Clock Rules
 
-Whenever the game clock is running, the shot clock runs.
+Whenever the game clock is running, the shot clock runs, with one exception.
 
-### Backend: Shot clock derivation (same delta as game clock)
+**Exception — shot attempt:** When a shot is attempted, the shot clock **stops** at that moment (in game time). The game clock keeps running for the rest of the turn. The shot clock **restarts** (resets to 30 and begins running) as follows:
 
-The backend does **not** track shot clock independently. For each turn it derives shot clock end from the game clock delta:
+- **Made shot, no shooting foul** → Next turn is BIP. Shot clock restarts when the receiver **receives the inbound pass** on that BIP turn.
+- **Miss, offensive rebound** → Next turn is OREB (kickout, putback attempt, etc.). Shot clock restarts when the ball is **attached to the rebounder** on that OREB turn.
+- **Miss, defensive rebound** → DREB occurs within the same shot-attempt turn. Shot clock restarts when the ball is **attached to the rebounding player** (at the DREB event) in that same turn.
+- **Made or missed with shooting foul (free throws)** → After the final free throw: if the final FT is a **make**, shot clock restarts when the receiver receives the inbound on the following BIP turn; if the final FT is a **miss**, shot clock restarts when the ball is attached to the rebounder (on the rebound that follows).
+
+### Backend: Shot clock derivation
+
+The backend does **not** track shot clock independently. For each turn it derives shot clock end as follows:
 
 1. **Current turn’s contract**
-   - `game_seconds_elapsed = clock_start - clock_end` (e.g. 11 seconds for 4:01 → 3:50).
-   - `shot_clock_end = shot_clock_start - game_seconds_elapsed`, clamped to 0.
-   - Example: clock 4:01→3:50 (11 sec), shot clock start 30 → shot clock end 19.
+   - **Game clock:** `game_seconds_elapsed = clock_start - clock_end` (full turn). The game clock always uses this full elapsed value.
+   - **Shot clock (non–shot-attempt turns):** `shot_clock_end = shot_clock_start - game_seconds_elapsed`, clamped to 0 (same as game clock delta).
+   - **Shot clock (shot-attempt turns):** The shot clock **stops at the moment of the shot**. The backend computes `game_seconds_at_shot` = sum of `step_clock_seconds[0 .. resolution_step_index]` (capped by game/shot remaining). Then `shot_clock_end = shot_clock_start - game_seconds_at_shot`, clamped to 0. The rest of the turn does not reduce the shot clock further.
+   - Shot-attempt turn = `result_type` in MAKE, MISS, BLOCK, or FOUL with free throws / `next_play_type` FREE_THROW. When `step_clock_seconds` and `resolution_step_index` are missing (e.g. some non-skeleton paths), the backend falls back to using full `game_seconds_elapsed` for that turn.
    - The **clock contract** attached to the turn uses this derived `shot_clock_end` so the frontend animates from `shot_clock_start` to `shot_clock_end` during the turn.
 
 2. **Reset only affects the next turn**
