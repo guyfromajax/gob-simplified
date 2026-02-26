@@ -1786,6 +1786,8 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
             turnover_type = "DEAD BALL"  # Keep as dead ball turnover
         elif turnover_type == "STEAL":
             turnover_type = "STEAL"  # Keep as steal
+        elif turnover_type == "SHOT_CLOCK":
+            turnover_type = "SHOT_CLOCK"  # Shot clock violation (announced as such; result_type stays DEAD BALL)
         # No random conversion when from resolution system
     else:
         # Legacy behavior: Only use random choice if turnover_type is not explicitly provided
@@ -1847,15 +1849,18 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
         })
     else:
         game_state["offensive_state"] = "HCO"
-        description = random.choice([
-            "throws it out of bounds",
-            "commits a travel.",
-            "commits a double dribble.",
-            "travels with the ball.",
-            "with an errant pass.",
-            "dribbles it off his foot and the ball goes out of bounds."
-        ])
-        text = f"{victim_name} {description}"
+        if turnover_type == "SHOT_CLOCK":
+            text = "Shot Clock Violation"
+        else:
+            description = random.choice([
+                "throws it out of bounds",
+                "commits a travel.",
+                "commits a double dribble.",
+                "travels with the ball.",
+                "with an errant pass.",
+                "dribbles it off his foot and the ball goes out of bounds."
+            ])
+            text = f"{victim_name} {description}"
         game_state["last_stealer"] = None
 
     bh_pos = get_player_position(off_lineup, ball_handler)
@@ -1866,11 +1871,15 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
     next_play_type = None
     if game_state.get("offensive_state") == "FAST_BREAK":
         next_play_type = "FAST_BREAK"
+    elif turnover_type == "SHOT_CLOCK":
+        next_play_type = "SIDE_INBOUND"
     elif game_state.get("offensive_state") == "HCO":
         next_play_type = "HCO"
 
+    # API: shot clock violation uses result_type "DEAD BALL" + turnover_type "SHOT_CLOCK" for announcement
+    result_type_for_api = "DEAD BALL" if turnover_type == "SHOT_CLOCK" else turnover_type
     result = {
-        "result_type": turnover_type,
+        "result_type": result_type_for_api,
         "ball_handler": ball_handler,
         "text": text,
         "time_elapsed": random.randint(3, 8),
@@ -1889,6 +1898,8 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
     if stealer_id:
         result["stealer_id"] = stealer_id
         result["stealer_name"] = stealer_name
+    if turnover_type == "SHOT_CLOCK":
+        result["turnover_type"] = "SHOT_CLOCK"
     if events:
         result["events"] = events
 
@@ -2858,7 +2869,12 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
         return skeleton
     
     # Determine which step to stop at based on result type
-    if result in ["O_FOUL", "D_FOUL"]:
+    if result == "SHOT_CLOCK_VIOLATION":
+        # Use precomputed step where shot clock hits 0 (set by HCO shot-clock check)
+        stop_step_index = game_state.get("shot_clock_violation_step_index")
+        if stop_step_index is None or stop_step_index < 0 or stop_step_index >= len(steps) - 1:
+            stop_step_index = max(1, len(steps) - 2)
+    elif result in ["O_FOUL", "D_FOUL"]:
         # Random step before final (exclude step 0 and final step)
         # If skeleton has 7 steps (0-6), choose from steps 1-5
         stop_step_index = random.randint(1, len(steps) - 2) if len(steps) > 2 else 1
@@ -2920,6 +2936,7 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
         "O_FOUL": "o_foul",
         "D_FOUL": "d_foul",
         "DEAD_BALL_TURNOVER": "dead_ball_turnover",
+        "SHOT_CLOCK_VIOLATION": "dead_ball_turnover",
         "STEAL": "steal"
     }
     stopper_action = stopper_action_map.get(result, "turnover")
@@ -2951,8 +2968,8 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
     
     # ✅ FIX: Store stop_step_index for later use in determining ball handler and defender
     # This ensures we use the actual ball handler at the step where the steal/foul/turnover occurred
-    # Store for all non-shot results (steals, fouls, turnovers) so defender determination uses correct ball handler
-    if result in ["STEAL", "DEAD_BALL_TURNOVER", "O_FOUL", "D_FOUL"]:
+    # Store for all non-shot results (steals, fouls, turnovers, shot clock violation) so defender determination uses correct ball handler
+    if result in ["STEAL", "DEAD_BALL_TURNOVER", "SHOT_CLOCK_VIOLATION", "O_FOUL", "D_FOUL"]:
         game_state["steal_stop_step_index"] = stop_step_index
         # Also store a reference to the original skeleton steps before truncation
         # (we'll use this to extract position from the correct step)
@@ -3789,8 +3806,30 @@ def resolve_half_court_offense_logic(game):
     if final_skeleton:
         final_skeleton = copy.deepcopy(final_skeleton)
     
+    # Shot clock violation: if result is SHOT but shot clock would hit 0 during this turn, treat as stopper (same as dead ball turnover).
+    if result == "SHOT" and final_skeleton and "steps" in final_skeleton:
+        steps = final_skeleton["steps"]
+        if steps:
+            timing = calc_skeleton_step_timing_contract(
+                steps,
+                resolution_step_index=len(steps) - 1,
+                include_hco_step1_bringup=True,
+                prev_offense_positions=game_state.get("_prev_offense_positions_for_hco"),
+                base_step_seconds=2,
+            )
+            step_clock_seconds = timing.get("step_clock_seconds") or []
+            shot_remaining = game_state.get("shot_clock_remaining", 30)
+            cumulative = 0
+            for i, sec in enumerate(step_clock_seconds):
+                cumulative += sec
+                if cumulative >= shot_remaining:
+                    game_state["shot_clock_violation_step_index"] = i
+                    result = "SHOT_CLOCK_VIOLATION"
+                    break
+    
     # ✅ STOPER SYSTEM: Apply stopper system to skeleton (truncate and add stopper step if needed)
     skeleton = apply_stopper_system_to_skeleton(final_skeleton, result, game_state)
+    game_state.pop("shot_clock_violation_step_index", None)  # Don't leak to next turn
     
     # Get the successful variant to determine intended shooter (only for Set Plays)
     # Motion plays don't have variants, so we'll use the base_loop skeleton
@@ -3807,7 +3846,7 @@ def resolve_half_court_offense_logic(game):
     # to be based on ball handler's position, not shooter's position
     # assign_roles() assigns defender based on shooter, but for steals we need
     # whoever is guarding the ball handler at the time of the steal
-    if result in ["STEAL", "DEAD_BALL_TURNOVER", "O_FOUL", "D_FOUL"]:
+    if result in ["STEAL", "DEAD_BALL_TURNOVER", "SHOT_CLOCK_VIOLATION", "O_FOUL", "D_FOUL"]:
         # ✅ FIX: Get ball handler from the stop step where the steal/foul/turnover occurs,
         # not from roles (which may be the shooter from a different step)
         # This is critical for Motion plays where the ball handler changes throughout the motion
@@ -4166,6 +4205,8 @@ def resolve_half_court_offense_logic(game):
             event_type = "D_FOUL"
         elif result == "DEAD_BALL_TURNOVER":
             event_type = "TURNOVER"
+        elif result == "SHOT_CLOCK_VIOLATION":
+            event_type = "TURNOVER"
         elif result == "STEAL":
             event_type = "TURNOVER"
         else:
@@ -4261,14 +4302,14 @@ def resolve_half_court_offense_logic(game):
         
         #need to add animations to each of these
         if event_type == "TURNOVER":
-            # Use result to determine turnover type (STEAL vs DEAD BALL)
-            # Convert DEAD_BALL_TURNOVER (from resolution system) to "DEAD BALL" format
+            # Use result to determine turnover type (STEAL vs DEAD BALL vs SHOT_CLOCK)
             if result == "DEAD_BALL_TURNOVER":
                 turnover_type = "DEAD BALL"
+            elif result == "SHOT_CLOCK_VIOLATION":
+                turnover_type = "SHOT_CLOCK"
             elif result == "STEAL":
                 turnover_type = "STEAL"
             else:
-                # Fallback for legacy code paths
                 turnover_type = "DEAD BALL"
             # Pass from_resolution_system=True to respect the resolution system's determination
             turn_result = resolve_turnover_logic(roles, game, turnover_type=turnover_type, from_resolution_system=True)

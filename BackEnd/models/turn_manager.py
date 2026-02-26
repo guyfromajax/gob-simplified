@@ -3345,23 +3345,8 @@ class TurnManager:
 
         self.game.game_state["shot_clock_remaining"] = raw_shot_end
 
-        # Shot clock hit 0 this turn → forced shot / violation (unless final-turn outcome).
-        _clock_enforced = ("HCO", "FCP", "HCT", "FAST_BREAK")
-        is_final_turn_outcome = (
-            result.get("result_type") == "FINAL_HOLD" or result.get("final_turn") is True
-        )
-        if (
-            impact_turn
-            and raw_shot_end == 0
-            and _should_reset_shot_clock(result)
-            and result.get("current_turn") in _clock_enforced
-            and not is_final_turn_outcome
-        ):
-            state = result.get("current_turn", "HCO")
-            violation = self._build_shot_clock_violation_result(state)
-            violation["time_elapsed"] = effective_game_elapsed
-            # Overwrite outcome only; keep skeleton, step_clock_seconds, animations so frontend can animate full turn.
-            result.update(violation)
+        # Shot clock violations are now resolved via the stopper system (phase_resolution) before we get here;
+        # we no longer overwrite the result when raw_shot_end == 0.
 
         # Convert to clock display (e.g., 400 → "6:40")
         minutes = self.game.game_state["time_remaining"] // 60

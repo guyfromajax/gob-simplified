@@ -446,12 +446,13 @@ function handleTurnoverAnnouncement(turnData, scene, context, offenseTeam) {
       // Randomly choose between Travel and Double Dribble (50/50)
       turnoverText = Math.random() < 0.5 ? "Travel!" : "Double Dribble!";
     } else {
-      // Use existing type mapping
+      // Use existing type mapping (includes shot clock violation from stopper path)
       const typeMap = {
         "TRAVEL": "Travel!",
         "DOUBLE_DRIBBLE": "Double Dribble!",
         "OUT_OF_BOUNDS": "OUT OF BOUNDS!",
-        "BAD_PASS": "BAD PASS!"
+        "BAD_PASS": "BAD PASS!",
+        "SHOT_CLOCK": "Shot Clock Violation!"
       };
       turnoverText = typeMap[turnoverType] || "TURNOVER!";
     }
@@ -461,7 +462,8 @@ function handleTurnoverAnnouncement(turnData, scene, context, offenseTeam) {
       "TRAVEL": "Travel!",
       "DOUBLE_DRIBBLE": "Double Dribble!",
       "OUT_OF_BOUNDS": "OUT OF BOUNDS!",
-      "BAD_PASS": "BAD PASS!"
+      "BAD_PASS": "BAD PASS!",
+      "SHOT_CLOCK": "Shot Clock Violation!"
     };
     turnoverText = typeMap[turnoverType] || "TURNOVER!";
   }
