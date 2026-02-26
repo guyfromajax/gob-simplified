@@ -1478,11 +1478,12 @@ export function createGameScene(Phaser) {
             });
           }
         }
-        // Reset takes precedence: e.g. D_FOUL → SIDE_INBOUND must show 30 even when turn has shot_clock_end
-        if (this.shotClock && shouldResetShotClockOnTurn(turn)) {
-          this.shotClock.syncWithBackend(30);
-        } else if (this.shotClock && incomingShotSec !== null) {
+        // Value first, then reset: use turn's shot clock when present so we don't show 30 on the FOUL
+        // (showing 30 on FOUL caused the next HCO to be skipped). Reset still applies when no value (e.g. SIP).
+        if (this.shotClock && incomingShotSec !== null) {
           this.shotClock.syncWithBackend(incomingShotSec);
+        } else if (this.shotClock && shouldResetShotClockOnTurn(turn)) {
+          this.shotClock.syncWithBackend(30);
         }
         if (this.shotClock && isNoImpactShotClockTurn(turn)) {
           this.shotClock.pause('no_impact_turn');
