@@ -1478,10 +1478,11 @@ export function createGameScene(Phaser) {
             });
           }
         }
-        if (this.shotClock && incomingShotSec !== null) {
+        // Reset takes precedence: e.g. D_FOUL → SIDE_INBOUND must show 30 even when turn has shot_clock_end
+        if (this.shotClock && shouldResetShotClockOnTurn(turn)) {
+          this.shotClock.syncWithBackend(30);
+        } else if (this.shotClock && incomingShotSec !== null) {
           this.shotClock.syncWithBackend(incomingShotSec);
-        } else if (this.shotClock && shouldResetShotClockOnTurn(turn)) {
-          this.shotClock.syncWithBackend(30); // shot-clock-only: reset when no value but turn type resets
         }
         if (this.shotClock && isNoImpactShotClockTurn(turn)) {
           this.shotClock.pause('no_impact_turn');
