@@ -3406,12 +3406,12 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
     roles["shot_spot"] = coords  # Same data for block reconciliation (explicit shot location = animation location)
 
 
-def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup):
+def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_shot_step_index=None):
     """
     Resolve Motion offense shot attempt.
     
     This function:
-    1. Selects a random step (excluding step 0) for shot attempt
+    1. Selects a random step (excluding step 0) for shot attempt, or uses forced_shot_step_index if provided
     2. Determines shot type (inside/outside/attack) based on possibilities and strategy
     3. Truncates skeleton at selected step
     4. Appends necessary steps (pass/receive, drive, shoot)
@@ -3422,6 +3422,7 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup):
         game: GameManager instance
         off_lineup: Offensive lineup dict
         def_lineup: Defensive lineup dict
+        forced_shot_step_index: Optional int. If provided, use this step index instead of random (for recalibration).
     
     Returns:
         dict: {
@@ -3449,8 +3450,11 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup):
         logging.warning(f"⚠️ [MOTION SHOT] Skeleton has insufficient steps ({len(steps)}), cannot select shot step")
         return None
     
-    # Phase 1: Select random step (excluding step 0)
-    shot_step_index = random.randint(1, len(steps) - 1)
+    # Phase 1: Select step (forced for recalibration, else random excluding step 0)
+    if forced_shot_step_index is not None:
+        shot_step_index = max(1, min(forced_shot_step_index, len(steps) - 1))
+    else:
+        shot_step_index = random.randint(1, len(steps) - 1)
     selected_step = steps[shot_step_index]
     
     # Truncate skeleton at selected step
@@ -3811,6 +3815,7 @@ def resolve_half_court_offense_logic(game):
         final_skeleton = copy.deepcopy(final_skeleton)
     
     # Shot clock violation: if result is SHOT but shot clock would hit 0 during this turn, either violation or shot-at-1 (Real_Time_Clock_System.md).
+    # Motion only: optional recalibration — chance to take a shot from an earlier step to avoid violation (docs/To Do/_motion_play_decision.md).
     if result == "SHOT" and final_skeleton and "steps" in final_skeleton:
         steps = final_skeleton["steps"]
         if steps:
@@ -3826,9 +3831,25 @@ def resolve_half_court_offense_logic(game):
             for i, sec in enumerate(step_clock_seconds):
                 cumulative += sec
                 if cumulative >= shot_remaining:
-                    # Decide: violation (path A) or shot attempt at 1s (path B) via violation_threshold
                     chemistry = int(off_team.team_attributes.get("team_chemistry", 7))
                     discipline = int(off_team.team_attributes.get("discipline", 0))
+
+                    # Motion recalibration: chance to shoot from step index 2..(i-1) to avoid violation
+                    if is_motion_play and i >= 3:
+                        recalibration_score = (chemistry * 3) + (discipline * 2)
+                        die_roll = random.randint(1, 100)
+                        if die_roll < recalibration_score:
+                            chosen_step = random.randint(2, i - 1)
+                            motion_shot_info = resolve_motion_offense_shot(
+                                final_skeleton, game, off_lineup, def_lineup,
+                                forced_shot_step_index=chosen_step,
+                            )
+                            if motion_shot_info:
+                                final_skeleton = motion_shot_info["skeleton"]
+                                game_state["_motion_shot_recalibrated"] = motion_shot_info
+                                break
+
+                    # No recalibration (or failed recalibration): violation vs shot-at-1
                     ball_handler_at_step = get_ball_handler_from_skeleton(final_skeleton, off_lineup, step_index=i)
                     iq = int(getattr(ball_handler_at_step, "attributes", {}).get("IQ", 0) or 0)
                     intelligence = min(20, iq // 5)
@@ -4486,9 +4507,11 @@ def resolve_half_court_offense_logic(game):
     # logging.warning(f"🔍 [HCO RESOLVE DEBUG] SECOND READ - Will call resolve_motion_offense_shot: {is_motion_play and event_type == 'SHOT'}")
     
     if is_motion_play and event_type == "SHOT":
-        # Motion play shot resolution
-        motion_shot_info = resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup)
-        
+        # Motion play shot resolution (or use precomputed recalibration from shot-clock path)
+        motion_shot_info = game_state.pop("_motion_shot_recalibrated", None)
+        if not motion_shot_info:
+            motion_shot_info = resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup)
+
         if motion_shot_info:
             # Update skeleton with Motion shot modifications
             skeleton = motion_shot_info["skeleton"]
