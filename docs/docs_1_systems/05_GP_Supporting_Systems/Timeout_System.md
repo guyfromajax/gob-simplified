@@ -139,6 +139,17 @@ The `next_play_type` in the timeout turn is **always** `"SIDE_INBOUND"` (except 
 
 **Used By:** `turn_manager.py` `setup_timeout_turn()` to determine `next_play_type` for foul-out timeouts
 
+### Foul Out Popup – Player Image
+
+**Purpose:** Show the **fouling-out** player’s headshot in the foul-out modal (the player who has 5 fouls and is ejected), not the player who was fouled.
+
+**Frontend (popup):**
+- **File:** `FrontEnd/static/js/phaser/utils/foulOutPopup.js`
+- **Player resolution:** Before showing the popup, the fouled-out player is resolved from `simData.players` by **string id** (`foul_out_player.player_id` or `playerId`). This guarantees the correct player (the one who fouled out) is shown even if the turn payload is ambiguous.
+- **Image path:** Use the player’s **string id** (same as API `player_id` / `playerId`; not an object id). Path: `/images/players/{playerId}.png`. Fallback: `/images/players/default.png` if the primary image fails.
+- **Static prefix:** On localhost/127.0.0.1 prepend `/static` (backend serves static from `/static/`). On Netlify and production use no prefix (site root is already the static publish folder).
+- **Call sites:** `gameScene.js` and `AnimationEngine.js` both resolve the player from `simData.players` by `foul_out_player.player_id` before calling `showFoulOutPopup`, so the popup always receives the fouling-out player.
+
 ### Foul Out Player Lineup Removal & Visual Indicators
 
 **Purpose:** Removes fouled-out players from lineup and visually disables them on lineup screen

@@ -1494,14 +1494,19 @@ export function createGameScene(Phaser) {
         const isFoulOutTimeoutTurn = turn.result_type === 'TIMEOUT' && turn.timeout_reason === 'FOUL_OUT';
         const isFoulOutFlaggedTurn = turn.fouled_out && turn.foul_out_player;
         const shouldShowFoulOutPopup = isFoulOutFlaggedTurn || isFoulOutTimeoutTurn;
-        const foulOutPlayer = turn.foul_out_player || (isFoulOutTimeoutTurn ? { name: 'Unknown', player_id: null, team: null, photo: null } : null);
+        const rawFoulOutPlayer = turn.foul_out_player || (isFoulOutTimeoutTurn ? { name: 'Unknown', player_id: null, team: null, photo: null } : null);
+        // Resolve fouled-out player from simData by id so we always show the player who fouled out (not the player who was fouled)
+        const foulOutId = rawFoulOutPlayer?.player_id ?? rawFoulOutPlayer?.playerId;
+        const foulOutPlayer = (foulOutId && this.simData?.players)
+          ? (this.simData.players.find(p => (p.playerId ?? p.player_id) === foulOutId) || rawFoulOutPlayer)
+          : rawFoulOutPlayer;
 
         if (shouldShowFoulOutPopup && foulOutPlayer && !document.querySelector('.foul-out-popup')) {
           // Clear red tint on fouled-out player's sprite so it doesn't stay "dead"
-          const foulOutId = foulOutPlayer.player_id ?? foulOutPlayer.playerId;
-          if (foulOutId) {
+          const foulOutIdForTint = foulOutPlayer.player_id ?? foulOutPlayer.playerId;
+          if (foulOutIdForTint) {
             import('./animation/negativeActionEffects.js').then(({ clearFoulTintForPlayer }) => {
-              clearFoulTintForPlayer(this, foulOutId);
+              clearFoulTintForPlayer(this, foulOutIdForTint);
             }).catch(() => {});
           }
           // Dynamically import foul out popup

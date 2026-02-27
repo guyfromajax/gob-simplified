@@ -499,12 +499,16 @@ export class AnimationEngine {
     // Use placeholder player if backend didn't send foul_out_player (contract: backend now always sends one).
     if (turnData.timeout_reason === 'FOUL_OUT') {
       const gameId = this.scene.gameId || this.scene.simData?.game_id;
-      const player = turnData.foul_out_player || { name: 'Unknown', player_id: null, team: null, photo: null };
+      const rawPlayer = turnData.foul_out_player || { name: 'Unknown', player_id: null, team: null, photo: null };
       if (!turnData.foul_out_player) {
         console.warn('⚠️ [FOUL OUT] TIMEOUT turn has timeout_reason=FOUL_OUT but no foul_out_player; showing popup with placeholder.');
       }
+      // Resolve fouled-out player from simData by id so we always show the player who fouled out (not the player who was fouled)
+      const foulOutPlayerId = rawPlayer?.player_id ?? rawPlayer?.playerId;
+      const player = (foulOutPlayerId && this.scene.simData?.players)
+        ? (this.scene.simData.players.find(p => (p.playerId ?? p.player_id) === foulOutPlayerId) || rawPlayer)
+        : rawPlayer;
       // Clear red tint on fouled-out player's sprite so it doesn't stay "dead" when we navigate
-      const foulOutPlayerId = player?.player_id ?? player?.playerId;
       if (foulOutPlayerId && this.scene) {
         try {
           const { clearFoulTintForPlayer } = await import('./negativeActionEffects.js');
