@@ -15,7 +15,6 @@
  * @param {string} [options.userTeamId] - User's team ID
  */
 export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournamentId, franchiseId, homeTeam, awayTeam, homeId, awayId, myTeamSide, userTeamId }) {
-  console.log('[FOUL-OUT POPUP] showFoulOutPopup called', { playerId: player?.player_id ?? player?.playerId, name: player?.name });
   // Remove any existing popup
   const existingPopup = document.querySelector('.foul-out-popup');
   if (existingPopup) {
@@ -139,16 +138,6 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
     photoUrl = staticPrefix + photoUrl;
   }
   defaultPlayerImg = staticPrefix + defaultPlayerImg;
-  // DEBUG: remove after fixing foul-out image
-  console.log('[FOUL-OUT POPUP] image URL debug', {
-    hostname,
-    staticPrefix,
-    playerId,
-    rawPhoto: rawPhoto || null,
-    photoUrlFinal: photoUrl || null,
-    defaultPlayerImgFinal: defaultPlayerImg,
-    showingImg: !!photoUrl
-  });
   const safePhotoUrl = photoUrl.replace(/"/g, '&quot;');
   const safeDefaultImg = defaultPlayerImg.replace(/"/g, '&quot;');
   const safeName = (player?.name || 'Player').replace(/"/g, '&quot;');
@@ -301,11 +290,5 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
     });
   }
   document.body.appendChild(popup);
-  const img = popup.querySelector('.foul-out-player-image');
-  if (img) {
-    img.addEventListener('error', () => {
-      console.warn('[FOUL-OUT POPUP] image failed to load', { src: img.src });
-    });
-  }
 }
 
