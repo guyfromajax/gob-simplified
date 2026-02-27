@@ -15,6 +15,7 @@
  * @param {string} [options.userTeamId] - User's team ID
  */
 export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournamentId, franchiseId, homeTeam, awayTeam, homeId, awayId, myTeamSide, userTeamId }) {
+  console.log('[FOUL-OUT POPUP] showFoulOutPopup called', { playerId: player?.player_id ?? player?.playerId, name: player?.name });
   // Remove any existing popup
   const existingPopup = document.querySelector('.foul-out-popup');
   if (existingPopup) {
