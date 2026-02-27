@@ -5014,6 +5014,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
     if result_type == "SHOT":
         # ✅ Get skeleton first (needed to determine shooter and passer dynamically)
         skeleton = get_fcp_skeleton("SHOT", game) or {}
+        if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 1:
+            skeleton = copy.deepcopy(skeleton)
+            skeleton["steps"] = skeleton["steps"][1:]
         
         # ✅ Dynamically determine shooter and passer from skeleton
         shooter = None
@@ -5177,6 +5180,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
     # Deep copy skeleton to avoid mutating cached skeleton
     if skeleton:
         skeleton = copy.deepcopy(skeleton)
+    
+    # BIP already ran step 0 (inbound setup + pass). Start FCP animation at step 1.
+    if skeleton and "steps" in skeleton and len(skeleton["steps"]) > 1:
+        skeleton["steps"] = skeleton["steps"][1:]
     
     # ✅ DEBUG: Log step 0 positions from HCO skeleton
     # if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 0:
@@ -6176,6 +6183,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     if result_type == "SHOT":
         # ✅ Get skeleton first (needed to determine shooter and passer dynamically)
         skeleton = get_hct_skeleton("SHOT", game) or {}
+        if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 1:
+            skeleton = copy.deepcopy(skeleton)
+            skeleton["steps"] = skeleton["steps"][1:]
         
         # ✅ Dynamically determine shooter and passer from skeleton
         shooter = None
@@ -6343,6 +6353,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     # Deep copy skeleton to avoid mutating cached skeleton
     if skeleton:
         skeleton = copy.deepcopy(skeleton)
+    
+    # BIP already ran step 0 (inbound setup + pass). Start HCT animation at step 1.
+    if skeleton and "steps" in skeleton and len(skeleton["steps"]) > 1:
+        skeleton["steps"] = skeleton["steps"][1:]
     
     # Apply stopper system (truncates if needed, or returns full skeleton if result == "HCO")
     skeleton = apply_stopper_system_to_skeleton(skeleton, result_type, game_state)
