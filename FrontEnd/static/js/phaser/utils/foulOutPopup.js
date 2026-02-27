@@ -138,6 +138,16 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
     photoUrl = staticPrefix + photoUrl;
   }
   defaultPlayerImg = staticPrefix + defaultPlayerImg;
+  // DEBUG: remove after fixing foul-out image
+  console.log('[FOUL-OUT POPUP] image URL debug', {
+    hostname,
+    staticPrefix,
+    playerId,
+    rawPhoto: rawPhoto || null,
+    photoUrlFinal: photoUrl || null,
+    defaultPlayerImgFinal: defaultPlayerImg,
+    showingImg: !!photoUrl
+  });
   const safePhotoUrl = photoUrl.replace(/"/g, '&quot;');
   const safeDefaultImg = defaultPlayerImg.replace(/"/g, '&quot;');
   const safeName = (player?.name || 'Player').replace(/"/g, '&quot;');
@@ -290,5 +300,11 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
     });
   }
   document.body.appendChild(popup);
+  const img = popup.querySelector('.foul-out-player-image');
+  if (img) {
+    img.addEventListener('error', () => {
+      console.warn('[FOUL-OUT POPUP] image failed to load', { src: img.src });
+    });
+  }
 }
 

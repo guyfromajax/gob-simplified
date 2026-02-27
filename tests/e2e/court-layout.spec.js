@@ -215,3 +215,50 @@ test.describe('Court Layout - Grid Constraints', () => {
     expect(playcallBox.height).toBeGreaterThanOrEqual(150); // At least min height
   });
 });
+
+test.describe('Regression - No infinite hang', () => {
+  test('court page loads and shows Play button within 25s (no hang)', async ({ page }) => {
+    await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
+    await expect(page.locator('.play-button')).toBeVisible({ timeout: 25000 });
+  });
+});
+
+test.describe('Foul Out Popup - Player image URL', () => {
+  test('popup image src uses correct path (static prefix on localhost)', async ({ page }) => {
+    await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+
+    await page.evaluate(() => {
+      window.TimeoutNavigationHelper = window.TimeoutNavigationHelper || {
+        buildGameNavigationParams: () => new URLSearchParams()
+      };
+    });
+
+    await page.evaluate(async () => {
+      const { showFoulOutPopup } = await import('/static/js/phaser/utils/foulOutPopup.js');
+      await showFoulOutPopup({
+        player: { player_id: 'test-1', name: 'Test', team: 'home' },
+        gameId: 'g1',
+        mode: 'single',
+        quarter: '1',
+        clock: '5:00',
+        homeTeam: 'Lancaster',
+        awayTeam: 'Four-Corners'
+      });
+    });
+
+    const popup = page.locator('.foul-out-popup');
+    await expect(popup).toBeVisible({ timeout: 5000 });
+    const img = popup.locator('.foul-out-player-image');
+    await expect(img).toBeAttached();
+    const src = await img.getAttribute('src');
+    expect(src).toContain('/images/players/');
+    expect(src).toContain('test-1.png');
+    // On localhost/Netlify we expect /static prefix
+    const hostname = await page.evaluate(() => window.location.hostname);
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.netlify.app')) {
+      expect(src).toContain('/static/images/players/');
+    }
+  });
+});
