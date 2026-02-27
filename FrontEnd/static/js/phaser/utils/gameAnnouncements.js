@@ -12,6 +12,17 @@
 
 import { showAnnouncement, showAndOneAnnouncement } from './announcements.js';
 import { triggerFoulEffect, triggerTurnoverEffect, triggerMadeShotFlash } from '../animation/negativeActionEffects.js';
+import gameStore from '../../state/gameStore.js';
+
+function getSecondaryColorForTeam(scene, teamId) {
+  if (!scene?.simData || teamId == null) return '#333333';
+  const colors = gameStore.getColors();
+  const homeId = scene.simData.home_team_id;
+  const awayId = scene.simData.away_team_id;
+  const isHome = String(teamId) === String(homeId);
+  const side = isHome ? colors.home : colors.away;
+  return side?.secondary_color || '#333333';
+}
 
 /**
  * Central game event announcement dispatcher
@@ -105,6 +116,20 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       showAnnouncement("Fast Break!", offenseTeam);
       break;
 
+    // ========== SITUATIONAL LOGIC (Q4/OT) ==========
+    case 'SLOW_IT_DOWN':
+      showAnnouncement("Slow It Down", offenseTeam);
+      break;
+
+    case 'QUICK_SHOT':
+      showAnnouncement("Quick Shot", offenseTeam);
+      break;
+
+    // ========== FINAL TURN (end of quarter/game) ==========
+    case 'FINAL_SHOT':
+      showAnnouncement("Final Shot", offenseTeam);
+      break;
+
     case 'DEFENSIVE_STOP':
       // Get stopper data if available
       const stopperId = context.stopperId || turnData.stopper_id;
@@ -115,7 +140,8 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
           stopperData = {
             playerId: stopperId,
             photo: stopperSprite.photo || null,
-            teamName: stopperSprite.team_id
+            teamName: stopperSprite.team_id,
+            secondaryColor: getSecondaryColorForTeam(scene, stopperSprite.team_id)
           };
         }
       }
@@ -144,7 +170,8 @@ function handleShotMakeAnnouncement(turnData, scene, context, offenseTeam) {
       playerData = {
         playerId: shooterId,
         photo: shooterSprite.photo || null,
-        teamName: shooterSprite.team_id
+        teamName: shooterSprite.team_id,
+        secondaryColor: getSecondaryColorForTeam(scene, shooterSprite.team_id)
       };
     }
   }
@@ -165,7 +192,8 @@ function handleAndOneAnnouncement(turnData, scene, context, offenseTeam) {
       shooterData = {
         playerId: shooterId,
         photo: shooterSprite.photo || null,
-        teamName: shooterSprite.team_id
+        teamName: shooterSprite.team_id,
+        secondaryColor: getSecondaryColorForTeam(scene, shooterSprite.team_id)
       };
     }
   }
@@ -176,7 +204,8 @@ function handleAndOneAnnouncement(turnData, scene, context, offenseTeam) {
       foulerData = {
         playerId: foulerId,
         photo: foulerSprite.photo || null,
-        teamName: foulerSprite.team_id
+        teamName: foulerSprite.team_id,
+        secondaryColor: getSecondaryColorForTeam(scene, foulerSprite.team_id)
       };
     }
   }
@@ -199,7 +228,8 @@ function handleFreeThrowMakeAnnouncement(turnData, scene, context, offenseTeam) 
       playerData = {
         playerId: shooterId,
         photo: shooterSprite.photo || null,
-        teamName: shooterSprite.team_id
+        teamName: shooterSprite.team_id,
+        secondaryColor: getSecondaryColorForTeam(scene, shooterSprite.team_id)
       };
     }
   }
@@ -219,7 +249,8 @@ function handleReboundAnnouncement(turnData, scene, context) {
   const playerData = {
     playerId: rebounderId,
     photo: rebounderSprite.photo || null,
-    teamName: rebounderSprite.team_id
+    teamName: rebounderSprite.team_id,
+    secondaryColor: getSecondaryColorForTeam(scene, rebounderSprite.team_id)
   };
 
   showAnnouncement("Rebound!", rebounderTeam, playerData);
@@ -236,7 +267,8 @@ function handleBlockAnnouncement(turnData, scene, context) {
   const playerData = {
     playerId: blockerId,
     photo: blockerSprite.photo || null,
-    teamName: blockerSprite.team_id
+    teamName: blockerSprite.team_id,
+    secondaryColor: getSecondaryColorForTeam(scene, blockerSprite.team_id)
   };
 
   showAnnouncement("BLOCK!", blockerTeam, playerData);
@@ -252,7 +284,8 @@ function handleShootingFoulAnnouncement(turnData, scene, context) {
       playerData = {
         playerId: foulerId,
         photo: foulerSprite.photo || null,
-        teamName: foulerSprite.team_id
+        teamName: foulerSprite.team_id,
+        secondaryColor: getSecondaryColorForTeam(scene, foulerSprite.team_id)
       };
     }
   }
@@ -270,7 +303,8 @@ function handleOffensiveFoulAnnouncement(turnData, scene, context, defenseTeam) 
       playerData = {
         playerId: foulerId,
         photo: foulerSprite.photo || null,
-        teamName: foulerSprite.team_id
+        teamName: foulerSprite.team_id,
+        secondaryColor: getSecondaryColorForTeam(scene, foulerSprite.team_id)
       };
     }
   }
@@ -293,7 +327,8 @@ function handleDefensiveFoulAnnouncement(turnData, scene, context, offenseTeam) 
       playerData = {
         playerId: foulerId,
         photo: foulerSprite.photo || null,
-        teamName: foulerSprite.team_id
+        teamName: foulerSprite.team_id,
+        secondaryColor: getSecondaryColorForTeam(scene, foulerSprite.team_id)
       };
     }
   }
@@ -316,7 +351,8 @@ function handleChargeAnnouncement(turnData, scene, context, defenseTeam) {
       playerData = {
         playerId: foulerId,
         photo: foulerSprite.photo || null,
-        teamName: foulerSprite.team_id
+        teamName: foulerSprite.team_id,
+        secondaryColor: getSecondaryColorForTeam(scene, foulerSprite.team_id)
       };
     }
   }
@@ -339,7 +375,8 @@ function handleBlockingFoulAnnouncement(turnData, scene, context, offenseTeam) {
       playerData = {
         playerId: foulerId,
         photo: foulerSprite.photo || null,
-        teamName: foulerSprite.team_id
+        teamName: foulerSprite.team_id,
+        secondaryColor: getSecondaryColorForTeam(scene, foulerSprite.team_id)
       };
     }
   }
@@ -362,7 +399,8 @@ function handleStealAnnouncement(turnData, scene, context, defenseTeam) {
       playerData = {
         playerId: stealerId,
         photo: stealerSprite.photo || null,
-        teamName: stealerSprite.team_id
+        teamName: stealerSprite.team_id,
+        secondaryColor: getSecondaryColorForTeam(scene, stealerSprite.team_id)
       };
     }
   }
@@ -386,7 +424,8 @@ function handleTurnoverAnnouncement(turnData, scene, context, offenseTeam) {
       playerData = {
         playerId: victimId,
         photo: victimSprite.photo || null,
-        teamName: victimSprite.team_id
+        teamName: victimSprite.team_id,
+        secondaryColor: getSecondaryColorForTeam(scene, victimSprite.team_id)
       };
     }
   }
@@ -407,12 +446,13 @@ function handleTurnoverAnnouncement(turnData, scene, context, offenseTeam) {
       // Randomly choose between Travel and Double Dribble (50/50)
       turnoverText = Math.random() < 0.5 ? "Travel!" : "Double Dribble!";
     } else {
-      // Use existing type mapping
+      // Use existing type mapping (includes shot clock violation from stopper path)
       const typeMap = {
         "TRAVEL": "Travel!",
         "DOUBLE_DRIBBLE": "Double Dribble!",
         "OUT_OF_BOUNDS": "OUT OF BOUNDS!",
-        "BAD_PASS": "BAD PASS!"
+        "BAD_PASS": "BAD PASS!",
+        "SHOT_CLOCK": "Shot Clock Violation!"
       };
       turnoverText = typeMap[turnoverType] || "TURNOVER!";
     }
@@ -422,7 +462,8 @@ function handleTurnoverAnnouncement(turnData, scene, context, offenseTeam) {
       "TRAVEL": "Travel!",
       "DOUBLE_DRIBBLE": "Double Dribble!",
       "OUT_OF_BOUNDS": "OUT OF BOUNDS!",
-      "BAD_PASS": "BAD PASS!"
+      "BAD_PASS": "BAD PASS!",
+      "SHOT_CLOCK": "Shot Clock Violation!"
     };
     turnoverText = typeMap[turnoverType] || "TURNOVER!";
   }

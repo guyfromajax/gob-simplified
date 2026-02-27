@@ -139,8 +139,14 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
       ballSprite.setPosition(rebounderSprite.x, rebounderSprite.y);
       ballSprite.setVisible(true);
     }
-    
-    
+
+    // OREB hold: rebounder holds until 1 game s remains, then acts (1 game s = 350ms real)
+    const orebHoldSeconds = turnData.oreb_hold_seconds;
+    if (typeof orebHoldSeconds === 'number' && orebHoldSeconds > 0 && scene.time) {
+      const holdMs = orebHoldSeconds * 350;
+      await new Promise((resolve) => scene.time.delayedCall(holdMs, resolve));
+    }
+
     const shotResult = await shootBall({
       scene,
       ballSprite,
@@ -241,7 +247,8 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
       
       // If DREB, set up next play (outlet pass for HCO only)
       // For FAST_BREAK, the outlet pass is handled in the fast break sequence itself
-      if (turnData.rebound_type === "DREB" && turnData.next_play_type !== "FAST_BREAK") {
+      // ✅ Force Foul after DREB: skip outlet — foul turn will animate defender→rebounder and "Quick Foul"
+      if (turnData.rebound_type === "DREB" && turnData.next_play_type !== "FAST_BREAK" && !turnData.force_foul_after_dreb) {
         // For putback misses leading to DREB, find the original MISS turn that has offense_getback
         // This might be a previous turn (the original shot attempt) or the putback turn itself
         let missTurn = null;
@@ -306,6 +313,13 @@ async function handleOrebKickout(scene, { playerSprites, ballSprite, rebounderId
   if (!pgId) {
     console.warn('handleOrebKickout: No PG ID provided', turnData);
     return;
+  }
+
+  // OREB hold: rebounder holds until 1 game s remains, then acts (1 game s = 350ms real)
+  const orebHoldSeconds = turnData.oreb_hold_seconds;
+  if (typeof orebHoldSeconds === 'number' && orebHoldSeconds > 0 && scene.time) {
+    const holdMs = orebHoldSeconds * 350;
+    await new Promise((resolve) => scene.time.delayedCall(holdMs, resolve));
   }
 
   // Step 1: Run outlet positioning animation (PG and rebounder move to outlet spots)
@@ -518,7 +532,9 @@ export async function animateGameTurns({ //hasBallAtStep
   // console.log('🎬 animateGameTurns: Starting turn processing loop', { totalTurns: turns.length });
   
   // Removed verbose loop start log
-  
+  // ✅ Force Foul: Expose current batch so router can pass nextTurn to BIP/SIP (same-turn defender move)
+  scene._currentTurnBatch = turns;
+
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
     
@@ -1021,6 +1037,20 @@ export async function animateGameTurns({ //hasBallAtStep
         updateDebugScore(turn, { turnIndex: i, possessionId });
         continue;
       }
+    }
+
+    // ✅ Phase 4: Final Turn — route FINAL_HOLD to AnimationRouter (clock out, then quarter/game end)
+    if (turn.result_type === "FINAL_HOLD") {
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      continue;
+    }
+
+    // ✅ Phase 4: Final Turn shot (blocking foul) — route FOUL with final_turn to AnimationRouter
+    if (turn.final_turn === true && turn.result_type === "FOUL") {
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      continue;
     }
 
     const shouldDebugHCO =

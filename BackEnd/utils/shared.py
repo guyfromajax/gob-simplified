@@ -1,3 +1,4 @@
+import math
 import random
 import logging
 from BackEnd.constants import (
@@ -6,6 +7,8 @@ from BackEnd.constants import (
     HCO_STRING_SPOTS,
     CHARGE_THRESHOLD,
     BLOCKING_FOUL_THRESHOLD,
+    ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND,
+    PASS_GRID_SPOTS_PER_GAME_SECOND,
 )
 
 
@@ -118,6 +121,277 @@ def get_time_elapsed(tempo_call):
     p = TEMPO_PARAMS[tempo_call]
     return int(max(p["min"], min(p["max"], random.gauss(p["mean"], p["std"]))))
 
+
+def clamp_turn_time_elapsed(seconds, cap=30):
+    """Clamp turn time to [0, cap] and return int."""
+    try:
+        value = int(seconds)
+    except (TypeError, ValueError):
+        value = 0
+    return max(0, min(cap, value))
+
+
+def round_fractional_game_seconds(fractional_seconds_list):
+    """
+    Sum fractional game seconds, then round: down if decimal <= .49, up if >= .50.
+    Returns int seconds to add to the final non-rim-hold event.
+    """
+    if not fractional_seconds_list:
+        return 0
+    total = sum(float(x) for x in fractional_seconds_list)
+    whole = int(total)
+    decimal = total - whole
+    if decimal <= 0.49:
+        return whole
+    return whole + 1
+
+
+def calc_skeleton_time_elapsed(steps, resolution_step_index=None, cap=30):
+    """
+    Calculate skeleton turn time from per-step random seconds (1..5).
+    """
+    timing = calc_skeleton_step_timing_contract(
+        steps,
+        resolution_step_index=resolution_step_index,
+        cap=cap,
+        include_hco_step1_bringup=False,
+    )
+    return timing["time_elapsed"]
+
+
+def _extract_step_location_coords(action_info):
+    """Resolve a step action location payload to {x, y} when possible."""
+    if not isinstance(action_info, dict):
+        return None
+    coords = action_info.get("coords")
+    if isinstance(coords, dict) and "x" in coords and "y" in coords:
+        return {"x": coords.get("x", 50), "y": coords.get("y", 25)}
+
+    spot = action_info.get("location") or action_info.get("spot")
+    if isinstance(spot, str):
+        spot_coords = HCO_STRING_SPOTS.get(spot)
+        if spot_coords:
+            return {"x": spot_coords.get("x", 50), "y": spot_coords.get("y", 25)}
+    return None
+
+
+def _get_step_ball_handler_pos(step):
+    """Best-effort ball handler position for a skeleton step."""
+    pos_actions = (step or {}).get("pos_actions", {})
+    for pos, action_info in pos_actions.items():
+        action = (action_info or {}).get("action", "")
+        if action in ["handle_ball", "receive", "shoot", "pass", "drive"]:
+            return pos
+    return None
+
+
+def _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions=None):
+    """
+    Pre-HCO bring-up time: distance-based using same rate as CG (unabated up the floor).
+    Rate: sqrt((dx/20)^2 + (dy/10)^2) game seconds per segment (Real_Time_Clock_System.md).
+
+    When prev_offense_positions is provided (e.g. from BIP/SIP oDestinations): use the
+    player who has the most distance to cover to reach their Step 0 position; that
+    determines the segment duration so the whole unit arrives in sync.
+
+    When prev_offense_positions is not provided (e.g. DREB→HCO): fall back to step0→step1
+    ball-handler move (legacy bring-up).
+    """
+    if not steps:
+        return 0
+    step0 = steps[0]
+    pos_actions0 = (step0.get("pos_actions") or {})
+
+    if prev_offense_positions:
+        # Pre-step-0: max over offense players of (distance from prev position to step 0 position)
+        max_seconds = 0.0
+        for pos, prev_coords in prev_offense_positions.items():
+            if not prev_coords or not isinstance(prev_coords, dict):
+                continue
+            action_info = pos_actions0.get(pos)
+            if not action_info:
+                continue
+            step0_coords = _extract_step_location_coords(action_info)
+            if not step0_coords:
+                continue
+            seg = calc_cg_segment_seconds(prev_coords, step0_coords)
+            if seg > max_seconds:
+                max_seconds = seg
+        return int(round(max_seconds)) if max_seconds > 0 else 0
+
+    # Fallback: step0 → step1 ball-handler move (e.g. when no inbound positions stored)
+    if len(steps) < 2:
+        return 0
+    step1 = steps[1]
+    ball_handler_pos = _get_step_ball_handler_pos(step1) or _get_step_ball_handler_pos(step0)
+    if not ball_handler_pos:
+        return 0
+    step0_action = pos_actions0.get(ball_handler_pos, {})
+    step1_action = (step1.get("pos_actions", {}) or {}).get(ball_handler_pos, {})
+    start = _extract_step_location_coords(step0_action)
+    end = _extract_step_location_coords(step1_action)
+    if not start or not end:
+        return 0
+    return int(round(calc_cg_segment_seconds(start, end)))
+
+
+# Minimum game seconds per step when movement cannot be computed (no blanket per-step default).
+FALLBACK_STEP_SECONDS = 1
+
+
+def calc_skeleton_step_timing_contract(
+    steps,
+    resolution_step_index=None,
+    cap=30,
+    include_hco_step1_bringup=False,
+    prev_offense_positions=None,
+):
+    """
+    Build deterministic per-step clock timing contract for skeleton turns.
+    Each step's duration = max over all movers in that step (time for last player to reach
+    destination): drive actions use drive rate (1 game sec per 12 grid spots), other movement
+    uses CG rate. Pass in-air time is added to the step. When include_hco_step1_bringup is
+    True, prev_offense_positions (e.g. from BIP/SIP oDestinations) is used for pre-step-0
+    bring-up. Steps with no computable movement use FALLBACK_STEP_SECONDS.
+    """
+    if not steps:
+        one_step = FALLBACK_STEP_SECONDS
+        return {
+            "step_clock_seconds": [one_step],
+            "time_elapsed": clamp_turn_time_elapsed(one_step, cap=cap),
+            "resolution_step_index": 0,
+            "executed_step_count": 1,
+        }
+
+    max_index = len(steps) - 1
+    if resolution_step_index is None:
+        resolution_step_index = max_index
+    resolution_step_index = max(0, min(max_index, int(resolution_step_index)))
+
+    executed_count = resolution_step_index + 1
+    step_clock_seconds = []
+
+    for i in range(executed_count):
+        step_i = steps[i] if i < len(steps) else None
+        if not step_i:
+            step_clock_seconds.append(FALLBACK_STEP_SECONDS)
+            continue
+
+        mover_durations = []
+        if i > 0:
+            prev_step = steps[i - 1]
+            pos_actions_i = step_i.get("pos_actions") or {}
+            prev_actions = prev_step.get("pos_actions") or {}
+            for pos, action_info in (pos_actions_i or {}).items():
+                action_info = action_info or {}
+                action = action_info.get("action", "")
+                end_coords = _extract_step_location_coords(action_info)
+                if not end_coords:
+                    continue
+                prev_info = prev_actions.get(pos)
+                start_coords = _extract_step_location_coords(prev_info) if prev_info else None
+                if action == "drive" and start_coords:
+                    sec = calc_drive_segment_seconds(start_coords, end_coords)
+                    mover_durations.append(sec)
+                elif start_coords:
+                    sec = calc_cg_segment_seconds(start_coords, end_coords)
+                    if sec > 0:
+                        mover_durations.append(sec)
+
+        step_sec = max(mover_durations) if mover_durations else 0
+        step_sec = max(FALLBACK_STEP_SECONDS, round(step_sec)) if step_sec else FALLBACK_STEP_SECONDS
+
+        # Pass in-air time for this step
+        pos_actions_i = step_i.get("pos_actions") or {}
+        for ev in step_i.get("events") or []:
+            if (ev or {}).get("type") != "pass":
+                continue
+            from_pos = (ev or {}).get("from")
+            to_pos = (ev or {}).get("to")
+            if not from_pos or not to_pos:
+                continue
+            passer_info = pos_actions_i.get(from_pos)
+            receiver_info = pos_actions_i.get(to_pos)
+            passer_coords = _extract_step_location_coords(passer_info) if passer_info else None
+            receiver_coords = _extract_step_location_coords(receiver_info) if receiver_info else None
+            if passer_coords and receiver_coords:
+                step_sec += round(calc_pass_segment_seconds(passer_coords, receiver_coords))
+
+        step_clock_seconds.append(int(step_sec))
+
+    if include_hco_step1_bringup and len(step_clock_seconds) > 0:
+        step_clock_seconds[0] += _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions)
+
+    total = sum(step_clock_seconds)
+    if total > cap:
+        overflow = total - cap
+        for idx in range(len(step_clock_seconds) - 1, -1, -1):
+            if overflow <= 0:
+                break
+            reducible = max(0, step_clock_seconds[idx] - FALLBACK_STEP_SECONDS)
+            if reducible <= 0:
+                continue
+            reduce_by = min(reducible, overflow)
+            step_clock_seconds[idx] -= reduce_by
+            overflow -= reduce_by
+
+    final_total = clamp_turn_time_elapsed(sum(step_clock_seconds), cap=cap)
+    return {
+        "step_clock_seconds": step_clock_seconds,
+        "time_elapsed": final_total,
+        "resolution_step_index": resolution_step_index,
+        "executed_step_count": len(step_clock_seconds),
+    }
+
+
+def calc_cg_segment_seconds(start, end):
+    """
+    Cover-ground segment duration using anisotropic distance scaling.
+    """
+    if not start or not end:
+        return 0.0
+    dx = abs((end.get("x", 0) or 0) - (start.get("x", 0) or 0))
+    dy = abs((end.get("y", 0) or 0) - (start.get("y", 0) or 0))
+    return math.sqrt((dx / 20.0) ** 2 + (dy / 10.0) ** 2)
+
+
+def calc_drive_segment_seconds(start, end):
+    """
+    Attack drive to basket: 1 game second per ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND
+    grid spots (Euclidean distance). Used for motion HCO drive steps.
+    """
+    if not start or not end:
+        return 0.0
+    dx = abs((end.get("x", 0) or 0) - (start.get("x", 0) or 0))
+    dy = abs((end.get("y", 0) or 0) - (start.get("y", 0) or 0))
+    grid_dist = math.sqrt(dx * dx + dy * dy)
+    return grid_dist / float(ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND)
+
+
+def calc_pass_segment_seconds(passer_coords, receiver_coords):
+    """
+    Ball in air (pass): 1 game second per PASS_GRID_SPOTS_PER_GAME_SECOND grid spots
+    (Euclidean). Used for HCO steps that contain a pass event.
+    """
+    if not passer_coords or not receiver_coords:
+        return 0.0
+    dx = abs((receiver_coords.get("x", 0) or 0) - (passer_coords.get("x", 0) or 0))
+    dy = abs((receiver_coords.get("y", 0) or 0) - (passer_coords.get("y", 0) or 0))
+    grid_dist = math.sqrt(dx * dx + dy * dy)
+    return grid_dist / float(PASS_GRID_SPOTS_PER_GAME_SECOND)
+
+
+def calc_cg_time_elapsed_from_movement_points(points, cap=30):
+    """
+    Round-at-end CG time from ordered movement points.
+    """
+    if not points or len(points) < 2:
+        return 0
+    total = 0.0
+    for idx in range(1, len(points)):
+        total += calc_cg_segment_seconds(points[idx - 1], points[idx])
+    return clamp_turn_time_elapsed(round(total), cap=cap)
+
 def oreb_shot_attempt(player_attrs):
     """
     Calculate shot score for OREB putback attempts.
@@ -162,7 +436,7 @@ def resolve_offensive_rebound(game, rebounder):
         attrs = rebounder.attributes
         # ✅ NEW: Use dedicated OREB shot attempt function
         shot_score = oreb_shot_attempt(attrs)
-        time_elapsed = random.randint(2, 5)
+        time_elapsed = random.randint(1, 5)
 
         defender_pos = random.choice(["C", "C", "C", "PF", "PF", "SF", "SF", "SG", "PG"])
         defender = def_team.lineup[defender_pos]
@@ -257,7 +531,7 @@ def resolve_offensive_rebound(game, rebounder):
 
     # Kick out to PG
     pg = off_team.lineup.get("PG")
-    duration = random.randint(1, 3)
+    duration = random.randint(1, 5)
     from_coords = getattr(rebounder, "coords", {"x": 25, "y": 50})
     to_coords = getattr(pg, "coords", {"x": 25, "y": 50}) if pg else {"x": 25, "y": 50}
 
@@ -685,8 +959,8 @@ def resolve_steal_attempt(offense_value, defense_value, soft_steal, hard_steal, 
         defense_value: Defender's steal attempt value (pressure)
         soft_steal: Soft steal threshold (default: -100)
         hard_steal: Hard steal threshold (default: -200)
-        soft_foul: Soft foul threshold (default: 100)
-        hard_foul: Hard foul threshold (default: 200)
+        soft_foul: Soft foul threshold (default: 150, from constants.SOFT_FOUL)
+        hard_foul: Hard foul threshold (default: 250, from constants.HARD_FOUL)
     
     Returns:
         One of:
@@ -1315,6 +1589,7 @@ def summarize_game_state(game, exclude_animations=True):
         # ✅ TIMEOUT/FOUL_OUT: Only write when truthy so normal saves don't overwrite DB and wipe resume state (we $unset on actual resume in main.py)
         **({"timeout_next_play_type": game.game_state["timeout_next_play_type"]} if game.game_state.get("timeout_next_play_type") else {}),
         **({"timeout_offense_team_id": game.game_state["timeout_offense_team_id"]} if game.game_state.get("timeout_offense_team_id") else {}),
+        **({"timeout_trace_id": game.game_state["timeout_trace_id"]} if game.game_state.get("timeout_trace_id") else {}),
         # ✅ FREE_THROW timeout resume: persist FT state so first simulate_turn creates the FT turn
         **(
             {
@@ -1328,6 +1603,7 @@ def summarize_game_state(game, exclude_animations=True):
         ),
         "clock": game.game_state.get("clock", "8:00"),  # ✅ TIMEOUT: Save clock for resume (same as quarter breaks)
         "time_remaining": game.game_state.get("time_remaining", 480),  # ✅ TIMEOUT: Save time_remaining for resume (same as quarter breaks)
+        "shot_clock_remaining": game.game_state.get("shot_clock_remaining", min(30, game.game_state.get("time_remaining", 480))),
         "man_defense_matchups": game.game_state.get("man_defense_matchups", {}),  # ✅ MAN DEFENSE MATCHUPS: User team matchups for persistence
         "man_defense_matchups_computer": game.game_state.get("man_defense_matchups_computer", {}),  # Computer team matchups (default if missing)
         "computer_timeouts": serialize_computer_timeouts(game.game_state.get("computer_timeouts")),  # ✅ COMPUTER TIMEOUT: Per-quarter count + checked_conditions (enforces max 1 per quarter Q1–Q3 after DB load)

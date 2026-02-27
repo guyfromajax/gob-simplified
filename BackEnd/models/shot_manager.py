@@ -4,7 +4,7 @@ from BackEnd.constants import (
     THREE_POINT_PROBABILITY, 
     THREE_POINT_SPOTS,
     PAINT_SPOTS,
-    PLAYCALL_ATTRIBUTE_WEIGHTS,
+    PLAYCALL_ATTRIBUTE_WEIGHTS, 
     BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD,
     BLOCK_RECONCILIATION_BLOCK_THRESHOLD,
     BLOCK_Y_ROLL_MIN,
@@ -20,6 +20,8 @@ from BackEnd.constants import (
 from BackEnd.utils.shared import (
     apply_scoring,
     get_time_elapsed,
+    calc_skeleton_time_elapsed,
+    calc_skeleton_step_timing_contract,
     resolve_offensive_rebound,
     get_player_position,
     calculate_screen_score,
@@ -227,6 +229,22 @@ class ShotManager:
         
         # Check if spot is a paint spot (case insensitive)
         return spot in PAINT_SPOTS
+
+    def _resolve_forced_shot_type(self, shooter, roles):
+        """
+        Forced shot classification:
+        - inside: lower/upper lowpost, lower/upper midpost, midlane, basketspot
+        - outside: any other location
+        """
+        _, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
+        shooter_location_str = (shooter_location or "unknown").strip()
+        shooter_location_key = shooter_location_str.lower()
+
+        is_inside_forced = shooter_location_key in PAINT_SPOTS
+        forced_shot_type = "inside" if is_inside_forced else "outside"
+        is_paint_forced = is_inside_forced
+
+        return forced_shot_type, is_paint_forced, shooter_location_str
     
     def _calculate_getback_coordinates(self, getback_player, off_team, def_team):
         """
@@ -352,53 +370,58 @@ class ShotManager:
             is_three = self.is_three_point_shot(shooter, roles)
             # Determine if shot is from the paint (PIP)
             is_paint = self.is_paint_shot(shooter, roles)
-        
+
+        forced_shot = bool(roles.get("forced_shot", False))
+
         # Determine shot_type (inside/attack/outside) for shot score calculation
         # Motion offense: use randomly chosen type from resolve_motion_offense_shot (motion_shot_type)
         # Set plays: infer from skeleton (location + handle_ball/drive detection)
-        shot_type = roles.get("shot_type") or roles.get("motion_shot_type")
-        if not shot_type:
-            # For Set plays, determine shot_type from skeleton analysis (location + attack detection)
-            # Attack = paint shot where shooter had "handle_ball" in previous step and moved to shoot spot
-            shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
-            steps = roles.get("steps", [])
-            
-            # Attack detection: shoot step is last step; if shoot location is paint, check step before for handle_ball + different location
-            has_drive = False
-            if steps and shooter_pos and len(steps) >= 2:
-                shoot_step = steps[-1]
-                pos_actions = shoot_step.get("pos_actions", {})
-                shooter_action = pos_actions.get(shooter_pos, {})
-                if shooter_action.get("action") == "shoot":
-                    shoot_location_key = shooter_action.get("location") or shooter_action.get("spot", "")
-                    shoot_location_lower = shoot_location_key.lower() if shoot_location_key else ""
-                    if shoot_location_lower in PAINT_SPOTS:
-                        prev_step = steps[-2]
-                        prev_pos_actions = prev_step.get("pos_actions", {})
-                        prev_action = prev_pos_actions.get(shooter_pos, {})
-                        if prev_action.get("action") == "handle_ball":
-                            prev_location_key = prev_action.get("location") or prev_action.get("spot", "")
-                            prev_location_lower = prev_location_key.lower() if prev_location_key else ""
-                            if prev_location_lower != shoot_location_lower:
-                                has_drive = True
-            
-            # Determine shot_type based on location and drive (same logic as Motion plays)
-            if shooter_location:
-                shooter_location_lower = shooter_location.lower()
-                if shooter_location_lower in PAINT_SPOTS:
-                    # Paint spot: attack if there was a drive, otherwise inside
-                    shot_type = "attack" if has_drive else "inside"
+        if forced_shot:
+            shot_type, is_paint, _ = self._resolve_forced_shot_type(shooter, roles)
+        else:
+            shot_type = roles.get("shot_type") or roles.get("motion_shot_type")
+            if not shot_type:
+                # For Set plays, determine shot_type from skeleton analysis (location + attack detection)
+                # Attack = paint shot where shooter had "handle_ball" in previous step and moved to shoot spot
+                shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
+                steps = roles.get("steps", [])
+                
+                # Attack detection: shoot step is last step; if shoot location is paint, check step before for handle_ball + different location
+                has_drive = False
+                if steps and shooter_pos and len(steps) >= 2:
+                    shoot_step = steps[-1]
+                    pos_actions = shoot_step.get("pos_actions", {})
+                    shooter_action = pos_actions.get(shooter_pos, {})
+                    if shooter_action.get("action") == "shoot":
+                        shoot_location_key = shooter_action.get("location") or shooter_action.get("spot", "")
+                        shoot_location_lower = shoot_location_key.lower() if shoot_location_key else ""
+                        if shoot_location_lower in PAINT_SPOTS:
+                            prev_step = steps[-2]
+                            prev_pos_actions = prev_step.get("pos_actions", {})
+                            prev_action = prev_pos_actions.get(shooter_pos, {})
+                            if prev_action.get("action") == "handle_ball":
+                                prev_location_key = prev_action.get("location") or prev_action.get("spot", "")
+                                prev_location_lower = prev_location_key.lower() if prev_location_key else ""
+                                if prev_location_lower != shoot_location_lower:
+                                    has_drive = True
+
+                # Determine shot_type based on location and drive (same logic as Motion plays)
+                if shooter_location:
+                    shooter_location_lower = shooter_location.lower()
+                    if shooter_location_lower in PAINT_SPOTS:
+                        # Paint spot: attack if there was a drive, otherwise inside
+                        shot_type = "attack" if has_drive else "inside"
+                    else:
+                        # Not a paint spot: outside shot
+                        shot_type = "outside"
                 else:
-                    # Not a paint spot: outside shot
-                    shot_type = "outside"
-            else:
-                # Fallback to playcall if location not found
-                if playcall == "Inside":
-                    shot_type = "inside"
-                elif playcall == "Attack" or playcall == "Set":
-                    shot_type = "attack"
-                else:
-                    shot_type = "outside"
+                    # Fallback to playcall if location not found
+                    if playcall == "Inside":
+                        shot_type = "inside"
+                    elif playcall == "Attack" or playcall == "Set":
+                        shot_type = "attack"
+                    else:
+                        shot_type = "outside"
         
         # ✅ BALANCING SYSTEM: Check for balancing override first
         # Balancing override is set when score difference exceeds threshold based on quarter and team attributes
@@ -439,6 +462,10 @@ class ShotManager:
             # Debug logging removed - was cluttering logs
             # logging.debug(f"🎯 Variant modifier: {variant} → {variant_modifier:+d} (threshold: {shot_threshold})")
 
+        # Shot-at-1 (shot clock would hit 0, chose shot attempt at 1s): add 100 to threshold (Real_Time_Clock_System.md)
+        if game_state.pop("shot_at_one_second", False):
+            shot_threshold += 100
+
         # Get shooter location for debug logs
         shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
         shooter_location_str = shooter_location if shooter_location else "unknown"
@@ -448,6 +475,9 @@ class ShotManager:
         shot_score, shot_score_pre_defense, d_foul, foul_player = self.calculate_shot_score(
             shooter, passer, screener, defender, shot_type, defense_call, is_three, is_paint, second_defender, shooter_location_str
         )
+        if forced_shot:
+            # Forced shots keep standard defender/defense scoring, then apply hard penalty.
+            shot_score -= 100
         
         # ✅ MOTION OFFENSE: Apply attack penalty if applicable
         motion_attack_penalty = roles.get("motion_attack_penalty", 0) or game_state.get("motion_attack_penalty", 0)
@@ -521,8 +551,15 @@ class ShotManager:
                     else:
                         text = f"{get_name_safe(shooter)} misses. {get_name_safe(defender)} fouls him!"
                     shooter_pos = get_player_position(off_lineup, shooter)
-                    tempo = off_team.strategy_calls.get("tempo_call", "normal")
-                    time_elapsed_ft = get_time_elapsed(tempo)
+                    # Keep turn timing aligned to skeleton progression for shot attempts.
+                    is_hco = self.game_state.get("offensive_state") == "HCO"
+                    timing_contract = calc_skeleton_step_timing_contract(
+                        steps,
+                        resolution_step_index=shot_step_index,
+                        include_hco_step1_bringup=is_hco,
+                        prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
+                    )
+                    time_elapsed_ft = timing_contract["time_elapsed"]
                     ft_remaining = 1 if made_from_foul else 2
                     result = {
                         "result_type": "MAKE" if made_from_foul else "MISS",
@@ -534,6 +571,9 @@ class ShotManager:
                         "offense_team_id": off_team.team_id, "defense_team_id": def_team.team_id,
                         "has_and_one": made_from_foul,
                         "one_and_one": False,
+                        "step_clock_seconds": timing_contract["step_clock_seconds"],
+                        "resolution_step_index": timing_contract["resolution_step_index"],
+                        "executed_step_count": timing_contract["executed_step_count"],
                     }
                     if block_recon_foul_out_info and block_recon_foul_out_info.get("fouled_out"):
                         result["fouled_out"] = True
@@ -583,8 +623,14 @@ class ShotManager:
             # Handle CHARGE: Return early with possession flip, no shot attempt
             if charge_result == "CHARGE":
                 shooter_pos = get_player_position(off_lineup, shooter)
-                tempo = off_team.strategy_calls.get("tempo_call", "normal")
-                time_elapsed = get_time_elapsed(tempo)
+                is_hco = self.game_state.get("offensive_state") == "HCO"
+                timing_contract = calc_skeleton_step_timing_contract(
+                    steps,
+                    resolution_step_index=shot_step_index,
+                    include_hco_step1_bringup=is_hco,
+                    prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
+                )
+                time_elapsed = timing_contract["time_elapsed"]
                 
                 # Record foul on shooter (offensive foul)
                 shooter.record_stat("F")
@@ -610,9 +656,12 @@ class ShotManager:
                     "events": [],
                     "foul_player_id": shooter.player_id,
                     "foul_team": "OFFENSE",
-                    "next_play_type": "SIP",
+                    "next_play_type": "SIDE_INBOUND",
                     "offense_team_id": off_team.team_id,
                     "defense_team_id": def_team.team_id,
+                    "step_clock_seconds": timing_contract["step_clock_seconds"],
+                    "resolution_step_index": timing_contract["resolution_step_index"],
+                    "executed_step_count": timing_contract["executed_step_count"],
                 }
                 return result
             
@@ -630,8 +679,17 @@ class ShotManager:
                     from BackEnd.engine.phase_resolution import check_and_handle_foul_out
                     blocking_foul_out_info = check_and_handle_foul_out(defender, self.game_state, def_team)
                     
+                    # Final Turn attack: blocking foul always awards exactly 2 FTs (no and-1, no 3 FTs for three)
+                    if self.game_state.get("final_turn") and shot_type == "attack":
+                        self.game_state["offensive_state"] = "FREE_THROW"
+                        self.game_state["free_throws"] = 2
+                        self.game_state["free_throws_remaining"] = 2
+                        self.game_state["one_and_one"] = False
+                        self.game_state["last_ball_handler"] = shooter
+                        self.game_state["shooter"] = shooter
+                        next_play_type = "FREE_THROW"
                     # Check bonus status (reuse logic from resolve_non_shooting_foul)
-                    if def_team.team_fouls >= 10:
+                    elif def_team.team_fouls >= 10:
                         # Double bonus (10+ fouls): 2 free throws
                         self.game_state["offensive_state"] = "FREE_THROW"
                         self.game_state["free_throws"] = 2
@@ -658,8 +716,14 @@ class ShotManager:
                     
                     # Early return: nullify shot attempt, return result for next turn
                     shooter_pos = get_player_position(off_lineup, shooter)
-                    tempo = off_team.strategy_calls.get("tempo_call", "normal")
-                    time_elapsed = get_time_elapsed(tempo)
+                    is_hco = self.game_state.get("offensive_state") == "HCO"
+                    timing_contract = calc_skeleton_step_timing_contract(
+                        steps,
+                        resolution_step_index=shot_step_index,
+                        include_hco_step1_bringup=is_hco,
+                        prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
+                    )
+                    time_elapsed = timing_contract["time_elapsed"]
                     intended_shooter_pos = roles.get("intended_shooter_pos")
                     intended_shooter = off_lineup.get(intended_shooter_pos) if intended_shooter_pos else None
                     intended_shooter_id = intended_shooter.player_id if intended_shooter else None
@@ -684,6 +748,9 @@ class ShotManager:
                         "next_play_type": next_play_type,
                         "offense_team_id": off_team.team_id,
                         "defense_team_id": def_team.team_id,
+                        "step_clock_seconds": timing_contract["step_clock_seconds"],
+                        "resolution_step_index": timing_contract["resolution_step_index"],
+                        "executed_step_count": timing_contract["executed_step_count"],
                     }
                     if next_play_type == "FREE_THROW":
                         result["free_throws_remaining"] = self.game_state.get("free_throws_remaining", 0)
@@ -699,7 +766,7 @@ class ShotManager:
                         }
                         result["foul_count"] = blocking_foul_out_info["foul_count"]
                     return result
-        
+
         made = shot_score >= shot_threshold
         if getattr(self, "_block_spot", None):
             made = False  # Block reconciliation decided block; use miss path with block spot
@@ -763,7 +830,12 @@ class ShotManager:
         # Get strategy settings directly as numeric values (0-4)
         # No need for string conversion - we just need the numbers for probability calculations
         offense_reb_value = off_team.strategy_settings.get("rebounding", 2)  # Crash boards vs get back
-        defense_fast_breaks_value = def_team.strategy_settings.get("fast_breaks", 2)  # Stay vs release for FB
+        # ✅ Situational Logic (Q4/OT): Slow It Down overrides offense (leading) team's fast break to 0 when they're defense on this shot
+        override_team_id = game_state.get("_situational_fast_break_override_team_id")
+        if override_team_id and getattr(def_team, "team_id", None) == override_team_id:
+            defense_fast_breaks_value = 0
+        else:
+            defense_fast_breaks_value = def_team.strategy_settings.get("fast_breaks", 2)  # Stay vs release for FB
         
         # get_name_safe already imported at top of file
         shooter_name = get_name_safe(shooter)
@@ -1196,17 +1268,25 @@ class ShotManager:
 
                     if stat == "OREB":
                         possession_flips = False
-                        self.game_state["pending_oreb"] = {
-                            "rebounder": rebounder,
-                            "rebounder_id": getattr(rebounder, "player_id", None),
-                            "from_block": getattr(self, "_block_spot", None) is not None,
-                        }
-                        result["next_play_type"] = "OREB"
+                        if self.game_state.get("final_turn"):
+                            result["quarter_ends_after"] = True
+                            result["next_play_type"] = None
+                        else:
+                            self.game_state["pending_oreb"] = {
+                                "rebounder": rebounder,
+                                "rebounder_id": getattr(rebounder, "player_id", None),
+                                "from_block": getattr(self, "_block_spot", None) is not None,
+                            }
+                            result["next_play_type"] = "OREB"
                     else:
                         possession_flips = True
-                        self.game_state["offensive_state"] = "HCO"
-                        self.game_state["last_rebounder"] = rebounder
-                        result["next_play_type"] = "HCO"
+                        if self.game_state.get("final_turn"):
+                            result["quarter_ends_after"] = True
+                            result["next_play_type"] = None
+                        else:
+                            self.game_state["offensive_state"] = "HCO"
+                            self.game_state["last_rebounder"] = rebounder
+                            result["next_play_type"] = "HCO"
 
                     is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
                     for pos, rebounder_player in o_rebounder_lineup.items():
@@ -1231,11 +1311,11 @@ class ShotManager:
                     else:
                         shooter_pos, shooter_spot = self._get_shooter_position_and_spot(shooter, roles)
                         bounce_spot = calculate_bounce_spot(self.game, shooter_spot=shooter_spot)
-                    
-                    # Step 2: Filter lineups to only eligible rebounders (those crashing boards)
-                    # Build filtered lineups containing only players in offense_rebounders/defense_rebounders
-                    o_rebounder_lineup = {pos: off_team.lineup[pos] for pos in offense_rebounders if off_team.lineup.get(pos) is not None}
-                    d_rebounder_lineup = {pos: def_team.lineup[pos] for pos in defense_rebounders if def_team.lineup.get(pos) is not None}
+
+                # Step 2: Filter lineups to only eligible rebounders (those crashing boards)
+                # Build filtered lineups containing only players in offense_rebounders/defense_rebounders
+                o_rebounder_lineup = {pos: off_team.lineup[pos] for pos in offense_rebounders if off_team.lineup.get(pos) is not None}
+                d_rebounder_lineup = {pos: def_team.lineup[pos] for pos in defense_rebounders if def_team.lineup.get(pos) is not None}
                 
                 # Step 3: Penalize shooter (20% distance penalty) but don't exclude
                 shooter_id = getattr(shooter, "player_id", None)
@@ -1402,72 +1482,72 @@ class ShotManager:
                 
                 if stat == "OREB":
                     possession_flips = False
-                    # Store OREB info for game_manager to create a separate OREB turn
-                    self.game_state["pending_oreb"] = {
-                        "rebounder": rebounder,
-                        "rebounder_id": getattr(rebounder, "player_id", None),
-                        "from_block": getattr(self, "_block_spot", None) is not None,
-                    }
-                    # OREB will be handled as a separate turn
-                    # Don't process putback here - let next turn handle it
-                    # ✅ FIX: Set next_play_type for OREB (will be overridden by OREB turn, but ensures it's never None)
-                    result["next_play_type"] = "OREB"
-                else:
-                    # DREB - determine next play type
-                    possession_flips = True
-                    events.append({
-                        "event_type": "defReb",
-                        "rebounderId": getattr(rebounder, "player_id", None),
-                    })
-                    self.game.turn_manager.logger.log("defReb")
-                    self.game_state["last_rebounder"] = rebounder
-                    
-                    # NEW FAST BREAK LOGIC:
-                    # Fast Break is determined DURING the shot (by defense tempo), not after DREB
-                    # If a defender released for fast break during shot → auto-trigger fast break
-                    # If no defender released → regular HCO
-                    next_play_type = "FAST_BREAK" if defense_release_list else "HCO"
-                    if defense_release_list:
-                        # next_play_type = "FAST_BREAK"
-                        # Log fast break determination with release player info
-                        release_player_ids = [def_team.lineup[pos].player_id for pos in defense_release_list]
-                        # ✅ Store release player in game_state for use in resolve_fast_break_logic
-                        # The outlet pass should go to the release player, not a randomly chosen ball handler
-                        release_pos = defense_release_list[0]  # Get first release position (usually only one)
-                        release_player = def_team.lineup.get(release_pos)
-                        if release_player:
-                            self.game_state["last_release_player"] = release_player
-                            # ✅ COMMENTED OUT: Fast break debug logs (cluttering transition debugging)
-                            # logging.info(f"🏀 FAST_BREAK determined during shot: defense_release_list={defense_release_list}, release_player_ids={release_player_ids}, release_player_stored={getattr(release_player, 'player_id', None)}, shooter={get_name_safe(shooter)}")
-                        else:
-                            # logging.warning(f"⚠️ FAST_BREAK determined but release_player not found at position {release_pos}")
-                            pass  # Debug logging commented out
+                    if self.game_state.get("final_turn"):
+                        result["quarter_ends_after"] = True
+                        result["next_play_type"] = None
                     else:
-                        next_play_type = "HCO"
-                        # Clear release player if not doing fast break
-                        self.game_state["last_release_player"] = None
-                        # logging.info(f"🏀 HCO determined during shot: no defense_release_list, shooter={get_name_safe(shooter)}")
-                    
-                    self.game_state["offensive_state"] = next_play_type
-                    # ✅ FIX: Always set next_play_type for MISS with DREB (HCO or FAST_BREAK)
-                    result["next_play_type"] = next_play_type
+                        # Store OREB info for game_manager to create a separate OREB turn
+                        self.game_state["pending_oreb"] = {
+                            "rebounder": rebounder,
+                            "rebounder_id": getattr(rebounder, "player_id", None),
+                            "from_block": getattr(self, "_block_spot", None) is not None,
+                        }
+                        result["next_play_type"] = "OREB"
+                else:
+                    # DREB - determine next play type (or Force Foul: forgo FB/HCO and outlet)
+                    possession_flips = True
+                    if self.game_state.get("final_turn"):
+                        result["quarter_ends_after"] = True
+                        result["next_play_type"] = None
+                    else:
+                        events.append({
+                            "event_type": "defReb",
+                            "rebounderId": getattr(rebounder, "player_id", None),
+                        })
+                        self.game.turn_manager.logger.log("defReb")
+                        self.game_state["last_rebounder"] = rebounder
+                        # ✅ Situational Logic: Force Foul after DREB — execute immediately, forgo FB/HCO and outlet
+                        from BackEnd.utils import situational_logic as sl
+                        time_remaining_sec = self.game_state.get("time_remaining")
+                        force_foul_after_dreb = (
+                            sl.is_situational_active(getattr(self.game, "quarter", None))
+                            and sl.is_slow_it_down(self.game, time_remaining_sec)
+                            and sl.should_force_foul(self.game, time_remaining_sec)
+                        )
+                        if force_foul_after_dreb:
+                            result["force_foul_after_dreb"] = True
+                            next_play_type = "HCO"
+                            self.game_state["last_release_player"] = None
+                            self.game_state["offensive_state"] = "HCO"
+                            result["next_play_type"] = next_play_type
+                        else:
+                            # NEW FAST BREAK LOGIC:
+                            next_play_type = "FAST_BREAK" if defense_release_list else "HCO"
+                            if defense_release_list:
+                                release_pos = defense_release_list[0]
+                                release_player = def_team.lineup.get(release_pos)
+                                if release_player:
+                                    self.game_state["last_release_player"] = release_player
+                            else:
+                                next_play_type = "HCO"
+                                self.game_state["last_release_player"] = None
+                            self.game_state["offensive_state"] = next_play_type
+                            result["next_play_type"] = next_play_type
 
-        # ⏱️ Add tempo-based time to turn
-        # If HCO came after FCP/HCT, adjust time based on pressure phase time
-        pressure_phase_time = game_state.get("pressure_phase_time", 0)
-        
-        if pressure_phase_time > 0:
-            # Adjust HCO time: random.randint(15 - pressure_phase_time, min(35, 35 - pressure_phase_time))
-            min_time = max(1, 15 - pressure_phase_time)  # Ensure min_time doesn't go below 1
-            max_time = min(35, 35 - pressure_phase_time)
-            hco_time = random.randint(min_time, max_time)
-            time_elapsed += hco_time + pressure_phase_time  # Total = FCP/HCT time + HCO time
-            # Clear pressure_phase_time after use
-            game_state["pressure_phase_time"] = 0
+        # ⏱️ Skeleton turns use per-step random (1..5) up to shot resolution step.
+        # Fast breaks are CG turns and will be overwritten in resolve_fast_break_logic.
+        timing_contract = None
+        if roles.get("is_fast_break"):
+            time_elapsed = 0
         else:
-            # Normal HCO without pressure phase
-            tempo = off_team.strategy_calls["tempo_call"]
-            time_elapsed += get_time_elapsed(tempo)
+            is_hco = self.game_state.get("offensive_state") == "HCO"
+            timing_contract = calc_skeleton_step_timing_contract(
+                steps,
+                resolution_step_index=shot_step_index,
+                include_hco_step1_bringup=is_hco,
+                prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
+            )
+            time_elapsed = timing_contract["time_elapsed"]
 
         shooter_pos = get_player_position(off_lineup, shooter)
         
@@ -1509,6 +1589,10 @@ class ShotManager:
             "foul_player_id": getattr(foul_player, "player_id", None) if d_foul and foul_player else (defender.player_id if charge_result == "BLOCKING_FOUL" and defender else None),
             "foul_team": self.game_state.get("foul_team") if (d_foul or charge_result == "BLOCKING_FOUL") else None,
         })
+        if timing_contract is not None:
+            result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
+            result["resolution_step_index"] = timing_contract["resolution_step_index"]
+            result["executed_step_count"] = timing_contract["executed_step_count"]
         if is_block_outcome:
             result["blocker_id"] = getattr(self._block_defender, "player_id", None) if getattr(self, "_block_defender", None) else None
             if hasattr(self, "_block_spot"):
@@ -1973,12 +2057,15 @@ class ShotManager:
                     result["rebounderId"] = getattr(rebounder, "player_id", None)
                     result["rebound_type"] = "OREB"
                     possession_flips = False
-                    # Store OREB info for game_manager to create a separate OREB turn
-                    self.game_state["pending_oreb"] = {
-                        "rebounder": rebounder,
-                        "rebounder_id": getattr(rebounder, "player_id", None),
-                        "from_block": getattr(self, "_block_spot", None) is not None,
-                    }
+                    if self.game_state.get("final_turn"):
+                        result["quarter_ends_after"] = True
+                        result["next_play_type"] = None
+                    else:
+                        self.game_state["pending_oreb"] = {
+                            "rebounder": rebounder,
+                            "rebounder_id": getattr(rebounder, "player_id", None),
+                            "from_block": getattr(self, "_block_spot", None) is not None,
+                        }
                 else:
                     # DREB: Transition to HCO with outlet step
                     rebounder.record_stat("DREB")
@@ -1986,11 +2073,15 @@ class ShotManager:
                     result["rebounderId"] = getattr(rebounder, "player_id", None)
                     result["rebound_type"] = "DREB"
                     possession_flips = True
-                    text += " -- entering half court."
-                    self.game_state["offensive_state"] = "HCO"
-                    self.game_state["last_rebounder"] = rebounder
-                    self.game_state["last_rebound"] = "DREB"
-                    result["next_play_type"] = "HCO"
+                    if self.game_state.get("final_turn"):
+                        result["quarter_ends_after"] = True
+                        result["next_play_type"] = None
+                    else:
+                        text += " -- entering half court."
+                        self.game_state["offensive_state"] = "HCO"
+                        self.game_state["last_rebounder"] = rebounder
+                        self.game_state["last_rebound"] = "DREB"
+                        result["next_play_type"] = "HCO"
             else:
                 # 1+ defenders: Find closest defender to bounce spot
                 # Build lineup from defenders present

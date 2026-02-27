@@ -109,6 +109,15 @@ Specialized Handlers (execution)
 - Consistent ball flight behavior
 - Proper receiver positioning
 
+## Coordinate Flipping (Court Side)
+
+**Rule:** One attacking side — both offense and defense are drawn on the same (attacking) half of the court. No flip when the home team is on offense; flip when the away team is on offense.
+
+- **Home team on offense:** Use backend positions as-is. Both teams set up on the home side.
+- **Away team on offense:** Flip coordinates for both offense and defense (e.g. `x → 101 − x`, `y` unchanged) so the whole setup is on the away (attacking) side.
+
+Backend sends positions in a single convention (e.g. home-side) where applicable (e.g. Final Turn alignment, HCO string spots). The frontend derives “away offense” (e.g. `offenseTeamId !== homeTeamId`) and applies one flip to both offense and defense when true. This keeps the rule consistent across turn types (HCO entry, Final Turn setup, etc.) without special cases.
+
 ## State Tracking System
 
 **Status:** ✅ **CORE COMPONENT** - Fundamental architectural pattern

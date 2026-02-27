@@ -953,14 +953,12 @@ async function init() {
   
   const initStartTime = performance.now();
   console.log('⏱️ [PERF] FCC init() START');
-  
+  try {
   const topDataStartTime = performance.now();
   const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
   const topDataEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
-  if (!topData) return; // Access denied or error - redirect already triggered for 401/403
-
-  if (typeof AccessDenied !== 'undefined' && AccessDenied.hideLoadingOverlay) AccessDenied.hideLoadingOverlay();
+  if (!topData) return; // Access denied or error - redirect already triggered for 401/403; finally block will hide page-load-overlay
 
   // ✅ SS&S: Resolve team_id from command center data if not already set
   if (topData && topData.team_id && !userTeamId) {
@@ -1092,6 +1090,10 @@ async function init() {
     
     const initEndTime = performance.now();
     console.log(`⏱️ [PERF] FCC init() COMPLETE: ${(initEndTime - initStartTime).toFixed(2)}ms`);
+  } finally {
+    if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+    if (typeof AccessDenied !== 'undefined' && AccessDenied.hideLoadingOverlay) AccessDenied.hideLoadingOverlay();
+  }
 }
 
 function clearFranchiseLocalStorage() {

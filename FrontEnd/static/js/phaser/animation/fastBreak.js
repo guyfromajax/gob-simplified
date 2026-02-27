@@ -447,8 +447,8 @@ async function animateStealEntry(scene, turnData, playerSprites, ballSprite, wid
  * Defender still animates to stopper position, but ball handler animates past them to shot spot
  */
 async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, ballSprite, width, height) {
-  // ✅ FIX: Import showAnnouncement at the start of the function
-  const { showAnnouncement } = await import('../utils/announcements.js');
+  // ✅ FIX: Import showAnnouncement/showAndOneAnnouncement at the start of the function (AND-1 / shooting foul in Fast Break path)
+  const { showAnnouncement, showAndOneAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
   
   const shooterId = turnData.roles?.shooter?.player_id || turnData.shooter_id || turnData.roles?.ball_handler?.player_id || getCurrentOwner(scene);
   const shooterSprite = playerSprites[shooterId];
@@ -587,7 +587,7 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
     shotTargetPxWithStopper = gridToPixels(adjustedBasket.x, adjustedBasket.y, width, height);
   }
   await animateShotToRim(scene, shotTargetPxWithStopper, {
-    duration: 400,
+    duration: animationConfig.fastBreak?.shotMs ?? 350,
     easing: "Sine.easeInOut",
     arc: { height: 50 }
   });
@@ -618,13 +618,32 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
                          "Away";
     const shooterTeamName = shooterTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
     
+    const hasFoulPlayer = !!(turnData?.foul_player_id || turnData?.foul_player?.player_id);
+    const isAndOne = turnData?.text?.includes('AND-1') || (hasFoulPlayer && turnData?.result_type === "MAKE" && turnData?.foul_team === "DEFENSE");
     if (shooterInfo) {
       const shooterPlayerData = {
         playerId: shooterId,
         photo: shooterSprite?.photo || null,
-        teamName: shooterTeamName
+        teamName: shooterTeamName,
+        secondaryColor: getSecondaryColorForTeam(scene, shooterTeamId)
       };
-      showAnnouncement("Fast Break Score!", shooterTeamId === scene.homeTeamId ? "home" : "away", shooterPlayerData);
+      const teamStyle = shooterTeamId === scene.homeTeamId ? "home" : "away";
+      if (isAndOne) {
+        const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
+        if (foulPlayerId) {
+          const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
+          const foulPlayerTeamId = foulPlayerSprite?.team_id;
+          const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+          const foulPlayerData = { playerId: foulPlayerId, photo: foulPlayerSprite?.photo || null, teamName: foulPlayerTeamName, secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId) };
+          showAndOneAnnouncement(teamStyle, shooterPlayerData, foulPlayerData);
+        } else {
+          showAnnouncement("It's Good! And 1!", teamStyle, shooterPlayerData);
+        }
+      } else {
+        showAnnouncement("Fast Break Score!", teamStyle, shooterPlayerData);
+      }
+    } else if (isAndOne) {
+      showAnnouncement("It's Good! And 1!", shooterTeamId === scene.homeTeamId ? "home" : "away", null);
     }
   } else if (turnData.result_type === "MISS" || turnData.result_type === "BLOCK") {
     // Handle MISS/BLOCK → rebound transition
@@ -634,6 +653,34 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
       announceGameEvent('BLOCK', turnData, scene, { blockerId });
       appendToTextScroll("Blocked!");
     } else {
+      // Shooting foul on miss (Fast Break path; ballManager not used)
+      const hasFreeThrowsRemaining = (turnData?.free_throws_remaining ?? 0) > 0;
+      const nextPlayTypeIsFreeThrow = turnData?.next_play_type === 'FREE_THROW';
+      const isShootingFoulOnMiss = hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow;
+      if (isShootingFoulOnMiss) {
+        const { triggerFoulEffect } = await import('./negativeActionEffects.js');
+        const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
+        if (foulPlayerId && scene) {
+          const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
+          if (foulPlayerSprite) {
+            const teamsObj = scene.simData?.teams || {};
+            const homeId = scene.simData?.home_team_id;
+            const awayId = scene.simData?.away_team_id;
+            const homeTeamNameMiss = (homeId && teamsObj[homeId]?.name) || scene.simData?.home_team?.name || "Home";
+            const awayTeamNameMiss = (awayId && teamsObj[awayId]?.name) || scene.simData?.away_team?.name || "Away";
+            const foulPlayerTeamId = foulPlayerSprite?.team_id;
+            const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamNameMiss : awayTeamNameMiss;
+            const foulPlayerData = { playerId: foulPlayerId, photo: foulPlayerSprite?.photo || null, teamName: foulPlayerTeamName, secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId) };
+            triggerFoulEffect(scene, foulPlayerId);
+            showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
+          } else {
+            triggerFoulEffect(scene, foulPlayerId);
+            showAnnouncement("Shooting Foul!", 'neutral', null);
+          }
+        } else {
+          showAnnouncement("Shooting Foul!", 'neutral', null);
+        }
+      }
       appendToTextScroll("Missed!");
     }
     // ✅ FIX: Check all possible field names (matching animateFastBreakShot pattern)
@@ -865,7 +912,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   }
   // ✅ STEP 3 MIGRATION: Use new animateShotToRim() helper instead of manual detach + animate
   await animateShotToRim(scene, shotTargetPx, {
-    duration: 400,
+    duration: animationConfig.fastBreak?.shotMs ?? 350,
     easing: "Sine.easeInOut",
     arc: { height: 50 }
   });
@@ -881,8 +928,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   
   // Handle outcome
   if (turnData.result_type === "MAKE") {
-    // Show announcement with shooter headshot
-    const { showAnnouncement } = await import('../utils/announcements.js');
+    // Show announcement with shooter headshot (AND-1 handled here; ballManager path not used for Fast Break)
+    const { showAnnouncement, showAndOneAnnouncement } = await import('../utils/announcements.js');
     const shooterInfo = scene.playerInfo?.[shooterId];
     const shooterTeamId = shooterSprite?.team_id;
     
@@ -896,13 +943,30 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const shooterPlayerData = shooterInfo ? {
       playerId: shooterId,
       photo: shooterSprite?.photo || null,
-      teamName: shooterTeamName
+      teamName: shooterTeamName,
+      secondaryColor: getSecondaryColorForTeam(scene, shooterTeamId)
     } : null;
-    
+
     const teamStyle = isHomeOffense ? 'home' : 'away';
-    showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
+    const hasFoulPlayer = !!(turnData?.foul_player_id || turnData?.foul_player?.player_id);
+    const isAndOne = turnData?.text?.includes('AND-1') || (hasFoulPlayer && turnData?.result_type === "MAKE" && turnData?.foul_team === "DEFENSE");
+    if (isAndOne) {
+      const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
+      if (foulPlayerId && shooterPlayerData) {
+        const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
+        const foulPlayerTeamId = foulPlayerSprite?.team_id;
+        const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+        const foulPlayerData = { playerId: foulPlayerId, photo: foulPlayerSprite?.photo || null, teamName: foulPlayerTeamName, secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId) };
+        showAndOneAnnouncement(teamStyle, shooterPlayerData, foulPlayerData);
+      } else {
+        showAnnouncement("It's Good! And 1!", teamStyle, shooterPlayerData);
+      }
+    } else {
+      showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
+    }
     
-    await new Promise(resolve => scene.time.delayedCall(1000, resolve));
+    const makeHoldMs = animationConfig.fastBreak?.makeAnnouncementHoldMs ?? 1000;
+    await new Promise(resolve => scene.time.delayedCall(makeHoldMs, resolve));
     
     // ✅ OPTION 1 FIX: Ensure onShotEnd() is called before transitioning to inbound pass
     // This ensures ball state is cleared before inbound setup
@@ -1004,7 +1068,34 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       }
     }
   } else {
-    // Miss - handle rebound
+    // Miss - shooting foul announcement (Fast Break path; ballManager not used)
+    const hasFreeThrowsRemaining = (turnData?.free_throws_remaining ?? 0) > 0;
+    const nextPlayTypeIsFreeThrow = turnData?.next_play_type === 'FREE_THROW';
+    const isShootingFoulOnMiss = hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow;
+    if (isShootingFoulOnMiss) {
+      const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
+      const { triggerFoulEffect } = await import('./negativeActionEffects.js');
+      const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
+      if (foulPlayerId && scene) {
+        const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
+        if (foulPlayerSprite) {
+          const homeTeamField = scene.simData?.home_team;
+          const awayTeamField = scene.simData?.away_team;
+          const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+          const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+          const foulPlayerTeamId = foulPlayerSprite?.team_id;
+          const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+          const foulPlayerData = { playerId: foulPlayerId, photo: foulPlayerSprite?.photo || null, teamName: foulPlayerTeamName, secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId) };
+          triggerFoulEffect(scene, foulPlayerId);
+          showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
+        } else {
+          triggerFoulEffect(scene, foulPlayerId);
+          showAnnouncement("Shooting Foul!", 'neutral', null);
+        }
+      } else {
+        showAnnouncement("Shooting Foul!", 'neutral', null);
+      }
+    }
     appendToTextScroll("Missed!");
     safeTransition(scene.stateMachine, States.Rebound);
     
@@ -1483,14 +1574,16 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
       const stopperPlayerData = stopperInfo ? {
         playerId: stopperId,
         photo: stopperSprite?.photo || null,
-        teamName: stopperTeamName
+        teamName: stopperTeamName,
+        secondaryColor: getSecondaryColorForTeam(scene, stopperSprite?.team_id)
       } : null;
-      
+
       // Defensive stop: show in defense team color (they benefited)
       const defenseTeam = isHomeOffense ? 'away' : 'home';
       showAnnouncement("Great Stop!", defenseTeam, stopperPlayerData);
       
-      await new Promise(resolve => scene.time.delayedCall(1000, resolve));
+      const stopHoldMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
+      await new Promise(resolve => scene.time.delayedCall(stopHoldMs, resolve));
     }
   } else {
     // Display outcome text for non-Fast Break stops

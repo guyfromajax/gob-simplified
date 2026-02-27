@@ -1,30 +1,19 @@
 1. Make end of season progression in franchise mode a true EOS (age players, recruiting process, manage player stats, manage user stats?)
-2. Wire site for SEO
-3. Add glow effect to drag and drop on Lineup Selection screen when starting click on the player image
-4. rebound not resistering to player stats when he gets an OREB from a missed OREB putback attempt (note he made teh follow up shot)
-
-7. Frontend Scores display revert during Sim Quarter at times
-9.Pre-populate Playbooks with submittable values
-12. Not announcign shooting fouls on Fast Break shots
-15. Chamption Pop Up
-16. Box Score bug
 17 Create "DEFENSE" SFX
 18. Defense Matchups pop up -- DEFENSE when appearing, whistle when exiting
-19. Defense Matchups pop up is not consistently showing when it should
+19. Defense Matchups pop up is not consistently showing when it should - coming out of quarter breaks
 20. We need to clean up user Timeout implementation cadence
-21. Airhorn is not sounding on pop up when Computer calls timeout
-22. Rebound position, clamp players from going out of bounds
-
-24. Align on Production Update process once Alpha is live
-25. Lineup Screen displays incorrect data at times
+21. Remove team backgrounds from Announcement System
+22. Sentry Bug Report 2.21.2026
 29. Stale data on initial page load - TOL shows 5, scores incorrect, player NG shows 100% until first turn processes
-30. Calibrate Tournament init settings to seed
+30. Fast Break / DREB animation bug
 34. Player Of The Game
 35. Verify Special Stats are tracking properly
 36. Season & Career Stats for Players for special stats
-37. Remove player sprite enlarging when he commits a foul
-38. Playbooks and Game Plan settings are not persisting in tournament mode. Both TCC and in game are broken.
+37. Player Foul Out Next Step bug
 39. Not getting a Timeout pop up when the computer calls timeout
+
+40. **Final play of quarter hold — clock display:** ~~During the 3-second hold… show **0:00**.~~ **Fixed:** AnimationEngine calls `context.onUpdate({ clock: '0:00' })` at the start of the hold in `handleFinalTurnShot` and `handleFreeThrow` when `quarter_ends_after`, so the scoreboard shows 0:00 for the full hold.
 
 
 ## Future Cleanup (Non-Critical Warnings)

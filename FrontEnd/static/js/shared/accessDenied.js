@@ -10,10 +10,14 @@
   const REDIRECT_DELAY_MS = 1500;
 
   function showMessage(message) {
+    if (typeof window.PageLoadOverlay !== 'undefined' && window.PageLoadOverlay.hide) {
+      window.PageLoadOverlay.hide();
+    }
     var overlay = document.getElementById('cc-loading-overlay');
     if (overlay) {
       overlay.textContent = message;
       overlay.classList.add('cc-loading-overlay--denied');
+      overlay.style.display = 'flex';
     } else {
       var div = document.createElement('div');
       div.id = 'cc-loading-overlay';

@@ -810,6 +810,8 @@ const gameRes = await fetch(`/api/game/${gameId}?quarter=1&source=db`);
 
 **Lineup header during timeout resume:** The lineup page header (time remaining and score) must show the state at the moment the user entered the timeout. **Clock** is read from the **URL** when `resume_from_timeout=true` (timeout navigation puts the displayed clock in the URL). **Scores** are read from the URL when `home_score`/`away_score` are present (same rationale as clock); otherwise scores are loaded from the API with `source=db`. Quarter breaks force clock to 8:00 or 4:00 (OT) and do not use URL clock.
 
+**Court display on return (timeout / quarter break / foul-out):** When the user returns to court with an existing `game_id`, the scoreboard (scores, clock, TOL, fouls) and the Player and Team box scores must show current game state, not stale start-of-quarter data. Scoreboard immediacy and the force-update of Player and Team box scores from `GET /api/game/{game_id}` are documented in **`docs/docs_1_systems/05_GP_Supporting_Systems/Timeout_System.md`** — see “Scoreboard Display Immediacy System” and “Player and Team Box Score Force-Update on Resume”.
+
 **Backend Implementation:**
 ```python
 @app.get("/api/game/{game_id}")
@@ -840,6 +842,38 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 - Score changes: Saved to DB during turn completion
 - Foul/timeout changes: Saved to DB during turn completion
 - Cache refreshed after timeout saves (most critical for consistency)
+
+#### 4. Timeout Click Clock Reconciliation (February 2026)
+
+**Problem:** With realtime frontend countdown, timeout can be clicked between backend turn commits. In those moments, backend `time_remaining` can lag the displayed clock by a few seconds. Saving timeout state from backend-only time caused resume-to-court to jump backward.
+
+**Solution:** Reconcile game/shot clock at timeout click in `/api/call-timeout` using a monotonic min rule before timeout save.
+
+**Reconciliation Rule:**
+- `effective_game_time = min(backend_time_remaining, displayed_time_remaining)`
+- `effective_shot_clock = min(backend_shot_clock_remaining, displayed_shot_clock_remaining, effective_game_time)`
+- Clamp both to `>= 0`
+
+**Contract (Frontend -> Backend):**
+- Frontend timeout click sends:
+  - `displayed_clock`
+  - `displayed_time_remaining`
+  - `displayed_shot_clock_remaining`
+  - `timeout_trace_id`
+- Backend uses these values only for timeout snapshot capture, then persists normally.
+
+**Traceability:**
+- `timeout_trace_id` is carried through:
+  - timeout save log
+  - timeout DB snapshot
+  - resume request (`simulate-quarter`)
+  - resume response diagnostics
+- This allows end-to-end correlation of click time, saved snapshot, and resumed first-turn state.
+
+**Persistence Impact:**
+- Database remains authoritative for resume.
+- Cache is refreshed from DB after timeout save as before.
+- Lineup and resume now read a timeout snapshot that reflects what user saw when timeout was called, preventing clock rollback on return to court.
 
 ### Player Energy (NG) Persistence ✅ **FIXED** (January 2025)
 

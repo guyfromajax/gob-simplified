@@ -120,6 +120,12 @@ The stopper system truncates FCP/HCT "base" variant skeletons at strategic point
 - Defender determined by position-matching to ball handler
 - Frontend animates truncated skeleton normally (no special handling needed)
 
+**Clock start and inbound pass**
+- **Game and shot clocks** start only after the inbound receiver has the ball (same behavior as BIP→HCO and SIP).
+- The **inbound pass** runs during the BASELINE_INBOUND (BIP) step; the frontend runs the full inbound sequence (positions + pass) for FCP/HCT as well as HCO.
+- The backend **trims** the FCP/HCT skeleton to `steps[1:]` when building the turn. Step 0 (inbound setup + pass) is not animated again; the first animated step is post-receive, so clocks start on that first step.
+- Implemented in: `phase_resolution.py` (trim after `get_fcp_skeleton` / `get_hct_skeleton` for both shot and non-shot paths), `turnAnimation.js` `runInboundSetup()` (inbound pass runs for FCP/HCT; no early return).
+
 **Long Form Documentation**
 
 ### Overview

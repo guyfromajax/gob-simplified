@@ -154,10 +154,8 @@ def execute_opening_tip(game):
                 "action": "CONVERGE_ON_BALL"
             })
     
-    # Random time elapsed (2-5 seconds)
-    # ✅ TEMPORARILY DISABLED: Opening tip no longer consumes time to avoid clock issues
-    # time_elapsed = random.randint(2, 5)
-    time_elapsed = 0  # Set to 0 to prevent clock consumption
+    # Tip possession 1-5 game s; +1 for apex+pass (400ms real, pass 300/350 rounds up to 1 game s)
+    time_elapsed = random.randint(1, 5) + 1
     
     text = f"{winner_name} wins the tip!"
     

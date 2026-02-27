@@ -21,6 +21,7 @@ import { gridToPixels } from '../utils/gridToPixels.js';
 import { animateStep } from './animateStep.js';
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from './courtConstants.js';
 import { getPlayerDuration } from './turnAnimation.js';
+import animationConfig from './animation_config.js';
 
 export class ShotAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -158,8 +159,15 @@ export class ShotAnimationSystem {
         )
       : 0;
     
-    // 1. Setup: Move players to step 0 positions
-    await this.runSetupTween(turnData, ballSprite, currentBallOwnerRef);
+    // 1. Setup: Move players to step 0 positions (Phase 5: skip for Final Turn — alignment already done in Phase 4)
+    if (!turnData.final_turn) {
+      await this.runSetupTween(turnData, ballSprite, currentBallOwnerRef);
+    } else {
+      const delayMs = animationConfig?.finalTurn?.moveDelayMs ?? 0;
+      if (delayMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
     
     // ✅ MATCH playTurnAnimation EXACTLY: Update ball ownership at step 0
     const { updateBallOwnership } = await import('./BallControllerAdapter.js');
@@ -184,9 +192,9 @@ export class ShotAnimationSystem {
     
     // ✅ CRITICAL FIX: If we are coming directly from an inbound or opening tip, the ball should already be attached
     // to the inbound receiver or tip winner, so we don't re-derive or re-attach at step 0.
-    // This is the key difference between HCO shots (don't come from inbound) and FCP/HCT shots (come from inbound)
+    // Phase 5: Final Turn — ball already attached to ball handler in runFinalTurnAlignment.
     let step0OwnerSprite = null;
-    if (!previousTurnWasShot && !fromInbound && !fromOpeningTip) {
+    if (!previousTurnWasShot && !fromInbound && !fromOpeningTip && !turnData.final_turn) {
       for (const anim of turnData.animations) {
         if (anim.hasBallAtStep?.[0]) {
           step0OwnerSprite = this.playerSprites[anim.playerId];
@@ -300,7 +308,36 @@ export class ShotAnimationSystem {
       console.log('⚠️ [ShotAnimationSystem.animatePlayerMovement] Skipping - skipToEnd is true');
       return;
     }
-    
+
+    // 🔍 [SHOT ANIM PAYLOAD] One-time log to compare "good" vs "bad" turns (e.g. MAKE/OREB vs MISS+DREB)
+    const { detectPassAtStep } = await import('./passDetection.js');
+    const passAtSteps = [];
+    for (let si = 1; si < maxSteps; si++) {
+      if (detectPassAtStep(turnData.animations, si)) passAtSteps.push(si);
+    }
+    const animSummary = (turnData.animations || []).map(a => ({
+      id: (a.playerId || '').toString().substring(0, 8),
+      movementLen: (a.movement && Array.isArray(a.movement)) ? a.movement.length : 0
+    }));
+    console.log('🔍 [SHOT ANIM PAYLOAD]', {
+      result_type: turnData.result_type,
+      rebound_type: turnData.rebound_type ?? null,
+      animationsCount: (turnData.animations || []).length,
+      maxSteps,
+      passAtSteps,
+      animSummary
+    });
+
+    // 🔍 [SHOT ANIM STATE] Cross-turn state at start of this shot turn (compare after DREB vs after MAKE/OREB)
+    console.log('🔍 [SHOT ANIM STATE]', {
+      result_type: turnData.result_type,
+      rebound_type: turnData.rebound_type ?? null,
+      passInFlight: this.scene.passInFlight === true,
+      currentBallOwnerId: currentBallOwnerRef?.value?.playerId ?? null,
+      _previousTurnWasShot: this.scene._previousTurnWasShot === true,
+      sceneRebounderId: this.scene.rebounderId ?? null
+    });
+
     // ✅ CRITICAL FIX: Kill all ball tweens before starting step loop
     // Lingering ball tweens from previous shots/passes can block the tween manager
     if (ballSprite && this.scene.tweens) {
@@ -420,7 +457,10 @@ export class ShotAnimationSystem {
       // ✅ SCALABLE FIX: Use shared pass detection utility
       // This ensures passes work for HCO shots, fouls, turnovers, etc.
       const passInfo = detectPassAtStep(turnData.animations, stepIndex);
-      
+      // 🔍 [SHOT ANIM TIMING] Collect defender tween start times only on first step that has a pass
+      const isFirstPassStep = passAtSteps.length > 0 && stepIndex === passAtSteps[0];
+      const step4DefenderStarts = isFirstPassStep ? [] : null;
+
       // ✅ COMMENTED OUT: Pass detection result log (cluttering console)
       // console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Pass detection result`, {
       //   passInfo: passInfo ? {
@@ -473,7 +513,7 @@ export class ShotAnimationSystem {
           scene: this.scene,
           sprite,
           step: prev,  // Previous step (for position calculation)
-          nextStep: curr,  // Current step (for action checking)
+          nextStep: curr,  // Current step target
           duration,
           ballSprite,
           currentBallOwnerRef,
@@ -494,17 +534,14 @@ export class ShotAnimationSystem {
             passerPromise = promise;
           }
         } else {
-          // ✅ COMMENTED OUT: Timing logs (didn't solve the issue)
-          // const defensiveTweenStartTime = performance.now();
-          // console.log(`⏱️ [TIMING] Step ${stepIndex}: Defensive tween CREATED and STARTED for ${anim.playerId?.substring(0, 8)}`, {
-          //   playerId: anim.playerId?.substring(0, 8),
-          //   animateStepCallDuration: afterAnimateStep - beforeAnimateStep,
-          //   tweenStartTime: defensiveTweenStartTime,
-          //   note: 'Tween starts immediately when animateStep() is called, not when Phase 2 begins'
-          // });
+          if (step4DefenderStarts) {
+            step4DefenderStarts.push({
+              id: (anim.playerId || '').toString().substring(0, 8),
+              startTime: beforeAnimateStep
+            });
+          }
           defensivePromises.push({
             promise,
-            // startTime: defensiveTweenStartTime,
             playerId: anim.playerId
           });
         }
@@ -563,6 +600,20 @@ export class ShotAnimationSystem {
       // Extract promises from defensivePromises array (which now contains objects with {promise, playerId})
       const defensivePromiseArray = defensivePromises.map(dp => dp.promise);
       passAndDefensePromises.push(...defensivePromiseArray);
+
+      // 🔍 [SHOT ANIM TIMING] Log only for first step with a pass (compare DREB vs non-DREB)
+      if (step4DefenderStarts && step4DefenderStarts.length > 0) {
+        const earliest = Math.min(...step4DefenderStarts.map(d => d.startTime));
+        console.log('🔍 [SHOT ANIM TIMING]', {
+          stepIndex,
+          result_type: turnData.result_type,
+          rebound_type: turnData.rebound_type ?? null,
+          phase2StartTime,
+          defenderStarts: step4DefenderStarts,
+          earliestDefenderStart: earliest,
+          msFromFirstDefenderToPhase2: Math.round(phase2StartTime - earliest)
+        });
+      }
       // ✅ COMMENTED OUT: Defensive animations added log (cluttering console)
       // console.log(`✅ [SHOT ANIM] Step ${stepIndex}: Added ${defensivePromiseArray.length} defensive animations to Phase 2`);
       
@@ -858,6 +909,9 @@ export class ShotAnimationSystem {
         }
         // Else: y is exactly 25 or 26, keep it the same (rare)
         
+        // Clamp X to court between the two rims (prevent players moving out of bounds on HCO shot attempts)
+        targetGridX = Math.max(9, Math.min(91, targetGridX));
+        
         // Convert target grid back to pixels
         const targetPixel = gridToPixels(targetGridX, targetGridY, canvasWidth, canvasHeight);
         
@@ -936,142 +990,104 @@ export class ShotAnimationSystem {
       });
     }
 
-    // ✅ FIX: Ball is already at rim from animateBallFlight() - just hold it there
-    // Match the behavior of putback makes and free throws (no repositioning)
+    // ✅ FIX: Ball is already at rim from animateBallFlight() - hold and show announcement in unison
+    // Freeze clocks during rim hold + made-shot announcement window.
+    const clockPauseReason = 'made_shot_hold';
+    this.scene?.gameClock?.pause?.(clockPauseReason);
+    this.scene?.shotClock?.pause?.(clockPauseReason);
     const ballSprite = this.ballController.ballSprite;
-    
-    // Determine rim hold duration: 1 second for HCO, 2 seconds for fast break
     const isFastBreak = turnData.fast_break === true;
-    const rimHoldDuration = isFastBreak ? 2000 : 1000;
-    
+
     if (ballSprite) {
-      // Keep ball visible and hold at rim
       ballSprite.setVisible(true);
-      
-      // Hold ball at rim (allows announcement to display)
+    }
+
+    // Show announcement and flash immediately so they run in unison with rim hold (single 1000ms period)
+    if (!isPutbackMake) {
+      const { showAnnouncement, showAndOneAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
+      const { triggerMadeShotFlash } = await import('./negativeActionEffects.js');
+      const shooterInfo = this.scene.playerInfo?.[turnData.shooter_id];
+      const shooterSprite = this.playerSprites[turnData.shooter_id];
+      const shooterTeamId = shooterSprite?.team_id;
+      const homeTeamField = this.scene.simData?.home_team;
+      const awayTeamField = this.scene.simData?.away_team;
+      const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+      const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+      const shooterTeamName = shooterTeamId === this.scene.simData?.home_team_id ? homeTeamName : awayTeamName;
+      const shooterPlayerData = shooterInfo ? {
+        playerId: turnData.shooter_id,
+        photo: shooterSprite?.photo || null,
+        teamName: shooterTeamName,
+        secondaryColor: getSecondaryColorForTeam(this.scene, shooterTeamId)
+      } : null;
+      const isHomeOffense = shooterTeamId === this.scene.simData?.home_team_id;
+      const teamStyle = isHomeOffense ? 'home' : 'away';
+      const isAndOne = turnData.next_play_type === "FREE_THROW" &&
+                       (turnData.foul_player_id || turnData.foul_player?.player_id);
+      triggerMadeShotFlash(this.scene, isAndOne);
+      if (isAndOne) {
+        const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
+        if (foulPlayerId && shooterPlayerData) {
+          const foulPlayerSprite = this.playerSprites[foulPlayerId];
+          const foulPlayerTeamId = foulPlayerSprite?.team_id;
+          const foulPlayerTeamName = foulPlayerTeamId === this.scene.simData?.home_team_id ? homeTeamName : awayTeamName;
+          const foulPlayerData = {
+            playerId: foulPlayerId,
+            photo: foulPlayerSprite?.photo || null,
+            teamName: foulPlayerTeamName,
+            secondaryColor: getSecondaryColorForTeam(this.scene, foulPlayerTeamId)
+          };
+          showAndOneAnnouncement(teamStyle, shooterPlayerData, foulPlayerData);
+        } else {
+          showAnnouncement("It's Good! And 1!", teamStyle, shooterPlayerData);
+        }
+      } else {
+        showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
+      }
+    }
+
+    // Single wait: rim hold and announcement in unison (use announcement hold so announcement stays 1000ms)
+    const holdMs = !isPutbackMake
+      ? (animationConfig.shot?.makeAnnouncementHoldMs ?? 1000)
+      : (isFastBreak ? (animationConfig.fastBreak?.rimHoldMs ?? 1000) : (animationConfig.shot?.rimHoldMs ?? 1000));
+    try {
       await new Promise(resolve => {
         if (this.scene.time?.delayedCall) {
-          this.scene.time.delayedCall(rimHoldDuration, resolve);
+          this.scene.time.delayedCall(holdMs, resolve);
         } else {
-          setTimeout(resolve, rimHoldDuration);
+          setTimeout(resolve, holdMs);
         }
       });
-      
-      // ✅ FIX: Stop get-back player animations after rim hold completes
-      // Players may not have reached their destination, which is fine
+    } finally {
+      this.scene?.gameClock?.resume?.(clockPauseReason);
+      this.scene?.shotClock?.resume?.(clockPauseReason);
+    }
+
+    if (ballSprite) {
       if (this._getBackTweens) {
-        const beforeKill = getTweenManagerState();
         this._getBackTweens.forEach(tween => {
           if (tween && tween.isPlaying && this.scene.tweens) {
             this.scene.tweens.killTweensOf(tween.targets);
           }
         });
         this._getBackTweens = [];
-        const afterKill = getTweenManagerState();
-        console.log(`🔍 [MAKE HANDLER] After killing _getBackTweens`, {
-          beforeKill,
-          afterKill,
-          killedCount: this._getBackTweens ? 0 : 'N/A'
-        });
       }
-      
-      // Hide ball after hold
       ballSprite.setVisible(false);
     }
 
-    // Transition to IDLE state (end of possession)
     if (this.stateMachine) {
       this.stateMachine.transition(AnimationStates.IDLE, {
         reason: 'shot_made',
         shooter_id: turnData.shooter_id
       });
-      console.log(`🔍 [MAKE HANDLER] After state transition to IDLE`, {
-        currentState: this.stateMachine.state
-      });
     }
-
-    // Ball hold already handled above (1 second), no additional delay needed
-    
-    // ✅ PRIORITY 1 FIX: Call onShotEnd() to clear in-flight state
-    // This matches the pattern in ballManager.js (line 626)
     this.ballController.onShotEnd();
-    console.log(`🔍 [MAKE HANDLER] After onShotEnd()`, {
-      ballControllerState: {
-        isAttached: this.ballController.isAttached,
-        isInFlight: this.ballController.isInFlight
-      }
-    });
-    
-    // ✅ FIX: Show announcement for ALL made shots (like Fast Break does)
-    // This includes both regular makes and AND-1 situations
+
     if (!isPutbackMake) {
-      const { showAnnouncement, showAndOneAnnouncement } = await import('../utils/announcements.js');
-      const { triggerMadeShotFlash } = await import('./negativeActionEffects.js');
-      const shooterInfo = this.scene.playerInfo?.[turnData.shooter_id];
-      const shooterSprite = this.playerSprites[turnData.shooter_id];
-      const shooterTeamId = shooterSprite?.team_id;
-      
-      // Handle both new nested structure (object) and old flat structure (string)
-      const homeTeamField = this.scene.simData?.home_team;
-      const awayTeamField = this.scene.simData?.away_team;
-      const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-      const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
-      const shooterTeamName = shooterTeamId === this.scene.simData?.home_team_id ? homeTeamName : awayTeamName;
-      
-      const shooterPlayerData = shooterInfo ? {
-        playerId: turnData.shooter_id,
-        photo: shooterSprite?.photo || null,
-        teamName: shooterTeamName
-      } : null;
-      
-      const isHomeOffense = shooterTeamId === this.scene.simData?.home_team_id;
-      const teamStyle = isHomeOffense ? 'home' : 'away';
-      
-      // Check if this is an AND-1 situation (made shot with defensive foul)
-      const isAndOne = turnData.next_play_type === "FREE_THROW" && 
-                       (turnData.foul_player_id || turnData.foul_player?.player_id);
-      
-      // Trigger green flash (full screen for regular makes, same for AND-1)
-      triggerMadeShotFlash(this.scene, isAndOne);
-      
-      if (isAndOne) {
-        // AND-1 - Use special two-row announcement (red box with shooter + fouler)
-        const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
-        if (foulPlayerId && shooterPlayerData) {
-          const foulPlayerSprite = this.playerSprites[foulPlayerId];
-          const foulPlayerTeamId = foulPlayerSprite?.team_id;
-          const foulPlayerTeamName = foulPlayerTeamId === this.scene.simData?.home_team_id ? homeTeamName : awayTeamName;
-          
-          const foulPlayerData = {
-            playerId: foulPlayerId,
-            photo: foulPlayerSprite?.photo || null,
-            teamName: foulPlayerTeamName
-          };
-          
-          showAndOneAnnouncement(teamStyle, shooterPlayerData, foulPlayerData);
-        } else {
-          // Fallback if data missing
-          showAnnouncement("It's Good! And 1!", teamStyle, shooterPlayerData);
-        }
-      } else {
-        // Regular made shot
-        showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
-      }
-      
-      // Wait for announcement (like Fast Break)
-      await new Promise(resolve => this.scene.time.delayedCall(1000, resolve));
-      
-      // ✅ FIX: Only call runInboundSetup if next_play_type is BASELINE_INBOUND
-      // For AND-1 situations (next_play_type === "FREE_THROW"), let the free throw system handle the transition
-      // ✅ CRITICAL: Also check possession_flips flag to prevent AND-1 from flipping possession
-      // ✅ FIX: Don't call runInboundSetup() here if next_play_type === "BASELINE_INBOUND"
-      // The BASELINE_INBOUND turn will handle the inbound setup via AnimationEngine.handleBaselineInbound()
-      // Calling it here causes double inbound passes and double setup animations
-      const shouldFlipPossession = turnData.next_play_type === "BASELINE_INBOUND" && 
+      const shouldFlipPossession = turnData.next_play_type === "BASELINE_INBOUND" &&
                                    (turnData.possession_flips !== false);
       if (shouldFlipPossession) {
-        // ✅ REMOVED: runInboundSetup() call - BASELINE_INBOUND turn handles it
-        // This prevents double inbound passes and double setup animations
+        // BASELINE_INBOUND turn handles inbound setup
       }
     }
     
@@ -1104,8 +1120,8 @@ export class ShotAnimationSystem {
     
     if (isShootingFoul) {
       // ✅ FIX: Replicate AND-1 announcement pattern exactly (matches made shot flow from ballManager.js)
-      const { showAnnouncement } = await import('../utils/announcements.js');
-      
+      const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
+
       // Get foul player data from turnData (same pattern as AND-1)
       const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
       if (foulPlayerId && this.scene) {
@@ -1118,11 +1134,12 @@ export class ShotAnimationSystem {
           const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
           const foulPlayerTeamId = foulPlayerSprite?.team_id;
           const foulPlayerTeamName = foulPlayerTeamId === this.scene.homeTeamId ? homeTeamName : awayTeamName;
-          
+
           const foulPlayerData = {
             playerId: foulPlayerId,
             photo: foulPlayerSprite?.photo || null,
-            teamName: foulPlayerTeamName
+            teamName: foulPlayerTeamName,
+            secondaryColor: getSecondaryColorForTeam(this.scene, foulPlayerTeamId)
           };
           
           // Trigger foul effect
@@ -1371,8 +1388,8 @@ export class ShotAnimationSystem {
       let targetGridX = bounceGridX + offsetX;
       let targetGridY = bounceGridY + offsetY;
       
-      // Clamp to court bounds (0-100 x, 0-50 y)
-      targetGridX = Math.max(0, Math.min(100, targetGridX));
+      // Clamp to court bounds between rims on X (9-91) and full court on Y (0-50)
+      targetGridX = Math.max(9, Math.min(91, targetGridX));
       targetGridY = Math.max(0, Math.min(50, targetGridY));
       
       const targetPixel = gridToPixels(targetGridX, targetGridY, this.scene.game.config.width, this.scene.game.config.height);
@@ -1486,20 +1503,22 @@ export class ShotAnimationSystem {
     
     // Use the same defensive rebound setup for HCO, HCT, and FCP
     // Fast breaks handle outlet in their own turn
-    if (nextPlayType === 'HCO' || nextPlayType === 'HCT' || nextPlayType === 'FCP') {
+    // ✅ Force Foul after DREB: skip outlet — foul turn animates defender→rebounder and "Quick Foul"
+    if ((nextPlayType === 'HCO' || nextPlayType === 'HCT' || nextPlayType === 'FCP') && !turnData.force_foul_after_dreb) {
       // ✅ REMOVED: Defensive rebound logging (cluttering console)
       
       // ✅ FIX: Announce rebound before outlet animation
       // ballManager only announces rebounds for its own rebound positioning code
       // Outlet pass system needs to announce too
-      const { showAnnouncement } = await import('../utils/announcements.js');
+      const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
       const rebounderSprite = this.playerSprites[turnData.rebounderId];
       if (rebounderSprite) {
         const rebounderTeam = rebounderSprite.team; // "home" or "away"
         const playerData = {
           playerId: turnData.rebounderId,
           photo: rebounderSprite.photo || null,
-          teamName: rebounderSprite.team_id
+          teamName: rebounderSprite.team_id,
+          secondaryColor: getSecondaryColorForTeam(this.scene, rebounderSprite.team_id)
         };
         showAnnouncement("Rebound!", rebounderTeam, playerData);
       }

@@ -338,6 +338,7 @@ def simulate_quarter(
         new_clock = "8:00" if q <= 4 else "4:00"
         gm.game_state["time_remaining"] = new_time
         gm.game_state["clock"] = new_clock
+        gm.game_state["shot_clock_remaining"] = min(30, int(new_time))
 
     # ✅ TIMEOUT: If resuming from timeout, skip all quarter initialization
     # Reuse the same pattern as quarter breaks - preserve all game state
@@ -381,14 +382,16 @@ def simulate_quarter(
             # ✅ TIMEOUT RESUME: Ensure clock is in turn payload for frontend
             if "clock" not in sip_turn:
                 sip_turn["clock"] = gm.game_state.get("clock", "0:00")
+            gm.turn_manager._attach_clock_contract(
+                sip_turn,
+                clock_start=int(gm.game_state.get("time_remaining", 0)),
+                shot_clock_start=int(gm.game_state.get("shot_clock_remaining", 30)),
+                game_state=gm.game_state,
+                source="bypass:SIP_RESUME",
+            )
             gm.turns.append(sip_turn)
             gm.text_log.append(sip_turn.get("text", "Side inbound"))
-            # Update clock (SIP takes 4 seconds)
-            if gm.game_state.get("time_remaining", 0) > 4:
-                gm.game_state["time_remaining"] -= 4
-                minutes = gm.game_state["time_remaining"] // 60
-                seconds = gm.game_state["time_remaining"] % 60
-                gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
+            # No-impact turn: SIDE_INBOUND does not consume game clock.
             logging.info(f"✅ TIMEOUT RESUME: SIP turn created with offense team: {gm.offense_team.name} (team_id: {gm.offense_team.team_id}), total turns: {len(gm.turns)}")
         elif resume_from_timeout and timeout_next_play_type == "FREE_THROW":
             # Free throw turn will be created by simulate_macro_turn (first call from frontend)
@@ -403,19 +406,23 @@ def simulate_quarter(
             logging.warning(f"⚠️ TIMEOUT RESUME: timeout_next_play_type={timeout_next_play_type} is unexpected, defaulting to SIDE_INBOUND")
             gm.turn_manager.set_strategy_calls()
             sip_turn = gm.turn_manager.setup_side_inbound()
+            gm.turn_manager._attach_clock_contract(
+                sip_turn,
+                clock_start=int(gm.game_state.get("time_remaining", 0)),
+                shot_clock_start=int(gm.game_state.get("shot_clock_remaining", 30)),
+                game_state=gm.game_state,
+                source="bypass:SIP_RESUME",
+            )
             gm.turns.append(sip_turn)
             gm.text_log.append(sip_turn.get("text", "Side inbound"))
-            if gm.game_state.get("time_remaining", 0) > 4:
-                gm.game_state["time_remaining"] -= 4
-                minutes = gm.game_state["time_remaining"] // 60
-                seconds = gm.game_state["time_remaining"] % 60
-                gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
+            # No-impact turn: SIDE_INBOUND does not consume game clock.
         
         # ✅ TIMEOUT: Only clear timeout state and return early if we actually handled a timeout resume
         if resume_from_timeout:
             # ✅ TIMEOUT: Clear timeout state from memory
             gm.game_state.pop("timeout_next_play_type", None)
             gm.game_state.pop("timeout_offense_team_id", None)  # Also clear possession team
+            gm.game_state.pop("timeout_trace_id", None)
             
             # ✅ TIMEOUT: Clear timeout state from database after resume (defensive cleanup)
             # This prevents stale timeout state from affecting future games
@@ -426,6 +433,7 @@ def simulate_quarter(
                     unset_fields = {
                         "timeout_next_play_type": "",
                         "timeout_offense_team_id": "",
+                        "timeout_trace_id": "",
                         "timeout_free_throws_remaining": "",
                         "timeout_free_throws": "",
                         "timeout_shooter_id": "",
@@ -487,13 +495,15 @@ def simulate_quarter(
         # Opening tip for Q1 and all OT periods
         from BackEnd.utils.opening_tip import execute_opening_tip
         _, _, tip_turn = execute_opening_tip(gm)
+        gm.turn_manager._attach_clock_contract(
+            tip_turn,
+            clock_start=int(gm.game_state.get("time_remaining", 0)),
+            shot_clock_start=int(gm.game_state.get("shot_clock_remaining", 30)),
+            game_state=gm.game_state,
+            source="bypass:OPENING_TIP",
+        )
         gm.turns.append(tip_turn)
-        # ✅ TEMPORARILY DISABLED: Opening tip no longer consumes time to avoid clock issues
-        # Update clock for tip time elapsed
-        # gm.game_state["time_remaining"] -= tip_turn["time_elapsed"]
-        # minutes = gm.game_state["time_remaining"] // 60
-        # seconds = gm.game_state["time_remaining"] % 60
-        # gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
+        # Keep opening tip start clock fixed at quarter start baseline (Q1=8:00, OT=4:00).
     elif q == 2:
         # Q2: Team that didn't win opening tip gets possession via BASELINE_INBOUND
         opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
@@ -523,11 +533,18 @@ def simulate_quarter(
         inbound_turn = {
             **inbound_payload,
             "text": f"Start of Q{q}: {gm.offense_team.name} inbounds the ball.",
-            "time_elapsed": 4,
+            "time_elapsed": 0,
             "possession_flips": False,
             "quarter": q,
         }
         
+        gm.turn_manager._attach_clock_contract(
+            inbound_turn,
+            clock_start=int(gm.game_state.get("time_remaining", 0)),
+            shot_clock_start=int(gm.game_state.get("shot_clock_remaining", 30)),
+            game_state=gm.game_state,
+            source="bypass:BIP_QUARTER_START",
+        )
         gm.turns.append(inbound_turn)
         gm.text_log.append(inbound_turn["text"])
         
@@ -565,11 +582,18 @@ def simulate_quarter(
         inbound_turn = {
             **inbound_payload,
             "text": f"Start of Q{q}: {gm.offense_team.name} inbounds the ball.",
-            "time_elapsed": 4,
+            "time_elapsed": 0,
             "possession_flips": False,
             "quarter": q,
         }
         
+        gm.turn_manager._attach_clock_contract(
+            inbound_turn,
+            clock_start=int(gm.game_state.get("time_remaining", 0)),
+            shot_clock_start=int(gm.game_state.get("shot_clock_remaining", 30)),
+            game_state=gm.game_state,
+            source="bypass:BIP_QUARTER_START",
+        )
         gm.turns.append(inbound_turn)
         gm.text_log.append(inbound_turn["text"])
         
@@ -607,11 +631,18 @@ def simulate_quarter(
         inbound_turn = {
             **inbound_payload,
             "text": f"Start of Q{q}: {gm.offense_team.name} inbounds the ball.",
-            "time_elapsed": 4,
+            "time_elapsed": 0,
             "possession_flips": False,
             "quarter": q,
         }
         
+        gm.turn_manager._attach_clock_contract(
+            inbound_turn,
+            clock_start=int(gm.game_state.get("time_remaining", 0)),
+            shot_clock_start=int(gm.game_state.get("shot_clock_remaining", 30)),
+            game_state=gm.game_state,
+            source="bypass:BIP_QUARTER_START",
+        )
         gm.turns.append(inbound_turn)
         gm.text_log.append(inbound_turn["text"])
         
@@ -701,6 +732,7 @@ def simulate_quarter(
             logging.warning(f"🧹 QUARTER COMPLETE: Clearing stale timeout state (quarter {gm.quarter} finished)")
             gm.game_state.pop("timeout_next_play_type", None)
             gm.game_state.pop("timeout_offense_team_id", None)
+            gm.game_state.pop("timeout_trace_id", None)
         
         _loop_sec = _time.time() - _loop_start
         logging.warning(f"⏱️ [PERF] full_sim loop: Q{gm.quarter} turns={turn_count} loop_time={_loop_sec:.2f}s ({1000*_loop_sec/max(turn_count,1):.0f}ms/turn)")

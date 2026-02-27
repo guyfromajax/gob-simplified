@@ -4,27 +4,13 @@ export function onAction(action, sprite, timestamp) {
   
     switch (action) {
       case "handle_ball":
-        // Light glow pulse
-        scene.tweens.add({
-          targets: sprite,
-          scale: 1.1,
-          duration: 150,
-          yoyo: true,
-          ease: "Sine.easeInOut"
-        });
+        // Scale tweens removed (sunset) — no effect
         break;
-  
+
       case "pass":
-        // Quick scale-out and in
-        scene.tweens.add({
-          targets: sprite,
-          scale: 1.2,
-          duration: 100,
-          yoyo: true,
-          ease: "Quad.easeInOut"
-        });
+        // Scale tweens removed (sunset) — no effect
         break;
-  
+
       case "receive":
         // Small bounce effect
         scene.tweens.add({
@@ -49,14 +35,7 @@ export function onAction(action, sprite, timestamp) {
         break;
   
       case "shoot":
-        // Pop with delay (setup for future shot arc or animation)
-        scene.tweens.add({
-          targets: sprite,
-          scale: 1.3,
-          duration: 150,
-          yoyo: true,
-          ease: "Back.easeOut"
-        });
+        // Scale tweens removed (sunset) — no effect
         break;
 
       case "steal":

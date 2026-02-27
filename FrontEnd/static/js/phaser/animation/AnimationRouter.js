@@ -100,6 +100,124 @@ export class AnimationRouter {
     const isHCO = !turnData.fast_break && (turnData.result_type === "MAKE" || turnData.result_type === "MISS" || turnData.result_type === "BLOCK");
 
     try {
+      // Clock control for no-impact turns:
+      // Pause UX countdown when backend marks no time elapsed (or known no-impact result types),
+      // then release that pause token for impact turns.
+      const noImpactResultTypes = new Set([
+        'FREE_THROW',
+        'SIDE_INBOUND',
+        'BASELINE_INBOUND',
+        'TIMEOUT',
+      ]);
+      const elapsedValue = Number(turnData?.time_elapsed ?? turnData?.timeElapsed);
+      const hasElapsedValue = Number.isFinite(elapsedValue);
+      const isNoImpactTurn =
+        (hasElapsedValue && elapsedValue === 0) ||
+        noImpactResultTypes.has(turnData?.result_type);
+      const isOpeningTipTurn = turnData?.result_type === 'OPENING_TIP';
+
+      // Clocks: game clock never forced; shot clock uses contract only (backend authority — Real_Time_Clock_System §101–102).
+      if (this.scene?.gameClock || this.scene?.shotClock) {
+        const applyClockControl = (clockRef) => {
+          if (!clockRef) return;
+          if (isNoImpactTurn) clockRef.pause('no_impact_turn');
+          else {
+            clockRef.resume('no_impact_turn');
+            if (this.scene.isPaused) clockRef.pause('user_pause');
+          }
+        };
+        applyClockControl(this.scene.gameClock);
+        applyClockControl(this.scene.shotClock);
+      }
+
+      // Contract fields (snake_case + camelCase)
+      const clockStart = Number(turnData?.clock_start ?? turnData?.clockStart);
+      const clockEnd = Number(turnData?.clock_end ?? turnData?.clockEnd);
+      const shotClockStart = Number(turnData?.shot_clock_start ?? turnData?.shotClockStart);
+      const shotClockEnd = Number(turnData?.shot_clock_end ?? turnData?.shotClockEnd);
+      const durationMs = Math.max(0, Math.floor(Number(turnData?.real_time_elapsed_ms ?? turnData?.realTimeElapsedMs) || 0));
+      const gameSecondsToCount = Number.isFinite(clockStart) && Number.isFinite(clockEnd) ? clockStart - clockEnd : 0;
+      const shotSecondsToCount = Number.isFinite(shotClockStart) && Number.isFinite(shotClockEnd) ? shotClockStart - shotClockEnd : 0;
+      // Sync diagnostics: compare backend real-time estimate to game time (1:1 would be game_seconds * 1000)
+      const expectedRealMsIf1To1 = gameSecondsToCount * 1000;
+      const ratioRealToGame = expectedRealMsIf1To1 > 0 ? (durationMs / expectedRealMsIf1To1) : null;
+
+      console.log('⏱️ [CLOCK CONTRACT] Turn dict clock fields', {
+        clock_start: turnData?.clock_start,
+        clock_end: turnData?.clock_end,
+        shot_clock_start: turnData?.shot_clock_start,
+        shot_clock_end: turnData?.shot_clock_end,
+        real_time_elapsed_ms: turnData?.real_time_elapsed_ms,
+        result_type: turnData?.result_type,
+        // Sync diagnostics: game/shot seconds vs backend real-time estimate
+        game_seconds_elapsed: gameSecondsToCount,
+        shot_seconds_elapsed: shotSecondsToCount,
+        real_time_elapsed_ms_estimate: durationMs,
+        expected_real_ms_if_1_to_1: expectedRealMsIf1To1,
+        ratio_real_to_game: ratioRealToGame != null ? `${(ratioRealToGame * 100).toFixed(0)}%` : null,
+        keys: typeof turnData === 'object' ? Object.keys(turnData).filter(k => k.includes('clock') || k === 'real_time_elapsed_ms') : [],
+      });
+
+      if (this.scene._clockInterpolationTween) {
+        this.scene._clockInterpolationTween.remove();
+        this.scene._clockInterpolationTween = null;
+      }
+
+      // Turn start: same condition for both — when game clock has contract, sync both (shot uses shot keys, clamp 30)
+      if (this.scene?.gameClock && this.scene?.shotClock && Number.isFinite(clockStart)) {
+        this.scene.gameClock.syncWithBackend(clockStart);
+        const shotStart = Number.isFinite(shotClockStart) ? Math.min(30, shotClockStart) : 30;
+        this.scene.shotClock.syncWithBackend(shotStart);
+      }
+
+      // Tween: run when game clock runs (same condition). Two-phase when shot stops early: both in sync, then shot paused.
+      const shouldRunClockTween = durationMs > 0 && gameSecondsToCount > 0 && this.scene?.gameClock && this.scene?.shotClock;
+      if (shouldRunClockTween) {
+        const gameClock = this.scene.gameClock;
+        const shotClock = this.scene.shotClock;
+        const startGame = Number.isFinite(clockStart) ? clockStart : 0;
+        const endGame = Number.isFinite(clockEnd) ? clockEnd : 0;
+        const startShot = Number.isFinite(shotClockStart) ? Math.min(30, shotClockStart) : 30;
+        const endShot = Number.isFinite(shotClockEnd) ? Math.min(30, shotClockEnd) : 30;
+        const shotSecondsToCount = Math.max(0, startShot - endShot);
+        // When shot elapsed < game elapsed, phase 1 = both in sync for shotSecondsToCount, phase 2 = shot paused, game continues.
+        const useTwoPhase = gameSecondsToCount > 0 && shotSecondsToCount < gameSecondsToCount;
+        const ratio = useTwoPhase ? shotSecondsToCount / gameSecondsToCount : 1;
+        const progressObj = { p: 0 };
+        this.scene._clockInterpolationTween = this.scene.tweens.add({
+          targets: progressObj,
+          p: 1,
+          duration: durationMs,
+          ease: 'Linear',
+          onUpdate: () => {
+            const progress = Math.min(1, Math.max(0, progressObj.p));
+            let gameSeconds;
+            let shotSeconds;
+            if (useTwoPhase && ratio > 0) {
+              if (progress <= ratio) {
+                const phase1Progress = progress / ratio;
+                gameSeconds = startGame - phase1Progress * shotSecondsToCount;
+                shotSeconds = startShot - phase1Progress * shotSecondsToCount;
+              } else {
+                const phase2Progress = (progress - ratio) / (1 - ratio);
+                gameSeconds = (startGame - shotSecondsToCount) - phase2Progress * (gameSecondsToCount - shotSecondsToCount);
+                shotSeconds = endShot;
+              }
+            } else {
+              gameSeconds = startGame - progress * gameSecondsToCount;
+              shotSeconds = startShot + progress * (endShot - startShot);
+            }
+            gameClock.syncWithBackend(Math.max(endGame, Math.min(startGame, gameSeconds)));
+            shotClock.syncWithBackend(Math.max(0, Math.min(30, shotSeconds)));
+          },
+          onComplete: () => {
+            if (this.scene._clockInterpolationTween) {
+              this.scene._clockInterpolationTween = null;
+            }
+          },
+        });
+      }
+
       // ✅ PHASE 2.3: Call prepareTurnForAnimation at the start
       // Extract turnIndex from turnData (will be set by prepareTurnForAnimation if not present)
       turnIndex = turnData.index ?? turnData.turnIndex ?? null;
@@ -173,13 +291,16 @@ export class AnimationRouter {
       // No need to kill turns mid-animation - timeouts wait for turn boundaries
       
       // ✅ PHASE 2.1: Enhanced context object with all required parameters
+      // ✅ Force Foul: nextTurn so BIP/SIP can animate defender move in same turn when next is quick_foul
+      const nextTurn = this.scene._currentTurnBatch?.[(turnData.index ?? turnIndex ?? 0) + 1];
       const context = {
         playerSprites: this.playerSprites,
         ballSprite: this.ballSprite,
         onUpdate: this.onUpdate,
         simData: this.scene.simData,
         onAction: this.onAction, // Pass onAction callback if provided
-        turnIndex: turnIndex // ✅ PHASE 2.1: Add turnIndex to context
+        turnIndex: turnIndex, // ✅ PHASE 2.1: Add turnIndex to context
+        nextTurn: nextTurn ?? null
       };
       
       if (!shouldLog) {
@@ -205,10 +326,15 @@ export class AnimationRouter {
       });
       throw error;
     } finally {
+      // PHASE2: Stop bounded clock interpolation so final snap (updateScoreboard) is authoritative
+      if (this.scene?._clockInterpolationTween) {
+        this.scene._clockInterpolationTween.remove();
+        this.scene._clockInterpolationTween = null;
+      }
       // ✅ PHASE 2.3: Call finalizeTurnAfterAnimation in finally block (always runs)
       try {
         // ✅ REMOVED: Finalize logging (cluttering console)
-        
+
         await finalizeTurnAfterAnimation({
           turn: turnData,
           scene: this.scene,

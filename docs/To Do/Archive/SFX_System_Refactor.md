@@ -63,7 +63,7 @@ If you ran `git lfs migrate`, use your normal process for pushing rewritten hist
 
 ## 5. Verify (optional)
 
-- **After push:** On GitHub/GitLab, open a file under `FrontEnd/static/sounds/` and confirm it shows an LFS pointer (small file) or a “Stored with Git LFS” badge.
+- **After push:** On GitHub/GitLab, open a file under `FrontEnd/static/sounds/` and confirm it shows an LFS pointer (small file) or a "Stored with Git LFS" badge.
 - **Fresh clone:** `git clone <repo>` then `git lfs pull` (or clone with `GIT_LFS_SKIP_SMUDGE=0`). Confirm `FrontEnd/static/sounds/*.mp3` (etc.) are real audio files, not pointer blobs.
 
 ---

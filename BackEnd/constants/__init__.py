@@ -164,16 +164,38 @@ STANDARD_D_FOUL = 95
 STANDARD_O_FOUL = 5
 HARD_STEAL = -135
 SOFT_STEAL = -35
-HARD_FOUL = 200
-SOFT_FOUL = 100
+HARD_FOUL = 250
+SOFT_FOUL = 150
 STEAL_ATTEMPT = 30
-DEAD_BALL_TURNOVER = 7
+DEAD_BALL_TURNOVER = 30  # temp change from 7
 
 # Charge/Blocking Foul (drive reconciliation thresholds)
 # reconciliation = offense_score - defense_score
 # < CHARGE_THRESHOLD → charge (offensive foul); > BLOCKING_FOUL_THRESHOLD → blocking foul (defensive foul)
 CHARGE_THRESHOLD = -240
 BLOCKING_FOUL_THRESHOLD = 220
+
+# Situational Logic (Q4/OT): time-band table (see docs/.../Situational_Logic_System.md)
+# Each entry: (min_sec, max_sec, config). Time remaining in quarter (seconds). Bands: 2:01-3:00, 1:01-2:00, 0:31-1:00, 0:01-0:30.
+SITUATIONAL_TIME_BANDS = (
+    (121, 180, {"slow_min": 12, "quick_lo": -24, "quick_hi": -12, "outside": 0.60, "attack": 0.20, "inside": 0.20, "force_foul": False}),
+    (61, 120, {"slow_min": 9, "quick_lo": -18, "quick_hi": -9, "outside": 0.70, "attack": 0.20, "inside": 0.10, "force_foul": False}),
+    (31, 60, {"slow_min": 3, "quick_lo": -12, "quick_hi": -3, "outside": 0.80, "attack": 0.15, "inside": 0.05, "force_foul_lo": 3, "force_foul_hi": 12}),
+    (0, 30, {"slow_min": 1, "quick_lo": -9, "quick_hi": -1, "last_30_quick": True, "outside_if_delta_below": -2, "force_foul_lo": 1, "force_foul_hi": 9}),
+)
+# Legacy: used only if a caller expects single ratio; bands above define explicit outside/attack/inside
+SITUATIONAL_QUICK_SHOT_ATTACK_RATIO = 0.75
+SITUATIONAL_FORCE_FOUL_TIME_ELAPSED_MIN = 1
+SITUATIONAL_FORCE_FOUL_TIME_ELAPSED_MAX = 3
+# Inbound pass receiver position for Force Foul (BIP/SIP)
+SITUATIONAL_BIP_RECEIVER_POS = "SG"
+SITUATIONAL_SIP_RECEIVER_POS = "SG"
+
+# Movement rates (game seconds vs grid distance); see Real_Time_Clock_System.md
+# Attack drive to basket: 1 game second per N grid spots (Euclidean)
+ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND = 12
+# Pass (ball in air): 1 game second per N grid spots (Euclidean), from passer to receiver
+PASS_GRID_SPOTS_PER_GAME_SECOND = 36
 
 HCO_STRING_SPOTS = {
     "key": {"x": 64, "y": 25},
@@ -274,8 +296,8 @@ OFFSET_SPOTS = {
 }
 
 # Shared court coordinates
-HOME_RIM_COORDS = {"x": 90, "y": 25}
-AWAY_RIM_COORDS = {"x": 10, "y": 25}
+HOME_RIM_COORDS = {"x": 91, "y": 25}
+AWAY_RIM_COORDS = {"x": 9, "y": 25}
 HOME_TOP_KEY = {"x": 64, "y": 25}
 AWAY_TOP_KEY = {"x": 36, "y": 25}
 HOME_INBOUND_LEFT = {"x": 97, "y": 20}  # Home team inbounding from left side (under away basket)

@@ -19,6 +19,16 @@ const defaults = {
     duration: 150,
     easing: 'Sine.easeInOut',
     arc: null,
+    // Hold after ball placed with inbound passer (SIP/BIP); applied twice in sequence
+    holdAfterPlaceMs: 200,
+  },
+  shot: {
+    // Rim hold: ball at rim after make/miss (HCO normal)
+    rimHoldMs: 1000,
+    // After "It's Good!" / AND-1 before inbound (announcement hold)
+    makeAnnouncementHoldMs: 1000,
+    // Made shot rim hold in ballManager path (announcement hold)
+    madeRimHoldMs: 1000,
   },
   kickout: {
     duration: 300,
@@ -41,7 +51,7 @@ const defaults = {
     // Duration in ms for players to collapse toward the rebound spot
     playerMoveMs: 300,
     // Delay before possession is considered secured
-    attachDelayMs: 1000,
+    attachDelayMs: 500,
   },
   freeThrow: {
     lineupMoveMs: 800,
@@ -50,19 +60,31 @@ const defaults = {
     useArc: false,
     arcHeight: 40,
     rimHoldMs: 300,
+    // Made FT rim hold (non-final); announcement hold
+    makeRimHoldMs: 1000,
   },
   fastBreak: {
     sprintSpeed: 1.5, // multiplier
     laneSpacing: 6,
     passMs: 250,
     outletMoveMs: 300, // duration for outlet receiver advance
-    shotMs: 500,
+    shotMs: 350, // synced to 1 game second (350ms = 1 game s)
     arcHeight: 60,
     // Time to hold the ball at the rim after a made fast break shot
-    rimHoldMs: 2000,
+    rimHoldMs: 1000,
+    // Announcement hold after "It's Good!" (FB make)
+    makeAnnouncementHoldMs: 1000,
+    // Announcement hold after "Great Stop!" (FB defensive stop); 0 game time
+    defensiveStopHoldMs: 500,
   },
   offensiveRebound: { pauseMs: 1000 },
   putback: { duration: 500, easing: 'Sine.easeInOut' },
+  finalTurn: {
+    holdClockOutMs: 1800,
+    holdFinalShotMs: 3000, // Hold at rim (make) or bounce (miss) before quarter end; no BIP/rebound
+    alignment: { ease: 'Linear' },
+    moveDelayMs: 0, // Optional delay before BH/shooter movement (e.g. 1500 for "3–5 seconds remaining" feel)
+  },
   possession: {
     msPerTick: 1,
     minFrameDurationMs: 120,
@@ -84,6 +106,7 @@ export const animationConfig = {
   pass: { ...defaults.pass, ...(overrides.pass || {}) },
   possession: { ...defaults.possession, ...(overrides.possession || {}) },
   inbound: { ...defaults.inbound, ...(overrides.inbound || {}) },
+  shot: { ...defaults.shot, ...(overrides.shot || {}) },
   kickout: { ...defaults.kickout, ...(overrides.kickout || {}) },
   steal: { ...defaults.steal, ...(overrides.steal || {}) },
   rebound: {
@@ -103,6 +126,7 @@ export const animationConfig = {
     ...(overrides.offensiveRebound || {}),
   },
   putback: { ...defaults.putback, ...(overrides.putback || {}) },
+  finalTurn: { ...defaults.finalTurn, ...(overrides.finalTurn || {}) },
   possession: {
     msPerTick: overrides.possession?.msPerTick ?? defaults.possession.msPerTick,
     minFrameDurationMs:

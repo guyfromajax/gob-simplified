@@ -1427,6 +1427,7 @@ function wireLineupNavButtons() {
 }
 
 async function init() {
+  try {
   wireLineupNavButtons();
   // ✅ PHASE 2: Validate pointers on page load
   const validationPassed = await validatePointersOnLoad();
@@ -1436,14 +1437,14 @@ async function init() {
     if (btn) btn.classList.add('disabled');
     return;
   }
-  
+
   if (!resolveTeam()) {
     alert("Can't determine your team for this game. Please return and relaunch.");
     const btn = document.getElementById('play-now');
     if (btn) btn.classList.add('disabled');
     return;
   }
-  
+
   await setHeader();
   await loadRoster();
   setupSlots(); // Setup slot event handlers (this clears slots/lineup)
@@ -1585,6 +1586,9 @@ async function init() {
         myTeamSide: myTeamSide,
         clock: currentUrlParams.get('clock')
       });
+      // Pass through quarter_break_from so court knows whether to play airhorn (play_quarter only)
+      const quarterBreakFrom = currentUrlParams.get('quarter_break_from');
+      if (quarterBreakFrom) params.set('quarter_break_from', quarterBreakFrom);
       
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - After building params:', {
         resume_from_timeout: params.get('resume_from_timeout'),
@@ -1606,6 +1610,9 @@ async function init() {
     });
   }
   // Game Plan, Playbooks, Box Score wired in wireLineupNavButtons()
+  } finally {
+    if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+  }
 }
 
 // ========== PLAYER VIEW IMPLEMENTATION ==========

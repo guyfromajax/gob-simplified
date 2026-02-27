@@ -47,21 +47,16 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
 2. `BASELINE_INBOUND` turn is created by backend
 3. Frontend routes to `AnimationEngine.handleBaselineInbound()`
 4. Players are positioned based on next turn type
-5. Inbound pass: **HCO** — executed in `runInboundSetup()` (SF → PG). **FCP/HCT** — skipped in `runInboundSetup()`; the FCP/HCT skeleton animates it (avoids double inbound).
+5. Inbound pass: Executed in `runInboundSetup()` (SF → PG) for **HCO, FCP, and HCT**. FCP/HCT backend trims skeleton to step 1 so clocks start when receiver has the ball.
 6. Next turn (HCO/HCT/FCP) begins with players already in position
 
-### Double Inbound Pass Fix (BIP → FCP/HCT)
+### Inbound pass and clock start (BIP → FCP/HCT)
 
-**Problem:** New FCP/HCT skeletons include an inbound pass in their initial steps. `runInboundSetup()` also played an inbound pass for every BIP, so BIP → FCP/HCT showed a double inbound pass (once in BIP, once in the skeleton).
+**Behavior:** For FCP/HCT, the inbound pass runs during BIP (same as HCO). The frontend runs the full inbound sequence in `runInboundSetup()` — positions plus SF → PG pass — with no early return for FCP/HCT. The backend trims the FCP/HCT skeleton to start at step 1 when building the turn, so the first animated step is post-receive. **Game and shot clocks start when that first step runs** (i.e. after the receiver has the ball), matching BIP→HCO and SIP.
 
-**Solution:** In `runInboundSetup()` (`turnAnimation.js`), when `pressureType === "FCP"` or `pressureType === "HCT"`, after positioning players and attaching the ball to the inbounder (SF) and a short hold:
-- Skip the explicit inbound pass animation.
-- Transition state to HalfCourt, set `scene.isInboundSetup = false` and `scene.passInFlight = false`, and return.
-- The FCP/HCT skeleton then runs and animates the inbound pass as part of its first step.
+**Location:** `turnAnimation.js` `runInboundSetup()` (inbound pass runs for all next-turn types); `BackEnd/engine/phase_resolution.py` (skeleton trimmed to `steps[1:]` for FCP/HCT shot and non-shot paths).
 
-**Location:** `turnAnimation.js` `runInboundSetup()` — FCP/HCT skip block (around lines 1849–1866).
-
-**SIP unchanged:** SIP (SIDE_INBOUND) turns always use `runSideInboundSetup()`, never `runInboundSetup()`. This fix lives only in `runInboundSetup()`, so SIP is unaffected and always gets the full side inbound pass and transition to HCO.
+**SIP unchanged:** SIP (SIDE_INBOUND) turns use `runSideInboundSetup()`, not `runInboundSetup()`, and always get the full side inbound pass and transition to HCO.
 
 ### Three Next Turn Scenarios
 
@@ -103,7 +98,7 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
   - Applies `opp` logic when using `location`:
     - `opp=True`: Flip coords for home offense (ball handlers go to away side)
     - `opp=False`: Flip coords for away offense (outlet players go to away side)
-- **Inbound pass:** SF → PG is **not** animated in `runInboundSetup()` for HCT; it is animated by the HCT skeleton’s first step (see **Double Inbound Pass Fix** above).
+- **Inbound pass:** SF → PG **is** animated in `runInboundSetup()` for HCT (same as HCO). HCT turn animation starts at step 1; clocks start when the receiver has the ball (see **Inbound pass and clock start** above).
 - **HCT Turn Start:** ✅ **NEW** (January 2025) - `playTurnAnimation()` skips `runSetupTween()` when `fromInbound === true` AND `isFCPHCT === true`
   - Players are already positioned at step 0 from BIP, so redundant positioning is skipped
   - Prevents timing conflicts with inbound pass animation completion
@@ -145,7 +140,7 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
   - **Critical:** Frontend checks `coords` field first (has `opp` logic applied)
   - Falls back to `location` field if `coords` missing
   - Applies `opp` logic when using `location` (same as HCT)
-- **Inbound pass:** SF → PG is **not** animated in `runInboundSetup()` for FCP; it is animated by the FCP skeleton’s first step (see **Double Inbound Pass Fix** above).
+- **Inbound pass:** SF → PG **is** animated in `runInboundSetup()` for FCP (same as HCO). FCP turn animation starts at step 1; clocks start when the receiver has the ball (see **Inbound pass and clock start** above).
 - **FCP Turn Start:** ✅ **NEW** (January 2025) - `playTurnAnimation()` skips `runSetupTween()` when `fromInbound === true` AND `isFCPHCT === true`
   - Players are already positioned at step 0 from BIP, so redundant positioning is skipped
   - Prevents timing conflicts with inbound pass animation completion

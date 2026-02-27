@@ -70,6 +70,9 @@ export class AnimationEngine {
     this.animationHandlers.set('DEFENSIVE_STOP', this.handleDefensiveStop.bind(this));
     // ✅ TIMEOUT: Add handler for TIMEOUT turns
     this.animationHandlers.set('TIMEOUT', this.handleTimeout.bind(this));
+    // ✅ Phase 4: Final Turn — FINAL_HOLD (clock out, quarter end) and Final Turn shot (alignment then shot)
+    this.animationHandlers.set('FINAL_HOLD', this.handleFinalHold.bind(this));
+    this.animationHandlers.set('FINAL_TURN_SHOT', this.handleFinalTurnShot.bind(this));
   }
 
   /**
@@ -125,6 +128,14 @@ export class AnimationEngine {
                         turnData.result_type === "FAST_BREAK";
     if (isFastBreak) {
       return this.animationHandlers.get('FAST_BREAK');
+    }
+
+    // ✅ Phase 4: Final Turn — route FINAL_HOLD and Final Turn shot to dedicated handlers
+    if (turnData.result_type === 'FINAL_HOLD') {
+      return this.animationHandlers.get('FINAL_HOLD');
+    }
+    if (turnData.final_turn === true && this.isShotAttempt(turnData)) {
+      return this.animationHandlers.get('FINAL_TURN_SHOT');
     }
 
     // ✅ SS&S: FCP/HCT routes through same handlers as HCO
@@ -255,6 +266,14 @@ export class AnimationEngine {
     const { appendToTextScroll } = await import('../utils/textScroll.js');
     appendToTextScroll(turnData.text || "Free throw attempt");
     
+    // Final play of quarter (e.g. Final Turn shooting foul → FTs): show 0:00, hold then quarter end (no BIP)
+    if (turnData.quarter_ends_after) {
+      if (context.onUpdate) context.onUpdate({ clock: '0:00' });
+      this._playFinalHoldAirhorn();
+      const animationConfig = (await import('./animation_config.js')).default;
+      const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 3000;
+      await new Promise(resolve => setTimeout(resolve, holdMs));
+    }
     // Note: onUpdate is already called inside runFreeThrowSequence for each FT attempt
     // Do NOT call it again here or stats will be double counted
   }
@@ -562,7 +581,8 @@ export class AnimationEngine {
           home_team_timeouts: responseData.home_team_timeouts || turnData.home_team_timeouts || 0,
           away_team_timeouts: responseData.away_team_timeouts || turnData.away_team_timeouts || 0,
           clock: responseClock,  // ✅ UNIFIED: Use clock from API response (same as user timeout)
-          time_remaining: responseTimeRemaining  // ✅ UNIFIED: Use time_remaining from API response
+          time_remaining: responseTimeRemaining,  // ✅ UNIFIED: Use time_remaining from API response
+          timeout_trace_id: responseData.timeout_trace_id || turnData.timeout_trace_id
         };
         // ✅ COMPUTER TIMEOUT: Navigate directly (no popup) - same flow as user timeouts
         const computerTeamName = turnData.timeout_calling_team?.name || 
@@ -627,6 +647,79 @@ export class AnimationEngine {
     }
     
     // Note: Announcements and score updates are handled by AnimationRouter (finalizeTurnAfterAnimation)
+  }
+
+  /**
+   * Play Timeout - Airhorn.mp3 when the clock hits 0:00 (e.g. final play of quarter hold).
+   */
+  _playFinalHoldAirhorn() {
+    if (typeof window === 'undefined') return;
+    try {
+      const staticPath = (window.API_CONFIG && typeof window.API_CONFIG.getStaticPath === 'function')
+        ? window.API_CONFIG.getStaticPath()
+        : '/static';
+      const airhorn = new Audio(`${staticPath}/sounds/Timeout - Airhorn.mp3`);
+      airhorn.volume = 0.7;
+      airhorn.currentTime = 0;
+      airhorn.play().catch(() => {});
+    } catch (e) {}
+  }
+
+  /**
+   * Phase 4: FINAL_HOLD — no shot, run clock out (short delay), then complete.
+   * Quarter/game end is triggered by the API when quarter_complete is true.
+   */
+  async handleFinalHold(turnData, context) {
+    if (turnData.text && this.scene.events) {
+      this.scene.events.emit('textScroll', turnData.text);
+    }
+    const animationConfig = (await import('./animation_config.js')).default;
+    const holdMs = animationConfig?.finalTurn?.holdClockOutMs ?? 1800;
+    await new Promise(resolve => setTimeout(resolve, holdMs));
+  }
+
+  /**
+   * Phase 4: Final Turn shot — tween offense/defense to oDestinations/dDestinations (alignment),
+   * then run standard shot animation (ShotAnimationSystem or playTurnAnimation).
+   */
+  async handleFinalTurnShot(turnData, context) {
+    const { runFinalTurnAlignment } = await import('./turnAnimation.js');
+    await runFinalTurnAlignment({
+      scene: this.scene,
+      playerSprites: context.playerSprites,
+      ballSprite: context.ballSprite,
+      turnData
+    });
+    if (this.shotSystem) {
+      await this.shotSystem.processShot(turnData);
+    } else {
+      const { playTurnAnimation } = await import('./turnAnimation.js');
+      await playTurnAnimation({
+        scene: this.scene,
+        simData: context.simData,
+        playerSprites: context.playerSprites,
+        turnData,
+        ballSprite: context.ballSprite,
+        onAction: context.onAction,
+        turnIndex: context.turnIndex,
+        onUpdate: context.onUpdate
+      });
+    }
+    if (turnData.result_type === "MAKE" || turnData.result_type === "MISS" || turnData.result_type === "BLOCK") {
+      this.scene._previousTurnWasShot = true;
+    }
+    // Final play of quarter: hold ball at rim (make) or bounce (miss), announce "It's Good" on make, then quarter end (no BIP/rebound)
+    if (turnData.quarter_ends_after) {
+      if (context.onUpdate) context.onUpdate({ clock: '0:00' });
+      this._playFinalHoldAirhorn();
+      const animationConfig = (await import('./animation_config.js')).default;
+      const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 3000;
+      if (turnData.result_type === 'MAKE') {
+        const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+        announceGameEvent('SHOT_MAKE', turnData, this.scene, context);
+      }
+      await new Promise(resolve => setTimeout(resolve, holdMs));
+    }
   }
 
   async handleDefensiveStop(turnData, context) {
@@ -905,7 +998,25 @@ export class AnimationEngine {
       hct_foul: turnData.hct_foul,
       pressureSequenceActive: this.scene.pressureSequenceActive
     });
-    
+
+    // ✅ Force Foul: animation (defender move) was already done during BIP/SIP turn
+    if (turnData.result_type === 'FOUL' && turnData._quickFoulAnimatedDuringInbound) {
+      return;
+    }
+
+    // ✅ Force Foul after DREB: animate defender→victim (rebounder), then finalize ("Quick Foul")
+    if (turnData.result_type === 'FOUL' && turnData.force_foul_after_dreb) {
+      const victimId = turnData.victim_id;
+      const foulPlayerId = turnData.foul_player_id;
+      const victimSprite = context.playerSprites?.[victimId];
+      const defenderSprite = context.playerSprites?.[foulPlayerId];
+      if (victimSprite && defenderSprite) {
+        const { animateQuickFoulDefenderToReceiver } = await import('./turnAnimation.js');
+        await animateQuickFoulDefenderToReceiver(this.scene, defenderSprite, victimSprite);
+      }
+      return;
+    }
+
     // ✅ PHASE 2.3: Note: Pre/post setup is handled by AnimationRouter
     // This handler only needs to call playTurnAnimation with the provided context
     // Import and use existing turn animation handler for now

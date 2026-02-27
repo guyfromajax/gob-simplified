@@ -31,7 +31,8 @@ from BackEnd.utils.shared import (
     get_player_position,
     update_player_coords_from_animations,
     serialize_lineup,
-    getAwayTeamCoords
+    getAwayTeamCoords,
+    calc_pass_segment_seconds,
 )
 from BackEnd.utils.shared_defense import (
     get_defender_coords
@@ -64,6 +65,100 @@ class TurnManager:
                     setattr(player, "player_id", str(id(player)))
                 if not hasattr(player, "coords"):
                     setattr(player, "coords", {"x": 25, "y": 50})
+
+    def _compute_real_time_elapsed_ms(self, result: dict) -> int:
+        """
+        Compute total wall clock animation duration in ms for this turn.
+        Formula: (game_time_elapsed * 350) + fixed_phases_ms
+        Clock runs through fixed phases except: announcement holds, rim hold on makes,
+        OPENING_TIP initial_hold. Used by frontend to interpolate clock display.
+        """
+        game_time_elapsed = int(result.get("time_elapsed", 0) or 0)
+        movement_ms = game_time_elapsed * 350
+
+        result_type = (result.get("result_type") or "").strip()
+        points = int(result.get("points", 0) or 0)
+        is_make = points > 0 or result_type == "MAKE"
+        is_fast_break = result.get("fast_break") is True or result_type == "FAST_BREAK"
+
+        fixed_ms = 0
+
+        # Zero-elapsed turns: clock does not move
+        if result_type in ("FREE_THROW", "SIDE_INBOUND", "BASELINE_INBOUND", "TIMEOUT"):
+            return 0
+
+        if result_type == "DEFENSIVE_STOP":
+            # Announcement hold only; 500ms real, 0 game time (do not expire game time)
+            fixed_ms = 500 if is_fast_break else 0
+
+        elif result_type in ("MAKE", "MISS", "BLOCK"):
+            if is_fast_break:
+                # pass 250ms + outlet move 300ms + shot 350ms; rim excluded on make
+                fixed_ms = 900 if is_make else 1900  # 900 + 1000 rim on miss
+            else:
+                # HCO / FCP / HCT: pass or steal 150ms; rim 1000ms on miss only
+                # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
+                fixed_ms = 150 if is_make else 1150
+
+        elif result_type == "FINAL_HOLD":
+            # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
+            fixed_ms = 1800  # holdClockOutMs
+
+        elif result_type in ("OREB_KICKOUT", "PUTBACK_MAKE", "PUTBACK_MISS"):
+            # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
+            if result_type == "PUTBACK_MAKE":
+                fixed_ms = 800   # rebound_move + attach_delay; rim excluded
+            elif result_type == "PUTBACK_MISS":
+                fixed_ms = 1800  # rebound_move + attach_delay + rim_hold
+            else:
+                fixed_ms = 800   # OREB_KICKOUT
+
+        elif result_type == "FOUL":
+            fixed_ms = 0
+
+        elif result_type == "OPENING_TIP":
+            # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
+            fixed_ms = 400  # apex_delay + pass_delay; initial_hold excluded
+
+        else:
+            # STEAL, DEAD BALL, TURNOVER, CHARGE, etc.
+            fixed_ms = 0
+
+        return movement_ms + fixed_ms
+
+    def _attach_clock_contract(
+        self,
+        result: dict,
+        clock_start: int,
+        shot_clock_start: int,
+        game_state: dict,
+        source: str,
+    ) -> None:
+        """Attach authoritative clock contract fields to a turn result dict."""
+        clock_end = int(game_state.get("time_remaining", 0))
+        sc_end = int(game_state.get("shot_clock_remaining", 30))
+        sc_reset = sc_end > shot_clock_start or (
+            sc_end == 30 and clock_start != clock_end
+        )
+        result["clock_start"] = clock_start
+        result["clock_end"] = clock_end
+        result["shot_clock_start"] = shot_clock_start
+        result["shot_clock_end"] = sc_end
+        result["shot_clock_reset"] = bool(sc_reset)
+        result["clock_contract_source"] = source
+        result["real_time_elapsed_ms"] = self._compute_real_time_elapsed_ms(result)
+        logging.debug(
+            "⏱️ [CLOCK CONTRACT] type=%s source=%s "
+            "clock=%d→%d elapsed=%d sc=%d→%d reset=%s",
+            result.get("result_type", "UNKNOWN"),
+            source,
+            clock_start,
+            clock_end,
+            clock_start - clock_end,
+            shot_clock_start,
+            sc_end,
+            sc_reset,
+        )
 
     def setup_side_inbound(self):
         """
@@ -128,11 +223,15 @@ class TurnManager:
         d_dest = getAwayTeamCoords(d_dest_home.copy()) if is_away_offense else d_dest_home
         self.logger.log("defenseUpdate:end")
 
+        from BackEnd.constants import SITUATIONAL_SIP_RECEIVER_POS
+        receiver_pos = SITUATIONAL_SIP_RECEIVER_POS
         payload = {
             "result_type": "SIDE_INBOUND",
+            "time_elapsed": 0,
             "ball_spot": getAwayTeamCoords({"tmp": inbound_spot_home})["tmp"] if is_away_offense else inbound_spot_home,
             "oDestinations": o_dest,
             "dDestinations": d_dest,
+            "receiver_pos": receiver_pos,  # for situational Force Foul (pass receiver)
             "offense_team_id": offense_team.team_id,  # ✅ SS&S: Team on offense during this turn
             "current_turn": "SIDE_INBOUND",  # ✅ SS&S: Explicit turn type
             "next_turn": "HCO",  # ✅ SS&S: Always transitions to HCO after side inbound
@@ -259,11 +358,14 @@ class TurnManager:
                 d_dest[pos] = d_coords
         self.logger.log("defenseUpdate:end")
 
+        from BackEnd.constants import SITUATIONAL_BIP_RECEIVER_POS
         payload = {
             "result_type": "BASELINE_INBOUND",
+            "time_elapsed": 0,
             "ball_spot": getAwayTeamCoords({"tmp": inbound_spot_home})["tmp"] if is_away_offense else inbound_spot_home,
             "oDestinations": o_dest,
             "dDestinations": d_dest,
+            "receiver_pos": SITUATIONAL_BIP_RECEIVER_POS,  # for situational Force Foul (pass receiver)
             "offense_team_id": offense_team.team_id,  # ✅ SS&S: Use offense_team_id (not possession_team_id)
             "current_turn": "BASELINE_INBOUND",  # ✅ SS&S: Explicit turn type
             "quarter": self.game.quarter,
@@ -312,6 +414,26 @@ class TurnManager:
 
         # STEP 1: Set strategy calls (tempo + aggression)
         self.set_strategy_calls()
+        
+        # ✅ Situational Logic (Q4/OT): tempo and temp overrides (revert when situation ends)
+        from BackEnd.utils import situational_logic as sl
+        game_state = self.game.game_state
+        time_remaining = game_state.get("time_remaining")
+        quarter = getattr(self.game, "quarter", None)
+        if sl.is_situational_active(quarter) and time_remaining is not None:
+            if sl.is_slow_it_down(self.game, time_remaining):
+                self.game.offense_team.strategy_calls["tempo_call"] = "slow"
+                game_state["_situational_fast_break_override_team_id"] = self.game.offense_team.team_id
+            else:
+                game_state.pop("_situational_fast_break_override_team_id", None)
+            if sl.is_quick_shot(self.game, time_remaining):
+                self.game.offense_team.strategy_calls["tempo_call"] = "fast"
+                game_state["_situational_quick_shot_fcp_hct_override"] = True
+            else:
+                game_state.pop("_situational_quick_shot_fcp_hct_override", None)
+        else:
+            game_state.pop("_situational_fast_break_override_team_id", None)
+            game_state.pop("_situational_quick_shot_fcp_hct_override", None)
         
         # ✅ LOG: Check for Playcall Center overrides at start of turn
         # ✅ PERFORMANCE: Skip Playcall Center checks during full simulation (full_sim=True)
@@ -375,7 +497,149 @@ class TurnManager:
         #     print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
 
         # STEP 3: Route based on offensive state
-        if state == "FREE_THROW":
+        result = None
+        from BackEnd.utils import situational_logic as sl
+        shot_clock_remaining = int(game_state.get("shot_clock_remaining", min(30, int(game_state.get("time_remaining", 30) or 30))))
+        game_clock_remaining = int(game_state.get("time_remaining", 0) or 0)
+
+        # Defensive scrub: free_throws_remaining can occasionally leak across non-FT turns.
+        # Keep FT state only when there is coherent FT context.
+        free_throws_remaining = int(game_state.get("free_throws_remaining", 0) or 0)
+        if free_throws_remaining > 0:
+            timeout_next_play_type = str(game_state.get("timeout_next_play_type") or "").upper()
+            last_turn = self.game.turns[-1] if self.game.turns and isinstance(self.game.turns[-1], dict) else {}
+            last_turn_next_play = str(last_turn.get("next_play_type") or "").upper()
+            last_turn_current = str(last_turn.get("current_turn") or "").upper()
+            has_ft_context = (
+                str(state).upper() == "FREE_THROW"
+                or timeout_next_play_type == "FREE_THROW"
+                or last_turn_next_play == "FREE_THROW"
+                or last_turn_current == "FREE_THROW"
+            )
+            if not has_ft_context:
+                logging.warning(
+                    "🧭 [FT SCRUB TRACE] Clearing stale free_throws_remaining=%s state=%s timeout_next_play_type=%s last_turn_current=%s last_turn_next_play=%s",
+                    free_throws_remaining,
+                    state,
+                    timeout_next_play_type,
+                    last_turn_current,
+                    last_turn_next_play,
+                )
+                game_state["free_throws_remaining"] = 0
+                game_state["one_and_one"] = False
+
+        # ✅ Final Turn (Q4/OT): clear "triggered" flag when quarter/period changes so each period gets one chance
+        quarter = getattr(self.game, "quarter", None)
+        if game_state.get("_last_final_turn_quarter") != quarter:
+            game_state["_last_final_turn_quarter"] = quarter
+            game_state["final_turn_triggered_this_period"] = False
+
+        # ✅ Final Turn (Phase 6): first possession with time_remaining <= 30s triggers Final Turn (all quarters + OT).
+        # OREB and Fast Break: excluded by design — state must be HCO, HCT, or FCP. The *next* turn after OREB/FB
+        # (when time is still <= 30 and quarter >= 4) is the one evaluated for Final Turn.
+        time_remaining_sec = game_state.get("time_remaining")
+        final_turn_eligible = (
+            quarter is not None
+            and time_remaining_sec is not None
+            and int(time_remaining_sec) <= 30
+            and state != "FAST_BREAK"
+            and state in ("HCO", "HCT", "FCP")
+            and not game_state.get("final_turn_triggered_this_period")
+        )
+        if final_turn_eligible:
+            game_state["final_turn_triggered_this_period"] = True
+            if quarter >= 4:
+                # Q4/OT: decide subtype (FINAL_HOLD, Force Foul, Quick Shot, or normal final shot)
+                slow = sl.is_slow_it_down(self.game, time_remaining_sec)
+                quick = sl.is_quick_shot(self.game, time_remaining_sec)
+                force_foul = sl.should_force_foul(self.game, time_remaining_sec)
+                if slow and not force_foul:
+                    # FINAL_HOLD: hold until 0, no shot, no fouls/turnovers
+                    result = self._build_final_hold_result(time_remaining_sec)
+                elif slow and force_foul:
+                    # Phase 6 edge case: Slow It Down + Force Foul — execute Force Foul (existing logic).
+                    # No special Final Turn alignment for this possession; victim = current ball handler / PG.
+                    result = self._execute_final_turn_force_foul()
+                elif quick:
+                    # Normal Quick Shot turn — fall through to state routing (don't set result)
+                    pass
+                else:
+                    # Normal final shot (trailing/tied): use Final Turn play execution (Phase 2)
+                    game_state["final_turn_shot_this_turn"] = True
+            else:
+                # Qs 1–3: Final Turn shot (same play execution as Q4 "normal" final shot)
+                game_state["final_turn_shot_this_turn"] = True
+
+        # ✅ Situational Logic: Force Foul after BIP/SIP — execute first so it runs regardless of next step (HCO, HCT, FCP)
+        from BackEnd.engine.phase_resolution import (
+            resolve_non_shooting_foul,
+            select_defender_closest_to_victim,
+        )
+        pending_foul = self.game.game_state.pop("situational_force_foul_pending", None)
+        if pending_foul:
+            victim_id = pending_foul.get("victim_id")
+            victim_coords = pending_foul.get("victim_coords") or {"x": 50, "y": 25}
+            off_lineup = self.game.offense_team.lineup
+            def_lineup = self.game.defense_team.lineup
+            victim = None
+            for p in off_lineup.values():
+                if p and getattr(p, "player_id", None) == victim_id:
+                    victim = p
+                    break
+            if victim and def_lineup:
+                d_dest = pending_foul.get("defender_coords_by_pos")
+                foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, d_dest)
+                if foul_player:
+                    roles = {
+                        "ball_handler": victim,
+                        "defender": foul_player,
+                        "foul_player": foul_player,
+                        "shooter": victim,
+                        "screener": None,
+                        "passer": None,
+                    }
+                    self.game.game_state["foul_team"] = "DEFENSE"
+                    result = resolve_non_shooting_foul(
+                        roles, self.game, time_elapsed_override=sl.force_foul_time_elapsed()
+                    )
+                    result["offense_team_id"] = self.game.offense_team.team_id
+                    result["current_turn"] = "HCO"
+                    result["quick_foul"] = True  # Situational Force Foul → frontend announces "Quick Foul"
+
+        clock_enforced_states = ("HCO", "FCP", "HCT", "FAST_BREAK")
+
+        low_clock_branch = None
+
+        if result is not None:
+            pass  # Force Foul already handled; skip state routing (HCO/HCT/FCP)
+        elif state in clock_enforced_states and game_clock_remaining <= 0:
+            # At exact 0 game clock, do not run a normal possession.
+            # This should terminally hand control back to API quarter-end handling.
+            result = self._build_final_hold_result(0)
+            result["text"] = "Clock expires before a shot."
+            result["forced_shot"] = False
+            low_clock_branch = "GAME_CLOCK_LE_0_FINAL_HOLD"
+        elif state in clock_enforced_states and shot_clock_remaining <= 0:
+            # At exact 0 shot clock: temporary 50/50 behavior.
+            # 1) Forced shot path
+            # 2) Shot clock violation path
+            if random.random() < 0.5:
+                result = self._execute_forced_shot(state)
+                low_clock_branch = "SHOT_CLOCK_LE_0_FORCED_SHOT"
+            else:
+                result = self._build_shot_clock_violation_result(state)
+                low_clock_branch = "SHOT_CLOCK_LE_0_VIOLATION"
+        elif state in clock_enforced_states and game_clock_remaining <= 1:
+            # Game clock precedence: force final-turn shot execution at 1 or 0 seconds.
+            result = self.resolve_final_turn_shot()
+            result["forced_shot"] = True
+            result["forced_shot_reason"] = "GAME_CLOCK"
+            low_clock_branch = "GAME_CLOCK_LE_1_FORCED_SHOT"
+        elif state in clock_enforced_states and shot_clock_remaining <= 1:
+            # Force shot-clock attempt at 1 or 0 seconds.
+            result = self._execute_forced_shot(state)
+            low_clock_branch = "SHOT_CLOCK_LE_1_FORCED_SHOT"
+        elif state == "FREE_THROW":
             result = self.resolve_free_throw()
         elif state == "FAST_BREAK":
             self.logger.log("fb:start")
@@ -388,84 +652,99 @@ class TurnManager:
             self.logger.log("hct:start")
             result = resolve_half_court_trap_logic(self.game)
         else:
-            calls = self.set_playcalls()
-            self.game.game_state["current_playcall"] = calls["offense"]
-            self.game.game_state["defense_playcall"] = calls["defense"]
+            # HCO: normal half-court offense (Force Foul after DREB is now handled at DREB time in game_manager)
+            if result is not None:
+                # Force Foul result already set; skip set_playcalls and resolve_half_court_offense
+                pass
+            else:
+                calls = self.set_playcalls()
+                self.game.game_state["current_playcall"] = calls["offense"]
+                self.game.game_state["defense_playcall"] = calls["defense"]
             
-            # Track defensive playcall usage
-            from BackEnd.utils.defense_utils import map_defense_playcall_to_tracking_name
-            def_team = self.game.defense_team
-            defense_playcall = calls["defense"]  # "Man", "2-3 Zone", "3-2 Zone", etc.
-            # Defense playcall is now stored as specific name (e.g., "2-3 Zone")
-            tracking_name = defense_playcall  # Use specific name directly
-            if tracking_name in def_team.scouting_data["defense"]:
-                # Get offensive play type and focus for granular tracking
-                # ✅ SS&S: Use offense_play_type as single source of truth (works for both user overrides and normal selection)
-                offense_play_type_raw = calls.get("offense_play_type", "")
-                offense_play_type = offense_play_type_raw.lower() if offense_play_type_raw else ""
-                offense_focus = calls.get("offense_focus", "")  # "inside", "attack", "outside"
-                
-                # Normalize play type (set_play -> set) to match phase_resolution.py
-                if offense_play_type == "set_play":
-                    offense_play_type = "set"
-                
-                def_team.scouting_data["defense"][tracking_name]["used"] += 1
-                def_team.scouting_data["defense"][tracking_name]["game_stats"]["used"] += 1
-                
-                # Track granular usage by play type
-                if offense_play_type == "motion":
-                    def_team.scouting_data["defense"][tracking_name]["game_stats"]["vs_motion"]["attempts"] += 1
-                elif offense_play_type == "set":
-                    def_team.scouting_data["defense"][tracking_name]["game_stats"]["vs_set"]["attempts"] += 1
-                
-                # Track granular usage by focus type
-                if offense_focus in ["inside", "attack", "outside"]:
-                    def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_{offense_focus}"]["attempts"] += 1
+                # Track defensive playcall usage
+                from BackEnd.utils.defense_utils import map_defense_playcall_to_tracking_name
+                def_team = self.game.defense_team
+                defense_playcall = calls["defense"]  # "Man", "2-3 Zone", "3-2 Zone", etc.
+                # Defense playcall is now stored as specific name (e.g., "2-3 Zone")
+                tracking_name = defense_playcall  # Use specific name directly
+                if tracking_name in def_team.scouting_data["defense"]:
+                    # Get offensive play type and focus for granular tracking
+                    # ✅ SS&S: Use offense_play_type as single source of truth (works for both user overrides and normal selection)
+                    offense_play_type_raw = calls.get("offense_play_type", "")
+                    offense_play_type = offense_play_type_raw.lower() if offense_play_type_raw else ""
+                    offense_focus = calls.get("offense_focus", "")  # "inside", "attack", "outside"
                     
-                    # Track combination of play type + focus
+                    # Normalize play type (set_play -> set) to match phase_resolution.py
+                    if offense_play_type == "set_play":
+                        offense_play_type = "set"
+                    
+                    def_team.scouting_data["defense"][tracking_name]["used"] += 1
+                    def_team.scouting_data["defense"][tracking_name]["game_stats"]["used"] += 1
+                    
+                    # Track granular usage by play type
                     if offense_play_type == "motion":
-                        def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_motion_{offense_focus}"]["attempts"] += 1
+                        def_team.scouting_data["defense"][tracking_name]["game_stats"]["vs_motion"]["attempts"] += 1
                     elif offense_play_type == "set":
-                        def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_set_{offense_focus}"]["attempts"] += 1
-            
-            # Calculate EV (Expected Value) for the playcall matchup
-            ev = self.calculate_ev(
-                offensive_playcall=calls["offense"],
-                defensive_playcall=calls["defense"],
-                offensive_lineup=self.game.offense_team.lineup,
-                defensive_lineup=self.game.defense_team.lineup,
-                offensive_team=self.game.offense_team,
-                defensive_team=self.game.defense_team
-            )
-            
-            # Store EV score in scouting data
-            self._store_ev_score(ev, calls, self.game.offense_team, self.game.defense_team)
-            
-            result = self.resolve_half_court_offense()
-            # Add playcalls to result for frontend display
-            # ✅ FIX 2: Use current_playcall from game_state (may be overridden for Motion plays)
-            # This ensures Motion play overrides (like "3-2 Motion") are reflected in the result
-            result["offensive_playcall"] = self.game.game_state.get("current_playcall", calls["offense"])
-            result["defensive_playcall"] = calls["defense"]
-            # ✅ PERFORMANCE: Skip playcall logging during full simulations
-            if not is_full_simulation:
-                offense_name = calls["offense"]
-                defense_name = calls["defense"]
-                logging.info(f"🎮 [PLAYCALL RESULT] Added to result: offensive_playcall='{offense_name}', defensive_playcall='{defense_name}'")
-            # ✅ SS&S: Set offense_override_cleared flag from calls (overrides default False)
-            result["offense_override_cleared"] = calls.get("offense_override_cleared", False)
-            
-            # Add play type and focus for frontend display
-            # ✅ SS&S: Use offense_play_type as single source of truth (works for both user overrides and normal selection)
-            offense_play_type = calls.get("offense_play_type", None)
-            # Capitalize for display (Motion/Set) if we have a value, otherwise use "-"
-            result["offensive_play_type"] = offense_play_type.title() if offense_play_type else "-"
-            result["offensive_play_focus"] = calls.get("offense_focus", None)
-            result["defensive_play_type"] = calls.get("defense_type", "-")
-            result["defensive_play_focus"] = calls.get("defense_focus", None)
-            
-            # Add EV to result for frontend display
-            result["ev"] = ev
+                        def_team.scouting_data["defense"][tracking_name]["game_stats"]["vs_set"]["attempts"] += 1
+                    
+                    # Track granular usage by focus type
+                    if offense_focus in ["inside", "attack", "outside"]:
+                        def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_{offense_focus}"]["attempts"] += 1
+                        
+                        # Track combination of play type + focus
+                        if offense_play_type == "motion":
+                            def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_motion_{offense_focus}"]["attempts"] += 1
+                        elif offense_play_type == "set":
+                            def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_set_{offense_focus}"]["attempts"] += 1
+                
+                # Calculate EV (Expected Value) for the playcall matchup
+                ev = self.calculate_ev(
+                    offensive_playcall=calls["offense"],
+                    defensive_playcall=calls["defense"],
+                    offensive_lineup=self.game.offense_team.lineup,
+                    defensive_lineup=self.game.defense_team.lineup,
+                    offensive_team=self.game.offense_team,
+                    defensive_team=self.game.defense_team
+                )
+                
+                # Store EV score in scouting data
+                self._store_ev_score(ev, calls, self.game.offense_team, self.game.defense_team)
+                
+                # Final Turn shot uses dedicated resolver (Phase 2 will add alignment + shot); for now stub to normal HCO
+                if game_state.pop("final_turn_shot_this_turn", False):
+                    result = self.resolve_final_turn_shot()
+                else:
+                    result = self.resolve_half_court_offense()
+                # Add playcalls to result for frontend display
+                # ✅ FIX 2: Use current_playcall from game_state (may be overridden for Motion plays)
+                # This ensures Motion play overrides (like "3-2 Motion") are reflected in the result
+                result["offensive_playcall"] = self.game.game_state.get("current_playcall", calls["offense"])
+                result["defensive_playcall"] = calls["defense"]
+                # ✅ PERFORMANCE: Skip playcall logging during full simulations
+                if not is_full_simulation:
+                    offense_name = calls["offense"]
+                    defense_name = calls["defense"]
+                    logging.info(f"🎮 [PLAYCALL RESULT] Added to result: offensive_playcall='{offense_name}', defensive_playcall='{defense_name}'")
+                # ✅ SS&S: Set offense_override_cleared flag from calls (overrides default False)
+                result["offense_override_cleared"] = calls.get("offense_override_cleared", False)
+                
+                # Add play type and focus for frontend display
+                # ✅ SS&S: Use offense_play_type as single source of truth (works for both user overrides and normal selection)
+                offense_play_type = calls.get("offense_play_type", None)
+                # Capitalize for display (Motion/Set) if we have a value, otherwise use "-"
+                result["offensive_play_type"] = offense_play_type.title() if offense_play_type else "-"
+                result["offensive_play_focus"] = calls.get("offense_focus", None)
+                result["defensive_play_type"] = calls.get("defense_type", "-")
+                result["defensive_play_focus"] = calls.get("defense_focus", None)
+                
+                # Add EV to result for frontend display
+                result["ev"] = ev
+
+                # Situational Logic (Q4/OT): flags for HCO turn-start announcements (Slow It Down / Quick Shot)
+                from BackEnd.utils import situational_logic as sl
+                time_remaining = self.game.game_state.get("time_remaining")
+                result["slow_it_down"] = sl.is_slow_it_down(self.game, time_remaining)
+                result["quick_shot"] = sl.is_quick_shot(self.game, time_remaining)
 
         # ✅ SS&S: Set offense_team_id (single source of truth)
         # This represents the team on offense DURING this turn (for animations)
@@ -568,23 +847,33 @@ class TurnManager:
                 self.game.game_state["fastBreakInProgress"] = False
         # If animations weren't assigned yet (e.g. fast break, free throw), use fallback
         if "animations" not in result:
-            roles = result.get("roles")
-            if roles:
-                # ✅ FIX: Reconstruct player references if they're missing from serializable_roles
-                # serializable_roles may not include Player objects, but capture_halfcourt_animation needs them
-                if "shooter" not in roles and result.get("shooter"):
-                    roles["shooter"] = result["shooter"]
-                if "ball_handler" not in roles and result.get("ball_handler"):
-                    roles["ball_handler"] = result["ball_handler"]
-                
+            # Phase 5: Final Turn shot — use skeleton_to_animations for play execution (BH/shooter movement, then shot)
+            if result.get("final_turn") and result.get("skeleton"):
                 from BackEnd.models.animator import Animator
                 animator = Animator(self.game)
-                result["animations"] = animator.capture_halfcourt_animation(
-                    roles=roles,
-                    event_step=result.get("event_step")
+                off_lineup = self.game.offense_team.lineup
+                def_lineup = self.game.defense_team.lineup
+                result["animations"] = animator.skeleton_to_animations(
+                    result["skeleton"], off_lineup, def_lineup, add_defenders=True, is_fcp=False, is_hct=False
                 )
             else:
-                result["animations"] = []  # No animation possible (e.g., free throw or turnover with no roles)
+                roles = result.get("roles")
+                if roles:
+                    # ✅ FIX: Reconstruct player references if they're missing from serializable_roles
+                    # serializable_roles may not include Player objects, but capture_halfcourt_animation needs them
+                    if "shooter" not in roles and result.get("shooter"):
+                        roles["shooter"] = result["shooter"]
+                    if "ball_handler" not in roles and result.get("ball_handler"):
+                        roles["ball_handler"] = result["ball_handler"]
+                    
+                    from BackEnd.models.animator import Animator
+                    animator = Animator(self.game)
+                    result["animations"] = animator.capture_halfcourt_animation(
+                        roles=roles,
+                        event_step=result.get("event_step")
+                    )
+                else:
+                    result["animations"] = []  # No animation possible (e.g., free throw or turnover with no roles)
         # ✅ REMOVED: possession_team_id is now set BEFORE update_clock_and_possession (line 373)
         # This ensures it represents the team on offense DURING the turn, not after any flips
 
@@ -773,6 +1062,25 @@ class TurnManager:
                 }
         result["player_energy"] = player_energy
         
+        if low_clock_branch:
+            logging.warning(
+                "🧭 [ZERO CLOCK TRACE] run_micro_turn branch=%s state=%s game_clock_remaining=%s shot_clock_remaining=%s result_type=%s next_play_type=%s next_turn=%s",
+                low_clock_branch,
+                state,
+                game_clock_remaining,
+                shot_clock_remaining,
+                result.get("result_type") if isinstance(result, dict) else None,
+                result.get("next_play_type") if isinstance(result, dict) else None,
+                result.get("next_turn") if isinstance(result, dict) else None,
+            )
+        elif state in clock_enforced_states and (game_clock_remaining <= 2 or shot_clock_remaining <= 2):
+            logging.warning(
+                "🧭 [ZERO CLOCK TRACE] run_micro_turn near-zero NO_BRANCH state=%s game_clock_remaining=%s shot_clock_remaining=%s",
+                state,
+                game_clock_remaining,
+                shot_clock_remaining,
+            )
+
         # Include strategy calls for frontend strategy bars (actual calls, not settings)
         result["offense_tempo_call"] = self.game.offense_team.strategy_calls.get("tempo_call", "normal")
         result["offense_aggression_call"] = self.game.offense_team.strategy_calls.get("aggression_call", "normal")
@@ -796,6 +1104,7 @@ class TurnManager:
         result["awayFouls"] = self.game.away_team.team_fouls
         
         result["clock"] = self.game.game_state["clock"]
+        result["shot_clock_remaining"] = self.game.game_state.get("shot_clock_remaining", 30)
         result["quarter"] = self.game.game_state["quarter"]
         result["period_label"] = self.game.game_state.get("period_label")
         # Ensure no Player objects remain in the result payload
@@ -812,6 +1121,90 @@ class TurnManager:
 
         # print(f"inside run_micro_turn result: {result}")
         
+        return result
+
+    def _build_shot_clock_violation_result(self, current_state):
+        offense_team = self.game.offense_team
+        defense_team = self.game.defense_team
+        return {
+            "result_type": "DEAD BALL",
+            "text": "Shot Clock Violation",
+            "turnover_type": "SHOT_CLOCK",
+            "time_elapsed": 0,
+            "possession_flips": True,
+            "next_play_type": "SIDE_INBOUND",
+            "next_turn": "SIDE_INBOUND",
+            "offense_team_id": offense_team.team_id,
+            "defense_team_id": defense_team.team_id,
+            "current_turn": current_state,
+            "forced_shot": False,
+            "events": [],
+        }
+
+    def _coords_to_nearest_spot(self, coords):
+        from BackEnd.constants import HCO_STRING_SPOTS
+        if not isinstance(coords, dict):
+            return "key"
+        x = coords.get("x")
+        y = coords.get("y")
+        if x is None or y is None:
+            return "key"
+        best_spot = "key"
+        best_dist = float("inf")
+        for spot, s_coords in HCO_STRING_SPOTS.items():
+            dx = (s_coords.get("x", 50) - x)
+            dy = (s_coords.get("y", 25) - y)
+            dist = (dx * dx) + (dy * dy)
+            if dist < best_dist:
+                best_dist = dist
+                best_spot = spot
+        return best_spot
+
+    def _execute_forced_shot(self, current_state):
+        from BackEnd.constants import ACTIONS, POSITION_LIST
+        from BackEnd.utils.shared import get_player_position
+        from BackEnd.engine.phase_resolution import select_defender_closest_to_victim
+
+        off_lineup = self.game.offense_team.lineup
+        def_lineup = self.game.defense_team.lineup
+        ball_handler = self.game.game_state.get("last_ball_handler")
+        if not ball_handler:
+            ball_handler = off_lineup.get("PG") or next((p for p in off_lineup.values() if p), None)
+
+        if not ball_handler:
+            return self._build_shot_clock_violation_result(current_state)
+
+        shooter = ball_handler
+        shooter_pos = get_player_position(off_lineup, shooter) or "PG"
+        shooter_coords = getattr(shooter, "coords", {"x": 50, "y": 25}) or {"x": 50, "y": 25}
+        shooter_spot = self._coords_to_nearest_spot(shooter_coords)
+        defender = select_defender_closest_to_victim(shooter_coords, def_lineup, None) if def_lineup else None
+
+        step0 = {"timestamp": 0, "pos_actions": {}}
+        step1 = {"timestamp": 300, "pos_actions": {}}
+        for pos in POSITION_LIST:
+            if pos == shooter_pos:
+                step0["pos_actions"][pos] = {"action": ACTIONS["HANDLE"], "location": shooter_spot}
+                step1["pos_actions"][pos] = {"action": ACTIONS["SHOOT"], "location": shooter_spot}
+            else:
+                step0["pos_actions"][pos] = {"action": "stand", "location": "key"}
+                step1["pos_actions"][pos] = {"action": "stand", "location": "key"}
+
+        roles = {
+            "skeleton": {"steps": [step0, step1]},
+            "steps": [step0, step1],
+            "ball_handler": ball_handler,
+            "shooter": shooter,
+            "passer": None,
+            "screener": None,
+            "defender": defender,
+            "shot_type": "inside" if shooter_spot.lower() in ("lower lowpost", "lower midpost", "upper lowpost", "upper midpost", "midlane", "basketspot") else "outside",
+            "forced_shot": True,
+            "shooter_location": shooter_spot,
+        }
+        result = self.game.shot_manager.resolve_shot(roles)
+        result["forced_shot"] = True
+        result["forced_shot_reason"] = "SHOT_CLOCK"
         return result
 
 
@@ -1065,25 +1458,32 @@ class TurnManager:
         chosen_play_type = weighted_random_from_dict(weights)
         
         # Level 2: Determine play focus (inside/attack/outside)
-        inside_val = self.game.offense_team.strategy_settings.get("inside", 2)
-        attack_val = self.game.offense_team.strategy_settings.get("attack", 2)
-        outside_val = self.game.offense_team.strategy_settings.get("outside", 2)
-        
-        total = inside_val + attack_val + outside_val
-        
-        if total == 0:
-            # Fallback if all are zero (shouldn't happen but safe)
-            chosen_focus = "inside"
+        # ✅ Situational Logic (Q4/OT): Quick Shot overrides to outside-heavy focus
+        from BackEnd.utils import situational_logic as sl
+        time_remaining = self.game.game_state.get("time_remaining")
+        focus_override = sl.get_situational_play_focus_override(self.game, time_remaining) if sl.is_situational_active(getattr(self.game, "quarter", None)) else None
+        if focus_override:
+            chosen_focus = sl.choose_focus_from_override(focus_override)
         else:
-            # Roll random number from 1 to total
-            roll = random.randint(1, total)
+            inside_val = self.game.offense_team.strategy_settings.get("inside", 2)
+            attack_val = self.game.offense_team.strategy_settings.get("attack", 2)
+            outside_val = self.game.offense_team.strategy_settings.get("outside", 2)
             
-            if roll <= inside_val:
+            total = inside_val + attack_val + outside_val
+            
+            if total == 0:
+                # Fallback if all are zero (shouldn't happen but safe)
                 chosen_focus = "inside"
-            elif roll <= inside_val + attack_val:
-                chosen_focus = "attack"
             else:
-                chosen_focus = "outside"
+                # Roll random number from 1 to total
+                roll = random.randint(1, total)
+                
+                if roll <= inside_val:
+                    chosen_focus = "inside"
+                elif roll <= inside_val + attack_val:
+                    chosen_focus = "attack"
+                else:
+                    chosen_focus = "outside"
         
         # Query plays collection for matching play (cached per game process to avoid 200+ DB round-trips per quarter)
         # ✅ FIX: Motion plays don't filter by play_focus (focus is only for tracking/influence)
@@ -1924,6 +2324,119 @@ class TurnManager:
         from BackEnd.engine.phase_resolution import resolve_half_court_offense_logic
         return resolve_half_court_offense_logic(self.game)
 
+    def resolve_final_turn_shot(self):
+        """Final Turn shot (≤30s): alignment (Phase 2) + shot execution (Phase 3)."""
+        from BackEnd.engine.phase_resolution import resolve_final_turn_shot_logic
+        o_dest, position_to_spot, bh_pos = self._build_final_turn_offense_alignment()
+        d_dest, zone_playcall = self._build_final_turn_defense_alignment()
+        self.game.game_state["defense_playcall"] = zone_playcall
+        return resolve_final_turn_shot_logic(
+            self.game, o_dest, d_dest, position_to_spot, bh_pos
+        )
+
+    def _build_final_turn_offense_alignment(self):
+        """Final Turn offense: BH 60% PG / 30% SG / 10% SF; PG/SG deep wings; SF/PF corners; C key.
+        Returns (oDestinations, position_to_spot, bh_pos). Always in home-side convention; frontend
+        flips when away offense (one attacking side, both teams there)."""
+        from BackEnd.constants import HCO_STRING_SPOTS
+        game = self.game
+        off_team = game.offense_team
+        off_lineup = off_team.lineup
+        # Ball handler position: 60% PG, 30% SG, 10% SF
+        r = random.random()
+        bh_pos = "PG" if r < 0.60 else ("SG" if r < 0.90 else "SF")
+        # Deep wings (random order for PG/SG)
+        wings = ["deep upper wing", "deep lower wing"]
+        random.shuffle(wings)
+        pg_wing, sg_wing = wings[0], wings[1]
+        # Corners: one upper, one lower from {upper corner, lower corner, upper midCorner, lower midCorner}
+        upper_spots = ["upper corner", "upper midCorner"]
+        lower_spots = ["lower corner", "lower midCorner"]
+        random.shuffle(upper_spots)
+        random.shuffle(lower_spots)
+        sf_spot = upper_spots[0]
+        pf_spot = lower_spots[0]
+        if random.random() < 0.5:
+            sf_spot, pf_spot = pf_spot, sf_spot  # swap so one upper one lower
+        position_to_spot = {"C": "key"}
+        if bh_pos == "SF":
+            position_to_spot["SF"] = pg_wing
+            position_to_spot["SG"] = sg_wing
+            position_to_spot["PG"] = random.choice(upper_spots)
+            position_to_spot["PF"] = random.choice(lower_spots)
+        else:
+            position_to_spot["PG"] = pg_wing
+            position_to_spot["SG"] = sg_wing
+            position_to_spot["SF"] = sf_spot
+            position_to_spot["PF"] = pf_spot
+        o_destinations = {}
+        for pos in ["PG", "SG", "SF", "PF", "C"]:
+            spot = position_to_spot.get(pos, "key")
+            coords = HCO_STRING_SPOTS.get(spot, {"x": 64, "y": 25})
+            o_destinations[pos] = dict(coords)
+        return (o_destinations, position_to_spot, bh_pos)
+
+    def _build_final_turn_defense_alignment(self):
+        """Final Turn defense: 50/50 2-3 or 3-2 zone, ball-at-key positions. Returns (dDestinations, zone_playcall).
+        Always in home-side convention; frontend flips when away offense (one attacking side, both teams there)."""
+        from BackEnd.constants import HCO_STRING_SPOTS
+        from BackEnd.utils.shared_defense import ZONE_23_NORMAL, ZONE_32_NORMAL
+        game = self.game
+        def_team = game.defense_team
+        zone_playcall = random.choice(["2-3 Zone", "3-2 Zone"])
+        zone_map = ZONE_23_NORMAL if zone_playcall == "2-3 Zone" else ZONE_32_NORMAL
+        d_destinations = {}
+        for pos, spots in zone_map.items():
+            spot = spots[0] if spots else "key"
+            coords = HCO_STRING_SPOTS.get(spot, {"x": 64, "y": 25})
+            d_destinations[pos] = dict(coords)
+        return (d_destinations, zone_playcall)
+
+    def _build_final_hold_result(self, time_remaining_sec):
+        """Build FINAL_HOLD result: time_elapsed = time_remaining, no shot, no fouls/turnovers. Quarter ends after."""
+        return {
+            "result_type": "FINAL_HOLD",
+            "current_turn": "HCO",
+            "time_elapsed": int(time_remaining_sec),
+            "offense_team_id": self.game.offense_team.team_id,
+            "possession_flips": False,
+            "text": "Hold for final shot.",
+            "next_play_type": None,
+            "next_turn": None,
+        }
+
+    def _execute_final_turn_force_foul(self):
+        """Edge case: Slow It Down + Force Foul at Final Turn time. Victim = PG (ball handler)."""
+        from BackEnd.utils import situational_logic as sl
+        from BackEnd.engine.phase_resolution import (
+            resolve_non_shooting_foul,
+            select_defender_closest_to_victim,
+        )
+        off_lineup = self.game.offense_team.lineup
+        def_lineup = self.game.defense_team.lineup
+        victim = off_lineup.get("PG") or next((p for p in off_lineup.values() if p), None)
+        if not victim or not def_lineup:
+            return None
+        victim_coords = {"x": 50, "y": 25}
+        foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, None)
+        if not foul_player:
+            return None
+        self.game.game_state["foul_team"] = "DEFENSE"
+        roles = {
+            "ball_handler": victim,
+            "defender": foul_player,
+            "foul_player": foul_player,
+            "shooter": victim,
+            "screener": None,
+            "passer": None,
+        }
+        result = resolve_non_shooting_foul(
+            roles, self.game, time_elapsed_override=sl.force_foul_time_elapsed()
+        )
+        result["offense_team_id"] = self.game.offense_team.team_id
+        result["current_turn"] = "HCO"
+        result["quick_foul"] = True
+        return result
 
     def resolve_fast_break(self):
         return resolve_fast_break_logic(self.game) 
@@ -2362,12 +2875,23 @@ class TurnManager:
                         "team": team.name
                     }
             self.game.update_team_stats()
+            # OREB: collapse+attach 3 game s; add pass time (rebounder -> PG)
+            _base = 3
+            _pass_sec = 0.0
+            if rebounder and pg:
+                rc = getattr(rebounder, "coords", None) or {}
+                pc = getattr(pg, "coords", None) or {}
+                if isinstance(rc, dict) and isinstance(pc, dict) and "x" in rc and "y" in rc and "x" in pc and "y" in pc:
+                    _pass_sec = calc_pass_segment_seconds(rc, pc)
+            _oreb_te = round(_base + _pass_sec)
             return {
                 "result_type": "OREB_KICKOUT",
                 "ball_handler": getattr(rebounder, "player_id", None),
                 "text": f"{rebounder_name} secures the rebound after the block. Reset to half-court.",
                 "possession_flips": False,
-                "time_elapsed": 2,
+                "time_elapsed": _oreb_te,
+                "oreb_hold_seconds": _oreb_te - 1,
+                "oreb_action_seconds": 1,
                 "offense_team_id": self.game.offense_team.team_id,
                 "current_turn": "OREB",
                 "next_play_type": "HCO",
@@ -2404,7 +2928,9 @@ class TurnManager:
         if oreb_event["event_type"] == "PUTBACK_ATTEMPT":
             self.logger.log("putbackStart")
             self.logger.log(oreb_event["result"].lower())
-            
+            # OREB: collapse+attach 3 game s; rebounder then acts (putback)
+            _oreb_te = 3
+
             # Build roles for the putback shot (for animation and three-point determination)
             # Putback shots don't have a skeleton, so we'll use current coords
             defender_pos = ["C", "PF", "SF"][0]  # Simplified - closest big
@@ -2470,7 +2996,9 @@ class TurnManager:
                     "defender": getattr(defender, "player_id", None),
                     "text": text,
                     "possession_flips": possession_flips,
-                    "time_elapsed": oreb_event.get("timeElapsed", 3),
+                    "time_elapsed": _oreb_te,
+                    "oreb_hold_seconds": _oreb_te - 1,
+                    "oreb_action_seconds": 1,
                     "points": oreb_event.get("points", 2),
                     "scoring_team": off_team.name,
                     "offense_team_id": off_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
@@ -2520,7 +3048,9 @@ class TurnManager:
                     "defender": getattr(defender, "player_id", None),
                     "text": text,
                     "possession_flips": possession_flips,  # Will be updated based on rebound type
-                    "time_elapsed": oreb_event.get("timeElapsed", 3),
+                    "time_elapsed": _oreb_te,
+                    "oreb_hold_seconds": _oreb_te - 1,
+                    "oreb_action_seconds": 1,
                     "offense_team_id": off_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
                     "current_turn": "OREB",  # ✅ SS&S: Explicit turn type
                     "animations": [],
@@ -2683,13 +3213,23 @@ class TurnManager:
             
             # Update team stats before sending
             self.game.update_team_stats()
-            
+            # OREB: collapse+attach 3 game s; add pass time (rebounder -> PG)
+            _base_kickout = 3
+            _pass_sec_kickout = 0.0
+            if rebounder and pg:
+                rc = getattr(rebounder, "coords", None) or {}
+                pc = getattr(pg, "coords", None) or {}
+                if isinstance(rc, dict) and isinstance(pc, dict) and "x" in rc and "y" in rc and "x" in pc and "y" in pc:
+                    _pass_sec_kickout = calc_pass_segment_seconds(rc, pc)
+            _oreb_te_kickout = round(_base_kickout + _pass_sec_kickout)
             return {
                 "result_type": "OREB_KICKOUT",
                 "ball_handler": getattr(rebounder, "player_id", None),
                 "text": text,
                 "possession_flips": False,
-                "time_elapsed": oreb_event.get("timeElapsed", 2),
+                "time_elapsed": _oreb_te_kickout,
+                "oreb_hold_seconds": _oreb_te_kickout - 1,
+                "oreb_action_seconds": 1,
                 "offense_team_id": self.game.offense_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
                 "current_turn": "OREB",  # ✅ SS&S: Explicit turn type
                 "next_turn": "HCO",  # ✅ SS&S: Kickouts continue to HCO
@@ -2720,13 +3260,93 @@ class TurnManager:
             }
 
     def update_clock_and_possession(self, result):
-        # 🕒 Reduce clock by time_elapsed
-        time_elapsed = result.get("time_elapsed", 0)
-        self.game.game_state["time_remaining"] -= time_elapsed
+        _cc_clock_start = int(self.game.game_state.get("time_remaining", 0))
+        _cc_sc_start = int(self.game.game_state.get("shot_clock_remaining", 30))
+
+        def _is_no_impact_turn(turn_result):
+            no_impact_types = {"FREE_THROW", "SIDE_INBOUND", "BASELINE_INBOUND", "TIMEOUT"}
+            rt = turn_result.get("result_type")
+            if rt in no_impact_types:
+                return True
+            te = turn_result.get("time_elapsed", 0)
+            return int(te or 0) == 0 and rt in {"SIDE_INBOUND", "BASELINE_INBOUND"}
+
+        def _should_reset_shot_clock(turn_result):
+            rt = turn_result.get("result_type")
+            foul_type = str(turn_result.get("foul_type") or turn_result.get("foul_team") or "").upper()
+            next_play_type = str(turn_result.get("next_play_type") or turn_result.get("next_turn") or "").upper()
+            current_turn = str(turn_result.get("current_turn") or "").upper()
+            rebound_type = str(turn_result.get("rebound_type") or "").upper()
+            possession_flips = bool(turn_result.get("possession_flips"))
+            if _is_no_impact_turn(turn_result):
+                return True
+            # Reset on any offensive rebound event, not just a literal "OREB" result_type.
+            # OREB flows commonly use result types like OREB_KICKOUT / PUTBACK_* with rebound_type="OREB".
+            if rebound_type == "OREB" or current_turn == "OREB" or rt == "OREB":
+                return True
+            if rt == "MAKE":
+                return True
+            if rt in {"STEAL", "DEAD BALL", "TURNOVER", "CHARGE"}:
+                return True
+            if rt == "FOUL" and foul_type == "OFFENSIVE":
+                return True
+            if rt == "FOUL" and foul_type == "DEFENSIVE" and next_play_type in {"SIDE_INBOUND", "SIP"}:
+                return True
+            if possession_flips and rt != "TIMEOUT":
+                return True
+            return False
+
+        game_remaining_before = int(self.game.game_state.get("time_remaining", 0) or 0)
+        shot_remaining_before = int(
+            self.game.game_state.get(
+                "shot_clock_remaining",
+                min(30, game_remaining_before),
+            ) or 0
+        )
+
+        # 🕒 Reduce clock by time_elapsed with legal cap enforcement.
+        time_elapsed = int(result.get("time_elapsed", 0) or 0)
+        impact_turn = not _is_no_impact_turn(result)
+        if impact_turn:
+            legal_cap = max(0, min(game_remaining_before, shot_remaining_before))
+            if time_elapsed > legal_cap:
+                time_elapsed = legal_cap
+        else:
+            time_elapsed = 0
+
+        # Shot attempt: add 1 game second to game clock only (rim-hold time); shot clock does not get the +1.
+        is_shot_attempt = result.get("result_type") in ("MAKE", "MISS", "BLOCK") or (
+            result.get("result_type") == "FOUL"
+            and (int(result.get("free_throws_remaining", 0) or 0) > 0
+                 or result.get("next_play_type") == "FREE_THROW")
+        )
+        if impact_turn and is_shot_attempt:
+            effective_game_elapsed = min(time_elapsed + 1, legal_cap) if impact_turn else time_elapsed
+            shot_elapsed = time_elapsed
+        else:
+            effective_game_elapsed = time_elapsed
+            shot_elapsed = time_elapsed
+
+        result["time_elapsed"] = effective_game_elapsed
+        self.game.game_state["time_remaining"] -= effective_game_elapsed
 
         # Clamp to 0
         if self.game.game_state["time_remaining"] < 0:
             self.game.game_state["time_remaining"] = 0
+
+        clock_end = int(self.game.game_state.get("time_remaining", 0))
+        game_seconds_elapsed = _cc_clock_start - clock_end
+
+        # Shot clock: same as game clock except on shot attempts (shot_elapsed = time_elapsed, game = time_elapsed + 1).
+        if impact_turn:
+            raw_shot_end = max(0, _cc_sc_start - shot_elapsed)
+        else:
+            raw_shot_end = min(30, clock_end)
+
+        self.game.game_state["shot_clock_remaining"] = raw_shot_end
+
+        # Shot clock violations are now resolved via the stopper system (phase_resolution) before we get here;
+        # we no longer overwrite the result when raw_shot_end == 0.
 
         # Convert to clock display (e.g., 400 → "6:40")
         minutes = self.game.game_state["time_remaining"] // 60
@@ -2734,12 +3354,26 @@ class TurnManager:
         self.game.game_state["clock"] = f"{minutes}:{seconds:02d}"
 
         # ✅ Track MIN (minutes played) for all active players
-        # Only track if time_elapsed > 0 (skip timeouts and other 0-time turns)
-        if time_elapsed > 0:
+        # Only track if effective_game_elapsed > 0 (skip timeouts and other 0-time turns)
+        if effective_game_elapsed > 0:
             for team in [self.game.home_team, self.game.away_team]:
                 for position, player in team.lineup.items():
                     if player:  # Skip None slots (empty lineup positions)
-                        player.stats["game"]["MIN"] += time_elapsed
+                        player.stats["game"]["MIN"] += effective_game_elapsed
+
+        # Attach contract while game_state still has raw_shot_end (current turn's end).
+        # Contract must show derived shot_clock_end so frontend animates start→end during this turn.
+        self._attach_clock_contract(
+            result,
+            clock_start=_cc_clock_start,
+            shot_clock_start=_cc_sc_start,
+            game_state=self.game.game_state,
+            source=f"ucp:{result.get('result_type', 'UNKNOWN')}",
+        )
+
+        # Reset only affects NEXT turn: set shot_clock_remaining=30 so next turn's _cc_sc_start is 30.
+        if _should_reset_shot_clock(result):
+            self.game.game_state["shot_clock_remaining"] = min(30, clock_end)
 
         # ✅ REMOVED: Possession flips now handled in game_manager (Fixes 2-4)
         # This old flip caused double-flipping with the new system
@@ -2897,7 +3531,7 @@ class TurnManager:
                 
                 # Find who has ball at this step
                 for pos, action_info in pos_actions.items():
-                    action = action_info.get("action", "")
+                    action = (action_info.get("action") or "").lower().strip()
                     
                     if action in ["handle_ball", "receive", "shoot", "pass"]:
                         step_owner = pos
@@ -2910,6 +3544,9 @@ class TurnManager:
                         elif action == "handle_ball":
                             if current_owner_pos is None:
                                 current_owner_pos = pos
+                        elif action == "shoot":
+                            # Shooter has ball at this step; track so stopper/empty-step fallback credits them
+                            current_owner_pos = pos
                         
                         break
                 
@@ -3029,14 +3666,33 @@ class TurnManager:
                     touch_counts[player] += 1
 
             for event in events:
-                if event["type"] == "pass":
-                    passer = off_lineup[event["from"]]
-                    receiver = off_lineup[event["to"]]
-                    touch_counts[passer] += 1
-                    touch_counts[receiver] += 1
-                elif event["type"] == "shot":
-                    shooter = off_lineup[event["by"]]
-                    touch_counts[shooter] += 1
+                event_type = event.get("type")
+                if event_type == "pass":
+                    passer_pos = event.get("from")
+                    receiver_pos = event.get("to")
+                    if passer_pos in off_lineup and receiver_pos in off_lineup:
+                        passer = off_lineup[passer_pos]
+                        receiver = off_lineup[receiver_pos]
+                        touch_counts[passer] += 1
+                        touch_counts[receiver] += 1
+                elif event_type == "shot":
+                    shooter_pos = event.get("by")
+                    # Final-turn helper skeletons can emit {"type":"shot"} without "by".
+                    # Fall back to the shooter action in this step.
+                    if shooter_pos not in off_lineup:
+                        for pos, action_info in pos_actions.items():
+                            if action_info.get("action") == ACTIONS["SHOOT"]:
+                                shooter_pos = pos
+                                break
+                    if shooter_pos in off_lineup:
+                        shooter = off_lineup[shooter_pos]
+                        touch_counts[shooter] += 1
+                    else:
+                        logging.warning(
+                            "🧭 [FINAL TURN TRACE] assign_roles shot event missing valid shooter mapping; event=%s step_index=%s",
+                            event,
+                            step_index,
+                        )
 
         # --- Step 4: Derive primary roles from steps (optimized - uses final steps only)
         derived_roles = derive_roles_from_steps(steps, off_lineup)
@@ -3297,6 +3953,10 @@ class TurnManager:
         # After a made shot, possession will flip. The team that just scored
         # (currently offense_team) will become the defense team and apply pressure.
         def_team = self.game.offense_team
+        
+        # ✅ Situational Logic (Q4/OT): Quick Shot overrides defense FCP/HCT to 0
+        if self.game.game_state.get("_situational_quick_shot_fcp_hct_override"):
+            return "HCO"
         
         # Ensure strategy_settings is initialized (but don't overwrite existing settings)
         # Only initialize if it's completely missing (None), not if it's an empty dict

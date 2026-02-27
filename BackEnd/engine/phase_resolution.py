@@ -19,6 +19,11 @@ from BackEnd.models.animator import Animator
 from BackEnd.utils.shared import (
     get_name_safe,
     get_time_elapsed,
+    calc_skeleton_time_elapsed,
+    calc_skeleton_step_timing_contract,
+    calc_cg_segment_seconds,
+    calc_pass_segment_seconds,
+    clamp_turn_time_elapsed,
     get_fast_break_chance,
     calculate_rebound_score,
     calculate_outlet_pass_score,
@@ -202,9 +207,9 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
         step = steps[i]
         pos_actions = step.get("pos_actions", {})
         
-        # Find who has ball at this step
+        # Find who has ball at this step (normalize action so we don't miss due to casing)
         for pos, action_info in pos_actions.items():
-            action = action_info.get("action", "")
+            action = (action_info.get("action") or "").lower().strip()
             # Actions that indicate ball possession
             if action in ["handle_ball", "receive", "shoot"]:
                 # Found ball handler position
@@ -212,7 +217,7 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
                 if ball_handler_player:
                     return ball_handler_player
     
-    # Fallback: use PG or first player
+    # Fallback: use PG or first player (only when no step had a clear ball handler)
     return off_lineup.get("PG", list(off_lineup.values())[0])
 
 
@@ -317,9 +322,50 @@ def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup):
     
     return foul_player
 
+
+def select_defender_closest_to_victim(victim_coords, def_lineup, defender_coords_by_pos=None):
+    """
+    For intentional foul (situational Force Foul): select the defender closest to the victim
+    by Euclidean distance in court coordinates.
+
+    Args:
+        victim_coords: dict with "x" and "y" (e.g. from HCO_STRING_SPOTS or inbound oDestinations)
+        def_lineup: dict position -> Player
+        defender_coords_by_pos: optional dict position -> {"x", "y"}. If None, use position-based
+            default spots (key) for all defenders as fallback.
+
+    Returns:
+        Player object that is closest to victim_coords, or None if def_lineup empty.
+    """
+    if not def_lineup or not victim_coords:
+        return None
+    vx = victim_coords.get("x", 50)
+    vy = victim_coords.get("y", 25)
+    from BackEnd.constants import HCO_STRING_SPOTS
+    best_defender = None
+    best_dist_sq = float("inf")
+    for pos, defender in def_lineup.items():
+        if defender is None:
+            continue
+        if defender_coords_by_pos and pos in defender_coords_by_pos:
+            coords = defender_coords_by_pos[pos]
+            dx = coords.get("x", 50)
+            dy = coords.get("y", 25)
+        else:
+            coords = HCO_STRING_SPOTS.get(pos, {"x": 50, "y": 25})
+            dx = coords.get("x", 50)
+            dy = coords.get("y", 25)
+        dist_sq = (dx - vx) ** 2 + (dy - vy) ** 2
+        if dist_sq < best_dist_sq:
+            best_dist_sq = dist_sq
+            best_defender = defender
+    return best_defender
+
     
-def resolve_non_shooting_foul(roles, game):
-    
+def resolve_non_shooting_foul(roles, game, time_elapsed_override=None):
+    """
+    time_elapsed_override: if provided (e.g. situational Force Foul), use instead of tempo-based time.
+    """
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     foul_team = off_team if game_state["foul_team"] == "OFFENSE" else def_team
     
@@ -329,8 +375,15 @@ def resolve_non_shooting_foul(roles, game):
     shooter = roles["shooter"]
     screener = roles.get("screener", "")
     passer = roles.get("passer", "")
-    tempo = off_team.strategy_calls["tempo_call"]
-    time_elapsed = get_time_elapsed(tempo)
+    if time_elapsed_override is not None:
+        time_elapsed = time_elapsed_override
+    else:
+        steps = roles.get("steps", [])
+        event_step_index = roles.get("event_step")
+        if steps:
+            time_elapsed = calc_skeleton_time_elapsed(steps, event_step_index)
+        else:
+            time_elapsed = random.randint(1, 5)
 
     # Track the foul
     foul_player.record_stat("F")
@@ -392,6 +445,8 @@ def resolve_non_shooting_foul(roles, game):
     # This ensures consistent behavior: all possession flips for SIP transitions happen in one place
     logging.warning(f"⏭️ [RESOLVE_FOUL] NOT flipping possession here - SIP setup will handle it (possession_flips={possession_flips})")
     
+    # next_play_type so turn_manager._should_reset_shot_clock resets on D_FOUL → SIDE_INBOUND (Real_Time_Clock_System.md)
+    next_play_type = "FREE_THROW" if game_state.get("offensive_state") == "FREE_THROW" else "SIDE_INBOUND"
     result = {
         "result_type": "FOUL",
         "ball_handler": ball_handler,
@@ -406,7 +461,9 @@ def resolve_non_shooting_foul(roles, game):
         "foul_player_id": getattr(foul_player, "player_id", None) if foul_player else None,
         "foul_team": game_state.get("foul_team"),
         "foul_count": foul_out_info["foul_count"],
-        "fouled_out": foul_out_info["fouled_out"]
+        "fouled_out": foul_out_info["fouled_out"],
+        "next_play_type": next_play_type,
+        "next_turn": next_play_type,
     }
     
     # Add foul out player info if applicable
@@ -729,7 +786,12 @@ def resolve_fast_break_logic(game: "GameManager"):
             if rebounder and rebounder != ball_handler:
                 fb_roles["outlet_passer"] = getattr(rebounder, "player_id", None)
                 fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
-                
+                rebounder_coords = getattr(rebounder, "coords", None) or {}
+                if isinstance(rebounder_coords, dict):
+                    fb_roles["outlet_passer_x"] = rebounder_coords.get("x")
+                    fb_roles["outlet_passer_y"] = rebounder_coords.get("y")
+                else:
+                    fb_roles["outlet_passer_x"] = fb_roles["outlet_passer_y"] = None
                 # Calculate outlet pass score for stat tracking
                 outlet_score = calculate_outlet_pass_score(rebounder)
                 fb_roles["outlet_score"] = outlet_score
@@ -739,6 +801,7 @@ def resolve_fast_break_logic(game: "GameManager"):
             else:
                 fb_roles["outlet_passer"] = None
                 fb_roles["outlet_receiver"] = None
+                fb_roles["outlet_passer_x"] = fb_roles["outlet_passer_y"] = None
                 fb_roles["outlet_score"] = None
         else:
             # Fallback: Random ball handler if no release player (shouldn't happen, but safety check)
@@ -752,7 +815,12 @@ def resolve_fast_break_logic(game: "GameManager"):
             if rebounder and rebounder != ball_handler:
                 fb_roles["outlet_passer"] = getattr(rebounder, "player_id", None)
                 fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
-                
+                rebounder_coords = getattr(rebounder, "coords", None) or {}
+                if isinstance(rebounder_coords, dict):
+                    fb_roles["outlet_passer_x"] = rebounder_coords.get("x")
+                    fb_roles["outlet_passer_y"] = rebounder_coords.get("y")
+                else:
+                    fb_roles["outlet_passer_x"] = fb_roles["outlet_passer_y"] = None
                 # Calculate outlet pass score for stat tracking
                 outlet_score = calculate_outlet_pass_score(rebounder)
                 fb_roles["outlet_score"] = outlet_score
@@ -762,6 +830,7 @@ def resolve_fast_break_logic(game: "GameManager"):
             else:
                 fb_roles["outlet_passer"] = None
                 fb_roles["outlet_receiver"] = None
+                fb_roles["outlet_passer_x"] = fb_roles["outlet_passer_y"] = None
                 fb_roles["outlet_score"] = None
 
         # No additional offensive players when starting from a rebound
@@ -851,16 +920,16 @@ def resolve_fast_break_logic(game: "GameManager"):
     # logging.debug(f"  is_away_offense: {is_away_offense}")
     
     # Determine direction toward basket
-    # Home offense: basket at x=90, so direction = +1 (right)
-    # Away offense: basket at x=10, so direction = -1 (left)
+    # Home offense: basket at x=91, so direction = +1 (right)
+    # Away offense: basket at x=9, so direction = -1 (left)
     if is_away_offense:
         # Away offense: smaller x is closer to basket
         direction = -1
-        basket_x = 10
+        basket_x = 9
     else:
         # Home offense: larger x is closer to basket
         direction = 1
-        basket_x = 90
+        basket_x = 91
     
     # ============================================================================
     # STEAL ENTRY vs OUTLET PASS: Different logic for steals vs rebounds
@@ -1227,6 +1296,71 @@ def resolve_fast_break_logic(game: "GameManager"):
         _record_outlet_pass_stats(outlet_passer_id, outlet_score, is_successful, game)
     # ==================== END OUTLET PASS STAT TRACKING ====================
 
+    def _apply_fast_break_cg_time(turn_result, shot_attempted=False):
+        """
+        Cover-ground timing for fast breaks:
+        - distance time from ball handler movement path
+        - +1s pass, +1s receive, +1s shot overhead (when applicable)
+        - round at end, cap at 30
+        """
+        roles_data = turn_result.get("roles", {}) or {}
+        animations_data = turn_result.get("animations", []) or []
+        path_points = []
+
+        bh = roles_data.get("ball_handler")
+        bh_id = getattr(bh, "player_id", None) if bh else None
+        if bh_id:
+            for anim in animations_data:
+                if anim.get("playerId") == bh_id:
+                    movement = anim.get("movement", []) or []
+                    for step in movement:
+                        coords = step.get("coords") or {}
+                        if "x" in coords and "y" in coords:
+                            path_points.append({"x": coords["x"], "y": coords["y"]})
+                    break
+
+        if len(path_points) < 2:
+            start = {
+                "x": roles_data.get("ball_handler_outlet_x"),
+                "y": roles_data.get("ball_handler_outlet_y"),
+            }
+            end = turn_result.get("shot_spot")
+            if not end and bh_id:
+                for anim in animations_data:
+                    if anim.get("playerId") == bh_id and isinstance(anim.get("end"), dict):
+                        end = anim.get("end")
+                        break
+            if isinstance(start.get("x"), (int, float)) and isinstance(start.get("y"), (int, float)) and end:
+                path_points = [start, {"x": end.get("x", start["x"]), "y": end.get("y", start["y"])}]
+
+        distance_seconds = 0.0
+        if len(path_points) >= 2:
+            for idx in range(1, len(path_points)):
+                distance_seconds += calc_cg_segment_seconds(path_points[idx - 1], path_points[idx])
+
+        overhead_seconds = 0.0
+        # Outlet pass: use distance-based pass time (passer -> receiver) when coords available
+        outlet_passer_x = roles_data.get("outlet_passer_x")
+        outlet_passer_y = roles_data.get("outlet_passer_y")
+        receiver_x = roles_data.get("ball_handler_outlet_x")
+        receiver_y = roles_data.get("ball_handler_outlet_y")
+        if (roles_data.get("outlet_passer") and roles_data.get("outlet_receiver")
+                and isinstance(outlet_passer_x, (int, float)) and isinstance(outlet_passer_y, (int, float))
+                and isinstance(receiver_x, (int, float)) and isinstance(receiver_y, (int, float))):
+            passer_coords = {"x": outlet_passer_x, "y": outlet_passer_y}
+            receiver_coords = {"x": receiver_x, "y": receiver_y}
+            overhead_seconds += calc_pass_segment_seconds(passer_coords, receiver_coords)
+        elif roles_data.get("outlet_passer") and roles_data.get("outlet_receiver"):
+            overhead_seconds += 2.0  # fallback when coords missing
+        if shot_attempted:
+            overhead_seconds += 1.0
+
+        turn_result["time_elapsed"] = clamp_turn_time_elapsed(
+            round(distance_seconds + overhead_seconds),
+            cap=30
+        )
+        return turn_result
+
     # If defensive stop triggered, defense stopped the fast break
     # NOTE: This should NOT happen if has_outlet_pass is True (handled above)
     if event_type == "DEFENSIVE_STOP":
@@ -1249,7 +1383,7 @@ def resolve_fast_break_logic(game: "GameManager"):
             "defender": best_defender,
             "text": f"Fast Break! Nice stop by {defender_name}!",
             "possession_flips": False,
-            "time_elapsed": 3,
+            "time_elapsed": 0,
             "animations": animations,
             "current_turn": "FAST_BREAK",  # ✅ SS&S: Explicit turn type
             "next_play_type": "HCO",
@@ -1279,6 +1413,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         # Record Fast Break stats for release player (offensive) and get-back players (defensive)
         _record_fast_break_stats(fb_roles, result, game)
         # ==================== END FAST BREAK STAT TRACKING ====================
+        _apply_fast_break_cg_time(result, shot_attempted=False)
         
         return result
 
@@ -1407,6 +1542,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         )
     turn_result["roles"] = fb_roles
     turn_result["fast_break"] = True  # ✅ Add fast_break flag for frontend routing
+    _apply_fast_break_cg_time(turn_result, shot_attempted=(event_type == "SHOT"))
 
     # ✅ SS&S: Backend is single source of truth for shot spot and defender placement on Fast Break shots
     # Expose so frontend uses these instead of recomputing (avoids mismatch and missing defender)
@@ -1654,6 +1790,8 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
             turnover_type = "DEAD BALL"  # Keep as dead ball turnover
         elif turnover_type == "STEAL":
             turnover_type = "STEAL"  # Keep as steal
+        elif turnover_type == "SHOT_CLOCK":
+            turnover_type = "SHOT_CLOCK"  # Shot clock violation (announced as such; result_type stays DEAD BALL)
         # No random conversion when from resolution system
     else:
         # Legacy behavior: Only use random choice if turnover_type is not explicitly provided
@@ -1715,15 +1853,18 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
         })
     else:
         game_state["offensive_state"] = "HCO"
-        description = random.choice([
-            "throws it out of bounds",
-            "commits a travel.",
-            "commits a double dribble.",
-            "travels with the ball.",
-            "with an errant pass.",
-            "dribbles it off his foot and the ball goes out of bounds."
-        ])
-        text = f"{victim_name} {description}"
+        if turnover_type == "SHOT_CLOCK":
+            text = "Shot Clock Violation"
+        else:
+            description = random.choice([
+                "throws it out of bounds",
+                "commits a travel.",
+                "commits a double dribble.",
+                "travels with the ball.",
+                "with an errant pass.",
+                "dribbles it off his foot and the ball goes out of bounds."
+            ])
+            text = f"{victim_name} {description}"
         game_state["last_stealer"] = None
 
     bh_pos = get_player_position(off_lineup, ball_handler)
@@ -1734,11 +1875,15 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
     next_play_type = None
     if game_state.get("offensive_state") == "FAST_BREAK":
         next_play_type = "FAST_BREAK"
+    elif turnover_type == "SHOT_CLOCK":
+        next_play_type = "SIDE_INBOUND"
     elif game_state.get("offensive_state") == "HCO":
         next_play_type = "HCO"
 
+    # API: shot clock violation uses result_type "DEAD BALL" + turnover_type "SHOT_CLOCK" for announcement
+    result_type_for_api = "DEAD BALL" if turnover_type == "SHOT_CLOCK" else turnover_type
     result = {
-        "result_type": turnover_type,
+        "result_type": result_type_for_api,
         "ball_handler": ball_handler,
         "text": text,
         "time_elapsed": random.randint(3, 8),
@@ -1757,6 +1902,8 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
     if stealer_id:
         result["stealer_id"] = stealer_id
         result["stealer_name"] = stealer_name
+    if turnover_type == "SHOT_CLOCK":
+        result["turnover_type"] = "SHOT_CLOCK"
     if events:
         result["events"] = events
 
@@ -2726,7 +2873,12 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
         return skeleton
     
     # Determine which step to stop at based on result type
-    if result in ["O_FOUL", "D_FOUL"]:
+    if result == "SHOT_CLOCK_VIOLATION":
+        # Use precomputed step where shot clock hits 0 (set by HCO shot-clock check)
+        stop_step_index = game_state.get("shot_clock_violation_step_index")
+        if stop_step_index is None or stop_step_index < 0 or stop_step_index >= len(steps) - 1:
+            stop_step_index = max(1, len(steps) - 2)
+    elif result in ["O_FOUL", "D_FOUL"]:
         # Random step before final (exclude step 0 and final step)
         # If skeleton has 7 steps (0-6), choose from steps 1-5
         stop_step_index = random.randint(1, len(steps) - 2) if len(steps) > 2 else 1
@@ -2758,11 +2910,11 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
     ball_handler_location = "key"  # Default location
     ball_handler_action_info = None  # Store full action_info to preserve opp, coords, etc.
     
-    # Find ball handler in the stop step
+    # Find ball handler in the stop step (include "shoot" so violation-on-shot credits the shooter, not PG fallback)
     pos_actions = stop_step.get("pos_actions", {})
     for pos, action_info in pos_actions.items():
         action = action_info.get("action", "").lower()
-        if action in ["handle_ball", "receive", "pass"]:
+        if action in ["handle_ball", "receive", "pass", "shoot"]:
             ball_handler_pos = pos
             ball_handler_location = action_info.get("location", "key")
             ball_handler_action_info = action_info  # Store full action_info
@@ -2774,7 +2926,7 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
         prev_pos_actions = prev_step.get("pos_actions", {})
         for pos, action_info in prev_pos_actions.items():
             action = action_info.get("action", "").lower()
-            if action in ["handle_ball", "receive"]:
+            if action in ["handle_ball", "receive", "shoot"]:
                 ball_handler_pos = pos
                 ball_handler_location = action_info.get("location", "key")
                 ball_handler_action_info = action_info  # Store full action_info
@@ -2788,6 +2940,7 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
         "O_FOUL": "o_foul",
         "D_FOUL": "d_foul",
         "DEAD_BALL_TURNOVER": "dead_ball_turnover",
+        "SHOT_CLOCK_VIOLATION": "dead_ball_turnover",
         "STEAL": "steal"
     }
     stopper_action = stopper_action_map.get(result, "turnover")
@@ -2819,8 +2972,8 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
     
     # ✅ FIX: Store stop_step_index for later use in determining ball handler and defender
     # This ensures we use the actual ball handler at the step where the steal/foul/turnover occurred
-    # Store for all non-shot results (steals, fouls, turnovers) so defender determination uses correct ball handler
-    if result in ["STEAL", "DEAD_BALL_TURNOVER", "O_FOUL", "D_FOUL"]:
+    # Store for all non-shot results (steals, fouls, turnovers, shot clock violation) so defender determination uses correct ball handler
+    if result in ["STEAL", "DEAD_BALL_TURNOVER", "SHOT_CLOCK_VIOLATION", "O_FOUL", "D_FOUL"]:
         game_state["steal_stop_step_index"] = stop_step_index
         # Also store a reference to the original skeleton steps before truncation
         # (we'll use this to extract position from the correct step)
@@ -3253,12 +3406,12 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
     roles["shot_spot"] = coords  # Same data for block reconciliation (explicit shot location = animation location)
 
 
-def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup):
+def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_shot_step_index=None):
     """
     Resolve Motion offense shot attempt.
     
     This function:
-    1. Selects a random step (excluding step 0) for shot attempt
+    1. Selects a random step (excluding step 0) for shot attempt, or uses forced_shot_step_index if provided
     2. Determines shot type (inside/outside/attack) based on possibilities and strategy
     3. Truncates skeleton at selected step
     4. Appends necessary steps (pass/receive, drive, shoot)
@@ -3269,6 +3422,7 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup):
         game: GameManager instance
         off_lineup: Offensive lineup dict
         def_lineup: Defensive lineup dict
+        forced_shot_step_index: Optional int. If provided, use this step index instead of random (for recalibration).
     
     Returns:
         dict: {
@@ -3296,8 +3450,11 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup):
         logging.warning(f"⚠️ [MOTION SHOT] Skeleton has insufficient steps ({len(steps)}), cannot select shot step")
         return None
     
-    # Phase 1: Select random step (excluding step 0)
-    shot_step_index = random.randint(1, len(steps) - 1)
+    # Phase 1: Select step (forced for recalibration, else random excluding step 0)
+    if forced_shot_step_index is not None:
+        shot_step_index = max(1, min(forced_shot_step_index, len(steps) - 1))
+    else:
+        shot_step_index = random.randint(1, len(steps) - 1)
     selected_step = steps[shot_step_index]
     
     # Truncate skeleton at selected step
@@ -3450,6 +3607,128 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup):
     }
 
 
+def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position_to_spot, bh_pos):
+    """
+    Final Turn shot: build minimal skeleton (alignment -> pass/receive -> shoot), pick shooter by
+    SH (outside) or SC+AG (attack) with weights 50/30/20/9/1, then resolve_shot. Attach alignment
+    and time_elapsed = time_remaining to result. Clock runs to 0 on this turn, so quarter/game end
+    triggers after the shot (or after FTs if shooting foul); blocking foul on attack awards 2 FTs only.
+    """
+    import random
+    from BackEnd.constants import ACTIONS
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    # Shot type: 50% outside, 50% attack
+    shot_type = "Outside" if random.random() < 0.5 else "Attack"
+    game_state["current_playcall"] = shot_type
+    # Shooter: rank by SH (outside) or SC+AG (attack), weighted random 50/30/20/9/1
+    weights = [0.50, 0.30, 0.20, 0.09, 0.01]
+    candidates = []
+    for pos, player in off_lineup.items():
+        if not player:
+            continue
+        attrs = getattr(player, "attributes", {}) or {}
+        if shot_type == "Outside":
+            score = attrs.get("SH", 0)
+        else:
+            score = attrs.get("SC", 0) + attrs.get("AG", 0)
+        candidates.append((player, pos, score))
+    candidates.sort(key=lambda t: (t[2], random.random()), reverse=True)
+    if not candidates:
+        for pos in ["PG", "SG", "SF", "PF", "C"]:
+            if off_lineup.get(pos):
+                shooter, shooter_pos = off_lineup[pos], pos
+                break
+        else:
+            shooter, shooter_pos = None, "PG"
+    else:
+        r = random.random()
+        cum = 0
+        shooter, shooter_pos = candidates[0][0], candidates[0][1]
+        for i, (player, pos, _) in enumerate(candidates):
+            w = weights[i] if i < len(weights) else (1.0 - cum)
+            cum += w
+            if r <= cum:
+                shooter, shooter_pos = player, pos
+                break
+    shot_wing = random.choice(["upper wing", "lower wing"])
+    bh_is_shooter = bh_pos == shooter_pos
+    # Opposite vertical half spots for the other 3 or 4 players (doc: midWing, wing, midCorner, corner, deep wing, deep baseline)
+    if shot_wing == "upper wing":
+        opposite_half_spots = [
+            "lower midWing", "lower wing", "lower midCorner", "lower corner",
+            "deep lower wing", "deep lower baseline",
+        ]
+    else:
+        opposite_half_spots = [
+            "upper midWing", "upper wing", "upper midCorner", "upper corner",
+            "deep upper wing", "deep upper baseline",
+        ]
+    random.shuffle(opposite_half_spots)
+    other_positions = [p for p in ["PG", "SG", "SF", "PF", "C"] if p != bh_pos and p != shooter_pos]
+    other_spot_by_pos = {}
+    for i, pos in enumerate(other_positions):
+        other_spot_by_pos[pos] = opposite_half_spots[i % len(opposite_half_spots)]
+    # Skeleton: step 0 alignment, step 1 pass/receive (or BH to wing if BH shoots), step 2 shoot
+    step0 = {"timestamp": 0, "pos_actions": {}}
+    for pos in ["PG", "SG", "SF", "PF", "C"]:
+        spot = position_to_spot.get(pos, "key")
+        step0["pos_actions"][pos] = {
+            "action": ACTIONS["HANDLE"] if pos == bh_pos else "stand",
+            "location": spot,
+        }
+    step1 = {"timestamp": 300, "pos_actions": {}}
+    for pos in ["PG", "SG", "SF", "PF", "C"]:
+        if bh_is_shooter and pos == bh_pos:
+            step1["pos_actions"][pos] = {"action": ACTIONS["HANDLE"], "location": shot_wing}
+        elif not bh_is_shooter and pos == bh_pos:
+            step1["pos_actions"][pos] = {"action": ACTIONS["PASS"], "location": "deep key"}
+        elif pos == shooter_pos:
+            step1["pos_actions"][pos] = {"action": ACTIONS["RECEIVE"], "location": shot_wing}
+        else:
+            step1["pos_actions"][pos] = {
+                "action": "stand",
+                "location": other_spot_by_pos.get(pos, position_to_spot.get(pos, "key")),
+            }
+    is_away_offense = off_team.team_id == game.away_team.team_id
+    if shot_type == "Attack":
+        # Reuse Motion offense logic: drive to basket then shoot (two steps, shooter only in those steps)
+        valid_destinations = _determine_attack_drive_destination(shot_wing)
+        destination = random.choice(valid_destinations) if valid_destinations else "basketSpot"
+        drive_shoot_steps = _create_attack_drive_shoot_steps(
+            shooter_pos, shot_wing, destination, timestamp=600, is_away_offense=is_away_offense
+        )
+        skeleton = {"steps": [step0, step1] + drive_shoot_steps}
+    else:
+        # Outside: shoot at wing (single step 2)
+        step2 = {"timestamp": 600, "pos_actions": {}}
+        for pos in ["PG", "SG", "SF", "PF", "C"]:
+            if pos == shooter_pos:
+                step2["pos_actions"][pos] = {"action": ACTIONS["SHOOT"], "location": shot_wing}
+            else:
+                step1_location = "deep key" if pos == bh_pos else other_spot_by_pos.get(pos, position_to_spot.get(pos, "key"))
+                step2["pos_actions"][pos] = {"action": "stand", "location": step1_location}
+        skeleton = {"steps": [step0, step1, step2]}
+    roles = game.turn_manager.assign_roles(
+        off_call=shot_type, def_call=game_state.get("defense_playcall", "2-3 Zone"), skeleton=skeleton
+    )
+    # Set final_turn so shot_manager can apply Final Turn rules (e.g. blocking foul = 2 FTs only on attack)
+    game_state["final_turn"] = True
+    try:
+        shot_result = game.shot_manager.resolve_shot(roles)
+    finally:
+        game_state.pop("final_turn", None)
+    # Use time_elapsed = time_remaining for the turn so clock goes to 0 and quarter/game end triggers
+    time_remaining = game_state.get("time_remaining", 24)
+    shot_result["time_elapsed"] = int(time_remaining)
+    shot_result["oDestinations"] = o_destinations
+    shot_result["dDestinations"] = d_destinations
+    shot_result["skeleton"] = skeleton
+    shot_result["final_turn"] = True
+    shot_result["current_turn"] = shot_result.get("current_turn", "HCO")
+    shot_result["offense_team_id"] = off_team.team_id
+    return shot_result
+
+
 def resolve_half_court_offense_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
 
@@ -3535,8 +3814,73 @@ def resolve_half_court_offense_logic(game):
     if final_skeleton:
         final_skeleton = copy.deepcopy(final_skeleton)
     
+    # Shot clock violation: if result is SHOT but shot clock would hit 0 during this turn, either violation or shot-at-1 (Real_Time_Clock_System.md).
+    # Motion only: optional recalibration — chance to take a shot from an earlier step to avoid violation (docs/To Do/_motion_play_decision.md).
+    if result == "SHOT" and final_skeleton and "steps" in final_skeleton:
+        steps = final_skeleton["steps"]
+        if steps:
+            timing = calc_skeleton_step_timing_contract(
+                steps,
+                resolution_step_index=len(steps) - 1,
+                include_hco_step1_bringup=True,
+                prev_offense_positions=game_state.get("_prev_offense_positions_for_hco"),
+            )
+            step_clock_seconds = timing.get("step_clock_seconds") or []
+            shot_remaining = game_state.get("shot_clock_remaining", 30)
+            cumulative = 0
+            for i, sec in enumerate(step_clock_seconds):
+                cumulative += sec
+                if cumulative >= shot_remaining:
+                    chemistry = int(off_team.team_attributes.get("team_chemistry", 7))
+                    discipline = int(off_team.team_attributes.get("discipline", 0))
+
+                    # Motion recalibration: chance to shoot from step index 2..(i-1) to avoid violation
+                    if is_motion_play and i >= 3:
+                        recalibration_score = (chemistry * 3) + (discipline * 2)
+                        die_roll = random.randint(1, 100)
+                        if die_roll < recalibration_score:
+                            chosen_step = random.randint(2, i - 1)
+                            motion_shot_info = resolve_motion_offense_shot(
+                                final_skeleton, game, off_lineup, def_lineup,
+                                forced_shot_step_index=chosen_step,
+                            )
+                            if motion_shot_info:
+                                final_skeleton = motion_shot_info["skeleton"]
+                                game_state["_motion_shot_recalibrated"] = motion_shot_info
+                                break
+
+                    # No recalibration (or failed recalibration): violation vs shot-at-1
+                    ball_handler_at_step = get_ball_handler_from_skeleton(final_skeleton, off_lineup, step_index=i)
+                    iq = int(getattr(ball_handler_at_step, "attributes", {}).get("IQ", 0) or 0)
+                    intelligence = min(20, iq // 5)
+                    violation_threshold = 50 + chemistry + discipline + intelligence
+                    x = random.randint(1, 100)
+                    if x > violation_threshold:
+                        # Path A: shot clock violation (current behavior)
+                        game_state["shot_clock_violation_step_index"] = i
+                        result = "SHOT_CLOCK_VIOLATION"
+                    else:
+                        # Path B: shot attempt at 1 second remaining — truncate skeleton, keep result SHOT
+                        movement_target = shot_remaining - 1
+                        cum = 0
+                        j = -1
+                        for idx, s in enumerate(step_clock_seconds):
+                            cum += s
+                            if cum <= movement_target:
+                                j = idx
+                            else:
+                                break
+                        if j < 0:
+                            j = 0
+                        truncated_steps = steps[: j + 1] + [steps[-1]]
+                        final_skeleton["steps"] = truncated_steps
+                        game_state["shot_at_one_second"] = True
+                        game_state["_shot_at_one_second_time_elapsed"] = shot_remaining - 1
+                    break
+    
     # ✅ STOPER SYSTEM: Apply stopper system to skeleton (truncate and add stopper step if needed)
     skeleton = apply_stopper_system_to_skeleton(final_skeleton, result, game_state)
+    game_state.pop("shot_clock_violation_step_index", None)  # Don't leak to next turn
     
     # Get the successful variant to determine intended shooter (only for Set Plays)
     # Motion plays don't have variants, so we'll use the base_loop skeleton
@@ -3553,7 +3897,7 @@ def resolve_half_court_offense_logic(game):
     # to be based on ball handler's position, not shooter's position
     # assign_roles() assigns defender based on shooter, but for steals we need
     # whoever is guarding the ball handler at the time of the steal
-    if result in ["STEAL", "DEAD_BALL_TURNOVER", "O_FOUL", "D_FOUL"]:
+    if result in ["STEAL", "DEAD_BALL_TURNOVER", "SHOT_CLOCK_VIOLATION", "O_FOUL", "D_FOUL"]:
         # ✅ FIX: Get ball handler from the stop step where the steal/foul/turnover occurs,
         # not from roles (which may be the shooter from a different step)
         # This is critical for Motion plays where the ball handler changes throughout the motion
@@ -3912,6 +4256,8 @@ def resolve_half_court_offense_logic(game):
             event_type = "D_FOUL"
         elif result == "DEAD_BALL_TURNOVER":
             event_type = "TURNOVER"
+        elif result == "SHOT_CLOCK_VIOLATION":
+            event_type = "TURNOVER"
         elif result == "STEAL":
             event_type = "TURNOVER"
         else:
@@ -4007,17 +4353,26 @@ def resolve_half_court_offense_logic(game):
         
         #need to add animations to each of these
         if event_type == "TURNOVER":
-            # Use result to determine turnover type (STEAL vs DEAD BALL)
-            # Convert DEAD_BALL_TURNOVER (from resolution system) to "DEAD BALL" format
+            # Use result to determine turnover type (STEAL vs DEAD BALL vs SHOT_CLOCK)
             if result == "DEAD_BALL_TURNOVER":
                 turnover_type = "DEAD BALL"
+            elif result == "SHOT_CLOCK_VIOLATION":
+                turnover_type = "SHOT_CLOCK"
             elif result == "STEAL":
                 turnover_type = "STEAL"
             else:
-                # Fallback for legacy code paths
                 turnover_type = "DEAD BALL"
             # Pass from_resolution_system=True to respect the resolution system's determination
             turn_result = resolve_turnover_logic(roles, game, turnover_type=turnover_type, from_resolution_system=True)
+            timing_contract = calc_skeleton_step_timing_contract(
+                roles.get("steps", []),
+                resolution_step_index=roles.get("event_step"),
+                include_hco_step1_bringup=True,
+            )
+            turn_result["time_elapsed"] = timing_contract["time_elapsed"]
+            turn_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
+            turn_result["resolution_step_index"] = timing_contract["resolution_step_index"]
+            turn_result["executed_step_count"] = timing_contract["executed_step_count"]
             # Add skeleton and animations to result
             turn_result["skeleton"] = skeleton or {}
             turn_result["animations"] = animations
@@ -4050,6 +4405,15 @@ def resolve_half_court_offense_logic(game):
             game_state["foul_team"] = "OFFENSE"
             logging.warning(f"🔍 [HCO O_FOUL] About to call resolve_non_shooting_foul() - offense_team={game.offense_team.name}, defense_team={game.defense_team.name}")
             foul_result = resolve_non_shooting_foul(roles, game)
+            timing_contract = calc_skeleton_step_timing_contract(
+                roles.get("steps", []),
+                resolution_step_index=roles.get("event_step"),
+                include_hco_step1_bringup=True,
+            )
+            foul_result["time_elapsed"] = timing_contract["time_elapsed"]
+            foul_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
+            foul_result["resolution_step_index"] = timing_contract["resolution_step_index"]
+            foul_result["executed_step_count"] = timing_contract["executed_step_count"]
             logging.warning(f"🔍 [HCO O_FOUL] After resolve_non_shooting_foul() - offense_team={game.offense_team.name}, defense_team={game.defense_team.name}, possession_flips={foul_result.get('possession_flips')}")
             # Add skeleton and animations to result
             foul_result["skeleton"] = skeleton or {}
@@ -4082,6 +4446,15 @@ def resolve_half_court_offense_logic(game):
         elif event_type == "D_FOUL":
             game_state["foul_team"] = "DEFENSE"
             foul_result = resolve_non_shooting_foul(roles, game)
+            timing_contract = calc_skeleton_step_timing_contract(
+                roles.get("steps", []),
+                resolution_step_index=roles.get("event_step"),
+                include_hco_step1_bringup=True,
+            )
+            foul_result["time_elapsed"] = timing_contract["time_elapsed"]
+            foul_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
+            foul_result["resolution_step_index"] = timing_contract["resolution_step_index"]
+            foul_result["executed_step_count"] = timing_contract["executed_step_count"]
             # Add skeleton and animations to result
             foul_result["skeleton"] = skeleton or {}
             foul_result["animations"] = animations
@@ -4134,9 +4507,11 @@ def resolve_half_court_offense_logic(game):
     # logging.warning(f"🔍 [HCO RESOLVE DEBUG] SECOND READ - Will call resolve_motion_offense_shot: {is_motion_play and event_type == 'SHOT'}")
     
     if is_motion_play and event_type == "SHOT":
-        # Motion play shot resolution
-        motion_shot_info = resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup)
-        
+        # Motion play shot resolution (or use precomputed recalibration from shot-clock path)
+        motion_shot_info = game_state.pop("_motion_shot_recalibrated", None)
+        if not motion_shot_info:
+            motion_shot_info = resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup)
+
         if motion_shot_info:
             # Update skeleton with Motion shot modifications
             skeleton = motion_shot_info["skeleton"]
@@ -4183,6 +4558,10 @@ def resolve_half_court_offense_logic(game):
     update_player_coords_from_animations(game, animations)
     set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)  # After so block spot uses shot location, not animation coords
     shot_result = game.shot_manager.resolve_shot(roles)
+    
+    # Shot-at-1 path: set time_elapsed so shot clock ends at 1 (Real_Time_Clock_System.md)
+    if "_shot_at_one_second_time_elapsed" in game_state:
+        shot_result["time_elapsed"] = game_state.pop("_shot_at_one_second_time_elapsed")
     
     # Add playcall and variant debug info to the text
     variant = skeleton.get("_variant", "unknown") if skeleton else "unknown"
@@ -4658,6 +5037,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
     if result_type == "SHOT":
         # ✅ Get skeleton first (needed to determine shooter and passer dynamically)
         skeleton = get_fcp_skeleton("SHOT", game) or {}
+        if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 1:
+            skeleton = copy.deepcopy(skeleton)
+            skeleton["steps"] = skeleton["steps"][1:]
         
         # ✅ Dynamically determine shooter and passer from skeleton
         shooter = None
@@ -4822,6 +5204,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
     if skeleton:
         skeleton = copy.deepcopy(skeleton)
     
+    # BIP already ran step 0 (inbound setup + pass). Start FCP animation at step 1.
+    if skeleton and "steps" in skeleton and len(skeleton["steps"]) > 1:
+        skeleton["steps"] = skeleton["steps"][1:]
+    
     # ✅ DEBUG: Log step 0 positions from HCO skeleton
     # if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 0:
     #     step_0 = skeleton["steps"][0]
@@ -4856,6 +5242,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "shooter": ball_handler,
         "passer": None,
         "screener": None,
+        "steps": skeleton.get("steps", []) if skeleton else [],
     }
     
     # Handle foul results - use standard foul types for frontend
@@ -5023,12 +5410,13 @@ def resolve_full_court_press_logic(game: "GameManager"):
                 game_state["offensive_state"] = "HCO"
     # For DEAD BALL, O_FOUL, D_FOUL: next_play_type is now set to SIDE_INBOUND (unless FREE_THROW)
     
-    # Calculate time elapsed for FCP phase
-    fcp_time_elapsed = random.randint(5, 9)
-    
-    # If transitioning to HCO, store the FCP time for HCO to add to its time
-    if result_type == "HCO":
-        game_state["pressure_phase_time"] = fcp_time_elapsed
+    # Calculate skeleton-aligned time for FCP phase
+    fcp_timing_contract = calc_skeleton_step_timing_contract(
+        roles.get("steps", []),
+        resolution_step_index=(len(roles.get("steps", [])) - 1 if roles.get("steps") else None),
+        include_hco_step1_bringup=False,
+    )
+    fcp_time_elapsed = fcp_timing_contract["time_elapsed"]
     
     # Track FCP player stats for non-SHOT results
     fcp_roles = {
@@ -5055,6 +5443,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "offense_team_id": off_team.team_id,  # ✅ SS&S: Team on offense DURING this turn
         "possession_flips": possession_flips,  # ✅ Backend internal flag (tells backend when to call switch_possession)
         "time_elapsed": fcp_time_elapsed,  # Time spent in FCP phase
+        "step_clock_seconds": fcp_timing_contract["step_clock_seconds"],
+        "resolution_step_index": fcp_timing_contract["resolution_step_index"],
+        "executed_step_count": fcp_timing_contract["executed_step_count"],
         "events": [],
         "skeleton": skeleton,
         "animations": animations,
@@ -5815,6 +6206,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     if result_type == "SHOT":
         # ✅ Get skeleton first (needed to determine shooter and passer dynamically)
         skeleton = get_hct_skeleton("SHOT", game) or {}
+        if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 1:
+            skeleton = copy.deepcopy(skeleton)
+            skeleton["steps"] = skeleton["steps"][1:]
         
         # ✅ Dynamically determine shooter and passer from skeleton
         shooter = None
@@ -5983,6 +6377,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     if skeleton:
         skeleton = copy.deepcopy(skeleton)
     
+    # BIP already ran step 0 (inbound setup + pass). Start HCT animation at step 1.
+    if skeleton and "steps" in skeleton and len(skeleton["steps"]) > 1:
+        skeleton["steps"] = skeleton["steps"][1:]
+    
     # Apply stopper system (truncates if needed, or returns full skeleton if result == "HCO")
     skeleton = apply_stopper_system_to_skeleton(skeleton, result_type, game_state)
     # logging.warning(f"🔍 [HCT NON-SHOT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
@@ -6001,6 +6399,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "shooter": ball_handler,
         "passer": None,
         "screener": None,
+        "steps": skeleton.get("steps", []) if skeleton else [],
     }
     
     # Initialize animator if not already initialized
@@ -6161,12 +6560,13 @@ def resolve_half_court_trap_logic(game: "GameManager"):
                 game_state["offensive_state"] = "HCO"
     # For DEAD BALL, O_FOUL, D_FOUL: next_play_type is now set to SIDE_INBOUND (unless FREE_THROW)
     
-    # Calculate time elapsed for HCT phase
-    hct_time_elapsed = random.randint(5, 9)
-    
-    # If transitioning to HCO, store the HCT time for HCO to add to its time
-    if result_type == "HCO":
-        game_state["pressure_phase_time"] = hct_time_elapsed
+    # Calculate skeleton-aligned time for HCT phase
+    hct_timing_contract = calc_skeleton_step_timing_contract(
+        roles.get("steps", []),
+        resolution_step_index=(len(roles.get("steps", [])) - 1 if roles.get("steps") else None),
+        include_hco_step1_bringup=False,
+    )
+    hct_time_elapsed = hct_timing_contract["time_elapsed"]
     
     # Track HCT player stats for non-SHOT results
     hct_roles = {
@@ -6193,6 +6593,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "offense_team_id": off_team.team_id,  # ✅ SS&S: Team on offense DURING this turn
         "possession_flips": possession_flips,  # ✅ Backend internal flag (tells backend when to call switch_possession)
         "time_elapsed": hct_time_elapsed,  # Time spent in HCT phase
+        "step_clock_seconds": hct_timing_contract["step_clock_seconds"],
+        "resolution_step_index": hct_timing_contract["resolution_step_index"],
+        "executed_step_count": hct_timing_contract["executed_step_count"],
         "events": [],
         "skeleton": skeleton,
         "animations": animations,

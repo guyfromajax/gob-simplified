@@ -104,7 +104,22 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
         announceGameEvent('PRESSURE_HCT', turn, scene);
       }
     }
-    
+
+    // Situational Logic (Q4/OT): announce Slow It Down / Quick Shot at start of HCO turn
+    const isHCOTurn = turn.current_turn === 'HCO' || turn.play_type === 'HCO';
+    if (isHCOTurn) {
+      if (turn.slow_it_down) {
+        announceGameEvent('SLOW_IT_DOWN', turn, scene);
+      } else if (turn.quick_shot) {
+        announceGameEvent('QUICK_SHOT', turn, scene);
+      }
+    }
+
+    // Final Turn: announce "Final Shot" at start of Final Turn shot attempt (not FINAL_HOLD)
+    if (turn.final_turn && turn.result_type !== 'FINAL_HOLD') {
+      announceGameEvent('FINAL_SHOT', turn, scene);
+    }
+
     turn._contextAnnouncementsShown = true;
   }
   

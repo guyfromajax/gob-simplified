@@ -113,24 +113,24 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
   
   const lineupUrl = `/set-lineup.html?${params.toString()}`;
 
-  // Resolve player image URL (backend may send photo; fallback to /images/players/{id}.png)
-  const playerId = player?.player_id || player?.playerId || player?.id;
+  // Resolve player image URL — same rule as announcement system (announcements.js): bare path, no API_CONFIG dependency.
+  const rawId = player?.player_id ?? player?.playerId ?? player?.id;
+  const playerId = rawId != null ? String(rawId) : '';
   const rawPhoto = player?.photo || player?.image_url;
-  const staticPath = (typeof window !== 'undefined' && window.API_CONFIG) ? window.API_CONFIG.getStaticPath() : '';
-  const defaultPlayerImg = `${staticPath || ''}/images/players/default.png`;
   let photoUrl = '';
   if (rawPhoto && typeof rawPhoto === 'string' && rawPhoto.trim()) {
     const t = rawPhoto.trim();
     if (t.startsWith('http://') || t.startsWith('https://')) {
       photoUrl = t;
     } else {
-      const base = staticPath || window.location.origin;
+      const base = typeof window !== 'undefined' ? window.location.origin : '';
       photoUrl = t.startsWith('/') ? `${base}${t}` : `${base}/${t}`;
     }
   }
   if (!photoUrl && playerId) {
-    photoUrl = `${staticPath || ''}/images/players/${playerId}.png`;
+    photoUrl = `/images/players/${playerId}.png`;
   }
+  const defaultPlayerImg = '/images/players/default.png';
   const safePhotoUrl = photoUrl.replace(/"/g, '&quot;');
   const safeDefaultImg = defaultPlayerImg.replace(/"/g, '&quot;');
   const safeName = (player?.name || 'Player').replace(/"/g, '&quot;');

@@ -10,6 +10,7 @@ import { initializePossessionManager } from './utils/possessionManager.js';
 import gameStore from '../state/gameStore.js';
 import { animateCountdownTransition } from './animation/countdownAnimation.js';
 import { ENABLE_TIMEOUT_BUTTON, initTimeoutButton } from './utils/timeoutButtonManager.js';
+import { createGameClock, parseClockToSeconds } from './utils/gameClock.js';
 
 const DEBUG_SIM_PAYLOAD =
   (typeof window !== 'undefined' && window.DEBUG_SIM_PAYLOAD) ||
@@ -42,6 +43,8 @@ export function createGameScene(Phaser) {
       
       // Initialize centralized possession manager
       this.possessionManager = null; // Will be initialized in create()
+      this.gameClock = null;
+      this.shotClock = null;
     }
 
     init(data) {
@@ -91,6 +94,14 @@ export function createGameScene(Phaser) {
       
       // Reset pause state and kill all tweens
       this.isPaused = false;
+      if (this.gameClock) {
+        this.gameClock.stop();
+        this.gameClock = null;
+      }
+      if (this.shotClock) {
+        this.shotClock.stop();
+        this.shotClock = null;
+      }
       if (this.tweens) {
         // Resume all tweens before killing them to prevent stuck state
         this.tweens.resumeAll();
@@ -167,6 +178,7 @@ export function createGameScene(Phaser) {
       // We'll show the popup after simData is fetched but before animation starts
       const urlParams = new URLSearchParams(window.location.search);
       const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+      const timeoutTraceId = urlParams.get('timeout_trace_id');
       const fromLineup = urlParams.get('from') === 'set-lineup';
       const isQ1Start = this.quarter === 1 && !resumeFromTimeout && !fromLineup;
       const isAfterBreak = resumeFromTimeout || fromLineup;
@@ -262,6 +274,18 @@ export function createGameScene(Phaser) {
       if (resumeFromTimeout) {
         payload.resume_from_timeout = true;
         // ✅ REMOVED: Timeout resume logging (cluttering console)
+      }
+      if (timeoutTraceId) {
+        payload.timeout_trace_id = timeoutTraceId;
+      }
+      if (timeoutTraceId) {
+        console.log('🧭 [TIMEOUT TRACE] lineup->court URL', {
+          timeout_trace_id: timeoutTraceId,
+          game_id: this.gameId,
+          quarter: this.quarter,
+          resume_from_timeout: resumeFromTimeout,
+          clock: urlParams.get('clock')
+        });
       }
       if (DEBUG_FLOW) {
         console.log('[gameScene] request payload', {
@@ -479,6 +503,7 @@ export function createGameScene(Phaser) {
       const awayTolEl = document.getElementById('away-tol');
       const clockEl = document.getElementById('game-clock');
       const quarterEl = document.getElementById('quarter');
+      const shotClockEl = document.getElementById('shot-clock');
       
       // ✅ FOUL OUT RESUME: Initialize clock early (before DOM usage)
       // When resuming from timeout/foul out, the first turn has the correct clock from backend
@@ -494,7 +519,12 @@ export function createGameScene(Phaser) {
         // For new games or non-timeout resumes, use URL param or simData
         // Reuse urlParams from above (line 167)
         const urlClock = urlParams.get('clock');
-        liveClock = urlClock || simData.clock || '8:00';
+        // ✅ BUG 2 FIX: Quarter break (Q2+ start) — backend is source of truth; ignore URL clock so stale Q1 clock never overrides 8:00
+        if (this.quarter > 1 && !resumeFromTimeout) {
+          liveClock = simData.clock || '8:00';
+        } else {
+          liveClock = urlClock || simData.clock || '8:00';
+        }
       }
       
       let liveQuarter = this.quarter;
@@ -505,6 +535,29 @@ export function createGameScene(Phaser) {
       if (clockEl && liveClock) {
         clockEl.textContent = liveClock;
       }
+      if (this.gameClock) {
+        this.gameClock.stop();
+      }
+      if (this.shotClock) {
+        this.shotClock.stop();
+      }
+      const initialClockSeconds =
+        (typeof simData.time_remaining === 'number' ? simData.time_remaining : null) ??
+        parseClockToSeconds(liveClock);
+      this.gameClock = createGameClock({
+        timeRemainingSeconds: initialClockSeconds,
+        clockElement: clockEl,
+        tickMs: 350,
+      });
+      this.gameClock.syncWithBackend(initialClockSeconds); // Backend-driven: display from backend only; no countdown interval.
+      this.shotClock = createGameClock({
+        timeRemainingSeconds: 30,
+        clockElement: shotClockEl,
+        tickMs: 350,
+        formatter: (seconds) => String(Math.max(0, Math.floor(Number(seconds) || 0))),
+      });
+      this.shotClock.syncWithBackend(30);
+      // Clocks are backend-driven: updated only when turn data is applied (updateScoreboard), not by a countdown interval.
       if (quarterEl && livePeriodLabel) {
         quarterEl.textContent = livePeriodLabel;
       }
@@ -966,6 +1019,101 @@ export function createGameScene(Phaser) {
         });
       }
 
+      // Resumed game (timeout/quarter break/foul-out): force Player and Team box scores from current game state
+      // so they match the scoreboard; only these two areas are updated—nothing else on court.
+      if (this.gameId && homeTeam && awayTeam) {
+        try {
+          const { fetchGameState } = await import('./utils/loadGameStats.js');
+          const gameData = await fetchGameState(this.gameId);
+          if (gameData) {
+            // Force Team Box Score (S1, S2, S3) from current game state
+            if (typeof window.setTeamBoxData === 'function') {
+              const homeTotals = gameData.team_totals?.[homeTeam] || {};
+              const awayTotals = gameData.team_totals?.[awayTeam] || {};
+              const hTeamId = gameData.home_team_id;
+              const aTeamId = gameData.away_team_id;
+              const teamsObj = gameData.teams || {};
+              const hObj = hTeamId && teamsObj[hTeamId] ? teamsObj[hTeamId] : null;
+              const aObj = aTeamId && teamsObj[aTeamId] ? teamsObj[aTeamId] : null;
+              const hAttrs = hObj?.attributes || gameData.home_team?.attributes || {};
+              const aAttrs = aObj?.attributes || gameData.away_team?.attributes || {};
+              const hOff = gameData.team_stats?.[homeTeam]?.offense || {};
+              const aOff = gameData.team_stats?.[awayTeam]?.offense || {};
+              const hDef = gameData.team_stats?.[homeTeam]?.defense || {};
+              const aDef = gameData.team_stats?.[awayTeam]?.defense || {};
+              window.setTeamBoxData({
+                home: { offense: hOff, defense: hDef, attributes: hAttrs, totals: homeTotals },
+                away: { offense: aOff, defense: aDef, attributes: aAttrs, totals: awayTotals }
+              });
+            }
+            // Force Player Box Score: sync this.playerStats and DOM cells from current game state
+            // API returns box_score keyed by team_id (not team name) - use home_team_id/away_team_id
+            const boxScore = gameData.box_score || {};
+            const homeTeamId = gameData.home_team_id;
+            const awayTeamId = gameData.away_team_id;
+            ['home', 'away'].forEach(teamKey => {
+              const teamId = teamKey === 'home' ? homeTeamId : awayTeamId;
+              const teamName = teamKey === 'home' ? homeTeam : awayTeam;
+              const teamBox = (teamId && boxScore[teamId]) ? boxScore[teamId] : (boxScore[teamName] || {});
+              Object.values(teamBox).forEach((statBlock) => {
+                if (!statBlock || typeof statBlock !== 'object' || !statBlock.name) return;
+                const playerId = (statBlock.playerId ?? statBlock.player_id) || this.nameToId[statBlock.name];
+                if (!playerId) return;
+                const ps = this.playerStats[playerId];
+                if (!ps || !ps.cells) return;
+                const oreb = statBlock.OREB ?? 0;
+                const dreb = statBlock.DREB ?? 0;
+                const reb = statBlock.REB ?? (oreb + dreb);
+                ps.PTS = statBlock.PTS ?? 0;
+                ps.F = statBlock.F ?? 0;
+                ps.OREB = oreb;
+                ps.DREB = dreb;
+                ps.REB = reb;
+                ps.AST = statBlock.AST ?? 0;
+                ps.STL = statBlock.STL ?? 0;
+                ps.BLK = statBlock.BLK ?? 0;
+                ps.TO = statBlock.TO ?? 0;
+                ps.DEF_A = statBlock.DEF_A ?? 0;
+                ps.DEF_S = statBlock.DEF_S ?? 0;
+                const defPct = ps.DEF_A > 0 ? Math.round((ps.DEF_S / ps.DEF_A) * 100) : 0;
+                ps.DEF_PCT = `${defPct}%`;
+                if (ps.cells.pts) ps.cells.pts.textContent = ps.PTS;
+                if (ps.cells.reb) ps.cells.reb.textContent = ps.REB;
+                if (ps.cells.ast) ps.cells.ast.textContent = ps.AST;
+                if (ps.cells.fouls) ps.cells.fouls.textContent = ps.F;
+                if (ps.cells.stl) ps.cells.stl.textContent = ps.STL;
+                if (ps.cells.blk) ps.cells.blk.textContent = ps.BLK;
+                if (ps.cells.to) ps.cells.to.textContent = ps.TO;
+                if (ps.cells.defAttempts) ps.cells.defAttempts.textContent = ps.DEF_A;
+                if (ps.cells.def) ps.cells.def.textContent = ps.DEF_PCT;
+              });
+            });
+            // Apply energy (NG) from gameData.players so rows show correct energy color on resume
+            const playersList = gameData.players || [];
+            playersList.forEach((p) => {
+              const playerId = p._id ?? p.playerId ?? p.player_id;
+              if (!playerId) return;
+              const ps = this.playerStats[playerId];
+              if (!ps || !ps.cells) return;
+              const ng = p.NG ?? p.attributes?.NG ?? 1.0;
+              ps.NG = ng;
+              const color = getEnergyColor(ng);
+              Object.values(ps.cells).forEach((cell) => {
+                if (cell) cell.style.color = color;
+              });
+              if (ps.nameCell) ps.nameCell.style.color = color;
+            });
+            const homeBox = (homeTeamId && boxScore[homeTeamId]) ? boxScore[homeTeamId] : (boxScore[homeTeam] || {});
+            const awayBox = (awayTeamId && boxScore[awayTeamId]) ? boxScore[awayTeamId] : (boxScore[awayTeam] || {});
+            if (Object.keys(homeBox).length || Object.keys(awayBox).length) {
+              window.currentPlayerStats = { home: homeBox, away: awayBox };
+            }
+          }
+        } catch (err) {
+          console.warn('⚠️ Could not refresh box scores from game state:', err);
+        }
+      }
+
       if (this.animate) {
         // Count existing sprites in the scene BEFORE creating new ones
         const existingContainers = this.children.list.filter(child => 
@@ -1236,6 +1384,8 @@ export function createGameScene(Phaser) {
       const awayTimeoutsFromData = awayTeamObj?.timeouts ?? simData.timeouts?.away ?? simData.away_team_timeouts;
       let liveHomeTimeouts = typeof homeTimeoutsFromData === 'number' ? homeTimeoutsFromData : (isNewGame ? 4 : 4);
       let liveAwayTimeouts = typeof awayTimeoutsFromData === 'number' ? awayTimeoutsFromData : (isNewGame ? 4 : 4);
+      const noImpactShotClockTypes = new Set(['FREE_THROW', 'BASELINE_INBOUND', 'SIDE_INBOUND']);
+      const isNoImpactShotClockTurn = (turn = {}) => noImpactShotClockTypes.has(turn?.result_type);
 
       const updateScoreboard = (turn = {}) => {
         const prevHome = liveScore[homeTeam];
@@ -1281,6 +1431,42 @@ export function createGameScene(Phaser) {
             this.simData.clock = liveClock;
           }
         }
+        // Same code path for both clocks: get incoming value (explicit then contract end), then sync. Game: monotonic check. Shot: backend authority only (Real_Time_Clock_System §101–102).
+        const incomingGameSec = typeof turn.time_remaining === 'number'
+          ? Math.max(0, Math.floor(turn.time_remaining))
+          : (turn.clock || turn.game_clock)
+            ? parseClockToSeconds(turn.clock || turn.game_clock)
+            : Number.isFinite(Number(turn?.clock_end ?? turn?.clockEnd))
+              ? Math.max(0, Math.floor(Number(turn.clock_end ?? turn.clockEnd)))
+              : null;
+        // Single source: turn/response from backend (shot_clock_remaining, then contract end, then start). No frontend reset logic.
+        const incomingShotSecRaw = Number(turn?.shot_clock_remaining ?? turn?.shotClockRemaining ?? turn?.shot_clock_end ?? turn?.shotClockEnd ?? turn?.shot_clock_start ?? turn?.shotClockStart);
+        const incomingShotSec = Number.isFinite(incomingShotSecRaw) ? Math.max(0, Math.min(30, Math.floor(incomingShotSecRaw))) : null;
+
+        if (this.gameClock && Number.isFinite(incomingGameSec)) {
+          const clockState = this.gameClock.getState?.() || {};
+          const currentClockSec = Number.isFinite(clockState.timeRemaining) ? clockState.timeRemaining : null;
+          const incomingQuarter = (typeof turn.quarter === 'number') ? turn.quarter : liveQuarter;
+          const allowIncrease = incomingQuarter > liveQuarter;
+          if (currentClockSec == null || allowIncrease || incomingGameSec <= currentClockSec) {
+            this.gameClock.syncWithBackend(incomingGameSec);
+          } else {
+            console.warn('⏱️ Ignoring non-monotonic clock update', {
+              currentClockSec,
+              incomingClockSec: incomingGameSec,
+              liveQuarter,
+              incomingQuarter,
+              result_type: turn.result_type
+            });
+          }
+        }
+        if (this.shotClock && incomingShotSec !== null) {
+          this.shotClock.syncWithBackend(incomingShotSec);
+        }
+        if (this.shotClock && isNoImpactShotClockTurn(turn)) {
+          this.shotClock.pause('no_impact_turn');
+        }
+
         if (turn.quarter != null) liveQuarter = turn.quarter;
         if (turn.period_label) {
           livePeriodLabel = turn.period_label;
@@ -1295,7 +1481,7 @@ export function createGameScene(Phaser) {
         if (awayFoulsEl) awayFoulsEl.textContent = `F: ${liveAwayFouls}`;
         if (homeTolEl) homeTolEl.textContent = `TOL: ${liveHomeTimeouts}`;
         if (awayTolEl) awayTolEl.textContent = `TOL: ${liveAwayTimeouts}`;
-        if (clockEl) clockEl.textContent = liveClock;
+        // Clock text is written only by gameClock (single-writer authority).
         if (quarterEl) quarterEl.textContent = livePeriodLabel;
 
         applyPlayerStats(turn);
@@ -1460,6 +1646,8 @@ export function createGameScene(Phaser) {
                 tweenManagerTimeScale: this.tweens.timeScale
               });
             }
+            if (this.gameClock) this.gameClock.pause('user_pause');
+            if (this.shotClock) this.shotClock.pause('user_pause');
             pauseBtn.textContent = 'Resume';
           } else {
             // Resume all tweens
@@ -1503,6 +1691,8 @@ export function createGameScene(Phaser) {
                 resumedTweens: activeTweens.length
               });
             }
+            if (this.gameClock) this.gameClock.resume('user_pause');
+            if (this.shotClock) this.shotClock.resume('user_pause');
             
             pauseBtn.textContent = 'Pause';
           }
@@ -1842,11 +2032,58 @@ export function createGameScene(Phaser) {
       
       // Initialize with any turns from the initial simulation (e.g., opening tip, inbound)
       const initialTurns = initialSimData.turns || [];
-      
+
+      // Live clock mode: disable speculative preloading so backend turn decisions
+      // (forced-shot/violation at 0) are computed after the visible turn completes.
+      const ENABLE_TURN_PRELOAD = false;
+
+      // Part 2 (Preload): helper and state defined early so we can preload during initial turns (opening tip → first HCO).
+      const simMode = this.mode || 'single';
+      const fetchTurnData = async (offenseOverride, defenseOverride) => {
+        const response = await fetch(API_CONFIG.buildUrl('/api/simulate-turn'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            game_id: gameId,
+            offense_override: offenseOverride ?? null,
+            defense_override: defenseOverride ?? null,
+            mode: simMode
+          })
+        });
+        if (!response.ok) {
+          let errorData;
+          try {
+            errorData = await response.json();
+          } catch {
+            errorData = { detail: `HTTP ${response.status}: ${response.statusText}` };
+          }
+          console.error('❌ /api/simulate-turn failed:', errorData);
+          if (response.status === 404 && errorData.detail && errorData.detail.includes('not found')) {
+            if (window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
+              const urlParams = new URLSearchParams(window.location.search);
+              window.ErrorHandler.showMissingTruthError({
+                pointerType: 'game_id',
+                pointerValue: urlParams.get('game_id') || 'unknown',
+                message: errorData.detail || 'Game was cleared from backend memory. This may indicate a backend restart or timeout.',
+                mode: urlParams.get('mode') || 'single',
+                recoveryOptions: { redirectTo: 'mode-select', redirectLabel: 'Go to Mode Select' }
+              });
+            }
+            throw new Error(`Game not found: ${errorData.detail || 'Game was cleared from backend memory'}`);
+          }
+          throw new Error(`API error: ${errorData.detail || `HTTP ${response.status}`}`);
+        }
+        return await response.json();
+      };
+
+      let preloadedTurnPromise = null;
+
       // Animate initial turns first (opening tip, quarter start inbound, etc.)
       if (initialTurns.length > 0) {
-        // ✅ REMOVED: Animating initial turns logging (cluttering console)
-        
+        // Part 2: Preload first HCO while opening tip (and any quarter-start inbound) animates.
+        if (ENABLE_TURN_PRELOAD) {
+          preloadedTurnPromise = fetchTurnData(null, null);
+        }
         // Add indices to initial turns for text scroll
         initialTurns.forEach((turn, idx) => {
           turn.index = idx;
@@ -1861,82 +2098,34 @@ export function createGameScene(Phaser) {
           onUpdate: updateScoreboard
         });
       }
-      
+
       // Main turn-by-turn loop
       while (!quarterComplete) {
         try {
-          // ✅ SS&S: Overrides are now stored in team.strategy_calls via /api/set-playcall-override
-          // No need to pass overrides here - backend checks team.strategy_calls automatically
-          // Legacy support: Still check window globals for backward compatibility (will be removed)
           const offenseOverride = window.nextOffenseOverride || null;
           const defenseOverride = window.nextDefenseOverride || null;
-          
-          // Clear legacy window globals after reading (single-use)
           window.nextOffenseOverride = null;
           window.nextDefenseOverride = null;
           window.nextDefenseTypeOverride = null;
           window.nextDefenseAggressionOverride = null;
-          
-          // Clear visual selections in Playcall Center (only if override was used)
-          // Note: Highlighting will be managed by tracking which turn used the override
-          // For now, clear on every turn (will be refined to only clear after override is used)
           if (window.clearPlaycallOverrides && (offenseOverride || defenseOverride)) {
             window.clearPlaycallOverrides();
           }
-          
-          const response = await fetch(API_CONFIG.buildUrl('/api/simulate-turn'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              game_id: gameId,
-              offense_override: offenseOverride,  // Legacy support - will be removed
-              defense_override: defenseOverride,   // Legacy support - will be removed
-              mode: this.mode || 'single'
-            })
-          });
-          
-          if (!response.ok) {
-            let errorData;
+
+          // Part 2: Use preloaded turn when available and no overrides; else fetch. On preload failure, fetch with overrides.
+          let turnData;
+          if (preloadedTurnPromise && !offenseOverride && !defenseOverride) {
             try {
-              errorData = await response.json();
-            } catch {
-              errorData = { detail: `HTTP ${response.status}: ${response.statusText}` };
+              turnData = await preloadedTurnPromise;
+            } catch (e) {
+              console.warn('⚠️ Preloaded turn failed, fetching fresh:', e?.message);
+              turnData = await fetchTurnData(offenseOverride, defenseOverride);
             }
-            console.error('❌ /api/simulate-turn failed:', errorData);
-            // ✅ FIX: Don't assume 404 = quarter complete
-            // A 404 could mean: game not found, backend restart, network issue, etc.
-            // Only mark quarter complete if backend explicitly says so (quarter_complete=true)
-            if (response.status === 404 && errorData.detail && errorData.detail.includes('not found')) {
-              console.error('⚠️ Game was cleared from backend memory. This may indicate a backend restart or timeout.');
-              
-              // ✅ Phase 4: Show missing truth error screen for game not found
-              if (window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
-                const urlParams = new URLSearchParams(window.location.search);
-                const gameId = urlParams.get('game_id');
-                const mode = urlParams.get('mode') || 'single';
-                
-                window.ErrorHandler.showMissingTruthError({
-                  pointerType: 'game_id',
-                  pointerValue: gameId || 'unknown',
-                  message: errorData.detail || 'Game was cleared from backend memory. This may indicate a backend restart or timeout.',
-                  mode,
-                  recoveryOptions: {
-                    redirectTo: 'mode-select',
-                    redirectLabel: 'Go to Mode Select'
-                  }
-                });
-              }
-              
-              // ✅ FIX: Don't break - throw error to be caught by outer catch block
-              // This prevents quarter completion logic from running
-              throw new Error(`Game not found: ${errorData.detail || 'Game was cleared from backend memory'}`);
-            }
-            // ✅ FIX: For other errors, throw to prevent quarter completion
-            throw new Error(`API error: ${errorData.detail || `HTTP ${response.status}`}`);
+            preloadedTurnPromise = null;
+          } else {
+            if (preloadedTurnPromise) preloadedTurnPromise = null;
+            turnData = await fetchTurnData(offenseOverride, defenseOverride);
           }
-          
-          const turnData = await response.json();
-          
           // ✅ FIX: Only break if there's no turn to animate
           // If quarter_complete is True but turn exists, animate the turn first (it's the final turn of the quarter)
           if (!turnData.turn) {
@@ -1950,13 +2139,15 @@ export function createGameScene(Phaser) {
             quarterComplete = true;
             lastTurnData = turnData; // Store last turn data for game completion check
             
-            // Update final scores
+            // Update final scores (include response shot_clock for backend authority)
             updateScoreboard({
               home_score: turnData.home_score,
               away_score: turnData.away_score,
               home_team_fouls: turnData.home_team_fouls,
               away_team_fouls: turnData.away_team_fouls,
-              clock: turnData.clock
+              clock: turnData.clock,
+              shot_clock_remaining: turnData.shot_clock_remaining,
+              time_remaining: turnData.time_remaining
             });
             
             // Update tracked scores from final turnData
@@ -1977,7 +2168,23 @@ export function createGameScene(Phaser) {
           
           // Animate this single turn (or batch of turns)
           const turn = turnData.turn;
-          
+          // Guarantee clock contract on turn so AnimationRouter always has clock_start/shot_clock_start (API now sends at top level)
+          const clockContractKeys = [
+            ['clock_start', 'clockStart'],
+            ['clock_end', 'clockEnd'],
+            ['shot_clock_start', 'shotClockStart'],
+            ['shot_clock_end', 'shotClockEnd'],
+            ['real_time_elapsed_ms', 'realTimeElapsedMs'],
+          ];
+          const mergeClockContract = (target, source) => {
+            if (!target || !source) return;
+            for (const [snake, camel] of clockContractKeys) {
+              const val = source[snake] ?? source[camel];
+              if (val != null && (target[snake] == null || target[snake] === undefined)) target[snake] = val;
+            }
+          };
+          mergeClockContract(turn, turnData);
+
           // ✅ FIX: Check if this is the final turn of the quarter AFTER getting the turn
           // This ensures the final turn is animated before handling quarter completion
           if (turnData.quarter_complete) {
@@ -1993,6 +2200,11 @@ export function createGameScene(Phaser) {
             });
           }
           let finalTurn = turn; // Track the final turn for Quick Adjust logic
+
+          // Part 2: Start preload for next turn (runs in parallel with animation). Skip when we will exit after this turn (timeout or final turn of quarter).
+          if (ENABLE_TURN_PRELOAD && turn.result_type !== 'TIMEOUT' && !turnData.quarter_complete) {
+            preloadedTurnPromise = fetchTurnData(null, null);
+          }
           
           // ✅ TIMEOUT: Check if this is a timeout turn - if so, stop the simulation loop
           if (turn.result_type === "TIMEOUT") {
@@ -2007,7 +2219,8 @@ export function createGameScene(Phaser) {
               home_score: turnData.home_score,
               away_score: turnData.away_score,
               home_team_timeouts: turnData.home_team_timeouts,
-              away_team_timeouts: turnData.away_team_timeouts
+              away_team_timeouts: turnData.away_team_timeouts,
+              timeout_trace_id: turnData.timeout_trace_id
             };
             // Animate the timeout turn (will handle navigation)
             await animateGameTurns({
@@ -2034,7 +2247,7 @@ export function createGameScene(Phaser) {
             for (const subTurn of turn.batch_turns) {
               turnCount++;
               subTurn.index = turnCount;
-              
+              mergeClockContract(subTurn, turnData);
               console.log(`🎬 Turn ${turnCount}: ${subTurn.result_type} - ${subTurn.text?.substring(0, 50)}...`);
               
               // Display debug info in text scroll
@@ -2081,7 +2294,8 @@ export function createGameScene(Phaser) {
                   home_score: turnData.home_score,
                   away_score: turnData.away_score,
                   home_team_timeouts: turnData.home_team_timeouts,
-                  away_team_timeouts: turnData.away_team_timeouts
+                  away_team_timeouts: turnData.away_team_timeouts,
+                  timeout_trace_id: turnData.timeout_trace_id
                 };
                 // Stop processing remaining batch turns and exit the main loop.
                 break;
@@ -2136,13 +2350,15 @@ export function createGameScene(Phaser) {
             }
           }
           
-          // Update scores and game state after each turn
+          // Update scores and game state after each turn (include response shot_clock so display uses backend authority)
           updateScoreboard({
             home_score: turnData.home_score,
             away_score: turnData.away_score,
             home_team_fouls: turnData.home_team_fouls,
             away_team_fouls: turnData.away_team_fouls,
-            clock: turnData.clock
+            clock: turnData.clock,
+            shot_clock_remaining: turnData.shot_clock_remaining,
+            time_remaining: turnData.time_remaining
           });
           
           // Track latest scores for game completion check
@@ -2211,7 +2427,9 @@ export function createGameScene(Phaser) {
           */
           
           // ✅ FIX: Check if quarter is complete AFTER animating the turn
-          // This ensures the final turn of the quarter is animated before handling quarter completion
+          // This ensures the final turn of the quarter is animated before handling quarter completion.
+          // Phase 6: Final Turn shot and FINAL_HOLD are covered — backend sets quarter_complete when
+          // time_remaining hits 0 (after the turn or after FTs); we advance to Quarter Break / game end here.
           if (turnData.quarter_complete) {
             console.log('✅ [FINAL TURN DEBUG] Quarter complete! (after final turn animation)', {
               turn_result_type: turn?.result_type,
@@ -2227,13 +2445,15 @@ export function createGameScene(Phaser) {
             quarterComplete = true;
             lastTurnData = turnData; // Store last turn data for game completion check
             
-            // Update final scores
+            // Update final scores (include response shot_clock for backend authority)
             updateScoreboard({
               home_score: turnData.home_score,
               away_score: turnData.away_score,
               home_team_fouls: turnData.home_team_fouls,
               away_team_fouls: turnData.away_team_fouls,
-              clock: turnData.clock
+              clock: turnData.clock,
+              shot_clock_remaining: turnData.shot_clock_remaining,
+              time_remaining: turnData.time_remaining
             });
             
             // Update tracked scores from final turnData
@@ -2251,9 +2471,6 @@ export function createGameScene(Phaser) {
             
             break;
           }
-          
-          // Small delay between turns for readability (optional)
-          await new Promise(resolve => setTimeout(resolve, 100));
           
         } catch (error) {
           console.error('❌ Error in turn-by-turn loop:', error);
@@ -2582,7 +2799,7 @@ export function createGameScene(Phaser) {
             team_id: this.teamId
           }
         });
-        
+        params.set('quarter_break_from', 'play_quarter'); // Airhorn only on Play Quarter quarter break
         console.log('🔍 [DEBUG QTR BREAK] gameScene.js - Using TimeoutNavigationHelper (Sim Quarter pattern):', {
           quarter: this.quarter,
           nextQ: nextQ,

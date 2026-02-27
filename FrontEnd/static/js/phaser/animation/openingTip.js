@@ -136,6 +136,7 @@ function animateJumpBall(scene, playerSprites, animations, ballSprite, onComplet
         onComplete: () => {
             // Stay at peak position
             // ✅ REMOVED: Opening tip logging (cluttering console)
+            scene.events?.emit('openingTipApex');
             
             // Wait a moment, then continue
             scene.time.delayedCall(100, () => {
@@ -286,4 +287,3 @@ function findTipWinner(playerSprites, animations, ballLandingCoords, canvasWidth
     }
     return null;
 }
-

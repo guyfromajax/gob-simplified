@@ -115,6 +115,10 @@
     if (clockTime) {
       params.set('clock', clockTime);
     }
+    const timeoutTraceId = overrides.timeout_trace_id || sourceParams.get('timeout_trace_id');
+    if (timeoutTraceId) {
+      params.set('timeout_trace_id', timeoutTraceId);
+    }
     
     // ============================================
     // 5b. SCORE PRESERVATION (timeout resume – lineup header shows what user saw)

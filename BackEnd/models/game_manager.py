@@ -12,6 +12,7 @@ from BackEnd.utils.transition_validator import validate_transition, get_turn_typ
 from BackEnd.utils.transition_event_detector import detect_instigating_event, validate_event_matches_transition
 from BackEnd.utils.transition_registry import TurnType
 import logging
+import uuid
 
 class GameManager:
     def __init__(self, home_team_name, away_team_name, home_strategy_settings=None, away_strategy_settings=None, home_team_attributes=None, away_team_attributes=None, home_scouting_data=None, away_scouting_data=None, home_plays_data=None, away_plays_data=None, home_strategy_calls=None, away_strategy_calls=None, mode="single", user_team_side=None, franchise_id=None):
@@ -142,6 +143,7 @@ class GameManager:
             "quarter": self.quarter,
             "time_remaining": 480,
             "clock": "8:00",
+            "shot_clock_remaining": 30,
             "time_elapsed": 0,
             "turns": self.turns,
             "current_playcall": "Outside",
@@ -234,6 +236,8 @@ class GameManager:
         
         # Store next_play_type and offense_team_id for resume
         self.game_state["timeout_next_play_type"] = timeout_turn.get("next_play_type", "SIDE_INBOUND")
+        # Stable trace id for end-to-end timeout resume diagnostics.
+        self.game_state["timeout_trace_id"] = self.game_state.get("timeout_trace_id") or f"to-{uuid.uuid4().hex[:10]}"
         
         # ✅ FIX: For DREB => HCO transitions, read offense_team_id from the last turn (which was updated after flip)
         # For SIP/BIP, self.offense_team.team_id is already correct (possession flipped before turn creation)
@@ -257,7 +261,12 @@ class GameManager:
         
         self.game_state["timeout_offense_team_id"] = timeout_offense_team_id
         
-        logging.info(f"✅ TIMEOUT: Stored next_play_type '{self.game_state['timeout_next_play_type']}' and offense_team_id '{timeout_offense_team_id}' for resume")
+        logging.info(
+            "✅ TIMEOUT: Stored next_play_type '%s' offense_team_id '%s' trace_id '%s' for resume",
+            self.game_state["timeout_next_play_type"],
+            timeout_offense_team_id,
+            self.game_state.get("timeout_trace_id"),
+        )
         
         # Rebuild lineups
         from BackEnd.utils.db_utils import build_lineup_from_mongo, autoset_strategy_settings
@@ -302,10 +311,17 @@ class GameManager:
         
         for team in [self.home_team, self.away_team]:
             for player in team.get_all_players():
-                recharge_amount = random.choice(timeout_recharge_amounts)
-                if hasattr(player, "recharge_energy"):
-                    player.recharge_energy(recharge_amount)
+                    recharge_amount = random.choice(timeout_recharge_amounts)
+                    if hasattr(player, "recharge_energy"):
+                        player.recharge_energy(recharge_amount)
         
+        self.turn_manager._attach_clock_contract(
+            timeout_turn,
+            clock_start=int(self.game_state.get("time_remaining", 0)),
+            shot_clock_start=int(self.game_state.get("shot_clock_remaining", 30)),
+            game_state=self.game_state,
+            source="bypass:TIMEOUT",
+        )
         self._append_turn(timeout_turn)
         
         # Set timeout_called flag (for simulation loop stopping)
@@ -366,6 +382,20 @@ class GameManager:
         creates and appends the foul-out timeout turn. Ensures we check after every
         turn (main result, OREB, SIP, BIP, timeouts).
         """
+        # Keep clock payload fields present on every emitted turn so frontend scoreboard
+        # and shot-clock sync remain authoritative even for non-micro helper turns.
+        if isinstance(turn_result, dict):
+            turn_result.setdefault("time_remaining", self.game_state.get("time_remaining", 0))
+            turn_result.setdefault("clock", self.game_state.get("clock", "0:00"))
+            turn_result.setdefault(
+                "shot_clock_remaining",
+                self.game_state.get(
+                    "shot_clock_remaining",
+                    min(30, int(self.game_state.get("time_remaining", 0) or 0)),
+                ),
+            )
+            turn_result.setdefault("quarter", self.game_state.get("quarter", self.quarter))
+
         self.turns.append(turn_result)
         self.text_log.append(text if text is not None else turn_result.get("text", ""))
         self._check_lineups_for_foul_out(turn_result)
@@ -506,6 +536,29 @@ class GameManager:
                 self.game_id,
             )
 
+    def _maybe_set_force_foul_pending_after_inbound(self, inbound_payload, inbound_type):
+        """
+        Situational Logic (Q4/OT): If Slow It Down + Force Foul, set pending so the next
+        API turn returns a defensive foul on the inbound pass receiver (after frontend animates the pass).
+        """
+        from BackEnd.utils import situational_logic as sl
+        time_remaining = self.game_state.get("time_remaining")
+        if not (
+            sl.is_situational_active(self.quarter)
+            and sl.is_slow_it_down(self, time_remaining)
+            and sl.should_force_foul(self, time_remaining)
+        ):
+            return
+        receiver_pos = inbound_payload.get("receiver_pos", "SG")
+        off_lineup = self.offense_team.lineup
+        if receiver_pos not in off_lineup or not off_lineup[receiver_pos]:
+            return
+        self.game_state["situational_force_foul_pending"] = {
+            "victim_id": getattr(off_lineup[receiver_pos], "player_id", None),
+            "victim_coords": inbound_payload.get("oDestinations", {}).get(receiver_pos, {"x": 50, "y": 25}),
+            "defender_coords_by_pos": inbound_payload.get("dDestinations", {}),
+        }
+
     def simulate_macro_turn(self): #run_simulation
         import time as _time
         # ⏱️ Coarse timers for full_sim (logged on sample turns)
@@ -548,6 +601,8 @@ class GameManager:
                 oreb_turn["next_turn"] = self.determine_next_turn(oreb_turn)
                 
                 self._append_turn(oreb_turn)
+                # Apply OREB turn's time_elapsed to game state (same method as run_micro_turn)
+                self.turn_manager.update_clock_and_possession(oreb_turn)
                 
                 # Handle possession flip for OREB turn (doesn't go through run_micro_turn)
                 if oreb_turn.get("possession_flips"):
@@ -586,9 +641,12 @@ class GameManager:
             old_offense = self.offense_team.name
             self.switch_possession()
             result["possession_flips"] = False
-            # ✅ CRITICAL FIX: Update offense_team_id AFTER flip (was set to old team in turn_manager)
-            result["offense_team_id"] = self.offense_team.team_id
-            logging.debug(f"🔄 [DREB→HCO] Flipped possession before HCO: {old_offense} → {self.offense_team.name}, updated offense_team_id={result['offense_team_id']}")
+            # ✅ ANIMATION FIX: Do NOT update result["offense_team_id"] here. The skeleton was built
+            # with the team that had the ball during the play (old offense). The frontend uses
+            # offense_team_id to classify offense/defense for the step loop; if we set it to the new
+            # team, defenders animate first and the pass animates after (wrong order). Keep the
+            # result turn's offense_team_id = old team so pass steps animate in sync.
+            logging.debug(f"🔄 [DREB→HCO] Flipped possession before HCO: {old_offense} → {self.offense_team.name} (result keeps offense_team_id=old team for animation)")
 
         # ✅ FIX 4: Backend flip for DREB → Fast Break (Pattern C)
         # Handle possession flips for DREB transitions that go to Fast Break
@@ -597,9 +655,49 @@ class GameManager:
             old_offense = self.offense_team.name
             self.switch_possession()
             result["possession_flips"] = False
-            # ✅ CRITICAL FIX: Update offense_team_id AFTER flip (was set to old team in turn_manager)
-            result["offense_team_id"] = self.offense_team.team_id
-            logging.debug(f"🔄 [DREB→FB] Flipped possession before Fast Break: {old_offense} → {self.offense_team.name}, updated offense_team_id={result['offense_team_id']}")
+            # ✅ ANIMATION FIX: Do NOT update result["offense_team_id"] here (same as DREB→HCO).
+            # Keep result turn's offense_team_id = old team so frontend classifies correctly for step animation.
+            logging.debug(f"🔄 [DREB→FB] Flipped possession before Fast Break: {old_offense} → {self.offense_team.name} (result keeps offense_team_id=old team for animation)")
+
+        # ✅ Situational Logic: Force Foul after DREB — inject FOUL turn and forgo outlet/FB/HCO
+        if result.get("force_foul_after_dreb"):
+            from BackEnd.utils import situational_logic as sl
+            from BackEnd.engine.phase_resolution import (
+                resolve_non_shooting_foul,
+                select_defender_closest_to_victim,
+            )
+            victim = self.game_state.get("last_rebounder")
+            def_lineup = self.defense_team.lineup  # After DREB flip, rebounder's team is offense; fouling team is defense
+            victim_coords = {"x": 50, "y": 25}  # Rebounder at half-court; defender positions use HCO fallback
+            foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, None)
+            if victim and foul_player:
+                self.game_state["foul_team"] = "DEFENSE"
+                roles = {
+                    "ball_handler": victim,
+                    "defender": foul_player,
+                    "foul_player": foul_player,
+                    "shooter": victim,
+                    "screener": None,
+                    "passer": None,
+                }
+                foul_result = resolve_non_shooting_foul(
+                    roles, self, time_elapsed_override=sl.force_foul_time_elapsed()
+                )
+                foul_result["offense_team_id"] = self.offense_team.team_id
+                foul_result["current_turn"] = "HCO"
+                foul_result["quick_foul"] = True
+                foul_result["force_foul_after_dreb"] = True  # Frontend: animate defender→rebounder, no outlet
+                foul_result["victim_id"] = getattr(victim, "player_id", None)  # Rebounder (fouled player) for animation
+                foul_result["next_turn"] = foul_result.get("next_play_type") or "SIDE_INBOUND"
+                self.turn_manager._attach_clock_contract(
+                    foul_result,
+                    clock_start=int(self.game_state.get("time_remaining", 0)),
+                    shot_clock_start=int(self.game_state.get("shot_clock_remaining", 30)),
+                    game_state=self.game_state,
+                    source="bypass:FOUL_AFTER_DREB",
+                )
+                self._append_turn(foul_result)
+                result = foul_result  # So FOUL/SIP block below runs
 
         # (Foul-out check and timeout creation now run inside _append_turn for the main result)
 
@@ -692,10 +790,23 @@ class GameManager:
                     # Don't append SIP turn - timeout will replace it on next API call
                     return
             else:
+                # ✅ Situational Logic: Force Foul after SIP — set pending so next turn is the foul
+                self._maybe_set_force_foul_pending_after_inbound(inbound_payload, "SIDE_INBOUND")
+                self.turn_manager._attach_clock_contract(
+                    inbound_payload,
+                    clock_start=int(self.game_state.get("time_remaining", 0)),
+                    shot_clock_start=int(self.game_state.get("shot_clock_remaining", 30)),
+                    game_state=self.game_state,
+                    source="bypass:SIP",
+                )
+                # Store offense destinations so next HCO turn can use pre-step-0 bring-up (max distance to step 0)
+                self.game_state["_prev_offense_positions_for_hco"] = inbound_payload.get("oDestinations") or {}
                 self._append_turn(inbound_payload)
             
             # Reset offensive state to HCO after side inbound (FCP/HCT only apply after made shots)
             self.game_state["offensive_state"] = "HCO"
+            # Any time we come out of a SIP, shot clock resets to 30 (next turn is HCO with full clock)
+            self.game_state["shot_clock_remaining"] = min(30, int(self.game_state.get("time_remaining", 30)))
 
         # ✅ FIX 2: Backend flip for Made Shots → Inbound (Pattern A)
         # Create BASELINE_INBOUND turns for ALL made shots (HCO, FT, FB, FCP/HCT, OREB)
@@ -709,7 +820,13 @@ class GameManager:
             return
         
         last_turn = self.turns[-1] if self.turns else None
+        # ✅ Final play of quarter: no BIP after make or after FTs when time_remaining == 0
         if last_turn and last_turn.get("next_play_type") == "BASELINE_INBOUND":
+            if self.game_state.get("time_remaining", 1) == 0:
+                last_turn["quarter_ends_after"] = True
+                last_turn["next_play_type"] = None
+                logging.debug("✅ [FINAL PLAY] Skipping BIP — quarter ends after this turn (time_remaining=0)")
+                return
             # ✅ Flip possession BEFORE creating BASELINE_INBOUND (gold standard pattern)
             if last_turn.get("possession_flips"):
                 old_offense = self.offense_team.name
@@ -789,6 +906,18 @@ class GameManager:
                     # Don't append BIP turn - timeout will replace it on next API call
                     return
             else:
+                # ✅ Situational Logic: Force Foul after BIP — set pending so next turn is the foul
+                self._maybe_set_force_foul_pending_after_inbound(inbound_payload, "BASELINE_INBOUND")
+                self.turn_manager._attach_clock_contract(
+                    inbound_payload,
+                    clock_start=int(self.game_state.get("time_remaining", 0)),
+                    shot_clock_start=int(self.game_state.get("shot_clock_remaining", 30)),
+                    game_state=self.game_state,
+                    source="bypass:BIP",
+                )
+                # Store offense destinations for pre-step-0 bring-up when next turn is HCO
+                if not next_defensive_setup:
+                    self.game_state["_prev_offense_positions_for_hco"] = inbound_payload.get("oDestinations") or {}
                 self._append_turn(inbound_payload, text="Baseline inbound after made shot")
             
             # Preserve offensive_state for next API call
@@ -930,6 +1059,10 @@ class GameManager:
         current = result.get("current_turn")
         result_type = result.get("result_type")
         
+        # FINAL_HOLD is terminal for the possession/period boundary.
+        if result_type == "FINAL_HOLD":
+            return None
+
         # OPENING_TIP → HCO (always)
         if current == "OPENING_TIP":
             return "HCO"

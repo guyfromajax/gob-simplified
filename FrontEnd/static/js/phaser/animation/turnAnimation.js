@@ -304,6 +304,30 @@ function getBallDuration(ballSprite, targetX, targetY) {
   return getDurationFromDistance(currentX, currentY, targetX, targetY, speed);
 }
 
+function delayMs(scene, ms) {
+  const safe = Math.max(0, Math.floor(Number(ms) || 0));
+  if (!safe) return Promise.resolve();
+  if (scene?.time?.delayedCall) {
+    return new Promise((resolve) => scene.time.delayedCall(safe, resolve));
+  }
+  return new Promise((resolve) => setTimeout(resolve, safe));
+}
+
+function getStepBallHandlerId(animations, stepIndex) {
+  if (!Array.isArray(animations)) return null;
+  for (const anim of animations) {
+    if (anim?.hasBallAtStep?.[stepIndex]) return anim.playerId;
+  }
+  for (const anim of animations) {
+    const step = anim?.movement?.[stepIndex];
+    const action = step?.action;
+    if (action === "handle_ball" || action === "receive" || action === "pass" || action === "shoot" || action === "drive") {
+      return anim.playerId;
+    }
+  }
+  return null;
+}
+
 
 /**
  * Centralized ball ownership logic
@@ -339,19 +363,27 @@ async function updateBallOwnership({ scene, ballSprite, animations, playerSprite
  * Locks the ball to the player with hasBallAtStep[0] during this setup tween.
  */
 
-async function runSetupTween({ scene, ballSprite, animations, playerSprites, currentBallOwnerRef }) {
+async function runSetupTween({ scene, ballSprite, animations, playerSprites, currentBallOwnerRef, turnData = null, stepDurationMs = null }) {
   if (scene.skipToEnd) return;
   const stepIndex = 0;
   const promises = [];
-
   for (const anim of animations) {
     if (scene.skipToEnd) break;
     const sprite = playerSprites[anim.playerId];
     const firstStep = anim.movement?.[stepIndex];
     if (!sprite || !firstStep) continue;
 
+    const isInboundSpot = firstStep.coords.x <= 5 || firstStep.coords.x >= 95;
+    const shouldClampXToRims =
+      !isInboundSpot &&
+      turnData?.result_type !== "SIDE_INBOUND" &&
+      turnData?.result_type !== "BASELINE_INBOUND";
+    const targetGridX = shouldClampXToRims
+      ? Phaser.Math.Clamp(firstStep.coords.x, 9, 91)
+      : firstStep.coords.x;
+
     const { x, y } = gridToPixels(
-      firstStep.coords.x,
+      targetGridX,
       firstStep.coords.y,
       scene.game.config.width,
       scene.game.config.height
@@ -387,7 +419,7 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
 }
 
 // Setup sideline inbound play
-async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData }) {
+async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData, context = null }) {
   if (!turnData || scene?.skipToEnd || scene?.stateMachine?.is(States.FreeThrow)) return;
 
   scene.isInboundSetup = true;
@@ -491,8 +523,8 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
             if (pos === "SF" && sfSprite && ballSprite && ball_spot) {
               attachBallToPlayer(scene, ballSprite, sfSprite);
               animationDebugLog(`[sideInbound][ballAttach][SF] sf:${sfId}`);
-              // ✅ TIMEOUT: Hold for 0.2 seconds after ball is placed with inbound passer
-              await new Promise(resolve => setTimeout(resolve, 200));
+              const holdMs = animationConfig.inbound?.holdAfterPlaceMs ?? 200;
+              await new Promise(resolve => setTimeout(resolve, holdMs));
             }
             resolve();
           },
@@ -502,8 +534,8 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
             if (pos === "SF" && sfSprite && ballSprite && ball_spot) {
               attachBallToPlayer(scene, ballSprite, sfSprite);
               animationDebugLog(`[sideInbound][ballAttach][SF] sf:${sfId}`);
-              // ✅ TIMEOUT: Hold for 0.2 seconds after ball is placed with inbound passer
-              await new Promise(resolve => setTimeout(resolve, 200));
+              const holdMs = animationConfig.inbound?.holdAfterPlaceMs ?? 200;
+              await new Promise(resolve => setTimeout(resolve, holdMs));
             }
             resolve();
           }
@@ -560,21 +592,30 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
     // ✅ TIMEOUT: Removed markInboundPassStarted - button is always live now
     
     if (!scene.stateMachine?.is(States.FastBreak)) {
-      if (passInfo) {
-        // ✅ Use dynamic pass from animation data
-        console.log('🏀 [SIDE_INBOUND] Using dynamic pass from animation data', passInfo);
-        await handlePassAnimation({
-          scene,
-          passInfo,
-          playerSprites
-        });
-      } else if (pgSprite) {
-        // Fallback to hardcoded SF→PG pass
-        console.log('🏀 [SIDE_INBOUND] Using fallback hardcoded SF→PG pass');
-        await runPass(scene, { fromId: sfId, toId: pgId, easing: ease });
+      // ✅ Force Foul: when next turn is Quick Foul, animate defender to receiver in same step as the pass
+      const nextTurn = context?.nextTurn;
+      const isQuickFoulNext = nextTurn?.quick_foul && nextTurn?.result_type === 'FOUL';
+      const passPromise = passInfo
+        ? (console.log('🏀 [SIDE_INBOUND] Using dynamic pass from animation data', passInfo),
+           handlePassAnimation({ scene, passInfo, playerSprites }))
+        : pgSprite
+          ? (console.log('🏀 [SIDE_INBOUND] Using fallback hardcoded SF→PG pass'),
+             runPass(scene, { fromId: sfId, toId: pgId, easing: ease }))
+          : Promise.resolve();
+
+      let defenderPromise = Promise.resolve();
+      if (isQuickFoulNext) {
+        const receiverId = passInfo?.receiverId ?? pgId;
+        const receiverSprite = playerSprites[receiverId];
+        const defenderSprite = nextTurn.foul_player_id ? playerSprites[nextTurn.foul_player_id] : null;
+        if (receiverSprite && defenderSprite) {
+          defenderPromise = animateQuickFoulDefenderToReceiver(scene, defenderSprite, receiverSprite);
+          nextTurn._quickFoulAnimatedDuringInbound = true;
+        }
       }
+      await Promise.all([passPromise, defenderPromise]);
     }
-    
+
     animationDebugLog(`[sideInbound][passEnd] sf:${sfId} pg:${pgId}`);
     if (pgSprite) {
       animationDebugLog(`[sideInbound][pgAttach] sf:${sfId} pg:${pgId}`);
@@ -892,8 +933,8 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       const targetGrid = {
         x: Phaser.Math.Clamp(
           currentGridX + direction * distance,
-          4,  // Stay in bounds
-          97
+          9,  // Stay between rims
+          91
         ),
         y: Phaser.Math.Clamp(
           currentGridY + Phaser.Math.Between(-10, 10),
@@ -1233,6 +1274,22 @@ async function runOffensiveReboundKickoutSetup({ scene, ballSprite, playerSprite
   animationDebugLog('runOffensiveReboundKickoutSetup: Outlet positioning complete');
 }
 
+/**
+ * Animate the fouling defender moving to within 1-2 x spots and ±1 y spots of the receiver (Quick Foul after BIP/SIP).
+ * Used in the same turn as the inbound pass so ball and defender move together.
+ */
+function animateQuickFoulDefenderToReceiver(scene, defenderSprite, receiverSprite) {
+  if (!scene?.tweens || !defenderSprite || !receiverSprite) return Promise.resolve();
+  const w = scene.game.config?.width ?? 1229;
+  const h = scene.game.config?.height ?? 768;
+  const spotW = w / 100;
+  const spotH = h / 50;
+  const offsetX = spotW * (Math.random() < 0.5 ? 1 : 2);
+  const offsetY = spotH * (Math.random() * 2 - 1); // -1 to 1
+  const target = { x: receiverSprite.x + offsetX, y: receiverSprite.y + offsetY };
+  return tweenPlayerTo(scene, defenderSprite, target, { duration: 400, easing: 'Linear' });
+}
+
 // Setup baseline inbound play after a made basket
 async function runInboundSetup({
   scene,
@@ -1243,7 +1300,8 @@ async function runInboundSetup({
   awayTeamId,
   skipRetreat = false,  // Allow skipping retreat for FCP/HCT
   pressureType = null,   // "FCP" or "HCT" to determine defensive positioning
-  turnData = null        // ✅ NEW: Optional turnData for dynamic pass detection
+  turnData = null,       // ✅ NEW: Optional turnData for dynamic pass detection
+  context = null        // ✅ Force Foul: nextTurn so we can animate defender move in same turn
 }) {
   // ✅ CRITICAL: ALWAYS set scene.offenseTeamId to match newOffenseSide BEFORE doing anything else
   // This ensures that any code that reads scene.offenseTeamId will get the correct value
@@ -1812,36 +1870,17 @@ async function runInboundSetup({
   animationDebugLog(`[inbound][ballAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   attachBallToPlayer(scene, ballSprite, sfSprite);
   
-  // ✅ TIMEOUT: Hold for 0.2 seconds after ball is placed with inbound passer
-  await new Promise(resolve => setTimeout(resolve, 200));
-  
-  // ✅ TIMEOUT: Hold for 0.2 seconds after ball is placed with inbound passer
-  await new Promise(resolve => setTimeout(resolve, 200));
+  const inboundHoldMs = animationConfig.inbound?.holdAfterPlaceMs ?? 200;
+  await new Promise(resolve => setTimeout(resolve, inboundHoldMs));
+  await new Promise(resolve => setTimeout(resolve, inboundHoldMs));
 
   animationDebugLog(`[inbound][holdStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   // Removed 1000ms pause for smoother transitions
   
   // ✅ TIMEOUT: Removed markInboundPassStarted - button is always live now
 
-  // ✅ BIP → FCP/HCT: Skip inbound pass here; skeleton will animate it (avoids double inbound).
+  // ✅ BIP → FCP/HCT: Execute inbound pass here (same as HCO). FCP/HCT turn will start at step 1 (step 0 done in BIP).
   // SIP (side inbound) always uses runSideInboundSetup() and never calls this function, so SIP is unaffected.
-  if (pressureType === "FCP" || pressureType === "HCT") {
-    if (scene.stateMachine?.is(States.Inbound)) {
-      safeTransition(
-        scene.stateMachine,
-        States.HalfCourt,
-        {
-          stepIndex: 0,
-          currentOwnerId: getCurrentOwner(scene),
-          pendingOwnerId: getPendingOwner(scene),
-        },
-        ["stepIndex"]
-      );
-    }
-    scene.isInboundSetup = false;
-    scene.passInFlight = false;
-    return;
-  }
 
   if (scene.tweens) {
     scene.tweens.killTweensOf(ballSprite);
@@ -1871,23 +1910,26 @@ async function runInboundSetup({
   }
   
   // Allow inbound pass regardless of current state (including FastBreak)
-  if (passInfo) {
-    // ✅ Use dynamic pass from animation data
-    console.log('🏀 [BASELINE_INBOUND] Using dynamic pass from animation data', passInfo);
-    await handlePassAnimation({
-      scene,
-      passInfo,
-      playerSprites
-    });
-  } else {
-    // Fallback to hardcoded SF→PG pass
-    await runPass(scene, {
-      fromId: sfId,
-      toId: pgId,
-      duration: 500,
-      easing: "Sine.easeInOut"
-    });
+  // ✅ Force Foul: when next turn is Quick Foul, animate defender to receiver in same step as the pass
+  const nextTurn = context?.nextTurn;
+  const isQuickFoulNext = nextTurn?.quick_foul && nextTurn?.result_type === 'FOUL';
+  const passPromise = passInfo
+    ? (console.log('🏀 [BASELINE_INBOUND] Using dynamic pass from animation data', passInfo),
+       handlePassAnimation({ scene, passInfo, playerSprites }))
+    : runPass(scene, { fromId: sfId, toId: pgId, duration: 500, easing: "Sine.easeInOut" });
+
+  let defenderPromise = Promise.resolve();
+  if (isQuickFoulNext) {
+    const receiverId = passInfo?.receiverId ?? pgId;
+    const receiverSprite = playerSprites[receiverId];
+    const defenderSprite = nextTurn.foul_player_id ? playerSprites[nextTurn.foul_player_id] : null;
+    if (receiverSprite && defenderSprite) {
+      defenderPromise = animateQuickFoulDefenderToReceiver(scene, defenderSprite, receiverSprite);
+      nextTurn._quickFoulAnimatedDuringInbound = true;
+    }
   }
+  await Promise.all([passPromise, defenderPromise]);
+
   animationDebugLog(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   animationDebugLog(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
 
@@ -2104,6 +2146,17 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // ShotAnimationSystem.runSetupTween() handles setup for all skeleton animations, including FCP/HCT
 
   let eventsProcessed = false;
+  const clockSecondMs = scene?.gameClock?.getState?.().tickMs || 350;
+  const stepClockSeconds = Array.isArray(turnData?.step_clock_seconds)
+    ? turnData.step_clock_seconds
+    : null;
+  const getContractStepDurationMs = (stepIndex, fallbackDurationMs) => {
+    const stepSeconds = stepClockSeconds?.[stepIndex];
+    if (Number.isFinite(stepSeconds) && stepSeconds > 0) {
+      return Math.max(50, Math.round(stepSeconds * clockSecondMs));
+    }
+    return fallbackDurationMs;
+  };
 
   // ✅ CRITICAL FIX: Kill all ball tweens before starting step loop
   // Lingering ball tweens from previous shots/passes can block the tween manager
@@ -2185,7 +2238,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       ballSprite,
       animations: turnData.animations,
       playerSprites,
-      currentBallOwnerRef
+      currentBallOwnerRef,
+      turnData,
+      stepDurationMs: getContractStepDurationMs(0, null),
     });
   } else {
     console.log('⏭️ [FCP/HCT] Skipping runSetupTween() - players already positioned at step 0 from BIP');
@@ -2328,7 +2383,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       // This ensures smooth transitions between turns and consistent speeds
       // The sprite's current position (sprite.x, sprite.y) is where it actually is,
       // which may be from the end of the previous turn or from a previous step
-      const duration = getPlayerDuration(sprite, targetX, targetY);
+      const distanceDuration = getPlayerDuration(sprite, targetX, targetY);
+      const duration = distanceDuration;
       
 
       DEBUG && animationDebugLog('[turn]', turnData?.id, step.timestamp, nextStep.timestamp, duration, {
@@ -2836,10 +2892,85 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         }
       }
     }
+
   }
 }
 
-export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup, runOffensiveReboundKickoutSetup, getPlayerDuration };
+/**
+ * Phase 4: Final Turn alignment — tween offense and defense to oDestinations/dDestinations.
+ * When away team is on offense, flip both offense and defense coords so the whole setup is on the
+ * away (attacking) half; backend sends home-side coords. Attaches ball to ball handler when done.
+ */
+export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, turnData }) {
+  if (scene?.skipToEnd || !turnData) return;
+  const oDestinations = turnData.oDestinations || turnData.o_destinations || {};
+  const dDestinations = turnData.dDestinations || turnData.d_destinations || {};
+  const { resolveOffenseTeamId } = await import('../utils/offenseTeamIdResolver.js');
+  const offenseTeamId = resolveOffenseTeamId({ scene, turnData, playerSprites });
+  const homeTeamId = scene.simData?.home_team_id;
+  const isAwayOffense = offenseTeamId && homeTeamId && String(offenseTeamId) !== String(homeTeamId);
+  const flipCoords = (coords) => ({ x: 101 - coords.x, y: coords.y });
+
+  const width = scene.game.config.width;
+  const height = scene.game.config.height;
+  const cfg = animationConfig?.finalTurn?.alignment || {};
+  const ease = cfg.ease ?? "Linear";
+
+  const offenseSprites = {};
+  const defenseSprites = {};
+  let ballHandlerSprite = null;
+
+  if (scene.tweens && ballSprite) scene.tweens.killTweensOf(ballSprite);
+  for (const [id, sprite] of Object.entries(playerSprites)) {
+    const info = scene.playerInfo?.[id];
+    if (!info) continue;
+    if (scene.tweens) scene.tweens.killTweensOf(sprite);
+    if (String(sprite.team_id) === String(offenseTeamId)) {
+      offenseSprites[info.pos] = sprite;
+    } else {
+      defenseSprites[info.pos] = sprite;
+    }
+  }
+
+  const addTween = (sprite, coords, pos) => {
+    if (!sprite || !coords) return Promise.resolve();
+    const { x, y } = gridToPixels(coords.x, coords.y, width, height);
+    const duration = getPlayerDuration(sprite, x, y);
+    return new Promise((resolve) => {
+      scene.tweens.add({
+        targets: sprite,
+        x, y, duration, ease,
+        onComplete: resolve,
+        onStop: resolve
+      });
+    });
+  };
+
+  const promises = [];
+  Object.entries(oDestinations).forEach(([pos, coords]) => {
+    const c = isAwayOffense ? flipCoords(coords) : coords;
+    promises.push(addTween(offenseSprites[pos], c, pos));
+  });
+  Object.entries(dDestinations).forEach(([pos, coords]) => {
+    const c = isAwayOffense ? flipCoords(coords) : coords;
+    promises.push(addTween(defenseSprites[pos], c, pos));
+  });
+
+  await Promise.all(promises);
+
+  const ballHandlerId = turnData.ball_handler_id ?? turnData.roles?.ball_handler_id ?? turnData.ball_handler?.player_id;
+  if (!ballHandlerId && turnData.animations?.length) {
+    const animWithBall = turnData.animations.find(a => a.hasBallAtStep?.[0]);
+    if (animWithBall) ballHandlerSprite = playerSprites[animWithBall.playerId];
+  } else if (ballHandlerId) {
+    ballHandlerSprite = playerSprites[ballHandlerId];
+  }
+  if (ballSprite && ballHandlerSprite) {
+    attachBallToPlayer(scene, ballSprite, ballHandlerSprite);
+  }
+}
+
+export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup, runOffensiveReboundKickoutSetup, getPlayerDuration, animateQuickFoulDefenderToReceiver };
 // Provide an uncapped duration helper for long transitions (e.g., inbound -> HCO)
 export function getPlayerDurationUncapped(sprite, targetX, targetY) {
   const currentX = sprite.x;
@@ -2911,4 +3042,3 @@ export async function runDefensiveStopTransition({ scene, playerSprites, ballSpr
 if (typeof window !== "undefined") {
   window.playTurnAnimation = playTurnAnimation;
 }
-

@@ -14,6 +14,9 @@
 3. **Idempotent Flags**:
    - `turn._contextAnnouncementsShown` - Prevents duplicate start announcements
 
+4. **Announcement hold time**:
+   - **1000 ms** — Uniform delay for result announcements before the next animation. In **ShotAnimationSystem** (HCO/regular makes), the rim hold and "It's Good!" / AND-1 run **in unison**: one 1000 ms period with ball at rim and announcement both visible. Other paths (ballManager made shot, FT make, FB make, "Great Stop!") use a 1000 ms hold after the announcement. Do not reduce when tuning other animation delays; see "Hold time after result announcements" below.
+
 **Announcement System Flow (2 Phases)**
 
 1. **Start Announcements** (`timing='start'`)
@@ -60,13 +63,15 @@ The Announcement System provides visual feedback for game events using timing-ba
 **Location:** `FrontEnd/static/js/phaser/utils/announcements.js` - `announceFromTurnData()` (lines 334-493)
 
 **Shot Results:**
-- **"It's Good!"** - Handled in `ballManager.js` when ball reaches rim (line 542)
+- **"It's Good!"** - Handled in `ballManager.js` when ball reaches rim (line 542); **Fast Break** shots use `fastBreak.js` (see below).
 - **"It's Good! And 1!"** - Detected when text includes "AND-1" OR (`foul_player_id` exists + `result === "MAKE"` + `foul_team === "DEFENSE"`)
   - Uses `showAndOneAnnouncement()` for two-row announcement with shooter and fouler headshots
   - Fallback: Single-row announcement if player data missing
-- **"Shooting Foul!"** - Detected when `foul_player_id` exists, `foul_team === "DEFENSE"`, and `result === "MISS"`
+- **"Shooting Foul!"** - Detected when `result === "MISS"` and (`next_play_type === 'FREE_THROW'` or `free_throws_remaining > 0`)
   - Always displays announcement even if player sprite/info is missing (fallback pattern)
   - Dark yellow text with silver border
+
+**Fast Break shot path:** Fast Break shots are animated only in `fastBreak.js` (`animateFastBreakShot`, `animateFastBreakShotWithStopper`). They use `animateShotToRim()` and do **not** go through `ballManager.shootBall()` or ShotAnimationSystem. Therefore **AND-1** and **"Shooting Foul!"** (on miss) must be detected and announced inside `fastBreak.js` using the same logic as in `ballManager.js` (same `turnData` fields and `showAnnouncement` / `showAndOneAnnouncement` / `triggerFoulEffect`).
 
 **Steal Announcements:**
 - **"STEAL!"** - Triggered when `result_type === 'STEAL'` or (`result_type === 'TURNOVER'` and text includes "steal")
@@ -78,6 +83,7 @@ The Announcement System provides visual feedback for game events using timing-ba
   - Triggered when `result_type === 'DEAD BALL'` or (`result_type === 'TURNOVER'` without steal indicators)
 - **Other Turnovers:** Parsed from `turnover_type` field or text:
   - "OUT OF BOUNDS!", "BAD PASS!", "PALMING!", "ILLEGAL DRIBBLE!", "SHOT CLOCK VIOLATION!", "BACKCOURT VIOLATION!"
+- **Shot Clock Violation:** Displays "Shot Clock Violation!" (when `turnover_type === 'SHOT_CLOCK'`). Uses **whistle-3.mp3** (see Sounds below).
 - Shows victim's headshot in offense team color
 
 **Foul Announcements:**
@@ -92,6 +98,32 @@ The Announcement System provides visual feedback for game events using timing-ba
 **Rebound Announcements:**
 - **"Rebound!"** - Handled in `ballManager.js` / `ShotAnimationSystem.handleEmbeddedRebound` when ball reaches rebounder
 - Shows rebounder's headshot in rebounder's team color
+
+### Sounds (SFX)
+
+| Announcement | Sound file | Location |
+|--------------|------------|----------|
+| **Shot Clock Violation!** | `whistle-3.mp3` | `announcements.js` – `showAnnouncement()` when `text === 'Shot Clock Violation!'` |
+| Dead ball turnovers (Travel!, Double Dribble!, etc.), foul announcements | `whistle-1.mp3` | `announcements.js` – `showAnnouncement()` for foul or dead-ball turnover text |
+| AND-1 (shooting foul on make) | `whistle-1.mp3` | `announcements.js` – `showAndOneAnnouncement()` |
+
+Sounds are played in sync with the on-screen announcement (volume 0.7). Path: `/sounds/` + filename.
+
+### Hold time after result announcements (1000 ms)
+
+**Rule:** All result announcements use a **uniform 1000 ms** period on screen before the next animation. In **ShotAnimationSystem** (HCO made shots), the rim hold and "It's Good!" / AND-1 run **in unison**: the announcement is shown immediately and the ball stays at the rim for the same 1000 ms, so there is a single 1000 ms period (not rim hold then announcement). Other paths use a 1000 ms hold after the announcement. Do not reduce below 1000 ms when tuning animation delays.
+
+**Where the 1000 ms hold is used:**
+
+| Announcement / context | Location | Note |
+|------------------------|----------|------|
+| Shot make — "It's Good!" / AND-1 | `ShotAnimationSystem.js` | **In unison** with rim hold: one 1000 ms period (ball at rim + announcement together) |
+| Made shot rim hold (ballManager path) | `ballManager.js` | Holds after ball at rim; allows announcement to display |
+| Free throw make — rim hold | `FreeThrowAnimationSystem.js` | Non-final FT; ball at rim then next attempt or transition |
+| Fast break make — "It's Good!" | `fastBreak.js` | After FB make announcement |
+| Fast break defensive stop — "Great Stop!" | `fastBreak.js` | After "Great Stop!" before transition to HalfCourt |
+
+**Do not reduce** these holds below 1000 ms when tuning animation delays; see `docs/To Do/SEAMLESS_DELAY_TUNING_AND_NEXT_STEPS.md` for which delays are safe to shorten (e.g. shot rim hold, rebound attach, OREB pause) vs announcement holds.
 
 ### Idempotent Design
 
@@ -150,6 +182,8 @@ When a steal leads to a fast break:
 - `FrontEnd/static/js/phaser/animation/ballManager.js`
   - Shot result announcements when ball reaches rim (lines 476-598)
   - Rebound announcements when ball reaches rebounder (lines 822-839)
+- `FrontEnd/static/js/phaser/animation/fastBreak.js`
+  - Fast Break shot result announcements (AND-1, "Shooting Foul!" on miss) in `animateFastBreakShot` and `animateFastBreakShotWithStopper` (separate path from ballManager)
 - `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js`
   - BLOCK announcement at start of `handleMissedShot` when `result_type === 'BLOCK'` (before bounce/rebound)
   - Rebound announcement in `handleEmbeddedRebound` (e.g. before outlet setup)

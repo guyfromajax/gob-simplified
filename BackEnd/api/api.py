@@ -352,6 +352,7 @@ try:
         full_sim: bool = False  # If True, turn_by_turn_mode=False (fully simulate instantly)
         # ✅ TIMEOUT: Resume from timeout flag (reuse quarter break pattern)
         resume_from_timeout: bool = False
+        timeout_trace_id: str | None = None
     
     
     ongoing_games: dict[str, GameManager] = {}
@@ -369,6 +370,10 @@ try:
         calling_team: str  # "home" or "away"
         offense_override: str | None = None  # e.g., "Inside", "Attack", "Outside"
         defense_override: str | None = None  # e.g., "Zone", "Man"
+        displayed_clock: str | None = None
+        displayed_time_remaining: int | None = None
+        displayed_shot_clock_remaining: int | None = None
+        timeout_trace_id: str | None = None
         # Mode context
     
     
@@ -951,10 +956,14 @@ try:
             
             # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log what we loaded (Hypothesis 2 - confirm doc has timeout state and game_stats_initialized)
             logging.warning(
-                "🔍 [FOUL_OUT DEBUG] restore_timeout_resume_state loaded doc: game_id=%s, timeout_next_play_type=%s, "
-                "game_stats_initialized=%s, has_teams=%s, top_level_score=%s",
+                "🔍 [FOUL_OUT DEBUG] restore_timeout_resume_state loaded doc: game_id=%s, timeout_trace_id=%s, timeout_next_play_type=%s, "
+                "quarter=%s, clock=%s, time_remaining=%s, game_stats_initialized=%s, has_teams=%s, top_level_score=%s",
                 game_id,
+                saved.get("timeout_trace_id"),
                 saved.get("timeout_next_play_type"),
+                saved.get("quarter"),
+                saved.get("clock"),
+                saved.get("time_remaining"),
                 saved.get("game_stats_initialized"),
                 "teams" in saved and bool(saved.get("teams")),
                 saved.get("score"),
@@ -1042,6 +1051,7 @@ try:
         # Save to DB (same for both user and computer timeouts)
         from bson import ObjectId
         db_summary = summarize_game_state(gm, exclude_animations=True)
+        trace_id = db_summary.get("timeout_trace_id") or gm.game_state.get("timeout_trace_id")
         game_id_type = type(game_id).__name__
         logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] Saving with _id: '{game_id}' (type: {game_id_type})")
         result = games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
@@ -1067,6 +1077,15 @@ try:
         logging.warning(f"💾 [TIMEOUT-SAVE] db_summary away playbook slot_assignments: {len(away_summary_pb.get('slot_assignments', {})) if away_summary_pb else 0}")
         logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] db_summary timeout fields: timeout_next_play_type={db_summary.get('timeout_next_play_type')}, timeout_offense_team_id={db_summary.get('timeout_offense_team_id')}")
         logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] db_summary score={db_summary.get('score')}, clock={db_summary.get('clock')}, time_remaining={db_summary.get('time_remaining')}")
+        logging.warning(
+            "🧭 [TIMEOUT TRACE] save trace_id=%s game_id=%s quarter=%s clock=%s time_remaining=%s next_play=%s",
+            trace_id,
+            game_id,
+            db_summary.get("quarter"),
+            db_summary.get("clock"),
+            db_summary.get("time_remaining"),
+            db_summary.get("timeout_next_play_type"),
+        )
         
         # ✅ DIAGNOSTIC: Verify what was actually saved to DB
         from bson import ObjectId
@@ -1123,6 +1142,7 @@ try:
             "offense_team": gm.offense_team.name,
             "defense_team": gm.defense_team.name,
             "game_id": game_id,
+            "timeout_trace_id": trace_id,
             "box_score": gm.get_box_score(),
             "team_totals": {
                 gm.home_team.name: gm.home_team.get_team_game_stats(),
@@ -1164,12 +1184,16 @@ try:
             gm.game_state["timeout_next_play_type"] = saved["timeout_next_play_type"]
         if "timeout_offense_team_id" in saved:
             gm.game_state["timeout_offense_team_id"] = saved["timeout_offense_team_id"]
+        if "timeout_trace_id" in saved:
+            gm.game_state["timeout_trace_id"] = saved["timeout_trace_id"]
         
         # Update clock and time
         if "clock" in saved:
             gm.game_state["clock"] = saved["clock"]
         if "time_remaining" in saved:
             gm.game_state["time_remaining"] = saved["time_remaining"]
+        if "shot_clock_remaining" in saved:
+            gm.game_state["shot_clock_remaining"] = saved["shot_clock_remaining"]
         
         # Update scores
         if "score" in saved and isinstance(saved["score"], dict):
@@ -1238,6 +1262,9 @@ try:
         if "timeout_next_play_type" in saved:
             gm.game_state["timeout_next_play_type"] = saved["timeout_next_play_type"]
             logging.info(f"🔄 TIMEOUT RESUME: Applied timeout_next_play_type={saved['timeout_next_play_type']}")
+        if "timeout_trace_id" in saved:
+            gm.game_state["timeout_trace_id"] = saved["timeout_trace_id"]
+            logging.info(f"🔄 TIMEOUT RESUME: Applied timeout_trace_id={saved['timeout_trace_id']}")
         
         # ✅ FREE_THROW timeout resume: restore offensive_state, shooter, free_throws so first simulate_turn creates the FT turn
         if saved.get("timeout_next_play_type") == "FREE_THROW":
@@ -1292,6 +1319,9 @@ try:
         if "time_remaining" in saved:
             gm.game_state["time_remaining"] = saved["time_remaining"]
             logging.info(f"🔄 TIMEOUT RESUME: Restored time_remaining={saved['time_remaining']} from saved document")
+        if "shot_clock_remaining" in saved:
+            gm.game_state["shot_clock_remaining"] = saved["shot_clock_remaining"]
+            logging.info(f"🔄 TIMEOUT RESUME: Restored shot_clock_remaining={saved['shot_clock_remaining']} from saved document")
         
         # ✅ COMPUTER TIMEOUT: Restore per-quarter count and checked_conditions (enforces max 1 per quarter Q1–Q3 after DB load)
         if "computer_timeouts" in saved and saved["computer_timeouts"]:
@@ -1940,11 +1970,53 @@ try:
         """Rate limited: 30/minute per IP. quiet_sim=True sets log level to ERROR during sim (sanity check for logging cost)."""
         import time
         start_time = time.time()
-        game_id = body.game_id
-        # ✅ TIMEOUT/FOUL_OUT RESUME: Normalize game_id once so restore_timeout_resume_state and DB load use same _id as save
+        raw_game_id = body.game_id
+        game_id = raw_game_id
+        entry_trace_id = body.timeout_trace_id
+        # Keep non-ObjectId ids stable. Normalizing non-ObjectId values can generate
+        # a new id and break timeout resume hydration.
         if game_id:
-            from BackEnd.utils.game_id_utils import normalize_game_id
-            game_id = normalize_game_id(game_id) or game_id
+            from BackEnd.utils.game_id_utils import normalize_game_id, validate_game_id
+            if validate_game_id(game_id):
+                game_id = normalize_game_id(game_id) or game_id
+            else:
+                logging.info(
+                    "🔍 simulate_quarter_endpoint: preserving non-ObjectId game_id for lookup (%s)",
+                    game_id,
+                )
+
+        def _candidate_game_ids():
+            ids = []
+            if game_id:
+                ids.append(game_id)
+            if raw_game_id and raw_game_id not in ids:
+                ids.append(raw_game_id)
+            return ids
+
+        def _get_cached_game():
+            for gid in _candidate_game_ids():
+                cached = ongoing_games.get(gid)
+                if cached is not None:
+                    return cached, gid
+            return None, None
+
+        def _drop_cached_game():
+            for gid in _candidate_game_ids():
+                if gid in ongoing_games:
+                    del ongoing_games[gid]
+
+        def _store_cached_game(gm_obj):
+            for gid in _candidate_game_ids():
+                ongoing_games[gid] = gm_obj
+
+        def _find_saved_game_doc():
+            if games_collection is None:
+                return None, None
+            for gid in _candidate_game_ids():
+                saved_doc, effective = find_game_doc(games_collection, gid)
+                if saved_doc:
+                    return saved_doc, (effective or gid)
+            return None, None
         # ✅ PERFORMANCE: Removed debug logging - only log errors and critical events
         if debug:
             logging.debug(
@@ -1956,13 +2028,21 @@ try:
                     "quarter": body.quarter,
                 },
             )
+        logging.warning(
+            "🧭 [TIMEOUT TRACE] simulate-quarter entry trace_id=%s raw_game_id=%s normalized_game_id=%s resume_from_timeout=%s requested_quarter=%s",
+            entry_trace_id,
+            raw_game_id,
+            game_id,
+            body.resume_from_timeout,
+            body.quarter,
+        )
         source = "resume"
         sim_quarter_load_source = None  # "cache" | "db" | "new" for PERF logging
         # ✅ SS&S: Preserve user_team_side from in-memory game BEFORE any DB operations
         # This ensures user_team_side persists even if it's not in the saved document or request
         preserved_user_team_side = None
         if game_id:
-            gm = ongoing_games.get(game_id)
+            gm, _ = _get_cached_game()
             if gm is not None:
                 sim_quarter_load_source = "cache"
             # ✅ DEBUG: Track ongoing_games state at start of simulate_quarter_endpoint
@@ -1993,7 +2073,7 @@ try:
                 logging.warning(
                     f"🆕 [ONGOING_GAMES] Removing game from cache: game_id={game_id}, reason='New game scenario (Q1 requested but game in memory at Q{gm.quarter})'"
                 )
-                del ongoing_games[game_id]
+                _drop_cached_game()
                 gm = None  # Force reload from DB where new game detection will run
                 sim_quarter_load_source = None
             
@@ -2101,12 +2181,20 @@ try:
                 timeout_saved_state = restore_timeout_resume_state(game_id, body, games_collection)
             
             if timeout_saved_state:
-                # Validate quarter match to prevent stale data from affecting new games
-                # Only restore timeout state when the client explicitly asked for it (resume_from_timeout=true).
-                # Otherwise we clear it - e.g. "Play Quarter" after "Sim quarter" for prior quarters must not
-                # restore leftover timeout_next_play_type (e.g. FREE_THROW at end of Q3) or user gets instant EOG.
+                # Only activate timeout resume when the client explicitly requested it.
+                # Non-resume requests should ignore timeout state (without mutating/clearing DB state).
                 saved_quarter = timeout_saved_state.get("quarter", 0)
                 timeout_next_play_type = timeout_saved_state.get("timeout_next_play_type")
+                saved_trace_id = timeout_saved_state.get("timeout_trace_id")
+                logging.warning(
+                    "🧭 [TIMEOUT TRACE] simulate-quarter loaded-timeout trace_id=%s game_id=%s saved_quarter=%s saved_clock=%s saved_time_remaining=%s saved_next_play=%s",
+                    saved_trace_id or entry_trace_id,
+                    game_id,
+                    saved_quarter,
+                    timeout_saved_state.get("clock"),
+                    timeout_saved_state.get("time_remaining"),
+                    timeout_next_play_type,
+                )
                 
                 if body.resume_from_timeout and timeout_next_play_type and saved_quarter == body.quarter:
                     logging.info(f"✅ TIMEOUT RESUME: Found valid timeout state in DB, timeout_next_play_type={timeout_next_play_type}, quarter={saved_quarter}")
@@ -2117,57 +2205,33 @@ try:
                     if gm is not None:
                         logging.warning(f"🔍 TIMEOUT RESUME: Game in memory, but forcing DB reload to ensure latest state (game_id={game_id})")
                         logging.warning(f"🔄 [ONGOING_GAMES] Removing game from cache: game_id={game_id}, reason='Timeout resume - forcing DB reload'")
-                        del ongoing_games[game_id]
+                        _drop_cached_game()
                         gm = None  # Force reload from DB
                     logging.info(f"🔍 TIMEOUT RESUME: Will load fresh game from DB and apply timeout state")
-                elif body.resume_from_timeout and timeout_next_play_type and saved_quarter > body.quarter:
-                    # ✅ FOUL-OUT DATA-LOSS FIX: Frontend sometimes sends quarter=1 on "return to court" (e.g. Play Quarter)
-                    # while the game is actually in a later quarter. Use doc as source of truth and treat as timeout resume.
+                elif body.resume_from_timeout and timeout_next_play_type and saved_quarter != body.quarter:
+                    # Timeout resume requested with quarter mismatch: use saved quarter as source of truth.
                     logging.warning(
                         "⚠️ TIMEOUT RESUME: Quarter mismatch (requested=%s, saved=%s) - using saved quarter and treating as timeout resume (game_id=%s)",
                         body.quarter, saved_quarter, game_id,
                     )
                     body.quarter = saved_quarter
-                    body.resume_from_timeout = True
                     if gm is not None:
                         logging.warning(f"🔍 TIMEOUT RESUME: Game in memory, forcing DB reload (game_id={game_id})")
-                        del ongoing_games[game_id]
+                        _drop_cached_game()
                         gm = None
                     logging.info(f"✅ TIMEOUT RESUME: Corrected body.quarter to %s, resume_from_timeout=True", saved_quarter)
                 else:
-                    # Stale timeout data (quarter mismatch or missing next_play_type) - ignore it
-                    # logging.warning(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={body.quarter}, next_play_type={timeout_next_play_type})")
-                    
-                    # ✅ QUARTER BREAK: Explicitly clear any stale timeout state in saved document BEFORE clearing timeout_saved_state
-                    # This ensures quarter breaks are treated as new quarter starts, not timeout resumes
-                    # timeout_saved_state still contains the saved document at this point
-                    if timeout_saved_state and ("timeout_next_play_type" in timeout_saved_state or "timeout_offense_team_id" in timeout_saved_state):
-                        logging.info(f"✅ QUARTER BREAK: Clearing stale timeout state from saved document (quarter {body.quarter})")
-                        update_data = {}
-                        if "timeout_next_play_type" in timeout_saved_state:
-                            update_data["timeout_next_play_type"] = None
-                        if "timeout_offense_team_id" in timeout_saved_state:
-                            update_data["timeout_offense_team_id"] = None
-                        if update_data:
-                            unset_op = {"$unset": update_data}
-                            r = games_collection.update_one({"_id": game_id}, unset_op)
-                            if r.matched_count == 0 and game_id and len(game_id) == 24:
-                                try:
-                                    games_collection.update_one({"_id": ObjectId(game_id)}, unset_op)
-                                except (ValueError, TypeError):
-                                    pass
-                    
-                    timeout_saved_state = None  # Clear invalid timeout state
-                    # Force reload from DB so we use the cleared doc (no timeout state), not cached gm with stale state
-                    if gm is not None:
-                        logging.info(f"✅ QUARTER BREAK: Clearing cache so next load uses doc without timeout state (game_id={game_id})")
-                        del ongoing_games[game_id]
-                        gm = None
-                    # ✅ QUARTER BREAK: Clear resume_from_timeout flag and timeout state if no valid timeout state
-                    # This handles cases where resume_from_timeout was incorrectly preserved across quarter boundaries
-                    # Quarter breaks should NOT have timeout state - clear it explicitly
+                    # Non-resume requests (or missing next_play_type): ignore timeout state for this request.
+                    # Do not mutate DB timeout fields here; timeout state is cleared after a successful resume.
+                    timeout_saved_state = None
                     if body.resume_from_timeout:
-                        logging.warning(f"⚠️ QUARTER BREAK: Clearing invalid resume_from_timeout flag (no valid timeout state for quarter {body.quarter})")
+                        logging.warning(
+                            "⚠️ QUARTER BREAK: resume_from_timeout=true but timeout state is incomplete/invalid "
+                            "(saved_quarter=%s, requested_quarter=%s, next_play_type=%s). Treating as normal quarter start.",
+                            saved_quarter,
+                            body.quarter,
+                            timeout_next_play_type,
+                        )
                         body.resume_from_timeout = False
             else:
                 if body.resume_from_timeout:
@@ -2195,7 +2259,7 @@ try:
                         game_id,
                     )
                 db_lookup_start = time.time()
-                saved, _ = find_game_doc(games_collection, game_id) if (games_collection is not None and game_id) else (None, None)
+                saved, _ = _find_saved_game_doc()
                 db_lookup_time = (time.time() - db_lookup_start) * 1000
                 # logging.warning(f"⏱️ [DB TIMING] simulate_quarter: games_collection.find_one(game_id={game_id}): {db_lookup_time:.2f}ms, found={saved is not None}")
                 if saved:
@@ -2583,7 +2647,7 @@ try:
                             # ✅ TIMEOUT RESUME: Apply unified timeout state restoration (if resuming from timeout)
                             # This uses the state we loaded earlier from DB (single source of truth)
                             # Only apply if we actually found timeout state and quarter matches (not stale data)
-                            if timeout_saved_state:
+                            if timeout_saved_state and body.resume_from_timeout:
                                 # Validate that this is actually a timeout resume (not stale data from previous game)
                                 # Check that timeout_next_play_type exists and quarter matches
                                 saved_quarter = saved.get("quarter", 0)
@@ -2625,7 +2689,7 @@ try:
                                 # Clear any old turns from previous game - opening tip will be added in simulate_quarter
                                 gm.turns = []
                             
-                            ongoing_games[game_id] = gm
+                            _store_cached_game(gm)
                             sim_quarter_load_source = "db"
                             # ✅ DEBUG: Track when game is added to ongoing_games
                             # ✅ REMOVED: Verbose debug log
@@ -3463,6 +3527,15 @@ try:
             # When full_sim=False (playing), use turn-by-turn mode (for animation)
             turn_by_turn_mode = not body.full_sim
             logging.info(f"🎮 simulate_quarter_endpoint: full_sim={body.full_sim}, turn_by_turn_mode={turn_by_turn_mode}, quarter={body.quarter}, resume_from_timeout={body.resume_from_timeout}")
+            if gm is not None:
+                logging.warning(
+                    "🧭 [TIMEOUT TRACE] simulate-quarter pre-sim trace_id=%s game_id=%s gm_quarter=%s gm_clock=%s gm_time_remaining=%s",
+                    gm.game_state.get("timeout_trace_id") or entry_trace_id,
+                    game_id,
+                    gm.quarter,
+                    gm.game_state.get("clock"),
+                    gm.game_state.get("time_remaining"),
+                )
             
             # Sanity check: quiet_sim=True suppresses INFO/WARNING during sim to measure logging cost
             saved_log_levels = None
@@ -3641,6 +3714,17 @@ try:
         
         # Return frontend summary WITH animations for real-time play
         turns = frontend_summary.get("turns", [])
+        first_turn = turns[0] if turns else {}
+        logging.warning(
+            "🧭 [TIMEOUT TRACE] simulate-quarter response trace_id=%s game_id=%s response_clock=%s response_time_remaining=%s first_turn_clock=%s first_turn_time_remaining=%s first_turn_type=%s",
+            frontend_summary.get("timeout_trace_id") or (gm.game_state.get("timeout_trace_id") if gm else None) or entry_trace_id,
+            game_id,
+            frontend_summary.get("clock"),
+            frontend_summary.get("time_remaining"),
+            first_turn.get("clock") if isinstance(first_turn, dict) else None,
+            first_turn.get("time_remaining") if isinstance(first_turn, dict) else None,
+            first_turn.get("result_type") if isinstance(first_turn, dict) else None,
+        )
         
         # ✅ TIMEOUT: Return the SIP turn that was created in simulate_quarter() (same pattern as quarter breaks)
         # simulate_quarter() already created the SIP turn and added it to gm.turns when resume_from_timeout=True
@@ -3725,18 +3809,71 @@ try:
         even if time_remaining has reached 0.
         """
         try:
-            if (gm.game_state.get("free_throws_remaining", 0) or 0) > 0:
-                return True
-            if gm.game_state.get("offensive_state") == "FREE_THROW":
-                return True
+            last_turn = gm.turns[-1] if (gm.turns and isinstance(gm.turns[-1], dict)) else {}
+            timeout_next_play_type = str(gm.game_state.get("timeout_next_play_type") or "").upper()
+            offensive_state = str(gm.game_state.get("offensive_state") or "").upper()
+            last_turn_next_play = str(last_turn.get("next_play_type") or "").upper()
+            last_turn_current = str(last_turn.get("current_turn") or "").upper()
+            has_ft_context = (
+                offensive_state == "FREE_THROW"
+                or timeout_next_play_type == "FREE_THROW"
+                or last_turn_next_play == "FREE_THROW"
+                or last_turn_current == "FREE_THROW"
+            )
+
+            free_throws_remaining = int(gm.game_state.get("free_throws_remaining", 0) or 0)
+            if free_throws_remaining > 0:
+                if has_ft_context:
+                    logging.warning(
+                        "🧭 [EOG TRACE] pending-terminal-ft=True reason=game_state.free_throws_remaining game_id=%s quarter=%s clock=%s time_remaining=%s free_throws_remaining=%s offensive_state=%s timeout_next_play_type=%s last_turn_current=%s last_turn_next_play=%s",
+                        getattr(gm, "game_id", None),
+                        getattr(gm, "quarter", None),
+                        gm.game_state.get("clock"),
+                        gm.game_state.get("time_remaining"),
+                        free_throws_remaining,
+                        offensive_state,
+                        timeout_next_play_type,
+                        last_turn_current,
+                        last_turn_next_play,
+                    )
+                    return True
+                logging.warning(
+                    "🧭 [EOG TRACE] pending-terminal-ft=False reason=stale_free_throws_remaining game_id=%s quarter=%s clock=%s time_remaining=%s free_throws_remaining=%s offensive_state=%s timeout_next_play_type=%s last_turn_current=%s last_turn_next_play=%s",
+                    getattr(gm, "game_id", None),
+                    getattr(gm, "quarter", None),
+                    gm.game_state.get("clock"),
+                    gm.game_state.get("time_remaining"),
+                    free_throws_remaining,
+                    offensive_state,
+                    timeout_next_play_type,
+                    last_turn_current,
+                    last_turn_next_play,
+                )
+            # Do not treat offensive_state alone as authoritative for pending FT.
+            # It can be stale across transitions and incorrectly suppress quarter end.
             if gm.turns and isinstance(gm.turns[-1], dict):
-                last_turn = gm.turns[-1]
                 if last_turn.get("next_play_type") == "FREE_THROW":
+                    logging.warning(
+                        "🧭 [EOG TRACE] pending-terminal-ft=True reason=last_turn.next_play_type game_id=%s quarter=%s clock=%s time_remaining=%s last_turn_type=%s",
+                        getattr(gm, "game_id", None),
+                        getattr(gm, "quarter", None),
+                        gm.game_state.get("clock"),
+                        gm.game_state.get("time_remaining"),
+                        last_turn.get("result_type"),
+                    )
                     return True
                 if (
                     last_turn.get("current_turn") == "FREE_THROW"
                     and (last_turn.get("free_throws_remaining", 0) or 0) > 0
                 ):
+                    logging.warning(
+                        "🧭 [EOG TRACE] pending-terminal-ft=True reason=last_turn.free_throw_remaining game_id=%s quarter=%s clock=%s time_remaining=%s last_turn_ft_remaining=%s",
+                        getattr(gm, "game_id", None),
+                        getattr(gm, "quarter", None),
+                        gm.game_state.get("clock"),
+                        gm.game_state.get("time_remaining"),
+                        last_turn.get("free_throws_remaining"),
+                    )
                     return True
         except Exception:
             # Defensive fallback: never block normal completion on helper failure.
@@ -3764,6 +3901,17 @@ try:
                 status_code=404,
                 detail=f"Game {game_id} not found. Start a quarter first with /api/simulate-quarter"
             )
+
+        logging.warning(
+            "🧭 [SIM TURN ENTRY TRACE] game_id=%s quarter=%s clock=%s time_remaining=%s shot_clock_remaining=%s offensive_state=%s turns_len=%s",
+            game_id,
+            getattr(gm, "quarter", None),
+            gm.game_state.get("clock"),
+            gm.game_state.get("time_remaining"),
+            gm.game_state.get("shot_clock_remaining"),
+            gm.game_state.get("offensive_state"),
+            len(getattr(gm, "turns", []) or []),
+        )
         
         # Log lineup state when simulate-turn is called
         home_lineup = getattr(gm.home_team, "lineup", None)
@@ -3788,6 +3936,15 @@ try:
         # Check if quarter is already over.
         # Edge-case rule: at 0:00, only continue if a free throw sequence is pending.
         if gm.game_state["time_remaining"] <= 0 and not pending_terminal_ft:
+            logging.warning(
+                "🧭 [SIM TURN EARLY RETURN TRACE] reason=quarter_complete game_id=%s quarter=%s clock=%s time_remaining=%s shot_clock_remaining=%s pending_terminal_ft=%s",
+                game_id,
+                getattr(gm, "quarter", None),
+                gm.game_state.get("clock"),
+                gm.game_state.get("time_remaining"),
+                gm.game_state.get("shot_clock_remaining"),
+                pending_terminal_ft,
+            )
             early_return = {
                 "quarter_complete": True,
                 "game_id": game_id,
@@ -3806,7 +3963,14 @@ try:
             return JSONResponse(content=early_return, status_code=200)
         elif gm.game_state["time_remaining"] <= 0 and pending_terminal_ft:
             logging.warning(
-                "🧭 [EOG-EDGE] time_remaining=0 but pending FT sequence detected; continuing turn simulation"
+                "🧭 [SIM TURN EARLY RETURN TRACE] reason=pending_terminal_ft_continue game_id=%s quarter=%s clock=%s time_remaining=%s shot_clock_remaining=%s free_throws_remaining=%s offensive_state=%s",
+                game_id,
+                getattr(gm, "quarter", None),
+                gm.game_state.get("clock"),
+                gm.game_state.get("time_remaining"),
+                gm.game_state.get("shot_clock_remaining"),
+                gm.game_state.get("free_throws_remaining"),
+                gm.game_state.get("offensive_state"),
             )
         
         # ✅ TIMEOUT: Check if last turn is a TIMEOUT turn (user-initiated or foul out)
@@ -3863,6 +4027,29 @@ try:
                 
                 logging.debug(f"⏸️ COMPUTER TIMEOUT: Creating deferred timeout turn for {calling_team.name} (turn_type: {turn_type})")
                 
+                # ✅ BUG 1 (lineup/resume clock): When processing deferred computer timeout, gm may have stale
+                # clock (e.g. from cache refresh or eviction). The previous request persisted the correct clock
+                # when it set pending_computer_timeout. Load that doc and apply clock so the timeout response
+                # (and thus lineup screen) and the save both use the correct time.
+                if game_id:
+                    _saved = games_collection.find_one({"_id": game_id})
+                    if not _saved and isinstance(game_id, str) and len(game_id) == 24:
+                        try:
+                            _saved = games_collection.find_one({"_id": ObjectId(game_id)})
+                        except (ValueError, TypeError):
+                            pass
+                    if _saved and ("clock" in _saved or "time_remaining" in _saved):
+                        if "clock" in _saved:
+                            gm.game_state["clock"] = _saved["clock"]
+                        if "time_remaining" in _saved:
+                            gm.game_state["time_remaining"] = _saved["time_remaining"]
+                        if "shot_clock_remaining" in _saved:
+                            gm.game_state["shot_clock_remaining"] = _saved["shot_clock_remaining"]
+                        logging.info(
+                            "💾 COMPUTER TIMEOUT: Restored clock from persisted doc for lineup/resume: clock=%s time_remaining=%s",
+                            gm.game_state.get("clock"), gm.game_state.get("time_remaining"),
+                        )
+                
                 # Create the timeout turn now (after previous turn was animated)
                 timeout_turn = gm.call_timeout(
                     calling_team=calling_team,
@@ -3878,9 +4065,6 @@ try:
                     # ✅ UNIFIED: Use shared helper function for timeout save and response
                     # This ensures user and computer timeouts work identically
                     try:
-                        # Remove the TIMEOUT turn from turns so next API call can simulate the actual next turn
-                        timeout_turn = gm.turns.pop()
-                        
                         # ✅ UNIFIED: Use shared helper function (same as user timeout)
                         timeout_response = handle_timeout_save_and_response(gm, timeout_turn, game_id, timeout_reason="COMPUTER")
                         
@@ -3896,7 +4080,6 @@ try:
                         logging.error(f"🚨 COMPUTER TIMEOUT: Failed to save game state: {e}")
                         # Don't fail the timeout return if save fails - game is still in memory
                         # Return timeout turn without save (fallback)
-                        timeout_turn = gm.turns.pop() if gm.turns else None
                         if timeout_turn:
                             fallback = {
                                 "turn": timeout_turn,
@@ -3939,6 +4122,26 @@ try:
             # In that case, simulate_macro_turn() wasn't called, so new_turns will be empty - that's expected and correct
             new_turns = gm.turns[turns_before:] if len(gm.turns) > turns_before else []
             
+            # ✅ BUG 1 FIX: When we deferred a computer timeout (pending_computer_timeout set), persist current
+            # state to DB now so that if the user navigates away before the next /api/simulate-turn (which would
+            # create the timeout and save), resume-from-timeout still loads the correct clock/time_remaining.
+            if gm.game_state.get("pending_computer_timeout") and game_id:
+                try:
+                    db_summary = summarize_game_state(gm, exclude_animations=True)
+                    _pid = game_id
+                    _res = games_collection.update_one({"_id": _pid}, {"$set": db_summary})
+                    if _res.matched_count == 0 and isinstance(_pid, str) and len(_pid) == 24:
+                        try:
+                            _res = games_collection.update_one({"_id": ObjectId(_pid)}, {"$set": db_summary})
+                        except (ValueError, TypeError):
+                            pass
+                    logging.info(
+                        "💾 [PENDING TIMEOUT] Persisted game state so resume has correct clock: game_id=%s clock=%s time_remaining=%s",
+                        game_id, db_summary.get("clock"), db_summary.get("time_remaining"),
+                    )
+                except Exception as e:
+                    logging.error("🚨 [PENDING TIMEOUT] Failed to persist state for deferred computer timeout: %s", e)
+            
             if not new_turns:
                 # No turns were created - this can happen legitimately if pending_computer_timeout was processed above
                 # In that case, the timeout was already returned, so we shouldn't reach here
@@ -3972,11 +4175,53 @@ try:
             
             # Check if quarter is now complete.
             # Edge-case rule: if FT is still pending at 0:00, quarter is NOT complete yet.
+            # Phase 6: Final Turn shot and FINAL_HOLD use time_elapsed = time_remaining, so clock reaches 0
+            # after the turn (or after FTs if shooting foul); this block then sets quarter_complete and
+            # advances to Quarter Break / OT / game end via existing logic.
             pending_terminal_ft_after_turn = _has_pending_terminal_free_throw(gm)
             quarter_complete = (
                 gm.game_state["time_remaining"] <= 0
                 and not pending_terminal_ft_after_turn
             )
+
+            if gm.game_state["time_remaining"] <= 2 or int(gm.game_state.get("shot_clock_remaining", 0) or 0) <= 2:
+                latest_turn_type = latest_turn.get("result_type") if isinstance(latest_turn, dict) else None
+                latest_turn_next = latest_turn.get("next_play_type") if isinstance(latest_turn, dict) else None
+                latest_turn_elapsed = latest_turn.get("time_elapsed") if isinstance(latest_turn, dict) else None
+                logging.warning(
+                    "🧭 [ZERO CLOCK TRACE] simulate-turn post-turn game_id=%s quarter=%s time_before=%s time_after=%s shot_after=%s latest_turn_type=%s latest_turn_next=%s latest_turn_elapsed=%s pending_terminal_ft=%s quarter_complete=%s",
+                    game_id,
+                    gm.quarter,
+                    time_before_turn,
+                    gm.game_state.get("time_remaining"),
+                    gm.game_state.get("shot_clock_remaining"),
+                    latest_turn_type,
+                    latest_turn_next,
+                    latest_turn_elapsed,
+                    pending_terminal_ft_after_turn,
+                    quarter_complete,
+                )
+
+            # Detect repeated FINAL_HOLD at 0:00 (infinite-loop symptom).
+            if isinstance(latest_turn, dict) and latest_turn.get("result_type") == "FINAL_HOLD" and gm.game_state.get("time_remaining", 0) <= 0:
+                streak = int(gm.game_state.get("_debug_final_hold_streak", 0) or 0) + 1
+                gm.game_state["_debug_final_hold_streak"] = streak
+                if streak >= 2:
+                    logging.error(
+                        "🚨 [ZERO CLOCK LOOP TRACE] repeated FINAL_HOLD streak=%s game_id=%s quarter=%s clock=%s time_remaining=%s shot_clock_remaining=%s pending_terminal_ft=%s free_throws_remaining=%s offensive_state=%s latest_turn_next=%s",
+                        streak,
+                        game_id,
+                        gm.quarter,
+                        gm.game_state.get("clock"),
+                        gm.game_state.get("time_remaining"),
+                        gm.game_state.get("shot_clock_remaining"),
+                        pending_terminal_ft_after_turn,
+                        gm.game_state.get("free_throws_remaining"),
+                        gm.game_state.get("offensive_state"),
+                        latest_turn.get("next_play_type"),
+                    )
+            else:
+                gm.game_state["_debug_final_hold_streak"] = 0
             
             # Debug logging for quarter completion check
             if quarter_complete:
@@ -4049,11 +4294,28 @@ try:
                 finally:
                     db_save_time = (time.time() - db_save_start) * 1000
             
+            # Clock contract at top level so frontend can always apply it (turn may be BATCH wrapper without contract)
+            _src = latest_turn
+            if isinstance(_src, dict) and _src.get("result_type") == "BATCH" and _src.get("batch_turns"):
+                _src = _src["batch_turns"][0]
+            _contract = (
+                _src.get("clock_start"),
+                _src.get("clock_end"),
+                _src.get("shot_clock_start"),
+                _src.get("shot_clock_end"),
+                _src.get("real_time_elapsed_ms"),
+            ) if isinstance(_src, dict) else (None, None, None, None, None)
             # Return turn data + metadata
             response_data = {
                 "turn": latest_turn,
+                "clock_start": _contract[0],
+                "clock_end": _contract[1],
+                "shot_clock_start": _contract[2],
+                "shot_clock_end": _contract[3],
+                "real_time_elapsed_ms": _contract[4],
                 "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
                 "time_remaining": gm.game_state["time_remaining"],
+                "shot_clock_remaining": gm.game_state.get("shot_clock_remaining", min(30, gm.game_state.get("time_remaining", 0))),
                 "clock": gm.game_state.get("clock", "8:00"),
                 "quarter_complete": quarter_complete,
                 "quarter": gm.quarter,
@@ -4224,6 +4486,70 @@ try:
         gm = ongoing_games.get(game_id) if game_id else None
         if gm is None:
             raise HTTPException(status_code=404, detail=f"Game {game_id} not found.")
+
+        def _parse_clock_to_seconds(clock_str: str | None) -> int | None:
+            if not clock_str or not isinstance(clock_str, str):
+                return None
+            try:
+                parts = clock_str.strip().split(":")
+                if len(parts) != 2:
+                    return None
+                minutes = int(parts[0])
+                seconds = int(parts[1])
+                if minutes < 0 or seconds < 0 or seconds > 59:
+                    return None
+                return minutes * 60 + seconds
+            except Exception:
+                return None
+
+        # Timeout-click clock reconciliation:
+        # If frontend display is ahead of backend game_state, preserve the more-elapsed value for timeout save.
+        backend_time = int(gm.game_state.get("time_remaining", 0) or 0)
+        backend_clock = gm.game_state.get("clock")
+        displayed_time = (
+            int(request.displayed_time_remaining)
+            if isinstance(request.displayed_time_remaining, int)
+            else _parse_clock_to_seconds(request.displayed_clock)
+        )
+        effective_time = backend_time
+        if displayed_time is not None:
+            effective_time = max(0, min(backend_time, int(displayed_time)))
+
+        if effective_time != backend_time:
+            gm.game_state["time_remaining"] = effective_time
+            gm.game_state["clock"] = f"{effective_time // 60}:{effective_time % 60:02d}"
+
+        backend_shot = int(
+            gm.game_state.get("shot_clock_remaining", min(30, int(gm.game_state.get("time_remaining", 0) or 0))) or 0
+        )
+        displayed_shot = (
+            int(request.displayed_shot_clock_remaining)
+            if isinstance(request.displayed_shot_clock_remaining, int)
+            else None
+        )
+        effective_shot = backend_shot
+        if displayed_shot is not None:
+            effective_shot = max(0, min(backend_shot, displayed_shot, effective_time))
+            gm.game_state["shot_clock_remaining"] = effective_shot
+        else:
+            gm.game_state["shot_clock_remaining"] = max(0, min(backend_shot, effective_time))
+
+        if request.timeout_trace_id:
+            gm.game_state["timeout_trace_id"] = request.timeout_trace_id
+
+        logging.warning(
+            "🧭 [TIMEOUT TRACE] click-capture trace_id=%s game_id=%s backend_clock=%s backend_time=%s displayed_clock=%s displayed_time=%s effective_time=%s backend_shot=%s displayed_shot=%s effective_shot=%s",
+            gm.game_state.get("timeout_trace_id") or request.timeout_trace_id,
+            game_id,
+            backend_clock,
+            backend_time,
+            request.displayed_clock,
+            displayed_time,
+            gm.game_state.get("time_remaining"),
+            backend_shot,
+            displayed_shot,
+            gm.game_state.get("shot_clock_remaining"),
+        )
         
         calling_team = gm.home_team if calling_team_side == 'home' else gm.away_team
         
@@ -4266,7 +4592,8 @@ try:
                 "quarter_complete": timeout_response["quarter_complete"],
                 "home_score": timeout_response["home_score"],
                 "away_score": timeout_response["away_score"],
-                "game_id": timeout_response["game_id"]
+                "game_id": timeout_response["game_id"],
+                "timeout_trace_id": timeout_response.get("timeout_trace_id"),
             }
         except Exception as e:
             logging.error(f"🚨 TIMEOUT: Failed to save game state: {e}")
@@ -4280,6 +4607,7 @@ try:
             "away_team_timeouts": getattr(gm.away_team, 'timeouts', 4),
                 "clock": gm.game_state.get("clock", "8:00"),
                 "time_remaining": gm.game_state.get("time_remaining", 480),
+                "timeout_trace_id": gm.game_state.get("timeout_trace_id"),
         }
     
     
