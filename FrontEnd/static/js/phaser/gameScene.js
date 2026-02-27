@@ -1526,6 +1526,7 @@ export function createGameScene(Phaser) {
             
             showFoulOutPopup({
               player: foulOutPlayer,
+              foulOutPlayerId: foulOutId,
               gameId: this.gameId,
               mode: mode,
               quarter: liveQuarter,

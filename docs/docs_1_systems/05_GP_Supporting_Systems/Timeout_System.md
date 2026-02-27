@@ -145,10 +145,10 @@ The `next_play_type` in the timeout turn is **always** `"SIDE_INBOUND"` (except 
 
 **Frontend (popup):**
 - **File:** `FrontEnd/static/js/phaser/utils/foulOutPopup.js`
-- **Player resolution:** Before showing the popup, the fouled-out player is resolved from `simData.players` by **string id** (`foul_out_player.player_id` or `playerId`). This guarantees the correct player (the one who fouled out) is shown even if the turn payload is ambiguous.
-- **Image path:** Use the player’s **string id** (same as API `player_id` / `playerId`; not an object id). Path: `/images/players/{playerId}.png`. Fallback: `/images/players/default.png` if the primary image fails.
+- **Single source of truth for image:** Same pattern as the shooting-foul popup (which uses `turnData.foul_player_id`). Call sites pass `foulOutPlayerId` from the turn: `turn.foul_out_player?.player_id ?? turn.foul_out_player?.playerId`. The popup uses this id for the image URL; if missing, it falls back to `player.player_id` / `player.playerId`.
+- **Image path:** `/images/players/{foulOutPlayerId}.png` (string id from the turn; same as API `player_id`). Fallback: `/images/players/default.png` if the primary image fails.
 - **Static prefix:** On localhost/127.0.0.1 prepend `/static` (backend serves static from `/static/`). On Netlify and production use no prefix (site root is already the static publish folder).
-- **Call sites:** `gameScene.js` and `AnimationEngine.js` both resolve the player from `simData.players` by `foul_out_player.player_id` before calling `showFoulOutPopup`, so the popup always receives the fouling-out player.
+- **Call sites:** `gameScene.js` and `AnimationEngine.js` pass `foulOutPlayerId: turn.foul_out_player?.player_id ?? turn.foul_out_player?.playerId` (or `turnData.foul_out_player` in AnimationEngine) so the image is always wired to the fouling-out player’s id from the turn.
 
 ### Foul Out Player Lineup Removal & Visual Indicators
 

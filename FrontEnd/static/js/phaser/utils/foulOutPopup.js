@@ -13,8 +13,9 @@
  * @param {string} [options.awayId] - Away team ID
  * @param {string} [options.myTeamSide] - User's team side ('home' or 'away')
  * @param {string} [options.userTeamId] - User's team ID
+ * @param {string} [options.foulOutPlayerId] - Fouling-out player's id from turn (single source of truth for image; same as shooting-foul uses turnData.foul_player_id)
  */
-export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournamentId, franchiseId, homeTeam, awayTeam, homeId, awayId, myTeamSide, userTeamId }) {
+export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournamentId, franchiseId, homeTeam, awayTeam, homeId, awayId, myTeamSide, userTeamId, foulOutPlayerId: foulOutPlayerIdFromTurn }) {
   // Remove any existing popup
   const existingPopup = document.querySelector('.foul-out-popup');
   if (existingPopup) {
@@ -47,7 +48,7 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
 
   // ✅ FOUL OUT: Remove fouled-out player from user's lineup (user must replace this slot)
   try {
-    const foulOutPlayerId = player?.player_id || player?.playerId || player?.id;
+    const foulOutPlayerId = (foulOutPlayerIdFromTurn != null && foulOutPlayerIdFromTurn !== '') ? String(foulOutPlayerIdFromTurn) : (player?.player_id || player?.playerId || player?.id);
     const foulOutPlayerTeam = player?.team;
     const userTeamName = effectiveMyTeamSide === 'home' ? homeTeam : awayTeam;
 
@@ -113,9 +114,9 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
   
   const lineupUrl = `/set-lineup.html?${params.toString()}`;
 
-  // Resolve player image URL — same rule as announcement system (announcements.js): bare path, no API_CONFIG dependency.
-  const rawId = player?.player_id ?? player?.playerId ?? player?.id;
-  const playerId = rawId != null ? String(rawId) : '';
+  // Resolve player image URL — same as shooting-foul: use turn's foul_out_player.player_id as single source of truth (announcements.js uses turnData.foul_player_id).
+  const imagePlayerId = (foulOutPlayerIdFromTurn != null && foulOutPlayerIdFromTurn !== '') ? String(foulOutPlayerIdFromTurn) : (player?.player_id ?? player?.playerId ?? player?.id);
+  const playerId = imagePlayerId != null ? String(imagePlayerId) : '';
   const rawPhoto = player?.photo || player?.image_url;
   let photoUrl = '';
   if (rawPhoto && typeof rawPhoto === 'string' && rawPhoto.trim()) {

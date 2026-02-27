@@ -534,6 +534,7 @@ export class AnimationEngine {
           const quarter = turnData.quarter ?? this.scene.quarter ?? 1;
           showFoulOutPopup({
             player,
+            foulOutPlayerId: foulOutPlayerId,
             gameId,
             mode,
             quarter,
