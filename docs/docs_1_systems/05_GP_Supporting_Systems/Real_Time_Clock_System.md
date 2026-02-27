@@ -271,3 +271,18 @@ if x > violation_threshold, violation = True, else shot attempt = True
 if shot attempt, the ball handler shoots from his location at the point the turn ends
 - add 100 to the shot threshold when calculating shot success
 
+## Second Chance System (Motion only)
+
+When a **Motion** HCO turn would hit shot clock 0, the offense gets one chance to “recalibrate” to an earlier step and take a normal shot instead of a violation or shot-at-1.
+
+**When it runs:** Only for Motion plays. Only when the shot clock would reach 0 during the turn (same point as the violation/shot-at-1 decision). If the violation step index is &lt; 3, recalibration is skipped (no valid earlier step).
+
+**Roll:**
+- `recalibration_score = (chemistry × 3) + (discipline × 2)` (chemistry 7–25, discipline -10–10).
+- `die_roll = random.randint(1, 100)`.
+- If `die_roll < recalibration_score` → recalibrate; else → normal violation/shot-at-1 logic.
+
+**Recalibration:** Pick a random step index in **[2, violation_step − 1]**. Resolve the motion shot from that step (same shot-type and execution logic as normal motion). Replace the turn’s skeleton with that shot sequence; game and shot clock elapse to the new shot. No new shot execution code—existing `resolve_motion_offense_shot` is called with a forced step index.
+
+**Location:** `BackEnd/engine/phase_resolution.py` — shot clock block in `resolve_half_court_offense_logic`, and downstream motion shot block when `_motion_shot_recalibrated` is set. See `docs/To Do/_motion_play_decision.md` for the original spec.
+
