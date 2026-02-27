@@ -130,7 +130,14 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
   if (!photoUrl && playerId) {
     photoUrl = `/images/players/${playerId}.png`;
   }
-  const defaultPlayerImg = '/images/players/default.png';
+  let defaultPlayerImg = '/images/players/default.png';
+  // Prepend /static only in popup (localhost + Netlify staging); production stays at root. No api-config.
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  const staticPrefix = (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.netlify.app')) ? '/static' : '';
+  if (photoUrl && !photoUrl.startsWith('http')) {
+    photoUrl = staticPrefix + photoUrl;
+  }
+  defaultPlayerImg = staticPrefix + defaultPlayerImg;
   const safePhotoUrl = photoUrl.replace(/"/g, '&quot;');
   const safeDefaultImg = defaultPlayerImg.replace(/"/g, '&quot;');
   const safeName = (player?.name || 'Player').replace(/"/g, '&quot;');
