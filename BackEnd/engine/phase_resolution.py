@@ -4983,9 +4983,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
     off_pt_opp_modifier = off_attrs.get("pt_opp_modifier", 0)
     def_pt_efficiency = def_attrs.get("pt_efficiency", 0)
     def_discipline = def_attrs.get("discipline", 0)
+    off_fight = int(off_attrs.get("fight", 0))
     
-    # Calculate BSM (Base Success Modifier) = 500 for FCP
-    BSM = 500
+    # Calculate BSM (Base Success Modifier): 400 + (10 * offense fight), then chemistry adjustments (FCP_HCT_System.md)
+    BSM = 400 + (10 * off_fight)
     
     # Offense contribution to BSM (using pt_opp_modifier)
     if off_pt_opp_modifier > 0:
@@ -5012,8 +5013,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
     if (offenseScore + BSM) > defenseScore:
         # Success
         if offenseScore - defenseScore > DST:
-            # Dominant success - weighted random
-            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.3, 0.5, 0.2])[0]
+            # Dominant success - weighted random (FCP_HCT_System.md: D_FOUL 30%, HCO 40%, SHOT 30%)
+            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.3, 0.4, 0.3])[0]
         else:
             # Regular success - just break through
             result_type = "HCO"
@@ -6159,9 +6160,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     off_pt_opp_modifier = off_attrs.get("pt_opp_modifier", 0)
     def_pt_efficiency = def_attrs.get("pt_efficiency", 0)
     def_discipline = def_attrs.get("discipline", 0)
+    off_fight = int(off_attrs.get("fight", 0))
     
-    # Calculate BSM (Base Success Modifier) = 300 for HCT
-    BSM = 300
+    # Calculate BSM (Base Success Modifier): 200 + (10 * offense fight), then chemistry adjustments (FCP_HCT_System.md)
+    BSM = 200 + (10 * off_fight)
     
     # Offense contribution to BSM (using pt_opp_modifier)
     if off_pt_opp_modifier > 0:
@@ -6188,8 +6190,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     if (offenseScore + BSM) > defenseScore:
         # Success
         if offenseScore - defenseScore > DST:
-            # Dominant success - weighted random
-            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.3, 0.5, 0.2])[0]
+            # Dominant success - weighted random (FCP_HCT_System.md: D_FOUL 30%, HCO 40%, SHOT 30%)
+            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.3, 0.4, 0.3])[0]
         else:
             # Regular success - just break through
             result_type = "HCO"

@@ -1,10 +1,10 @@
 ## FCP/HCT System ✅ **COMPLETE** (January 2025)
 
 **Base Constants**
-1. FCP Success Threshold: `offenseScore + 500 > defenseScore`
-2. HCT Success Threshold: `offenseScore + 300 > defenseScore` (lower than FCP)
+1. FCP Success Threshold: `offenseScore + BSM (defined below) > defenseScore`
+2. HCT Success Threshold: `offenseScore + BSM (defined below) > defenseScore` (lower than FCP)
 3. Dominant Success Threshold: `offenseScore - defenseScore > 1000` (for both FCP and HCT)
-4. Success Result Weights: `["D_FOUL", "HCO", "SHOT"]` with weights `[0.3, 0.5, 0.2]`
+4. Success Result Weights: `["D_FOUL", "HCO", "SHOT"]` with weights `[0.3, 0.4, 0.3]`
 5. Failure Result Weights: `["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"]` with weights `[0.2, 0.5, 0.3]`
 6. Turnover Type Weights: `["TRAVEL", "DOUBLE DRIBBLE", "BAD PASS"]` with weights `[0.6, 0.3, 0.1]`
 
@@ -28,17 +28,19 @@
    - **Note**: Scores are attribute-based (not purely random), with a random multiplier applied
 
 5. Determine Outcome Type #
-   - BSM (Base Success Modifier) = 500 for FCP, 300 for HCT
+   - Calculate BSM (Base Success Modifier)
+      - Starting FCP BSM = 400 + (10 * offense team's fight attribute value)
+      - Starting HCT BSM = 200 + (10 * offense team's fight attribute value)
       - BSM += random.randint(1, offense team chemistry) * offense pt_opp_modifier if offense team pt_opp_modifier > 0, else += random.randint(1, offense team chemistry)
       - BSM -= random.randint(1, defense team chemistry) * defense team pt_efficiency if defense team pt_efficiency > 0 else -= random.randint(1, defense team chemistry)
     - DST (Defense Safety Threshold) = 600 for FCP, 800 for HCT
       - DST += random.randint(1, defense team chemistry) * defense team discipline if defense team discipline > 0 else += random.randint(1, defense team chemistry)
    - **FCP Success**: `if (offenseScore + BSM) > defenseScore`
-     - If `offenseScore - defenseScore > DST`: Weighted random `["D_FOUL", "HCO", "SHOT"]` with weights `[0.3, 0.5, 0.2]`
+     - If `offenseScore - defenseScore > DST`: Weighted random `["D_FOUL", "HCO", "SHOT"]` with weights `[0.3, 0.4, 0.3]`
      - Otherwise: `"HCO"` (press break)
    - **FCP Failure**: Otherwise → Weighted random `["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"]` with weights `[0.2, 0.5, 0.3]`
    - **HCT Success**: `if (offenseScore + BSM) > defenseScore` (lower threshold than FCP)
-     - If `offenseScore - defenseScore > DST`: Weighted random `["D_FOUL", "HCO", "SHOT"]` with weights `[0.3, 0.5, 0.2]`
+     - If `offenseScore - defenseScore > DST`: Weighted random `["D_FOUL", "HCO", "SHOT"]` with weights `[0.3, 0.4, 0.3]`
      - Otherwise: `"HCO"` (trap break)
    - **HCT Failure**: Otherwise → Weighted random `["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"]` with weights `[0.2, 0.5, 0.3]`
 
