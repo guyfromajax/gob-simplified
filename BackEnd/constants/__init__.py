@@ -194,11 +194,11 @@ SITUATIONAL_SIP_RECEIVER_POS = "SG"
 
 # Movement rates (game seconds vs grid distance); see Real_Time_Clock_System.md
 # Doc lists rate as x/y; segment formula uses x rate: sqrt(dx^2+dy^2)/x
-OPEN_FLOOR_GRID_PER_GAME_SECOND = 20  # OF (20/20): bring-up, fallback
-CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND = 18  # COF (18/18): HCT/FCP steps, Fast Break
-ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND = 12  # Drive (12/12): attack to basket
-COMPRESSED_HCO_GRID_PER_GAME_SECOND = 16  # Compressed HCO (16/16): non-drive non-shoot
-HCO_SHOT_GRID_PER_GAME_SECOND = 14  # HCO shot with movement (14/14); stationary = 1 sec
+OPEN_FLOOR_GRID_PER_GAME_SECOND = 20  # OF (20/15): bring-up, fallback
+CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND = 16  # COF (16/12): HCT/FCP steps, Fast Break
+ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND = 12  # Drive (12/9): attack to basket
+COMPRESSED_HCO_GRID_PER_GAME_SECOND = 12  # Compressed HCO (12/9): non-drive non-shoot
+HCO_SHOT_GRID_PER_GAME_SECOND = 16  # HCO shot with movement (16/12) per (e); stationary = 1 sec
 PASS_GRID_SPOTS_PER_GAME_SECOND = 36  # Pass (ball in air): Euclidean
 
 HCO_STRING_SPOTS = {

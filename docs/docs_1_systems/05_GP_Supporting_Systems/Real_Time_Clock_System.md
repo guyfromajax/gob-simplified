@@ -76,26 +76,26 @@ Rates are defined as **grid units per game second** per axis (x / y). Segment fo
 
 | ID | Type | Description | Rate (x / y) |
 |----|------|-------------|--------------|
-| **a)** | **Open Floor (OF)** | Unabated, unchallenged movement. | **20 / 20** |
+| **a)** | **Open Floor (OF)** | Unabated, unchallenged movement. | **20 / 15** |
 | | | Examples: bring the ball up from BIP or SIP; bring-up when no inbound positions (e.g. DREB→HCO fallback). | |
-| **b)** | **Challenged Open Floor (COF)** | Non-HCO skeleton steps with defensive pressure. | **18 / 18** |
+| **b)** | **Challenged Open Floor (COF)** | Non-HCO skeleton steps with defensive pressure. | **16 / 12** |
 | | | Examples: HCT and FCP skeleton steps (non-drive actions); all Fast Break movement. | |
-| **c)** | **Drive / Attack to basket** | Any skeleton step (HCO, HCT, or FCP) with action **"drive"**. | **12 / 12** |
-| **d)** | **Compressed HCO** | HCO skeleton steps that are neither drive nor shoot (cut, handle_ball, receive, pass as movement). | **16 / 16** |
-| **e)** | **HCO shot attempts** | HCO step with shoot action. If there is player movement to the shot spot, use Compressed rate (16/12). If all players stationary, assign **1 game second** for the step. | **14 / 14** or **1 sec** |
-| **f)** | **All other steps** | Any skeleton step not covered by (a)–(e). Open Floor is the fallback. | **20 / 20** |
+| **c)** | **Drive / Attack to basket** | Any skeleton step (HCO, HCT, or FCP) with action **"drive"**. | **12 / 9** |
+| **d)** | **Compressed HCO** | HCO skeleton steps that are neither drive nor shoot (cut, handle_ball, receive, pass as movement). | **12 / 9** |
+| **e)** | **HCO shot attempts** | HCO step with shoot action. If there is player movement to the shot spot, use Compressed rate (16/12). If all players stationary, assign **1 game second** for the step. | **12 / 9** or **1 sec** |
+| **f)** | **All other steps** | Any skeleton step not covered by (a)–(e). Open Floor is the fallback. | **20 / 15** |
 | **g)** | **Pass (ball in air)** | Additive: 1 game second per 36 grid spots (Euclidean) from passer to receiver. Applied in addition to movement time for the step. | **36** (Euclidean) |
 
 ### Segment formulas
 
 | Type | Rate | Formula |
 |------|------|---------|
-| **OF** | 20 / 20 | `segment_seconds = sqrt(dx^2 + dy^2) / 20` |
-| **COF** | 18 / 18 | `segment_seconds = sqrt(dx^2 + dy^2) / 18` |
-| **Drive** | 12 / 12 | `segment_seconds = sqrt(dx^2 + dy^2) / 12` |
-| **Compressed HCO** | 16 / 16 | `segment_seconds = sqrt(dx^2 + dy^2) / 16` |
-| **HCO shot (with movement)** | 14 / 14 | `segment_seconds = sqrt(dx^2 + dy^2) / 14`; stationary = 1 sec |
-| **Fallback (other steps)** | 20 / 20 | `segment_seconds = sqrt(dx^2 + dy^2) / 20` |
+| **OF** | 20 / 15 | `segment_seconds = sqrt(dx^2 + dy^2) / 20` |
+| **COF** | 16 / 12 | `segment_seconds = sqrt(dx^2 + dy^2) / 16` |
+| **Drive** | 12 / 9 | `segment_seconds = sqrt(dx^2 + dy^2) / 12` |
+| **Compressed HCO** | 12 / 9 | `segment_seconds = sqrt(dx^2 + dy^2) / 12` |
+| **HCO shot (with movement)** | 16 / 12 | `segment_seconds = sqrt(dx^2 + dy^2) / 16`; stationary = 1 sec |
+| **Fallback (other steps)** | 20 / 15 | `segment_seconds = sqrt(dx^2 + dy^2) / 20` |
 | **Pass (ball in air)** | 36 (Euclidean) | `segment_seconds = sqrt(dx^2 + dy^2) / 36` — added to step duration when step contains a pass event. |
 
 Pass is used in: HCO, HCT, FCP (skeleton steps with pass events); Fast Break (outlet pass); OREB Kickout (kickout pass from rebounder to PG).
