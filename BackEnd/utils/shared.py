@@ -1512,13 +1512,28 @@ def summarize_game_state(game, exclude_animations=True):
     
     # Process turns: exclude animations for database persistence, keep for real-time frontend
     from copy import deepcopy
-    
+
+    def _turns_to_serializable(turn_list):
+        """Recursively replace Player instances with player_to_dict so JSON serialization succeeds."""
+        from BackEnd.models.player import Player, player_to_dict
+
+        def _convert(obj):
+            if isinstance(obj, Player):
+                return player_to_dict(obj)
+            if isinstance(obj, list):
+                return [_convert(x) for x in obj]
+            if isinstance(obj, dict):
+                return {k: _convert(v) for k, v in obj.items()}
+            return obj
+
+        return [_convert(t) for t in turn_list]
+
     # For database saves, don't store turns at all (only need game state metadata)
     # Turns are only needed for real-time frontend display, not for persistence
     if exclude_animations:
         turns = []  # Empty array - don't save turns to database (prevents document size issues)
     else:
-        turns = deepcopy(game.turns)  # Keep full turns with animations for real-time frontend
+        turns = _turns_to_serializable(game.turns)  # Serializable copy for JSON response (no Player instances)
     
     # Get cumulative box scores
     cumulative_box = game.get_box_score()
