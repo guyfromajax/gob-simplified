@@ -367,7 +367,7 @@ def calc_skeleton_step_timing_contract(
 def calc_isotropic_segment_seconds(start, end, rate):
     """
     Segment duration using isotropic rate: sqrt(dx^2 + dy^2) / rate.
-    Used for OF (20), COF (16), Drive (12), Compressed HCO (12), HCO shot (16), fallback (20).
+    Used for OF (20), COF (16), Drive (12), Compressed HCO (8), HCO shot (8), fallback (20).
     """
     if not start or not end or not rate:
         return 0.0
