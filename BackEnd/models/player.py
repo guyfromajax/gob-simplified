@@ -184,8 +184,12 @@ class Player:
         self._rescale_attributes()
 
     def __getattr__(self, item):
-        if item in self.attributes:
-            return self.attributes[item]
+        try:
+            attrs = object.__getattribute__(self, "attributes")
+        except AttributeError:
+            raise AttributeError(f"{item} not found")
+        if item in attrs:
+            return attrs[item]
         raise AttributeError(f"{item} not found")
 
 
