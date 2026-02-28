@@ -114,32 +114,15 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
   
   const lineupUrl = `/set-lineup.html?${params.toString()}`;
 
-  // Resolve player image URL — same as shooting-foul: use turn's foul_out_player.player_id as single source of truth (announcements.js uses turnData.foul_player_id).
+  // Image: id only, same as Defensive Foul announcement — do not use player.photo.
   const imagePlayerId = (foulOutPlayerIdFromTurn != null && foulOutPlayerIdFromTurn !== '') ? String(foulOutPlayerIdFromTurn) : (player?.player_id ?? player?.playerId ?? player?.id);
   const playerId = imagePlayerId != null ? String(imagePlayerId) : '';
-  const rawPhoto = player?.photo || player?.image_url;
-  let photoUrl = '';
-  if (rawPhoto && typeof rawPhoto === 'string' && rawPhoto.trim()) {
-    const t = rawPhoto.trim();
-    if (t.startsWith('http://') || t.startsWith('https://')) {
-      photoUrl = t;
-    } else {
-      const base = typeof window !== 'undefined' ? window.location.origin : '';
-      photoUrl = t.startsWith('/') ? `${base}${t}` : `${base}/${t}`;
-    }
-  }
-  if (!photoUrl && playerId) {
-    photoUrl = `/images/players/${playerId}.png`;
-  }
-  let defaultPlayerImg = '/images/players/default.png';
-  // Prepend /static only for local dev (backend serves from /static/). Netlify and production use root.
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   const staticPrefix = (hostname === 'localhost' || hostname === '127.0.0.1') ? '/static' : '';
-  if (photoUrl && !photoUrl.startsWith('http')) {
-    photoUrl = staticPrefix + photoUrl;
-  }
-  defaultPlayerImg = staticPrefix + defaultPlayerImg;
-  const safePhotoUrl = photoUrl.replace(/"/g, '&quot;');
+  let photoUrl = playerId ? `/images/players/${playerId}.png` : '';
+  if (photoUrl) photoUrl = staticPrefix + photoUrl;
+  const defaultPlayerImg = staticPrefix + '/images/players/default.png';
+  const safePhotoUrl = photoUrl ? photoUrl.replace(/"/g, '&quot;') : '';
   const safeDefaultImg = defaultPlayerImg.replace(/"/g, '&quot;');
   const safeName = (player?.name || 'Player').replace(/"/g, '&quot;');
   const initialContent = photoUrl
