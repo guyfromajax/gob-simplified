@@ -13,7 +13,7 @@ Define how gameplay turns map to clock countdown behavior using four clock categ
 Used for turn types with skeleton steps (`HCO`, `FCP`, `HCT`).
 
 Clock calculation:
-- **Bespoke per-step timing**: each step’s game seconds = time for the **last player in that step to reach his destination**. For each step, the backend considers all movers (from `pos_actions` vs previous step): **drive** actions use attack drive rate (1 game second per 12 grid spots, Euclidean); all other movement uses CG rate (anisotropic). Step duration = **max**(mover durations), or a minimum fallback (1 game second) when movement cannot be computed. **Pass steps**: ball-in-air time from passer to receiver (1 game second per 36 grid spots, Euclidean) is added to that step’s clock seconds. No blanket “2 seconds per step” or “1 second per step”; timing is derived from actual movement.
+- **Bespoke per-step timing**: each step’s game seconds = time for the **last player in that step to reach his destination**. For each step, the backend considers all movers and applies the rate for that movement type (Open Floor, Challenged Open Floor, Drive, Compressed HCO, HCO shot, or fallback). Step duration = **max**(mover durations), or a minimum of 1 game second when no movement is computed. **Pass (ball in air)** time is added to the step when a pass event occurs. See **Movement rates** below for the full classification and formulas.
 - Backend emits per-step timing contract:
   - `step_clock_seconds[]`
   - `resolution_step_index`
@@ -22,7 +22,7 @@ Clock calculation:
 - Cap per turn: `min(sum_steps, 30)`
 - HCO step-1 bring-up overhead:
   - Add movement-based overhead seconds to step 0 timing (setup-to-step1 bring-up), then apply cap.
-  - Overhead uses distance rule aligned with CG scaling and rounds to nearest second.
+  - Overhead uses **Open Floor (OF)** rate when inbound positions are available; otherwise fallback segment (step0→step1 ball-handler) at OF rate. See **Movement rates** below.
 
 Execution:
 - Backend computes authoritative `time_elapsed`
@@ -37,10 +37,8 @@ Execution:
 Used for non-skeleton turns that travel significant court distance (`FAST_BREAK`).
 
 Clock calculation (per movement segment):
-- `dx = abs(x2 - x1)`
-- `dy = abs(y2 - y1)`
-- `segment_seconds = sqrt((dx/20)^2 + (dy/10)^2)`
-- Turn elapsed = sum of all segment seconds (plus optional small action costs if enabled later)
+- Fast Break movement uses **Challenged Open Floor (COF)** rate: `segment_seconds = sqrt(dx^2 + dy^2) / 20`.
+- Turn elapsed = sum of all segment seconds (plus pass in-air where applicable). See **Movement rates** below.
 
 Execution:
 - Build movement segment timeline from start/end points
@@ -72,11 +70,34 @@ Execution:
 
 ## Movement rates (game seconds vs grid distance)
 
-| Context | Rate | Formula / note |
-|--------|------|----------------|
-| **CG (cover-ground)** | Anisotropic | `segment_seconds = sqrt((dx/20)^2 + (dy/10)^2)` — e.g. fast break, pre-HCO bring-up. |
-| **Attack drive to basket** | 1 game second per 12 grid spots | Euclidean grid distance: `segment_seconds = sqrt(dx^2 + dy^2) / 12`. Used for drive steps in motion HCO (attack shot drives to the basket). |
-| **Pass (ball in air)** | 1 game second per 36 grid spots | Euclidean grid distance from passer to receiver: `segment_seconds = sqrt(dx^2 + dy^2) / 36`. Used in: **HCO, HCT, FCP** (skeleton steps with pass events); **Fast Break** (outlet pass from rebounder to ball handler); **OREB Kickout** (kickout pass from rebounder to PG). Affects both game-time elapsed and (via step budget) real-time estimate. |
+Rates are defined as **grid units per game second** per axis. Isotropic rates (e.g. 24/24) use the same value for x and y; the segment formula is Euclidean distance divided by that rate. **Step duration** = max over all movers in that step (time for last player to reach destination), or a minimum of 1 game second when no movement is computed. **Pass (ball in air)** time is additive to the step when a pass event occurs.
+
+### Movement type classification
+
+| ID | Type | Description | Rate (x / y) |
+|----|------|-------------|--------------|
+| **a)** | **Open Floor (OF)** | Unabated, unchallenged movement. | **24 / 24** |
+| | | Examples: bring the ball up from BIP or SIP; bring-up when no inbound positions (e.g. DREB→HCO fallback). | |
+| **b)** | **Challenged Open Floor (COF)** | Non-HCO skeleton steps with defensive pressure. | **20 / 20** |
+| | | Examples: HCT and FCP skeleton steps (non-drive actions); all Fast Break movement. | |
+| **c)** | **Drive / Attack to basket** | Any skeleton step (HCO, HCT, or FCP) with action **"drive"**. | **16 / 16** |
+| **d)** | **Compressed HCO** | HCO skeleton steps that are neither drive nor shoot (cut, handle_ball, receive, pass as movement). | **16 / 16** |
+| **e)** | **HCO shot attempts** | HCO step with shoot action. If there is player movement to the shot spot, use Compressed rate (16/16). If all players stationary, assign **1 game second** for the step. | **16 / 16** or **1 sec** |
+| **f)** | **All other steps** | Any skeleton step not covered by (a)–(e). Open Floor is the fallback. | **24 / 24** |
+| **g)** | **Pass (ball in air)** | Additive: 1 game second per 36 grid spots (Euclidean) from passer to receiver. Applied in addition to movement time for the step. | **36** (Euclidean) |
+
+### Segment formulas
+
+| Type | Rate | Formula |
+|------|------|---------|
+| **OF** | 24 / 24 | `segment_seconds = sqrt(dx^2 + dy^2) / 24` |
+| **COF** | 20 / 20 | `segment_seconds = sqrt(dx^2 + dy^2) / 20` |
+| **Drive** | 16 / 16 | `segment_seconds = sqrt(dx^2 + dy^2) / 16` |
+| **Compressed HCO** | 16 / 16 | `segment_seconds = sqrt(dx^2 + dy^2) / 16` |
+| **Fallback (other steps)** | 24 / 24 | `segment_seconds = sqrt(dx^2 + dy^2) / 24` |
+| **Pass (ball in air)** | 36 (Euclidean) | `segment_seconds = sqrt(dx^2 + dy^2) / 36` — added to step duration when step contains a pass event. |
+
+Pass is used in: HCO, HCT, FCP (skeleton steps with pass events); Fast Break (outlet pass); OREB Kickout (kickout pass from rebounder to PG).
 
 ## Turn Classification Matrix
 

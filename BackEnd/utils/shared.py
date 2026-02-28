@@ -9,6 +9,9 @@ from BackEnd.constants import (
     BLOCKING_FOUL_THRESHOLD,
     ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND,
     PASS_GRID_SPOTS_PER_GAME_SECOND,
+    OPEN_FLOOR_GRID_PER_GAME_SECOND,
+    CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND,
+    COMPRESSED_HCO_GRID_PER_GAME_SECOND,
 )
 
 
@@ -187,15 +190,9 @@ def _get_step_ball_handler_pos(step):
 
 def _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions=None):
     """
-    Pre-HCO bring-up time: distance-based using same rate as CG (unabated up the floor).
-    Rate: sqrt((dx/20)^2 + (dy/10)^2) game seconds per segment (Real_Time_Clock_System.md).
-
-    When prev_offense_positions is provided (e.g. from BIP/SIP oDestinations): use the
-    player who has the most distance to cover to reach their Step 0 position; that
-    determines the segment duration so the whole unit arrives in sync.
-
-    When prev_offense_positions is not provided (e.g. DREB→HCO): fall back to step0→step1
-    ball-handler move (legacy bring-up).
+    Pre-HCO bring-up time: Open Floor (OF) rate 24 grid/game sec (Real_Time_Clock_System.md).
+    When prev_offense_positions is provided (e.g. BIP/SIP oDestinations): max over offense
+    players' distance to step 0. When not provided (e.g. DREB→HCO): step0→step1 ball-handler.
     """
     if not steps:
         return 0
@@ -203,7 +200,6 @@ def _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions=None):
     pos_actions0 = (step0.get("pos_actions") or {})
 
     if prev_offense_positions:
-        # Pre-step-0: max over offense players of (distance from prev position to step 0 position)
         max_seconds = 0.0
         for pos, prev_coords in prev_offense_positions.items():
             if not prev_coords or not isinstance(prev_coords, dict):
@@ -214,12 +210,11 @@ def _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions=None):
             step0_coords = _extract_step_location_coords(action_info)
             if not step0_coords:
                 continue
-            seg = calc_cg_segment_seconds(prev_coords, step0_coords)
+            seg = calc_isotropic_segment_seconds(prev_coords, step0_coords, OPEN_FLOOR_GRID_PER_GAME_SECOND)
             if seg > max_seconds:
                 max_seconds = seg
         return int(round(max_seconds)) if max_seconds > 0 else 0
 
-    # Fallback: step0 → step1 ball-handler move (e.g. when no inbound positions stored)
     if len(steps) < 2:
         return 0
     step1 = steps[1]
@@ -232,7 +227,7 @@ def _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions=None):
     end = _extract_step_location_coords(step1_action)
     if not start or not end:
         return 0
-    return int(round(calc_cg_segment_seconds(start, end)))
+    return int(round(calc_isotropic_segment_seconds(start, end, OPEN_FLOOR_GRID_PER_GAME_SECOND)))
 
 
 # Minimum game seconds per step when movement cannot be computed (no blanket per-step default).
@@ -245,14 +240,12 @@ def calc_skeleton_step_timing_contract(
     cap=30,
     include_hco_step1_bringup=False,
     prev_offense_positions=None,
+    phase_type=None,
 ):
     """
-    Build deterministic per-step clock timing contract for skeleton turns.
-    Each step's duration = max over all movers in that step (time for last player to reach
-    destination): drive actions use drive rate (1 game sec per 12 grid spots), other movement
-    uses CG rate. Pass in-air time is added to the step. When include_hco_step1_bringup is
-    True, prev_offense_positions (e.g. from BIP/SIP oDestinations) is used for pre-step-0
-    bring-up. Steps with no computable movement use FALLBACK_STEP_SECONDS.
+    Build per-step clock timing per Real_Time_Clock_System.md movement rates.
+    phase_type: 'HCO' | 'HCT' | 'FCP' | None. Drive→16, HCO non-drive→16, HCO shoot stationary→1,
+    HCT/FCP non-drive→20, fallback→24. Pass in-air added per step. Bring-up uses OF 24 when enabled.
     """
     if not steps:
         one_step = FALLBACK_STEP_SECONDS
@@ -278,9 +271,13 @@ def calc_skeleton_step_timing_contract(
             continue
 
         mover_durations = []
+        pos_actions_i = step_i.get("pos_actions") or {}
+        step_has_shoot = any(
+            (a or {}).get("action") == "shoot" for a in (pos_actions_i or {}).values()
+        )
+
         if i > 0:
             prev_step = steps[i - 1]
-            pos_actions_i = step_i.get("pos_actions") or {}
             prev_actions = prev_step.get("pos_actions") or {}
             for pos, action_info in (pos_actions_i or {}).items():
                 action_info = action_info or {}
@@ -290,15 +287,34 @@ def calc_skeleton_step_timing_contract(
                     continue
                 prev_info = prev_actions.get(pos)
                 start_coords = _extract_step_location_coords(prev_info) if prev_info else None
-                if action == "drive" and start_coords:
+                if not start_coords:
+                    continue
+                dx = abs((end_coords.get("x", 0) or 0) - (start_coords.get("x", 0) or 0))
+                dy = abs((end_coords.get("y", 0) or 0) - (start_coords.get("y", 0) or 0))
+                has_movement = (dx * dx + dy * dy) > 0
+
+                if action == "drive":
                     sec = calc_drive_segment_seconds(start_coords, end_coords)
                     mover_durations.append(sec)
-                elif start_coords:
-                    sec = calc_cg_segment_seconds(start_coords, end_coords)
+                elif has_movement:
+                    if phase_type == "HCO":
+                        sec = calc_isotropic_segment_seconds(
+                            start_coords, end_coords, COMPRESSED_HCO_GRID_PER_GAME_SECOND
+                        )
+                    elif phase_type in ("HCT", "FCP"):
+                        sec = calc_isotropic_segment_seconds(
+                            start_coords, end_coords, CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
+                        )
+                    else:
+                        sec = calc_isotropic_segment_seconds(
+                            start_coords, end_coords, OPEN_FLOOR_GRID_PER_GAME_SECOND
+                        )
                     if sec > 0:
                         mover_durations.append(sec)
 
         step_sec = max(mover_durations) if mover_durations else 0
+        if step_sec == 0 and phase_type == "HCO" and step_has_shoot:
+            step_sec = 1
         step_sec = max(FALLBACK_STEP_SECONDS, round(step_sec)) if step_sec else FALLBACK_STEP_SECONDS
 
         # Pass in-air time for this step
@@ -344,9 +360,21 @@ def calc_skeleton_step_timing_contract(
     }
 
 
+def calc_isotropic_segment_seconds(start, end, rate):
+    """
+    Segment duration using isotropic rate: sqrt(dx^2 + dy^2) / rate.
+    Used for OF (24), COF (20), Drive (16), Compressed HCO (16), fallback (24).
+    """
+    if not start or not end or not rate:
+        return 0.0
+    dx = abs((end.get("x", 0) or 0) - (start.get("x", 0) or 0))
+    dy = abs((end.get("y", 0) or 0) - (start.get("y", 0) or 0))
+    return math.sqrt(dx * dx + dy * dy) / float(rate)
+
+
 def calc_cg_segment_seconds(start, end):
     """
-    Cover-ground segment duration using anisotropic distance scaling.
+    Legacy anisotropic CG; prefer calc_isotropic_segment_seconds with explicit rate where applicable.
     """
     if not start or not end:
         return 0.0

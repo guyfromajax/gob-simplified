@@ -141,14 +141,18 @@ The `next_play_type` in the timeout turn is **always** `"SIDE_INBOUND"` (except 
 
 ### Foul Out Popup – Player Image
 
-**Purpose:** Show the **fouling-out** player’s headshot in the foul-out modal (the player who has 5 fouls and is ejected), not the player who was fouled.
+**Purpose:** Show the **fouling-out** player’s headshot in the foul-out modal (the player who has 5 fouls and is ejected). Works for every foul-out type: offensive foul, non-shooting defensive foul, shooting defensive foul, etc.
+
+**How it works (same as Defensive Foul announcement):**
+- **Id only for the image.** Do not use `player.photo` or any other field for the image URL. The image is built from the fouling-out player’s id and the path only.
+- **Id from the turn.** Call sites pass `foulOutPlayerId` from the turn: `turn.foul_out_player?.player_id ?? turn.foul_out_player?.playerId` (gameScene) or `turnData.foul_out_player?.player_id ?? turnData.foul_out_player?.playerId` (AnimationEngine). If that’s missing, the popup falls back to `player?.player_id ?? player?.playerId ?? player?.id` for the image id.
+- **Image path:** `/images/players/{foulOutPlayerId}.png` (string id; same as API `player_id`). Fallback: `/images/players/default.png` on img `onerror`.
+- **Static prefix:** On localhost/127.0.0.1 prepend `/static`. On Netlify and production use no prefix (site root is the static publish folder).
 
 **Frontend (popup):**
 - **File:** `FrontEnd/static/js/phaser/utils/foulOutPopup.js`
-- **Single source of truth for image:** Same pattern as the shooting-foul popup (which uses `turnData.foul_player_id`). Call sites pass `foulOutPlayerId` from the turn: `turn.foul_out_player?.player_id ?? turn.foul_out_player?.playerId`. The popup uses this id for the image URL; if missing, it falls back to `player.player_id` / `player.playerId`.
-- **Image path:** `/images/players/{foulOutPlayerId}.png` (string id from the turn; same as API `player_id`). Fallback: `/images/players/default.png` if the primary image fails.
-- **Static prefix:** On localhost/127.0.0.1 prepend `/static` (backend serves static from `/static/`). On Netlify and production use no prefix (site root is already the static publish folder).
-- **Call sites:** `gameScene.js` and `AnimationEngine.js` pass `foulOutPlayerId: turn.foul_out_player?.player_id ?? turn.foul_out_player?.playerId` (or `turnData.foul_out_player` in AnimationEngine) so the image is always wired to the fouling-out player’s id from the turn.
+- **Logic:** `imagePlayerId` = `foulOutPlayerIdFromTurn` when present, else from `player`. `photoUrl` = `playerId ? staticPrefix + '/images/players/' + playerId + '.png' : ''`. No use of `player.photo` or `player.image_url` for the image.
+- **Call sites:** `gameScene.js` and `AnimationEngine.js` pass `foulOutPlayerId` from the turn so the image is always wired to the fouling-out player’s id. The backend sets `foul_out_player` for every foul-out type, so this works universally.
 
 ### Foul Out Player Lineup Removal & Visual Indicators
 

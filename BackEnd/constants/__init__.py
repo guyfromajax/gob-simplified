@@ -192,10 +192,11 @@ SITUATIONAL_BIP_RECEIVER_POS = "SG"
 SITUATIONAL_SIP_RECEIVER_POS = "SG"
 
 # Movement rates (game seconds vs grid distance); see Real_Time_Clock_System.md
-# Attack drive to basket: 1 game second per N grid spots (Euclidean)
-ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND = 12
-# Pass (ball in air): 1 game second per N grid spots (Euclidean), from passer to receiver
-PASS_GRID_SPOTS_PER_GAME_SECOND = 36
+OPEN_FLOOR_GRID_PER_GAME_SECOND = 24  # OF: unabated movement (bring-up, fallback)
+CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND = 20  # COF: HCT/FCP steps, Fast Break
+ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND = 16  # Drive: attack to basket
+COMPRESSED_HCO_GRID_PER_GAME_SECOND = 16  # Compressed HCO: non-drive non-shoot, HCO shot with movement
+PASS_GRID_SPOTS_PER_GAME_SECOND = 36  # Pass (ball in air): Euclidean
 
 HCO_STRING_SPOTS = {
     "key": {"x": 64, "y": 25},
