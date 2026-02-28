@@ -37,7 +37,7 @@ Execution:
 Used for non-skeleton turns that travel significant court distance (`FAST_BREAK`).
 
 Clock calculation (per movement segment):
-- Fast Break movement uses **Challenged Open Floor (COF)** rate: `segment_seconds = sqrt(dx^2 + dy^2) / 20`.
+- Fast Break movement uses **Challenged Open Floor (COF)** rate (20/15): `segment_seconds = sqrt(dx^2 + dy^2) / 20`. See **Movement rates** below.
 - Turn elapsed = sum of all segment seconds (plus pass in-air where applicable). See **Movement rates** below.
 
 Execution:
@@ -70,19 +70,19 @@ Execution:
 
 ## Movement rates (game seconds vs grid distance)
 
-Rates are defined as **grid units per game second** per axis. Isotropic rates (e.g. 24/24) use the same value for x and y; the segment formula is Euclidean distance divided by that rate. **Step duration** = max over all movers in that step (time for last player to reach destination), or a minimum of 1 game second when no movement is computed. **Pass (ball in air)** time is additive to the step when a pass event occurs.
+Rates are defined as **grid units per game second** per axis (x / y). Segment formulas use the x rate for isotropic calculation: `segment_seconds = sqrt(dx^2 + dy^2) / x_rate`. **Step duration** = max over all movers in that step (time for last player to reach destination), or a minimum of 1 game second when no movement is computed. **Pass (ball in air)** time is additive to the step when a pass event occurs.
 
 ### Movement type classification
 
 | ID | Type | Description | Rate (x / y) |
 |----|------|-------------|--------------|
-| **a)** | **Open Floor (OF)** | Unabated, unchallenged movement. | **24 / 24** |
+| **a)** | **Open Floor (OF)** | Unabated, unchallenged movement. | **24 / 18** |
 | | | Examples: bring the ball up from BIP or SIP; bring-up when no inbound positions (e.g. DREB→HCO fallback). | |
-| **b)** | **Challenged Open Floor (COF)** | Non-HCO skeleton steps with defensive pressure. | **20 / 20** |
+| **b)** | **Challenged Open Floor (COF)** | Non-HCO skeleton steps with defensive pressure. | **20 / 15** |
 | | | Examples: HCT and FCP skeleton steps (non-drive actions); all Fast Break movement. | |
-| **c)** | **Drive / Attack to basket** | Any skeleton step (HCO, HCT, or FCP) with action **"drive"**. | **16 / 16** |
-| **d)** | **Compressed HCO** | HCO skeleton steps that are neither drive nor shoot (cut, handle_ball, receive, pass as movement). | **16 / 16** |
-| **e)** | **HCO shot attempts** | HCO step with shoot action. If there is player movement to the shot spot, use Compressed rate (16/16). If all players stationary, assign **1 game second** for the step. | **16 / 16** or **1 sec** |
+| **c)** | **Drive / Attack to basket** | Any skeleton step (HCO, HCT, or FCP) with action **"drive"**. | **16 / 12** |
+| **d)** | **Compressed HCO** | HCO skeleton steps that are neither drive nor shoot (cut, handle_ball, receive, pass as movement). | **16 / 12** |
+| **e)** | **HCO shot attempts** | HCO step with shoot action. If there is player movement to the shot spot, use Compressed rate (16/12). If all players stationary, assign **1 game second** for the step. | **16 / 12** or **1 sec** |
 | **f)** | **All other steps** | Any skeleton step not covered by (a)–(e). Open Floor is the fallback. | **24 / 24** |
 | **g)** | **Pass (ball in air)** | Additive: 1 game second per 36 grid spots (Euclidean) from passer to receiver. Applied in addition to movement time for the step. | **36** (Euclidean) |
 
@@ -90,10 +90,10 @@ Rates are defined as **grid units per game second** per axis. Isotropic rates (e
 
 | Type | Rate | Formula |
 |------|------|---------|
-| **OF** | 24 / 24 | `segment_seconds = sqrt(dx^2 + dy^2) / 24` |
-| **COF** | 20 / 20 | `segment_seconds = sqrt(dx^2 + dy^2) / 20` |
-| **Drive** | 16 / 16 | `segment_seconds = sqrt(dx^2 + dy^2) / 16` |
-| **Compressed HCO** | 16 / 16 | `segment_seconds = sqrt(dx^2 + dy^2) / 16` |
+| **OF** | 24 / 18 | `segment_seconds = sqrt(dx^2 + dy^2) / 24` |
+| **COF** | 20 / 15 | `segment_seconds = sqrt(dx^2 + dy^2) / 20` |
+| **Drive** | 16 / 12 | `segment_seconds = sqrt(dx^2 + dy^2) / 16` |
+| **Compressed HCO** | 16 / 12 | `segment_seconds = sqrt(dx^2 + dy^2) / 16` |
 | **Fallback (other steps)** | 24 / 24 | `segment_seconds = sqrt(dx^2 + dy^2) / 24` |
 | **Pass (ball in air)** | 36 (Euclidean) | `segment_seconds = sqrt(dx^2 + dy^2) / 36` — added to step duration when step contains a pass event. |
 
@@ -199,7 +199,7 @@ Goal: ensure correctness, responsiveness, and stable UX.
 ## Acceptance Criteria
 - Every simulated turn has deterministic category-based `time_elapsed` logic applied on backend.
 - `Skeleton` and `CG` turns never exceed `30` seconds elapsed.
-- CG calculation uses `sqrt((dx/20)^2 + (dy/10)^2)` with round-at-end and cap.
+- CG (Fast Break) calculation uses COF rate: `segment_seconds = sqrt(dx^2 + dy^2) / 20`; see Movement rates. Round-at-end and cap apply.
 - `INBOUND_PASS`, `SIDE_INBOUND_PASS`, and `FREE_THROW` always return `time_elapsed = 0`.
 - Frontend countdown runs continuously during active play, pauses correctly, and syncs at turn boundaries.
 - No increase in backend/API call frequency.
