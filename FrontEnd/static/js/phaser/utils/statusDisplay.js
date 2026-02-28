@@ -8,19 +8,21 @@
  * @param {string} msg - Status message to display
  */
 export function showStatus(msg) {
+  const container = document.getElementById('phaser-container') || document.body;
   let el = document.getElementById('sim-status');
   if (!el) {
     el = document.createElement('div');
     el.id = 'sim-status';
     el.style.color = '#fff';
     el.style.fontFamily = 'Bebas Neue, sans-serif';
-    el.style.position = 'fixed';
+    // Position relative to court container so "Simulating Q..." is vertically centered in the court
+    el.style.position = 'absolute';
     el.style.top = '50%';
     el.style.left = '50%';
     el.style.transform = 'translate(-50%, -50%)';
     el.style.fontSize = '24px';
     el.style.zIndex = '10000';
-    const container = document.getElementById('phaser-container') || document.body;
+    el.style.pointerEvents = 'none';
     container.appendChild(el);
   }
   el.textContent = msg;

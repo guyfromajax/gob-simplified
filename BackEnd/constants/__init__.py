@@ -161,14 +161,14 @@ THREE_POINT_SHOT_THRESHOLD_INCREASE = 40
 # Target averages per game:
 # - 60 field goal attempts per team per game
 # - Average target FG% of 45%
-STANDARD_D_FOUL = 95
-STANDARD_O_FOUL = 5
+STANDARD_D_FOUL = 93
+STANDARD_O_FOUL = 7
 HARD_STEAL = -135
 SOFT_STEAL = -35
 HARD_FOUL = 250
 SOFT_FOUL = 150
 STEAL_ATTEMPT = 30
-DEAD_BALL_TURNOVER = 8
+DEAD_BALL_TURNOVER = 6
 
 # Charge/Blocking Foul (drive reconciliation thresholds)
 # reconciliation = offense_score - defense_score
