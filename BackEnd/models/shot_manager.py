@@ -15,6 +15,7 @@ from BackEnd.constants import (
     AGGRESSION_FOUL_MULTIPLIER,
     HARD_SHOOTING_FOUL_THRESHOLD,
     SOFT_SHOOTING_FOUL_THRESHOLD,
+    HARD_PROB,
     SOFT_PROB
 )
 from BackEnd.utils.shared import (
@@ -1842,8 +1843,7 @@ class ShotManager:
 
         # Determine if foul occurs
         if defense_score < hard_threshold:
-            d_foul = True
-            # logging.warning(f"   ✅ RESULT: HARD FOUL (defense_score {defense_score} < hard_threshold {hard_threshold})")
+            d_foul = random.random() < HARD_PROB
         elif defense_score < soft_threshold:
             # Soft foul: random chance based on SOFT_PROB
             soft_roll = random.random()

@@ -148,6 +148,7 @@ AGGRESSION_FOUL_MULTIPLIER = {
 # Shooting Foul System constants
 HARD_SHOOTING_FOUL_THRESHOLD = 50
 SOFT_SHOOTING_FOUL_THRESHOLD = 110
+HARD_PROB = 0.85  # When defense_score < hard_threshold, call shooting foul with this probability (reduces automatic fouls)
 SOFT_PROB = 0.16
 
 # Shooting Foul Calibration constants (chance that a defensive shooting foul forces a miss)

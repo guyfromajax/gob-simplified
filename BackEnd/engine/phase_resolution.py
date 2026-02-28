@@ -3838,9 +3838,9 @@ def resolve_half_court_offense_logic(game):
                     chemistry = int(off_team.team_attributes.get("team_chemistry", 7))
                     discipline = int(off_team.team_attributes.get("discipline", 0))
 
-                    # Motion recalibration: chance to shoot from step index 2..(i-1) to avoid violation
+                    # Motion recalibration: chance to shoot from step index 2..(i-1) to avoid violation (Real_Time_Clock_System.md)
                     if is_motion_play and i >= 3:
-                        recalibration_score = (chemistry * 3) + (discipline * 2)
+                        recalibration_score = (chemistry * 5) + (discipline * 3)
                         die_roll = random.randint(1, 100)
                         if die_roll < recalibration_score:
                             chosen_step = random.randint(2, i - 1)
