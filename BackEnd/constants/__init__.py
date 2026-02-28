@@ -148,7 +148,7 @@ AGGRESSION_FOUL_MULTIPLIER = {
 # Shooting Foul System constants
 HARD_SHOOTING_FOUL_THRESHOLD = 50
 SOFT_SHOOTING_FOUL_THRESHOLD = 110
-HARD_PROB = 0.85  # When defense_score < hard_threshold, call shooting foul with this probability (reduces automatic fouls)
+HARD_PROB = 0.7  # When defense_score < hard_threshold, call shooting foul with this probability (reduces automatic fouls)
 SOFT_PROB = 0.16
 
 # Shooting Foul Calibration constants (chance that a defensive shooting foul forces a miss)
@@ -168,7 +168,7 @@ SOFT_STEAL = -35
 HARD_FOUL = 250
 SOFT_FOUL = 150
 STEAL_ATTEMPT = 30
-DEAD_BALL_TURNOVER = 30  # temp change from 7
+DEAD_BALL_TURNOVER = 15  # temp change from 7 and then 30
 
 # Charge/Blocking Foul (drive reconciliation thresholds)
 # reconciliation = offense_score - defense_score
@@ -366,6 +366,6 @@ TEMPO_PARAMS = {
 
 # Team attribute clamps (min, max) for shot_threshold and rebound_modifier. Used by team init and training.
 TEAM_ATTR_RANGES = {
-    "shot_threshold": (0, 200),
+    "shot_threshold": (10, 210),
     "rebound_modifier": (0.0, 0.4),
 }

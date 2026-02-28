@@ -403,37 +403,38 @@ class TeamManager:
                 a_lo, a_hi = 5, 10
                 tc_lo, tc_hi = 20, 25
                 rm_lo, rm_hi = 30, 40  # 0.30-0.40
-                st_lo, st_hi = 0, 100
+                st_lo, st_hi = 10, 110
             elif tournament_seed <= 4:
                 a_lo, a_hi = -2, 10
                 tc_lo, tc_hi = 12, 25
                 rm_lo, rm_hi = 15, 40  # 0.15-0.40
-                st_lo, st_hi = 0, 150
+                st_lo, st_hi = 10, 160
             elif tournament_seed <= 7:
                 a_lo, a_hi = -8, 5
                 tc_lo, tc_hi = 8, 18
                 rm_lo, rm_hi = 1, 40  # 0.01-0.40
-                st_lo, st_hi = 50, 200
+                st_lo, st_hi = 60, 210
             else:  # seed 8
                 a_lo, a_hi = -10, -2
                 tc_lo, tc_hi = 7, 12
                 rm_lo, rm_hi = 1, 20  # 0.01-0.20
-                st_lo, st_hi = 100, 200
+                st_lo, st_hi = 110, 210
             attr_range = (a_lo, a_hi)
             team_chemistry = random.randint(tc_lo, tc_hi)
             rebound_modifier = round(random.randint(rm_lo, rm_hi) / 100.0, 2)
             shot_threshold = random.randint(st_lo, st_hi)
         else:
             # Common/single/franchise or tournament without seed (fallback)
-            st_lo, st_hi = TEAM_ATTR_RANGES["shot_threshold"]
-            shot_threshold = random.randint(int(st_lo), int(st_hi))
             rm_lo, rm_hi = TEAM_ATTR_RANGES["rebound_modifier"]
             if mode == "franchise":
                 attr_range = (-1, 1)
                 team_chemistry = random.randint(7, 10)
                 rebound_modifier = 0.2
+                shot_threshold = random.randint(100, 120)
             else:
                 # Single Game or tournament fallback (no seed)
+                st_lo, st_hi = TEAM_ATTR_RANGES["shot_threshold"]
+                shot_threshold = random.randint(int(st_lo), int(st_hi))
                 attr_range = (-10, 10)
                 team_chemistry = random.randint(7, 25)
                 rebound_modifier = round(rm_lo + random.random() * (rm_hi - rm_lo), 2)

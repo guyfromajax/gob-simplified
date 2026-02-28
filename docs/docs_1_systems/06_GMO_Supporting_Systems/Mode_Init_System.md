@@ -7,9 +7,9 @@ stat## Mode Initialization System ✅ **COMPLETE** (January 2025)
    - **Randomized**: NG=1.0, CH (Character)=random(1-100), MO (Momentum)=0, EM (Emotion)=random(1-100)
 
 2. **Team Attribute Ranges**:
-   - **Single Game**: `random.randint(-10, 10)` for A Group, `team_chemistry=random(7-25)`, `rebound_modifier=random(0.0-0.4)`, `shot_threshold=random(0, 200)`
+   - **Single Game**: `random.randint(-10, 10)` for A Group, `team_chemistry=random(7-25)`, `rebound_modifier=random(0.0-0.4)`, `shot_threshold=random(10, 210)`
    - **Tournament**: Seed-based (Seed 1 best → Seed 8 worst); see "Team Attribute Initialization" below for per-seed ranges
-   - **Franchise**: `random.randint(-1, 1)` for most attributes, `team_chemistry=random(7-10)`, `rebound_modifier=0.2` (fixed), `shot_threshold=random(90, 110)`
+   - **Franchise**: `random.randint(-1, 1)` for most attributes, `team_chemistry=random(7-10)`, `rebound_modifier=0.2` (fixed), `shot_threshold=random(100, 120)`
 
 3. **Common Team Attributes** (all modes):
    - `shot_threshold`
@@ -79,7 +79,7 @@ The Mode Initialization System diversifies attribute values when users create a 
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
 - `team_chemistry`: `random.randint(7, 25)`
 - `rebound_modifier`: `random.randint(0, 40) / 100.0` (random 0.0-0.4 in 0.01 increments)
-- `shot_threshold`: `random.randint(0, 200)`
+- `shot_threshold`: `random.randint(10, 210)`
 
 **Tournament Mode:**
 Ranges will be determined by each team's seed
@@ -88,23 +88,23 @@ Ranges will be determined by each team's seed
 - Custom Group: `team_chemistry`, `rebound_modifier`,`shot_threshold`
 - Seed 1: 
   - A Group: each gets random.randint(5,10), 
-  - Custom Group: team_chemistry random.randint(20,25), rebound_modifier `random.randint(30, 40) / 100.0` (random 0.3-0.4 in 0.01 increments), shot_threshold random.randint(0, 100)
+  - Custom Group: team_chemistry random.randint(20,25), rebound_modifier `random.randint(30, 40) / 100.0` (random 0.3-0.4 in 0.01 increments), shot_threshold random.randint(10, 110)
 - Seeds 2-4: 
   - A Group: each gets random.randint(-2,10), 
-  - Custom Group: team_chemistry random.randint(12,25), rebound_modifier `random.randint(15, 40) / 100.0` (random 0.15-0.4 in 0.01 increments), shot_threshold random.randint(0,150)
+  - Custom Group: team_chemistry random.randint(12,25), rebound_modifier `random.randint(15, 40) / 100.0` (random 0.15-0.4 in 0.01 increments), shot_threshold random.randint(10,160)
 - Seeds 5-7: 
   - A Group: each gets random.randint(-8,5), 
-  - Custom Group: team_chemistry random.randint(8,18), rebound_modifier `random.randint(1, 40) / 100.0` (random 0.01-0.4 in 0.01 increments), shot_threshold random.randint(50,200)
+  - Custom Group: team_chemistry random.randint(8,18), rebound_modifier `random.randint(1, 40) / 100.0` (random 0.01-0.4 in 0.01 increments), shot_threshold random.randint(60,210)
 - Seeds 8: 
   - A Group: each gets random.randint(-10,-2), 
-  - Custom Group: team_chemistry random.randint(7,12), rebound_modifier `random.randint(1, 20) / 100.0` (random 0.01-0.2 in 0.01 increments), shot_threshold random.randint(100,200)
+  - Custom Group: team_chemistry random.randint(7,12), rebound_modifier `random.randint(1, 20) / 100.0` (random 0.01-0.2 in 0.01 increments), shot_threshold random.randint(110,210)
 
 **Franchise Mode:**
 - Attribute range: `random.randint(-1, 1)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
 - `team_chemistry`: `random.randint(7, 10)` (tighter range for more controlled progression)
 - `rebound_modifier`: `0.2` (fixed center value)
-- `shot_threshold`: `random.randint(90, 110)`
+- `shot_threshold`: `random.randint(100, 120)`
 
 **Implementation:**
 - `TeamManager.init_team_attributes(mode, tournament_seed=None)`: accepts `mode` and, for `mode="tournament"`, optional `tournament_seed` (1–8). When `tournament_seed` is provided, uses the seed-based ranges above; otherwise falls back to single-game-style ranges.

@@ -282,11 +282,11 @@ The backend does **not** track shot clock independently. For each turn it derive
 When we reach the point of a potential Shot Clock Violation
 
 chemistry = offense team's chemistry value (7-25)
-discipline = offense team's discipline value (-10 - 10)
-intelligence = int(ball handler' IQ attribute / 5) (0-20)
+discipline = offense team's discipline value (-10, 10)
+intelligence = int(ball handler' IQ attribute / 4) (0-25)
 *Note you don't need to use these exact variable names in the code, I'm just using them as placeholder in the documentation to commuicate intent
 
-50 + chemistry + discipline + intelligence = violation_threshold
+60 + chemistry + discipline + intelligence = violation_threshold
 x = random.randint(1, 100)
 if x > violation_threshold, violation = True, else shot attempt = True
 
@@ -300,7 +300,7 @@ When a **Motion** HCO turn would hit shot clock 0, the offense gets one chance t
 **When it runs:** Only for Motion plays. Only when the shot clock would reach 0 during the turn (same point as the violation/shot-at-1 decision). If the violation step index is &lt; 3, recalibration is skipped (no valid earlier step).
 
 **Roll:**
-- `recalibration_score = (chemistry × 3) + (discipline × 2)` (chemistry 7–25, discipline -10–10).
+- `recalibration_score = (chemistry × 5) + (discipline × 3)` (chemistry 7–25, discipline -10–10).
 - `die_roll = random.randint(1, 100)`.
 - If `die_roll < recalibration_score` → recalibrate; else → normal violation/shot-at-1 logic.
 

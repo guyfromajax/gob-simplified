@@ -3856,8 +3856,8 @@ def resolve_half_court_offense_logic(game):
                     # No recalibration (or failed recalibration): violation vs shot-at-1
                     ball_handler_at_step = get_ball_handler_from_skeleton(final_skeleton, off_lineup, step_index=i)
                     iq = int(getattr(ball_handler_at_step, "attributes", {}).get("IQ", 0) or 0)
-                    intelligence = min(20, iq // 5)
-                    violation_threshold = 50 + chemistry + discipline + intelligence
+                    intelligence = min(25, iq // 4)  # int(IQ/4), cap 0-25 (Real_Time_Clock_System.md)
+                    violation_threshold = 60 + chemistry + discipline + intelligence
                     x = random.randint(1, 100)
                     if x > violation_threshold:
                         # Path A: shot clock violation (current behavior)
