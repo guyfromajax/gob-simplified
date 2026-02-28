@@ -12,6 +12,7 @@ from BackEnd.constants import (
     OPEN_FLOOR_GRID_PER_GAME_SECOND,
     CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND,
     COMPRESSED_HCO_GRID_PER_GAME_SECOND,
+    HCO_SHOT_GRID_PER_GAME_SECOND,
 )
 
 
@@ -298,9 +299,12 @@ def calc_skeleton_step_timing_contract(
                     mover_durations.append(sec)
                 elif has_movement:
                     if phase_type == "HCO":
-                        sec = calc_isotropic_segment_seconds(
-                            start_coords, end_coords, COMPRESSED_HCO_GRID_PER_GAME_SECOND
+                        rate = (
+                            HCO_SHOT_GRID_PER_GAME_SECOND
+                            if step_has_shoot
+                            else COMPRESSED_HCO_GRID_PER_GAME_SECOND
                         )
+                        sec = calc_isotropic_segment_seconds(start_coords, end_coords, rate)
                     elif phase_type in ("HCT", "FCP"):
                         sec = calc_isotropic_segment_seconds(
                             start_coords, end_coords, CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
