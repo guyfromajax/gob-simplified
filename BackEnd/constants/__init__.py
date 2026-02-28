@@ -168,7 +168,7 @@ SOFT_STEAL = -35
 HARD_FOUL = 250
 SOFT_FOUL = 150
 STEAL_ATTEMPT = 30
-DEAD_BALL_TURNOVER = 15  # temp change from 7 and then 30
+DEAD_BALL_TURNOVER = 8
 
 # Charge/Blocking Foul (drive reconciliation thresholds)
 # reconciliation = offense_score - defense_score
@@ -197,8 +197,8 @@ SITUATIONAL_SIP_RECEIVER_POS = "SG"
 OPEN_FLOOR_GRID_PER_GAME_SECOND = 20  # OF (20/15): bring-up, fallback
 CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND = 16  # COF (16/12): HCT/FCP steps, Fast Break
 ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND = 12  # Drive (12/9): attack to basket
-COMPRESSED_HCO_GRID_PER_GAME_SECOND = 8  # Compressed HCO (8/6): non-drive non-shoot
-HCO_SHOT_GRID_PER_GAME_SECOND = 8  # HCO shot with movement (8/6); stationary = 1 sec
+COMPRESSED_HCO_GRID_PER_GAME_SECOND = 10  # Compressed HCO (10/7): non-drive non-shoot
+HCO_SHOT_GRID_PER_GAME_SECOND = 10  # HCO shot with movement (10/7); stationary = 1 sec
 PASS_GRID_SPOTS_PER_GAME_SECOND = 36  # Pass (ball in air): Euclidean
 
 HCO_STRING_SPOTS = {

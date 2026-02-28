@@ -81,8 +81,8 @@ Rates are defined as **grid units per game second** per axis (x / y). Segment fo
 | **b)** | **Challenged Open Floor (COF)** | Non-HCO skeleton steps with defensive pressure. | **16 / 12** |
 | | | Examples: HCT and FCP skeleton steps (non-drive actions); all Fast Break movement. | |
 | **c)** | **Drive / Attack to basket** | Any skeleton step (HCO, HCT, or FCP) with action **"drive"**. | **12 / 9** |
-| **d)** | **Compressed HCO** | HCO skeleton steps that are neither drive nor shoot (cut, handle_ball, receive, pass as movement). | **8 / 6** |
-| **e)** | **HCO shot attempts** | HCO step with shoot action. If there is player movement to the shot spot, use Compressed rate (16/12). If all players stationary, assign **1 game second** for the step. | **8 / 6** or **1 sec** |
+| **d)** | **Compressed HCO** | HCO skeleton steps that are neither drive nor shoot (cut, handle_ball, receive, pass as movement). | **10 / 7** |
+| **e)** | **HCO shot attempts** | HCO step with shoot action. If there is player movement to the shot spot, use Compressed rate (10/7). If all players stationary, assign **1 game second** for the step. | **10 / 7** or **1 sec** |
 | **f)** | **All other steps** | Any skeleton step not covered by (a)–(e). Open Floor is the fallback. | **20 / 15** |
 | **g)** | **Pass (ball in air)** | Additive: 1 game second per 36 grid spots (Euclidean) from passer to receiver. Applied in addition to movement time for the step. | **36** (Euclidean) |
 
@@ -93,8 +93,8 @@ Rates are defined as **grid units per game second** per axis (x / y). Segment fo
 | **OF** | 20 / 15 | `segment_seconds = sqrt(dx^2 + dy^2) / 20` |
 | **COF** | 16 / 12 | `segment_seconds = sqrt(dx^2 + dy^2) / 16` |
 | **Drive** | 12 / 9 | `segment_seconds = sqrt(dx^2 + dy^2) / 12` |
-| **Compressed HCO** | 8 / 6 | `segment_seconds = sqrt(dx^2 + dy^2) / 8` |
-| **HCO shot (with movement)** | 8 / 6 | `segment_seconds = sqrt(dx^2 + dy^2) / 8`; stationary = 1 sec |
+| **Compressed HCO** | 10 / 7 | `segment_seconds = sqrt(dx^2 + dy^2) / 10` |
+| **HCO shot (with movement)** | 10 / 7 | `segment_seconds = sqrt(dx^2 + dy^2) / 10`; stationary = 1 sec |
 | **Fallback (other steps)** | 20 / 15 | `segment_seconds = sqrt(dx^2 + dy^2) / 20` |
 | **Pass (ball in air)** | 36 (Euclidean) | `segment_seconds = sqrt(dx^2 + dy^2) / 36` — added to step duration when step contains a pass event. |
 
