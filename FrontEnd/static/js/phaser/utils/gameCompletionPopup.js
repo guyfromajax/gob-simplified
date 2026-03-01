@@ -270,7 +270,7 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
 
       .potg-stats-row {
         font-family: 'Bebas Neue', sans-serif;
-        font-size: 14px;
+        font-size: 18px;
         letter-spacing: 1px;
         color: #1a1a2e;
         text-align: center;
@@ -279,7 +279,7 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
 
       .potg-meta-row {
         font-family: 'Bebas Neue', sans-serif;
-        font-size: 14px;
+        font-size: 18px;
         letter-spacing: 1px;
         text-align: center;
         line-height: 1.1;
