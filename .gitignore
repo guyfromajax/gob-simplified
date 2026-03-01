@@ -30,3 +30,4 @@ package-lock.json
 
 # God mode config overrides (per-environment, not committed)
 config_overrides.json
+FrontEnd/static/sounds/
