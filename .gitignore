@@ -12,6 +12,9 @@
 # MongoDB backup output (mongodump)
 dump/
 
+# Local backups (avoid committing large zips)
+gob-backup-*.zip
+
 # Backup script log (launchd)
 backup-mongodb.log
 

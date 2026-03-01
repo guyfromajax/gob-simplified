@@ -742,8 +742,8 @@ function createPill(originalValue, attrKey) {
   let value = originalValue;
   
   if (attrKey === 'shot_threshold') {
-    maxValue = 100; // Range is -10 to 190, center at 90, so max deviation is 100
-    value = 90 - originalValue; // Invert: lower is better (positive/green), higher is worse (negative/red)
+    maxValue = 100; // Range is 10 to 210, center at 110, so max deviation is 100
+    value = 110 - originalValue; // Invert: lower is better (positive/green), higher is worse (negative/red)
   } else if (attrKey === 'rebound_modifier') {
     // Rebound modifier is 0.0-0.4, center at 0.2
     // We'll show deviation from 0.2

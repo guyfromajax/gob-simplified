@@ -8,7 +8,8 @@ Title:
 - ALPHA RELEASE
 
 Body:
-- **February 17 Update** Fixed Sim Quarter scoreboard regression bug and Lineup Screen showing incorrect score / time remaining bug. Added UI SFX. 
+- **February 27 Update** Added real time game clock and shot clock. Minimized animation pause between turns. Added Situational Logic to end of quarters and end of game.  
+- **March 1 Calibration** Increased number of possesions in the game. Reduced frequency of shot clock violations and shooting fouls. Re-calibrated team attributes impact at end of games.
 
 Source:
 - `FrontEnd/static/mode-select.html`

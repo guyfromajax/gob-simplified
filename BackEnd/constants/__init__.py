@@ -148,6 +148,7 @@ AGGRESSION_FOUL_MULTIPLIER = {
 # Shooting Foul System constants
 HARD_SHOOTING_FOUL_THRESHOLD = 50
 SOFT_SHOOTING_FOUL_THRESHOLD = 110
+HARD_PROB = 0.7  # When defense_score < hard_threshold, call shooting foul with this probability (reduces automatic fouls)
 SOFT_PROB = 0.16
 
 # Shooting Foul Calibration constants (chance that a defensive shooting foul forces a miss)
@@ -160,14 +161,14 @@ THREE_POINT_SHOT_THRESHOLD_INCREASE = 40
 # Target averages per game:
 # - 60 field goal attempts per team per game
 # - Average target FG% of 45%
-STANDARD_D_FOUL = 95
-STANDARD_O_FOUL = 5
+STANDARD_D_FOUL = 94
+STANDARD_O_FOUL = 6
 HARD_STEAL = -135
 SOFT_STEAL = -35
 HARD_FOUL = 250
 SOFT_FOUL = 150
 STEAL_ATTEMPT = 30
-DEAD_BALL_TURNOVER = 30  # temp change from 7
+DEAD_BALL_TURNOVER = 10
 
 # Charge/Blocking Foul (drive reconciliation thresholds)
 # reconciliation = offense_score - defense_score
@@ -192,10 +193,13 @@ SITUATIONAL_BIP_RECEIVER_POS = "SG"
 SITUATIONAL_SIP_RECEIVER_POS = "SG"
 
 # Movement rates (game seconds vs grid distance); see Real_Time_Clock_System.md
-# Attack drive to basket: 1 game second per N grid spots (Euclidean)
-ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND = 12
-# Pass (ball in air): 1 game second per N grid spots (Euclidean), from passer to receiver
-PASS_GRID_SPOTS_PER_GAME_SECOND = 36
+# Doc lists rate as x/y; segment formula uses x rate: sqrt(dx^2+dy^2)/x
+OPEN_FLOOR_GRID_PER_GAME_SECOND = 20  # OF (20/15): bring-up, fallback
+CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND = 16  # COF (16/12): HCT/FCP steps, Fast Break
+ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND = 12  # Drive (12/9): attack to basket
+COMPRESSED_HCO_GRID_PER_GAME_SECOND = 10  # Compressed HCO (10/7): non-drive non-shoot
+HCO_SHOT_GRID_PER_GAME_SECOND = 10  # HCO shot with movement (10/7); stationary = 1 sec
+PASS_GRID_SPOTS_PER_GAME_SECOND = 36  # Pass (ball in air): Euclidean
 
 HCO_STRING_SPOTS = {
     "key": {"x": 64, "y": 25},
@@ -362,6 +366,6 @@ TEMPO_PARAMS = {
 
 # Team attribute clamps (min, max) for shot_threshold and rebound_modifier. Used by team init and training.
 TEAM_ATTR_RANGES = {
-    "shot_threshold": (0, 200),
+    "shot_threshold": (10, 210),
     "rebound_modifier": (0.0, 0.4),
 }

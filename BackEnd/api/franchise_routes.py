@@ -419,44 +419,45 @@ def update_team_attributes_after_game(
             },
         )
         
-        # shot_threshold
+        # shot_threshold: winning team by FG%; losing team by FG% (different ranges)
         if is_winner:
             if fg_pct > 50:
-                changes["shot_threshold"] = -random.randint(5, 15)
+                changes["shot_threshold"] = random.randint(-20, -10)   # −(10 to 20)
             elif fg_pct > 45:
-                changes["shot_threshold"] = 0
+                changes["shot_threshold"] = random.randint(-10, 0)    # −(0 to 10)
             else:
-                changes["shot_threshold"] = random.randint(5, 15)
+                changes["shot_threshold"] = random.randint(0, 10)     # +(0 to 10)
         else:
-            changes["shot_threshold"] = random.randint(10, 25)
+            if fg_pct > 50:
+                changes["shot_threshold"] = random.randint(-15, -5)   # −(5 to 15)
+            elif fg_pct > 45:
+                changes["shot_threshold"] = random.randint(-5, 0)    # −(0 to 5)
+            else:
+                changes["shot_threshold"] = random.randint(0, 15)     # +(0 to 15)
         
-        # discipline
-        to = team_totals.get("TO", 0)
-        stl = team_totals.get("STL", 0)
-        discipline_branch = "mid"
-        if to > (2 * stl):
-            discipline_branch = "to_gt_2x_stl"
-            changes["discipline"] = random.randint(-3, -2)
-        elif (to * 2) < stl:
-            discipline_branch = "to_x2_lt_stl"
-            changes["discipline"] = random.randint(1, 2)
+        # discipline: both teams same criteria — if team (F+TO) < opponent (F+TO) then +(0,1), else −(1 to 3)
+        team_f_plus_to = team_totals.get("F", 0) + team_totals.get("TO", 0)
+        opp_f_plus_to = opponent_totals.get("F", 0) + opponent_totals.get("TO", 0)
+        discipline_branch = "f_plus_to_ge_opp"
+        if team_f_plus_to < opp_f_plus_to:
+            discipline_branch = "f_plus_to_lt_opp"
+            changes["discipline"] = random.randint(0, 1)
         else:
-            discipline_branch = "else"
-            changes["discipline"] = random.randint(-2, 0)
+            changes["discipline"] = random.randint(-3, -1)
         logger.warning(
-            "🧪 [EOG-BRANCH] team=%s attr=discipline branch=%s to=%s stl=%s raw_change=%s",
+            "🧪 [EOG-BRANCH] team=%s attr=discipline branch=%s team_f_plus_to=%s opp_f_plus_to=%s raw_change=%s",
             str(team_id_label),
             discipline_branch,
-            to,
-            stl,
+            team_f_plus_to,
+            opp_f_plus_to,
             changes.get("discipline"),
         )
         
-        # fight
+        # fight: winning +(0, 1), losing +(−3 to −1)
         if is_winner:
-            changes["fight"] = random.randint(1, 2)
+            changes["fight"] = random.randint(0, 1)
         else:
-            changes["fight"] = random.randint(-4, -1)
+            changes["fight"] = random.randint(-3, -1)
         
         # rebound_modifier
         if treb > (opp_treb + 5):
@@ -466,11 +467,11 @@ def update_team_attributes_after_game(
         else:
             changes["rebound_modifier"] = random.uniform(-0.05, 0.05)
         
-        # offensive_efficiency
-        changes["offensive_efficiency"] = random.randint(-2, 0)
+        # offensive_efficiency: both teams +(−2, −1)
+        changes["offensive_efficiency"] = random.randint(-2, -1)
         
-        # defensive_efficiency
-        changes["defensive_efficiency"] = random.randint(-2, 0)
+        # defensive_efficiency: both teams +(−2, −1)
+        changes["defensive_efficiency"] = random.randint(-2, -1)
         
         # fb_efficiency
         if team_scouting["fb_rate"] > 60:

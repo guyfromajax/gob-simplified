@@ -29,7 +29,7 @@ def _normalize_team_name_key(name: str | None) -> str | None:
 
 
 def _aggregate_from_box(team_box_score: dict) -> dict:
-    out = {"FGM": 0, "FGA": 0, "TO": 0, "STL": 0, "DREB": 0, "OREB": 0}
+    out = {"FGM": 0, "FGA": 0, "TO": 0, "STL": 0, "DREB": 0, "OREB": 0, "F": 0}
     if isinstance(team_box_score, dict):
         for player_stats in team_box_score.values():
             if isinstance(player_stats, dict):
@@ -39,6 +39,7 @@ def _aggregate_from_box(team_box_score: dict) -> dict:
                 out["STL"] += player_stats.get("STL", 0)
                 out["DREB"] += player_stats.get("DREB", 0)
                 out["OREB"] += player_stats.get("OREB", 0)
+                out["F"] += player_stats.get("F", 0)
     return out
 
 
@@ -127,6 +128,7 @@ def calculate_team_totals_from_sources(
             "STL": totals.get("STL", 0),
             "DREB": totals.get("DREB", 0),
             "OREB": totals.get("OREB", 0),
+            "F": totals.get("F", 0),
         }
 
     from_box = _aggregate_from_box((box_score_obj or {}).get(team_id_label, {}))
@@ -232,6 +234,7 @@ def build_eog_inputs_from_game_doc(game_doc: dict, home_team_id: str, away_team_
             "STL": home_team_totals.get("STL", 0),
             "DREB": home_team_totals.get("DREB", 0),
             "OREB": home_team_totals.get("OREB", 0),
+            "F": home_team_totals.get("F", 0),
         }
         home_totals_source = "teams.totals"
     else:
@@ -250,6 +253,7 @@ def build_eog_inputs_from_game_doc(game_doc: dict, home_team_id: str, away_team_
             "STL": away_team_totals.get("STL", 0),
             "DREB": away_team_totals.get("DREB", 0),
             "OREB": away_team_totals.get("OREB", 0),
+            "F": away_team_totals.get("F", 0),
         }
         away_totals_source = "teams.totals"
     else:

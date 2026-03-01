@@ -43,7 +43,7 @@
 - This prevents final-turn edge cases from skipping score-impacting free throws and keeps quarter/final scoring consistent.
 
 **Team Attributes Update System**
-Team attributes will adjust at the end of game based on the notes below. Note this will replace the team attribute decay we had coded into the Training System.
+Team attributes will adjust at the end of game based on the notes below. Note this will replace the team attribute decay we had coded into the Training System. For a side-by-side comparison with Training, see `docs/To Do/team_attributes_eog_vs_training_comparison.md`.
 - Values will be capped to normal ranges:
   - `shot_threshold`: 0 to 200
   - `rebound_modifier`: 0 to 0.4
@@ -51,26 +51,22 @@ Team attributes will adjust at the end of game based on the notes below. Note th
   - all others: -10 to 10
 - End of game attribute adjustments (applies to each team, all stat conditions for the game just run):
   - `shot_threshold`
-    - winning team: 
-      - If game FG% > 50%: -= random.randint(5,15)
-      - elif game FG% > 45%: 0
-      - else: += random.randint(5,15)
-    - losing team: += random.randint(10,25)
-  - `discipline` (winning and losing team have same criteria)
-    - if team TO > (2 * team STL): += random.randint(-3, -2)
-    - elif team (team TO * 2) < team STL: += random.randint(1,2)
-    - else: += (-2, 0)
-  - `fight` 
-    - winning team: += random.randint(1,2)
-    - losing team: += random.randint(-4,-1)
+    - **Winning team:** If game FG% > 50%: −(10 to 20); if FG% > 45%: −(0 to 10); else +(0 to 10).
+    - **Losing team:** If game FG% > 50%: −(5 to 15); if FG% > 45%: −(0 to 5); else +(0 to 15).
+  - `discipline` (both teams, same criteria)
+    - If team (F + TO) < opponent's (F + TO): += random.randint(0, 1). Otherwise: += random.randint(-3, -1).
+    - F = team fouls for the game (from box score / team totals).
+  - `fight`
+    - **Winning team:** += random.randint(0, 1).
+    - **Losing team:** += random.randint(-3, -1).
   - `rebound_modifier` (winning and losing team have same criteria)
     - if team TREB for the game > opponents TREB for the game + 5: += random.uniform(0, 0.1)
-    - elif TREB for the game < oppoens TREB for the game - 5: += random.uniform(-0.1, 0)
+    - elif TREB for the game < opponents TREB for the game - 5: += random.uniform(-0.1, 0)
     - else: += random.uniform(-0.05, 0.05)
   - `offensive_efficiency` (winning and losing team have same criteria)
-    - += random.randint(-2,0)
+    - += random.randint(-2, -1)
   - `defensive_efficiency` (winning and losing team have same criteria)
-    - += random.randint(-2,0)
+    - += random.randint(-2, -1)
   - `fb_efficiency`
     - if fast break success rate > 60%: += random.randint(0,1)
     - else: += random.randint(-2,-1)
@@ -100,7 +96,7 @@ Team attributes will adjust at the end of game based on the notes below. Note th
       - winning team += random.randint(1,4)
       - losing team += random.randint(-6,-2)
 - **Data Sources:**
-  - Team statistics (TO, STL, TREB, FG%) come from the current game's box score
+  - Team statistics (F, TO, STL, TREB, FG%) come from the current game's box score / team totals (F = team fouls; used with TO for discipline rule)
   - Fast Break, HC Trap, and FC Press success rates come from the box score's "Special Situations" section
   - Success rates are calculated as: (successes / attempts) * 100%
   - [FOR REFERENCE ONLY]: Previous deprecation rates when run in training:

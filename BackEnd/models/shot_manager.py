@@ -15,6 +15,7 @@ from BackEnd.constants import (
     AGGRESSION_FOUL_MULTIPLIER,
     HARD_SHOOTING_FOUL_THRESHOLD,
     SOFT_SHOOTING_FOUL_THRESHOLD,
+    HARD_PROB,
     SOFT_PROB
 )
 from BackEnd.utils.shared import (
@@ -558,6 +559,7 @@ class ShotManager:
                         resolution_step_index=shot_step_index,
                         include_hco_step1_bringup=is_hco,
                         prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
+                        phase_type="HCO" if is_hco else None,
                     )
                     time_elapsed_ft = timing_contract["time_elapsed"]
                     ft_remaining = 1 if made_from_foul else 2
@@ -629,6 +631,7 @@ class ShotManager:
                     resolution_step_index=shot_step_index,
                     include_hco_step1_bringup=is_hco,
                     prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
+                    phase_type="HCO" if is_hco else None,
                 )
                 time_elapsed = timing_contract["time_elapsed"]
                 
@@ -722,6 +725,7 @@ class ShotManager:
                         resolution_step_index=shot_step_index,
                         include_hco_step1_bringup=is_hco,
                         prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
+                        phase_type="HCO" if is_hco else None,
                     )
                     time_elapsed = timing_contract["time_elapsed"]
                     intended_shooter_pos = roles.get("intended_shooter_pos")
@@ -1546,6 +1550,7 @@ class ShotManager:
                 resolution_step_index=shot_step_index,
                 include_hco_step1_bringup=is_hco,
                 prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
+                phase_type="HCO" if is_hco else None,
             )
             time_elapsed = timing_contract["time_elapsed"]
 
@@ -1838,8 +1843,7 @@ class ShotManager:
 
         # Determine if foul occurs
         if defense_score < hard_threshold:
-            d_foul = True
-            # logging.warning(f"   ✅ RESULT: HARD FOUL (defense_score {defense_score} < hard_threshold {hard_threshold})")
+            d_foul = random.random() < HARD_PROB
         elif defense_score < soft_threshold:
             # Soft foul: random chance based on SOFT_PROB
             soft_roll = random.random()

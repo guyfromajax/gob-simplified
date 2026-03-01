@@ -13,7 +13,7 @@ Define how gameplay turns map to clock countdown behavior using four clock categ
 Used for turn types with skeleton steps (`HCO`, `FCP`, `HCT`).
 
 Clock calculation:
-- **Bespoke per-step timing**: each step’s game seconds = time for the **last player in that step to reach his destination**. For each step, the backend considers all movers (from `pos_actions` vs previous step): **drive** actions use attack drive rate (1 game second per 12 grid spots, Euclidean); all other movement uses CG rate (anisotropic). Step duration = **max**(mover durations), or a minimum fallback (1 game second) when movement cannot be computed. **Pass steps**: ball-in-air time from passer to receiver (1 game second per 36 grid spots, Euclidean) is added to that step’s clock seconds. No blanket “2 seconds per step” or “1 second per step”; timing is derived from actual movement.
+- **Bespoke per-step timing**: each step’s game seconds = time for the **last player in that step to reach his destination**. For each step, the backend considers all movers and applies the rate for that movement type (Open Floor, Challenged Open Floor, Drive, Compressed HCO, HCO shot, or fallback). Step duration = **max**(mover durations), or a minimum of 1 game second when no movement is computed. **Pass (ball in air)** time is added to the step when a pass event occurs. See **Movement rates** below for the full classification and formulas.
 - Backend emits per-step timing contract:
   - `step_clock_seconds[]`
   - `resolution_step_index`
@@ -22,7 +22,7 @@ Clock calculation:
 - Cap per turn: `min(sum_steps, 30)`
 - HCO step-1 bring-up overhead:
   - Add movement-based overhead seconds to step 0 timing (setup-to-step1 bring-up), then apply cap.
-  - Overhead uses distance rule aligned with CG scaling and rounds to nearest second.
+  - Overhead uses **Open Floor (OF)** rate when inbound positions are available; otherwise fallback segment (step0→step1 ball-handler) at OF rate. See **Movement rates** below.
 
 Execution:
 - Backend computes authoritative `time_elapsed`
@@ -37,10 +37,8 @@ Execution:
 Used for non-skeleton turns that travel significant court distance (`FAST_BREAK`).
 
 Clock calculation (per movement segment):
-- `dx = abs(x2 - x1)`
-- `dy = abs(y2 - y1)`
-- `segment_seconds = sqrt((dx/20)^2 + (dy/10)^2)`
-- Turn elapsed = sum of all segment seconds (plus optional small action costs if enabled later)
+- Fast Break movement uses **Challenged Open Floor (COF)** rate (18/18): `segment_seconds = sqrt(dx^2 + dy^2) / 18`. See **Movement rates** below.
+- Turn elapsed = sum of all segment seconds (plus pass in-air where applicable). See **Movement rates** below.
 
 Execution:
 - Build movement segment timeline from start/end points
@@ -72,11 +70,35 @@ Execution:
 
 ## Movement rates (game seconds vs grid distance)
 
-| Context | Rate | Formula / note |
-|--------|------|----------------|
-| **CG (cover-ground)** | Anisotropic | `segment_seconds = sqrt((dx/20)^2 + (dy/10)^2)` — e.g. fast break, pre-HCO bring-up. |
-| **Attack drive to basket** | 1 game second per 12 grid spots | Euclidean grid distance: `segment_seconds = sqrt(dx^2 + dy^2) / 12`. Used for drive steps in motion HCO (attack shot drives to the basket). |
-| **Pass (ball in air)** | 1 game second per 36 grid spots | Euclidean grid distance from passer to receiver: `segment_seconds = sqrt(dx^2 + dy^2) / 36`. Used in: **HCO, HCT, FCP** (skeleton steps with pass events); **Fast Break** (outlet pass from rebounder to ball handler); **OREB Kickout** (kickout pass from rebounder to PG). Affects both game-time elapsed and (via step budget) real-time estimate. |
+Rates are defined as **grid units per game second** per axis (x / y). Segment formulas use the x rate for isotropic calculation: `segment_seconds = sqrt(dx^2 + dy^2) / x_rate`. **Step duration** = max over all movers in that step (time for last player to reach destination), or a minimum of 1 game second when no movement is computed. **Pass (ball in air)** time is additive to the step when a pass event occurs.
+
+### Movement type classification
+
+| ID | Type | Description | Rate (x / y) |
+|----|------|-------------|--------------|
+| **a)** | **Open Floor (OF)** | Unabated, unchallenged movement. | **20 / 15** |
+| | | Examples: bring the ball up from BIP or SIP; bring-up when no inbound positions (e.g. DREB→HCO fallback). | |
+| **b)** | **Challenged Open Floor (COF)** | Non-HCO skeleton steps with defensive pressure. | **16 / 12** |
+| | | Examples: HCT and FCP skeleton steps (non-drive actions); all Fast Break movement. | |
+| **c)** | **Drive / Attack to basket** | Any skeleton step (HCO, HCT, or FCP) with action **"drive"**. | **12 / 9** |
+| **d)** | **Compressed HCO** | HCO skeleton steps that are neither drive nor shoot (cut, handle_ball, receive, pass as movement). | **10 / 7** |
+| **e)** | **HCO shot attempts** | HCO step with shoot action. If there is player movement to the shot spot, use Compressed rate (10/7). If all players stationary, assign **1 game second** for the step. | **10 / 7** or **1 sec** |
+| **f)** | **All other steps** | Any skeleton step not covered by (a)–(e). Open Floor is the fallback. | **20 / 15** |
+| **g)** | **Pass (ball in air)** | Additive: 1 game second per 36 grid spots (Euclidean) from passer to receiver. Applied in addition to movement time for the step. | **36** (Euclidean) |
+
+### Segment formulas
+
+| Type | Rate | Formula |
+|------|------|---------|
+| **OF** | 20 / 15 | `segment_seconds = sqrt(dx^2 + dy^2) / 20` |
+| **COF** | 16 / 12 | `segment_seconds = sqrt(dx^2 + dy^2) / 16` |
+| **Drive** | 12 / 9 | `segment_seconds = sqrt(dx^2 + dy^2) / 12` |
+| **Compressed HCO** | 10 / 7 | `segment_seconds = sqrt(dx^2 + dy^2) / 10` |
+| **HCO shot (with movement)** | 10 / 7 | `segment_seconds = sqrt(dx^2 + dy^2) / 10`; stationary = 1 sec |
+| **Fallback (other steps)** | 20 / 15 | `segment_seconds = sqrt(dx^2 + dy^2) / 20` |
+| **Pass (ball in air)** | 36 (Euclidean) | `segment_seconds = sqrt(dx^2 + dy^2) / 36` — added to step duration when step contains a pass event. |
+
+Pass is used in: HCO, HCT, FCP (skeleton steps with pass events); Fast Break (outlet pass); OREB Kickout (kickout pass from rebounder to PG).
 
 ## Turn Classification Matrix
 
@@ -178,7 +200,7 @@ Goal: ensure correctness, responsiveness, and stable UX.
 ## Acceptance Criteria
 - Every simulated turn has deterministic category-based `time_elapsed` logic applied on backend.
 - `Skeleton` and `CG` turns never exceed `30` seconds elapsed.
-- CG calculation uses `sqrt((dx/20)^2 + (dy/10)^2)` with round-at-end and cap.
+- CG (Fast Break) calculation uses COF rate: `segment_seconds = sqrt(dx^2 + dy^2) / 18`; see Movement rates. Round-at-end and cap apply.
 - `INBOUND_PASS`, `SIDE_INBOUND_PASS`, and `FREE_THROW` always return `time_elapsed = 0`.
 - Frontend countdown runs continuously during active play, pauses correctly, and syncs at turn boundaries.
 - No increase in backend/API call frequency.
@@ -260,11 +282,11 @@ The backend does **not** track shot clock independently. For each turn it derive
 When we reach the point of a potential Shot Clock Violation
 
 chemistry = offense team's chemistry value (7-25)
-discipline = offense team's discipline value (-10 - 10)
-intelligence = int(ball handler' IQ attribute / 5) (0-20)
+discipline = offense team's discipline value (-10, 10)
+intelligence = int(ball handler' IQ attribute / 4) (0-25)
 *Note you don't need to use these exact variable names in the code, I'm just using them as placeholder in the documentation to commuicate intent
 
-50 + chemistry + discipline + intelligence = violation_threshold
+60 + chemistry + discipline + intelligence = violation_threshold
 x = random.randint(1, 100)
 if x > violation_threshold, violation = True, else shot attempt = True
 
@@ -278,7 +300,7 @@ When a **Motion** HCO turn would hit shot clock 0, the offense gets one chance t
 **When it runs:** Only for Motion plays. Only when the shot clock would reach 0 during the turn (same point as the violation/shot-at-1 decision). If the violation step index is &lt; 3, recalibration is skipped (no valid earlier step).
 
 **Roll:**
-- `recalibration_score = (chemistry × 3) + (discipline × 2)` (chemistry 7–25, discipline -10–10).
+- `recalibration_score = (chemistry × 5) + (discipline × 3)` (chemistry 7–25, discipline -10–10).
 - `die_roll = random.randint(1, 100)`.
 - If `die_roll < recalibration_score` → recalibrate; else → normal violation/shot-at-1 logic.
 

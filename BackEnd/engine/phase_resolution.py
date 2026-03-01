@@ -16,12 +16,13 @@ if TYPE_CHECKING:
     from BackEnd.models.game_manager import GameManager
 from BackEnd.models.animator import Animator
 
+from BackEnd.constants import CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
 from BackEnd.utils.shared import (
     get_name_safe,
     get_time_elapsed,
     calc_skeleton_time_elapsed,
     calc_skeleton_step_timing_contract,
-    calc_cg_segment_seconds,
+    calc_isotropic_segment_seconds,
     calc_pass_segment_seconds,
     clamp_turn_time_elapsed,
     get_fast_break_chance,
@@ -1336,7 +1337,9 @@ def resolve_fast_break_logic(game: "GameManager"):
         distance_seconds = 0.0
         if len(path_points) >= 2:
             for idx in range(1, len(path_points)):
-                distance_seconds += calc_cg_segment_seconds(path_points[idx - 1], path_points[idx])
+                distance_seconds += calc_isotropic_segment_seconds(
+                    path_points[idx - 1], path_points[idx], CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
+                )
 
         overhead_seconds = 0.0
         # Outlet pass: use distance-based pass time (passer -> receiver) when coords available
@@ -1503,6 +1506,16 @@ def resolve_fast_break_logic(game: "GameManager"):
         update_player_coords_from_animations(game, [])
         turn_result = game.shot_manager.resolve_shot(roles)
         game_state.pop("fast_break_shot_threshold_override", None)
+
+        # 🔍 [FB MISS DEBUG] Log Fast Break miss outcome and next-turn/possession state for debugging
+        if turn_result.get("result_type") == "MISS":
+            outcome = "shooting_foul" if turn_result.get("next_play_type") == "FREE_THROW" else turn_result.get("rebound_type", "?")
+            logging.warning(
+                "🔍 [FB MISS] phase_resolution: result_type=MISS outcome=%s next_play_type=%s possession_flips=%s",
+                outcome,
+                turn_result.get("next_play_type"),
+                turn_result.get("possession_flips"),
+            )
 
         turn_result["defender_count"] = defender_count
         turn_result["outlet_passer_id"] = fb_roles.get("outlet_passer")
@@ -3824,6 +3837,7 @@ def resolve_half_court_offense_logic(game):
                 resolution_step_index=len(steps) - 1,
                 include_hco_step1_bringup=True,
                 prev_offense_positions=game_state.get("_prev_offense_positions_for_hco"),
+                phase_type="HCO",
             )
             step_clock_seconds = timing.get("step_clock_seconds") or []
             shot_remaining = game_state.get("shot_clock_remaining", 30)
@@ -3834,9 +3848,9 @@ def resolve_half_court_offense_logic(game):
                     chemistry = int(off_team.team_attributes.get("team_chemistry", 7))
                     discipline = int(off_team.team_attributes.get("discipline", 0))
 
-                    # Motion recalibration: chance to shoot from step index 2..(i-1) to avoid violation
+                    # Motion recalibration: chance to shoot from step index 2..(i-1) to avoid violation (Real_Time_Clock_System.md)
                     if is_motion_play and i >= 3:
-                        recalibration_score = (chemistry * 3) + (discipline * 2)
+                        recalibration_score = (chemistry * 5) + (discipline * 3)
                         die_roll = random.randint(1, 100)
                         if die_roll < recalibration_score:
                             chosen_step = random.randint(2, i - 1)
@@ -3852,8 +3866,8 @@ def resolve_half_court_offense_logic(game):
                     # No recalibration (or failed recalibration): violation vs shot-at-1
                     ball_handler_at_step = get_ball_handler_from_skeleton(final_skeleton, off_lineup, step_index=i)
                     iq = int(getattr(ball_handler_at_step, "attributes", {}).get("IQ", 0) or 0)
-                    intelligence = min(20, iq // 5)
-                    violation_threshold = 50 + chemistry + discipline + intelligence
+                    intelligence = min(25, iq // 4)  # int(IQ/4), cap 0-25 (Real_Time_Clock_System.md)
+                    violation_threshold = 60 + chemistry + discipline + intelligence
                     x = random.randint(1, 100)
                     if x > violation_threshold:
                         # Path A: shot clock violation (current behavior)
@@ -4368,6 +4382,7 @@ def resolve_half_court_offense_logic(game):
                 roles.get("steps", []),
                 resolution_step_index=roles.get("event_step"),
                 include_hco_step1_bringup=True,
+                phase_type="HCO",
             )
             turn_result["time_elapsed"] = timing_contract["time_elapsed"]
             turn_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
@@ -4409,6 +4424,7 @@ def resolve_half_court_offense_logic(game):
                 roles.get("steps", []),
                 resolution_step_index=roles.get("event_step"),
                 include_hco_step1_bringup=True,
+                phase_type="HCO",
             )
             foul_result["time_elapsed"] = timing_contract["time_elapsed"]
             foul_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
@@ -4450,6 +4466,7 @@ def resolve_half_court_offense_logic(game):
                 roles.get("steps", []),
                 resolution_step_index=roles.get("event_step"),
                 include_hco_step1_bringup=True,
+                phase_type="HCO",
             )
             foul_result["time_elapsed"] = timing_contract["time_elapsed"]
             foul_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
@@ -4976,9 +4993,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
     off_pt_opp_modifier = off_attrs.get("pt_opp_modifier", 0)
     def_pt_efficiency = def_attrs.get("pt_efficiency", 0)
     def_discipline = def_attrs.get("discipline", 0)
+    off_fight = int(off_attrs.get("fight", 0))
     
-    # Calculate BSM (Base Success Modifier) = 500 for FCP
-    BSM = 500
+    # Calculate BSM (Base Success Modifier): 400 + (10 * offense fight), then chemistry adjustments (FCP_HCT_System.md)
+    BSM = 400 + (10 * off_fight)
     
     # Offense contribution to BSM (using pt_opp_modifier)
     if off_pt_opp_modifier > 0:
@@ -5005,8 +5023,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
     if (offenseScore + BSM) > defenseScore:
         # Success
         if offenseScore - defenseScore > DST:
-            # Dominant success - weighted random
-            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.3, 0.5, 0.2])[0]
+            # Dominant success - weighted random (FCP_HCT_System.md: D_FOUL 30%, HCO 40%, SHOT 30%)
+            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.3, 0.4, 0.3])[0]
         else:
             # Regular success - just break through
             result_type = "HCO"
@@ -5415,6 +5433,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         roles.get("steps", []),
         resolution_step_index=(len(roles.get("steps", [])) - 1 if roles.get("steps") else None),
         include_hco_step1_bringup=False,
+        phase_type="FCP",
     )
     fcp_time_elapsed = fcp_timing_contract["time_elapsed"]
     
@@ -6151,9 +6170,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     off_pt_opp_modifier = off_attrs.get("pt_opp_modifier", 0)
     def_pt_efficiency = def_attrs.get("pt_efficiency", 0)
     def_discipline = def_attrs.get("discipline", 0)
+    off_fight = int(off_attrs.get("fight", 0))
     
-    # Calculate BSM (Base Success Modifier) = 300 for HCT
-    BSM = 300
+    # Calculate BSM (Base Success Modifier): 200 + (10 * offense fight), then chemistry adjustments (FCP_HCT_System.md)
+    BSM = 200 + (10 * off_fight)
     
     # Offense contribution to BSM (using pt_opp_modifier)
     if off_pt_opp_modifier > 0:
@@ -6180,8 +6200,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     if (offenseScore + BSM) > defenseScore:
         # Success
         if offenseScore - defenseScore > DST:
-            # Dominant success - weighted random
-            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.3, 0.5, 0.2])[0]
+            # Dominant success - weighted random (FCP_HCT_System.md: D_FOUL 30%, HCO 40%, SHOT 30%)
+            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.3, 0.4, 0.3])[0]
         else:
             # Regular success - just break through
             result_type = "HCO"
@@ -6565,6 +6585,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         roles.get("steps", []),
         resolution_step_index=(len(roles.get("steps", [])) - 1 if roles.get("steps") else None),
         include_hco_step1_bringup=False,
+        phase_type="HCT",
     )
     hct_time_elapsed = hct_timing_contract["time_elapsed"]
     

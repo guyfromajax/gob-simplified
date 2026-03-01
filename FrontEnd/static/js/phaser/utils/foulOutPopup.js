@@ -13,8 +13,9 @@
  * @param {string} [options.awayId] - Away team ID
  * @param {string} [options.myTeamSide] - User's team side ('home' or 'away')
  * @param {string} [options.userTeamId] - User's team ID
+ * @param {string} [options.foulOutPlayerId] - Fouling-out player's id from turn (single source of truth for image; same as shooting-foul uses turnData.foul_player_id)
  */
-export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournamentId, franchiseId, homeTeam, awayTeam, homeId, awayId, myTeamSide, userTeamId }) {
+export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournamentId, franchiseId, homeTeam, awayTeam, homeId, awayId, myTeamSide, userTeamId, foulOutPlayerId: foulOutPlayerIdFromTurn }) {
   // Remove any existing popup
   const existingPopup = document.querySelector('.foul-out-popup');
   if (existingPopup) {
@@ -47,7 +48,7 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
 
   // ✅ FOUL OUT: Remove fouled-out player from user's lineup (user must replace this slot)
   try {
-    const foulOutPlayerId = player?.player_id || player?.playerId || player?.id;
+    const foulOutPlayerId = (foulOutPlayerIdFromTurn != null && foulOutPlayerIdFromTurn !== '') ? String(foulOutPlayerIdFromTurn) : (player?.player_id || player?.playerId || player?.id);
     const foulOutPlayerTeam = player?.team;
     const userTeamName = effectiveMyTeamSide === 'home' ? homeTeam : awayTeam;
 
@@ -113,25 +114,15 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
   
   const lineupUrl = `/set-lineup.html?${params.toString()}`;
 
-  // Resolve player image URL — same rule as announcement system (announcements.js): bare path, no API_CONFIG dependency.
-  const rawId = player?.player_id ?? player?.playerId ?? player?.id;
-  const playerId = rawId != null ? String(rawId) : '';
-  const rawPhoto = player?.photo || player?.image_url;
-  let photoUrl = '';
-  if (rawPhoto && typeof rawPhoto === 'string' && rawPhoto.trim()) {
-    const t = rawPhoto.trim();
-    if (t.startsWith('http://') || t.startsWith('https://')) {
-      photoUrl = t;
-    } else {
-      const base = typeof window !== 'undefined' ? window.location.origin : '';
-      photoUrl = t.startsWith('/') ? `${base}${t}` : `${base}/${t}`;
-    }
-  }
-  if (!photoUrl && playerId) {
-    photoUrl = `/images/players/${playerId}.png`;
-  }
-  const defaultPlayerImg = '/images/players/default.png';
-  const safePhotoUrl = photoUrl.replace(/"/g, '&quot;');
+  // Image: id only, same as Defensive Foul announcement — do not use player.photo.
+  const imagePlayerId = (foulOutPlayerIdFromTurn != null && foulOutPlayerIdFromTurn !== '') ? String(foulOutPlayerIdFromTurn) : (player?.player_id ?? player?.playerId ?? player?.id);
+  const playerId = imagePlayerId != null ? String(imagePlayerId) : '';
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  const staticPrefix = (hostname === 'localhost' || hostname === '127.0.0.1') ? '/static' : '';
+  let photoUrl = playerId ? `/images/players/${playerId}.png` : '';
+  if (photoUrl) photoUrl = staticPrefix + photoUrl;
+  const defaultPlayerImg = staticPrefix + '/images/players/default.png';
+  const safePhotoUrl = photoUrl ? photoUrl.replace(/"/g, '&quot;') : '';
   const safeDefaultImg = defaultPlayerImg.replace(/"/g, '&quot;');
   const safeName = (player?.name || 'Player').replace(/"/g, '&quot;');
   const initialContent = photoUrl
