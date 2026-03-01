@@ -143,10 +143,10 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
           />
         </div>
         <div class="potg-stats-row">
-          ${potg.stats.pts} PTS&nbsp;&nbsp;&nbsp;${potg.stats.reb} REB&nbsp;&nbsp;&nbsp;${potg.stats.ast} AST
+          <span style="color: ${potg.teamColor || '#1a1a2e'};">${potg.stats.pts} PTS&nbsp;&nbsp;&nbsp;${potg.stats.reb} REB&nbsp;&nbsp;&nbsp;${potg.stats.ast} AST</span>
         </div>
         <div class="potg-stats-row">
-          ${potg.stats.stl} STL&nbsp;&nbsp;&nbsp;${potg.stats.blk} BLK&nbsp;&nbsp;&nbsp;${potg.stats.defPct} DEF%
+          <span style="color: ${potg.teamColor || '#1a1a2e'};">${potg.stats.stl} STL&nbsp;&nbsp;&nbsp;${potg.stats.blk} BLK&nbsp;&nbsp;&nbsp;${potg.stats.defPct} DEF%</span>
         </div>
       ` : ''}
       <div class="button-container">

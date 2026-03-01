@@ -360,6 +360,8 @@ async function renderPlayerOfTheGameSection() {
   if (!isGameComplete) {
     playerLine.textContent = '';
     statsLine.textContent = '';
+    playerLine.style.color = '';
+    statsLine.style.color = '';
     return;
   }
 
@@ -379,6 +381,9 @@ async function renderPlayerOfTheGameSection() {
     section.style.display = 'block';
     playerLine.textContent = `${potg.name} - ${potg.teamName}`;
     statsLine.textContent = `${potg.stats.pts} PTS  ${potg.stats.reb} REB  ${potg.stats.ast} AST  ${potg.stats.stl} STL  ${potg.stats.blk} BLK  ${potg.stats.defPct} DEF%`;
+    const potgColor = potg.teamColor || '#1a1a2e';
+    playerLine.style.color = potgColor;
+    statsLine.style.color = potgColor;
   } catch (err) {
     console.warn('[box-score] Failed to render POTG section:', err);
     section.style.display = 'none';

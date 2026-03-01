@@ -13,6 +13,10 @@ function canonicalTeamName(name) {
   return String(name).replace(/-/g, '_').replace(/\s+/g, '_').toUpperCase();
 }
 
+function resolvePrimaryColor(teamObj, fallback = '#1a1a2e') {
+  return teamObj?.colors?.primary_color || teamObj?.primary_color || fallback;
+}
+
 function getTeamContext(gameData, scoreOverride = null) {
   const homeTeamId = gameData?.home_team_id || '';
   const awayTeamId = gameData?.away_team_id || '';
@@ -39,6 +43,8 @@ function getTeamContext(gameData, scoreOverride = null) {
     homeScore,
     awayScore,
     winningTeam,
+    homePrimaryColor: resolvePrimaryColor(homeTeamObj),
+    awayPrimaryColor: resolvePrimaryColor(awayTeamObj),
   };
 }
 
@@ -82,6 +88,7 @@ function buildCandidates(gameData, scoreOverride = null) {
       name,
       team: fallbackTeam || raw.team || 'unknown',
       teamName: fallbackTeam === 'home' ? teamCtx.homeTeamName : (fallbackTeam === 'away' ? teamCtx.awayTeamName : 'Unknown Team'),
+      teamColor: fallbackTeam === 'home' ? teamCtx.homePrimaryColor : (fallbackTeam === 'away' ? teamCtx.awayPrimaryColor : '#1a1a2e'),
       photo: getPlayerImage(raw),
       stats: {},
     };
@@ -91,9 +98,11 @@ function buildCandidates(gameData, scoreOverride = null) {
     if (fallbackTeam) {
       existing.team = fallbackTeam;
       existing.teamName = fallbackTeam === 'home' ? teamCtx.homeTeamName : teamCtx.awayTeamName;
+      existing.teamColor = fallbackTeam === 'home' ? teamCtx.homePrimaryColor : teamCtx.awayPrimaryColor;
     } else if (raw.team === 'home' || raw.team === 'away') {
       existing.team = raw.team;
       existing.teamName = raw.team === 'home' ? teamCtx.homeTeamName : teamCtx.awayTeamName;
+      existing.teamColor = raw.team === 'home' ? teamCtx.homePrimaryColor : teamCtx.awayPrimaryColor;
     }
     existing.stats = { ...existing.stats, ...stats };
 
@@ -226,6 +235,7 @@ export function calculatePlayerOfTheGame(gameData, options = {}) {
     name: winner.name,
     team: winner.team,
     teamName: winner.teamName,
+    teamColor: winner.teamColor || '#1a1a2e',
     photo: winner.photo,
     potgPoints: winner.score,
     stats: {
@@ -239,4 +249,3 @@ export function calculatePlayerOfTheGame(gameData, options = {}) {
     },
   };
 }
-
