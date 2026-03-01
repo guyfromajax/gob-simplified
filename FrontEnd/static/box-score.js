@@ -356,6 +356,13 @@ async function renderPlayerOfTheGameSection() {
     return;
   }
 
+  const isGameComplete = isGameCompleteForPotg(gameData);
+  if (!isGameComplete) {
+    playerLine.textContent = '';
+    statsLine.textContent = '';
+    return;
+  }
+
   try {
     const staticBase = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath)
       ? window.API_CONFIG.getStaticPath()
@@ -376,6 +383,35 @@ async function renderPlayerOfTheGameSection() {
     console.warn('[box-score] Failed to render POTG section:', err);
     section.style.display = 'none';
   }
+}
+
+function isGameCompleteForPotg(data) {
+  if (!data || typeof data !== 'object') return false;
+
+  if (data.is_final === true || data.finalized === true || data.game_complete === true) {
+    return true;
+  }
+
+  const status = String(data.status || data.game_status || '').toLowerCase();
+  if (['complete', 'completed', 'final', 'finalized'].includes(status)) {
+    return true;
+  }
+
+  // Conservative fallback for older game docs without explicit completion flags.
+  const quarter = Number(data.quarter || 0);
+  const timeRemaining = Number(data.time_remaining);
+  const score = data.score || {};
+  const teamsObj = data.teams || {};
+  const homeTeamName = (data.home_team_id && teamsObj[data.home_team_id]?.name) || data.home_team?.name || 'Home Team';
+  const awayTeamName = (data.away_team_id && teamsObj[data.away_team_id]?.name) || data.away_team?.name || 'Away Team';
+  const homeScore = Number(score[homeTeamName] ?? data.home_team?.score ?? 0);
+  const awayScore = Number(score[awayTeamName] ?? data.away_team?.score ?? 0);
+
+  if (quarter >= 4 && Number.isFinite(timeRemaining) && timeRemaining <= 0 && homeScore !== awayScore) {
+    return true;
+  }
+
+  return false;
 }
 
 // Build zeroed box score data from rosters when viewing pre-game
