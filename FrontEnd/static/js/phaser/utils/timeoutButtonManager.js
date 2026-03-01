@@ -67,6 +67,50 @@ function ensureTimeoutSounds() {
 }
 
 /**
+ * Shared timeout popup button styles.
+ * Kept separate from popup-specific container styles so user/computer popups
+ * can reuse the exact same button design.
+ */
+function ensureTimeoutPopupButtonStyles() {
+    if (document.getElementById('timeout-popup-button-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'timeout-popup-button-styles';
+    style.textContent = `
+        .button-container {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .timeout-button {
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .go-to-timeout-button {
+            background: #ff9800;
+            color: #fff;
+        }
+
+        .go-to-timeout-button:hover {
+            background: #f57c00;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(255, 152, 0, 0.3);
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+/**
  * Ensure button is initialized (lazy initialization)
  */
 function ensureButtonInitialized() {
@@ -513,6 +557,8 @@ async function handleTimeoutButtonClick(executeOnly = false) {
  * @param {Object} scene - Game scene object
  */
 async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
+    ensureTimeoutPopupButtonStyles();
+
     // Remove any existing popup
     const existingPopup = document.querySelector('.user-timeout-popup');
     if (existingPopup) {
@@ -582,36 +628,6 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
                 letter-spacing: 2px;
             }
 
-            .button-container {
-                display: flex;
-                gap: 20px;
-                width: 100%;
-                justify-content: center;
-            }
-
-            .timeout-button {
-                padding: 15px 40px;
-                font-size: 18px;
-                font-weight: bold;
-                border: none;
-                border-radius: 6px;
-                cursor: pointer;
-                text-decoration: none;
-                display: inline-block;
-                transition: all 0.3s;
-                font-family: 'Inter', sans-serif;
-            }
-
-            .go-to-timeout-button {
-                background: #ff9800;
-                color: #fff;
-            }
-
-            .go-to-timeout-button:hover {
-                background: #f57c00;
-                transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(255, 152, 0, 0.3);
-            }
         `;
         document.head.appendChild(style);
     }
@@ -653,6 +669,8 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
  * @param {string|null} computerTeamName - Name of team calling timeout
  */
 export async function showComputerTimeoutPopup(timeoutResult, gameId, scene, computerTeamName = null) {
+    ensureTimeoutPopupButtonStyles();
+
     // Remove any existing popup of this type
     const existingPopup = document.querySelector('.computer-timeout-popup');
     if (existingPopup) {
