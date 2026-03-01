@@ -422,28 +422,28 @@ def update_team_attributes_after_game(
         # shot_threshold: winning team by FG%; losing team by FG% (different ranges)
         if is_winner:
             if fg_pct > 50:
-                changes["shot_threshold"] = -random.randint(15, 25)
+                changes["shot_threshold"] = random.randint(-20, -10)   # −(10 to 20)
             elif fg_pct > 45:
-                changes["shot_threshold"] = -random.randint(5, 15)
+                changes["shot_threshold"] = random.randint(-10, 0)    # −(0 to 10)
             else:
-                changes["shot_threshold"] = 0
+                changes["shot_threshold"] = random.randint(0, 10)     # +(0 to 10)
         else:
             if fg_pct > 50:
-                changes["shot_threshold"] = -random.randint(10, 20)
+                changes["shot_threshold"] = random.randint(-15, -5)   # −(5 to 15)
             elif fg_pct > 45:
-                changes["shot_threshold"] = -random.randint(0, 10)
+                changes["shot_threshold"] = random.randint(-5, 0)    # −(0 to 5)
             else:
-                changes["shot_threshold"] = 0
+                changes["shot_threshold"] = random.randint(0, 15)     # +(0 to 15)
         
-        # discipline: both teams same criteria — if team (F+TO) > opponent (F+TO) then +(1, 2)
+        # discipline: both teams same criteria — if team (F+TO) < opponent (F+TO) then +(0,1), else −(1 to 3)
         team_f_plus_to = team_totals.get("F", 0) + team_totals.get("TO", 0)
         opp_f_plus_to = opponent_totals.get("F", 0) + opponent_totals.get("TO", 0)
-        discipline_branch = "f_plus_to_leq_opp"
-        if team_f_plus_to > opp_f_plus_to:
-            discipline_branch = "f_plus_to_gt_opp"
-            changes["discipline"] = random.randint(1, 2)
+        discipline_branch = "f_plus_to_ge_opp"
+        if team_f_plus_to < opp_f_plus_to:
+            discipline_branch = "f_plus_to_lt_opp"
+            changes["discipline"] = random.randint(0, 1)
         else:
-            changes["discipline"] = 0
+            changes["discipline"] = random.randint(-3, -1)
         logger.warning(
             "🧪 [EOG-BRANCH] team=%s attr=discipline branch=%s team_f_plus_to=%s opp_f_plus_to=%s raw_change=%s",
             str(team_id_label),
@@ -453,9 +453,9 @@ def update_team_attributes_after_game(
             changes.get("discipline"),
         )
         
-        # fight: winning +(1–2), losing +(−3 to −1)
+        # fight: winning +(0, 1), losing +(−3 to −1)
         if is_winner:
-            changes["fight"] = random.randint(1, 2)
+            changes["fight"] = random.randint(0, 1)
         else:
             changes["fight"] = random.randint(-3, -1)
         

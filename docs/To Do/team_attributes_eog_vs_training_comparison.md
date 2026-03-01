@@ -16,11 +16,11 @@ Comparison of how each of the **11 core team attributes** (per Team_Attribute_Sy
 
 | Attribute | End of Game (EOG) | Training |
 |-----------|-------------------|----------|
-| **shot_threshold** | **Winning team:** If game FG% > 50%: −(15-25); if FG% > 45%: -(5-15); else 0. **Losing team:** If game FG% > 50%: −(10-20); if FG% > 45%: -(0-10); else 0. | **Scrimmages** (1 pt). By slider points: 0 pts → +(5–15); 1 → −(5–15); 2 → −(10–20); 3 → −(10–30); 4 → −(10–35); 5 → −(10–40). Coaching focus can amplify (e.g. Culture Builder). |
+| **shot_threshold** | **Winning team:** If game FG% > 50%: −(10-20); if FG% > 45%: -(0-10); else +(0,10). **Losing team:** If game FG% > 50%: −(5-15); if FG% > 45%: -(0-5); else +(0,15). | **Scrimmages** (1 pt). By slider points: 0 pts → +(5–15); 1 → −(5–15); 2 → −(10–20); 3 → −(10–30); 4 → −(10–35); 5 → −(10–40). Coaching focus can amplify (e.g. Culture Builder). |
 
-| **discipline** | **Both teams (same criteria):** If team F+TO > opponent's F+TO +(1,2). | From **player drills** (0.25 pts each): Inside Defense, Outside Defense, Ball Handling, Passing. Team point ranges: 0→(−2,0), 1→(1,2), 2→(2,3), 3→(2,5), 4→(2,6), 5→(2,7). **Authoritarian – Discipline** amplifies gains. |
+| **discipline** | **Both teams (same criteria):** If team F+TO < opponent's F+TO +(0,1) else -(1,3). | From **player drills** (0.25 pts each): Inside Defense, Outside Defense, Ball Handling, Passing. Team point ranges: 0→(−2,0), 1→(1,2), 2→(2,3), 3→(2,5), 4→(2,6), 5→(2,7). **Authoritarian – Discipline** amplifies gains. |
 
-| **fight** | **Winning team:** +(1–2). **Losing team:** +(−3 to −1). | From **Strength** (0.5 pts) and **Conditioning** (0.5 pts). Same team point ranges as above. **Authoritarian – Discipline** amplifies. |
+| **fight** | **Winning team:** +(0,1). **Losing team:** +(−3 to −1). | From **Strength** (0.5 pts) and **Conditioning** (0.5 pts). Same team point ranges as above. **Authoritarian – Discipline** amplifies. |
 
 | **rebound_modifier** | **Both teams (same criteria):** If team TREB > opp TREB + 5: +rand(0, 0.1); if TREB < opp TREB − 5: +rand(−0.1, 0); else +rand(−0.05, 0.05). Capped 0–0.4. | **Rebounding** drill (0.5 pts) and **Scrimmages** (0.5 pts). Rebound drill: 0→−0.05 to −0.01; 1→0 to 0.03; … 5→0.04 to 0.14. Scrimmages: 0→−0.09 to −0.03; 1→−0.03 to 0.03; … 5→0.03 to 0.09. **Authoritarian – Rebounding** amplifies. |
 
@@ -51,9 +51,9 @@ Comparison of how each of the **11 core team attributes** (per Team_Attribute_Sy
 
 | Attribute | EOG condition | EOG range | Training condition | Training range |
 |-----------|---------------|-----------|--------------------|----------------|
-| shot_threshold | Win + FG% vs Lose | Win: −25 to 0 (FG%>50: −25 to −15; >45: −15 to −5; else 0); Lose: −20 to 0 (FG%>50: −20 to −10; >45: −10 to 0; else 0) | Scrimmages slider 0–5 | −40 to +15 (0 pts: +5 to +15; 5 pts: −10 to −40) |
-| discipline | F+TO vs opp F+TO | 0 to +2 (if team F+TO > opp: +1 or +2) | 4 player drills (0.25 pts each) | −2 to +7 |
-| fight | Win vs Lose | Win: +1 to +2; Lose: −3 to −1 | Strength + Conditioning (0.5 each) | −2 to +7 |
+| shot_threshold | Win + FG% vs Lose | Win: −(10–20), −(0–10), +(0–10); Lose: −(5–15), −(0–5), +(0–15) | Scrimmages slider 0–5 | −40 to +15 (0 pts: +5 to +15; 5 pts: −10 to −40) |
+| discipline | F+TO vs opp F+TO | If team F+TO < opp: +(0,1); else −(1 to 3) | 4 player drills (0.25 pts each) | −2 to +7 |
+| fight | Win vs Lose | Win: +(0,1); Lose: −3 to −1 | Strength + Conditioning (0.5 each) | −2 to +7 |
 | rebound_modifier | TREB vs opp TREB | −0.1 to +0.1 | Rebounding + Scrimmages (0.5 each) | −0.09 to +0.14 |
 | offensive_efficiency | — | −2 to −1 | Offense Install 0–5 | −2 to +7 |
 | defensive_efficiency | — | −2 to −1 | Defense Install 0–5 | −2 to +7 |

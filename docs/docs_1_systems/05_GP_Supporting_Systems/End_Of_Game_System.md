@@ -51,13 +51,13 @@ Team attributes will adjust at the end of game based on the notes below. Note th
   - all others: -10 to 10
 - End of game attribute adjustments (applies to each team, all stat conditions for the game just run):
   - `shot_threshold`
-    - **Winning team:** If game FG% > 50%: += random.randint(-25,-15) i.e. −(15 to 25); if FG% > 45%: += random.randint(-15,-5) i.e. −(5 to 15); else: 0.
-    - **Losing team:** If game FG% > 50%: += random.randint(-20,-10) i.e. −(10 to 20); if FG% > 45%: += random.randint(-10,0) i.e. −(0 to 10); else: 0.
+    - **Winning team:** If game FG% > 50%: −(10 to 20); if FG% > 45%: −(0 to 10); else +(0 to 10).
+    - **Losing team:** If game FG% > 50%: −(5 to 15); if FG% > 45%: −(0 to 5); else +(0 to 15).
   - `discipline` (both teams, same criteria)
-    - If team (F + TO) > opponent's (F + TO): += random.randint(1, 2). Otherwise: no change (0).
+    - If team (F + TO) < opponent's (F + TO): += random.randint(0, 1). Otherwise: += random.randint(-3, -1).
     - F = team fouls for the game (from box score / team totals).
   - `fight`
-    - **Winning team:** += random.randint(1, 2).
+    - **Winning team:** += random.randint(0, 1).
     - **Losing team:** += random.randint(-3, -1).
   - `rebound_modifier` (winning and losing team have same criteria)
     - if team TREB for the game > opponents TREB for the game + 5: += random.uniform(0, 0.1)
