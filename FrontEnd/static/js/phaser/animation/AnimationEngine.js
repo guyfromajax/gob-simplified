@@ -557,14 +557,12 @@ export class AnimationEngine {
       return;
     }
 
-    // ✅ COMPUTER TIMEOUT: Navigate to lineup screen automatically
-    // For computer timeouts, we need to trigger navigation immediately
-    // User timeouts navigate via button click, but computer timeouts need automatic navigation
+    // ✅ COMPUTER TIMEOUT: Show popup first, then navigate on explicit button click
     const gameId = this.scene.gameId || this.scene.simData?.game_id;
     if (gameId) {
-      // Import and call showTimeoutPopup (same function used by user timeouts)
+      // Import and call computer-timeout popup flow
       try {
-        const { showTimeoutPopup } = await import('../utils/timeoutButtonManager.js');
+        const { showComputerTimeoutPopup } = await import('../utils/timeoutButtonManager.js');
         // ✅ UNIFIED: Extract clock/time_remaining from API response (same as user timeout)
         // The response from /api/simulate-turn includes clock and time_remaining
         // For computer timeouts, this is stored in turnData._responseData (set in gameScene.js)
@@ -589,7 +587,7 @@ export class AnimationEngine {
           time_remaining: responseTimeRemaining,  // ✅ UNIFIED: Use time_remaining from API response
           timeout_trace_id: responseData.timeout_trace_id || turnData.timeout_trace_id
         };
-        // ✅ COMPUTER TIMEOUT: Navigate directly (no popup) - same flow as user timeouts
+        // Show popup; navigation occurs when user clicks "Go To Timeout"
         const computerTeamName = turnData.timeout_calling_team?.name || 
                                  (typeof turnData.timeout_calling_team === 'string' ? turnData.timeout_calling_team : null) ||
                                  null;
@@ -598,9 +596,9 @@ export class AnimationEngine {
           computerTeamName: computerTeamName,
           timeout_reason: turnData.timeout_reason
         });
-        await showTimeoutPopup(timeoutResult, gameId, this.scene, true, computerTeamName);
+        await showComputerTimeoutPopup(timeoutResult, gameId, this.scene, computerTeamName);
       } catch (error) {
-        console.error('❌ COMPUTER TIMEOUT: Failed to navigate to lineup screen:', error);
+        console.error('❌ COMPUTER TIMEOUT: Failed to show timeout popup:', error);
         // Fallback: Show alert and let user navigate manually
         alert(`${turnData.timeout_calling_team?.name || 'Team'} called a timeout. Please return to the game.`);
       }
