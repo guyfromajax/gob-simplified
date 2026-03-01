@@ -7,8 +7,9 @@
  * @param {string} [options.franchiseId] - Franchise ID (for franchise mode)
  * @param {string} [options.teamId] - Team ID (ObjectId) for navigation anchor
  * @param {Object} [options.finalScore] - Final score object with homeTeam, awayTeam, homeScore, awayScore
+ * @param {Object} [options.gameData] - Full game document for POTG calculation (optional)
  */
-export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseId, teamId, finalScore, homeTeam, awayTeam }) {
+export async function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseId, teamId, finalScore, homeTeam, awayTeam, gameData }) {
   // Remove any existing popup
   const existingPopup = document.querySelector('.game-completion-popup');
   if (existingPopup) {
@@ -86,6 +87,32 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
     console.log('💾 Saved box score URL to localStorage for debugging');
   }
 
+  let potg = null;
+  try {
+    const staticBase = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath)
+      ? window.API_CONFIG.getStaticPath()
+      : '';
+    const { calculatePlayerOfTheGame } = await import(`${staticBase}/js/shared/potg.js`);
+    let potgGameData = gameData || null;
+    if (!potgGameData && gameId && typeof fetch === 'function' && typeof API_CONFIG !== 'undefined') {
+      const resp = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`), {
+        headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
+      });
+      if (resp.ok) {
+        potgGameData = await resp.json();
+      }
+    }
+    const scoreOverride = finalScore ? {
+      [finalScore.homeTeam || homeTeam || 'Home Team']: Number(finalScore.homeScore || 0),
+      [finalScore.awayTeam || awayTeam || 'Away Team']: Number(finalScore.awayScore || 0),
+    } : null;
+    if (potgGameData) {
+      potg = calculatePlayerOfTheGame(potgGameData, { gameId, scoreOverride });
+    }
+  } catch (err) {
+    console.warn('[gameCompletionPopup] Failed to calculate POTG:', err);
+  }
+
   // Create popup
   const popup = document.createElement('div');
   popup.className = 'game-completion-popup';
@@ -104,6 +131,22 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
               <span class="score">${finalScore.awayScore || 0}</span>
             </div>
           </div>
+        </div>
+      ` : ''}
+      ${potg ? `
+        <div class="potg-image-row">
+          <img
+            class="potg-image"
+            src="${potg.photo}"
+            alt="${potg.name}"
+            onerror="this.onerror=null;this.src='/images/players/default.png';"
+          />
+        </div>
+        <div class="potg-stats-row">
+          ${potg.stats.pts} PTS&nbsp;&nbsp;&nbsp;${potg.stats.reb} REB&nbsp;&nbsp;&nbsp;${potg.stats.ast} AST
+        </div>
+        <div class="potg-stats-row">
+          ${potg.stats.stl} STL&nbsp;&nbsp;&nbsp;${potg.stats.blk} BLK&nbsp;&nbsp;&nbsp;${potg.stats.defPct} DEF%
         </div>
       ` : ''}
       <div class="button-container">
@@ -201,6 +244,33 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
         justify-content: center;
       }
 
+      .potg-image-row {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        margin: 4px 0;
+      }
+
+      .potg-image {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        border: 3px solid #d7d7d7;
+        object-fit: cover;
+        object-position: top;
+        background: #f2f2f2;
+      }
+
+      .potg-stats-row {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 28px;
+        letter-spacing: 1px;
+        color: #1a1a2e;
+        text-align: center;
+        line-height: 1.1;
+      }
+
       .completion-button {
         padding: 15px 40px;
         font-size: 18px;
@@ -272,4 +342,3 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
     });
   }
 }
-

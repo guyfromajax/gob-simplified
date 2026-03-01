@@ -2040,7 +2040,8 @@ async function handleGameCompletion({ gameId, lastSummary, tournamentId, franchi
     teamId: teamId, // ✅ SS&S: Include team_id (ObjectId) for navigation anchor preservation
     finalScore: finalScore,
     homeTeam: homeTeam,
-    awayTeam: awayTeam
+    awayTeam: awayTeam,
+    gameData: finalGameData
   });
 }
 

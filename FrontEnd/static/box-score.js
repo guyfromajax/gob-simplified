@@ -335,11 +335,47 @@ function renderBoxScore() {
 
   renderHeader();
   renderQuarterScoring();
+  renderPlayerOfTheGameSection();
   renderPlayerStats();
   renderTeamStats();
   renderScoutingNotes();
   renderTeamAttributeChangesForTab('home');
   renderTeamAttributeChangesForTab('away');
+}
+
+async function renderPlayerOfTheGameSection() {
+  const section = document.getElementById('potg-section');
+  const playerLine = document.getElementById('potg-player-line');
+  const statsLine = document.getElementById('potg-stats-line');
+  if (!section || !playerLine || !statsLine) return;
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const isPregame = urlParams.get('pregame') === '1';
+  if (isPregame) {
+    section.style.display = 'none';
+    return;
+  }
+
+  try {
+    const staticBase = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath)
+      ? window.API_CONFIG.getStaticPath()
+      : '';
+    const { calculatePlayerOfTheGame } = await import(`${staticBase}/js/shared/potg.js`);
+    const gameId = urlParams.get('game_id') || '';
+    const potg = calculatePlayerOfTheGame(gameData, { gameId });
+
+    if (!potg) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = 'block';
+    playerLine.textContent = `${potg.name} - ${potg.teamName}`;
+    statsLine.textContent = `${potg.stats.pts} PTS  ${potg.stats.reb} REB  ${potg.stats.ast} AST  ${potg.stats.stl} STL  ${potg.stats.blk} BLK  ${potg.stats.defPct} DEF%`;
+  } catch (err) {
+    console.warn('[box-score] Failed to render POTG section:', err);
+    section.style.display = 'none';
+  }
 }
 
 // Build zeroed box score data from rosters when viewing pre-game
