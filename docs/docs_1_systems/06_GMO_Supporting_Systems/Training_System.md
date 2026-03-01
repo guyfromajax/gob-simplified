@@ -152,7 +152,7 @@ The training execution system applies pre-training conditions, allocates trainin
 1. **Pre-Training Conditions** (`apply_pre_training_conditions`)
    - Applies random decreases to player attributes (excluding EM, MO, NG)
    - Player attributes: see pre-training decay section below
-   - Team attributes are no longer decayed in training. They are updated at the end of each game based on performance (see End_Of_Game_System.md).
+   - Team attributes are no longer decayed in training. They are updated at the end of each game based on performance (see End_Of_Game_System.md). For a side-by-side of how each team attribute is changed in EOG vs Training, see `docs/To Do/team_attributes_eog_vs_training_comparison.md`.
    - **Skipped for training camp in franchise mode** - determined by `week == 1 and not results.get("1")`, no depreciation occurs before first games
 
 2. **Training Point Application** (`apply_training_points`)
