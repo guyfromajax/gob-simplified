@@ -179,10 +179,15 @@ export function createGameScene(Phaser) {
       const urlParams = new URLSearchParams(window.location.search);
       const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
       const timeoutTraceId = urlParams.get('timeout_trace_id');
-      const fromLineup = urlParams.get('from') === 'set-lineup';
-      const isQ1Start = this.quarter === 1 && !resumeFromTimeout && !fromLineup;
-      const isAfterBreak = resumeFromTimeout || fromLineup;
-      this.shouldShowMatchupsPopup = (isQ1Start || isAfterBreak) && this.gameId;
+      // Defense Matchups popup trigger:
+      // - Q1 start (non-timeout)
+      // - Any quarter > 1 entry (quarter breaks)
+      // - Any timeout/foul-out resume (resume_from_timeout=true)
+      // Keep timeout/navigation contracts unchanged; this only controls popup visibility.
+      const isQ1Start = this.quarter === 1 && !resumeFromTimeout;
+      const isQuarterBreakEntry = this.quarter > 1;
+      const isTimeoutOrFoulOutResume = resumeFromTimeout;
+      this.shouldShowMatchupsPopup = (isQ1Start || isQuarterBreakEntry || isTimeoutOrFoulOutResume) && this.gameId;
       
       // Reset pause state BEFORE killing tweens
       this.isPaused = false;
@@ -1785,13 +1790,8 @@ export function createGameScene(Phaser) {
           if (this.shouldShowMatchupsPopup && this.animate) {
             try {
               const { showDefenseMatchupsPopup, resetDontShowAgainFlag } = await import('./utils/defenseMatchupsPopup.js');
-              // Reset "Don't show again" flag at start of new game (Q1)
-              const urlParams = new URLSearchParams(window.location.search);
-              const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
-              const fromLineup = urlParams.get('from') === 'set-lineup';
-              const isQ1Start = this.quarter === 1 && !resumeFromTimeout && !fromLineup;
-              
-              if (isQ1Start) {
+              // Reset only for a truly new game (new game_id at Q1), not URL-shape heuristics.
+              if (isNewGame) {
                 resetDontShowAgainFlag(this.gameId);
               }
               
