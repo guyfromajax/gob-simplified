@@ -206,7 +206,7 @@ export function calculatePlayerOfTheGame(gameData, options = {}) {
   const second = scored[1] || null;
   let winner = top;
 
-  if (second && (top.score - second.score) < 10) {
+  if (second && (top.score - second.score) < 16) {
     const cutoff = second.score;
     const contenders = scored.filter((p) => p.score >= cutoff);
 
