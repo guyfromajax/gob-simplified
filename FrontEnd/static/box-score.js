@@ -405,16 +405,19 @@ function isGameCompleteForPotg(data) {
   // Conservative fallback for older game docs without explicit completion flags.
   const quarter = Number(data.quarter || 0);
   const timeRemaining = Number(data.time_remaining);
+  const clock = String(data.clock || '').trim();
   const score = data.score || {};
   const teamsObj = data.teams || {};
   const homeTeamName = (data.home_team_id && teamsObj[data.home_team_id]?.name) || data.home_team?.name || 'Home Team';
   const awayTeamName = (data.away_team_id && teamsObj[data.away_team_id]?.name) || data.away_team?.name || 'Away Team';
   const homeScore = Number(score[homeTeamName] ?? data.home_team?.score ?? 0);
   const awayScore = Number(score[awayTeamName] ?? data.away_team?.score ?? 0);
+  const hasWinner = homeScore !== awayScore;
+  const clockAtZero = clock === '0:00' || clock === '00:00';
+  const noClockData = !Number.isFinite(timeRemaining) && !clock;
 
-  if (quarter >= 4 && Number.isFinite(timeRemaining) && timeRemaining <= 0 && homeScore !== awayScore) {
-    return true;
-  }
+  if (quarter > 4 && hasWinner && (clockAtZero || !Number.isFinite(timeRemaining) || timeRemaining <= 0 || noClockData)) return true;
+  if (quarter === 4 && hasWinner && (clockAtZero || (Number.isFinite(timeRemaining) && timeRemaining <= 0) || noClockData)) return true;
 
   return false;
 }

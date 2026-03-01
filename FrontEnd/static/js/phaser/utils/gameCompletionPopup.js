@@ -88,6 +88,7 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   }
 
   let potg = null;
+  let potgImageUrl = '';
   try {
     const staticBase = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath)
       ? window.API_CONFIG.getStaticPath()
@@ -108,6 +109,9 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     } : null;
     if (potgGameData) {
       potg = calculatePlayerOfTheGame(potgGameData, { gameId, scoreOverride });
+      if (potg?.playerId) {
+        potgImageUrl = `${staticBase}/images/players/${potg.playerId}.png`;
+      }
     }
   } catch (err) {
     console.warn('[gameCompletionPopup] Failed to calculate POTG:', err);
@@ -134,14 +138,16 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
         </div>
       ` : ''}
       ${potg ? `
+        <div class="potg-meta-row" style="color: ${potg.teamColor || '#1a1a2e'};">Player Of The Game</div>
         <div class="potg-image-row">
           <img
             class="potg-image"
-            src="${potg.photo}"
+            src="${potgImageUrl || '/images/players/default.png'}"
             alt="${potg.name}"
             onerror="this.onerror=null;this.src='/images/players/default.png';"
           />
         </div>
+        <div class="potg-meta-row" style="color: ${potg.teamColor || '#1a1a2e'};">${potg.name}</div>
         <div class="potg-stats-row">
           <span style="color: ${potg.teamColor || '#1a1a2e'};">${potg.stats.pts} PTS&nbsp;&nbsp;&nbsp;${potg.stats.reb} REB&nbsp;&nbsp;&nbsp;${potg.stats.ast} AST</span>
         </div>
@@ -264,9 +270,17 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
 
       .potg-stats-row {
         font-family: 'Bebas Neue', sans-serif;
-        font-size: 28px;
+        font-size: 14px;
         letter-spacing: 1px;
         color: #1a1a2e;
+        text-align: center;
+        line-height: 1.1;
+      }
+
+      .potg-meta-row {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 14px;
+        letter-spacing: 1px;
         text-align: center;
         line-height: 1.1;
       }
