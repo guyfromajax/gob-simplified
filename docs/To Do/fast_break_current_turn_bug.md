@@ -1,6 +1,6 @@
 # Fast Break Miss: current_turn Mislabeled Bug
 
-**Status:** Documented; verification via existing debug logs; fix not yet implemented.
+**Status:** Fixed. `current_turn` now set from routing state (start of turn) in `turn_manager.run_micro_turn()`.
 
 **Related:** Turn_by_Turn_System, Fast_Break_System, Shot_System, Rebound_System. Debug logs: `🔍 [FB MISS]` in `phase_resolution.py` and `game_manager.py`.
 
@@ -53,14 +53,14 @@ Then inspect the **serialized turn** sent to the frontend for that same turn: ch
 
 ---
 
-## Proposed Fix (to implement after verification)
+## Fix (implemented)
 
 In `turn_manager.run_micro_turn()`:
 
-- **Preserve** the routing state at the start of the turn (the `state` used to decide which handler to call — e.g. keep it in a variable like `routing_state` or `current_turn_type`).
-- When adding Bucket 1 and setting `result["current_turn"]`, use that **preserved start-of-turn state**, not a fresh read of `game_state["offensive_state"]` after the handler.
+- **Removed** the re-read of `game_state["offensive_state"]` at Bucket 1 (previously line ~761). The variable `state` is set once at the start of the turn (line ~464) for routing and is never overwritten.
+- `result["current_turn"]` is now set from that same `state` (the turn we just ran), not from the post-handler value.
 
-That way, for a Fast Break turn we always set `result["current_turn"] = "FAST_BREAK"` regardless of the handler having set `offensive_state` to `"HCO"` (or anything else) for the next turn.
+So for a Fast Break turn we always set `result["current_turn"] = "FAST_BREAK"` regardless of the handler having set `offensive_state` to `"HCO"` or `"FAST_BREAK"` for the next turn.
 
 ---
 

@@ -756,9 +756,8 @@ class TurnManager:
         if "offense_override_cleared" not in result:
             result["offense_override_cleared"] = False
         
-        # ✅ SS&S: Set current_turn based on offensive_state
-        # This explicitly identifies what type of turn this is
-        state = self.game.game_state.get("offensive_state", "HCO")
+        # ✅ SS&S: Set current_turn from the state we used for routing (start of turn), not post-handler state.
+        # Handlers update offensive_state for the *next* turn; current_turn must reflect the turn we just ran.
         result["current_turn"] = state  # HCO, FCP, HCT, FAST_BREAK, FREE_THROW, or OREB
         
         # ✅ SS&S: Copy next_play_type to next_turn for explicit naming
