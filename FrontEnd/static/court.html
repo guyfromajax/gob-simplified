@@ -1872,6 +1872,22 @@
       background-color: #0056b3;
     }
 
+    /* Dead controls are intentionally non-interactive with an obvious visual mask. */
+    .dead-control {
+      position: relative;
+      opacity: 0.45;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .dead-control::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.28);
+    }
+
     /* Skip To End is not yet implemented; keep it clearly disabled until post-alpha */
     #skip-btn:disabled {
       opacity: 0.45;
@@ -2501,9 +2517,9 @@
       
       <!-- Game controls (pause/skip) at bottom of court -->
       <div class="game-controls">
-        <button id="game-speed-btn">Game Speed</button>
+        <button id="game-speed-btn" class="dead-control" disabled title="Coming in a future update">Game Speed</button>
         <button id="pause-btn">Pause</button>
-        <button id="skip-btn" disabled title="Coming in a future update">Skip To End</button>
+        <button id="skip-btn" class="dead-control" disabled title="Coming in a future update">Skip To End</button>
         <button id="timeout-btn">Timeout</button>
       </div>
       

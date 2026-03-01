@@ -1600,7 +1600,7 @@ export function createGameScene(Phaser) {
       updateSpeedDropdown(initialSpeed);
       
       // Game Speed button handler
-      if (gameSpeedBtn && speedDropdown) {
+      if (gameSpeedBtn && speedDropdown && !gameSpeedBtn.disabled) {
         gameSpeedBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
@@ -1627,6 +1627,8 @@ export function createGameScene(Phaser) {
             speedDropdown.style.display = 'none';
           });
         });
+      } else if (speedDropdown) {
+        speedDropdown.style.display = 'none';
       }
       
       function updateSpeedDropdown(currentSpeed) {
