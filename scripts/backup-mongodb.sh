@@ -6,6 +6,9 @@
 #
 # Setup: Copy .env.backup.example to .env.backup, fill in MONGO_URI.
 # Schedule: Use launchd (see docs/To Do/backup_schedule.md) for weekly run.
+#
+# Disable: Set GOB_BACKUP_DISABLED=1 in .env.backup (e.g. when using Atlas backups).
+#          Also unload the launchd job: launchctl unload ~/Library/LaunchAgents/com.gob.mongodb-backup.plist
 
 set -e
 
@@ -16,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-# Load backup env (MONGO_URI, optional BACKUP_OUTPUT_DIR)
+# Load backup env (MONGO_URI, optional BACKUP_OUTPUT_DIR, optional GOB_BACKUP_DISABLED)
 if [[ -f "$REPO_ROOT/.env.backup" ]]; then
   set -a
   source "$REPO_ROOT/.env.backup"
@@ -24,6 +27,11 @@ if [[ -f "$REPO_ROOT/.env.backup" ]]; then
 else
   echo "Missing .env.backup. Copy .env.backup.example to .env.backup and set MONGO_URI." >&2
   exit 1
+fi
+
+if [[ -n "$GOB_BACKUP_DISABLED" ]]; then
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Local backup disabled (GOB_BACKUP_DISABLED is set). Exiting."
+  exit 0
 fi
 
 if [[ -z "$MONGO_URI" ]]; then

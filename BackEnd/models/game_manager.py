@@ -587,6 +587,16 @@ class GameManager:
         self._append_turn(result)
         _perf["next_turn_append"] = (_time.time() - _t0) * 1000
 
+        # 🔍 [FB MISS DEBUG] Log Fast Break miss: outcome, next_turn we're set to process, possession_flips value
+        if result.get("fast_break") and result.get("result_type") == "MISS":
+            outcome = "shooting_foul" if result.get("next_play_type") == "FREE_THROW" else result.get("rebound_type", "?")
+            logging.warning(
+                "🔍 [FB MISS] game_manager: outcome=%s next_turn=%s possession_flips=%s (before flip logic)",
+                outcome,
+                result.get("next_turn"),
+                result.get("possession_flips"),
+            )
+
         # If the turn ended with an offensive rebound, create a separate OREB turn
         # Process ALL consecutive OREBs in this same call (for batch efficiency)
         _t0 = _time.time()
@@ -638,6 +648,11 @@ class GameManager:
         # ✅ SS&S FIX: Only flip if possession_flips is True (prevents double flip for Fast Break → HCO)
         # Fast Break defensive stop sets possession_flips: False, so it won't trigger this flip
         if result.get("next_play_type") == "HCO" and result.get("possession_flips") is True:
+            if result.get("fast_break"):
+                logging.warning(
+                    "🔍 [FB MISS] game_manager: processing DREB→HCO flip possession_flips=%s next_turn=%s",
+                    result.get("possession_flips"), result.get("next_turn"),
+                )
             old_offense = self.offense_team.name
             self.switch_possession()
             result["possession_flips"] = False
@@ -652,6 +667,11 @@ class GameManager:
         # Handle possession flips for DREB transitions that go to Fast Break
         # This includes: MISS with DREB → Fast Break, STEAL → Fast Break
         if result.get("next_play_type") == "FAST_BREAK" and result.get("possession_flips"):
+            if result.get("fast_break"):
+                logging.warning(
+                    "🔍 [FB MISS] game_manager: processing DREB→FAST_BREAK flip possession_flips=%s next_turn=%s",
+                    result.get("possession_flips"), result.get("next_turn"),
+                )
             old_offense = self.offense_team.name
             self.switch_possession()
             result["possession_flips"] = False

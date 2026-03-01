@@ -1507,6 +1507,16 @@ def resolve_fast_break_logic(game: "GameManager"):
         turn_result = game.shot_manager.resolve_shot(roles)
         game_state.pop("fast_break_shot_threshold_override", None)
 
+        # 🔍 [FB MISS DEBUG] Log Fast Break miss outcome and next-turn/possession state for debugging
+        if turn_result.get("result_type") == "MISS":
+            outcome = "shooting_foul" if turn_result.get("next_play_type") == "FREE_THROW" else turn_result.get("rebound_type", "?")
+            logging.warning(
+                "🔍 [FB MISS] phase_resolution: result_type=MISS outcome=%s next_play_type=%s possession_flips=%s",
+                outcome,
+                turn_result.get("next_play_type"),
+                turn_result.get("possession_flips"),
+            )
+
         turn_result["defender_count"] = defender_count
         turn_result["outlet_passer_id"] = fb_roles.get("outlet_passer")
 
