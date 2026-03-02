@@ -3137,7 +3137,7 @@
               headshotImg.setAttribute('data-player-id', shooterId);
               headshotImg.onerror = () => {
                 console.warn(`⚠️ [PLAYCALL HEADSHOTS] Headshot failed to load: ${imgPath}, using default`);
-                headshotImg.src = API_CONFIG.buildStaticPath('/images/players/default.png');
+                headshotImg.src = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
               };
               
               // Add tooltip event listeners (if tooltip functions exist)
@@ -4281,7 +4281,7 @@
       
       // Set player image
       image.src = API_CONFIG.buildStaticPath(`/images/players/${playerId}.png`);
-      image.onerror = () => { image.src = API_CONFIG.buildStaticPath('/images/players/default.png'); };
+      image.onerror = () => { image.src = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png'); };
       
       // Energy (NG)
       const ng = stats.NG ?? stats.ng ?? 1.0;
@@ -4377,7 +4377,7 @@
         
         // Fallback to default if image fails to load
         headshotEl.onerror = () => {
-          headshotEl.src = API_CONFIG.buildStaticPath('/images/players/default.png');
+          headshotEl.src = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
         };
       } else {
         headshotEl.style.display = 'none';
@@ -4449,7 +4449,7 @@
       headshotEl.style.display = 'block';
       
       headshotEl.onerror = () => {
-        headshotEl.src = API_CONFIG.buildStaticPath('/images/players/default.png');
+        headshotEl.src = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
       };
 
       const mo = data.shooterMO || 5;
@@ -4554,10 +4554,10 @@
 
       // Image error handling
       awayHeadshot.onerror = () => {
-        awayHeadshot.src = API_CONFIG.buildStaticPath('/images/players/default.png');
+        awayHeadshot.src = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
       };
       homeHeadshot.onerror = () => {
-        homeHeadshot.src = API_CONFIG.buildStaticPath('/images/players/default.png');
+        homeHeadshot.src = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
       };
 
       // Display audible text in scoreboard if provided

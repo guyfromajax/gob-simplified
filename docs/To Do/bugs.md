@@ -2,18 +2,13 @@
 2. 3 pointer on P/T Break does not register as a 3
 17 Create "DEFENSE" SFX
 18. Defense Matchups pop up -- DEFENSE when appearing, whistle when exiting
-19. Defense Matchups pop up is not consistently showing when it should - coming out of quarter breaks
 20. We need to clean up user Timeout implementation cadence
-21. Remove team backgrounds from Announcement System
-22. Sentry Bug Report 2.21.2026
-29. Stale data on initial page load - TOL shows 5, scores incorrect, player NG shows 100% until first turn processes
-30. Fast Break / DREB animation bug
 34. Player Of The Game
 35. Verify Special Stats are tracking properly
 36. Season & Career Stats for Players for special stats
 37. Player Foul Out Next Step bug
 38. Block on Hold for Final Shot snaps to the wrong end of the court.
-39. Not getting a Timeout pop up when the computer calls timeout
+
 
 40. **Final play of quarter hold — clock display:** ~~During the 3-second hold… show **0:00**.~~ **Fixed:** AnimationEngine calls `context.onUpdate({ clock: '0:00' })` at the start of the hold in `handleFinalTurnShot` and `handleFreeThrow` when `quarter_ends_after`, so the scoreboard shows 0:00 for the full hold.
 41. Disable Game Speed button
@@ -153,11 +148,11 @@
 - **Next Steps**: Verify CSS is loading and container width is correct
 
 ### 🔍 Investigating: Continuous 404 Requests for Player Tooltip Images (court.html)
-- **Issue**: Continuous stream of 404 requests for player headshot images (`/images/players/${playerId}.png` and `/images/players/default.png`) even when game is paused
+- **Issue**: Continuous stream of 404 requests for player headshot images (`/images/players/${playerId}.png` and `/images/players/generic_headshot.png`) even when game is paused
 - **Location**: `FrontEnd/static/js/phaser/gameScene.js` lines 519-523 (player tooltip image loading)
 - **Root Cause**:
   1. Tooltip tries to load player image: `/images/players/${playerId}.png` (UUID-based filenames)
-  2. When that fails (404), `onerror` handler tries fallback: `/images/players/default.png`
+  2. When that fails (404), `onerror` handler tries fallback: `/images/players/generic_headshot.png`
   3. Fallback also doesn't exist (404), creating a retry loop
   4. `mousemove` event listener (lines 673-683) is active even when paused, continuously triggering tooltip updates and image load attempts
 - **Impact**:

@@ -645,7 +645,7 @@ export function createGameScene(Phaser) {
         const playerPhoto = player.photo || `/images/players/${playerId}.png`;
         image.src = playerPhoto;
         image.onerror = () => {
-          image.src = '/images/players/default.png'; // Fallback image
+          image.src = '/images/players/generic_headshot.png'; // Fallback image
         };
         
         // Get current player stats (including current energy)

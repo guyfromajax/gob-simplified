@@ -889,7 +889,7 @@ function updateSlotDisplay(slot) {
     slotContent.innerHTML = `
       <div class="player-image-container">
         <img class="player-image" src="/images/players/${playerId}.png" 
-             onerror="this.src='/images/players/default.png'" alt="${player.name}">
+             onerror="this.src='/images/players/generic_headshot.png'" alt="${player.name}">
       </div>
       <div class="player-name">${player.name}</div>
       <div class="player-rating">${rating}</div>

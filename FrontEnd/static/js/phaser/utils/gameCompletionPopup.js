@@ -154,9 +154,9 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
             <div class="potg-image-row">
               <img
                 class="potg-image"
-                src="${potgImageUrl || '/images/players/default.png'}"
+                src="${potgImageUrl || '/images/players/generic_headshot.png'}"
                 alt="${potg.name}"
-                onerror="this.onerror=null;this.src='/images/players/default.png';"
+                onerror="this.onerror=null;this.src='/images/players/generic_headshot.png';"
               />
             </div>
             <div class="potg-meta-row potg-player-name" style="color: ${potg.teamColor || '#1a1a2e'};">${potg.name}</div>
