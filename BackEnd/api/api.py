@@ -5275,7 +5275,14 @@ try:
     ):
         try:
             print(f"🔍 Looking up player with ID: {player_id}")
-            player = players_collection.find_one({"_id": player_id})
+            # Players collection uses ObjectId for _id; URL passes string — try ObjectId first
+            query_id = player_id
+            if len(player_id) == 24 and all(c in "0123456789abcdefABCDEF" for c in player_id):
+                try:
+                    query_id = ObjectId(player_id)
+                except Exception:
+                    pass
+            player = players_collection.find_one({"_id": query_id})
             if not player:
                 print(f"❌ Player not found with _id: {player_id}")
                 # Try a broader search to help debug
