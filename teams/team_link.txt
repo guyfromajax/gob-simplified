@@ -1,0 +1,120 @@
+9	Crickstown
+10	Cagers World
+11	Nickel Beach
+12	Chapel Hill
+13	Appalachia
+14	Casino Row
+15	IDA
+16	Durham
+17	Montpeiler
+18	Queen's Guard
+19	Independence
+20	Concord
+21	Garden Elites
+22	D1 Institute
+23	Providence
+24	Ivy Prep
+25	Amariabi International
+26	Falls Academy
+27	Upstate
+28	St Peters
+29	Empire City
+30	Syracuse
+31	Toronto Limited
+32	Long Island Methodist
+33	Harding Central
+34	Upper Peninsula
+35	Mynsk
+36	Ann Arbor
+37	Hardwood Fields
+38	Columbus
+39	North Columbus
+40	Cleveland-Carlysle
+41	Burroughs
+42	Wacker West
+43	Archbishop McClellan
+44	Sacred Heart
+45	Templeton-Wesley
+46	Dillinger
+47	Quigley Catholic
+48	Evanston
+49	Crimson County
+50	Myrtle Private
+51	Washington Carver
+52	Knoxville
+53	Biloxi
+54	Mobile
+55	Monroe-Hayes
+56	Lexington
+57	Keys High
+58	Gainesville
+59	Valdosta Valley
+60	DeLand
+61	Grayson Ranch
+62	Reardon-Mayes
+63	Dade Academy
+64	Tallahassee
+65	Hyde Methodist
+66	Wash U Prep
+67	Lawrence
+68	Ozark Centre
+69	Fielding
+70	Iowa Academy
+71	Grupenberg
+72	Tri-Cities Prep
+73	HA Rushmore
+74	Rodeo Circuit
+75	Mt Simmons
+76	Lewis Catholic
+77	Crofton
+78	Minot
+79	Tower Academy
+80	Two Rivers
+81	Norman
+82	River's Edge
+83	Amarillo Tech
+84	Pan Handle Limited
+85	Ada
+86	Kenton
+87	Reyes-Santiago
+88	Stormwood
+89	Houston Jesuit
+90	Austin
+91	GP Prep School
+92	MiddleTEX
+93	Abilene
+94	Chambless Global
+95	Austin West
+96	Bayou District
+97	Pike's Prep
+98	Desert Regional
+99	East Rockies
+100	Circus Circus
+101	Tucson
+102	Barton Lutheran
+103	Border Academy
+104	Southwest Miner
+105	Rainier Central
+106	Salem
+107	Swoosh
+108	Seattle AAA
+109	Vancouver
+110	Cardinal Conor
+111	Couer d'Alene
+112	Boise
+113	Valley High
+114	San Jose
+115	Rancho Estrada
+116	Berkley
+117	Hollywood Prep
+118	DeCatur Dei
+119	West Ocean City
+120	Huntington Canyon
+121	Mahala Alou
+122	Pacific All-Stars
+123	Juneau-Nome
+124	Redwood High
+125	Grizzly Academy
+126	Hana Road
+127	Cupertino
+128	Melbourne Americas

@@ -1,0 +1,1441 @@
+first_name last_name year jersey player_type height weight SC SH ID OD PS BH RB ST AG ND IQ FT team_link
+Ethen	Rojas	SR	5	Classic PG	67	162	19	26	42	40	28	43	9	34	31	45	21	33	9
+Raphael	Beck	JR	21	Classic PG	69	172	51	47	49	32	57	51	24	21	52	15	54	16	9
+Numbers	Eichner	SR	23	Defensive Wizard	75	212	73	73	82	73	93	61	40	41	54	54	53	80	9
+Maxwell	Morris	JR	6	Classic PF	75	199	48	14	25	86	74	64	59	78	42	60	76	33	9
+Chad	Anderson	SR	27	Outside Duel Threat	72	190	33	48	39	34	50	37	51	37	39	37	26	28	9
+Ronan	Spence	JR	8	Pure Shooter	76	212	66	50	79	26	34	26	46	46	49	79	39	90	9
+Andre	Watters	SR	31	Below Average	68	162	10	19	13	31	40	37	9	12	9	50	28	41	9
+Donte	Koh	JR	40	Classic PF	75	202	59	60	39	46	75	20	33	18	59	22	45	30	9
+Alvaro	Callahan	FR	55	Outside Duel Threat	70	181	20	58	66	12	68	16	45	81	67	49	79	27	9
+Jeremy	Jones	SO	1	All-Around Scorer	71	196	59	34	17	13	35	32	10	28	19	7	17	18	9
+Cruz	Rhodes	SR	2	Classic PG	69	170	16	25	51	48	46	53	16	8	16	18	39	48	9
+Damion	Rand	SO	9	Classic PG	72	200	18	43	47	59	72	49	23	22	64	37	60	12	9
+Jayson	Ketchum	FR	2	Below Average	72	188	2	10	7	15	2	-1	5	-1	10	8	2	11	10
+Zachary	Wood	SR	17	Classic SF	73	188	50	51	32	47	60	15	34	45	45	67	56	70	10
+Bernard	Hope	FR	24	Average	69	170	13	23	57	65	36	45	27	11	69	24	29	25	10
+Randy	Riordan	SO	9	Outside C	77	222	45	91	63	66	16	49	88	83	82	56	27	74	10
+Byron	Cotner	SO	33	Classic SG	73	197	70	58	56	51	23	13	29	60	66	55	24	50	10
+Josh	Goetzinger	SR	30	Athlete	71	182	39	93	64	64	66	79	58	56	50	73	38	45	10
+Reynaldo	Curry	JR	5	Average	66	161	22	61	26	65	82	21	75	15	27	15	67	29	10
+Charles	Vaughan	SO	23	Classic C	79	236	60	19	58	65	36	13	27	65	69	32	70	73	10
+Riley	Carroll	SR	22	Below Average	67	160	7	21	20	27	21	7	5	17	10	8	14	1	10
+Stacy	Riggs	FR	10	Below Average	72	188	28	42	38	51	38	11	14	34	35	60	58	19	10
+Cesar	Rossi	JR	55	Below Average	84	255	3	7	11	8	7	15	3	11	8	4	6	2	10
+Justin	Branch	SR	20	Three & D	76	225	15	62	41	65	54	32	56	63	61	27	31	33	10
+Elijah	Stevens	JR	6	Intangibles	75	198	34	18	72	77	72	30	8	60	57	64	69	55	11
+Corky	Hendrickson	FR	23	Pure Shooter	71	192	40	18	63	61	48	79	77	29	31	60	51	69	11
+Andreas	Delgado	SR	21	Classic SG	73	211	53	74	25	60	56	47	50	52	63	71	79	29	11
+Lester	O'Neal	SR	43	Inside Defender	79	229	22	120	83	92	40	119	33	36	79	111	79	39	11
+Willie	Batchelor	SR	15	Classic PG	71	190	46	44	21	30	55	47	43	35	40	44	58	10	11
+Smith	Patterson	SR	11	Average	71	188	57	78	33	32	49	43	87	76	41	55	88	13	11
+Arakbu	Eddison	SO	3	Below Average	70	173	12	10	11	3	9	4	11	3	7	5	7	10	11
+Tucker	Buckley	SO	7	Below Average	69	173	12	26	69	78	32	45	41	72	20	59	73	48	11
+Yadiel	Terra	FR	32	Athlete	71	200	40	71	91	66	91	27	123	71	102	111	127	105	11
+Carroll	Heckart	JR	50	Below Average	71	194	42	23	23	24	33	12	37	17	4	14	28	26	11
+Brevin	Jones-Whiteside	FR	12	Average	69	163	6	29	21	16	7	30	32	14	22	30	29	34	11
+BJ	Stark	JR	4	Athlete	72	198	62	65	71	19	41	79	72	69	65	75	75	61	11
+Stanley	Keith	SO	4	Outside Duel Threat	73	206	43	66	61	42	78	49	34	79	83	57	32	46	12
+Otis	Nixon	JR	17	Outside Defender	68	159	9	10	34	69	69	64	35	38	45	22	53	67	12
+Eugene	Johnston	FR	46	Outside C	79	238	84	105	82	89	91	39	44	92	53	65	111	48	12
+Dale	Butler	SO	30	Outside Defender	68	175	27	40	77	58	60	39	11	52	11	25	49	50	12
+Colt	Robles	SO	27	Classic PG	70	167	17	68	66	95	96	59	69	118	32	40	123	40	12
+Darren	Parrish	SR	55	Intangibles	73	200	71	19	41	4	59	32	51	24	38	47	69	12	12
+Brice	Monroe Jr	FR	11	Classic PF	73	192	66	69	23	89	26	15	90	92	70	85	60	78	12
+Landon	Turley	JR	10	Classic SG	70	167	26	66	76	20	70	42	24	73	93	85	54	78	12
+Dayton	Weber	SO	34	Pure Shooter	70	169	40	83	46	59	73	65	73	43	31	81	69	54	12
+Nathan	Randolph	JR	25	Outside Duel Threat	72	200	32	62	60	13	62	11	63	45	20	70	57	59	12
+Thanh	Small	FR	32	Athlete	77	235	67	39	29	72	20	84	86	46	53	62	70	59	12
+Shorty	Holmstrom	SR	31	Classic SF	74	205	25	76	5	39	75	15	87	80	68	85	86	50	12
+Coby	Cantu	SO	49	Inside Defender	78	235	86	11	64	85	83	4	23	50	78	36	49	53	13
+Hog	Dempsey	SR	17	Four-Star	83	258	64	49	65	90	30	43	72	104	57	78	98	107	13
+Gerald	Lamar	SR	2	Average	72	204	39	59	49	35	31	29	58	58	66	59	79	30	13
+Marcelo	Villegas	JR	50	Average	70	175	29	34	39	66	56	34	16	16	10	37	22	32	13
+Bradley	Anderson	SR	18	Classic PF	76	225	76	74	31	35	69	49	34	14	37	52	10	32	13
+Uriah	Roca	SO	4	Below Average	68	159	46	36	36	41	31	21	44	21	49	10	55	42	13
+Devan	Simpson	JR	44	Below Average	69	180	19	27	26	27	34	37	29	27	43	20	13	40	13
+Lawerence	Riddle	SO	35	Outside C	79	247	62	47	34	64	12	18	36	34	90	45	35	49	13
+Jean	Holland	SO	6	Athlete	76	217	24	15	15	29	33	20	27	32	24	36	32	18	13
+Sonny	Johnson	SO	1	Average	71	194	15	14	9	10	16	8	20	16	13	15	19	7	13
+Thomas	Billings	SR	23	All-Around Scorer	77	220	51	56	21	8	45	95	14	14	29	33	18	94	13
+Carlton	Shaw	SR	25	Classic C	78	242	70	11	29	81	15	80	81	39	80	74	78	50	13
+Walker	Ansley	FR	43	Five-Star	83	261	112	129	83	77	117	67	79	84	124	105	128	126	14
+Ezra	Cole	SO	44	Three & D	71	183	25	39	58	43	38	22	60	46	46	37	52	37	14
+Jewell	Green	SR	5	Average	65	135	14	28	5	29	26	16	22	7	30	24	16	18	14
+Tyrese	Orozco	FR	1	Four-Star	75	207	121	69	61	120	46	41	26	95	75	97	93	77	14
+Kevin	Alvarado	JR	51	Defensive Wizard	68	176	57	98	63	97	38	68	98	62	96	83	22	53	14
+Trey	Walton	SR	14	Athlete	70	183	32	25	31	4	14	20	29	46	43	40	23	40	14
+Daryn	Sexton	FR	21	Three & D	73	209	51	28	35	21	11	32	45	55	9	48	34	26	14
+Layton	Pettyjohn	SR	35	Classic SG	69	170	76	67	32	62	35	61	46	38	82	61	14	42	14
+Max	Bautista	SR	23	Outside Duel Threat	69	169	9	18	20	8	11	16	49	40	61	45	17	7	14
+Terrell	Banks	FR	52	Average	68	166	20	10	38	29	43	7	13	16	30	25	15	9	14
+Lito	Leonardi	FR	1	Below Average	67	156	23	12	34	24	18	64	30	9	49	64	66	4	14
+Georgie	Hanson	JR	24	Average	74	202	26	8	51	18	28	13	37	32	24	26	52	36	14
+Dmitri	Ilikos	FR	17	Three & D	78	243	32	37	35	37	12	17	11	14	11	25	34	24	15
+Felipe	Brazzell	FR	16	Average	67	147	11	38	69	67	44	62	30	39	44	71	37	21	15
+Charles	Amiriabi	SR	99	Five-Star	81	253	94	107	125	95	106	100	80	70	108	99	57	125	15
+Sean	Villora	SR	33	Below Average	67	161	52	27	40	17	21	19	18	25	35	43	18	41	15
+Jadyn	Thayer	JR	42	Athlete	73	193	71	13	37	36	58	58	26	68	35	60	35	49	15
+Reggie	Powers	FR	23	Outside Duel Threat	70	172	4	66	61	62	14	24	67	31	42	49	47	53	15
+Will	Benton	JR	6	Pure Shooter	69	166	66	48	69	66	15	65	28	45	64	61	67	39	15
+Andrei	Markov	SR	15	All-Around Scorer	71	181	29	47	50	69	66	18	48	62	74	59	77	17	15
+Makai	Tohaki	SR	30	Classic SF	72	202	74	60	63	54	53	35	38	83	79	46	55	56	15
+Heath	Cannon	SO	18	Outside C	78	235	4	14	16	12	14	25	11	2	23	23	21	25	15
+Reynaldo	Groves	SR	31	Classic SG	74	215	38	60	60	53	49	22	28	51	29	27	22	43	15
+Jonathan	Ng	JR	5	Classic SF	80	244	67	82	108	100	69	67	42	67	77	28	109	103	15
+Jamarion	Vance	JR	6	Three & D	75	213	66	81	51	82	57	34	97	108	50	63	67	67	16
+Nestor	Sosnowski	JR	20	All-Around Scorer	76	226	70	52	26	9	76	24	59	62	57	61	44	31	16
+Todd	Swim	SR	32	Average	66	142	34	21	54	49	43	63	4	44	73	64	75	80	16
+Chauncey	Aquaviva	SR	15	Five-Star	81	259	109	30	134	30	36	109	140	127	102	99	105	97	16
+Jordyn	Quinton	SO	3	Below Average	69	181	19	22	13	8	24	13	7	14	22	5	16	6	16
+Jefferson	Valencia	JR	17	Driver	71	187	55	12	52	74	41	85	24	71	44	75	95	18	16
+Matthias	Wright	JR	39	Classic PG	70	178	34	29	21	20	20	32	38	30	21	17	35	32	16
+Sam	Turner	JR	12	Classic PF	75	206	4	55	49	57	66	46	47	39	55	49	51	29	16
+Ricky	Chang	FR	23	Driver	72	194	88	65	25	18	72	97	56	88	65	96	48	90	16
+Chris	Davidson	SR	11	All-Around Scorer	75	204	39	48	53	20	27	86	82	66	36	27	12	19	16
+Wiley	Oliver	JR	33	Driver	75	218	38	68	27	83	78	57	56	68	72	32	69	75	16
+Christain	Walsh	SR	4	All-Around Scorer	74	208	85	50	45	63	58	65	55	51	42	59	83	66	16
+Matteo	Hockett	JR	52	Classic C	78	236	23	18	35	21	25	36	12	25	60	41	54	61	17
+Khalil	Mullen	JR	41	Classic SF	73	189	76	52	16	54	40	41	83	33	70	79	54	19	17
+Antonio	Andersen	FR	23	Classic SF	75	214	29	21	36	20	37	27	26	35	38	27	35	14	17
+Rueben	Tate	SR	34	Below Average	71	192	62	37	36	57	68	38	20	36	19	46	20	61	17
+Tommy	Morales	JR	46	Defensive Wizard	79	243	60	44	90	74	67	30	38	50	85	29	59	31	17
+Jackie	Cobb	SO	2	Below Average	70	178	42	20	40	60	15	10	73	10	36	68	61	20	17
+Vaughn	Nichols	JR	19	Average	67	159	24	38	38	10	27	17	32	31	27	17	20	17	17
+Willie	Menchaca	JR	40	Below Average	71	189	59	66	81	87	79	44	78	51	11	58	19	85	17
+Columbus	Heyden	SR	11	Average	73	198	63	65	37	29	52	63	54	30	60	44	33	55	17
+Micheal	Raymond	JR	35	Below Average	73	210	23	36	24	8	17	13	25	8	18	7	35	36	17
+Tate	Moreau	SO	44	Average	72	200	43	48	49	51	43	42	63	49	16	39	38	49	17
+Landon	Scott	SR	1	Average	70	164	16	31	27	19	6	19	30	36	35	32	21	35	17
+Dexter	Kibler	SR	11	Below Average	69	173	15	35	5	35	40	20	30	25	23	13	41	32	18
+Yaz	Shimizu	JR	16	Driver	71	186	63	60	50	48	23	39	42	42	7	29	45	25	18
+Nathen	Archambault	FR	34	Intangibles	73	207	74	89	66	88	58	70	52	70	77	60	78	44	18
+Jovany	Roberson	SR	5	Average	69	171	43	67	63	46	60	60	44	25	41	64	32	35	18
+Ronan	Casas	SR	45	Classic PF	77	227	61	2	54	60	54	59	31	27	43	23	26	18	18
+Johnathan	Barrett	SR	22	Average	68	168	12	18	22	16	12	26	17	39	34	29	24	19	18
+River	Moody	JR	10	Classic C	79	233	109	114	123	114	87	43	84	113	103	35	18	60	18
+Craig	Smith	FR	18	Three & D	74	201	40	65	48	49	32	27	50	14	16	26	49	49	18
+Paxton	Walters	JR	52	Driver	65	152	32	40	46	73	46	28	70	35	62	70	50	11	18
+Tyrell	Orr	FR	42	Classic C	81	254	50	40	56	23	27	12	51	43	51	53	62	69	18
+Rogelio	Berry	SR	25	Below Average	68	169	27	56	45	31	24	24	18	66	59	32	78	39	18
+Jon	Nash	JR	51	Below Average	70	176	24	19	11	46	52	32	43	20	48	21	27	37	18
+Manny	Murillo	JR	21	All-Around Scorer	77	231	72	67	39	12	25	99	75	48	95	60	75	84	19
+Miller	Wheless	SR	10	Average	68	166	19	33	0	9	14	14	29	35	23	16	32	25	19
+Woodrow	Frost	SR	2	Intangibles	72	184	29	18	5	34	6	34	30	44	40	45	26	31	19
+Lincoln	Morningside	JR	7	Average	74	207	22	10	15	15	23	16	18	21	20	28	36	9	19
+Carlos	Harrell	JR	5	Classic SG	74	195	28	48	71	31	32	33	40	12	28	79	56	60	19
+Abe	Carpenter	FR	34	Defensive Wizard	71	194	28	44	36	84	16	13	74	24	42	38	33	60	19
+Gunther	Stevenson	SR	41	Classic SF	73	215	64	50	41	29	15	10	49	32	45	49	50	60	19
+Dirk	Thomas	SR	20	Pure Shooter	68	170	38	20	74	49	10	64	44	4	44	63	28	51	19
+Boogie	Ibarra	SR	24	Average	68	160	28	15	17	20	13	6	22	6	25	23	28	20	19
+Willie	Saville	FR	42	Defensive Wizard	74	204	86	37	82	38	32	79	86	81	60	26	8	53	19
+Kamren	Reid	SR	35	Classic C	78	235	47	13	31	22	48	42	30	16	32	23	31	29	19
+Alec	Hopkins	JR	44	Defensive Wizard	77	228	14	25	13	68	69	33	25	43	53	52	87	67	19
+Rashad	Cain	SR	45	Outside Defender	71	187	14	17	66	33	64	80	21	60	65	21	52	66	20
+D'Ante	Ortega	SR	1	Below Average	66	150	35	47	20	31	33	24	32	21	20	40	17	41	20
+Lance	Horn	FR	23	Three & D	73	197	49	57	37	75	69	61	21	39	40	48	11	30	20
+Brent	Houston	SO	20	All-Around Scorer	71	186	64	46	32	40	28	46	51	71	53	77	61	12	20
+Robbie	Ewing	SR	44	Defensive Wizard	77	222	68	50	47	63	55	58	25	57	53	57	36	9	20
+Keith	Lawlor	SR	43	Classic SG	69	174	16	19	18	19	7	8	12	8	13	12	5	25	20
+Tayshawn	Mayes	JR	10	Defensive Wizard	72	200	10	31	71	82	43	73	100	52	72	52	74	44	20
+Jason	Potter	JR	4	Average	71	198	5	2	9	0	-1	0	-2	-2	-2	2	1	0	20
+Jordon	Zimmerman	JR	52	Five-Star	75	196	72	62	79	89	81	107	26	50	93	85	78	77	20
+Ryan	Draper	SO	22	Classic SG	68	175	60	59	67	53	33	23	41	12	36	58	21	68	20
+David	Singh	SO	27	Average	81	233	53	28	29	14	52	49	19	39	26	74	51	68	20
+John	McAndrews	JR	7	Classic PG	73	200	14	27	31	15	35	31	32	16	10	24	12	20	20
+Nick	Golden	JR	6	Outside Defender	67	155	24	53	17	38	50	6	3	31	15	68	51	36	21
+Ellsworth	Beckman	SR	51	Average	71	185	22	8	4	23	10	15	10	-1	6	14	24	25	21
+Mervin	Dawson	SR	44	Classic C	82	254	17	96	101	75	64	52	21	100	73	60	73	50	21
+Ricky	Doverspike	SO	11	Classic SF	74	211	39	88	106	18	117	7	46	75	36	70	59	43	21
+Elden	Eckles	SO	9	Outside Defender	70	165	39	9	53	97	16	75	38	72	79	22	45	16	21
+Johnathon	Robles	SR	3	Average	69	183	13	18	37	29	7	18	25	4	3	29	24	35	21
+Denzel	Walquist	SR	42	Five-Star	67	151	25	97	19	112	99	84	105	70	64	90	71	81	21
+Jimmy	Fielding	SR	22	Driver	73	186	62	54	43	56	49	57	40	61	48	42	3	13	21
+Paris	Wolf	SR	24	Defensive Wizard	73	196	45	34	32	44	44	53	54	76	77	65	20	29	21
+Cyrus	Thompson	SO	52	Average	66	152	12	18	13	14	22	20	23	5	14	21	11	11	21
+Chris	Jacobs	SR	0	Five-Star	72	193	77	126	57	73	107	131	112	96	77	119	79	67	21
+Kevin	Montgomery	JR	1	Below Average	72	188	4	38	19	34	29	18	23	7	37	40	16	15	21
+Wesley	Rhodes	SO	1	Classic SG	68	170	60	60	93	88	90	38	70	22	65	60	56	49	22
+Rohan	Gooden	JR	22	Classic PG	70	169	43	22	35	11	16	38	60	59	47	15	67	60	22
+Talon	Gordon	SR	7	Average	67	162	18	15	24	15	31	16	35	41	41	48	43	49	22
+Mauricio	Blake	FR	3	Classic SG	69	172	57	43	55	47	11	51	48	42	54	37	28	28	22
+Deandre	Meyer	SR	30	Below Average	69	165	7	0	9	9	2	9	10	10	4	5	0	-2	22
+Carey	Realm	SR	9	Below Average	69	163	32	64	65	13	3	61	60	51	68	49	30	47	22
+Jace	Powell	SR	22	Classic C	78	231	46	67	78	43	28	67	56	31	65	67	23	30	22
+Desaun	Lynes	FR	45	Three & D	73	192	84	96	59	54	96	85	92	113	86	44	68	107	22
+Leonidas	Howling	JR	49	Outside C	75	218	67	73	13	84	72	81	30	12	58	48	66	28	22
+Thomas	Owen	JR	10	Pure Shooter	73	208	26	41	39	59	43	49	40	35	20	24	25	35	22
+Desmond	Baldwin	SO	53	Classic C	80	231	51	35	34	32	82	32	26	96	90	7	69	58	22
+Jaylin	Pearson	JR	50	Inside Defender	81	253	50	47	68	89	59	81	62	98	55	50	97	14	22
+Robin	Hibbler	JR	4	Intangibles	71	178	15	7	40	40	19	46	25	22	34	34	39	23	23
+Otis	Hobbs	SO	3	Below Average	71	187	33	10	18	20	29	36	1	23	28	18	35	16	23
+Messiah	Jackson	SO	7	Classic SF	75	215	83	91	28	37	68	6	69	88	23	65	62	60	23
+Delvin	Wilson	SR	42	Three & D	76	226	98	45	48	47	97	90	96	44	9	9	60	31	23
+Noe	Connors	FR	24	Average	71	179	12	64	19	30	22	23	21	57	16	20	49	64	23
+Ramon	McCoy	JR	51	Classic SG	70	174	67	33	19	62	46	33	67	73	55	43	52	50	23
+Reginald	Berner	SO	55	Outside C	80	239	28	21	30	26	22	35	22	23	38	45	21	26	23
+Jaycee	Horrigan	JR	22	Driver	76	228	23	13	49	36	35	21	50	15	16	32	54	69	23
+Demetrius	Mathews	FR	41	Outside C	77	224	45	50	88	83	86	76	36	15	86	42	23	44	23
+Hexagon	Murillo	SO	31	Average	71	184	29	42	12	16	38	44	22	10	42	37	42	43	23
+Dante	Rivera	FR	72	Three & D	72	189	50	50	78	96	67	38	98	76	93	111	60	11	23
+Rex	Cortez	SR	25	Outside Duel Threat	72	199	47	59	57	27	32	38	89	85	77	31	5	23	23
+Cristofer	Byham	JR	19	Athlete	70	172	65	35	49	94	54	100	25	82	58	58	61	84	24
+Zayne	Yates	SR	8	Average	77	217	53	27	25	36	34	52	24	47	20	6	13	33	24
+Semaj	Griest	FR	42	Below Average	71	176	15	59	49	30	16	27	44	35	7	64	25	62	24
+Arthur	Manley	FR	2	Classic PF	75	203	52	44	8	56	60	52	72	9	46	47	28	50	24
+James	Kirby	FR	52	Below Average	71	183	12	36	9	13	4	18	32	8	24	31	26	30	24
+Micheal	Lappin	JR	30	Classic PG	71	190	17	22	16	21	14	15	-1	8	6	4	2	3	24
+Lee Roy	Seales	SR	1	Classic PG	70	175	19	25	81	54	54	84	65	39	40	60	35	53	24
+Jumpy	Knoll	JR	51	Classic C	79	236	27	11	23	9	19	33	16	12	20	29	31	31	24
+Tommy	Webster	FR	5	Classic PG	73	192	26	40	24	38	21	44	6	47	44	19	32	19	24
+Wilfredo	Roberts	SO	31	Outside Duel Threat	71	175	31	19	14	11	4	42	11	39	20	9	36	26	24
+Alejandro	Santos	SR	41	Four-Star	84	272	58	22	76	55	117	21	90	74	92	120	126	118	24
+Shakur	Curtis	SR	24	Outside Duel Threat	70	171	63	78	15	15	97	103	89	88	24	74	22	15	24
+Bryson	Seneca	SR	43	Driver	73	209	85	68	16	81	91	80	76	26	56	58	5	58	25
+Tony	Jensen	FR	52	Outside Duel Threat	67	147	30	45	5	62	40	60	52	55	40	20	44	67	25
+Reuben	Brown	FR	30	Outside C	80	246	55	55	56	74	39	51	45	26	52	75	71	37	25
+Shaka	Ipock	JR	23	Average	74	202	26	30	16	13	38	27	47	22	37	44	12	27	25
+Carlos	Clements	FR	9	Pure Shooter	70	179	42	39	38	11	65	92	56	52	68	56	22	41	25
+Russell	Robles	FR	1	Average	71	188	37	32	25	30	27	10	7	39	34	21	10	5	25
+Isaiah	Lawrence	JR	3	Four-Star	74	195	36	86	54	90	53	100	49	53	69	69	86	84	25
+Ronny	Deguzman	SR	22	Three & D	76	213	39	40	44	33	44	29	55	13	33	8	29	58	25
+Marvin	Zitkowski	SO	10	Four-Star	82	254	47	73	81	63	53	78	42	112	58	98	107	122	25
+Jahir	Smith	SR	2	Classic PG	72	190	112	36	42	40	87	39	11	26	42	62	27	21	25
+Jonathon	Redwine	FR	7	Driver	73	196	78	69	29	30	56	31	73	55	74	26	19	67	25
+Oscar	Landry	FR	11	Average	67	160	22	0	10	34	9	26	30	12	12	28	39	21	25
+Andre	Walters	SR	3	Classic SF	78	227	83	111	19	103	118	64	110	46	55	64	117	57	26
+Reginald	Galloway	JR	45	Below Average	77	226	34	10	51	36	43	14	29	45	34	41	58	19	26
+Marvin	Holmes	SR	23	Classic SF	72	206	46	15	23	29	27	29	40	51	10	28	12	48	26
+Finnegan	Braun	SR	13	Four-Star	70	178	73	73	107	103	118	46	123	122	84	109	101	78	26
+Camden	Burch	SR	8	All-Around Scorer	73	206	60	46	76	38	82	58	81	56	30	79	47	31	26
+Omar	Bullock	SO	21	Average	65	145	25	25	20	15	15	5	34	18	6	42	12	33	26
+Cole	Armstrong	JR	52	Classic PF	75	208	19	26	19	34	33	27	48	31	10	26	30	51	26
+Josh	Scally	SR	33	Below Average	66	144	21	12	39	27	22	19	19	27	27	3	26	20	26
+Denis	McNeal	SO	7	Inside Defender	77	229	13	46	55	10	11	60	55	15	38	39	60	41	26
+Tyshawn	Manson	SO	20	Below Average	68	160	22	9	19	10	13	34	36	7	31	19	30	23	26
+Hayden	Garner	SO	50	Average	72	192	28	38	28	27	37	37	11	6	23	41	37	11	26
+Robbie	Ruiz	SR	2	Classic SG	72	200	35	92	26	99	100	29	40	102	15	96	18	33	26
+Hank	Pearson	JR	52	All-Around Scorer	73	189	86	46	48	12	33	59	69	90	65	68	20	50	27
+Jefferey	Patel	SR	4	Classic PG	67	151	34	67	9	21	50	40	47	15	60	24	12	61	27
+David	Boese	SO	5	Below Average	67	159	27	41	10	22	9	38	20	29	19	34	34	16	27
+Llyod	Hamm	SR	17	Below Average	70	183	13	8	6	2	13	3	-2	16	6	9	12	3	27
+Pete	Harris	SR	42	Classic PG	69	169	39	11	28	40	36	48	33	54	62	25	7	7	27
+Dwayne	Eggleton	JR	8	Inside Defender	78	239	52	59	61	61	49	72	25	35	78	75	22	76	27
+Brian	Yu	FR	43	Outside C	78	231	9	20	26	12	20	17	23	19	17	26	17	34	27
+Carson	Campos	JR	26	Outside C	77	228	40	92	104	36	37	24	68	45	62	29	44	93	27
+Danny	Davies	SO	7	Below Average	68	169	3	15	17	14	27	27	24	23	32	17	12	12	27
+Carlton	Conley	FR	12	Average	82	264	6	9	-2	1	2	-2	8	6	7	0	-1	10	27
+Patrick	Barajas	JR	30	Classic C	78	234	68	5	62	37	69	28	48	41	69	41	57	38	27
+Rick	Winter	SO	36	Classic SF	71	177	97	72	58	43	34	70	7	50	44	88	71	76	27
+Shawn	Davis Jr	JR	50	Outside C	81	249	53	29	36	59	5	73	38	56	62	49	65	50	28
+John	Manske	SO	26	Classic SG	69	168	23	99	47	80	39	28	49	76	46	64	59	94	28
+Donald	David	JR	10	Outside Duel Threat	68	162	82	100	50	98	32	94	95	90	33	106	9	38	28
+Jeff	Beard	SR	32	Inside Defender	76	218	62	45	60	68	18	33	43	8	61	32	25	40	28
+Grant	Klein	SO	13	Four-Star	77	216	104	136	106	126	58	106	121	66	110	94	84	123	28
+Lowell	Colon	SR	54	Average	70	186	8	16	15	13	4	19	12	11	20	14	12	19	28
+Val	Butler	SR	55	Intangibles	72	199	82	52	51	67	99	33	53	49	60	64	79	49	28
+Talvin	Poppy	SO	1	All-Around Scorer	79	233	69	65	19	49	55	27	58	32	44	31	39	41	28
+Roy	Farrell	SR	5	Classic C	79	236	21	27	28	28	15	12	2	28	29	8	23	7	28
+Tommy	Frey	SO	47	Three & D	76	230	81	64	54	89	72	30	72	80	49	32	14	40	28
+Fletcher	Miles	JR	4	Outside Defender	72	189	20	17	17	61	48	38	62	64	57	41	45	54	28
+Grant	Robinson	SR	11	Outside Defender	70	175	57	20	67	34	25	46	52	57	53	64	15	62	28
+Pro	Dowling	SR	51	Driver	72	195	24	58	65	56	14	43	38	29	19	13	11	43	29
+Cole	Page	JR	20	Intangibles	73	195	18	1	45	12	29	41	43	41	43	48	42	21	29
+Lamont	Marcus	SR	44	Outside Duel Threat	69	179	44	61	76	74	43	49	66	77	66	12	63	16	29
+Cornelius	Ramirez	SO	1	Classic SG	72	203	13	23	6	22	27	44	27	44	24	37	51	26	29
+Gregory	Bishop	SR	30	Classic PG	74	209	98	108	105	79	59	74	101	83	76	61	69	22	29
+Cedric	Brown	JR	2	Intangibles	76	215	46	18	14	35	19	47	64	64	28	73	50	44	29
+Nazir	Dahlke	JR	5	Four-Star	71	179	87	68	112	93	101	67	34	114	113	70	88	85	29
+Jayson	Blue	SR	34	Classic PF	78	238	61	15	12	43	27	21	46	61	29	28	26	17	29
+Ivan	Lebedev	SR	12	Average	70	166	11	48	10	16	13	48	52	47	59	47	45	34	29
+Donovan	Fox	JR	25	Classic PG	72	190	21	36	41	70	18	34	34	31	44	33	45	30	29
+Michael	Arnett	JR	6	Defensive Wizard	73	201	82	61	70	76	52	26	35	51	88	38	42	28	29
+Zavien	Liu	SO	14	Intangibles	72	196	61	53	64	8	16	25	50	60	64	52	62	49	29
+Keenan	Paul	SR	55	Driver	75	204	62	32	17	70	42	41	44	63	31	42	10	37	30
+Carlo	Carr	JR	15	Classic SG	71	188	23	43	29	46	54	27	33	50	26	40	26	30	30
+Theodore	Muster	JR	32	Classic SF	70	185	35	58	17	46	18	32	45	41	30	23	22	50	30
+Henry	Underwood	SR	33	Pure Shooter	73	197	69	74	77	45	6	90	71	35	21	20	80	77	30
+Malaki	Rodl	SR	30	Classic PG	77	224	20	63	42	58	84	76	28	34	23	34	53	23	30
+Hunter	Hopkins	SO	10	Three & D	74	212	22	36	34	72	67	73	13	47	23	48	54	69	30
+Oscar	Kelley	JR	52	Defensive Wizard	78	231	86	77	26	34	25	56	27	64	83	35	91	76	30
+Joey	Birkenstock	SR	22	Below Average	71	196	15	37	21	10	9	47	34	33	13	26	26	37	30
+Clifford	Casselman	SO	5	Driver	70	181	50	14	76	23	13	57	15	92	19	96	58	83	30
+Kasey	Hatfield	SR	50	Classic SF	75	217	43	36	34	84	71	66	69	71	39	13	64	27	30
+Theodore	Dunklin	JR	1	Below Average	72	210	26	29	33	23	11	18	20	21	20	10	12	11	30
+David	Elsworth	JR	77	Five-Star	72	205	62	94	63	75	97	100	116	70	90	106	96	95	30
+Asante	Schreiber	JR	52	Classic PG	70	174	55	51	58	57	44	71	46	62	41	9	9	53	31
+Miles	Matthews	SR	44	Average	82	266	49	67	18	58	29	40	33	21	49	39	9	56	31
+Jermaine	Barnett	SR	13	Average	69	171	25	16	65	46	34	41	59	55	53	14	67	71	31
+Jamie	Hernandez	JR	15	Classic SG	72	193	53	74	32	70	60	12	82	67	54	48	59	23	31
+August	Huber	SR	21	Classic PF	75	201	50	15	55	30	49	43	46	49	64	15	38	9	31
+Craig	Rountree	SR	50	Below Average	75	212	12	27	58	31	53	27	36	50	19	37	72	61	31
+Kai	Alahari	FR	3	Average	71	197	16	26	7	28	23	21	20	11	24	17	27	20	31
+Ray	Berger	SR	54	Classic PG	68	160	67	90	48	54	65	39	74	69	82	79	77	104	31
+Donavan	Gaines	JR	20	Classic SG	74	202	74	84	78	44	91	24	18	18	89	98	55	39	31
+Kelly	Miles	FR	10	Classic PF	76	228	24	13	26	59	15	48	52	52	56	45	24	18	31
+Luka	Mattos	SR	6	Intangibles	77	218	45	33	40	28	28	20	17	12	40	30	35	34	31
+Shawn	Dunlap	SR	41	Outside Defender	70	174	13	72	47	35	65	63	71	45	76	22	30	60	31
+Porfirio	Ferguson	FR	15	Pure Shooter	74	208	71	33	63	43	59	21	68	32	51	19	55	53	32
+Bart	Andrews	SR	9	Athlete	75	212	22	23	7	11	10	21	16	23	25	23	27	25	32
+Drake	McAdams	JR	54	Outside C	78	241	62	74	13	22	68	49	9	27	43	33	72	41	32
+Kyle	McGrath	JR	21	Outside Defender	70	177	66	19	18	78	71	77	73	64	35	42	74	39	32
+Kyree	Douglas	SR	30	All-Around Scorer	77	231	64	57	30	76	71	76	70	60	11	59	46	51	32
+Jamar	Williams	JR	2	Average	67	160	39	50	19	27	16	20	22	21	46	36	62	63	32
+Jefferey	Twiss	SR	4	Average	66	152	21	31	26	8	13	18	8	8	13	7	16	19	32
+Maximilian	Hammond	FR	1	Average	70	162	32	86	20	68	41	35	28	85	70	60	14	24	32
+Galen	Templeton	JR	3	Classic PF	78	230	19	57	35	29	16	21	77	41	51	45	76	54	32
+Ike	Hines	FR	45	Classic C	77	234	46	41	42	21	24	12	5	41	69	61	59	25	32
+Rodney	Parkey	SR	33	Below Average	71	193	10	29	23	33	32	31	8	18	35	20	37	24	32
+Maximilian	Owens	SO	26	Classic PG	70	175	68	71	59	59	53	89	69	15	42	56	37	60	32
+Lamont	Friesen	SR	20	Classic C	80	250	60	26	62	21	26	38	6	40	51	37	45	23	33
+Carl	Miles	JR	33	Four-Star	73	212	58	103	62	87	57	76	92	103	57	61	70	97	33
+Darrell	Wunsch	SO	53	All-Around Scorer	73	203	25	73	18	38	13	64	21	19	39	28	75	51	33
+Scot	Veit	JR	51	Below Average	70	170	16	73	38	54	38	23	47	82	83	78	104	42	33
+Woody	Rakowski	FR	3	Average	74	198	26	24	37	25	20	32	28	8	34	37	32	16	33
+Seth	Coots	FR	39	Average	70	174	34	20	4	11	10	7	5	14	41	42	13	42	33
+Randall	Pennington	SO	42	Defensive Wizard	75	209	18	15	49	48	85	73	28	65	44	19	58	63	33
+Ace	Mendoza	JR	21	Inside Defender	79	237	20	16	56	52	29	15	18	31	25	14	14	19	33
+Colin	Clemans	SR	5	Classic PG	69	178	14	21	51	67	40	74	18	54	40	49	46	69	33
+Dean	Barajas	JR	31	Outside Duel Threat	74	200	17	38	6	43	46	46	21	17	42	33	32	10	33
+Kelvin	Ward	JR	8	Classic PG	74	209	21	13	22	12	31	21	9	7	14	6	12	17	33
+Patrick	Noble	SR	43	Three & D	75	208	65	57	68	58	8	63	11	68	69	55	50	41	33
+Dalton	Vaughn	FR	44	Defensive Wizard	77	224	78	33	44	19	11	44	14	54	59	59	73	36	34
+Matias	Woodward	JR	11	Classic PG	70	163	62	34	49	35	68	63	34	57	45	26	27	52	34
+Julio	Harper	SR	22	Classic PG	70	178	18	30	45	42	47	46	38	29	48	25	41	46	34
+Leon	Wallace	SR	52	Intangibles	73	197	20	12	33	53	45	89	56	37	30	59	49	5	34
+Rashad	Trombley	SR	33	Average	77	215	26	27	24	23	47	45	45	40	46	61	67	24	34
+Gavyn	Almazan	SR	34	Classic PF	74	204	8	48	35	26	55	36	64	67	47	27	69	28	34
+Rasul	Leach	SR	1	Defensive Wizard	70	169	25	75	90	95	22	78	22	98	50	56	23	63	34
+Weston	Benitez	SR	24	Outside Duel Threat	76	220	27	28	15	24	19	16	24	33	20	22	20	23	34
+Larry	Salinas	FR	30	Average	70	161	30	14	44	30	38	58	10	58	46	28	43	45	34
+Ryder	Hutchinson	FR	12	Classic SG	74	204	8	37	37	77	8	39	74	57	17	30	47	62	34
+Kenneth	Ford	SR	53	Pure Shooter	71	186	20	39	28	34	14	25	16	52	64	61	66	50	34
+Darryl	Delacerda	SR	50	Classic PF	75	211	27	13	25	49	14	4	42	61	33	31	65	54	34
+Wilber	Grahn	SO	13	Classic SG	71	188	67	126	28	114	52	59	68	83	31	69	102	37	35
+Jarvis	Gardner	JR	6	Outside C	77	227	30	15	43	47	14	39	32	30	34	43	15	36	35
+Kenneth	Holder	SO	8	Classic SG	70	166	77	55	51	62	36	20	9	28	49	66	9	67	35
+Holden	Murray	SO	24	Average	69	163	14	70	58	21	48	60	58	19	15	23	43	53	35
+Evan	Dupont	SO	32	Outside C	79	238	59	56	26	69	57	65	51	48	44	13	34	53	35
+Darren	Barrera	SR	1	Outside C	76	215	5	9	2	5	6	4	5	5	3	6	7	11	35
+Stinky	Wilkerson	JR	30	Three & D	71	190	0	3	7	6	1	8	-2	3	1	8	6	3	35
+Tuan	Park	SR	3	Outside Duel Threat	71	196	2	7	-1	4	3	4	2	-2	6	4	6	7	35
+Omari	Sherman	SR	11	Below Average	68	162	27	26	1	41	25	22	17	20	13	33	25	20	35
+Marques	McCoy	JR	15	Driver	72	198	16	8	30	26	15	15	38	25	27	19	7	19	35
+Tyler	Garrett	FR	21	Below Average	70	170	29	28	25	23	26	10	3	9	25	23	16	16	35
+Enos	Enis	SO	52	Classic SG	71	179	19	40	32	24	23	18	31	7	42	22	53	38	35
+Lance	Darner	SO	31	Three & D	76	215	30	32	10	25	23	19	16	7	11	17	32	34	36
+Jrae	Howard	SR	51	Classic SF	79	244	41	28	28	45	55	62	50	53	28	58	47	51	36
+Chet	Gaver	JR	25	Classic PF	76	211	30	28	55	34	69	40	99	38	54	59	55	65	36
+Matthias	Whitney	JR	38	Athlete	75	219	8	49	46	32	49	47	16	49	65	53	37	47	36
+Bridger	Mally	JR	44	Classic SG	77	217	35	50	72	64	44	4	29	30	28	63	34	34	36
+Anton	O'Brien	SR	42	Classic C	83	290	95	42	127	59	112	115	109	98	130	124	136	38	36
+Eddie	Terrell	SR	13	Classic PG	70	182	56	51	29	51	45	45	48	51	44	34	55	44	36
+Cortez	Conway	SR	53	Outside C	78	229	59	66	108	28	67	43	56	94	121	48	97	93	36
+Fisher	Velez	SO	10	Average	70	158	23	18	30	10	44	13	41	48	50	44	22	19	36
+Mervin	Floyd	SR	14	Below Average	68	159	2	3	10	12	12	6	13	8	2	12	3	4	36
+Landon	Gordon	JR	66	Outside C	82	248	35	60	61	24	53	14	96	42	84	34	61	44	36
+Titus	Hong	SO	15	Classic SG	70	188	14	23	23	31	18	40	55	22	8	42	18	13	36
+Sean	Chambers	JR	33	Classic PG	68	169	46	22	92	96	87	59	78	112	9	63	49	100	37
+Keaton	Crestshire	SR	17	Average	67	162	16	31	48	75	35	49	46	54	55	48	37	33	37
+Joshua	Heckart	FR	1	Average	67	156	12	14	11	4	7	3	8	11	10	11	6	4	37
+Kendrick	Tuma	JR	8	Classic C	80	247	37	64	34	53	65	71	55	63	67	16	30	9	37
+Douglass	Zimmerman	SO	43	Driver	76	211	101	90	99	100	82	82	45	44	33	10	97	32	37
+Chris	Smith-Weibel	SR	40	Athlete	70	167	69	31	52	65	29	57	57	16	60	70	48	9	37
+Jaylen	Peterson	SR	4	Average	71	196	2	8	21	25	22	1	40	11	35	33	11	20	37
+Marcus	Molina	SR	7	Outside Duel Threat	67	160	98	85	37	90	64	69	14	44	39	88	17	41	37
+James	Burke	SO	10	Outside C	77	232	43	56	79	21	34	42	40	36	72	74	48	55	37
+Andy	Martin	JR	55	Inside Defender	78	240	11	55	20	34	69	50	15	52	40	22	13	15	37
+Edward	Gomez	JR	12	Three & D	75	217	15	13	64	54	20	43	27	17	18	66	15	36	37
+Leland	Dougherty	SR	15	Below Average	69	156	18	23	29	40	23	25	42	39	15	38	33	16	37
+AZ	Ross	JR	6	Driver	72	183	38	75	28	16	24	30	25	36	15	32	33	18	38
+Vincent	Kidd	SR	1	Below Average	69	168	16	18	27	28	8	16	42	8	23	17	7	36	38
+Hai	Stucker	FR	8	Inside Defender	80	247	25	38	97	98	38	90	55	34	48	76	101	56	38
+Marquez	Wilmoth	SR	23	Three & D	76	218	61	41	47	24	53	65	34	71	52	23	41	46	38
+Jayce	Bond	SR	31	All-Around Scorer	81	249	42	42	19	24	54	17	63	36	19	39	48	26	38
+Ezequiel	Battle	SR	10	Average	72	199	26	18	10	36	38	20	52	43	27	32	38	25	38
+Gilberto	Hopkins	SR	35	Below Average	70	177	8	13	8	16	6	10	8	8	13	15	9	5	38
+Ryan	Finley	JR	42	Driver	73	190	46	21	37	86	79	13	93	46	68	42	67	16	38
+Than	Kime	SR	2	Average	70	172	4	8	6	12	4	10	2	-1	3	7	10	6	38
+Chad	McKinney	SR	50	Classic PG	65	145	89	8	9	52	49	66	39	52	90	109	81	9	38
+Micah	Parrish	JR	32	Below Average	72	198	8	17	41	49	41	40	45	34	40	45	21	15	38
+Tyler	Allison	SR	22	Average	70	169	15	3	6	16	12	0	4	5	9	11	10	8	38
+Toby	Schroeder Jr	SO	24	Outside Duel Threat	72	200	6	56	14	82	18	76	88	73	44	61	78	23	39
+Lerod	Giles	JR	6	Classic PF	76	231	26	59	51	11	22	33	35	36	29	32	42	36	39
+Jabari	Taunton	SR	20	Below Average	71	180	6	8	21	16	6	23	6	17	4	22	16	8	39
+Mckinley	Stiffler	FR	33	Classic SG	74	215	20	44	36	28	64	30	68	42	62	29	62	50	39
+Braden	Smith	FR	48	Inside Defender	76	216	11	30	64	90	18	50	79	8	80	34	74	43	39
+Dexter	Jordan	JR	40	Inside Defender	76	222	49	72	64	33	49	47	79	52	58	45	59	61	39
+Edmund	Hilliard	SO	26	Average	71	175	16	65	28	8	46	3	16	55	19	22	35	14	39
+Morton	Cobb	FR	4	Classic C	78	232	40	43	44	46	6	53	3	20	48	59	6	29	39
+Lennon	Chan	SR	7	Athlete	69	170	15	56	56	31	15	30	37	55	44	44	57	59	39
+Donald	Solberg	FR	12	Inside Defender	79	242	12	18	32	23	13	11	22	22	33	22	23	14	39
+Erik	Tate	SR	18	Average	73	199	82	43	53	66	55	12	22	75	76	35	21	40	39
+Jeremy	Strickland	JR	55	Classic C	78	231	78	35	68	75	10	32	71	38	73	41	4	71	39
+Jose	Mercadito	SR	25	Average	71	197	38	29	17	57	48	34	38	28	17	37	10	48	40
+Dax	Hughes	JR	33	Average	70	174	20	24	63	41	30	22	40	27	62	62	68	63	40
+Francisco	Conner	JR	53	Classic PF	77	224	17	20	72	66	52	84	52	64	102	70	78	52	40
+Immanuel	Newton	SR	13	Average	71	184	4	4	6	14	7	16	5	9	4	2	4	3	40
+Caden	Savino	JR	6	Outside C	75	201	85	102	73	16	16	65	64	49	61	71	65	70	40
+Darwin	Willette	SO	43	Four-Star	75	209	80	112	74	91	58	123	72	86	74	120	96	61	40
+Marques	Bailey	SR	20	Below Average	71	194	39	37	58	56	60	14	34	57	60	32	57	20	40
+Courtney	Wyatt	FR	2	Classic SG	71	187	49	76	85	62	44	52	20	50	59	24	64	26	40
+Graham	Stefan	JR	51	Average	68	159	11	21	6	17	16	10	24	7	10	28	16	21	40
+Sterling	Renninger	FR	52	Average	78	241	17	24	41	53	19	38	21	46	38	31	51	16	40
+Ezra	Rice	SO	1	Average	67	163	2	18	15	3	8	3	16	14	16	2	14	3	40
+Javion	Felice	JR	54	Below Average	70	172	54	19	43	17	27	13	31	37	6	45	33	27	40
+Leonard	Lindahl	SR	42	Outside Duel Threat	72	200	29	31	21	16	52	66	16	77	73	77	67	20	41
+Koen	Hogsett	SR	53	Classic PG	67	170	23	23	90	84	77	38	40	39	18	52	54	67	41
+Charles	Wilis	SO	32	Four-Star	76	214	58	43	79	95	44	73	61	115	97	79	65	79	41
+Lane	Brock	JR	50	Classic C	78	225	98	57	93	89	39	112	68	26	92	41	14	60	41
+Issac	Le	SO	20	Below Average	70	182	17	35	24	11	32	24	38	23	32	36	21	40	41
+Travis	Werner	JR	45	Inside Defender	77	212	49	27	27	46	34	6	24	57	53	31	20	46	41
+Dennis	Granda	JR	19	Defensive Wizard	75	227	33	40	58	66	101	30	65	36	104	72	104	38	41
+Arjun	Phelps	SR	7	Below Average	70	181	6	23	9	36	36	16	16	33	33	29	29	29	41
+Kendrick	Molyneaux	SR	6	Pure Shooter	68	159	60	60	21	35	38	40	28	71	44	27	39	67	41
+Eddie	Zuniga	JR	18	Average	70	173	46	10	32	18	29	16	21	1	44	20	40	4	41
+Jeff	McDowell	FR	11	Defensive Wizard	72	204	34	58	46	43	76	92	20	27	20	56	14	78	41
+Kyan	Jackson	FR	9	Classic SF	77	219	57	24	50	60	50	47	62	47	54	26	65	18	41
+KJ	Bargo	SR	35	Below Average	71	182	39	48	43	27	13	23	20	26	37	26	27	42	42
+Davante	Paige	SR	55	Average	69	166	18	12	16	7	13	18	5	19	8	10	19	8	42
+Wayne	Burke	SO	27	Driver	68	163	43	46	35	64	11	21	38	57	39	13	50	28	42
+Keagan	Prosperie	JR	41	Four-Star	73	212	55	61	100	59	75	86	61	65	78	82	67	91	42
+Vaughn	Wiggins	FR	32	Classic C	77	222	50	46	55	82	50	52	49	33	53	59	67	24	42
+Philip	Blair	SR	6	All-Around Scorer	72	193	72	53	27	20	47	46	4	32	18	34	55	58	42
+Jamar	Butler	SR	7	Below Average	70	178	13	33	37	18	12	15	35	17	32	21	27	7	42
+Immanuel	Amare	SO	45	Outside C	81	248	62	123	114	46	106	120	119	27	93	97	19	78	42
+Darrell	Avery	SR	12	All-Around Scorer	73	209	70	51	80	66	64	13	53	31	82	87	29	55	42
+Melvin	Jensen	SR	53	Outside C	78	233	19	44	37	11	9	51	21	32	35	42	20	36	42
+Raiden	Wright	JR	3	Four-Star	72	190	68	66	113	46	102	50	36	78	107	89	96	84	42
+Pinky	Howell	SR	17	Classic C	79	247	30	47	48	27	15	24	32	50	30	45	30	22	42
+Scott	Warner	FR	1	Classic SF	77	232	80	72	23	34	13	29	83	90	79	48	58	65	43
+Taylor	Lopez	SR	2	Three & D	73	199	17	49	56	9	14	33	50	45	69	26	51	52	43
+Jeremiah	McDonald	SO	12	Average	71	177	47	50	39	40	54	49	58	59	17	39	72	46	43
+Braylon	Williams	SO	10	Driver	76	215	49	17	57	50	18	19	16	38	55	18	24	4	43
+Carter	Herring	SR	13	Outside Duel Threat	67	152	46	102	13	86	27	78	61	85	73	20	103	26	43
+Jason	Toms	SO	20	Outside C	75	197	23	21	26	16	12	9	20	48	44	39	25	13	43
+David	Welch	SR	15	Inside Defender	78	224	68	103	88	102	31	30	40	36	65	69	52	78	43
+Leonardo	Wittman	FR	44	All-Around Scorer	71	181	65	95	86	65	28	69	46	55	68	15	72	75	43
+Robt	Glenn	SR	50	Classic C	78	218	73	10	78	28	82	60	56	54	49	72	24	39	43
+Tyler	Dargan	FR	41	Classic C	78	227	30	9	53	17	58	11	26	10	36	38	38	49	43
+Jackson	Thomas	JR	18	Outside Duel Threat	75	208	67	41	64	63	43	77	76	70	41	39	72	41	43
+Jonas	Ayers	SR	43	Average	69	186	5	65	67	34	14	43	6	24	10	61	79	78	43
+Ruben	Becker	JR	25	Pure Shooter	69	166	71	46	68	109	36	102	25	25	46	40	62	114	44
+Octavio	Cook	FR	11	Average	70	186	30	58	34	33	39	16	66	50	39	55	23	40	44
+Matias	Tapscott	JR	24	Below Average	67	160	19	27	23	45	48	58	38	36	22	11	34	6	44
+LJ	Buckley	JR	44	Classic PF	76	225	16	41	11	24	40	8	49	14	41	26	1	29	44
+Cleo	Hall	SR	45	Below Average	70	170	36	30	13	31	2	17	33	17	4	33	40	31	44
+Wes	Porter	SR	17	Below Average	70	163	17	5	2	9	14	8	22	6	0	14	11	7	44
+Takyo	Hairston	FR	22	Outside C	78	229	10	67	31	46	31	23	77	30	48	34	39	31	44
+Byron	McKee	JR	4	Below Average	70	161	50	23	6	40	8	33	30	54	32	46	45	18	44
+Robby	Cox	SO	3	Three & D	75	217	37	32	19	18	41	9	42	39	15	28	45	16	44
+Moises	Levy	FR	32	Average	70	165	74	44	91	85	91	54	60	15	15	69	19	56	44
+Steve	Barker	FR	21	Five-Star	70	179	111	80	69	128	120	101	30	91	105	73	130	114	44
+Becker	Estrada	JR	13	Outside Duel Threat	71	189	32	40	13	40	21	54	30	39	35	27	51	13	44
+Ronan	Huff	FR	21	Classic SG	70	180	33	62	71	27	69	61	39	22	73	17	54	66	45
+Tristen	Lewis	SR	12	Classic PG	67	160	31	23	45	43	37	38	42	52	34	19	45	22	45
+Ellis	Padillo	FR	43	Intangibles	74	194	20	8	31	22	16	26	27	31	44	32	31	30	45
+Gauge	Griffith	SR	1	Outside Defender	72	200	45	33	15	41	21	17	40	66	38	64	22	16	45
+Ernest	Jefferson	SR	34	Four-Star	65	152	82	88	123	90	80	125	99	111	101	68	98	77	45
+Harold	Mathis	SO	11	Average	68	162	54	84	45	36	53	60	33	87	70	64	33	25	45
+Rudy	Barnes	SR	32	Classic PF	71	190	50	48	31	50	82	34	40	40	40	31	33	78	45
+Josiah	Douglas	SR	35	Outside Duel Threat	73	199	14	50	32	21	39	17	9	36	32	8	37	17	45
+Patrick	Ashbrook	SO	31	Below Average	71	188	27	35	58	6	45	18	4	3	39	43	33	47	45
+Will	McMahon	FR	3	Below Average	69	178	16	17	12	8	22	18	16	10	8	8	3	13	45
+Phoenix	Moon	SR	18	Classic PG	69	160	18	15	75	56	38	56	49	29	15	77	75	8	45
+Walter	Quick	SR	90	Five-Star	80	241	88	79	80	103	103	110	52	99	63	90	8	112	45
+Rickey	Moles	FR	43	Outside C	75	204	81	31	67	50	45	87	48	73	69	39	16	36	46
+Rodney	Shimizu	JR	48	Classic PF	72	197	25	50	72	33	83	76	88	71	61	13	25	32	46
+Jaiden	Gray	JR	10	Classic SF	74	212	62	29	26	12	30	40	49	36	80	69	95	47	46
+Angel	Acevedo	SO	30	Average	66	143	74	52	45	22	58	27	18	47	15	22	5	25	46
+Houston	Greenblatt	SO	58	Classic C	80	232	55	86	59	65	97	37	51	75	65	43	39	39	46
+R'Qwan	Armie	JR	31	Outside Defender	73	187	41	39	26	19	30	34	13	25	29	11	42	13	46
+Sonny	Burgess	SO	21	Driver	76	219	51	36	59	25	42	22	48	38	22	50	44	18	46
+Dez	Lowery	JR	45	Classic PF	76	228	55	19	28	80	33	75	77	81	60	76	23	76	46
+Mason	Fikes	JR	2	Outside Duel Threat	71	191	28	25	44	18	23	12	8	23	9	8	35	11	46
+Atticus	Haynes	FR	9	Intangibles	71	187	15	25	39	12	21	11	18	32	27	26	37	30	46
+Damon	Tabb	SR	19	Intangibles	74	196	39	16	36	28	40	18	19	40	32	30	15	12	46
+Jay	Zwiebel	SO	20	Average	69	164	25	16	36	52	15	22	30	16	46	22	20	42	46
+Jaime	Brewer	FR	32	Inside Defender	76	224	29	22	4	21	42	50	18	62	51	34	69	21	47
+Theo	Olson	JR	2	Athlete	67	158	67	102	80	100	38	76	47	79	130	121	91	25	47
+Kyle	Ansley	JR	12	Classic PF	76	218	15	82	56	38	26	81	68	54	70	31	62	43	47
+Johan	Petersen	FR	50	All-Around Scorer	72	202	47	53	49	28	19	51	77	42	67	38	24	32	47
+Mathias	Morris	FR	5	Classic SF	72	200	83	91	25	71	70	42	97	63	91	35	41	29	47
+Jax	Hesser	SO	10	Classic SF	73	198	60	29	33	40	72	55	18	55	29	46	67	16	47
+Gary	Hammonds	SR	11	Average	64	142	10	8	8	3	4	4	-1	10	5	6	6	-1	47
+Carlton	James	SR	25	Average	69	165	40	10	71	66	72	43	39	71	17	61	64	59	47
+Mark	Whitney	SO	8	Average	71	187	29	37	39	28	38	25	29	12	51	9	21	24	47
+Jim	Arrowood	JR	34	Pure Shooter	74	201	105	97	99	59	68	31	107	106	90	97	18	27	47
+Carter	Snyder	FR	40	Classic PF	75	211	28	2	17	24	9	27	20	16	25	36	26	16	47
+Eric	Hazelton	FR	3	Below Average	73	200	18	8	12	3	18	26	19	24	19	7	19	26	47
+JJ	Tunstall	SO	7	Below Average	72	195	64	9	47	62	16	27	45	46	49	68	41	13	48
+Ethan	Blair	FR	11	Below Average	71	182	16	36	41	20	16	40	46	49	43	39	35	57	48
+Monty	Sailer	SR	41	Five-Star	82	250	96	21	87	92	90	75	90	117	108	38	69	90	48
+Trinidad	Brooks	SO	5	Driver	70	171	70	42	24	63	17	39	9	35	11	51	68	44	48
+Billy	Kirby	SO	37	Below Average	69	170	36	19	13	55	54	34	65	21	54	11	45	48	48
+Derrick	Bundrick	SR	1	Below Average	68	159	27	24	20	9	6	29	8	23	22	16	21	11	48
+Deven	Barr	SO	8	Inside Defender	73	193	58	42	28	17	42	23	20	10	43	26	18	24	48
+Stanley	Brown Jr	SO	19	Three & D	74	197	85	30	71	75	92	82	23	70	39	80	36	80	48
+Ron	Strecker	JR	2	Classic SF	74	195	66	79	101	112	79	93	110	55	81	84	25	84	48
+Bruce	Sanders	SR	42	Average	69	177	49	54	23	31	28	59	57	18	68	66	13	47	48
+Savion	McQueeney	JR	51	Classic C	81	243	39	20	42	25	48	81	14	26	60	27	38	78	48
+Jabari	Pruitt	SR	40	Intangibles	72	196	31	41	86	41	76	37	16	34	35	53	74	38	48
+Tomas	Badgley	JR	53	Four-Star	75	206	46	111	43	85	46	52	48	71	75	125	58	110	49
+Kiki	Christensen	SR	25	Classic C	80	251	107	34	110	11	54	106	107	115	69	27	11	86	49
+Enoch	Pope	SR	16	Classic SF	76	216	51	41	63	38	3	22	74	66	50	68	44	30	49
+Jerimiah	Kalina	SR	4	Classic SG	71	183	63	36	22	32	30	45	12	32	29	22	28	46	49
+Roman	Sampson	SR	21	Driver	68	164	26	19	23	15	50	37	35	31	26	11	15	22	49
+Triston	Harrington	SO	34	Classic PG	69	162	52	13	34	75	74	59	65	62	21	71	41	44	49
+Sergio	Horvath	SO	6	Classic PG	70	174	59	42	19	71	54	49	20	61	54	39	44	78	49
+Lumpy	DeRoche	SR	10	Five-Star	71	183	14	70	40	102	121	84	34	109	126	95	84	73	49
+Geraldo	McDuffee	SO	11	Athlete	72	199	22	23	39	14	40	89	44	67	86	59	58	27	49
+Shirley	Kane	SO	7	Athlete	70	172	16	44	55	66	28	40	58	70	78	58	15	82	49
+Darnell	Fisher	SR	31	All-Around Scorer	72	190	69	36	20	27	23	26	36	44	66	14	20	39	49
+Timmy	Robertson	SR	42	Four-Star	65	160	24	110	101	101	97	121	122	94	126	88	89	131	49
+Yahir	Dublin	SO	48	Defensive Wizard	73	205	48	50	44	38	21	28	8	40	83	50	37	20	50
+Dashawn	Winters	JR	44	Classic PF	77	228	40	14	8	37	28	26	34	15	38	20	7	10	50
+Danilo	McMahon	JR	22	Average	72	183	37	37	20	30	28	13	36	35	33	39	20	16	50
+Amari	Williams	SR	32	Outside Defender	69	169	38	29	34	86	64	24	24	66	15	33	79	53	50
+Omar	Ramsburg	SR	2	Classic C	77	219	114	91	124	60	94	70	103	126	117	22	48	64	50
+Giovanni	Kearse	JR	54	Four-Star	77	221	67	38	48	91	62	21	98	94	82	99	90	63	50
+Everett	Blevins	SR	12	Average	69	179	23	56	10	53	38	51	23	33	38	54	59	64	50
+Darius	Morrison	JR	17	All-Around Scorer	76	217	72	46	86	30	50	75	24	58	88	47	42	31	50
+Greg	Koonce	SR	3	Classic PF	76	221	19	62	29	65	41	13	67	19	35	15	57	35	50
+Kendrick	Columbus	FR	30	Outside C	74	204	21	66	105	34	91	50	46	104	90	71	45	32	50
+Zebediah	Wolfe	FR	6	Classic SF	77	224	65	51	59	39	62	32	56	56	33	68	72	24	50
+Hugo	Schwarz	SR	13	Pure Shooter	75	206	14	49	45	62	56	23	64	59	70	25	33	48	50
+Keon	Rush	FR	6	Driver	72	194	36	27	53	46	57	17	21	31	12	53	49	12	51
+Joseph	Carlson	JR	16	Average	70	167	10	7	9	3	16	4	12	22	7	14	7	12	51
+Savion	Chandler	JR	40	Defensive Wizard	75	205	67	56	67	26	62	37	33	50	67	37	34	9	51
+Frank	Ballin	SR	4	Classic C	77	227	24	10	17	14	17	27	14	23	17	19	12	28	51
+Donavan	Mattice	SO	22	All-Around Scorer	80	249	48	32	65	53	58	59	36	69	57	17	43	81	51
+Kerry	Byrd	JR	31	Intangibles	73	201	10	13	3	6	22	6	17	16	20	27	22	11	51
+Monte	Fowler	JR	2	Three & D	71	192	27	71	74	82	34	56	40	21	20	22	19	64	51
+Kadyn	Hodgkins	SO	42	Classic PF	78	226	33	37	40	16	67	49	38	53	37	36	14	42	51
+Braxton	Carlson	SR	5	Pure Shooter	75	204	100	76	101	42	47	120	54	104	53	49	91	34	51
+Deacon	Donner	SO	23	Classic PF	75	219	19	59	21	52	48	38	49	27	57	17	60	27	51
+Bryce	Robbins	JR	30	Classic SF	75	210	68	92	16	38	32	86	81	74	119	108	76	37	51
+DeShawn	Sandersfeld	SO	51	Outside Defender	70	164	30	19	23	24	12	55	44	46	33	25	17	36	51
+Kelvin	Johnson-Olde	SR	54	Five-Star	73	208	80	81	68	82	122	103	54	86	112	138	90	90	52
+Wilburn	Ressler	SO	12	Driver	73	202	48	59	30	40	34	49	57	58	38	17	58	58	52
+Lincoln	Ellis	FR	35	Inside Defender	77	218	38	55	59	32	58	38	56	52	68	67	48	69	52
+Matias	Vaulkner	SR	33	Classic PG	70	163	21	23	68	54	48	65	18	49	23	49	42	21	52
+Noah	Patrick	FR	11	Classic SF	77	236	98	101	123	80	99	50	106	118	100	66	125	119	52
+Clark	Delgado	SR	10	Classic C	78	237	57	68	67	52	14	71	50	11	54	64	24	57	52
+Bo	Nixon	FR	30	Classic SF	75	199	49	45	40	77	52	102	63	49	57	83	37	75	52
+Quinton	Cleveland	SR	44	All-Around Scorer	76	223	81	71	91	24	75	88	54	75	62	14	32	76	52
+Doyle	Varn	SR	16	Average	68	160	27	13	13	14	13	34	15	5	28	27	4	11	52
+Sambo	Dickson	SR	1	Classic PG	71	197	37	16	25	66	36	41	40	51	58	35	57	55	52
+Amare	Bryant	JR	2	Defensive Wizard	70	170	20	22	45	63	28	58	16	40	70	57	70	65	52
+Tarron	High	SR	3	Classic SF	73	196	8	13	14	14	19	15	15	11	9	19	17	14	52
+Billy	Brooks	SR	4	Average	69	166	18	14	8	13	14	8	23	0	13	13	7	8	53
+Murray	Benson	SR	7	Outside C	79	233	17	55	67	15	45	28	30	20	44	34	17	19	53
+Alexi	Arellano	JR	12	Below Average	70	164	43	71	56	14	19	62	63	53	8	57	26	46	53
+Stone	Fill	SO	19	Below Average	83	263	1	11	8	9	10	3	12	9	9	5	12	2	53
+Dewey	Martz	JR	52	Four-Star	87	273	64	43	130	84	29	14	43	132	126	75	136	133	53
+Charles	Heart	SR	43	Classic C	79	236	90	34	101	102	60	27	33	47	67	108	46	33	53
+Duyami	Mystowiak	FR	54	Below Average	66	154	37	33	16	12	21	20	21	23	19	19	26	21	53
+Arturo	Carr	FR	44	Outside C	75	212	35	77	13	35	12	78	29	29	78	55	71	82	53
+Lorenzo	McFarren	SO	15	Defensive Wizard	73	201	80	18	70	71	42	48	43	86	60	37	26	51	53
+Nikolai	Bowers	FR	40	Pure Shooter	72	196	57	67	66	34	65	74	33	17	61	57	49	59	53
+Chace	Salazar	FR	39	Below Average	69	169	38	12	41	36	53	40	44	51	21	41	24	37	53
+Lester	Client	SO	42	All-Around Scorer	69	158	29	62	59	20	58	21	81	46	84	90	57	80	53
+Ike	Parkey	SO	31	Outside C	81	247	24	22	26	32	18	22	14	8	23	10	14	3	54
+Harrison	Conner	SO	10	Inside Defender	76	224	60	15	55	35	56	29	21	20	46	29	55	84	54
+Dan	Wagstaff	JR	12	Average	70	174	10	-1	4	3	7	1	9	8	4	8	8	4	54
+Romeo	McFee	JR	44	Classic SG	72	192	16	82	82	110	102	73	57	63	24	59	72	40	54
+Irvin	Flowers	SR	38	Inside Defender	78	237	24	68	68	41	42	39	23	21	61	23	38	77	54
+Austin	Taylor	SO	35	Inside Defender	77	226	90	118	107	113	102	89	52	108	90	45	52	115	54
+Nathan	Santiago	FR	32	Pure Shooter	75	214	13	52	56	27	37	53	28	59	15	51	30	24	54
+Kylan	McMillan	SO	51	Classic SG	72	194	57	37	50	51	65	37	57	54	48	58	28	15	54
+Levi	Lynch	SR	23	Outside Duel Threat	70	179	66	95	21	89	64	71	70	44	73	77	90	22	54
+Craig	McClure	JR	20	Defensive Wizard	74	206	89	32	60	79	58	22	73	48	72	94	72	96	54
+Brent	Garrett	SR	42	Three & D	77	228	55	24	62	46	58	28	27	57	7	28	37	49	54
+Isai	Goodin	SR	7	Classic PF	77	235	88	45	31	53	76	87	59	65	57	25	81	42	54
+Sidney	Gay	JR	50	Below Average	71	186	32	7	31	42	11	37	43	13	38	38	35	24	55
+Rueben	Groves	JR	54	Athlete	70	173	37	82	68	47	80	29	68	31	88	63	84	53	55
+Erasmo	Weeks	JR	41	Inside Defender	74	204	57	50	35	38	54	29	54	38	45	37	54	57	55
+Ryder	Faz	SR	24	Classic SG	72	200	7	25	23	4	30	34	17	8	38	20	33	42	55
+Declan	Estes	SR	22	Classic SG	69	164	50	102	95	30	32	70	71	83	67	70	16	22	55
+Cody	Beasley	SR	1	Classic PG	67	163	57	44	16	34	40	61	19	45	4	59	59	49	55
+Antwan	Phillips	FR	7	Classic SG	71	189	35	61	61	37	10	34	7	38	57	11	32	20	55
+Chaz	Perkins	JR	51	Classic PF	74	206	45	78	15	68	79	73	100	79	98	102	66	46	55
+Levi	Baxter	FR	49	Inside Defender	77	220	57	32	42	13	52	27	27	37	37	48	32	46	55
+Finn	Shelton	FR	12	Classic C	79	246	29	43	34	65	88	61	53	80	87	41	86	48	55
+Ty	Hinton	SR	31	Five-Star	80	234	74	113	96	69	32	52	67	119	70	74	76	55	55
+Charlie	Gordon	SR	6	Classic PG	65	150	54	34	35	60	61	27	43	36	65	12	20	56	55
+Cedric	Ayala	SR	28	Five-Star	77	223	143	85	83	114	120	40	138	103	91	140	124	69	56
+Thomas	McCabe	JR	1	Average	70	175	21	34	4	49	23	61	59	16	60	37	12	57	56
+Axel	Brock	SO	51	Classic PG	68	161	46	67	43	43	89	81	40	72	84	72	34	68	56
+Jackie	Johnson	SR	2	Four-Star	78	241	82	72	81	48	44	88	43	102	100	106	96	108	56
+Jovani	Arroyo	SR	6	Average	69	177	43	50	51	55	41	32	12	11	22	42	12	15	56
+Isaac	Mooney	SR	18	Below Average	68	159	62	20	49	56	60	14	43	49	19	34	57	17	56
+Horace	Backus	SO	45	Three & D	75	202	80	74	52	38	84	54	64	27	22	24	22	24	56
+Earl	Carpenter	SR	30	Four-Star	77	213	84	84	87	76	92	20	107	64	76	98	61	94	56
+Casey	Franklin	SR	25	Average	69	172	9	21	28	18	39	35	24	24	32	22	18	45	56
+Jacoby	Lopez	SR	16	Inside Defender	77	224	84	81	32	17	37	65	73	84	76	51	73	65	56
+Davis	Acevedo	SR	9	Average	67	165	13	39	32	43	31	16	24	60	65	58	19	20	56
+Trevon	Burkhart	SR	23	Classic SF	79	242	36	38	44	7	46	35	26	34	42	18	48	13	56
+Tyson	Junk	FR	9	Athlete	77	233	33	40	43	23	67	54	13	71	80	71	53	75	57
+Noah	Garcia	FR	16	Inside Defender	77	219	62	27	46	45	32	16	56	55	50	54	23	34	57
+Noah	Cross	SO	19	Below Average	68	179	9	15	12	21	14	15	21	16	20	15	20	9	57
+Trevor	Matthews	SR	12	Outside C	80	250	27	40	56	73	35	17	42	16	62	62	53	73	57
+Saint	Parker	JR	21	Classic SF	72	196	72	45	74	25	11	113	107	112	40	70	39	17	57
+Isben	Curry	SR	41	Average	67	156	26	51	70	21	32	38	32	29	33	37	21	76	57
+Bruce	Long	FR	30	Classic PF	78	234	39	35	64	33	25	62	72	73	78	67	30	53	57
+Damon	Sanders	FR	34	Classic PF	77	224	25	45	41	17	63	28	28	36	57	22	8	29	57
+Dannie	Fischer	JR	45	Classic SF	72	192	84	63	89	36	84	35	63	56	36	58	82	88	57
+Eden	Gutierrez	SR	25	Average	72	199	6	74	63	64	18	41	17	72	57	27	56	63	57
+Afeatu	Hoover	SO	54	Classic SG	71	185	18	78	43	76	73	17	11	13	82	20	8	66	57
+Jonathan	McGwire	SR	55	Classic SF	73	216	43	76	25	28	70	56	69	53	57	51	30	54	57
+Miguel	Simon	FR	21	Classic SF	76	229	21	38	51	4	54	23	62	48	19	62	18	27	58
+Jordan	Long	JR	3	Classic SG	71	184	66	39	67	47	102	100	103	33	32	46	17	18	58
+Tanner	English	SR	30	All-Around Scorer	75	209	75	48	55	65	31	21	36	65	64	35	22	58	58
+Kyle	Tollingsworth	JR	16	Classic SF	75	209	73	80	84	13	40	46	62	96	14	21	50	46	58
+Justin	Junction	FR	32	Defensive Wizard	75	220	28	68	41	72	10	52	24	76	66	60	78	69	58
+Mekhi	Richmond	FR	23	Average	66	157	1	31	24	30	26	43	8	16	15	51	37	24	58
+Jasper	Allen	SR	17	Five-Star	75	205	100	125	70	126	114	62	40	101	126	102	97	100	58
+Hobert	Huffman	JR	13	Outside C	76	221	45	79	30	17	71	77	54	60	63	10	24	34	58
+Umabi	McGrath	JR	14	Outside C	76	231	23	48	34	44	8	12	32	40	49	24	37	42	58
+Nehemiah	Blair	FR	20	Classic PG	70	176	83	67	83	95	43	91	15	15	32	60	85	59	58
+Cedrick	Tanner	SR	2	Classic SF	73	205	7	13	5	10	15	22	18	11	16	0	23	12	58
+Tripp	Dave	JR	41	Three & D	75	216	49	91	51	75	38	60	75	15	56	105	103	92	58
+Pablo	Finn	FR	12	Average	68	180	21	39	52	33	10	8	62	29	29	77	53	73	59
+Hubert	Joseph	SO	3	Outside Defender	70	171	38	119	45	123	104	76	30	93	35	104	99	75	59
+Damonte	Adayenbodo	JR	11	Four-Star	74	203	84	107	112	73	34	113	90	105	76	79	61	91	59
+Vincent	Willis	FR	53	Classic C	78	233	30	28	35	13	17	30	19	44	40	6	27	29	59
+Harvey	Holloway	SR	33	Below Average	67	152	38	28	39	50	19	53	48	29	8	30	41	55	59
+Brandon	Ptacek	SO	32	Outside C	77	226	32	24	1	24	26	21	26	20	29	9	2	20	59
+Sean	Selders	JR	21	Average	70	170	22	7	34	42	8	32	33	11	9	32	36	28	59
+Ronald	North	SR	6	Classic PF	74	203	99	89	65	91	68	115	117	119	90	108	63	33	59
+Steven	Grumbles	JR	4	Classic PF	77	217	13	69	72	26	77	69	54	38	49	13	7	14	59
+Will	Cochran	SR	41	Average	66	164	14	3	6	4	12	8	5	8	1	5	3	9	59
+Timothy	Lowe	SR	50	Classic C	81	248	41	6	24	3	32	30	0	21	38	40	30	31	59
+Chaim	Kluender	FR	45	Classic PF	75	208	57	19	50	65	27	67	77	51	55	62	19	61	59
+Ty	Booth	SR	29	Below Average	67	146	9	12	10	9	13	13	2	7	25	4	6	15	60
+Nelson	Nadel	JR	19	Classic SF	72	194	40	40	11	46	57	61	12	54	65	18	34	72	60
+Manual	Bell	SO	25	Classic C	78	235	52	50	42	36	15	21	38	35	40	62	41	51	60
+Larry	Shelton	SR	3	Below Average	68	163	22	5	14	21	25	21	20	12	12	28	16	2	60
+Ali	Galiano	SR	40	Five-Star	77	239	136	91	107	66	131	55	96	120	40	75	134	65	60
+Curtis	Fischer	SO	34	Outside Defender	71	172	45	65	35	74	33	63	57	63	63	83	20	65	60
+Donnie	Frazier	JR	4	Average	69	173	6	34	21	54	7	17	19	26	52	40	24	56	60
+Steven	Ventura	FR	42	Classic PG	69	166	58	47	31	25	54	55	28	39	36	91	51	34	60
+Mitchell	Dorsey	FR	21	All-Around Scorer	74	217	101	83	72	39	50	48	36	78	27	24	52	62	60
+Rory	Rehbein	SR	17	Four-Star	76	222	103	90	104	49	42	31	104	77	76	72	68	55	60
+Victor	Leonard	SO	22	Classic PG	68	157	13	42	26	42	31	35	48	49	31	55	4	10	60
+Kelvin	Coots	SO	44	Defensive Wizard	78	238	42	26	85	73	51	13	46	71	88	7	50	17	60
+Derick	Gilmore	SR	53	Below Average	65	154	15	14	12	6	21	17	19	5	25	11	13	14	61
+Wynston	Sawyer	SO	44	Average	68	157	53	20	27	49	13	38	61	34	17	60	43	23	61
+Danny	Valentine	JR	4	Four-Star	67	151	39	47	42	42	114	73	79	103	108	69	63	86	61
+Gee	Johnson	JR	11	Classic SG	71	188	25	64	22	23	55	49	48	23	49	8	17	18	61
+Reyes	Burnett	JR	12	Average	70	172	24	31	8	19	18	16	15	5	8	21	26	8	61
+Karson	Darden-James	JR	19	Outside C	80	249	57	40	35	37	35	29	27	23	30	18	47	37	61
+Ahmad	Luft	FR	6	Average	71	171	14	11	21	41	25	43	55	19	26	31	13	43	61
+Luca	Montiago	FR	5	Classic C	81	245	32	12	27	17	49	12	45	53	37	28	35	27	61
+Julien	Shaffer	SR	3	Classic SG	70	167	42	14	43	59	41	17	18	41	22	30	53	59	61
+Sanford	Larson	JR	20	Below Average	67	148	42	41	53	60	13	16	53	51	38	16	58	51	61
+Keyode	Randall	FR	16	Defensive Wizard	71	190	28	55	92	95	97	95	65	46	49	52	95	53	61
+Gavin	Tripodi	SR	7	Intangibles	75	214	2	19	29	37	21	42	20	33	25	57	49	45	61
+Clarence	Cantrell	SR	23	Classic SF	73	198	30	29	18	10	33	11	43	34	14	12	11	29	62
+Jimmy	Strong	SR	4	Outside C	77	224	45	26	35	53	70	59	67	60	41	69	56	35	62
+Carlo	Gatton	SR	45	Three & D	72	196	24	84	73	48	27	28	40	50	50	44	56	45	62
+Dashawn	Bonenfant	JR	41	Outside C	78	228	63	29	60	41	24	46	17	23	73	76	73	53	62
+Colnoel	Owens	SR	25	Four-Star	75	211	75	65	51	46	91	35	97	102	82	86	112	57	62
+Devin	Clayton	SR	2	Five-Star	74	206	121	96	83	71	97	59	37	126	125	92	90	101	62
+Michael	Tuck	FR	53	Inside Defender	79	231	110	87	71	52	76	43	49	43	76	114	69	87	62
+Parker	Grady	SR	8	Below Average	71	202	49	19	44	58	49	58	62	39	29	31	24	17	62
+Mario	Terry	JR	24	Classic SF	72	194	46	61	26	43	44	55	22	41	18	36	45	16	62
+Carlo	McConnell	JR	18	Pure Shooter	75	214	86	70	78	50	40	38	91	41	79	21	53	79	62
+Gregory	Stroman	SO	7	Pure Shooter	68	172	11	52	21	12	59	39	13	53	18	35	22	47	62
+Deonte	Russo	JR	15	Four-Star	78	225	79	55	87	28	65	8	86	68	76	64	90	64	62
+Brandon	Wall	SO	18	Below Average	72	201	19	27	29	1	31	42	25	25	42	34	39	31	63
+Jarred	Burts	SO	51	Athlete	73	189	91	67	88	16	53	67	36	67	75	75	12	103	63
+TJ	Hickman	SO	11	Classic SF	76	215	47	36	66	13	48	28	21	69	74	20	41	13	63
+Zion	Fields	SO	44	Classic SF	74	203	59	50	25	16	13	20	59	43	37	32	23	68	63
+Elroy	McLeod	JR	0	Four-Star	80	236	77	93	116	120	67	76	85	31	117	83	136	117	63
+Asahari	Cortez	JR	4	Classic SF	74	214	93	59	37	19	56	45	24	79	37	71	67	44	63
+Herbert	Bernard	JR	55	Classic SG	68	169	39	54	62	21	77	92	58	85	52	28	31	84	63
+Curtis	Roman	SR	9	Intangibles	76	216	3	31	29	13	47	29	9	34	22	32	34	39	63
+Thaddeus	Wesson	JR	3	Average	67	160	50	30	28	18	38	36	25	43	78	92	61	63	63
+Daniel	Smith	SR	7	Classic SG	73	196	66	64	66	35	34	51	78	21	35	64	17	20	63
+Chris	George	FR	14	Below Average	70	165	49	8	17	49	10	57	47	19	61	61	40	56	63
+Darrick	Rodriguez	JR	10	Classic C	86	278	79	42	26	79	34	56	30	27	75	81	25	84	63
+Alan	Bray	SR	55	Classic C	79	250	85	56	120	72	68	73	23	72	116	100	15	28	64
+Cale	Wessington	SO	30	All-Around Scorer	78	243	68	37	55	21	47	84	19	24	84	63	37	41	64
+Horace	Lowe	SR	23	All-Around Scorer	72	205	56	62	25	78	73	77	40	71	69	68	48	82	64
+Michael	Vining	FR	4	Intangibles	69	179	61	29	30	59	39	4	20	40	40	51	47	62	64
+Edison	Scheerer	FR	14	Average	67	158	14	25	7	17	14	7	4	10	13	9	9	24	64
+Valentine	O'Neal	JR	13	Classic PG	71	163	26	29	73	67	49	15	34	9	40	62	15	23	64
+Ethan	Sales	JR	44	Outside C	75	210	6	77	22	24	64	64	65	71	75	29	36	38	64
+Peyton	Roberts	SR	31	Average	67	155	41	36	43	28	50	21	49	28	42	46	40	47	64
+Chandler	Quan	JR	5	Three & D	76	206	66	88	70	67	36	67	74	70	25	61	75	71	64
+Edmund	Alm	SR	51	Inside Defender	77	224	70	87	50	57	46	7	53	111	64	108	18	89	64
+Hai	Kerrigan	SR	22	Below Average	69	173	37	35	17	14	19	19	30	39	19	9	12	27	64
+Hayden	McGinnis	SR	42	Athlete	78	236	35	49	61	32	42	49	13	72	48	80	74	12	64
+Killian	Swanson	SR	22	All-Around Scorer	76	214	103	78	97	55	26	86	38	93	69	59	10	61	65
+Johnathon	Gillespie	SR	44	Classic PF	73	197	3	46	44	25	65	14	33	23	30	49	71	16	65
+Lucian	Jimenez	FR	20	All-Around Scorer	71	184	76	78	48	44	56	33	35	39	26	14	57	79	65
+Seth	Buchheit	SO	1	Outside Defender	73	194	23	49	26	53	34	51	55	40	30	58	21	50	65
+Drew	Dunn	FR	30	Average	69	176	40	32	65	14	34	44	26	24	43	3	8	66	65
+Duncan	Duran	SR	7	Average	71	184	4	8	6	11	4	4	5	10	1	7	2	-1	65
+Jamien	Duran	JR	3	Five-Star	68	158	111	54	69	116	121	117	19	108	89	113	91	115	65
+Jared	Pellingsty	SR	10	Below Average	68	162	17	16	6	13	21	20	35	8	8	15	27	27	65
+Jacoby	Waldorf	JR	40	Classic C	80	244	55	45	57	58	19	44	37	30	32	55	9	46	65
+Shawn	Purtee	FR	14	Classic SF	75	205	22	16	11	13	10	16	28	22	18	16	20	5	65
+D'Wayne	Hinze	SO	53	Below Average	75	216	23	20	27	17	35	6	28	47	37	34	37	41	65
+Jim	Oberlin	JR	46	Average	71	188	45	46	25	21	16	8	51	34	49	43	41	17	65
+Noble	Ochoa	SO	4	Classic SG	70	173	14	18	66	33	25	48	44	30	19	65	42	57	66
+Refugio	Tempel	SR	24	All-Around Scorer	72	193	71	47	37	41	33	19	85	60	69	84	23	71	66
+Wesley	Pope	SO	31	Driver	71	189	68	23	61	9	47	49	37	60	54	43	25	21	66
+Tanner	Franco	SR	43	Five-Star	83	261	113	27	74	10	90	74	47	66	116	89	117	55	66
+Dewey	Hooper	JR	13	Average	69	168	22	33	27	23	25	19	31	20	31	35	17	16	66
+Jacoby	Alvarez	FR	29	Classic SG	72	198	92	97	65	81	65	87	64	90	58	25	70	84	66
+Rashad	Evans	SO	1	Average	68	157	23	49	31	52	31	19	18	46	16	42	48	44	66
+Gabriel	Horn	SR	12	Classic SG	71	180	92	79	70	101	108	98	67	28	73	96	111	99	66
+Frank	Mauk	SR	42	Classic PG	69	163	44	34	58	19	64	60	32	15	69	67	35	44	66
+Devin	Brittan	JR	21	Average	68	156	0	11	14	7	16	6	19	5	18	0	4	21	66
+Errol	Ugarte	JR	32	Classic SF	72	196	35	35	44	19	63	72	34	19	64	30	55	62	66
+Collin	Alexander	SR	51	Driver	73	202	36	26	29	61	66	27	54	73	29	79	20	40	66
+Gerald	Daughtery	JR	35	Average	80	247	37	15	54	69	65	47	31	37	50	33	29	59	67
+Cason	Diez	FR	4	Athlete	81	246	45	66	45	10	12	43	59	47	60	42	45	34	67
+Malik	Watson	FR	2	Below Average	71	191	13	11	3	4	4	7	0	5	10	10	9	0	67
+Ben	Summers	SR	11	Classic SG	70	178	6	35	85	80	24	45	98	27	85	21	87	90	67
+Cade	Carlson	SR	10	Inside Defender	78	240	79	14	25	47	94	75	85	43	69	103	50	103	67
+Eddie	Rubio	SO	34	Outside Defender	70	172	48	80	106	72	82	119	95	115	80	70	49	60	67
+Samuel	Greve	SR	43	Pure Shooter	71	188	136	84	115	133	105	105	88	106	94	62	20	72	67
+Bryce	Jackson	JR	54	Athlete	70	179	68	69	79	81	83	65	53	40	50	62	23	47	67
+Gil	Hunter	JR	12	Average	70	176	20	16	36	57	67	14	74	50	79	75	65	24	67
+Shaun	Burnett	SR	0	Below Average	69	164	3	20	16	21	37	20	32	38	23	8	10	35	67
+Milton	Curtis	SR	13	Five-Star	69	154	22	99	88	94	78	92	67	103	87	62	101	68	67
+Sawyer	Rasmussen	SO	1	Average	67	167	77	55	40	68	45	31	82	61	50	77	9	43	67
+Randall	Woods	JR	15	Average	70	169	41	45	14	50	16	34	15	31	21	48	16	41	68
+Monte	Blood	JR	25	Three & D	78	237	32	30	11	28	30	19	24	41	14	35	23	12	68
+Marcus	Farmer	FR	10	Classic SF	73	197	30	39	31	33	23	33	39	16	25	19	37	31	68
+Michael	Glass	SO	40	Below Average	68	162	39	12	65	44	51	60	53	52	13	48	50	31	68
+Horace	Gorgone	JR	12	Average	70	181	38	37	30	42	42	47	23	37	49	24	58	52	68
+Mervin	King	SR	32	Defensive Wizard	73	201	31	68	50	73	74	35	33	74	57	13	79	51	68
+Braylen	Webster	SR	19	Outside Defender	71	181	52	73	26	47	116	28	86	64	19	116	12	47	68
+Ronnie	Bachus	SR	8	Classic SF	72	202	44	52	6	48	9	53	21	51	20	43	52	57	68
+Ahmed	Geyer	SR	13	Driver	73	202	68	49	96	49	47	89	38	46	44	68	81	20	68
+Kaleb	Chandler	FR	54	Classic SF	75	219	58	46	35	59	54	62	59	25	30	46	33	6	68
+Scott	Dart	JR	16	Average	67	153	3	6	4	5	2	-2	3	9	5	7	8	10	68
+Josue	O'Neal	FR	41	Classic PG	71	186	44	62	13	37	42	76	26	61	58	18	83	24	68
+Chase	Galvan	SR	46	Outside Defender	71	182	15	40	18	60	66	71	21	32	38	66	71	53	69
+Case	Jennison	JR	22	Five-Star	72	196	90	95	90	72	112	47	95	98	69	85	92	95	69
+Edmund	Kitzman	SO	10	Classic PG	70	172	29	13	14	44	60	31	38	42	22	23	41	35	69
+Llance	Nelson	SO	44	Classic SG	69	173	34	30	26	49	35	34	12	46	30	48	30	51	69
+Shawn	Graves	JR	20	Three & D	73	199	14	87	32	38	69	13	30	29	50	53	26	65	69
+Caleb	Grahn	SR	6	Outside Duel Threat	70	175	49	40	74	23	32	23	48	41	32	43	10	54	69
+Wilburn	Gleeson	SR	55	Average	80	235	15	17	34	12	36	44	47	7	49	32	11	31	69
+Walter	Stutler	SO	19	Classic C	77	215	30	8	47	20	38	44	25	83	83	98	78	28	69
+Lucas	Johnson	JR	24	Average	69	173	9	27	35	10	16	9	40	26	32	33	37	27	69
+Ladell	Lyons	SO	23	Classic PF	77	214	19	85	26	90	13	66	75	84	65	14	81	11	69
+Kyson	Martinez	JR	52	Classic SF	76	218	31	21	11	10	32	24	5	19	20	21	20	24	69
+Hector	Nicholson	JR	12	Outside C	77	226	78	66	28	43	39	63	41	60	88	22	29	55	69
+Xavier	Sharpe	SO	10	Classic PG	70	177	42	72	81	52	77	101	107	54	113	37	65	108	70
+Milton	Nettles	FR	9	Driver	71	180	44	19	64	16	12	75	23	44	19	70	63	77	70
+Izaiah	Stultz	SR	19	Three & D	73	188	19	44	90	84	47	51	76	86	35	69	92	23	70
+Judah	Bartlett	FR	11	Defensive Wizard	71	182	32	69	70	85	89	86	21	21	72	27	38	89	70
+Man	Jarvis	JR	1	Classic PG	69	162	60	9	23	32	88	97	29	83	97	89	94	57	70
+JZ	Terrell	SR	37	Classic SG	71	179	60	67	50	42	17	5	21	10	38	57	72	64	70
+Denis	Mulholland	JR	33	Classic SG	71	190	21	93	54	95	80	71	82	43	65	39	49	21	70
+Kenneth	Brown	JR	44	Classic PG	66	146	16	10	18	27	18	37	22	34	6	11	27	34	70
+Robby	Pisano	JR	17	Below Average	72	192	3	10	7	12	8	9	13	16	4	15	18	8	70
+Demetric	Gamble	JR	42	Four-Star	72	192	67	75	114	49	53	20	79	83	98	116	86	88	70
+Malcolm	Castillo	SR	8	Classic PG	70	168	11	26	18	38	55	50	80	53	55	15	55	66	70
+Ishaan	Wasserman	SO	62	Four-Star	76	212	55	74	98	86	51	105	18	85	93	80	82	55	70
+Brian	Morris	SO	49	Classic PG	68	167	27	42	24	39	30	35	20	59	14	16	22	51	71
+Everett	Moad	JR	9	Below Average	70	183	32	43	15	70	46	33	60	29	47	58	33	51	71
+Jason	Gregg	JR	11	Below Average	70	174	4	27	17	16	25	11	8	12	4	26	17	4	71
+Jerald	Saulter	JR	33	Below Average	65	147	26	6	19	24	42	23	32	9	43	19	29	34	71
+Aldo	Zapps	SO	24	Pure Shooter	68	167	34	58	23	46	77	72	55	49	84	51	28	63	71
+Royce	Scarlett	FR	45	Below Average	72	196	1	13	22	22	6	38	27	15	15	30	14	17	71
+Nicholas	Stinnett	JR	55	Classic PG	66	153	34	40	12	36	41	49	25	32	57	57	20	11	71
+Vernon	Flemin	SO	23	Driver	70	183	44	41	38	68	71	18	53	41	63	76	82	27	71
+Diego	Simmons	SR	5	Below Average	72	204	29	24	17	10	11	21	39	53	43	24	31	25	71
+Jesse	Chen	SR	4	Three & D	77	214	44	18	65	69	70	29	37	24	34	26	24	31	71
+Ryan	Coursey	FR	40	Outside Duel Threat	71	186	103	72	88	36	51	94	32	84	100	40	18	97	71
+Olin	Thetford	JR	21	Intangibles	73	195	36	57	22	36	25	42	22	33	38	41	23	30	71
+Cliff	Smith IV	FR	2	Classic SG	75	211	11	34	7	14	44	59	40	44	54	32	19	40	72
+Barrett	Richard	JR	25	Below Average	72	201	55	30	23	33	65	60	13	9	6	35	52	39	72
+Fufu	Oceguera	SR	7	Defensive Wizard	74	200	30	36	44	40	15	61	40	23	67	14	34	24	72
+Keith	Harper	SR	4	Below Average	69	174	23	36	44	10	18	37	23	26	8	15	11	33	72
+Jalen	Wolf	SO	43	Classic SG	72	194	23	28	25	60	23	69	39	94	92	86	52	47	72
+Theodore	Pratt	JR	33	All-Around Scorer	74	202	77	65	68	27	91	80	76	89	22	33	79	78	72
+Ryan	May	SR	17	Defensive Wizard	72	200	33	64	91	63	35	53	40	88	70	92	100	95	72
+Orval	Thiele	FR	54	Classic PG	69	172	16	34	74	42	63	80	23	64	60	38	47	29	72
+Douglas	Thomas	SO	6	Classic SF	78	237	96	67	19	71	22	39	75	99	99	21	52	46	72
+Shaka	Gallagher	JR	42	Classic PF	75	204	54	21	83	24	72	51	89	74	31	27	16	31	72
+Erik	Morris	SR	15	Three & D	72	187	36	49	43	50	15	32	21	35	56	53	2	10	72
+Teagan	Williamson	JR	5	Average	71	195	30	14	35	37	26	57	28	36	31	25	55	22	72
+Jalen	Holmes	FR	55	All-Around Scorer	73	203	48	43	75	72	50	27	41	55	85	88	83	74	73
+Jonathan	Moyer	JR	5	Below Average	70	167	25	57	62	35	56	59	40	48	37	47	57	14	73
+Hai	Adkins	FR	43	Classic PG	72	187	57	33	67	26	54	73	87	69	90	78	8	83	73
+Boston	Prescott	FR	40	Classic SG	74	201	38	66	36	28	39	53	65	18	25	17	48	60	73
+Jerry	Menefee	SO	2	Driver	74	196	62	77	24	28	29	63	83	51	27	30	68	29	73
+Michael	Moldanado	SR	25	All-Around Scorer	75	214	59	47	20	59	30	72	61	31	47	73	24	83	73
+Sam	Biel	SO	24	Three & D	71	183	104	93	77	62	62	92	34	59	96	17	64	69	73
+Randy	He	FR	30	Classic PG	69	161	21	60	25	18	33	53	54	64	37	67	64	20	73
+Philip	Carter	FR	50	Below Average	71	174	7	0	8	-2	-1	4	9	2	3	-2	7	-2	73
+Rene	Tallant	JR	22	Average	68	157	6	16	27	6	23	15	17	16	19	23	6	14	73
+Rickey	Dearmond	SR	36	Four-Star	80	239	43	42	61	91	52	29	36	92	91	94	90	92	73
+Jonah	Hester	SO	15	Outside C	79	231	55	67	41	24	42	31	55	72	63	16	19	53	73
+Kamari	Bird	JR	53	Outside Duel Threat	72	192	62	88	70	27	110	64	26	116	63	70	55	44	74
+Dane	Mullins	FR	6	Pure Shooter	72	208	24	22	59	11	26	14	50	27	49	33	3	14	74
+Fisher	Huntley	SR	50	Below Average	68	168	3	20	45	16	10	38	52	9	8	41	29	17	74
+Ben	Blyster	SR	11	Average	83	254	63	10	17	14	52	54	53	46	48	48	29	55	74
+Keyshawn	Houseman	SR	9	Classic PG	69	167	90	45	81	38	81	65	43	12	46	59	28	59	74
+Steve	Jordan	FR	23	Classic SF	73	204	10	12	9	3	6	13	16	16	9	7	13	14	74
+Alonzo	Wednesday	FR	22	Driver	69	163	61	52	32	71	37	4	72	75	8	15	24	43	74
+Forest	Donovan	SO	7	Classic C	80	242	48	27	46	37	16	16	53	11	49	52	5	18	74
+Gunnar	Barker	SR	51	Inside Defender	76	209	37	33	25	42	34	10	17	24	36	29	41	42	74
+Robert	Pugliese	FR	2	Defensive Wizard	73	198	83	57	75	43	39	29	24	59	69	31	76	13	74
+Shane	Perlmutter	SR	4	Average	69	159	30	20	23	6	25	21	38	13	31	41	11	4	74
+Brycen	Nathanson	SR	34	Classic C	82	233	71	74	33	66	90	31	101	68	73	70	17	46	74
+Jorge	Carlin	JR	59	Outside C	79	241	86	94	31	43	101	17	93	43	70	33	48	67	75
+Hugh	Liu	SO	10	Classic PG	69	179	108	37	77	59	87	89	65	26	25	34	82	63	75
+Gaston	Marsh	SR	44	Athlete	74	207	32	20	44	33	58	81	51	51	100	89	24	27	75
+Elton	Ball	JR	5	Outside C	78	235	18	28	42	6	23	40	25	14	40	31	28	20	75
+Max	Hawkins	FR	18	Classic C	80	235	43	67	66	50	45	42	17	49	47	54	53	60	75
+Randall	Pace	FR	24	Average	70	163	14	28	13	21	32	48	30	16	28	39	17	48	75
+Harper	Lentini	JR	1	Classic C	77	233	88	49	68	53	72	20	24	51	52	70	49	50	75
+Lennon	Ryba	SO	2	Below Average	71	179	56	19	20	53	19	28	37	52	36	36	28	23	75
+Jaydon	Coursey	JR	38	Outside C	77	227	9	17	23	47	11	35	7	16	18	2	17	5	75
+Will	McKey	SR	16	Classic PG	67	171	46	62	18	33	55	51	35	52	22	21	35	40	75
+Brenton	Wald	SO	35	Three & D	75	220	63	50	78	73	58	39	42	53	61	45	14	73	75
+Marvin	Prince	SR	50	All-Around Scorer	77	224	89	89	99	75	32	23	38	94	70	59	22	14	75
+Cliff	Cardella	JR	12	Classic PG	68	165	55	9	68	38	35	71	62	25	41	52	58	31	76
+Joaquin	Camacho Jr	FR	34	Below Average	74	205	16	12	17	12	9	13	12	18	14	7	5	13	76
+Gregory	Carter	JR	25	Three & D	73	210	68	29	75	60	35	74	13	64	39	15	66	43	76
+Konnor	Jefferis	JR	23	Outside Duel Threat	69	169	15	52	42	55	28	26	42	51	36	49	49	62	76
+Abdiel	Duarte	SO	44	Classic C	82	240	55	96	83	122	92	74	35	109	118	43	74	97	76
+Moses	Charles	SO	50	Three & D	78	235	69	42	71	73	72	37	22	25	22	34	27	63	76
+Dawson	Valencia	JR	43	Outside Defender	73	197	28	24	31	42	41	11	25	17	22	8	13	19	76
+Brett	Hart	SR	6	Average	76	221	52	29	17	49	34	33	61	30	24	35	67	63	76
+Waldo	Mack	SR	20	Below Average	68	170	12	12	28	22	22	39	16	43	25	37	12	6	76
+LeCharles	Marcuson	SO	4	Classic PF	76	218	77	6	17	48	45	5	68	77	21	19	66	82	76
+Ian	Trombley	SR	22	Average	73	182	45	21	81	64	66	53	45	70	66	66	38	30	76
+Tracy	Wilkins	JR	8	Intangibles	76	233	20	17	26	24	25	13	20	18	4	12	15	17	76
+Nash	Green	SR	40	Classic SF	72	201	12	64	17	17	18	59	65	63	20	60	87	72	77
+Bugsy	McPherson	SO	31	Outside C	75	217	65	25	45	72	25	58	35	27	55	59	60	49	77
+Demario	Melvin	SR	4	Three & D	76	218	94	142	45	146	114	30	81	107	92	90	84	156	77
+Johnson	McIntyre	SO	12	Driver	75	207	45	6	46	32	16	32	18	5	23	5	30	49	77
+Joel	O'Brien	SR	7	Below Average	70	171	57	36	27	36	26	19	15	42	24	7	8	45	77
+Ismael	Fuller	SR	11	Five-Star	84	265	96	48	140	44	122	33	83	139	68	59	93	134	77
+Teagan	Maddox	SR	35	Outside Duel Threat	68	172	63	62	20	73	22	51	14	26	12	49	42	68	77
+Douglas	Koester	SR	25	Pure Shooter	67	159	9	24	30	28	12	18	18	19	18	23	7	32	77
+Burt	Fuentes	JR	32	Outside C	77	213	120	105	113	29	59	83	93	16	104	101	84	66	77
+Allan	Navarro	FR	19	Below Average	70	167	47	11	25	19	58	14	53	31	50	22	12	24	77
+Nick	Carney	FR	8	Inside Defender	77	231	30	96	94	24	6	61	76	114	69	41	60	104	77
+Vince	Miranda	SR	13	Outside Defender	70	174	65	15	18	55	75	55	45	74	43	71	42	52	77
+Bobby	Byrd	FR	33	Inside Defender	79	236	42	65	67	25	43	39	16	59	45	22	44	20	78
+Beckham	Goode	FR	51	All-Around Scorer	71	181	69	49	56	81	41	16	74	67	68	4	29	67	78
+Jaxon	Monroe	SO	46	Athlete	69	156	49	55	30	17	22	35	25	49	31	29	15	3	78
+Irving	Castro	SO	43	Outside Defender	70	179	12	26	2	18	10	7	18	26	14	22	23	19	78
+PJ	Colorado	SO	12	Average	73	194	34	17	31	10	21	50	48	34	37	49	41	38	78
+Eden	Pietrowski	FR	1	Below Average	70	175	9	19	18	22	18	3	33	24	29	18	32	18	78
+Owen	Woods	JR	3	Classic PG	70	178	43	37	35	57	17	43	51	20	51	34	62	50	78
+Earl	Yates	FR	23	Outside Defender	71	179	13	29	9	32	34	16	25	37	5	15	30	29	78
+Darwin	Marable	SR	52	Average	68	160	46	24	14	51	50	53	3	13	14	14	32	35	78
+Reid	Short	SO	32	Classic SG	71	184	59	51	70	60	14	57	54	46	68	64	43	47	78
+Emmett	McSwain	FR	25	Inside Defender	80	245	23	74	72	5	54	69	63	48	58	28	37	60	78
+Victor	Duffy	FR	15	Three & D	71	201	34	52	30	66	29	42	3	16	39	14	68	61	78
+Gustavo	Tripp	SR	7	Four-Star	75	218	68	88	21	63	98	46	69	92	119	110	81	112	79
+Dalton	Mendez	SO	44	Athlete	67	164	38	76	94	34	46	104	81	33	61	83	61	43	79
+Jim	Keaton	JR	18	Below Average	70	174	10	21	21	33	19	42	58	33	36	55	8	14	79
+Eugene	Smith	SR	55	Defensive Wizard	75	213	76	81	30	50	44	79	27	76	76	42	80	68	79
+Xander	Walls	SO	48	Average	73	202	38	30	31	29	34	40	28	30	27	10	7	37	79
+Duante	Harris	JR	21	Driver	73	211	38	38	14	18	54	33	13	46	28	51	24	39	79
+Uwe	Scalia	SR	25	Average	69	172	37	59	18	39	53	37	58	21	13	49	49	44	79
+Arlen	Hanby	SR	5	Outside Defender	71	189	42	17	28	61	62	34	59	58	54	81	73	80	79
+Antoine	Soto	JR	14	Pure Shooter	72	191	37	38	34	43	28	13	17	30	11	33	17	42	79
+Rich	Duren	SO	2	Intangibles	73	205	23	29	38	10	16	30	28	31	40	26	39	35	79
+Garfield	Cowan	SO	34	Classic PG	66	156	25	57	96	108	104	86	25	31	71	45	89	19	79
+Brennan	Ray	SR	40	Classic SF	75	212	58	40	25	13	48	15	16	27	58	23	38	26	79
+Aaron	Watts	JR	3	Below Average	72	195	12	35	36	19	30	23	31	30	23	26	40	29	80
+Jamal	Grieco	SR	5	Average	70	173	33	10	38	44	34	26	23	38	31	23	12	24	80
+Nick	Daniel	FR	1	Three & D	75	207	77	37	73	62	55	22	14	18	37	32	38	73	80
+Stephen	Williams	FR	42	Classic SG	70	183	38	57	58	54	15	70	76	28	71	36	38	52	80
+Wilber	Cervantes	SO	4	Classic SF	71	186	44	69	30	72	49	76	70	61	70	65	35	64	80
+Dmitry	Winchenbach	SR	40	Average	67	163	9	9	6	7	7	19	20	15	7	2	8	12	80
+Steve	Frye-Cooke	SR	10	Average	68	160	29	17	14	30	16	23	25	15	21	28	26	35	80
+Cleveland	Peck	JR	45	Classic SG	72	186	116	61	20	41	46	33	87	34	92	95	58	88	80
+Rashad	Franklin	JR	44	Classic PF	75	207	31	67	31	26	66	54	62	59	62	31	51	64	80
+Jakobe	Faulkner	FR	17	Inside Defender	78	234	66	63	41	20	63	24	67	55	53	14	67	43	80
+Charles	Thunderburke	SR	29	Average	67	160	57	27	61	29	60	47	40	28	13	65	33	30	80
+Tyrell	Vox	JR	41	Below Average	69	165	13	22	24	25	17	25	15	17	21	12	17	8	80
+Deyo	Gorgone	SR	35	Four-Star	73	200	36	31	43	65	60	83	23	45	76	71	76	63	81
+Dylan	McFarland	SR	30	All-Around Scorer	72	188	72	55	35	52	68	78	37	77	36	34	71	66	81
+Nasir	Barnes	JR	50	Classic C	78	239	63	41	40	61	58	31	54	63	36	16	32	70	81
+Fletcher	Proffit	JR	2	Average	72	198	67	57	48	45	17	55	31	53	26	3	50	14	81
+Dorian	Jackson	SR	55	Inside Defender	76	219	22	34	76	68	50	58	22	62	62	56	68	66	81
+Lukas	Flink	SR	41	Athlete	76	223	9	22	24	24	35	22	27	51	52	61	24	62	81
+Al	Gambrell	SR	33	Intangibles	75	206	14	23	33	37	66	34	50	46	80	61	43	48	81
+Justin	Foxworth	SO	15	Athlete	71	179	96	92	79	45	90	54	98	87	85	86	19	24	81
+Javon	Black	JR	6	Athlete	70	173	16	31	46	78	34	27	41	63	73	56	36	26	81
+Marques	Auyeung	SR	11	Outside Duel Threat	69	165	89	79	82	85	17	71	55	111	56	78	44	114	81
+Jarrett	Lloyd	SR	13	Average	72	197	66	81	16	75	33	9	30	15	60	47	28	24	81
+Donnie	Krahn	SO	46	Three & D	74	203	19	38	40	37	25	50	19	18	11	14	48	41	81
+Carlos	Stone	JR	33	Classic SF	72	191	42	48	20	53	52	27	20	41	36	30	46	7	82
+Landyn	Macias	SR	45	Classic SG	69	170	23	53	58	24	62	27	12	52	59	38	59	27	82
+Brett	Raines	SR	41	Average	67	158	10	3	-2	5	-2	9	5	10	7	-1	9	4	82
+Marlon	Huynh	JR	7	Average	68	161	4	40	29	40	16	7	32	21	21	29	32	50	82
+Tyree	Kulesza	JR	5	Classic PF	73	196	84	33	88	40	43	70	72	28	76	70	87	59	82
+Lynwood	Hardy	FR	54	Pure Shooter	72	186	15	19	14	22	12	16	15	7	8	7	3	18	82
+Russ	Braxton	JR	2	Five-Star	76	216	122	104	148	83	38	72	99	134	93	134	152	134	82
+Van	Daughtery	FR	21	Three & D	70	160	29	77	62	49	55	23	95	38	29	71	34	67	82
+Coleman	Montes	SR	17	Classic PF	75	205	37	69	94	79	91	15	56	83	87	74	68	75	82
+Brett	Stanton	SR	22	Driver	73	186	34	20	36	27	28	41	38	56	9	46	22	37	82
+Clarence	Varden	SO	50	Defensive Wizard	80	246	49	25	65	39	81	76	83	52	78	17	62	67	82
+Wyatt	Camarillo	JR	14	Five-Star	72	184	92	101	57	79	105	108	42	62	81	92	98	80	82
+Winfred	Little	SR	32	Classic PG	71	184	87	70	14	87	65	88	28	62	17	92	62	49	83
+Marcel	Lyunch	JR	20	Inside Defender	75	209	39	38	23	38	33	38	44	42	26	8	1	24	83
+GB	Selvidge	SR	5	Average	70	182	22	11	14	12	9	13	5	7	6	24	14	16	83
+Alexi	Turgenev	SR	2	Driver	70	180	51	39	25	12	14	45	39	34	33	46	45	45	83
+Sage	Simmons	SR	52	Driver	69	171	50	64	80	19	31	56	13	85	80	28	22	31	83
+Casey	Kemp	SR	13	Classic SG	70	172	96	47	75	99	12	27	37	45	92	100	44	27	83
+Ian	Lacefield	JR	30	Below Average	69	168	20	49	25	45	60	28	6	56	28	11	44	44	83
+Fred	Ashbrook	SR	16	Driver	72	194	93	22	74	57	25	42	86	33	57	62	77	59	83
+Kenny	Clarke	JR	24	Inside Defender	78	235	58	43	66	38	53	51	34	17	57	29	60	41	83
+Charles	Felice	FR	1	Below Average	69	167	51	90	80	93	46	90	63	27	82	80	42	21	83
+Tobias	Douglas	SR	22	Classic C	80	249	87	37	41	70	106	61	43	53	84	113	59	99	83
+Mason	Pierce	SR	7	Outside Duel Threat	69	170	45	40	36	53	21	24	46	45	22	16	37	37	83
+Dontrell	Munoz	SR	54	Outside C	79	237	83	85	22	23	20	25	13	56	33	16	37	79	84
+Jabril	Benitez	JR	9	Average	71	185	18	21	20	30	34	27	42	17	13	35	30	34	84
+DeMarcus	Sharp	SR	23	Intangibles	73	198	75	87	16	89	18	42	48	72	47	51	69	25	84
+Sebastian	Ebner	FR	40	Classic PF	76	226	81	48	54	60	78	40	52	48	59	60	41	73	84
+Tony	Ashbrook	SO	18	Intangibles	74	194	62	69	31	18	11	21	19	41	29	65	59	79	84
+Adrian	Darden	SR	19	Three & D	74	213	46	48	73	43	65	43	37	24	24	76	26	45	84
+Oswald	Spiel	FR	35	Defensive Wizard	74	215	66	79	51	71	24	74	67	59	45	85	54	31	84
+Chuckie	Mann	JR	22	Below Average	66	162	18	19	2	14	2	13	7	23	10	15	4	20	84
+KJ	Brough	SR	11	Classic C	81	248	53	24	57	60	12	59	41	23	42	51	65	70	84
+Wilson	David	SO	25	Classic SG	71	192	48	26	14	32	39	35	49	13	9	29	41	16	84
+Conrad	Mines	SR	30	Below Average	71	184	19	14	28	7	19	22	5	38	30	35	16	32	84
+Thomas	Villarreal	FR	47	Outside Duel Threat	69	165	25	68	27	26	21	55	18	53	26	26	63	82	84
+Marion	Miller	JR	18	Classic SF	77	220	83	19	35	19	69	25	53	60	64	17	17	36	85
+Jamari	Cedano	SO	53	Classic C	78	235	57	52	91	35	45	42	25	25	93	91	55	90	85
+Orlando	Christian	SO	12	Inside Defender	78	234	12	57	51	58	23	62	80	73	82	50	43	63	85
+Anderson	Lara	FR	43	Outside Duel Threat	67	163	0	8	9	11	11	5	18	2	18	16	10	13	85
+Sullivan	Harris	SO	1	Average	72	192	51	40	18	21	25	9	66	28	40	20	61	53	85
+Omar-Ha	Wrenn	SO	24	Outside Duel Threat	70	178	26	66	14	72	50	52	48	67	17	69	69	86	85
+Brady	Carrillo	SO	50	Below Average	73	206	15	52	25	50	48	46	23	42	35	57	18	43	85
+Wilmer	Estrada	FR	4	Three & D	73	207	32	70	56	60	55	75	36	77	76	28	88	15	85
+Ernest	Barr	FR	42	Classic C	80	249	21	30	8	15	21	34	29	12	18	15	12	14	85
+Lester	Long	SR	14	Classic SG	69	166	86	44	34	69	48	12	41	27	74	58	58	88	85
+OT	Wilson	JR	33	All-Around Scorer	71	179	79	24	12	45	46	32	26	46	16	65	63	49	85
+Johnny	Glascock	SR	3	Defensive Wizard	73	201	42	48	43	35	96	64	44	20	26	83	69	44	85
+Emilio	Perry	SO	17	Classic SF	75	206	63	54	94	70	37	64	76	36	23	13	33	96	86
+Derrick	Sandoval	SR	10	Pure Shooter	71	186	64	39	29	35	44	81	77	24	70	18	36	66	86
+Junior	Chambers	SO	30	Classic PG	66	151	22	38	59	48	25	50	18	17	52	18	47	36	86
+Xavier	McMunster	SR	54	Classic PG	67	163	61	18	7	58	46	47	41	65	24	55	30	38	86
+Kaiden	Dennis	JR	90	Classic C	79	247	82	63	66	28	88	13	48	90	79	30	52	76	86
+Hayden	Holmes	FR	42	Classic C	78	244	62	82	56	26	67	53	32	49	67	78	84	91	86
+Tanner	Allen	FR	3	Average	81	245	22	25	20	5	9	18	10	17	33	29	10	33	86
+Trenton	Madden	SO	8	Average	69	180	29	18	24	55	50	63	37	59	63	10	62	47	86
+John	Michael	SO	13	Average	73	203	67	40	58	61	50	18	38	61	26	69	20	29	86
+Bernard	Einhorn	SR	9	Classic PF	76	222	21	71	37	93	41	28	77	60	75	12	45	95	86
+Zayden	Lester	JR	32	Below Average	70	165	6	14	11	10	11	20	18	20	14	13	11	9	86
+Jayden	James	JR	33	Three & D	73	195	31	71	45	49	10	76	63	53	35	69	26	86	86
+Adam	Fennessey	SR	51	Average	70	166	39	73	30	58	25	40	54	5	53	49	15	71	87
+Buddy	Gayden	SR	34	Average	74	202	30	38	28	20	11	3	19	30	36	18	21	57	87
+Paulson	Noble	SR	45	Below Average	69	174	11	12	32	20	28	20	38	31	24	34	19	39	87
+Sage	Knapp III	SR	8	Outside C	78	244	58	81	29	94	59	65	53	73	55	37	91	40	87
+Joel	Calvin	SO	12	Classic SG	70	168	24	23	17	7	21	21	13	13	5	15	5	27	87
+Quincy	McGee	SO	33	All-Around Scorer	77	222	72	67	35	34	63	88	69	51	56	40	37	76	87
+Hayden	English	FR	22	Average	67	145	49	20	35	79	35	37	48	65	49	24	41	43	87
+Gregory	Khan	FR	50	All-Around Scorer	75	209	49	81	99	72	114	20	26	55	34	26	61	89	87
+Cedric	Fox	SR	14	Inside Defender	75	216	41	39	26	30	25	62	40	51	38	28	26	9	87
+Jerry	Frederickson	SO	30	Below Average	73	190	22	17	19	11	2	7	6	12	6	5	14	19	87
+Bryant	Almada	FR	7	Average	71	185	21	26	7	25	12	29	21	13	10	13	23	35	87
+Jerry	McLaughlin	JR	54	Three & D	74	202	61	96	89	49	59	98	41	87	18	106	75	86	87
+Roy	Beckett	SR	21	Classic C	85	281	65	44	42	54	15	16	31	9	37	39	39	19	88
+Blake	Gonzalez	FR	9	Below Average	70	166	47	32	46	49	12	51	33	25	43	14	29	13	88
+Vincent	O'Brady	JR	13	Intangibles	73	190	56	49	65	30	59	63	20	80	63	80	56	34	88
+Tylan	Rodgers	SO	33	Intangibles	76	219	30	18	21	41	52	62	14	13	61	30	42	16	88
+Willie	Villora	SR	34	Below Average	71	187	41	48	28	15	24	54	41	44	26	41	34	39	88
+Columbus	Criado	JR	32	Average	69	168	57	50	61	73	90	11	85	53	70	82	52	66	88
+Wilber	Biel	SO	6	Classic C	78	237	34	29	62	26	31	57	61	49	34	2	49	30	88
+Eliezer	Barton	SR	8	Intangibles	74	208	32	100	73	32	94	99	67	102	52	73	68	88	88
+Devin	Policastro	SR	5	Average	73	207	49	20	28	68	43	48	45	9	37	9	41	56	88
+Brian	O'Donnell	JR	52	Classic C	81	248	45	63	71	39	42	11	72	30	68	22	34	65	88
+Sincere	Brough	JR	17	Average	65	150	58	42	15	17	66	62	60	49	15	63	30	27	88
+Kent	Taylor	JR	1	Average	70	188	27	12	14	33	15	27	25	25	34	30	23	32	88
+Dennis	MacDonald	JR	43	Classic SF	75	211	65	24	66	52	22	19	70	19	40	52	48	21	89
+Giancarlo	Sullivan	FR	35	Four-Star	74	208	92	113	105	76	85	102	40	86	76	64	90	69	89
+Melvin	Ferguson	SR	11	Classic SF	72	188	46	35	32	93	73	10	102	46	122	105	37	34	89
+Sheldon	Davis	SO	41	Four-Star	83	257	105	86	59	102	106	40	114	67	91	109	72	69	89
+Lamont	Hayden	JR	2	Pure Shooter	73	205	54	44	18	30	70	25	13	62	74	19	34	69	89
+Trenton	Henson	JR	16	Classic SG	68	155	58	65	67	31	21	46	65	47	39	47	52	73	89
+Thurman	Slaughter	SR	24	Athlete	71	177	28	65	60	26	36	11	35	32	72	46	55	55	89
+Jay	Chapman	JR	14	Classic C	82	254	31	24	29	15	33	20	42	34	27	23	35	17	89
+Alberto	Gutierrez	SR	20	All-Around Scorer	77	220	43	19	32	73	22	49	78	53	10	48	14	67	89
+Arnav	Anderson	SR	6	Five-Star	73	186	118	84	21	131	128	94	22	122	140	99	127	130	89
+Moses	Gibson	SR	44	Classic PF	73	211	30	38	53	80	41	86	82	81	48	73	21	42	89
+Tyrone	Mercer	JR	38	All-Around Scorer	70	166	68	38	32	51	45	85	54	39	38	45	43	23	89
+Drew	Shea	SR	4	Average	69	169	40	8	45	35	18	9	19	13	26	40	39	34	90
+Jair	Speights	JR	7	Pure Shooter	72	198	27	82	75	19	51	20	38	11	52	81	52	80	90
+Ibrahim	Mata	SO	6	Average	75	210	10	53	62	33	41	37	28	24	29	26	41	27	90
+Dexter	Hardin	SR	22	Classic PG	71	193	76	19	96	58	92	92	36	78	103	32	121	102	90
+Devon	Grauer	FR	42	Inside Defender	80	240	11	36	38	33	42	14	23	17	18	14	14	11	90
+Gus	Keck	SO	13	Classic PG	67	158	42	91	78	41	110	76	38	53	109	66	98	33	90
+Damari	Nathan	SR	25	Outside Duel Threat	71	178	64	36	70	10	16	60	42	50	26	42	75	30	90
+Boris	Ivanov	SR	2	Classic PF	72	195	51	42	61	76	17	33	21	70	58	18	98	21	90
+Aron	Dixon	FR	32	Driver	71	176	53	66	57	9	73	12	65	36	53	30	23	37	90
+Myles	Papineau	SR	55	All-Around Scorer	69	165	55	35	48	23	29	59	69	103	47	46	96	85	90
+Kenyon	Padilla	JR	45	Below Average	71	189	29	32	17	21	41	17	39	47	32	44	12	43	90
+Hunter	Goodwin	SR	5	Classic PG	66	167	62	54	22	57	25	42	46	17	31	45	57	19	90
+Reece	Bullock	SR	41	Classic SF	72	194	49	33	55	42	61	21	34	45	53	14	17	43	91
+Luciano	Bright	SR	23	Below Average	66	160	18	22	24	22	8	27	36	30	35	38	3	21	91
+Michale	Nelson	JR	50	Inside Defender	79	250	57	68	78	61	21	11	31	70	45	85	80	83	91
+Garrett	Buckwheat	SO	1	Classic C	77	229	40	39	43	31	49	37	35	41	59	54	31	58	91
+Hal	Griffith	SR	11	Average	79	241	22	6	19	40	18	49	41	16	26	16	17	43	91
+Noah	Hanson	JR	15	Four-Star	82	247	90	64	82	56	32	46	74	43	70	51	58	42	91
+Derrick	McKenzie	FR	20	Classic SG	72	184	29	27	40	20	15	30	40	26	20	14	20	28	91
+Benjamin	Fleener	SR	32	Outside C	77	219	111	48	52	23	40	67	105	46	111	73	60	63	91
+Kyle	Goosby	SO	6	All-Around Scorer	73	209	84	86	9	71	48	65	43	53	77	21	36	72	91
+Earl	Birdsell	SR	52	Below Average	69	174	6	12	11	11	19	10	17	9	14	9	5	15	91
+Markus	Willis	SR	44	Average	68	167	13	20	33	24	25	34	33	28	20	10	20	34	91
+Jensen	Craine	SO	25	Inside Defender	78	233	49	33	40	46	24	24	29	11	33	56	35	18	91
+Royal	Vincent	JR	88	Classic C	80	241	54	80	72	68	69	68	113	25	83	88	21	77	92
+Leland	Oliver	SR	1	Classic SF	73	202	99	82	61	53	22	78	27	60	46	79	37	10	92
+Will	Owens	FR	40	Outside Defender	70	190	114	48	22	81	70	93	122	79	43	40	80	32	92
+Colby	Shields	JR	22	Below Average	73	200	13	14	10	10	11	8	2	13	6	2	1	4	92
+Dexter	Dunn	SO	44	Athlete	72	197	68	20	65	32	48	38	63	81	69	50	22	45	92
+Mervin	Copeland	SR	17	Athlete	73	209	31	59	22	31	27	45	16	29	29	59	45	58	92
+Anonymous	Sanderson	JR	2	Classic C	85	284	50	15	33	41	43	52	52	23	31	50	39	15	92
+Quincy	O'Brien	SO	12	Average	69	173	34	54	46	34	16	31	36	45	11	36	13	54	92
+Dalton	Gardner	JR	50	Pure Shooter	73	203	33	36	48	32	45	19	38	20	24	39	44	25	92
+Shaun	Preston	SR	11	Average	69	165	16	48	75	72	23	62	88	59	13	19	48	58	92
+Devyn	Graham	JR	5	Driver	73	208	45	63	77	31	75	44	66	91	31	91	53	68	92
+Gaylord	Giles	FR	55	Below Average	83	261	5	7	5	6	15	3	8	11	6	9	10	17	92
+Steve	Remmington	JR	11	Classic SF	80	238	35	50	65	54	25	14	37	43	32	15	67	52	93
+Cletus	Wilson	SR	4	Classic C	81	239	45	28	80	23	34	66	50	65	57	40	72	23	93
+Jacob	Rhodes Jr	SR	16	Classic PF	75	215	22	30	7	56	14	56	52	39	46	47	13	52	93
+William	Duca	JR	23	Classic SG	70	176	29	44	51	69	59	53	36	20	38	61	33	55	93
+Mark	Clukey	JR	52	Classic SF	74	204	34	23	24	17	21	9	9	27	26	20	22	19	93
+Terry	Turner	SR	32	Below Average	71	182	38	7	24	17	56	64	60	32	21	18	42	23	93
+Jamison	Moses	SR	34	Classic PF	77	225	36	13	36	40	20	26	20	10	12	31	34	21	93
+Florentino	Downs	SR	20	Average	65	151	33	59	36	22	39	65	59	25	33	52	46	58	93
+Tyrone	O'Neal	SR	43	Classic PF	75	217	13	47	36	55	35	13	46	29	35	24	43	18	93
+Alexzander	Watson	JR	15	Pure Shooter	69	162	17	36	53	18	20	29	18	38	12	13	15	40	93
+Tom	McCallister	SO	10	Average	68	167	0	10	17	9	11	9	18	18	2	5	20	10	93
+Herschel	Tatham	FR	50	Classic PG	68	166	42	49	10	18	40	44	27	45	19	11	53	28	93
+Williams	Weber	SR	14	Defensive Wizard	74	199	65	58	58	53	75	54	53	32	19	97	95	62	94
+Ryland	Whisenhunt	SR	46	Below Average	70	186	20	40	64	27	50	33	58	11	30	50	20	17	94
+Bruno	Grant	JR	40	Classic SF	73	202	54	34	19	94	91	78	28	13	96	49	59	14	94
+Dave	Daniels	SR	52	Four-Star	64	151	93	37	58	86	46	83	49	100	99	50	86	83	94
+Dominic	Williams	JR	6	Classic PF	73	207	30	53	74	22	65	46	50	71	44	70	84	18	94
+Luca	Betancourt	FR	3	Classic PG	69	171	11	24	42	51	60	39	33	72	35	23	4	57	94
+Trevor	Ferguson	FR	19	Classic PF	75	218	57	64	22	96	69	89	71	37	63	30	49	85	94
+Riley	Bell	JR	33	All-Around Scorer	69	168	63	32	55	44	25	53	52	61	84	91	36	101	94
+Travis	Schmidt	SO	4	Athlete	74	205	24	64	80	56	5	82	65	42	83	61	82	40	94
+Willie	Johnson	JR	54	Three & D	75	218	24	38	57	51	47	46	20	53	20	10	43	63	94
+Marion	Nunez	SO	10	Outside Duel Threat	70	189	57	57	33	43	14	4	20	65	28	21	35	36	94
+Wes	Hudson	SR	34	Outside Defender	70	170	101	11	143	125	89	47	32	88	93	63	48	22	94
+Major	Cervantes	SR	45	Below Average	69	167	50	51	39	53	29	22	71	31	50	25	34	70	95
+Trent	Dixon	SR	13	Average	71	181	87	27	60	77	79	68	50	42	80	44	27	75	95
+Calvin	Gervais	JR	6	Average	68	168	32	34	30	22	13	29	28	30	18	12	71	61	95
+Kelvin	Frederick	JR	1	Classic C	77	231	53	57	76	46	71	70	30	56	46	39	71	29	95
+Dickie	Hall	JR	11	Inside Defender	78	230	22	26	59	69	38	71	6	39	59	73	58	28	95
+Ben	Reed	FR	9	Average	73	183	47	14	42	35	22	37	8	43	18	47	31	24	95
+Demarcus	Cantu	FR	23	Below Average	70	175	78	81	31	58	68	52	52	69	29	82	44	83	95
+Shaun	Kim	FR	35	Athlete	77	231	58	65	46	56	87	85	28	83	55	75	53	70	95
+Victor	Deng	SO	43	Below Average	73	195	17	3	10	12	10	22	21	16	11	7	21	18	95
+Robby	Hardin	JR	3	Classic PF	81	245	68	56	16	48	61	12	34	68	29	66	67	34	95
+Geovanni	Macky	JR	12	Three & D	74	209	16	37	4	58	43	38	15	40	42	52	26	28	95
+Chadwick	Jones	SR	21	Intangibles	73	202	27	24	46	9	17	14	30	72	72	75	50	32	95
+Geoff	Wong	SR	14	Classic C	78	227	55	30	56	57	26	18	64	60	49	34	11	40	96
+Homer	Jackson	SO	1	Driver	70	179	55	52	24	43	53	58	61	50	33	26	52	33	96
+Dougie	Neal	SR	5	Intangibles	74	195	48	51	77	55	49	83	78	55	54	51	83	58	96
+Brooks	Sackett	SO	24	Four-Star	74	210	51	95	107	115	105	75	30	97	106	80	138	28	96
+Layton	Bloom	SR	4	Driver	71	199	44	15	64	38	56	19	32	40	28	47	13	62	96
+Lawerence	Tatro	FR	30	Defensive Wizard	75	211	32	16	56	67	32	17	48	41	47	41	49	40	96
+Russ	Jackson	SR	21	Outside C	77	223	56	64	105	55	50	67	31	48	48	73	45	31	96
+Josh	Raye	JR	16	Average	69	170	7	25	34	27	18	33	39	28	19	23	24	26	96
+James K	Bentley	SO	53	Inside Defender	74	214	61	64	100	25	93	70	41	77	107	86	76	81	96
+Armand	Cook	SO	33	Intangibles	72	195	31	12	25	32	48	36	48	23	29	51	42	39	96
+Jaylen	Holt	SR	19	Classic PG	66	147	71	45	52	85	49	46	39	39	38	14	40	87	96
+Fernando	Montoya	SR	13	Classic C	77	226	16	48	52	49	24	49	35	36	29	10	31	33	96
+Bruce	Phelps	JR	34	Pure Shooter	76	225	83	71	115	46	97	75	105	30	112	55	31	96	97
+Jewell	Bond	JR	10	Three & D	75	219	31	33	33	47	46	16	18	6	41	48	26	29	97
+Drew	Roaches	SR	14	Below Average	68	174	36	35	25	29	7	15	30	17	11	20	23	9	97
+Marlon	Lewis	SR	43	Outside C	76	225	74	70	52	50	13	30	71	34	67	32	61	72	97
+Rylan	Pagaduan	SR	0	Inside Defender	75	206	36	24	29	51	76	33	61	43	70	65	69	69	97
+Everett	Vanscoy	SR	22	Below Average	68	144	26	21	29	15	13	34	26	17	30	8	12	28	97
+Maddox	Helfrich	SO	42	Inside Defender	75	223	28	45	35	38	17	12	16	80	63	60	46	41	97
+Emanuel	Paige	JR	44	Three & D	76	238	37	99	59	101	34	53	62	85	28	123	109	33	97
+John	Spencer	FR	19	Intangibles	75	205	19	10	56	13	51	50	43	34	24	60	68	22	97
+Elias	Houston	SR	50	Average	70	168	67	21	36	53	59	30	16	18	53	14	54	54	97
+Jakob	Quinn	SR	13	Four-Star	78	227	22	85	58	77	68	73	60	68	85	59	85	67	97
+Vince	Chase	JR	51	Classic SG	71	183	30	60	50	53	43	36	37	56	11	22	58	45	97
+Aditya	Hampton	JR	4	Outside Defender	72	184	79	13	38	64	25	79	32	31	65	71	37	71	98
+Gilbert	Carlson	FR	21	Average	68	171	100	79	92	56	53	66	56	21	94	82	40	66	98
+Lawrence	Carey	SO	12	Average	71	182	48	28	69	62	30	46	46	23	54	24	27	60	98
+Kyan	Greene	SR	1	Average	67	161	52	62	65	66	57	36	54	47	63	41	52	80	98
+Camryn	Lane	FR	42	Defensive Wizard	72	185	87	21	73	55	40	42	5	49	71	78	78	18	98
+Finnegan	Cole	SR	5	Below Average	69	168	11	5	11	1	10	1	1	5	10	10	9	4	98
+Casanova	Roth	SO	33	Pure Shooter	67	158	54	38	12	52	36	10	33	38	10	33	33	62	98
+Nathen	Joyce	SR	34	Classic C	78	230	76	78	51	74	39	27	39	21	44	39	45	27	98
+Dustin	Trial	SR	23	Below Average	65	150	52	45	38	49	11	22	6	44	7	41	36	51	98
+Ken	Toupin	SO	45	Classic PF	76	214	61	50	55	57	53	63	35	68	46	10	9	67	98
+Enoch	Luken	SR	54	Classic SG	71	188	84	87	19	66	60	86	92	72	48	94	17	80	98
+Pedro	Jennings	SO	17	Classic SF	74	203	28	26	7	6	8	21	25	11	29	12	30	24	98
+Johnnie	Myers	SR	19	Pure Shooter	71	194	80	54	54	31	50	24	53	37	36	19	58	41	99
+Dave	Bigley	SR	14	Average	70	171	24	65	64	44	20	42	32	43	52	12	36	14	99
+Donovan	Mack-Woods	SO	51	Average	72	195	5	30	13	4	50	31	37	15	34	48	22	32	99
+Jovanni	Saunders	JR	41	Classic PF	78	229	17	98	114	101	42	69	63	23	35	119	90	38	99
+Tad	Sandoval	SR	32	Below Average	74	205	20	40	59	47	27	20	47	55	41	52	38	28	99
+Russell	Andersen	SR	13	Average	70	178	26	11	24	21	22	32	14	8	3	23	22	13	99
+Harold	Durbin	SR	17	Below Average	70	185	40	19	39	16	27	44	20	20	39	34	52	20	99
+Conner	Murray Jr	JR	20	Classic SF	71	188	12	33	19	10	39	19	31	32	41	23	11	25	99
+Abraham	Deleon	SO	52	Classic C	79	245	43	25	38	45	32	29	6	51	38	25	14	13	99
+Moses	McFarland	SR	2	Intangibles	72	185	15	37	35	61	91	102	96	93	25	69	97	103	99
+Ray	Palmer	FR	9	Outside Duel Threat	69	177	56	48	29	26	27	40	62	48	12	61	85	81	99
+Waylon	Doggett	SR	54	Classic C	80	244	14	30	34	15	12	8	40	23	32	4	33	20	99
+Irvin	Thomas	JR	25	Outside Duel Threat	72	195	22	26	44	22	52	36	36	42	49	53	42	27	100
+Claud	Ryan	FR	40	Inside Defender	78	238	8	50	32	18	16	31	12	31	59	53	56	9	100
+Jeremy	Snow	JR	10	Average	69	168	14	12	7	11	18	4	12	10	16	11	6	18	100
+Theo	Solomon	SR	98	Four-Star	81	261	95	119	124	74	32	125	44	70	129	81	87	73	100
+Felix	Vernon	FR	55	Average	70	164	7	5	8	8	14	7	9	7	9	16	3	11	100
+Kareem	Rawles	FR	8	Inside Defender	77	228	60	54	79	44	29	66	86	31	62	45	78	94	100
+Zaid	Gates	SR	27	Classic C	79	238	38	27	22	37	21	12	43	12	20	20	29	26	100
+Jeffrey	Sheriff	SO	19	Below Average	67	164	15	22	27	27	32	4	23	11	31	20	11	29	100
+Anthony	Swim	SO	33	Five-Star	73	216	115	108	111	55	94	70	98	69	111	53	113	111	100
+Jagger	Sutton	SR	14	Classic C	82	245	66	44	35	53	59	52	57	20	76	49	55	62	100
+Gary	Patton	SO	12	Outside Duel Threat	70	168	55	41	55	29	30	35	34	58	61	36	26	30	100
+Hans	Hickerson	SR	9	Outside C	78	242	14	26	21	43	20	45	36	42	32	19	48	49	100
+Thad	Saunders	SR	6	Pure Shooter	70	172	65	33	48	54	45	26	80	27	72	62	35	83	101
+Larry	Livingston	JR	1	Three & D	76	218	21	62	55	78	39	28	53	13	59	23	51	36	101
+Gerald	Ferriera	FR	25	Classic PF	75	215	26	37	36	64	74	103	31	18	69	106	21	101	101
+Henry	Anthony	SR	4	Below Average	68	159	21	20	21	11	7	11	7	28	27	15	21	6	101
+Jakobe	Ortiz	SO	12	Classic SF	73	204	52	37	28	44	62	64	66	46	87	53	83	62	101
+Wes	Brin	SR	23	Classic PG	72	188	64	51	46	44	47	82	64	51	77	47	52	12	101
+Chuck	Speers	JR	11	Below Average	71	188	43	96	74	52	57	46	22	28	19	9	20	24	101
+Burton	Simons	SO	42	Three & D	78	225	37	30	55	86	27	42	53	73	97	21	86	28	101
+Evan	O'Neill	JR	3	Average	70	167	61	57	62	73	9	82	18	85	19	14	61	74	101
+Marlon	Smith	SR	31	Pure Shooter	69	172	25	88	79	73	89	89	16	33	84	89	51	103	101
+Osa	Walters	SO	43	Outside C	83	261	41	69	73	22	30	27	29	54	49	75	81	60	101
+Jameson	Arch	JR	2	Below Average	67	156	47	51	23	60	37	34	69	43	21	53	49	36	101
+Sydney	Stuart	SR	54	Average	69	176	63	57	16	63	27	47	18	27	37	55	64	55	102
+Jermie	Boyer	SR	9	Classic SG	70	166	98	72	31	65	49	32	69	17	39	17	59	75	102
+Rolando	Faircloth	SO	5	Below Average	73	192	9	5	5	10	7	6	10	9	13	14	8	15	102
+Lionel	Williams	SR	8	Below Average	74	198	10	4	9	2	-2	10	3	9	5	7	-1	3	102
+Keith	Wilson Jr	SR	50	Below Average	86	268	6	7	14	3	12	5	9	11	13	2	11	12	102
+Phillip	McGuire	JR	37	Outside C	75	205	98	41	68	26	10	55	17	58	48	96	44	70	102
+Rick	James	SO	3	Outside C	76	221	23	55	28	64	15	25	47	60	69	61	19	9	102
+Tre'	Barajas	JR	53	Classic PF	74	194	53	17	88	35	35	36	75	32	32	26	46	67	102
+Michael	Berner-Banks	SR	23	Intangibles	73	200	27	29	9	11	58	65	42	29	60	59	36	47	102
+Herbert	Smith	JR	35	Average	68	171	48	69	77	30	65	36	56	37	54	80	49	56	102
+Luke	DeLeon	SR	41	Below Average	73	195	21	42	32	11	23	32	18	22	23	13	18	41	102
+Jose	Colligiari	FR	1	Inside Defender	78	228	30	21	35	6	16	12	20	22	35	29	19	4	102
+Brian	Somers	SR	15	Classic SG	72	181	58	69	26	56	70	39	61	44	57	70	51	19	103
+Marco	Mines	SR	5	Classic SG	73	196	50	38	41	30	28	34	22	41	66	14	63	11	103
+Chris	Choat	JR	55	Athlete	72	183	8	19	52	35	58	20	21	47	52	31	16	33	103
+Sean	Hooper	FR	1	All-Around Scorer	74	210	85	89	54	73	70	63	78	78	56	31	29	27	103
+Daniel	Hughes	SO	24	All-Around Scorer	74	206	83	49	52	46	34	29	43	56	96	38	21	32	103
+Mac	O'Donnell	JR	41	Classic PG	67	151	65	28	48	67	70	62	33	39	29	68	18	24	103
+Jamar	Wrinkle	JR	52	Classic PF	76	212	75	58	38	28	10	43	35	61	56	17	56	67	103
+Harley	Cole	SR	12	Average	70	185	56	64	55	45	32	49	25	48	42	32	45	56	103
+Landon	Alvarado	SO	17	Classic SG	72	192	65	16	15	52	22	21	34	50	57	81	40	27	103
+Adrian	Beltran	SO	13	Average	67	164	20	26	44	41	15	11	43	21	15	14	20	20	103
+Slade	Yepez	SR	54	Driver	70	177	26	20	62	34	45	27	21	35	25	64	46	28	103
+Jessie	Charles	SR	23	Classic SG	74	198	37	54	30	28	40	61	45	23	42	40	48	30	103
+Stan	Rayburn	SR	22	Classic SG	71	191	72	74	50	55	8	51	41	89	54	67	66	85	104
+Savion	Wilson	SO	31	All-Around Scorer	77	220	49	67	38	56	83	72	51	73	13	41	46	30	104
+Todd	McCann	JR	4	Intangibles	76	219	18	62	62	25	46	22	20	46	16	34	42	71	104
+Jarred	Collinson	SR	17	Classic PG	68	172	12	65	14	35	58	51	56	53	30	64	49	45	104
+Dante	Reese	FR	5	Average	69	174	33	21	13	10	33	30	16	23	17	18	30	34	104
+Norbert	Othello	FR	3	Average	69	177	17	24	28	62	41	64	40	19	46	45	23	33	104
+Conrad	Ball	FR	10	Outside Defender	73	209	57	32	45	47	61	40	60	44	45	18	70	70	104
+Jeremiah	Love	FR	14	Outside C	76	212	13	22	23	7	10	4	3	29	36	38	38	23	104
+Zander	Heldt	FR	16	Classic C	78	240	31	31	47	30	22	55	13	54	44	48	46	22	104
+Richard	Bates	SR	25	Below Average	70	176	36	42	13	43	43	20	53	25	11	19	42	51	104
+Orville	Harrison	JR	35	Classic C	76	218	64	73	91	89	46	49	67	90	92	25	48	15	104
+Quinten	Worthington	JR	44	Outside Duel Threat	71	176	84	71	55	18	103	93	28	38	41	42	15	45	104
+Franklin	Parker	JR	7	Average	68	177	21	9	29	14	26	8	19	20	13	3	19	9	105
+Misael	Miller	SR	35	Below Average	70	176	24	18	12	37	28	27	9	13	9	22	34	10	105
+Samuel	Bold	SO	2	Pure Shooter	73	205	30	69	9	86	59	74	50	80	27	18	53	71	105
+Digambe	Amabe	FR	32	All-Around Scorer	71	173	86	27	37	50	68	64	23	32	93	81	93	60	105
+Trent	Hobgood	FR	21	Classic SF	69	166	89	98	97	90	25	83	16	26	99	92	18	17	105
+Ellis	Lee	JR	14	Athlete	73	209	69	30	14	47	43	67	27	59	48	67	45	60	105
+Valentine	Cowden	SO	3	Average	70	174	69	24	52	17	35	27	15	44	55	55	78	10	105
+Nickolas	Beckworth	JR	42	Average	68	158	30	82	78	22	59	96	62	60	92	17	24	41	105
+Donald	Parker	SR	15	Three & D	74	187	28	17	18	12	15	26	12	29	6	16	9	14	105
+Bentley	Boyd	JR	8	Five-Star	70	171	93	125	130	81	92	104	115	75	95	103	92	73	105
+Tariq	Kesner	SR	30	Outside C	82	249	64	38	60	10	85	36	57	84	84	61	45	75	105
+Shawn	Marcos	SR	25	Athlete	79	253	15	26	70	28	19	34	58	13	54	42	29	56	105
+Milton	Wheeless	FR	8	Driver	72	196	56	58	72	58	40	35	24	31	18	15	48	36	106
+Jarrett	Mercado	SO	16	Below Average	71	176	26	45	43	62	34	63	26	31	32	63	18	14	106
+Landon	Channing	FR	21	Athlete	71	171	13	31	66	44	30	47	8	49	53	57	45	49	106
+Rishi	Dorsey	SR	9	Intangibles	72	189	64	55	50	28	16	68	23	35	75	84	73	26	106
+Charles	Tapscott	SO	41	Below Average	71	182	15	51	36	58	15	64	19	58	53	26	49	74	106
+Nico	Camacho	JR	10	Below Average	71	190	13	12	5	9	7	11	13	10	4	9	2	9	106
+Gerald	Zambia	JR	2	Classic SG	70	179	43	51	35	46	36	15	57	41	28	63	63	59	106
+Shooter	Fitzgerald	FR	3	Pure Shooter	71	188	9	36	18	29	17	22	25	38	28	16	28	28	106
+Todd	Gallegos	FR	52	Outside C	79	236	33	42	63	61	62	30	39	39	38	40	45	62	106
+Clint	Tran	SO	25	Driver	71	185	27	9	67	41	64	27	9	55	21	59	68	61	106
+Sahir	Salas	FR	55	Classic PG	68	157	18	68	51	31	60	44	65	42	43	31	36	71	106
+Levi	Hardge	SR	51	Average	69	165	86	79	46	19	28	74	78	90	47	87	45	93	106
+Juan	Davila	JR	7	Classic C	78	226	57	33	34	31	26	42	33	16	57	64	55	33	107
+Johnie	Freeman	SR	19	Classic PG	69	176	56	34	25	71	79	92	32	66	50	36	100	29	107
+Jack	Wall	SO	35	All-Around Scorer	72	186	95	53	37	79	42	74	13	84	22	54	90	88	107
+Giovani	Stevenson	SO	45	Classic C	80	237	61	24	89	30	42	85	36	89	78	6	43	93	107
+Sidney	Jones	SR	59	Four-Star	81	246	115	16	87	65	65	113	59	95	114	109	61	55	107
+Greg	Fox-Dodson	JR	41	Average	67	154	14	37	29	20	27	40	29	1	5	27	19	18	107
+Razor	McIntyre	FR	5	Inside Defender	76	208	57	52	36	69	26	21	71	72	65	57	69	17	107
+Kolten	Wood	SR	1	Average	84	272	91	15	100	17	11	42	92	35	77	34	56	42	107
+Calvin	Guiney	SR	30	Classic PF	76	221	50	57	58	64	46	50	53	42	62	11	47	28	107
+Jett	Scheller	SO	4	Classic SG	74	204	15	26	21	27	9	41	39	21	25	31	13	12	107
+Robbie	Byrd-Moxie	SR	50	Outside C	77	232	59	58	31	15	52	14	24	50	57	58	19	56	107
+Jordyn	Mathers	JR	44	Classic PF	74	211	25	54	108	52	97	20	113	113	97	79	103	99	107
+Wilber	Mullen	SR	15	Below Average	73	197	11	12	47	35	18	26	25	56	19	22	25	12	108
+Arnulfo	Todd	SO	14	Average	70	186	14	44	43	42	35	67	55	63	66	35	20	25	108
+Chris	Poppe	FR	50	Average	68	168	10	17	20	4	16	10	13	16	8	2	14	8	108
+George	Green	SR	2	Classic PG	69	168	43	26	53	55	78	46	22	60	15	46	75	50	108
+Chubby	Karnes	FR	12	Classic PG	70	174	60	14	51	74	40	33	34	32	60	85	56	81	108
+Leo	Gilmore	SR	45	Outside Duel Threat	66	159	45	76	71	75	33	87	83	50	17	36	26	80	108
+Sir	Olsen	SR	40	Below Average	75	215	28	20	35	22	11	25	23	13	23	11	10	29	108
+Francois	St James	SR	3	Classic PF	72	189	101	64	69	9	19	20	57	30	79	35	65	109	108
+Anthony	Avila	SR	19	Driver	74	206	65	64	59	4	69	49	43	55	30	71	69	16	108
+Slade	Bolton	FR	43	Outside Duel Threat	71	183	75	43	30	12	80	50	42	38	61	71	49	19	108
+Emile	Gregory	FR	30	Three & D	77	228	61	50	75	85	71	45	79	24	50	28	15	86	108
+DD	Forshee	FR	20	Classic PF	76	229	38	68	23	27	73	12	56	17	75	38	47	47	108
+Jerald	Ros	SO	21	Driver	69	172	40	17	86	34	65	19	78	75	41	74	80	12	109
+Patrick	Gatton	SR	13	Classic SF	81	238	63	102	31	36	90	38	32	92	28	40	86	75	109
+Mervin	Dalrymple	SR	6	Average	69	178	32	34	40	38	24	49	20	32	19	21	30	32	109
+Danny	Banks	JR	7	All-Around Scorer	76	216	90	32	31	46	27	69	75	25	60	15	41	85	109
+Konnor	Wyant	SR	42	Average	70	183	18	14	10	5	5	8	11	9	12	13	12	16	109
+Leonard	Hayes	JR	31	Inside Defender	77	229	34	39	63	28	35	63	67	44	31	9	55	22	109
+Skyler	Pilson	SO	2	Classic C	79	257	77	54	36	78	17	49	17	55	57	39	32	50	109
+Davis	Criado	FR	17	Outside Defender	68	156	61	16	47	43	22	72	60	40	72	48	25	46	109
+Geoffrey	Ward	JR	55	Driver	70	169	82	84	22	77	23	33	59	39	78	17	79	52	109
+Grant	Costa	SR	24	Average	70	172	22	45	42	44	49	42	29	27	30	14	11	6	109
+Paul	Flores	SO	30	Classic SF	75	210	41	25	69	65	37	67	50	53	49	73	39	19	109
+Cameron	Yan	SR	20	Below Average	70	179	21	47	14	45	44	20	15	47	50	17	42	28	109
+Caiden	Brown	SR	6	Defensive Wizard	73	187	74	9	15	36	69	79	33	82	90	114	110	91	110
+Rick	Blankenship	FR	21	All-Around Scorer	74	197	58	62	74	47	22	26	52	94	26	88	55	15	110
+Marc	Jamison	JR	22	Below Average	69	172	25	31	42	17	15	44	21	34	24	30	38	49	110
+Galen	Gafford	FR	30	Classic SG	69	165	26	33	18	42	82	10	38	45	66	56	68	51	110
+Elijah	House	SR	24	Classic SG	73	211	31	36	52	55	16	34	52	53	21	28	49	56	110
+Coleman	Watson	JR	43	Below Average	72	200	34	28	42	28	5	18	17	34	34	5	42	17	110
+Cannon	Moles	SO	34	Classic SG	71	186	32	18	3	16	19	39	57	26	17	52	39	32	110
+Lennon	Foster	FR	14	Classic SG	71	193	60	27	61	48	46	71	81	65	92	76	72	89	110
+Dane	Danks	JR	7	Outside C	79	241	11	54	62	18	30	32	57	50	60	17	16	69	110
+Byron	Harris	JR	1	Average	72	183	15	24	44	8	12	10	15	32	18	36	10	32	110
+AB	Patrick	SR	5	Average	69	168	52	39	42	34	34	46	42	85	49	51	78	48	110
+Tim	Nunez	JR	52	Below Average	73	199	12	25	15	32	36	16	45	21	35	8	28	29	110
+Ronnie	Keller	SO	19	Average	67	156	15	12	42	40	21	44	17	54	37	23	20	6	111
+Pierce	Bowman	FR	13	Driver	75	209	34	58	26	58	13	59	25	45	31	60	58	39	111
+Terrell	Brown	SR	10	Driver	70	167	37	44	34	6	27	14	41	37	26	2	32	28	111
+Courtney	Hoover	JR	23	Intangibles	74	217	11	19	64	18	28	33	25	20	21	67	62	23	111
+Andrew	Adkins	SO	8	Classic C	76	206	64	62	80	53	59	12	47	74	79	61	84	53	111
+Rey	Hoffman	JR	24	Classic PG	72	191	44	43	52	78	98	70	55	95	16	44	84	113	111
+Camryn	Laux	SR	41	Below Average	68	164	3	9	13	10	3	5	10	9	2	13	2	12	111
+Caleb	McNeil	SO	51	Classic C	79	239	63	51	54	49	56	42	71	35	67	16	24	11	111
+Marquise	Chasteen	SR	4	Classic PG	66	166	67	96	117	42	77	46	28	83	56	71	30	115	111
+Zach	Moreno	FR	12	Inside Defender	77	229	48	77	42	56	61	79	61	23	54	89	21	37	111
+Porfirio	Kraker	SR	49	Classic PF	77	232	10	82	15	33	26	53	57	66	77	71	35	52	111
+Ezequiel	Haney	SR	11	All-Around Scorer	69	176	40	81	81	45	66	50	21	42	40	77	19	29	111
+Neal	Best	SR	7	Defensive Wizard	73	200	69	18	104	50	78	83	68	67	29	93	44	37	112
+Preston	Autry	JR	16	Average	72	193	32	13	30	10	32	18	44	18	16	14	14	21	112
+Garrison	Hayes	SR	23	Classic SF	72	198	48	21	59	55	54	14	24	57	55	47	67	28	112
+Yusuf	McConnell	SO	12	Athlete	74	195	60	30	80	9	63	58	67	41	71	67	25	38	112
+Elias	Barrera	SO	20	Average	69	179	26	24	35	17	13	9	23	7	29	12	18	24	112
+Terrance	Esparza	JR	41	Driver	75	211	61	20	49	21	30	16	77	36	61	36	15	36	112
+Alex	Yearsley	FR	52	Outside Duel Threat	68	171	38	36	50	5	44	5	43	47	40	44	10	17	112
+Jay	Taylor	SO	44	Classic SG	71	176	49	75	64	83	17	40	86	64	57	70	71	66	112
+Talanoa	Moloha	FR	17	Classic C	77	236	91	16	63	31	22	34	51	66	81	94	15	20	112
+Alvin	Ellis	SR	1	Pure Shooter	70	170	97	91	42	100	60	72	85	31	49	31	19	77	112
+Ricky	Reyes	SR	43	Three & D	75	217	62	22	44	78	67	48	23	57	61	40	33	77	112
+Cyrus	Stout	JR	14	Inside Defender	76	228	9	35	61	16	61	48	28	30	44	26	68	31	112
+Trent	Michaels-Parks	SR	51	Below Average	71	173	5	17	8	8	14	11	8	13	15	16	10	12	113
+Derrick	Judon	SO	42	Three & D	76	205	28	62	66	44	37	41	52	66	13	32	88	75	113
+Seamus	Toms	JR	35	All-Around Scorer	75	215	43	43	9	65	33	82	12	53	40	30	57	20	113
+Vern	Kurz	JR	13	Average	69	170	50	53	48	59	47	93	43	87	7	46	37	6	113
+Benny	Stevens III	SR	3	Athlete	73	209	57	51	68	66	20	15	24	42	45	55	14	63	113
+Robby	Valenzuela	SR	12	Below Average	71	195	8	42	31	38	51	18	52	11	18	27	33	16	113
+Donte	Ballard	FR	7	Classic SF	71	191	52	37	65	8	8	52	53	56	22	41	57	47	113
+Bert	Miller	JR	1	Pure Shooter	71	186	26	62	54	23	36	69	69	21	9	33	52	49	113
+Norbert	Hash	SR	25	Driver	72	187	76	53	93	49	74	20	76	74	43	31	60	76	113
+James	Bryan	SO	30	Average	70	176	70	33	63	35	59	45	35	53	58	62	15	66	113
+Robert	Schaefer	JR	15	Below Average	68	161	5	40	27	15	18	7	19	32	21	19	23	18	113
+Pranav	Sullivan	SO	54	Average	68	158	15	23	43	27	12	20	12	30	44	23	20	34	113
+Fritz	Korte	JR	22	Outside Duel Threat	69	173	56	35	48	42	18	41	58	33	12	65	41	84	114
+Derek	Simpler	SR	55	Classic PF	74	195	21	19	36	13	52	59	50	10	50	52	9	22	114
+Lavern	Good	JR	1	Classic SF	75	214	19	44	7	28	10	55	56	56	25	25	29	22	114
+Marcelino	Delorme	SR	35	Outside C	79	232	84	68	36	82	48	21	26	71	97	42	84	21	114
+Nicholas	Maxwell	JR	33	Intangibles	75	205	13	23	67	66	64	25	54	3	42	32	54	65	114
+Ronnie	Villanueva	SR	9	Below Average	66	142	7	18	3	13	6	17	13	11	14	18	6	9	114
+Draven	Rosario	SR	4	Below Average	69	166	36	47	51	26	58	24	14	14	15	10	29	41	114
+Maurice	Price	SO	30	Classic PF	76	219	81	66	42	18	42	62	32	26	58	78	4	28	114
+Vance	Blake-Williams	SO	33	Four-Star	73	209	55	91	117	80	28	89	97	89	69	112	79	64	114
+Jaeden	Gathings	SO	25	Below Average	67	167	37	14	10	39	34	19	23	60	54	49	14	50	114
+Evan	Archer	SO	7	Classic PG	71	171	17	37	57	61	105	82	29	30	63	103	77	74	114
+Mateo	Montgomery	SR	23	Five-Star	85	263	84	81	75	33	69	46	74	90	92	115	107	118	114
+Mark	Bermejo	SR	3	Classic C	76	210	34	16	33	9	16	25	23	20	29	31	36	12	115
+Frederick	Cowan	SR	32	Below Average	73	198	10	-1	1	-1	10	9	1	1	-2	6	3	8	115
+Micah	Floor	FR	53	Outside C	80	244	22	18	21	18	24	10	9	26	20	28	28	9	115
+Travis	McKay	JR	22	Below Average	69	165	9	18	13	15	17	11	12	7	9	15	11	4	115
+Gunner	Ellis	JR	19	Below Average	72	190	22	6	4	24	8	12	21	22	19	24	6	6	115
+Orlando	Arnott	SR	12	Average	72	191	31	13	23	38	33	28	18	39	8	27	29	20	115
+DeAngelo	Osgood	JR	36	All-Around Scorer	74	198	78	92	101	81	103	101	98	74	15	77	69	18	115
+Jeromy	Altar	JR	34	Outside Duel Threat	69	160	24	18	28	45	18	36	36	33	19	28	57	34	115
+Aaron	Vasquez	SR	11	Outside C	77	226	46	25	56	38	30	26	19	23	74	59	48	42	115
+Maximillian	Santego	SR	33	Classic PF	75	219	36	17	17	37	40	35	45	47	13	47	49	14	115
+Garry	Griffin	FR	10	Inside Defender	79	239	102	118	107	37	27	85	120	45	118	105	63	36	115
+Dave	Thomas	JR	23	Average	68	157	14	19	32	15	36	21	28	23	46	45	51	21	115
+Christain	Doner	SO	2	Below Average	70	182	17	39	38	44	43	26	13	34	13	14	19	31	116
+Elijah	McMichael	JR	19	All-Around Scorer	73	197	60	58	44	35	61	63	12	68	71	56	13	68	116
+Harry	Kellerhouse	FR	21	Outside C	77	231	68	54	94	33	102	23	84	26	54	83	79	93	116
+Roberto	Lambert	SO	23	All-Around Scorer	75	214	72	46	22	40	18	29	20	38	52	56	48	36	116
+Earnest	Schroeder	SR	10	Intangibles	75	205	83	38	71	64	23	48	71	48	62	52	50	69	116
+Kaeden	Lounsbury	SR	35	Classic SF	82	253	40	51	58	20	63	32	25	67	18	62	29	48	116
+Isaias	Lewis	SR	24	Below Average	73	195	15	27	19	27	34	39	27	17	5	34	24	9	116
+Jamie	Wiggins	FR	13	Below Average	72	183	29	9	4	40	19	29	51	25	20	45	46	19	116
+Easton	Melendez	JR	22	Average	70	179	36	45	20	25	46	34	5	54	16	13	8	13	116
+Vance	Miller	SR	4	Classic SF	75	216	37	29	7	19	40	39	15	35	16	22	39	9	116
+Kenton	Breech	SR	5	Three & D	77	229	61	138	117	90	54	100	67	60	16	40	22	111	116
+Glenn	Harris	JR	11	Classic PF	72	191	96	62	102	45	20	76	39	88	54	69	38	87	116
+Mikey	Roswell	SO	1	Intangibles	77	226	21	28	19	36	58	23	46	19	36	30	36	45	117
+Don	Lutz	JR	20	Average	68	163	30	21	11	37	8	22	14	10	48	37	42	47	117
+Hipolito	Phinney	SR	33	Classic SF	72	185	51	25	55	42	64	29	38	25	20	29	48	48	117
+Jarod	Larsen	JR	23	Below Average	71	180	3	4	23	9	5	6	24	16	4	24	20	19	117
+Lance	Michelson	JR	4	Four-Star	71	189	44	44	30	77	103	120	117	72	65	90	93	112	117
+Grady	Bonilla	FR	54	Outside Defender	72	186	42	24	57	56	37	74	81	49	69	64	41	39	117
+Cary	Davis	JR	35	Outside C	75	211	11	39	16	13	31	19	47	13	26	13	26	36	117
+Ernest	Ordaz	JR	9	Below Average	68	147	10	15	11	13	15	2	8	11	8	20	13	2	117
+Koen	Pugh	SO	26	Outside Defender	70	179	38	27	79	89	36	88	35	70	66	12	98	66	117
+Vicente	Amaro	SR	3	Four-Star	80	246	95	39	79	143	80	93	104	45	101	115	133	76	117
+Kellen	Rivas	SR	8	Three & D	72	208	45	51	62	67	14	30	37	44	84	51	50	46	117
+Brendon	Wedell	SR	7	Four-Star	68	169	88	98	89	93	27	95	79	71	79	98	70	87	117
+Elisha	Tunstall	SR	24	Below Average	70	167	0	20	30	3	15	12	23	15	29	23	16	15	118
+Kolton	Miranda	JR	45	Classic SF	73	208	92	60	8	31	27	31	48	53	50	92	20	64	118
+Jerald	Hollie	SR	12	Classic SF	74	193	74	24	32	103	94	50	106	108	68	28	45	97	118
+Markus	Gill	FR	14	Outside C	79	235	31	51	16	61	61	42	45	65	48	36	82	41	118
+Sidney	Hess	JR	17	Inside Defender	80	235	38	75	65	82	9	92	5	58	48	20	21	24	118
+Tomarillo	Christian	SO	53	Below Average	71	190	42	15	13	24	15	21	47	32	54	43	50	58	118
+Tom	Abeeri	JR	5	Outside C	78	233	31	49	13	37	46	44	38	58	40	48	19	18	118
+Houston	Rowe	SR	55	Below Average	82	260	26	6	28	6	11	21	18	19	30	26	20	18	118
+Karter	French	SR	6	Average	70	171	17	49	34	21	16	24	55	8	24	18	40	35	118
+Ike	Schreckengost	FR	31	Average	72	198	14	29	13	0	8	16	11	18	21	12	30	31	118
+Kameron	Campbell	SR	43	Classic C	84	272	96	46	70	41	21	108	78	43	79	104	63	95	118
+Zaiden	Arias	FR	50	Classic C	84	263	55	14	53	20	56	14	25	38	55	66	17	15	118
+Major	Moss	SR	14	Average	67	170	55	36	54	36	26	29	9	61	21	65	57	29	119
+Derek	Bowers	JR	6	Classic PG	67	168	32	56	33	69	69	42	3	49	34	55	40	52	119
+Chase	Doctor	JR	5	Classic C	77	225	35	28	30	18	33	16	24	28	32	31	40	8	119
+Fermin	Widrick	SO	2	Outside Defender	68	169	15	48	8	27	18	40	33	39	13	58	12	19	119
+Jaxson	Kepner	JR	16	Outside C	77	229	16	18	17	10	34	29	19	25	25	19	9	14	119
+Vincent	Guerreo	SO	4	Classic C	78	248	40	63	70	21	50	31	45	14	47	45	33	54	119
+Franklin	McAndrew	SR	15	Five-Star	72	206	117	94	57	119	110	61	100	109	70	70	81	108	119
+Rodriguo	Qi	FR	23	Pure Shooter	70	182	63	37	15	75	77	59	66	23	71	48	35	45	119
+Brendan	Wade	SO	31	Outside Defender	70	152	43	18	58	40	38	34	39	62	14	34	58	12	119
+Marshall	Elliott	FR	40	Classic PF	75	215	17	59	75	26	40	28	84	53	44	44	15	28	119
+Sheldon	Ernst	JR	13	Athlete	74	202	7	10	15	10	12	8	12	11	15	11	11	3	119
+Wesley	Black	SR	30	All-Around Scorer	73	197	64	41	26	55	60	64	14	67	24	13	43	43	119
+Nathanial	Melton	JR	2	Intangibles	71	186	43	19	50	66	85	20	76	76	80	61	70	72	120
+Christopher	Whitehead	SR	13	Inside Defender	75	214	88	58	62	46	60	92	94	98	63	38	80	19	120
+Wilburn	Clarke	SR	10	Driver	74	207	31	25	17	8	30	16	31	22	32	36	15	24	120
+Edmund	Killion	JR	17	Below Average	69	171	2	2	-1	1	7	7	2	7	4	10	9	8	120
+Ronald	Wilson	SR	46	Classic PF	74	196	58	5	25	59	64	56	59	29	14	57	27	33	120
+Ethan	Krueger	SR	1	Five-Star	69	170	88	106	47	56	41	62	32	70	63	67	65	106	120
+Terrance	Chavez	SO	44	Four-Star	78	226	89	77	97	60	80	79	94	95	126	85	73	43	120
+Conner	Lewis	FR	3	Pure Shooter	71	194	26	17	88	20	21	81	64	32	92	60	69	87	120
+Leon	Lucas	SR	52	Below Average	67	170	10	7	10	1	7	8	12	11	15	18	14	-2	120
+Cooper	Lociano	SR	32	Outside Duel Threat	68	159	9	50	34	55	54	19	103	89	42	35	39	16	120
+Julius	Jackson	SR	51	Average	69	167	65	39	15	37	24	62	39	37	20	59	45	44	120
+Sheldon	Chavez	SO	41	Outside Defender	71	188	15	54	52	18	41	27	28	79	33	35	49	59	120
+Edward	McCarthy	JR	7	Classic PG	67	164	31	53	55	59	62	28	44	41	55	39	54	71	121
+Brent	Wilburn	FR	3	Classic PF	79	242	42	41	30	35	42	30	53	36	23	46	52	22	121
+Steve	Enders	JR	42	Three & D	74	205	74	76	62	60	27	27	48	58	57	31	68	58	121
+Kymani	Pacheco	JR	12	Average	75	221	59	83	50	30	55	76	60	80	59	39	16	53	121
+Josh	Crane	SR	14	Classic SF	74	215	39	67	12	73	19	22	36	73	14	49	66	64	121
+Jeremy	Vargas	SR	31	Average	71	189	3	28	28	33	34	23	32	14	36	5	36	11	121
+Brock	Rahim	SR	32	Average	71	191	11	15	14	20	15	25	23	24	12	5	17	11	121
+Rolondo	Warner	JR	52	Average	82	260	16	18	16	22	8	12	25	6	19	27	17	28	121
+Jasiah	Dent	JR	24	Outside Defender	71	189	11	35	68	64	60	58	37	49	67	60	30	64	121
+Samuel	Prom	JR	4	Below Average	84	263	66	51	19	51	43	71	39	41	27	76	17	41	121
+Vince	Choi	SR	44	Inside Defender	78	236	69	41	23	61	23	68	3	12	48	37	30	57	121
+Braeden	Thomas	SR	30	Classic C	77	223	8	27	45	36	27	33	35	60	33	55	34	47	121
+Branson	Gomez	FR	45	Classic PF	74	197	22	19	20	13	76	58	71	16	30	11	41	73	122
+Jeffrey P	Seltzer	JR	53	Inside Defender	77	230	31	62	33	21	24	41	52	63	39	39	48	16	122
+Salvatore	Albotti	SR	9	Pure Shooter	72	195	52	59	32	69	40	19	64	28	59	67	81	51	122
+Ryker	Luna	SR	24	Pure Shooter	72	191	25	46	39	64	38	28	27	93	91	30	39	36	122
+Bradley	Arzu	SR	33	Classic PG	70	188	14	26	6	12	25	15	24	24	13	15	13	14	122
+Lavern	Webb	JR	5	Classic SG	73	201	28	37	25	49	44	47	41	19	40	6	46	41	122
+Chad	Reeves	SR	22	Below Average	68	160	35	41	47	41	20	19	19	22	17	13	6	25	122
+Hezekiah	Lawson	SO	8	Classic SG	69	166	38	106	60	76	96	40	34	59	53	80	69	93	122
+Leonardo	Jones	JR	32	Below Average	67	162	7	13	18	36	22	10	10	34	4	21	15	18	122
+Kael	Austin	JR	10	Classic PG	71	193	65	97	21	64	65	98	113	118	35	111	73	88	122
+London	Vance	SO	3	Pure Shooter	74	214	63	29	58	30	53	18	24	23	43	27	40	47	122
+James	Payne	JR	7	Outside Duel Threat	73	204	46	30	25	30	36	37	3	65	17	51	46	48	122
+Garrett	Squire	JR	30	Driver	76	232	96	57	86	62	53	51	49	73	77	32	32	48	123
+Ethan	Wilson	SR	3	Below Average	70	179	23	24	32	15	13	29	11	17	19	12	14	23	123
+Franco	Keller	JR	45	All-Around Scorer	74	209	55	55	49	68	3	38	23	54	38	4	61	26	123
+Ean	Lozano	SR	18	Classic PG	67	167	39	24	69	23	57	78	56	87	88	47	52	67	123
+Warren	Maldonado	SR	16	Classic SG	68	172	58	65	99	87	59	96	17	22	78	78	87	99	123
+James	Summer	JR	13	Three & D	77	231	26	86	46	92	77	48	86	46	36	105	66	103	123
+Chris	Duffy	JR	55	Average	70	182	27	7	34	8	19	20	17	17	40	15	3	19	123
+Lester	Newton	SR	43	Classic SF	78	236	20	44	49	80	54	56	41	54	77	34	8	24	123
+Jacques	Roberes	FR	21	Average	74	193	33	33	22	15	9	16	19	8	23	25	37	16	123
+Tristian	Gordon	SR	14	Below Average	71	187	57	38	64	69	20	28	70	74	59	41	73	46	123
+Jaelon	Maxie	SO	6	Below Average	71	184	17	33	16	37	33	30	23	15	45	37	19	5	123
+Christian	O'Donnell	SO	7	Driver	75	208	63	66	52	62	20	45	68	76	25	67	22	75	123
+Harlan	Hodge	SR	23	Average	72	195	9	33	17	23	25	24	32	3	22	17	24	27	124
+Nate	Carrillo	FR	16	Average	69	171	52	49	58	36	57	23	39	41	62	12	34	56	124
+Kenny	Sanfilippo	FR	41	Below Average	75	203	78	74	70	64	27	79	24	55	62	59	11	63	124
+Whitney	Chicoine	JR	43	Driver	74	204	66	75	59	36	21	50	16	54	34	62	56	29	124
+Shamar	Torres	SR	31	Driver	73	197	70	93	63	51	74	73	23	81	16	81	63	11	124
+Omari	Cole	SR	22	Classic SG	72	193	70	86	26	83	48	27	25	27	90	20	13	54	124
+Matt	Charles	JR	3	Below Average	69	172	-1	2	4	5	3	10	1	3	11	0	8	8	124
+Harrison	Parsons	JR	32	All-Around Scorer	73	214	91	67	87	54	25	76	65	62	72	25	87	5	124
+Hong	Andrade	SO	54	Classic SG	72	188	39	27	48	29	69	73	53	57	63	28	25	53	124
+Franklin	Pugh	JR	11	Three & D	75	218	58	66	70	61	41	74	13	53	16	54	14	40	124
+Marcus	Chaney	SR	50	Classic C	77	236	49	11	78	43	51	45	72	72	66	38	31	17	124
+Stephen	Mora	JR	55	Intangibles	75	206	70	46	65	42	67	69	41	22	75	42	63	70	124
+Collin	Cervantes	JR	11	Below Average	69	177	14	25	27	32	34	20	21	11	10	26	12	20	125
+Patrick	Smith	SO	25	Driver	76	229	51	35	69	59	64	38	89	76	59	28	51	76	125
+Jermaine	Tanner	FR	55	Average	68	166	59	24	29	43	17	25	42	66	37	36	44	47	125
+Samson	Leverette	SR	1	Below Average	67	168	13	11	4	7	13	5	22	11	5	18	10	11	125
+Cayden	Everett	SR	47	Defensive Wizard	74	201	21	23	67	62	70	49	52	31	34	35	29	52	125
+Kieran	Heath	SR	22	Intangibles	72	198	82	28	17	30	13	90	80	29	40	56	82	62	125
+Wilber	Jones Jr	SR	16	Classic PG	68	174	43	20	39	51	59	33	26	56	76	18	35	70	125
+Nick	Forness	JR	10	Average	68	165	46	17	21	46	38	13	29	39	21	22	27	8	125
+Daniel	Wilkinson	JR	6	Classic PG	66	153	33	52	12	19	12	52	15	46	12	36	22	16	125
+Walter	Frizell	SR	44	Inside Defender	75	206	25	14	17	28	6	20	36	27	25	10	11	19	125
+Jerrell	Sellers	JR	52	Outside C	78	226	71	54	40	22	39	39	43	15	57	31	28	57	125
+Jerold	Price	JR	13	Below Average	72	199	29	82	57	55	58	51	17	55	56	46	50	27	125
+Chad	Austin	SR	20	Classic SF	76	212	79	31	43	73	52	27	34	38	60	53	60	70	126
+Ron	Shepherd	SR	21	Classic PG	71	181	54	83	56	76	90	107	46	55	76	47	57	76	126
+Oliver	Stansberry	JR	4	Outside Defender	71	192	18	13	43	21	13	13	26	17	20	17	31	49	126
+Gerald	Pham	SO	7	Below Average	70	161	20	20	14	20	21	19	4	20	8	9	25	14	126
+Lucas	Fry	SO	11	Outside Duel Threat	69	160	79	32	102	51	96	60	85	54	38	61	88	61	126
+James	Avery	SR	19	Below Average	72	194	7	10	16	10	13	19	-1	10	9	0	15	10	126
+Damien	Yield	JR	12	Below Average	70	170	2	8	7	26	15	19	14	14	12	21	15	21	126
+Golden	Mines	SR	17	Classic PF	77	231	49	30	23	47	15	52	28	43	49	57	27	12	126
+Marco	Conner	SR	10	Average	70	173	24	55	43	37	31	57	40	35	57	50	16	16	126
+Randy	Lant	FR	6	Below Average	70	174	4	4	9	15	16	13	12	13	9	7	13	20	126
+Fischer	McBrayer	SR	23	Below Average	69	171	12	17	4	2	21	7	10	7	21	22	20	9	126
+Roger	Robinson	FR	14	Below Average	70	179	17	19	11	16	10	8	18	-1	3	19	15	11	126
+London	Palacios	SR	53	Inside Defender	77	217	77	26	58	35	83	30	35	70	58	12	27	44	127
+Denzel	Hynek	SO	5	Below Average	71	184	22	24	22	27	34	17	43	38	15	35	35	20	127
+Arman	Rios	SO	25	Average	69	172	13	53	41	34	52	53	96	69	57	44	77	31	127
+Ryland	Herrera	FR	51	Outside C	78	234	74	89	34	24	33	56	44	62	97	16	100	47	127
+Tony	Middleton	FR	91	Four-Star	82	247	86	20	60	119	36	100	67	98	107	73	82	69	127
+Alan	Ford	JR	40	Classic SF	79	242	66	31	64	33	45	37	55	37	73	37	54	16	127
+Wilmer	Dagley	SR	9	Intangibles	74	201	68	65	108	38	43	97	39	105	102	59	103	84	127
+Jim	Albington	FR	6	Driver	76	225	34	84	64	81	62	59	71	57	65	15	82	22	127
+Larry	Osborne	JR	11	Below Average	67	158	75	46	17	15	32	46	9	30	26	35	74	57	127
+Kelvin	Prince	SO	3	Inside Defender	79	238	15	20	52	26	70	60	43	34	42	29	70	36	127
+Woodrow	Holmes	SR	45	Four-Star	82	264	100	31	79	73	107	54	89	91	109	111	86	90	127
+Isaiah	McKnight	SO	21	Defensive Wizard	76	230	24	69	55	92	90	37	7	63	56	87	90	34	127
+Donny	Bingaman	SO	23	Pure Shooter	73	205	98	92	15	74	39	29	55	49	98	44	21	62	128
+Cole	Haas	SR	50	Classic C	76	223	48	57	80	29	14	31	38	40	58	28	76	77	128
+Michael	Walker	SR	6	Below Average	70	168	31	33	31	28	3	18	17	16	22	10	15	15	128
+Gage	West	SO	1	Five-Star	79	234	138	132	129	80	115	124	116	113	86	104	65	102	128
+Jimbo	Little	FR	10	Four-Star	76	223	44	30	68	73	61	6	58	45	80	39	89	58	128
+Gilbert	Mixx	SR	51	Below Average	70	179	43	73	38	71	19	65	12	11	10	30	32	35	128
+Edison	Pierce	SR	55	Classic C	77	219	54	83	69	16	81	64	11	14	74	61	14	27	128
+Rex	Mooney	SR	33	Classic PG	72	196	41	94	95	62	104	64	58	79	26	8	47	35	128
+Erasmo	Trinidad	SR	43	Classic SG	71	182	11	74	70	70	15	28	59	47	38	37	45	37	128
+Miles	Ryba	JR	4	Classic SF	78	244	71	28	72	62	59	85	88	43	18	55	17	69	128
+Eric	Frizell	JR	17	Average	71	184	10	12	15	11	15	22	33	30	24	18	18	32	128
+John	Baldwin	SR	25	Average	72	196	26	26	43	13	41	25	12	28	29	53	44	19	128

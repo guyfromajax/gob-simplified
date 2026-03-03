@@ -551,14 +551,15 @@ try:
                 if doc and team_id:
                     teams_obj = doc.get("teams", {})
                     team_obj = teams_obj.get(team_id, {})
-                    # Extract team_attributes from team_obj
+                    # Game doc stores attributes under team_obj["attributes"] (from summarize_game_state)
+                    source = team_obj.get("attributes", team_obj)
                     attrs = {}
                     for key in ["shot_threshold", "discipline", "fight",
                                "rebound_modifier", "momentum_score", "offensive_efficiency",
                                "team_chemistry", "defensive_efficiency", "fb_efficiency",
                                "pt_efficiency", "fb_opp_modifier", "pt_opp_modifier"]:
-                        if key in team_obj:
-                            attrs[key] = team_obj[key]
+                        if key in source:
+                            attrs[key] = source[key]
             except Exception as e:
                 print(f"⚠️ Error loading team_attributes from game doc: {e}")
         

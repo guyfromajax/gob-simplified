@@ -1,0 +1,129 @@
+id	school	mascot	team_id	primary_color	secondary_color	conference	region	prestige
+1	Bentley-Truman	Sterling Knights	BENTLEY_TRUMAN	#4066b2	#ffffff	1	1	630
+2	Ocean City	Admirals	OCEAN_CITY	#2a2168	#f2d045	1	1	536
+3	Lancaster	Johnnies	LANCASTER	#d24a1b	#000000	1	1	537
+4	Four Corners	Harvest	FOUR_CORNERS	#c0976a	#3b3b3b	1	1	504
+5	Morristown	Pirates	MORRISTOWN	#ec1d28	#cccccc	1	1	516
+6	Xavien	Elm Trees	XAVIEN	#016837	#ffffff	1	1	413
+7	Little York	Minutemen	LITTLE_YORK	#65308e	#f2d045	1	1	525
+8	South Lancaster	Bulldogs	SOUTH_LANCASTER	#7c2b24	#f1c40f	1	1	465
+9	Crickstown	Caribou	CRICKSTOWN	#6a1f2b	#f3e6d0	2	1	490
+10	Cagers World	Mustangs	CAGERS_WORLD	#5a3a1b	#c5c5c5	2	1	444
+11	Nickel Beach	Sea Turtles	NICKEL_BEACH	#008b8f	#2a2a2a	2	1	567
+12	Chapel Hill	Sky	CHAPEL_HILL	#87b5e6	#1e2f5b	2	1	659
+13	Appalachia	Rams	APPALACHIA	#0f3d2e	#c5a642	2	1	486
+14	Casino Row	Blackjacks	CASINO_ROW	#111111	#d4af37	2	1	526
+15	IDA	Academy	IDA	#f2f2f2	#1f4fb2	2	1	574
+16	Durham	Generals	DURHAM	#1c2a44	#c8a951	2	1	626
+17	Montpeiler	Maples	MONTPEILER	#264653	#e76f51	3	2	465
+18	Queen's Guard	Sentinels	QUEEN_S_GUARD	#111111	#d4af37	3	2	524
+19	Independence	Spartans	INDEPENDENCE	#3b3b3b	#c0976a	3	2	442
+20	Concord	Rams	CONCORD	#ec1d28	#cccccc	3	2	469
+21	Garden Elites	Legion	GARDEN_ELITES	#0b1f3a	#a9c6e8	3	2	532
+22	D1 Institute	Orioles	D1_INSTITUTE	#008b8f	#2a2a2a	3	2	558
+23	Providence	Chill	PROVIDENCE	#2a2168	#f2d045	3	2	510
+24	Ivy Prep	Regents	IVY_PREP	#ff6f61	#1c1c1e	3	2	460
+25	Amariabi International	Collective	AMARIABI_INTERNATIONAL	#65308e	#f2d045	4	2	549
+26	Falls Academy	Sailors	FALLS_ACADEMY	#8d99ae	#2b2d42	4	2	503
+27	Upstate	Wolverines	UPSTATE	#006847	#c0c0c0	4	2	409
+28	St Peters	Titans	ST_PETERS	#3d348b	#f7b801	4	2	598
+29	Empire City	Hawks	EMPIRE_CITY	#7c2b24	#f1c40f	4	2	555
+30	Syracuse	Tigers	SYRACUSE	#2e3a46	#4fd1c5	4	2	542
+31	Toronto Limited	Lions	TORONTO_LIMITED	#3b3b3b	#c0976a	4	2	524
+32	Long Island Methodist	Comets	LONG_ISLAND_METHODIST	#005f73	#e9d8a6	4	2	474
+33	Harding Central	Spartans	HARDING_CENTRAL	#111111	#d4af37	5	3	464
+34	Upper Peninsula	Huskies	UPPER_PENINSULA	#6a1f2b	#f3e6d0	5	3	478
+35	Mynsk	Cougars	MYNSK	#0b1f3a	#a9c6e8	5	3	332
+36	Ann Arbor	Coyotes	ANN_ARBOR	#4066b2	#ffffff	5	3	528
+37	Hardwood Fields	Rams	HARDWOOD_FIELDS	#1c2a44	#c8a951	5	3	497
+38	Columbus	Beavers	COLUMBUS	#264653	#e76f51	5	3	384
+39	North Columbus	Falcons	NORTH_COLUMBUS	#008b8f	#2a2a2a	5	3	462
+40	Cleveland-Carlysle	Bobcats	CLEVELAND_CARLYSLE	#0f3d2e	#c5a642	5	3	468
+41	Burroughs	Bears	BURROUGHS	#3d348b	#f7b801	6	3	542
+42	Wacker West	Hitmen	WACKER_WEST	#9b1b30	#f2f2f2	6	3	541
+43	Archbishop McClellan	Hawks	ARCHBISHOP_MCCLELLAN	#ff6f61	#1c1c1e	6	3	560
+44	Sacred Heart	Leopards	SACRED_HEART	#2e3a46	#4fd1c5	6	3	471
+45	Templeton-Wesley	Wolverines	TEMPLETON_WESLEY	#7c2b24	#f1c40f	6	3	529
+46	Dillinger	Wolves	DILLINGER	#0b1f3a	#a9c6e8	6	3	463
+47	Quigley Catholic	Knights	QUIGLEY_CATHOLIC	#2a2168	#f2d045	6	3	508
+48	Evanston	Wildcats	EVANSTON	#6d6e71	#ffffff	6	3	552
+49	Crimson County	Cowboys	CRIMSON_COUNTY	#1c2a44	#c8a951	7	4	654
+50	Myrtle Private	Carriers	MYRTLE_PRIVATE	#111111	#d4af37	7	4	582
+51	Washington Carver	Cougars	WASHINGTON_CARVER	#7c2b24	#f1c40f	7	4	463
+52	Knoxville	Ninjas	KNOXVILLE	#6a1f2b	#f3e6d0	7	4	618
+53	Biloxi	Diesel	BILOXI	#f4c300	#111111	7	4	508
+54	Mobile	Red Wave	MOBILE	#9b1b30	#f2f2f2	7	4	575
+55	Monroe-Hayes	Hawks	MONROE_HAYES	#264653	#e76f51	7	4	570
+56	Lexington	Thunder	LEXINGTON	#8d99ae	#2b2d42	7	4	632
+57	Keys High	Dolphins	KEYS_HIGH	#1f4fb2	#f2f2f2	8	4	539
+58	Gainesville	Swamp Creatures	GAINESVILLE	#8d99ae	#2b2d42	8	4	581
+59	Valdosta Valley	Falcons	VALDOSTA_VALLEY	#7c2b24	#f1c40f	8	4	517
+60	DeLand	Lions	DELAND	#2e3a46	#4fd1c5	8	4	537
+61	Grayson Ranch	Warriors	GRAYSON_RANCH	#2a2168	#f2d045	8	4	440
+62	Reardon-Mayes	Golden Eagles	REARDON_MAYES	#f4c300	#111111	8	4	637
+63	Dade Academy	Captains	DADE_ACADEMY	#6d6e71	#ffffff	8	4	576
+64	Tallahassee	Ratsnakes	TALLAHASSEE	#006847	#c0c0c0	8	4	550
+65	Hyde Methodist	Raiders	HYDE_METHODIST	#f4c300	#111111	9	5	452
+66	Wash U Prep	Knights	WASH_U_PREP	#2a2168	#f2d045	9	5	565
+67	Lawrence	Eagles	LAWRENCE	#6a1f2b	#f3e6d0	9	5	648
+68	Ozark Centre	Devils	OZARK_CENTRE	#6d6e71	#ffffff	9	5	463
+69	Fielding	Force	FIELDING	#006847	#c0c0c0	9	5	501
+70	Iowa Academy	Capitals	IOWA_ACADEMY	#1f4fb2	#f2f2f2	9	5	622
+71	Grupenberg	Generals	GRUPENBERG	#4066b2	#ffffff	9	5	435
+72	Tri-Cities Prep	Sorcerers	TRI_CITIES_PREP	#7c2b24	#f1c40f	9	5	530
+73	HA Rushmore	Saloon	HA_RUSHMORE	#2a2168	#f2d045	10	5	543
+74	Rodeo Circuit	Clowns	RODEO_CIRCUIT	#d24a1b	#000000	10	5	453
+75	Mt Simmons	Cobras	MT_SIMMONS	#1c2a44	#c8a951	10	5	528
+76	Lewis Catholic	Saints	LEWIS_CATHOLIC	#0f3d2e	#c5a642	10	5	476
+77	Crofton	Cardinals	CROFTON	#6d6e71	#ffffff	10	5	617
+78	Minot	Engineers	MINOT	#ec1d28	#cccccc	10	5	421
+79	Tower Academy	Royals	TOWER_ACADEMY	#1f4fb2	#f2f2f2	10	5	536
+80	Two Rivers	Pointers	TWO_RIVERS	#4066b2	#ffffff	10	5	459
+81	Norman	Tornados	NORMAN	#005f73	#e9d8a6	11	6	585
+82	River's Edge	Catfish	RIVER_S_EDGE	#1c2a44	#c8a951	11	6	583
+83	Amarillo Tech	Armadillos	AMARILLO_TECH	#6a1f2b	#f3e6d0	11	6	545
+84	Pan Handle Limited	Steeds	PAN_HANDLE_LIMITED	#3b3b3b	#c0976a	11	6	471
+85	Ada	Falcons	ADA	#264653	#e76f51	11	6	508
+86	Kenton	Eagles	KENTON	#3d348b	#f7b801	11	6	522
+87	Reyes-Santiago	Cacti	REYES_SANTIAGO	#4066b2	#ffffff	11	6	464
+88	Stormwood	Tigers	STORMWOOD	#65308e	#f2d045	11	6	511
+89	Houston Jesuit	Cowboys	HOUSTON_JESUIT	#7c2b24	#f1c40f	12	6	677
+90	Austin	Wolves	AUSTIN	#6d6e71	#ffffff	12	6	535
+91	GP Prep School	Elites	GP_PREP_SCHOOL	#2e3a46	#4fd1c5	12	6	460
+92	MiddleTEX	Bucking Broncos	MIDDLETEX	#264653	#e76f51	12	6	505
+93	Abilene	Scorpions	ABILENE	#0f3d2e	#c5a642	12	6	388
+94	Chambless Global	Raiders	CHAMBLESS_GLOBAL	#65308e	#f2d045	12	6	628
+95	Austin West	Defenders	AUSTIN_WEST	#ff6f61	#1c1c1e	12	6	516
+96	Bayou District	Airboats	BAYOU_DISTRICT	#0b1f3a	#a9c6e8	12	6	582
+97	Pike's Prep	Climbers	PIKE_S_PREP	#006847	#c0c0c0	13	7	545
+98	Desert Regional	Mesas	DESERT_REGIONAL	#f4c300	#111111	13	7	518
+99	East Rockies	Mountain Lions	EAST_ROCKIES	#2a2168	#f2d045	13	7	451
+100	Circus Circus	Ringmasters	CIRCUS_CIRCUS	#ff6f61	#1c1c1e	13	7	496
+101	Tucson	Rattlesnakes	TUCSON	#d24a1b	#000000	13	7	582
+102	Barton Lutheran	Panthers	BARTON_LUTHERAN	#ec1d28	#cccccc	13	7	389
+103	Border Academy	Swordsmen	BORDER_ACADEMY	#264653	#e76f51	13	7	502
+104	Southwest Miner	Cowboys	SOUTHWEST_MINER	#1f4fb2	#f2f2f2	13	7	503
+105	Rainier Central	Patrol	RAINIER_CENTRAL	#9b1b30	#f2f2f2	14	7	560
+106	Salem	Woodchucks	SALEM	#1c2a44	#c8a951	14	7	485
+107	Swoosh	Knights	SWOOSH	#005f73	#e9d8a6	14	7	568
+108	Seattle AAA	Sound	SEATTLE_AAA	#006847	#c0c0c0	14	7	500
+109	Vancouver	Bears	VANCOUVER	#d24a1b	#000000	14	7	495
+110	Cardinal Conor	Monarchs	CARDINAL_CONOR	#3b3b3b	#c0976a	14	7	485
+111	Couer d'Alene	Grizzlies	COUER_D_ALENE	#f4c300	#111111	14	7	525
+112	Boise	Mountaineers	BOISE	#ff6f61	#1c1c1e	14	7	524
+113	Valley High	Orcas	VALLEY_HIGH	#ec1d28	#cccccc	15	8	456
+114	San Jose	Kings	SAN_JOSE	#264653	#e76f51	15	8	546
+115	Rancho Estrada	Miners	RANCHO_ESTRADA	#006847	#c0c0c0	15	8	383
+116	Berkley	Wasps	BERKLEY	#8d99ae	#2b2d42	15	8	519
+117	Hollywood Prep	Cavalry	HOLLYWOOD_PREP	#6d6e71	#ffffff	15	8	556
+118	DeCatur Dei	Pelicans	DECATUR_DEI	#1f4fb2	#f2f2f2	15	8	463
+119	West Ocean City	Mariners	WEST_OCEAN_CITY	#ff6f61	#1c1c1e	15	8	470
+120	Huntington Canyon	Rangers	HUNTINGTON_CANYON	#3d348b	#f7b801	15	8	529
+121	Mahala Alou	Sharks	MAHALA_ALOU	#ec1d28	#cccccc	16	8	464
+122	Pacific All-Stars	Squad	PACIFIC_ALL_STARS	#ff6f61	#1c1c1e	16	8	485
+123	Juneau-Nome	Fishermen	JUNEAU_NOME	#2a2168	#f2d045	16	8	527
+124	Redwood High	Owls	REDWOOD_HIGH	#d24a1b	#000000	16	8	529
+125	Grizzly Academy	Patriots	GRIZZLY_ACADEMY	#2e3a46	#4fd1c5	16	8	425
+126	Hana Road	Waterfalls	HANA_ROAD	#9b1b30	#f2f2f2	16	8	357
+127	Cupertino	Diamondbacks	CUPERTINO	#0b1f3a	#a9c6e8	16	8	656
+128	Melbourne Americas	Breakers	MELBOURNE_AMERICAS	#005f73	#e9d8a6	16	8	575
