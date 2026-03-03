@@ -1819,6 +1819,8 @@ def command_center_data(
         response["intangibles"] = team_doc.get("intangibles", "-")
         response["prestige"] = team_doc.get("prestige", "-")
         response["rank"] = team_doc.get("rank", "-")
+        response["user_conference"] = team_doc.get("conference")
+        response["user_region"] = team_doc.get("region", "")
         # Rankings list for Rankings tab: all FTD teams with natl_rank and team name, sorted by natl_rank
         if franchise_id and franchise_doc:
             try:
@@ -2316,7 +2318,6 @@ def leaders(
         cat_start = time.time()
         top = get_leaders(franchise_id, scope=scope, stat=cat, limit=limit)
         cat_time = time.time() - cat_start
-        # logger.info(f"⏱️ [PERF] /franchise/leaders get_leaders('{cat}'): {cat_time:.3f}s")
         result[cat] = [
             {
                 "player_id": p.get("player_id"),
@@ -2326,6 +2327,21 @@ def leaders(
             }
             for p in top
         ]
+    all_team_names = set()
+    for cat in categories:
+        for entry in result[cat]:
+            tn = entry.get("team")
+            if tn:
+                all_team_names.add(tn)
+    team_meta = {}
+    if all_team_names:
+        for t in db.teams.find({"name": {"$in": list(all_team_names)}}, {"name": 1, "conference": 1, "region": 1}):
+            team_meta[t.get("name", "")] = {"conference": t.get("conference"), "region": t.get("region", "")}
+    for cat in categories:
+        for entry in result[cat]:
+            meta = team_meta.get(entry.get("team") or "", {})
+            entry["conference"] = meta.get("conference")
+            entry["region"] = meta.get("region", "")
     
     total_time = time.time() - start_time
     # logger.info(f"⏱️ [PERF] /franchise/leaders COMPLETE: {total_time:.3f}s")
@@ -2380,6 +2396,14 @@ def team_stats(franchise_id: str):
     )
     aggregation_time = time.time() - aggregation_start
     # logger.info(f"⏱️ [PERF] /franchise/team-stats Aggregation: {aggregation_time:.3f}s")
+    team_ids_for_meta = [ObjectId(t["team_id"]) for t in output if t.get("team_id")]
+    if team_ids_for_meta:
+        team_meta_docs = list(db.teams.find({"_id": {"$in": team_ids_for_meta}}, {"_id": 1, "conference": 1, "region": 1}))
+        id_to_meta = {str(d["_id"]): {"conference": d.get("conference"), "region": d.get("region", "")} for d in team_meta_docs}
+        for t in output:
+            meta = id_to_meta.get(t.get("team_id", ""), {})
+            t["conference"] = meta.get("conference")
+            t["region"] = meta.get("region", "")
     
     total_time = time.time() - start_time
     # logger.info(f"⏱️ [PERF] /franchise/team-stats COMPLETE: {total_time:.3f}s")
@@ -2420,13 +2444,15 @@ def team_traits(franchise_id: str):
     
     for team_id_str in team_list.keys():
         try:
-            team_doc = db.teams.find_one({"_id": ObjectId(team_id_str)}, {"name": 1, "primary_color": 1})
+            team_doc = db.teams.find_one({"_id": ObjectId(team_id_str)}, {"name": 1, "primary_color": 1, "conference": 1, "region": 1})
             if team_doc:
                 team_name = team_doc.get("name", team_id_str)
                 team_names[team_id_str] = team_name
                 team_totals[team_id_str] = {
                     "team_name": team_name,
                     "primary_color": team_doc.get("primary_color", "#000000"),
+                    "conference": team_doc.get("conference"),
+                    "region": team_doc.get("region", ""),
                     "attributes": {attr: 0 for attr in attributes}
                 }
         except Exception:
@@ -2487,6 +2513,8 @@ def team_traits(franchise_id: str):
             "team_id": team_id,
             "team_name": data["team_name"],
             "primary_color": data["primary_color"],
+            "conference": data.get("conference"),
+            "region": data.get("region", ""),
             "attributes": data["attributes"]
         })
     

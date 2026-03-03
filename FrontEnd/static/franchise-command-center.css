@@ -298,3 +298,32 @@
   overflow-x: auto;
   margin-bottom: 8px;
 }
+
+/* Stats and Team Traits scope toggles (Conference / Region / National) */
+.stats-scope-toggle-wrap,
+.traits-scope-toggle-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.stats-scope-btn,
+.traits-scope-btn {
+  padding: 8px 14px;
+  border-radius: 4px;
+  border: 1px solid #4065af;
+  background: #fff;
+  color: #4065af;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+}
+.stats-scope-btn:hover,
+.traits-scope-btn:hover {
+  background: #f0f7ff;
+}
+.stats-scope-btn.active,
+.traits-scope-btn.active {
+  background: #4065af;
+  color: #fff;
+}

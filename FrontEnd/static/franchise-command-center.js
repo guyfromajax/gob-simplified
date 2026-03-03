@@ -20,7 +20,14 @@ const userTeamName = localStorage.getItem('franchise_user_team') || '';
 // ✅ SS&S: Store team ObjectId for consistent navigation
 let userTeamId = null; // Will be resolved from command center data or URL params
 let userTeamNameForLeaders = null; // Store user team name for leaderboard highlighting
+let userConference = null; // User team's conference (for Stats/Traits scope)
+let userRegion = null;    // User team's region (for Stats/Traits scope)
 let teamColorCache = null; // Cache for team primary colors
+let leadersDataCache = null;
+let teamStatsDataCache = null;
+let teamTraitsDataCache = null;
+let statsScope = 'conference';   // 'conference' | 'region' | 'national'
+let traitsScope = 'conference';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
 
 function buildPlayerDetailUrl(playerId) {
@@ -175,6 +182,28 @@ function bindStandingsRegionButtons() {
   });
 }
 
+function bindStatsAndTraitsScopeButtons() {
+  document.querySelectorAll('.stats-scope-btn').forEach(btn => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+      statsScope = btn.getAttribute('data-scope') || 'conference';
+      document.querySelectorAll('.stats-scope-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-scope') === statsScope));
+      if (leadersDataCache) renderLeaders(leadersDataCache, statsScope);
+      if (teamStatsDataCache) renderTeamStats(teamStatsDataCache, statsScope);
+    });
+  });
+  document.querySelectorAll('.traits-scope-btn').forEach(btn => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+      traitsScope = btn.getAttribute('data-scope') || 'conference';
+      document.querySelectorAll('.traits-scope-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-scope') === traitsScope));
+      if (teamTraitsDataCache) renderTeamTraits(teamTraitsDataCache, traitsScope);
+    });
+  });
+}
+
 let rankingsFullList = [];
 
 function renderRankings(rankings, showAll) {
@@ -221,8 +250,28 @@ function getTeamPrimaryColor(teamName) {
   return teamColorCache[teamName] || null;
 }
 
-function renderLeaders(data) {
+function filterLeadersByScope(data, scope) {
+  if (!data || scope === 'national') return data;
+  const out = {};
+  const confMatch = scope === 'conference' && userConference != null;
+  const regionMatch = scope === 'region' && userRegion != null;
+  const regionNorm = (v) => (v || '').toString().toUpperCase();
+  const userRegionNorm = regionNorm(userRegion);
+  Object.keys(data).forEach(cat => {
+    const list = data[cat] || [];
+    out[cat] = list.filter((p) => {
+      if (confMatch) return p.conference === userConference;
+      if (regionMatch) return regionNorm(p.region) === userRegionNorm;
+      return true;
+    });
+  });
+  return out;
+}
+
+function renderLeaders(data, scope) {
   if (!data) return;
+  scope = scope || statsScope;
+  const filtered = filterLeadersByScope(data, scope);
   const container = document.getElementById('leaders-container');
   container.innerHTML = '';
   const preferredOrderGroups = [
@@ -234,11 +283,11 @@ function renderLeaders(data) {
     ['STL']
   ];
   const ordered = preferredOrderGroups
-    .map(group => group.find(cat => Object.prototype.hasOwnProperty.call(data, cat)))
+    .map(group => group.find(cat => Object.prototype.hasOwnProperty.call(filtered, cat)))
     .filter(Boolean);
   const categories = [
     ...ordered,
-    ...Object.keys(data).filter(cat => !ordered.includes(cat))
+    ...Object.keys(filtered).filter(cat => !ordered.includes(cat))
   ];
   const primaryColor = getTeamPrimaryColor(userTeamNameForLeaders);
   
@@ -275,7 +324,7 @@ function renderLeaders(data) {
     const valueHeader = valueHeaderMap[cat] || 'Value';
     table.innerHTML = `<thead><tr><th>Rank</th><th>Player</th><th>Team</th><th>${valueHeader}</th></tr></thead>`;
     const body = document.createElement('tbody');
-    (data[cat] || []).forEach((p, idx) => {
+    (filtered[cat] || []).forEach((p, idx) => {
       const tr = document.createElement('tr');
       const isUserTeam = userTeamNameForLeaders && p.team === userTeamNameForLeaders;
       
@@ -313,9 +362,25 @@ function renderLeaders(data) {
 // Store teams data for sorting
 let teamsDataForSorting = [];
 
-function renderTeamStats(data) {
+function filterTeamsByScope(teams, scope) {
+  if (!teams || scope === 'national') return teams || [];
+  const confMatch = scope === 'conference' && userConference != null;
+  const regionMatch = scope === 'region' && userRegion != null;
+  const regionNorm = (v) => (v || '').toString().toUpperCase();
+  const userRegionNorm = regionNorm(userRegion);
+  return teams.filter((t) => {
+    if (confMatch) return t.conference === userConference;
+    if (regionMatch) return regionNorm(t.region) === userRegionNorm;
+    return true;
+  });
+}
+
+function renderTeamStats(data, scope) {
   if (!data) return;
-  teamsDataForSorting = JSON.parse(JSON.stringify(data.teams || [])); // Deep copy for sorting
+  scope = scope || statsScope;
+  const allTeams = data.teams || [];
+  const filtered = filterTeamsByScope(JSON.parse(JSON.stringify(allTeams)), scope);
+  teamsDataForSorting = filtered;
   TeamStatsTable.renderTeamStatsTable(teamsDataForSorting);
   
   // Add click handlers to sortable headers (only once)
@@ -815,10 +880,11 @@ let teamTraitsDataForSorting = [];
 let teamTraitsSortColumn = 'total';
 let teamTraitsSortDirection = 'desc';
 
-function renderTeamTraits(data) {
+function renderTeamTraits(data, scope) {
   if (!data || !data.teams) return;
-  
-  teamTraitsDataForSorting = data.teams;
+  scope = scope || traitsScope;
+  const filtered = filterTeamsByScope(JSON.parse(JSON.stringify(data.teams)), scope);
+  teamTraitsDataForSorting = filtered;
   
   // Calculate totals for each team and add to data
   teamTraitsDataForSorting.forEach(team => {
@@ -861,7 +927,7 @@ function renderTeamTraits(data) {
   });
   
   // Render Top 10 list (excluding FT)
-  renderTeamTraitsTop10(data.teams);
+  renderTeamTraitsTop10(teamTraitsDataForSorting);
 }
 
 function sortTeamTraitsTable(columnName, direction) {
@@ -1082,9 +1148,13 @@ async function init() {
     });
   }
   
-  // Store user team name for leaderboard highlighting
+  // Store user team name and scope keys for leaderboard / Stats / Traits
   if (topData && topData.team) {
     userTeamNameForLeaders = topData.team;
+  }
+  if (topData) {
+    userConference = topData.user_conference != null ? topData.user_conference : null;
+    userRegion = topData.user_region != null && topData.user_region !== '' ? topData.user_region : null;
   }
   
   // Initialize team color cache for leaderboard highlighting
@@ -1131,7 +1201,8 @@ async function init() {
     const leadersData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/leaders')}?franchise_id=${franchiseId}`);
     const leadersEndTime = performance.now();
     console.log(`⏱️ [PERF] /franchise/leaders: ${(leadersEndTime - leadersStartTime).toFixed(2)}ms`);
-    renderLeaders(leadersData);
+    leadersDataCache = leadersData;
+    renderLeaders(leadersData, statsScope);
     
     // ============================================================================
     // 🛠️ DEV MODE: Simulate Entire Regular Season Popup (Temporary Development Feature)
@@ -1153,7 +1224,8 @@ async function init() {
     const teamStatsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/team-stats')}?franchise_id=${franchiseId}`);
     const teamStatsEndTime = performance.now();
     console.log(`⏱️ [PERF] /franchise/team-stats: ${(teamStatsEndTime - teamStatsStartTime).toFixed(2)}ms`);
-    renderTeamStats(teamStatsData);
+    teamStatsDataCache = teamStatsData;
+    renderTeamStats(teamStatsData, statsScope);
     
     const recruitsStartTime = performance.now();
     const recruitsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/recruits')}?franchise_id=${franchiseId}`);
@@ -1165,7 +1237,9 @@ async function init() {
     const teamTraitsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/team-traits')}?franchise_id=${franchiseId}`);
     const teamTraitsEndTime = performance.now();
     console.log(`⏱️ [PERF] /franchise/team-traits: ${(teamTraitsEndTime - teamTraitsStartTime).toFixed(2)}ms`);
-    renderTeamTraits(teamTraitsData);
+    teamTraitsDataCache = teamTraitsData;
+    renderTeamTraits(teamTraitsData, traitsScope);
+    bindStatsAndTraitsScopeButtons();
     // ✅ Removed: renderTrainingResults - Training Reports are now linked directly on Schedule page
     
     // Initialize tooltips for table headers
