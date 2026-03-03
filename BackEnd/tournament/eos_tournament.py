@@ -96,7 +96,7 @@ def initialize_eos_tournament(
     team_ids: Optional[List[Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Initialize EOS Tournament after week 14 completion.
+    Initialize EOS Tournament after regular season (week 26) completion.
 
     Args:
         franchise_doc: Franchise document

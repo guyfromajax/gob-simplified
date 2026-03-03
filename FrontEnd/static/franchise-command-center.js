@@ -26,6 +26,8 @@ let teamColorCache = null; // Cache for team primary colors
 let leadersDataCache = null;
 let teamStatsDataCache = null;
 let teamTraitsDataCache = null;
+let scheduleDataCache = null;       // { schedule, team_id, team_conferences }
+let selectedScheduleConference = 1;  // 1–16; set from userConference on load
 let statsScope = 'conference';   // 'conference' | 'region' | 'national'
 let traitsScope = 'conference';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
@@ -751,14 +753,59 @@ function sortRosterTable(columnName, direction) {
   }
 }
 
-function renderSchedule(data) {
+/** Conference 1–16 -> label e.g. "Conf A1", "Conf A2", "Conf B3", … "Conf H16" */
+function getScheduleConferenceLabel(c) {
+  if (c == null || c < 1 || c > 16) return `Conf ${c}`;
+  const regionLetter = String.fromCharCode(65 + Math.floor((c - 1) / 2));
+  return `Conf ${regionLetter}${c}`;
+}
+
+function renderScheduleConferenceToggles() {
+  const wrap = document.getElementById('schedule-conference-toggle-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const row1 = document.createElement('div');
+  row1.className = 'schedule-conference-row';
+  const row2 = document.createElement('div');
+  row2.className = 'schedule-conference-row';
+  for (let c = 1; c <= 16; c++) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'schedule-conference-btn';
+    if (c === selectedScheduleConference) btn.classList.add('active');
+    btn.dataset.conference = String(c);
+    btn.textContent = getScheduleConferenceLabel(c);
+    (c <= 8 ? row1 : row2).appendChild(btn);
+  }
+  wrap.appendChild(row1);
+  wrap.appendChild(row2);
+  wrap.querySelectorAll('.schedule-conference-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      selectedScheduleConference = parseInt(btn.dataset.conference, 10);
+      wrap.querySelectorAll('.schedule-conference-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (scheduleDataCache) renderSchedule(scheduleDataCache, selectedScheduleConference);
+    });
+  });
+}
+
+function renderSchedule(data, conferenceFilter) {
   if (!data) return;
-  // Schedule container is now in the schedule-tab, not standings-tab
   const container = document.getElementById('schedule-container');
   if (!container) return;
   container.innerHTML = '';
   const teamId = data.team_id;
-  (data.schedule || []).forEach((weekGames, idx) => {
+  const teamConferences = data.team_conferences || {};
+  let schedule = data.schedule || [];
+  if (conferenceFilter != null && conferenceFilter >= 1 && conferenceFilter <= 16 && Object.keys(teamConferences).length) {
+    schedule = schedule.map((weekGames) =>
+      (weekGames || []).filter(
+        (g) =>
+          teamConferences[g.away_team_id] === conferenceFilter || teamConferences[g.home_team_id] === conferenceFilter
+      )
+    );
+  }
+  schedule.forEach((weekGames, idx) => {
     if (!weekGames || weekGames.length === 0) return; // Skip empty weeks
     
     const weekDiv = document.createElement('div');
@@ -1195,7 +1242,10 @@ async function init() {
     const scheduleData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/schedule')}?franchise_id=${franchiseId}`);
     const scheduleEndTime = performance.now();
     console.log(`⏱️ [PERF] /franchise/schedule: ${(scheduleEndTime - scheduleStartTime).toFixed(2)}ms`);
-    renderSchedule(scheduleData);
+    scheduleDataCache = scheduleData;
+    selectedScheduleConference = (userConference != null && userConference >= 1 && userConference <= 16) ? userConference : 1;
+    renderScheduleConferenceToggles();
+    renderSchedule(scheduleDataCache, selectedScheduleConference);
     
     const leadersStartTime = performance.now();
     const leadersData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/leaders')}?franchise_id=${franchiseId}`);

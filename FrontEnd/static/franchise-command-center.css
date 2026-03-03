@@ -327,3 +327,34 @@
   background: #4065af;
   color: #fff;
 }
+
+/* Schedule tab: 16 conference toggles (2 rows of 8) */
+.schedule-conference-toggle-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.schedule-conference-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.schedule-conference-btn {
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #4065af;
+  background: #fff;
+  color: #4065af;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 13px;
+}
+.schedule-conference-btn:hover {
+  background: #f0f7ff;
+}
+.schedule-conference-btn.active {
+  background: #4065af;
+  color: #fff;
+}

@@ -99,9 +99,8 @@ class FranchiseManager:
         self.db = db
         self.teams = self.load_teams()
         self.week = 1
-        # Schedule uses Conference 1 only (8 teams) for round-robin; full team list still used for FTD etc.
-        conference_1_teams = [t for t in self.teams if t.get("conference") == 1]
-        self.schedule_manager = ScheduleManager(conference_1_teams)
+        # Phase 1: 26-week schedule for all 128 teams (conference → region → OOR).
+        self.schedule_manager = ScheduleManager(self.teams)
         self.recruit_manager = RecruitManager(self.db)
         self.schedule = []
         self.franchise_id = None
@@ -136,7 +135,7 @@ class FranchiseManager:
         if start_week_env:
             try:
                 w = int(start_week_env)
-                if 1 <= w <= 14:
+                if 1 <= w <= ScheduleManager.REGULAR_SEASON_WEEKS:
                     self.week = w
                     logger.info("FRANCHISE_START_WEEK=%s: starting franchise at week %s (testing)", start_week_env, self.week)
             except ValueError:
@@ -429,7 +428,7 @@ class FranchiseManager:
             )
 
     def run_week(self):
-        if self.week > 14:
+        if self.week > ScheduleManager.REGULAR_SEASON_WEEKS:
             return "Regular season complete"
         games = self.schedule[self.week - 1]
         for team1_id, team2_id in games:
@@ -549,38 +548,132 @@ class FranchiseManager:
     # /franchise/stats → aggregate from self.db.players (stats.season)
     # /franchise/recruits → use self.db.recruits.find()
 
+def _double_round_robin_8(team_ids):
+    """Generate 14 rounds of 4 games (away_id, home_id) for 8 teams. Double round-robin, 1H/1A per pair."""
+    if len(team_ids) != 8:
+        raise ValueError("_double_round_robin_8 expects exactly 8 team IDs.")
+    teams = list(team_ids)
+    random.shuffle(teams)
+    schedule = []
+    for round_index in range(7):
+        week = []
+        for i in range(4):
+            home = teams[i]
+            away = teams[-i - 1]
+            if round_index % 2 == 0:
+                week.append((away, home))
+            else:
+                week.append((home, away))
+        schedule.append(week)
+        teams = [teams[0]] + [teams[-1]] + teams[1:-1]
+    mirrored = [(home, away) for week in schedule for (away, home) in week]
+    schedule += [mirrored[i : i + 4] for i in range(0, len(mirrored), 4)]
+    return schedule
+
+
 class ScheduleManager:
+    """
+    Phase 1 franchise schedule: 26 weeks for 128 teams.
+    Weeks 1–14: conference (14 games per team, 64 games/week).
+    Weeks 15–22: region (8 games per team, 64 games/week).
+    Weeks 23–26: out-of-region (4 games per team, 64 games/week).
+    """
+
+    REGULAR_SEASON_WEEKS = 26
+    CONFERENCE_WEEKS = 14
+    REGION_WEEKS = 8
+    OOR_WEEKS = 4
+
     def __init__(self, teams):
-        self.teams = [team["_id"] for team in teams]
+        """
+        Args:
+            teams: List of team docs with _id, conference (1–16), region ("A"–"H").
+        """
+        self.teams = teams
+        self._by_conference = None
+        self._by_region = None
+
+    def _index_teams(self):
+        if self._by_conference is not None:
+            return
+        by_conf = {}
+        by_region = {}
+        for t in self.teams:
+            c = t.get("conference")
+            r = t.get("region")
+            if c is not None:
+                by_conf.setdefault(c, []).append(t["_id"])
+            if r is not None:
+                by_region.setdefault(r, []).append(t["_id"])
+        self._by_conference = by_conf
+        self._by_region = by_region
 
     def generate_schedule(self):
-        if len(self.teams) != 8:
-            raise ValueError("This round-robin generator expects exactly 8 teams.")
-
-        teams = list(self.teams)
-        random.shuffle(teams)  # Randomize starting order
-
-        schedule = []
-
-        for round_index in range(len(teams) - 1):
+        """Return 26 weeks, each a list of (away_id, home_id). 64 games per week."""
+        self._index_teams()
+        if len(self.teams) != 128:
+            raise ValueError(
+                "Franchise schedule expects exactly 128 teams, got %d." % len(self.teams)
+            )
+        out = []
+        # Weeks 1–14: conference block
+        conf_rounds = []
+        for c in range(1, 17):
+            ids = self._by_conference.get(c, [])
+            if len(ids) != 8:
+                raise ValueError(
+                    "Conference %d has %d teams, expected 8." % (c, len(ids))
+                )
+            conf_rounds.append(_double_round_robin_8(ids))
+        for w in range(self.CONFERENCE_WEEKS):
             week = []
-            for i in range(len(teams) // 2):
-                home = teams[i]
-                away = teams[-i - 1]
-                # Alternate home/away each round
-                if round_index % 2 == 0:
-                    week.append((away, home))  # away at home
-                else:
-                    week.append((home, away))  # away at home
-            schedule.append(week)
-            # Rotate the teams (keep the first fixed)
-            teams = [teams[0]] + [teams[-1]] + teams[1:-1]
+            for conf_sched in conf_rounds:
+                week.extend(conf_sched[w])
+            out.append(week)
 
-        # Second half of season: reverse home/away of first 7 weeks
-        mirrored_schedule = [(home, away) for week in schedule for (away, home) in week]
-        schedule += [mirrored_schedule[i:i+4] for i in range(0, len(mirrored_schedule), 4)]
+        # Weeks 15–22: region block (sister-conference matchups). 8 weeks, 64 games/week.
+        region_letters = ["A", "B", "C", "D", "E", "F", "G", "H"]
+        region_weeks = []
+        for round_idx in range(8):
+            week = []
+            for r in region_letters:
+                conf1, conf2 = (ord(r) - ord("A")) * 2 + 1, (ord(r) - ord("A")) * 2 + 2
+                c1_ids = self._by_conference.get(conf1, [])
+                c2_ids = self._by_conference.get(conf2, [])
+                for i in range(8):
+                    j = (i + round_idx) % 8
+                    if i in [(round_idx + k) % 8 for k in range(4)]:
+                        week.append((c2_ids[j], c1_ids[i]))
+                    else:
+                        week.append((c1_ids[i], c2_ids[j]))
+            region_weeks.append(week)
+        out = out[: self.CONFERENCE_WEEKS] + region_weeks
 
-        return schedule
+        # Weeks 23–26: out-of-region (4 region-pair slots per week)
+        # Pairings: (A,B),(C,D),(E,F),(G,H); (A,C),(B,D),(E,G),(F,H); (A,D),(B,C),(E,H),(F,G); (A,E),(B,F),(C,G),(D,H)
+        pairings = [
+            [("A", "B"), ("C", "D"), ("E", "F"), ("G", "H")],
+            [("A", "C"), ("B", "D"), ("E", "G"), ("F", "H")],
+            [("A", "D"), ("B", "C"), ("E", "H"), ("F", "G")],
+            [("A", "E"), ("B", "F"), ("C", "G"), ("D", "H")],
+        ]
+        for pairing_list in pairings:
+            week = []
+            for r1, r2 in pairing_list:
+                ids1 = self._by_region.get(r1, [])
+                ids2 = self._by_region.get(r2, [])
+                if len(ids1) != 16 or len(ids2) != 16:
+                    raise ValueError(
+                        "Region %s or %s has wrong size." % (r1, r2)
+                    )
+                # 16 games: 8 with r1 home, 8 with r2 home
+                for i in range(8):
+                    week.append((ids2[i], ids1[i]))
+                for i in range(8, 16):
+                    week.append((ids1[i], ids2[i]))
+            out.append(week)
+
+        return out
 
 class RecruitManager:
     """Manage recruit generation using optional external name data."""

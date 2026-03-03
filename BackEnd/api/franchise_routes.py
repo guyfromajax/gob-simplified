@@ -22,7 +22,7 @@ from BackEnd.db import (
 from BackEnd.utils.shared import summarize_game_state
 from BackEnd.utils import stat_updater
 from BackEnd.utils.team_stats_aggregator import aggregate_team_stats_from_players
-from BackEnd.models.franchise_manager import FranchiseManager
+from BackEnd.models.franchise_manager import FranchiseManager, ScheduleManager
 from BackEnd.tournament.bracket_engine import get_round_name
 from BackEnd.tournament.eos_tournament import (
     advance_tournament_round,
@@ -1058,13 +1058,13 @@ def play_next_game(
     manager.week = franchise_doc.get("week", 1)
     manager.franchise_id = franchise_doc.get("_id")
 
-    # ✅ EOS TOURNAMENT: Check if tournament is active (weeks 15-17)
+    # ✅ EOS TOURNAMENT: Check if tournament is active (weeks 27–29)
     eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
     eos_tournament = franchise_doc.get("eos_tournament", {})
     
     matchup = None
     
-    if eos_tournament_active and eos_tournament and manager.week >= 15:
+    if eos_tournament_active and eos_tournament and manager.week > ScheduleManager.REGULAR_SEASON_WEEKS:
         # ✅ SS&S: Reuse Tournament mode's bracket lookup pattern
         # Get current round and round name
         current_round = eos_tournament.get("current_round", 1)
@@ -1095,7 +1095,7 @@ def play_next_game(
                 "week": manager.week,
             }
     else:
-        # Regular season (weeks 1-14)
+        # Regular season (weeks 1–26)
         if manager.week - 1 < len(manager.schedule):
             for away_id, home_id in manager.schedule[manager.week - 1]:
                 # Compare ObjectIds (schedule uses ObjectIds, user_team_id is now ObjectId)
@@ -1280,7 +1280,7 @@ def complete_week(req: CompleteWeekRequest):
         franchise_doc.get("eos_tournament_active") and franchise_doc.get("eos_tournament")
     )
     eos_current_round = None
-    if req.week in (15, 16, 17) and eos_active:
+    if req.week in (ScheduleManager.REGULAR_SEASON_WEEKS + 1, ScheduleManager.REGULAR_SEASON_WEEKS + 2, ScheduleManager.REGULAR_SEASON_WEEKS + 3) and eos_active:
         eos = franchise_doc.get("eos_tournament", {})
         eos_current_round = eos.get("current_round", 1)
         rn = get_round_name(eos_current_round)
@@ -1605,7 +1605,7 @@ def complete_week(req: CompleteWeekRequest):
     # Reset training status for next week
     next_week = req.week + 1
     
-    # ✅ EOS TOURNAMENT: Initialize tournament after week 14 completion
+    # ✅ EOS TOURNAMENT: Initialize tournament after week 26 (regular season) completion
     update_fields = {
         "results": existing_results,
         "week": next_week,
@@ -1613,8 +1613,8 @@ def complete_week(req: CompleteWeekRequest):
         "training_status.session_type": "in-season"
     }
     
-    if req.week == 14:
-        # Week 14 complete - initialize EOS Tournament
+    if req.week == ScheduleManager.REGULAR_SEASON_WEEKS:
+        # Regular season complete - initialize EOS Tournament
         # ✅ FTD: Get team IDs from franchise_team_data
         # FTD stores franchise_id as ObjectId (from franchise_manager init); query with ObjectId, not string
         ftd_docs = list(franchise_team_data_collection.find(
@@ -1627,14 +1627,14 @@ def complete_week(req: CompleteWeekRequest):
                 f"⚠️ [EOS TOURNAMENT] Fewer than 8 teams in FTD (got {len(eos_team_ids)}); "
                 "bracket may fail. Proceeding anyway."
             )
-        logger.info(f"🎯 [EOS TOURNAMENT] Week 14 complete, initializing tournament (teams from FTD: {len(eos_team_ids)})")
-        # EOS seeds from franchise.results; ensure week 14 is included before init
+        logger.info(f"🎯 [EOS TOURNAMENT] Regular season complete (week {ScheduleManager.REGULAR_SEASON_WEEKS}), initializing tournament (teams from FTD: {len(eos_team_ids)})")
+        # EOS seeds from franchise.results; ensure regular season weeks are included before init
         franchise_doc["results"] = existing_results
         tournament_state = initialize_eos_tournament(franchise_doc, db.teams, team_ids=eos_team_ids)
         update_fields["eos_tournament"] = tournament_state
         update_fields["eos_tournament_active"] = True
-        logger.info(f"✅ [EOS TOURNAMENT] Tournament initialized, week set to 15")
-    elif req.week in [15, 16, 17]:
+        logger.info(f"✅ [EOS TOURNAMENT] Tournament initialized, week set to {ScheduleManager.REGULAR_SEASON_WEEKS + 1}")
+    elif req.week in [ScheduleManager.REGULAR_SEASON_WEEKS + 1, ScheduleManager.REGULAR_SEASON_WEEKS + 2, ScheduleManager.REGULAR_SEASON_WEEKS + 3]:
         # Tournament week - save game result and advance round if needed
         eos_tournament = franchise_doc.get("eos_tournament", {})
         if eos_tournament:
@@ -1676,7 +1676,7 @@ def complete_week(req: CompleteWeekRequest):
                 update_fields["eos_tournament"] = eos_tournament
                 new_round = eos_tournament.get("current_round", current_round)
                 if new_round > current_round:
-                    update_fields["week"] = 14 + new_round
+                    update_fields["week"] = ScheduleManager.REGULAR_SEASON_WEEKS + new_round
                 else:
                     update_fields["week"] = req.week
                 logger.info(f"✅ [EOS TOURNAMENT] Saved tournament game result for Round {current_round}, Matchup {matchup_index}")
@@ -1943,7 +1943,7 @@ def standings(franchise_id: str, profile: bool = False):
         matchup_map = {}
         eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
         eos_tournament = franchise_doc.get("eos_tournament", {})
-        if eos_tournament_active and eos_tournament and week >= 15:
+        if eos_tournament_active and eos_tournament and week > ScheduleManager.REGULAR_SEASON_WEEKS:
             current_round = eos_tournament.get("current_round", 1)
             round_name = get_round_name(current_round)
             bracket = eos_tournament.get("bracket", {})
@@ -2133,15 +2133,18 @@ def season_schedule(franchise_id: str):
             })
         weeks.append(week_games)
 
-    # ✅ EOS TOURNAMENT: Add tournament games (weeks 15-17) if tournament is active
+    # ✅ EOS TOURNAMENT: Add tournament games (weeks 27–29) if tournament is active
     eos_tournament = franchise_doc.get("eos_tournament")
     eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
-    
+    eos_week_1 = ScheduleManager.REGULAR_SEASON_WEEKS + 1
+    eos_week_2 = ScheduleManager.REGULAR_SEASON_WEEKS + 2
+    eos_week_3 = ScheduleManager.REGULAR_SEASON_WEEKS + 3
+
     if eos_tournament_active and eos_tournament:
         bracket = eos_tournament.get("bracket", {})
         seeds = eos_tournament.get("seeds", {})
         
-        # Week 15: Round 1 (Quarterfinals)
+        # Round 1 (Quarterfinals) = week 27
         round1 = bracket.get("round1", [])
         week15_games = []
         for matchup in round1:
@@ -2156,11 +2159,10 @@ def season_schedule(franchise_id: str):
             
             has_training_report = False
             if team_id and (str(matchup["away_team"]) == team_id or str(matchup["home_team"]) == team_id):
-                # Check if training report exists for week 15
-                has_training_report = "15" in training_reports
+                has_training_report = str(eos_week_1) in training_reports
             
             week15_games.append({
-                "week": 15,
+                "week": eos_week_1,
                 "away_team_id": str(matchup["away_team"]),
                 "home_team_id": str(matchup["home_team"]),
                 "away_score": away_score,
@@ -2174,7 +2176,7 @@ def season_schedule(franchise_id: str):
             })
         weeks.append(week15_games)
         
-        # Week 16: Round 2 (Semifinals)
+        # Round 2 (Semifinals) = week 28
         round2 = bracket.get("round2", [])
         week16_games = []
         for matchup in round2:
@@ -2189,10 +2191,10 @@ def season_schedule(franchise_id: str):
             
             has_training_report = False
             if team_id and (str(matchup["away_team"]) == team_id or str(matchup["home_team"]) == team_id):
-                has_training_report = "16" in training_reports
+                has_training_report = str(eos_week_2) in training_reports
             
             week16_games.append({
-                "week": 16,
+                "week": eos_week_2,
                 "away_team_id": str(matchup["away_team"]),
                 "home_team_id": str(matchup["home_team"]),
                 "away_score": away_score,
@@ -2206,7 +2208,7 @@ def season_schedule(franchise_id: str):
             })
         weeks.append(week16_games)
         
-        # Week 17: Final (Championship)
+        # Final (Championship) = week 29
         final = bracket.get("final", [])
         week17_games = []
         if final and len(final) > 0:
@@ -2222,10 +2224,10 @@ def season_schedule(franchise_id: str):
             
             has_training_report = False
             if team_id and (str(matchup["away_team"]) == team_id or str(matchup["home_team"]) == team_id):
-                has_training_report = "17" in training_reports
+                has_training_report = str(eos_week_3) in training_reports
             
             week17_games.append({
-                "week": 17,
+                "week": eos_week_3,
                 "away_team_id": str(matchup["away_team"]),
                 "home_team_id": str(matchup["home_team"]),
                 "away_score": away_score,
@@ -2239,8 +2241,10 @@ def season_schedule(franchise_id: str):
             })
         weeks.append(week17_games)
     
+    # FCC Schedule tab: team_id -> conference (1–16) for filtering by conference
+    team_conferences = {str(t["_id"]): t.get("conference") for t in db.teams.find({}, {"_id": 1, "conference": 1})}
     logger.info("season_schedule returning franchise_id=%s found=%s", franchise_id, found)
-    return {"schedule": weeks, "team_id": team_id}
+    return {"schedule": weeks, "team_id": team_id, "team_conferences": team_conferences}
 
 
 def get_leaders(
@@ -3125,7 +3129,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     week = franchise_doc.get("week", 1)
     results = franchise_doc.get("results", {})
     
-    if training_status.get("training_disabled_for_eos", False) and week >= 15:
+    if training_status.get("training_disabled_for_eos", False) and week > ScheduleManager.REGULAR_SEASON_WEEKS:
         raise HTTPException(
             status_code=400,
             detail="Training is disabled for remaining EOS weeks after elimination.",
@@ -4050,8 +4054,8 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
     round_name = get_round_name(current_round)
     matchups = bracket.get(round_name, [])
     
-    # Get current week (15, 16, or 17)
-    week = franchise_doc.get("week", 15)
+    # Get current week (27, 28, or 29 = EOS rounds)
+    week = franchise_doc.get("week", ScheduleManager.REGULAR_SEASON_WEEKS + 1)
     
     # Simulate all incomplete matchups in current round
     for i, matchup in enumerate(matchups):
@@ -4119,7 +4123,7 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
     new_round = eos_tournament.get("current_round", current_round)
     payload = {"eos_tournament": eos_tournament}
     if new_round > current_round:
-        payload["week"] = 14 + new_round
+        payload["week"] = ScheduleManager.REGULAR_SEASON_WEEKS + new_round
     db.franchises.update_one(
         {"_id": franchise_id},
         {"$set": payload}
@@ -4165,7 +4169,7 @@ def sim_championship(req: SimChampionshipRequest):
     if not home_name or not away_name:
         raise HTTPException(status_code=400, detail="Could not find team names")
     
-    week = 17  # Championship is always week 17
+    week = ScheduleManager.REGULAR_SEASON_WEEKS + 3  # Championship is always final EOS week
     
     try:
         # Run simulation
