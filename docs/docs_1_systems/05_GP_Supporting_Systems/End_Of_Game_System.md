@@ -35,40 +35,6 @@
 5. **Box Score Navigation**: User can navigate to Box Score page with all context parameters preserved (box score reflects updated team attributes)
 6. **Command Center Navigation**: User can navigate to appropriate Command Center (Tournament, Franchise, or Mode Select) with complete navigation context
 
-### Player Of The Game (POTG) (March 2026)
-
-- POTG is selected deterministically per game (seeded by `game_id`) so popup and box score remain stable across refreshes.
-- Candidate pool: players on both teams from game data (`players` + `box_score` merge).
-- POTG points:
-  - `+2` for each `PTS`, `AST`, `REB` (TREB), `STL`, `BLK`
-  - Defensive bonus only if `DEFA (DEF_A) > 10`:
-    - `+15` if `DEF% > 80`
-    - `+10` if `DEF% > 60`
-    - `+5` if `DEF% > 40`
-- Selection:
-  - If top player leads second by `>= 10` POTG points, top player wins.
-  - Otherwise, random draw from all players tied at/above second-place score.
-  - If contenders include both teams: winning-team contenders get total weight `67%`, losing-team contenders `33%` (split evenly within each side).
-  - If all contenders are on one side, draw evenly across contenders.
-- `DEF%` display is rounded to nearest whole number.
-
-### End-Game Popup POTG Content
-
-- Existing popup design remains unchanged; POTG rows are inserted between final score and CTA buttons:
-  1. Header: `Game Complete!`
-  2. Final score row
-  3. POTG image (centered)
-  4. POTG stats row: `XX PTS  XX REB  XX AST`
-  5. POTG stats row: `XX STL  XX BLK  XX DEF%`
-  6. CTA row: `Box Score` and `Go To Locker Room`
-
-### Box Score POTG Section
-
-- Added below **Quarter Scoring** and above team tabs:
-  - Header (centered): `Player Of The Game`
-  - Row 1 (centered): `{Player Name} - {Player Team}`
-  - Row 2 (centered): `XX PTS  XX REB  XX AST  XX STL  XX BLK  XX DEF%`
-
 ### Final-Turn Resolution Guardrail (February 2026)
 
 - At `0:00`, EOG resolution now follows one consistent rule:
@@ -274,3 +240,30 @@ The End of Game System handles game completion, displays final scores, and provi
 - **Expected log health:**
   - `🧪 [EOG-SNAPSHOT-SOURCES]` should report `teams.totals` or `teams.box_score` (not `none`) for completed games.
   - `🧭 [EOG-GAME-DOC-SELECT]` should show which candidate doc was used and its richness score.
+
+##Player Of The Game##
+Calculate player of the game by assigning each player on boht teams wiht POTG Points with teh follwing scale:
+1. 2 POTG Points for every point scored, assist, rebound, block, and steal
+2. if DEFA > 10:
+  - 15 POTG points if DEF % > 80%
+  - or 10 POTG points if DEF% > 60%
+  - or 5 POTG points if DEF% > 40%
+
+If the top ranking player's POTG points is 16 or more points greater than the second ranking player, then he is the player of the game.
+
+Else, ranomly choose from teh top 2. And if one player is on the winning team and another is on the losing team in teh top 2, the player on the winning team has a 67% chance of being randomly chosen. If the top to players are on teh same team, each player has a 50% chance of being chosen.
+
+End of Game Pop up
+-Header Text: Game Complete!
+- Row 1 (Final Score Row): left team+score vs right team+score
+- Row 2: POTG image (horizontally centered with equal spece between row above and row below it)
+- Row 3: POTG stats "XX PTS  XX Reb  XX Ast" (Reb is TREB)
+- Row 4: POTG stats "XX STL  XX BLK  XX Def%"
+- Row 5: Two CTA buttons (same as currenlty designed)
+Keep all design components of the pop up as is, jsut add the POTG content as instructed above
+
+Also, add "Player Of The Game" section to Box Score at end of game, below the Team Quarterly Scoring and above the two team tabs.
+
+Header, horizontally centered "Player Of The Game"
+Row 1: horizontally centered: "{Player Name} - {Player Team}"
+Row 2 (stats)" XX PTS  XX REB  XX AST  XX STL  XX BLK  XX DEF%"

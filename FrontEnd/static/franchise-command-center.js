@@ -124,6 +124,21 @@ function renderStandings(data) {
   });
 }
 
+let rankingsFullList = [];
+
+function renderRankings(rankings, showAll) {
+  const listEl = document.getElementById('rankings-list');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  if (!rankings || rankings.length === 0) return;
+  const toShow = showAll ? rankings : rankings.slice(0, 25);
+  toShow.forEach((r) => {
+    const li = document.createElement('li');
+    li.textContent = `${r.natl_rank}. ${r.team_name}`;
+    listEl.appendChild(li);
+  });
+}
+
 // Helper function to initialize team color cache
 async function initializeTeamColorCache() {
   if (teamColorCache) return; // Already initialized
@@ -988,6 +1003,25 @@ async function init() {
   }
   
   populateTop(topData);
+  
+  // Rankings tab: store list and render Top 25 by default
+  rankingsFullList = topData.rankings || [];
+  renderRankings(rankingsFullList, false);
+  const btnTop25 = document.getElementById('rankings-toggle-top25');
+  const btnAll128 = document.getElementById('rankings-toggle-all');
+  if (btnTop25 && btnAll128 && !btnTop25.dataset.bound) {
+    btnTop25.dataset.bound = '1';
+    btnTop25.addEventListener('click', () => {
+      renderRankings(rankingsFullList, false);
+      btnTop25.classList.add('active');
+      btnAll128.classList.remove('active');
+    });
+    btnAll128.addEventListener('click', () => {
+      renderRankings(rankingsFullList, true);
+      btnAll128.classList.add('active');
+      btnTop25.classList.remove('active');
+    });
+  }
   
   // Store user team name for leaderboard highlighting
   if (topData && topData.team) {

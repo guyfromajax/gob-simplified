@@ -3,7 +3,7 @@
 ## Base Constants
 
 1. **Core Team Attributes**:
-   - `shot_threshold` - Shot attempt threshold (range: -10 to 190)
+   - `shot_threshold` - Shot attempt threshold (range: 10 to 210)
    - `discipline` - Turnover modifier (formerly `turnover_modifier`)
    - `fight` - Foul modifier (formerly `foul_modifier`)
    - `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-0.4)

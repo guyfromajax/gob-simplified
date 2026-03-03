@@ -71,6 +71,7 @@
         <button data-tab="team-traits-tab">Team Traits</button>
         <button data-tab="recruits-tab">Recruits</button>
         <button data-tab="tournament-tab">Tournament</button>
+        <button data-tab="rankings-tab">Rankings</button>
       </div>
       <div id="standings-tab" class="tab-content active">
         <h3>Team Standings</h3>
@@ -256,6 +257,14 @@
         <div style="width: 100%; overflow-x: auto;">
           <div id="tournament-bracket-container" class="bracket"></div>
         </div>
+      </div>
+      <div id="rankings-tab" class="tab-content">
+        <h3>National Rankings</h3>
+        <div class="rankings-toggle-wrap">
+          <button type="button" id="rankings-toggle-top25" class="rankings-toggle active">Top 25</button>
+          <button type="button" id="rankings-toggle-all" class="rankings-toggle">All 128</button>
+        </div>
+        <ul id="rankings-list" class="rankings-list"></ul>
       </div>
     </div>
   </div>

@@ -1775,11 +1775,15 @@ def command_center_data(
                         team_doc = db.teams.find_one({"_id": ObjectId(team_id)}) or {}
                         ftd = franchise_team_data_collection.find_one(
                             {"franchise_id": fid, "team_id": ObjectId(team_id)},
-                            {"team_attributes": 1}
+                            {"team_attributes": 1, "prestige": 1, "natl_rank": 1}
                         )
                         if ftd:
                             attrs = ftd.get("team_attributes", {})
                             team_doc["team_chemistry"] = attrs.get("team_chemistry", 0)
+                            if "prestige" in ftd:
+                                team_doc["prestige"] = ftd["prestige"]
+                            if "natl_rank" in ftd:
+                                team_doc["rank"] = ftd["natl_rank"]
                         else:
                             team_doc["team_chemistry"] = 0
                     else:
@@ -1814,6 +1818,33 @@ def command_center_data(
         response["intangibles"] = team_doc.get("intangibles", "-")
         response["prestige"] = team_doc.get("prestige", "-")
         response["rank"] = team_doc.get("rank", "-")
+        # Rankings list for Rankings tab: all FTD teams with natl_rank and team name, sorted by natl_rank
+        if franchise_id and franchise_doc:
+            try:
+                fid = franchise_doc["_id"]
+                ftd_rank_docs = list(franchise_team_data_collection.find(
+                    {"franchise_id": fid},
+                    {"team_id": 1, "natl_rank": 1}
+                ))
+                if ftd_rank_docs:
+                    team_ids = [d["team_id"] for d in ftd_rank_docs if d.get("team_id") is not None]
+                    teams_names = {str(t["_id"]): t.get("name", "?") for t in db.teams.find(
+                        {"_id": {"$in": team_ids}},
+                        {"name": 1}
+                    )}
+                    rankings = [
+                        {"natl_rank": d.get("natl_rank", 128), "team_name": teams_names.get(str(d["team_id"]), "?")}
+                        for d in ftd_rank_docs
+                    ]
+                    rankings.sort(key=lambda x: x["natl_rank"])
+                    response["rankings"] = rankings
+                else:
+                    response["rankings"] = []
+            except Exception as e:
+                logger.debug("rankings for FCC: %s", e)
+                response["rankings"] = []
+        else:
+            response["rankings"] = []
         response["username"] = state.get("username", "Coach")
         response["seed"] = state.get("seed", 1)
         response["training_completed"] = training_completed
